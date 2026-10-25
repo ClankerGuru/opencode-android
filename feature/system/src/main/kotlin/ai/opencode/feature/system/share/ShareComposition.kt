@@ -149,8 +149,20 @@ object ShareComposition {
         if (images > 0) parts.add(if (images == 1) "1 image" else "$images images")
         if (files > 0) parts.add(if (files == 1) "1 file" else "$files files")
         val first = text.split(NEWLINES).firstOrNull { it.isNotEmpty() }?.trim() ?: ""
-        val line = if (first.length > 120) first.take(119) + "…" else first
+        val line = clippedCharacters(first, 120)
         return (listOf(line).filter { it.isNotEmpty() } + parts).joinToString(" · ")
+    }
+
+    /** iOS `count > limit ? prefix(limit - 1) + "…"`, counting grapheme clusters (Swift `Character`s). */
+    private fun clippedCharacters(text: String, limit: Int): String {
+        val breaks = java.text.BreakIterator.getCharacterInstance().apply { setText(text) }
+        val boundaries = ArrayList<Int>()
+        while (boundaries.size <= limit) {
+            val next = breaks.next()
+            if (next == java.text.BreakIterator.DONE) return text
+            boundaries += next
+        }
+        return text.substring(0, boundaries[limit - 2]) + "…"
     }
 
     /** Swift's `Character.isNewline`. */

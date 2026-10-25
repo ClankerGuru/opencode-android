@@ -82,7 +82,7 @@ class AskOpenCodeActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        if (savedInstanceState == null) model.start(intent)
+        if (savedInstanceState == null) model.start(intent, sendsAtOnce = AppActionActivity.isAssistant(this))
         setContent {
             OpenCodeAppTheme {
                 val state by model.state.collectAsStateWithLifecycle()
@@ -115,7 +115,12 @@ class AskOpenCodeModel : ViewModel() {
     val state: StateFlow<State> = mutableState.asStateFlow()
     private var sending: Job? = null
 
-    fun start(intent: Intent) {
+    /**
+     * [sendsAtOnce]: the message came from an assistant, which has already confirmed it (as
+     * Siri's parameter does). Any other app's text only fills the field, so nothing is sent
+     * on another app's say-so.
+     */
+    fun start(intent: Intent, sendsAtOnce: Boolean) {
         val context = dependency(AppContext)
         val directory = SessionDirectory.loadOrEmpty(SessionDirectory.file(context.filesDir))
         val sessions = directory.suggestedSessionEntities()
@@ -123,7 +128,7 @@ class AskOpenCodeModel : ViewModel() {
             ?.let { directory.sessionEntities(listOf(it)).firstOrNull() }
         val text = intent.getStringExtra(Intent.EXTRA_TEXT).orEmpty()
         mutableState.value = State(message = text, sessions = sessions, session = chosen ?: SessionQuery.defaultResult(directory))
-        if (text.isNotBlank()) send()
+        if (sendsAtOnce && text.isNotBlank()) send()
     }
 
     fun update(transform: (State) -> State) = mutableState.update { if (it.isSending) it else transform(it) }
@@ -178,6 +183,9 @@ private fun AskOpenCodeView(
                 .clickable(onClick = {}, indication = null, interactionSource = null),
             shape = MaterialTheme.shapes.extraLarge,
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            // Explicit: `contentColorFor` matches roles by value, and in the dark themes the
+            // container shares its colour with a role whose content colour is dim.
+            contentColor = MaterialTheme.colorScheme.onSurface,
             tonalElevation = 6.dp,
         ) {
             Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -252,6 +260,7 @@ private fun SessionPicker(
             enabled = !state.isSending,
             shape = MaterialTheme.shapes.medium,
             color = MaterialTheme.colorScheme.surfaceContainerHighest,
+            contentColor = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
         ) {
             Row(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {

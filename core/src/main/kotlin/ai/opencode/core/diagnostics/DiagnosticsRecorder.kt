@@ -162,6 +162,30 @@ data class DiagnosticsNetworkAddress(val family: DiagnosticsAddressFamily, val s
     }
 }
 
+/**
+ * iOS `DiagnosticsNetworkPhases`: timestamp evidence only; a missing phase stays unknown. TLS
+ * is nested in connect, so an unfinished handshake takes precedence over unfinished TCP.
+ * Timestamps are any monotonic reading (OkHttp `EventListener` callbacks use `System.nanoTime`).
+ */
+data class DiagnosticsNetworkPhases(
+    var dnsStart: Long? = null, var dnsEnd: Long? = null,
+    var connectStart: Long? = null, var connectEnd: Long? = null,
+    var tlsStart: Long? = null, var tlsEnd: Long? = null,
+    var requestStart: Long? = null, var requestEnd: Long? = null,
+    var responseStart: Long? = null, var responseEnd: Long? = null,
+) {
+    val unfinished: DiagnosticsFailurePhase?
+        get() = when {
+            dnsStart != null && dnsEnd == null -> DiagnosticsFailurePhase.Dns
+            tlsStart != null && tlsEnd == null -> DiagnosticsFailurePhase.Tls
+            connectStart != null && connectEnd == null -> DiagnosticsFailurePhase.Tcp
+            requestStart != null && requestEnd == null -> DiagnosticsFailurePhase.RequestWrite
+            requestEnd != null && responseStart == null -> DiagnosticsFailurePhase.Ttfb
+            responseStart != null && responseEnd == null -> DiagnosticsFailurePhase.BodyRead
+            else -> null
+        }
+}
+
 /** One request's transport timings (iOS `URLSessionTaskMetrics`, from OkHttp's `EventListener`). */
 data class DiagnosticsNetworkMetrics(
     val wireBytes: Long? = null,

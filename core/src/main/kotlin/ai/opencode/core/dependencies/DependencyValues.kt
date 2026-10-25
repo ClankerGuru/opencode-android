@@ -85,10 +85,29 @@ class DependencyValues private constructor(
             if (liveCache.containsKey(key)) liveCache[key] as T else key.liveValue.also { liveCache[key] = it }
         }
 
-        /** The process root: live values plus whatever the Application installed at startup. */
+        /**
+         * swift-dependencies' `isTesting`: true in JVM unit tests (JUnit on the classpath and
+         * not running on ART), so code outside a `TestStore` resolves `testValue`s too and a
+         * test never reaches live storage or the network by accident.
+         */
+        val isProcessTesting: Boolean =
+            System.getProperty("java.vm.name") != "Dalvik" &&
+                runCatching { Class.forName("org.junit.runner.Runner") }.isSuccess
+
+        /** The process root: live values (test values under unit tests) plus what the Application installed. */
         @Volatile
-        var root: DependencyValues = DependencyValues(emptyMap(), isTesting = false, HashMap())
+        var root: DependencyValues = DependencyValues(emptyMap(), isTesting = isProcessTesting, HashMap())
             private set
+
+        /**
+         * Forgets the root's resolved `testValue`s and installed overrides (iOS test isolation's
+         * `cachedValues.resetCache()` after each test), so no test sees another's clients.
+         * Only under unit tests.
+         */
+        fun resetTestCache() {
+            check(isProcessTesting) { "resetTestCache() is for unit tests" }
+            root = DependencyValues(emptyMap(), isTesting = true, HashMap())
+        }
 
         /** Installs process-wide overrides (only `Application.onCreate`, e.g. the app [android.content.Context]). */
         fun installRoot(block: Builder.() -> Unit) {

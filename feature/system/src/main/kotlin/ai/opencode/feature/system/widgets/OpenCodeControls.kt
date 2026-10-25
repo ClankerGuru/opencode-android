@@ -242,7 +242,8 @@ private fun ControlButton(symbol: SFSymbol, title: String, detail: String?, desc
         Column(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 title,
-                maxLines = 1,
+                // Without a detail line the title may wrap rather than cut off (large text).
+                maxLines = if (detail.isNullOrEmpty()) 2 else 1,
                 style = TextStyle(color = GlanceTheme.colors.onSecondaryContainer, fontSize = 15.sp, fontWeight = FontWeight.Medium),
             )
             if (!detail.isNullOrEmpty()) {

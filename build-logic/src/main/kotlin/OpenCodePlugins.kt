@@ -86,6 +86,8 @@ class OpenCodeFeaturePlugin : Plugin<Project> {
             add("debugImplementation", libs.findLibrary("compose-ui-tooling").get())
             add("implementation", libs.findLibrary("androidx-lifecycle-runtime-compose").get())
             add("implementation", libs.findLibrary("kotlinx-serialization-json").get())
+            // TestIsolationGuard, WireFixture and the network block (see AGENTS.md "Tests").
+            add("testImplementation", testFixtures(project(":server")))
         }
     }
 }

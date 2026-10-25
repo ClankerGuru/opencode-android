@@ -9,8 +9,16 @@ import com.google.firebase.messaging.RemoteMessage
 
 /**
  * FCM, the push channel behind [PushTokenProvider] (iOS: APNs and its delegate callbacks).
- * Inert without a Firebase configuration: with no `google-services.json` in the build no
- * `FirebaseApp` exists, so [FcmPushTokenProvider] fails at once and this service never runs.
+ * Inert without a Firebase configuration: Firebase's init provider makes the default
+ * `FirebaseApp` from the `google_app_id`, `gcm_defaultSenderId`, `google_api_key` and
+ * `project_id` string resources (what the google-services plugin generates; plain resources
+ * in `:app` work too). None ship, so no `FirebaseApp` exists, [FcmPushTokenProvider] fails at
+ * once and this service never runs.
+ *
+ * The relay is expected to send a data-only, high-priority FCM message whose `data` is the
+ * APNs alert's fields (`title`, `body`, `sessionID`, `status`, `ref`), so the app builds the
+ * notification itself ([SessionPushNotifications]: the In-App Notices rule, the visible
+ * session, the badge count) whether it runs or not.
  */
 class OpenCodeMessagingService : FirebaseMessagingService() {
     override fun onNewToken(token: String) {
@@ -26,8 +34,7 @@ class OpenCodeMessagingService : FirebaseMessagingService() {
 /** The FCM token, when the build carries a Firebase configuration. */
 class FcmPushTokenProvider(private val context: Context) : PushTokenProvider {
     override fun register(onToken: (String) -> Unit, onFailure: () -> Unit) {
-        val configured = runCatching { FirebaseApp.getApps(context).isNotEmpty() }.getOrDefault(false)
-        if (!configured) return onFailure()
+        if (!isConfigured(context)) return onFailure()
         runCatching {
             FirebaseMessaging.getInstance().token
                 .addOnSuccessListener { token -> if (token.isNullOrEmpty()) onFailure() else onToken(token) }
@@ -36,5 +43,11 @@ class FcmPushTokenProvider(private val context: Context) : PushTokenProvider {
                     onFailure()
                 }
         }.onFailure { onFailure() }
+    }
+
+    companion object {
+        /** Whether the build carries a Firebase configuration, so FCM can mint tokens. */
+        fun isConfigured(context: Context): Boolean =
+            runCatching { FirebaseApp.getApps(context).isNotEmpty() }.getOrDefault(false)
     }
 }

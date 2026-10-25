@@ -369,6 +369,10 @@ class ShareSender(
             is PortUnreachableException, is SocketException, is SSLException -> true
             // OkHttp's whole-call timeout.
             is InterruptedIOException -> true
+            // A connection lost mid-request ("unexpected end of stream", a reset stream): iOS
+            // `.networkConnectionLost` and the bare POSIX errors. A malformed reply isn't one.
+            is java.net.ProtocolException -> false
+            is java.io.IOException -> true
             else -> false
         }
 

@@ -9,6 +9,7 @@ import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.ServerSharedKeys
+import ai.opencode.server.sendPromptConfirming
 import ai.opencode.server.model.OpenCodeDelivery
 import ai.opencode.server.retry.RetryBudget
 import ai.opencode.feature.system.share.ShareSendRequest
@@ -82,7 +83,7 @@ object SystemPromptSender {
                 if (project != null) {
                     sessionID = client.createSession(server, project.directory, ShareSendRequest.newSessionID()).id
                 }
-                client.sendDeliveredPrompt(server, sessionID, trimmed, delivery)
+                client.sendPromptConfirming(server, sessionID, trimmed, delivery)
             }
         } catch (error: OpenCodeClientError) {
             throw Failure("Couldn’t send to OpenCode. ${error.message}")
