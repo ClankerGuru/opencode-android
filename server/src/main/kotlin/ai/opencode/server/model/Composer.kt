@@ -296,6 +296,55 @@ object AttachmentFileType {
         return trimmed.ifEmpty { "file" }
     }
 
+    const val PDF_MIME = "application/pdf"
+
+    /** The chip subtitle: "PDF", a language name, or the extension in capitals. */
+    fun label(name: String, mime: String): String {
+        if (mime == PDF_MIME) return "PDF"
+        val suffix = fileExtension(name)
+        if (suffix.isEmpty()) return "File"
+        return languageNames[suffix] ?: suffix.uppercase()
+    }
+
+    /** The SF Symbol name for a file chip (`OpenCodeIcon("sf.name")` maps it). */
+    fun symbolName(name: String, mime: String): String {
+        if (mime == PDF_MIME) return "doc.richtext"
+        if (mime.startsWith("image/")) return "photo"
+        if (mime.startsWith("video/")) return "film"
+        if (mime.startsWith("audio/")) return "waveform"
+        if (mime == "text/plain") {
+            return if (languageNames[fileExtension(name)] == null) "doc.text" else "chevron.left.forwardslash.chevron.right"
+        }
+        // iOS checks UTType conformance to archive / spreadsheet / presentation.
+        if (mime in archiveMimes) return "doc.zipper"
+        if (mime in spreadsheetMimes) return "tablecells"
+        if (mime in presentationMimes) return "rectangle.on.rectangle"
+        return "doc"
+    }
+
+    private val archiveMimes = setOf(
+        "application/zip", "application/gzip", "application/x-tar", "application/x-bzip2",
+        "application/x-7z-compressed", "application/vnd.rar", "application/x-xz",
+    )
+    private val spreadsheetMimes = setOf(
+        "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/x-iwork-numbers-sffnumbers", "application/vnd.oasis.opendocument.spreadsheet",
+    )
+    private val presentationMimes = setOf(
+        "application/vnd.ms-powerpoint", "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "application/x-iwork-keynote-sffkey", "application/vnd.oasis.opendocument.presentation",
+    )
+
+    /** The common subset of the language names desktop takes from Shiki. */
+    private val languageNames: Map<String, String> = mapOf(
+        "c" to "C", "cjs" to "JavaScript", "cpp" to "C++", "cs" to "C#", "css" to "CSS", "dart" to "Dart",
+        "go" to "Go", "html" to "HTML", "java" to "Java", "js" to "JavaScript",
+        "json" to "JSON", "jsx" to "JSX", "kt" to "Kotlin", "lua" to "Lua", "md" to "Markdown", "mjs" to "JavaScript",
+        "php" to "PHP", "py" to "Python", "rb" to "Ruby", "rs" to "Rust", "sh" to "Shell", "sql" to "SQL",
+        "swift" to "Swift", "toml" to "TOML", "ts" to "TypeScript", "tsx" to "TSX",
+        "xml" to "XML", "yaml" to "YAML", "yml" to "YAML", "zsh" to "Zsh",
+    )
+
     /** The lowercased extension of the last path component; a leading dot is a dotfile, not an extension. */
     fun fileExtension(name: String): String {
         val base = name.split("/").lastOrNull() ?: name

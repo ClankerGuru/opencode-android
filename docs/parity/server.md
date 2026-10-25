@@ -37,7 +37,7 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 | `OpenCodePendingRequests.swift` | `model/PendingRequests.kt` | done | `filePreview` returns `Pair(file, patch)` |
 | `OpenCodeReadCache.swift` | `live/OpenCodeReadCache.kt` | done | Locks + `Semaphore` permits; joined in-flight lookups, last waiter cancels |
 | `OpenCodeServer.swift` | `OpenCodeServer.kt`, `internal/Urls.kt` | done | `authorize(Request.Builder)`; `endpoint` returns `HttpUrl`; `HostAddress` parses IPv4/IPv6 like `inet_pton`; plus `httpClient(base)` (OkHttp client that authorizes this server's origins, for image loaders/players). OkHttp rejects non-ASCII/control header values URLSession would send: such custom headers are skipped |
-| `OpenCodeToolCall.swift` | `model/OpenCodeJSONValue.kt`, `model/OpenCodeToolCall.kt` | partial: no `fileReference` | `fileReference` needs `AgentFileReference` (`:feature:media`); `inputPath` is exposed for it. String helpers `nonEmpty`/`firstLine`/`bounded` are here |
+| `OpenCodeToolCall.swift` | `model/OpenCodeJSONValue.kt`, `model/OpenCodeToolCall.kt` | done | `fileReference` uses `AgentFileReference`, which moved down to `:server` (`model/AgentFileReference.kt`; see media.md). String helpers `nonEmpty`/`firstLine`/`bounded` are here |
 | `OpenCodeTranscriptItem.swift` | `model/OpenCodeTranscriptItem.kt` | done | Sealed interface, `@Serializable` (cache); see Markdown deviation above |
 | `OpenCodeTransport.swift` | `OpenCodeTransport.kt` | done | OkHttp pools; event stream 90 s idle timeouts |
 

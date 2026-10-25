@@ -13,7 +13,7 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 | `OpenCode/Browser/BrowserWebViews.swift` | 368 | | todo | |
 | `OpenCode/Browser/LinkMenu.swift` | 635 | | todo | |
 | `OpenCode/Media/AgentFiles/AgentFileLoader.swift` | 432 | | todo | |
-| `OpenCode/Media/AgentFiles/AgentFileReference.swift` | 354 | | todo | |
+| `OpenCode/Media/AgentFiles/AgentFileReference.swift` | 354 | `server/.../model/AgentFileReference.kt` | done | moved down to `:server` so `OpenCodeToolCall.fileReference` can use it; UTType lookups → fixed extension→MIME table; `init?(linkURL:)` → `fromLinkURL` |
 | `OpenCode/Media/AgentFiles/AgentFileViewer.swift` | 1181 | | todo | |
 | `OpenCode/Media/AgentFiles/AgentImageBento.swift` | 352 | | todo | |
 | `OpenCode/Media/AgentFiles/AgentImageGallery.swift` | 637 | | todo | |
