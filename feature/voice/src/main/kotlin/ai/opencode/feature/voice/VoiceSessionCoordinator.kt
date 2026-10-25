@@ -84,8 +84,9 @@ class VoiceSessionLifecycle<E, C, A> {
 abstract class VoiceSessionCoordinator<E, C, A>(
     val timing: VoiceCallTiming = VoiceCallTiming.live,
     val diagnostics: VoiceCallDiagnostics = dependency(VoiceCallDiagnostics),
+    /** The actor's single lane. Tests pass their virtual-time dispatcher (iOS runs the actor on real time). */
+    internal val dispatcher: CoroutineDispatcher = Dispatchers.Default.limitedParallelism(1),
 ) : VoiceCallTestingCoordinator {
-    internal val dispatcher = Dispatchers.Default.limitedParallelism(1)
     private val rtcAudio = VoiceRTCAudioContext()
     private val values = DependencyValues.current.with(VoiceRTCAudioContext, rtcAudio)
     internal val scope = CoroutineScope(SupervisorJob() + dispatcher + values.asContextElement())

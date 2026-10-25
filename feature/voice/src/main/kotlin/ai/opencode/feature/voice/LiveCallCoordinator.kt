@@ -13,7 +13,8 @@ class LiveCallCoordinator(
     timing: VoiceCallTiming = VoiceCallTiming.live,
     diagnostics: VoiceCallDiagnostics = dependency(VoiceCallDiagnostics),
     callLogMarker: ((String) -> Unit)? = null,
-) : VoiceSessionCoordinator<LiveServerEvent, LiveCommand, LiveCallCoordinator.PendingAppend>(timing, diagnostics) {
+    dispatcher: CoroutineDispatcher = Dispatchers.Default.limitedParallelism(1),
+) : VoiceSessionCoordinator<LiveServerEvent, LiveCommand, LiveCallCoordinator.PendingAppend>(timing, diagnostics, dispatcher) {
     data class Utterance(val id: String, val rawText: String, val startMilliseconds: Int?, val endMilliseconds: Int?,
         val delegated: Boolean = false, val userWordsBefore: Duration? = null)
     internal data class Acknowledgement(val offset: Int?, var utteranceID: String? = null, var deadline: Job? = null)
