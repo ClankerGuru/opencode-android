@@ -1,5 +1,14 @@
 package ai.opencode.feature.session
 
+import androidx.activity.compose.LocalActivity
+import androidx.compose.foundation.draganddrop.dragAndDropTarget
+import androidx.compose.foundation.border
+import androidx.compose.ui.draganddrop.DragAndDropEvent
+import androidx.compose.ui.draganddrop.DragAndDropTarget
+import androidx.compose.ui.draganddrop.toAndroidDragEvent
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.draw.alpha
 import ai.opencode.feature.composer.DictationLatency
 import ai.opencode.feature.composer.DictationDrag
 import ai.opencode.feature.composer.RequestBar
@@ -60,7 +69,6 @@ import kotlinx.coroutines.flow.map
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -99,7 +107,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -160,12 +167,28 @@ class SessionComposerHost {
     var pendingAttachmentsRow: (@Composable () -> Unit)? by mutableStateOf(null)
     /** Model Picker › Grow from Composer: the chip's level stack and label flight (iOS `modelPickerAnchors`). */
     var modelPickerAnchors: ai.opencode.feature.composer.modelpicker.ModelPickerAnchors? by mutableStateOf(null)
-    /** A panel grown out of the composer (model list, level panel) stands over what sits above it. */
-    var composerPanelCovers by mutableStateOf(false)
+    /** Grow from Composer's panels (iOS `modelList`, `modelSheet`, `levelPanel`), set by `SessionModelPickerOverlays`. */
+    internal var modelPanels: SessionModelPanels? by mutableStateOf(null)
+    /** Composer Autocomplete's suggestions are open (iOS `autocompleteController.isOpen`), set by the composer. */
+    internal var autocompleteCovers by mutableStateOf(false)
+    /** iOS `composerPanelCovers`: a panel grown out of the composer (model list, level panel, suggestions) stands over what sits above it. */
+    val composerPanelCovers: Boolean get() = modelPanels?.covers == true || autocompleteCovers
     /** The model list or level panel is shown: the composer stays expanded under it. */
-    var keepsComposerExpanded by mutableStateOf(false)
-    /** A control outside this file owns downward drags now (iOS `composerSwipeYields`' panels). */
-    var swipeYields by mutableStateOf(false)
+    val keepsComposerExpanded: Boolean get() = modelPanels?.keepsComposerExpanded == true
+    /** A panel or overlay owns downward drags now (iOS `composerSwipeYields`' panels). */
+    val swipeYields: Boolean get() = modelPanels?.swipeYields == true
+    /** A call's bar holds the composer's place (iOS `callStore != nil && !floatsCall && !usesCallTray`). */
+    internal var callHoldsComposer by mutableStateOf(false)
+    /** iOS `UIAccessibility.post(.announcement)`, set by the composer (the view announces). */
+    internal var announcer: (String) -> Unit = {}
+
+    /** iOS `UIAccessibility.post(notification: .announcement, argument:)`. */
+    fun announce(text: String) = announcer(text)
+
+    /** iOS `openModelList` (the Grow from Composer chip): the model list grows out of the composer. */
+    fun openModelList() {
+        modelPanels?.openModelList()
+    }
     /** The screen's imports (iOS `imageImporter`/`fileImporter`): pastes and drops on the field start them. */
     var importer: SessionAttachmentImporter? by mutableStateOf(null)
     /**
@@ -237,9 +260,23 @@ internal class SessionComposerViewState {
     var surfaceSize by mutableStateOf(androidx.compose.ui.geometry.Size.Zero)
     /** The composer area's height (dp), for the request panel's cap. */
     var areaHeight by mutableFloatStateOf(0f)
-    /** iOS `requestPanelHeight`: the panel's measured height (dp), and what the surface shows of it. */
+    /** iOS `requestPanelHeight`'s model value: the panel's measured height (dp). */
     var requestPanelHeight by mutableFloatStateOf(0f)
+    /** iOS `requestPanelHeight` as drawn: animated as iOS's `withAnimation` changes it (dp). */
+    val requestPanelShown = androidx.compose.animation.core.Animatable(0f)
+    /** How much of the panel's height the surface reveals (1 docked or lingering, folding to 0 as it leaves). */
+    val requestPanelReveal = androidx.compose.animation.core.Animatable(0f)
     val requestPanelEasing = RequestPanelFit.Easing()
+    /** iOS `requestRoomHeld`, `requestPanelLingers`, `requestPanelIdentity`, `requestPanelLeaveTask`. */
+    var requestRoomHeld by mutableStateOf(false)
+    var requestPanelLingers by mutableStateOf(false)
+    var requestPanelIdentity by mutableStateOf<SessionFeature.State.TaskIdentity?>(null)
+    var requestPanelLeaveJob: Job? = null
+    /** The bar's and the capsule's (bar plus the panel's room) heights, dp (iOS `requestPanelMeasures`). */
+    var barHeight by mutableFloatStateOf(0f)
+    var capsuleHeight by mutableFloatStateOf(0f)
+    /** iOS `isImageDropTargeted`. */
+    var isImageDropTargeted by mutableStateOf(false)
 }
 
 /** iOS `composerPresentation`'s tuple. */
@@ -411,6 +448,7 @@ fun SessionComposer(
         callShowsCaptions = callShowsCaptions,
         callTray = if (usesCallTray) callTray else null,
         callOwnsAudio = callStore != null && !callShowsCard,
+        photoSheet = LocalSessionPhotoSheet.current?.takeIf { it.usesPlusMenuSheet },
     )
 
     // iOS `attachComposerAutocomplete`: the controller follows the reducer's state and the composer's size.
@@ -427,6 +465,14 @@ fun SessionComposer(
     )
     host.focusAction = env.focus
     host.dismissAction = env.dismissKeyboard
+    SideEffect {
+        host.autocompleteCovers = usesAutocomplete && view.autocompleteController.isOpen
+        host.callHoldsComposer = env.voiceStore != null
+    }
+    // A request docking, a call taking the composer's place, or dictation taking the composer
+    // closes what grew out of it (iOS `closeModelPanels()` on each).
+    LaunchedEffect(env.docksRequest) { if (env.docksRequest) host.modelPanels?.closeModelPanels() }
+    LaunchedEffect(env.voiceStore != null) { if (env.voiceStore != null) host.modelPanels?.closeModelPanels() }
 
     // A share or quote continued in OpenCode lands with the keyboard up (iOS `composerFocusRequest`,
     // handled here because the composer owns the field). Catch Up's cards never take it.
@@ -438,6 +484,7 @@ fun SessionComposer(
     }
     // iOS `resetDictationPresentation()` and the hold's `onChange`.
     val recordingNow = snapshot.isPreparingDictation || snapshot.isDictating || snapshot.dictationHold != null
+    LaunchedEffect(recordingNow) { if (recordingNow) host.modelPanels?.closeModelPanels() }
     LaunchedEffect(snapshot.taskIdentity) {
         view.dictationRetention = view.dictationRetention.syncIdentity(snapshot.taskIdentity, snapshot.dictationHold, recordingNow)
         if (snapshot.dictationHold == null) {
@@ -529,6 +576,8 @@ internal class SessionComposerEnv(
     val callTray: CallTrayController? = null,
     /** iOS `callOwnsAudio`: the screen's call (its own or its root's) owns audio. */
     val callOwnsAudio: Boolean = false,
+    /** The New Plus Menu's sheet and flights (iOS `usesPlusMenuSheet ? photoSheet…`), else null. */
+    val photoSheet: SessionPhotoSheetState? = null,
 ) {
     /** iOS `usesCallTray` (`callPresentation == .tray`). */
     val usesCallTray: Boolean get() = callTray != null
@@ -541,7 +590,7 @@ internal class SessionComposerEnv(
      * With the tray, a request's panel holding the composer keeps it shut.
      */
     val showsCallTranscript: Boolean
-        get() = callShowsCaptions && (!usesCallTray || (!docksRequest && view.requestPanelHeight <= 0f))
+        get() = callShowsCaptions && (!usesCallTray || (!docksRequest && !holdsRequestPanelRoom && !lingersRequestPanel))
 
     /** iOS `hasCall`: the screen's own call or its root's. */
     val hasCall: Boolean get() = s.hasCall || callStore != null
@@ -565,7 +614,9 @@ internal class SessionComposerEnv(
     /** iOS `canSend`: mid-run sends steer; Send stays available while files upload. */
     val canSend: Boolean get() = s.hasPromptContent && !s.hasFailedFiles
 
-    private val hasComposerAttachments: Boolean get() = s.hasNonLocationAttachments || s.wantsLocationAttachment
+    internal val hasComposerAttachments: Boolean
+        get() = s.hasNonLocationAttachments || s.wantsLocationAttachment ||
+            photoSheet?.flights?.reservedAttachments?.isNotEmpty() == true
 
     /** iOS `docksRequest`: answering a request, its panel grows out of the composer (never under a call). */
     val docksRequest: Boolean get() = voiceStore == null && s.isAnsweringRequest
@@ -587,15 +638,21 @@ internal class SessionComposerEnv(
             val dictationActive = (s.isDictating || s.isFinishingDictation) && !holding
             // Answering a request, the field stays on the control row; a draft keeps its control
             // row showing, so the model is at hand.
+            val sheet = photoSheet
+            // The + menu keeps the composer open only when it'll hand the keyboard back.
+            val menuKeepsOpen = host.isAttachmentMenuOpen && (sheet == null || sheet.attachmentMenuRestoresFocus)
             val expanded = !s.isAnsweringRequest && (
                 s.isDraft || messageFieldFocused || dictationActive || s.draft.isNotEmpty() ||
-                    hasComposerAttachments || s.dictationError != null || host.keepsComposerExpanded || host.isAttachmentMenuOpen
+                    hasComposerAttachments || s.dictationError != null || host.keepsComposerExpanded || menuKeepsOpen ||
+                    (sheet != null && ((sheet.morph.isShown && sheet.restoresFocus) || sheet.flights.isFlying))
                 )
+            // Photos still decoding already count: their slots are in the row.
+            val hasReservedPhotos = sheet != null && sheet.flights.reservedAttachments.isNotEmpty()
             val controls = ComposerControls.make(
                 isDictating = s.isDictating && !holding,
                 isFinishing = s.isFinishingDictation && !holding,
                 isRunning = s.isRunning,
-                canSend = canSend,
+                canSend = canSend || (hasReservedPhotos && !s.hasFailedFiles),
                 expanded = expanded,
                 canCall = (showsVoiceControl || (usesCallTray && (callOwnsAudio || holdsCallTrayButton))) && !s.hasPromptContent,
             )
@@ -645,6 +702,8 @@ internal class SessionComposerEnv(
     /** iOS `composerSwipeYields(from:)`: a touch another control owns. */
     fun composerSwipeYields(start: Offset?): Boolean {
         if (Companion.composerSwipeYields(dictationHold = s.dictationHold, attachmentMenuOpen = host.isAttachmentMenuOpen, panelsShown = host.swipeYields)) return true
+        // The call's bar shares the surface: its drags never raise or dismiss the keyboard.
+        if (voiceStore != null) return true
         if (start == null) return false
         val mic = view.dictationMicFrame
         return mic != Rect.Zero && mic.inflate(4f).contains(start)
@@ -868,6 +927,7 @@ private fun SessionComposerEnv.QueuedActivity(hasQueued: Boolean) {
             title = "$count queued",
             rolls = true,
             onClick = { view.showsQueuedMessages = true },
+            onClickLabel = "Shows messages waiting for this response to finish",
             modifier = Modifier
                 // A queued send's words shrink into it (iOS `scrollEdgeBridge.queuedPillFrame`).
                 .onGloballyPositioned { host.queuedPillFrame = it.boundsInWindow() }
@@ -887,93 +947,277 @@ private fun SessionComposerEnv.QueuedActivity(hasQueued: Boolean) {
 // region Capsule
 
 /**
- * iOS `composerCapsule`: the composer on its surface, the swipes that raise or dismiss the
- * keyboard, and the hold layer above it. Android: the surface is an M3 tonal container.
+ * iOS `composerCapsule`: the composer and a call share one surface ([VoiceCallSurface]): starting
+ * or ending a call swaps what's inside it, + becoming Mute and the call button End, and the call's
+ * transcript grows out of the same surface. A pending request's panel grows up out of it too,
+ * drawn above the bar in the room the capsule makes for it (`padding(top = requestPanelRoom)`),
+ * which stays until the surface has folded, so nothing under the panel moves while it shows.
  */
 @Composable
 private fun SessionComposerEnv.ComposerCapsule() {
-    // A pending request's panel grows up out of the composer on its surface; with Composer
-    // Autocomplete on (and no panel or call), the suggestions grow there instead.
-    val showsAutocomplete = usesAutocomplete && !docksRequest && view.requestPanelHeight <= 0f && voiceStore == null
-    // The composer and a call share one place: starting or ending a call swaps what stands there,
-    // + becoming Mute and the call button End, and the call's transcript grows out of its surface.
+    RequestPanelPresence()
+    val showsRequestPanel = holdsRequestPanelRoom || lingersRequestPanel
+    // With Composer Autocomplete on (and no panel or call), the suggestions grow there instead.
+    val showsAutocomplete = usesAutocomplete && !showsRequestPanel && voiceStore == null
+    val photoSheet = LocalSessionPhotoSheet.current?.takeIf { it.usesPlusMenuSheet }
+    val density = LocalDensity.current
+    val cap = requestPanelCap()
+    val activeHeight = activeRequestPanelHeight(cap)
+    val room = if (voiceStore == null && showsRequestPanel) activeHeight else 0f
     // iOS `.callTrayHost(…)`: in the Call Tray style the composer stays and the tray splits out
-    // beneath it. Android draws the composer's own surface, so the tray never merges it.
+    // beneath it, merging the composer's surface into its own while nothing else grows out of it.
     CallTrayHost(
         controller = callTray,
         store = callStore,
         isEnabled = usesCallTray && !s.isCovered,
         isFocused = messageFieldFocused,
         reducedMotion = reducedMotion,
-        allowsMergedComposerGlass = false,
-        isRequestDocked = docksRequest || view.requestPanelHeight > 0f,
+        allowsMergedComposerGlass = voiceStore == null &&
+            !docksRequest && !holdsRequestPanelRoom && !lingersRequestPanel &&
+            host.modelPanels?.holdsComposerGlass != true &&
+            !(photoSheet != null && (photoSheet.morph.isOpen || photoSheet.morph.isShown)),
+        isRequestDocked = docksRequest || holdsRequestPanelRoom || lingersRequestPanel,
+        // iOS `closeOthersForModelPanel()` + `closeModelPanels()`.
         onExpandTranscript = {
             host.closeAttachmentMenu()
-            host.modelPickerAnchors?.resetFusedState()
+            host.modelPanels?.closeOthersForModelPanel()
+            host.modelPanels?.closeModelPanels() ?: host.modelPickerAnchors?.resetFusedState()
         },
     ) {
-        AnimatedContent(
-            targetState = voiceStore,
-            contentKey = { it != null },
-            transitionSpec = {
-                val spec: androidx.compose.animation.core.FiniteAnimationSpec<Float> = if (reducedMotion) Motion.easeInOut(0.2) else MotionSpring(0.32).spec()
-                fadeIn(spec) togetherWith fadeOut(spec) using SizeTransform(clip = false)
-            },
-            label = "composerCallSwap",
-        ) { call ->
-            if (call != null) {
-                VoiceCallSurface(call, Modifier.fillMaxWidth()) { VoiceCallComposer(call) }
-            } else {
-                ComposerSurface(showsAutocomplete)
-            }
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .padding(top = room.dp)
+                .onSizeChanged { view.capsuleHeight = with(density) { it.height.toDp().value } },
+        ) {
+            ComposerSurface(
+                showsAutocomplete = showsAutocomplete,
+                panel = if (showsRequestPanel || docksRequest) {
+                    { RequestPanelContent(isShown = docksRequest, cap = cap) }
+                } else {
+                    null
+                },
+                // Laid out from its arrival until its surface has folded.
+                panelExtent = if (showsRequestPanel) activeHeight else 0f,
+                // Under Reduce Motion the surface keeps its reach while the panel fades.
+                panelReveal = if (showsRequestPanel) activeHeight * view.requestPanelReveal.value else 0f,
+            )
         }
     }
 }
 
-/** The composer's own surface: a request's panel, autocomplete, the composer and the dictation hold layer. */
+/** iOS `holdsRequestPanelRoom`. */
+private val SessionComposerEnv.holdsRequestPanelRoom: Boolean
+    get() = docksRequest || (view.requestRoomHeld && view.requestPanelIdentity == s.taskIdentity)
+
+/** iOS `lingersRequestPanel`. */
+private val SessionComposerEnv.lingersRequestPanel: Boolean
+    get() = docksRequest || (view.requestPanelLingers && view.requestPanelIdentity == s.taskIdentity)
+
+/**
+ * iOS `requestPanelMaxHeight`: the tallest the request panel may be so the composer stays under
+ * the header (OC-471), from the room between the top safe area and the keyboard, the header and
+ * the composer's chrome outside the panel.
+ */
 @Composable
-private fun SessionComposerEnv.ComposerSurface(showsAutocomplete: Boolean) {
+private fun SessionComposerEnv.requestPanelCap(): Float? {
+    val chrome = RequestPanelFit.chrome(composer = view.areaHeight, capsule = view.capsuleHeight, bar = view.barHeight)
+    return RequestPanelFit.panelCap(room = host.availableHeight, header = host.headerHeight, chrome = chrome)
+}
+
+/**
+ * iOS `activeRequestPanelHeight`: the panel's room, its height as drawn, never more than the cap the
+ * panel is laid out under in this same pass.
+ */
+private fun SessionComposerEnv.activeRequestPanelHeight(cap: Float?): Float {
+    val height = if (docksRequest || view.requestPanelIdentity == s.taskIdentity) view.requestPanelShown.value else 0f
+    return RequestPanelFit.room(measured = height, cap = cap)
+}
+
+/**
+ * iOS's request panel bookkeeping on the capsule: `onAppear`, `onChange(of: docksRequest)`,
+ * `requestPanelLeft()` and `resetRequestPanel()` (on another screen in place).
+ */
+@Composable
+private fun SessionComposerEnv.RequestPanelPresence() {
+    val current by rememberUpdatedState(this)
+    val docks = docksRequest
+    fun dismissTrayCaptions() {
+        if (usesCallTray && callStore?.state?.showsCaptions == true) callStore.send(VoiceFeature.Action.CaptionsDismissed)
+    }
+    LaunchedEffect(Unit) {
+        if (!docks) return@LaunchedEffect
+        view.requestPanelIdentity = s.taskIdentity
+        view.requestRoomHeld = true
+        view.requestPanelReveal.snapTo(1f)
+        dismissTrayCaptions()
+    }
+    var lastDocks by remember { mutableStateOf(docks) }
+    LaunchedEffect(docks) {
+        if (lastDocks == docks) return@LaunchedEffect
+        lastDocks = docks
+        // The keyboard never carries over: the message's into an answer, or an answer's back into the message.
+        host.messageFieldFocused = false
+        view.requestPanelLeaveJob?.cancel()
+        view.requestPanelLeaveJob = null
+        if (!docks) return@LaunchedEffect current.requestPanelLeft()
+        view.requestPanelIdentity = s.taskIdentity
+        view.requestPanelLingers = false
+        view.requestRoomHeld = true
+        dismissTrayCaptions()
+        host.closeAttachmentMenu()
+        // The surface grows back over the panel from where a fold left it.
+        if (reducedMotion || view.requestPanelShown.value <= 0.5f) {
+            view.requestPanelReveal.snapTo(1f)
+        } else {
+            view.requestPanelReveal.animateTo(1f, RequestPanelReveal.glass(opening = true))
+        }
+    }
+    var seenIdentity by remember { mutableStateOf(s.taskIdentity) }
+    LaunchedEffect(s.taskIdentity) {
+        if (seenIdentity == s.taskIdentity) return@LaunchedEffect
+        seenIdentity = s.taskIdentity
+        current.resetRequestPanel()
+    }
+}
+
+/**
+ * iOS `requestPanelLeft()`: the request left (answered, withdrawn, or a call took the composer's
+ * place). The surface folds over the panel (under Reduce Motion it lingers while the panel fades);
+ * 350 ms later the room goes in one step, and 350 ms after that the panel's height is forgotten,
+ * so the next request grows from nothing.
+ */
+private fun SessionComposerEnv.requestPanelLeft() {
+    view.requestPanelLeaveJob?.cancel()
+    if (!holdsRequestPanelRoom && !lingersRequestPanel && activeRequestPanelHeight(null) <= 0f) return
+    val leaving = s.taskIdentity
+    view.requestPanelIdentity = leaving
+    if (reducedMotion) {
+        view.requestPanelLingers = true
+    } else {
+        scope.launch { view.requestPanelReveal.animateTo(0f, RequestPanelReveal.glass(opening = false)) }
+    }
+    // No request docked again (iOS `!docksRequest`, read now: a call holding the composer docks none), same screen.
+    fun stillLeaving() = !(!host.callHoldsComposer && store.state.isAnsweringRequest) && view.requestPanelIdentity == leaving
+    view.requestPanelLeaveJob = scope.launch {
+        delay(350)
+        if (!stillLeaving()) return@launch
+        view.requestPanelLingers = false
+        view.requestPanelReveal.snapTo(0f)
+        // Folded and faded: the room goes in one step, so the surface and its frame never part mid-animation.
+        view.requestRoomHeld = false
+        delay(350)
+        if (!stillLeaving()) return@launch
+        view.requestPanelHeight = 0f
+        view.requestPanelShown.snapTo(0f)
+    }
+}
+
+/** iOS `resetRequestPanel()`: another screen in place keeps nothing of the last one's panel. */
+private fun SessionComposerEnv.resetRequestPanel() {
+    view.requestPanelLeaveJob?.cancel()
+    view.requestPanelLeaveJob = null
+    val docks = docksRequest
+    view.requestPanelIdentity = if (docks) s.taskIdentity else null
+    view.requestPanelLingers = false
+    view.requestRoomHeld = docks
+    scope.launch {
+        view.requestPanelReveal.snapTo(if (docks) 1f else 0f)
+        if (!docks) {
+            view.requestPanelHeight = 0f
+            view.requestPanelShown.snapTo(0f)
+        }
+    }
+}
+
+/**
+ * The composer's surface, shared with a call ([VoiceCallSurface]): a request's [panel] on the bar,
+ * autocomplete, the composer (or the call's bar) and the dictation hold layer.
+ */
+@Composable
+private fun SessionComposerEnv.ComposerSurface(
+    showsAutocomplete: Boolean,
+    panel: (@Composable () -> Unit)?,
+    panelExtent: Float,
+    panelReveal: Float,
+) {
     val density = LocalDensity.current
     val current by rememberUpdatedState(this)
+    val call = voiceStore
+    val dropTarget = rememberComposerDropTarget()
     Box(Modifier.fillMaxWidth()) {
-        Surface(
+        VoiceCallSurface(
+            store = call,
             modifier = Modifier
                 .fillMaxWidth()
+                // iOS `.onDrop(of: TranscriptComposerDrop.acceptedTypes, isTargeted:)`: anywhere on the composer.
+                .then(if (call == null) Modifier.dragAndDropTarget(shouldStartDragAndDrop = { true }, target = dropTarget) else Modifier)
                 .onGloballyPositioned {
                     view.surfaceBounds = it.boundsInRoot()
                     host.attachmentAnchors.composer = view.surfaceBounds
                 }
+                .onSizeChanged { view.barHeight = with(density) { it.height.toDp().value } }
                 .composerSwipes({ current }, density.density)
                 .semantics { testTag = "session-composer" },
-            shape = RoundedCornerShape(ComposerTunables.cornerRadius.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            tonalElevation = 3.dp,
-            shadowElevation = 3.dp,
+            panel = panel,
+            panelExtent = panelExtent,
+            panelReveal = panelReveal,
+            panelShown = docksRequest,
+            controlsTakeTouches = composerPresentation.expanded,
         ) {
-            Column(Modifier.fillMaxWidth()) {
-                RequestPanel()
-                if (showsAutocomplete) {
-                    ComposerAutocompletePanel(
-                        controller = view.autocompleteController,
-                        onSelectRow = { store.send(Action.Autocomplete(ComposerAutocompleteAction.RowChosen(it))) },
-                    )
+            // The composer and the call trade places inside the one surface.
+            AnimatedContent(
+                targetState = call,
+                contentKey = { it != null },
+                transitionSpec = {
+                    val spec: androidx.compose.animation.core.FiniteAnimationSpec<Float> = if (reducedMotion) Motion.easeInOut(0.2) else MotionSpring(0.32).spec()
+                    fadeIn(spec) togetherWith fadeOut(spec) using SizeTransform(clip = false)
+                },
+                label = "composerCallSwap",
+            ) { shown ->
+                if (shown != null) {
+                    VoiceCallComposer(shown)
+                } else {
+                    Column(Modifier.fillMaxWidth()) {
+                        if (showsAutocomplete) {
+                            ComposerAutocompletePanel(
+                                controller = view.autocompleteController,
+                                onSelectRow = { store.send(Action.Autocomplete(ComposerAutocompleteAction.RowChosen(it))) },
+                            )
+                        }
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .autocompleteComposerAnchor(view.autocompleteBridge)
+                                .onSizeChanged { size ->
+                                    view.surfaceSize = with(density) { androidx.compose.ui.geometry.Size(size.width.toDp().value, size.height.toDp().value) }
+                                },
+                        ) { Composer() }
+                    }
                 }
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .autocompleteComposerAnchor(view.autocompleteBridge)
-                        .onSizeChanged { size ->
-                            view.surfaceSize = with(density) { androidx.compose.ui.geometry.Size(size.width.toDp().value, size.height.toDp().value) }
-                        },
-                ) { Composer() }
             }
+        }
+        // The drop highlight: decoration, taking no touches (iOS accent stroke, 2 pt, easeOut 0.15 s).
+        val dropAlpha by animateFloatAsState(
+            if (view.isImageDropTargeted && call == null) 1f else 0f,
+            if (reducedMotion) snap() else tween(150, easing = Motion.EaseOut),
+            label = "composerDropTarget",
+        )
+        if (dropAlpha > 0f) {
+            val accent = OpenCodeTheme.colors.accent
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .alpha(dropAlpha)
+                    .border(2.dp, accent, RoundedCornerShape(ComposerTunables.cornerRadius.dp)),
+            )
         }
         if (usesAutocomplete && view.autocompleteController.currentFrame.flights.isNotEmpty()) {
             AutocompleteFlightOverlay(view.autocompleteController, Modifier.matchParentSize())
         }
         // Above the surface, so its edge never crosses the hold circle.
         val hold = shownDictationHold
-        if (hold != null) {
+        if (hold != null && call == null) {
             DictationBarPresence(isLeaving = s.dictationHold == null, modifier = Modifier.matchParentSize()) {
                 DictationHoldLayer(
                     pose = dictationPose(hold),
@@ -987,15 +1231,52 @@ private fun SessionComposerEnv.ComposerSurface(showsAutocomplete: Boolean) {
 }
 
 /**
- * iOS `requestPanel(isShown:)` with the room the session keeps for it: the docked request's
- * [RequestDockView], capped so the composer stays under the header ([RequestPanelFit]), on a
- * band of the composer's surface that grows with the panel's measured height and folds back
- * when it leaves (after its content has faded, `RequestPanelReveal.glass`). Changes the cap
- * made (the keyboard, the room) follow at once; the panel's own content changes ease.
+ * The composer's drop target: what's dropped outside the field (whose own receiver takes drops on
+ * it first) goes through [SessionAttachmentImporter.handleComposerDrop]; while a drag is over the
+ * composer it shows the drop highlight (iOS `isImageDropTargeted`).
  */
 @Composable
-private fun SessionComposerEnv.RequestPanel() {
-    val docks = docksRequest
+private fun SessionComposerEnv.rememberComposerDropTarget(): DragAndDropTarget {
+    val activity = LocalActivity.current
+    val currentView by rememberUpdatedState(view)
+    val currentHost by rememberUpdatedState(host)
+    return remember {
+        object : DragAndDropTarget {
+            override fun onEntered(event: DragAndDropEvent) {
+                currentView.isImageDropTargeted = true
+            }
+
+            override fun onExited(event: DragAndDropEvent) {
+                currentView.isImageDropTargeted = false
+            }
+
+            override fun onEnded(event: DragAndDropEvent) {
+                currentView.isImageDropTargeted = false
+            }
+
+            override fun onDrop(event: DragAndDropEvent): Boolean {
+                currentView.isImageDropTargeted = false
+                val drag = event.toAndroidDragEvent()
+                val clip = drag.clipData ?: return false
+                // Another app's URIs are readable once the activity asks; held until it goes.
+                activity?.requestDragAndDropPermissions(drag)
+                val description = drag.clipDescription
+                val mimeTypes = if (description == null) emptyList() else (0 until description.mimeTypeCount).map(description::getMimeType)
+                return currentHost.importer?.handleComposerDrop(clip, mimeTypes) == true
+            }
+        }
+    }
+}
+
+/**
+ * iOS `requestPanel(isShown:)`: the docked request's [RequestDockView], capped so the composer
+ * stays under the header ([RequestPanelFit]), set on the bar by the surface, which reveals it from
+ * the bar up and folds back over it while a leaving request fades in place. Arriving, and as pages
+ * and choices change, the surface follows its height (eased); a change the keyboard or the cap
+ * made follows at once.
+ */
+@Composable
+private fun SessionComposerEnv.RequestPanelContent(isShown: Boolean, cap: Float?) {
     val dock by store.observe { it.requestDock }
     val context by store.observe { state ->
         if (!state.isAnsweringRequest && state.dockRequestID == null) {
@@ -1011,69 +1292,38 @@ private fun SessionComposerEnv.RequestPanel() {
             )
         }
     }
-    val chrome = RequestPanelFit.chrome(composer = view.areaHeight, capsule = view.surfaceBounds.height / LocalDensity.current.density, bar = view.surfaceSize.height)
-    val cap = RequestPanelFit.panelCap(room = host.availableHeight, header = host.headerHeight, chrome = chrome)
-    val room = RequestPanelFit.room(measured = if (docks) view.requestPanelHeight else 0f, cap = cap)
-    val shown = remember { androidx.compose.animation.core.Animatable(0f) }
-    var opened by remember { mutableStateOf(false) }
-
-    // The keyboard never carries over: the message's into an answer, or an answer's back into the message.
-    var lastDocks by remember { mutableStateOf(docks) }
-    LaunchedEffect(docks) {
-        if (lastDocks == docks) return@LaunchedEffect
-        lastDocks = docks
-        host.messageFieldFocused = false
-        if (docks) host.closeAttachmentMenu()
-        if (docks && usesCallTray && callStore?.state?.showsCaptions == true) callStore.send(VoiceFeature.Action.CaptionsDismissed)
-    }
-    LaunchedEffect(room, docks) {
-        val eases = view.requestPanelEasing.eases(room, cap, keyboardUp = messageFieldFocused)
-        when {
-            reducedMotion || (!eases && docks && opened) -> shown.snapTo(room)
-            docks && !opened -> {
-                opened = room > 0f
-                shown.animateTo(room, RequestPanelReveal.glass(opening = true))
-            }
-            docks -> shown.animateTo(room, MotionSpring(0.3).spec())
-            else -> {
-                opened = false
-                // Folded and faded: the band goes once the content has sunk away.
-                shown.animateTo(0f, RequestPanelReveal.glass(opening = false))
-            }
-        }
-    }
-    if (shown.value <= 0.5f && !docks && dock.dockRequestID == null) {
-        // Nothing lingers: unmounted so a leaving panel can't keep the room.
-        if (view.requestPanelHeight != 0f) SideEffect { view.requestPanelHeight = 0f }
-        return
-    }
     val density = LocalDensity.current
+    val current by rememberUpdatedState(this)
+    val currentCap by rememberUpdatedState(cap)
     Box(
         Modifier
             .fillMaxWidth()
-            .height(shown.value.dp)
-            // Clipped top and bottom only: the panel's × reaches past the band's sides onto the
-            // surface's corner arc (`outset`), which a full `clipToBounds` cut in half.
-            .clip(VerticalBandClip),
+            .requestPanelCap(cap?.dp)
+            .onSizeChanged { size ->
+                // A leaving panel keeps its height while the surface folds over it.
+                val env = current
+                val height = with(density) { size.height.toDp().value }
+                if (!isShown || env.store.state.dockRequestID == null || height <= 0f) return@onSizeChanged
+                env.view.requestPanelIdentity = env.s.taskIdentity
+                if (height == env.view.requestPanelHeight) return@onSizeChanged
+                val eases = env.view.requestPanelEasing.eases(height, currentCap, keyboardUp = env.messageFieldFocused)
+                val wasZero = env.view.requestPanelHeight == 0f
+                env.view.requestPanelHeight = height
+                env.scope.launch {
+                    when {
+                        env.reducedMotion || !eases -> env.view.requestPanelShown.snapTo(height)
+                        wasZero -> env.view.requestPanelShown.animateTo(height, RequestPanelReveal.glass(opening = true))
+                        else -> env.view.requestPanelShown.animateTo(height, MotionSpring(0.3).spec())
+                    }
+                }
+            },
     ) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .wrapContentHeight(Alignment.Top, unbounded = true)
-                .requestPanelCap(cap?.dp)
-                .onSizeChanged { size ->
-                    // A leaving panel keeps its height while the surface folds over it.
-                    val height = with(density) { size.height.toDp().value }
-                    if (docks && store.state.dockRequestID != null && height > 0f) view.requestPanelHeight = height
-                },
-        ) {
-            RequestDockView(
-                dock = dock,
-                context = context,
-                isKeyboardUp = messageFieldFocused,
-                send = { store.send(Action.RequestDock(it)) },
-            )
-        }
+        RequestDockView(
+            dock = dock,
+            context = context,
+            isKeyboardUp = messageFieldFocused,
+            send = { store.send(Action.RequestDock(it)) },
+        )
     }
 }
 
@@ -1183,7 +1433,8 @@ private fun SessionComposerEnv.Composer() {
     ) {
         ComposerFoldLayout(foldProgress = fold) {
             val row = host.pendingAttachmentsRow
-            if (row != null && (s.hasNonLocationAttachments || s.wantsLocationAttachment)) {
+            // Reserved photo slots (the New Plus Menu's picks still decoding) count too.
+            if (row != null && hasComposerAttachments) {
                 Box(
                     Modifier
                         .composerFolds()
@@ -1340,6 +1591,7 @@ private fun SessionComposerEnv.ComposerInput(expanded: Boolean, recording: Boole
                 }
             },
             onNonSendNewline = { text -> if (!recording) store.send(Action.NonSendNewlineInserted(text)) },
+            onDropTargetedChange = { view.isImageDropTargeted = it },
             returnKeySends = returnKeySends,
             autocompleteBridge = if (usesAutocomplete) view.autocompleteBridge else null,
             lineLimit = if (bar == null) null else 4,
@@ -1366,8 +1618,3 @@ private fun SessionComposerEnv.onDraftEdited(new: String, recording: Boolean) {
 }
 
 // endregion
-
-/** A clip that bounds only the vertical extent (the band's sides stay open). */
-private val VerticalBandClip = androidx.compose.foundation.shape.GenericShape { size, _ ->
-    addRect(androidx.compose.ui.geometry.Rect(-size.width, 0f, size.width * 2, size.height))
-}

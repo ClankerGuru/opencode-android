@@ -33,17 +33,17 @@ import ai.opencode.feature.composer.AttachmentMenuOverlay
 import ai.opencode.feature.composer.AttachmentMenuPhase
 import ai.opencode.feature.composer.AttachmentMenuPress
 import ai.opencode.feature.composer.ComposerAutocompleteAction
-import ai.opencode.feature.composer.DictationPermissionClient
 import ai.opencode.feature.composer.LocationPermissionPrompt
 import ai.opencode.feature.composer.PastedTextViewer
 import ai.opencode.feature.composer.modelpicker.ModelPickerAnchors
+import ai.opencode.feature.composer.plusmenu.PhotoFlightCanvas
+import ai.opencode.feature.composer.plusmenu.RecentPhotoPeekOverlay
 import androidx.compose.runtime.rememberCoroutineScope
 import ai.opencode.feature.composer.RequestDockContext
 import ai.opencode.feature.composer.RequestReviewSheet
 import ai.opencode.feature.media.LocalMediaPresenter
 import ai.opencode.core.store.Store
 import ai.opencode.core.motion.rememberReduceMotion
-import android.Manifest
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
@@ -165,6 +165,11 @@ fun SessionView(
     val modelPickerAnchors = remember { ModelPickerAnchors(anchorScope) }
     val colors = OpenCodeTheme.colors
     val density = LocalDensity.current
+    // The New Plus Menu (iOS `usesPlusMenuSheet`): the + menu grows into the photo sheet, and a hold on + peeks.
+    val photoSheet = rememberSessionPhotoSheetState()
+    val plusSheetSetting by remember { shared(ExperimentalFeature.plusMenuSheet.key).flow }.collectAsState(false)
+    val usesPlusMenuSheet = ExperimentalFeature.plusMenuSheet.isActive(plusSheetSetting)
+    var rootOffset by remember { mutableStateOf(Offset.Zero) }
 
     // The header controls' laid-out height (dp); the backdrop follows it.
     var headerHeight by remember { mutableFloatStateOf(SessionHeaderStyle.DEFAULT_HEADER_HEIGHT) }
@@ -200,7 +205,8 @@ fun SessionView(
         composerHost.headerHeight = headerHeight
         if (composerHost.pendingAttachmentsRow == null) composerHost.pendingAttachmentsRow = { SessionPendingAttachments(store) }
     }
-    SessionPermissionPrompts()
+    SessionPermissionPrompts(isCovered)
+    SessionPhotoSheetEnvironment(photoSheet, store, composerHost, importer, headerHeight, usesPlusMenuSheet, rootOffset)
 
     SessionMediaHost {
     CompositionLocalProvider(
@@ -208,9 +214,10 @@ fun SessionView(
         LocalSessionComposerHost provides composerHost,
         // Covered (a pushed subagent, a browser page), every scope underneath stops drawing.
         LocalDotScopeCovered provides isCovered,
+        LocalSessionPhotoSheet provides photoSheet,
     ) {
         // The + menu draws above the background-work capsule (iOS: the menu's glass covers it).
-        Box(modifier) {
+        Box(modifier.rootOffsetOnScreen { if (it != rootOffset) rootOffset = it }) {
         BackgroundWorkPresentation(
             anchor = backgroundWorkAnchor,
             sessionID = work.sessionID,
@@ -226,7 +233,11 @@ fun SessionView(
             inCall = work.inCall,
             showsCallTranscript = work.showsCallTranscript,
             // The capsule draws above the + menu's dismiss area: tapping it closes the menu.
-            onToggle = composerHost::dismissComposerKeyboard,
+            // iOS: typing ends, and the capsule draws above the menu's dismiss area: tapping it closes the menu.
+            onToggle = {
+                composerHost.dismissComposerKeyboard()
+                if (photoSheet.attachmentMenu != AttachmentMenuPhase.Closed) photoSheet.closeAttachmentMenu()
+            },
         ) {
             Box(Modifier.fillMaxSize().background(colors.canvas)) {
                 if (errorMessage != null) {
@@ -279,7 +290,11 @@ fun SessionView(
                 SessionModelPickerOverlays(store, modelPickerAnchors, headerHeight, composerHost.attachmentAnchors.composer)
             }
         }
-        SessionAttachmentMenu(store, composerHost, importer)
+        SessionAttachmentMenu(store, composerHost, importer, photoSheet, usesPlusMenuSheet)
+        if (usesPlusMenuSheet) {
+            RecentPhotoPeekOverlay(photoSheet.recentPeek, photoSheet.library, photoSheet.flights, Modifier.matchParentSize())
+            PhotoFlightCanvas(photoSheet.flights, Modifier.matchParentSize())
+        }
         }
         SessionSheets(store, listContext)
         LocationErrorAlert(store)
@@ -403,12 +418,17 @@ private fun SessionLifecycle(store: StoreOf<State, Action>) {
  * opens) attaches the clipboard's images through `PasteboardClient` and brings the keyboard back.
  */
 @Composable
-private fun SessionAttachmentMenu(store: StoreOf<State, Action>, host: SessionComposerHost, importer: SessionAttachmentImporter) {
-    var phase by remember { mutableStateOf(AttachmentMenuPhase.Closed) }
-    var restoresFocus by remember { mutableStateOf(false) }
+private fun SessionAttachmentMenu(
+    store: StoreOf<State, Action>,
+    host: SessionComposerHost,
+    importer: SessionAttachmentImporter,
+    sheet: SessionPhotoSheetState,
+    usesPlusMenuSheet: Boolean,
+) {
+    val phase = sheet.attachmentMenu
     var keepingLocationRow by remember { mutableStateOf(false) }
     var showsPhotoPicker by remember { mutableStateOf(false) }
-    var showsPlusSheet by remember { mutableStateOf(false) }
+    var pickerRestoresFocus by remember { mutableStateOf(false) }
     var showsCamera by remember { mutableStateOf(false) }
     var clipboardHasImages by remember { mutableStateOf(false) }
     val pasteboard = remember { dependency(ai.opencode.core.dependencies.PasteboardClient) }
@@ -419,82 +439,114 @@ private fun SessionAttachmentMenu(store: StoreOf<State, Action>, host: SessionCo
     val taskIdentity by store.observe { it.taskIdentity }
     val supportsFileUploads by store.observe { it.supportsFileUploads }
     val wantsLocation by store.observe { it.pendingLocation != null || it.isLocating }
-    val plusSheetSetting by remember { shared(ExperimentalFeature.plusMenuSheet.key).flow }.collectAsState(false)
-    val usesPlusMenuSheet = ExperimentalFeature.plusMenuSheet.isActive(plusSheetSetting)
+    val hasPendingRequests by store.observe { it.hasPendingRequests }
+    val dictating by store.observe { it.isPreparingDictation || it.isDictating || it.dictationHold != null }
     val files = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         if (uris.isNotEmpty()) importer.importPickedFiles(uris, onFocus = host::focusComposer)
     }
 
-    // Another session in place: the menu closes at once.
+    // Another session in place: the menu closes at once, and the sheet with it.
+    var shownIdentity by remember { mutableStateOf(taskIdentity) }
     LaunchedEffect(taskIdentity) {
-        phase = AttachmentMenuPhase.Closed
-        restoresFocus = false
-        showsPlusSheet = false
+        if (shownIdentity == taskIdentity) return@LaunchedEffect
+        shownIdentity = taskIdentity
+        importer.cancelImageImport()
+        sheet.attachmentMenuRestoresFocus = false
+        press.cancelled()
+        sheet.attachmentMenu = AttachmentMenuPhase.Closed
+        sheet.resetPhotoSheet()
     }
     HapticEffect(Haptic.tap, tapped)
 
-    fun close() {
-        phase = AttachmentMenuPhase.Closed
-        showsPlusSheet = false
-        if (restoresFocus) host.focusComposer()
+    // iOS `onChange(of: attachmentMenu)`: closed some other way, the sheet goes too, and the
+    // keyboard comes back if the menu kept it.
+    var previousPhase by remember { mutableStateOf(phase) }
+    LaunchedEffect(phase) {
+        if (phase == previousPhase) return@LaunchedEffect
+        previousPhase = phase
+        if (phase != AttachmentMenuPhase.Closed) return@LaunchedEffect
+        sheet.menuClosed()
+        if (!sheet.attachmentMenuRestoresFocus) return@LaunchedEffect
+        sheet.attachmentMenuRestoresFocus = false
+        host.focusComposer()
+    }
+    // iOS `onChange(of: messageFieldFocused)`: typing takes the menu's place, unless Back from the
+    // photo sheet handed the keyboard back under it.
+    val focused = host.messageFieldFocused
+    LaunchedEffect(focused) {
+        if (sheet.keepsMenu || !focused || sheet.attachmentMenu == AttachmentMenuPhase.Closed) return@LaunchedEffect
+        sheet.attachmentMenuRestoresFocus = false
+        sheet.closeAttachmentMenu()
+    }
+    // A pending request's dock takes the composer's place; dictation takes the composer.
+    LaunchedEffect(hasPendingRequests) { if (hasPendingRequests) sheet.attachmentMenu = AttachmentMenuPhase.Closed }
+    LaunchedEffect(dictating) {
+        if (!dictating || sheet.attachmentMenu == AttachmentMenuPhase.Closed) return@LaunchedEffect
+        sheet.attachmentMenuRestoresFocus = false
+        sheet.closeAttachmentMenu()
     }
 
     fun toggle() {
         if (phase == AttachmentMenuPhase.Closed) {
+            sheet.prepareMenuOpening()
             keepingLocationRow = false
-            restoresFocus = host.messageFieldFocused
+            sheet.attachmentMenuRestoresFocus = host.messageFieldFocused
             clipboardHasImages = pasteboard.hasImages()
-            phase = AttachmentMenuPhase.Menu
+            sheet.attachmentMenu = AttachmentMenuPhase.Menu
             press.menuOpened()
         } else {
-            close()
+            sheet.closeAttachmentMenu()
         }
     }
 
     fun choose(item: AttachmentMenuItem) {
-        if (phase != AttachmentMenuPhase.Menu) return
+        if (phase != AttachmentMenuPhase.Menu || sheet.morph.isOpening) return
         when (item) {
             AttachmentMenuItem.Photos -> {
+                if (usesPlusMenuSheet) return sheet.openPhotoSheet()
                 // Choosing the photo picker gives it the room the keyboard had.
+                // The keyboard comes back once something is attached, not as the menu goes.
+                pickerRestoresFocus = sheet.attachmentMenuRestoresFocus
+                sheet.attachmentMenuRestoresFocus = false
                 host.dismissComposerKeyboard()
-                if (usesPlusMenuSheet) {
-                    showsPlusSheet = true
-                } else {
-                    phase = AttachmentMenuPhase.Closed
-                    showsPhotoPicker = true
-                }
+                sheet.attachmentMenu = AttachmentMenuPhase.Closed
+                showsPhotoPicker = true
             }
             AttachmentMenuItem.Files -> {
-                restoresFocus = false
-                phase = AttachmentMenuPhase.Closed
+                sheet.attachmentMenuRestoresFocus = false
+                sheet.closeAttachmentMenu()
                 files.launch(arrayOf("*/*"))
             }
             AttachmentMenuItem.Location -> {
-                restoresFocus = false
+                sheet.attachmentMenuRestoresFocus = false
                 keepingLocationRow = true
                 store.send(Action.locationTapped)
-                phase = AttachmentMenuPhase.Closed
+                sheet.closeAttachmentMenu()
             }
             AttachmentMenuItem.Camera -> {
-                restoresFocus = false
+                sheet.attachmentMenuRestoresFocus = false
                 showsCamera = true
-                phase = AttachmentMenuPhase.Closed
+                sheet.closeAttachmentMenu()
             }
             // A paste control: tapped only (`onPaste`), never chosen by a slide.
             AttachmentMenuItem.Paste -> Unit
         }
     }
 
+    val sheetActive = sheet.morph.isOpening || sheet.morph.foldPending
     SideEffect {
         host.attachmentPress = press
         host.isAttachmentMenuOpen = phase != AttachmentMenuPhase.Closed
         host.onPlusTapped = ::toggle
-        host.attachmentMenuRows = if (phase == AttachmentMenuPhase.Menu && !showsPlusSheet) host.attachmentAnchors.rows else emptyMap()
+        host.attachmentMenuRows = if (phase == AttachmentMenuPhase.Menu && !sheet.morph.isOpening) host.attachmentAnchors.rows else emptyMap()
         // A slide from + chose it; the press already answered with its haptic.
         host.onAttachmentChoose = ::choose
-        host.closeAttachmentMenu = { if (phase != AttachmentMenuPhase.Closed) close() }
+        host.closeAttachmentMenu = { if (sheet.attachmentMenu != AttachmentMenuPhase.Closed) sheet.closeAttachmentMenu() }
     }
-    BackHandler(enabled = phase != AttachmentMenuPhase.Closed && !showsPlusSheet) { close() }
+    // System Back (iOS's escape action): the sheet goes back to the menu, the menu closes.
+    BackHandler(enabled = phase != AttachmentMenuPhase.Closed) {
+        if (sheet.morph.isOpening) sheet.backFromPhotoSheet() else sheet.closeAttachmentMenu()
+    }
 
     val items = sessionAttachmentMenuItems(
         hasCamera = hasCamera,
@@ -505,7 +557,7 @@ private fun SessionAttachmentMenu(store: StoreOf<State, Action>, host: SessionCo
     )
     AttachmentMenuOverlay(
         phase = phase,
-        onPhaseChange = { next -> if (next == AttachmentMenuPhase.Closed) close() else phase = next },
+        onPhaseChange = { next -> if (next == AttachmentMenuPhase.Closed) sheet.closeAttachmentMenu() else sheet.attachmentMenu = next },
         anchors = host.attachmentAnchors,
         press = press,
         items = items,
@@ -517,39 +569,29 @@ private fun SessionAttachmentMenu(store: StoreOf<State, Action>, host: SessionCo
         // iOS `pasteAttachments`: the keyboard comes back as the menu closes.
         onPaste = {
             if (phase == AttachmentMenuPhase.Menu) {
-                restoresFocus = true
+                sheet.attachmentMenuRestoresFocus = true
                 importer.pasteClipboardImages()
-                close()
+                sheet.closeAttachmentMenu()
             }
         },
         modifier = Modifier.fillMaxSize(),
-        // The New Plus Menu's morphing glass (`ComposerMorph`) isn't hosted: its menu stays this overlay's.
+        // Android draws the menu in this overlay and the photo sheet in its own morph
+        // (`SessionPlusPhotoSheet`), which grows out of the menu's resting frame.
         overComposer = false,
-        handedOff = showsPlusSheet,
+        handedOff = usesPlusMenuSheet && sheetActive,
         identity = taskIdentity,
     )
+    if (usesPlusMenuSheet) SessionPlusPhotoSheet(sheet)
     if (showsPhotoPicker) {
         SessionPhotoSheet(
             store = store,
             importer = importer,
             onDismiss = { showsPhotoPicker = false },
-            onAdded = if (restoresFocus) host::focusComposer else null,
+            onAdded = if (pickerRestoresFocus) host::focusComposer else null,
         )
     }
     if (showsCamera) {
         SessionAttachmentCamera(importer, onDismiss = { showsCamera = false }, onAdded = host::focusComposer)
-    }
-    if (showsPlusSheet) {
-        SessionPlusPhotoSheet(
-            importer = importer,
-            onBack = { showsPlusSheet = false },
-            onDismiss = { close() },
-            onAdded = if (restoresFocus) host::focusComposer else null,
-            onClosed = {
-                showsPlusSheet = false
-                phase = AttachmentMenuPhase.Closed
-            },
-        )
     }
 }
 
@@ -587,37 +629,22 @@ private fun RequestPanelRoomProbe(host: SessionComposerHost, modifier: Modifier)
 }
 
 /**
- * Registers the screen's permission prompts while it's shown: the microphone for dictation
- * ([DictationPermissionClient.register]) and location for the + menu's Location
- * ([LocationPermissionPrompt.install]), each through an activity-result launcher the screen owns.
+ * Registers the screen's location prompt while it's on top, for the + menu's Location
+ * ([LocationPermissionPrompt.install]), through an activity-result launcher the screen owns. The
+ * microphone (dictation and calls, iOS `requestRecordPermission()` as they start) is asked through
+ * the requesters the app's activity registers while it's resumed: a screen registering its own
+ * would leave none behind when a pushed subagent's screen went.
  */
 @Composable
-private fun SessionPermissionPrompts() {
-    val mic = remember { arrayOfNulls<CompletableDeferred<Boolean>>(1) }
+private fun SessionPermissionPrompts(isCovered: Boolean) {
     val location = remember { arrayOfNulls<CompletableDeferred<Boolean>>(1) }
-    val micLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        mic[0]?.complete(granted)
-        mic[0] = null
-    }
     val locationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
         location[0]?.complete(grants.values.any { it })
         location[0] = null
     }
-    DisposableEffect(micLauncher) {
-        val remove = dependency(DictationPermissionClient).register {
-            val answer = CompletableDeferred<Boolean>()
-            mic[0]?.complete(false)
-            mic[0] = answer
-            micLauncher.launch(Manifest.permission.RECORD_AUDIO)
-            answer.await()
-        }
-        onDispose {
-            remove()
-            mic[0]?.complete(false)
-            mic[0] = null
-        }
-    }
-    DisposableEffect(locationLauncher) {
+    // Only the screen on top asks; uncovered again (a pushed subagent went), it takes the prompt back.
+    DisposableEffect(locationLauncher, isCovered) {
+        if (isCovered) return@DisposableEffect onDispose {}
         val remove = LocationPermissionPrompt.install {
             val answer = CompletableDeferred<Boolean>()
             location[0]?.complete(false)
@@ -678,6 +705,7 @@ private fun SessionPendingAttachments(store: StoreOf<State, Action>) {
             }
         },
         onOpenLocation = { store.send(Action.LinkTapped(it)) },
+        flights = LocalSessionPhotoSheet.current?.takeIf { it.usesPlusMenuSheet }?.flights,
     )
 }
 
