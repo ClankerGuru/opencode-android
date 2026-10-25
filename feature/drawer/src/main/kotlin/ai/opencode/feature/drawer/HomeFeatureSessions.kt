@@ -7,6 +7,7 @@ import ai.opencode.core.store.Reduced
 import ai.opencode.feature.drawer.HomeFeature.Action
 import ai.opencode.feature.drawer.HomeFeature.State
 import ai.opencode.feature.composer.SharedComposerDraft
+import ai.opencode.feature.system.share.ShareInboxClient
 import ai.opencode.feature.drawer.bridge.SessionDelegate
 import ai.opencode.feature.drawer.bridge.SessionDetail
 import ai.opencode.feature.drawer.bridge.SessionScreenEvent
@@ -55,8 +56,11 @@ internal fun HomeFeature.reduceSessionDetail(state: State, event: SessionScreenE
         SessionScreenEvent.SendAccepted -> {
             // The session reducer has already run: an accepted send cleared the draft and is awaiting
             // its reply. Recents lists roots.
-            val (s, _) = state.notingScreenSendIfAccepted(state.sessionDetail, now)
-            // TODO(merge): `shareInbox.donateSuggestion(serverID, sessionID, title)` once `:feature:system` ports.
+            val (s, sessionID) = state.notingScreenSendIfAccepted(state.sessionDetail, now)
+            // iOS donates on `.sendTapped` only, not the browser's `.askSent`; the stand-in event
+            // carries both. TODO(merge) round 2b / `:feature:session`: match `.sendTapped`.
+            val session = sessionID?.let { id -> s.sessions.firstOrNull { it.id == id } }
+            if (session != null) dependency(ShareInboxClient).donateSuggestion(s.server.persistenceID, session.id, session.title)
             return Reduced(s)
         }
 

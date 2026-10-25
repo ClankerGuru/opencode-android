@@ -8,15 +8,11 @@ import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.PresentationAction
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
-import ai.opencode.feature.drawer.bridge.NotificationPermission
-import ai.opencode.feature.drawer.bridge.DictationCommand
 import ai.opencode.feature.drawer.bridge.SessionDetail
 import ai.opencode.feature.drawer.bridge.SessionRefreshReason
 import ai.opencode.feature.drawer.bridge.SessionScreenEvent
 import ai.opencode.feature.drawer.bridge.SessionScreenMessage
 import ai.opencode.feature.drawer.bridge.SessionSwitchSnapshot
-import ai.opencode.feature.drawer.bridge.SystemActionDestination
-import ai.opencode.feature.drawer.bridge.VoiceCallCommand
 import ai.opencode.feature.drawer.catchup.CatchUpFeature
 import ai.opencode.feature.drawer.notices.InAppNotice
 import ai.opencode.feature.drawer.switcher.SessionSwitcherFeature
@@ -30,6 +26,10 @@ import ai.opencode.feature.composer.SharedDrafts
 import ai.opencode.feature.composer.parkPersistedDraft
 import ai.opencode.feature.composer.syncAbsorbedDraft
 import ai.opencode.feature.session.SessionFeature
+import ai.opencode.feature.system.SystemAction
+import ai.opencode.feature.system.liveactivity.DictationCommand
+import ai.opencode.feature.system.liveactivity.VoiceCallCommand
+import ai.opencode.feature.system.notifications.NotificationPermission
 import ai.opencode.feature.system.share.ReceivedShare
 import ai.opencode.feature.settings.HomeSettingsFeature
 import ai.opencode.feature.settings.SettingsFeature
@@ -665,7 +665,7 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         data class DictationCommandReceived(val command: DictationCommand) : Action
         /** Shortcuts, a launcher action or a link, for this server; `AppFeature` has fetched any session the list lacked. */
         data class SystemActionOpened(
-            val destination: SystemActionDestination,
+            val destination: SystemAction.Destination,
             val startsCall: Boolean,
             val inBackground: Boolean = false,
         ) : Action

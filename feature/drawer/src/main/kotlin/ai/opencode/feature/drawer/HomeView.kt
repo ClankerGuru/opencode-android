@@ -24,7 +24,13 @@ import ai.opencode.feature.drawer.container.rememberSessionDrawerController
 import ai.opencode.feature.drawer.motion.DrawerButton
 import ai.opencode.feature.drawer.motion.rememberDrawerKeyboardHold
 import ai.opencode.feature.drawer.motion.rememberDrawerShortcutMotion
+import ai.opencode.core.experiments.InAppNoticeMode
 import ai.opencode.feature.drawer.notices.InAppNotice
+import ai.opencode.feature.drawer.notices.InAppNoticeSettings
+import ai.opencode.feature.system.notifications.SessionNotificationsClient
+import ai.opencode.feature.voice.VoiceRoutePreferences
+import ai.opencode.server.OpenCodeServer
+import androidx.compose.runtime.collectAsState
 import ai.opencode.feature.drawer.switcher.SessionSwitcherOverlay
 import ai.opencode.feature.session.SessionFeature
 import ai.opencode.feature.session.SessionView
@@ -378,7 +384,7 @@ private fun HomeSidebarEffects(store: StoreOf<HomeFeature.State, HomeFeature.Act
     // Beside a sidebar the drawer button has no label, so In-App Notices acts as Off, banners included.
     LaunchedEffect(usesSidebar) {
         if (usesSidebar) view.isSessionDrawerPresented = false
-        // TODO(merge): `sessionNotifications.setShowsDrawerLabel(!sidebar)` once `:feature:system` ports it.
+        dependency(SessionNotificationsClient).setShowsDrawerLabel(!usesSidebar)
         store.send(HomeFeature.Action.DrawerLabelAvailabilityChanged(!usesSidebar))
     }
     // A computer just paired: open its sessions as the drawer button does.
@@ -400,7 +406,8 @@ private fun HomeLifecycle(store: StoreOf<HomeFeature.State, HomeFeature.Action>,
     val settingsShown by store.observe { it.isSettingsShown }
     val drawerCloseRequests by store.observe { it.drawerCloseRequests }
     val selectedSessionID by store.observe { it.sessionDetail?.session?.id }
-    val systemVoiceAvailable by store.observe { it.systemVoiceAvailable }
+    val server by store.observe { it.server }
+    val isVoiceAvailable = rememberVoiceAvailable(server)
     val isDrawerVisible by store.observe { view.isDrawerVisible(it) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
 
@@ -441,10 +448,16 @@ private fun HomeLifecycle(store: StoreOf<HomeFeature.State, HomeFeature.Action>,
         firstCloseRequest.value = drawerCloseRequests
         if (previous != null && previous != drawerCloseRequests) view.closeSessionDrawer()
     }
-    // TODO(merge): iOS publishes `voicePreferences.isAvailable(server:)`; until `:feature:voice`
-    // ports it, the last observed value is republished per server.
-    LaunchedEffect(serverID, systemVoiceAvailable) {
-        store.send(HomeFeature.Action.SystemPublishRequested(systemVoiceAvailable))
+    // Settings changes these outside any Home action; the view sees them and tells Home, so the
+    // Start Call quick action follows.
+    LaunchedEffect(serverID, isVoiceAvailable) {
+        store.send(HomeFeature.Action.SystemPublishRequested(isVoiceAvailable))
+    }
+    // Notifications arriving in the foreground read In-App Notices' mode through Home's reader
+    // (iOS reads the shared key directly; `:feature:system` can't see the drawer's settings).
+    LaunchedEffect(Unit) {
+        val settings = dependency(InAppNoticeSettings)
+        dependency(SessionNotificationsClient).setInAppNoticesProvider { settings.mode() != InAppNoticeMode.off }
     }
     // iOS `scenePhase`: RESUMED is active, STARTED inactive, below that the background.
     LaunchedEffect(lifecycle) {
@@ -517,3 +530,24 @@ private fun HomeSettingsBack(store: StoreOf<HomeFeature.State, HomeFeature.Actio
 private const val TIME_REVEAL_REACH = 76f
 /** How much of the window the drawer button's notice label may span. */
 private const val HEADER_LABEL_FRACTION = 0.6f
+
+/**
+ * iOS `HomeView.isVoiceAvailable` (`store.voicePreferences.isAvailable(server:)`): Voice set up for
+ * [server], recomputed whenever a setting it reads changes (Settings changes them outside any
+ * Home action).
+ */
+@Composable
+private fun rememberVoiceAvailable(server: OpenCodeServer): Boolean {
+    val preferences = remember { VoiceRoutePreferences() }
+    val enabled by preferences.enabled.flow.collectAsState()
+    val engine by preferences.engine.flow.collectAsState()
+    val openAIKey by preferences.openAIKey.flow.collectAsState()
+    val xaiKey by preferences.xaiKey.flow.collectAsState()
+    val serverVoice by preferences.serverVoice.flow.collectAsState()
+    val provider by preferences.provider.flow.collectAsState()
+    val voiceServer by preferences.voiceServer.flow.collectAsState()
+    val support by preferences.support.flow.collectAsState()
+    return remember(server, enabled, engine, openAIKey, xaiKey, serverVoice, provider, voiceServer, support) {
+        preferences.isAvailable(server)
+    }
+}

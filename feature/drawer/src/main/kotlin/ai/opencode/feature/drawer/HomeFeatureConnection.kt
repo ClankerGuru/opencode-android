@@ -9,6 +9,8 @@ import ai.opencode.feature.drawer.HomeFeature.Action
 import ai.opencode.feature.drawer.HomeFeature.State
 import ai.opencode.feature.composer.ComposerPersistence
 import ai.opencode.feature.drawer.bridge.SessionDetail
+import ai.opencode.feature.system.share.ShareCredentials
+import ai.opencode.feature.system.share.ShareInboxClient
 import ai.opencode.feature.drawer.bridge.SessionScreenMessage
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeServerEvent
@@ -42,8 +44,9 @@ internal fun HomeFeature.reduceConnection(state: State, action: Action): HomeRed
     Action.TranscriptCacheFlushRequested -> {
         // Leaving the app is when the share sheet becomes reachable: it offers these sessions and
         // sends with this server's credentials.
-        // TODO(merge): `shareInbox.publishTargets(state.shareTargets)` and
-        // `shareInbox.publishCredentials(ShareCredentials(server), true)` once `:feature:system` ports.
+        val shareInbox = dependency(ShareInboxClient)
+        shareInbox.publishTargets(state.shareTargets)
+        shareInbox.publishCredentials(ShareCredentials(state.server), true)
         val persistence = dependency(TranscriptCachePersistence)
         Reduced(state, Effect.merge(Effect.run { persistence.flush() }, flushPersistedComposer(state)))
     }
@@ -54,8 +57,9 @@ internal fun HomeFeature.reduceConnection(state: State, action: Action): HomeRed
         // The stream started before any rename since; the name on screen wins.
         val server = action.server.copy(name = state.server.name)
         val s = state.unsettlingNotices().withServer(server)
-        // TODO(merge): `shareInbox.publishTargets(state.shareTargets)`: the share sheet offers this
-        // server's sessions as soon as it's connected.
+        // The share sheet offers this server's sessions and sends with its credentials, as soon
+        // as it's connected.
+        dependency(ShareInboxClient).publishTargets(s.shareTargets)
         Reduced(
             s,
             Effect.merge(
