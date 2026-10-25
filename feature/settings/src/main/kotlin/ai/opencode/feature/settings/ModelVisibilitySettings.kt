@@ -1,0 +1,333 @@
+package ai.opencode.feature.settings
+
+import ai.opencode.core.dependencies.Dependency
+import ai.opencode.core.haptics.Haptic
+import ai.opencode.core.haptics.HapticsClient
+import ai.opencode.core.sharing.shared
+import ai.opencode.core.store.Effect
+import ai.opencode.core.store.Reduced
+import ai.opencode.core.store.Reducer
+import ai.opencode.core.store.cancellable
+import ai.opencode.core.store.observe
+import ai.opencode.core.store.scope
+import ai.opencode.core.ui.OpenCodeIcon
+import ai.opencode.core.ui.OpenCodeIconSize
+import ai.opencode.core.ui.OpenCodePrimaryButton
+import ai.opencode.core.ui.OpenCodeTextStyles
+import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.core.ui.SFSymbol
+import ai.opencode.server.OpenCodeClient
+import ai.opencode.server.OpenCodeClientError
+import ai.opencode.server.OpenCodeServer
+import ai.opencode.server.model.ModelProviderGroup
+import ai.opencode.server.model.ModelVisibility
+import ai.opencode.server.model.OpenCodeModel
+import ai.opencode.server.model.OpenCodeModelCatalog
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+
+/**
+ * Port of iOS `Settings/ModelVisibilitySettings.swift`: Settings › Models (Hide Unused Models,
+ * OC-510), which of this server's models the Today and Sheet pickers list, kept on this phone
+ * per server (`ModelVisibility.modelVisibilityByServer`).
+ */
+class ModelVisibilityFeature : Reducer<ModelVisibilityFeature.State, ModelVisibilityFeature.Action> {
+    data class State(
+        val server: OpenCodeServer,
+        val models: List<OpenCodeModel> = emptyList(),
+        val isLoading: Boolean = false,
+        val loadError: String? = null,
+    ) {
+        val visibilityByServer: Map<String, ModelVisibility>
+            get() = shared(ModelVisibility.modelVisibilityByServer).value
+
+        val visibility: ModelVisibility get() = visibility(visibilityByServer)
+
+        fun visibility(byServer: Map<String, ModelVisibility>): ModelVisibility =
+            byServer[server.persistenceID] ?: ModelVisibility()
+
+        /** Providers in the order the server lists them. */
+        val providers: List<Provider>
+            get() {
+                val byProvider = LinkedHashMap<String, MutableList<OpenCodeModel>>()
+                for (model in models) byProvider.getOrPut(model.providerID) { mutableListOf() }.add(model)
+                return byProvider.map { (id, list) -> Provider(id, list) }
+            }
+
+        fun provider(id: String): Provider? = providers.firstOrNull { it.id == id }
+
+        /** Choices naming models or providers the server no longer offers. Empty until a catalog has loaded. */
+        fun staleEntries(visibility: ModelVisibility = this.visibility): ModelVisibility.StaleEntries =
+            if (models.isEmpty()) ModelVisibility.StaleEntries() else visibility.staleEntries(models)
+
+        /** “4 of 12”, or “Hidden” for a hidden provider. */
+        fun summary(provider: Provider, visibility: ModelVisibility = this.visibility): String {
+            if (provider.id in visibility.hiddenProviderIDs) return "Hidden"
+            val shown = visibility.visible(models, null).count { it.providerID == provider.id }
+            return if (shown == provider.models.size) "All" else "$shown of ${provider.models.size}"
+        }
+    }
+
+    data class Provider(val id: String, val models: List<OpenCodeModel>) {
+        val title: String get() = ModelProviderGroup.title(id)
+        val canonicalID: String? get() = models.firstOrNull()?.canonicalProviderID
+    }
+
+    sealed interface Action {
+        data object Task : Action
+        data class ModelsLoaded(val result: Result<OpenCodeModelCatalog>) : Action
+        data class ModeChanged(val mode: ModelVisibility.Mode) : Action
+        data class ProviderToggled(val providerID: String, val shown: Boolean) : Action
+        data class ModelToggled(val model: OpenCodeModel, val on: Boolean) : Action
+        data object ResetTapped : Action
+        data object ForgetUnavailableTapped : Action
+    }
+
+    private val openCodeClient by Dependency(OpenCodeClient)
+    private val haptics by Dependency(HapticsClient)
+
+    /** The catalog read; Settings cancels it when the page leaves. */
+    object LoadID
+
+    override fun reduce(state: State, action: Action): Reduced<State, Action> = when (action) {
+        Action.Task -> {
+            val server = state.server
+            val client = openCodeClient
+            Reduced(
+                state.copy(isLoading = state.models.isEmpty() || state.isLoading, loadError = null),
+                Effect.run<Action> { send ->
+                    val result = try {
+                        Result.success(client.modelCatalog(server, null))
+                    } catch (error: OpenCodeClientError) {
+                        Result.failure(error)
+                    }
+                    send(Action.ModelsLoaded(result))
+                }.cancellable(LoadID, cancelInFlight = true),
+            )
+        }
+        is Action.ModelsLoaded -> action.result.fold(
+            onSuccess = { catalog ->
+                val models = if (catalog.models.isNotEmpty() || state.models.isEmpty()) catalog.models else state.models
+                Reduced(state.copy(isLoading = false, models = models))
+            },
+            onFailure = { error ->
+                Reduced(state.copy(isLoading = false, loadError = if (state.models.isEmpty()) error.message else state.loadError))
+            },
+        )
+        is Action.ModeChanged -> update(state) { it.copy(mode = action.mode) }
+        is Action.ProviderToggled -> update(state) { it.setProvider(action.providerID, action.shown) }
+        is Action.ModelToggled -> update(state) { it.setModel(action.model, action.on) }
+        Action.ForgetUnavailableTapped -> {
+            val stale = state.staleEntries()
+            if (stale.isEmpty) {
+                Reduced(state)
+            } else {
+                haptics.play(Haptic.tap)
+                update(state) { it.forget(stale) }
+            }
+        }
+        Action.ResetTapped -> {
+            val id = state.server.persistenceID
+            val byServer = shared(ModelVisibility.modelVisibilityByServer)
+            if (id in byServer.value) {
+                haptics.play(Haptic.tap)
+                byServer.update { it - id }
+            }
+            Reduced(state)
+        }
+    }
+
+    private fun update(state: State, change: (ModelVisibility) -> ModelVisibility): Reduced<State, Action> {
+        val current = state.visibility
+        val next = change(current)
+        if (next == current) return Reduced(state)
+        val id = state.server.persistenceID
+        shared(ModelVisibility.modelVisibilityByServer).update { map ->
+            if (next == ModelVisibility()) map - id else map + (id to next)
+        }
+        return Reduced(state)
+    }
+}
+
+private typealias ModelsStore = ai.opencode.core.store.StoreOf<ModelVisibilityFeature.State, ModelVisibilityFeature.Action>
+
+@Composable
+private fun rememberModelsStore(store: SettingsStore, server: OpenCodeServer?): ModelsStore = remember(store) {
+    store.scope<SettingsFeature.State, SettingsFeature.Action, ModelVisibilityFeature.State, ModelVisibilityFeature.Action>(
+        state = { it.modelVisibility ?: ModelVisibilityFeature.State(it.server ?: server ?: placeholderServer) },
+        action = { SettingsFeature.Action.ModelVisibility(it) },
+    )
+}
+
+private val placeholderServer = OpenCodeServer(url = "", username = "", password = "")
+
+/** Settings › Models (iOS `ModelVisibilitySettingsView`). */
+@Composable
+fun ModelVisibilitySettingsView(store: SettingsStore) {
+    val models = rememberModelsStore(store, null)
+    val state by models.observe { it }
+    val byServer by remember { shared(ModelVisibility.modelVisibilityByServer).flow }.collectAsState()
+    val visibility = state.visibility(byServer)
+    LaunchedEffect(models) { models.send(ModelVisibilityFeature.Action.Task) }
+
+    Box(Modifier.fillMaxSize()) {
+        SettingsPageScaffold(title = "Models", store = store) {
+            item(key = "mode") {
+                Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                        listOf(ModelVisibility.Mode.hide to "Hide", ModelVisibility.Mode.onlyShow to "Only Show")
+                            .forEachIndexed { index, (mode, title) ->
+                                SegmentedButton(
+                                    selected = visibility.mode == mode,
+                                    onClick = { models.send(ModelVisibilityFeature.Action.ModeChanged(mode)) },
+                                    shape = SegmentedButtonDefaults.itemShape(index, 2),
+                                    icon = {},
+                                ) { Text(title) }
+                            }
+                    }
+                    SettingsFooterText(
+                        if (visibility.mode == ModelVisibility.Mode.hide) {
+                            "Turn off models you never use. The model picker lists the rest."
+                        } else {
+                            "Turn on only the models you use. The model picker lists just those."
+                        },
+                        Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp),
+                    )
+                }
+            }
+            val providers = state.providers
+            if (providers.isNotEmpty()) {
+                settingsSection(key = "providers", header = "Providers") {
+                    providers.forEachIndexed { index, provider ->
+                        if (index > 0) SettingsDivider(inset = true)
+                        SettingsRowFrame(onClick = {
+                            store.send(SettingsFeature.Action.PagePushed(SettingsPage.ModelProvider(provider.id)))
+                        }) {
+                            OpenCodeIcon(SFSymbol.Cpu, contentDescription = null, size = 20.dp, tint = OpenCodeTheme.colors.secondaryText)
+                            Text(provider.title, style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
+                            Text(state.summary(provider, visibility), style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.secondaryText)
+                            SettingsChevron()
+                        }
+                    }
+                }
+            }
+            val stale = state.staleEntries(visibility)
+            if (!stale.isEmpty) {
+                settingsSection(
+                    key = "stale",
+                    header = "No Longer Offered",
+                    footer = footerText("Your choices name these, but the server doesn’t offer them now."),
+                ) {
+                    stale.all.forEach { id ->
+                        SettingsRowFrame {
+                            Text(id, style = OpenCodeTextStyles.subheadline.copy(fontFamily = FontFamily.Monospace), color = OpenCodeTheme.colors.secondaryText)
+                        }
+                        SettingsDivider()
+                    }
+                    SettingsButtonRow("Forget Unavailable Models", onClick = { models.send(ModelVisibilityFeature.Action.ForgetUnavailableTapped) })
+                }
+            }
+            if (state.server.persistenceID in byServer) {
+                settingsSection(key = "reset") {
+                    SettingsButtonRow("Show Every Model", onClick = { models.send(ModelVisibilityFeature.Action.ResetTapped) })
+                }
+            }
+        }
+        if (state.isLoading && state.models.isEmpty()) {
+            CircularProgressIndicator(Modifier.align(Alignment.Center))
+        } else if (state.loadError != null && state.models.isEmpty()) {
+            Column(
+                Modifier.align(Alignment.Center).padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                OpenCodeIcon(SFSymbol.ExclamationmarkTriangle, contentDescription = null, size = OpenCodeIconSize.hero, tint = OpenCodeTheme.colors.secondaryText)
+                Text("Couldn’t Load Models", style = OpenCodeTextStyles.title3, color = OpenCodeTheme.colors.text)
+                Text(state.loadError.orEmpty(), style = OpenCodeTextStyles.subheadline, color = OpenCodeTheme.colors.secondaryText, textAlign = TextAlign.Center)
+                OpenCodePrimaryButton(onClick = { models.send(ModelVisibilityFeature.Action.Task) }) { Text("Try Again") }
+            }
+        }
+    }
+}
+
+/**
+ * One provider's page (iOS `ModelVisibilityProviderView`): hide the whole provider, or switch its
+ * models. Search matches every query word against the model's name or ID (iOS ranks with the
+ * composer's `ModelSearch`, which isn't in a module Settings can reach).
+ */
+@Composable
+fun ModelVisibilityProviderView(store: SettingsStore, providerID: String) {
+    val models = rememberModelsStore(store, null)
+    val state by models.observe { it }
+    val byServer by remember { shared(ModelVisibility.modelVisibilityByServer).flow }.collectAsState()
+    val visibility = state.visibility(byServer)
+    val provider = state.provider(providerID)
+    val providerTitle = provider?.title ?: ModelProviderGroup.title(providerID)
+    val providerShown = providerID !in visibility.hiddenProviderIDs
+    var filter by rememberSaveable { mutableStateOf("") }
+    val words = filter.lowercase().split(" ").filter { it.isNotBlank() }
+    val list = provider?.models.orEmpty().filter { model ->
+        words.all { word -> model.name.lowercase().contains(word) || model.id.lowercase().contains(word) }
+    }
+
+    SettingsPageScaffold(title = providerTitle, store = store) {
+        item(key = "search") {
+            OutlinedTextField(
+                value = filter,
+                onValueChange = { filter = it },
+                placeholder = { Text("Search Models") },
+                singleLine = true,
+                leadingIcon = { OpenCodeIcon(SFSymbol.Magnifyingglass, contentDescription = null, size = 20.dp) },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+        }
+        if (filter.isEmpty()) {
+            settingsSection(
+                key = "provider",
+                footer = if (!providerShown) footerText("The model picker lists none of this provider’s models.") else null,
+            ) {
+                SettingsToggleRow(
+                    "Show $providerTitle",
+                    checked = providerShown,
+                    onCheckedChange = { models.send(ModelVisibilityFeature.Action.ProviderToggled(providerID, it)) },
+                )
+            }
+        }
+        if (list.isNotEmpty()) {
+            settingsSection(key = "models") {
+                list.forEachIndexed { index, model ->
+                    if (index > 0) SettingsDivider()
+                    SettingsToggleRow(
+                        model.name,
+                        checked = visibility.isModelOn(model),
+                        onCheckedChange = { models.send(ModelVisibilityFeature.Action.ModelToggled(model, it)) },
+                        enabled = providerShown,
+                    )
+                }
+            }
+        }
+    }
+}

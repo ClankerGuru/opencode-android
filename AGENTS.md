@@ -101,6 +101,8 @@ Google's libwebrtc), Highlights + jlatexmath (transcript; iOS's Markdown and hig
 self-written, so port them first and use these only where iOS used a library, e.g. SwiftMath →
 jlatexmath), Firebase Messaging (push; keep it behind an interface until credentials exist).
 Add a new library only with a one-line justification here.
+- `com.google.zxing:core` (settings): decodes the pairing QR from CameraX frames, as iOS's
+  AVFoundation QR metadata output does; pure Java, no Play services (ML Kit would need them).
 - `play-services-code-scanner` (`:app`): Scan Pairing Code reads one QR symbology; Google's
   code scanner shows its own camera UI with no CAMERA permission, CameraX or bundled ML model.
 
