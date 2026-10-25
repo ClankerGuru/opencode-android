@@ -2,6 +2,7 @@ package ai.opencode.server
 
 import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.server.DiagnosticsInstrumentation.recordingDiagnostics
+import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 
@@ -18,7 +19,11 @@ class OpenCodeTransport(
 ) {
     companion object Key : DependencyKey<OpenCodeTransport> {
         override val liveValue: OpenCodeTransport by lazy {
-            val base = OkHttpClient()
+            // OkHttp caps calls per host at 5 by default; the event stream and a `/wait` long poll
+            // would hold two of them, and family/ancestry fan-out (six lookups plus active status)
+            // needs more. iOS's URLSession has no such cap on in-flight requests.
+            val dispatcher = Dispatcher().apply { maxRequestsPerHost = maxRequests }
+            val base = OkHttpClient.Builder().dispatcher(dispatcher).build()
             // Requests feed the diagnostics timeline (inert while recording is off); the event
             // stream records its own connect/disconnect marks instead.
             val recorded = base.newBuilder().recordingDiagnostics().build()
