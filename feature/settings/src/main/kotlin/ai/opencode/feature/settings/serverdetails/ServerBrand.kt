@@ -2,7 +2,9 @@ package ai.opencode.feature.settings.serverdetails
 
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
+import ai.opencode.core.ui.BrandAssets
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.core.ui.TemplateAssetImage
 import ai.opencode.feature.settings.SettingsTint
 import ai.opencode.server.model.OpenCodeAccount
 import ai.opencode.server.model.OpenCodeMCPServer
@@ -13,7 +15,6 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -32,12 +33,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -48,9 +46,8 @@ import java.util.Locale
  * Port of iOS `ServerBrand` (`Settings/ServerBrand.swift`): how an MCP server or provider account
  * looks in Server Details: its brand mark on its brand colour, or a monogram tile when the app
  * doesn't know it. The server sends no logos; iOS maps known names to marks bundled in
- * `ProviderIcons.xcassets` (`mcp-*`, `provider-*`). Android bundles none of those marks yet, so
- * [assetExists] answers false and every brand is a monogram tile; [asset] names the mark a
- * drawable would carry.
+ * `ProviderIcons.xcassets` (`mcp-*` from simple-icons, `provider-*`); Android bundles the same
+ * SVGs in `:core` assets ([BrandAssets]), and [asset] is their iOS asset name.
  */
 data class ServerBrand(
     val name: String,
@@ -100,11 +97,8 @@ data class ServerBrand(
         /** Muted tile colours for monograms, picked by a stable hash of the name. */
         private val monogramFills: List<Long> = listOf(0x46526A, 0x4F5D4A, 0x6A4A5E, 0x4A5F6A, 0x6A5A46, 0x584A6A)
 
-        /** No `mcp-*`/`provider-*` drawables are bundled on Android yet (see [drawableFor]). */
-        private val bundledAssets: (String) -> Boolean = { drawableFor(it) != null }
-
-        /** The drawable for an iOS asset name, once marks are bundled. */
-        fun drawableFor(@Suppress("UNUSED_PARAMETER") asset: String): Int? = null
+        /** iOS `UIImage(named:) != nil`: the mark is bundled. */
+        private val bundledAssets: (String) -> Boolean = BrandAssets::exists
 
         fun mcp(name: String, assetExists: (String) -> Boolean = bundledAssets): ServerBrand {
             val lower = name.lowercase()
@@ -143,8 +137,6 @@ data class ServerBrand(
 /** iOS `Color(serverBrandHex:)`. */
 fun serverBrandColor(hex: Long): Color = Color(0xFF000000 or (hex and 0xFFFFFF))
 
-private val GrayscaleFilter = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) })
-
 /** A brand mark on its tile. Decorative: rows name the server themselves. */
 @Composable
 fun BrandTile(
@@ -162,13 +154,16 @@ fun BrandTile(
     val b = (brand.fill and 0xFF).toDouble()
     val isPale = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 > 0.9
     val shape = if (round) CircleShape else RoundedCornerShape(size * 0.28f)
+    // iOS `.saturation(muted ? 0 : 1)` over the whole tile: every colour drawn goes grey.
+    fun Color.muted(): Color = if (muted) desaturated() else this
     val fill = serverBrandColor(brand.fill)
     val background = if (isPale && !isDark) {
         Brush.verticalGradient(listOf(SystemGray5Light, SystemGray5Light))
     } else {
         // SwiftUI `.gradient`: a soft top-lit vertical gradient of the colour.
-        Brush.verticalGradient(listOf(fill.lighten(0.08f), fill.darken(0.08f)))
+        Brush.verticalGradient(listOf(fill.lighten(0.08f).muted(), fill.darken(0.08f).muted()))
     }
+    val glyph = serverBrandColor(brand.glyph).muted()
     val rimAlpha = if (isPale && !isDark) 0.16f else 0.1f
     val rimColor = if (isDark) Color.White else Color.Black
     Box(
@@ -180,18 +175,13 @@ fun BrandTile(
             .border(0.5.dp, rimColor.copy(alpha = rimAlpha), shape),
         contentAlignment = Alignment.Center,
     ) {
-        val drawable = brand.asset?.let(ServerBrand::drawableFor)
-        if (drawable != null) {
-            Image(
-                painterResource(drawable),
-                contentDescription = null,
-                colorFilter = if (muted) GrayscaleFilter else ColorFilter.tint(serverBrandColor(brand.glyph)),
-                modifier = Modifier.size(size * 0.5f),
-            )
+        val asset = brand.asset
+        if (asset != null) {
+            TemplateAssetImage(asset, Modifier.size(size * 0.5f), tint = glyph)
         } else {
             Text(
                 brand.monogram,
-                color = if (muted) Color(0xFFE5E5EA) else serverBrandColor(brand.glyph),
+                color = glyph,
                 fontSize = (size.value * 0.38f).sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
@@ -206,6 +196,12 @@ private val SystemGray5Light = Color(0xFFE5E5EA)
 private fun Color.lighten(amount: Float) = Color(
     red + (1 - red) * amount, green + (1 - green) * amount, blue + (1 - blue) * amount, alpha,
 )
+
+/** SwiftUI `.saturation(0)`: the colour's Rec. 709 luminance as grey. */
+private fun Color.desaturated(): Color {
+    val luma = 0.2126f * red + 0.7152f * green + 0.0722f * blue
+    return Color(luma, luma, luma, alpha)
+}
 
 private fun Color.darken(amount: Float) = Color(red * (1 - amount), green * (1 - amount), blue * (1 - amount), alpha)
 
