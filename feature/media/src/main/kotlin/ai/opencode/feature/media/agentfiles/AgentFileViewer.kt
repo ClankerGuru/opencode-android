@@ -29,6 +29,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -69,12 +72,16 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -188,6 +195,7 @@ fun AgentFilePage(
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
+@androidx.annotation.OptIn(markerClass = [UnstableApi::class])
 @Composable
 private fun AgentFilePageContent(
     model: AgentFileViewerModel,
@@ -223,6 +231,16 @@ private fun AgentFilePageContent(
         onDispose { model.stop() }
     }
 
+    val playerContent = (phase as? AgentFileViewerModel.Phase.Ready)?.content as? AgentFileViewerModel.Content.Player
+    val pip = playerContent?.let { rememberAgentFilePictureInPicture(it.player, it.isAudio) }
+    if (pip != null && pip.isActive) {
+        // The viewer fills the window: in Picture in Picture the window is only the video.
+        Box(modifier.fillMaxSize().background(Color.Black).testTag("agent-file-pip")) {
+            ContentFrame(player = playerContent.player, modifier = Modifier.fillMaxSize())
+        }
+        return
+    }
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = background,
@@ -254,15 +272,23 @@ private fun AgentFilePageContent(
                             )
                         }
                     }
+                    if (pip != null && pip.isSupported) {
+                        IconButton(onClick = pip::start, modifier = Modifier.testTag("agent-file-pip-start")) {
+                            OpenCodeIcon("pip.enter", contentDescription = "Start Picture in Picture")
+                        }
+                    }
                     if (phase is AgentFileViewerModel.Phase.Ready) ShareControl(model)
                 },
             )
         },
     ) { padding ->
+        // An image fills the whole screen under the bar (iOS `.ignoresSafeArea()`), so it zooms
+        // in and out of the same frame the transcript's flight lands on.
+        val fillsScreen = phase is AgentFileViewerModel.Phase.Ready && phase.content is AgentFileViewerModel.Content.Image
         Box(
             Modifier
                 .fillMaxSize()
-                .padding(top = padding.calculateTopPadding()),
+                .padding(top = if (fillsScreen) 0.dp else padding.calculateTopPadding()),
             contentAlignment = Alignment.Center,
         ) {
             when (phase) {
@@ -276,7 +302,7 @@ private fun AgentFilePageContent(
                 is AgentFileViewerModel.Phase.Failed -> FailedView(phase.error, model::open)
                 is AgentFileViewerModel.Phase.Ready -> ReadyContent(
                     model, phase.content, isRoot, wrapsLines, showsSource, background, markdown, onOpen,
-                    onImageShown, onZoomChange, onImageFrame,
+                    onImageShown, onZoomChange, onImageFrame, pip,
                 )
             }
         }
@@ -348,6 +374,7 @@ private fun ReadyContent(
     onImageShown: (String, android.graphics.Bitmap) -> Unit,
     onZoomChange: (Boolean) -> Unit,
     onImageFrame: (String, Rect) -> Unit,
+    pip: AgentFilePictureInPicture?,
 ) {
     val reference = model.reference
     when (content) {
@@ -367,6 +394,7 @@ private fun ReadyContent(
             isAudio = content.isAudio,
             name = reference.name,
             isClear = background == Color.Transparent,
+            pip = pip,
             modifier = Modifier.testTag(if (content.isStreaming) "agent-file-player-streaming" else "agent-file-player"),
         )
         is AgentFileViewerModel.Content.QuickLook -> {
@@ -374,7 +402,7 @@ private fun ReadyContent(
             if (pdf != null) {
                 AgentPdfView(pdf, Modifier.testTag("agent-file-quick-look"))
             } else {
-                ExternalDocumentView(reference, model::openExternally, Modifier.testTag("agent-file-quick-look"))
+                ExternalDocumentView(reference, model.noAppOpens, model::openExternally, Modifier.testTag("agent-file-quick-look"))
             }
         }
         is AgentFileViewerModel.Content.Text -> AgentCodeView(content.document, wrapsLines)
@@ -484,7 +512,7 @@ private fun FailedView(error: AgentFileError, onRetry: () -> Unit) {
 
 /** A document Android can't preview here: another app opens it (iOS shows it in Quick Look). */
 @Composable
-private fun ExternalDocumentView(reference: AgentFileReference, onOpen: () -> Unit, modifier: Modifier) {
+private fun ExternalDocumentView(reference: AgentFileReference, noAppOpens: Boolean, onOpen: () -> Unit, modifier: Modifier) {
     Column(
         modifier.padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -496,6 +524,19 @@ private fun ExternalDocumentView(reference: AgentFileReference, onOpen: () -> Un
             Text(reference.typeLabel, style = OpenCodeTextStyles.subheadline, color = OpenCodeTheme.colors.secondaryText)
         }
         OpenCodePrimaryButton(text = "Open in Another App", onClick = onOpen)
+        if (noAppOpens) {
+            // Android only: nothing installed opens this type (Share still saves it to Files).
+            Text(
+                "No app on this device can open this file. Share it to save it or send it elsewhere.",
+                style = OpenCodeTextStyles.footnote,
+                color = OpenCodeTheme.colors.secondaryText,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .widthIn(max = 280.dp)
+                    .semantics { liveRegion = LiveRegionMode.Polite }
+                    .testTag("agent-file-no-app"),
+            )
+        }
     }
 }
 
@@ -506,7 +547,12 @@ private fun AgentPdfView(document: AgentPdfDocument, modifier: Modifier) {
         val widthPx = with(LocalDensity.current) { (maxWidth - TranscriptMetrics.standard * 2).roundToPx() }
         LazyColumn(
             Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(TranscriptMetrics.standard),
+            contentPadding = PaddingValues(
+                start = TranscriptMetrics.standard,
+                top = TranscriptMetrics.standard,
+                end = TranscriptMetrics.standard,
+                bottom = TranscriptMetrics.standard + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding(),
+            ),
             verticalArrangement = Arrangement.spacedBy(TranscriptMetrics.standard),
         ) {
             items(count = document.pageCount, key = { it }) { index ->
@@ -535,7 +581,7 @@ private fun AgentPdfView(document: AgentPdfDocument, modifier: Modifier) {
  */
 @androidx.annotation.OptIn(markerClass = [UnstableApi::class])
 @Composable
-private fun AgentFilePlayer(player: Player, isAudio: Boolean, name: String, isClear: Boolean, modifier: Modifier) {
+private fun AgentFilePlayer(player: Player, isAudio: Boolean, name: String, isClear: Boolean, pip: AgentFilePictureInPicture?, modifier: Modifier) {
     var controlsShown by remember { mutableStateOf(true) }
     val playPause = rememberPlayPauseButtonState(player)
     // Letterboxing shows the dark room behind, so it lifts with a drag.
@@ -550,7 +596,25 @@ private fun AgentFilePlayer(player: Player, isAudio: Boolean, name: String, isCl
         if (isAudio) {
             AudioArtwork(name)
         } else {
-            ContentFrame(player = player, modifier = Modifier.fillMaxSize())
+            ContentFrame(
+                player = player,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .onGloballyPositioned { coordinates ->
+                        // Where the letterboxed video sits: the PiP window grows out of it.
+                        val pipState = pip ?: return@onGloballyPositioned
+                        val bounds = coordinates.boundsInWindow()
+                        val video = player.videoSize
+                        pipState.videoFrame = if (video.width > 0 && video.height > 0 && bounds.width > 0f && bounds.height > 0f) {
+                            val aspect = video.width * video.pixelWidthHeightRatio / video.height
+                            val width = minOf(bounds.width, bounds.height * aspect)
+                            val height = width / aspect
+                            Rect(bounds.center.x - width / 2, bounds.center.y - height / 2, bounds.center.x + width / 2, bounds.center.y + height / 2)
+                        } else {
+                            bounds
+                        }
+                    },
+            )
         }
         LaunchedEffect(controlsShown, playPause.showPlay, isAudio) {
             if (!isAudio && controlsShown && !playPause.showPlay) {

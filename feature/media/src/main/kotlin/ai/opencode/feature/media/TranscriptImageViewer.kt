@@ -246,7 +246,9 @@ class TranscriptImageViewerFeature : Reducer<TranscriptImageViewerFeature.State,
                         } catch (cancellation: kotlinx.coroutines.CancellationException) {
                             throw cancellation
                         } catch (error: Throwable) {
-                            AppLog.app.error { "Photo save failed: ${error::class.java.simpleName}" }
+                            // iOS logs the NSError's domain and code; a Swift enum error's code is its case index.
+                            val code = if (error is PhotoSaveClientError.Denied) 0 else -1
+                            AppLog.app.error { "Photo save failed: ${error::class.java.name} code=$code" }
                             false
                         }
                         send(Action.SaveFinished(saved))
