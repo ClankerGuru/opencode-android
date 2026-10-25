@@ -5,6 +5,7 @@ import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.ui.OpenCodeTextStyles
+import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.openCodeTapTarget
 import ai.opencode.server.OpenCodePairingLink
 import android.view.ViewGroup
@@ -458,11 +459,12 @@ fun BrowserWebViewHost(
         var attached = false
     }
     val coordinator = remember { Coordinator(pageID) }
+    val isDark = OpenCodeTheme.colors.isDark
     var held by remember { mutableStateOf<Triple<String, Float, Float>?>(null) }
     val pages = BrowserWebViews.shared
 
     fun attach(container: FrameLayout) {
-        val webView = pages.webView(pageID, url)
+        val webView = pages.webView(pageID, url, isDark)
         if (webView.parent !== container) {
             (webView.parent as? ViewGroup)?.removeView(webView)
             container.removeAllViews()

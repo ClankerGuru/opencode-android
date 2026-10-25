@@ -319,10 +319,14 @@ private fun Modifier.thumbnailSize(image: Bitmap, fits: Boolean, maxHeight: Dp):
     } else {
         Size(width, if (proposedHeight.isInfinite()) imageSize.height else proposedHeight)
     }
-    val w = size.width.roundToInt().coerceIn(constraints.minWidth, constraints.maxWidth)
-    val h = size.height.roundToInt().coerceIn(constraints.minHeight, constraints.maxHeight)
+    // The image keeps its own frame (its clip, and where flights start and land) even when the
+    // caller insists on a larger one (`fillMaxWidth`): centred in it, as a SwiftUI frame does.
+    val w = size.width.roundToInt().coerceIn(0, constraints.maxWidth)
+    val h = size.height.roundToInt().coerceIn(0, constraints.maxHeight)
     val placeable = measurable.measure(androidx.compose.ui.unit.Constraints.fixed(w, h))
-    layout(w, h) { placeable.place(0, 0) }
+    val outerWidth = max(w, constraints.minWidth)
+    val outerHeight = max(h, constraints.minHeight)
+    layout(outerWidth, outerHeight) { placeable.place((outerWidth - w) / 2, (outerHeight - h) / 2) }
 }
 
 // MARK: - Viewer

@@ -85,7 +85,8 @@ fun AgentCodeView(document: AgentTextDocument, wrapsLines: Boolean, modifier: Mo
 
         val horizontalPadding = TranscriptMetrics.standard * 2
         val gutterSpacing = if (numbered) TranscriptMetrics.standard else 0.dp
-        val unwrappedWidth = (gutterWidth + gutterSpacing + charWidth * longestLine + horizontalPadding).coerceIn(maxWidth, MaxUnwrappedWidth)
+        // One character of slack: the estimate rounds, and an unwrapped line must never wrap.
+        val unwrappedWidth = (gutterWidth + gutterSpacing + charWidth * (longestLine + 1) + horizontalPadding).coerceIn(maxWidth, MaxUnwrappedWidth)
         val contentWidth = if (wrapsLines) maxWidth else unwrappedWidth
         val scroll = rememberScrollState()
         SelectionContainer(
@@ -117,7 +118,7 @@ fun AgentCodeView(document: AgentTextDocument, wrapsLines: Boolean, modifier: Mo
                         Text(
                             text = document.line(index, palette),
                             style = textStyle,
-                            softWrap = true,
+                            softWrap = wrapsLines,
                             modifier = Modifier.weight(1f).alignByBaseline(),
                         )
                     }

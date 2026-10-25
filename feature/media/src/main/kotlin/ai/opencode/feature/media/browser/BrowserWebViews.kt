@@ -16,6 +16,7 @@ import android.graphics.Canvas
 import android.os.Handler
 import android.os.Looper
 import android.os.Message
+import android.view.ContextThemeWrapper
 import android.view.MotionEvent
 import android.view.ViewGroup
 import android.view.animation.DecelerateInterpolator
@@ -108,16 +109,23 @@ class BrowserWebViews private constructor() {
         var lastTouchY = 0f
         /** The context a page needs for its dialogs and pickers: the host's while shown. */
         val context = MutableContextWrapper(dependency(AppContext))
+        /** The app's appearance when the page opened: the page's `prefers-color-scheme`. */
+        var isDark = false
     }
 
     private val entries = HashMap<UUID, Entry>()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var clearedThisRun = false
 
-    /** The page's web view, made on first use. */
-    fun webView(id: UUID, url: String): WebView {
+    /**
+     * The page's web view, made on first use. [isDark] is the app's appearance (iOS: a web view
+     * follows its window's interface style); Android hands it to the page as `prefers-color-scheme`
+     * through the creating context's `isLightTheme`, so it is fixed when the web view is made.
+     */
+    fun webView(id: UUID, url: String, isDark: Boolean = false): WebView {
         val entry = entries.getOrPut(id) { Entry(url, id) }
         entry.webView?.let { return it }
+        entry.isDark = isDark
         val webView = makeWebView(entry)
         entry.webView = webView
         webView.loadUrl(entry.url)
@@ -283,7 +291,12 @@ class BrowserWebViews private constructor() {
     @SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
     private fun makeWebView(entry: Entry): WebView {
         val profile = prepareProfile()
-        val webView = WebView(entry.context)
+        // Android's WebView reads the page's colour scheme from its context theme's `isLightTheme`.
+        val themed = ContextThemeWrapper(
+            entry.context,
+            if (entry.isDark) android.R.style.Theme_Material_NoActionBar else android.R.style.Theme_Material_Light_NoActionBar,
+        )
+        val webView = WebView(themed)
         if (profile != null) WebViewCompat.setProfile(webView, profile)
         if (!clearedThisRun) {
             clearedThisRun = true

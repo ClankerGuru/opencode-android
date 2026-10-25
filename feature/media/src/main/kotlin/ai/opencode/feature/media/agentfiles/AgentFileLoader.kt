@@ -172,10 +172,13 @@ object AgentFileLoader {
         val ranged = authorizedRequest(request, server).newBuilder().header("Range", "bytes=0-1").build()
         try {
             // Headers are all the probe needs; an old server is already sending the whole file.
-            client.newCall(ranged).await().use { response ->
-                if (response.code != 416) AgentFileError.from(response.code)?.let { throw it }
-                noteContact(contact, server, ranged, response)
-                return AgentFileProbe.of(response)
+            // Closed off the main thread: closing an unread body drains the connection.
+            return withContext(Dispatchers.IO) {
+                client.newCall(ranged).await().use { response ->
+                    if (response.code != 416) AgentFileError.from(response.code)?.let { throw it }
+                    noteContact(contact, server, ranged, response)
+                    AgentFileProbe.of(response)
+                }
             }
         } catch (error: AgentFileError) {
             throw error
