@@ -12,7 +12,11 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.view.View
 import android.webkit.MimeTypeMap
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.draganddrop.DragAndDropSourceScope
 import androidx.compose.foundation.draganddrop.dragAndDropSource
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
@@ -20,9 +24,11 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draganddrop.DragAndDropTransferData
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.net.toUri
 import java.util.Locale
+import kotlinx.coroutines.withTimeoutOrNull
 
 // The media-level half of iOS `Transcript/TranscriptDragSource.swift`: the `.url` and
 // `.agentFile` payloads media's own surfaces drag (links in `LinkMenu`, gallery tiles, file
@@ -226,16 +232,39 @@ sealed interface MediaDragPayload {
  * the file's `content://` URI. The clip data is built when the drag starts. Taps and scrolling
  * stay with the surface. `null` leaves the surface untouched.
  */
+@OptIn(ExperimentalFoundationApi::class)
 fun Modifier.mediaDragSource(payload: MediaDragPayload?): Modifier = if (payload == null) this else composed {
     val context = LocalContext.current
     val dragContext = LocalMediaDragContext.current
     val current by rememberUpdatedState(payload)
     val currentContext by rememberUpdatedState(dragContext)
-    dragAndDropSource { _ ->
-        val clip = current.clipData(context, currentContext) ?: return@dragAndDropSource null
-        markDragBegin()
-        DragAndDropTransferData(clip, flags = View.DRAG_FLAG_GLOBAL or View.DRAG_FLAG_GLOBAL_URI_READ)
+    // A hold that stays put starts the drag. Watched on the Initial pass without consuming:
+    // the surface's own `clickable` (inside this modifier) consumes the down, so Compose's
+    // default start detector would never see it. The system drag cancels the press, so the
+    // tap doesn't fire after a drag.
+    val start: suspend DragAndDropSourceScope.() -> Unit = {
+        val source = this
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            val slop = viewConfiguration.touchSlop
+            val held = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                while (true) {
+                    val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id }
+                        ?: return@withTimeoutOrNull false
+                    if (!change.pressed || change.isConsumed) return@withTimeoutOrNull false
+                    if ((change.position - down.position).getDistance() > slop) return@withTimeoutOrNull false
+                }
+                @Suppress("UNREACHABLE_CODE")
+                false
+            } ?: true
+            if (!held) return@awaitEachGesture
+            val clip = current.clipData(context, currentContext) ?: return@awaitEachGesture
+            markDragBegin()
+            source.startTransfer(DragAndDropTransferData(clip, flags = View.DRAG_FLAG_GLOBAL or View.DRAG_FLAG_GLOBAL_URI_READ))
+        }
     }
+    @Suppress("DEPRECATION")
+    dragAndDropSource(start)
 }
 
 /** iOS `LabMarks.mark("transcript_drag_begin")` (DEBUG builds only). */
