@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="system_new_session">New Session</string>
+    <string name="system_start_call">Start Call</string>
+    <string name="system_open_session">Open Session</string>
+    <string name="widget_start_call_description">Starts a voice call in a session you choose, or the one you viewed last.</string>
+    <string name="widget_open_session_description">Opens a session you choose.</string>
+    <string name="widget_new_session_description">Opens a new OpenCode session.</string>
+</resources>

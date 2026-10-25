@@ -157,11 +157,11 @@ internal object SystemColors {
  *
  * | M3 role | iOS colour |
  * | --- | --- |
- * | primary / onPrimary | accent / accent's high-contrast foreground |
+ * | primary / onPrimary | accent / white (System: UIKit tint) or the accent's high-contrast foreground (themes) |
  * | primaryContainer / onPrimaryContainer | canvas → accent 22 % (OKLab) / strong text |
  * | secondary / onSecondary | secondary text / canvas |
  * | secondaryContainer / onSecondaryContainer | surfaceStrong (secondary buttons) / text |
- * | tertiary / onTertiary | link / link's high-contrast foreground |
+ * | tertiary / onTertiary | link / white (System) or the link's high-contrast foreground (themes) |
  * | background, surface, surfaceContainerLowest | canvas |
  * | surfaceContainerLow | canvasWeak (grouped canvas, light) |
  * | surfaceContainer | canvasWeak ↔ userBubble midpoint |
@@ -169,7 +169,7 @@ internal object SystemColors {
  * | surfaceContainerHighest | surfaceStrong |
  * | onSurface / onSurfaceVariant | text / secondary text |
  * | outline / outlineVariant | borderStrong / border |
- * | error / onError | destructive red (System) or diffRemovedText (themes) / its foreground |
+ * | error / onError | destructive red (System) or diffRemovedText (themes) / white (System) or its high-contrast foreground |
  * | errorContainer / onErrorContainer | removed-diff fill over canvas / text |
  */
 fun OpenCodeColors.toColorScheme(): ColorScheme {
@@ -188,10 +188,15 @@ fun OpenCodeColors.toColorScheme(): ColorScheme {
     val errorContainer = (if (system) SystemColors.red(isDark).withAlpha(0.14) else v.glassDiffRemovedFill).composited(canvas)
     val surfaceBright = if (isDark) v.surfaceStrong else canvas
     val surfaceDim = if (isDark) canvas else v.canvasWeak
+    // UIKit's system tints (systemBlue, systemRed) are designed for white labels: iOS draws its
+    // tint-filled and destructive controls with white text in light and dark. The luminance pick
+    // ([highContrastForeground]) chooses near-black over systemBlue/systemRed, so it only
+    // applies to theme palettes (iOS `sendButtonForeground` over a theme accent).
+    val white = ThemeRGBA(1.0, 1.0, 1.0)
     val base = if (isDark) darkColorScheme() else lightColorScheme()
     return base.copy(
         primary = accent.color,
-        onPrimary = accent.highContrastForeground.color,
+        onPrimary = (if (system) white else accent.highContrastForeground).color,
         primaryContainer = primaryContainer.color,
         onPrimaryContainer = strong.color,
         inversePrimary = accent.mixedInOklab(canvas.highContrastForeground, 0.35).color,
@@ -200,7 +205,7 @@ fun OpenCodeColors.toColorScheme(): ColorScheme {
         secondaryContainer = v.surfaceStrong.color,
         onSecondaryContainer = textRgba.color,
         tertiary = v.link.color,
-        onTertiary = v.link.highContrastForeground.color,
+        onTertiary = (if (system) white else v.link.highContrastForeground).color,
         tertiaryContainer = canvas.mixedInOklab(v.link, 0.22).color,
         onTertiaryContainer = strong.color,
         background = canvas.color,
@@ -213,7 +218,7 @@ fun OpenCodeColors.toColorScheme(): ColorScheme {
         inverseSurface = v.text.color,
         inverseOnSurface = canvas.color,
         error = error.color,
-        onError = error.highContrastForeground.color,
+        onError = (if (system) white else error.highContrastForeground).color,
         errorContainer = errorContainer.color,
         onErrorContainer = textRgba.color,
         outline = outline.color,
