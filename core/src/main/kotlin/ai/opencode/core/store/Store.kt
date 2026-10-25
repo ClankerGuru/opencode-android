@@ -57,6 +57,7 @@ class Store<S, A>(
     override val states: StateFlow<S> get() = stateFlow
 
     override fun send(action: A) {
+        check(android.os.Looper.getMainLooper().isCurrentThread) { "Store.send must be called on the main thread" }
         queue.addLast(action)
         if (isSending) return
         isSending = true
@@ -67,6 +68,9 @@ class Store<S, A>(
                 stateFlow.value = reduced.state
                 DependencyValues.withValues(dependencies) { runner.execute(reduced.effect) }
             }
+        } catch (error: Throwable) {
+            queue.clear()
+            throw error
         } finally {
             isSending = false
         }
@@ -79,7 +83,10 @@ class Store<S, A>(
     }
 }
 
-/** Port of `store.scope(state:action:)`: a child view of a store. */
+/**
+ * Port of `store.scope(state:action:)`: a child view of a store. In composables use
+ * [rememberScope], so recomposition doesn't create a new scope (and re-subscribe) each time.
+ */
 fun <S, A, CS, CA> StoreOf<S, A>.scope(state: (S) -> CS, action: (CA) -> A): StoreOf<CS, CA> =
     ScopedStore(this, state, action)
 
@@ -103,3 +110,8 @@ fun <S, A, V> StoreOf<S, A>.observe(select: (S) -> V): State<V> {
     val flow = remember(this) { states.map(select).distinctUntilChanged() }
     return flow.collectAsState(initial = select(state))
 }
+
+/** [scope], remembered for this store: the form composables should use. */
+@Composable
+fun <S, A, CS, CA> StoreOf<S, A>.rememberScope(state: (S) -> CS, action: (CA) -> A): StoreOf<CS, CA> =
+    remember(this) { scope(state, action) }

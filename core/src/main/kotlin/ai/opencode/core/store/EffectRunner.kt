@@ -7,8 +7,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -26,6 +24,10 @@ internal class EffectRunner<A>(
     private val sendNow: (A) -> Unit,
     /** Delivers an action from a running effect. */
     private val sendFromEffect: suspend (A) -> Unit,
+    /** An effect threw (not cancellation): `Store` logs it, `TestStore` fails the test. */
+    private val onUnhandledError: (Throwable) -> Unit = { error ->
+        AppLog.app.error { "Unhandled effect error: ${error::class.java.simpleName}: ${error.stackTraceToString().take(2_000)}" }
+    },
 ) {
     private val lock = Any()
     private val inFlight = HashMap<Any, MutableSet<Job>>()
@@ -56,10 +58,21 @@ internal class EffectRunner<A>(
             }
             is Effect.Cancellable -> {
                 if (effect.cancelInFlight) cancel(listOf(effect.id))
-                launchTracked(effect.id) { runToCompletion(effect.effect, later) }
+                // A body with nothing to suspend (send/cancel only) stays synchronous, so a
+                // child's `.send` or `.cancel` under `ifLet`/`forEach` keeps TCA's ordering.
+                if (isSynchronous(effect.effect)) execute(effect.effect, now, later)
+                else launchTracked(effect.id) { runToCompletion(effect.effect, later) }
             }
             is Effect.Run, is Effect.Concatenate -> launchTracked(null) { runToCompletion(effect, later) }
         }
+    }
+
+    private fun isSynchronous(effect: Effect<*>): Boolean = when (effect) {
+        is Effect.None, is Effect.SendAction, is Effect.Cancel -> true
+        is Effect.Merge -> effect.effects.all(::isSynchronous)
+        is Effect.Mapped<*, *> -> isSynchronous(effect.effect)
+        is Effect.Cancellable -> isSynchronous(effect.effect)
+        is Effect.Run, is Effect.Concatenate -> false
     }
 
     private fun launchTracked(id: Any?, block: suspend () -> Unit) {
@@ -95,7 +108,7 @@ internal class EffectRunner<A>(
                     throw cancellation
                 } catch (error: Throwable) {
                     // Effects never crash the app; reducers model failures as actions.
-                    AppLog.app.error("Unhandled effect error: ${error::class.java.simpleName}")
+                    onUnhandledError(error)
                 }
             }
             is Effect.Merge -> coroutineScope { effect.effects.forEach { launch { runToCompletion(it, send) } } }
@@ -107,8 +120,9 @@ internal class EffectRunner<A>(
             is Effect.Cancellable -> {
                 if (effect.cancelInFlight) cancel(listOf(effect.id))
                 coroutineScope {
-                    val child = launch { runToCompletion(effect.effect, send) }
+                    val child = launch(start = CoroutineStart.LAZY) { runToCompletion(effect.effect, send) }
                     synchronized(lock) { inFlight.getOrPut(effect.id) { HashSet() } += child }
+                    child.start()
                     child.invokeOnCompletion {
                         synchronized(lock) { inFlight[effect.id]?.let { set -> set -= child; if (set.isEmpty()) inFlight.remove(effect.id) } }
                     }
@@ -116,7 +130,4 @@ internal class EffectRunner<A>(
             }
         }
     }
-
-    @Suppress("unused")
-    private suspend fun currentJob(): Job = currentCoroutineContext().job
 }

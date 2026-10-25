@@ -54,16 +54,18 @@ fun <S, A, CS, CA> scope(
 }
 
 /**
- * Port of TCA's `.ifLet(\.$child, action: \.child)` for optional (presented) child state.
+ * Port of TCA's `.ifLet(\.$child, action: \.child)` for presented (`@Presents`) child state.
  *
- * - Child actions while the child is absent are ignored (TCA would warn; we ignore).
- * - [PresentationAction.Dismiss] clears the child.
- * - When the child goes from present to absent (dismissed by the parent or itself),
- *   every effect the child started is cancelled, so presented work lives and dies with
- *   its presentation. Effects that must outlive dismissal belong in the parent.
+ * - Child actions while the child is absent are ignored.
+ * - The parent reduces [PresentationAction.Dismiss] with the child still present; the child is
+ *   cleared afterwards unless the parent replaced it (TCA order).
+ * - When the child goes away or is replaced by a child with a different [childID] (e.g. another
+ *   session), every effect the old child started is cancelled, so presented work lives and dies
+ *   with its presentation. Effects that must outlive dismissal belong in the parent, or use the
+ *   plain-optional [ifLet] overload.
  *
- * [id] distinguishes this presentation slot from others in the same store; pass a
- * stable private object.
+ * [id] distinguishes this presentation slot from others in the same store; pass a stable
+ * private object. [childID] is the child's identity (TCA's `Identifiable` id); default: its class.
  */
 fun <S, A, CS : Any, CA> ifLet(
     id: Any,
@@ -73,33 +75,61 @@ fun <S, A, CS : Any, CA> ifLet(
     action: (A) -> PresentationAction<CA>?,
     embed: (PresentationAction<CA>) -> A,
     child: Reducer<CS, CA>,
+    childID: (CS) -> Any? = { it::class },
 ): Reducer<S, A> = Reducer { current, parentAction ->
     val presentation = action(parentAction)
     var next = current
     val effects = ArrayList<Effect<A>>(3)
-    val cancelID = PresentationCancelID(id)
-    if (presentation is PresentationAction.Presented) {
-        val childState = state(next)
-        if (childState != null) {
-            val reduced = child.reduce(childState, presentation.action)
-            next = setState(next, reduced.state)
-            effects += reduced.effect
-                .map { embed(PresentationAction.Presented(it)) }
-                .cancellable(cancelID)
-        }
+    val before = state(current)
+    val beforeID = before?.let { PresentationCancelID(id, childID(it)) }
+    if (presentation is PresentationAction.Presented && before != null) {
+        val reduced = child.reduce(before, presentation.action)
+        next = setState(next, reduced.state)
+        effects += reduced.effect
+            .map { embed(PresentationAction.Presented(it)) }
+            .cancellable(beforeID!!)
     }
-    if (presentation is PresentationAction.Dismiss) {
-        next = setState(next, null)
-    }
-    val wasPresented = state(current) != null
+    val childBeforeParent = state(next)
     val parentReduced = parent.reduce(next, parentAction)
     next = parentReduced.state
     effects += parentReduced.effect
-    if (wasPresented && state(next) == null) effects += Effect.cancel(cancelID)
+    if (presentation is PresentationAction.Dismiss && state(next) === childBeforeParent) {
+        next = setState(next, null)
+    }
+    val after = state(next)
+    val afterID = after?.let { PresentationCancelID(id, childID(it)) }
+    if (beforeID != null && beforeID != afterID) effects += Effect.cancel(beforeID)
     Reduced(next, Effect.merge(effects))
 }
 
-private data class PresentationCancelID(val slot: Any)
+/**
+ * Port of TCA's plain-optional `.ifLet(\.child, action: \.child)` (no `@Presents`): runs [child]
+ * while its state exists; nothing is cancelled when it goes away (iOS `AppFeature.home`,
+ * `SessionFeature.sessionSheet`, whose effects intentionally outlive dismissal).
+ */
+fun <S, A, CS : Any, CA> ifLet(
+    parent: Reducer<S, A>,
+    state: (S) -> CS?,
+    setState: (S, CS) -> S,
+    action: (A) -> CA?,
+    embed: (CA) -> A,
+    child: Reducer<CS, CA>,
+): Reducer<S, A> = Reducer { current, parentAction ->
+    var next = current
+    val effects = ArrayList<Effect<A>>(2)
+    val childAction = action(parentAction)
+    val childState = state(next)
+    if (childAction != null && childState != null) {
+        val reduced = child.reduce(childState, childAction)
+        next = setState(next, reduced.state)
+        effects += reduced.effect.map(embed)
+    }
+    val parentReduced = parent.reduce(next, parentAction)
+    effects += parentReduced.effect
+    Reduced(parentReduced.state, Effect.merge(effects))
+}
+
+private data class PresentationCancelID(val slot: Any, val child: Any?)
 
 /** Port of TCA's `PresentationAction`: a presented child's action, or its dismissal. */
 sealed interface PresentationAction<out A> {
@@ -108,8 +138,10 @@ sealed interface PresentationAction<out A> {
 }
 
 /**
- * Port of TCA's `.forEach(\.items, action: \.items)` over an identified list. Child effects
- * are cancelled when their element is removed.
+ * Port of TCA's `.forEach(\.items, action: \.items)` over an identified list. Unlike TCA's
+ * `IdentifiedArray` `forEach`, child effects are cancelled when their element is removed, so a
+ * removed element's late actions (delegate actions included) never arrive. (iOS
+ * `HomeFeature+Composition.swift` cancels leftovers by hand for the same reason.)
  */
 fun <S, A, ID : Any, CS, CA> forEach(
     slot: Any,

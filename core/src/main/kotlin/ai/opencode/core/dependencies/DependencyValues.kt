@@ -25,7 +25,11 @@ import kotlin.properties.ReadOnlyProperty
  */
 interface DependencyKey<T> {
     val liveValue: T
-    val testValue: T get() = liveValue
+    /** Consulted only in test containers. Without an override, tests fail loudly instead of running live I/O. */
+    val testValue: T
+        get() = throw AssertionError(
+            "${javaClass.enclosingClass?.simpleName ?: javaClass.simpleName} has no testValue; override it in the test",
+        )
 }
 
 /**

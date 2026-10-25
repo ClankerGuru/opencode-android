@@ -4,6 +4,7 @@ import android.content.Context
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.yield
 import java.time.Instant
 import java.util.UUID
 import kotlin.coroutines.resume
@@ -71,21 +72,35 @@ class TestClock : Clock {
         }
     }
 
-    /** Moves time forward, resuming every sleep whose deadline has passed, in deadline order. */
-    fun advance(by: Duration = Duration.ZERO) {
-        val due = synchronized(lock) {
-            time += by
-            val ready = sleepers.filter { it.deadline <= time }.sortedBy { it.deadline }
-            sleepers.removeAll(ready)
-            ready
+    /**
+     * Moves time forward by [by], resuming due sleeps one deadline at a time and yielding after
+     * each so the woken effect runs (and may sleep again) before time moves on, as swift-clocks'
+     * `advance(by:)` does. Sleeps registered during the advance are honoured.
+     */
+    suspend fun advance(by: Duration = Duration.ZERO) {
+        val target = synchronized(lock) { time + by }
+        while (true) {
+            val next = synchronized(lock) {
+                val due = sleepers.filter { it.deadline <= target }.minByOrNull { it.deadline } ?: return@synchronized null
+                sleepers.remove(due)
+                if (due.deadline > time) time = due.deadline
+                due
+            } ?: break
+            next.continuation.resume(Unit)
+            repeat(YIELDS) { yield() }
         }
-        due.forEach { it.continuation.resume(Unit) }
+        synchronized(lock) { time = target }
+        repeat(YIELDS) { yield() }
     }
 
-    /** Runs every pending sleep. */
-    fun run() {
+    /** Runs every pending sleep (not ones that keep rescheduling forever). */
+    suspend fun run() {
         val last = synchronized(lock) { sleepers.maxOfOrNull { it.deadline } } ?: return
         advance(last - now())
+    }
+
+    private companion object {
+        const val YIELDS = 8
     }
 }
 

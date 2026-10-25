@@ -109,15 +109,13 @@ internal class SharedReference<T>(
         return runCatching { json.decodeFromString(key.serializer, data.decodeToString()) }.getOrElse { key.default }
     }
 
-    fun update(transform: (T) -> T) {
-        val changed = synchronized(lock) {
-            val old = state.value
-            val new = transform(old)
-            if (new == old) return
-            state.value = new
-            new
-        }
-        bytes.write(key.storage, key.id, json.encodeToString(key.serializer, changed).encodeToByteArray())
+    fun update(transform: (T) -> T) = synchronized(lock) {
+        val old = state.value
+        val new = transform(old)
+        if (new == old) return
+        state.value = new
+        // Inside the lock (it only enqueues onto the serial writer), so writes keep transition order.
+        bytes.write(key.storage, key.id, json.encodeToString(key.serializer, new).encodeToByteArray())
     }
 }
 

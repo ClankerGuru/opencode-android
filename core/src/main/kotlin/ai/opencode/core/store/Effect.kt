@@ -52,7 +52,9 @@ sealed interface Effect<out A> {
         fun none(): Effect<Nothing> = None
 
         /**
-         * A coroutine effect. Throwing (other than cancellation) is reported through
+         * A coroutine effect. It starts on the main thread, synchronously up to its first
+         * suspension: wrap blocking work in `withContext(...)` (take dispatchers from a
+         * dependency in code tests must control). Throwing (other than cancellation) is reported through
          * [onError] when given, else logged by the store; it never crashes the app.
          */
         fun <A> run(

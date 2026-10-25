@@ -7,6 +7,8 @@ import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import androidx.datastore.core.DataStore
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
@@ -41,7 +43,10 @@ internal class LiveSharedBytes private constructor(private val context: Context)
     private val io = Executors.newSingleThreadExecutor { Thread(it, "opencode-shared-io") }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val memory = InMemorySharedBytes()
-    private val dataStore: DataStore<Preferences> = PreferenceDataStoreFactory.create(scope = scope) {
+    private val dataStore: DataStore<Preferences> = PreferenceDataStoreFactory.create(
+        corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+        scope = scope,
+    ) {
         File(context.filesDir, "datastore/app-storage.preferences_pb")
     }
     @Volatile private var preferences: Preferences? = null
