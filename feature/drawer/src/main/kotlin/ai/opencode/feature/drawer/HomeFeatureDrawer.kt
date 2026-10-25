@@ -9,6 +9,7 @@ import ai.opencode.feature.system.share.ShareInboxClient
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.diagnostics.LabMarks
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.log.AppLog
@@ -17,6 +18,7 @@ import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.cancellable
 import ai.opencode.feature.drawer.HomeFeature.Action
 import ai.opencode.feature.drawer.HomeFeature.State
+import ai.opencode.feature.media.BrowserFeature
 import ai.opencode.feature.settings.SettingsFeature
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeClientError
@@ -96,7 +98,9 @@ internal fun HomeFeature.reduceDrawer(state: State, action: Action): HomeReduced
             val session = state.sessions.firstOrNull { it.id == action.sessionID } ?: return Reduced(state)
             var s = state.openingDetail(session, externalTranscript = true)
             s = s.copy(selectedTranscriptFetch = s.selectedTranscriptFetch?.copy(transition = s.detailGeneration))
-            return Reduced(s.pushingPendingSubagent())
+            s = s.pushingPendingSubagent()
+            LabMarks.mark("session_navigation_started", sessionID = action.sessionID)
+            return Reduced(s)
         }
 
         Action.NewSessionTapped -> {
@@ -293,11 +297,13 @@ private fun HomeFeature.sessionTapped(state: State, sessionID: String): HomeRedu
         val viewed = openViewedSession(s, session, cachedItems = null, opensDetail = false)
         s = viewed.state.copy(nextMoveReason = null).promotingCatchUpDetail()
         // The drawer's row for the session on screen goes back to it, from under any page or subagent.
+        if (s.sessionDetail?.browser?.isOpen == true) s = s.updatingDetail { it.copy(browser = BrowserFeature.State()) }
         s = s.poppingSubagents(toDepth = 0).pushingPendingSubagent()
         val pushedID = s.subagentStack.lastOrNull()?.session?.id ?: return Reduced(s, viewed.effect)
         val cancelled = cancelBackgroundTranscriptReads(s, setOf(sessionID, pushedID))
         return Reduced(cancelled.state, Effect.merge(cancelled.effect, viewed.effect))
     }
+    LabMarks.mark("session_tap", sessionID = sessionID)
     // The opened session reads itself; background reads step aside so it gets the connection.
     val cachedItems = s.cachedTranscriptItems(session)
     if (cachedItems == null) {
@@ -307,6 +313,7 @@ private fun HomeFeature.sessionTapped(state: State, sessionID: String): HomeRedu
         val server = s.server
         val client = dependency(OpenCodeClient)
         val load = Effect.run<Action> { send ->
+            LabMarks.mark("selected_transcript_effect_started", sessionID = sessionID)
             coroutineScope {
                 val loaded = async { selectedTranscript(client, server, sessionID) }
                 send(Action.SessionNavigationReady(sessionID))
@@ -317,6 +324,7 @@ private fun HomeFeature.sessionTapped(state: State, sessionID: String): HomeRedu
         return Reduced(cancelled.state, Effect.merge(cancelled.effect, viewed.effect, load))
     }
     val viewed = openViewedSession(s, session, cachedItems = cachedItems)
+    LabMarks.mark("session_navigation_started", sessionID = sessionID)
     return Reduced(viewed.state, Effect.merge(viewed.effect, Effect.cancel(HomeFeature.CancelID.SelectedTranscript)))
 }
 

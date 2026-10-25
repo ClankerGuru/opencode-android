@@ -96,11 +96,19 @@ internal fun HomeFeature.resolveActiveAncestry(state: HomeFeature.State): Effect
                 label = "GET /api/session/{id} (activeAncestry)",
                 clock = clock,
             ) { _ ->
-                withRetryPolicy(RetryPolicy.once) { client.activeSessionParents(server, unattributed, roots) }
+                try {
+                    withRetryPolicy(RetryPolicy.once) { client.activeSessionParents(server, unattributed, roots) }
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (error: OpenCodeClientError) {
+                    throw error
+                } catch (_: Exception) {
+                    throw OpenCodeClientError("Couldn’t load active session ancestry")
+                }
             }
         } catch (cancellation: CancellationException) {
             throw cancellation
-        } catch (_: OpenCodeClientError) {
+        } catch (_: Exception) {
             return@run
         }
         if (!currentCoroutineContext().isActive || parents.isEmpty()) return@run
@@ -149,7 +157,7 @@ internal fun HomeFeature.refreshCachedTranscript(
                 client.transcript(server, sessionID, SessionFeature.initialFetchLimit)
             } catch (cancellation: CancellationException) {
                 throw cancellation
-            } catch (_: OpenCodeClientError) {
+            } catch (_: Exception) {
                 null
             }
             if (!currentCoroutineContext().isActive) return@run
@@ -187,7 +195,7 @@ internal fun HomeFeature.prefetchTranscripts(state: HomeFeature.State): Effect<H
                 client.transcript(server, sessionID, SessionFeature.initialFetchLimit)
             } catch (cancellation: CancellationException) {
                 throw cancellation
-            } catch (_: OpenCodeClientError) {
+            } catch (_: Exception) {
                 if (!currentCoroutineContext().isActive) return@run
                 continue
             }
@@ -220,8 +228,9 @@ internal fun HomeFeature.acknowledgeShownSubagent(sessionID: String, idle: Long,
             send(HomeFeature.Action.detail(SessionFeature.Action.ViewAcknowledged(sessionID, idle)))
         } catch (cancellation: CancellationException) {
             throw cancellation
-        } catch (error: OpenCodeClientError) {
-            AppLog.network.notice { "Subagent view receipt failed: ${error.logSummary}" }
+        } catch (error: Exception) {
+            val description = (error as? OpenCodeClientError)?.logSummary ?: error::class.java.simpleName
+            AppLog.network.notice { "Subagent view receipt failed: $description" }
         }
     }.cancellable(HomeFeature.CancelID.ViewReceipt(sessionID), cancelInFlight = true)
 }
@@ -235,7 +244,7 @@ internal fun HomeFeature.acknowledgeView(session: OpenCodeSession, server: OpenC
             send(HomeFeature.Action.ViewAcknowledged(session.id, idle))
         } catch (cancellation: CancellationException) {
             throw cancellation
-        } catch (_: OpenCodeClientError) {
+        } catch (_: Exception) {
             // Keep the server unread state until an acknowledgment succeeds.
         }
     }.cancellable(HomeFeature.CancelID.ViewReceipt(session.id), cancelInFlight = true)
