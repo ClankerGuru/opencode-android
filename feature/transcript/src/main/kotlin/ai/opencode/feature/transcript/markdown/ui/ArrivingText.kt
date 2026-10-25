@@ -64,6 +64,12 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
+import ai.opencode.feature.media.LinkMenu
+import ai.opencode.feature.media.LinkMenuHandler
+import ai.opencode.feature.media.LocalLinkMenu
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.buildAnnotatedString
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
@@ -139,8 +145,11 @@ internal fun ArrivingText(
     val blurLayers = if (sweep?.focus == true) List(SweepParameters.STEPS) { rememberGraphicsLayer() } else null
     var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
     var pressed by remember { mutableStateOf<String?>(null) }
-    var menu by remember { mutableStateOf<Pair<String, Offset>?>(null) }
-    val haptics = remember { dependency(HapticsClient) }
+    // Web, pairing and session links hold to media's link menu (iOS `linkMenu(for:)`: the
+    // shared `LinkMenuView`, with the link's preview card, its actions, and dragging the link out
+    // from the hold); file links stay this text's own (tap opens the viewer).
+    val linkMenu = remember { LinkMenuHandler { action, url -> MarkdownLinkActions.perform(action, url, send) } }
+    val menuText = remember(presented.text) { linkMenuText(presented.text) }
     val chipGlyphs = if (presented.chips.isEmpty()) null else ChipGlyphs(
         session = painterResource(SFSymbol.BubbleLeftFill.drawable),
         subagent = painterResource(SFSymbol.ArrowTurnDownRight.drawable),
@@ -154,7 +163,8 @@ internal fun ArrivingText(
     )
     val links = presented.menuLinks
 
-    Box(modifier) {
+    CompositionLocalProvider(LocalLinkMenu provides linkMenu) {
+    LinkMenu(menuText, textLayout = { layout }, onOpen = { MarkdownLinkActions.tap(it, send) }, modifier = modifier) {
         Text(
             text = presented.text,
             style = style,
@@ -192,6 +202,8 @@ internal fun ArrivingText(
                             awaitEachGesture {
                                 val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                                 val url = layout?.let { linkAt(it, presented, down.position) } ?: return@awaitEachGesture
+                                // The link menu above owns the links it offers.
+                                if (MarkdownLinks.offersMenu(url)) return@awaitEachGesture
                                 down.consume()
                                 pressed = url
                                 val slop = viewConfiguration.touchSlop
@@ -213,20 +225,7 @@ internal fun ArrivingText(
                                     }
                                     result
                                 }
-                                val outcome = decided ?: 2
-                                when (outcome) {
-                                    1 -> MarkdownLinkActions.tap(url, send)
-                                    2 -> if (MarkdownLinks.offersMenu(url)) {
-                                        haptics.play(Haptic.tap)
-                                        menu = url to down.position
-                                        // Holding: the rest of the touch belongs to the menu.
-                                        while (true) {
-                                            val event = awaitPointerEvent(PointerEventPass.Initial)
-                                            event.changes.forEach { it.consume() }
-                                            if (event.changes.none { it.pressed }) break
-                                        }
-                                    }
-                                }
+                                if (decided == 1) MarkdownLinkActions.tap(url, send)
                                 pressed = null
                             }
                         }
@@ -235,36 +234,22 @@ internal fun ArrivingText(
                 .semantics {
                     // iOS `.accessibilityHint("Links to …")`: read after the text.
                     presented.linkHint?.let { stateDescription = it }
-                    if (links.isNotEmpty()) {
-                        customActions = links.flatMap { url ->
-                            MarkdownLinks.accessibilityActions(url).map { action ->
-                                CustomAccessibilityAction(MarkdownLinks.accessibilityName(action, url, links)) {
-                                    MarkdownLinkActions.perform(action, url, send)
-                                    true
-                                }
-                            }
-                        }
-                    }
+                    // The link menu gives TalkBack the links' actions (on its box).
                 },
         )
-        val shown = menu
-        if (shown != null) {
-            val (url, at) = shown
-            Box(Modifier.offset { IntOffset(at.x.roundToInt(), at.y.roundToInt()) }.size(0.dp)) {
-                DropdownMenu(expanded = true, onDismissRequest = { menu = null }, offset = DpOffset.Zero) {
-                    for (action in MarkdownLinks.menuActions(url)) {
-                        DropdownMenuItem(
-                            text = { Text(action.title) },
-                            leadingIcon = { OpenCodeIcon(action.systemImage, contentDescription = null) },
-                            onClick = {
-                                menu = null
-                                MarkdownLinkActions.perform(action, url, send)
-                            },
-                        )
-                    }
-                }
-            }
-        }
+    }
+    }
+}
+
+/** [text] with each link as a `LinkAnnotation.Url` over the same ranges, as media's [LinkMenu] reads links. */
+private fun linkMenuText(text: AnnotatedString): AnnotatedString {
+    val links = text.getLinkAnnotations(0, text.length).mapNotNull { range ->
+        (range.item as? LinkAnnotation.Clickable)?.tag?.takeIf(MarkdownLinks::offersMenu)?.let { Triple(it, range.start, range.end) }
+    }
+    if (links.isEmpty()) return AnnotatedString(text.text)
+    return buildAnnotatedString {
+        append(text.text)
+        for ((url, start, end) in links) addLink(LinkAnnotation.Url(url), start, end)
     }
 }
 
