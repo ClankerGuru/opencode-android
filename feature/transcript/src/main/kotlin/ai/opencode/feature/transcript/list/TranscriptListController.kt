@@ -313,6 +313,14 @@ class TranscriptListController(
 
     // MARK: Viewport
 
+    /**
+     * iOS `imageViewportIsSettling`: a session still opening (no content laid out, or its
+     * arrivals still landing) holds image previews back so their reads and redraws don't change
+     * rows while the list lands.
+     */
+    val imagesSettling: Boolean
+        get() = !hasLaidOutContent || transcriptNow() < arrivalsGlideAfter
+
     private fun heightOf(item: LazyListItemInfo): Float = item.size / density
 
     /** iOS `viewport` from LazyColumn's layout: measured heights where known, the average elsewhere. */

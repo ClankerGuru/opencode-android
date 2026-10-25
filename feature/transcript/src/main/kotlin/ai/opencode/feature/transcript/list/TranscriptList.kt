@@ -1,5 +1,14 @@
 package ai.opencode.feature.transcript.list
 
+import ai.opencode.feature.media.AgentImageViewport
+import ai.opencode.feature.media.AgentImageVisibility
+import ai.opencode.feature.media.AgentImageMarkerView
+import ai.opencode.feature.media.LocalAgentImageViewport
+import ai.opencode.feature.media.LocalAgentImageRow
+import ai.opencode.core.dependencies.dependency
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInWindow
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
@@ -180,7 +189,22 @@ private fun TranscriptListContent(
             linkPreviews.close()
         }
     }
+    // The list is its image previews' viewport (iOS `TranscriptListViewController:
+    // AgentImageViewport`): previews read and show only between the header and the composer.
+    val imageViewport = remember(controller) { TranscriptImageViewport(controller) }
+    imageViewport.topInset = with(density) { contentPadding.calculateTopPadding().toPx() }
+    imageViewport.bottomInset = with(density) { contentPadding.calculateBottomPadding().toPx() }
+    val imageVisibility = remember { dependency(AgentImageVisibility) }
+    DisposableEffect(imageViewport) {
+        imageVisibility.register(imageViewport)
+        onDispose { imageVisibility.unregister(imageViewport) }
+    }
+    LaunchedEffect(imageViewport) {
+        snapshotFlow { listState.layoutInfo.visibleItemsInfo.size to listState.firstVisibleItemScrollOffset }
+            .collect { imageVisibility.setNeedsUpdate() }
+    }
     CompositionLocalProvider(
+        LocalAgentImageViewport provides imageViewport,
         LocalTranscriptRowContext provides rowContext,
         LocalTranscriptLayoutTuning provides layoutTuning,
         LocalTranscriptTextReveal provides textReveal,
@@ -189,7 +213,8 @@ private fun TranscriptListContent(
         Box(modifier.nestedScroll(controller.nestedScrollConnection)) {
             LazyColumn(
                 state = listState,
-                modifier = Modifier.fillMaxSize().testTag("transcript-list"),
+                modifier = Modifier.fillMaxSize().testTag("transcript-list")
+                    .onGloballyPositioned { imageViewport.bounds = it.boundsInWindow(); imageVisibility.setNeedsUpdate() },
                 contentPadding = contentPadding,
             ) {
                 items(snapshot.items, key = { it.key }, contentType = { it.contentType }) { item ->
@@ -229,6 +254,7 @@ private fun TranscriptListContent(
                             val run = snapshot.runs[item.stableID] ?: UserMessageRun.alone
                             GrowingRow(controller, item.key, rowModifier) {
                                 CompositionLocalProvider(
+                                    LocalAgentImageRow provides item.stableID,
                                     LocalLinkPreviewRevision provides (linkRevisions[item.stableID] ?: 0),
                                     LocalLinkPreviewRow provides item.stableID,
                                 ) {
@@ -316,4 +342,31 @@ private fun GrowingRow(controller: TranscriptListController, key: String, modifi
 @Composable
 private fun WorkingLineFallback(modifier: Modifier = Modifier) {
     Text("Working", modifier, style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.secondaryText)
+}
+
+/**
+ * The transcript list as its image previews' viewport (iOS
+ * `TranscriptListViewController+ImagePreviews.swift`): nothing counts as on screen while the
+ * session opens, then the list's bounds between the header and the composer. A covered or
+ * backgrounded list holds no previews.
+ */
+private class TranscriptImageViewport(private val controller: TranscriptListController) : AgentImageViewport {
+    var bounds: Rect = Rect.Zero
+    var topInset = 0f
+    var bottomInset = 0f
+    private var imagesMayShow = false
+
+    override val imageViewportVisibleRect: Rect
+        get() {
+            if (!imagesMayShow && imageViewportIsSettling) return Rect.Zero
+            imagesMayShow = true
+            return Rect(bounds.left, bounds.top + topInset, bounds.right, (bounds.bottom - bottomInset).coerceAtLeast(bounds.top + topInset))
+        }
+
+    override val imageViewportIsSettling: Boolean get() = !imagesMayShow && controller.imagesSettling
+
+    override val imageViewportIsVisible: Boolean get() = controller.isShowingToReader
+
+    /** iOS marks the row as revised so its growth eases; this list's rows ease on their own (`GrowingRow`). */
+    override fun imageContentRevised(marker: AgentImageMarkerView) {}
 }
