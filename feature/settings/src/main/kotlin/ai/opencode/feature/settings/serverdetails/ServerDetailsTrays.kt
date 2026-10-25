@@ -63,6 +63,10 @@ import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -161,17 +165,36 @@ private fun MCPServersTray(
                 } else {
                     slideInHorizontally(spring) { -it * 3 / 10 } togetherWith slideOutHorizontally(spring) { it }
                 }.apply { targetContentZIndex = if (pushing) 1f else 0f }
-            }
+            }.using(
+                // The sheet keeps its height through the push (iOS's tray sits at its detent):
+                // it grows at once for a taller page and shrinks only after the 0.42 s slide.
+                SizeTransform(clip = true) { initial, target ->
+                    if (target.height >= initial.height) snap() else snap(delayMillis = 420)
+                },
+            )
         },
         label = "mcp-tray-push",
     ) { name ->
-        if (name != null) {
-            MCPServerTray(state, name, send, close, onBack = { detail = null })
-        } else {
-            MCPServersList(state, send, close) { detail = it }
+        // Each page is opaque and reaches to the sheet's bottom, as a NavigationStack page fills
+        // its detent: the page beneath never shows through or below it. The sheet's clip
+        // (SizeTransform) bounds the paint.
+        val canvas = OpenCodeTheme.colors.groupedCanvas
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .drawBehind { drawRect(canvas, size = Size(size.width, size.height + PageUnderpaint.toPx())) },
+        ) {
+            if (name != null) {
+                MCPServerTray(state, name, send, close, onBack = { detail = null })
+            } else {
+                MCPServersList(state, send, close) { detail = it }
+            }
         }
     }
 }
+
+/** How far below its content a tray page paints its canvas (more than any sheet is tall). */
+private val PageUnderpaint = 2000.dp
 
 @Composable
 private fun MCPServersList(
