@@ -12,3 +12,8 @@ dependencies {
     api(project(":feature:voice"))
     api(project(":feature:system"))
 }
+
+dependencies {
+    implementation(libs.androidx.navigation3.runtime)
+    implementation(libs.androidx.navigation3.ui)
+}
