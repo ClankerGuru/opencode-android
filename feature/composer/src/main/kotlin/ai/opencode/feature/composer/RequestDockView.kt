@@ -1005,7 +1005,9 @@ private fun SideBySideOrStacked(spacing: Dp, content: @Composable () -> Unit) {
         val count = measurables.size
         if (count == 0) return@Layout layout(0, 0) {}
         val slot = if (count > 1) (width - gap * (count - 1)) / count else width
-        val fits = count == 1 || measurables.all { it.minIntrinsicWidth(Constraints.Infinity) <= slot }
+        // ViewThatFits compares each action's ideal width: a title's whole line, not its longest word
+        // (minIntrinsicWidth), which let “Always Allow” clip to “Always” at large font sizes.
+        val fits = count == 1 || measurables.all { it.maxIntrinsicWidth(Constraints.Infinity) <= slot }
         if (fits) {
             val placeables = measurables.map { it.measure(Constraints.fixedWidth(slot).copy(maxHeight = constraints.maxHeight)) }
             val height = placeables.maxOf { it.height }
