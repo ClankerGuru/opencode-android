@@ -59,6 +59,7 @@ import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
@@ -78,6 +79,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
@@ -340,6 +343,7 @@ fun SessionDrawerContainer(
                 proxy = catchUpProxy,
                 previewRevision = previewRevision,
                 revealsPreviewOnBegin = false,
+                panRegions = panRegions,
                 modifier = Modifier.graphicsLayer {
                     translationX = controller.stackOffset.floatValue.dp.toPx() * if (rtl) -1 else 1
                 },
@@ -403,6 +407,30 @@ fun SessionDrawerContainer(
                         .then(if (contentHidden) Modifier.clearAndSetSemantics {} else Modifier),
                 ) {
                     cardContent()
+                }
+                controller.composerSlice?.let { slice ->
+                    // The stack card's composer strip sliding into the session, over a cover that
+                    // hides the live composer until it lands (iOS `composerSlice`/`composerCover`).
+                    val canvas = colors.canvas
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .clearAndSetSemantics {}
+                            .drawBehind {
+                                val p = controller.maskProgress.floatValue
+                                val clip = lerp(controller.composerSliceStart, controller.composerSliceEnd, p)
+                                drawRect(canvas, topLeft = Offset(0f, clip.top), size = Size(size.width, (size.height - clip.top).coerceAtLeast(0f)))
+                                val imageHeight = controller.composerSliceImageStartHeight +
+                                    (controller.composerSliceImageEndHeight - controller.composerSliceImageStartHeight) * p
+                                clipRect(clip.left, clip.top, clip.right, clip.bottom) {
+                                    drawImage(
+                                        slice,
+                                        dstOffset = IntOffset(clip.left.roundToInt(), (clip.bottom - imageHeight).roundToInt()),
+                                        dstSize = IntSize(clip.width.roundToInt().coerceAtLeast(1), imageHeight.roundToInt().coerceAtLeast(1)),
+                                    )
+                                }
+                            },
+                    )
                 }
                 if (outgoing != null && outgoingRect != null) {
                     Image(
@@ -482,6 +510,7 @@ fun SessionDrawerContainer(
         controller.isDark = isDark
         controller.keyboardHold = keyboardHold
         motion.keyboardHold = keyboardHold
+        panRegions.isOnTextField = keyboardHold::isOnTextField
         controller.isSheetPresented = { sheet }
         controller.isContentPushed = { pushed }
         controller.clearFocus = { focusManager.clearFocus(force = true) }

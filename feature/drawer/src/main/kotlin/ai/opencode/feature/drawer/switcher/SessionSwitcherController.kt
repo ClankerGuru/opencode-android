@@ -14,6 +14,7 @@ import ai.opencode.core.ui.DrawerPanExclusion
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.excludedFromDrawerPan
+import ai.opencode.feature.drawer.motion.drawerPanSwitcherStrip
 import ai.opencode.feature.drawer.HomeFeature
 import ai.opencode.feature.drawer.notices.AccessibilityAnnouncer
 import ai.opencode.server.model.OpenCodeTranscriptItem
@@ -186,6 +187,8 @@ class SessionSwitcherController internal constructor(private val scope: Coroutin
     internal var safeTop = 0f
     internal var keyboardUp: () -> Boolean = { false }
     internal var touchExploration: () -> Boolean = { false }
+    /** Whether a point (px in [rootCoordinates]) is on the card's text field (the composer's). */
+    internal var isOnTextField: (LayoutCoordinates?, Offset) -> Boolean = { _, _ -> false }
     internal var warmLayer: GraphicsLayer? = null
     private var size = Size.Zero
     private var lastSize = Size.Zero
@@ -347,6 +350,8 @@ class SessionSwitcherController internal constructor(private val scope: Coroutin
         if (keyboardUp()) return false
         // Controls on the card that own a sideways drag (`excludedFromDrawerPan`) keep it.
         if (exclusion?.contains(rootCoordinates, point) == true) return false
+        // A text field keeps its own editing gestures (iOS's `UITextView` ancestor walk).
+        if (isOnTextField(rootCoordinates, point)) return false
         return true
     }
 
@@ -1095,6 +1100,15 @@ internal class SessionSwitcherExclusion(private val parent: DrawerPanExclusion?)
         parent?.updateExclusion(id, coordinates)
     }
 
+    override fun updateHorizontalScroller(
+        id: Any,
+        coordinates: LayoutCoordinates?,
+        canScrollBackward: () -> Boolean,
+        canScrollForward: () -> Boolean,
+    ) {
+        parent?.updateHorizontalScroller(id, coordinates, canScrollBackward, canScrollForward)
+    }
+
     fun contains(root: LayoutCoordinates?, point: Offset): Boolean {
         if (root == null || !root.isAttached) return false
         return regions.values.any { region ->
@@ -1230,7 +1244,7 @@ internal fun SessionSwitcherStage(controller: SessionSwitcherController) {
                 .fillMaxWidth()
                 .height(SessionSwitcherTunables.gestureHeight)
                 .padding(horizontal = BackSwipeRules.edgeWidth)
-                .excludedFromDrawerPan(isEnabled = mode == SessionSwitcherController.Mode.idle && !touchExploration && !controller.keyboardUp()),
+                .drawerPanSwitcherStrip(isEnabled = mode == SessionSwitcherController.Mode.idle && !touchExploration && !controller.keyboardUp()),
         )
         Box(Modifier.fillMaxSize().excludedFromDrawerPan(isEnabled = mode != SessionSwitcherController.Mode.idle))
 

@@ -2,6 +2,8 @@ package ai.opencode.feature.drawer.motion
 
 import ai.opencode.core.ui.BackSwipeRules
 import ai.opencode.core.ui.DrawerPanExclusion
+import ai.opencode.core.ui.LocalDrawerPanExclusion
+import ai.opencode.core.ui.excludedFromDrawerPan
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.runtime.DisposableEffect
@@ -128,9 +130,35 @@ class DrawerPanRegions : DrawerPanExclusion {
     internal val claims = HashMap<Any, LayoutCoordinates>()
     internal val exclusions = HashMap<Any, LayoutCoordinates>()
 
+    /**
+     * The session switcher's strip: kept from the drawer's pan except over a text field, which
+     * the switcher refuses (iOS's drawer pan waits for the switcher's, which fails there at once).
+     */
+    internal val switcherStrips = HashMap<Any, LayoutCoordinates>()
+
+    /** Whether a point (px in the pan's coordinates) is on one of the card's text fields. */
+    internal var isOnTextField: (LayoutCoordinates, Offset) -> Boolean = { _, _ -> false }
+
     override fun updateExclusion(id: Any, coordinates: LayoutCoordinates?) {
         if (coordinates == null) exclusions.remove(id) else exclusions[id] = coordinates
     }
+
+    override fun updateHorizontalScroller(
+        id: Any,
+        coordinates: LayoutCoordinates?,
+        canScrollBackward: () -> Boolean,
+        canScrollForward: () -> Boolean,
+    ) {
+        if (coordinates == null) scrollers.remove(id) else scrollers[id] = Scroller(coordinates, canScrollBackward, canScrollForward)
+    }
+
+    /** The horizontal scrollers under [point] (px in [pan]). */
+    internal fun scrollersAt(pan: LayoutCoordinates, point: Offset): List<Scroller> =
+        scrollers.values.filter { contains(it.coordinates, pan, point) }
+
+    internal fun isExcluded(pan: LayoutCoordinates, point: Offset): Boolean =
+        exclusions.values.any { contains(it, pan, point) } ||
+            (switcherStrips.values.any { contains(it, pan, point) } && !isOnTextField(pan, point))
 
     internal fun contains(region: LayoutCoordinates?, pan: LayoutCoordinates, point: Offset): Boolean {
         if (region == null || !region.isAttached || !pan.isAttached) return false
@@ -143,6 +171,25 @@ private fun Modifier.region(regions: DrawerPanRegions, set: (Any, LayoutCoordina
     val id = remember { Any() }
     DisposableEffect(regions) { onDispose { set(id, null) } }
     onGloballyPositioned { set(id, it) }
+}
+
+/**
+ * The session switcher's gesture strip, kept from the drawer's pan while [isEnabled] except over
+ * a text field (see [DrawerPanRegions.switcherStrips]). Outside a drawer it's a plain
+ * `excludedFromDrawerPan`.
+ */
+fun Modifier.drawerPanSwitcherStrip(isEnabled: Boolean): Modifier = composed {
+    val regions = LocalDrawerPanExclusion.current as? DrawerPanRegions
+    if (regions == null) {
+        excludedFromDrawerPan(isEnabled)
+    } else {
+        val id = remember { Any() }
+        DisposableEffect(regions, isEnabled) {
+            if (!isEnabled) regions.switcherStrips.remove(id)
+            onDispose { regions.switcherStrips.remove(id) }
+        }
+        onGloballyPositioned { if (isEnabled) regions.switcherStrips[id] = it }
+    }
 }
 
 /** The drawer (iOS `drawerView`). */
@@ -217,7 +264,7 @@ fun Modifier.drawerDirectionalPan(
                 val point = down.position
                 val onExposedCard = regions.contains(regions.card, pan, point)
                 // Controls that own a sideways drag (the + menu, the held mic) keep it.
-                if (!presented && onExposedCard && regions.exclusions.values.any { regions.contains(it, pan, point) }) {
+                if (!presented && onExposedCard && regions.isExcluded(pan, point)) {
                     return@awaitEachGesture
                 }
                 if (!presented && !cardSwipe && isContentPushed()) return@awaitEachGesture
