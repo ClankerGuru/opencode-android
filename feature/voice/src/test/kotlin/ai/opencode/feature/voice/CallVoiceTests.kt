@@ -1,6 +1,9 @@
 package ai.opencode.feature.voice
 
+import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.DateClient
+import ai.opencode.core.dependencies.ImmediateClock
+import ai.opencode.core.dependencies.withDependenciesSuspending
 import ai.opencode.core.dependencies.DependencyValues
 import ai.opencode.core.dependencies.UuidClient
 import ai.opencode.core.sharing.SharedKeys
@@ -217,7 +220,9 @@ class CallVoiceTests {
         }
     }
 
+    // NetworkRetry sleeps between attempts; JVM tests resolve Clock's test value, so the retry needs an ImmediateClock.
     @Test fun previewSynthesizesWithProviderTTSRetriesAndCachesPerProviderAndVoiceOnDisk() = runBlocking {
+      withDependenciesSuspending({ this[Clock] = ImmediateClock() }) {
         val directory = Files.createTempDirectory("voice-previews-").toFile()
         try {
             val cache = VoicePreviewCache(directory = directory)
@@ -289,6 +294,7 @@ class CallVoiceTests {
         } finally {
             directory.deleteRecursively()
         }
+      }
     }
 
     private fun body(request: Request): String = Buffer().also { request.body!!.writeTo(it) }.readUtf8()
