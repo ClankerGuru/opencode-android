@@ -13,7 +13,7 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 | `OpenCode/Settings/ConnectionMonitor.swift` | 439 | | todo | |
 | `OpenCode/Settings/ConnectionScope.swift` | 305 | | todo | |
 | `OpenCode/Settings/ConnectionScopeShaders.metal` | 66 | | todo | |
-| `OpenCode/Settings/ExperimentalFeatures.swift` | 333 | | todo | |
+| `OpenCode/Settings/ExperimentalFeatures.swift` | 333 | `core/.../experiments/ExperimentalFeatures.kt` | done | moved down to `:core` (every feature reads it). `ExperimentalFeature.key` = iOS `.experimental(f)`, `ModelPickerStyle.key`, `ExperimentalFeatures` dependency. `OPENCODE_LAB_EXPERIMENTS` lab overrides n/a (no launch environment on Android) |
 | `OpenCode/Settings/ExperimentalSettingsView.swift` | 211 | | todo | |
 | `OpenCode/Settings/ModelVisibilitySettings.swift` | 273 | | todo | |
 | `OpenCode/Settings/NotificationSettingsView.swift` | 107 | | todo | |

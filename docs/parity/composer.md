@@ -36,7 +36,7 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 | `OpenCode/Composer/ModelPicker/ModelPickerOverlays.swift` | 2425 | | todo | |
 | `OpenCode/Composer/ModelPicker/ModelPickerSections.swift` | 438 | | todo | |
 | `OpenCode/Composer/ModelPicker/ModelPickerSheet.swift` | 163 | | todo | |
-| `OpenCode/Composer/ModelPicker/ModelVisibility.swift` | 108 | | todo | |
+| `OpenCode/Composer/ModelPicker/ModelVisibility.swift` | 108 | `server/.../model/ModelVisibility.kt` | done | moved down to `:server` (settings › Models and the pickers both read it); `modelVisibilityByServer` key in its companion |
 | `OpenCode/Composer/ModelPicker/ShowAllModelsRow.swift` | 29 | | todo | |
 | `OpenCode/Composer/PastedText.swift` | 180 | | todo | |
 | `OpenCode/Composer/PastedTextViews.swift` | 207 | | todo | |

@@ -47,7 +47,7 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 | `OpenCode/Drawer/HomeSettingsFeature.swift` | 211 | | todo | |
 | `OpenCode/Drawer/HomeView+Drawer.swift` | 394 | | todo | |
 | `OpenCode/Drawer/HomeView.swift` | 525 | | todo | |
-| `OpenCode/Drawer/InAppNotices.swift` | 264 | | todo | |
+| `OpenCode/Drawer/InAppNotices.swift` | 264 | | todo | `InAppNoticeMode` + its `experimental-in-app-notices` key moved down to `core/.../experiments/InAppNoticeMode.kt` (Settings › Notifications writes it); `shows(kind)` and the rest stay here |
 | `OpenCode/Drawer/ProjectIcon.swift` | 1670 | | todo | |
 | `OpenCode/Drawer/ProjectSVGPaint.swift` | 95 | | todo | |
 | `OpenCode/Drawer/ServerSwitcher.swift` | 204 | | todo | |
