@@ -3,6 +3,7 @@ package ai.opencode.feature.composer
 import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.feature.voice.VoiceLabEnvironment
 import ai.opencode.server.model.OpenCodeDelivery
 import ai.opencode.server.model.OpenCodeProject
 import ai.opencode.server.model.OpenCodeSession
@@ -65,7 +66,18 @@ class ComposerPersistence(
         /** `filesDir/support` (iOS Application Support/OpenCode), where `TranscriptCachePersistence` also writes. */
         fun defaultDirectory(): File = File(dependency(AppContext).applicationContext.filesDir, "support")
 
-        override val liveValue: ComposerPersistence by lazy { make(ComposerPersistenceStorage.live(defaultDirectory())) }
+        override val liveValue: ComposerPersistence by lazy {
+            // iOS DEBUG lab switches, read as debug system properties (`VoiceLabEnvironment`):
+            // a lab server run keeps drafts in memory unless asked to persist them.
+            if (VoiceLabEnvironment.string("OPENCODE_LAB_SERVER_URL") != null && !VoiceLabEnvironment.flag("OPENCODE_LAB_PERSIST_COMPOSER")) {
+                return@lazy inMemory()
+            }
+            if (VoiceLabEnvironment.flag("OPENCODE_LAB_RESET_COMPOSER_PERSISTENCE")) {
+                File(defaultDirectory(), "composer-state.json").delete()
+                File(defaultDirectory(), "ComposerAttachments").deleteRecursively()
+            }
+            make(ComposerPersistenceStorage.live(defaultDirectory()))
+        }
 
         override val testValue: ComposerPersistence get() = inMemory()
 
