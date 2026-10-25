@@ -110,10 +110,10 @@ object AttachmentFileType {
         "application/x-bzip2", "application/x-xz", "application/java-archive", "application/x-apple-diskimage",
     )
     private val spreadsheetMarkers = listOf(
-        "vnd.ms-excel", "spreadsheetml", "opendocument.spreadsheet", "vnd.apple.numbers",
+        "vnd.ms-excel", "spreadsheetml", "opendocument.spreadsheet", "vnd.apple.numbers", "x-iwork-numbers",
     )
     private val presentationMarkers = listOf(
-        "vnd.ms-powerpoint", "presentationml", "opendocument.presentation", "vnd.apple.keynote",
+        "vnd.ms-powerpoint", "presentationml", "opendocument.presentation", "vnd.apple.keynote", "x-iwork-keynote",
     )
 
     /** A plain file name the server can use as the last path component. */

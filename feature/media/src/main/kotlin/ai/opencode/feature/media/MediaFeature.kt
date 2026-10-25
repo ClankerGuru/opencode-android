@@ -1,31 +1,62 @@
 package ai.opencode.feature.media
 
+import ai.opencode.core.store.PresentationAction
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
+import ai.opencode.core.store.ifLet
 
 /**
- * Phase 0 placeholder for this area's root reducer (iOS TCA feature).
+ * The media area's root reducer: hosts the full-screen transcript image viewer
+ * ([TranscriptImageViewerFeature]) as a presentation, the way iOS `SessionView.presentImage`
+ * hands a [TranscriptImagePreview] to `MediaPresenter`. One viewer at a time: a request while
+ * one is up is ignored. The viewer's effects (a photo save, a share) are cancelled with it.
  *
- * Will port `Media/` (viewer, zoom/dismiss, `AgentFiles/`, `LinkPreviews/`, `Mermaid/`) and `Browser/` (`BrowserFeature`, `BrowserWebViews`, page reader)
- * from `/Users/vogel/dev/opencode-ios/OpenCode/Media/` (all of: OpenCode/Media/, OpenCode/Browser/).
- * Track every file in `docs/parity/media.md`.
- *
- * The experimental in-app browser (`BrowserFeature`) lives here too; gate it behind Experimental like iOS.
- *
- * Keep the public names (`MediaFeature`, `MediaFeature.State`, `MediaFeature.Action`, `MediaView`) stable: `:app`
- * and parent features already wire them. Replace the placeholder state and actions freely.
+ * [MediaView] draws it above the content it hosts and provides [LocalMediaPresenter], through
+ * which transcript thumbnails ask for it ([MediaPresenter.presentImage]) and documents present
+ * their own viewers.
  */
 class MediaFeature : Reducer<MediaFeature.State, MediaFeature.Action> {
     data class State(
-        val placeholder: Boolean = true,
+        /** The transcript image viewer, while it's up. */
+        val viewer: TranscriptImageViewerFeature.State? = null,
     )
 
     sealed interface Action {
         /** The view appeared (TCA `.task`). */
         data object Task : Action
+
+        /** A thumbnail was tapped: open its images full screen. */
+        data class PresentImage(val preview: TranscriptImagePreview) : Action
+
+        /** The viewer's actions; [PresentationAction.Dismiss] once its flight home has landed. */
+        data class Viewer(val action: PresentationAction<TranscriptImageViewerFeature.Action>) : Action
     }
 
-    override fun reduce(state: State, action: Action): Reduced<State, Action> = when (action) {
-        Action.Task -> Reduced(state)
+    private object ViewerSlot
+
+    private val core = Reducer<State, Action> { state, action ->
+        when (action) {
+            Action.Task -> Reduced(state)
+            is Action.PresentImage ->
+                if (state.viewer != null || action.preview.pages.isEmpty()) {
+                    Reduced(state)
+                } else {
+                    Reduced(state.copy(viewer = TranscriptImageViewerFeature.State(action.preview)))
+                }
+            is Action.Viewer -> Reduced(state)
+        }
     }
+
+    private val body: Reducer<State, Action> = ifLet(
+        id = ViewerSlot,
+        parent = core,
+        state = { it.viewer },
+        setState = { state, viewer -> state.copy(viewer = viewer) },
+        action = { (it as? Action.Viewer)?.action },
+        embed = { Action.Viewer(it) },
+        child = TranscriptImageViewerFeature(),
+        childID = { it.preview.id },
+    )
+
+    override fun reduce(state: State, action: Action): Reduced<State, Action> = body.reduce(state, action)
 }

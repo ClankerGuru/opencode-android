@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- MediaFileProvider: only the image viewer's share cache. -->
+<paths>
+    <cache-path name="media-share" path="media-share/" />
+</paths>

@@ -32,7 +32,7 @@ data class AgentFileReference(
     val kind: Kind get() = Kind.of(name)
 
     /** The MIME type implied by the extension; the server guesses the same way. */
-    val mime: String get() = mimeTypes[AttachmentFileType.fileExtension(name)] ?: "application/octet-stream"
+    val mime: String get() = mimeForExtension(AttachmentFileType.fileExtension(name)) ?: "application/octet-stream"
 
     val typeLabel: String
         get() = when (kind) {
@@ -51,8 +51,9 @@ data class AgentFileReference(
             Kind.Document -> AttachmentFileType.symbolName(name, mime)
         }
 
-    enum class Kind {
-        Video, Audio, Image, Pdf, Text, Document;
+    @Serializable
+    enum class Kind(val rawValue: String) {
+        Video("video"), Audio("audio"), Image("image"), Pdf("pdf"), Text("text"), Document("document");
 
         /** Media and documents earn a card under the reply; code paths stay inline links so a code-heavy answer doesn't sprout a row of cards. */
         val showsCard: Boolean get() = this != Text
@@ -357,7 +358,12 @@ data class AgentFileReference(
             "lisp", "mak", "pas", "perl", "pm", "rst", "s", "scm", "srt", "text", "tcl", "vb", "vtt", "y",
         )
 
-        /** `UTType(filenameExtension:)?.preferredMIMEType` for the types the viewer meets. */
+        /**
+         * The preferred MIME type for an extension (iOS `UTType(filenameExtension:).preferredMIMEType`),
+         * or null when the table doesn't know it. A fixed table so JVM tests and every device agree.
+         */
+        fun mimeForExtension(suffix: String): String? = mimeTypes[suffix.lowercase()]
+
         private val mimeTypes: Map<String, String> = mapOf(
             "pdf" to "application/pdf", "png" to "image/png", "jpg" to "image/jpeg", "jpeg" to "image/jpeg",
             "gif" to "image/gif", "webp" to "image/webp", "heic" to "image/heic", "heif" to "image/heif",
@@ -387,6 +393,10 @@ data class AgentFileReference(
             "pages" to "application/x-iwork-pages-sffpages", "epub" to "application/epub+zip",
             "odt" to "application/vnd.oasis.opendocument.text", "ods" to "application/vnd.oasis.opendocument.spreadsheet",
             "odp" to "application/vnd.oasis.opendocument.presentation",
+            "cjs" to "text/javascript", "c" to "text/x-c", "h" to "text/x-c", "cpp" to "text/x-c++src",
+            "java" to "text/x-java-source", "rb" to "text/x-ruby-script", "ics" to "text/calendar", "vcf" to "text/vcard",
+            "dmg" to "application/x-apple-diskimage", "apk" to "application/vnd.android.package-archive",
+            "wasm" to "application/wasm",
         )
 
         // MARK: URL helpers (URLComponents-compatible, pure Kotlin)
