@@ -164,7 +164,7 @@ fun HomeFeature.State.returningFromCatchUp(): HomeFeature.State {
     var s = copy(catchUpState = catchUpState)
     val stack = exiting ?: s.catchUp ?: return s
     s = s.withCatchUp(null)
-    s = s.parkingDraft(stack.returnComposer as? ai.opencode.feature.drawer.bridge.SessionDraftState, stack.composerTargetSessionID)
+    s = s.parkingDraft(stack.returnComposer, stack.composerTargetSessionID)
     val session = stack.returnSessionID?.let { id -> s.sessions.firstOrNull { it.id == id } }
     s = if (session != null) {
         s.openingDetail(session, cachedItems = s.cachedTranscriptItems(session), reason = "you left Catch Up")
@@ -178,7 +178,7 @@ fun HomeFeature.State.returningFromCatchUp(): HomeFeature.State {
 fun HomeFeature.State.leavingCatchUp(): HomeFeature.State {
     val stack = catchUp ?: return this
     return withCatchUp(null).parkingDraft(
-        stack.returnComposer as? ai.opencode.feature.drawer.bridge.SessionDraftState,
+        stack.returnComposer,
         stack.composerTargetSessionID,
     )
 }
@@ -318,7 +318,6 @@ fun HomeFeature.State.purgingSession(sessionID: String): HomeFeature.State {
                 .pruningRequests { owner, _ -> owner == sessionID }
         },
         sessionSnapshotOrder = sessionSnapshotOrder - sessionID,
-        parkedDrafts = parkedDrafts - sessionID,
     )
     val serverID = server.persistenceID
     ServerSharedKeys.cachedTranscriptSnapshots().update { it.removeEntry(serverID, sessionID) }

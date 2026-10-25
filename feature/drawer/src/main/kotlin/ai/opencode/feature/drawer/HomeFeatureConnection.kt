@@ -7,8 +7,13 @@ import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.cancellable
 import ai.opencode.feature.drawer.HomeFeature.Action
 import ai.opencode.feature.drawer.HomeFeature.State
+import ai.opencode.feature.composer.ComposerPersistence
 import ai.opencode.feature.drawer.bridge.SessionDetail
+import ai.opencode.feature.system.share.ShareCredentials
+import ai.opencode.feature.system.share.ShareInboxClient
 import ai.opencode.feature.drawer.bridge.SessionScreenMessage
+import ai.opencode.feature.voice.VoiceSessionBoard
+import ai.opencode.feature.voice.VoiceSessionBoardClient
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeServerEvent
 import ai.opencode.server.TranscriptCachePersistence
@@ -31,21 +36,22 @@ import kotlin.time.Duration.Companion.milliseconds
 internal fun HomeFeature.reduceConnection(state: State, action: Action): HomeReduced = when (action) {
     Action.Task -> {
         val s = if (state.isConnected) state.initializingInbox() else state
-        // TODO(merge): iOS also listens to the call's and the recording's Live Activity commands here
+        // TODO(merge) round 2b / `:feature:session`: iOS also listens to the call's and the recording's Live Activity commands here
         // (`voiceLiveActivity.commands()` → `.voiceCallCommand`, `dictationLiveActivity.commands()` →
-        // `.dictationCommand`, cancellable by `CancelID.voiceCallCommands` / `.dictationCommands`)
-        // once `:feature:voice` / `:feature:system` port their ongoing-notification clients.
+        // `.dictationCommand`, cancellable by `CancelID.voiceCallCommands` / `.dictationCommands`;
+        // `:feature:system`'s `VoiceLiveActivityClient`/`DictationLiveActivityClient`). Listening waits
+        // for the handlers, which need the screen's call and recording.
         if (s.isConnected) Reduced(s, Effect.merge(refreshAttention(s), resolveActiveAncestry(s))) else refreshSnapshot(s)
     }
 
     Action.TranscriptCacheFlushRequested -> {
         // Leaving the app is when the share sheet becomes reachable: it offers these sessions and
         // sends with this server's credentials.
-        // TODO(merge): `shareInbox.publishTargets(state.shareTargets)` and
-        // `shareInbox.publishCredentials(ShareCredentials(server), true)` once `:feature:system` ports.
-        // TODO(merge): `flushPersistedComposer(state)` once `:feature:composer` ports its persistence.
+        val shareInbox = dependency(ShareInboxClient)
+        shareInbox.publishTargets(state.shareTargets)
+        shareInbox.publishCredentials(ShareCredentials(state.server), true)
         val persistence = dependency(TranscriptCachePersistence)
-        Reduced(state, Effect.run { persistence.flush() })
+        Reduced(state, Effect.merge(Effect.run { persistence.flush() }, flushPersistedComposer(state)))
     }
 
     Action.SceneEnteredBackground -> Reduced(state, publishAppBadge(state))
@@ -54,8 +60,9 @@ internal fun HomeFeature.reduceConnection(state: State, action: Action): HomeRed
         // The stream started before any rename since; the name on screen wins.
         val server = action.server.copy(name = state.server.name)
         val s = state.unsettlingNotices().withServer(server)
-        // TODO(merge): `shareInbox.publishTargets(state.shareTargets)`: the share sheet offers this
-        // server's sessions as soon as it's connected.
+        // The share sheet offers this server's sessions and sends with its credentials, as soon
+        // as it's connected.
+        dependency(ShareInboxClient).publishTargets(s.shareTargets)
         Reduced(
             s,
             Effect.merge(
@@ -250,8 +257,8 @@ private fun HomeFeature.snapshotRefreshed(state: State, action: Action.SnapshotR
     val drained = drainDirtyCachedTranscripts(s)
     s = drained.state
     val prefetch = prefetchTranscripts(s)
-    // TODO(merge): `notifyVoiceSnapshot(&state, activeIDs:)` (a live call hears the list) once
-    // `:feature:voice` ports.
+    // TODO(merge) round 2b / `:feature:session`: `notifyVoiceSnapshot(&state, activeIDs:)` (a live
+    // call hears the list; the call is the screen's `VoiceFeature`).
     var retry: Effect<Action> = Effect.none()
     if (unattributed) {
         val refreshed = refreshSnapshot(s)
@@ -367,6 +374,7 @@ internal fun HomeFeature.refreshAttention(state: State): Effect<Action> {
     val directories = HomeFeature.attentionDirectories(state)
     val client = dependency(OpenCodeClient)
     val clock = dependency(Clock)
+    val board = dependency(VoiceSessionBoardClient)
     return Effect.run<Action> { send ->
         clock.sleep(150.milliseconds)
         val sessionIDs = try {
@@ -376,9 +384,53 @@ internal fun HomeFeature.refreshAttention(state: State): Effect<Action> {
         } catch (_: Exception) {
             null
         }
-        // TODO(merge): `voiceSessionBoard.attentionRead(server.persistenceID, sessionIDs != null)` (kept
-        // rows stay on screen, but the call's delegator reports them as unknown) once
-        // `:feature:voice` ports its session board.
-        if (sessionIDs != null) send(Action.AttentionRefreshed(sessionIDs))
+        if (sessionIDs != null) {
+            send(Action.AttentionRefreshed(sessionIDs))
+            board.attentionRead(server.persistenceID, true)
+        } else if (currentCoroutineContext().isActive) {
+            // Kept rows stay on screen, but the delegator reports them as unknown.
+            board.attentionRead(server.persistenceID, false)
+        }
     }.cancellable(HomeFeature.CancelID.Attention, cancelInFlight = true)
 }
+
+/**
+ * iOS `HomeFeature.flushPersistedComposer(_:)` (`ComposerPersistence.swift`): leaving the app
+ * saves every composer on screen that keeps its draft, then writes at once.
+ */
+internal fun HomeFeature.flushPersistedComposer(state: State): Effect<Action> {
+    val persistence = dependency(ComposerPersistence)
+    val serverID = state.server.persistenceID
+    fun schedule(detail: SessionDetail) {
+        val composer = detail.sessionComposer
+        if (composer.isEmpty) return
+        persistence.scheduleDraft(serverID, detail.session?.id, if (detail.session == null) detail.draftProject else null, composer)
+    }
+    val detail = state.sessionDetail
+    if (detail != null && state.catchUp == null && detail.readsOnView) schedule(detail)
+    for (child in state.subagentStack) if (child.readsOnView) schedule(child)
+    return Effect.run { persistence.flush() }
+}
+
+/**
+ * The board the call's delegator reads while a call is up; null otherwise, so Home pays nothing
+ * for it between calls (iOS `HomeFeature.State.voiceSessionBoard`, `VoiceSessionBoard.swift`).
+ */
+internal val State.voiceSessionBoard: VoiceSessionBoard?
+    get() {
+        // TODO(merge) round 2b / `:feature:session`: `sessionDetail?.voice != null` (the screen's call).
+        val hasVoiceCall = false
+        if (!hasVoiceCall) return null
+        val status = statusSnapshot()
+        return VoiceSessionBoard.make(
+            hasVoiceCall = true,
+            serverID = server.persistenceID,
+            sessions = sessions,
+            busyIDs = status.busy,
+            attentionIDs = status.attention,
+            unreadIDs = sessions.filter { status.isUnread(it) && !status.isMuted(it.id) }.mapTo(HashSet()) { it.id },
+            pinnedSessionKeys = pinnedSessionKeys,
+            attentionDirectories = HomeFeature.attentionDirectories(this).toSet(),
+            isLive = status.showsActivity,
+        )
+    }

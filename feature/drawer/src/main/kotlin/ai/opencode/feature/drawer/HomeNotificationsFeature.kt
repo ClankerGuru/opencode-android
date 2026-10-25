@@ -1,12 +1,13 @@
 package ai.opencode.feature.drawer
 
-import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
 import ai.opencode.core.store.cancellable
-import ai.opencode.feature.drawer.bridge.NotificationPermission
+import ai.opencode.feature.system.notifications.NotificationPermission
+import ai.opencode.feature.system.notifications.NotificationPermissionClient
+import ai.opencode.feature.system.notifications.SessionNotificationsClient
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeNotifyPluginStatus
@@ -62,7 +63,7 @@ class HomeNotificationsFeature : Reducer<HomeNotificationsFeature.State, HomeNot
 
             is Action.NotificationPermissionLoaded -> {
                 val next = state.copy(status = status.copy(notificationPermission = action.permission))
-                if (!action.permission.isEnabled) return Reduced(next)
+                if (action.permission != NotificationPermission.Enabled) return Reduced(next)
                 // Mint ahead so the next Send rarely waits on the relay.
                 val sessionNotifications = dependency(SessionNotificationsClient)
                 val server = state.server
@@ -124,81 +125,5 @@ class HomeNotificationsFeature : Reducer<HomeNotificationsFeature.State, HomeNot
                 state.copy(status = status.copy(notifyPlugin = action.status?.let(NotifyPluginCheck::Checked) ?: NotifyPluginCheck.Failed)),
             )
         }
-    }
-}
-
-/**
- * iOS `NotificationPermission.enabled`: authorized (iOS also counts provisional and ephemeral).
- * TODO(merge): drop once `NotificationPermission` is `:feature:system`'s three-case enum
- * (`notDetermined`, `disabled`, `enabled`); then compare with `enabled` directly.
- */
-internal val NotificationPermission.isEnabled: Boolean
-    get() = this == NotificationPermission.Authorized || this == NotificationPermission.Provisional
-
-/**
- * Port of iOS `NotificationPermissionClient` (`System/Notifications/SessionNotifications.swift`).
- *
- * TODO(merge): replace with `:feature:system`'s client once the notifications port lands. Until
- * then the live value reports Not Determined and opens nothing, as a build without a relay would.
- */
-class NotificationPermissionClient(
-    val status: suspend () -> NotificationPermission,
-    val request: suspend () -> NotificationPermission,
-    /** Opens the system's notification settings for this app; false if it couldn't. */
-    val openSettings: suspend () -> Boolean,
-) {
-    companion object Key : DependencyKey<NotificationPermissionClient> {
-        override val liveValue = NotificationPermissionClient(
-            status = { NotificationPermission.NotDetermined },
-            request = { NotificationPermission.NotDetermined },
-            openSettings = { false },
-        )
-        override val testValue = NotificationPermissionClient(
-            status = { NotificationPermission.Authorized },
-            request = { NotificationPermission.Authorized },
-            openSettings = { true },
-        )
-    }
-}
-
-/**
- * Port of iOS `SessionNotificationsClient` (`System/Notifications/SessionNotifications.swift`): the
- * callback URL a send attaches so the server's notify plugin can tell this phone when the run
- * ends. Null means "send without one": notifications only ever enhance a send and never delay or
- * fail it.
- *
- * TODO(merge): replace with `:feature:system`'s client once its FCM bridge lands. Until then the
- * live value is unavailable (no relay), as an iOS build without one is.
- */
-class SessionNotificationsClient(
-    /** Whether this build has a relay and a push environment to offer at all. */
-    val isAvailable: Boolean,
-    val callbackURL: suspend (OpenCodeServer) -> String?,
-    /** Mints ahead of the first send so Send rarely waits on the relay. */
-    val prepare: suspend (OpenCodeServer) -> Unit,
-    /** Drops a removed server's ref and callback (by persistence ID). */
-    val forget: suspend (String) -> Unit,
-    /** The random `ref` a server's pushes carry, made and saved the first time it's asked for. Main thread. */
-    val ref: (String) -> String = { "" },
-    /** Adds the badge to a permission granted before the app asked for it. */
-    val includeBadges: suspend () -> Unit = {},
-    /** Tells notifications which session is on screen so its own don't show. Main thread. */
-    val setVisibleSession: (shown: Boolean, sessionID: String?) -> Unit = { _, _ -> },
-    /** Whether the drawer button can show In-App Notices' label. Main thread. */
-    val setShowsDrawerLabel: (Boolean) -> Unit = {},
-) {
-    companion object Key : DependencyKey<SessionNotificationsClient> {
-        override val liveValue = SessionNotificationsClient(
-            isAvailable = false,
-            callbackURL = { null },
-            prepare = {},
-            forget = {},
-        )
-        override val testValue = SessionNotificationsClient(
-            isAvailable = true,
-            callbackURL = { null },
-            prepare = {},
-            forget = {},
-        )
     }
 }

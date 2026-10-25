@@ -9,9 +9,8 @@ import ai.opencode.core.store.map
 import ai.opencode.feature.drawer.HomeFeature.Action
 import ai.opencode.feature.drawer.HomeFeature.DelegateAction
 import ai.opencode.feature.drawer.HomeFeature.State
-import ai.opencode.feature.drawer.bridge.NotificationPermission
+import ai.opencode.feature.system.notifications.NotificationPermission
 import ai.opencode.feature.drawer.bridge.SessionDetail
-import ai.opencode.feature.drawer.bridge.SessionDraftState
 import ai.opencode.feature.drawer.catchup.CatchUpFeature
 import ai.opencode.feature.settings.ConnectionStatus
 import ai.opencode.feature.settings.HomeSettingsFeature
@@ -20,7 +19,7 @@ import ai.opencode.feature.settings.SettingsFeature
 import ai.opencode.feature.settings.SettingsFeature.SettingsDelegate
 import ai.opencode.feature.settings.whatsnew.WhatsNewEntry
 import ai.opencode.feature.settings.whatsnew.WhatsNewFeature
-import ai.opencode.feature.settings.whatsnew.whatsNewVoiceAvailable
+import ai.opencode.feature.voice.VoiceRoutePreferences
 
 /*
  * Port of iOS `HomeFeature+Settings.swift`, and the Settings half of `HomeFeature` and
@@ -70,8 +69,8 @@ private val State.settingsNotifications: SettingsFeature.Action.NotificationsCha
         permission = when (notificationPermission) {
             null -> null
             NotificationPermission.NotDetermined -> NotificationPermissionStatus.notDetermined
-            NotificationPermission.Denied -> NotificationPermissionStatus.disabled
-            NotificationPermission.Authorized, NotificationPermission.Provisional -> NotificationPermissionStatus.enabled
+            NotificationPermission.Disabled -> NotificationPermissionStatus.disabled
+            NotificationPermission.Enabled -> NotificationPermissionStatus.enabled
         },
         isRequesting = isRequestingNotifications,
         setupError = notificationSetupError,
@@ -170,7 +169,7 @@ internal fun HomeFeature.tryWhatsNew(destination: WhatsNewEntry.Destination, ent
             if (state.connectionStatus == HomeConnectionFeature.State.ConnectionStatus.disconnected) return Reduced(state)
         // Before Voice is set up, Settings pushes Voice's page over the entry instead and never
         // asks (`SettingsFeature`); checked again here as iOS does.
-        WhatsNewEntry.Destination.Call -> if (!whatsNewVoiceAvailable(state.server)) return Reduced(state)
+        WhatsNewEntry.Destination.Call -> if (!VoiceRoutePreferences().isAvailable(state.server)) return Reduced(state)
         WhatsNewEntry.Destination.ModelList -> Unit
     }
     var s = state.copy(settings = null, drawerCloseRequests = state.drawerCloseRequests + 1)
@@ -199,11 +198,11 @@ internal fun HomeFeature.tryWhatsNew(destination: WhatsNewEntry.Destination, ent
                 effects += opened.effect
             }
             if (s.sessionDetail == null) s = s.openingDraft(reason = "What’s New’s Try It")
-            // TODO(merge): close the top screen's in-app browser (`.browser(.closeTapped)`) once
-            // `:feature:media` ports it.
+            // TODO(merge) round 2b / `:feature:session`: close the top screen's in-app browser (`.browser(.closeTapped)`); the page is the screen's
+            // (`SessionFeature.browser`).
             if (destination == WhatsNewEntry.Destination.Call) {
                 // A pushed subagent's call belongs to the root, aimed at the top.
-                // TODO(merge): `startCallOnTop` for a pushed subagent once `:feature:voice` ports.
+                // TODO(merge) round 2b / `:feature:session`: `startCallOnTop` for a pushed subagent.
                 val call = startSystemCall(s)
                 s = call.state
                 effects += call.effect
@@ -225,8 +224,8 @@ private fun SessionDetail.typingBelow(text: String): SessionDetail {
     val added = text.trim()
     val current = draft.text
     return when {
-        current.isEmpty() -> copy(draft = SessionDraftState(text))
-        added.isNotEmpty() && !current.contains(added) -> copy(draft = SessionDraftState("$current\n\n$text"))
+        current.isEmpty() -> copy(draft = draft.copy(text = text))
+        added.isNotEmpty() && !current.contains(added) -> copy(draft = draft.copy(text = "$current\n\n$text"))
         else -> this
     }
 }

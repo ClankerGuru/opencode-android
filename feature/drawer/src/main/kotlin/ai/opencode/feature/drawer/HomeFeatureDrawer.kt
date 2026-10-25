@@ -1,5 +1,6 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.feature.system.share.ShareInboxClient
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.dependency
@@ -211,8 +212,9 @@ internal fun HomeFeature.reduceDrawer(state: State, action: Action): HomeReduced
         is Action.DeleteSessionResponse -> {
             val error = action.error
             if (error == null) {
-                // TODO(merge): `shareInbox.removeSuggestions(serverID, [sessionID])` once `:feature:system` ports.
-                return Reduced(state.purgingSession(action.sessionID))
+                val s = state.purgingSession(action.sessionID)
+                dependency(ShareInboxClient).removeSuggestions(s.server.persistenceID, listOf(action.sessionID))
+                return Reduced(s)
             }
             var s = state.copy(recentlyDeletedIDs = state.recentlyDeletedIDs - action.sessionID)
             s = restoreSession(s, action.backup)
@@ -280,7 +282,8 @@ private fun HomeFeature.sessionTapped(state: State, sessionID: String): HomeRedu
     }
     // Opening a session leaves the stack for the session it names.
     s = s.leavingCatchUp()
-    // TODO(merge): sessions you open are the Share Sheet's suggestions (`shareInbox.donateSuggestion`).
+    // Sessions you open are the Share Sheet's suggestions.
+    if (session.parentID == null) dependency(ShareInboxClient).donateSuggestion(s.server.persistenceID, sessionID, session.title)
     // Re-opening the session already on screen (a repeated row tap) must not rebuild it and lose the composer draft.
     if (s.sessionDetail?.session?.id == sessionID) {
         val viewed = openViewedSession(s, session, cachedItems = null, opensDetail = false)

@@ -1,5 +1,8 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.core.sharing.shared
+import ai.opencode.feature.voice.VoiceSharedKeys
+import ai.opencode.feature.composer.PromptOutbox
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
@@ -26,7 +29,10 @@ internal fun HomeFeature.reduceServerEvent(state: State, event: OpenCodeServerEv
 
         OpenCodeServerEvent.Connected -> {
             // A new stream may have missed events; its snapshot is the truth.
-            // TODO(merge): clear `serverVoiceSupportByServer[serverID]` and the call's support once `:feature:voice` ports.
+            val supportByServer = shared(VoiceSharedKeys.serverVoiceSupportByServer)
+            val serverID = state.server.persistenceID
+            if (supportByServer.value[serverID] != null) supportByServer.update { it - serverID }
+            // TODO(merge) round 2b / `:feature:session`: the open call's own `serverVoiceSupport` goes back to `.unknown`.
             return familyAndListRefresh(state.copy(runChangesDuringRefresh = emptyMap()))
         }
 
@@ -95,9 +101,12 @@ internal fun HomeFeature.reduceServerEvent(state: State, event: OpenCodeServerEv
 
         is OpenCodeServerEvent.InputQueueChanged -> {
             // A send of this phone's delivered while its session was off screen shows as sent when it opens.
-            // TODO(merge): `promptOutbox.markDelivered(inputID)` once `:feature:composer` ports the outbox.
             var s = state
-            event.inputID?.let { s = removingSnapshotQueuedInput(s, event.sessionID, it) }
+            event.inputID?.let { inputID ->
+                dependency(PromptOutbox).markDelivered(inputID)
+                // Off screen, its pending row would otherwise come back on entry.
+                s = removingSnapshotQueuedInput(s, event.sessionID, inputID)
+            }
             return Reduced(s, forwardToSession(s, event.sessionID, SessionScreenMessage.InputQueueChanged(event.inputID)))
         }
 
@@ -105,7 +114,7 @@ internal fun HomeFeature.reduceServerEvent(state: State, event: OpenCodeServerEv
             return Reduced(state, forwardToSession(state, event.sessionID, SessionScreenMessage.InputEnqueued(event.input)))
 
         is OpenCodeServerEvent.InputCancelled -> {
-            // TODO(merge): `promptOutbox.forgetAdmitted(inputID)`.
+            dependency(PromptOutbox).forgetAdmitted(event.inputID)
             val s = removingSnapshotQueuedInput(state, event.sessionID, event.inputID)
             return Reduced(s, forwardToSession(s, event.sessionID, SessionScreenMessage.InputCancelled(event.inputID)))
         }
@@ -143,7 +152,7 @@ internal fun HomeFeature.reduceServerEvent(state: State, event: OpenCodeServerEv
             val parents = s.knownParents
             val unattributed = !s.isAttributed(sessionID, parents)
             if (unattributed) s = s.invalidatingSnapshotFamilyReads { snapshot -> snapshot.family.none { it.id == sessionID } }
-            // TODO(merge): `voice.replyWatch.setSessionActive(sessionID, true)`.
+            // TODO(merge) round 2b / `:feature:session`: `voice.replyWatch.setSessionActive(sessionID, true)` (the screen's call).
             val changed = SessionScreenMessage.FamilyRunStateChanged(sessionID, isRunning = true)
             val started = noteRunStarted(s, sessionID)
             s = started.state
@@ -179,7 +188,7 @@ internal fun HomeFeature.reduceServerEvent(state: State, event: OpenCodeServerEv
             val unattributed = !s.isAttributed(sessionID, parents)
             val receivesRunState = { screen: SessionDetail -> shouldForwardFamilyRunState(screen, sessionID, unattributed, parents) }
             val ended = SessionScreenMessage.FamilyRunStateChanged(sessionID, isRunning = false)
-            // TODO(merge): `notifyVoiceExecutionEnded` (the call's reply watch) once `:feature:voice` ports.
+            // TODO(merge) round 2b / `:feature:session`: `notifyVoiceExecutionEnded` (the screen's call's reply watch).
             val notify = forwardToSubagents(s, ended, receivesRunState)
             // Refetch for updatedAt/ordering; if the finished run belongs to the open session, stop its
             // working indicator and pull the reply. Unlisted members too, as for a start.

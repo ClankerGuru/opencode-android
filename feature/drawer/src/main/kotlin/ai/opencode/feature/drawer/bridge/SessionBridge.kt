@@ -3,6 +3,9 @@ package ai.opencode.feature.drawer.bridge
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
 import ai.opencode.core.store.map
+import ai.opencode.feature.composer.DraftState
+import ai.opencode.feature.composer.SharedComposerDraft
+import ai.opencode.feature.composer.SharedDraftTarget
 import ai.opencode.feature.session.SessionFeature
 import ai.opencode.server.model.OpenCodeFormRequest
 import ai.opencode.server.model.OpenCodeModelRef
@@ -69,7 +72,8 @@ data class SessionDetail(
     val projects: List<OpenCodeProject> = emptyList(),
     val currentModel: OpenCodeModelRef? = null,
     val pendingModel: OpenCodeModelRef? = null,
-    val draft: SessionDraftState = SessionDraftState(),
+    /** iOS `sessionComposer`'s parts (`draft`, pending attachments, files, location, chips): `:feature:composer`'s [DraftState]. */
+    val draft: DraftState = DraftState(),
     val seenItemIDs: Set<String>? = null,
     val leftAt: Instant? = null,
     val permissionRequests: List<OpenCodePermissionRequest> = emptyList(),
@@ -81,7 +85,7 @@ data class SessionDetail(
     val isDraft: Boolean get() = session == null
 
     /** iOS `sessionComposer`: the composer this screen keeps for its session. */
-    val sessionComposer: SessionDraftState get() = draft
+    val sessionComposer: DraftState get() = draft
 
     /** iOS `hasPromptContent`. */
     val hasPromptContent: Boolean get() = draft.text.isNotEmpty()
@@ -161,23 +165,6 @@ data class SessionDetail(
     }
 }
 
-/** TODO(merge): replace with `SessionFeature.State.DraftState` (the composer's text, attachments …). */
-data class SessionDraftState(val text: String = "") {
-    val isEmpty: Boolean get() = text.isEmpty()
-
-    /** iOS `SharedComposerDraft.append(_:)`: shares for one composer join into one message. */
-    fun appending(other: SessionDraftState): SessionDraftState = SessionDraftState(joined(text, other.text))
-
-    companion object {
-        /** iOS `SharedComposerDraft.joined(_:_:)`: shared text follows what's there after a blank line. */
-        fun joined(first: String, second: String): String = when {
-            first.isEmpty() -> second
-            second.isEmpty() -> first
-            else -> first + "\n\n" + second
-        }
-    }
-}
-
 /**
  * Last-known chrome for a visited session (no effects, sheets or speculative reads), restored when
  * it opens again. TODO(merge): replace with `SessionFeature.SwitchSnapshot`.
@@ -252,7 +239,7 @@ sealed interface SessionDelegate {
     data class SetPinned(val session: OpenCodeSession, val pinned: Boolean) : SessionDelegate
     data class OpenDraft(val directory: String?) : SessionDelegate
     data class ToggleMute(val sessionID: String) : SessionDelegate
-    data class KeepDraft(val target: SharedDraftTarget, val draft: SessionDraftState) : SessionDelegate
+    data class KeepDraft(val target: SharedDraftTarget, val draft: SharedComposerDraft) : SessionDelegate
     data class ToggleRead(val sessionID: String) : SessionDelegate
     data class DeleteSession(val sessionID: String) : SessionDelegate
     data object ReportProblem : SessionDelegate
@@ -278,7 +265,7 @@ sealed interface SessionScreenEvent {
     data class AcceptedTranscriptUpdated(val sessionID: String, val items: List<OpenCodeTranscriptItem>) : SessionScreenEvent
     data class ModelApplied(val sessionID: String, val model: OpenCodeModelRef) : SessionScreenEvent
     data class SessionCreated(val session: OpenCodeSession) : SessionScreenEvent
-    data class DraftChanged(val draft: SessionDraftState) : SessionScreenEvent
+    data class DraftChanged(val draft: DraftState) : SessionScreenEvent
     data class Delegate(val delegate: SessionDelegate) : SessionScreenEvent
 }
 
@@ -305,18 +292,6 @@ sealed interface SessionScreenMessage {
     data class RequestsConnectionChanged(val connected: Boolean) : SessionScreenMessage
     data class EventStreamConnected(val serverID: String) : SessionScreenMessage
     data object VisibleScreenChanged : SessionScreenMessage
-}
-
-/** Where shared items go. TODO(merge): replace with `:feature:system`'s `SharedDraftTarget`. */
-sealed interface SharedDraftTarget {
-    data class Session(val id: String) : SharedDraftTarget
-    data object NewSession : SharedDraftTarget
-
-    val sessionID: String? get() = (this as? Session)?.id
-
-    companion object {
-        fun of(sessionID: String?): SharedDraftTarget = sessionID?.let(::Session) ?: NewSession
-    }
 }
 
 /** A linked session ID's answer (iOS `SessionLinkTarget`). TODO(merge): use `:feature:transcript`'s. */

@@ -24,7 +24,41 @@ import ai.opencode.feature.drawer.container.rememberSessionDrawerController
 import ai.opencode.feature.drawer.motion.DrawerButton
 import ai.opencode.feature.drawer.motion.rememberDrawerKeyboardHold
 import ai.opencode.feature.drawer.motion.rememberDrawerShortcutMotion
+import ai.opencode.core.experiments.InAppNoticeMode
 import ai.opencode.feature.drawer.notices.InAppNotice
+import ai.opencode.feature.drawer.notices.InAppNoticeSettings
+import ai.opencode.feature.system.notifications.SessionNotificationsClient
+import ai.opencode.core.experiments.ExperimentalCallStyle
+import ai.opencode.core.experiments.ExperimentalFeature
+import ai.opencode.core.experiments.key
+import ai.opencode.core.motion.Motion
+import ai.opencode.core.sharing.shared
+import ai.opencode.feature.drawer.style.DrawerMetrics
+import ai.opencode.feature.voice.CallTrayController
+import ai.opencode.feature.voice.CallTrayDock
+import ai.opencode.feature.voice.CallTrayDockGeometry
+import ai.opencode.feature.voice.CallTrayDockOverlay
+import ai.opencode.feature.voice.CallTrayTunables
+import ai.opencode.feature.voice.FloatingCallCenter
+import ai.opencode.feature.voice.FloatingCallOverlay
+import ai.opencode.feature.voice.VoiceRoutePreferences
+import ai.opencode.feature.voice.VoiceStoreOf
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import kotlin.math.max
+import ai.opencode.server.OpenCodeServer
+import androidx.compose.runtime.collectAsState
 import ai.opencode.feature.drawer.switcher.SessionSwitcherOverlay
 import ai.opencode.feature.session.SessionFeature
 import ai.opencode.feature.session.SessionView
@@ -145,6 +179,22 @@ private fun HomeLayout(
     val isDrawerOpen by store.observe { it.isDrawerOpen }
     val catchUpProxy = remember { CatchUpStageProxy() }
     val currentReducedMotion by rememberUpdatedState(reducedMotion)
+    val callPresentation = rememberCallPresentation()
+    val usesTray = callPresentation == ExperimentalCallStyle.tray
+    SideEffect { view.usesCallTray = usesTray }
+    val callTray = view.callTray
+    // The open session's call (iOS `sessionStore.scope(\.voice, action: \.voice.presented)`).
+    // TODO(merge) round 2b / `:feature:session`: scope the session's `VoiceFeature` child here.
+    val call: VoiceStoreOf? = null
+    // How far the drawer is open, each frame it moves: only the travelling tray reads these.
+    val drawerProgress = remember { mutableFloatStateOf(0f) }
+    val drawerTravels = remember { mutableStateOf(true) }
+    val firstUsesTray = remember { mutableStateOf<Boolean?>(null) }
+    LaunchedEffect(usesTray) {
+        val previous = firstUsesTray.value
+        firstUsesTray.value = usesTray
+        if (previous != null && !usesTray) callTray.reset()
+    }
     // The last stack shown, so the stage keeps its last count while it fades out.
     val lastCatchUp = remember { arrayOfNulls<CatchUpFeature.Stack>(1) }
     catchUp?.let { lastCatchUp[0] = it }
@@ -210,8 +260,12 @@ private fun HomeLayout(
             // iOS `@ScaledMetric(relativeTo: .footnote) timeRevealReach = 76`.
             view.timeReveal.update(phase, reach = TIME_REVEAL_REACH * density.fontScale, reducedMotion = currentReducedMotion)
         },
-        // TODO(merge): the Call Tray (`dismissesKeyboardOnOpen`, `onDrawerProgress` → `callTray.dock`) once `:feature:voice` ports it.
-        dismissesKeyboardOnOpen = false,
+        // The Call Tray follows the drawer into its bottom slot (D-114).
+        onDrawerProgress = { progress, travels ->
+            drawerProgress.floatValue = progress
+            drawerTravels.value = travels
+        },
+        dismissesKeyboardOnOpen = usesTray && (callTray.showsSurface || call != null),
         contentSessionID = DrawerKeyboard.closingSession(chosen = view.chosenSessionID, shown = selectedSessionID),
         isContentPushed = pushed,
         isSheetPresented = settingsShown,
@@ -241,13 +295,103 @@ private fun HomeLayout(
         },
         preview = { sessionID, revision -> CatchUpPreviewCard(store, sessionID, revision) },
     )
+    // During a call the tray docks in the drawer beneath New Session (D-114).
+    if (usesTray && !usesSidebar) {
+        HomeCallTrayDock(
+            controller = callTray,
+            call = call,
+            reducedMotion = reducedMotion,
+            drawerWidth = drawerWidth,
+            isCatchingUp = catchUp != null,
+            drawerProgress = { drawerProgress.floatValue },
+            drawerTravels = { drawerTravels.value },
+        )
+    }
+    // A floating call stays put above both while the card slides and sessions change: the call
+    // belongs to the root session.
+    HomeFloatingCall(if (callPresentation == ExperimentalCallStyle.floating) call else null)
+}
+
+/** iOS `HomeView.callPresentation`: Settings' Call Style, from the call experiments. */
+@Composable
+private fun rememberCallPresentation(): ExperimentalCallStyle {
+    val callTraySetting by remember { shared(ExperimentalFeature.callTray.key).flow }.collectAsState()
+    val floatingCallSetting by remember { shared(ExperimentalFeature.floatingCall.key).flow }.collectAsState()
+    val livingOrbSetting by remember { shared(ExperimentalFeature.livingOrb.key).flow }.collectAsState()
+    val floatingCenter = remember { FloatingCallCenter.shared }
+    return ExperimentalCallStyle.of(
+        callTray = ExperimentalFeature.callTray.isActive(callTraySetting),
+        floatingCall = floatingCenter.isOn(floatingCallSetting),
+        livingOrb = ExperimentalFeature.livingOrb.isActive(livingOrbSetting),
+    )
+}
+
+/**
+ * The travelling Call Tray over Home (iOS `CallTrayDockOverlay` in `homeLayout`), fed the drawer's
+ * slot (iOS `drawerCallTrayGeometry`: where New Session and Settings stand without a call, as
+ * wide as their row, in window space) and whether it may dock ([CallTrayDock.mayDock]).
+ */
+@Composable
+private fun HomeCallTrayDock(
+    controller: CallTrayController,
+    call: VoiceStoreOf?,
+    reducedMotion: Boolean,
+    drawerWidth: Dp,
+    isCatchingUp: Boolean,
+    drawerProgress: () -> Float,
+    drawerTravels: () -> Boolean,
+) {
+    val density = LocalDensity.current
+    val insetBottom = with(density) { WindowInsets.systemBars.union(WindowInsets.displayCutout).getBottom(this).toDp() }.value
+    var origin by remember { mutableStateOf(Offset.Zero) }
+    BoxWithConstraints(Modifier.fillMaxSize().onGloballyPositioned { origin = it.positionInWindow() / density.density }) {
+        val screen = Rect(origin.x, origin.y, origin.x + maxWidth.value, origin.y + maxHeight.value)
+        val height = CallTrayTunables.height
+        val edge = DrawerMetrics.rowEdge.value
+        // The slot's bottom is the resting composer's (`ComposerTunables.bottomGap`, 0).
+        val slotTop = screen.bottom - insetBottom - height
+        val geometry = CallTrayDockGeometry(
+            slot = Rect(screen.left + edge, slotTop, screen.left + edge + max(1f, drawerWidth.value - 2 * edge), slotTop + height),
+            bounds = Rect(screen.left, screen.top, screen.left + drawerWidth.value, screen.bottom),
+            // The phone's drawer recedes behind the card as it closes (iOS: phones, not iPads).
+            recedes = !reducedMotion,
+            screen = screen,
+        )
+        CallTrayDockOverlay(
+            controller = controller,
+            store = call,
+            reducedMotion = reducedMotion,
+            drawerProgress = drawerProgress,
+            drawerTravels = drawerTravels,
+            mayDock = CallTrayDock.mayDock(usesTray = true, usesSidebar = false, isCatchingUp = isCatchingUp, isResting = controller.isResting),
+            drawer = geometry,
+        )
+    }
+}
+
+/**
+ * The floating call, full-window over Home (iOS `homeLayout`'s second overlay): shown while the
+ * call doesn't show its card. A call that fails or drops hands over to its card: the orb fades
+ * rather than vanishing (a hang-up already shrinks it away).
+ */
+@Composable
+private fun HomeFloatingCall(call: VoiceStoreOf?) {
+    val showsCard = if (call == null) null else call.observe { it.phase.showsCard }.value
+    AnimatedVisibility(
+        visible = call != null && showsCard == false,
+        enter = EnterTransition.None,
+        exit = fadeOut(Motion.easeOut(0.25)),
+    ) {
+        if (call != null) FloatingCallOverlay(call)
+    }
 }
 
 /**
  * What the session's stack shows, bottom first: the session (or draft), then each subagent pushed
  * over it (iOS `stackPages` / `StackEntry`). Back (the back button, the predictive back gesture)
- * goes to the screen beneath. TODO(merge): web pages over the screen that opened them
- * (`StackEntry.web`) once `:feature:media` ports the in-app browser.
+ * goes to the screen beneath. TODO(merge) round 2b / `:feature:session`: web pages over the screen
+ * that opened them (`StackEntry.web`: `:feature:media`'s `BrowserPage` for the screen's
+ * `SessionFeature.browser.pageID`, Back closing it with `.browser(.closeTapped)`).
  */
 @Composable
 private fun HomeSessionStack(
@@ -378,7 +522,7 @@ private fun HomeSidebarEffects(store: StoreOf<HomeFeature.State, HomeFeature.Act
     // Beside a sidebar the drawer button has no label, so In-App Notices acts as Off, banners included.
     LaunchedEffect(usesSidebar) {
         if (usesSidebar) view.isSessionDrawerPresented = false
-        // TODO(merge): `sessionNotifications.setShowsDrawerLabel(!sidebar)` once `:feature:system` ports it.
+        dependency(SessionNotificationsClient).setShowsDrawerLabel(!usesSidebar)
         store.send(HomeFeature.Action.DrawerLabelAvailabilityChanged(!usesSidebar))
     }
     // A computer just paired: open its sessions as the drawer button does.
@@ -400,7 +544,8 @@ private fun HomeLifecycle(store: StoreOf<HomeFeature.State, HomeFeature.Action>,
     val settingsShown by store.observe { it.isSettingsShown }
     val drawerCloseRequests by store.observe { it.drawerCloseRequests }
     val selectedSessionID by store.observe { it.sessionDetail?.session?.id }
-    val systemVoiceAvailable by store.observe { it.systemVoiceAvailable }
+    val server by store.observe { it.server }
+    val isVoiceAvailable = rememberVoiceAvailable(server)
     val isDrawerVisible by store.observe { view.isDrawerVisible(it) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
 
@@ -417,6 +562,7 @@ private fun HomeLifecycle(store: StoreOf<HomeFeature.State, HomeFeature.Action>,
         if (previous == null || previous == serverID) return@LaunchedEffect
         view.cancelPinDrag()
         view.endSearch()
+        if (view.usesCallTray) view.callTray.reset()
     }
     // Search belongs to one visit to the drawer on one server.
     LaunchedEffect(view) {
@@ -441,10 +587,16 @@ private fun HomeLifecycle(store: StoreOf<HomeFeature.State, HomeFeature.Action>,
         firstCloseRequest.value = drawerCloseRequests
         if (previous != null && previous != drawerCloseRequests) view.closeSessionDrawer()
     }
-    // TODO(merge): iOS publishes `voicePreferences.isAvailable(server:)`; until `:feature:voice`
-    // ports it, the last observed value is republished per server.
-    LaunchedEffect(serverID, systemVoiceAvailable) {
-        store.send(HomeFeature.Action.SystemPublishRequested(systemVoiceAvailable))
+    // Settings changes these outside any Home action; the view sees them and tells Home, so the
+    // Start Call quick action follows.
+    LaunchedEffect(serverID, isVoiceAvailable) {
+        store.send(HomeFeature.Action.SystemPublishRequested(isVoiceAvailable))
+    }
+    // Notifications arriving in the foreground read In-App Notices' mode through Home's reader
+    // (iOS reads the shared key directly; `:feature:system` can't see the drawer's settings).
+    LaunchedEffect(Unit) {
+        val settings = dependency(InAppNoticeSettings)
+        dependency(SessionNotificationsClient).setInAppNoticesProvider { settings.mode() != InAppNoticeMode.off }
     }
     // iOS `scenePhase`: RESUMED is active, STARTED inactive, below that the background.
     LaunchedEffect(lifecycle) {
@@ -517,3 +669,24 @@ private fun HomeSettingsBack(store: StoreOf<HomeFeature.State, HomeFeature.Actio
 private const val TIME_REVEAL_REACH = 76f
 /** How much of the window the drawer button's notice label may span. */
 private const val HEADER_LABEL_FRACTION = 0.6f
+
+/**
+ * iOS `HomeView.isVoiceAvailable` (`store.voicePreferences.isAvailable(server:)`): Voice set up for
+ * [server], recomputed whenever a setting it reads changes (Settings changes them outside any
+ * Home action).
+ */
+@Composable
+private fun rememberVoiceAvailable(server: OpenCodeServer): Boolean {
+    val preferences = remember { VoiceRoutePreferences() }
+    val enabled by preferences.enabled.flow.collectAsState()
+    val engine by preferences.engine.flow.collectAsState()
+    val openAIKey by preferences.openAIKey.flow.collectAsState()
+    val xaiKey by preferences.xaiKey.flow.collectAsState()
+    val serverVoice by preferences.serverVoice.flow.collectAsState()
+    val provider by preferences.provider.flow.collectAsState()
+    val voiceServer by preferences.voiceServer.flow.collectAsState()
+    val support by preferences.support.flow.collectAsState()
+    return remember(server, enabled, engine, openAIKey, xaiKey, serverVoice, provider, voiceServer, support) {
+        preferences.isAvailable(server)
+    }
+}

@@ -425,7 +425,7 @@ private fun SessionSwitcherActive(
     val selectedID by store.observe { it.sessionDetail?.session?.id }
     val serverID by store.observe { it.server.persistenceID }
     val isPresented by store.observe { it.sessionSwitcher.isPresented }
-    // TODO(merge): also `sessionDetail?.browser.isOpen != true` once `:feature:media`'s in-app browser lands.
+    // TODO(merge) round 2b / `:feature:session`: also `sessionDetail?.browser.isOpen != true` (the in-app browser is the screen's `SessionFeature.browser`).
     val homeAllows by store.observe {
         !it.isDrawerOpen && it.catchUp == null && it.subagentStack.isEmpty() && !it.isSettingsShown
     }

@@ -2,6 +2,7 @@ package ai.opencode.feature.drawer
 
 import ai.opencode.core.store.StoreOf
 import ai.opencode.feature.settings.whatsnew.WhatsNewFeature
+import ai.opencode.feature.voice.CallTrayController
 import ai.opencode.feature.drawer.motion.DrawerKeyboardHold
 import ai.opencode.feature.drawer.motion.DrawerKeyboardMonitor
 import ai.opencode.feature.drawer.motion.DrawerPanRegions
@@ -44,6 +45,10 @@ class HomeViewState internal constructor(
     var usesSidebar: Boolean by mutableStateOf(false)
         internal set
 
+    /** Settings' Call Style is Tray (iOS `callPresentation == .tray`); Home's layout sets it. */
+    var usesCallTray: Boolean by mutableStateOf(false)
+        internal set
+
     /** The app is in the foreground (iOS `scenePhase == .active`). */
     var isSceneActive: Boolean by mutableStateOf(true)
         internal set
@@ -62,6 +67,12 @@ class HomeViewState internal constructor(
 
     /** The touch regions the drawer's pan tests (the list registers itself with `drawerPanList`). */
     val panRegions = DrawerPanRegions()
+
+    /**
+     * The Call Tray's motion (iOS `HomeView.callTray`): handed to the session's composer, and its
+     * dock carries the tray into the drawer's bottom slot during a call (D-114).
+     */
+    val callTray = CallTrayController()
 
     /** Counts the times leaving Catch Up hands TalkBack back to its row (iOS `catchUpFocusRequests`). */
     var catchUpFocusRequests: Int by mutableIntStateOf(0)
@@ -165,7 +176,8 @@ class HomeViewState internal constructor(
 
     /**
      * The screen a screen recording names while nothing covers Home (iOS `scrawlScreenName`).
-     * TODO(merge): the In-App Browser name once `:feature:media` ports the browser.
+     * TODO(merge) round 2b / `:feature:session`: “In-App Browser” while the top screen shows a page
+     * (`top.browser.pageID != null`; the page is the screen's `SessionFeature.browser`).
      */
     fun screenName(state: HomeFeature.State = this.state): String {
         if (state.catchUp != null) return "Catch Up"
@@ -176,9 +188,15 @@ class HomeViewState internal constructor(
     }
 }
 
-/** A [HomeViewState] for [store], kept across recompositions (iOS `HomeView`'s `@State`). */
+/**
+ * A [HomeViewState] for [store], kept across recompositions (iOS `HomeView`'s `@State`).
+ *
+ * A configuration change (light/dark, rotation) recreates the activity and this view with it,
+ * while Home's state lives on in the retained store: a drawer that last arrived open
+ * ([HomeFeature.State.isDrawerOpen]) opens again, at rest, rather than snapping shut.
+ */
 @Composable
 fun rememberHomeViewState(
     store: StoreOf<HomeFeature.State, HomeFeature.Action>,
     initiallyOpenDrawer: Boolean = false,
-): HomeViewState = remember(store) { HomeViewState(store, initiallyOpenDrawer) }
+): HomeViewState = remember(store) { HomeViewState(store, initiallyOpenDrawer || store.state.isDrawerOpen) }

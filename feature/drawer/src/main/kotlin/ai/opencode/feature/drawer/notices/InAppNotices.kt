@@ -5,9 +5,7 @@ import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.experiments.InAppNoticeMode
 import ai.opencode.core.sharing.shared
-import android.app.NotificationManager
-import android.content.Context
-import android.service.notification.StatusBarNotification
+import ai.opencode.feature.system.notifications.SessionPushNotifications
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityManager
 import kotlinx.coroutines.Dispatchers
@@ -174,7 +172,10 @@ data class InAppNoticeSignal(
     }
 }
 
-/** Removes delivered notifications from the notification shade. */
+/**
+ * Removes delivered notifications from the notification shade (iOS `DeliveredNotificationsClient`):
+ * `:feature:system`'s [SessionPushNotifications.remove], which knows how it posts them.
+ */
 class DeliveredNotificationsClient(
     /** Every notification for these sessions (their thread identifiers). */
     val removeAll: suspend (sessionIDs: Set<String>) -> Unit,
@@ -185,67 +186,11 @@ class DeliveredNotificationsClient(
         override val liveValue: DeliveredNotificationsClient by lazy {
             val context = dependency(AppContext)
             DeliveredNotificationsClient(
-                removeAll = { DeliveredNotifications.remove(context, it, needsInputOnly = false) },
-                removeNeedsInput = { DeliveredNotifications.remove(context, it, needsInputOnly = true) },
+                removeAll = { ids -> withContext(Dispatchers.Default) { SessionPushNotifications.remove(context, ids, needsInputOnly = false) } },
+                removeNeedsInput = { ids -> withContext(Dispatchers.Default) { SessionPushNotifications.remove(context, ids, needsInputOnly = true) } },
             )
         }
         override val testValue = DeliveredNotificationsClient(removeAll = {}, removeNeedsInput = {})
-    }
-}
-
-/**
- * How the app's session notifications are recognised and shown.
- *
- * The Android form of iOS's `userInfo["opencode"]` payload and `threadIdentifier` (agreed with the
- * notifications port in `:feature:system`): a posted session notification carries
- * [EXTRA_SESSION_ID] and [EXTRA_STATUS] in its extras and the session ID as its group.
- */
-object DeliveredNotifications {
-    /** iOS `opencode.sessionID`. */
-    const val EXTRA_SESSION_ID = "opencode.sessionID"
-
-    /** iOS `opencode.status`. */
-    const val EXTRA_STATUS = "opencode.status"
-
-    /** Statuses a needs-input notification carries in [EXTRA_STATUS]. */
-    val needsInputStatuses: Set<String> = setOf("needs-input", "permission", "question", "form")
-
-    fun sessionID(notification: StatusBarNotification): String? {
-        notification.notification.extras?.getString(EXTRA_SESSION_ID)?.let { return it }
-        return notification.notification.group?.takeIf { it.isNotEmpty() }
-    }
-
-    fun isNeedsInput(notification: StatusBarNotification): Boolean {
-        val status = notification.notification.extras?.getString(EXTRA_STATUS) ?: return false
-        return status in needsInputStatuses
-    }
-
-    suspend fun remove(context: Context, sessionIDs: Set<String>, needsInputOnly: Boolean) {
-        if (sessionIDs.isEmpty()) return
-        withContext(Dispatchers.Default) {
-            val manager = context.getSystemService(NotificationManager::class.java) ?: return@withContext
-            val matches = manager.activeNotifications.filter { notification ->
-                val id = sessionID(notification) ?: return@filter false
-                id in sessionIDs && (!needsInputOnly || isNeedsInput(notification))
-            }
-            for (notification in matches) manager.cancel(notification.tag, notification.id)
-        }
-    }
-
-    /** iOS `UNNotificationPresentationOptions`' members the app uses. */
-    @Suppress("EnumEntryName")
-    enum class Presentation { banner, sound, list }
-
-    /**
-     * How a notification arriving in the foreground shows. The session on screen shows nothing;
-     * while In-App Notices is on, the drawer button tells of the others, so they go only to the
-     * shade, silently.
-     */
-    fun presentation(sessionID: String?, visibleSessionID: String?, mode: InAppNoticeMode): Set<Presentation> {
-        val everything = setOf(Presentation.banner, Presentation.sound, Presentation.list)
-        if (sessionID == null) return everything
-        if (sessionID == visibleSessionID) return emptySet()
-        return if (mode == InAppNoticeMode.off) everything else setOf(Presentation.list)
     }
 }
 

@@ -41,6 +41,18 @@ import ai.opencode.feature.drawer.style.DrawerSectionBreak
 import ai.opencode.feature.drawer.style.DrawerRowLayout
 import ai.opencode.feature.drawer.style.DrawerTunables
 import ai.opencode.feature.drawer.switcher.DrawerTitleView
+import ai.opencode.feature.voice.CallTrayComposerMetrics
+import ai.opencode.feature.voice.CallTrayDockSlot
+import ai.opencode.feature.voice.CallTrayDockTunables
+import ai.opencode.feature.voice.CallTrayTunables
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -102,8 +114,10 @@ import kotlin.math.min
  * Android counterpart, so the drawer always draws its own footer wash ([DrawerFooterBackdrop], iOS's
  * `customBottom` path). `drawerControlsRaisedTargets` is n/a: the controls draw above the list, so
  * Compose's hit testing already gives the part of New Session and Settings that rises above their
- * bar to the buttons. The Call Tray's slot (D-114) waits for `:feature:voice`
- * (TODO(merge): `CallTrayDockSlot`, `drawerCarriesCallTray`, `drawerCallTrayGeometry`).
+ * bar to the buttons. During a call the Call Tray docks in the drawer's bottom slot (D-114):
+ * [CallTrayDockSlot] beneath New Session and Settings, which lift above it
+ * (`drawerCarriesCallTray`); Home measures the slot for the travelling tray
+ * (`drawerCallTrayGeometry`, `HomeCallTrayDock` in `HomeView.kt`).
  * `scrawlScreenName` and `tuningContext` live with [HomeViewState] / have no Tuning Panel.
  */
 
@@ -112,10 +126,11 @@ private val DrawerHeaderTop: Dp = 8.dp
 
 /**
  * iOS `drawerFooterBottom`: New Session and Settings centred on the resting composer's line
- * (`ComposerTunables.bottomGap` 0 + (bar 56 − footer 50) / 2). TODO(merge): read the composer's
- * tunables once `:feature:composer` exposes them; with a call the tray keeps the composer's edge.
+ * (`ComposerTunables.bottomGap` 0 + (bar 56 − footer 50) / 2). With a call the tray occupies the
+ * bottom slot and keeps the composer's bottom edge instead (`bottomGap` 0).
  */
-private val DrawerFooterBottom: Dp = 3.dp
+private fun drawerFooterBottom(carriesCallTray: Boolean): Dp =
+    if (carriesCallTray) 0.dp else ((CallTrayComposerMetrics.barHeight - DrawerTunables.footerHeight.value) / 2).dp
 
 /**
  * The session drawer's panel: everything inside the drawer, for the container's `drawer` slot.
@@ -175,6 +190,15 @@ fun HomeDrawer(
     var headerHeight by remember { mutableFloatStateOf(0f) }
     var controlsHeight by remember { mutableFloatStateOf(DrawerTunables.footerHeight.value) }
     val controlsReach = (controlsHeight * DrawerTunables.controlsReach.coerceIn(0f, 1f)).dp
+    // The drawer carries the Call Tray in its bottom slot (D-114): New Session and Settings lift above it.
+    val carriesCallTray = viewState.callTray.dock.liftsDrawerControls
+    val trayMotion = if (reducedMotion) snap<Dp>() else CallTrayTunables.close.spec<Dp>()
+    val footerBottom by animateDpAsState(drawerFooterBottom(carriesCallTray), trayMotion, label = "drawerFooterBottom")
+    val callTrayLift by animateDpAsState(
+        if (carriesCallTray) (CallTrayTunables.height + CallTrayDockTunables.gap).dp else 0.dp,
+        trayMotion,
+        label = "drawerCallTrayLift",
+    )
 
     val inputs = DrawerListInputs(
         selectedSessionID = selectedSessionID,
@@ -211,7 +235,7 @@ fun HomeDrawer(
             actions = actions,
             contentPadding = PaddingValues(
                 top = headerHeight.dp + DrawerTunables.topGap,
-                bottom = controlsHeight.dp + insetBottom + DrawerFooterBottom + DrawerTunables.bottomGap,
+                bottom = controlsHeight.dp + callTrayLift + insetBottom + footerBottom + DrawerTunables.bottomGap,
             ),
             modifier = Modifier.fillMaxSize(),
         )
@@ -220,7 +244,7 @@ fun HomeDrawer(
         Spacer(
             Modifier
                 .fillMaxSize()
-                .padding(top = headerHeight.dp, bottom = controlsHeight.dp + insetBottom + DrawerFooterBottom)
+                .padding(top = headerHeight.dp, bottom = controlsHeight.dp + callTrayLift + insetBottom + footerBottom)
                 .drawerPanList(viewState.panRegions),
         )
         if (DrawerTimeReveal.IS_TRACED) DrawerRevealTrace(viewState.timeReveal)
@@ -282,15 +306,19 @@ fun HomeDrawer(
                 insetBottom = insetBottom,
                 modifier = Modifier.matchParentSize(),
             )
-            Row(
+            Column(
                 Modifier
                     .fillMaxWidth()
                     .padding(horizontal = DrawerMetrics.rowEdge)
-                    .padding(bottom = insetBottom + DrawerFooterBottom)
-                    .onSizeChanged { controlsHeight = it.height / density.density }
-                    .then(if (DrawerControlsTrace.IS_TRACED) Modifier.drawerControlsTraceProbe(controlsTrace) else Modifier)
+                    .padding(bottom = insetBottom + footerBottom)
                     // Their band takes its own touches, the disabled pill's included.
                     .swallowingTouches(),
+            ) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .onSizeChanged { controlsHeight = it.height / density.density }
+                    .then(if (DrawerControlsTrace.IS_TRACED) Modifier.drawerControlsTraceProbe(controlsTrace) else Modifier),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -303,6 +331,16 @@ fun HomeDrawer(
                     size = DrawerTunables.footerHeight,
                     modifier = Modifier.testTag("drawer-settings"),
                 )
+            }
+            AnimatedVisibility(
+                visible = carriesCallTray,
+                enter = if (reducedMotion) EnterTransition.None else expandVertically(CallTrayTunables.close.spec()),
+                exit = if (reducedMotion) ExitTransition.None else shrinkVertically(CallTrayTunables.close.spec()),
+            ) {
+                // TODO(merge) round 2b / `:feature:session`: the open session's call
+                // (`sessionDetail.voice`), for the slot's Mute and End Call actions.
+                CallTrayDockSlot(store = null)
+            }
             }
         }
         if (DrawerControlsTrace.IS_TRACED) DrawerControlsTraceView(controlsTrace, keyboardMonitor)

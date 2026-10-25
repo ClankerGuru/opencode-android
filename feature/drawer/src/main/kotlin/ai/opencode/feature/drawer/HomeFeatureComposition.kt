@@ -20,6 +20,8 @@ import ai.opencode.feature.drawer.notices.DeliveredNotificationsClient
 import ai.opencode.feature.drawer.switcher.SessionSwitcherFeature
 import ai.opencode.feature.session.SessionFeature
 import ai.opencode.feature.settings.SettingsFeature
+import ai.opencode.feature.system.share.ShareInboxClient
+import ai.opencode.feature.voice.VoiceSessionBoardClient
 import ai.opencode.server.OpenCodeLiveContentEvent
 import ai.opencode.server.OpenCodeServerEvent
 
@@ -224,8 +226,8 @@ private fun HomeFeature.detailSessionsCore(): Reducer<State, Action> {
 /**
  * Home's own actions and the screens, then what follows them: a link tap dropped when its screen
  * stops being the one on top, and background reads resuming once the foreground read settles.
- * (iOS also discards a gone screen's in-app browser page and stops its recording here; those wait
- * for `:feature:media` and `:feature:voice`.)
+ * (iOS also discards a gone screen's in-app browser page (`discardPage`) and stops its recording
+ * here. TODO(merge) round 2b / `:feature:session`: the page and the recording are the screen's.)
  */
 private fun HomeFeature.detailSessions(): Reducer<State, Action> =
     detailSessionsCore()
@@ -319,26 +321,12 @@ private fun homeAction(action: HomeConnectionFeature.Action): Action = when (act
     is HomeConnectionFeature.Action.ServerEvent -> Action.ServerEvent(action.event)
 }
 
-/** What Shortcuts, launcher actions and search are handed (iOS `SystemPublication`). */
-internal data class SystemPublication(
-    val server: ai.opencode.server.OpenCodeServer,
-    val loaded: Boolean,
-    val sessions: List<ai.opencode.server.model.OpenCodeSession>,
-    val projects: List<ai.opencode.server.model.OpenCodeProject>,
-    val pinnedSessionKeys: List<String>,
-    val lastViewedSessionIDs: Map<String, String>,
-    val voiceAvailable: Boolean,
-)
-
-internal val State.systemPublication: SystemPublication
-    get() = SystemPublication(server, snapshotLoaded, sessions, projects, pinnedSessionKeys, lastViewedSessionIDs, systemVoiceAvailable)
-
 /**
  * The observers iOS chains on `detailReducer` and `detailChain`: In-App Notices follow Home's live
  * state, a session on screen clears its delivered notifications, an answered request clears its
- * needs-input notifications, and the system publication follows the list
- * (`HomeFeature+Notifications.swift`, `HomeFeature+System.swift`). The app badge's watch waits for
- * `:feature:system`'s `AppBadgeLedger` (`publishAppBadge` is inert until then).
+ * needs-input notifications, the icon's badge counts what Catch Up holds, the share sheet offers
+ * what the drawer does, and the system publication follows the list
+ * (`HomeFeature+Notifications.swift`, `HomeFeature+System.swift`, `ShareInbox.swift`).
  */
 private fun Reducer<State, Action>.homeChildrenObservers(feature: HomeFeature): Reducer<State, Action> =
     onChange({ feature.noticeInput(it) }) { old, _, state ->
@@ -356,7 +344,27 @@ private fun Reducer<State, Action>.homeChildrenObservers(feature: HomeFeature): 
             val delivered = dependency(DeliveredNotificationsClient)
             Reduced(state, Effect.run { delivered.removeNeedsInput(answered) })
         }
+        // The icon's badge counts what Catch Up holds.
+        .onChange({ it.appBadgePublication }) { old, new, state ->
+            val next = new.ledger
+            if (next == old.ledger) return@onChange Reduced(state)
+            Reduced(state, feature.publishAppBadge(state, next))
+        }
+        // The share sheet offers what the drawer does, kept current for a share sheet opened over the app.
+        .onChange({ it.shareTargetsPublication }) { old, _, state ->
+            if (!state.hasConnected) return@onChange Reduced(state)
+            val next = state.shareTargets
+            if (old.hasConnected && old.targets() == next) return@onChange Reduced(state)
+            dependency(ShareInboxClient).publishTargets(next)
+            Reduced(state)
+        }
+        // Shortcuts, launcher actions and search offer what the drawer does.
         .onChange({ it.systemPublication }) { _, _, state ->
             feature.publishToSystem(state)
+            Reduced(state)
+        }
+        // The call's delegator reads what the drawer shows from here.
+        .onChange({ it.voiceSessionBoard }) { _, new, state ->
+            dependency(VoiceSessionBoardClient).publish(new)
             Reduced(state)
         }
