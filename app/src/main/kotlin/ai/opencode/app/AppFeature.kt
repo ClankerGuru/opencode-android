@@ -16,7 +16,9 @@ import ai.opencode.core.store.Reducer
 import ai.opencode.core.store.cancellable
 import ai.opencode.core.store.ifLet
 import ai.opencode.core.ui.ThisDevice
+import ai.opencode.feature.drawer.HomeConnectionFeature
 import ai.opencode.feature.drawer.HomeFeature
+import ai.opencode.feature.drawer.HomeSnapshotDate
 import ai.opencode.feature.system.NotificationDestination
 import ai.opencode.feature.system.SessionDirectory
 import ai.opencode.feature.system.SystemAction
@@ -224,8 +226,18 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
                 )
                 val server = saved.value ?: return state
                 state = state.load(server)
-                val snapshot = cached.value[server.persistenceID]?.snapshot
-                return state.withHome(server, snapshot)
+                val cache = cached.value[server.persistenceID]
+                state = state.withHome(server, cache?.snapshot)
+                // iOS: a restored Home reconnects, and its cached run state expires on its own.
+                val home = state.home ?: return state
+                return state.copy(
+                    home = home.copy(
+                        connection = home.connection.copy(
+                            connectionStatus = HomeConnectionFeature.State.ConnectionStatus.reconnecting,
+                            lastKnownActivityDeadline = HomeFeature.lastKnownActivityDeadline(cache?.capturedAt, dependency(HomeSnapshotDate).now()),
+                        ),
+                    ),
+                )
             }
         }
 
@@ -233,10 +245,9 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         internal fun withHome(server: OpenCodeServer, snapshot: OpenCodeHomeSnapshot?): State = copy(
             homeServer = server,
             home = HomeFeature.State(
-                serverID = server.persistenceID,
-                serverName = server.friendlyName,
                 server = server,
-                sessions = snapshot?.sessions.orEmpty().filter { it.parentID == null }.sortedByDescending { it.updatedAt },
+                snapshot = snapshot ?: OpenCodeHomeSnapshot(projects = emptyList(), sessions = emptyList(), activeSessionIDs = emptySet()),
+                loaded = snapshot != null,
             ),
         )
 
@@ -546,7 +557,11 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         is HomeFeature.Action.Delegate -> when (action.action) {
             // Back to the picker (iOS `.home(.serverBadgeTapped)`): Home is rebuilt from scratch
             // on reconnect since sessions, projects and the event stream are all server-scoped.
-            HomeFeature.DelegateAction.ServersRequested -> cancelConnection(state.copy(returnServer = state.homeServer).withoutHome())
+            HomeFeature.DelegateAction.ServersRequested,
+            HomeFeature.DelegateAction.ServerBadgeTapped,
+            -> cancelConnection(state.copy(returnServer = state.homeServer).withoutHome())
+            // TODO(app): the drawer's server switcher, rename, edit, removal and pairing delegates.
+            else -> Reduced(state)
         }
         else -> Reduced(state)
     }
@@ -682,8 +697,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
 
     /** iOS `.home(.sessionTapped(id))` on the stub Home. */
     private fun openSession(state: State, sessionID: String): Effect<Action> {
-        val title = state.home?.sessions?.firstOrNull { it.id == sessionID }?.title.orEmpty()
-        return Effect.send(Action.Home(HomeFeature.Action.SessionTapped(sessionID, title)))
+        return Effect.send(Action.Home(HomeFeature.Action.SessionTapped(sessionID)))
     }
 
     /**
@@ -932,7 +946,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
                 AppLog.app.info { "paired computer drawer open dropped under an app presentation" }
                 return Reduced(next, Effect.merge(forgotten, system))
             }
-            return Reduced(next, Effect.merge(forgotten, system, Effect.send(Action.Home(HomeFeature.Action.DrawerOpenChanged(true)))))
+            return Reduced(next, Effect.merge(forgotten, system, Effect.send(Action.Home(HomeFeature.Action.PairedComputerOpened))))
         }
         return Reduced(next, Effect.merge(forgotten, system))
     }

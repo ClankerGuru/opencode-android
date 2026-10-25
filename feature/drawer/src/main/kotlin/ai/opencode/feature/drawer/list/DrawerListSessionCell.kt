@@ -1,0 +1,433 @@
+package ai.opencode.feature.drawer.list
+
+import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.ui.OpenCodeIcon
+import ai.opencode.core.ui.OpenCodeTextStyles
+import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.core.ui.SFSymbol
+import ai.opencode.feature.drawer.HomeFeature.State.Indicator
+import ai.opencode.feature.drawer.motion.DrawerTimeReveal
+import ai.opencode.feature.drawer.style.DrawerMetrics
+import ai.opencode.feature.drawer.style.DrawerRowEmphasis
+import ai.opencode.feature.drawer.style.DrawerRowLayout
+import ai.opencode.feature.drawer.style.DrawerSelectionStyle
+import ai.opencode.feature.drawer.style.DrawerTone
+import ai.opencode.feature.drawer.style.DrawerTunables
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.testTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.roundToInt
+
+/*
+ * Port of iOS `DrawerListSessionCell.swift`: a drawer session row. The project tile, the fading
+ * title, the status (the Working ring or a dot), the selected highlight and the time the reveal
+ * slides in all live in the slide, which the time reveal moves; the touch surface
+ * ([drawerRowInteraction]: tap, hold menu, lift to pin or reorder) stays put over the row.
+ *
+ * Per-frame values (the reveal's offset and progress, the pin drag's translation, the card-edge
+ * fade) are read in layer and draw blocks only, so neither a reveal nor a drag recomposes a row.
+ * A row recomposes only when its [DrawerListRow] changes; the list keeps unchanged rows'
+ * instances so they skip.
+ */
+
+/** What a session row does, as closures: the row never holds a store (iOS `DrawerListRowActions`). */
+class DrawerListRowActions(
+    val select: () -> Unit,
+    val pressed: () -> Unit,
+    val menu: () -> List<DrawerRowMenuItem>,
+    /** The held finger moved: start the pin drag at this list `y` (dp). */
+    val beginDrag: (fingerY: Float) -> Unit,
+    val moveDrag: (fingerY: Float) -> Unit,
+    /** The finger lifted at this list point (dp); [cancelled] when its stream was taken away. */
+    val endDrag: (fingerX: Float, fingerY: Float, cancelled: Boolean) -> Unit,
+    /** The row left the list mid-drag (iOS `Coordinator.dismantle`). */
+    val dismantled: () -> Unit,
+    val lifted: (String?) -> Unit,
+    val togglePin: () -> Unit,
+    val toggleRead: () -> Unit,
+    val toggleMute: () -> Unit,
+    val delete: () -> Unit,
+    val movePinUp: () -> Unit,
+    val movePinDown: () -> Unit,
+)
+
+/** The time reveal as the rows read it: the list springs it back from where it is on release. */
+interface DrawerListRevealValues {
+    val offset: Float
+    val progress: Float
+}
+
+object DrawerListSessionCell {
+    /** The status slot (ring or dot). */
+    val indicatorSize: Dp = 18.dp
+
+    /** iOS `.snappy(duration: 0.25)`: the status coming and going, and the title making room. */
+    val statusSpring = MotionSpring(0.25, 0.15)
+
+    /** iOS `.systemOrange`, the dot of a session that needs your input. */
+    fun attentionColor(isDark: Boolean): Color = if (isDark) Color(0xFFFF9F0A) else Color(0xFFFF9500)
+}
+
+@Composable
+fun DrawerListSessionCell(
+    row: DrawerListRow,
+    actions: DrawerListRowActions,
+    reveal: DrawerListRevealValues,
+    pinDrag: DrawerPinDrag,
+    listCoordinates: () -> LayoutCoordinates?,
+    modifier: Modifier = Modifier,
+    focusRequester: FocusRequester? = null,
+) {
+    val colors = OpenCodeTheme.colors
+    val density = LocalDensity.current
+    val hold = remember(row.session.id) { DrawerRowHoldState() }
+    val currentActions by rememberUpdatedState(actions)
+    val key = remember(row.session.id) { DrawerPinDrag.ItemKey.Row(row.session.id) }
+    val rowCoordinates = remember(row.session.id) { arrayOfNulls<LayoutCoordinates>(1) }
+
+    // A row leaving the list mid-hold or mid-drag ends it.
+    DisposableEffect(row.session.id) {
+        onDispose { if (hold.isDragActive) currentActions.dismantled() }
+    }
+
+    val emphasis = DrawerRowEmphasis.of(selected = row.selected, muted = row.muted, hasIndicator = row.indicator != Indicator.none)
+    val weight = emphasis.weight(DrawerTunables.unreadWeight, DrawerTunables.readWeight)
+    val selection = if (row.selected) DrawerTunables.selection else null
+    val onTint = selection == DrawerSelectionStyle.Tint
+    val titleColor = when {
+        onTint -> Color.White
+        row.muted -> colors.secondaryText
+        emphasis == DrawerRowEmphasis.Active && DrawerTunables.unreadTone != DrawerTone.Primary -> DrawerTunables.unreadTone.color
+        else -> colors.text.copy(alpha = colors.text.alpha * emphasis.opacity(row.increasedContrast, DrawerTunables.readOpacity))
+    }
+    val titleStyle = DrawerListFonts.font(DrawerTunables.rowFont.font, weight)
+    val twoLine = DrawerTunables.rowLayout == DrawerRowLayout.TwoLine && !row.showsProjectIcons
+
+    // The status comes and goes on a snappy spring for the same session; another row's arrives in place.
+    val previousID = remember { arrayOf(row.session.id) }
+    val animateStatus = previousID[0] == row.session.id && !row.reducedMotion
+    previousID[0] = row.session.id
+    val statusSpec = if (animateStatus) DrawerListSessionCell.statusSpring.spec<Float>() else snap()
+    val ringAlpha by animateFloatAsState(if (row.indicator == Indicator.running) 1f else 0f, statusSpec, label = "ring")
+    val dotAlpha by animateFloatAsState(
+        if (row.indicator == Indicator.attention || row.indicator == Indicator.unread) 1f else 0f,
+        statusSpec,
+        label = "dot",
+    )
+    val statusInset by animateDpAsState(
+        if (row.indicator == Indicator.none) 0.dp else DrawerListSessionCell.indicatorSize + DrawerTunables.statusGap,
+        if (animateStatus) DrawerListSessionCell.statusSpring.spec() else snap(),
+        label = "status-inset",
+    )
+
+    // The card-edge fade: on with the first dp of slide, eased in over `revealFadeIn`.
+    val masking by remember(row.reducedMotion) { derivedStateOf { !row.reducedMotion && reveal.offset != 0f } }
+    val veil = remember { Animatable(1f) }
+    LaunchedEffect(masking) {
+        if (masking && DrawerTunables.revealFadeIn > 0) {
+            veil.snapTo(1f)
+            veil.animateTo(0f, tween((DrawerTunables.revealFadeIn * 1000).roundToInt(), easing = ai.opencode.core.motion.Motion.EaseOut))
+        } else {
+            veil.snapTo(0f)
+        }
+    }
+
+    val held = hold.isHeld || row.isLifted
+    val raisedSurface = if (colors.isDark) MaterialTheme.colorScheme.surfaceContainerHigh else colors.canvas
+    val cornerRadius = DrawerMetrics.rowCornerRadius
+    val rowEdge = DrawerMetrics.rowEdge
+    val rowGap = DrawerTunables.rowGap
+
+    Box(
+        modifier
+            .zIndex(if (row.isLifted) 1f else 0f)
+            .fillMaxWidth()
+            .graphicsLayer {
+                translationY = pinDrag.translation(key) * density.density
+                compositingStrategy = if (masking) CompositingStrategy.Offscreen else CompositingStrategy.Auto
+            }
+            .drawWithContent {
+                drawContent()
+                if (!masking) return@drawWithContent
+                val fade = max(DrawerTunables.titleFade.toPx(), 0.5.dp.toPx())
+                val rowMaxX = size.width - rowEdge.toPx()
+                val offset = reveal.offset * density.density
+                val shift = fade * min(max(offset, 0f) / max(DrawerTunables.revealFadeRamp.toPx(), 1f), 1f)
+                val solidEnd = rowMaxX - shift
+                val rampEnd = max(rowMaxX + fade - shift, 1f)
+                val strength = veil.value.coerceIn(0f, 1f)
+                drawRect(
+                    brush = Brush.horizontalGradient(
+                        0f to Color.Black,
+                        (solidEnd / rampEnd).coerceIn(0f, 1f) to Color.Black,
+                        1f to Color.Black.copy(alpha = strength),
+                        startX = 0f,
+                        endX = rampEnd,
+                    ),
+                    blendMode = BlendMode.DstIn,
+                )
+            }
+            .padding(horizontal = rowEdge, vertical = rowGap / 2),
+    ) {
+        // The row's frame: the touch surface and what TalkBack reads, over the slide.
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = DrawerMetrics.rowHeight)
+                .onGloballyPositioned { rowCoordinates[0] = it }
+                .then(if (held) Modifier.shadow(8.dp, androidx.compose.foundation.shape.RoundedCornerShape(cornerRadius), clip = false) else Modifier)
+                .drawBehind {
+                    if (held) drawRoundRect(raisedSurface, cornerRadius = CornerRadius(cornerRadius.toPx()))
+                }
+                .drawerRowInteraction(
+                    interaction = DrawerRowInteraction(
+                        sessionID = row.session.id,
+                        reorderable = true,
+                        isPinnedSection = row.isPinnedSection,
+                        select = { currentActions.select() },
+                        pressed = { currentActions.pressed() },
+                        menu = { currentActions.menu() },
+                        beginDrag = { currentActions.beginDrag(it.y) },
+                        moveDrag = { currentActions.moveDrag(it.y) },
+                        endDrag = { point, cancelled -> currentActions.endDrag(point.x, point.y, cancelled) },
+                        lifted = { currentActions.lifted(it) },
+                    ),
+                    hold = hold,
+                    list = listCoordinates,
+                    row = { rowCoordinates[0] },
+                )
+                .then(if (focusRequester != null) Modifier.focusRequester(focusRequester).focusable() else Modifier)
+                .clearAndSetSemantics {
+                    testTag = "drawer-session-row-${row.session.id}"
+                    contentDescription = row.session.title
+                    stateDescription = row.accessibilityValue
+                    role = Role.Button
+                    selected = row.selected
+                    onClick { currentActions.select(); true }
+                    customActions = buildList {
+                        add(CustomAccessibilityAction(if (row.isPinnedSection) "Unpin" else "Pin") { currentActions.togglePin(); true })
+                        add(CustomAccessibilityAction(if (row.unread) "Mark as Read" else "Mark as Unread") { currentActions.toggleRead(); true })
+                        add(CustomAccessibilityAction(if (row.muted) "Unmute" else "Mute") { currentActions.toggleMute(); true })
+                        add(CustomAccessibilityAction("Delete") { currentActions.delete(); true })
+                        if (row.isPinnedSection) {
+                            add(CustomAccessibilityAction("Move Up") { currentActions.movePinUp(); true })
+                            add(CustomAccessibilityAction("Move Down") { currentActions.movePinDown(); true })
+                        }
+                    }
+                },
+        ) {
+            // The slide: everything the time reveal moves (by layer translation only).
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .graphicsLayer {
+                        translationX = if (row.reducedMotion) 0f else reveal.offset * density.density
+                    },
+            ) {
+                SelectionMark(selection, cornerRadius)
+                RevealedTime(row.time, reducedMotion = row.reducedMotion, progress = { reveal.progress })
+            }
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = DrawerMetrics.rowHeight)
+                    .graphicsLayer {
+                        translationX = if (row.reducedMotion) 0f else reveal.offset * density.density
+                    },
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(start = DrawerMetrics.textInset, end = DrawerMetrics.trailingInset),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (row.showsProjectIcons && row.project != null) {
+                        val side = DrawerListProjectTile.side(DrawerTunables.projectIconSize, density.fontScale)
+                        DrawerListProjectTile(
+                            project = row.project,
+                            server = row.server,
+                            muted = row.muted,
+                            side = side,
+                            increasedContrast = row.increasedContrast,
+                            reducedMotion = row.reducedMotion,
+                        )
+                        Spacer(Modifier.width(DrawerTunables.projectIconGap))
+                    }
+                    Column(Modifier.weight(1f)) {
+                        DrawerListTitleView(
+                            text = row.session.title,
+                            style = titleStyle,
+                            color = titleColor,
+                            fade = DrawerTunables.titleFade,
+                            time = row.time,
+                            reducedMotion = row.reducedMotion,
+                            modifier = Modifier.fillMaxWidth().padding(end = statusInset.coerceAtLeast(0.dp)),
+                            revealProgress = { reveal.progress },
+                        )
+                        if (twoLine) {
+                            val subtitle = listOfNotNull(row.project?.name, row.time).filter { it.isNotEmpty() }.joinToString(" · ")
+                            Text(
+                                subtitle,
+                                style = DrawerListFonts.monospacedDigits(DrawerListFonts.font(OpenCodeTextStyles.subheadline, FontWeight.Normal)),
+                                color = if (onTint) Color.White.copy(alpha = 0.8f) else colors.secondaryText,
+                                maxLines = 1,
+                                modifier = Modifier.padding(top = 1.dp),
+                            )
+                        }
+                    }
+                }
+                // The status, at the trailing end of the title's line.
+                Box(
+                    Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = DrawerMetrics.trailingInset)
+                        .size(DrawerListSessionCell.indicatorSize),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    DrawerListActivityRing(
+                        isSpinning = row.indicator == Indicator.running && !row.reducedMotion,
+                        opaqueTail = row.increasedContrast,
+                        modifier = Modifier.size(14.dp).graphicsLayer { alpha = ringAlpha },
+                    )
+                    OpenCodeIcon(
+                        SFSymbol.CircleFill,
+                        contentDescription = null,
+                        size = (11 * density.fontScale).dp,
+                        tint = if (row.indicator == Indicator.attention) DrawerListSessionCell.attentionColor(colors.isDark) else colors.accent,
+                        modifier = Modifier.graphicsLayer { alpha = dotAlpha },
+                    )
+                }
+            }
+            // Anchored on the row's frame so the menu opens beside the held row.
+            DrawerRowMenu(hold) { currentActions.menu() }
+        }
+    }
+}
+
+/** The selected row's mark: the shipped fill, the accent behind it, an outline, or a bar at its leading edge. */
+@Composable
+private fun SelectionMark(selection: DrawerSelectionStyle?, cornerRadius: Dp) {
+    if (selection == null) return
+    val colors = OpenCodeTheme.colors
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    Spacer(
+        Modifier
+            .fillMaxSize()
+            .drawBehind {
+                val radius = CornerRadius(cornerRadius.toPx())
+                when (selection) {
+                    DrawerSelectionStyle.Fill -> drawRoundRect(colors.text.copy(alpha = DrawerTunables.selectionOpacity), cornerRadius = radius)
+                    DrawerSelectionStyle.Tint -> drawRoundRect(colors.accent, cornerRadius = radius)
+                    DrawerSelectionStyle.Outline -> {
+                        val inset = 0.5.dp.toPx()
+                        drawRoundRect(
+                            colors.text.copy(alpha = min(DrawerTunables.selectionOpacity * 2.5f, 1f)),
+                            topLeft = Offset(inset, inset),
+                            size = Size(size.width - inset * 2, size.height - inset * 2),
+                            cornerRadius = CornerRadius(max(cornerRadius.toPx() - inset, 0f)),
+                            style = Stroke(1.dp.toPx()),
+                        )
+                    }
+                    DrawerSelectionStyle.Bar -> {
+                        val width = 3.dp.toPx()
+                        val x = if (rtl) size.width - width else 0f
+                        drawRoundRect(
+                            colors.accent,
+                            topLeft = Offset(x, 10.dp.toPx()),
+                            size = Size(width, max(0f, size.height - 20.dp.toPx())),
+                            cornerRadius = CornerRadius(1.5.dp.toPx()),
+                        )
+                    }
+                }
+            },
+    )
+}
+
+/**
+ * The time the reveal uncovers: right-aligned in the gutter the slide opens,
+ * [DrawerTimeReveal.SPACING] before the row (mirrored in RTL). Under reduce motion the title
+ * cross-fades into it instead ([DrawerListTitleView]), so this stays hidden.
+ */
+@Composable
+private fun RevealedTime(time: String, reducedMotion: Boolean, progress: () -> Float) {
+    if (reducedMotion) return
+    Text(
+        text = time,
+        style = DrawerListFonts.monospacedDigits(DrawerListFonts.font(OpenCodeTextStyles.footnote, FontWeight.Normal)),
+        color = OpenCodeTheme.colors.secondaryText,
+        maxLines = 1,
+        softWrap = false,
+        modifier = Modifier
+            .layout { measurable, constraints ->
+                val placeable = measurable.measure(constraints.copy(minWidth = 0, maxWidth = androidx.compose.ui.unit.Constraints.Infinity, minHeight = 0))
+                val height = if (constraints.hasBoundedHeight) constraints.maxHeight else placeable.height
+                layout(constraints.minWidth, height) {
+                    val spacing = DrawerTimeReveal.SPACING.dp.roundToPx()
+                    // `placeRelative` mirrors in RTL: the gutter is on the leading side either way.
+                    placeable.placeRelative(-spacing - placeable.width, (height - placeable.height) / 2)
+                }
+            }
+            .graphicsLayer { alpha = progress().coerceIn(0f, 1f) },
+    )
+}

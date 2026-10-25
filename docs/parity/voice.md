@@ -6,71 +6,73 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 
 | iOS file | Lines | Kotlin file(s) | Status | Notes |
 | --- | ---: | --- | --- | --- |
-| `OpenCode/Voice/CallTray.swift` | 1109 | | todo | |
-| `OpenCode/Voice/CallTrayBarLayout.swift` | 324 | | todo | |
-| `OpenCode/Voice/CallTrayDock.swift` | 573 | | todo | |
-| `OpenCode/Voice/CallTrayViews.swift` | 786 | | todo | |
-| `OpenCode/Voice/CallVoice.swift` | 483 | | todo | |
-| `OpenCode/Voice/DotScopeShaders.metal` | 218 | | todo | |
-| `OpenCode/Voice/DotScopeSimulation.swift` | 809 | | todo | |
-| `OpenCode/Voice/DotScopeView.swift` | 610 | | todo | |
-| `OpenCode/Voice/FloatingCall.swift` | 1020 | | todo | |
-| `OpenCode/Voice/FloatingCallFace.swift` | 596 | | todo | |
-| `OpenCode/Voice/FloatingOrbShaders.metal` | 270 | | todo | |
-| `OpenCode/Voice/GeminiLiveClient.swift` | 876 | | todo | |
-| `OpenCode/Voice/LiveCallCoordinator+Appends.swift` | 662 | | todo | |
-| `OpenCode/Voice/LiveCallCoordinator+Events.swift` | 391 | | todo | |
-| `OpenCode/Voice/LiveCallCoordinator.swift` | 557 | | todo | |
-| `OpenCode/Voice/LiveClient.swift` | 336 | | todo | |
-| `OpenCode/Voice/LiveProtocol.swift` | 671 | | todo | |
-| `OpenCode/Voice/LiveRTC.swift` | 1200 | | todo | |
-| `OpenCode/Voice/LivingOrbField.swift` | 157 | | todo | |
-| `OpenCode/Voice/LivingOrbShaders.metal` | 33 | | todo | |
-| `OpenCode/Voice/LivingOrbStyle.swift` | 27 | | todo | |
-| `OpenCode/Voice/LivingOrbTunables.swift` | 80 | | todo | |
-| `OpenCode/Voice/LivingOrbView.swift` | 93 | | todo | |
-| `OpenCode/Voice/RaiseToEar.swift` | 237 | | todo | |
-| `OpenCode/Voice/RealtimeClient.swift` | 437 | | todo | |
-| `OpenCode/Voice/RealtimeProtocol.swift` | 347 | | todo | |
-| `OpenCode/Voice/ReplyWatch.swift` | 725 | | todo | |
-| `OpenCode/Voice/ScreenAwakeClient.swift` | 41 | | todo | |
-| `OpenCode/Voice/ServerVoiceClient.swift` | 415 | | todo | |
-| `OpenCode/Voice/VoiceActionClaim.swift` | 56 | | todo | |
-| `OpenCode/Voice/VoiceAudioClient.swift` | 575 | | todo | |
-| `OpenCode/Voice/VoiceAudioEngine.swift` | 1145 | | todo | |
-| `OpenCode/Voice/VoiceAudioQuality.swift` | 150 | | todo | |
-| `OpenCode/Voice/VoiceBrokerTransport.swift` | 49 | | todo | |
-| `OpenCode/Voice/VoiceCallClient.swift` | 215 | | todo | |
-| `OpenCode/Voice/VoiceCallCoordinator.swift` | 425 | | todo | |
-| `OpenCode/Voice/VoiceCallDiagnostics.swift` | 46 | | todo | |
-| `OpenCode/Voice/VoiceCallEvent.swift` | 25 | | todo | |
-| `OpenCode/Voice/VoiceCallHost.swift` | 251 | | todo | |
-| `OpenCode/Voice/VoiceCallLog.swift` | 358 | | todo | |
-| `OpenCode/Voice/VoiceCallLogView.swift` | 346 | | todo | |
-| `OpenCode/Voice/VoiceCallLogging.swift` | 90 | | todo | |
-| `OpenCode/Voice/VoiceCallSounds.swift` | 676 | | todo | |
-| `OpenCode/Voice/VoiceControlSend.swift` | 9 | | todo | |
-| `OpenCode/Voice/VoiceDelegator.swift` | 453 | | todo | |
-| `OpenCode/Voice/VoiceDelegatorWorkspace.swift` | 989 | | todo | |
-| `OpenCode/Voice/VoiceFeature+Admission.swift` | 17 | | todo | |
-| `OpenCode/Voice/VoiceFeature+Context.swift` | 83 | | todo | |
-| `OpenCode/Voice/VoiceFeature+Delegation.swift` | 471 | | todo | |
-| `OpenCode/Voice/VoiceFeature+Instructions.swift` | 90 | | todo | |
-| `OpenCode/Voice/VoiceFeature+Start.swift` | 185 | | todo | |
-| `OpenCode/Voice/VoiceFeature.swift` | 969 | | todo | |
-| `OpenCode/Voice/VoiceHapticDesign.swift` | 250 | | todo | |
-| `OpenCode/Voice/VoiceHapticEngine.swift` | 223 | | todo | |
-| `OpenCode/Voice/VoiceLabDemo.swift` | 399 | | todo | |
-| `OpenCode/Voice/VoiceLabTriggers.swift` | 42 | | todo | |
-| `OpenCode/Voice/VoiceQuietGate.swift` | 153 | | todo | |
-| `OpenCode/Voice/VoiceRoute.swift` | 122 | | todo | |
-| `OpenCode/Voice/VoiceRoutePreferences.swift` | 35 | | todo | |
-| `OpenCode/Voice/VoiceSessionBoard.swift` | 191 | | todo | |
-| `OpenCode/Voice/VoiceSessionCoordinator.swift` | 497 | | todo | |
-| `OpenCode/Voice/VoiceTimeline.swift` | 117 | | todo | |
-| `OpenCode/Voice/VoiceTranscript.swift` | 712 | | todo | |
-| `OpenCode/Voice/VoiceTurnHistory.swift` | 118 | | todo | |
-| `OpenCode/Voice/VoiceTurnTaking.swift` | 176 | | todo | |
-| `OpenCode/Voice/VoiceUplinkWatch.swift` | 52 | | todo | |
-| `OpenCode/Voice/VoiceView.swift` | 1199 | | todo | |
-| `OpenCode/Voice/VoiceWorkClient.swift` | 515 | | todo | |
+| `OpenCode/Core/AudioSessionOwner.swift` | 171 | `AudioSessionOwner.kt`, `VoiceAudioEngine.kt` | done | Moved to :feature:voice for composer/dictation reuse. Shared-holder activation/release, epoch-guarded retries and generation cancellation; live controller maps to Android focus/mode/communication device. |
+| Android ongoing-call foreground service (Live Activity equivalent) | — | `VoiceCallService.kt`, `AndroidManifest.xml` | done | Microphone FGS, ongoing chronometer, Connecting…/Reconnecting…/Call ended, Mute/End commands guarded by call ID. Reducer starts/updates/stops via VoiceCallServiceClient and collects VoiceCallCommands; app owns runtime permission prompts. |
+| `OpenCode/Voice/CallTray.swift` | 1109 | `CallTray.kt` | done | `CallTrayController` as a plain object: `SpringSolver`s stepped by `motionFrameLoop` in the host's scope (`attach`), snapshot-state flags, `frameTick` so only geometry readers redraw per frame. Phases, tap seed, queued unfold/widen/sink/scan/reveal/descend, 0.24/0.10 s staggers, shoot widen with wind-up/punch/squash, spin open/close, disc colour blend (`buttonLook`), phone→phone.down cross-dissolve, composer mic look, Reduce Motion cross-fades. Droplet glass merge n/a (Material surfaces). DEBUG Motion X-ray and `OPENCODE_LAB_ANIMATION_SCALE` hooks n/a (lab). |
+| `OpenCode/Voice/CallTrayBarLayout.swift` | 324 | `CallTrayBarLayout.kt` | done | Tunables baked at iOS defaults with keys (`CallTrayTunables`), enums, `CallTrayBarLayout` math with 48 dp slots (Android target) so the mic gaps stay exact, mic glyph width from the Material `mic` ink, `CallTrayComposerMetrics` (iOS `ComposerTunables` values the tray uses; Composer is above voice), `CallTrayScopeSurface`, `Modifier.callTrayPart`. Tuning presets/registration n/a. |
+| `OpenCode/Voice/CallTrayDock.swift` | 573 | `CallTrayDock.kt` | done | `CallTrayDock` (trip/arming/return tail, origin ease, travel frame with width lead, `tray_handoff` notices with the same flags/counts), `CallTrayDockOverlay(controller, store, reducedMotion, drawerProgress, drawerTravels, mayDock, drawer)`, `CallTraySessionAnchor`, `CallTrayDockSlot` (TalkBack Mute/End Call actions). UIKit presentation-layer/keyboard-guide plumbing maps to Compose layout + `WindowInsets.ime` (the traveller's bottom stays above the keys); the return tail waits for the anchor to hold still two frames. Lab X-ray n/a. |
+| `OpenCode/Voice/CallTrayViews.swift` | 786 | `CallTrayViews.kt` | done | `CallTrayHost` (composer wrapper: reserve padding animated once per flip, stage/backdrop/transcript overlays drawn outside its frame, phase/tap/scene/captions sync), `callTrayReserveAnimation`, `Modifier.callTrayDip`/`callTrayMic`, `CallTrayBar`, seed view, `VoiceCallCenterButton`, `VoiceCaptionsDismissBackdrop`, `PoorConnectionBadge`. TalkBack hints map to click labels “Show/Hide the call transcript”. `CallTrayChromeProbe` (DEBUG) n/a. |
+| `OpenCode/Voice/CallVoice.swift` | 483 | `CallVoice.kt`, `VoiceHttp.kt` | done | Preview via `MediaPlayer` over the clip's bytes; cache in cacheDir/OpenCode/voice-previews. `VoiceLabDemo` preview key/demo fallbacks not ported (VoiceLabDemo is a lab demo). |
+| `OpenCode/Voice/DotScopeShaders.metal` | 218 | `DotScopeShaders.kt` | done | `dotScopeFragment` as AGSL; the lit field is an RGBA_F16 bitmap bound with `setInputBuffer` (raw, nearest). `catchUpDriftFragment` belongs to Drawer's Catch Up (palette shared via `DotScopePalette`). |
+| `OpenCode/Voice/DotScopeSimulation.swift` | 809 | `DotScopeSimulation.kt` | done | Fixed 240 Hz simulation, packed xyzw render field, grid, continuous scanner origins, scheduler and cue vocabulary. Frame-subdivision checks passed on JVM. |
+| `OpenCode/Voice/DotScopeView.swift` | 610 | `DotScopeView.kt` | done | `DotScopeView(mode, …)` (Call/Dictation/Preview/Panel/Tray), `DotScopeRenderer` (shared per call), `DotScopePalette`, `LocalDotScopeCovered`. Frame loop via `withFrameNanos` only while visible (not hidden/covered, lifecycle resumed), clock reset on resume, still frame under Reduce Motion. Ancestor-opacity KVO n/a: hosts pass `isHidden`. Dictation levels come in through `DotScopeLevelSource` (Composer owns `DictationLevels`). Lab scope trace n/a. |
+| `OpenCode/Voice/FloatingCall.swift` | 1020 | `FloatingCall.kt` | done | `FloatingCallOverlay(store)` (hosted full-window by Session/Drawer), `FloatingCallCenter` (dependency key; composer/call-button frames via `Modifier.floatingCallComposer()`/`floatingCallButton()`, playground scene/panel/dock requests, `forced`), `FloatingCallLayout` (plain geometry: rest/panel/stage frames, edge proximity, bead, drag `settle` with the 64/32/28 pt thresholds and UIKit-normal fling projection), stages seed→lifted→resting→panel→leaving with the iOS springs, lift hold 0.14 s, 1.2 s scope mount, 0.6 s settle, 2.2 s session tag, mount/awake rules, captions, duration, controls, mute badge, capsule End. Tunables baked with keys. Liquid Glass → M3 tonal surface with elevation; the edge's glass merge is a plain surface bead. Lab launch args via `VoiceLabEnvironment` (`lab_floating_*`, `floating_call_forced`). Escape → TalkBack dismiss (no back handler: no activity-compose in voice). Not reachable in the app until Session/Drawer host it. |
+| `OpenCode/Voice/FloatingCallFace.swift` | 596 | `FloatingCallFace.kt` | done | Styles, strip style, moods, scenes, palettes, `FloatingCallMotion` (followers 14/4, eases, phase/spin/orbit), `FloatingCallFace` (crossfade 0.35 s), Canvas liquid/aurora/rings (SwiftUI layer filters → `RenderEffect` on `RenderNode`s; alpha threshold as a steep colour matrix), round-1 `FloatingCallGlyph` + model, `FloatingCallDotFace` + `FloatingOrbRenderer`. `withFrameNanos` only while shown and resumed; still under Reduce Motion. `.activity` draws Session's `AgentActivityGlyph` through `LocalFloatingCallActivityGlyph` (falls back to the dot glyph). Scene levels from `VoiceScriptedDemo.continuousSpeechLevel`. |
+| `OpenCode/Voice/FloatingOrbShaders.metal` | 270 | `FloatingOrbShaders.kt` | done | `floatingOrbFragment` as AGSL (uniform layout kept; `fmod` wrap → `mod`, `atan2` → `atan`, take switch → ternary chain). AGSL compile not yet exercised on a device (the overlay isn't hosted yet). |
+| `OpenCode/Voice/GeminiLiveClient.swift` | 876 | `GeminiLiveProtocol.kt`, `GeminiLiveClient.kt`, `GeminiCallCoordinator.kt`, `VoiceSessionCoordinator.kt` | done | Server token/setup, resampling, multi-event decoding, transcripts/tools, seed and queued context, rotation/recovery, cancellation. Android microphone/speaker verification still requires a mounted call. |
+| `OpenCode/Voice/LiveCallCoordinator+Appends.swift` | 662 | `LiveCallCoordinatorAppends.kt`, `LiveCallCoordinator.kt` | done | Quiet/answer/result gates, FIFO whole-batch sends, cancellation/end rejection, orphan/claim leads, failed-batch replay, call-log markers and result history. Throwaway JVM probe exercised held answers/results and waiter cancellation. |
+| `OpenCode/Voice/LiveCallCoordinator+Events.swift` | 391 | `LiveCallCoordinatorEvents.kt` | done | Full-duplex captions, acknowledgement settle/wait, unbacked claims, Responses rounds, silent-frame hangover, interruptions and errors. Stand-in WebSocket and injected-event checks passed. |
+| `OpenCode/Voice/LiveCallCoordinator.swift` | 557 | `LiveCallCoordinator.kt`, `VoiceSessionCoordinator.kt` | done | Delegation rounds, controls, session.input seeds/catch-up, reconnect/rotation and mute keepalive. Adopts prewarmed audio before opening the socket; RTC releases local hardware before activating ADM, preserving the call session and cue clock across RTC/WS changes. |
+| `OpenCode/Voice/LiveClient.swift` | 336 | `LiveClient.kt`, `RealtimeClient.kt` | done | WebRTC first, 10-minute WebSocket stickiness only after a successful fallback, no refusal retry, broker-only routing, lab override, 20-second socket warmer/TLS warmup, bounded graceful close. |
+| `OpenCode/Voice/LiveProtocol.swift` | 671 | `LiveProtocol.kt` | done | VoiceEngine/VoiceProvider live here as in iOS (VoiceProvider.name → `displayName`); `VoiceKeyFingerprint` moved down from Settings/SettingsView.swift. ByteArray payload cases compare by content. |
+| `OpenCode/Voice/LiveRTC.swift` | 1200 | `LiveRTC.kt` | done | Stream WebRTC: negotiated channel 4, field trials, SDP/HTTP/broker exchanges, 8-second connect/5-second disconnect limits, network changes, link statistics and speech tagging. Android's Java ADM owns the sole hardware capture/playout; `VoiceAudioEngine(externalOwner=true)` retains routing, cues/meters/tracking. Coordinator must use connection `startAudio` and install one `VoiceRTCAudioContext` per call for seamless RTC rotations (standbys remain inactive). Physical audio/AEC, route changes and live RTP still require device verification. |
+| `OpenCode/Voice/LivingOrbField.swift` | 157 | `LivingOrbField.kt` | done | `LivingOrbState.resolve`, `LivingOrbLook` (baked; hue→RGB palette), `LivingOrbField` step/render/excitation/pattern with fast and slow phosphor history. |
+| `OpenCode/Voice/LivingOrbShaders.metal` | 33 | `LivingOrbShaders.kt` | done | `livingOrbFragment` as AGSL; lit field as an RGBA_F16 bitmap via `setInputBuffer`, as DotScope. AGSL compile not yet exercised on a device. |
+| `OpenCode/Voice/LivingOrbStyle.swift` | 27 | `LivingOrbStyle.kt` | done | `LivingOrbStyle` (+ titles), `LivingOrbStyleOverride`, `VoiceSharedKeys.livingOrbStyle` (`living-orb-style`, Polar Bloom). |
+| `OpenCode/Voice/LivingOrbTunables.swift` | 80 | `LivingOrbTunables.kt` | done | Every tunable baked at its iOS default with its key; presets and registration n/a (tuning panel not ported). |
+| `OpenCode/Voice/LivingOrbView.swift` | 93 | `LivingOrbView.kt` | done | `LivingOrbConfig`, `LivingOrbView`, `LivingOrbRenderer` (plain object: grid at the look's pitch, field upload, uniforms, scene/live levels, mute zeroes you). `AnimationTimeScale` lab scaling n/a. |
+| `OpenCode/Voice/RaiseToEar.swift` | 237 | `RaiseToEar.kt` | done | Proximity plus gravity/filtered accelerometer; 350/800/2500/100 ms timing, exact held-up thresholds, proximity-only screen-off lock scoped to monitor. Device validation pending. |
+| `OpenCode/Voice/RealtimeClient.swift` | 437 | `RealtimePreflight.kt`, `RealtimeClient.kt`, `RealtimeTransportDiagnostic.kt`, `DiagnosticsErrorCategory.kt` | done | OpenAI WebRTC/WebSocket, xAI WebSocket-only, broker tokens, bearer headers, 8-MiB messages, writer backpressure, handshake cancellation, completing/failing Flows and 1001 → SessionEnded. Diagnostic categories include underlying errors and Java/OkHttp network failures; DiagnosticsErrorCategory is voice-local to avoid an upward :devtools dependency. Each socket owns and shuts down its scope/client. |
+| `OpenCode/Voice/RealtimeProtocol.swift` | 347 | `RealtimeProtocol.kt` | done | `RealtimeJSON` = kotlinx `JsonElement` with `RealtimeJSONs` builders (integral numbers encode as Swift writes them). |
+| `OpenCode/Voice/ReplyWatch.swift` | 725 | `ReplyWatch.kt` | done | Immutable value: `transition(event)` returns the next watch and its effects (iOS `step` mutates); `noteUserActed`/`setSessionActive` return copies. `QuietGate` is declared here so it keeps the name `ReplyWatch.QuietGate`. |
+| `OpenCode/Voice/ScreenAwakeClient.swift` | 41 | `ScreenAwakeClient.kt` | done | needs :app install: one VoiceScreenActivityRegistry in installRoot before ScreenAwakeClient resolves; attach/detach resumed/paused Activities. Hold-counted FLAG_KEEP_SCREEN_ON preserves existing flags; key KDoc documents installation. |
+| `OpenCode/Voice/ServerVoiceClient.swift` | 415 | `ServerVoiceClient.kt` | done | Server transport as iOS (no NetworkRetry, as iOS); `voiceServerID` is VoiceDelegatorWorkspace.serverID's hash; `VoiceServerChoice` key in VoiceSharedKeys. |
+| `OpenCode/Voice/VoiceActionClaim.swift` | 56 | `VoiceActionClaim.kt` | done |  |
+| `OpenCode/Voice/VoiceAudioClient.swift` | 575 | `VoiceAudioClient.kt` | done | PCM16 24 kHz, levels, adaptive 200–500 ms scheduler, per-item tracker, prestart/cancel ownership, hardware/errors, rendered-gap counters. |
+| `OpenCode/Voice/VoiceAudioEngine.swift` | 1145 | `VoiceAudioEngine.kt` | done | AudioRecord/Track threads, AEC/NS/AGC, shared focus/mode/device, capture gate, mute, route ramps, interruptions, teardown. In-place local/ADM handoff preserves the call clock, lab cursor, levels and tracker; transport-independent cue tracks preserve prewarm cues. Lab hooks resolve before prepare. Hardware validation pending; ObjC exception catcher n/a. |
+| `OpenCode/Voice/VoiceAudioQuality.swift` | 150 | `VoiceAudioQuality.kt` | done | Five-second windows, arrival/capture/send percentiles, mid-speech starvation only, lifetime totals, address-free route metadata. |
+| `OpenCode/Voice/VoiceBrokerTransport.swift` | 49 | `VoiceBrokerTransport.kt` | done | Offers and tokens use ServerVoiceClient; refusals retain HTTP status (0 without an answer, 404 without route), propagate cancellation, and never fall back to a direct socket. |
+| `OpenCode/Voice/VoiceCallClient.swift` | 215 | `VoiceCallClient.kt`, `VoiceCallHost.kt` | done | liveValue now routes all engines through the host, with debug scripted override and audio lab dependency hooks. Test value remains inert. |
+| `OpenCode/Voice/VoiceCallCoordinator.swift` | 425 | `VoiceCallCoordinator.kt` | done | Realtime/Grok server VAD floor, barge-in truncate/cancel, transcript wait, cross-session tools and 55/58-minute rotation. Real stand-in rotation/reconnect/exhaustion plus injected transcript/tool/floor checks passed. Uses shared prewarm adoption and RTC/WS audio handoff. |
+| `OpenCode/Voice/VoiceCallDiagnostics.swift` | 46 | `VoiceCallDiagnostics.kt`, `DiagnosticsErrorCategory.kt` | done | needs :app install: VoiceCallDiagnostics with persistent recorder mark/socket-event callbacks via installRoot (key KDoc). Event names, close/loss classification, diagnostic errorCategory and code-only AppLog match iOS. |
+| `OpenCode/Voice/VoiceCallEvent.swift` | 25 | `VoiceCallEvent.kt` | done |  |
+| `OpenCode/Voice/VoiceCallHost.swift` | 251 | `VoiceCallHost.kt` | done | All runtime routes, start-attempt identity, at-ear sequence ordering, current coordinator ownership and controls are wired. Internal testing-coordinator seam has no UI entry point. |
+| `OpenCode/Voice/VoiceCallLog.swift` | 358 | `VoiceCallLog.kt` | done | needs :app install: VoiceCallLogUploadClient with Developer Mode's suspend upload callback via installRoot before VoiceCallLogClient resolves; honor transcript/privacy settings (key KDoc). Tracks/notes, network monitoring, 40-log private storage and bounded/redacted snapshots complete. |
+| `OpenCode/Voice/VoiceCallLogView.swift` | 346 | `VoiceCallLogView.kt` | done | `VoiceCallLogList(onBack, onOpenCall, onOpenWeb?, onShareLink?)` (empty state, swipe to delete, options menu, Delete All confirmation; Developer Mode links are the host's since Diagnostics sit above Voice) and `VoiceCallReplayView(log, onBack)` (timeline canvas with scrub, playhead follow, play/pause/position/speed, events list with auto-scroll). Logs read/deleted off the main thread. iOS `screenName` n/a (no screen tracking on Android). Copy “on this iPhone” → “on this phone”. |
+| `OpenCode/Voice/VoiceCallLogging.swift` | 90 | `VoiceCallLogging.kt`, `VoiceFeature.kt` | done | Verified VoiceFeature.reduce → logCall(core.state, action) → VoiceCallLogging.apply; terminal apply returns true and clears callLogID. All Swift log-action semantics ported. |
+| `OpenCode/Voice/VoiceCallSounds.swift` | 676 | `VoiceCallSounds.kt` | done | Breath Ping DSP and baked callSound.* defaults; six prototype buffers match lengths/peaks/sample positions within 1e-7; call clock, synchronized cues/haptics, telemetry, end tail. |
+| `OpenCode/Voice/VoiceControlSend.swift` | 9 | `VoiceControlSend.kt`, `RealtimeTransportDiagnostic.kt`, `DiagnosticsErrorCategory.kt` | done | `RealtimeTransportDiagnostic` includes errorCategory with underlying-error fallback; transport errors implement `CarriesRealtimeTransportDiagnostic`. |
+| `OpenCode/Voice/VoiceDelegator.swift` | 453 | `VoiceDelegator.kt` | done | Responses API over OkHttp (server transport pool, 60 s) + NetworkRetry idempotent; rounds results are `Result` with `OpenCodeClientError` failures. |
+| `OpenCode/Voice/VoiceDelegatorWorkspace.swift` | 989 | `VoiceDelegatorWorkspace.kt`, `VoiceAdmission.kt`, `VoiceLogUploader.kt` | done | Actor → one confined dispatcher. Upward refs: `SessionFeature.PendingPrompt` → `VoiceAdmittedPrompt` (`Effects.sent`; `VoiceAdmissionRecorder` key for :app), `ComposerFileAttachment` → `OpenCodeFileReference`, `DeveloperMode` → `VoiceLogUploader` key (inert live; :app/devtools installs), `serverID` → `voiceServerID`. Tool JSON: sorted keys, `\/` escaped like JSONSerialization. |
+| `OpenCode/Voice/VoiceFeature+Admission.swift` | 17 | `VoiceFeatureAdmission.kt` | done | `SessionFeature.PendingPrompt` + `PromptOutbox.recordAdmitted` → `VoiceAdmittedPrompt` + `VoiceAdmissionRecorder` (inert live value; :app installs the composer's outbox). |
+| `OpenCode/Voice/VoiceFeature+Context.swift` | 83 | `VoiceFeatureContext.kt`, `VoiceFeature.kt` (`savedServers`) | done | `bounded` → `withTimeoutOrNull`. |
+| `OpenCode/Voice/VoiceFeature+Delegation.swift` | 471 | `VoiceFeatureDelegation.kt` | done | `Effect.runOwningRetries`/`Send.leavingRetryScope` → `runOwningRetries` (`withRetryPolicy(RetryPolicy.once)`) and `Send.leavingRetryScope()` (`NetworkRetry.outsideScope`). Typed `throws(OpenCodeClientError)` → catch, non-client errors wrapped as `OpenCodeClientError`. |
+| `OpenCode/Voice/VoiceFeature+Instructions.swift` | 90 | `VoiceFeatureInstructions.kt` | done | |
+| `OpenCode/Voice/VoiceFeature+Start.swift` | 185 | `VoiceFeatureStart.kt` | done | `async let preflight` → `coroutineScope { async { … } }`. `haptics.voice(.callStarted)`/`cancelPendingVoiceStart` → `VoiceCallSounds.voice`/`cancelPendingStart`. Also sets the Android call presence ID. `VoiceLabFlags` (internal, same file) reads the `VoiceLabDemo` env hooks the reducer needs (`OPENCODE_LAB_VOICE_DEMO`, `_REALTIME_URL`, `_LIVE_URL`, `_OPENAI_KEY`, `_VOICE_ENGINE`) until VoiceLabDemo.kt exists. |
+| `OpenCode/Voice/VoiceFeature.swift` | 969 | `VoiceFeature.kt` | done | Immutable `State`; `phase`/`isAtEar` `didSet`s → `withPhase`/`withAtEar`; `mutating func`s return copies (`retarget`, `retargetToDraft`, `moveDraft`, `clearLiveReply`, `releaseUnadmitted`); `persistTranscript` writes the shared transcripts. `@Shared` fields are getters over `shared(…)`. `VoiceCallLogging` runs after the reducer through its adapter (clears `callLogID`). End's press → `VoiceCallSounds.cancelPressed()` (`.cancel` + landing skip). Android additions: the call owns its foreground service (`callPresenceID`, start on start, update on phase/mute/reconnecting, “Call ended” for 3 s on failure/drop, stop on hang-up or Close) and collects its Mute/End commands (`Action.CallCommand`, `CancelID.CallCommands`/`PresenceLinger`). `Action.Delegate` carries `DelegateAction`. |
+| `OpenCode/Voice/VoiceHapticDesign.swift` | 250 | `VoiceHapticDesign.kt` | done | Measured RMS envelopes, exact control/scan/audio patterns, late trimming and minimumGap. |
+| `OpenCode/Voice/VoiceHapticEngine.swift` | 223 | `VoiceHapticEngine.kt` | done | Mixes overlapping patterns into amplitude waveforms; background suspension and bounded finish. Continuous sharpness has no API 35 equivalent (curve preserved in design); vocabulary fallback via HapticsClient. |
+| `OpenCode/Voice/VoiceLabDemo.swift` | 399 | `VoiceLabDemo.kt`, `VoiceFeatureStart.kt`, `CallVoice.kt`, `LiveRTC.kt`, `VoiceAudioClient.kt`, `VoiceAudioEngine.kt` | done | Debug-only scripted/failing/recorded calls, cue AudioTrack, link patterns, WAV input and URL/engine switches (time scale 1). VoiceLabFlags aliases VoiceLabDemo; RTC relay/UDP filtering uses LiveRTC.routeLabRelay. Engines resolve input/preroll hooks before prepare, retaining the dependency context and lab cursor when adopted or changing transports. |
+| `OpenCode/Voice/VoiceLabTriggers.swift` | 42 | `VoiceLabTriggers.kt` | done | `VoiceLabTrigger` enum only; the `VoiceLabTriggers` view modifier (it drives `StoreOf<SessionFeature>`) moved to `:feature:session`. |
+| `OpenCode/Voice/VoiceQuietGate.swift` | 153 | `VoiceQuietGate.kt` (+ type in `ReplyWatch.kt`) | done | Policy (`delay`, `answerDelay`, `userSpeechHold`, `holdReason`, `QuietGate.live`) as extensions; instants are `Clock.now()` `Duration`s; `note…` return the next gate. Also `VoiceCallTiming.quietGate` (iOS VoiceCallClient.swift). |
+| `OpenCode/Voice/VoiceRoute.swift` | 122 | `VoiceRoute.kt` | done | `VoiceRoute.Server` → `ServerRoute`; `VoiceKeySource` moved down from Settings/VoiceKeySource.swift. |
+| `OpenCode/Voice/VoiceRoutePreferences.swift` | 35 | `VoiceRoutePreferences.kt` | done | Holds the `Shared` references (equal by identity); lab overrides via `VoiceLabFlags`. |
+| `OpenCode/Voice/VoiceSessionBoard.swift` | 191 | `VoiceSessionBoard.kt` | done | Home's `voiceSessionBoard` extension → `VoiceSessionBoard.make(…)` that Drawer calls. |
+| `OpenCode/Voice/VoiceSessionCoordinator.swift` | 497 | `VoiceSessionCoordinator.kt`, `LiveRTC.kt` | done | Serialized owned scopes, buffered event stream/termination cleanup, ready/attached identities, silent standby rotation, 0.5/2.5/6-second retry, Reconnecting emitted at once (the reducer owns the 1 s display delay), collectors never close the transport (explicit graceful close), uplink/link quality. One adopted engine/session and audio consumer pair across prewarm → RTC → WS → RTC; only call end stops the context. Physical ADM/microphone handoff still needs device verification. |
+| `OpenCode/Voice/VoiceTimeline.swift` | 117 | `VoiceTimeline.kt`, `VoiceDiagnostics.kt` | done | `DiagnosticsClient.voice` and `LabMarks.mark` → voice-owned `VoiceDiagnostics` key (inert live value; devtools/app may install one). |
+| `OpenCode/Voice/VoiceTranscript.swift` | 712 | `VoiceTranscript.kt` | done | Immutable tail (mutating methods return the new tail); handoff JSON written exactly as Swift's pretty encoder; `VoiceViewingPage` declared here (Browser is in :feature:media). |
+| `OpenCode/Voice/VoiceTurnHistory.swift` | 118 | `VoiceTurnHistory.kt`, `LiveCallCoordinator.kt` (constants only) | done | Immutable; LiveCallCoordinator holds only `claimLeadPrefix`/`earlierConnectionLead` until wave 3. |
+| `OpenCode/Voice/VoiceTurnTaking.swift` | 176 | `VoiceTurnTaking.kt` | done | Immutable; methods return (state, result). |
+| `OpenCode/Voice/VoiceUplinkWatch.swift` | 52 | `VoiceUplinkWatch.kt` | done | Immutable; methods return (watch, change). |
+| `OpenCode/Voice/VoiceView.swift` | 1199 | `VoiceView.kt` | done | `VoiceView(store, modifier, onOpenSettings)`, `VoiceCallComposer`, `VoiceCallSurface` (transcript growth, request panel, `ComposerExpansion` reach/detents, Reduce Motion cross-fade, 1 s linger, `TopInsetRect` clip pass-through), `hiddenUnderVoiceTranscript`/`hiddenUnderComposerPanel` modifiers (Modifier.Node), `VoiceCallTranscript`, `CallDuration`, `CaptionReveal`/`CaptionGlide`/`CaptionWordRenderer`/word flow, one long-lived pacer, `VoiceCallEnded`, `VoiceCallFailure`. Open Settings is the host's `onOpenSettings`. Liquid Glass → M3 tonal surfaces; interactive glass and expansion-latency probe n/a; `ridesKeyboard` follows a 0.25 s spring (keyboard motion can't be shared). |
+| `OpenCode/Voice/VoiceWorkClient.swift` | 515 | `VoiceWorkClient.kt` | done | `VoiceWorkCoordinator` actor → Mutex-guarded class; `PromptOutbox.newSessionID()` → `ServerIDClient.sessionID()`; `OpenCodeMarkdownBlock.markdown(from:)` → `AssistantMarkdown.text` (raw Markdown). Character counts are UTF-16 lengths (Swift counts graphemes). |
