@@ -279,7 +279,7 @@ private fun HomeLayout(
                 usesSidebar = usesSidebar,
                 modifier = Modifier.fillMaxSize(),
             ) {
-                HomeSessionStack(store, view, usesSidebar, containerWidth)
+                HomeSessionStack(store, view, usesSidebar, containerWidth, callTray = if (usesTray) callTray else null)
             }
         },
         // The drawer's panel (iOS `sessionDrawer(width:insets:)`); Home hosts the delete confirmation.
@@ -465,7 +465,8 @@ private fun stackEntries(state: HomeFeature.State): List<StackEntry> {
 /**
  * The session (or draft) at the root of [SessionPageStack], with each subagent pushed over it and
  * any in-app browser page over the screen that opened it. The root's call shows on whichever
- * subagent is on top (`hostedCall`).
+ * subagent is on top (`hostedCall`). With the Call Tray style every page's composer hosts Home's
+ * [callTray] (iOS `callTray: usesTray ? callTray : nil`).
  */
 @Composable
 private fun HomeSessionStack(
@@ -473,6 +474,7 @@ private fun HomeSessionStack(
     view: HomeViewState,
     usesSidebar: Boolean,
     containerWidth: Dp,
+    callTray: CallTrayController?,
 ) {
     val root = rememberRootStore(store)
     val call = rememberHomeCall(store)
@@ -507,6 +509,7 @@ private fun HomeSessionStack(
                 navigationIcon = { HomeDrawerButton(store, view, usesSidebar, containerWidth) },
                 listContext = listContext,
                 onCatchUpOpen = if (catchingUp) ({ store.send(HomeFeature.Action.catchUpOpenTapped) }) else null,
+                callTray = callTray,
             )
         },
     ) { page ->
@@ -522,6 +525,7 @@ private fun HomeSessionStack(
                         if (index >= 0) store.send(HomeFeature.Action.SubagentsPopped(index))
                     },
                     hostedCall = call,
+                    callTray = callTray,
                 )
             }
             is StackEntry.Web -> SessionBrowserPage(if (entry.owner == null) root else subagent(entry.owner), Modifier.fillMaxSize())

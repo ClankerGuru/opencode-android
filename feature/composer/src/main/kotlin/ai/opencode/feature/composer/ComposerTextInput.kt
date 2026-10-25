@@ -1,8 +1,10 @@
 package ai.opencode.feature.composer
 
 import ai.opencode.core.ui.BackSwipeRules
+import ai.opencode.core.ui.LocalDrawerKeyboardSignals
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.core.ui.drawerKeyboardField
 import ai.opencode.server.model.PastedText
 import android.net.Uri
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -399,7 +401,10 @@ fun ComposerTextInput(
     val currentOnNonSendNewline by rememberUpdatedState(onNonSendNewline)
     val currentOnDropTargetedChange by rememberUpdatedState(onDropTargetedChange)
     val currentBridge by rememberUpdatedState(autocompleteBridge)
-    val held by rememberUpdatedState(isKeyboardHeld)
+    // iOS `DrawerKeyboardHold.isHeld(textView)`: the drawer holds this field's keyboard.
+    val fieldKey = remember { Any() }
+    val drawerHold = LocalDrawerKeyboardSignals.current
+    val held by rememberUpdatedState(isKeyboardHeld || drawerHold?.isHeld(fieldKey) == true)
     val holdingMic by rememberUpdatedState(isHoldingMic)
 
     // Programmatic updates (dictation, a restored draft, Share/Quote) follow the newest text;
@@ -685,6 +690,7 @@ fun ComposerTextInput(
                 .padding(top = if (expanded) topInset else 0.dp)
                 .onGloballyPositioned { coordinates -> sendTransition?.textOrigin = coordinates.positionInWindow() }
                 .focusRequester(focusRequester)
+                .drawerKeyboardField(fieldKey)
                 .onFocusChanged { focus ->
                     if (focus.isFocused && controller.isSuppressingFocusAfterSwipe) {
                         // The touch that just dismissed the keyboard doesn't bring it back.

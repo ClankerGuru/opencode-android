@@ -1,5 +1,6 @@
 package ai.opencode.feature.composer.modelpicker
 
+import ai.opencode.core.ui.excludedFromDrawerPan
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTheme
@@ -89,6 +90,7 @@ fun FusedModelChip(
             .heightIn(min = 48.dp)
             .animateContentSize(FusedModelPickerTunables.animation(FusedModelPickerTunables.chipWidth, reduceMotion))
             .onGloballyPositioned { if (it.size.width > 0) anchors.chipFrame = it.boundsInRoot() }
+            .excludedFromDrawerPan(isEnabled)
             .pointerInput(Unit) {
                 val threshold = FusedModelPickerTunables.scrubThreshold.dp.toPx()
                 awaitEachGesture {

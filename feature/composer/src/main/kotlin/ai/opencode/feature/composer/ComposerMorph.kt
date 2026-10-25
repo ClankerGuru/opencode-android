@@ -1,5 +1,6 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.ui.excludedFromDrawerPan
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
@@ -549,6 +550,7 @@ fun ComposerMorphSurface(
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = dim * progress.coerceIn(0f, 1f)))
                 .let { if (morph.isOpen) it.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onDismiss) else it }
+                .excludedFromDrawerPan(morph.isOpen)
                 .clearAndSetSemantics {},
         )
         val shape = RoundedCornerShape(

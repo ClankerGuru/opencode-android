@@ -1,5 +1,6 @@
 package ai.opencode.feature.voice
 
+import ai.opencode.core.ui.excludedFromDrawerPan
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import ai.opencode.core.dependencies.DateClient
@@ -565,6 +566,7 @@ fun VoiceCallSurface(
                         .requiredSize(4_000.dp)
                         .background(Color.Black.copy(alpha = dim))
                         .then(if (expansionOpen) Modifier.clickable(interactionSource = null, indication = null) { activeExpansion.onDismiss() } else Modifier)
+                        .excludedFromDrawerPan(expansionOpen)
                         .semantics { hideFromAccessibility() },
                 )
             }

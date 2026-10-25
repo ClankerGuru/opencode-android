@@ -40,11 +40,15 @@ import ai.opencode.server.model.PastedText
 import ai.opencode.feature.composer.DictationFeature
 import ai.opencode.core.experiments.key
 import ai.opencode.core.sharing.ExperimentalFeature
+import ai.opencode.core.experiments.ExperimentalCallStyle
 import ai.opencode.core.experiments.ModelPickerStyle
 import ai.opencode.feature.composer.QueuedMessagesSheet
 import ai.opencode.server.model.OpenCodeProject
 import ai.opencode.server.model.OpenCodeQueuedInput
+import ai.opencode.feature.voice.CallTrayController
+import ai.opencode.feature.voice.CallTrayHost
 import ai.opencode.feature.voice.VoiceCallComposer
+import ai.opencode.feature.voice.VoiceFeature
 import ai.opencode.feature.voice.VoiceCallSurface
 import ai.opencode.feature.voice.VoiceStoreOf
 import ai.opencode.feature.voice.hiddenUnderVoiceTranscript
@@ -353,6 +357,7 @@ fun SessionComposer(
     store: StoreOf<SessionFeature.State, SessionFeature.Action>,
     modifier: Modifier = Modifier,
     callStore: VoiceStoreOf? = null,
+    callTray: CallTrayController? = null,
 ) {
     val host = LocalSessionComposerHost.current ?: remember { SessionComposerHost() }
     val view = remember { SessionComposerViewState() }
@@ -368,7 +373,9 @@ fun SessionComposer(
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
-    val floatsCall = rememberFloatsCall()
+    val callPresentation = rememberCallPresentation(callTray)
+    val floatsCall = callPresentation == ExperimentalCallStyle.floating
+    val usesCallTray = callPresentation == ExperimentalCallStyle.tray
     val callShowsCard by remember(callStore) { callStore?.let { call -> call.states.map { it.phase.showsCard } } ?: flowOf(false) }
         .collectAsState(callStore?.state?.phase?.showsCard ?: false)
     val callShowsCaptions by remember(callStore) { callStore?.let { call -> call.states.map { it.showsCaptions } } ?: flowOf(false) }
@@ -397,10 +404,13 @@ fun SessionComposer(
         },
         scope = scope,
         callStore = callStore,
-        // iOS `voiceStore`: the bar takes the composer's place unless the call floats or shows a card.
-        voiceStore = if (floatsCall || callShowsCard) null else callStore,
+        // iOS `voiceStore`: the bar takes the composer's place unless the call floats, rides the
+        // Call Tray, or shows a card.
+        voiceStore = if (floatsCall || usesCallTray || callShowsCard) null else callStore,
         floatsCall = floatsCall,
-        showsCallTranscript = callShowsCaptions,
+        callShowsCaptions = callShowsCaptions,
+        callTray = if (usesCallTray) callTray else null,
+        callOwnsAudio = callStore != null && !callShowsCard,
     )
 
     // iOS `attachComposerAutocomplete`: the controller follows the reducer's state and the composer's size.
@@ -513,9 +523,26 @@ internal class SessionComposerEnv(
     val voiceStore: VoiceStoreOf? = null,
     /** iOS `floatsCall`. */
     val floatsCall: Boolean = false,
-    /** iOS `showsCallTranscript`: the call's open transcript covers what stands above the composer. */
-    val showsCallTranscript: Boolean = false,
+    /** The call shows its transcript (iOS `callStore?.showsCaptions`). */
+    val callShowsCaptions: Boolean = false,
+    /** iOS `usesCallTray ? callTray : nil`: Home's Call Tray motion while the call style is the tray. */
+    val callTray: CallTrayController? = null,
+    /** iOS `callOwnsAudio`: the screen's call (its own or its root's) owns audio. */
+    val callOwnsAudio: Boolean = false,
 ) {
+    /** iOS `usesCallTray` (`callPresentation == .tray`). */
+    val usesCallTray: Boolean get() = callTray != null
+
+    /** iOS `holdsCallTrayButton`: the tray's disc holds the call button's place. */
+    val holdsCallTrayButton: Boolean get() = usesCallTray && !s.isCovered && callTray?.holdsCallButton == true
+
+    /**
+     * iOS `showsCallTranscript`: the call's open transcript covers what stands above the composer.
+     * With the tray, a request's panel holding the composer keeps it shut.
+     */
+    val showsCallTranscript: Boolean
+        get() = callShowsCaptions && (!usesCallTray || (!docksRequest && view.requestPanelHeight <= 0f))
+
     /** iOS `hasCall`: the screen's own call or its root's. */
     val hasCall: Boolean get() = s.hasCall || callStore != null
 
@@ -570,8 +597,19 @@ internal class SessionComposerEnv(
                 isRunning = s.isRunning,
                 canSend = canSend,
                 expanded = expanded,
-                canCall = showsVoiceControl && !s.hasPromptContent,
+                canCall = (showsVoiceControl || (usesCallTray && (callOwnsAudio || holdsCallTrayButton))) && !s.hasPromptContent,
             )
+            // With the Call Tray, the mic stays in its slot and animates out and back in with
+            // `CallTrayController.composerMicLook`.
+            if (usesCallTray && (callOwnsAudio || holdsCallTrayButton) && controls.trailing == ComposerTrailingControl.Mic) {
+                return ComposerPresentation(
+                    expanded,
+                    controls.copy(
+                        trailing = ComposerTrailingControl.Send(enabled = false),
+                        secondaryMic = if (expanded) ComposerControls.MicPlacement.leading else ComposerControls.MicPlacement.trailing,
+                    ),
+                )
+            }
             return ComposerPresentation(expanded, controls)
         }
 
@@ -859,19 +897,35 @@ private fun SessionComposerEnv.ComposerCapsule() {
     val showsAutocomplete = usesAutocomplete && !docksRequest && view.requestPanelHeight <= 0f && voiceStore == null
     // The composer and a call share one place: starting or ending a call swaps what stands there,
     // + becoming Mute and the call button End, and the call's transcript grows out of its surface.
-    AnimatedContent(
-        targetState = voiceStore,
-        contentKey = { it != null },
-        transitionSpec = {
-            val spec: androidx.compose.animation.core.FiniteAnimationSpec<Float> = if (reducedMotion) Motion.easeInOut(0.2) else MotionSpring(0.32).spec()
-            fadeIn(spec) togetherWith fadeOut(spec) using SizeTransform(clip = false)
+    // iOS `.callTrayHost(…)`: in the Call Tray style the composer stays and the tray splits out
+    // beneath it. Android draws the composer's own surface, so the tray never merges it.
+    CallTrayHost(
+        controller = callTray,
+        store = callStore,
+        isEnabled = usesCallTray && !s.isCovered,
+        isFocused = messageFieldFocused,
+        reducedMotion = reducedMotion,
+        allowsMergedComposerGlass = false,
+        isRequestDocked = docksRequest || view.requestPanelHeight > 0f,
+        onExpandTranscript = {
+            host.closeAttachmentMenu()
+            host.modelPickerAnchors?.resetFusedState()
         },
-        label = "composerCallSwap",
-    ) { call ->
-        if (call != null) {
-            VoiceCallSurface(call, Modifier.fillMaxWidth()) { VoiceCallComposer(call) }
-        } else {
-            ComposerSurface(showsAutocomplete)
+    ) {
+        AnimatedContent(
+            targetState = voiceStore,
+            contentKey = { it != null },
+            transitionSpec = {
+                val spec: androidx.compose.animation.core.FiniteAnimationSpec<Float> = if (reducedMotion) Motion.easeInOut(0.2) else MotionSpring(0.32).spec()
+                fadeIn(spec) togetherWith fadeOut(spec) using SizeTransform(clip = false)
+            },
+            label = "composerCallSwap",
+        ) { call ->
+            if (call != null) {
+                VoiceCallSurface(call, Modifier.fillMaxWidth()) { VoiceCallComposer(call) }
+            } else {
+                ComposerSurface(showsAutocomplete)
+            }
         }
     }
 }
@@ -970,6 +1024,7 @@ private fun SessionComposerEnv.RequestPanel() {
         lastDocks = docks
         host.messageFieldFocused = false
         if (docks) host.closeAttachmentMenu()
+        if (docks && usesCallTray && callStore?.state?.showsCaptions == true) callStore.send(VoiceFeature.Action.CaptionsDismissed)
     }
     LaunchedEffect(room, docks) {
         val eases = view.requestPanelEasing.eases(room, cap, keyboardUp = messageFieldFocused)

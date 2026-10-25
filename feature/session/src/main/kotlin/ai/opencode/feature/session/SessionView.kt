@@ -19,6 +19,7 @@ import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.State
+import ai.opencode.feature.voice.CallTrayController
 import ai.opencode.feature.voice.DotScopeRenderer
 import ai.opencode.feature.voice.LocalDotScopeCovered
 import ai.opencode.feature.voice.VoiceStoreOf
@@ -141,6 +142,8 @@ import kotlin.math.roundToInt
  * @param onCatchUpOpen set while the session is a catch-up card: the title leaves Catch Up for the session.
  * @param hostedCall the call its root owns, on a pushed subagent (iOS `hostedCall`): its cards and
  *   bar show here, as the screen's own call would.
+ * @param callTray Home's Call Tray motion (iOS `callTray`), while Settings' Call Style is the tray:
+ *   the composer hosts the tray instead of swapping in the call bar.
  */
 @Composable
 fun SessionView(
@@ -151,6 +154,7 @@ fun SessionView(
     onBack: (() -> Unit)? = null,
     onCatchUpOpen: (() -> Unit)? = null,
     hostedCall: VoiceStoreOf? = null,
+    callTray: CallTrayController? = null,
 ) {
     val scrollEdgeBridge = remember { SessionScrollEdgeBridge() }
     val backgroundWorkAnchor = rememberBackgroundWorkAnchor()
@@ -179,7 +183,7 @@ fun SessionView(
     val ownsCall by store.observe { it.voice != null }
     SessionCallTasks(store, callStore, hasCall = ownsCall || hostedCall != null)
     val isCovered by store.observe { it.isCovered }
-    val floatsCall = rememberFloatsCall()
+    val floatsCall = rememberFloatsCall(callTray)
 
     val work by store.observe(BackgroundWorkModel::from)
     val agentScope by store.observe { "${it.server.persistenceID}|${it.session?.id ?: "draft"}" }
@@ -267,7 +271,7 @@ fun SessionView(
                         .then(if (floatsCall) Modifier.floatingCallComposer() else Modifier),
                 ) {
                     SessionCallCards(callStore)
-                    SessionComposer(store, callStore = callStore)
+                    SessionComposer(store, callStore = callStore, callTray = callTray)
                 }
                 // A send's words fly from the field into its bubble, over both.
                 SessionSendFlightOverlay(composerHost, scrollEdgeBridge, Modifier.matchParentSize())

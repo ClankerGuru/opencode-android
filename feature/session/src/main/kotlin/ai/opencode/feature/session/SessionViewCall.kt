@@ -4,11 +4,13 @@ import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
+import ai.opencode.core.experiments.ExperimentalCallStyle
 import ai.opencode.core.experiments.key
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.State
+import ai.opencode.feature.voice.CallTrayController
 import ai.opencode.feature.voice.FloatingCallCenter
 import ai.opencode.feature.voice.LiveSocketWarmer
 import ai.opencode.feature.voice.LiveSocketWarmerClient
@@ -44,7 +46,8 @@ import kotlin.time.Duration.Companion.seconds
 // presentation (`callPresentation`/`voiceStore`), the failed and ended cards above the composer,
 // and the screen's `.task`s that start it once, listen for Raise to Talk and keep a GPT-Live socket
 // warm. The bar itself is :feature:voice's `VoiceCallComposer` on `VoiceCallSurface`, swapped into
-// the composer's place by `SessionComposer`.
+// the composer's place by `SessionComposer`; in the Call Tray style the composer stays and the
+// tray splits out beneath it instead (`CallTrayHost`, with Home's `CallTrayController`).
 
 /**
  * iOS `callStore`: the call on this screen, its own (`store.scope(\.voice, action: \.voice.presented)`)
@@ -55,18 +58,30 @@ internal fun StoreOf<State, Action>.rememberCallStore(hostedCall: VoiceStoreOf?)
     rememberOptionalScope<VoiceFeature.State, VoiceFeature.Action>({ it.voice }, { Action.voicePresented(it) }) ?: hostedCall
 
 /**
- * iOS `floatsCall` (`callPresentation == .floating`): Floating Call or Living Orb is on, so the call
- * floats over the screen (Home hosts `FloatingCallOverlay`) and the composer stays a composer.
- * The Call Tray takes precedence on iOS only when Home hands the screen a `CallTrayController`;
- * Android's Home doesn't host the tray yet, so the tray style never applies here.
+ * iOS `callPresentation`: Settings' Call Style, from the call experiments. The Call Tray applies
+ * only when Home hands the screen its [CallTrayController] ([callTray]); Living Orb outranks it,
+ * and it outranks Floating Call (`ExperimentalCallStyle.of`).
  */
 @Composable
-internal fun rememberFloatsCall(): Boolean {
+internal fun rememberCallPresentation(callTray: CallTrayController?): ExperimentalCallStyle {
     val center = remember { dependency(FloatingCallCenter) }
+    val tray by remember { shared(ExperimentalFeature.callTray.key).flow }.collectAsState(shared(ExperimentalFeature.callTray.key).value)
     val floating by remember { shared(ExperimentalFeature.floatingCall.key).flow }.collectAsState(shared(ExperimentalFeature.floatingCall.key).value)
     val livingOrb by remember { shared(ExperimentalFeature.livingOrb.key).flow }.collectAsState(shared(ExperimentalFeature.livingOrb.key).value)
-    return ExperimentalFeature.livingOrb.isActive(livingOrb) || center.isOn(floating)
+    return ExperimentalCallStyle.of(
+        callTray = callTray != null && ExperimentalFeature.callTray.isActive(tray),
+        floatingCall = center.isOn(floating),
+        livingOrb = ExperimentalFeature.livingOrb.isActive(livingOrb),
+    )
 }
+
+/**
+ * iOS `floatsCall` (`callPresentation == .floating`): Floating Call or Living Orb is on, so the call
+ * floats over the screen (Home hosts `FloatingCallOverlay`) and the composer stays a composer.
+ */
+@Composable
+internal fun rememberFloatsCall(callTray: CallTrayController?): Boolean =
+    rememberCallPresentation(callTray) == ExperimentalCallStyle.floating
 
 /**
  * The screen's call tasks (iOS `sessionScaffold`'s `.task`s and the composer area's `.task(id: hasCall)`):
