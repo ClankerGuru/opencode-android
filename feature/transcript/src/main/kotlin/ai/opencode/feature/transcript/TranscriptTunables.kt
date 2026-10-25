@@ -1,5 +1,13 @@
 package ai.opencode.feature.transcript
 
+import ai.opencode.core.motion.MotionTunables
+import ai.opencode.core.tuning.Tunable
+import ai.opencode.core.tuning.TunableChoice
+import ai.opencode.core.tuning.TuningPreset
+import ai.opencode.core.tuning.TuningPresets
+import ai.opencode.core.tuning.TuningStore
+import ai.opencode.feature.transcript.markdown.ui.SessionLinkTunables
+import ai.opencode.feature.transcript.markdown.ui.TextRevealTunables
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.text.font.FontWeight
@@ -8,84 +16,329 @@ import androidx.compose.ui.unit.dp
 
 /**
  * The transcript's layout and motion tunables (iOS `TranscriptTunables`, Developer Mode →
- * Tuning Panel → Transcript). Android bakes the defaults: the Tuning Panel is not ported
- * (`:devtools`), so each value is the iOS `default:`. Points port 1:1 to dp/sp.
+ * Tuning Panel → Transcript). Same keys, labels, defaults, ranges and steps as iOS; the
+ * declarations live in [Knobs] and each value reads live through its getter, so call sites read
+ * plain numbers. Motion parameters are captured when each motion begins, so dragging a slider
+ * mid-animation never causes a jump. Points port 1:1 to dp/sp.
  */
 object TranscriptTunables {
+    /** The declarations (iOS `TranscriptTunables.<name>` tunables). */
+    object Knobs {
+        // Arrivals
+        val entranceDuration = Tunable("transcript.arrivals.entranceDuration", "Entrance fade duration", default = 0.25, range = 0.05..0.8, step = 0.01)
+        val entranceRise = Tunable("transcript.arrivals.entranceRise", "Entrance rise (pt)", default = 6f, range = 0.0..24.0, step = 1.0)
+        val settlingDuration = Tunable("transcript.arrivals.settlingDuration", "Model-switch fade", default = 0.4, range = 0.1..1.0, step = 0.02)
+        val textFadeDuration = Tunable("transcript.textReveal.duration", "Reveal duration (s)", default = 0.2, range = 0.05..0.8, step = 0.01)
+        val workingFinale = Tunable("transcript.arrivals.workingFinale", "Working finale flash", default = 0.55, range = 0.15..1.4, step = 0.05)
+        val workingHandoff = Tunable("transcript.arrivals.workingHandoff", "Working → Copy handoff", default = 0.34, range = 0.1..1.0, step = 0.02)
+
+        // Growth
+        val growthMinDuration = Tunable("transcript.growth.minDuration", "Min growth duration", default = 0.22, range = 0.08..0.6, step = 0.02)
+        val growthMaxDuration = Tunable("transcript.growth.maxDuration", "Max growth duration", default = 0.55, range = 0.2..1.5, step = 0.05)
+        val growthMaxFrameChange = Tunable("transcript.growth.maxFrameChange", "Max frame Δ (pt/frame²)", default = 1.5f, range = 0.25..6.0, step = 0.25)
+        val growthSoftEdge = Tunable("transcript.growth.softEdge", "Soft edge fade (pt)", default = 28f, range = 0.0..64.0, step = 2.0)
+        val disclosureOpen = Tunable("transcript.growth.disclosureOpen", "Disclosure open spring", default = 0.3, range = 0.1..0.8, step = 0.02)
+        val disclosureClose = Tunable("transcript.growth.disclosureClose", "Disclosure close spring", default = 0.24, range = 0.1..0.8, step = 0.02)
+
+        // Follow
+        val arrivalOmega = Tunable("transcript.follow.arrivalOmega", "Arrival spring ω", default = 20.0, range = 10.0..60.0, step = 1.0)
+        val viewportOmega = Tunable("transcript.follow.viewportOmega", "Viewport/keyboard ω", default = 18.0, range = 8.0..50.0, step = 1.0)
+        val maxFrameStep = Tunable("transcript.follow.maxFrameStep", "Max step (pt/frame)", default = 18.0, range = 4.0..24.0, step = 1.0)
+        val arrivalReach = Tunable("transcript.follow.arrivalReach", "Glide window (screens)", default = 2.5f, range = 0.5..6.0, step = 0.25)
+
+        // Promotion
+        val promotionDuration = Tunable("transcript.promotion.duration", "Steer promote spring", default = 0.4, range = 0.15..1.0, step = 0.02)
+        val promotionLabelRise = Tunable("transcript.promotion.labelRise", "Label exit rise (pt)", default = 6f, range = 0.0..20.0, step = 1.0)
+
+        // Send
+        val sendFlightOmega = Tunable("transcript.send.flightOmega", "Send flight ω", default = 14.0, range = 6.0..32.0, step = 0.5)
+        val sendPillDuration = Tunable("transcript.send.pillDuration", "Queued pill flight", default = 0.45, range = 0.15..1.0, step = 0.02)
+
+        // Jump
+        val jumpDuration = Tunable("transcript.jump.duration", "Jump glide duration", default = 0.5, range = 0.15..1.2, step = 0.02)
+        val jumpReach = Tunable("transcript.jump.reach", "Full-glide reach (screens)", default = 2.5f, range = 1.0..6.0, step = 0.25)
+        val jumpLead = Tunable("transcript.jump.lead", "Cut-in lead (screens)", default = 1.5f, range = 0.5..4.0, step = 0.25)
+
+        // Reveal
+        val newMinDuration = Tunable("transcript.reveal.newMinDuration", "New divider min glide", default = 0.28, range = 0.1..0.8, step = 0.02)
+        val newMaxDuration = Tunable("transcript.reveal.newMaxDuration", "New divider max glide", default = 0.62, range = 0.2..1.4, step = 0.02)
+        val agentGlowRise = Tunable("transcript.reveal.agentGlowRise", "Agent glow rise (s)", default = 0.07, range = 0.02..0.25, step = 0.01)
+        val agentGlowDuration = Tunable("transcript.reveal.agentGlowDuration", "Agent glow decay (s)", default = 1.39, range = 0.4..3.0, step = 0.05)
+
+        // Row, Bubble & Card Layout
+        val flowHalf = Tunable("transcript.row.flowHalf", "Reply row half-gap", default = 8f, range = 2.0..20.0, step = 1.0)
+        val turnHalf = Tunable("transcript.row.turnHalf", "Turn half-gap", default = 12f, range = 4.0..28.0, step = 1.0)
+        val sectionHalf = Tunable("transcript.row.sectionHalf", "Section rule half-gap", default = 16f, range = 6.0..36.0, step = 1.0)
+        val contentGutter = Tunable("transcript.row.contentGutter", "Horizontal gutter", default = 16f, range = 8.0..32.0, step = 1.0)
+        val bubbleVertical = Tunable("transcript.bubble.verticalPadding", "Bubble vertical padding", default = 10f, range = 6.0..20.0, step = 1.0)
+        val bubbleCornerRadius = Tunable("transcript.bubble.cornerRadius", "Bubble corner radius", default = 18f, range = 8.0..28.0, step = 1.0)
+        val bubbleMaxFraction = Tunable("transcript.bubble.maxFraction", "Bubble max width", default = 0.78f, range = 0.55..0.95, step = 0.01)
+        val cardCornerRadius = Tunable("transcript.card.cornerRadius", "Card corner radius", default = 14f, range = 6.0..24.0, step = 1.0)
+
+        // Typography (D-52)
+        val bodySize = Tunable("transcript.typography.bodySize", "Body size (pt)", default = 17f, range = 14.0..20.0, step = 0.5)
+        val bodyLeading = Tunable("transcript.typography.bodyLeading", "Body leading (pt)", default = 4.5f, range = 0.0..8.0, step = 0.5)
+        val bodyTone = Tunable("transcript.typography.bodyTone", "Body tone", default = 0.92, range = 0.75..1.0, step = 0.01)
+        val h1Size = Tunable("transcript.typography.h1Size", "H1 size (pt)", default = 22f, range = 18.0..28.0, step = 1.0)
+        val h2Size = Tunable("transcript.typography.h2Size", "H2 size (pt)", default = 20f, range = 16.0..24.0, step = 1.0)
+        val h3Size = Tunable("transcript.typography.h3Size", "H3 size (pt)", default = 18f, range = 12.0..20.0, step = 0.5)
+        val h3Weight = Tunable("transcript.typography.h3Weight", "H3 weight", default = TranscriptFontWeight.Bold)
+        val metaSize = Tunable("transcript.typography.metaSize", "Used N & Working size (pt)", default = 17f, range = 11.0..17.0, step = 0.5)
+        val listNumSize = Tunable("transcript.typography.listNumSize", "List number size (pt)", default = 13f, range = 11.0..17.0, step = 0.5)
+        val codeLeading = Tunable("transcript.typography.codeLeading", "Code leading (pt)", default = 3f, range = 0.0..6.0, step = 0.5)
+        /** `0` inherits `flowHalf * 2`; any positive value is used directly. */
+        val paragraphGap = Tunable("transcript.typography.paragraphGap", "Paragraph gap (pt, 0 = 2 × flowHalf)", default = 0f, range = 0.0..24.0, step = 1.0)
+    }
+
     // Arrivals
-    const val entranceDuration = 0.25
-    const val entranceRise = 6f
-    const val settlingDuration = 0.4
-    const val textFadeDuration = 0.2
-    const val workingFinale = 0.55
-    const val workingHandoff = 0.34
+    val entranceDuration: Double get() = Knobs.entranceDuration.value
+    val entranceRise: Float get() = Knobs.entranceRise.value
+    val settlingDuration: Double get() = Knobs.settlingDuration.value
+    val textFadeDuration: Double get() = Knobs.textFadeDuration.value
+    val workingFinale: Double get() = Knobs.workingFinale.value
+    val workingHandoff: Double get() = Knobs.workingHandoff.value
 
     // Growth
-    const val growthMinDuration = 0.22
-    const val growthMaxDuration = 0.55
-    const val growthMaxFrameChange = 1.5f
-    const val growthSoftEdge = 28f
-    const val disclosureOpen = 0.3
-    const val disclosureClose = 0.24
+    val growthMinDuration: Double get() = Knobs.growthMinDuration.value
+    val growthMaxDuration: Double get() = Knobs.growthMaxDuration.value
+    val growthMaxFrameChange: Float get() = Knobs.growthMaxFrameChange.value
+    val growthSoftEdge: Float get() = Knobs.growthSoftEdge.value
+    val disclosureOpen: Double get() = Knobs.disclosureOpen.value
+    val disclosureClose: Double get() = Knobs.disclosureClose.value
 
     // Follow
-    const val arrivalOmega = 20.0
-    const val viewportOmega = 18.0
-    const val maxFrameStep = 18.0
-    const val arrivalReach = 2.5f
+    val arrivalOmega: Double get() = Knobs.arrivalOmega.value
+    val viewportOmega: Double get() = Knobs.viewportOmega.value
+    val maxFrameStep: Double get() = Knobs.maxFrameStep.value
+    val arrivalReach: Float get() = Knobs.arrivalReach.value
 
     // Promotion
-    const val promotionDuration = 0.4
-    const val promotionLabelRise = 6f
+    val promotionDuration: Double get() = Knobs.promotionDuration.value
+    val promotionLabelRise: Float get() = Knobs.promotionLabelRise.value
 
     // Send
-    const val sendFlightOmega = 14.0
-    const val sendPillDuration = 0.45
+    val sendFlightOmega: Double get() = Knobs.sendFlightOmega.value
+    val sendPillDuration: Double get() = Knobs.sendPillDuration.value
 
     // Jump
-    const val jumpDuration = 0.5
-    const val jumpReach = 2.5f
-    const val jumpLead = 1.5f
+    val jumpDuration: Double get() = Knobs.jumpDuration.value
+    val jumpReach: Float get() = Knobs.jumpReach.value
+    val jumpLead: Float get() = Knobs.jumpLead.value
 
     // Reveal
-    const val newMinDuration = 0.28
-    const val newMaxDuration = 0.62
-    const val agentGlowRise = 0.07
-    const val agentGlowDuration = 1.39
+    val newMinDuration: Double get() = Knobs.newMinDuration.value
+    val newMaxDuration: Double get() = Knobs.newMaxDuration.value
+    val agentGlowRise: Double get() = Knobs.agentGlowRise.value
+    val agentGlowDuration: Double get() = Knobs.agentGlowDuration.value
 
     // Row, bubble & card layout
-    const val flowHalf = 8f
-    const val turnHalf = 12f
-    const val sectionHalf = 16f
-    const val contentGutter = 16f
-    const val bubbleVertical = 10f
-    const val bubbleCornerRadius = 18f
-    const val bubbleMaxFraction = 0.78f
-    const val cardCornerRadius = 14f
+    val flowHalf: Float get() = Knobs.flowHalf.value
+    val turnHalf: Float get() = Knobs.turnHalf.value
+    val sectionHalf: Float get() = Knobs.sectionHalf.value
+    val contentGutter: Float get() = Knobs.contentGutter.value
+    val bubbleVertical: Float get() = Knobs.bubbleVertical.value
+    val bubbleCornerRadius: Float get() = Knobs.bubbleCornerRadius.value
+    val bubbleMaxFraction: Float get() = Knobs.bubbleMaxFraction.value
+    val cardCornerRadius: Float get() = Knobs.cardCornerRadius.value
 
     // Typography (D-52)
-    const val bodySize = 17f
-    const val bodyLeading = 4.5f
-    const val bodyTone = 0.92
-    const val h1Size = 22f
-    const val h2Size = 20f
-    const val h3Size = 18f
-    val h3Weight = FontWeight.Bold
-    const val metaSize = 17f
-    const val listNumSize = 13f
-    const val codeLeading = 3f
+    val bodySize: Float get() = Knobs.bodySize.value
+    val bodyLeading: Float get() = Knobs.bodyLeading.value
+    val bodyTone: Double get() = Knobs.bodyTone.value
+    val h1Size: Float get() = Knobs.h1Size.value
+    val h2Size: Float get() = Knobs.h2Size.value
+    val h3Size: Float get() = Knobs.h3Size.value
+    val h3Weight: FontWeight get() = Knobs.h3Weight.value.weight
+    val metaSize: Float get() = Knobs.metaSize.value
+    val listNumSize: Float get() = Knobs.listNumSize.value
+    val codeLeading: Float get() = Knobs.codeLeading.value
 
     /** `0` inherits `flowHalf * 2` (`MarkdownStyle.inheritedParagraphGap`). */
-    const val paragraphGap = 0f
+    val paragraphGap: Float get() = Knobs.paragraphGap.value
 
     /** Backwards-compatible alias for `maxFrameStep * 60` (points per second). */
-    const val arrivalSpeedPointsPerSecond = maxFrameStep * 60
+    val arrivalSpeedPointsPerSecond: Double get() = maxFrameStep * 60
 
     fun resolvedParagraphGap(paragraphGap: Float, flowHalf: Float): Float =
         if (paragraphGap > 0) paragraphGap else flowHalf * 2
 
-    fun layoutSnapshot(imageLinkPreviews: Boolean = false): TranscriptLayoutTuning =
-        TranscriptLayoutTuning(imageLinkPreviews = imageLinkPreviews)
+    /**
+     * Session view typography presets (D-52): 1 is what shipped (Refined Standard with Used N
+     * and Working kept at 17 pt body size), 2 is the pre-D-52 baseline.
+     */
+    val typography: TuningPresets by lazy {
+        with(Knobs) {
+            TuningPresets(
+                "transcript.typography", "Typography",
+                listOf(
+                    TuningPreset("Today"),
+                    TuningPreset(
+                        "Before D-52",
+                        bodyLeading.preset(4f), bodyTone.preset(1.0),
+                        h3Size.preset(17f), h3Weight.preset(TranscriptFontWeight.Semibold),
+                        codeLeading.preset(0f),
+                    ),
+                    TuningPreset(
+                        "Crisp Technical",
+                        bodySize.preset(16f), bodyLeading.preset(3.5f), bodyTone.preset(0.88),
+                        h1Size.preset(20f), h2Size.preset(17f), h3Size.preset(13f), h3Weight.preset(TranscriptFontWeight.Semibold),
+                        metaSize.preset(12f), codeLeading.preset(4f), paragraphGap.preset(14f),
+                    ),
+                    TuningPreset(
+                        "Editorial",
+                        bodyLeading.preset(5f), bodyTone.preset(0.9),
+                        h1Size.preset(23f), h3Size.preset(13f), h3Weight.preset(TranscriptFontWeight.Semibold),
+                        metaSize.preset(13f), paragraphGap.preset(18f),
+                    ),
+                ),
+            )
+        }
+    }
+
+    /** Card-sized choices: each variant resets only the family it names. */
+    val cardPresets: List<TuningPresets> by lazy {
+        with(Knobs) {
+            listOf(
+                TuningPresets(
+                    "transcript.arrivals.presets", "Arrivals",
+                    listOf(
+                        TuningPreset("Native"),
+                        TuningPreset("Snappy", entranceDuration.preset(0.18), entranceRise.preset(4f), settlingDuration.preset(0.3), textFadeDuration.preset(0.14), workingFinale.preset(0.4), workingHandoff.preset(0.24)),
+                        TuningPreset("Gentle", entranceDuration.preset(0.32), entranceRise.preset(6f), settlingDuration.preset(0.48), textFadeDuration.preset(0.26), workingFinale.preset(0.65), workingHandoff.preset(0.4)),
+                    ),
+                    resetting = listOf(entranceDuration, entranceRise, settlingDuration, textFadeDuration, workingFinale, workingHandoff).map { it.descriptor },
+                ),
+                TuningPresets(
+                    "transcript.growth.presets", "Growth",
+                    listOf(
+                        TuningPreset("Native"),
+                        TuningPreset("Snappy", growthMinDuration.preset(0.16), growthMaxDuration.preset(0.4), growthSoftEdge.preset(20f), disclosureOpen.preset(0.24), disclosureClose.preset(0.18)),
+                        TuningPreset("Gentle", growthMinDuration.preset(0.3), growthMaxDuration.preset(0.65), growthSoftEdge.preset(32f), disclosureOpen.preset(0.4), disclosureClose.preset(0.32)),
+                    ),
+                    resetting = listOf(growthMinDuration, growthMaxDuration, growthMaxFrameChange, growthSoftEdge, disclosureOpen, disclosureClose).map { it.descriptor },
+                ),
+                TuningPresets(
+                    "transcript.follow.presets", "Following",
+                    listOf(
+                        TuningPreset("Native"),
+                        TuningPreset("Snappy", arrivalOmega.preset(26.0), viewportOmega.preset(24.0)),
+                        TuningPreset("Gentle", arrivalOmega.preset(16.0), viewportOmega.preset(15.0), maxFrameStep.preset(15.0), arrivalReach.preset(2.25f)),
+                    ),
+                    resetting = listOf(arrivalOmega.descriptor, viewportOmega.descriptor, maxFrameStep.descriptor, arrivalReach.descriptor),
+                ),
+                TuningPresets(
+                    "transcript.promotion.presets", "Steering",
+                    listOf(
+                        TuningPreset("Native"),
+                        TuningPreset("Snappy", promotionDuration.preset(0.31), promotionLabelRise.preset(4f)),
+                        TuningPreset("Gentle", promotionDuration.preset(0.49), promotionLabelRise.preset(5f)),
+                    ),
+                    resetting = listOf(promotionDuration.descriptor, promotionLabelRise.descriptor),
+                ),
+                TuningPresets(
+                    "transcript.send.presets", "Sending",
+                    listOf(
+                        TuningPreset("Native"),
+                        TuningPreset("Snappy", sendFlightOmega.preset(18.0), sendPillDuration.preset(0.31)),
+                        TuningPreset("Gentle", sendFlightOmega.preset(11.0), sendPillDuration.preset(0.55)),
+                    ),
+                    resetting = listOf(sendFlightOmega.descriptor, sendPillDuration.descriptor),
+                ),
+                TuningPresets(
+                    "transcript.jump.presets", "Jump to Latest",
+                    listOf(
+                        TuningPreset("Native"),
+                        TuningPreset("Snappy", jumpDuration.preset(0.35), jumpReach.preset(2f)),
+                        TuningPreset("Gentle", jumpDuration.preset(0.65), jumpReach.preset(3f), jumpLead.preset(1.75f)),
+                    ),
+                    resetting = listOf(jumpDuration.descriptor, jumpReach.descriptor, jumpLead.descriptor),
+                ),
+                TuningPresets(
+                    "transcript.reveal.presets", "Return & Glow",
+                    listOf(
+                        TuningPreset("Native"),
+                        TuningPreset("Snappy", newMinDuration.preset(0.2), newMaxDuration.preset(0.46), agentGlowRise.preset(0.05), agentGlowDuration.preset(1.05)),
+                        TuningPreset("Gentle", newMinDuration.preset(0.36), newMaxDuration.preset(0.76), agentGlowRise.preset(0.1), agentGlowDuration.preset(1.7)),
+                    ),
+                    resetting = listOf(newMinDuration.descriptor, newMaxDuration.descriptor, agentGlowRise.descriptor, agentGlowDuration.descriptor),
+                ),
+                TuningPresets(
+                    "transcript.typography.presets", "Typography",
+                    listOf(TuningPreset("Native")) + typography.presets.drop(1),
+                    resetting = listOf(
+                        bodySize.descriptor, bodyLeading.descriptor, bodyTone.descriptor,
+                        h1Size.descriptor, h2Size.descriptor, h3Size.descriptor, h3Weight.descriptor,
+                        metaSize.descriptor, listNumSize.descriptor, codeLeading.descriptor, paragraphGap.descriptor,
+                    ),
+                ),
+            )
+        }
+    }
+
+    /**
+     * iOS `TranscriptTunables.register(in:)`: lists the transcript's knobs (and the text reveal's
+     * and motion's) in the Tuning Panel before their first read. A no-op while tuning is off.
+     */
+    fun register(store: TuningStore = TuningStore.shared) {
+        if (!store.isEnabled) return
+        with(Knobs) {
+            store.register(
+                entranceDuration, settlingDuration, textFadeDuration, workingFinale, workingHandoff,
+                growthMinDuration, growthMaxDuration, disclosureOpen, disclosureClose,
+            )
+            store.register(entranceRise, growthMaxFrameChange, growthSoftEdge)
+            store.register(arrivalOmega, viewportOmega, maxFrameStep)
+            store.register(arrivalReach)
+            store.register(promotionDuration, sendFlightOmega, sendPillDuration, jumpDuration)
+            store.register(promotionLabelRise, jumpReach, jumpLead)
+            store.register(newMinDuration, newMaxDuration, agentGlowRise, agentGlowDuration)
+            store.register(typography)
+            for (presets in cardPresets) store.register(presets)
+            TextRevealTunables.register(store)
+            // iOS registers these through `InlineLinkTunables.register`.
+            SessionLinkTunables.register(store)
+            MotionTunables.register(store)
+            store.register(flowHalf, turnHalf, sectionHalf, contentGutter, bubbleVertical, bubbleCornerRadius, bubbleMaxFraction, cardCornerRadius)
+            store.register(bodySize, bodyLeading, h1Size, h2Size, h3Size, metaSize, listNumSize, codeLeading, paragraphGap)
+            store.register(bodyTone)
+            store.register(h3Weight)
+        }
+    }
+
+    /** iOS `layoutSnapshot(in:imageLinkPreviews:)`: the live layout values. */
+    fun layoutSnapshot(imageLinkPreviews: Boolean = false): TranscriptLayoutTuning {
+        val flow = flowHalf
+        return TranscriptLayoutTuning(
+            flowHalf = flow,
+            turnHalf = turnHalf,
+            sectionHalf = sectionHalf,
+            contentGutter = contentGutter,
+            bubbleVertical = bubbleVertical,
+            bubbleCornerRadius = bubbleCornerRadius,
+            bubbleMaxFraction = bubbleMaxFraction,
+            cardCornerRadius = cardCornerRadius,
+            bodySize = bodySize,
+            bodyLeading = bodyLeading,
+            bodyTone = bodyTone,
+            h1Size = h1Size,
+            h2Size = h2Size,
+            h3Size = h3Size,
+            h3Weight = h3Weight,
+            metaSize = metaSize,
+            listNumSize = listNumSize,
+            codeLeading = codeLeading,
+            paragraphGap = resolvedParagraphGap(paragraphGap, flow),
+            imageLinkPreviews = imageLinkPreviews,
+        )
+    }
+}
+
+/** iOS `DrawerFontWeight` as the H3 weight tunable holds it (same raw values). */
+enum class TranscriptFontWeight(override val rawValue: String, val weight: FontWeight) : TunableChoice {
+    Regular("regular", FontWeight.Normal),
+    Medium("medium", FontWeight.Medium),
+    Semibold("semibold", FontWeight.SemiBold),
+    Bold("bold", FontWeight.Bold),
 }
 
 /**

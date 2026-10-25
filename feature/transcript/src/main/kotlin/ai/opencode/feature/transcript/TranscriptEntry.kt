@@ -1,5 +1,6 @@
 package ai.opencode.feature.transcript
 
+import androidx.compose.ui.unit.dp
 import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.rows.TranscriptTimeStamps
 import ai.opencode.server.model.OpenCodeImageAttachment
@@ -133,23 +134,28 @@ sealed interface TranscriptEntry {
             }
         }
 
-    /** Rows meet at the sum of their halves (iOS `rowInsets`). */
+    /** Rows meet at the sum of their halves (iOS `rowInsets`), on the live row tunables. */
     val rowInsets: RowInsets
-        get() = when (this) {
-            is UserGroup -> RowInsets(if (startsTurn) TranscriptMetrics.turnHalf else androidx.compose.ui.unit.Dp(0f), TranscriptMetrics.turnHalf)
-            is Single -> when (val item = item) {
-                is OpenCodeTranscriptItem.Compaction -> RowInsets(TranscriptMetrics.sectionHalf, TranscriptMetrics.sectionHalf)
-                // Set apart from the reply above, close over the message it applied to.
-                is OpenCodeTranscriptItem.ModelSwitch -> RowInsets(TranscriptMetrics.sectionHalf, TranscriptMetrics.flowHalf)
-                // A time sits close over the message it dates.
-                is OpenCodeTranscriptItem.Info if item.id.startsWith(TranscriptTimeStamps.PREFIX) ->
-                    RowInsets(TranscriptMetrics.sectionHalf, TranscriptMetrics.compact)
-                else -> RowInsets(TranscriptMetrics.flowHalf, TranscriptMetrics.flowHalf)
+        get() {
+            val flow = TranscriptTunables.flowHalf.dp
+            val turn = TranscriptTunables.turnHalf.dp
+            val section = TranscriptTunables.sectionHalf.dp
+            return when (this) {
+                is UserGroup -> RowInsets(if (startsTurn) turn else 0.dp, turn)
+                is Single -> when (val item = item) {
+                    is OpenCodeTranscriptItem.Compaction -> RowInsets(section, section)
+                    // Set apart from the reply above, close over the message it applied to.
+                    is OpenCodeTranscriptItem.ModelSwitch -> RowInsets(section, flow)
+                    // A time sits close over the message it dates.
+                    is OpenCodeTranscriptItem.Info if item.id.startsWith(TranscriptTimeStamps.PREFIX) ->
+                        RowInsets(section, TranscriptMetrics.compact)
+                    else -> RowInsets(flow, flow)
+                }
+                is ToolGroup -> RowInsets(flow, flow)
+                // Belongs to the reply above it; the next row is a new turn.
+                is ReplyEnd -> RowInsets(flow, turn)
+                is SinceYouLeftEntry -> RowInsets(flow, flow)
             }
-            is ToolGroup -> RowInsets(TranscriptMetrics.flowHalf, TranscriptMetrics.flowHalf)
-            // Belongs to the reply above it; the next row is a new turn.
-            is ReplyEnd -> RowInsets(TranscriptMetrics.flowHalf, TranscriptMetrics.turnHalf)
-            is SinceYouLeftEntry -> RowInsets(TranscriptMetrics.flowHalf, TranscriptMetrics.flowHalf)
         }
 
     companion object {
@@ -262,7 +268,8 @@ sealed interface TranscriptEntry {
                     is OpenCodeTranscriptItem.AssistantMarkdown -> {
                         flush()
                         entries += Single(item)
-                        reply += item.text
+                        // iOS appends the reply's blocks: text that parses to none adds nothing.
+                        if (item.text.isNotBlank()) reply += item.text
                         replyID = item.id
                     }
                     is OpenCodeTranscriptItem.Compaction, is OpenCodeTranscriptItem.Info, is OpenCodeTranscriptItem.Undone -> {
@@ -538,7 +545,7 @@ data class TranscriptRowIdentityPlan(
 /** iOS `OpenCodeQueuedInput.rowInsets`. */
 val OpenCodeQueuedInput.rowInsets: RowInsets
     get() = if (isCompaction) {
-        RowInsets(TranscriptMetrics.sectionHalf, TranscriptMetrics.sectionHalf)
+        RowInsets(TranscriptTunables.sectionHalf.dp, TranscriptTunables.sectionHalf.dp)
     } else {
-        RowInsets(TranscriptMetrics.turnHalf, TranscriptMetrics.turnHalf)
+        RowInsets(TranscriptTunables.turnHalf.dp, TranscriptTunables.turnHalf.dp)
     }

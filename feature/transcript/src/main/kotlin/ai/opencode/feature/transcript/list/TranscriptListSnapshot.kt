@@ -102,7 +102,8 @@ data class TranscriptListSnapshot(
                         var p = RowProps(isGrowing = stableID == growingStableID)
                         val entry = row.entry
                         if (!configuration.isRunning && configuration.sessionID != null && entry is TranscriptEntry.UserGroup &&
-                            row.failure == null && row.note == null && !isFromAgent(entry)
+                            row.failure == null && row.note == null &&
+                            ai.opencode.feature.transcript.user.TranscriptUserMessage.from(entry)?.isFromAgent == false
                         ) {
                             p = p.copy(canEditMessage = true)
                         }
@@ -159,10 +160,6 @@ data class TranscriptListSnapshot(
             return TranscriptListSnapshot(items, queuedItems, rows, props, userRuns(items, rows))
         }
 
-        /** iOS `TranscriptUserMessage.isFromAgent` without parsing: an agent source. Voice delegations: see the user message port. */
-        private fun isFromAgent(entry: TranscriptEntry.UserGroup): Boolean =
-            entry.items.any { it is OpenCodeTranscriptItem.UserText && it.source != null }
-
         /** Runs of adjacent user messages (iOS `userRuns(in:rows:)`). */
         private fun userRuns(items: List<TranscriptItemID>, rows: Map<String, MessageRow>): Map<String, UserMessageRun> {
             val members = items.map { item ->
@@ -184,9 +181,9 @@ data class TranscriptListSnapshot(
         private fun runMember(row: MessageRow): UserMessageRun.Member? {
             fun carriesCallLog(names: List<String>) = names.any { it.startsWith("voice-call-") }
             fun shape(member: UserMessageRun.Member, text: String, hasAttachments: Boolean): UserMessageRun.Member {
-                // iOS also moves a shared location (`SharedLocation`) into a card above the bubble.
-                val hasText = text.isNotEmpty()
-                return member.copy(endsWithBubble = hasText, startsWithBubble = hasText && !hasAttachments)
+                val location = ai.opencode.feature.transcript.user.SharedLocation.parse(text)
+                val hasText = (location?.second ?: text).isNotEmpty()
+                return member.copy(endsWithBubble = hasText, startsWithBubble = hasText && !hasAttachments && location == null)
             }
             return when (row) {
                 is MessageRow.Entry -> {

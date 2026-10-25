@@ -46,6 +46,7 @@ class TranscriptListController(
     var send: (TranscriptAction) -> Unit = {}
     var setShowsJumpButton: (Boolean) -> Unit = {}
     var density: Float = 1f
+    var frameDuration: Double = 1.0 / 60.0
     var reduceMotion: Boolean = false
     /** Whether the reader can watch the list move now (on screen, app resumed). */
     var isShowingToReader: Boolean = true
@@ -83,6 +84,12 @@ class TranscriptListController(
     var isUserGestureActive = false
         private set
     private var contentArrivedDuringDrag = false
+    var trailingSpace by mutableStateOf(0f)
+        private set
+    private var heldSpaceDrain = HeldSpaceDrain()
+    private var bottomObstruction: Float? = null
+    private var keyboardInset = 0f
+    private var keyboardMoved = false
 
     // Motion.
     private var bottomSpring: BottomSpring? = null
@@ -95,9 +102,22 @@ class TranscriptListController(
     private val settledHeights = HashMap<String, Float>()
     private val enteringItems = HashSet<String>()
     private val pendingEntrances = HashMap<String, Pair<Double, RowEntranceStyle>>()
+    private val entranceStarts = HashMap<String, Double>()
     private var disclosureEntryID: String? = null
     private var disclosureToggledAt = 0.0
     private val ride = GrowthRide()
+    // LazyColumn lays out after the motion tick. Consume growth only after that layout;
+    // dispatching before it clamps against yesterday's end and silently loses the ride.
+    private var pendingGrowthRide: Pair<Boolean, Float>? = null
+    private val removedHeights = HashMap<String, Float>()
+    private val runResizedItems = HashSet<String>()
+    private val revisedRows = HashMap<String, Double>()
+    private val imageGrowths = HashMap<String, ai.opencode.feature.media.AgentImageRowGrowth>()
+    private var readingAnchor: Pair<String, Int>? = null
+    private var promotionUntil = 0.0
+    private var followsSentRow = false
+    var animatesPlacement by mutableStateOf(false)
+        private set
 
     // New messages.
     private var newMessagesDecision: Pair<String, Boolean>? = null
@@ -105,6 +125,9 @@ class TranscriptListController(
     private var landedNewMessages: Int? = null
     private var passedNewMessages: Int? = null
     private var pendingNewMessagesLanding: Int? = null
+    private var revealGlide: JumpGlide? = null
+    private var revealDeadline = 0.0
+    private var revealsNewMessages = false
 
     /** Agent-sent messages glow once on arrival (iOS `TranscriptAgentMessageReveal`). */
     var agentReveal = ai.opencode.feature.transcript.user.TranscriptAgentMessageReveal()
@@ -117,6 +140,16 @@ class TranscriptListController(
     /** When the empty row started loading, so its mark keeps its fade across rehosting. */
     var emptyLoadingSince: Double? = null
         private set
+    data class EmptyHandoff(val loading: Boolean, val showsEmpty: Boolean, val since: Double?, val start: Double, val duration: Double)
+    var emptyHandoff by mutableStateOf<EmptyHandoff?>(null)
+        private set
+
+    fun handoffProgress(): Float {
+        @Suppress("UNUSED_VARIABLE") val tick = frameTick
+        val handoff = emptyHandoff ?: return 1f
+        val progress = ((transcriptNow() - handoff.start) / handoff.duration).toFloat().coerceIn(0f, 1f)
+        return androidx.compose.animation.core.CubicBezierEasing(0.42f, 0f, 0.58f, 1f).transform(progress)
+    }
 
     init {
         disclosure.animateToggle = ::toggleDisclosure
@@ -151,6 +184,7 @@ class TranscriptListController(
         // A following reader's send arrives under its flight from the composer. A browsing reader's
         // send takes them back to the end the way Jump to latest does, and the message arrives there.
         if (configuration.sendGeneration != old.sendGeneration && !sessionChanged) {
+            followsSentRow = !wasBrowsing
             pendingEffects += {
                 val returnsToEnd = wasBrowsing || behavior.mode == TranscriptScrollBehavior.Mode.Browsing
                 // A send during a jump's glide arrives under that glide: a flight on top would be a second motion.
@@ -166,6 +200,12 @@ class TranscriptListController(
         val mark = configuration.newMessages
         if (mark != null && mark.generation != old.newMessages?.generation && landedNewMessages != mark.generation) {
             pendingNewMessagesLanding = mark.generation
+            revealsNewMessages = hasLaidOutContent && isShowingToReader && !reduceMotion && !isUserGestureActive
+        }
+        if (mark == null) {
+            newMessagesDecision = null
+            pendingNewMessagesLanding = null
+            revealGlide = null
         }
         if (configuration.isLoading && emptyLoadingSince == null && configuration.entries.isEmpty()) emptyLoadingSince = transcriptNow()
         if (!configuration.isLoading) emptyLoadingSince = if (configuration.entries.isEmpty()) emptyLoadingSince else null
@@ -216,10 +256,20 @@ class TranscriptListController(
     private fun resetForSessionChange() {
         stopBottomSpring()
         growths.clear()
+        removedHeights.clear()
+        runResizedItems.clear()
+        revisedRows.clear()
+        imageGrowths.values.forEach { it.settle() }
+        imageGrowths.clear()
+        readingAnchor = null
+        pendingGrowthRide = null
+        promotionUntil = 0.0
+        followsSentRow = false
         disclosureSprings.clear()
         settledHeights.clear()
         enteringItems.clear()
         pendingEntrances.clear()
+        entranceStarts.clear()
         measuredHeights.clear()
         ride.reset()
         entryStableIDs = emptyMap()
@@ -236,7 +286,11 @@ class TranscriptListController(
         landedNewMessages = null
         passedNewMessages = null
         pendingNewMessagesLanding = null
+        revealGlide = null
+        trailingSpace = 0f
+        heldSpaceDrain = HeldSpaceDrain()
         emptyLoadingSince = null
+        emptyHandoff = null
         agentReveal = ai.opencode.feature.transcript.user.TranscriptAgentMessageReveal()
         disclosure = TranscriptDisclosureState().also { it.animateToggle = ::toggleDisclosure }
     }
@@ -265,6 +319,7 @@ class TranscriptListController(
         previousEntries = configuration.entries
         previousQueued = configuration.queuedInputs
         val old = snapshot
+        captureReadingAnchor()
         val next = TranscriptListSnapshot.build(
             configuration = configuration,
             entryStableIDs = entryStableIDs,
@@ -273,11 +328,43 @@ class TranscriptListController(
             sessionLinkIDsByStableID = sessionLinkIDsByStableID,
             drawsNewDivider = { TranscriptListSnapshot.drawsNewMessagesDivider(it, fittingNewMessages, newMessagesDecision) },
         )
+        if (previous != null && TranscriptItemID.Empty in old.items &&
+            (TranscriptItemID.Empty !in next.items || previous.isLoading && !configuration.isLoading)
+        ) {
+            val time = transcriptNow()
+            val hold = if (previous.isLoading) MarkLoadingTiming(emptyLoadingSince).handoffDelay(time) else 0.0
+            if (hold != null) {
+                emptyHandoff = EmptyHandoff(previous.isLoading, previous.showsEmptyState, emptyLoadingSince,
+                    time + hold, if (previous.isLoading) MarkLoadingTunables.fadeOut else EmptyStateTunables.exitFade)
+                pendingEffects += { startMotion() }
+            }
+        }
         // Rows new at the end grow in and fade in (iOS `enteringItems`, `RowEntrance`); more than
         // four is a refresh or a catch-up, which lands.
         if (previous != null && hasLaidOutContent) {
             val oldKeys = old.items.map { it.key }.toSet()
-            val lastKept = next.items.indexOfLast { it.key in oldKeys }
+            val nextKeys = next.items.map { it.key }.toSet()
+            val sent = previous.sendGeneration != configuration.sendGeneration
+            val promoted = next.items.any { item ->
+                item is TranscriptItemID.Message && old.rows[item.stableID] is MessageRow.Queued &&
+                    next.rows[item.stableID] is MessageRow.Entry
+            }
+            if (promoted) {
+                finishGrowths()
+                promotionUntil = transcriptNow() + ai.opencode.feature.transcript.user.PromotionMotion.duration * 1.5
+                animatesPlacement = !reduceMotion
+                val until = promotionUntil
+                pendingEffects += {
+                    scope.launch {
+                        kotlinx.coroutines.delay((ai.opencode.core.tuning.AnimationTimeScale.shared.wallSeconds(until - transcriptNow()) * 1000).toLong())
+                        if (promotionUntil == until) animatesPlacement = false
+                    }
+                }
+            }
+            // Working and waiting messages don't fence off arrivals in the reply above them.
+            val lastKept = next.items.indexOfLast {
+                it.key in oldKeys && it is TranscriptItemID.Message && old.rows[it.stableID] is MessageRow.Entry
+            }
             val tailInserted = next.items.drop(lastKept + 1).filter { it.key !in oldKeys }
             if (tailInserted.size > RowEntrance.MAXIMUM_ROWS) {
                 landArrivals()
@@ -290,13 +377,43 @@ class TranscriptListController(
                         is MessageRow.Queued -> ai.opencode.feature.transcript.user.TranscriptUserMessage.from(row.input)
                         null -> null
                     }?.takeIf { it.isFromAgent }?.let { agentReveal.arrive(it.id) }
-                    enteringItems += item.key
-                    pendingEntrances[item.key] = t to RowEntranceStyle.Arrival
+                    // The flight owns a local send's arrival. Its destination must be measured
+                    // at full height, not clipped to a pixel while the follower looks for it.
+                    if (!sent && !promoted && !reduceMotion) {
+                        enteringItems += item.key
+                        pendingEntrances[item.key] = t to RowEntranceStyle.Arrival
+                    }
                 }
                 if (tailInserted.isNotEmpty()) pendingEffects += { startMotion() }
             }
             if (behavior.mode == TranscriptScrollBehavior.Mode.Following && isUserGestureActive && tailInserted.isNotEmpty()) {
                 contentArrivedDuringDrag = true
+            }
+            for ((id, run) in next.runs) {
+                if (old.rows[id] == next.rows[id] && old.runs[id] != run) runResizedItems += "m:$id"
+            }
+            // A removed row lends its height to the new neighbour, or the survivor above it.
+            // Its content fades separately; the layout closes on the ordinary growth curve.
+            if (!sent && !promoted && allowsGrowth(0f)) {
+                for ((index, item) in old.items.withIndex()) {
+                    if (item.key in nextKeys || item == TranscriptItemID.Empty || item == TranscriptItemID.History) continue
+                    val visible = lastLayout?.visibleItemsInfo?.firstOrNull { it.key == item.key } ?: continue
+                    val above = old.items.take(index).lastOrNull { it.key in nextKeys }
+                    val position = above?.let(next.items::indexOf)?.plus(1) ?: 0
+                    val below = next.items.getOrNull(position)?.takeIf { it.key in enteringItems }
+                    val neighbour = below ?: above ?: continue
+                    removedHeights[neighbour.key] = (removedHeights[neighbour.key] ?: 0f) + heightOf(visible)
+                }
+            }
+            growths.keys.retainAll(nextKeys)
+            settledHeights.keys.retainAll(nextKeys)
+            enteringItems.retainAll(nextKeys)
+            pendingEntrances.keys.retainAll(nextKeys)
+            entranceStarts.keys.retainAll(nextKeys)
+            imageGrowths.keys.filter { it !in next.rows }.forEach { imageGrowths.remove(it)?.settle() }
+            // The opening settle is for initial self-sizing, not a live update or a send.
+            if (!configuration.isLoading && !previous.isLoading && (tailInserted.isNotEmpty() || next.rows != old.rows)) {
+                arrivalsGlideAfter = min(arrivalsGlideAfter, transcriptNow())
             }
         }
         snapshot = next
@@ -321,12 +438,45 @@ class TranscriptListController(
     val imagesSettling: Boolean
         get() = !hasLaidOutContent || transcriptNow() < arrivalsGlideAfter
 
+    fun imageGrowth(stableID: String): ai.opencode.feature.media.AgentImageRowGrowth =
+        imageGrowths.getOrPut(stableID) { ai.opencode.feature.media.AgentImageRowGrowth() }
+
+    fun imageContentRevised(stableID: String) {
+        revisedRows["m:$stableID"] = transcriptNow()
+        captureReadingAnchor()
+    }
+
+    /** Composer space may shrink under a held finger; the IME is already system-animated. */
+    fun obstructionChanged(bottom: Float, ime: Float) {
+        keyboardMoved = abs(ime - keyboardInset) > 0.5f
+        val old = bottomObstruction
+        if (old != null && hasLaidOutContent && isUserGestureActive && !keyboardMoved && bottom < old) {
+            trailingSpace += old - bottom
+            pendingEffects += { startMotion() }
+        }
+        bottomObstruction = bottom
+        keyboardInset = ime
+    }
+
+    fun visibilityChanged() {
+        if (isShowingToReader) lastLayout?.let(::onLayout) else finishGrowths()
+    }
+
+    private fun captureReadingAnchor() {
+        if (readingAnchor != null || (behavior.mode != TranscriptScrollBehavior.Mode.Browsing && !isUserGestureActive)) return
+        val visible = lastLayout?.visibleItemsInfo ?: return
+        val entries = visible.filter { (it.key as? String)?.removePrefix("m:")?.let(snapshot.rows::get) is MessageRow.Entry }
+        // Prefer the row below one only peeking out from under the header (44 pt).
+        val row = entries.firstOrNull { it.offset + it.size > 44 * density } ?: entries.firstOrNull() ?: return
+        readingAnchor = (row.key as String) to row.offset
+    }
+
     private fun heightOf(item: LazyListItemInfo): Float = item.size / density
 
     /** iOS `viewport` from LazyColumn's layout: measured heights where known, the average elsewhere. */
     fun viewport(info: LazyListLayoutInfo = state.layoutInfo): TranscriptScrollBehavior.Viewport {
         val visible = info.visibleItemsInfo
-        val visibleHeight = (info.viewportEndOffset - info.afterContentPadding) / density
+        val visibleHeight = (info.viewportEndOffset - info.afterContentPadding) / density + trailingSpace
         val keys = snapshot.items
         val average = if (measuredHeights.isEmpty()) 80f else measuredHeights.values.average().toFloat()
         val canRequest = configuration.hasEarlierItems && !configuration.isLoadingEarlier && configuration.earlierHistoryError == null
@@ -350,7 +500,7 @@ class TranscriptListController(
             offsetY = offsetY,
             contentHeight = max(contentHeight, 0f),
             visibleHeight = visibleHeight,
-            trailingSpace = 0f,
+            trailingSpace = trailingSpace,
             canRequestEarlierHistory = canRequest,
             isUserScrolling = isUserGestureActive,
         )
@@ -370,7 +520,7 @@ class TranscriptListController(
             measuredHeights[key] = heightOf(item)
         }
         if (keys.isEmpty() || info.visibleItemsInfo.isEmpty()) return
-        val visibleHeight = (info.viewportEndOffset - info.afterContentPadding) / density
+        val visibleHeight = (info.viewportEndOffset - info.afterContentPadding) / density + trailingSpace
         val width = info.viewportSize.width / density
         if (!hasLaidOutContent) {
             // A session opens on its bottom; the self-sizing that follows its first frame lands.
@@ -390,6 +540,27 @@ class TranscriptListController(
         lastVisibleHeight = visibleHeight
         lastContentWidth = width
         val viewport = viewport(info)
+        readingAnchor?.let { (key, offset) ->
+            readingAnchor = null
+            val row = info.visibleItemsInfo.firstOrNull { it.key == key }
+            if (row != null && abs(row.offset - offset) > 1) {
+                state.dispatchRawDelta((row.offset - offset).toFloat())
+                return
+            }
+        }
+        pendingGrowthRide?.let { (wasAtEnd, step) ->
+            pendingGrowthRide = null
+            if (behavior.mode == TranscriptScrollBehavior.Mode.Following && !isUserGestureActive && bottomSpring == null) {
+                val end = viewport.offsetY + distanceFromBottom(viewport)
+                val before = if (wasAtEnd) viewport.offsetY else end
+                val next = ride.offset(viewport.offsetY, before, end, step)
+                if (next > viewport.offsetY) state.dispatchRawDelta((next - viewport.offsetY) * density)
+                if (growths.isEmpty()) {
+                    if (distanceFromBottom() > 0.5f) springToBottom(SpringKind.Arrival)
+                    ride.reset()
+                }
+            }
+        }
         if (isUserGestureActive) {
             handleBehavior(TranscriptScrollBehavior.Event.UserScrolled(viewport))
             return
@@ -399,11 +570,18 @@ class TranscriptListController(
             beginCutGlide(viewport)
             return
         }
-        if (jumpGlide != null) return
+        if (jumpGlide != null || revealGlide != null) return
         pendingNewMessagesLanding?.let { generation ->
             if (landOnNewMessages(generation, info)) return
         }
         checkNewMessagesPassed(info)
+        // A send is an explicit new destination, even if an earlier streaming row is
+        // still growing. That growth's ride only owns an already-pinned end; it cannot
+        // bridge the height of a new steering row below Working.
+        if (followsSentRow && behavior.mode == TranscriptScrollBehavior.Mode.Following) {
+            followsSentRow = false
+            followEnd(viewport, viewportChanged = geometryChanged)
+        }
         // Rows growing at the end are ridden by the frame loop.
         if (growths.isNotEmpty() || bottomSpring != null) return
         if (behavior.mode == TranscriptScrollBehavior.Mode.Following && distanceFromBottom(viewport) > 0.5f) {
@@ -422,7 +600,9 @@ class TranscriptListController(
         val glides = !reduceMotion && hasLaidOutContent && t >= arrivalsGlideAfter && !isUserGestureActive && isShowingToReader
         // Not yet measured rows at the end come into view as the glide scrolls (LazyColumn clamps at the end).
         if (glides && (lastVisible || distance <= viewport.visibleHeight) && distance <= viewport.visibleHeight * BottomSpring.ARRIVAL_REACH) {
-            springToBottom(if (viewportChanged) SpringKind.Keyboard else SpringKind.Arrival)
+            springToBottom(if (viewportChanged) {
+                if (keyboardMoved) SpringKind.Keyboard else SpringKind.Viewport
+            } else SpringKind.Arrival)
         } else {
             landOnLastItem()
         }
@@ -459,6 +639,8 @@ class TranscriptListController(
 
     private fun dragBegan() {
         stopBottomSpring()
+        revealGlide = null
+        readingAnchor = null
         finishGrowths()
         isUserGestureActive = true
         contentArrivedDuringDrag = false
@@ -469,6 +651,21 @@ class TranscriptListController(
         isUserGestureActive = false
         handleBehavior(TranscriptScrollBehavior.Event.UserSettled(viewport(), contentArrivedDuringDrag))
         lastLayout?.let { checkNewMessagesPassed(it) }
+    }
+
+    /** TalkBack/focus scrolls enter LazyListState's scroll mutation without nested drag events. */
+    fun scrollInProgressChanged(scrolling: Boolean) {
+        if (scrolling && !isUserGestureActive) dragBegan()
+        if (!scrolling && isUserGestureActive) settleUserScroll()
+    }
+
+    fun scrollToTop(): Boolean {
+        stopBottomSpring()
+        revealGlide = null
+        finishGrowths()
+        handleBehavior(TranscriptScrollBehavior.Event.UserLeftBottom)
+        scope.launch { state.animateScrollToItem(0) }
+        return true
     }
 
     // MARK: Behavior
@@ -486,8 +683,11 @@ class TranscriptListController(
             when (command) {
                 is TranscriptScrollBehavior.Command.AdjustOffset -> if (command.by != 0f) state.dispatchRawDelta(command.by * density)
                 is TranscriptScrollBehavior.Command.ScrollToBottom -> scrollToBottom(command.animated && !reduceMotion)
-                // Space held under the finger: LazyColumn never clamps a held reader, so nothing to hold.
-                is TranscriptScrollBehavior.Command.SetTrailingSpace -> Unit
+                is TranscriptScrollBehavior.Command.SetTrailingSpace -> {
+                    if (command.space > trailingSpace) heldSpaceDrain = HeldSpaceDrain()
+                    trailingSpace = command.space
+                    if (trailingSpace > 0) startMotion()
+                }
                 TranscriptScrollBehavior.Command.RequestEarlierHistory -> send(TranscriptAction.ShowEarlierTapped)
                 is TranscriptScrollBehavior.Command.ShowJumpButton -> setShowsJumpButton(command.shows)
             }
@@ -507,6 +707,9 @@ class TranscriptListController(
 
     /** Jump to latest, tapped or by sending while browsing (iOS `jumpToLatest`). */
     fun jumpToLatest(event: TranscriptScrollBehavior.Event = TranscriptScrollBehavior.Event.JumpToLatestTapped, fromBrowsing: Boolean = false) {
+        revealGlide = null
+        isUserGestureActive = false
+        readingAnchor = null
         val previousMode = if (fromBrowsing) TranscriptScrollBehavior.Mode.Browsing else behavior.mode
         if (fromBrowsing && behavior.mode != TranscriptScrollBehavior.Mode.Browsing) behavior.handle(TranscriptScrollBehavior.Event.UserLeftBottom)
         execute(behavior.handle(event))
@@ -577,48 +780,81 @@ class TranscriptListController(
     private fun startMotion() {
         if (motionJob?.isActive == true) return
         motionJob = scope.launch {
-            motionFrameLoop { tick ->
+            motionFrameLoop(frameDurationSeconds = frameDuration) { tick ->
                 now = transcriptNow()
-                if (stepMotion(tick.dt)) MotionFrameAction.Continue else MotionFrameAction.Stop
+                if (stepMotion(tick.dt, min(tick.dt, tick.rawFrameDuration * tick.scale))) MotionFrameAction.Continue else MotionFrameAction.Stop
             }
         }
     }
 
     /** One frame of every transcript motion. Returns whether anything is still moving. */
-    private fun stepMotion(dt: Double): Boolean {
+    private fun stepMotion(dt: Double, followDt: Double): Boolean {
         var moved = false
+        if (trailingSpace > 0) {
+            val held = trailingSpace
+            trailingSpace = if (reduceMotion) 0f else heldSpaceDrain.step(held, followDt, 1f / density)
+            val drained = held - trailingSpace
+            handleBehavior(TranscriptScrollBehavior.Event.ViewportRode(-drained))
+            state.dispatchRawDelta(-drained * density)
+            moved = trailingSpace > 0
+        }
+        revealGlide?.let { glide ->
+            val remaining = newMessagesDistance()
+            val share = remaining?.let { glide.step(dt, it, 1f / density, now > revealDeadline) }
+            if (remaining == null || share == null) {
+                if (remaining != null) state.dispatchRawDelta(remaining * density)
+                revealGlide = null
+                handleBehavior(TranscriptScrollBehavior.Event.RevealEnded(distanceFromBottom() <= 1f))
+            } else {
+                state.dispatchRawDelta(remaining * share * density)
+                moved = true
+            }
+        }
+        emptyHandoff?.let {
+            if (now >= it.start + it.duration) emptyHandoff = null
+            frameTick++
+            moved = moved || emptyHandoff != null
+        }
         val following = behavior.mode == TranscriptScrollBehavior.Mode.Following && !isUserGestureActive
         // Row growth, ridden at the end while following (iOS `stepGrowths` + `GrowthRide`).
         if (growths.isNotEmpty() || disclosureSprings.isNotEmpty()) {
-            var grown = 0f
+            val atEnd = distanceFromBottom() <= 1f || ride.deficit > 0.5f
             val finished = mutableListOf<String>()
             for ((key, growth) in growths) {
-                val before = growth.height
+                if (lastLayout?.visibleItemsInfo?.none { it.key == key } == true) {
+                    finished += key
+                    imageGrowths[key.removePrefix("m:")]?.settle()
+                    continue
+                }
                 growth.advance(dt, now)
-                grown += growth.height - before
                 if (growth.isFinished) finished += key
             }
             for (key in finished) {
                 growths.remove(key)?.let { settledHeights[key] = it.target }
+                imageGrowths[key.removePrefix("m:")]?.growthFinished()
             }
+            for ((key, growth) in growths) imageGrowths[key.removePrefix("m:")]?.update(growth.target - growth.height)
             val doneDisclosures = disclosureSprings.filterValues { it.step(dt) }.keys
             for (key in doneDisclosures) disclosureSprings.remove(key)?.let { settledHeights[key] = it.target }
             if (following && bottomSpring?.kind != SpringKind.Jump) {
-                val viewport = viewport()
-                val distance = distanceFromBottom(viewport)
-                val endBefore = viewport.offsetY + distance
                 val step = (BottomSpring.ARRIVAL_SPEED * dt).toFloat()
-                val next = ride.offset(viewport.offsetY, endBefore, endBefore + max(0f, grown), step)
-                val delta = next - viewport.offsetY
-                if (delta > 0.01f) state.dispatchRawDelta(delta * density)
+                pendingGrowthRide = atEnd to step
             }
             frameTick++
             moved = true
-            if (growths.isEmpty()) ride.reset()
+            if (growths.isEmpty() && following && bottomSpring == null && distanceFromBottom() > 0.5f) {
+                // The last subpixel height need not trigger another LazyColumn layout.
+                // Hand the unconsumed ride directly to the follower instead of waiting for one.
+                val carriesVelocity = ride.deficit > 0.5f
+                springToBottom(SpringKind.Arrival)
+                if (carriesVelocity) bottomSpring?.velocity = BottomSpring.ARRIVAL_SPEED
+                ride.reset()
+            }
         }
         // Entrances fade on the same clock.
         if (pendingEntrances.isNotEmpty()) {
-            pendingEntrances.entries.removeAll { now - it.value.first > RowEntrance.WINDOW + RowEntrance.SETTLING_DURATION }
+            pendingEntrances.entries.removeAll { now - (entranceStarts[it.key] ?: it.value.first) > RowEntrance.WINDOW + RowEntrance.SETTLING_DURATION }
+            entranceStarts.keys.retainAll(pendingEntrances.keys)
             if (pendingEntrances.isNotEmpty()) {
                 frameTick++
                 moved = true
@@ -629,7 +865,7 @@ class TranscriptListController(
             if (behavior.mode != TranscriptScrollBehavior.Mode.Following || isUserGestureActive) {
                 stopBottomSpring()
             } else {
-                stepBottomSpring(spring, dt)
+                stepBottomSpring(spring, if (spring.kind == SpringKind.Jump) dt else followDt)
                 moved = moved || bottomSpring != null
             }
         }
@@ -670,6 +906,8 @@ class TranscriptListController(
     private fun finishGrowths() {
         for ((key, growth) in growths) settledHeights[key] = growth.target
         growths.clear()
+        imageGrowths.values.forEach { it.settle() }
+        pendingGrowthRide = null
         for ((key, spring) in disclosureSprings) settledHeights[key] = spring.target
         disclosureSprings.clear()
         enteringItems.clear()
@@ -688,14 +926,34 @@ class TranscriptListController(
         // Reading the tick subscribes this row's layout to motion frames: a growth that starts in
         // this pass must relayout the row on the next frame. Children's measurements stay cached.
         @Suppress("UNUSED_VARIABLE") val tick = frameTick
+        val imageGrowth = imageGrowths[key.removePrefix("m:")]
+        val revised = revisedRows[key]?.let { transcriptNow() - it < 1 } == true
+        val removed = removedHeights.remove(key) ?: 0f
+        val runResized = runResizedItems.remove(key)
+        val row = lastLayout?.visibleItemsInfo?.firstOrNull { it.key == key }
+        val aboveAnchor = row != null && row.offset + row.size <= 44 * density
+        if (runResized && removed <= 0.5f || revised && aboveAnchor) {
+            growths.remove(key)
+            revisedRows.remove(key)
+            settledHeights[key] = measured
+            imageGrowth?.settle()
+            return measured
+        }
         val growth = growths[key]
         if (growth != null) {
             if (!growth.continues(width)) {
                 growths.remove(key)
                 settledHeights[key] = measured
+                imageGrowth?.settle()
                 return measured
             }
-            if (abs(growth.target - measured) > 0.25f) growth.retarget(measured)
+            if (removed > 0.5f) {
+                growth.absorb(removed, measured)
+                imageGrowth?.beginGrowth()
+            } else if (abs(growth.target - measured) > 0.25f) {
+                growth.retarget(measured)
+                imageGrowth?.beginGrowth()
+            } else imageGrowth?.measuredUnchanged()
             return growth.height
         }
         val disclosureSpring = disclosureSprings[key]
@@ -705,13 +963,14 @@ class TranscriptListController(
         }
         val settled = settledHeights[key]
         val entering = enteringItems.remove(key)
-        if (settled == null && !entering) {
+        if (settled == null && !entering && removed <= 0.5f) {
             settledHeights[key] = measured
             return measured
         }
-        val from = settled ?: (1f / density)
+        val from = (if (entering) 1f / density else settled ?: measured) + removed
         if (abs(from - measured) <= 0.5f) {
             settledHeights[key] = measured
+            imageGrowth?.measuredUnchanged()
             return measured
         }
         if (disclosureEntryID == key && now - disclosureToggledAt < 1.0) {
@@ -720,11 +979,22 @@ class TranscriptListController(
             startMotion()
             return from
         }
-        if (!allowsGrowth(measured - from)) {
+        val changedRowMayGrow = revised && !reduceMotion && hasLaidOutContent && isShowingToReader &&
+            !isUserGestureActive && jumpGlide == null && transcriptNow() >= promotionUntil &&
+            transcriptNow() >= catchUpLandsUntil && abs(measured - from) <= lastVisibleHeight
+        if (!allowsGrowth(measured - from) && !changedRowMayGrow) {
             settledHeights[key] = measured
+            imageGrowth?.settle()
             return measured
         }
-        growths[key] = RowGrowth(from, measured, now, width).also { it.changedRow = settled != null }
+        growths[key] = RowGrowth(from, measured, transcriptNow(), width,
+            springDuration = if (revised) {
+                val entry = (snapshot.rows[key.removePrefix("m:")] as? MessageRow.Entry)?.entry
+                if (entry is TranscriptEntry.ReplyEnd) ai.opencode.feature.transcript.links.LinkPreviewMotion.grow else ai.opencode.feature.media.AgentImageTunables.grow
+            } else null,
+        ).also { it.changedRow = revised }
+        revisedRows.remove(key)
+        imageGrowth?.beginGrowth()
         startMotion()
         return from
     }
@@ -735,6 +1005,7 @@ class TranscriptListController(
         return !reduceMotion && hasLaidOutContent && isShowingToReader &&
             behavior.mode == TranscriptScrollBehavior.Mode.Following && !isUserGestureActive &&
             t >= arrivalsGlideAfter && t >= catchUpLandsUntil && jumpGlide == null &&
+            t >= promotionUntil &&
             abs(delta) <= visible
     }
 
@@ -754,16 +1025,23 @@ class TranscriptListController(
 
     /** Entrance progress for [key]: null once settled (iOS `RowEntrance.add`). */
     fun entrance(key: String): Pair<Float, RowEntranceStyle>? {
-        val (start, style) = pendingEntrances[key] ?: return null
+        val (queued, style) = pendingEntrances[key] ?: return null
         @Suppress("UNUSED_VARIABLE") val tick = frameTick
+        val time = transcriptNow()
+        if (entranceStarts[key] == null && time - queued > RowEntrance.WINDOW) {
+            pendingEntrances.remove(key)
+            return null
+        }
+        val start = entranceStarts.getOrPut(key) { time }
         val duration = when (style) {
             RowEntranceStyle.Arrival -> RowEntrance.DURATION
             RowEntranceStyle.Settling -> RowEntrance.SETTLING_DURATION
             RowEntranceStyle.WithFlight -> RowEntrance.WITH_FLIGHT_DURATION
         }
-        val progress = ((transcriptNow() - start) / duration).toFloat()
+        val progress = ((time - start) / duration).toFloat()
         if (progress >= 1f) {
             pendingEntrances.remove(key)
+            entranceStarts.remove(key)
             return null
         }
         return progress.coerceIn(0f, 1f) to style
@@ -797,14 +1075,24 @@ class TranscriptListController(
             pendingNewMessagesLanding = null
             return false
         }
-        if (!isShowingToReader || behavior.mode != TranscriptScrollBehavior.Mode.Following || isUserGestureActive) return false
+        if (!isShowingToReader || isUserGestureActive) return false
         pendingNewMessagesLanding = null
         landedNewMessages = generation
-        if (!mark.showsDivider) return false
+        if (!mark.showsDivider) {
+            fittingNewMessages = generation
+            send(TranscriptAction.NewMessagesFit(generation))
+            return false
+        }
+        if (behavior.mode == TranscriptScrollBehavior.Mode.Browsing) {
+            newMessagesDecision = mark.entryID to true
+            return false
+        }
         val dividerIndex = snapshot.items.indexOf(TranscriptItemID.NewDivider)
         if (dividerIndex < 0) return false
         val divider = info.visibleItemsInfo.firstOrNull { it.index == dividerIndex }
-        val fits = divider != null && divider.offset >= 0 && info.visibleItemsInfo.lastOrNull()?.index == snapshot.items.lastIndex
+        val last = info.visibleItemsInfo.lastOrNull()
+        val fits = divider != null && last?.index == snapshot.items.lastIndex &&
+            (last.offset + last.size - divider.offset) / density <= viewport(info).visibleHeight
         if (fits) {
             // What's new fits below it: no divider, as in a chat app.
             fittingNewMessages = generation
@@ -814,16 +1102,27 @@ class TranscriptListController(
             return false
         }
         newMessagesDecision = mark.entryID to true
-        execute(behavior.handle(TranscriptScrollBehavior.Event.RevealBegan))
-        state.requestScrollToItem(dividerIndex, 0)
-        handleBehavior(TranscriptScrollBehavior.Event.RevealEnded(atEnd = false))
+        stopBottomSpring()
+        finishGrowths()
+        handleBehavior(TranscriptScrollBehavior.Event.RevealBegan)
+        val distance = newMessagesDistance()
+        if (revealsNewMessages && distance != null && distance > 1f) {
+            val duration = NewMessagesReveal.duration(distance, viewport(info).visibleHeight)
+            revealGlide = JumpGlide(distance, JumpGlide.Curve.FromRest, duration)
+            revealDeadline = transcriptNow() + duration + JumpGlide.MAXIMUM_EXTENSION + 0.5
+            startMotion()
+        } else {
+            state.requestScrollToItem(dividerIndex, 0)
+            handleBehavior(TranscriptScrollBehavior.Event.RevealEnded(atEnd = false))
+        }
+        revealsNewMessages = false
         AppLog.app.debug("transcript new divider landed generation=$generation")
         return true
     }
 
     private fun checkNewMessagesPassed(info: LazyListLayoutInfo) {
         val mark = configuration.newMessages ?: return
-        if (passedNewMessages == mark.generation || !isShowingToReader || behavior.mode != TranscriptScrollBehavior.Mode.Following) return
+        if (passedNewMessages == mark.generation || revealGlide != null || pendingNewMessagesLanding != null || !isShowingToReader || behavior.mode != TranscriptScrollBehavior.Mode.Following) return
         val dividerIndex = snapshot.items.indexOf(TranscriptItemID.NewDivider)
         if (dividerIndex < 0) return
         val divider = info.visibleItemsInfo.firstOrNull { it.index == dividerIndex }
@@ -832,6 +1131,24 @@ class TranscriptListController(
         if (!passed) return
         passedNewMessages = mark.generation
         send(TranscriptAction.NewMessagesPassed(mark.generation))
+    }
+
+    /** Exact once the divider enters view; measured row heights carry the glide until then. */
+    private fun newMessagesDistance(): Float? {
+        val index = snapshot.items.indexOf(TranscriptItemID.NewDivider)
+        if (index < 0) return null
+        val info = state.layoutInfo
+        val visible = info.visibleItemsInfo.firstOrNull { it.key == TranscriptItemID.NewDivider.key }
+        if (visible != null) return min(visible.offset / density, distanceFromBottom())
+        val first = info.visibleItemsInfo.firstOrNull() ?: return null
+        val average = if (measuredHeights.isEmpty()) 80f else measuredHeights.values.average().toFloat()
+        var distance = first.offset / density
+        if (index >= first.index) {
+            for (i in first.index until index) distance += measuredHeights[snapshot.items[i].key] ?: average
+        } else {
+            for (i in index until first.index) distance -= measuredHeights[snapshot.items[i].key] ?: average
+        }
+        return min(distance, distanceFromBottom())
     }
 
     // MARK: Session links

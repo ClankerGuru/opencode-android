@@ -150,7 +150,7 @@ class BottomSpring(var kind: SpringKind, current: Float, var target: Float, now:
             v = 0.0
         }
         // Move at least a pixel, and land once within one.
-        val minStep = pixel
+        val minStep = pixel * min(1.0, ai.opencode.core.tuning.AnimationTimeScale.shared.scale)
         if (abs(x - x0) < minStep && dt > 0) {
             if (abs(x0) <= pixel) {
                 x = 0.0

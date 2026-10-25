@@ -23,6 +23,7 @@ import ai.opencode.feature.transcript.TranscriptAction
 import ai.opencode.feature.transcript.TranscriptConfiguration
 import ai.opencode.feature.transcript.TranscriptLayoutTuning
 import ai.opencode.feature.transcript.TranscriptRowContext
+import ai.opencode.feature.transcript.links.LinkPreviewArrivals
 import ai.opencode.feature.transcript.markdown.ui.LocalLinkPreviewRow
 import ai.opencode.feature.transcript.markdown.ui.LocalTranscriptTextReveal
 import ai.opencode.feature.transcript.markdown.ui.TranscriptTextReveal
@@ -31,6 +32,10 @@ import ai.opencode.feature.transcript.user.TranscriptMessageRow
 import ai.opencode.feature.transcript.user.UserMessageRun
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -64,8 +69,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
@@ -134,15 +145,24 @@ private fun TranscriptListContent(
     controller.send = { currentSend(it) }
     controller.setShowsJumpButton = { currentShowsJump(it) }
     controller.density = density.density
+    controller.frameDuration = ai.opencode.core.motion.rememberFrameDurationSeconds()
     controller.reduceMotion = reduceMotion
     controller.isShowingToReader = resumed.isAtLeast(Lifecycle.State.RESUMED)
     controller.sendLanding = ai.opencode.feature.transcript.user.LocalSendLanding.current
     // Applied in composition so this frame draws the new rows with their stable keys.
     controller.update(configuration)
+    controller.obstructionChanged(contentPadding.calculateBottomPadding().value, WindowInsets.ime.getBottom(density) / density.density)
     SideEffect { controller.flushEffects() }
+
+    LaunchedEffect(resumed) { controller.visibilityChanged() }
+    // iOS `SessionView+Header` registers the transcript's knobs as the session draws.
+    SideEffect { ai.opencode.feature.transcript.TranscriptTunables.register() }
 
     LaunchedEffect(controller) {
         snapshotFlow { listState.layoutInfo }.collect { controller.onLayout(it) }
+    }
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.isScrollInProgress }.collect(controller::scrollInProgressChanged)
     }
     // iOS `reportHeaderGeometry`: how far content sits above its resting top (dp), for the
     // session header's backdrop reveal. Past the first row it's simply "far".
@@ -174,6 +194,13 @@ private fun TranscriptListContent(
         )
     }
     val gutter = layoutTuning.contentGutter.dp
+    val direction = LocalLayoutDirection.current
+    val listPadding = PaddingValues(
+        start = contentPadding.calculateStartPadding(direction),
+        top = contentPadding.calculateTopPadding(),
+        end = contentPadding.calculateEndPadding(direction),
+        bottom = contentPadding.calculateBottomPadding() + controller.trailingSpace.dp,
+    )
 
     // One per list, so a row LazyColumn recreates never fades its text again (iOS controller-owned).
     val textReveal = remember(controller.disclosure) { TranscriptTextReveal() }
@@ -183,12 +210,18 @@ private fun TranscriptListContent(
     val linkPreviews = remember { LinkPreviewStore() }
     val linkRevisions = remember { mutableStateMapOf<String, Int>() }
     DisposableEffect(linkPreviews) {
-        linkPreviews.onArrival = { rows -> for (row in rows) linkRevisions[row] = linkPreviews.revision(row) }
+        linkPreviews.onArrival = { rows ->
+            for (row in rows) {
+                controller.imageContentRevised(row)
+                linkRevisions[row] = linkPreviews.revision(row)
+            }
+        }
         onDispose {
             linkPreviews.onArrival = null
             linkPreviews.close()
         }
     }
+    remember(linkPreviews) { LinkPreviewArrivals(linkPreviews) }.update(snapshot, configuration.isRunning, controller.hasLaidOutContent)
     // The list is its image previews' viewport (iOS `TranscriptListViewController:
     // AgentImageViewport`): previews read and show only between the header and the composer.
     val imageViewport = remember(controller) { TranscriptImageViewport(controller) }
@@ -214,12 +247,20 @@ private fun TranscriptListContent(
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize().testTag("transcript-list")
+                    .semantics { customActions = listOf(CustomAccessibilityAction("Scroll to top", controller::scrollToTop)) }
+                    .graphicsLayer { alpha = controller.handoffProgress() }
+                    .then(if (controller.emptyHandoff != null) Modifier.clearAndSetSemantics { } else Modifier)
                     .onGloballyPositioned { imageViewport.bounds = it.boundsInWindow(); imageVisibility.setNeedsUpdate() },
-                contentPadding = contentPadding,
+                contentPadding = listPadding,
             ) {
                 items(snapshot.items, key = { it.key }, contentType = { it.contentType }) { item ->
                     // Centred at the readable width on a wider window (iOS `readableColumn`).
                     val rowModifier = Modifier
+                        .animateItem(
+                            fadeInSpec = null,
+                            placementSpec = if (controller.animatesPlacement) ai.opencode.feature.transcript.user.PromotionMotion.spring.spec() else null,
+                            fadeOutSpec = if (item == TranscriptItemID.Empty) null else androidx.compose.animation.core.tween((RowEntrance.EXIT_DURATION * 1000).toInt()),
+                        )
                         .fillMaxWidth()
                         .wrapContentWidth()
                         .widthIn(max = TranscriptMetrics.readableColumnWidth)
@@ -236,7 +277,7 @@ private fun TranscriptListContent(
                             isLoading = configuration.isLoading,
                             showsEmptyState = configuration.showsEmptyState,
                             loadingSince = controller.emptyLoadingSince,
-                            pulsePaused = false,
+                            pulsePaused = !controller.isShowingToReader,
                             modifier = rowModifier.fillParentMaxHeight(),
                         )
                         TranscriptItemID.NewDivider -> NewMessagesDivider(rowModifier)
@@ -255,40 +296,47 @@ private fun TranscriptListContent(
                             GrowingRow(controller, item.key, rowModifier) {
                                 CompositionLocalProvider(
                                     LocalAgentImageRow provides item.stableID,
+                                    ai.opencode.feature.media.LocalAgentImageRowGrowth provides controller.imageGrowth(item.stableID),
                                     LocalLinkPreviewRevision provides (linkRevisions[item.stableID] ?: 0),
                                     LocalLinkPreviewRow provides item.stableID,
                                 ) {
-                                    when (row) {
-                                        is MessageRow.Entry -> TranscriptMessageRow(
+                                    if (row is MessageRow.Queued && row.input.isCompaction) {
+                                        TranscriptQueuedInputView(row.input, Modifier.padding(vertical = TranscriptMetrics.sectionHalf))
+                                    } else {
+                                        // Keep one call site: a pending row's remembered presentation
+                                        // changes in place while animateItem moves that same row.
+                                        val entry = row as? MessageRow.Entry
+                                        val queued = row as? MessageRow.Queued
+                                        TranscriptMessageRow(
                                             rowID = item.stableID,
-                                            entry = row.entry,
-                                            queued = null,
-                                            failure = row.failure,
-                                            deliveryNote = row.note,
+                                            entry = entry?.entry,
+                                            queued = queued?.input,
+                                            failure = entry?.failure,
+                                            deliveryNote = entry?.note ?: queued?.note,
                                             props = props,
                                             run = run,
-                                            revealArrival = row.entry.userMessageID?.let(controller.agentReveal::arrival),
+                                            revealArrival = (entry?.entry?.userMessageID ?: queued?.input?.id)?.let(controller.agentReveal::arrival),
                                         )
-                                        is MessageRow.Queued -> if (row.input.isCompaction) {
-                                            TranscriptQueuedInputView(row.input, Modifier.padding(vertical = TranscriptMetrics.sectionHalf))
-                                        } else {
-                                            TranscriptMessageRow(
-                                                rowID = item.stableID,
-                                                entry = null,
-                                                queued = row.input,
-                                                failure = null,
-                                                deliveryNote = row.note,
-                                                props = props,
-                                                run = run,
-                                                revealArrival = controller.agentReveal.arrival(row.input.id),
-                                            )
-                                        }
                                     }
                                 }
                             }
                         }
                     }
                 }
+            }
+            controller.emptyHandoff?.let { leaving ->
+                TranscriptEmptyView(
+                    isLoading = leaving.loading,
+                    showsEmptyState = leaving.showsEmpty,
+                    loadingSince = leaving.since,
+                    pulsePaused = !controller.isShowingToReader,
+                    modifier = Modifier.fillMaxSize().padding(contentPadding)
+                        .graphicsLayer { alpha = 1f - controller.handoffProgress() }
+                        .clearAndSetSemantics { }
+                        .pointerInput(Unit) {
+                            awaitPointerEventScope { while (true) awaitPointerEvent().changes.forEach { it.consume() } }
+                        },
+                )
             }
         }
     }
@@ -367,6 +415,7 @@ private class TranscriptImageViewport(private val controller: TranscriptListCont
 
     override val imageViewportIsVisible: Boolean get() = controller.isShowingToReader
 
-    /** iOS marks the row as revised so its growth eases; this list's rows ease on their own (`GrowingRow`). */
-    override fun imageContentRevised(marker: AgentImageMarkerView) {}
+    override fun imageContentRevised(marker: AgentImageMarkerView) {
+        (marker.rowKey as? String)?.let(controller::imageContentRevised)
+    }
 }
