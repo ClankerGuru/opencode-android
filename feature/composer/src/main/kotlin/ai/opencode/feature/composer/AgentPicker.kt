@@ -67,7 +67,10 @@ object AgentPickerSharedKeys {
 val OpenCodeAutocompleteAgent.shortDescription: String?
     get() {
         val text = description?.trim()?.takeIf { it.isNotEmpty() } ?: return null
-        val sentence = text.split('.', limit = 2).firstOrNull()?.takeIf { it.isNotEmpty() } ?: text
+        // Swift's `split(separator: ".", maxSplits: 1)` omits empty pieces, so leading dots
+        // don't count: the first non-empty run before a dot, or the whole text when none.
+        val rest = text.trimStart('.')
+        val sentence = if (rest.isEmpty()) text else rest.substringBefore('.')
         return sentence.trim()
     }
 

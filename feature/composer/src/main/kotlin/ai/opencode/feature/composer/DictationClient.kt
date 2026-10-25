@@ -24,6 +24,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -39,6 +40,8 @@ import java.util.concurrent.LinkedBlockingQueue
 import kotlin.coroutines.resume
 import kotlin.math.log10
 import kotlin.math.sqrt
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -457,7 +460,12 @@ private class SpeechSetup(private val context: Context) {
         // Warming up never downloads: `triggerModelDownload` shows a system
         // dialog, which belongs to the press that needs the language.
         if (needsInstall && !install) throw DictationModelNotInstalled()
-        if (needsInstall && !install(language)) {
+        val installed = !needsInstall || when (install(language)) {
+            true -> true
+            null -> awaitInstalled(language)
+            false -> false
+        }
+        if (!installed) {
             // The on-device language can't be installed now: the default
             // recognizer, offline where it can, still dictates.
             if (!available) throw DictationError.LocaleUnsupported()
@@ -491,8 +499,8 @@ private class SpeechSetup(private val context: Context) {
         }
     }
 
-    /** Downloads the on-device model for [language]; false when it won't be there now. */
-    private suspend fun install(language: String): Boolean = withContext(Dispatchers.Main) {
+    /** Downloads the on-device model for [language]: true installed, null scheduled, false when it won't be there. */
+    private suspend fun install(language: String): Boolean? = withContext(Dispatchers.Main) {
         val recognizer = SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
         try {
             suspendCancellableCoroutine { continuation ->
@@ -506,7 +514,9 @@ private class SpeechSetup(private val context: Context) {
                         }
 
                         override fun onScheduled() {
-                            if (continuation.isActive) continuation.resume(false)
+                            // Queued with the system's downloader (it asks the user first):
+                            // [awaitInstalled] waits for it to land.
+                            if (continuation.isActive) continuation.resume(null)
                         }
 
                         override fun onError(error: Int) {
@@ -521,6 +531,30 @@ private class SpeechSetup(private val context: Context) {
         }
     }
 
+    /**
+     * A scheduled download of [language]'s model (the system asked the user, then downloads
+     * it): waits while dictation shows Preparing for it to be installed, as iOS's
+     * `downloadAndInstall()` does. False when it doesn't land within [INSTALL_WAIT], or is
+     * no longer pending (declined or failed) after [INSTALL_GRACE].
+     */
+    private suspend fun awaitInstalled(language: String): Boolean {
+        val started = SystemClock.uptimeMillis()
+        while (true) {
+            val elapsed = (SystemClock.uptimeMillis() - started).milliseconds
+            if (elapsed > INSTALL_WAIT) break
+            delay(INSTALL_POLL)
+            val support = support(onDevice = true) ?: break
+            if (support.installedOnDeviceLanguages.any { it.equals(language, ignoreCase = true) }) {
+                AppLog.voice.info("dictation_language_installed waited=${elapsed.inWholeMilliseconds}ms")
+                return true
+            }
+            val pending = support.pendingOnDeviceLanguages.any { it.equals(language, ignoreCase = true) }
+            if (!pending && elapsed > INSTALL_GRACE) break
+        }
+        AppLog.voice.notice("dictation_language_not_installed")
+        return false
+    }
+
     private fun bestLocale(supported: List<String>?): String {
         val current = Locale.getDefault()
         val tag = current.toLanguageTag()
@@ -532,6 +566,9 @@ private class SpeechSetup(private val context: Context) {
 
     private companion object {
         val mainExecutor = Executor(Handler(Looper.getMainLooper())::post)
+        val INSTALL_POLL = 1.seconds
+        val INSTALL_GRACE = 15.seconds
+        val INSTALL_WAIT = 5.minutes
     }
 }
 

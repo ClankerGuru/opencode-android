@@ -1,7 +1,10 @@
 package ai.opencode.feature.composer.plusmenu
 
+import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.feature.composer.AttachmentPickerButton
+import ai.opencode.feature.composer.ComposerMorph
+import ai.opencode.feature.composer.ComposerMorphTunables
 import ai.opencode.feature.composer.PlusMenuTunables
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
@@ -15,6 +18,9 @@ import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.openCodeTapTarget
+import android.content.ComponentCallbacks2
+import android.content.Context
+import android.content.res.Configuration
 import android.content.res.Resources
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateFloatAsState
@@ -94,6 +100,16 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.semantics.testTag
+import kotlin.math.hypot
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -111,27 +127,6 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
-
-/**
- * The `composer.morph.*` drag thresholds and corner radii the photo sheet reads (iOS
- * `ComposerMorphTunables` in `ComposerMorph.swift`). A local copy until a `ComposerMorph`
- * port owns them; the values match iOS. The `composer.plusMenu.*` values live in
- * [PlusMenuTunables] (`AttachmentMenu.kt`).
- */
-object PlusPhotoMorphTunables {
-    /** `composer.morph.topRadius` / `bottomRadius` (dp). */
-    const val topRadius = 30f
-    const val bottomRadius = 46f
-
-    /** `composer.morph.photoExpandDrag` (dp), `photoExpandVelocity` (dp/s), `photoCollapseDrag` (dp). */
-    const val photoExpandDrag = 36f
-    const val photoExpandVelocity = 450f
-    const val photoCollapseDrag = 48f
-
-    /** `composer.morph.dragCloses` (dp) and `throwCloses` (dp/s): `ComposerMorph.closes`. */
-    const val dragCloses = 90f
-    const val throwCloses = 700f
-}
 
 /**
  * The newest photos for the New Plus Menu (OC-354), shared by the photo sheet and the recent
@@ -170,6 +165,27 @@ class PlusPhotoLibrary(private val client: PhotoLibraryClient = dependency(Photo
     private var photosById: Map<String, LibraryPhoto> by mutableStateOf(emptyMap())
     private val thumbnails = HashMap<ThumbnailCacheKey, ImageBitmap>()
     private val thumbnailOrder = ArrayList<ThumbnailCacheKey>()
+    private var memoryObserver: Pair<Context, ComponentCallbacks2>? = null
+
+    /** iOS `didReceiveMemoryWarningNotification` → [purgeCache]: Android's memory trim. */
+    private fun installMemoryObserverIfNeeded() {
+        if (memoryObserver != null) return
+        val context = runCatching { dependency(AppContext) }.getOrNull() ?: return
+        val callbacks = object : ComponentCallbacks2 {
+            override fun onTrimMemory(level: Int) {
+                if (level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND) scope.launch { purgeCache() }
+            }
+
+            override fun onConfigurationChanged(newConfig: Configuration) = Unit
+
+            @Deprecated("Deprecated in Java")
+            override fun onLowMemory() {
+                scope.launch { purgeCache() }
+            }
+        }
+        context.registerComponentCallbacks(callbacks)
+        memoryObserver = context to callbacks
+    }
 
     val canRead: Boolean get() = access.canRead
 
@@ -201,6 +217,8 @@ class PlusPhotoLibrary(private val client: PhotoLibraryClient = dependency(Photo
     fun stop() {
         watch?.cancel()
         watch = null
+        memoryObserver?.let { (context, callbacks) -> context.unregisterComponentCallbacks(callbacks) }
+        memoryObserver = null
         purgeCache()
     }
 
@@ -222,6 +240,7 @@ class PlusPhotoLibrary(private val client: PhotoLibraryClient = dependency(Photo
 
     /** Reads what access there is without asking, and the newest photos if it can: the recent strip only ever shows what's already allowed. */
     suspend fun prime() {
+        installMemoryObserverIfNeeded()
         val expected = generation
         val now = client.access()
         if (access != now) access = now
@@ -232,6 +251,7 @@ class PlusPhotoLibrary(private val client: PhotoLibraryClient = dependency(Photo
 
     /** Asks for access if it was never asked (the sheet is open: the dialog is expected), then loads. */
     suspend fun load() {
+        installMemoryObserverIfNeeded()
         val expected = generation
         var now = client.access()
         if (now == PhotoLibraryAccess.NotDetermined) {
@@ -406,9 +426,9 @@ data class PlusPhotoSheetDetent(
     fun settle(
         predicted: Float?,
         velocity: Float,
-        expandDrag: Float = PlusPhotoMorphTunables.photoExpandDrag,
-        expandVelocity: Float = PlusPhotoMorphTunables.photoExpandVelocity,
-        collapseDrag: Float = PlusPhotoMorphTunables.photoCollapseDrag,
+        expandDrag: Float = ComposerMorphTunables.photoExpandDrag.toFloat(),
+        expandVelocity: Float = ComposerMorphTunables.photoExpandVelocity.toFloat(),
+        collapseDrag: Float = ComposerMorphTunables.photoCollapseDrag.toFloat(),
     ): Settlement {
         val currentDrag = drag
         val end = predicted ?: currentDrag
@@ -463,8 +483,7 @@ data class PlusPhotoSheetDetent(
 
         /** iOS `ComposerMorph.closes(translation:predicted:velocity:)`. */
         fun closes(translation: Float, predicted: Float, velocity: Float): Boolean =
-            translation > PlusPhotoMorphTunables.dragCloses ||
-                (velocity > PlusPhotoMorphTunables.throwCloses && predicted > translation)
+            ComposerMorph.closes(translation.toDouble(), predicted.toDouble(), velocity.toDouble())
     }
 }
 
@@ -581,18 +600,46 @@ fun PlusPhotoSheet(
     }
 }
 
-/** iOS's grabber header: a 36 × 5 capsule in a 22 pt band; tap toggles Half/Full. */
+/**
+ * iOS's grabber header: a 36 × 5 capsule in a 22 pt band; tap toggles Half/Full. Hosted in the
+ * morph ([onDrag] non-null), a vertical drag past 4 dp moves the sheet too (screen coordinates,
+ * so the band moving with the sheet doesn't feed back), and its release settles it.
+ */
 @Composable
-private fun PlusPhotoSheetGrabber(isExpanded: Boolean, onToggle: () -> Unit) {
+private fun PlusPhotoSheetGrabber(
+    isExpanded: Boolean,
+    onToggle: () -> Unit,
+    onDrag: ((Float) -> Unit)? = null,
+    onDragEnded: ((Float, Float) -> Unit)? = null,
+    onDragCancelled: (() -> Unit)? = null,
+) {
+    val coords = remember { CoordinatesHolder() }
+    val currentOnDrag by rememberUpdatedState(onDrag)
+    val currentOnDragEnded by rememberUpdatedState(onDragEnded)
+    val currentOnDragCancelled by rememberUpdatedState(onDragCancelled)
     Box(
         Modifier
             .fillMaxWidth()
             .heightIn(min = GRABBER_HEIGHT.dp)
+            .onGloballyPositioned { coords.value = it }
+            .then(
+                if (onDrag == null) Modifier else Modifier.sheetDrag(
+                    coords = coords,
+                    slopDp = 4f,
+                    onMove = { dy, change ->
+                        change.consume()
+                        currentOnDrag?.invoke(dy)
+                    },
+                    onEnd = { dy, velocity -> currentOnDragEnded?.invoke(dy + velocity * PREDICT_SECONDS, velocity) },
+                    onCancel = { currentOnDragCancelled?.invoke() },
+                ),
+            )
             .clickable(onClickLabel = null, role = Role.Button, onClick = onToggle)
             .clearAndSetSemantics {
                 contentDescription = "Sheet Grabber"
                 stateDescription = if (isExpanded) "Full" else "Half"
                 role = Role.Button
+                testTag = "plus-photo-grabber"
                 onClick { onToggle(); true }
             },
         contentAlignment = Alignment.TopCenter,
@@ -606,11 +653,80 @@ private fun PlusPhotoSheetGrabber(isExpanded: Boolean, onToggle: () -> Unit) {
     }
 }
 
+/** A node's latest coordinates, read when a pointer moves; not observed. */
+private class CoordinatesHolder {
+    var value: LayoutCoordinates? = null
+}
+
+/**
+ * iOS `DragGesture(minimumDistance:, coordinateSpace: .global)`, observed beside the node's own
+ * gestures (`simultaneousGesture`): it watches the initial pass without taking the pointer until
+ * [onMove] consumes a change. Translations are root-space dp from the touch's start, so a sheet
+ * that moves under the finger doesn't feed back; velocity is dp/s.
+ */
+private fun Modifier.sheetDrag(
+    coords: CoordinatesHolder,
+    slopDp: Float,
+    onBegin: () -> Unit = {},
+    onMove: (dy: Float, change: PointerInputChange) -> Unit,
+    onEnd: (dy: Float, velocity: Float) -> Unit,
+    onCancel: () -> Unit,
+): Modifier = pointerInput(Unit) {
+    val px = density
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+        fun root(position: Offset): Offset = coords.value?.takeIf { it.isAttached }?.localToRoot(position) ?: position
+        val start = root(down.position)
+        val tracker = VelocityTracker()
+        tracker.addPosition(down.uptimeMillis, start)
+        var dragging = false
+        var dy = 0f
+        try {
+            while (true) {
+                val event = awaitPointerEvent(PointerEventPass.Initial)
+                val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                val point = root(change.position)
+                tracker.addPosition(change.uptimeMillis, point)
+                dy = (point.y - start.y) / px
+                if (!change.pressed) {
+                    if (dragging) onEnd(dy, tracker.calculateVelocity().y / px)
+                    return@awaitEachGesture
+                }
+                if (!dragging && hypot((point.x - start.x) / px, dy) >= slopDp) {
+                    dragging = true
+                    onBegin()
+                }
+                if (dragging) onMove(dy, change)
+            }
+            if (dragging) onCancel()
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            if (dragging) onCancel()
+            throw cancelled
+        }
+    }
+}
+
 private const val GRID_SPACING = 2f
 private const val GRABBER_HEIGHT = 22f
 private const val CAMERA_KEY = "__camera__"
 
-/** The sheet's grid (iOS `PlusPhotoSheetContent`). */
+/** UIKit's normal deceleration: a throw's predicted travel is velocity × 0.499 s (SwiftUI `predictedEndTranslation`). */
+private const val PREDICT_SECONDS = 0.499f
+
+/**
+ * The sheet's content (iOS `PlusPhotoSheetContent`): the camera, then the newest photos, three
+ * across. Tapping photos picks them. Laid out once where the sheet rests and revealed by the
+ * sheet's surface, so nothing reflows as it grows.
+ *
+ * In the M3 [PlusPhotoSheet] the sheet owns its drag handle and detents. Hosted in the morph
+ * ([ComposerMorphPhotoSheet], [onDrag] non-null), it draws its own grabber and drives the
+ * sheet as iOS does: compact, the grid doesn't scroll and a drag anywhere moves the sheet;
+ * expanded, it scrolls, and a pull down from its top collapses it (a baseline taken when the
+ * pull starts mid-scroll). Taps are suppressed while a sheet drag runs and 80 ms after.
+ *
+ * @param onDrag the sheet drag's translation (dp).
+ * @param onDragEnded predicted end translation and velocity (dp, dp/s).
+ */
 @Composable
 fun PlusPhotoSheetContent(
     library: PlusPhotoLibrary,
@@ -620,12 +736,19 @@ fun PlusPhotoSheetContent(
     onCamera: () -> Unit,
     onDismiss: () -> Unit,
     contentBottomPadding: () -> Float = { 0f },
+    onDrag: ((Float) -> Unit)? = null,
+    onDragEnded: (predictedTranslation: Float, velocity: Float) -> Unit = { _, _ -> },
+    onDragCancelled: () -> Unit = {},
+    onToggleExpand: () -> Unit = {},
 ) {
     val density = LocalDensity.current.density
     library.displayScale = density
+    val scope = rememberCoroutineScope()
+    val tapSuppression = remember { PlusPhotoSheetTapSuppression(scope) }
+    DisposableEffect(tapSuppression) { onDispose { tapSuppression.cancel() } }
     val gridInset = PlusMenuTunables.GRID_INSET
-    val topRadius = max(PlusPhotoMorphTunables.topRadius - gridInset, 14f)
-    val bottomRadius = max(PlusPhotoMorphTunables.bottomRadius - gridInset, 20f)
+    val topRadius = max(ComposerMorphTunables.topRadius.toFloat() - gridInset, 14f)
+    val bottomRadius = max(ComposerMorphTunables.bottomRadius.toFloat() - gridInset, 20f)
     val gridShape = RoundedCornerShape(topRadius.dp, topRadius.dp, bottomRadius.dp, bottomRadius.dp)
     val photos = library.photos
     val initialIndex = remember {
@@ -642,48 +765,118 @@ fun PlusPhotoSheetContent(
                 if (index == 0 && offset <= 4 * density) {
                     library.savedScrollPhotoID = null
                 } else if (library.photos.isNotEmpty()) {
-                    val photoIndex = (index - 1).coerceIn(0, library.photos.size - 1)
+                    // iOS: the first visible row (at least the second), its first photo after the camera.
+                    val photoIndex = (max(index, 3) - 1).coerceIn(0, library.photos.size - 1)
                     library.savedScrollPhotoID = library.photos[photoIndex].id
                 }
             }
     }
+    val hosted = onDrag != null
+    val currentExpanded by rememberUpdatedState(isExpanded)
+    val currentOnDrag by rememberUpdatedState(onDrag)
+    val currentOnDragEnded by rememberUpdatedState(onDragEnded)
+    val currentOnDragCancelled by rememberUpdatedState(onDragCancelled)
+    val gridCoords = remember { CoordinatesHolder() }
+    var collapseBaseline by remember { mutableStateOf<Float?>(null) }
     val footHeight = PlusPhotoSheetFootDefaults.HEIGHT + PlusPhotoSheetFootDefaults.INSET * 2
     val bottomPadding = with(LocalDensity.current) { contentBottomPadding().toDp() } + footHeight.dp
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(3),
-        state = gridState,
-        horizontalArrangement = Arrangement.spacedBy(GRID_SPACING.dp),
-        verticalArrangement = Arrangement.spacedBy(GRID_SPACING.dp),
-        contentPadding = PaddingValues(bottom = bottomPadding),
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(start = gridInset.dp, end = gridInset.dp, bottom = gridInset.dp)
-            .clip(gridShape)
-            .onGloballyPositioned { coordinates ->
-                val frame = coordinates.boundsOnScreen()
-                flights.sheetViewport = frame
-                camera.viewport = frame
-            }
-            .semantics { contentDescription = "Photos" },
-    ) {
-        item(key = CAMERA_KEY) {
-            PlusCameraTile(camera = camera, onCamera = onCamera)
-        }
-        items(photos.size, key = { photos[it].id }) { index ->
-            val photo = photos[index]
-            PlusPhotoTile(
-                photo = photo,
-                order = library.order(photo.id),
-                scale = density,
-                inFlight = flights.hidesPhoto(photo.id),
-                flights = flights,
-                cached = library.cachedThumbnail(photo.id, PlusPhotoLibrary.GRID_THUMBNAIL_SIDE, density),
-                load = { id, side, scale, onDegraded -> library.thumbnail(id, side, scale, onDegraded) },
-                onTap = { library.toggle(photo.id) },
+    Column(Modifier.fillMaxSize()) {
+        if (hosted) {
+            PlusPhotoSheetGrabber(
+                isExpanded = isExpanded,
+                onToggle = onToggleExpand,
+                onDrag = onDrag,
+                onDragEnded = onDragEnded,
+                onDragCancelled = onDragCancelled,
             )
         }
-        if (library.access == PhotoLibraryAccess.Denied) {
-            item(span = { GridItemSpan(maxLineSpan) }) { DeniedNotice(onOpenSettings = library::openSettings) }
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(3),
+            state = gridState,
+            horizontalArrangement = Arrangement.spacedBy(GRID_SPACING.dp),
+            verticalArrangement = Arrangement.spacedBy(GRID_SPACING.dp),
+            contentPadding = PaddingValues(bottom = bottomPadding),
+            // iOS `scrollDisabled(!isExpanded)`: compact, a drag moves the sheet instead.
+            userScrollEnabled = !hosted || isExpanded,
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(start = gridInset.dp, end = gridInset.dp, bottom = gridInset.dp)
+                .clip(gridShape)
+                .onGloballyPositioned { coordinates ->
+                    gridCoords.value = coordinates
+                    val frame = coordinates.boundsOnScreen()
+                    flights.sheetViewport = frame
+                    camera.viewport = frame
+                }
+                .then(
+                    if (!hosted) Modifier else Modifier.sheetDrag(
+                        coords = gridCoords,
+                        slopDp = 6f,
+                        onBegin = { tapSuppression.beginDrag() },
+                        onMove = { dy, change ->
+                            tapSuppression.beginDrag()
+                            if (!currentExpanded) {
+                                change.consume()
+                                currentOnDrag?.invoke(dy)
+                                return@sheetDrag
+                            }
+                            val baseline = collapseBaseline
+                            // How far the grid is scrolled from its top (dp; past the first row, far).
+                            val scrolled = if (gridState.firstVisibleItemIndex == 0) gridState.firstVisibleItemScrollOffset / density else Float.MAX_VALUE
+                            if (baseline != null) {
+                                change.consume()
+                                currentOnDrag?.invoke(max(0f, dy - baseline))
+                            } else if (dy > 0 && scrolled <= 2f) {
+                                val start = if (scrolled <= 0.5f) 0f else dy
+                                collapseBaseline = start
+                                change.consume()
+                                currentOnDrag?.invoke(max(0f, dy - start))
+                            }
+                        },
+                        onEnd = { dy, velocity ->
+                            tapSuppression.scheduleReset()
+                            val predicted = dy + velocity * PREDICT_SECONDS
+                            val baseline = collapseBaseline
+                            collapseBaseline = null
+                            if (!currentExpanded) {
+                                currentOnDragEnded(predicted, velocity)
+                            } else if (baseline != null) {
+                                val pull = max(0f, dy - baseline)
+                                currentOnDragEnded(max(pull, predicted - baseline), velocity)
+                            }
+                        },
+                        onCancel = {
+                            collapseBaseline = null
+                            currentOnDragCancelled()
+                            tapSuppression.scheduleReset()
+                        },
+                    ),
+                )
+                .semantics {
+                    contentDescription = "Photos"
+                    testTag = "plus-photo-grid"
+                },
+        ) {
+            item(key = CAMERA_KEY) {
+                PlusCameraTile(camera = camera, onCamera = { if (!tapSuppression.isSuppressed) onCamera() })
+            }
+            items(photos.size, key = { photos[it].id }) { index ->
+                val photo = photos[index]
+                PlusPhotoTile(
+                    photo = photo,
+                    order = library.order(photo.id),
+                    scale = density,
+                    inFlight = flights.hidesPhoto(photo.id),
+                    flights = flights,
+                    cached = library.cachedThumbnail(photo.id, PlusPhotoLibrary.GRID_THUMBNAIL_SIDE, density),
+                    load = { id, side, scale, onDegraded -> library.thumbnail(id, side, scale, onDegraded) },
+                    onTap = { if (!tapSuppression.isSuppressed) library.toggle(photo.id) },
+                )
+            }
+            if (library.access == PhotoLibraryAccess.Denied) {
+                item(span = { GridItemSpan(maxLineSpan) }) { DeniedNotice(onOpenSettings = library::openSettings) }
+            }
         }
     }
 }
@@ -769,6 +962,11 @@ fun PlusPhotoSheetFoot(
             symbol = SFSymbol.ChevronLeft,
             contentDescription = "Back",
             onClick = onBack,
+            // iOS `accessibilityHint("Returns to attachment options")`: TalkBack reads “Double-tap to return…”.
+            modifier = Modifier.semantics {
+                testTag = "plus-photo-back"
+                onClick(label = "Return to attachment options") { onBack(); true }
+            },
         )
         Spacer(Modifier.weight(1f).width(12.dp))
         AnimatedContent(
@@ -859,11 +1057,12 @@ internal fun VideoDurationBadge(duration: String, compact: Boolean = false, modi
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(if (compact) 3.dp else 4.dp),
     ) {
-        OpenCodeIcon(SFSymbol.PlayFill, contentDescription = null, size = if (compact) 8.dp else 10.dp, tint = Color.White)
+        // iOS: play.fill at 7 pt (strip) / 8 pt (grid), the duration at 10 pt / caption2, semibold, tabular.
+        OpenCodeIcon(SFSymbol.PlayFill, contentDescription = null, size = if (compact) 7.dp else 8.dp, tint = Color.White)
         Text(
             duration,
             color = Color.White,
-            style = (if (compact) OpenCodeTextStyles.caption2 else OpenCodeTextStyles.caption2).copy(
+            style = (if (compact) OpenCodeTextStyles.caption2.copy(fontSize = 10.sp) else OpenCodeTextStyles.caption2).copy(
                 fontWeight = FontWeight.SemiBold,
                 fontFeatureSettings = "tnum",
             ),
@@ -911,7 +1110,8 @@ private fun PlusPhotoTile(
 
     val alpha by animateFloatAsState(
         targetValue = if (inFlight) 0f else 1f,
-        animationSpec = if (inFlight) androidx.compose.animation.core.snap() else Motion.easeInOut(0.25),
+        // iOS `.smooth(duration: 0.25)`: a spring with no bounce.
+        animationSpec = if (inFlight) androidx.compose.animation.core.snap() else MotionSpring(0.25).spec(),
         label = "tile-in-flight",
     )
     val badgeScale by animateFloatAsState(

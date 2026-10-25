@@ -12,6 +12,7 @@ import ai.opencode.core.ui.sfSymbol
 import ai.opencode.server.model.OpenCodeQueuedInput
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -59,6 +60,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -107,7 +109,7 @@ fun QueuedMessagesSheet(
         Column(
             Modifier
                 .heightIn(max = QueuedMessagesSheetMetrics.maximumHeight(screenHeight))
-                .animateContentSize(animationSpec = Motion.settle.animation(reduceMotion)),
+                .animateContentSize(animationSpec = QueuedMessagesSheetMetrics.snappy.animation(reduceMotion)),
         ) {
             Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
                 Text(
@@ -116,7 +118,7 @@ fun QueuedMessagesSheet(
                     textAlign = TextAlign.Center,
                     modifier = Modifier.align(Alignment.Center).semantics { heading() },
                 )
-                IconButton(onClick = onClose, modifier = Modifier.align(Alignment.CenterEnd)) {
+                IconButton(onClick = onClose, modifier = Modifier.align(Alignment.CenterEnd).testTag("queued-messages-close")) {
                     OpenCodeIcon(SFSymbol.Xmark, contentDescription = "Close")
                 }
             }
@@ -134,10 +136,12 @@ fun QueuedMessagesSheet(
                 }
             } else {
                 LazyColumn(
+                    modifier = Modifier.testTag("queued-message-list"),
                     contentPadding = PaddingValues(top = QueuedMessagesSheetMetrics.listTop, bottom = QueuedMessagesSheetMetrics.listBottom),
                 ) {
                     itemsIndexed(messages, key = { _, input -> input.id }) { index, input ->
-                        Column(if (reduceMotion) Modifier else Modifier.animateItem()) {
+                        // iOS `.animation(reducedMotion ? nil : .snappy, value: ids)`.
+                        Column(if (reduceMotion) Modifier else Modifier.animateItem(placementSpec = QueuedMessagesSheetMetrics.snappy.spec(IntOffset.VisibilityThreshold))) {
                             QueuedMessageRow(
                                 input = input,
                                 number = index + 1,
@@ -163,6 +167,9 @@ object QueuedMessagesSheetMetrics {
 
     /** What a row is taken to be before it has been measured (iOS 76 pt). */
     val estimatedRowHeight = 76.dp
+
+    /** SwiftUI `.snappy` (duration 0.5, extra bounce 0.15): the list and the row's expansion. */
+    val snappy = ai.opencode.core.motion.MotionSpring(0.5, 0.15)
 
     /** Just short of the full sheet: past it, the rows scroll. */
     fun maximumHeight(screenHeight: androidx.compose.ui.unit.Dp) = maxOf(screenHeight - 110.dp, 320.dp)
@@ -276,6 +283,7 @@ fun QueuedMessageRow(
                             if (canExpand) add(CustomAccessibilityAction(if (expanded) "Show Less" else "Show More") { expanded = !expanded; true })
                         }
                     }
+                    .testTag("queued-message-$number")
                     .padding(start = 20.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
             ) {
                 val number = @Composable {
@@ -301,7 +309,7 @@ fun QueuedMessageRow(
                                 maxLines = if (expanded) Int.MAX_VALUE else 2,
                                 overflow = TextOverflow.Ellipsis,
                                 onTextLayout = { if (!expanded) overflows = it.hasVisualOverflow },
-                                modifier = Modifier.fillMaxWidth().animateContentSize(Motion.settle.animation(reduceMotion)),
+                                modifier = Modifier.fillMaxWidth().animateContentSize(QueuedMessagesSheetMetrics.snappy.animation(reduceMotion)),
                             )
                         }
                     }
@@ -424,13 +432,13 @@ private fun QueuedAttachments(input: OpenCodeQueuedInput) {
                 }
             }
         }
-        for (file in files) QueuedChip(file.name, queuedFileSymbol(file.name, file.mime))
+        for (file in files) QueuedChip(file.name, AttachmentFileType.symbolName(file.name, file.mime))
         // Inline files: a PDF, or a long paste with its length.
         for (file in inline) {
             val pasted = file.pasted
             QueuedChip(
                 if (pasted != null) "${file.name} · ${pasted.length}" else file.name,
-                if (pasted == null) queuedFileSymbol(file.name, file.mime) else "doc.plaintext",
+                if (pasted == null) AttachmentFileType.symbolName(file.name, file.mime) else "doc.plaintext",
             )
         }
     }
@@ -446,31 +454,12 @@ private fun QueuedChip(title: String, symbolName: String) {
             modifier = Modifier.size(OpenCodeIconSize.small),
         )
         Text(
-            middleTruncated(title),
+            title,
             style = OpenCodeTextStyles.subheadline,
             color = OpenCodeTheme.colors.secondaryText,
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+            // iOS `.truncationMode(.middle)`.
+            overflow = TextOverflow.MiddleEllipsis,
         )
     }
-}
-
-/** Long names keep their start and extension (iOS `.truncationMode(.middle)`), approximated by characters. */
-private fun middleTruncated(title: String, limit: Int = 48): String =
-    if (title.length <= limit) title else title.take(limit / 2 - 1) + "…" + title.takeLast(limit / 2 - 1)
-
-/**
- * The chip glyph for a file (iOS `AttachmentFileType.symbolName(name:mime:)`), a local copy of
- * the attachments port's rules until it's shared.
- */
-private fun queuedFileSymbol(name: String, mime: String): String = when {
-    mime == "application/pdf" -> "doc.richtext"
-    mime.startsWith("image/") -> "photo"
-    mime.startsWith("video/") -> "film"
-    mime.startsWith("audio/") -> "waveform"
-    mime == "text/plain" -> "doc.text"
-    mime.contains("zip") || mime.contains("tar") || mime.contains("compressed") -> "doc.zipper"
-    mime.contains("spreadsheet") || mime == "text/csv" -> "tablecells"
-    mime.contains("presentation") -> "rectangle.on.rectangle"
-    else -> "doc"
 }

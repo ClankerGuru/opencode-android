@@ -2,6 +2,8 @@ package ai.opencode.feature.composer
 
 import ai.opencode.core.log.AppLog
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.util.UUID
 
 /**
@@ -39,7 +41,7 @@ class ComposerPersistenceStorage(
                         stateFile.delete()
                     } else {
                         try {
-                            writeAtomically(stateFile, data)
+                            writeAtomically(stateFile, data, baseDirectory)
                         } catch (error: Exception) {
                             AppLog.app.error { "Couldn’t write composer state: ${error::class.java.simpleName}" }
                         }
@@ -51,7 +53,7 @@ class ComposerPersistenceStorage(
                         attachmentsDirectory.mkdirs()
                         for ((id, data) in writes) {
                             try {
-                                writeAtomically(File(attachmentsDirectory, id.toString()), data)
+                                writeAtomically(File(attachmentsDirectory, id.toString()), data, baseDirectory)
                             } catch (error: Exception) {
                                 AppLog.app.error { "Couldn’t write composer attachment (${data.size} bytes): ${error::class.java.simpleName}" }
                             }
@@ -97,13 +99,21 @@ class ComposerPersistenceStorage(
             )
         }
 
-        private fun writeAtomically(target: File, data: ByteArray) {
+        /**
+         * iOS `Data.write(options: .atomic)`: a uniquely named temporary file, moved over [target]
+         * in one step. The temporary file sits in [tempDirectory] (the base directory, never the
+         * attachments folder, whose sweep removes every non-UUID name), so a flush and a debounced
+         * write racing each other never share or delete one another's temporary file.
+         */
+        private fun writeAtomically(target: File, data: ByteArray, tempDirectory: File) {
             target.parentFile?.mkdirs()
-            val temp = File(target.parentFile, "${target.name}.tmp")
-            temp.writeBytes(data)
-            if (!temp.renameTo(target)) {
-                target.delete()
-                if (!temp.renameTo(target)) throw java.io.IOException("rename failed")
+            tempDirectory.mkdirs()
+            val temp = File.createTempFile(".${target.name}.", ".tmp", tempDirectory)
+            try {
+                temp.writeBytes(data)
+                Files.move(temp.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+            } finally {
+                temp.delete()
             }
         }
     }

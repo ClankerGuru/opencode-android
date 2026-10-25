@@ -6,6 +6,13 @@ import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -168,10 +175,15 @@ fun FusedModelChip(
             if (FusedModelPickerTunables.chipProviderLogo && model != null) {
                 ProviderIcon(model.providerID, model.canonicalProviderID, size = 15.dp, tint = OpenCodeTheme.colors.secondaryText)
             }
-            AnimatedContent(
-                targetState = shortName,
-                transitionSpec = { fadeIn(FusedModelPickerTunables.animation(FusedModelPickerTunables.chipRoll, reduceMotion)) togetherWith fadeOut(FusedModelPickerTunables.animation(FusedModelPickerTunables.chipRoll, reduceMotion)) },
+            // The name rolls to the new one; the chip's width follows on `chipWidth`.
+            ChipRoll(
+                shortName,
+                ascending = { _, _ -> true },
+                spring = FusedModelPickerTunables.chipWidth,
+                reduceMotion = reduceMotion,
                 label = "chip-name",
+                // The label's frame as it lays out (and widens), as iOS's `onGeometryChange` reads it.
+                modifier = Modifier.onGloballyPositioned { if (it.size.width > 0) anchors.chipNameFrame = it.boundsInRoot() },
             ) { name ->
                 Text(
                     name,
@@ -179,9 +191,7 @@ fun FusedModelChip(
                     color = OpenCodeTheme.colors.text,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .alpha(if (flightActive) 0f else 1f)
-                        .onGloballyPositioned { if (it.size.width > 0) anchors.chipNameFrame = it.boundsInRoot() },
+                    modifier = Modifier.alpha(if (flightActive) 0f else 1f),
                 )
             }
         }
@@ -215,10 +225,24 @@ fun FusedModelChip(
                     .testTag("composer-level"),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                AnimatedContent(
-                    targetState = levelLabel,
-                    transitionSpec = { fadeIn(FusedModelPickerTunables.animation(FusedModelPickerTunables.chipRoll, reduceMotion)) togetherWith fadeOut(FusedModelPickerTunables.animation(FusedModelPickerTunables.chipRoll, reduceMotion)) },
+                // A higher level rolls up into place, a lower one down.
+                val levelScale = scale
+                ChipRoll(
+                    levelLabel,
+                    ascending = { from, to ->
+                        val levels = levelScale?.levels.orEmpty().map(ModelLevelScale::label)
+                        levels.indexOf(to) >= levels.indexOf(from)
+                    },
+                    spring = FusedModelPickerTunables.chipRoll,
+                    reduceMotion = reduceMotion,
                     label = "chip-level",
+                    modifier = Modifier.onGloballyPositioned {
+                        if (it.size.width > 0) {
+                            val frame = it.boundsInRoot()
+                            anchors.chipLevelFrame = frame
+                            anchors.levelControl = frame
+                        }
+                    },
                 ) { label ->
                     Text(
                         label,
@@ -226,15 +250,7 @@ fun FusedModelChip(
                         color = OpenCodeTheme.colors.text.copy(alpha = FusedModelPickerTunables.levelAlpha.toFloat()),
                         maxLines = 1,
                         softWrap = false,
-                        modifier = Modifier
-                            .alpha(if (flightActive) 0f else 1f)
-                            .onGloballyPositioned {
-                                if (it.size.width > 0) {
-                                    val frame = it.boundsInRoot()
-                                    anchors.chipLevelFrame = frame
-                                    anchors.levelControl = frame
-                                }
-                            },
+                        modifier = Modifier.alpha(if (flightActive) 0f else 1f),
                     )
                 }
             }
@@ -243,5 +259,51 @@ fun FusedModelChip(
         if (FusedModelPickerTunables.chipChevron) {
             OpenCodeIcon(SFSymbol.ChevronDown, null, size = 12.dp, tint = OpenCodeTheme.colors.secondaryText)
         }
+    }
+}
+
+/**
+ * The chip's label roll (`chipRoll` "Label roll", `chipBlur` "Roll blur"): the outgoing words
+ * roll out of the line and the incoming roll in from the other side, a full line apart, each
+ * blurred by up to [FusedModelPickerTunables.chipBlur] and faded while it travels, clipped to the
+ * line. [ascending] says whether the new words come up from below (true) or down from above.
+ * The size follows on [spring]. Reduce Motion cross-fades ([FusedModelPickerTunables.reduceFade]).
+ */
+@Composable
+private fun ChipRoll(
+    target: String,
+    ascending: (from: String, to: String) -> Boolean,
+    spring: ai.opencode.core.motion.MotionSpring,
+    reduceMotion: Boolean,
+    label: String,
+    modifier: Modifier = Modifier,
+    content: @Composable (text: String) -> Unit,
+) {
+    val roll = FusedModelPickerTunables.chipRoll
+    AnimatedContent(
+        targetState = target,
+        transitionSpec = {
+            val fade = FusedModelPickerTunables.animation<Float>(roll, reduceMotion)
+            val size = SizeTransform(clip = !reduceMotion) { _, _ -> FusedModelPickerTunables.animation(spring, reduceMotion) }
+            if (reduceMotion) {
+                (fadeIn(fade) togetherWith fadeOut(fade)).using(size)
+            } else {
+                val up = ascending(initialState, targetState)
+                val slide = FusedModelPickerTunables.animation<IntOffset>(roll, false)
+                (
+                    (slideInVertically(slide) { h -> if (up) h else -h } + fadeIn(fade)) togetherWith
+                        (slideOutVertically(slide) { h -> if (up) -h else h } + fadeOut(fade))
+                    ).using(size)
+            }
+        },
+        modifier = modifier,
+        contentAlignment = Alignment.CenterStart,
+        label = label,
+    ) { text ->
+        val blur by transition.animateFloat(
+            transitionSpec = { FusedModelPickerTunables.animation(roll, reduceMotion) },
+            label = "$label-blur",
+        ) { phase -> if (phase == EnterExitState.Visible || reduceMotion) 0f else FusedModelPickerTunables.chipBlur.toFloat() }
+        Box(Modifier.layerBlur { blur }) { content(text) }
     }
 }

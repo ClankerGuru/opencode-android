@@ -4,12 +4,16 @@ import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.feature.composer.AttachmentCameraView
+import ai.opencode.feature.composer.ComposerMorphTunables
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -102,7 +106,13 @@ object PlusCameraTunables {
  * [onCapture] with no review and folds the viewfinder back. Reduce Motion fades it in place.
  */
 @Composable
-fun PlusCameraSurface(presentation: PlusCameraPresentation, sheetIsOpen: Boolean, onCapture: (ByteArray) -> Unit) {
+fun PlusCameraSurface(
+    presentation: PlusCameraPresentation,
+    sheetIsOpen: Boolean,
+    onCapture: (ByteArray) -> Unit,
+    /** The sheet's content reveal (iOS `sheet.content`): the viewfinder fades with the sheet's content. */
+    sheetContent: () -> Float = { 1f },
+) {
     val reduceMotion = rememberReduceMotion()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val progress = remember { Animatable(0f) }
@@ -151,14 +161,28 @@ fun PlusCameraSurface(presentation: PlusCameraPresentation, sheetIsOpen: Boolean
             val p = progress.value
             val fullRect = Rect(Offset.Zero, full)
             val tile = presentation.tile.translate(-origin.x, -origin.y)
-            val rect = if (reduceMotion || tile == Rect.Zero || full == Size.Zero) fullRect else lerp(tile, fullRect, p.coerceIn(0f, 1.2f))
-            val radius = if (reduceMotion) 0f else PlusPhotoMorphTunables.topRadius * (1 - p).coerceIn(0f, 1f)
+            val viewport = presentation.viewport.translate(-origin.x, -origin.y)
+            val unmeasured = full == Size.Zero
+            // The viewfinder grows from the tile to the whole screen…
+            val rect = if (reduceMotion || tile == Rect.Zero || unmeasured) fullRect else lerp(tile, fullRect, p.coerceIn(0f, 1.2f))
+            // …through a mask that grows from the sheet's grid (its top corners) to the screen.
+            val mask = if (reduceMotion || presentation.viewport == Rect.Zero || unmeasured) fullRect else lerp(viewport, fullRect, p.coerceIn(0f, 1f))
+            val radius = if (reduceMotion) 0f else ComposerMorphTunables.topRadius.toFloat() * (1 - p).coerceIn(0f, 1f)
+            val dp = LocalDensity.current
             Box(
                 Modifier
-                    .offset { IntOffset(rect.left.roundToInt(), rect.top.roundToInt()) }
-                    .size(with(LocalDensity.current) { max(rect.width, 1f).toDp() }, with(LocalDensity.current) { max(rect.height, 1f).toDp() })
-                    .graphicsLayer { alpha = if (reduceMotion) p.coerceIn(0f, 1f) else min(1f, p * 4f) }
-                    .clip(RoundedCornerShape((radius).dp))
+                    .offset { IntOffset(mask.left.roundToInt(), mask.top.roundToInt()) }
+                    .size(with(dp) { max(mask.width, 1f).toDp() }, with(dp) { max(mask.height, 1f).toDp() })
+                    // iOS `.opacity(active ? sheet.content : 0)` on the expand/collapse animation.
+                    .graphicsLayer { alpha = p.coerceIn(0f, 1f) * sheetContent().coerceIn(0f, 1f) }
+                    .clip(RoundedCornerShape(radius.dp)),
+            ) {
+            Box(
+                Modifier
+                    .wrapContentSize(Alignment.TopStart, unbounded = true)
+                    .offset { IntOffset((rect.left - mask.left).roundToInt(), (rect.top - mask.top).roundToInt()) }
+                    .requiredSize(with(dp) { max(rect.width, 1f).toDp() }, with(dp) { max(rect.height, 1f).toDp() })
+                    .clip(androidx.compose.ui.graphics.RectangleShape)
                     .background(Color.Black),
             ) {
                 AttachmentCameraView(
@@ -170,6 +194,7 @@ fun PlusCameraSurface(presentation: PlusCameraPresentation, sheetIsOpen: Boolean
                     isEmbeddedInSheet = true,
                     isActive = active,
                 )
+            }
             }
         }
     }
