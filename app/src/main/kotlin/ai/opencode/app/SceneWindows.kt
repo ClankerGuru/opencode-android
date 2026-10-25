@@ -132,7 +132,7 @@ object SceneWindows {
     internal fun attached(window: RootStore) = roster.attached(window)
 
     internal fun detached(window: RootStore) {
-        AppLog.app.notice("Window scene disconnected role=${window.role?.name?.lowercase()}")
+        AppLog.app.notice("Window scene disconnected role=${window.role?.name?.lowercase() ?: "nil"}")
         roster.detached(window)
     }
 
@@ -284,7 +284,7 @@ class RootStore : ViewModel(), WindowRosterMember {
     }
 
     override fun rosterOwnsAppWideWork(owns: Boolean) {
-        if (owns) AppLog.app.notice("Window took the app-wide work role=${role?.name?.lowercase()}")
+        if (owns) AppLog.app.notice("Window took the app-wide work role=${role?.name?.lowercase() ?: "nil"}")
     }
 
     override fun onCleared() {

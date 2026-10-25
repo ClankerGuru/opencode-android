@@ -338,7 +338,14 @@ private fun interface CentreReporter {
 
 private val LocalCentreReporter = staticCompositionLocalOf<CentreReporter?> { null }
 
-private val largeTitleBold: TextStyle get() = OpenCodeTextStyles.largeTitle.copy(fontWeight = FontWeight.Bold)
+/** Page titles: iOS `.font(.largeTitle.bold())`, centred like every line above and below the centre. */
+private val largeTitleBold: TextStyle get() = OpenCodeTextStyles.largeTitle.copy(fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+
+/** Body copy in a page's top or below block, centred as iOS's `.multilineTextAlignment(.center)`. */
+private val centredBody: TextStyle get() = OpenCodeTextStyles.body.centred()
+
+/** An explicit `style` replaces [CenteredText]'s provided one, so top/below text centres itself. */
+private fun TextStyle.centred(): TextStyle = copy(textAlign = TextAlign.Center)
 
 @Composable
 private fun secondary(): Color = OpenCodeTheme.colors.secondaryText
@@ -364,7 +371,7 @@ private fun Welcome(on: Boolean, send: (Action) -> Unit) {
                 Entrance(on, 2) {
                     Text(
                         "Pick up a session. Talk through an idea. Keep things moving from your phone.",
-                        style = OpenCodeTextStyles.body,
+                        style = centredBody,
                         color = secondary(),
                     )
                 }
@@ -428,7 +435,7 @@ private fun Camera(on: Boolean, send: (Action) -> Unit) {
         },
         centre = { Spacer(Modifier.height(ApertureSide)) },
         below = {
-            Entrance(on, 3) { Text("Point your camera at the pairing code", style = OpenCodeTextStyles.subheadline, color = secondary()) }
+            Entrance(on, 3) { Text("Point your camera at the pairing code", style = OpenCodeTextStyles.subheadline.centred(), color = secondary()) }
         },
         footer = {
             Entrance(on, 4) { SecondaryButton("Use Sample Code", on) { send(Action.SampleCodeTapped) } }
@@ -451,7 +458,7 @@ private fun Waiting(on: Boolean, send: (Action) -> Unit) {
         },
         centre = { Spacer(Modifier.height(ApertureSide)) },
         below = {
-            Entrance(on, 2) { Text("The signal stays quiet until it replies", style = OpenCodeTextStyles.subheadline, color = secondary()) }
+            Entrance(on, 2) { Text("The signal stays quiet until it replies", style = OpenCodeTextStyles.subheadline.centred(), color = secondary()) }
         },
         footer = {
             Entrance(on, 3) { SecondaryButton("Cancel", on) { send(Action.CancelTapped) } }
@@ -482,7 +489,7 @@ private fun Connected(on: Boolean, send: (Action) -> Unit) {
         },
         centre = { Spacer(Modifier.height(120.dp)) },
         below = {
-            Entrance(on, 3) { Text("Your next session starts here", style = OpenCodeTextStyles.subheadline, color = secondary()) }
+            Entrance(on, 3) { Text("Your next session starts here", style = OpenCodeTextStyles.subheadline.centred(), color = secondary()) }
         },
         footer = {
             Entrance(on, 4) { PrimaryButton("Start a Session", on) { send(Action.StartSessionTapped) } }
