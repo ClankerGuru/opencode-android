@@ -10,8 +10,8 @@ import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.rememberHighContrast
-import ai.opencode.feature.drawer.bridge.DrawerBadge
-import ai.opencode.feature.drawer.notices.InAppNotice
+import ai.opencode.feature.session.DrawerBadge
+import ai.opencode.feature.session.InAppNotice
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable

@@ -10,7 +10,8 @@ import ai.opencode.core.store.cancellable
 import ai.opencode.feature.drawer.HomeFeature.Action
 import ai.opencode.feature.drawer.HomeFeature.State
 import ai.opencode.feature.drawer.notices.AccessibilityAnnouncer
-import ai.opencode.feature.drawer.notices.InAppNotice
+import ai.opencode.feature.session.InAppNotice
+import ai.opencode.feature.session.setTyped
 import ai.opencode.core.experiments.InAppNoticeMode
 import ai.opencode.feature.drawer.notices.InAppNoticeSettings
 import ai.opencode.feature.drawer.notices.InAppNoticeSignal
@@ -46,9 +47,7 @@ internal fun HomeFeature.reduceNotifications(state: State, action: Action): Home
             val s = state.copy(settings = null)
                 .leavingCatchUp()
                 .openingDraft(reason = "notification setup")
-                // iOS `sessionDetail?.setTyped(notifyPluginSetUpPrompt)`.
-                // TODO(merge): `SessionFeature.State.setTyped` (it rebases a live recording).
-                .updatingDetail { it.copy(draft = it.draft.copy(text = HomeFeature.notifyPluginSetUpPrompt)) }
+                .updatingDetail { it.setTyped(HomeFeature.notifyPluginSetUpPrompt) }
             Reduced(s)
         }
     }
@@ -273,8 +272,7 @@ internal fun HomeFeature.inAppNoticeSignalChanged(oldInput: InAppNoticeInput, ne
     if (added.isEmpty()) return Reduced(s)
     val urgent = added.any { it.kind == InAppNotice.Kind.needsInput }
     // A call has its own sounds.
-    // TODO(merge) round 2b / `:feature:session`: `sessionDetail?.voice.map { !$0.phase.isTerminal }`.
-    val inCall = false
+    val inCall = s.sessionDetail?.voice?.let { !it.phase.isTerminal } ?: false
     // iOS speaks up only from the window in use (Multiple Windows, `sceneWindow.isFront`); the
     // Android app has one task, so the window is always the one in use.
     if (urgent && !inCall) dependency(HapticsClient).play(Haptic.attention)

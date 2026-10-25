@@ -1,6 +1,9 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.feature.session.*
+import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.diagnostics.LabMarks
 import ai.opencode.core.log.AppLog
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.PresentationAction
@@ -13,24 +16,37 @@ import ai.opencode.core.store.onChange
 import ai.opencode.core.store.scope
 import ai.opencode.feature.drawer.HomeFeature.Action
 import ai.opencode.feature.drawer.HomeFeature.State
-import ai.opencode.feature.drawer.bridge.SessionDetail
-import ai.opencode.feature.drawer.bridge.SessionScreenMessage
+import ai.opencode.feature.composer.DictationClient
+import ai.opencode.feature.composer.DictationFeature
 import ai.opencode.feature.drawer.catchup.CatchUpFeature
+import ai.opencode.feature.media.PageReaderClient
 import ai.opencode.feature.drawer.notices.DeliveredNotificationsClient
 import ai.opencode.feature.drawer.switcher.SessionSwitcherFeature
 import ai.opencode.feature.session.SessionFeature
+import ai.opencode.feature.session.hasLiveDictation
+import ai.opencode.feature.session.dictationHold
+import ai.opencode.feature.session.dictationPhase
+import ai.opencode.feature.session.dictationPress
+import ai.opencode.feature.session.unstartedUploadIDs
 import ai.opencode.feature.settings.SettingsFeature
+import ai.opencode.feature.system.liveactivity.DictationActivityAttributes
+import ai.opencode.feature.system.liveactivity.DictationLiveActivity
+import ai.opencode.feature.system.liveactivity.DictationLiveActivityClient
+import ai.opencode.feature.system.liveactivity.VoiceLiveActivity
 import ai.opencode.feature.system.share.ShareInboxClient
+import ai.opencode.feature.voice.VoiceFeature
 import ai.opencode.feature.voice.VoiceSessionBoardClient
 import ai.opencode.server.OpenCodeLiveContentEvent
 import ai.opencode.server.OpenCodeServerEvent
+import java.util.UUID
 
 /*
  * Port of iOS `HomeFeature+Composition.swift`: how Home's reducers stack. Children settle after
  * Home's own coordination (`core`), the open session and pushed subagents run as presented and
  * identified children, and a chain of observers follows state Home derives (Catch Up's queue, the
- * selected transcript read, the pairing's drawer open, In-App Notices, the foreground read
- * settling, the What's New close).
+ * selected transcript read, the pairing's drawer open, In-App Notices, the call's and the
+ * recording's ongoing notifications, pages and recordings a gone screen leaves, the foreground
+ * read settling, the What's New close).
  *
  * Fast streaming actions ([isFastStreamAction]) skip the observer chain and run only Home's own
  * reducer and the screens, as iOS does. iOS's `bodyCache` is a build-time optimisation with no
@@ -105,6 +121,12 @@ private fun HomeFeature.homeReducers(): Reducer<State, Action> = combine(
         embed = Action::SessionSwitcher,
         child = SessionSwitcherFeature(),
     ),
+    // Save the outgoing member before the presented reducer selects another one. Drawer navigation
+    // instead saves in makeDetail/makeDraft.
+    Reducer { state, action ->
+        val detailAction = (action as? Action.SessionDetail)?.action as? PresentationAction.Presented
+        if (detailAction?.action is SessionFeature.Action.FamilyPicked) Reduced(state.rememberingSession()) else Reduced(state)
+    },
     detailReducer().homeChildrenObservers(this),
     // Whatever replaced the detail an uncached tap's read belongs to (New Session, a voice draft,
     // Catch Up, a deletion, another tap) ends it.
@@ -141,12 +163,19 @@ private fun HomeFeature.homeReducers(): Reducer<State, Action> = combine(
             Reduced(state.copy(inAppNotice = notice.copy(events = remaining)))
         }
     },
+    // Absorbing shared files is a pure state change; start their uploads here.
+    Reducer { state, _ ->
+        if (state.sessionDetail?.unstartedUploadIDs.isNullOrEmpty()) {
+            Reduced(state)
+        } else {
+            Reduced(state, Effect.send(Action.detail(SessionFeature.Action.queuedUploadsStarted)))
+        }
+    },
     // Only list and attention changes move the stack; skip the transcript's own high-frequency
     // traffic and actions that already maintain `catchUp` or only update the transcript cache.
     Reducer { state, action ->
         val skips = when (action) {
-            is Action.SessionDetail, is Action.SessionDetailEvent, is Action.SubagentStack, is Action.SubagentEvent,
-            is Action.ScreenMessage, is Action.CatchUp, is Action.TranscriptPrefetched, is Action.CachedTranscriptRefreshed,
+            is Action.SessionDetail, is Action.SubagentStack, is Action.CatchUp, is Action.TranscriptPrefetched, is Action.CachedTranscriptRefreshed,
             is Action.SelectedTranscriptResponse, is Action.ViewAcknowledged -> true
             is Action.ServerEvent -> action.event is OpenCodeServerEvent.ContentBatch || action.event is OpenCodeServerEvent.MessageInvalidated
             else -> false
@@ -159,14 +188,22 @@ private fun HomeFeature.homeReducers(): Reducer<State, Action> = combine(
     },
 )
 
-/** `detailSessions`, dropping a gone screen's late actions first (iOS `detailReducer`). */
+/**
+ * `detailSessions`, dropping a gone screen's late actions first (iOS `detailReducer`): a popped
+ * subagent's view stays in the page stack for its exit animation, and async UI callbacks or
+ * queued forwards can land after its state has left [State.subagentStack].
+ */
 private fun HomeFeature.detailReducer(): Reducer<State, Action> {
     val chain = detailSessions()
-    return Reducer { state, action ->
+    return Reducer<State, Action> { state, action ->
         if (action is Action.SubagentStack && state.subagentStack.none { it.navigationID == action.id }) return@Reducer Reduced(state)
         if (action is Action.SessionDetail && state.sessionDetail == null) return@Reducer Reduced(state)
         chain.reduce(state, action)
     }
+        // A Send Later share sends itself once its composer has it.
+        .onChange({ it.sessionDetail?.sharedSend != null }) { _, new, state ->
+            if (!new) Reduced(state) else Reduced(state, Effect.send(Action.detail(SessionFeature.Action.SharedSendRequested)))
+        }
 }
 
 /** Home's own actions, the open session and its pushed subagents (iOS `detailSessionsCore`). */
@@ -174,7 +211,7 @@ private fun HomeFeature.detailSessionsCore(): Reducer<State, Action> {
     val catchUp = CatchUpFeature()
     val notifications = HomeNotificationsFeature()
     val connection = HomeConnectionFeature()
-    val session = SessionDetail.reducer(SessionFeature())
+    val session = SessionFeature()
     val home = combine<State, Action>(
         scope(
             state = { it.catchUpState },
@@ -201,21 +238,21 @@ private fun HomeFeature.detailSessionsCore(): Reducer<State, Action> {
             child = connection,
         ),
     )
-    val presented = ifLet<State, Action, SessionDetail, SessionFeature.Action>(
+    val presented = ifLet<State, Action, SessionFeature.State, SessionFeature.Action>(
         id = SessionDetailSlot,
         parent = home,
         state = { it.sessionDetail },
-        setState = { s: State, d: SessionDetail? -> s.copy(sessionDetail = d) },
+        setState = { s: State, d: SessionFeature.State? -> s.copy(sessionDetail = d) },
         action = { (it as? Action.SessionDetail)?.action },
         embed = Action::SessionDetail,
         child = session,
         childID = { it.navigationID },
     )
-    return forEach<State, Action, Int, SessionDetail, SessionFeature.Action>(
+    return forEach<State, Action, Int, SessionFeature.State, SessionFeature.Action>(
         slot = SubagentStackSlot,
         parent = presented,
         elements = { it.subagentStack },
-        setElements = { s: State, list: List<SessionDetail> -> s.copy(subagentStack = list) },
+        setElements = { s: State, list: List<SessionFeature.State> -> s.copy(subagentStack = list) },
         elementID = { it.navigationID },
         action = { (it as? Action.SubagentStack)?.let { a -> a.id to a.action } },
         embed = { id, a -> Action.SubagentStack(id, a) },
@@ -223,25 +260,57 @@ private fun HomeFeature.detailSessionsCore(): Reducer<State, Action> {
     )
 }
 
+/** What a pushed subagent's screen leaves behind when it goes (iOS `StackLeftovers`). */
+private data class StackLeftovers(val pageID: UUID?, val livePress: Int?) {
+    constructor(detail: SessionFeature.State) : this(
+        pageID = detail.browser.pageID,
+        livePress = if (detail.hasLiveDictation) detail.dictationPress else null,
+    )
+}
+
 /**
- * Home's own actions and the screens, then what follows them: a link tap dropped when its screen
- * stops being the one on top, and background reads resuming once the foreground read settles.
- * (iOS also discards a gone screen's in-app browser page (`discardPage`) and stops its recording
- * here. TODO(merge) round 2b / `:feature:session`: the page and the recording are the screen's.)
+ * Home's own actions, the open session and its pushed subagents, and the pages and recordings
+ * those take with them when they go; a link tap dropped when its screen stops being the one on
+ * top; and background reads resuming once the foreground read settles.
  */
 private fun HomeFeature.detailSessions(): Reducer<State, Action> =
     detailSessionsCore()
+        // A pushed subagent that leaves takes its page with it, and a recording still running there
+        // stops (its words wait in its parked composer).
+        .onChange({ state ->
+            if (state.subagentStack.isEmpty()) emptyMap() else state.subagentStack.associate { it.navigationID to StackLeftovers(it) }
+        }) { old, _, state ->
+            val remaining = state.subagentStack.mapTo(HashSet()) { it.navigationID }
+            val gone = old.filterKeys { it !in remaining }.values
+            if (gone.isEmpty()) return@onChange Reduced(state)
+            val dictation = dependency(DictationClient)
+            Reduced(
+                state,
+                Effect.merge(
+                    gone.mapNotNull { it.pageID }.map { discardPage(it) } +
+                        gone.mapNotNull { it.livePress }.map { press -> Effect.run<Action> { dictation.cancel(press) } },
+                ),
+            )
+        }
         // A link tap waits on the system only while the screen it was tapped on stays the one on
-        // screen. Whatever changes that drops the tap: its answer must open nothing.
+        // screen. Whatever changes that (another session, a subagent pushed or popped, a family
+        // switch in place, Catch Up moving to another card or running out) drops the tap: its
+        // answer must open nothing. Only the screen that was on top can hold one, and a screen
+        // that left ended its own effects.
         .onChange({ it.visibleScreen }) { old, _, state ->
             val id = old.navigationID ?: return@onChange Reduced(state)
-            // TODO(merge): only when that screen holds a link probe (`linkProbe != nil`).
             if (old.stackDepth > 0) {
-                if (state.subagentStack.none { it.navigationID == id }) return@onChange Reduced(state)
-                return@onChange Reduced(state, Effect.send(Action.ScreenMessage(id, SessionScreenMessage.VisibleScreenChanged)))
+                if (state.subagentStack.firstOrNull { it.navigationID == id }?.linkProbe == null) return@onChange Reduced(state)
+                return@onChange Reduced(state, Effect.send(Action.SubagentStack(id, SessionFeature.Action.VisibleScreenChanged)))
             }
-            if (state.sessionDetail?.navigationID != id) return@onChange Reduced(state)
-            Reduced(state, Effect.send(Action.ScreenMessage(id, SessionScreenMessage.VisibleScreenChanged)))
+            val detail = state.sessionDetail
+            if (detail?.navigationID != id || detail.linkProbe == null) return@onChange Reduced(state)
+            Reduced(state, Effect.send(Action.detail(SessionFeature.Action.VisibleScreenChanged)))
+        }
+        // A session replaced on screen (the drawer, New Session, Catch Up, a delete) or one that
+        // left takes its in-app browser page with it.
+        .onChange({ it.sessionDetail?.browser?.pageID }) { old, new, state ->
+            if (old == null || old == new) Reduced(state) else Reduced(state, discardPage(old))
         }
         .onChange({ it.isInitialTranscriptInFlight }) { wasInFlight, _, state ->
             if (!wasInFlight || state.isInitialTranscriptInFlight) Reduced(state) else settleForegroundTranscriptLoad(state)
@@ -259,11 +328,11 @@ internal fun isFastStreamAction(state: State, action: Action): Boolean = when (a
         else -> false
     }
     is Action.TranscriptPrefetched, is Action.CachedTranscriptRefreshed -> true
-    // iOS `.sessionDetail(.presented(.contentBatch | .familyRunStateChanged))`.
-    // TODO(merge): match the real `SessionFeature` actions once `:feature:session` ports them.
-    is Action.ScreenMessage ->
-        (action.message is SessionScreenMessage.ContentBatch || action.message is SessionScreenMessage.FamilyRunStateChanged) &&
-            state.sessionDetail?.navigationID == action.navigationID
+    is Action.SessionDetail -> {
+        val presented = (action.action as? PresentationAction.Presented)?.action
+        (presented is SessionFeature.Action.ContentBatch || presented is SessionFeature.Action.FamilyRunStateChanged) &&
+            state.sessionDetail != null
+    }
     else -> false
 }
 
@@ -368,3 +437,72 @@ private fun Reducer<State, Action>.homeChildrenObservers(feature: HomeFeature): 
             dependency(VoiceSessionBoardClient).publish(new)
             Reduced(state)
         }
+        // Whoever moves a live call (the drawer, New Session, a draft's project) only edits its
+        // target; the voice model hears about it here.
+        .onChange({ it.sessionDetail?.voice?.placement }) { old, new, state ->
+            // Releasing what was let go clears it; that alone isn't a move.
+            if (old == null || new == null || (old.target == new.target && new.abandonedCallIDs.isEmpty())) {
+                Reduced(state)
+            } else {
+                Reduced(state, Effect.send(Action.detail(SessionFeature.Action.voicePresented(VoiceFeature.Action.TargetChanged))))
+            }
+        }
+        // What the call's ongoing notification shows follows the call wherever it moves, changing
+        // only when what it shows changes, never per second. On Android the call's own microphone
+        // foreground service (`:feature:voice`'s `VoiceCallService`, started by the call) *is* that
+        // notification, with its Mute and End buttons, so Home keeps the content (AppFeature reads
+        // it: a call keeps Home through a server switch) without posting a second one through
+        // `VoiceLiveActivityClient`.
+        .onChange({ it.sessionDetail?.voice?.let(::liveActivityCall) }) { _, call, state ->
+            val content = VoiceLiveActivity.content(call, state.voiceCallActivity, dependency(DateClient).now())
+            if (content == state.voiceCallActivity) Reduced(state) else Reduced(state.copy(voiceCallActivity = content))
+        }
+        // The recording's ongoing notification follows it across sessions, pushed only when what it
+        // shows changes. A call starting stops the recording, and the call's own takes over.
+        .onChange({ liveActivityRecording(it.recordingDetail) }) { _, recording, state ->
+            val content = DictationLiveActivity.content(recording, state.dictationActivity, dependency(DateClient).now())
+            if (content == state.dictationActivity) return@onChange Reduced(state)
+            val attributes = recording?.let { DictationActivityAttributes(serverID = it.serverID) }
+            val client = dependency(DictationLiveActivityClient)
+            Reduced(state.copy(dictationActivity = content), Effect.run { client.update(content, attributes) })
+        }
+        .onChange({ if (LabMarks.isEnabled) it.sessionIndicators else emptyMap() }) { old, _, state ->
+            for ((sessionID, indicator) in state.sessionIndicators) {
+                if (old[sessionID] != indicator) LabMarks.mark("indicator:${indicator.labMarkName}", sessionID = sessionID)
+            }
+            Reduced(state)
+        }
+
+/** The part of a call its ongoing notification shows (iOS `VoiceLiveActivity.Call.init(_:)`). */
+private fun liveActivityCall(voice: VoiceFeature.State): VoiceLiveActivity.Call = VoiceLiveActivity.Call(
+    phase = when (voice.phase) {
+        VoiceFeature.State.Phase.Connecting -> VoiceLiveActivity.CallPhase.Connecting
+        VoiceFeature.State.Phase.Live -> VoiceLiveActivity.CallPhase.Live
+        is VoiceFeature.State.Phase.EndingAfterGoodbye -> VoiceLiveActivity.CallPhase.EndingAfterGoodbye
+        VoiceFeature.State.Phase.Ended -> VoiceLiveActivity.CallPhase.Ended
+        is VoiceFeature.State.Phase.Failed -> VoiceLiveActivity.CallPhase.Failed
+        VoiceFeature.State.Phase.Dropped -> VoiceLiveActivity.CallPhase.Dropped
+    },
+    isMuted = voice.isMuted,
+    // Already delayed: a reconnect shorter than a second never sets it.
+    isReconnecting = voice.isReconnecting,
+    serverID = voice.target.server.id,
+    sessionID = voice.target.sessionID ?: "",
+)
+
+/** iOS `DictationLiveActivity.recording(in:)`: only a hands-free recording, outside a call. */
+private fun liveActivityRecording(detail: SessionFeature.State?): DictationLiveActivity.Recording? =
+    DictationLiveActivity.recording(
+        hasDetail = detail != null,
+        callIsTerminal = detail?.voice?.phase?.isTerminal ?: true,
+        isRecording = detail?.dictationPhase == DictationFeature.Phase.Recording,
+        holdIsLocked = detail?.dictationHold?.isLocked ?: true,
+        sessionTitle = detail?.session?.title,
+        serverID = detail?.server?.id ?: "",
+    )
+
+/** iOS `discardPage(_:)`: a page no screen shows any more is let go. */
+internal fun discardPage(id: UUID): Effect<Action> {
+    val pageReader = dependency(PageReaderClient)
+    return Effect.run { pageReader.discard(id) }
+}

@@ -1,13 +1,14 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.feature.session.*
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.PresentationAction
 import ai.opencode.core.store.Reduced
 import ai.opencode.feature.drawer.HomeFeature.Action
 import ai.opencode.feature.drawer.HomeFeature.State
-import ai.opencode.feature.drawer.bridge.SessionScreenEvent
-import ai.opencode.feature.drawer.notices.InAppNotice
+import ai.opencode.feature.session.SessionFeature
+import ai.opencode.feature.session.InAppNotice
 import ai.opencode.feature.drawer.switcher.reduceSessionSwitcher
 import ai.opencode.server.OpenCodeServerEvent
 
@@ -25,7 +26,7 @@ internal fun HomeFeature.core(state: State, action: Action): Reduced<State, Acti
         is Action.ServerEvent -> action.event is OpenCodeServerEvent.SessionRenamed ||
             action.event is OpenCodeServerEvent.SessionDeleted ||
             action.event is OpenCodeServerEvent.ProjectUpdated
-        is Action.SessionDetailEvent -> action.event is SessionScreenEvent.SessionCreated
+        is Action.SessionDetail -> (action.action as? PresentationAction.Presented)?.action is SessionFeature.Action.SessionCreated
         else -> false
     }
     if (persists) s = s.persistingSnapshot(dependency(HomeSnapshotDate).now())
@@ -71,14 +72,36 @@ private fun HomeFeature.coreRoute(state: State, action: Action): Reduced<State, 
     is Action.SystemPublishRequested,
     -> reduceSystem(state, action)
 
-    is Action.SessionDetailEvent -> {
-        if (state.sessionDetail == null) Reduced(state) else reduceSessionDetail(state, action.event)
+    is Action.SessionDetail -> when (val presentation = action.action) {
+        is PresentationAction.Presented -> reduceSessionDetail(state, presentation.action)
+        PresentationAction.Dismiss -> Reduced(state)
     }
 
-    // A popped subagent's late callbacks are dropped (iOS `detailReducer`).
-    is Action.SubagentEvent ->
-        if (state.subagentStack.none { it.navigationID == action.id }) Reduced(state)
-        else reduceSubagent(state, action.id, action.event)
+    is Action.SubagentStack -> {
+        val reduced = reduceSubagent(state, action.id, action.action)
+        when (val detailAction = action.action) {
+            SessionFeature.Action.Task -> {
+                val detail = reduced.state.subagentStack.firstOrNull { it.navigationID == action.id }
+                val sessionID = detail?.session?.id
+                if (detail == null || detail.initialTranscriptRequestIsExternal || sessionID == null) {
+                    reduced
+                } else {
+                    val cancelled = cancelBackgroundTranscriptReads(reduced.state, setOf(sessionID))
+                    Reduced(cancelled.state, Effect.merge(reduced.effect, cancelled.effect))
+                }
+            }
+            is SessionFeature.Action.RefreshRequested -> {
+                if (detailAction.reason !in foregroundRefreshReasons) {
+                    reduced
+                } else {
+                    val sessionID = reduced.state.subagentStack.firstOrNull { it.navigationID == action.id }?.session?.id
+                    val cancelled = cancelBackgroundTranscriptReads(reduced.state, setOfNotNull(sessionID))
+                    Reduced(cancelled.state, Effect.merge(reduced.effect, cancelled.effect))
+                }
+            }
+            else -> reduced
+        }
+    }
 
     is Action.LinkedSessionFetched, is Action.LinkedSessionOpened -> reduceSessionLinks(state, action)
 
@@ -165,10 +188,4 @@ private fun HomeFeature.coreRoute(state: State, action: Action): Reduced<State, 
     // The Onboarding Playground opens inside Settings (`SettingsFeature`), which sends it there.
     is Action.Settings -> reducePreferences(state, action.action)
 
-    is Action.SessionDetail -> when (action.action) {
-        is PresentationAction.Presented -> Reduced(state)
-        PresentationAction.Dismiss -> Reduced(state)
-    }
-
-    is Action.SubagentStack, is Action.ScreenMessage -> Reduced(state)
 }

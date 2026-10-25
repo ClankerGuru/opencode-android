@@ -1,5 +1,7 @@
 package ai.opencode.feature.drawer.switcher
 
+import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
+import ai.opencode.feature.transcript.markdown.ui.MarkdownBlocksView
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberFrameDurationSeconds
 import ai.opencode.core.motion.rememberReduceMotion
@@ -425,9 +427,9 @@ private fun SessionSwitcherActive(
     val selectedID by store.observe { it.sessionDetail?.session?.id }
     val serverID by store.observe { it.server.persistenceID }
     val isPresented by store.observe { it.sessionSwitcher.isPresented }
-    // TODO(merge) round 2b / `:feature:session`: also `sessionDetail?.browser.isOpen != true` (the in-app browser is the screen's `SessionFeature.browser`).
     val homeAllows by store.observe {
-        !it.isDrawerOpen && it.catchUp == null && it.subagentStack.isEmpty() && !it.isSettingsShown
+        !it.isDrawerOpen && it.catchUp == null && it.subagentStack.isEmpty() && !it.isSettingsShown &&
+            it.sessionDetail?.browser?.isOpen != true
     }
     val available = !usesSidebar && !drawerOpen && homeAllows
     controller.frameDuration = rememberFrameDurationSeconds()
@@ -480,9 +482,7 @@ private fun listProject(session: OpenCodeSession, projects: List<OpenCodeProject
  * A cold card (iOS `SessionSwitcherCachedPage`): drawn once from the existing transcript cache,
  * never a live session screen and never any I/O. It keeps the session screen's layout (header,
  * transcript, composer) so a card that becomes the live screen lands without a layout jump.
- *
- * TODO(merge): assistant text renders as plain text until `:feature:transcript` ports
- * `MarkdownBlocksView`.
+ * Replies render as the transcript's Markdown ([MarkdownBlocksView]), as history.
  */
 @Composable
 internal fun SessionSwitcherCachedPage(card: SessionSwitcherCard, items: List<OpenCodeTranscriptItem>, topInset: Dp, bottomInset: Dp) {
@@ -534,7 +534,10 @@ internal fun SessionSwitcherCachedPage(card: SessionSwitcherCard, items: List<Op
                                     .padding(horizontal = 14.dp, vertical = 10.dp),
                             )
                         }
-                        is OpenCodeTranscriptItem.AssistantMarkdown -> Text(item.text, style = OpenCodeTextStyles.body, color = colors.text)
+                        is OpenCodeTranscriptItem.AssistantMarkdown -> {
+                            val blocks = remember(item.text) { OpenCodeMarkdownBlock.blocks(item.text) }
+                            MarkdownBlocksView(blocks, rowID = item.id, revealItem = null)
+                        }
                         is OpenCodeTranscriptItem.Info -> Text(item.text, style = OpenCodeTextStyles.footnote, color = colors.secondaryText)
                         is OpenCodeTranscriptItem.Notice -> Text(item.text, style = OpenCodeTextStyles.footnote, color = colors.secondaryText)
                         else -> Unit

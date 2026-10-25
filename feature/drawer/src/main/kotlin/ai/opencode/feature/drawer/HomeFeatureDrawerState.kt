@@ -1,11 +1,13 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.feature.session.*
 import ai.opencode.core.sharing.SharedKey
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
-import ai.opencode.feature.drawer.bridge.DrawerBadge
-import ai.opencode.feature.drawer.bridge.SessionDetail
-import ai.opencode.feature.drawer.bridge.SessionSwitchSnapshot
+import ai.opencode.feature.media.BrowserFeature
+import ai.opencode.feature.session.DrawerBadge
+import ai.opencode.feature.session.SessionFeature
+import ai.opencode.feature.session.pruneRequests
 import ai.opencode.feature.drawer.catchup.CatchUpFeature
 import ai.opencode.server.ServerSharedKeys
 import ai.opencode.server.model.OpenCodeSession
@@ -80,7 +82,7 @@ internal inline fun HomeFeature.State.updatingSession(sessionID: String, transfo
 /** Replaces one remembered snapshot in place (`sessionSnapshots[id]?.… = …`). */
 internal inline fun HomeFeature.State.updatingSnapshot(
     sessionID: String,
-    transform: (SessionSwitchSnapshot) -> SessionSwitchSnapshot,
+    transform: (SessionFeature.SwitchSnapshot) -> SessionFeature.SwitchSnapshot,
 ): HomeFeature.State {
     val snapshot = sessionSnapshots[sessionID] ?: return this
     val next = transform(snapshot)
@@ -89,21 +91,21 @@ internal inline fun HomeFeature.State.updatingSnapshot(
 }
 
 /** `sessionDetail?.… = …`. */
-internal inline fun HomeFeature.State.updatingDetail(transform: (SessionDetail) -> SessionDetail): HomeFeature.State {
+internal inline fun HomeFeature.State.updatingDetail(transform: (SessionFeature.State) -> SessionFeature.State): HomeFeature.State {
     val detail = sessionDetail ?: return this
     val next = transform(detail)
     return if (next == detail) this else copy(sessionDetail = next)
 }
 
 /** `subagentStack[id: id]?.… = …` for each pushed screen. */
-internal inline fun HomeFeature.State.updatingSubagents(transform: (SessionDetail) -> SessionDetail): HomeFeature.State {
+internal inline fun HomeFeature.State.updatingSubagents(transform: (SessionFeature.State) -> SessionFeature.State): HomeFeature.State {
     if (subagentStack.isEmpty()) return this
     val next = subagentStack.map(transform)
     return if (next == subagentStack) this else copy(subagentStack = next)
 }
 
 /** `subagentStack[id: id]?.… = …`. */
-internal inline fun HomeFeature.State.updatingSubagent(id: Int, transform: (SessionDetail) -> SessionDetail): HomeFeature.State {
+internal inline fun HomeFeature.State.updatingSubagent(id: Int, transform: (SessionFeature.State) -> SessionFeature.State): HomeFeature.State {
     val index = subagentStack.indexOfFirst { it.navigationID == id }
     if (index < 0) return this
     val next = transform(subagentStack[index])
@@ -315,7 +317,7 @@ fun HomeFeature.State.purgingSession(sessionID: String): HomeFeature.State {
         sessionSnapshots = (sessionSnapshots - sessionID).mapValues { (_, snapshot) ->
             // A deleted subagent's requests leave the cached family too.
             snapshot.copy(family = snapshot.family.filterNot { it.id == sessionID })
-                .pruningRequests { owner, _ -> owner == sessionID }
+                .pruneRequests { it.sessionID == sessionID }
         },
         sessionSnapshotOrder = sessionSnapshotOrder - sessionID,
     )
@@ -391,18 +393,25 @@ fun HomeFeature.State.drawerBadge(excluding: String?): DrawerBadge? {
 }
 
 /**
- * Records local activity on the family root when [detail] accepted a send (draft cleared and
- * awaiting reply); returns the state and the root ID.
+ * Records local activity on the family root when [action] was an accepted send on [detail] (draft
+ * cleared and awaiting reply); returns the state and the root ID.
  */
-fun HomeFeature.State.notingScreenSendIfAccepted(detail: SessionDetail?, at: () -> Instant): Pair<HomeFeature.State, String?> {
-    if (detail == null || !detail.draft.isEmpty) return this to null
+fun HomeFeature.State.notingScreenSendIfAccepted(
+    detail: SessionFeature.State?,
+    action: SessionFeature.Action,
+    at: () -> Instant,
+): Pair<HomeFeature.State, String?> {
+    if (detail == null || !detail.isAwaitingReply) return this to null
+    val accepted = (action == SessionFeature.Action.SendTapped && detail.draft.isEmpty()) ||
+        (action == SessionFeature.Action.Browser(BrowserFeature.Action.AskSent) && detail.browser.askDraft.isEmpty())
+    if (!accepted) return this to null
     val rootID = sessionDetail?.familyRootID ?: sessionDetail?.session?.id ?: detail.familyRootID ?: detail.session?.id
         ?: return this to null
     return notingLocalActivity(rootID, at()) to rootID
 }
 
 fun HomeFeature.State.invalidatingSnapshotFamilyReads(
-    matching: (SessionSwitchSnapshot) -> Boolean = { true },
+    matching: (SessionFeature.SwitchSnapshot) -> Boolean = { true },
 ): HomeFeature.State {
     var changed = false
     val next = sessionSnapshots.mapValues { (_, snapshot) ->

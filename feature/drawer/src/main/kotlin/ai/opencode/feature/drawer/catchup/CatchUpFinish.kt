@@ -246,8 +246,8 @@ data class CatchUpFinishTimeline(
  * it at Catch Up with its count. Per-frame values are read in draw/layer blocks, so the row
  * recomposes only when the count first shows 0.
  *
- * Laid out like iOS `DrawerShortcutLabel` (symbol 22 wide, 8 apart, row 44 high, 10/12 insets).
- * TODO(merge): host inside the drawer list's shortcut label once `DrawerStyle` is ported.
+ * Laid out like iOS `DrawerShortcutLabel` (symbol 22 wide, 8 apart, row 44 high, 10/12 insets);
+ * the drawer list's Catch Up row (`DrawerListSupportCells`) hosts it in its shortcut label.
  */
 @Composable
 fun DrawerCatchUpFinishedLabel(

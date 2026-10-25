@@ -1,5 +1,6 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.feature.session.*
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.dependency
@@ -7,13 +8,11 @@ import ai.opencode.core.log.AppLog
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.cancellable
-import ai.opencode.feature.drawer.bridge.SessionFeatureLimits
-import ai.opencode.feature.drawer.bridge.SessionScreenEvent
+import ai.opencode.feature.session.SessionFeature
 import ai.opencode.server.retry.NetworkRetry
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
-import ai.opencode.server.OpenCodeTranscriptWindow
 import ai.opencode.server.retry.RequestIdempotency
 import ai.opencode.server.retry.RetryPolicy
 import ai.opencode.server.model.OpenCodeSession
@@ -147,7 +146,7 @@ internal fun HomeFeature.refreshCachedTranscript(
             if (after > Duration.ZERO) clock.sleep(after)
             if (!currentCoroutineContext().isActive) return@run
             val items = try {
-                client.transcript(server, sessionID, SessionFeatureLimits.initialFetchLimit)
+                client.transcript(server, sessionID, SessionFeature.initialFetchLimit)
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (_: OpenCodeClientError) {
@@ -185,7 +184,7 @@ internal fun HomeFeature.prefetchTranscripts(state: HomeFeature.State): Effect<H
             if (index > 0) clock.sleep(50.milliseconds)
             if (!currentCoroutineContext().isActive) return@run
             val items = try {
-                client.transcript(server, sessionID, SessionFeatureLimits.initialFetchLimit)
+                client.transcript(server, sessionID, SessionFeature.initialFetchLimit)
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (_: OpenCodeClientError) {
@@ -203,9 +202,9 @@ internal suspend fun selectedTranscript(
     client: OpenCodeClient,
     server: OpenCodeServer,
     sessionID: String,
-): Pair<Result<List<OpenCodeTranscriptItem>>, OpenCodeTranscriptWindow.PageCursor?> = try {
-    val window = client.transcriptWithContextUsageAndCursor(server, sessionID, SessionFeatureLimits.firstFrameFetchLimit)
-    Result.success(window.items) to window.pageCursor
+): Pair<Result<List<OpenCodeTranscriptItem>>, SessionFeature.AuthoritativeRefresh.PageCursor?> = try {
+    val window = client.transcriptWithContextUsageAndCursor(server, sessionID, SessionFeature.firstFrameFetchLimit)
+    Result.success(window.items) to window.pageCursor?.let { SessionFeature.AuthoritativeRefresh.PageCursor(it.next) }
 } catch (cancellation: CancellationException) {
     throw cancellation
 } catch (error: OpenCodeClientError) {
@@ -218,7 +217,7 @@ internal fun HomeFeature.acknowledgeShownSubagent(sessionID: String, idle: Long,
     return Effect.run<HomeFeature.Action> { send ->
         try {
             client.viewSession(server, sessionID, idle)
-            send(HomeFeature.Action.SessionDetailEvent(SessionScreenEvent.ViewAcknowledged(sessionID, idle)))
+            send(HomeFeature.Action.detail(SessionFeature.Action.ViewAcknowledged(sessionID, idle)))
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (error: OpenCodeClientError) {

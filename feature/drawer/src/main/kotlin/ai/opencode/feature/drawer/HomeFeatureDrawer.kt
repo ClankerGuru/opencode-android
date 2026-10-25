@@ -1,5 +1,10 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.feature.composer.SharedDraftTarget
+import ai.opencode.feature.composer.SharedComposerDraft
+import ai.opencode.feature.composer.DraftState
+import ai.opencode.feature.composer.ComposerPersistence
+import ai.opencode.feature.session.*
 import ai.opencode.feature.system.share.ShareInboxClient
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.DateClient
@@ -83,8 +88,7 @@ internal fun HomeFeature.reduceDrawer(state: State, action: Action): HomeReduced
             action.result.getOrNull()?.let { items ->
                 s = s.publishingTranscript(action.sessionID, items).persistingTranscriptCache(action.sessionID)
             }
-            // TODO(merge): send `.sessionDetail(.presented(.transcriptResponse(…, pageCursor:)))`.
-            return Reduced(s.updatingDetail { it.applyingTranscript(action.result) })
+            return Reduced(s, Effect.send(Action.detail(SessionFeature.Action.TranscriptResponse(action.sessionID, action.result, action.pageCursor))))
         }
 
         is Action.SessionNavigationReady -> {
@@ -317,10 +321,45 @@ private fun HomeFeature.sessionTapped(state: State, sessionID: String): HomeRedu
 }
 
 /**
- * Catch Up's card becomes the open session as it is (iOS `promoteCatchUpDetail`): it reads on view
- * again, keeping its draft and any subagent the reader opened.
+ * Catch Up's card becomes the open session as it is (iOS `promoteCatchUpDetail`,
+ * `ComposerPersistence.swift`): it reads on view again, keeping any subagent the reader opened.
+ * What was typed on the card joins what waited for the session (a share, or its persisted draft),
+ * and the family members' card drafts join theirs.
  */
-internal fun State.promotingCatchUpDetail(): State = updatingDetail { if (it.readsOnView) it else it.copy(readsOnView = true) }
+internal fun State.promotingCatchUpDetail(): State {
+    var detail = sessionDetail ?: return this
+    val wasCatchUpCard = !detail.readsOnView
+    detail = detail.copy(readsOnView = true)
+    if (!wasCatchUpCard) return copy(sessionDetail = detail)
+    val cardComposer = detail.sessionComposer
+    val persistence = dependency(ComposerPersistence)
+    val serverID = server.persistenceID
+    var s = this
+    for ((memberID, draft) in detail.catchUpFamilyDrafts) {
+        if (draft.isEmpty || memberID == detail.session?.id) continue
+        val waiting = s.sharedDrafts.removeValue(SharedDraftTarget(memberID))
+        val persisted = if (waiting == null) persistence.loadDraft(serverID, memberID) else null
+        val merged = when {
+            waiting != null -> SessionFeature.State.draft(s.server, null, s.projects).absorb(waiting).absorb(SharedComposerDraft(draft))
+            persisted != null -> SessionFeature.State.draft(s.server, null, s.projects).applyPersistedDraft(persisted).absorb(SharedComposerDraft(draft))
+            else -> null
+        }
+        persistence.scheduleDraft(serverID, memberID, null, merged?.sessionComposer ?: draft)
+    }
+    detail = detail.copy(catchUpFamilyDrafts = emptyMap())
+    val waiting = s.sharedDrafts.removeValue(SharedDraftTarget(detail.session?.id))
+    val persisted = if (waiting == null) persistence.loadDraft(serverID, detail.session?.id) else null
+    if (waiting != null) {
+        detail = detail.setSessionComposer(DraftState()).absorb(waiting)
+        if (!cardComposer.isEmpty) detail = detail.absorb(SharedComposerDraft(cardComposer))
+    } else if (persisted != null) {
+        detail = detail.setSessionComposer(DraftState()).applyPersistedDraft(persisted)
+        if (!cardComposer.isEmpty) detail = detail.absorb(SharedComposerDraft(cardComposer))
+    }
+    s = s.copy(sessionDetail = detail)
+    s.syncAbsorbedDraft(detail)
+    return s
+}
 
 /**
  * Marks [session] as the last-viewed, locally read session and, when [opensDetail] is true and it

@@ -1,5 +1,6 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.feature.session.*
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
@@ -7,7 +8,15 @@ import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.feature.drawer.HomeFeature.Action
 import ai.opencode.feature.drawer.HomeFeature.State
-import ai.opencode.feature.drawer.bridge.SessionScreenMessage
+import ai.opencode.feature.session.SessionFeature
+import ai.opencode.feature.session.hasLiveDictation
+import ai.opencode.feature.session.isDraft
+import ai.opencode.feature.session.isVoiceAvailable
+import ai.opencode.feature.system.liveactivity.DictationCommand
+import ai.opencode.feature.system.liveactivity.DictationLiveActivityClient
+import ai.opencode.feature.system.liveactivity.VoiceCallCommand
+import ai.opencode.feature.system.liveactivity.VoiceLiveActivityClient
+import ai.opencode.feature.voice.VoiceFeature
 import ai.opencode.feature.composer.SharedComposerDraft
 import ai.opencode.feature.composer.SharedDraftTarget
 import ai.opencode.feature.system.SystemAction
@@ -18,7 +27,6 @@ import ai.opencode.feature.system.share.ShareCredentials
 import ai.opencode.feature.system.share.ShareInboxClient
 import ai.opencode.feature.system.share.ShareTargets
 import ai.opencode.feature.system.share.ShareTargetsPublication
-import ai.opencode.feature.voice.VoiceRoutePreferences
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import ai.opencode.feature.system.share.ReceivedShare
@@ -51,15 +59,40 @@ internal fun HomeFeature.publishShareCredentials(server: OpenCodeServer): Effect
 }
 
 internal fun HomeFeature.reduceSystem(state: State, action: Action): HomeReduced = when (action) {
-    // TODO(merge) round 2b / `:feature:session`: iOS ends or mutes the open session's call
-    // (`.voice(.presented(.endTapped/.muteTapped))`), and with no call clears `voiceCallActivity` and
-    // the activity (`voiceLiveActivity.update(nil, nil)`). Needs the session's `VoiceFeature` child.
-    is Action.VoiceCallCommandReceived -> Reduced(state)
+    is Action.VoiceCallCommandReceived -> {
+        val voice = state.sessionDetail?.voice
+        if (voice == null) {
+            // No call owns the notification the tap came from.
+            val client = dependency(VoiceLiveActivityClient)
+            Reduced(state.copy(voiceCallActivity = null), Effect.run { client.update(null, null) })
+        } else if (voice.phase.isTerminal) {
+            // An ended call can still be in state while its bar sweeps out.
+            Reduced(state)
+        } else {
+            val callAction = when (action.command) {
+                VoiceCallCommand.End -> VoiceFeature.Action.EndTapped
+                VoiceCallCommand.ToggleMute -> VoiceFeature.Action.MuteTapped
+            }
+            Reduced(state, Effect.send(Action.detail(SessionFeature.Action.voicePresented(callAction))))
+        }
+    }
 
-    // TODO(merge) round 2b / `:feature:session`: iOS stops the recording the command came from (a
-    // pushed subagent's first, else the session's: `.dictationStopRequested`), and with none clears
-    // `dictationActivity` and the activity. Needs the session's dictation state.
-    is Action.DictationCommandReceived -> Reduced(state)
+    is Action.DictationCommandReceived -> {
+        val child = state.subagentStack.lastOrNull { it.hasLiveDictation }
+        when {
+            child != null -> when (action.command) {
+                DictationCommand.Stop -> Reduced(state, Effect.send(Action.SubagentStack(child.navigationID, SessionFeature.Action.dictationStopRequested)))
+            }
+            state.sessionDetail?.hasLiveDictation != true -> {
+                // No recording owns the notification the tap came from.
+                val client = dependency(DictationLiveActivityClient)
+                Reduced(state.copy(dictationActivity = null), Effect.run { client.update(null, null) })
+            }
+            else -> when (action.command) {
+                DictationCommand.Stop -> Reduced(state, Effect.send(Action.detail(SessionFeature.Action.dictationStopRequested)))
+            }
+        }
+    }
 
     is Action.SharesReceived -> sharesReceived(state, action.shares)
 
@@ -191,8 +224,7 @@ internal fun HomeFeature.openSystemDestination(
             s = s.openingDraft(directory = project?.directory, reason = "a shortcut started a new session")
         } else if (project != null && s.sessionDetail?.draftProject != project) {
             // The picker's own path, which also moves a live call's draft.
-            // TODO(merge) round 2b / `:feature:session`: send the screen `.projectPicked(project)`.
-            s = s.updatingDetail { it.copy(draftProject = project) }
+            effects += Effect.send(Action.detail(SessionFeature.Action.ProjectPicked(project)))
         }
         // A project that's gone is asked for again, never swapped for another.
         if (projectID != null && project == null) s = s.updatingDetail { it.copy(draftProject = null) }
@@ -218,23 +250,22 @@ internal fun HomeFeature.openSystemDestination(
  * cleared first, as the screen does when it changes; without Voice set up, Settings opens where
  * it's set up. In the background no call view appears to start the call (`startIfNeeded`), so
  * it's started here.
- *
- * TODO(merge) round 2b / `:feature:session`: with the screen's `VoiceFeature` child: clear a
- * terminal call, keep a live one, and with Voice available send the screen `.voiceTapped` (then
- * `.voice(.presented(.startIfNeeded))` in the background). Until then a call set up has nothing to
- * start here; without Voice set up (`VoiceRoutePreferences.isAvailable`, iOS
- * `detail.isVoiceAvailable`) the call button's path opens Settings.
  */
-@Suppress("UnusedReceiverParameter", "UNUSED_PARAMETER")
+@Suppress("UnusedReceiverParameter")
 internal fun HomeFeature.startSystemCall(state: State, inBackground: Boolean = false): HomeReduced {
-    if (state.sessionDetail == null) return Reduced(state)
-    if (VoiceRoutePreferences().isAvailable(state.server)) return Reduced(state)
-    return Reduced(state.showingSettings())
+    val detail = state.sessionDetail ?: return Reduced(state)
+    var s = state
+    if (detail.voice?.phase?.isTerminal == true) s = s.updatingDetail { it.copy(voice = null) }
+    if (s.sessionDetail?.voice != null) return Reduced(s)
+    if (!detail.isVoiceAvailable) return Reduced(s.showingSettings())
+    val tapped = Effect.send<Action>(Action.detail(SessionFeature.Action.VoiceTapped))
+    if (!inBackground) return Reduced(s, tapped)
+    return Reduced(s, Effect.concatenate(tapped, Effect.send(Action.detail(SessionFeature.Action.voicePresented(VoiceFeature.Action.StartIfNeeded)))))
 }
 
 /** Tells the open screens their requests lost the connection. */
 @Suppress("UnusedReceiverParameter")
 internal fun HomeFeature.requestsDisconnected(state: State): Effect<Action> = Effect.merge(
-    sendToDetail(state, SessionScreenMessage.RequestsConnectionChanged(false)),
-    forwardToSubagents(state, SessionScreenMessage.RequestsConnectionChanged(false)),
+    sendToDetail(state, SessionFeature.Action.RequestsConnectionChanged(false)),
+    forwardToSubagents(state, SessionFeature.Action.RequestsConnectionChanged(false)),
 )

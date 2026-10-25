@@ -8,24 +8,21 @@ import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.PresentationAction
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
-import ai.opencode.feature.drawer.bridge.SessionDetail
-import ai.opencode.feature.drawer.bridge.SessionRefreshReason
-import ai.opencode.feature.drawer.bridge.SessionScreenEvent
-import ai.opencode.feature.drawer.bridge.SessionScreenMessage
-import ai.opencode.feature.drawer.bridge.SessionSwitchSnapshot
 import ai.opencode.feature.drawer.catchup.CatchUpFeature
-import ai.opencode.feature.drawer.notices.InAppNotice
+import ai.opencode.feature.session.InAppNotice
 import ai.opencode.feature.drawer.switcher.SessionSwitcherFeature
-import ai.opencode.feature.drawer.bridge.SessionFeatureLimits
-import ai.opencode.feature.composer.ComposerFileAttachment
 import ai.opencode.feature.composer.ComposerPersistence
+import ai.opencode.feature.composer.PromptOutbox
 import ai.opencode.feature.composer.DraftState
 import ai.opencode.feature.composer.SharedComposerDraft
 import ai.opencode.feature.composer.SharedDraftTarget
 import ai.opencode.feature.composer.SharedDrafts
 import ai.opencode.feature.composer.parkPersistedDraft
 import ai.opencode.feature.composer.syncAbsorbedDraft
-import ai.opencode.feature.session.SessionFeature
+import ai.opencode.feature.session.*
+import ai.opencode.feature.system.liveactivity.DictationActivityAttributes
+import ai.opencode.feature.system.liveactivity.VoiceCallActivityAttributes
+import ai.opencode.feature.voice.VoiceFeature
 import ai.opencode.feature.system.SystemAction
 import ai.opencode.feature.system.liveactivity.DictationCommand
 import ai.opencode.feature.system.liveactivity.VoiceCallCommand
@@ -37,7 +34,6 @@ import ai.opencode.feature.settings.whatsnew.WhatsNewFeature
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.OpenCodeServerEvent
-import ai.opencode.server.OpenCodeTranscriptWindow
 import ai.opencode.server.model.OpenCodeHomeSnapshot
 import ai.opencode.server.model.OpenCodeModelRef
 import ai.opencode.server.model.OpenCodeNotifyPluginStatus
@@ -59,8 +55,9 @@ import kotlin.time.Duration.Companion.seconds
  * `HomeFeatureCore.kt`. Child features (`HomeConnectionFeature`, `HomeNotificationsFeature`,
  * `HomeSettingsFeature`, `SessionSwitcherFeature`, `CatchUpFeature`) are scoped there.
  *
- * Session screens are [SessionDetail] stand-ins wrapping the stub `SessionFeature.State` until
- * `:feature:session` ports the fields Home coordinates (see `bridge/`).
+ * Session screens are `:feature:session`'s [SessionFeature]: the open one presented (`ifLet`) and
+ * pushed subagents identified by their `navigationID` (`forEach`); Home matches their actions after
+ * they've reduced, as iOS's `HomeFeature` does on `.sessionDetail(.presented(…))`.
  */
 class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
 
@@ -106,7 +103,7 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         /** An uncached session's transcript being read for the tap that opened it (`CancelID.selectedTranscript`). */
         val selectedTranscriptFetch: SelectedTranscriptFetch? = null,
         /** Last-known chrome for the last few visited sessions, scoped to this server. */
-        val sessionSnapshots: Map<String, SessionSwitchSnapshot> = emptyMap(),
+        val sessionSnapshots: Map<String, SessionFeature.SwitchSnapshot> = emptyMap(),
         /** Model picks waiting for the next send into a session not on screen yet. */
         val waitingPicks: Map<String, OpenCodeModelRef> = emptyMap(),
         val sessionSnapshotOrder: List<String> = emptyList(),
@@ -141,11 +138,11 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
          * effects end when it closes. What's New from the drawer's row is this with `root = whatsNew`.
          */
         val settings: SettingsFeature.State? = null,
-        val sessionDetail: SessionDetail? = null,
+        val sessionDetail: SessionFeature.State? = null,
         /** A subagent waiting for its parent to open under it (`sessionTapped`). */
         val pendingSubagentPush: OpenCodeSession? = null,
         /** Subagents pushed over [sessionDetail], bottom first; keyed by their (negative) `navigationID`. */
-        val subagentStack: List<SessionDetail> = emptyList(),
+        val subagentStack: List<SessionFeature.State> = emptyList(),
         /** Sessions looked up for links in transcripts (`SessionLink`), by ID. */
         val linkedSessions: Map<String, OpenCodeSession> = emptyMap(),
         val missingLinkedSessionIDs: Set<String> = emptySet(),
@@ -174,6 +171,10 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         val snapshotLoaded: Boolean = true,
         /** Whether Voice is set up, as last observed. */
         val systemVoiceAvailable: Boolean = false,
+        /** What the voice call's ongoing notification (iOS Live Activity) last showed. */
+        val voiceCallActivity: VoiceCallActivityAttributes.ContentState? = null,
+        /** What the recording's ongoing notification (iOS Live Activity) last showed. */
+        val dictationActivity: DictationActivityAttributes.ContentState? = null,
         /** In-App Notices (Experimental): the drawer button's label for another session's update, while it shows. */
         val inAppNotice: InAppNotice? = null,
         val inAppNoticeGeneration: Int = 0,
@@ -264,14 +265,14 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
             val sessionID: String,
             val items: List<OpenCodeTranscriptItem>?,
             val isRunning: Boolean,
-            val snapshot: SessionSwitchSnapshot?,
+            val snapshot: SessionFeature.SwitchSnapshot?,
             val activeFamilyIDs: Set<String>,
         )
 
         /** What `knownParents` merges (iOS `ParentSources`). */
         data class ParentSources(
             val activeSessionParents: Map<String, String>,
-            val sessionSnapshots: Map<String, SessionSwitchSnapshot>,
+            val sessionSnapshots: Map<String, SessionFeature.SwitchSnapshot>,
             val family: List<OpenCodeSession>,
         ) {
             val knownParents: Map<String, String>
@@ -432,17 +433,34 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         fun unsettlingNotices(): State = copy(noticeReadiness = NoticeReadiness.unsettled)
 
         /** The screen on top: the last pushed subagent, else the session. */
-        val topDetail: SessionDetail? get() = subagentStack.lastOrNull() ?: sessionDetail
+        val topDetail: SessionFeature.State? get() = subagentStack.lastOrNull() ?: sessionDetail
 
-        /** Whether an initial or foreground transcript request is in flight. */
+        /** The screen whose recording the ongoing notification shows: a pushed one keeps its own while it stays. */
+        val recordingDetail: SessionFeature.State? get() = subagentStack.lastOrNull { it.hasLiveDictation } ?: sessionDetail
+
+        /** Whether an initial or foreground transcript request (`selectedTranscript` or the top screen's `.open`/`.resume`/`.reconnect` refresh) is in flight. */
         val isInitialTranscriptInFlight: Boolean
             get() {
                 val fetch = selectedTranscriptFetch
                 if (fetch != null && fetch.transition == detailGeneration) return true
-                // TODO(merge): also the top screen's `.open`/`.resume`/`.reconnect` refresh in flight
-                // (`topDetail?.refresh`), once SessionFeature reads its own transcript.
-                return false
+                val refresh = topDetail?.refresh ?: return false
+                return refresh.reason in foregroundRefreshReasons || refresh.followup?.let { it in foregroundRefreshReasons } == true
             }
+
+        /** The open session's call, while it connects, is live or is leaving (not ended or failed). */
+        val hasLiveCall: Boolean get() = sessionDetail?.voice?.phase?.isTerminal == false
+
+        /**
+         * A call or a recording owns an ongoing notification (iOS `voiceCallActivity != nil ||
+         * dictationActivity != nil`): `AppFeature` keeps this Home through a server switch only without one.
+         */
+        val hasLiveCallOrRecording: Boolean get() = voiceCallActivity != null || dictationActivity != null
+
+        /** The open session drew its first content frame (iOS `isColdLaunchContentReady` reads it). */
+        val hasRenderedFirstContentFrame: Boolean get() = sessionDetail?.hasRenderedFirstContentFrame == true
+
+        /** The open session shows a sheet, alert or page over itself (iOS `sessionDetail?.presentsOverSession`). */
+        val presentsOverSession: Boolean get() = sessionDetail?.presentsOverSession == true
 
         /** What the reader is looking at: the screen on top, the session it shows, and Catch Up's card. */
         val visibleScreen: VisibleScreen
@@ -624,22 +642,10 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         data class SnapshotRefreshed(val snapshot: OpenCodeHomeSnapshot) : Action
         data class ActiveAncestryResolved(val parents: Map<String, String>) : Action
         data class AttentionRefreshed(val sessionIDs: Set<String>) : Action
-        /** The open session's own actions (`ifLet`). */
+        /** The open session's own actions (`ifLet`); Home matches them after the screen has reduced them. */
         data class SessionDetail(val action: PresentationAction<SessionFeature.Action>) : Action
-        /**
-         * What the open session's screen did that Home coordinates (iOS matches these on
-         * `.sessionDetail(.presented(…))`). TODO(merge): fold into [SessionDetail].
-         */
-        data class SessionDetailEvent(val event: SessionScreenEvent) : Action
         /** A pushed subagent's own actions, by its `navigationID` (`forEach`). */
         data class SubagentStack(val id: Int, val action: SessionFeature.Action) : Action
-        /** What a pushed subagent's screen did. TODO(merge): fold into [SubagentStack]. */
-        data class SubagentEvent(val id: Int, val event: SessionScreenEvent) : Action
-        /**
-         * Home telling the screen [navigationID] something (iOS sends a `SessionFeature.Action`).
-         * Inert until `:feature:session` handles them. TODO(merge): send the real actions.
-         */
-        data class ScreenMessage(val navigationID: Int, val message: SessionScreenMessage) : Action
         /** The screen went back until [depth] subagents remain pushed. */
         data class SubagentsPopped(val depth: Int) : Action
         /** A linked session ID looked up for its title. */
@@ -659,7 +665,7 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         data class SelectedTranscriptResponse(
             val sessionID: String,
             val result: Result<List<OpenCodeTranscriptItem>>,
-            val pageCursor: OpenCodeTranscriptWindow.PageCursor? = null,
+            val pageCursor: SessionFeature.AuthoritativeRefresh.PageCursor? = null,
         ) : Action
         data class VoiceCallCommandReceived(val command: VoiceCallCommand) : Action
         data class DictationCommandReceived(val command: DictationCommand) : Action
@@ -678,7 +684,7 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         /** From the view: whether the drawer button can show the label. */
         data class DrawerLabelAvailabilityChanged(val shows: Boolean) : Action
         /** Used by playgrounds to swap fixture states in place. */
-        data class PlaygroundSetSessionDetail(val detail: ai.opencode.feature.drawer.bridge.SessionDetail) : Action
+        data class PlaygroundSetSessionDetail(val detail: SessionFeature.State) : Action
         data class PlaygroundReplaceState(val state: State) : Action
 
         companion object {
@@ -690,6 +696,9 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
             fun catchUpFinished(reducedMotion: Boolean): Action = CatchUp(CatchUpFeature.Action.Finished(reducedMotion))
             val catchUpOpenTapped: Action get() = CatchUp(CatchUpFeature.Action.OpenTapped)
             val catchUpMarkAllReadTapped: Action get() = CatchUp(CatchUpFeature.Action.MarkAllReadTapped)
+
+            /** `.sessionDetail(.presented(action))`. */
+            fun detail(action: SessionFeature.Action): Action = SessionDetail(PresentationAction.Presented(action))
         }
     }
 
@@ -780,8 +789,8 @@ object HomeSnapshotDate : DependencyKey<DateClient> {
     override val testValue: DateClient = DateClient.constant(Instant.EPOCH)
 }
 
-/** iOS `SessionRefreshReason` values that make a foreground read. */
-internal val foregroundRefreshReasons = setOf(SessionRefreshReason.Open, SessionRefreshReason.Resume, SessionRefreshReason.Reconnect)
+/** The `RefreshReason`s that make a foreground read (`.open`, `.resume`, `.reconnect`). */
+internal val foregroundRefreshReasons: Set<RefreshReason> = setOf(RefreshReason.Open, RefreshReason.Resume, RefreshReason.Reconnect)
 
 // region State navigation (iOS `HomeFeature.State` methods in `HomeFeature.swift`)
 
@@ -819,7 +828,7 @@ fun HomeFeature.State.absorbingSharedDrafts(): HomeFeature.State {
     for (child in s.subagentStack) {
         val key = SharedDraftTarget(child.session?.id ?: continue)
         val shared = s.sharedDrafts.removeValue(key) ?: continue
-        s = s.updatingSubagent(child.navigationID) { it.absorbing(shared) }
+        s = s.updatingSubagent(child.navigationID) { it.absorb(shared) }
         s.subagentStack.firstOrNull { it.navigationID == child.navigationID }?.let { s.syncAbsorbedDraft(it) }
     }
     val detail = s.sessionDetail ?: return s
@@ -835,35 +844,13 @@ fun HomeFeature.State.absorbingSharedDrafts(): HomeFeature.State {
         val project = detail.projects.firstOrNull { it.id == projectID } ?: s.projects.firstOrNull { it.id == projectID }
         if (project != null) s = s.updatingDetail { it.copy(draftProject = project) }
     }
-    s = s.updatingDetail { it.absorbing(shared) }
+    s = s.updatingDetail { it.absorb(shared) }
     s.sessionDetail?.let { s.syncAbsorbedDraft(it) }
     return s
 }
 
-/**
- * iOS `SessionFeature.State.absorb(_:)` (`ShareInbox.swift`): shared text follows whatever is
- * already typed, and its attachments, files, location and chips join the composer's. A parked file
- * still uploading can't resume, so it comes back failed. TODO(merge) round 2b / `:feature:session`:
- * the screen's own `absorb` (the request bar's parked composer, a live recording's rebase, the
- * focus request, Send Later's `sharedSend`, `unstartedUploadIDs`).
- */
-private fun SessionDetail.absorbing(shared: SharedComposerDraft): SessionDetail {
-    val newFiles = shared.parkedFiles.map { file ->
-        if (file.isUploading) file.copy(status = ComposerFileAttachment.Status.Failed("Couldn’t upload")) else file
-    } + shared.files.map { ComposerFileAttachment(it) }
-    return copy(
-        draft = draft.copy(
-            text = SharedComposerDraft.joined(draft.text, shared.text),
-            attachments = draft.attachments + shared.attachments,
-            files = draft.files + newFiles,
-            location = shared.location ?: draft.location,
-            chips = draft.chips + shared.chips.filter { chip -> draft.chips.none { it.id == chip.id } },
-        ),
-    )
-}
-
 /** iOS `syncAbsorbedDraft(for:)`: a composer that took a share is saved (or cleared) at once. */
-internal fun HomeFeature.State.syncAbsorbedDraft(detail: SessionDetail) {
+internal fun HomeFeature.State.syncAbsorbedDraft(detail: SessionFeature.State) {
     if (catchUp != null || !detail.readsOnView) return
     dependency(ComposerPersistence).syncAbsorbedDraft(server.persistenceID, detail.session, detail.draftProject, detail.sessionComposer)
 }
@@ -888,34 +875,32 @@ fun HomeFeature.State.makeDetail(
     cachedItems: List<OpenCodeTranscriptItem>? = null,
     externalTranscript: Boolean = false,
     reason: String = "you opened it",
-): Pair<HomeFeature.State, SessionDetail> {
+): Pair<HomeFeature.State, SessionFeature.State> {
     val (begun, transition) = beginningDetailTransition(defaultReason = reason)
     var s = begun
-    var detail = SessionDetail.forSession(
+    var detail = SessionFeature.State.session(
         server = server,
         session = session,
+        cachedItems = cachedItems,
+        initialTranscriptRequestIsExternal = externalTranscript,
+        isRunning = session.id in s.activeSessionIDs,
         navigationID = transition.navID,
         visit = transition.visit,
-        cachedItems = cachedItems,
-        externalTranscript = externalTranscript,
-        isRunning = session.id in s.activeSessionIDs,
     )
     detail = s.seedingSessionSnapshot(detail)
-    detail = detail.copy(
-        streamIsHealthy = s.isEventStreamLive,
-        seenItemIDs = s.sessionSnapshots[session.id]?.seenItemIDs,
-        leftAt = s.sessionSnapshots[session.id]?.leftAt,
-    )
+    detail = detail.copy(streamIsHealthy = s.isEventStreamLive)
+    detail = detail.noteOpening(seen = s.sessionSnapshots[session.id]?.seenItemIDs, leftAt = s.sessionSnapshots[session.id]?.leftAt)
     val pick = s.waitingPicks[session.id]
     if (pick != null) {
         s = s.copy(waitingPicks = s.waitingPicks - session.id)
         detail = detail.copy(currentModel = pick, pendingModel = pick)
     }
-    detail = s.finishingDetailTransition(detail)
+    // A live call follows the screen.
+    val voice = transition.activeVoice?.retarget(session, reason = transition.reason)
+    detail = s.finishingDetailTransition(detail, voice, transition.keepsIdentity)
     val (restored, withDraft) = s.restoringPersistedDraft(detail)
     s = restored
     if (cachedItems != null) s = s.touchingCachedTranscript(session)
-    // TODO(merge) round 2b / `:feature:session`: a live call follows the screen (`voice.retarget`), logging `transition.reason`.
     return s to withDraft
 }
 
@@ -931,7 +916,8 @@ fun HomeFeature.State.openingDetail(
 }
 
 /** iOS `makeDraft(directory:reason:)`. */
-fun HomeFeature.State.makeDraft(directory: String? = null, reason: String = "you started a new session"): Pair<HomeFeature.State, SessionDetail> {
+fun HomeFeature.State.makeDraft(directory: String? = null, reason: String = "you started a new session"): Pair<HomeFeature.State, SessionFeature.State> {
+    val outgoingDirectory = sessionDetail?.session?.directory
     val (begun, transition) = beginningDetailTransition(defaultReason = reason, targetIsDraft = true)
     var s = begun
     var projects = s.projectsByRecency
@@ -940,7 +926,7 @@ fun HomeFeature.State.makeDraft(directory: String? = null, reason: String = "you
         val index = projects.indexOfFirst { it.directory == directory }
         if (index >= 0) projects = listOf(projects[index]) + projects.filterIndexed { i, _ -> i != index }
     }
-    var draft = SessionDetail.draft(
+    var draft = SessionFeature.State.draft(
         server = s.server,
         draftProject = directory?.let { OpenCodeProject.folder(it, projects) } ?: projects.firstOrNull(),
         projects = projects,
@@ -948,7 +934,11 @@ fun HomeFeature.State.makeDraft(directory: String? = null, reason: String = "you
         navigationID = transition.navID,
         visit = transition.visit,
     )
-    draft = s.finishingDetailTransition(draft)
+    val voice = transition.activeVoice?.let { current ->
+        val callDirectory = draft.draftProject?.directory ?: outgoingDirectory ?: current.target.directory
+        current.retargetToDraft(directory = callDirectory, model = draft.currentModel, reason = transition.reason)
+    }
+    draft = s.finishingDetailTransition(draft, voice, transition.keepsIdentity)
     val (restored, withDraft) = s.restoringPersistedDraft(draft, preservesExplicitProject = directory != null)
     s = restored
     return s to withDraft
@@ -962,16 +952,17 @@ fun HomeFeature.State.openingDraft(directory: String? = null, reason: String = "
 
 /**
  * The server has [model] for [sessionID]: the list's copy says so, so a new session started now
- * inherits it. Its snapshot and a pick waiting for its screen follow.
+ * inherits it. Its snapshot (a session visited before) and a pick waiting for its screen follow:
+ * a pick it matches no longer waits, and an explicit switch ([replacesPick], the voice
+ * delegator's) replaces any.
  */
 fun HomeFeature.State.notingModel(model: OpenCodeModelRef, sessionID: String, replacesPick: Boolean = false): HomeFeature.State {
     var s = updatingSession(sessionID) { it.copy(model = model) }
     if (replacesPick || s.waitingPicks[sessionID] == model) s = s.copy(waitingPicks = s.waitingPicks - sessionID)
     s = s.updatingSubagents { child ->
-        if (child.session?.id != sessionID) return@updatingSubagents child
-        if (replacesPick) child.copy(currentModel = model, pendingModel = null)
-        else if (child.pendingModel == null || child.pendingModel == model) child.copy(currentModel = model, pendingModel = null)
-        else child
+        var next = child
+        if (replacesPick && next.session?.id == sessionID) next = next.copy(currentModel = model, pendingModel = null)
+        next.modelApplied(model, sessionID)
     }
     return s.updatingSnapshot(sessionID) { snapshot ->
         var next = snapshot.copy(
@@ -984,7 +975,14 @@ fun HomeFeature.State.notingModel(model: OpenCodeModelRef, sessionID: String, re
     }
 }
 
-internal data class DetailTransition(val navID: Int, val visit: Int, val reason: String, val keepsIdentity: Boolean)
+internal data class DetailTransition(
+    val navID: Int,
+    val visit: Int,
+    val reason: String,
+    /** The outgoing screen's call, while it isn't over: it follows the screen. */
+    val activeVoice: VoiceFeature.State?,
+    val keepsIdentity: Boolean,
+)
 
 private fun HomeFeature.State.beginningDetailTransition(
     defaultReason: String,
@@ -994,27 +992,61 @@ private fun HomeFeature.State.beginningDetailTransition(
     var s = poppingSubagents(toDepth = 0).rememberingSession().syncingOutgoingDetailDraft(targetIsDraft)
     val reason = s.nextMoveReason ?: defaultReason
     // Keeping the identity keeps a live call's or recording's effects alive.
-    // TODO(merge) round 2b / `:feature:session`: `keepsIdentity` is true while the outgoing screen has a live call or carried dictation.
-    val keepsIdentity = false
+    val activeVoice = s.sessionDetail?.voice?.takeIf { !it.phase.isTerminal }
+    val keepsIdentity = activeVoice != null || s.sessionDetail?.carriedDictation != null
     // Every move counts, identity kept or not (`selectedTranscriptFetch`).
     val fresh = s.detailGeneration + 1
     s = s.copy(nextMoveReason = null, detailGeneration = fresh)
     val navID = if (keepsIdentity) (s.sessionDetail?.navigationID ?: fresh) else fresh
-    return s to DetailTransition(navID, fresh, reason, keepsIdentity)
+    return s to DetailTransition(navID, fresh, reason, activeVoice, keepsIdentity)
 }
 
-private fun HomeFeature.State.finishingDetailTransition(detail: SessionDetail): SessionDetail =
+private fun HomeFeature.State.finishingDetailTransition(
+    detail: SessionFeature.State,
+    activeVoice: VoiceFeature.State?,
+    keepsIdentity: Boolean,
+): SessionFeature.State {
+    var next = detail
+    if (activeVoice != null) {
+        next = next.copy(
+            voice = activeVoice.copy(
+                replyWatch = activeVoice.replyWatch.copy(activeSessionIDs = activeSessionIDs),
+                viewing = next.browser.viewing,
+            ),
+        )
+    }
+    next = next.reconcileInvariants()
+    val outgoing = sessionDetail
     // The screen swaps details in place without appearing again, so the new one inherits whether it is on screen.
-    detail.copy(isVisible = sessionDetail?.isVisible ?: false)
+    next = next.copy(isVisible = outgoing?.isVisible ?: false, inheritsLiveWork = keepsIdentity)
+    // The same identity names the Working line's runs, so their numbers carry on.
+    if (keepsIdentity) next = next.copy(workingRun = next.workingRun.copy(counter = outgoing?.workingRun?.counter ?: 0))
+    // Raise to Talk's grace after a recording follows the screen too.
+    next = next.withDictationEndedAt(outgoing?.dictationEndedAt)
+    return carryingDictation(next)
+}
+
+/**
+ * A recording follows the screen to the next session, as a call does: the new detail keeps the
+ * old one's identity (see [makeDetail]), so the recording's effect lives on, and it is sent
+ * wherever it is when Send is tapped. What was typed beside it stays with its own session and is
+ * back in the composer there. Catch Up keeps its own composer. (iOS `carryDictation(into:)`.)
+ */
+private fun HomeFeature.State.carryingDictation(detail: SessionFeature.State): SessionFeature.State {
+    val old = sessionDetail ?: return detail
+    val carried = old.carriedDictation ?: return detail
+    if (catchUp == null && old.readsOnView) parkingDraft(old.sessionComposer, old.session?.id)
+    return detail.copy(isSceneActive = old.isSceneActive).adoptDictation(carried)
+}
 
 /**
  * The outgoing screen's composer waits for its session (iOS `syncOutgoingDetailDraft`). New
- * Session over a draft starts empty: the old draft's words go.
+ * Session over a draft starts empty: the old draft's words go. A screen carrying a recording
+ * leaves its composer to [carryingDictation].
  */
 private fun HomeFeature.State.syncingOutgoingDetailDraft(targetIsDraft: Boolean = false): HomeFeature.State {
     val old = sessionDetail ?: return this
-    if (catchUp != null || !old.readsOnView) return this
-    // TODO(merge) round 2b / `:feature:session`: also skip while the outgoing screen carries dictation (`carriedDictation != nil`).
+    if (catchUp != null || !old.readsOnView || old.carriedDictation != null) return this
     val persistence = dependency(ComposerPersistence)
     if (targetIsDraft && old.isDraft) {
         persistence.clearDraft(server.persistenceID, null, false)
@@ -1030,32 +1062,60 @@ private fun HomeFeature.State.syncingOutgoingDetailDraft(targetIsDraft: Boolean 
 }
 
 /**
- * A parked or persisted composer comes back with its session (iOS `restorePersistedDraft(into:)`).
- * TODO(merge) round 2b / `:feature:session`: a draft whose send already created its session
- * (`loadOutbox` → `draftBecameSessionID`, `promoteDraftOutboxToSession`) and the outbox's
- * directory for a draft; `applyPersistedDraft` is the screen's.
+ * A parked or persisted composer comes back with its session (iOS `restorePersistedDraft(into:)`),
+ * and a draft whose send already created its session becomes that session.
  */
 private fun HomeFeature.State.restoringPersistedDraft(
-    detail: SessionDetail,
+    detail: SessionFeature.State,
     preservesExplicitProject: Boolean = false,
-): Pair<HomeFeature.State, SessionDetail> {
+): Pair<HomeFeature.State, SessionFeature.State> {
     // Catch Up's cards keep no composer: the parked one waits for the session's own screen.
     if (catchUp != null || !detail.readsOnView) return this to detail
-    if (!detail.sessionComposer.isEmpty) return this to detail
     val persistence = dependency(ComposerPersistence)
-    if (persistence.sharedDraft(server.persistenceID, detail.session?.id) != null) return this to detail
-    val restored = persistence.loadDraft(server.persistenceID, detail.session?.id) ?: return this to detail
-    var next = detail.copy(draft = restored.draft)
-    if (detail.isDraft && !(preservesExplicitProject && detail.draftProject != null)) {
-        restored.project?.let { project -> next = next.copy(draftProject = project) }
+    var s = this
+    var next = detail
+    if (next.session == null) {
+        val entry = persistence.loadOutbox(server.persistenceID, null).firstOrNull()
+        if (entry != null) {
+            val alreadyInOutbox = dependency(PromptOutbox).contains(entry.pending.messageID)
+            val created = entry.createdSession
+            val entryDirectory = entry.directory
+            if (!alreadyInOutbox && created != null) {
+                if (s.sessions.none { it.id == created.id }) s = s.copy(sessions = listOf(created) + s.sessions)
+                s = s.updatingLastViewedSessionIDs { it + (server.persistenceID to created.id) }
+                next = next.copy(
+                    draftBecameSessionID = created.id,
+                    session = created,
+                    familySessions = listOf(created),
+                    familyRootID = created.id,
+                    outboxDraftID = null,
+                )
+                persistence.promoteDraftOutboxToSession(server.persistenceID, entry.draftID, created.id)
+                val nilDraft = persistence.loadDraft(server.persistenceID, null)
+                if (nilDraft != null) {
+                    persistence.clearDraft(server.persistenceID, null, false)
+                    if (persistence.loadDraft(server.persistenceID, created.id) == null) {
+                        persistence.scheduleDraft(server.persistenceID, created.id, null, nilDraft.draft)
+                    }
+                }
+            } else if (!preservesExplicitProject && !entryDirectory.isNullOrEmpty()) {
+                next = next.copy(draftProject = OpenCodeProject.folder(entryDirectory, next.projects))
+            }
+        }
     }
-    return this to next
+    if (!next.sessionComposer.isEmpty) return s to next
+    if (persistence.sharedDraft(server.persistenceID, next.session?.id) != null) return s to next
+    val restored = persistence.loadDraft(server.persistenceID, next.session?.id) ?: return s to next
+    val explicitProject = next.draftProject
+    next = next.applyPersistedDraft(restored)
+    if (preservesExplicitProject && explicitProject != null) next = next.copy(draftProject = explicitProject)
+    return s to next
 }
 
 fun HomeFeature.State.rememberingSession(): HomeFeature.State = sessionDetail?.let(::remembering) ?: this
 
-fun HomeFeature.State.remembering(detail: SessionDetail): HomeFeature.State {
-    val snapshot = SessionSwitchSnapshot.of(detail) ?: return this
+fun HomeFeature.State.remembering(detail: SessionFeature.State): HomeFeature.State {
+    val snapshot = SessionFeature.SwitchSnapshot.from(detail) ?: return this
     val id = snapshot.session.id
     if (id in recentlyDeletedIDs) return this
     if (sessions.none { it.id == id } && snapshot.session.parentID == null) return this
@@ -1069,7 +1129,11 @@ fun HomeFeature.State.remembering(detail: SessionDetail): HomeFeature.State {
                 familyReadAt = snapshot.familyReadAt,
                 permissions = snapshot.permissions,
                 forms = snapshot.forms,
+                formAnswers = snapshot.formAnswers,
+                questionPageIndices = snapshot.questionPageIndices,
                 hasLoadedRequests = snapshot.hasLoadedRequests,
+                completedRequests = snapshot.completedRequests,
+                selectedRequest = snapshot.selectedRequest,
             )
         }
     }
@@ -1080,30 +1144,30 @@ fun HomeFeature.State.remembering(detail: SessionDetail): HomeFeature.State {
 
 /**
  * Pushes [session], a subagent of the screen on top, over it. Its first frame comes from what the
- * parent already knows, so nothing new is read to show it.
+ * parent already knows (its transcript, its own subagents, their requests), so nothing new is
+ * read to show it.
  */
 fun HomeFeature.State.pushingSubagent(session: OpenCodeSession): HomeFeature.State {
     val parent = topDetail ?: return this
     if (parent.session?.id == session.id) return this
     val pushedCount = pushedDetailCount + 1
     var s = copy(pushedDetailCount = pushedCount)
-    var detail = SessionDetail.forSession(
+    var detail = SessionFeature.State.session(
         server = server,
         session = session,
-        navigationID = -pushedCount,
         cachedItems = parent.familyTranscriptCache[session.id] ?: s.cachedTranscriptItems(session),
         isRunning = session.id in s.activeSessionIDs || session.id in parent.activeFamilySessionIDs,
+        navigationID = -pushedCount,
     )
     detail = s.seedingSessionSnapshot(detail)
-    detail = detail.copy(
-        streamIsHealthy = s.isEventStreamLive || parent.streamIsHealthy,
-        seenItemIDs = s.sessionSnapshots[session.id]?.seenItemIDs,
-        leftAt = s.sessionSnapshots[session.id]?.leftAt,
-    )
+    detail = detail.copy(streamIsHealthy = s.isEventStreamLive || parent.streamIsHealthy)
+    detail = detail.noteOpening(seen = s.sessionSnapshots[session.id]?.seenItemIDs, leftAt = s.sessionSnapshots[session.id]?.leftAt)
     val pick = s.waitingPicks[session.id]
     if (pick != null) {
         s = s.copy(waitingPicks = s.waitingPicks - session.id)
         detail = detail.copy(currentModel = pick, pendingModel = pick)
+    } else if (s.sessionSnapshots[session.id] == null) {
+        parent.familyPendingModels[session.id]?.let { detail = detail.copy(currentModel = it, pendingModel = it) }
     }
     val known = detail.familySessions.mapTo(HashSet()) { it.id }
     detail = detail.copy(
@@ -1113,11 +1177,12 @@ fun HomeFeature.State.pushingSubagent(session: OpenCodeSession): HomeFeature.Sta
     if (detail.familyReadAt == null) detail = detail.copy(familyReadAt = parent.familyReadAt)
     if (!detail.hasLoadedPendingRequests) {
         val members = detail.familySessions.mapTo(HashSet()) { it.id }
-        detail = detail.copy(
-            permissionRequests = parent.permissionRequests.filter { it.sessionID in members },
-            formRequests = parent.formRequests.filter { it.sessionID in members },
-            hasLoadedPendingRequests = parent.hasLoadedPendingRequests,
-        )
+        val forms = parent.formRequests.filter { it.sessionID in members }
+        val formIDs = forms.mapTo(HashSet()) { it.id }
+        detail = detail.withPermissionRequests(parent.permissionRequests.filter { it.sessionID in members })
+            .withFormRequests(forms)
+            .withFormAnswers(parent.formAnswers.filterKeys { it in formIDs })
+            .copy(hasLoadedPendingRequests = parent.hasLoadedPendingRequests)
     }
     detail = detail.copy(
         activeFamilySessionIDs = detail.activeFamilySessionIDs + parent.activeFamilySessionIDs,
@@ -1125,10 +1190,12 @@ fun HomeFeature.State.pushingSubagent(session: OpenCodeSession): HomeFeature.Sta
         isVisible = s.sessionDetail?.isVisible ?: false,
         isSceneActive = s.sessionDetail?.isSceneActive ?: true,
     )
+    // A request it inherits docks from the first frame, as a restored snapshot's does, so its
+    // parked draft comes back as the message.
+    if (detail.wantsRequestDock && !detail.isAnsweringRequest) detail = detail.beginAnswering()
     val (restored, withDraft) = s.restoringPersistedDraft(detail)
     s = restored.copy(subagentStack = restored.subagentStack + withDraft)
-    // TODO(merge) round 2b / `:feature:session`: `retargetCallToTop(reason: "you opened a subagent")`.
-    return s.markingTopScreen().absorbingSharedDrafts()
+    return s.markingTopScreen().absorbingSharedDrafts().retargetingCallToTop(reason = "you opened a subagent")
 }
 
 /** Only the screen on top of the stack plays a request's arrival. */
@@ -1141,27 +1208,31 @@ private fun HomeFeature.State.markingTopScreen(): HomeFeature.State {
 
 /**
  * Takes pushed subagents off down to [toDepth]. Their composers wait for their sessions like shared
- * items, and their transcripts stay with the parent for the next push.
+ * items, their transcripts stay with the parent for the next push, and a recording there ends
+ * with its words.
  */
 fun HomeFeature.State.poppingSubagents(toDepth: Int): HomeFeature.State {
     val targetDepth = maxOf(toDepth, 0)
     if (subagentStack.size <= targetDepth) return this
-    var s = this
-    val now by lazy { dependency(DateClient).now() }
-    val stack = s.subagentStack.mapIndexed { index, child ->
-        if (index < targetDepth) return@mapIndexed child
-        // iOS `noteLeaving()`: a screen the reader saw marks when they left it.
-        // TODO(merge): `hasRenderedFirstContentFrame` instead of `isVisible`, and the screen's own `noteLeaving`.
-        val left = if (child.isVisible && child.isSceneActive && !child.isDraft) child.copy(leftAt = now) else child
-        left.copy(isVisible = false)
-    }.toMutableList()
-    s = s.copy(subagentStack = stack.toList())
+    var s = copy(
+        subagentStack = subagentStack.mapIndexed { index, child ->
+            if (index < targetDepth) return@mapIndexed child
+            val left = if (child.hasRenderedFirstContentFrame && child.isSceneActive) child.noteLeaving() else child
+            left.copy(isVisible = false)
+        },
+    )
     while (s.subagentStack.size > targetDepth) {
-        val child = s.subagentStack.last()
-        s = s.copy(subagentStack = s.subagentStack.dropLast(1)).remembering(child)
+        var child = s.subagentStack.last()
+        s = s.copy(subagentStack = s.subagentStack.dropLast(1))
+        // A recording's words so far live in its hold until it ends: they park with the composer,
+        // as a call taking the mic keeps them.
+        child.dictationHold?.let { child = child.withDraft(it.text) }
+        s = s.remembering(child)
         val sessionID = child.session?.id ?: continue
-        s = s.parkingDraft(child.draft, sessionID)
-        val items = child.cacheableItems.takeLast(SessionFeatureLimits.initialFetchLimit)
+        // While its bar answers a request, the message is the one parked aside; the bar's words are
+        // an answer, never a message draft.
+        s = s.parkingDraft(child.parkedComposer ?: child.draftState, sessionID)
+        val items = child.cacheableItems.takeLast(SessionFeature.initialFetchLimit)
         val parentID = s.subagentStack.lastOrNull()?.navigationID
         s = if (parentID != null) {
             s.updatingSubagent(parentID) { it.copy(familyTranscriptCache = it.familyTranscriptCache + (sessionID to items)) }
@@ -1169,8 +1240,7 @@ fun HomeFeature.State.poppingSubagents(toDepth: Int): HomeFeature.State {
             s.updatingDetail { it.copy(familyTranscriptCache = it.familyTranscriptCache + (sessionID to items)) }
         }
     }
-    // TODO(merge) round 2b / `:feature:session`: `retargetCallToTop(reason: "you went back")`.
-    return s.markingTopScreen()
+    return s.markingTopScreen().retargetingCallToTop(reason = "you went back")
 }
 
 fun HomeFeature.State.pushingPendingSubagent(): HomeFeature.State {
@@ -1179,8 +1249,21 @@ fun HomeFeature.State.pushingPendingSubagent(): HomeFeature.State {
     return copy(pendingSubagentPush = null).pushingSubagent(child)
 }
 
+/** The call follows the screen on top, as it follows a drawer switch (iOS `retargetCallToTop(reason:)`). */
+fun HomeFeature.State.retargetingCallToTop(reason: String): HomeFeature.State {
+    val voice = sessionDetail?.voice ?: return this
+    if (voice.phase.isTerminal) return this
+    val topScreen = topDetail ?: return this
+    val top = topScreen.session ?: return this
+    if (voice.target.sessionID == top.id) return this
+    return updatingDetail { detail ->
+        val moved = detail.voice?.retarget(top, reason = reason)?.copy(viewing = topScreen.browser.viewing)
+        detail.copy(voice = moved).reconcileInvariants(targetScreen = topScreen)
+    }
+}
+
 /** Shared by the selected detail and Catch Up's inert next-card preview. */
-fun HomeFeature.State.seedingSessionSnapshot(detail: SessionDetail): SessionDetail {
+fun HomeFeature.State.seedingSessionSnapshot(detail: SessionFeature.State): SessionFeature.State {
     val session = detail.session ?: return detail
     val snapshot = sessionSnapshots[session.id] ?: return detail
     if (snapshot.session.directory != session.directory) return detail

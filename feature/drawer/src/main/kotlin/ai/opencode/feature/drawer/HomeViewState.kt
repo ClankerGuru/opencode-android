@@ -176,13 +176,12 @@ class HomeViewState internal constructor(
 
     /**
      * The screen a screen recording names while nothing covers Home (iOS `scrawlScreenName`).
-     * TODO(merge) round 2b / `:feature:session`: “In-App Browser” while the top screen shows a page
-     * (`top.browser.pageID != null`; the page is the screen's `SessionFeature.browser`).
      */
     fun screenName(state: HomeFeature.State = this.state): String {
         if (state.catchUp != null) return "Catch Up"
         if (isSessionDrawerPresented || state.isDrawerOpen) return "Sessions"
         val top = state.topDetail ?: return "Sessions"
+        if (top.browser.pageID != null) return "In-App Browser"
         if (state.subagentStack.isNotEmpty()) return "Session · subagent"
         return if (top.session == null) "New Session" else "Session"
     }

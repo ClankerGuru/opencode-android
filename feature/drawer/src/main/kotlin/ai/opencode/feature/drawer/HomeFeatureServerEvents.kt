@@ -1,5 +1,6 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.feature.session.*
 import ai.opencode.core.sharing.shared
 import ai.opencode.feature.voice.VoiceSharedKeys
 import ai.opencode.feature.composer.PromptOutbox
@@ -8,8 +9,9 @@ import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.feature.drawer.HomeFeature.Action
 import ai.opencode.feature.drawer.HomeFeature.State
-import ai.opencode.feature.drawer.bridge.SessionDetail
-import ai.opencode.feature.drawer.bridge.SessionScreenMessage
+import ai.opencode.feature.session.SessionFeature
+import ai.opencode.feature.session.waitingSessionIDs
+import ai.opencode.feature.voice.ServerVoiceSupport
 import ai.opencode.server.OpenCodeLiveContentEvent
 import ai.opencode.server.OpenCodeServerEvent
 
@@ -32,8 +34,12 @@ internal fun HomeFeature.reduceServerEvent(state: State, event: OpenCodeServerEv
             val supportByServer = shared(VoiceSharedKeys.serverVoiceSupportByServer)
             val serverID = state.server.persistenceID
             if (supportByServer.value[serverID] != null) supportByServer.update { it - serverID }
-            // TODO(merge) round 2b / `:feature:session`: the open call's own `serverVoiceSupport` goes back to `.unknown`.
-            return familyAndListRefresh(state.copy(runChangesDuringRefresh = emptyMap()))
+            var s = state.copy(runChangesDuringRefresh = emptyMap())
+            val support = s.sessionDetail?.voice?.serverVoiceSupport
+            if (support != null && support != ServerVoiceSupport.unknown) {
+                s = s.updatingDetail { it.copy(voice = it.voice?.copy(serverVoiceSupport = ServerVoiceSupport.unknown)) }
+            }
+            return familyAndListRefresh(s)
         }
 
         is OpenCodeServerEvent.SessionCreated -> {
@@ -63,8 +69,8 @@ internal fun HomeFeature.reduceServerEvent(state: State, event: OpenCodeServerEv
             return Reduced(
                 s,
                 Effect.merge(
-                    if (rereadDetail) sendToDetail(s, SessionScreenMessage.FamilyRefreshRequested) else Effect.none(),
-                    forwardToSubagentFamilies(s, parentID, SessionScreenMessage.FamilyRefreshRequested),
+                    if (rereadDetail) sendToDetail(s, SessionFeature.Action.FamilyRefreshRequested) else Effect.none(),
+                    forwardToSubagentFamilies(s, parentID, SessionFeature.Action.FamilyRefreshRequested),
                 ),
             )
         }
@@ -79,7 +85,7 @@ internal fun HomeFeature.reduceServerEvent(state: State, event: OpenCodeServerEv
                 s = reduced.state
                 reduced.effect
             }
-            val notify = Effect.merge(notifyContentBatch(s, event.sessionID, event.events), refresh)
+            val notify = Effect.merge(notifyVoiceContentBatch(s, event.sessionID, event.events), refresh)
             // Like the TUI's subagent footer, a new step means the session runs, even when its start
             // came before this stream connected.
             if (event.sessionID in s.activeSessionIDs || event.events.none { it is OpenCodeLiveContentEvent.StepStarted }) {
@@ -90,13 +96,13 @@ internal fun HomeFeature.reduceServerEvent(state: State, event: OpenCodeServerEv
         }
 
         is OpenCodeServerEvent.MessageInvalidated ->
-            return Reduced(state, forwardToSession(state, event.sessionID, SessionScreenMessage.MessageInvalidated(event.sessionID)))
+            return Reduced(state, forwardToSession(state, event.sessionID, SessionFeature.Action.MessageInvalidated(event.sessionID)))
 
         is OpenCodeServerEvent.RevertChanged -> {
             val s = state.updatingSession(event.sessionID) { it.copy(revertMessageID = event.messageID) }
                 .updatingSnapshot(event.sessionID) { it.copy(session = it.session.copy(revertMessageID = event.messageID)) }
             if (s.sessionDetail?.session?.id != event.sessionID) return Reduced(s)
-            return Reduced(s, sendToDetail(s, SessionScreenMessage.RevertChanged(event.sessionID, event.messageID, event.committed)))
+            return Reduced(s, sendToDetail(s, SessionFeature.Action.RevertChanged(event.sessionID, event.messageID, event.committed)))
         }
 
         is OpenCodeServerEvent.InputQueueChanged -> {
@@ -107,16 +113,18 @@ internal fun HomeFeature.reduceServerEvent(state: State, event: OpenCodeServerEv
                 // Off screen, its pending row would otherwise come back on entry.
                 s = removingSnapshotQueuedInput(s, event.sessionID, inputID)
             }
-            return Reduced(s, forwardToSession(s, event.sessionID, SessionScreenMessage.InputQueueChanged(event.inputID)))
+            // Queued work lives outside projected history, so only the open session cares; the list
+            // already reorders on execution events.
+            return Reduced(s, forwardToSession(s, event.sessionID, SessionFeature.Action.InputQueueChanged(event.inputID)))
         }
 
         is OpenCodeServerEvent.InputEnqueued ->
-            return Reduced(state, forwardToSession(state, event.sessionID, SessionScreenMessage.InputEnqueued(event.input)))
+            return Reduced(state, forwardToSession(state, event.sessionID, SessionFeature.Action.InputEnqueued(event.input)))
 
         is OpenCodeServerEvent.InputCancelled -> {
             dependency(PromptOutbox).forgetAdmitted(event.inputID)
             val s = removingSnapshotQueuedInput(state, event.sessionID, event.inputID)
-            return Reduced(s, forwardToSession(s, event.sessionID, SessionScreenMessage.InputCancelled(event.inputID)))
+            return Reduced(s, forwardToSession(s, event.sessionID, SessionFeature.Action.InputCancelled(event.inputID)))
         }
 
         is OpenCodeServerEvent.AttentionChanged -> {
@@ -127,13 +135,13 @@ internal fun HomeFeature.reduceServerEvent(state: State, event: OpenCodeServerEv
             if (asked != null && s.sessions.any { it.id == asked }) s = s.copy(attentionSessionIDs = s.attentionSessionIDs + asked)
             return Reduced(
                 s,
-                Effect.merge(refreshAttention(s), forwardToScreens(s, SessionScreenMessage.RequestsChanged) { it.session != null }),
+                Effect.merge(refreshAttention(s), forwardToScreens(s, SessionFeature.Action.RequestsChanged) { it.session != null }),
             )
         }
 
         is OpenCodeServerEvent.ShellStarted -> {
             val sessionID = event.shell.sessionID ?: return Reduced(state)
-            return Reduced(state, forwardToSession(state, sessionID, SessionScreenMessage.ShellStarted(event.shell)))
+            return Reduced(state, forwardToSession(state, sessionID, SessionFeature.Action.ShellStarted(event.shell)))
         }
 
         is OpenCodeServerEvent.ShellEnded -> {
@@ -143,7 +151,7 @@ internal fun HomeFeature.reduceServerEvent(state: State, event: OpenCodeServerEv
                     else snapshot
                 },
             )
-            return Reduced(s, forwardToScreens(s, SessionScreenMessage.ShellEnded(event.shellID)))
+            return Reduced(s, forwardToScreens(s, SessionFeature.Action.ShellEnded(event.shellID)))
         }
 
         is OpenCodeServerEvent.ExecutionStarted -> {
@@ -152,17 +160,20 @@ internal fun HomeFeature.reduceServerEvent(state: State, event: OpenCodeServerEv
             val parents = s.knownParents
             val unattributed = !s.isAttributed(sessionID, parents)
             if (unattributed) s = s.invalidatingSnapshotFamilyReads { snapshot -> snapshot.family.none { it.id == sessionID } }
-            // TODO(merge) round 2b / `:feature:session`: `voice.replyWatch.setSessionActive(sessionID, true)` (the screen's call).
-            val changed = SessionScreenMessage.FamilyRunStateChanged(sessionID, isRunning = true)
+            s = s.updatingDetail { detail ->
+                val voice = detail.voice ?: return@updatingDetail detail
+                detail.copy(voice = voice.copy(replyWatch = voice.replyWatch.setSessionActive(sessionID, true)))
+            }
+            val changed = SessionFeature.Action.FamilyRunStateChanged(sessionID, isRunning = true)
             val started = noteRunStarted(s, sessionID)
             s = started.state
             // Every open screen whose family it may belong to hears it, listed or not. One whose family
             // Home's parent links say it joins, but that hasn't listed it, reads again.
-            val reread = { screen: SessionDetail -> joinsUnlisted(screen, sessionID, parents) }
-            val receivesRunState = { screen: SessionDetail -> shouldForwardFamilyRunState(screen, sessionID, unattributed, parents) }
+            val reread = { screen: SessionFeature.State -> joinsUnlisted(screen, sessionID, parents) }
+            val receivesRunState = { screen: SessionFeature.State -> shouldForwardFamilyRunState(screen, sessionID, unattributed, parents) }
             val pushed = Effect.merge(
                 forwardToSubagents(s, changed, receivesRunState),
-                forwardToSubagents(s, SessionScreenMessage.FamilyRefreshRequested, reread),
+                forwardToSubagents(s, SessionFeature.Action.FamilyRefreshRequested, reread),
             )
             val detail = s.sessionDetail
             if (detail?.session == null) return Reduced(s, Effect.merge(started.effect, pushed))
@@ -172,7 +183,7 @@ internal fun HomeFeature.reduceServerEvent(state: State, event: OpenCodeServerEv
                     started.effect,
                     pushed,
                     if (receivesRunState(detail)) sendToDetail(s, changed) else Effect.none(),
-                    if (reread(detail)) sendToDetail(s, SessionScreenMessage.FamilyRefreshRequested) else Effect.none(),
+                    if (reread(detail)) sendToDetail(s, SessionFeature.Action.FamilyRefreshRequested) else Effect.none(),
                 ),
             )
         }
@@ -186,10 +197,11 @@ internal fun HomeFeature.reduceServerEvent(state: State, event: OpenCodeServerEv
             s = s.copy(runChangesDuringRefresh = s.runChangesDuringRefresh + (sessionID to false))
             val parents = s.knownParents
             val unattributed = !s.isAttributed(sessionID, parents)
-            val receivesRunState = { screen: SessionDetail -> shouldForwardFamilyRunState(screen, sessionID, unattributed, parents) }
-            val ended = SessionScreenMessage.FamilyRunStateChanged(sessionID, isRunning = false)
-            // TODO(merge) round 2b / `:feature:session`: `notifyVoiceExecutionEnded` (the screen's call's reply watch).
-            val notify = forwardToSubagents(s, ended, receivesRunState)
+            val receivesRunState = { screen: SessionFeature.State -> shouldForwardFamilyRunState(screen, sessionID, unattributed, parents) }
+            val ended = SessionFeature.Action.FamilyRunStateChanged(sessionID, isRunning = false)
+            val voiceEnded = notifyVoiceExecutionEnded(s, sessionID)
+            s = voiceEnded.state
+            val notify = Effect.merge(voiceEnded.effect, forwardToSubagents(s, ended, receivesRunState))
             // Refetch for updatedAt/ordering; if the finished run belongs to the open session, stop its
             // working indicator and pull the reply. Unlisted members too, as for a start.
             val refreshed = refreshSnapshot(s)
@@ -217,18 +229,12 @@ internal fun HomeFeature.reduceServerEvent(state: State, event: OpenCodeServerEv
                     )
                 },
             ).updatingSession(sessionID) { it.copy(title = title) }
-                // The open screen's own copy follows. TODO(merge): the screen handles `familySessionRenamed`.
-                .updatingDetail { detail ->
-                    detail.copy(
-                        session = detail.session?.let { if (it.id == sessionID) it.copy(title = title) else it },
-                        familySessions = detail.familySessions.map { if (it.id == sessionID) it.copy(title = title) else it },
-                        feature = detail.feature.copy(session = detail.feature.session?.let { if (it.id == sessionID) it.copy(title = title) else it }),
-                    )
-                }
-            val renamed = SessionScreenMessage.FamilySessionRenamed(sessionID, title)
+            val renamed = SessionFeature.Action.FamilySessionRenamed(sessionID, title)
             val pushed = forwardToSubagentFamilies(s, sessionID, renamed)
             val detail = s.sessionDetail
-            if (detail == null || detail.familySessions.none { it.id == sessionID }) return Reduced(s, pushed)
+            if (detail == null || (detail.familySessions.none { it.id == sessionID } && detail.voice?.target?.sessionID != sessionID)) {
+                return Reduced(s, pushed)
+            }
             return Reduced(s, Effect.merge(sendToDetail(s, renamed), pushed))
         }
 
@@ -246,7 +252,7 @@ internal fun HomeFeature.reduceServerEvent(state: State, event: OpenCodeServerEv
             }
             s = s.purgingSession(sessionID)
             s = s.copy(recentlyDeletedIDs = s.recentlyDeletedIDs - sessionID)
-            val deleted = SessionScreenMessage.FamilySessionDeleted(sessionID)
+            val deleted = SessionFeature.Action.FamilySessionDeleted(sessionID)
             val pushed = forwardToSubagentFamilies(s, sessionID, deleted)
             // A subagent the family read hasn't listed may still own a docked request.
             val detail = s.sessionDetail
@@ -256,7 +262,6 @@ internal fun HomeFeature.reduceServerEvent(state: State, event: OpenCodeServerEv
             if (detail.familyRootID == sessionID) {
                 return Reduced(s.openingDraft(reason = "the session went away on the server"), cancelSelected)
             }
-            s = s.updatingDetail { d -> d.copy(familySessions = d.familySessions.filterNot { it.id == sessionID }) }
             return Reduced(s, Effect.merge(cancelSelected, sendToDetail(s, deleted), pushed))
         }
 
@@ -297,9 +302,9 @@ internal fun HomeFeature.familyAndListRefresh(state: State): HomeReduced {
         .updatingDetail { it.copy(familyReadAt = null) }
         .updatingSubagents { it.copy(familyReadAt = null) }
     val refreshed = refreshSnapshot(s)
-    val refresh = Effect.merge(refreshed.effect, forwardToSubagents(refreshed.state, SessionScreenMessage.FamilyRefreshRequested))
+    val refresh = Effect.merge(refreshed.effect, forwardToSubagents(refreshed.state, SessionFeature.Action.FamilyRefreshRequested))
     if (refreshed.state.sessionDetail == null) return Reduced(refreshed.state, refresh)
-    return Reduced(refreshed.state, Effect.merge(refresh, sendToDetail(refreshed.state, SessionScreenMessage.FamilyRefreshRequested)))
+    return Reduced(refreshed.state, Effect.merge(refresh, sendToDetail(refreshed.state, SessionFeature.Action.FamilyRefreshRequested)))
 }
 
 private fun removingSnapshotQueuedInput(state: State, sessionID: String, inputID: String): State =

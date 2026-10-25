@@ -1,5 +1,6 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.feature.session.*
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
@@ -8,9 +9,7 @@ import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.cancellable
 import ai.opencode.feature.drawer.HomeFeature.Action
 import ai.opencode.feature.drawer.HomeFeature.State
-import ai.opencode.feature.drawer.bridge.SessionDelegate
-import ai.opencode.feature.drawer.bridge.SessionLinkTarget
-import ai.opencode.feature.drawer.bridge.SessionScreenEvent
+import ai.opencode.feature.transcript.SessionLinkTarget
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.model.OpenCodeSession
@@ -30,7 +29,7 @@ internal fun HomeFeature.resolveSessionLinks(state: State, ids: List<String>): H
     for (id in ids) {
         val session = s.linkedSession(id)
         when {
-            session != null -> answers[id] = SessionLinkTarget.of(session)
+            session != null -> answers[id] = sessionLinkTarget(session)
             id in s.missingLinkedSessionIDs -> answers[id] = SessionLinkTarget.Missing
             id !in s.linkedSessionFetches && id !in s.linkedSessionQueue -> s = s.copy(linkedSessionQueue = s.linkedSessionQueue + id)
         }
@@ -113,7 +112,7 @@ private fun learningLinkedSession(state: State, id: String, result: Result<OpenC
     val error = result.exceptionOrNull() as? OpenCodeClientError
     return when {
         session != null && session.id == id ->
-            state.copy(linkedSessions = state.linkedSessions + (id to session)).applyingSessionLinks(mapOf(id to SessionLinkTarget.of(session)))
+            state.copy(linkedSessions = state.linkedSessions + (id to session)).applyingSessionLinks(mapOf(id to sessionLinkTarget(session)))
         error?.statusCode == 404 ->
             state.copy(missingLinkedSessionIDs = state.missingLinkedSessionIDs + id).applyingSessionLinks(mapOf(id to SessionLinkTarget.Missing))
         // Unreachable or odd: screens forget they asked, so the next look asks again.
@@ -123,7 +122,7 @@ private fun learningLinkedSession(state: State, id: String, result: Result<OpenC
 
 private fun HomeFeature.openLinkedSession(state: State, session: OpenCodeSession): HomeReduced {
     if (state.topDetail?.session?.id == session.id) return Reduced(state)
-    if (session.parentID != null) return reduceSessionDetail(state, SessionScreenEvent.Delegate(SessionDelegate.OpenSubagent(session)))
+    if (session.parentID != null) return reduceSessionDetail(state, SessionFeature.Action.Delegate(SessionFeature.Delegate.OpenSubagent(session)))
     var s = state
     if (s.sessions.none { it.id == session.id }) s = s.copy(sessions = listOf(session) + s.sessions)
     return Reduced(s.copy(nextMoveReason = "a session link was tapped"), Effect.send(Action.SessionTapped(session.id)))
@@ -145,21 +144,15 @@ fun State.linkedSession(id: String): OpenCodeSession? {
     return null
 }
 
-/**
- * Hands each open screen the answers for IDs it asked about (iOS `applySessionLinks`), kept here as
- * [State.linkTargets] for the screens to read. TODO(merge): `SessionFeature.State.applySessionLinks`.
- */
-@Suppress("UNUSED_PARAMETER")
-fun State.applyingSessionLinks(targets: Map<String, SessionLinkTarget>): State = this
+/** Hands each open screen the answers for IDs it asked about (iOS `applySessionLinks`). */
+fun State.applyingSessionLinks(targets: Map<String, SessionLinkTarget>): State {
+    if (targets.isEmpty()) return this
+    return updatingDetail { it.applySessionLinks(targets) }.updatingSubagents { it.applySessionLinks(targets) }
+}
 
-/** A lookup that failed: screens still waiting on it may ask again. TODO(merge): `forgetSessionLinks`. */
-@Suppress("UNUSED_PARAMETER")
-fun State.forgettingSessionLinks(ids: List<String>): State = this
+/** A lookup that failed: screens still waiting on it may ask again (iOS `forgetSessionLinks`). */
+fun State.forgettingSessionLinks(ids: List<String>): State =
+    updatingDetail { it.forgetSessionLinks(ids) }.updatingSubagents { it.forgetSessionLinks(ids) }
 
-/** Every linked ID's answer, as the screens see them. */
-val State.linkTargets: Map<String, SessionLinkTarget>
-    get() = buildMap {
-        for ((id, session) in linkedSessions) put(id, SessionLinkTarget.of(session))
-        for (id in missingLinkedSessionIDs) put(id, SessionLinkTarget.Missing)
-        for (id in linkedSessionFetches + linkedSessionQueue) putIfAbsent(id, SessionLinkTarget.Resolving)
-    }
+/** iOS `SessionLinkTarget(_ session:)`: a linked session's title, and whether it's a subagent. */
+internal fun sessionLinkTarget(session: OpenCodeSession): SessionLinkTarget = SessionLinkTarget.Session(session.title, session.parentID)

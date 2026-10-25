@@ -1,5 +1,6 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.feature.session.*
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.Effect
@@ -10,7 +11,11 @@ import ai.opencode.feature.drawer.HomeFeature.Action
 import ai.opencode.feature.drawer.HomeFeature.DelegateAction
 import ai.opencode.feature.drawer.HomeFeature.State
 import ai.opencode.feature.system.notifications.NotificationPermission
-import ai.opencode.feature.drawer.bridge.SessionDetail
+import ai.opencode.feature.media.BrowserFeature
+import ai.opencode.feature.session.SessionFeature
+import ai.opencode.feature.session.isDraft
+import ai.opencode.feature.session.sessionComposer
+import ai.opencode.feature.session.typeBelow
 import ai.opencode.feature.drawer.catchup.CatchUpFeature
 import ai.opencode.feature.settings.ConnectionStatus
 import ai.opencode.feature.settings.HomeSettingsFeature
@@ -176,10 +181,10 @@ internal fun HomeFeature.tryWhatsNew(destination: WhatsNewEntry.Destination, ent
             if (s.catchUp == null && s.subagentStack.isEmpty() && detail != null && detail.isDraft && detail.readsOnView &&
                 !detail.sessionComposer.isEmpty
             ) {
-                return Reduced(s.updatingDetail { it.typingBelow(destination.text) })
+                return Reduced(s.updatingDetail { it.typeBelow(destination.text) })
             }
             val opened = reduceDrawer(s, Action.NewSessionTapped)
-            Reduced(opened.state.updatingDetail { it.typingBelow(destination.text) }, opened.effect)
+            Reduced(opened.state.updatingDetail { it.typeBelow(destination.text) }, opened.effect)
         }
         WhatsNewEntry.Destination.ModelList, WhatsNewEntry.Destination.Call -> {
             // The screen the reader comes back to: Catch Up's card opened as the session (or, with
@@ -192,34 +197,22 @@ internal fun HomeFeature.tryWhatsNew(destination: WhatsNewEntry.Destination, ent
                 effects += opened.effect
             }
             if (s.sessionDetail == null) s = s.openingDraft(reason = "What’s New’s Try It")
-            // TODO(merge) round 2b / `:feature:session`: close the top screen's in-app browser (`.browser(.closeTapped)`); the page is the screen's
-            // (`SessionFeature.browser`).
+            val top = s.subagentStack.lastOrNull()
+            if (top?.browser?.isOpen ?: (s.sessionDetail?.browser?.isOpen == true)) {
+                val close = SessionFeature.Action.Browser(BrowserFeature.Action.CloseTapped)
+                effects += Effect.send(if (top != null) Action.SubagentStack(top.navigationID, close) else Action.detail(close))
+            }
             if (destination == WhatsNewEntry.Destination.Call) {
                 // A pushed subagent's call belongs to the root, aimed at the top.
-                // TODO(merge) round 2b / `:feature:session`: `startCallOnTop` for a pushed subagent.
-                val call = startSystemCall(s)
+                val call = if (top == null) startSystemCall(s) else startCallOnTop(s)
                 s = call.state
                 effects += call.effect
+            } else {
+                val models = SessionFeature.Action.ModelButtonTapped
+                effects += Effect.send(if (top != null) Action.SubagentStack(top.navigationID, models) else Action.detail(models))
             }
-            // TODO(merge): otherwise send the top screen `.modelButtonTapped` (the model list) once
-            // `:feature:session` ports it.
             Reduced(s, Effect.concatenate(effects))
         }
         is WhatsNewEntry.Destination.Open -> Reduced(s)
-    }
-}
-
-/**
- * iOS `SessionFeature.State.typeBelow`: text the app adds below what's already typed, never over
- * it, and once: a repeat tap finds it there. TODO(merge): `SessionFeature`'s (it leaves a live
- * recording's words alone).
- */
-private fun SessionDetail.typingBelow(text: String): SessionDetail {
-    val added = text.trim()
-    val current = draft.text
-    return when {
-        current.isEmpty() -> copy(draft = draft.copy(text = text))
-        added.isNotEmpty() && !current.contains(added) -> copy(draft = draft.copy(text = "$current\n\n$text"))
-        else -> this
     }
 }

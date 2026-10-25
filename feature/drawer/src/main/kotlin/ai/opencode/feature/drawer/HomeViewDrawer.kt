@@ -337,9 +337,8 @@ fun HomeDrawer(
                 enter = if (reducedMotion) EnterTransition.None else expandVertically(CallTrayTunables.close.spec()),
                 exit = if (reducedMotion) ExitTransition.None else shrinkVertically(CallTrayTunables.close.spec()),
             ) {
-                // TODO(merge) round 2b / `:feature:session`: the open session's call
-                // (`sessionDetail.voice`), for the slot's Mute and End Call actions.
-                CallTrayDockSlot(store = null)
+                // The open session's call, for the slot's Mute and End Call actions.
+                CallTrayDockSlot(store = rememberHomeCall(store))
             }
             }
         }

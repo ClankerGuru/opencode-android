@@ -15,7 +15,6 @@ import ai.opencode.feature.session.header.BreathingTitleHold
 import ai.opencode.feature.session.header.SessionContextRing
 import ai.opencode.feature.session.header.SessionContextText
 import ai.opencode.feature.session.header.titleBreathing
-import ai.opencode.feature.session.seams.InAppNotice
 import ai.opencode.feature.system.notifications.SessionNotificationsClient
 import ai.opencode.server.model.ModelVariant
 import ai.opencode.server.model.OpenCodeContextUsage

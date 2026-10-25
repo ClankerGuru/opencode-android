@@ -1,5 +1,6 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.feature.session.*
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
@@ -101,13 +102,13 @@ internal fun HomeFeature.reduceCatchUp(state: State, action: CatchUpFeature.Acti
             // opened, and let it read as any open session.
             var s = state.leavingCatchUp()
             val viewed = openViewedSession(s, root, cachedItems = null, opensDetail = false)
-            s = viewed.state.promotingCatchUpDetail().updatingDetail { it.markingViewed(root) }
+            s = viewed.state.promotingCatchUpDetail().updatingDetail { it.markViewed(root) }
             val receipts = mutableListOf(viewed.effect)
             // A subagent on screen reads too, as it would had it been picked.
             val shown = detail.session
             val idle = shown?.idleMilliseconds
             if (shown != null && shown.id != rootID && idle != null && idle > (shown.viewedMilliseconds ?: -1)) {
-                s = s.updatingDetail { it.markingViewed(shown) }
+                s = s.updatingDetail { it.markViewed(shown) }
                 receipts += acknowledgeShownSubagent(shown.id, idle, s.server)
             }
             return Reduced(s, Effect.merge(receipts))

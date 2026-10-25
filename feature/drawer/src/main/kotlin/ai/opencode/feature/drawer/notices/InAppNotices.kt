@@ -5,16 +5,16 @@ import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.experiments.InAppNoticeMode
 import ai.opencode.core.sharing.shared
+import ai.opencode.feature.session.InAppNotice
 import ai.opencode.feature.system.notifications.SessionPushNotifications
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.seconds
 
-// Port of iOS `OpenCode/Drawer/InAppNotices.swift`, the model and rules half: the mode, the
-// notice and its timing and copy, the signal Home derives from its live state, and the clients
+// Port of iOS `OpenCode/Drawer/InAppNotices.swift`, the rules half: the mode (the
+// notice itself, [InAppNotice], moved down to `:feature:session`, whose `SessionListContext`
+// carries it), the signal Home derives from its live state, and the clients
 // that clear delivered notifications and speak to TalkBack. The drawer button's label (the view)
 // is `DrawerNoticeLabel` in `motion/DrawerButton.kt`, which reads only [InAppNotice] (its [InAppNotice.title],
 // [InAppNotice.status], [InAppNotice.needsInput], [InAppNotice.target]) and sends Home's
@@ -43,75 +43,6 @@ class InAppNoticeSettings(val mode: () -> InAppNoticeMode) {
 
         fun constant(mode: InAppNoticeMode) = InAppNoticeSettings { mode }
     }
-}
-
-/**
- * The drawer button's label: one or more other sessions that just finished or now need input,
- * shown for a few seconds before it folds back into the button's dot. One at a time; a later
- * event updates it in place.
- */
-data class InAppNotice(
-    /** Names this notice for its timer; a new notice gets a new one. */
-    val id: Int,
-    val events: List<Event>,
-) {
-    @Suppress("EnumEntryName")
-    enum class Kind { needsInput, done }
-
-    data class Event(val sessionID: String, val title: String, val kind: Kind)
-
-    sealed interface Target {
-        data class Session(val sessionID: String) : Target
-        data object Drawer : Target
-    }
-
-    val needsInputCount: Int get() = events.count { it.kind == Kind.needsInput }
-    val needsInput: Boolean get() = needsInputCount > 0
-
-    /** Needs your input holds 6 s, Done 4 s; several hold the longer. */
-    val hold: Duration get() = if (needsInput || events.size > 1) 6.seconds else 4.seconds
-
-    val target: Target get() = if (events.size == 1) Target.Session(events[0].sessionID) else Target.Drawer
-
-    val title: String get() = if (events.size == 1) events[0].title else "${events.size} sessions"
-
-    val status: String
-        get() {
-            val waiting = needsInputCount
-            if (events.size <= 1) return if (waiting > 0) "Needs your input" else "Done"
-            if (waiting <= 0) return "Done"
-            return "$waiting ${if (waiting == 1) "needs" else "need"} your input"
-        }
-
-    /** The notice after [merge], and the events that were new to it. */
-    data class Merged(val notice: InAppNotice, val added: List<Event>)
-
-    /**
-     * Adds events, a session's newer one replacing its older, and Needs your input outranking
-     * Done for the same session. Returns the merged notice and the events new to it.
-     */
-    fun merge(incoming: List<Event>): Merged {
-        val events = events.toMutableList()
-        val added = mutableListOf<Event>()
-        for (event in incoming) {
-            val index = events.indexOfFirst { it.sessionID == event.sessionID }
-            if (index >= 0) {
-                if (!(events[index].kind == Kind.done && event.kind == Kind.needsInput)) {
-                    events[index] = events[index].copy(title = event.title)
-                    continue
-                }
-                events[index] = event
-                added += event
-            } else {
-                events += event
-                added += event
-            }
-        }
-        return Merged(copy(events = events), added)
-    }
-
-    /** What TalkBack hears: the label, without moving focus. */
-    val announcement: String get() = "$title, $status"
 }
 
 /**

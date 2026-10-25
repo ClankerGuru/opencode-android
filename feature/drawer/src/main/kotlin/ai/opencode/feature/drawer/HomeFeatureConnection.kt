@@ -1,5 +1,6 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.feature.session.*
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.store.Effect
@@ -8,10 +9,12 @@ import ai.opencode.core.store.cancellable
 import ai.opencode.feature.drawer.HomeFeature.Action
 import ai.opencode.feature.drawer.HomeFeature.State
 import ai.opencode.feature.composer.ComposerPersistence
-import ai.opencode.feature.drawer.bridge.SessionDetail
+import ai.opencode.feature.session.SessionFeature
+import ai.opencode.feature.session.sessionComposer
+import ai.opencode.feature.system.liveactivity.DictationLiveActivityClient
+import ai.opencode.feature.system.liveactivity.VoiceLiveActivityClient
 import ai.opencode.feature.system.share.ShareCredentials
 import ai.opencode.feature.system.share.ShareInboxClient
-import ai.opencode.feature.drawer.bridge.SessionScreenMessage
 import ai.opencode.feature.voice.VoiceSessionBoard
 import ai.opencode.feature.voice.VoiceSessionBoardClient
 import ai.opencode.server.OpenCodeClient
@@ -36,12 +39,20 @@ import kotlin.time.Duration.Companion.milliseconds
 internal fun HomeFeature.reduceConnection(state: State, action: Action): HomeReduced = when (action) {
     Action.Task -> {
         val s = if (state.isConnected) state.initializingInbox() else state
-        // TODO(merge) round 2b / `:feature:session`: iOS also listens to the call's and the recording's Live Activity commands here
-        // (`voiceLiveActivity.commands()` → `.voiceCallCommand`, `dictationLiveActivity.commands()` →
-        // `.dictationCommand`, cancellable by `CancelID.voiceCallCommands` / `.dictationCommands`;
-        // `:feature:system`'s `VoiceLiveActivityClient`/`DictationLiveActivityClient`). Listening waits
-        // for the handlers, which need the screen's call and recording.
-        if (s.isConnected) Reduced(s, Effect.merge(refreshAttention(s), resolveActiveAncestry(s))) else refreshSnapshot(s)
+        val load = if (s.isConnected) Reduced(s, Effect.merge(refreshAttention(s), resolveActiveAncestry(s))) else refreshSnapshot(s)
+        // The call's and the recording's ongoing-notification buttons.
+        val voiceLiveActivity = dependency(VoiceLiveActivityClient)
+        val dictationLiveActivity = dependency(DictationLiveActivityClient)
+        Reduced(
+            load.state,
+            Effect.merge(
+                load.effect,
+                Effect.run<Action> { send -> voiceLiveActivity.commands().collect { send(Action.VoiceCallCommandReceived(it)) } }
+                    .cancellable(HomeFeature.CancelID.VoiceCallCommands, cancelInFlight = true),
+                Effect.run<Action> { send -> dictationLiveActivity.commands().collect { send(Action.DictationCommandReceived(it)) } }
+                    .cancellable(HomeFeature.CancelID.DictationCommands, cancelInFlight = true),
+            ),
+        )
     }
 
     Action.TranscriptCacheFlushRequested -> {
@@ -67,8 +78,8 @@ internal fun HomeFeature.reduceConnection(state: State, action: Action): HomeRed
             s,
             Effect.merge(
                 Effect.send(Action.ServerEvent(OpenCodeServerEvent.Connected)),
-                sendToDetail(s, SessionScreenMessage.EventStreamConnected(server.persistenceID)),
-                forwardToSubagents(s, SessionScreenMessage.EventStreamConnected(server.persistenceID)),
+                sendToDetail(s, SessionFeature.Action.EventStreamConnected(server)),
+                forwardToSubagents(s, SessionFeature.Action.EventStreamConnected(server)),
                 publishShareCredentials(server),
             ),
         )
@@ -125,7 +136,7 @@ internal fun HomeFeature.reduceConnection(state: State, action: Action): HomeRed
         for ((id, snapshot) in s.sessionSnapshots) {
             val rootID = snapshot.family.firstOrNull { it.parentID == null }?.id ?: snapshot.session.parentID ?: id
             if (rootID in sessionIDs) continue
-            snapshots = snapshots + (id to snapshot.pruningRequests { sessionID, isPermission -> isPermission || sessionID != "global" })
+            snapshots = snapshots + (id to snapshot.pruneRequests { it is PendingRequest.Permission || it.sessionID != "global" })
         }
         Reduced(if (snapshots == s.sessionSnapshots) s else s.copy(sessionSnapshots = snapshots))
     }
@@ -202,9 +213,9 @@ private fun HomeFeature.snapshotRefreshed(state: State, action: Action.SnapshotR
             val running = childID in snapshotActive
             Effect.merge(
                 if (child.isExternallyActive == running) Effect.none()
-                else Effect.send(Action.ScreenMessage(child.navigationID, SessionScreenMessage.ExternalRunStateChanged(running))),
+                else Effect.send(Action.SubagentStack(child.navigationID, SessionFeature.Action.ExternalRunStateChanged(running))),
                 if (wasConnected) Effect.none()
-                else Effect.send(Action.ScreenMessage(child.navigationID, SessionScreenMessage.RequestsConnectionChanged(true))),
+                else Effect.send(Action.SubagentStack(child.navigationID, SessionFeature.Action.RequestsConnectionChanged(true))),
             )
         },
     )
@@ -257,8 +268,9 @@ private fun HomeFeature.snapshotRefreshed(state: State, action: Action.SnapshotR
     val drained = drainDirtyCachedTranscripts(s)
     s = drained.state
     val prefetch = prefetchTranscripts(s)
-    // TODO(merge) round 2b / `:feature:session`: `notifyVoiceSnapshot(&state, activeIDs:)` (a live
-    // call hears the list; the call is the screen's `VoiceFeature`).
+    // A live call hears the list.
+    val voiceNotified = notifyVoiceSnapshot(s, snapshotActive)
+    s = voiceNotified.state
     var retry: Effect<Action> = Effect.none()
     if (unattributed) {
         val refreshed = refreshSnapshot(s)
@@ -266,6 +278,7 @@ private fun HomeFeature.snapshotRefreshed(state: State, action: Action.SnapshotR
         retry = refreshed.effect
     }
     val voiceSnapshot = Effect.merge(
+        voiceNotified.effect,
         Effect.cancel(HomeFeature.CancelID.SnapshotRetry),
         Effect.cancel(HomeFeature.CancelID.LastKnownActivity),
         retry,
@@ -276,7 +289,7 @@ private fun HomeFeature.snapshotRefreshed(state: State, action: Action.SnapshotR
     val openSessionID = detail?.session?.id
     if (detail != null && openSessionID != null) {
         val update = snapshotSessions.firstOrNull { it.id == openSessionID }
-            ?.let { sendToDetail(s, SessionScreenMessage.SessionSnapshotUpdated(it)) } ?: Effect.none()
+            ?.let { sendToDetail(s, SessionFeature.Action.SessionSnapshotUpdated(it)) } ?: Effect.none()
         val runState = openSessionID in snapshotActive
         return Reduced(
             s,
@@ -289,8 +302,8 @@ private fun HomeFeature.snapshotRefreshed(state: State, action: Action.SnapshotR
                 subagentRuns,
                 update,
                 if (detail.isExternallyActive == runState) Effect.none()
-                else sendToDetail(s, SessionScreenMessage.ExternalRunStateChanged(runState)),
-                if (wasConnected) Effect.none() else sendToDetail(s, SessionScreenMessage.RequestsConnectionChanged(true)),
+                else sendToDetail(s, SessionFeature.Action.ExternalRunStateChanged(runState)),
+                if (wasConnected) Effect.none() else sendToDetail(s, SessionFeature.Action.RequestsConnectionChanged(true)),
             ),
         )
     }
@@ -311,10 +324,10 @@ private fun HomeFeature.activeAncestryResolved(state: State, resolved: Map<Strin
     val s = state.copy(activeSessionParents = parents).persistingSnapshot(dependency(HomeSnapshotDate).now())
     val known = s.knownParents
     val activeIDs = s.activeSessionIDs
-    val reread = { screen: SessionDetail -> activeIDs.any { joinsUnlisted(screen, it, known) } }
-    val pushed = forwardToSubagents(s, SessionScreenMessage.FamilyRefreshRequested, reread)
+    val reread = { screen: SessionFeature.State -> activeIDs.any { joinsUnlisted(screen, it, known) } }
+    val pushed = forwardToSubagents(s, SessionFeature.Action.FamilyRefreshRequested, reread)
     val detailReread = s.sessionDetail?.let {
-        if (reread(it)) sendToDetail(s, SessionScreenMessage.FamilyRefreshRequested) else Effect.none()
+        if (reread(it)) sendToDetail(s, SessionFeature.Action.FamilyRefreshRequested) else Effect.none()
     } ?: Effect.none()
     val attention = if (HomeFeature.attentionDirectories(s) == previousDirectories) Effect.none() else refreshAttention(s)
     return Reduced(s, Effect.merge(attention, pushed, detailReread))
@@ -401,7 +414,7 @@ internal fun HomeFeature.refreshAttention(state: State): Effect<Action> {
 internal fun HomeFeature.flushPersistedComposer(state: State): Effect<Action> {
     val persistence = dependency(ComposerPersistence)
     val serverID = state.server.persistenceID
-    fun schedule(detail: SessionDetail) {
+    fun schedule(detail: SessionFeature.State) {
         val composer = detail.sessionComposer
         if (composer.isEmpty) return
         persistence.scheduleDraft(serverID, detail.session?.id, if (detail.session == null) detail.draftProject else null, composer)
@@ -418,9 +431,7 @@ internal fun HomeFeature.flushPersistedComposer(state: State): Effect<Action> {
  */
 internal val State.voiceSessionBoard: VoiceSessionBoard?
     get() {
-        // TODO(merge) round 2b / `:feature:session`: `sessionDetail?.voice != null` (the screen's call).
-        val hasVoiceCall = false
-        if (!hasVoiceCall) return null
+        if (sessionDetail?.voice == null) return null
         val status = statusSnapshot()
         return VoiceSessionBoard.make(
             hasVoiceCall = true,

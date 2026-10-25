@@ -1,9 +1,10 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.feature.session.*
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.sharing.shared
 import ai.opencode.feature.drawer.HomeFeature.State.StatusSnapshot
-import ai.opencode.feature.drawer.bridge.SessionFeatureLimits
+import ai.opencode.feature.session.SessionFeature
 import ai.opencode.server.CachedHomeSnapshot
 import ai.opencode.server.CachedTranscriptSnapshots
 import ai.opencode.server.ServerSharedKeys
@@ -84,7 +85,7 @@ fun HomeFeature.State.touchingCachedTranscript(session: OpenCodeSession): HomeFe
 
 fun HomeFeature.State.publishingTranscript(sessionID: String, items: List<OpenCodeTranscriptItem>): HomeFeature.State {
     val s = copy(dirtyCachedTranscriptIDs = dirtyCachedTranscriptIDs - sessionID)
-    val bounded = items.takeLast(SessionFeatureLimits.initialFetchLimit)
+    val bounded = items.takeLast(SessionFeature.initialFetchLimit)
     if (s.transcriptCache[sessionID] == bounded) return s
     return s.copy(transcriptCache = s.transcriptCache + (sessionID to bounded)).trimmingTranscriptCache()
 }

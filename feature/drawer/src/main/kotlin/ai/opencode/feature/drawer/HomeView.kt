@@ -12,7 +12,6 @@ import ai.opencode.core.ui.OpenCodeIconButton
 import ai.opencode.core.ui.OpenCodeIconButtonStyle
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
-import ai.opencode.feature.drawer.bridge.SessionScreenEvent
 import ai.opencode.feature.drawer.catchup.CatchUpChrome
 import ai.opencode.feature.drawer.catchup.CatchUpFeature
 import ai.opencode.feature.drawer.catchup.CatchUpStage
@@ -25,7 +24,7 @@ import ai.opencode.feature.drawer.motion.DrawerButton
 import ai.opencode.feature.drawer.motion.rememberDrawerKeyboardHold
 import ai.opencode.feature.drawer.motion.rememberDrawerShortcutMotion
 import ai.opencode.core.experiments.InAppNoticeMode
-import ai.opencode.feature.drawer.notices.InAppNotice
+import ai.opencode.feature.session.InAppNotice
 import ai.opencode.feature.drawer.notices.InAppNoticeSettings
 import ai.opencode.feature.system.notifications.SessionNotificationsClient
 import ai.opencode.core.experiments.ExperimentalCallStyle
@@ -61,6 +60,19 @@ import ai.opencode.server.OpenCodeServer
 import androidx.compose.runtime.collectAsState
 import ai.opencode.feature.drawer.switcher.SessionSwitcherOverlay
 import ai.opencode.feature.session.SessionFeature
+import ai.opencode.core.store.Reduced
+import ai.opencode.core.store.Reducer
+import ai.opencode.core.store.Store
+import ai.opencode.feature.media.BrowserFeature
+import ai.opencode.feature.session.SessionBrowserPage
+import ai.opencode.feature.session.SessionListContext
+import ai.opencode.feature.session.SessionPageStack
+import ai.opencode.feature.session.SessionStackPage
+import ai.opencode.feature.session.sessionBrowserStackPage
+import ai.opencode.feature.voice.VoiceFeature
+import ai.opencode.server.model.OpenCodeSession
+import ai.opencode.server.model.OpenCodeTranscriptItem
+import androidx.compose.runtime.DisposableEffect
 import ai.opencode.feature.session.SessionView
 import ai.opencode.feature.settings.HomeSettingsFeature
 import ai.opencode.feature.settings.SettingsFeature
@@ -90,25 +102,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.min
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.navigation3.runtime.NavEntry
-import androidx.navigation3.ui.NavDisplay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 
-/** Navigation3 keys for the session's stack: the root session (or draft), then pushed subagents. */
-sealed interface HomeRoute {
-    data object Root : HomeRoute
-    data class Subagent(val navigationID: Int) : HomeRoute
-}
-
 /**
  * Port of `OpenCode/Drawer/HomeView.swift`: one server's Home. The open session (or a draft) on
- * the session drawer's card ([SessionDrawerContainer]), its pushed subagents (Navigation3 with
- * predictive back), Catch Up, Settings pushed over everything, the delete confirmation, and the
+ * the session drawer's card ([SessionDrawerContainer]), its pushed subagents and in-app browser
+ * pages (`:feature:session`'s [SessionPageStack], with predictive back), the call's tray and
+ * floating orb, Catch Up, Settings pushed over everything, the delete confirmation, and the
  * lifecycle that tells [HomeFeature] about the screen.
  *
  * A window at least [SidebarMetrics.minimumWindowWidth] wide lists the sessions in a sidebar
@@ -174,7 +177,8 @@ private fun HomeLayout(
     val isSidebarShown by store.observe { it.isSidebarShown }
     val previewRevision by store.observe { it.previewRevision }
     val selectedSessionID by store.observe { it.sessionDetail?.session?.id }
-    val pushed by store.observe { it.subagentStack.isNotEmpty() }
+    // A subagent or a web page pushed over the session: its back gesture has the drag.
+    val pushed by store.observe { it.subagentStack.isNotEmpty() || it.sessionDetail?.browser?.pageID != null }
     val settingsShown by store.observe { it.isSettingsShown }
     val isDrawerOpen by store.observe { it.isDrawerOpen }
     val catchUpProxy = remember { CatchUpStageProxy() }
@@ -184,8 +188,7 @@ private fun HomeLayout(
     SideEffect { view.usesCallTray = usesTray }
     val callTray = view.callTray
     // The open session's call (iOS `sessionStore.scope(\.voice, action: \.voice.presented)`).
-    // TODO(merge) round 2b / `:feature:session`: scope the session's `VoiceFeature` child here.
-    val call: VoiceStoreOf? = null
+    val call = rememberHomeCall(store)
     // How far the drawer is open, each frame it moves: only the travelling tray reads these.
     val drawerProgress = remember { mutableFloatStateOf(0f) }
     val drawerTravels = remember { mutableStateOf(true) }
@@ -387,11 +390,82 @@ private fun HomeFloatingCall(call: VoiceStoreOf?) {
 }
 
 /**
- * What the session's stack shows, bottom first: the session (or draft), then each subagent pushed
- * over it (iOS `stackPages` / `StackEntry`). Back (the back button, the predictive back gesture)
- * goes to the screen beneath. TODO(merge) round 2b / `:feature:session`: web pages over the screen
- * that opened them (`StackEntry.web`: `:feature:media`'s `BrowserPage` for the screen's
- * `SessionFeature.browser.pageID`, Back closing it with `.browser(.closeTapped)`).
+ * The open session's call, scoped from its screen (iOS `sessionStore.scope(\.voice, action:
+ * \.voice.presented)`): null while there's none. It keeps its last state while it leaves, so a
+ * view still drawing it never reads a missing call.
+ */
+@Composable
+internal fun rememberHomeCall(store: StoreOf<HomeFeature.State, HomeFeature.Action>): VoiceStoreOf? {
+    val present by store.observe { it.sessionDetail?.voice != null }
+    if (!present) return null
+    return remember(store) {
+        var last: VoiceFeature.State? = null
+        store.scope<HomeFeature.State, HomeFeature.Action, VoiceFeature.State, VoiceFeature.Action>(
+            state = { home -> (home.sessionDetail?.voice ?: last ?: error("rememberHomeCall read before the call appeared")).also { last = it } },
+            action = { HomeFeature.Action.detail(SessionFeature.Action.voicePresented(it)) },
+        )
+    }
+}
+
+/** The open session's screen (iOS `store.scope(\.sessionDetail, action: \.sessionDetail.presented)`), keeping its last state while it leaves. */
+@Composable
+private fun rememberRootStore(store: StoreOf<HomeFeature.State, HomeFeature.Action>): StoreOf<SessionFeature.State, SessionFeature.Action> =
+    remember(store) {
+        var last: SessionFeature.State? = store.state.sessionDetail
+        store.scope<HomeFeature.State, HomeFeature.Action, SessionFeature.State, SessionFeature.Action>(
+            state = { home -> (home.sessionDetail ?: last ?: SessionFeature.State.draft(home.server, null, emptyList())).also { last = it } },
+            action = { HomeFeature.Action.detail(it) },
+        )
+    }
+
+/** A pushed subagent's screen by its `navigationID` (iOS `subagentStack` element scope), drawable while it animates out. */
+private fun subagentStore(
+    store: StoreOf<HomeFeature.State, HomeFeature.Action>,
+    navigationID: Int,
+): StoreOf<SessionFeature.State, SessionFeature.Action> {
+    var last: SessionFeature.State? = store.state.subagentStack.firstOrNull { it.navigationID == navigationID }
+    return store.scope(
+        state = { home ->
+            (home.subagentStack.firstOrNull { it.navigationID == navigationID } ?: last ?: SessionFeature.State.draft(home.server, null, emptyList()))
+                .also { last = it }
+        },
+        action = { HomeFeature.Action.SubagentStack(navigationID, it) },
+    )
+}
+
+/** One page of the session's stack (iOS `StackEntry`): a subagent at [index], or a web page over the screen [owner] names. */
+private sealed interface StackEntry {
+    val page: SessionStackPage
+
+    data class Subagent(val index: Int, val navigationID: Int, override val page: SessionStackPage) : StackEntry
+
+    /** [owner]: the screen that opened it, a subagent's `navigationID` or null for the session. */
+    data class Web(val owner: Int?, override val page: SessionStackPage) : StackEntry
+}
+
+/**
+ * What the session's stack shows, bottom first: each subagent pushed over the session, and a web
+ * page over whichever screen opened it (iOS `stackPages`, D-40). Back (the back button, the back
+ * gesture, TalkBack's escape) goes to the screen beneath.
+ */
+private fun stackEntries(state: HomeFeature.State): List<StackEntry> {
+    val entries = ArrayList<StackEntry>()
+    fun web(owner: Int?, screen: SessionFeature.State) {
+        val page = sessionBrowserStackPage(screen) ?: return
+        entries += StackEntry.Web(owner, page)
+    }
+    state.sessionDetail?.let { web(null, it) }
+    for ((index, child) in state.subagentStack.withIndex()) {
+        entries += StackEntry.Subagent(index, child.navigationID, SessionStackPage(id = child.navigationID))
+        web(child.navigationID, child)
+    }
+    return entries
+}
+
+/**
+ * The session (or draft) at the root of [SessionPageStack], with each subagent pushed over it and
+ * any in-app browser page over the screen that opened it. The root's call shows on whichever
+ * subagent is on top (`hostedCall`).
  */
 @Composable
 private fun HomeSessionStack(
@@ -400,59 +474,80 @@ private fun HomeSessionStack(
     usesSidebar: Boolean,
     containerWidth: Dp,
 ) {
-    val rootID by store.observe { it.sessionDetail?.navigationID }
-    val stackIDs by store.observe { state -> state.subagentStack.map { it.navigationID } }
-    val backStack: List<HomeRoute> = listOf(HomeRoute.Root) + stackIDs.map(HomeRoute::Subagent)
-    NavDisplay(
-        backStack = backStack,
-        // The reader went back one page: the subagent on top pops to the screen beneath it.
-        onBack = { store.send(HomeFeature.Action.SubagentsPopped(maxOf(store.state.subagentStack.size - 1, 0))) },
-        entryProvider = { route ->
-            when (route) {
-                HomeRoute.Root -> NavEntry(route) {
-                    val detail = remember(store) {
-                        store.scope<HomeFeature.State, HomeFeature.Action, SessionFeature.State, SessionFeature.Action>(
-                            state = { it.sessionDetail?.feature ?: SessionFeature.State.draft(it.server, null, emptyList()) },
-                            action = { HomeFeature.Action.SessionDetail(PresentationAction.Presented(it)) },
-                        )
-                    }
-                    // Each presented screen has its own identity (`navigationID`), as iOS's `ifLet` does.
-                    key(rootID) {
-                        LaunchedEffect(rootID) {
-                            store.send(HomeFeature.Action.SessionDetailEvent(SessionScreenEvent.VisibilityChanged(true)))
-                        }
-                        SessionView(
-                            detail,
-                            navigationIcon = { HomeDrawerButton(store, view, usesSidebar, containerWidth) },
-                        )
-                    }
+    val root = rememberRootStore(store)
+    val call = rememberHomeCall(store)
+    val entries by store.observe(::stackEntries)
+    val catchingUp by store.observe { it.catchUp != null }
+    val drawerOpen by store.observe { it.isDrawerOpen }
+    val listContext by store.observe { it.sessionListContext(it.sessionDetail?.session) }
+    // Pages drawn while they animate out, by their identity.
+    val known = remember { HashMap<Int, StackEntry>() }
+    for (entry in entries) known[entry.page.id] = entry
+    val subagentStores = remember(store) { HashMap<Int, StoreOf<SessionFeature.State, SessionFeature.Action>>() }
+    fun subagent(navigationID: Int) = subagentStores.getOrPut(navigationID) { subagentStore(store, navigationID) }
+    SessionPageStack(
+        pages = entries.map { it.page },
+        onPop = { depth ->
+            // The reader went back one page: a web page closes; a subagent pops to the screen beneath it.
+            val current = stackEntries(store.state)
+            when (val entry = current.getOrNull(depth)) {
+                null -> store.send(HomeFeature.Action.SubagentsPopped(depth))
+                is StackEntry.Web -> {
+                    val close = SessionFeature.Action.Browser(BrowserFeature.Action.CloseTapped)
+                    store.send(if (entry.owner == null) HomeFeature.Action.detail(close) else HomeFeature.Action.SubagentStack(entry.owner, close))
                 }
-                is HomeRoute.Subagent -> NavEntry(route) {
-                    val detail = remember(store, route) {
-                        store.scope<HomeFeature.State, HomeFeature.Action, SessionFeature.State, SessionFeature.Action>(
-                            state = { home ->
-                                home.subagentStack.firstOrNull { it.navigationID == route.navigationID }?.feature ?: SessionFeature.State.draft(home.server, null, emptyList())
-                            },
-                            action = { HomeFeature.Action.SubagentStack(route.navigationID, it) },
-                        )
-                    }
-                    SessionView(
-                        detail,
-                        navigationIcon = {
-                            OpenCodeIconButton(
-                                symbol = SFSymbol.ChevronBackward,
-                                contentDescription = "Back",
-                                style = OpenCodeIconButtonStyle.Standard,
-                                onClick = {
-                                    val index = store.state.subagentStack.indexOfFirst { it.navigationID == route.navigationID }
-                                    if (index >= 0) store.send(HomeFeature.Action.SubagentsPopped(index))
-                                },
-                            )
-                        },
-                    )
-                }
+                is StackEntry.Subagent -> store.send(HomeFeature.Action.SubagentsPopped(entry.index))
             }
         },
+        modifier = Modifier.fillMaxSize(),
+        enabled = !catchingUp && !drawerOpen && !view.isSessionDrawerPresented,
+        root = {
+            SessionView(
+                root,
+                navigationIcon = { HomeDrawerButton(store, view, usesSidebar, containerWidth) },
+                listContext = listContext,
+                onCatchUpOpen = if (catchingUp) ({ store.send(HomeFeature.Action.catchUpOpenTapped) }) else null,
+            )
+        },
+    ) { page ->
+        when (val entry = known[page.id]) {
+            is StackEntry.Subagent -> {
+                val child = subagent(entry.navigationID)
+                val project by child.observe { SessionListContext.project(it.session, store.state.projects) }
+                SessionView(
+                    child,
+                    listContext = SessionListContext(project = project),
+                    onBack = {
+                        val index = store.state.subagentStack.indexOfFirst { it.navigationID == entry.navigationID }
+                        if (index >= 0) store.send(HomeFeature.Action.SubagentsPopped(index))
+                    },
+                    hostedCall = call,
+                )
+            }
+            is StackEntry.Web -> SessionBrowserPage(if (entry.owner == null) root else subagent(entry.owner), Modifier.fillMaxSize())
+            null -> Unit
+        }
+    }
+    // Stores for subagents that left go once their pages have.
+    val liveIDs = entries.mapNotNull { (it as? StackEntry.Subagent)?.navigationID }.toSet()
+    SideEffect { subagentStores.keys.retainAll { it in liveIDs || known[it] != null } }
+}
+
+/**
+ * What a session screen shows of the drawer's knowledge of it (iOS `sessionListContext(for:)`):
+ * its project, pin, read and mute state, the drawer button's dot for other sessions, and the
+ * In-App Notice, outside Catch Up.
+ */
+internal fun HomeFeature.State.sessionListContext(session: OpenCodeSession?): SessionListContext {
+    val listed = session?.let { s -> sessions.firstOrNull { it.id == s.id } }
+    val isCatchUp = catchUp != null
+    return SessionListContext(
+        project = SessionListContext.project(session, projects),
+        isPinned = listed?.let { isPinned(it.id) },
+        isUnread = listed?.let { isUnread(it) } ?: false,
+        isMuted = listed?.let { isMuted(it.id) } ?: false,
+        elsewhere = if (isCatchUp) null else drawerBadge(excluding = session?.id),
+        notice = if (isCatchUp) null else inAppNotice,
     )
 }
 
@@ -491,28 +586,94 @@ private fun HomeDrawerButton(
 }
 
 /**
- * The real session screen for the card behind the open one, from what Home knows of it (iOS
- * `CatchUpPreviewCard`). Inert: it never sends anything, and the stack hides it from TalkBack.
- * TODO(merge): render the cached transcript with an inert `SessionFeature` store
- * (`CatchUpPreviewStores`) once `:feature:session` ports it.
+ * The real session screen for the card behind the open one, rendered from its cached transcript
+ * by an inert store (iOS `CatchUpPreviewCard` over `CatchUpPreviewStores`). One store for the
+ * preview host: its state is replaced in place, so its screen's scaffold is reused across swipes.
+ * Inert: it reads nothing and sends nothing, and the stack hides it from TalkBack.
  */
 @Composable
 private fun CatchUpPreviewCard(store: StoreOf<HomeFeature.State, HomeFeature.Action>, sessionID: String, revision: Int) {
-    val session = remember(sessionID, revision) { store.state.sessions.firstOrNull { it.id == sessionID } }
+    val home = store.state
+    val session = remember(sessionID, revision) { home.sessions.firstOrNull { it.id == sessionID } }
     if (session == null) {
         Box(Modifier.fillMaxSize().background(OpenCodeTheme.colors.canvas))
         return
     }
-    val inert = remember(session.id, session.title) { InertStore<SessionFeature.State, SessionFeature.Action>(SessionFeature.State.session(store.state.server, session)) }
-    SessionView(inert, Modifier.fillMaxSize().clearAndSetSemantics {})
+    val previews = remember { CatchUpPreviewStores() }
+    DisposableEffect(previews) { onDispose { previews.close() } }
+    val preview = previews.store(session, home)
+    SideEffect { previews.commit() }
+    SessionView(
+        preview,
+        Modifier.fillMaxSize().clearAndSetSemantics {},
+        listContext = remember(session, revision) { home.sessionListContext(session) },
+        onCatchUpOpen = {},
+    )
 }
 
-/** A store that shows [initial] and drops every action (the preview card's). */
-private class InertStore<S, A>(initial: S) : StoreOf<S, A> {
-    private val flow = MutableStateFlow(initial)
-    override val state: S get() = flow.value
-    override val states: StateFlow<S> get() = flow
-    override fun send(action: A) = Unit
+/**
+ * iOS `CatchUpPreviewStores`: the inert store behind the Catch Up preview card, rebuilt from what
+ * Home knows (cached transcript, run state, remembered snapshot) only when that changes. Its
+ * reducer honours the renderer's first-frame event, as the live screen does, and nothing else: a
+ * preview performs no loading, request handling or read receipts.
+ */
+private class CatchUpPreviewStores {
+    private data class Inputs(
+        val session: OpenCodeSession,
+        val items: List<OpenCodeTranscriptItem>?,
+        val isRunning: Boolean,
+        val snapshot: SessionFeature.SwitchSnapshot?,
+        val activeFamilyIDs: Set<String>,
+    )
+
+    private var inputs: Inputs? = null
+    private var store: Store<SessionFeature.State, SessionFeature.Action>? = null
+    private var pending: SessionFeature.State? = null
+
+    fun store(session: OpenCodeSession, home: HomeFeature.State): StoreOf<SessionFeature.State, SessionFeature.Action> {
+        val items = home.transcriptCache[session.id]
+        val isRunning = session.id in home.activeSessionIDs
+        val snapshot = home.sessionSnapshots[session.id]
+        val familyIDs = snapshot?.family?.mapTo(HashSet()) { it.id } ?: setOf(session.id)
+        val active = if (home.activeSessionIDs.isEmpty()) emptySet() else home.activeSessionIDs intersect familyIDs
+        val next = Inputs(session, items, isRunning, snapshot, active)
+        val existing = store
+        if (existing != null && inputs == next) return existing
+        var state = SessionFeature.State.session(home.server, session, cachedItems = items, isRunning = isRunning)
+        state = home.seedingSessionSnapshot(state).copy(readsOnView = false)
+        if (existing != null && inputs?.session?.id == session.id && existing.state.hasRenderedFirstContentFrame) {
+            state = state.copy(hasRenderedFirstContentFrame = true)
+        }
+        inputs = next
+        if (existing != null) {
+            // Applied after composition ([commit]): one host, one store, its state replaced in place.
+            pending = state
+            return existing
+        }
+        val created = Store<SessionFeature.State, SessionFeature.Action>(
+            state,
+            Reducer { current, action ->
+                when (action) {
+                    SessionFeature.Action.FirstContentFrameRendered -> Reduced(current.copy(hasRenderedFirstContentFrame = true))
+                    is SessionFeature.Action.PreviewStateReplaced -> Reduced(action.state)
+                    else -> Reduced(current)
+                }
+            },
+        )
+        store = created
+        return created
+    }
+
+    fun commit() {
+        val next = pending ?: return
+        pending = null
+        store?.send(SessionFeature.Action.PreviewStateReplaced(next))
+    }
+
+    fun close() {
+        store?.close()
+        store = null
+    }
 }
 
 /** iOS `homeLayout`'s `onChange(of: usesSidebar)` and `onChange(of: store.opensDrawerForPairing)`, both `initial: true`. */

@@ -117,7 +117,7 @@ import kotlin.math.roundToInt
  *   of holding it beside the card.
  * @param contentSessionID the session the card shows or is about to show (`null` for a draft): a
  *   drawer that closes on another session than it opened on leaves the keyboard down.
- * @param isContentPushed a subagent is pushed over the session (its back gesture has the drag).
+ * @param isContentPushed a subagent or a web page is pushed over the session (its back gesture has the drag).
  * @param isSheetPresented something is presented over Home (Settings): closing never restores
  *   focus, and Back is left to it (the drawer's and Catch Up's back handlers stand down).
  * @param preview the inert card behind the open one in Catch Up.
