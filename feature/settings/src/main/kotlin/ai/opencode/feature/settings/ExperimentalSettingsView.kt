@@ -11,10 +11,13 @@ import ai.opencode.core.experiments.ModelPickerStyle
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
+import ai.opencode.devtools.DevTools
+import ai.opencode.devtools.DevToolsView
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -183,53 +186,19 @@ val ExperimentalGroup.tint: SettingsTint
     }
 
 /**
- * Settings › Advanced › Developer (iOS `Diagnostics/DiagnosticsView.swift`, the parts that are
- * Settings): Developer Mode, Demo Call Audio while it's on, and Tuning › Playgrounds. Android's
- * recording, traces and tuning live in `:devtools` (not a port of iOS Diagnostics), so Record
- * Diagnostics, Include Transcripts, Touch Probe, Motion Watch, Troubleshooting and Team Feedback
- * are not offered here.
+ * Settings › Advanced › Developer (iOS `Diagnostics/DiagnosticsView.swift`): `:devtools`'
+ * Developer screen (Developer Mode, Record Diagnostics, Demo Call Audio, Troubleshooting,
+ * Tuning, Android's tools), with Settings' Playgrounds under Tuning as on iOS. Its sub-pages
+ * go back inside it; its main page's back pops Settings' stack. The overlay shares the store.
  */
 @Composable
 fun DeveloperSettingsView(store: SettingsStore) {
-    val developerMode by remember { shared(SharedKeys.developerMode).flow }.collectAsState()
-    val demoMode by remember { shared(SharedKeys.voiceDemoMode).flow }.collectAsState()
-    val send = { action: HomeSettingsFeature.Action -> store.send(SettingsFeature.Action.Settings(action)) }
-
-    SettingsPageScaffold(title = "Developer", store = store) {
-        settingsSection(
-            key = "recording",
-            header = "Recording and Diagnostics",
-            footer = footerText(
-                if (developerMode) {
-                    "Adds Report a Problem to the session menu and uploads voice calls (kept 30 days)."
-                } else {
-                    "Records timing and network metadata on this $ThisDeviceName; nothing is uploaded while Developer Mode is off."
-                },
-            ),
-        ) {
-            SettingsToggleRow(
-                "Developer Mode",
-                checked = developerMode,
-                onCheckedChange = { send(HomeSettingsFeature.Action.DeveloperModeChanged(it)) },
-            )
-            if (developerMode) {
-                SettingsDivider()
-                SettingsToggleRow(
-                    "Demo Call Audio",
-                    checked = demoMode,
-                    onCheckedChange = { send(HomeSettingsFeature.Action.VoiceDemoModeChanged(it)) },
-                    summary = "Play the next voice call as media so a Mac screen recording captures it",
-                )
-            }
-        }
-        if (developerMode) {
-            settingsSection(key = "tuning", header = "Tuning") {
-                SettingsRow("Playgrounds", "play.rectangle.on.rectangle", SettingsTint.Indigo) {
-                    store.send(SettingsFeature.Action.PagePushed(SettingsPage.Playgrounds))
-                }
-            }
-        }
-    }
+    DevToolsView(
+        DevTools.developerStore,
+        Modifier.fillMaxSize(),
+        onClose = { store.send(SettingsFeature.Action.BackTapped) },
+        onOpenPlaygrounds = { store.send(SettingsFeature.Action.PagePushed(SettingsPage.Playgrounds)) },
+    )
 }
 
 /**
