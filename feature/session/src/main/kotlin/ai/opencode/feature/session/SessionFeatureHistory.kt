@@ -282,7 +282,7 @@ internal fun SessionFeature.evaluateSinceYouLeft(
     }
     val seen = s.sinceYouLeftSeen ?: s.newMessagesBaseline ?: return Reduced(s)
 
-    // iOS ignores the minimum absence in DEBUG/PERF lab runs (`SinceYouLeftLab`); not ported.
+    // iOS DEBUG/PERF: lab runs ignore the minimum absence (`SinceYouLeftLab`, debug builds only).
     val input = SinceYouLeft.buildInput(
         sessionID = sessionID,
         items = s.items,
@@ -296,7 +296,7 @@ internal fun SessionFeature.evaluateSinceYouLeft(
             forms = s.formRequests,
             sessionID = sessionID,
         ),
-        ignoreMinimumAbsenceDuration = false,
+        ignoreMinimumAbsenceDuration = SinceYouLeftLab.isEnabled,
     )
 
     clearBaselineIfSettling()

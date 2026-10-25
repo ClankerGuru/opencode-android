@@ -695,8 +695,11 @@ internal class SessionComposerEnv(
     val isComposingDraft: Boolean
         get() {
             if (s.hasCall) return false
+            // Picks still decoding (or flying in) are already the draft's: the list stays folded
+            // rather than opening between the sheet closing and the photos arriving.
+            val photosArriving = photoSheet != null && (photoSheet.flights.reservedAttachments.isNotEmpty() || photoSheet.flights.isFlying)
             return messageFieldFocused || s.hasPromptContent || s.dictationHold != null || s.isDictating ||
-                s.isFinishingDictation || host.isAttachmentMenuOpen || host.keepsComposerExpanded
+                s.isFinishingDictation || host.isAttachmentMenuOpen || host.keepsComposerExpanded || photosArriving
         }
 
     /** iOS `composerSwipeYields(from:)`: a touch another control owns. */

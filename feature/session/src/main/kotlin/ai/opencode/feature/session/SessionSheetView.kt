@@ -70,6 +70,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -525,12 +527,15 @@ private fun SessionSheetTile(title: String, symbol: SFSymbol, isOn: Boolean = fa
                 }
             }
         }
-        Text(
+        // iOS `.lineLimit(1).minimumScaleFactor(0.75)`: a long caption shrinks to 75 % before it truncates.
+        val style = OpenCodeTextStyles.caption1.copy(fontWeight = if (isOn) FontWeight.SemiBold else FontWeight.Normal)
+        BasicText(
             title,
-            style = OpenCodeTextStyles.caption1.copy(fontWeight = if (isOn) FontWeight.SemiBold else FontWeight.Normal),
-            color = if (isOn) OpenCodeTheme.colors.text else OpenCodeTheme.colors.secondaryText,
+            style = style.copy(color = if (isOn) OpenCodeTheme.colors.text else OpenCodeTheme.colors.secondaryText),
             maxLines = 1,
+            softWrap = false,
             overflow = TextOverflow.Ellipsis,
+            autoSize = TextAutoSize.StepBased(minFontSize = style.fontSize * 0.75f, maxFontSize = style.fontSize),
         )
     }
 }

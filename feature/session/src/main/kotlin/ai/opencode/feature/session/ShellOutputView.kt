@@ -25,7 +25,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -54,6 +55,12 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.platform.LocalWindowInfo
+import kotlin.math.roundToInt
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
@@ -99,14 +106,42 @@ fun ShellOutputView(
         if (isActive) store.send(ShellOutputFeature.Action.Task)
         onDispose { if (isActive) store.send(ShellOutputFeature.Action.TaskEnded) }
     }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    val windowHeight = LocalWindowInfo.current.containerSize.height
+    val navigationBottom = WindowInsets.navigationBars.getBottom(LocalDensity.current)
     ModalBottomSheet(
         onDismissRequest = onClose,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false),
+        sheetState = sheetState,
         modifier = Modifier.testTag("shell-output"),
     ) {
         var isFollowing by remember { mutableStateOf(true) }
         var jumpRequest by remember { mutableIntStateOf(0) }
-        Column(Modifier.fillMaxSize().navigationBarsPadding()) {
+        // iOS `.medium` keeps the status bar (`safeAreaBar(edge: .bottom)`) at the sheet's visible
+        // foot: the column is as tall as the part of the sheet on screen, not the whole sheet.
+        // The column's top below the sheet's (the drag handle), so the visible part is the window
+        // below the sheet's top less that.
+        var headerInSheet by remember { mutableFloatStateOf(0f) }
+        Column(
+            Modifier
+                .fillMaxSize()
+                .onGloballyPositioned { coordinates ->
+                    val offset = runCatching { sheetState.requireOffset() }.getOrNull() ?: return@onGloballyPositioned
+                    headerInSheet = (coordinates.positionInWindow().y - offset).coerceAtLeast(0f)
+                }
+                .layout { measurable, constraints ->
+                    val offset = runCatching { sheetState.requireOffset() }.getOrNull()
+                    val full = constraints.maxHeight
+                    // Above the navigation bar, wherever the sheet rests (its own inset spacer sits
+                    // off screen at the medium rest).
+                    val visible = if (offset == null || windowHeight <= 0) {
+                        full - navigationBottom
+                    } else {
+                        (windowHeight - navigationBottom - offset - headerInSheet).roundToInt()
+                    }.coerceIn(0, full)
+                    val placeable = measurable.measure(constraints.copy(minHeight = visible, maxHeight = visible))
+                    layout(placeable.width, full) { placeable.place(0, 0) }
+                },
+        ) {
             Toolbar(state, onClose, send = store::send)
             EarlierOutputBar(state) { store.send(ShellOutputFeature.Action.LoadEarlierTapped) }
             Box(Modifier.weight(1f).fillMaxWidth()) {
