@@ -1,5 +1,8 @@
 package ai.opencode.core.ui
 
+import ai.opencode.core.tuning.AnimationTimeScale
+import ai.opencode.core.tuning.swiftRounded
+import java.text.BreakIterator
 import java.text.DecimalFormatSymbols
 import java.util.Locale
 import kotlin.math.PI
@@ -9,7 +12,6 @@ import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
-import kotlin.math.roundToLong
 import kotlin.math.sqrt
 
 /**
@@ -343,7 +345,7 @@ class RollingNumberModel {
         if (settled) {
             slots = slots.filterNot { it.removing }
             for (slot in slots) {
-                val digit = rollingWrappedDigit(slot.reel.target.roundToLong().toInt()).toDouble()
+                val digit = rollingWrappedDigit(swiftRounded(slot.reel.target).toInt()).toDouble()
                 slot.reel = Spring(digit, digit)
                 slot.from = slot.to
             }
@@ -358,7 +360,7 @@ class RollingNumberModel {
             lastStep = atSeconds
             return
         }
-        var elapsed = (atSeconds - last).coerceIn(0.0, 1.0 / 20.0)
+        var elapsed = AnimationTimeScale.shared.scaledDelta((atSeconds - last).coerceIn(0.0, 1.0 / 20.0))
         lastStep = atSeconds
         val dt = 1.0 / 240.0
         while (elapsed > 0) {
@@ -398,7 +400,8 @@ class RollingNumberModel {
                 // Non-ASCII decimal digits (e.g. Eastern Arabic) stay static localized text.
                 if (Character.isDigit(cp) && cp !in 0x30..0x39) return false
             }
-            return text.any { it in '0'..'9' }
+            // Swift `Character`s: a digit carrying a combining mark (`1⃣`) is not a digit.
+            return text.characterGlyphs().any { it.isAsciiDigit }
         }
 
         /**
@@ -406,7 +409,7 @@ class RollingNumberModel {
          * when at most 5 faces away, otherwise the shorter way so `15 → 8` never passes 0.
          */
         fun unwrap(digit: Double, value: Double, up: Boolean): Double {
-            val rounded = Math.round(value).toDouble()
+            val rounded = swiftRounded(value)
             if (abs(rounded - value) < 0.0001 && rollingWrappedDigit(rounded.toInt()) == digit.toInt()) return rounded
             val base = floor(value / 10) * 10
             var above = base + digit
@@ -434,7 +437,7 @@ class RollingNumberModel {
          * keying integer places from the right of each run and separators by the place they precede.
          */
         fun parse(text: String, locale: Locale): Parsed {
-            val chars = text.codePointGlyphs()
+            val chars = text.characterGlyphs()
             val symbols = DecimalFormatSymbols.getInstance(locale)
             val decimalChar = symbols.decimalSeparator.toString()
             val groupChar = symbols.groupingSeparator.toString()
@@ -518,14 +521,17 @@ class RollingNumberModel {
 /** Horizontal placement of a [RollingNumber] inside its resting width. */
 enum class RollingNumberAlignment { Start, Center, End }
 
-private fun String.codePointGlyphs(): List<String> {
+/** The string's Swift `Character`s: extended grapheme clusters (`\r\n`, a digit with a combining mark, an emoji sequence). */
+private fun String.characterGlyphs(): List<String> {
     val out = ArrayList<String>(length)
-    var i = 0
-    while (i < length) {
-        val cp = codePointAt(i)
-        val n = Character.charCount(cp)
-        out += substring(i, i + n)
-        i += n
+    val breaks = BreakIterator.getCharacterInstance(Locale.ROOT)
+    breaks.setText(this)
+    var start = breaks.first()
+    var end = breaks.next()
+    while (end != BreakIterator.DONE) {
+        out += substring(start, end)
+        start = end
+        end = breaks.next()
     }
     return out
 }

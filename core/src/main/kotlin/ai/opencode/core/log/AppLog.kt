@@ -4,7 +4,8 @@ import android.os.Trace
 import android.util.Log
 import java.time.Instant
 import java.time.format.DateTimeFormatter
-import java.util.Locale
+import java.math.BigDecimal
+import java.math.RoundingMode
 import kotlin.time.Duration
 
 /**
@@ -20,6 +21,8 @@ import kotlin.time.Duration
  * Messages are lambdas, built only when the level is collected (iOS's autoclosure).
  */
 class AppLog private constructor(val category: String, subsystem: String = SUBSYSTEM, private val traces: Boolean = false) {
+    /** iOS `recentLines` reads only the app's own subsystem, so `opencode.perf` marks stay out of reports. */
+    private val recorded = subsystem == SUBSYSTEM
     private val tag = if (subsystem == SUBSYSTEM) "OpenCode/$category" else "$subsystem/$category"
 
     fun debug(message: () -> String) = log(Log.DEBUG, "debug", message)
@@ -41,7 +44,7 @@ class AppLog private constructor(val category: String, subsystem: String = SUBSY
             Trace.beginSection("oc:" + text.substringBefore(' ').take(117))
             Trace.endSection()
         }
-        Ring.append("${DateTimeFormatter.ISO_INSTANT.format(Instant.now())} $level $category: $text")
+        if (recorded) Ring.append("${DateTimeFormatter.ISO_INSTANT.format(Instant.now())} $level $category: $text")
     }
 
     companion object {
@@ -60,7 +63,7 @@ class AppLog private constructor(val category: String, subsystem: String = SUBSY
         /** The responsiveness gauntlet's timing marks (`LabMarks`), under the `opencode.perf` subsystem. */
         val perf = AppLog("session", subsystem = "opencode.perf", traces = true)
 
-        /** Recent `AppLog` lines from this process, oldest first. */
+        /** Recent `AppLog` lines from this process (the app's own subsystem, not `opencode.perf`), oldest first. */
         fun recentLines(since: Instant): List<String> = Ring.since(since)
     }
 
@@ -84,7 +87,7 @@ val Duration.logSummary: String
     get() {
         val milliseconds = inWholeNanoseconds / 1_000_000.0
         if (milliseconds < 1_000) return "${Math.round(milliseconds)} ms"
-        val seconds = milliseconds / 1_000
-        val text = String.format(Locale.ROOT, "%.2f", seconds).trimEnd('0').trimEnd('.')
+        // iOS formats with ICU (`fractionLength(0...2)`): half-even from the shortest decimal form.
+        val text = BigDecimal.valueOf(milliseconds / 1_000).setScale(2, RoundingMode.HALF_EVEN).stripTrailingZeros().toPlainString()
         return "$text s"
     }
