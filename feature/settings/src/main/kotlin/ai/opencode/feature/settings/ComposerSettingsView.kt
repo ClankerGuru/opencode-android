@@ -24,8 +24,8 @@ fun ComposerSettingsView(store: SettingsStore) {
     val send = { action: HomeSettingsFeature.Action -> store.send(SettingsFeature.Action.Settings(action)) }
 
     SettingsPageScaffold(title = "Composer", store = store) {
-        // iOS: “⌘↩︎ always sends.” — a hardware keyboard's Ctrl/Cmd-Enter on Android.
-        settingsSection(key = "return", footer = footerText("⌘↩\uFE0E always sends.")) {
+        // iOS: “⌘↩︎ always sends.”; Android hardware keyboards send with Ctrl+Enter.
+        settingsSection(key = "return", footer = footerText("Ctrl+Enter always sends on a hardware keyboard.")) {
             SettingsToggleRow(
                 "Return Key Sends",
                 checked = returnKeySends,
