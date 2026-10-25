@@ -4,6 +4,7 @@ import ai.opencode.core.diagnostics.DiagnosticsErrorCategory
 import ai.opencode.core.diagnostics.DiagnosticsFailurePhase
 import ai.opencode.core.diagnostics.DiagnosticsNetworkAddress
 import ai.opencode.core.diagnostics.DiagnosticsNetworkMetrics
+import ai.opencode.core.diagnostics.DiagnosticsNetworkPhases
 import ai.opencode.core.diagnostics.DiagnosticsRecorder
 import ai.opencode.core.diagnostics.LabMarks
 import okhttp3.Call
@@ -23,6 +24,7 @@ import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.Proxy
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -33,6 +35,9 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 internal object DiagnosticsInstrumentation {
     private val inFlight = AtomicInteger(0)
+
+    /** Each measured call's phase evidence, for the failure phase of a transport error (iOS `LabNetworkMetricsRecorder.failurePhase`). */
+    private val phasesByCall = ConcurrentHashMap<Call, DiagnosticsNetworkPhases>()
 
     fun OkHttpClient.Builder.recordingDiagnostics(): OkHttpClient.Builder =
         addInterceptor(RecordingInterceptor).eventListenerFactory { call -> if (LabMarks.needsNetworkMetrics) MetricsListener(call.request()) else EventListener.NONE }
@@ -59,7 +64,11 @@ internal object DiagnosticsInstrumentation {
                 recorder.requestEnded(
                     id, request.method, url, statusCode = null, errorCategory = category, decodedBytes = null, contentEncoding = null,
                     operationID = operation, attempt = attempt,
-                    failurePhase = if (category == DiagnosticsErrorCategory.Cancelled) DiagnosticsFailurePhase.Cancelled else null,
+                    failurePhase = if (category == DiagnosticsErrorCategory.Cancelled) {
+                        DiagnosticsFailurePhase.Cancelled
+                    } else {
+                        phasesByCall[chain.call()]?.let { synchronized(it) { it.unfinished } }
+                    },
                 )
                 throw error
             }
@@ -120,41 +129,82 @@ internal object DiagnosticsInstrumentation {
         private var protocol: Protocol? = null
         private var reused = true
         private var address: DiagnosticsNetworkAddress? = null
+        /** The latest attempt's phase timestamps (iOS reads the last transaction's metrics). */
+        private val phases = DiagnosticsNetworkPhases()
+
+        private fun phase(update: DiagnosticsNetworkPhases.(Long) -> Unit) {
+            synchronized(phases) { phases.update(System.nanoTime()) }
+        }
 
         private fun ms(from: Long, to: Long): Double? = if (from == 0L || to < from) null else (to - from) / 1e6
 
-        override fun callStart(call: Call) { callStart = System.nanoTime() }
-        override fun dnsStart(call: Call, domainName: String) { dnsStart = System.nanoTime() }
-        override fun dnsEnd(call: Call, domainName: String, inetAddressList: List<java.net.InetAddress>) { dns += System.nanoTime() - dnsStart }
+        override fun callStart(call: Call) {
+            callStart = System.nanoTime()
+            phasesByCall[call] = phases
+        }
+        override fun dnsStart(call: Call, domainName: String) {
+            dnsStart = System.nanoTime()
+            phase { dnsStart = it; dnsEnd = null }
+        }
+        override fun dnsEnd(call: Call, domainName: String, inetAddressList: List<java.net.InetAddress>) {
+            dns += System.nanoTime() - dnsStart
+            phase { dnsEnd = it }
+        }
         override fun connectStart(call: Call, inetSocketAddress: InetSocketAddress, proxy: Proxy) {
             reused = false
             connectStart = System.nanoTime()
             address = DiagnosticsNetworkAddress.of(inetSocketAddress.address?.address)
+            phase { connectStart = it; connectEnd = null; tlsStart = null; tlsEnd = null }
         }
-        override fun secureConnectStart(call: Call) { tlsStart = System.nanoTime() }
-        override fun secureConnectEnd(call: Call, handshake: Handshake?) { tls += System.nanoTime() - tlsStart }
-        override fun connectEnd(call: Call, inetSocketAddress: InetSocketAddress, proxy: Proxy, protocol: Protocol?) { connect += System.nanoTime() - connectStart }
+        override fun secureConnectStart(call: Call) {
+            tlsStart = System.nanoTime()
+            phase { tlsStart = it }
+        }
+        override fun secureConnectEnd(call: Call, handshake: Handshake?) {
+            tls += System.nanoTime() - tlsStart
+            phase { tlsEnd = it }
+        }
+        override fun connectEnd(call: Call, inetSocketAddress: InetSocketAddress, proxy: Proxy, protocol: Protocol?) {
+            connect += System.nanoTime() - connectStart
+            phase { connectEnd = it }
+        }
         override fun connectionAcquired(call: Call, connection: Connection) {
             protocol = connection.protocol()
             if (address == null) address = DiagnosticsNetworkAddress.of(connection.route().socketAddress.address?.address)
         }
-        override fun requestHeadersStart(call: Call) { requestStart = System.nanoTime() }
+        override fun requestHeadersStart(call: Call) {
+            requestStart = System.nanoTime()
+            phase { requestStart = it; requestEnd = null; responseStart = null; responseEnd = null }
+        }
         override fun requestHeadersEnd(call: Call, request: Request) {
             requestEnd = System.nanoTime()
             requestHeaderBytes += request.headers.byteCount()
+            if (request.body == null) phase { requestEnd = it }
         }
+        override fun requestBodyStart(call: Call) = phase { requestEnd = null }
         override fun requestBodyEnd(call: Call, byteCount: Long) {
             requestEnd = System.nanoTime()
             requestBodyBytes += byteCount
+            phase { requestEnd = it }
         }
-        override fun responseHeadersStart(call: Call) { responseStart = System.nanoTime() }
+        override fun responseHeadersStart(call: Call) {
+            responseStart = System.nanoTime()
+            phase { responseStart = it }
+        }
         override fun responseHeadersEnd(call: Call, response: Response) { responseHeaderBytes += response.headers.byteCount() }
         override fun responseBodyEnd(call: Call, byteCount: Long) {
             responseEnd = System.nanoTime()
             responseBodyBytes += byteCount
+            phase { responseEnd = it }
         }
-        override fun callEnd(call: Call) = report()
-        override fun callFailed(call: Call, ioe: IOException) = report()
+        override fun callEnd(call: Call) {
+            phasesByCall.remove(call)
+            report()
+        }
+        override fun callFailed(call: Call, ioe: IOException) {
+            phasesByCall.remove(call)
+            report()
+        }
 
         private fun report() {
             if (callStart == 0L) return

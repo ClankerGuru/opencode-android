@@ -15,7 +15,8 @@ import android.os.Bundle
 
 /**
  * The one door every system entry point opens: launcher quick actions and app shortcuts,
- * Quick Settings tiles, widgets, `opencode://` links, and tapped notifications. It reads the
+ * Quick Settings tiles, widgets, App Actions (through [AppActionActivity]), and tapped
+ * notifications. Private to the app: other apps can't start calls through it. It reads the
  * [SystemAction] the intent carries, posts it to [SystemActionInbox] (as iOS intents'
  * `perform` does), then brings the app forward and finishes without drawing.
  *
@@ -40,9 +41,13 @@ class SystemActionActivity : Activity() {
         intent.getStringExtra(EXTRA_APP_FEATURE)?.let { spoken ->
             val directory = SessionDirectory.loadOrEmpty(SessionDirectory.file(filesDir))
             when (val feature = OpenCodeShortcuts.feature(spoken, directory)) {
-                OpenCodeShortcuts.Feature.BackgroundCall -> {
+                // Without the app showing only for an assistant (AppActionActivity); otherwise
+                // the call starts with the app open.
+                OpenCodeShortcuts.Feature.BackgroundCall -> if (intent.getBooleanExtra(EXTRA_FROM_ASSISTANT, false)) {
                     startActivity(Intent(this, BackgroundCallActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                     return false
+                } else {
+                    StartVoiceCallIntent.perform(null)
                 }
                 OpenCodeShortcuts.Feature.StartVoiceCall -> StartVoiceCallIntent.perform(null)
                 is OpenCodeShortcuts.Feature.NewSession -> NewSessionIntent.perform(feature.project)
@@ -95,6 +100,8 @@ class SystemActionActivity : Activity() {
         const val EXTRA_CONTROL_KIND = "controlKind"
         /** An App Action's spoken feature (`actions.intent.OPEN_APP_FEATURE`). */
         const val EXTRA_APP_FEATURE = "appFeature"
+        /** Set by [AppActionActivity]: the App Action came from an assistant. */
+        internal const val EXTRA_FROM_ASSISTANT = "fromAssistant"
         internal const val EXTRA_PUSH_REF = "opencode.ref"
         internal const val EXTRA_PUSH_SESSION = "opencode.sessionID"
         internal const val EXTRA_SHARE_SERVER = "opencode-share.server"
