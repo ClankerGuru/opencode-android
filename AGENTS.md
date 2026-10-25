@@ -128,4 +128,13 @@ Add a new library only with a one-line justification here.
 - In this shared checkout stage only the files you own (`git add <paths>`), never `git add -A`.
   Don't amend, rebase, stash, or reset other agents' work.
 - Never commit secrets, `local.properties`, `google-services.json`, keystores, or private
-  screenshots/logs. New test files only with approval (port iOS tests when the coordinator asks).
+  screenshots/logs.
+
+## Tests
+
+- Port the iOS unit tests (`/Users/vogel/dev/opencode-ios/OpenCodeTests/`) into each module's
+  `src/test` (JVM, exhaustive `TestStore` like iOS's `TestStore`), keeping iOS test names so the
+  suites diff side by side. A ported test that fails is a parity bug: fix the code, not the test,
+  unless the iOS behaviour itself can't exist on Android (then delete it and note why in the
+  parity row).
+- Other new test files (beyond ports of iOS tests) still need the coordinator's approval.
