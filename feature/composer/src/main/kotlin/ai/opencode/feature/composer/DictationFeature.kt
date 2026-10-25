@@ -38,17 +38,10 @@ object DictationFeature : Reducer<DictationFeature.State, DictationFeature.Actio
         data class Finishing(val send: OpenCodeDelivery?) : Phase
     }
 
-    /**
-     * The draft a recording let go to send carries (iOS
-     * `SessionFeature.State.DraftState`). The session area owns the draft type,
-     * so it rides here as [payload] (its attachments, files, location, chips);
-     * this reducer only ever rewrites [text].
-     */
-    data class SendingDraft(val text: String = "", val payload: Any? = null)
-
     data class Sending(
         val recording: Int,
-        val draft: SendingDraft,
+        /** The draft it sends (iOS `SessionFeature.State.DraftState`); this reducer only rewrites its text. */
+        val draft: DraftState,
         val delivery: OpenCodeDelivery,
         val base: String = "",
         /** The session it was sent in; null for a draft. It goes out only there. */

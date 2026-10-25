@@ -2,6 +2,8 @@ package ai.opencode.feature.composer
 
 import ai.opencode.core.dependencies.BackgroundTaskClient
 import ai.opencode.core.dependencies.DependencyKey
+import ai.opencode.core.dependencies.DependencyValues
+import ai.opencode.core.dependencies.asContextElement
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.ServerID
@@ -289,7 +291,7 @@ class PromptOutbox(
 
     fun startIfNeeded(lane: Lane, serverKey: String) {
         val start = synchronized(lock) { claimWorker(resolve(lane, serverKey)) }
-        if (start != null) scope.launch { run(start) }
+        if (start != null) scope.launch(DependencyValues.current.asContextElement()) { run(start) }
     }
 
     /**
@@ -370,7 +372,7 @@ class PromptOutbox(
             claimWorker(key) to snapshot
         }
         persisted?.record()
-        if (start != null) scope.launch { run(start) }
+        if (start != null) scope.launch(DependencyValues.current.asContextElement()) { run(start) }
         return stream
     }
 
@@ -508,7 +510,7 @@ class PromptOutbox(
             observer.trySend(Status.Withdrawn)
             observer.close()
         }
-        start?.let { key -> scope.launch { run(key) } }
+        start?.let { key -> scope.launch(DependencyValues.current.asContextElement()) { run(key) } }
         return found
     }
 
@@ -913,7 +915,7 @@ class PromptOutbox(
          * retried after a lost response finds the session it already made instead of making a
          * second (iOS `ShareSendRequest.newSessionID`).
          */
-        fun newSessionID(at: Instant = Instant.now(), entropy: String = UUID.randomUUID().toString()): String {
+        fun newSessionID(at: Instant = Instant.now(), entropy: String = UUID.randomUUID().toString().uppercase()): String {
             val time = ServerID.timePart(ServerID.milliseconds(at.toEpochMilli()), counter = 1, descending = true)
             val random = entropy.split("_").lastOrNull { it.isNotEmpty() } ?: entropy
             val tail = random.filter { it.isLetterOrDigit() }.takeLast(ServerID.RANDOM_LENGTH)

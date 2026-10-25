@@ -5,6 +5,7 @@ import ai.opencode.core.dependencies.UuidClient
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
+import ai.opencode.server.model.PageShareRequest
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import java.net.IDN
 import java.util.UUID
@@ -153,14 +154,6 @@ class BrowserFeature : Reducer<BrowserFeature.State, BrowserFeature.Action> {
         return Effect.run { pageReader.discard(id) }
     }
 }
-
-/** What a send asks of the open page (iOS `PageShareRequest`). */
-data class PageShareRequest(
-    val pageID: UUID,
-    val url: String,
-    val title: String,
-    val includesScreenshot: Boolean,
-)
 
 /** The page the voice agent hears about (iOS `VoiceViewingPage`). */
 data class VoiceViewingPage(
