@@ -6,8 +6,6 @@ import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.feature.media.FileAttachmentCard
 import ai.opencode.feature.media.FileAttachmentDetail
-import ai.opencode.server.model.OpenCodeTranscriptFile
-import ai.opencode.server.model.PastedTextSummary
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -15,8 +13,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -24,7 +20,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -45,70 +40,6 @@ object FileAttachmentMetrics {
     val cardCornerRadius: Dp = 14.dp
     val clustered: Dp = 8.dp
     val standard: Dp = 12.dp
-}
-
-/** iOS `OpenCodeTranscriptFile.typeLabel`. */
-val OpenCodeTranscriptFile.typeLabel: String get() = AttachmentFileType.label(name, mime)
-
-/** iOS `OpenCodeTranscriptFile.symbolName`. */
-val OpenCodeTranscriptFile.symbolName: String get() = AttachmentFileType.symbolName(name, mime)
-
-/**
- * Sent files on a user message, trailing like the message's images (iOS `TranscriptFileChips`).
- * An uploaded file opens in the viewer from the server's copy ([onOpen] gets its path).
- *
- * @param pastedTextCard draws a Pasted Text file (`PastedTextCard`, `PastedTextViews.kt`).
- * @param trailingShape the trailing card's shape, tight where it meets another surface of its
- *   message's run (`UserSurfaceCorners`, transcript area).
- */
-@Composable
-fun TranscriptFileChips(
-    files: List<OpenCodeTranscriptFile>,
-    modifier: Modifier = Modifier,
-    onOpen: ((path: String) -> Unit)? = null,
-    trailingShape: Shape = RoundedCornerShape(FileAttachmentMetrics.cardCornerRadius),
-    pastedTextCard: (@Composable (file: OpenCodeTranscriptFile, text: String, summary: PastedTextSummary, shape: Shape) -> Unit)? = null,
-) {
-    val round = RoundedCornerShape(FileAttachmentMetrics.cardCornerRadius)
-    // Anchored trailing: reversed layout keeps the last card at the end.
-    LazyRow(
-        modifier.fillMaxWidth(),
-        reverseLayout = true,
-        horizontalArrangement = Arrangement.spacedBy(FileAttachmentMetrics.clustered, Alignment.End),
-    ) {
-        items(files.asReversed(), key = { it.id }) { file ->
-            val shape = if (file.id == files.lastOrNull()?.id) trailingShape else round
-            val text = file.text
-            val summary = file.pasted
-            if (text != null && summary != null && pastedTextCard != null) {
-                pastedTextCard(file, text, summary, shape)
-            } else {
-                TranscriptFileChip(file, shape, onOpen)
-            }
-        }
-    }
-}
-
-@Composable
-private fun TranscriptFileChip(file: OpenCodeTranscriptFile, shape: Shape, onOpen: ((String) -> Unit)?) {
-    val path = file.path
-    val opens = onOpen != null && path != null
-    FileAttachmentCard(
-        name = file.name,
-        symbolName = file.symbolName,
-        modifier = Modifier
-            .clip(shape)
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .then(if (opens) Modifier.clickable(role = Role.Button) { onOpen!!(path!!) } else Modifier)
-            .clearAndSetSemantics {
-                contentDescription = "Attached file ${file.name}"
-                stateDescription = file.typeLabel
-                if (opens) {
-                    role = Role.Button
-                    onClick(label = "Opens the file") { onOpen!!(path!!); true }
-                }
-            },
-    ) { FileAttachmentDetail(file.typeLabel) }
 }
 
 /** A composer file: name, size, and upload progress, or a retry when the upload failed (iOS `ComposerFileChip`). */
