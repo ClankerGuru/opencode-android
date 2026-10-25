@@ -6,7 +6,7 @@ import ai.opencode.core.log.AppLog
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.OpenCodeTransport
-import ai.opencode.server.model.AttachmentFileType
+import ai.opencode.core.files.AttachmentFileType
 import ai.opencode.server.model.FileReadTarget
 import ai.opencode.server.model.OpenCodeDirectoryListing
 import ai.opencode.server.model.OpenCodeUploadEvent

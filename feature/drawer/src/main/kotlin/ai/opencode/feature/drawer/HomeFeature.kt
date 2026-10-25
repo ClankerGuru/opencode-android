@@ -20,13 +20,14 @@ import ai.opencode.feature.drawer.bridge.SessionSwitchSnapshot
 import ai.opencode.feature.drawer.bridge.SharedDraftTarget
 import ai.opencode.feature.drawer.bridge.SystemActionDestination
 import ai.opencode.feature.drawer.bridge.VoiceCallCommand
-import ai.opencode.feature.drawer.bridge.WhatsNewAction
-import ai.opencode.feature.drawer.bridge.WhatsNewState
 import ai.opencode.feature.drawer.catchup.CatchUpFeature
 import ai.opencode.feature.drawer.notices.InAppNotice
 import ai.opencode.feature.drawer.switcher.SessionSwitcherFeature
 import ai.opencode.feature.drawer.bridge.SessionFeatureLimits
 import ai.opencode.feature.session.SessionFeature
+import ai.opencode.feature.settings.HomeSettingsFeature
+import ai.opencode.feature.settings.SettingsFeature
+import ai.opencode.feature.settings.whatsnew.WhatsNewFeature
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.OpenCodeServerEvent
@@ -128,8 +129,12 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         val pendingDeletion: OpenCodeSession? = null,
         val deletionError: String? = null,
         val recentlyDeletedIDs: Set<String> = emptySet(),
-        /** Settings, pushed full screen over the drawer and the session; Back returns to whichever was showing. */
-        val isSettingsShown: Boolean = false,
+        /**
+         * Settings, pushed full screen over the drawer and the session; Back returns to whichever
+         * was showing (iOS `isSettingsShown` and `SettingsPresentation`'s state). Presented: its
+         * effects end when it closes. What's New from the drawer's row is this with `root = whatsNew`.
+         */
+        val settings: SettingsFeature.State? = null,
         val sessionDetail: SessionDetail? = null,
         /** A subagent waiting for its parent to open under it (`sessionTapped`). */
         val pendingSubagentPush: OpenCodeSession? = null,
@@ -143,7 +148,12 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         val linkedSessionQueue: List<String> = emptyList(),
         /** A tapped link being looked up, and the screen it was tapped on. */
         val pendingLinkedSessionOpen: PendingLinkedSessionOpen? = null,
-        val whatsNew: WhatsNewState = WhatsNewState(),
+        /**
+         * The drawer's What's New row (iOS `whatsNew.showsButton`): its switch is on and some
+         * feature is unseen. Read from What's New's shared keys at start, when Settings closes and
+         * when the row is hidden.
+         */
+        val showsWhatsNewButton: Boolean = false,
         /** Bumped when an action takes the screen to the session from over the open drawer; the drawer closes as it changes. */
         val drawerCloseRequests: Int = 0,
         /** A computer just paired: the drawer opens on its sessions. Holds the [detailGeneration] it was asked on. */
@@ -395,7 +405,6 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         val presentsOverHome: Boolean
             get() = catchUp != null ||
                 isSettingsShown ||
-                whatsNew.isPresented ||
                 sessionSwitcher.isPresented ||
                 pendingDeletion != null ||
                 selectedTranscriptFetch != null ||
@@ -403,11 +412,18 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
                 pendingLinkedSessionOpen != null ||
                 subagentStack.isNotEmpty()
 
-        /** Settings pushed as Settings, never as What's New. */
-        fun showingSettings(): State = copy(whatsNew = whatsNew.copy(isPresented = false), isSettingsShown = true)
+        /** iOS `isSettingsShown`. */
+        val isSettingsShown: Boolean get() = settings != null
 
-        /** The push closed with What's New open or read in it. */
-        val closesWhatsNew: Boolean get() = !isSettingsShown && (whatsNew.isPresented || whatsNew.wasViewed)
+        /**
+         * Settings pushed as Settings, never as What's New (a call needing Voice set up, the cog):
+         * already up with What's New as its page, it cross-fades to Settings' root.
+         */
+        fun showingSettings(): State {
+            val shown = settings ?: return presentingSettings(SettingsFeature.State(server = server))
+            if (shown.root != SettingsFeature.State.Root.whatsNew) return this
+            return copy(settings = SettingsFeature().reduce(shown, SettingsFeature.Action.ShowSettingsRoot).state)
+        }
 
         /** A reconnect, a server's first connection, or a return to the app: the next list and attention read set the baseline quietly. */
         fun unsettlingNotices(): State = copy(noticeReadiness = NoticeReadiness.unsettled)
@@ -472,6 +488,7 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
                     manuallyUnreadSessionKeys = shared(SharedKeys.manuallyUnreadSessionKeys).value,
                     mutedSessionKeys = shared(SharedKeys.mutedSessionKeys).value,
                     isSidebarShown = shared(SharedKeys.sidebarShown).value,
+                    showsWhatsNewButton = WhatsNewFeature.State().showsButton,
                     initializedInboxServerIDs = shared(SharedKeys.initializedInboxServerIDs).value,
                 )
                 return base.restoringTranscriptCache().restoringInitialSession()
@@ -539,8 +556,12 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
     sealed interface Action {
         data class SessionSwitcher(val action: SessionSwitcherFeature.Action) : Action
         data class CatchUp(val action: CatchUpFeature.Action) : Action
-        data class WhatsNew(val action: WhatsNewAction) : Action
+        /** The drawer's What's New row: open (`buttonTapped`) or hide (`hideTapped`). */
+        data class WhatsNew(val action: WhatsNewFeature.Action) : Action
+        /** Preferences (`:feature:settings`' `HomeSettingsFeature`); Home's own sender is the sidebar toggle. */
         data class Settings(val action: HomeSettingsFeature.Action) : Action
+        /** The presented Settings ([State.settings]); its delegates are handled in `HomeFeatureSettings.kt`. */
+        data class SettingsScreen(val action: PresentationAction<SettingsFeature.Action>) : Action
         /** iOS `.binding(.set(\.search, …))`. */
         data class SearchChanged(val text: String) : Action
         /** iOS `.binding(.set(\.isSettingsShown, …))`: the view popped (or pushed) Settings. */
@@ -571,6 +592,8 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         /** Opens a draft whose prompt asks OpenCode to install the plugin. */
         data object NotifyPluginSetUpTapped : Action
         data object SettingsTapped : Action
+        /** Manage Servers… in the drawer's title menu: Settings arrives showing the server page. */
+        data object ManageServersTapped : Action
         /** The drawer visually reached the other edge: its haptic. */
         data class SessionDrawerArrived(val isOpen: Boolean) : Action
         data object NewSessionTapped : Action

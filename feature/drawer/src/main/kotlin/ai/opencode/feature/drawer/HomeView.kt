@@ -3,8 +3,6 @@ package ai.opencode.feature.drawer
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
-import ai.opencode.core.motion.Motion
-import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.PresentationAction
 import ai.opencode.core.store.StoreOf
@@ -30,21 +28,17 @@ import ai.opencode.feature.drawer.notices.InAppNotice
 import ai.opencode.feature.drawer.switcher.SessionSwitcherOverlay
 import ai.opencode.feature.session.SessionFeature
 import ai.opencode.feature.session.SessionView
+import ai.opencode.feature.settings.HomeSettingsFeature
 import ai.opencode.feature.settings.SettingsFeature
+import ai.opencode.feature.settings.SettingsPresentation
 import ai.opencode.feature.settings.SettingsView
-import ai.opencode.server.friendlyName
-import androidx.activity.compose.PredictiveBackHandler
-import androidx.compose.animation.core.Animatable
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -53,27 +47,17 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.min
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.ui.NavDisplay
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -111,7 +95,16 @@ fun HomeView(
     view.shortcutMotion = rememberDrawerShortcutMotion()
     val hasDetail by store.observe { it.sessionDetail != null }
 
-    SettingsPresentation(store, reducedMotion, modifier) {
+    val settingsShown by store.observe { it.settings != null }
+    val settingsAtRoot by store.observe { it.settings?.path?.isEmpty() ?: true }
+    SettingsPresentation(
+        isShown = settingsShown,
+        atRoot = settingsAtRoot,
+        // At the root Back closes Settings (`SettingsDelegate.Close`, which Home handles).
+        onClose = { store.send(HomeFeature.Action.SettingsScreen(PresentationAction.Presented(SettingsFeature.Action.BackTapped))) },
+        settings = { HomeSettings(store) },
+        modifier = modifier,
+    ) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             // An iPad-wide window lists the sessions in a sidebar beside the session; anything
             // narrower slides the phone's drawer under it.
@@ -124,6 +117,7 @@ fun HomeView(
             HomeSidebarEffects(store, view, usesSidebar)
         }
     }
+    HomeSettingsBack(store)
     HomeLifecycle(store, view)
     // iOS hosts it on Home, so deletes from the session's own menu confirm too.
     HomeDeleteConfirmation(store)
@@ -441,9 +435,6 @@ private fun HomeLifecycle(store: StoreOf<HomeFeature.State, HomeFeature.Action>,
     LaunchedEffect(selectedSessionID) {
         if (selectedSessionID != null && selectedSessionID == view.chosenSessionID) view.chosenSessionID = null
     }
-    LaunchedEffect(settingsShown) {
-        if (!settingsShown) view.settingsFocusesServers = false
-    }
     val firstCloseRequest = remember { mutableStateOf<Int?>(null) }
     LaunchedEffect(drawerCloseRequests) {
         val previous = firstCloseRequest.value
@@ -487,123 +478,41 @@ private fun Flow<Lifecycle.State>.scenePhases(): Flow<ScenePhase> = map { state 
 }.distinctUntilChanged()
 
 /**
- * Settings pushed over Home (iOS `SettingsPresentation`, `Settings/SettingsPresentation.swift`):
- * Home moves left by 30 % and dims by 12 % under it as it slides in on a 0.42 s spring (Reduce
- * Motion: a 0.3 s cross-fade); system back, predictive included, closes it with the finger.
- * Home keeps its own hit testing; a cover takes its touches while Settings is up.
- * TODO(merge): `:feature:settings` owns the real presentation (What’s New root, Manage
- * Servers… focus, its own navigator); this mounts its `SettingsView` with Home's scope.
+ * The presented Settings ([HomeFeature.State.settings]) as `:feature:settings`' [SettingsView]. It
+ * keeps showing the last state while it slides out (Home drops the state as it closes); anything
+ * sent then is dropped by the presentation.
  */
 @Composable
-private fun SettingsPresentation(
-    store: StoreOf<HomeFeature.State, HomeFeature.Action>,
-    reducedMotion: Boolean,
-    modifier: Modifier,
-    content: @Composable () -> Unit,
-) {
-    val shown by store.observe { it.isSettingsShown }
-    val progress = remember { Animatable(0f) }
-    var mounted by remember { mutableStateOf(false) }
-    val focusManager = LocalFocusManager.current
-    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-    val spec = if (reducedMotion) Motion.easeInOut<Float>(SETTINGS_FADE) else SettingsPush.spec<Float>()
-
-    LaunchedEffect(shown) {
-        if (shown) {
-            focusManager.clearFocus(force = true)
-            // Mounted off screen first, then pushed in, so the page slides rather than appearing.
-            mounted = true
-            progress.animateTo(1f, spec)
-        } else if (mounted) {
-            progress.animateTo(0f, spec)
-            if (!store.state.isSettingsShown) mounted = false
-        }
+private fun HomeSettings(store: StoreOf<HomeFeature.State, HomeFeature.Action>) {
+    val settings = remember(store) {
+        var last: SettingsFeature.State? = null
+        store.scope<HomeFeature.State, HomeFeature.Action, SettingsFeature.State, SettingsFeature.Action>(
+            state = { home -> home.settings?.also { last = it } ?: last ?: SettingsFeature.State(server = home.server) },
+            action = { HomeFeature.Action.SettingsScreen(PresentationAction.Presented(it)) },
+        )
     }
+    SettingsView(settings)
+}
 
-    BoxWithConstraints(modifier.fillMaxSize()) {
-        val widthPx = constraints.maxWidth.toFloat()
-        val direction = if (rtl) -1f else 1f
-        Box(
-            Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    translationX = if (reducedMotion) 0f else -widthPx * SETTINGS_PARALLAX * progress.value * direction
-                }
-                .then(if (mounted) Modifier.clearAndSetSemantics {} else Modifier),
-        ) {
-            content()
-        }
-        if (mounted) {
-            // Dims what's beneath, and keeps its touches while Settings is up.
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .drawBehind { if (!reducedMotion) drawRect(Color.Black, alpha = SETTINGS_DIM * progress.value) }
-                    .pointerInput(Unit) { awaitPointerEventScope { while (true) awaitPointerEvent().changes.forEach { it.consume() } } }
-                    .clearAndSetSemantics {},
-            )
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .graphicsLayer {
-                        translationX = if (reducedMotion) 0f else widthPx * (1f - progress.value) * direction
-                        alpha = if (reducedMotion) progress.value else 1f
-                    }
-                    .background(OpenCodeTheme.colors.groupedCanvas),
-            ) {
-                val settings = remember(store) {
-                    store.scope<HomeFeature.State, HomeFeature.Action, SettingsFeature.State, SettingsFeature.Action>(
-                        state = { SettingsFeature.State(serverName = it.server.friendlyName) },
-                        action = { action ->
-                            when (action) {
-                                SettingsFeature.Action.ServersTapped ->
-                                    HomeFeature.Action.Delegate(HomeFeature.DelegateAction.ServersRequested)
-                                SettingsFeature.Action.Task -> HomeFeature.Action.SettingsShownChanged(true)
-                            }
-                        },
-                    )
-                }
-                SettingsView(settings, Modifier.windowInsetsPadding(WindowInsets.systemBars))
-                // The soft shadow the incoming page casts on what it covers.
-                Box(
-                    Modifier
-                        .fillMaxHeight()
-                        .width(10.dp)
-                        .graphicsLayer {
-                            translationX = -10.dp.toPx() * direction
-                            alpha = if (reducedMotion) 0f else progress.value
-                        }
-                        .background(Brush.horizontalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.12f))))
-                        .clearAndSetSemantics {},
-                )
-            }
-        }
-    }
-
-    // Back closes Settings, following the finger while the predictive gesture runs. Keyed on
-    // `shown` so the handler registers anew (and so last, ahead of the drawer's and Catch Up's,
-    // which compose after Home's first frame) each time Settings opens.
+/**
+ * Back closes Settings at its root, not what waits beneath it. `:feature:settings`'
+ * [SettingsPresentation] registers its predictive handler with Home's first frame, before the
+ * session's stack (subagent pushes) composes, so while a subagent is pushed beneath, this one —
+ * registered anew each time Settings opens, so last — takes Back instead. (The drawer's and Catch
+ * Up's own handlers stand down while Settings is up: `SessionDrawerContainer(isSheetPresented)`.)
+ */
+@Composable
+private fun HomeSettingsBack(store: StoreOf<HomeFeature.State, HomeFeature.Action>) {
+    val shown by store.observe { it.settings != null }
+    val atRoot by store.observe { it.settings?.path?.isEmpty() ?: true }
+    val pushedBeneath by store.observe { it.subagentStack.isNotEmpty() }
     key(shown) {
-        PredictiveBackHandler(enabled = shown) { events ->
-            try {
-                events.collect { event -> progress.snapTo(1f - event.progress) }
-                store.send(HomeFeature.Action.SettingsShownChanged(false))
-            } catch (cancelled: CancellationException) {
-                // The gesture was cancelled: Settings springs back open.
-                progress.animateTo(1f, spec)
-            }
+        BackHandler(enabled = shown && atRoot && pushedBeneath) {
+            store.send(HomeFeature.Action.SettingsScreen(PresentationAction.Presented(SettingsFeature.Action.BackTapped)))
         }
     }
 }
 
-/** iOS `SettingsPresentation.push` (`.interpolatingSpring(duration: 0.42, bounce: 0)`). */
-private val SettingsPush = MotionSpring(0.42, 0.0)
-/** iOS `SettingsPresentation.fade` (`.easeInOut(duration: 0.3)`). */
-private const val SETTINGS_FADE = 0.3
-/** How far Home moves left under open Settings (iOS `parallax`). */
-private const val SETTINGS_PARALLAX = 0.3f
-/** How much Home dims under open Settings (iOS `dim`). */
-private const val SETTINGS_DIM = 0.12f
 /** iOS `timeRevealReach` (76 pt, scaled with the footnote style). */
 private const val TIME_REVEAL_REACH = 76f
 /** How much of the window the drawer button's notice label may span. */

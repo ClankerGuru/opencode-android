@@ -6,47 +6,83 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 
 | iOS file | Lines | Kotlin file(s) | Status | Notes |
 | --- | ---: | --- | --- | --- |
-| `OpenCode/Diagnostics/Diagnostics.swift` | 698 | | todo | |
-| `OpenCode/Diagnostics/DiagnosticsClient.swift` | 105 | | todo | |
-| `OpenCode/Diagnostics/DiagnosticsJournal.swift` | 227 | | todo | |
-| `OpenCode/Diagnostics/DiagnosticsNetwork.swift` | 113 | | todo | |
-| `OpenCode/Diagnostics/DiagnosticsView.swift` | 421 | | todo | |
-| `OpenCode/Diagnostics/GlassMorphTrace.swift` | 491 | | todo | |
-| `OpenCode/Diagnostics/LabMarks.swift` | 221 | | todo | |
-| `OpenCode/Diagnostics/LabTapAudit.swift` | 294 | | todo | |
-| `OpenCode/Diagnostics/MetricKitClient.swift` | 482 | | todo | |
-| `OpenCode/Diagnostics/PerfFrameSampler.swift` | 201 | | todo | |
-| `OpenCode/Diagnostics/PerfTimeline.swift` | 457 | | todo | |
-| `OpenCode/Diagnostics/ScrawlTags.swift` | 73 | | todo | |
-| `OpenCode/Diagnostics/TouchProbe.swift` | 407 | | todo | |
-| `OpenCode/Diagnostics/Traces/DeveloperMode.swift` | 131 | | todo | |
-| `OpenCode/Diagnostics/Traces/HomeFeature+Traces.swift` | 57 | | todo | |
-| `OpenCode/Diagnostics/Traces/MotionWatch.swift` | 413 | | todo | |
-| `OpenCode/Diagnostics/Traces/ProblemReport.swift` | 312 | | todo | |
-| `OpenCode/Diagnostics/Traces/TeamFeedback.swift` | 499 | | todo | |
-| `OpenCode/Diagnostics/Traces/TraceTriggers.swift` | 672 | | todo | |
-| `OpenCode/Diagnostics/Traces/TraceUploads.swift` | 537 | | todo | |
-| `OpenCode/Tuning/AnimationTimeScale.swift` | 309 | | todo | |
-| `OpenCode/Tuning/MotionXRay+Autocomplete.swift` | 108 | | todo | |
-| `OpenCode/Tuning/MotionXRay+Findings.swift` | 382 | | todo | |
-| `OpenCode/Tuning/MotionXRay+Surfaces.swift` | 477 | | todo | |
-| `OpenCode/Tuning/MotionXRay.swift` | 993 | | todo | |
-| `OpenCode/Tuning/Playgrounds/PlaygroundBridgeAndPresets.swift` | 247 | | todo | |
-| `OpenCode/Tuning/Playgrounds/PlaygroundFixtureEngine+Autocomplete.swift` | 72 | | todo | |
-| `OpenCode/Tuning/Playgrounds/PlaygroundFixtureEngine+ClientAdapter.swift` | 332 | | todo | |
-| `OpenCode/Tuning/Playgrounds/PlaygroundFixtureEngine+Composer.swift` | 573 | | todo | |
-| `OpenCode/Tuning/Playgrounds/PlaygroundFixtureEngine+Drawer.swift` | 216 | | todo | |
-| `OpenCode/Tuning/Playgrounds/PlaygroundFixtureEngine+Replays.swift` | 321 | | todo | |
-| `OpenCode/Tuning/Playgrounds/PlaygroundFixtureEngine+TranscriptPresets.swift` | 722 | | todo | |
-| `OpenCode/Tuning/Playgrounds/PlaygroundFixtureEngine.swift` | 199 | | todo | |
-| `OpenCode/Tuning/Playgrounds/PlaygroundHostView.swift` | 897 | | todo | |
-| `OpenCode/Tuning/Playgrounds/PlaygroundScenario.swift` | 46 | | todo | |
-| `OpenCode/Tuning/Playgrounds/PlaygroundSessionHost.swift` | 273 | | todo | |
-| `OpenCode/Tuning/Tunable.swift` | 538 | | todo | |
-| `OpenCode/Tuning/TuningFeature.swift` | 632 | | todo | |
-| `OpenCode/Tuning/TuningGestures.swift` | 98 | | todo | |
-| `OpenCode/Tuning/TuningOverlay.swift` | 179 | | todo | |
-| `OpenCode/Tuning/TuningPanelView.swift` | 781 | | todo | |
-| `OpenCode/Tuning/TuningPlacement.swift` | 106 | | todo | |
-| `OpenCode/Tuning/TuningRemote.swift` | 485 | | todo | |
-| `OpenCode/Tuning/TuningStore.swift` | 698 | | todo | |
+| `OpenCode/Diagnostics/Diagnostics.swift` | 698 | `core/.../diagnostics/DiagnosticsRecorder.kt` | partial: no journal (previous-run tail) | moved to `:core` (`:server` records into it). `DiagnosticsErrorCategory`, `DiagnosticsEvent` (all fields, iOS JSON names), recorder (5,000 events / 15 min default-on in internal builds, else opt-in 2,000 / 10 min; `diagnostics.enabled`/`diagnostics.includeTranscripts`), marks/voice/socket/request/metrics/decode/stream records, navigation epochs, excerpts, `exportText`/`exportJSON`, `redactedPath` (`/auth/<route>/<redacted>`, `/api/fs/read/<redacted>`, query names only), coalesced 0.25 s `changes`. n/a: header-style resolution (session area), MetricKit bundle |
+| `OpenCode/Diagnostics/DiagnosticsClient.swift` | 105 | `core/.../diagnostics/DiagnosticsRecorder.kt` (`DiagnosticsRecorder.Key`), `devtools/.../DevToolsClient.kt` | partial: `liveActivities`, `motionJumps`, `metricKitPayloads`, touch probe and header-resolution fields not carried (n/a or owned by system/session) | Reducers use `dependency(DiagnosticsRecorder)` (timeline, enable, transcripts, clear) and `DevToolsClient` (app log, share, lab, relaunch). `developerModeChanged` → `DevTools.accessChanged()`; uploading saved voice logs on enable is the voice area's (`DeveloperModeUploads.uploadVoiceLog`) |
+| `OpenCode/Diagnostics/DiagnosticsJournal.swift` | 227 | `core/.../tuning/TuningAccess.kt` (`InternalBuild`) | partial: the crash-surviving JSONL journal (previous-run tail, foreground marker) is not ported | `InternalBuild.isDebug` = debuggable; `isEnabled` = debuggable or not installed by Play (iOS Debug ∥ TestFlight) |
+| `OpenCode/Diagnostics/DiagnosticsNetwork.swift` | 113 | `core/.../diagnostics/DiagnosticsRecorder.kt`, `server/.../DiagnosticsInstrumentation.kt` | done | failure phases, interface/family/scope enums, `DiagnosticsNetworkAddress` scope rules, stream names and `DiagnosticsStreamProgress` (30 s resume). `URLSessionTaskMetrics` → OkHttp `EventListener` (DNS/connect/TLS/TTFB/download/upload, header/body bytes, protocol, reuse); in-flight count in the interceptor |
+| `OpenCode/Diagnostics/DiagnosticsView.swift` | 421 | `devtools/.../DevToolsView.kt`, `devtools/.../DevToolsFeature.kt`, `devtools/.../Troubleshooting.kt` | done | Developer screen with iOS's rows, hints and footers (Developer Mode, Record Diagnostics disabled while Developer Mode is on, Include Transcripts for internal builds, Demo Call Audio, Troubleshooting: summary, epochs, request rows, Share Text/JSON, Clear). n/a: Team Feedback section (Scrawl), Motion Watch row, Touch Probe row, Mac pairing (`TuningSettingsSection`), Playgrounds → Session Lab. Adds Android tools (Tuning, slow motion, perf HUD, layout bounds, App Log, Network, Session Lab, Export Diagnostics) |
+| `OpenCode/Diagnostics/GlassMorphTrace.swift` | 491 | — | n/a | Liquid Glass morph lab trace (`-lab-glass-trace`); Android has no glass. Perf HUD + Perfetto `oc:` sections cover motion timing |
+| `OpenCode/Diagnostics/LabMarks.swift` | 221 | `core/.../diagnostics/LabMarks.kt` | partial: trace payload helpers (`promotionTrace`, `motionTrace`, `transcriptSnapshot`, …) and `observe`/`forward` not ported | moved to `:core`. `mark`/`markOnce` (AppLog.perf line, Perfetto instant, diagnostics mark, POST to the lab endpoint with `footprintKB` = PSS), `post(event:)`, `needsNetworkMetrics`. Endpoint = intent extra `lab-marks-url` (debug builds only). `PerfTrace` adds `android.os.Trace` sections/async intervals/counters |
+| `OpenCode/Diagnostics/LabTapAudit.swift` | 294 | `devtools/.../perf/LayoutBoundsOverlay.kt` | n/a | XCUITest tap-audit reducer and hit sweep. Android equivalent: Layout Bounds overlay outlines every semantics node and fills clickable targets under 48 dp red (touch bounds) |
+| `OpenCode/Diagnostics/MetricKitClient.swift` | 482 | — | n/a | MetricKit payloads are iOS-only. Android: Perfetto traces (`PerfTrace`, AppLog.perf instants) and Play vitals; `ApplicationExitInfo` not wired |
+| `OpenCode/Diagnostics/PerfFrameSampler.swift` | 201 | `devtools/.../perf/PerfHud.kt` | partial: windows/stalls are shown and logged (`frame_stall` ≥ 250 ms) and traced as counters, not posted to the lab endpoint; no input-latency link | `Window.OnFrameMetricsAvailableListener` (total vs deadline = janky), 500 ms windows, worst frame, recomposed scopes/s via `Recomposer.observe`/`CompositionObserver` |
+| `OpenCode/Diagnostics/PerfTimeline.swift` | 457 | `core/.../diagnostics/LabMarks.kt` (`PerfTrace`) | partial: the Cold Start / First Timeline / Session Switch interval bookkeeping is for the owning features to emit with `PerfTrace.begin/end` | `os_signpost` → `android.os.Trace` sections, async intervals and counters (`oc:` prefix), visible in Perfetto/Android Studio |
+| `OpenCode/Diagnostics/ScrawlTags.swift` | 73 | — | n/a | Scrawl screen tags (iOS team screen-recording tool); not part of Android |
+| `OpenCode/Diagnostics/TouchProbe.swift` | 407 | — | n/a | UIKit hit chains and gesture-recognizer states. Android: Developer options › Pointer location, plus Layout Bounds |
+| `OpenCode/Diagnostics/Traces/DeveloperMode.swift` | 131 | `core/.../tuning/TuningAccess.kt` (`DeveloperMode.isEnabled`), `server/.../DeveloperModeUploads.kt` | done | Same base URL, 64-hex owner key in `developerModeOwner` (keychain), `webURL`/`traceURL`, `PUT v1/logs|v1/traces/<owner>/<id>` expecting 201 under `NetworkRetry` (send policy for traces, request for logs), `traceBody` shape |
+| `OpenCode/Diagnostics/Traces/HomeFeature+Traces.swift` | 57 | — | todo | `problemReportContext`/destination live on `HomeFeature` (drawer area); build with core `ProblemReportContext` |
+| `OpenCode/Diagnostics/Traces/MotionWatch.swift` | 413 | — | n/a | Presentation-layer jump detector (UIKit layers). Android: Perf HUD (janky frames, recomposition rate) and Layout Bounds |
+| `OpenCode/Diagnostics/Traces/ProblemReport.swift` | 312 | `core/.../diagnostics/ProblemReport.kt` | partial: Motion Watch jump files not carried (n/a) | Moved to `:core`. Context/device/report models, `make` with iOS size budgets, highlights, summary, session message + attachment + ID + follow-up, `safeServerID`/`serverKey`, `tail`, `boundedJSON`. Used by Export Diagnostics |
+| `OpenCode/Diagnostics/Traces/TeamFeedback.swift` | 499 | — | n/a | Team Feedback enrollment for three-finger Scrawl recordings (iOS team tool, separate ingest); not offered on Android |
+| `OpenCode/Diagnostics/Traces/TraceTriggers.swift` | 672 | — | todo | Report a Problem sheet triggers, crash-marker prompt and screenshot capture belong in the session/drawer areas; builder (`ProblemReportBuilder`) and upload (`DeveloperModeUploads`) are ready |
+| `OpenCode/Diagnostics/Traces/TraceUploads.swift` | 537 | — | todo | `TraceUploadsFeature` (Report a Problem flow, send to session, retry) belongs in the drawer/session areas; same dependencies as above |
+| `OpenCode/Tuning/AnimationTimeScale.swift` | 309 | `core/.../tuning/AnimationTimeScale.kt` | done | moved to `:core`. Virtual clock, `scaledDelta`, `wallSeconds`, `setScale` (access-gated), `normalizeScale`, `requestedLabScale`. `window.layer.speed` → applied in `Motion.*`/`MotionSpring.spec` (stiffness × s²), tween durations ÷ s, `motionFrameLoop` dt × s. n/a: Darwin-notification lab bridge |
+| `OpenCode/Tuning/MotionXRay+Autocomplete.swift` | 108 | — | n/a | DEBUG presentation-layer recorder; see Perf HUD |
+| `OpenCode/Tuning/MotionXRay+Findings.swift` | 382 | — | n/a | DEBUG anomaly findings over Core Animation layers; see Perf HUD |
+| `OpenCode/Tuning/MotionXRay+Surfaces.swift` | 477 | — | n/a | DEBUG surface catalog for the X-Ray recorder |
+| `OpenCode/Tuning/MotionXRay.swift` | 993 | — | n/a | DEBUG Core Animation layer + spring capture for the Mac page; Android: Perfetto + Perf HUD + slow motion |
+| `OpenCode/Tuning/Playgrounds/PlaygroundBridgeAndPresets.swift` | 247 | — | n/a | In-app fixture playgrounds driven from the Mac page. Android: Session Lab switcher (`devtools/.../DevToolsFeature.kt` Lab) points the app at `session-lab.py` and selects checkpoints |
+| `OpenCode/Tuning/Playgrounds/PlaygroundFixtureEngine+Autocomplete.swift` | 72 | — | n/a | In-app fixture playgrounds driven from the Mac page. Android: Session Lab switcher (`devtools/.../DevToolsFeature.kt` Lab) points the app at `session-lab.py` and selects checkpoints |
+| `OpenCode/Tuning/Playgrounds/PlaygroundFixtureEngine+ClientAdapter.swift` | 332 | — | n/a | In-app fixture playgrounds driven from the Mac page. Android: Session Lab switcher (`devtools/.../DevToolsFeature.kt` Lab) points the app at `session-lab.py` and selects checkpoints |
+| `OpenCode/Tuning/Playgrounds/PlaygroundFixtureEngine+Composer.swift` | 573 | — | n/a | In-app fixture playgrounds driven from the Mac page. Android: Session Lab switcher (`devtools/.../DevToolsFeature.kt` Lab) points the app at `session-lab.py` and selects checkpoints |
+| `OpenCode/Tuning/Playgrounds/PlaygroundFixtureEngine+Drawer.swift` | 216 | — | n/a | In-app fixture playgrounds driven from the Mac page. Android: Session Lab switcher (`devtools/.../DevToolsFeature.kt` Lab) points the app at `session-lab.py` and selects checkpoints |
+| `OpenCode/Tuning/Playgrounds/PlaygroundFixtureEngine+Replays.swift` | 321 | — | n/a | In-app fixture playgrounds driven from the Mac page. Android: Session Lab switcher (`devtools/.../DevToolsFeature.kt` Lab) points the app at `session-lab.py` and selects checkpoints |
+| `OpenCode/Tuning/Playgrounds/PlaygroundFixtureEngine+TranscriptPresets.swift` | 722 | — | n/a | In-app fixture playgrounds driven from the Mac page. Android: Session Lab switcher (`devtools/.../DevToolsFeature.kt` Lab) points the app at `session-lab.py` and selects checkpoints |
+| `OpenCode/Tuning/Playgrounds/PlaygroundFixtureEngine.swift` | 199 | — | n/a | In-app fixture playgrounds driven from the Mac page. Android: Session Lab switcher (`devtools/.../DevToolsFeature.kt` Lab) points the app at `session-lab.py` and selects checkpoints |
+| `OpenCode/Tuning/Playgrounds/PlaygroundHostView.swift` | 897 | — | n/a | In-app fixture playgrounds driven from the Mac page. Android: Session Lab switcher (`devtools/.../DevToolsFeature.kt` Lab) points the app at `session-lab.py` and selects checkpoints |
+| `OpenCode/Tuning/Playgrounds/PlaygroundScenario.swift` | 46 | — | n/a | In-app fixture playgrounds driven from the Mac page. Android: Session Lab switcher (`devtools/.../DevToolsFeature.kt` Lab) points the app at `session-lab.py` and selects checkpoints |
+| `OpenCode/Tuning/Playgrounds/PlaygroundSessionHost.swift` | 273 | — | n/a | In-app fixture playgrounds driven from the Mac page. Android: Session Lab switcher (`devtools/.../DevToolsFeature.kt` Lab) points the app at `session-lab.py` and selects checkpoints |
+| `OpenCode/Tuning/Tunable.swift` | 538 | `core/.../tuning/Tunable.kt` | done | moved to `:core`. `Tunable` (Double/Float/Dp/Int/Boolean/`TunableChoice` overloads), `TunableSpring` (→ `MotionSpring`), `TuningTitle`, `TuningContext` (+ iOS contexts), `TuneValue`/`TuneKind`, `TunableDescriptor` (`accepting`, `valueText`, `effectiveRange`, step grid, `randomValue`, `alternateValue`, `decimal`), `TuningPreset(s)`. `swiftLiteral` → `kotlinLiteral`; `.tuningContext(_:)` → `TuningContextEffect` |
+| `OpenCode/Tuning/TuningFeature.swift` | 632 | `devtools/.../tuning/TuningFeature.kt` | partial: Mac link (`TuningRemote`), playground selection and controls-on-Mac are not ported | Same actions (summoned with confirm haptic, close, collapse/expand persisted `tuning-panel-collapsed`, All, hide group, Turn Off Tuning, value/preset/dice/undo/reset, Copy Values / Copy as Kotlin with tap haptic and 1.5 s Copied), `TuningPanelGroups.shown`; adds placement, folded groups (`tuning-folded-groups`) and Developer Tools |
+| `OpenCode/Tuning/TuningGestures.swift` | 98 | `devtools/.../DevToolsOverlay.kt` (`summonGesture`), `core/.../tuning/TuningAccess.kt` | done | Three-finger double tap or four fingers held 0.45 s, observed in the Initial pass without consuming. `TuningAccess.isAvailable` = debug && !`tuning-as-release`, or Developer Mode |
+| `OpenCode/Tuning/TuningOverlay.swift` | 179 | `devtools/.../DevTools.kt`, `devtools/.../DevToolsOverlay.kt` | done | `install` (saved `tuning-enabled` switch), launch extras (iOS launch args), `summon`, `setTuningEnabled`, `accessChanged`; the overlay draws above the app only where tuning is available. n/a: separate UIWindow (Compose overlay in the root Box; the panel takes only its own touches), tune links |
+| `OpenCode/Tuning/TuningPanelView.swift` | 781 | `devtools/.../tuning/TuningPanel.kt` | partial: no tucked edge tab | M3 surface: header (title/All, changed count, … menu with Copy All Values/as Kotlin, Reset All, Show hidden, Turn Off Tuning), collapse pill, group headers (fold, count, Undo Roll, dice, actions menu), numbered preset chips, sections by second key segment, rows with slider (step-snapped)/switch/menu and orange tap-to-reset value; “Nothing to tune here/yet” |
+| `OpenCode/Tuning/TuningPlacement.swift` | 106 | `devtools/.../tuning/TuningPanel.kt` | partial: settles to the nearer side at the release height; no throw velocity projection or edge tuck | Placement persisted as fractions (`tuning-panel-x/y`), inside safe drawing insets |
+| `OpenCode/Tuning/TuningRemote.swift` | 485 | — | n/a | WebSocket link to the Mac tune page (`scripts/tune-server.ts`). Android tunes on the phone; values bake with `scripts/tune.py bake` from Copy Values |
+| `OpenCode/Tuning/TuningStore.swift` | 698 | `core/.../tuning/TuningStore.kt` | done | moved to `:core`. Same registry semantics (register on first read while on, sanitize stale overrides, presets ordering, hidden groups, contexts, dice + undo, batch `set`, events as `SharedFlow`), persisted keys `tuning-overrides`/`tuning-hidden-groups` (SharedPreferences `tuning`). Observation → Compose snapshot state. Copy as Swift → `kotlinSnippet`; bake → `scripts/tune.py bake`. n/a: `labHeaderStyle`, playground status/jumps/captures (Mac page events) |
+
+## Android developer tools (entry points)
+
+`:devtools` builds Android-native tools that cover what iOS Developer Mode offers, not a line-by-line
+port of `Tuning/` and `Diagnostics/`. Shared pieces moved to lower modules so features can use them:
+
+| Piece | Where | Use |
+| --- | --- | --- |
+| `Tunable`, `TunableSpring`, `TuningPresets`, `TuningStore`, `TuningContext`, `TuningContextEffect` | `:core` `ai.opencode.core.tuning` | Features declare phone-judged values with iOS keys/defaults: `object DrawerTunables { val cardOmega = Tunable("drawer.card.omega", "Card spring ω", default = 28.5, range = 10.0..60.0) }`; read `.value` (composables recompose), reducers `dependency(TuningStore).value(t)`. One line per declaration for `scripts/tune.py bake` |
+| `MotionTunables`, `RollingNumberTunables` | `:core` | iOS `Motion` (`motion.*`) and `numbers.*` live; `Motion.*` getters read them |
+| `AnimationTimeScale` | `:core` | Slow motion; applied by `Motion.*`, `MotionSpring.spec`, `motionFrameLoop` |
+| `TuningAccess`, `InternalBuild`, `DeveloperMode.isEnabled` | `:core` | iOS gating: debug builds always; others while Developer Mode is on (`SharedKeys.developerMode`, key `voice-call-uploads`) |
+| `DiagnosticsRecorder`, `LabMarks`, `PerfTrace`, `ProblemReportBuilder` | `:core` `ai.opencode.core.diagnostics` | Timeline (requests recorded by `:server`), marks → AppLog.perf + Perfetto, report bundles |
+| `DeveloperModeUploads` | `:server` | Owner key, trace/log uploads (Report a Problem, voice logs) |
+
+`:app` wiring (done in this branch): `DevTools.install()` in `OpenCodeApplication.onCreate`,
+`DevTools.handleLaunchIntent(intent)` and `setContent { DevToolsOverlay { AppView(store) } }` in
+`MainActivity`. Settings › Advanced › Developer: `:feature:settings` should show
+`DevToolsView(store, onClose = …)` with a `Store(DevToolsFeature.State(), DevToolsFeature())`
+(settings does not depend on `:devtools` today: `:app` can pass it in as a slot, or the coordinator
+adds the `:feature:settings → :devtools` edge, which is acyclic). The same screen opens over the
+app from the Tuning Panel's … › Developer Tools. What's New developer entries stay in settings,
+gated on `SharedKeys.developerMode` exactly as iOS.
+
+| Tool | Files | Notes |
+| --- | --- | --- |
+| Summon gesture + Tuning Panel | `DevToolsOverlay.kt`, `tuning/TuningPanel.kt`, `tuning/TuningFeature.kt` | three-finger double tap / four-finger 0.45 s hold; debug intent extra `--ez tuning-panel true` opens it for lab runs |
+| Slow motion | `DevToolsView.kt` | 1×, 0.5×, 0.25×, 0.1× (`AnimationTimeScale.supportedScales`); extra `--es lab-time-scale 0.25` |
+| Perf HUD | `perf/PerfHud.kt` | fps, janky/frames per 500 ms, worst frame, recomposed scopes/s, compositions; Perfetto counters `oc:hud_*` |
+| Layout bounds / touch-target audit | `perf/LayoutBoundsOverlay.kt` | semantics-node outlines; clickable < 48 dp filled red |
+| App Log | `DevToolsView.kt` (Logs) | `AppLog.recentLines` (same privacy as AppLog), category + text filter, Copy, Share |
+| Network inspector | `DevToolsView.kt` (Network), `server/.../DiagnosticsInstrumentation.kt` | method, redacted path, status, duration, wire/decoded bytes, protocol, reuse, DNS/connect/TLS/TTFB/download, address family/scope, op/attempt, SSE marks; failures filter |
+| Troubleshooting | `DevToolsView.kt`, `Troubleshooting.kt` | iOS summary + navigation epochs; Share Text/JSON, Clear |
+| Session Lab switcher | `DevToolsFeature.kt` (Lab), `DevToolsClient.kt` | `GET /lab/state` (checks `session-rendering-v1`), checkpoint select (`POST /lab/select`), Use as Server (saves `http://<address>` with empty password, flushes, relaunches) |
+| Export Diagnostics | `DevToolsFeature.kt`, `DevToolsClient.kt` | zip of `report-<id>.md`, `timeline.txt/json`, `app-log.txt` via FileProvider (`<appId>.devtools.files`); no addresses, credentials or message text |
+| Lab launch extras | `DevTools.kt` | `tuning-enabled`, `tuning-as-release`, `tuning-panel`, `lab-time-scale`, `lab-marks-url`, `diagnostics-enabled`, `lab-tuning-perf` |

@@ -15,11 +15,11 @@ import ai.opencode.feature.drawer.HomeFeature.Action
 import ai.opencode.feature.drawer.HomeFeature.State
 import ai.opencode.feature.drawer.bridge.SessionDetail
 import ai.opencode.feature.drawer.bridge.SessionScreenMessage
-import ai.opencode.feature.drawer.bridge.WhatsNewAction
 import ai.opencode.feature.drawer.catchup.CatchUpFeature
 import ai.opencode.feature.drawer.notices.DeliveredNotificationsClient
 import ai.opencode.feature.drawer.switcher.SessionSwitcherFeature
 import ai.opencode.feature.session.SessionFeature
+import ai.opencode.feature.settings.SettingsFeature
 import ai.opencode.server.OpenCodeLiveContentEvent
 import ai.opencode.server.OpenCodeServerEvent
 
@@ -36,6 +36,7 @@ import ai.opencode.server.OpenCodeServerEvent
  */
 
 private object SessionDetailSlot
+private object SettingsSlot
 private object SubagentStackSlot
 
 internal fun HomeFeature.builtBody(): Reducer<State, Action> {
@@ -61,13 +62,38 @@ internal fun HomeFeature.builtBody(): Reducer<State, Action> {
 }
 
 /**
- * What's New read on the pushed page is seen once the page closes, so its dots stay while you read
- * and the drawer's row leaves on the way back.
+ * Settings runs presented over Home's reducers ([State.settings]): its effects end when it closes,
+ * whichever action closes it. While it's up it's told whenever Home's connection or notification
+ * state changes (opening fills both in). What's New read on the pushed page is seen once the page
+ * closes, so its dots stay while you read and the drawer's row leaves on the way back.
  */
 private fun HomeFeature.fullBody(): Reducer<State, Action> =
-    homeReducers().onChange({ it.isSettingsShown }) { _, _, state ->
-        Reduced(state, if (state.closesWhatsNew) Effect.send(Action.WhatsNew(WhatsNewAction.Closed)) else Effect.none())
-    }
+    ifLet<State, Action, SettingsFeature.State, SettingsFeature.Action>(
+        id = SettingsSlot,
+        parent = homeReducers(),
+        state = { it.settings },
+        setState = { s: State, c: SettingsFeature.State? -> s.copy(settings = c) },
+        action = { (it as? Action.SettingsScreen)?.action },
+        embed = Action::SettingsScreen,
+        child = SettingsFeature(),
+    )
+        .onChange({ it.settings?.whatsNew }) { old, new, state ->
+            if (old == null || new != null) Reduced(state) else Reduced(settingsClosed(old, state))
+        }
+        .onChange({ it.settingsHomeInput }) { old, new, state ->
+            if (old == null || new == null) {
+                Reduced(state)
+            } else {
+                Reduced(state, Effect.send(Action.SettingsScreen(PresentationAction.Presented(new))))
+            }
+        }
+        .onChange({ it.settingsNotificationsInput }) { old, new, state ->
+            if (old == null || new == null) {
+                Reduced(state)
+            } else {
+                Reduced(state, Effect.send(Action.SettingsScreen(PresentationAction.Presented(new))))
+            }
+        }
 
 private fun HomeFeature.homeReducers(): Reducer<State, Action> = combine(
     scope(
@@ -144,7 +170,6 @@ private fun HomeFeature.detailReducer(): Reducer<State, Action> {
 /** Home's own actions, the open session and its pushed subagents (iOS `detailSessionsCore`). */
 private fun HomeFeature.detailSessionsCore(): Reducer<State, Action> {
     val catchUp = CatchUpFeature()
-    val settings = HomeSettingsFeature()
     val notifications = HomeNotificationsFeature()
     val connection = HomeConnectionFeature()
     val session = SessionDetail.reducer(SessionFeature())
@@ -159,13 +184,6 @@ private fun HomeFeature.detailSessionsCore(): Reducer<State, Action> {
         // Home first coordinates against the previous child state (permission changes and
         // connection recovery), then the children settle that action.
         Reducer { state, action -> core(state, action) },
-        scope(
-            state = { it.settings },
-            setState = { s: State, c: HomeSettingsFeature.State -> s.withSettings(c) },
-            action = { (it as? Action.Settings)?.action },
-            embed = Action::Settings,
-            child = settings,
-        ),
         scope(
             state = { it.notifications },
             setState = { s: State, c: HomeNotificationsFeature.State -> s.copy(notificationState = c.status) },
@@ -245,16 +263,6 @@ internal fun isFastStreamAction(state: State, action: Action): Boolean = when (a
         (action.message is SessionScreenMessage.ContentBatch || action.message is SessionScreenMessage.FamilyRunStateChanged) &&
             state.sessionDetail?.navigationID == action.navigationID
     else -> false
-}
-
-/** Settings effects use the live server without maintaining a second copy (iOS computed `settings`). */
-val State.settings: HomeSettingsFeature.State get() = HomeSettingsFeature.State(server = server, isSidebarShown = isSidebarShown)
-
-internal fun State.withSettings(settings: HomeSettingsFeature.State): State {
-    var s = if (settings.server == server) this else withServer(settings.server)
-    val sidebar = settings.isSidebarShown
-    if (sidebar != s.isSidebarShown) s = s.copy(isSidebarShown = sidebar)
-    return s
 }
 
 /** iOS computed `notifications`. */

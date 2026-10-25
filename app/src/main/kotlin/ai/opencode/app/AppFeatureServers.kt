@@ -27,7 +27,7 @@ internal fun AppFeature.selectServer(
     preservingPending: Boolean = false,
     keepingHome: Boolean = false,
 ): Reduced<AppFeature.State, AppFeature.Action> = connect(
-    state.copy(isScanningPairingCode = false, isScannerUnavailable = false, isEditingServer = false, editingSavedServer = null).load(server),
+    state.copy(isScanningPairingCode = false, isEditingServer = false, editingSavedServer = null).load(server),
     preservingPending = preservingPending,
     keepingHome = keepingHome,
 )

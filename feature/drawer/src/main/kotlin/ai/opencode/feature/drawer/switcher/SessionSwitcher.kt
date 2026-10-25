@@ -11,7 +11,8 @@ import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
-import ai.opencode.feature.drawer.ExperimentalFeature
+import ai.opencode.core.experiments.ExperimentalFeature
+import ai.opencode.core.experiments.key
 import ai.opencode.feature.drawer.HomeFeature
 import ai.opencode.feature.drawer.statusSnapshot
 import ai.opencode.server.OpenCodeServer

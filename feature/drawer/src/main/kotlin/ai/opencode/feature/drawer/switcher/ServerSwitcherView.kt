@@ -8,7 +8,8 @@ import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
-import ai.opencode.feature.drawer.ExperimentalFeature
+import ai.opencode.core.experiments.ExperimentalFeature
+import ai.opencode.core.experiments.key
 import ai.opencode.feature.drawer.HomeConnectionFeature
 import ai.opencode.feature.drawer.HomeFeature
 import ai.opencode.feature.drawer.style.DrawerTunables
@@ -137,8 +138,8 @@ fun DrawerTitleView(
 /**
  * The title wired to Home as iOS `HomeView.drawerHeader` wires it: saved servers from
  * `ServerSharedKeys.savedServers` ([switchableServers], sorted by friendly name), switch / Try
- * Again / Title Is the Switch sent as Home actions. [onManage] stays with the caller (iOS sets
- * `settingsFocusesServers` and opens Settings, which is view state).
+ * Again / Title Is the Switch sent as Home actions. [onManage] stays with the caller (Home sends
+ * `ManageServersTapped`: Settings opens on its server page, iOS `settingsFocusesServers`).
  */
 @Composable
 fun DrawerTitleView(

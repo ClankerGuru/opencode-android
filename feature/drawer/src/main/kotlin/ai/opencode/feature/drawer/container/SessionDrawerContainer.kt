@@ -118,7 +118,8 @@ import kotlin.math.roundToInt
  * @param contentSessionID the session the card shows or is about to show (`null` for a draft): a
  *   drawer that closes on another session than it opened on leaves the keyboard down.
  * @param isContentPushed a subagent is pushed over the session (its back gesture has the drag).
- * @param isSheetPresented something is presented over Home (Settings): closing never restores focus.
+ * @param isSheetPresented something is presented over Home (Settings): closing never restores
+ *   focus, and Back is left to it (the drawer's and Catch Up's back handlers stand down).
  * @param preview the inert card behind the open one in Catch Up.
  */
 @Composable
@@ -460,8 +461,9 @@ fun SessionDrawerContainer(
         }
 
         // Back: Catch Up exits; an open drawer closes (a pushed subagent's own back sits beneath).
-        BackHandler(enabled = catchUp != null) { currentCatchUp?.onExit?.invoke() }
-        BackHandler(enabled = catchUp == null && motion.isPresented) { controller.closeDrawer() }
+        // Under Settings neither does: Back closes Settings, not what waits beneath it.
+        BackHandler(enabled = !sheet && catchUp != null) { currentCatchUp?.onExit?.invoke() }
+        BackHandler(enabled = !sheet && catchUp == null && motion.isPresented) { controller.closeDrawer() }
     }
 
     DisposableEffect(controller) { onDispose { controller.dispose() } }

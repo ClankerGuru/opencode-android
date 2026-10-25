@@ -2,25 +2,9 @@ package ai.opencode.feature.drawer.bridge
 
 /*
  * Drawer-local stand-ins for iOS Settings/System/Voice types that Home's state and actions name
- * but whose areas (`:feature:settings`, `:feature:system`, `:feature:voice`) haven't ported yet.
+ * but whose areas (`:feature:system`, `:feature:voice`) haven't ported yet. (What's New is
+ * `:feature:settings`' `WhatsNewFeature` now.)
  */
-
-/**
- * What's New's state as Home reads it (iOS `WhatsNewFeature.State`: `isPresented`, `wasViewed`,
- * `showsButton`). TODO(merge): replace with `WhatsNewFeature.State` from `:feature:settings`.
- */
-data class WhatsNewState(
-    val isPresented: Boolean = false,
-    val wasViewed: Boolean = false,
-    val showsButton: Boolean = false,
-)
-
-/** TODO(merge): replace with `WhatsNewFeature.Action` (Home handles `buttonTapped`, `tryTapped`, sends `closed`). */
-sealed interface WhatsNewAction {
-    data object ButtonTapped : WhatsNewAction
-    data class TryTapped(val destination: String, val entryID: String) : WhatsNewAction
-    data object Closed : WhatsNewAction
-}
 
 /** iOS `NotificationPermission` (`System/Notifications`). TODO(merge): replace with `:feature:system`'s type. */
 enum class NotificationPermission { NotDetermined, Denied, Authorized, Provisional }

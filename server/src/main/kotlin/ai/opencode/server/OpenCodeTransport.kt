@@ -1,6 +1,7 @@
 package ai.opencode.server
 
 import ai.opencode.core.dependencies.DependencyKey
+import ai.opencode.server.DiagnosticsInstrumentation.recordingDiagnostics
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 
@@ -18,10 +19,13 @@ class OpenCodeTransport(
     companion object Key : DependencyKey<OpenCodeTransport> {
         override val liveValue: OpenCodeTransport by lazy {
             val base = OkHttpClient()
+            // Requests feed the diagnostics timeline (inert while recording is off); the event
+            // stream records its own connect/disconnect marks instead.
+            val recorded = base.newBuilder().recordingDiagnostics().build()
             OpenCodeTransport(
-                request = base,
-                measuredRequest = base.newBuilder().build(),
-                longPoll = base.newBuilder().build(),
+                request = recorded,
+                measuredRequest = recorded.newBuilder().build(),
+                longPoll = recorded.newBuilder().build(),
                 // Server heartbeats reset the idle interval, not a total stream deadline.
                 eventStream = base.newBuilder()
                     .connectTimeout(90, TimeUnit.SECONDS)

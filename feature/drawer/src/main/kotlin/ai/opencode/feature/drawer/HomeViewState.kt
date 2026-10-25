@@ -1,6 +1,7 @@
 package ai.opencode.feature.drawer
 
 import ai.opencode.core.store.StoreOf
+import ai.opencode.feature.settings.whatsnew.WhatsNewFeature
 import ai.opencode.feature.drawer.motion.DrawerKeyboardHold
 import ai.opencode.feature.drawer.motion.DrawerKeyboardMonitor
 import ai.opencode.feature.drawer.motion.DrawerPanRegions
@@ -65,9 +66,6 @@ class HomeViewState internal constructor(
     /** Counts the times leaving Catch Up hands TalkBack back to its row (iOS `catchUpFocusRequests`). */
     var catchUpFocusRequests: Int by mutableIntStateOf(0)
 
-    /** Manage Servers… opens Settings at its server page (iOS `settingsFocusesServers`). */
-    var settingsFocusesServers: Boolean by mutableStateOf(false)
-
     /** The drawer's keyboard hold (iOS `DrawerKeyboardHold`'s statics live on this instance). */
     var keyboardHold: DrawerKeyboardHold? = null
         internal set
@@ -116,8 +114,7 @@ class HomeViewState internal constructor(
 
     /** Manage Servers… in the drawer's title menu: Settings arrives showing the server page. */
     fun manageServers() {
-        settingsFocusesServers = true
-        openSettings()
+        store.send(HomeFeature.Action.ManageServersTapped)
     }
 
     /** Search opened (iOS `beginSearch()`; the pill animates itself). */
@@ -163,7 +160,7 @@ class HomeViewState internal constructor(
     /** The drawer's What’s New row (iOS `DrawerListActions.openWhatsNew`). */
     fun openWhatsNew() {
         keyboardHold?.cardWillChange()
-        store.send(HomeFeature.Action.WhatsNew(ai.opencode.feature.drawer.bridge.WhatsNewAction.ButtonTapped))
+        store.send(HomeFeature.Action.WhatsNew(WhatsNewFeature.Action.ButtonTapped))
     }
 
     /**

@@ -1,51 +1,159 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.core.sharing.SharedKeys
+import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.Effect
+import ai.opencode.core.store.PresentationAction
 import ai.opencode.core.store.Reduced
+import ai.opencode.core.store.map
 import ai.opencode.feature.drawer.HomeFeature.Action
+import ai.opencode.feature.drawer.HomeFeature.DelegateAction
 import ai.opencode.feature.drawer.HomeFeature.State
+import ai.opencode.feature.drawer.bridge.NotificationPermission
 import ai.opencode.feature.drawer.bridge.SessionDetail
 import ai.opencode.feature.drawer.bridge.SessionDraftState
-import ai.opencode.feature.drawer.bridge.WhatsNewAction
 import ai.opencode.feature.drawer.catchup.CatchUpFeature
+import ai.opencode.feature.settings.ConnectionStatus
+import ai.opencode.feature.settings.HomeSettingsFeature
+import ai.opencode.feature.settings.NotificationPermissionStatus
+import ai.opencode.feature.settings.SettingsFeature
+import ai.opencode.feature.settings.SettingsFeature.SettingsDelegate
+import ai.opencode.feature.settings.whatsnew.WhatsNewEntry
+import ai.opencode.feature.settings.whatsnew.WhatsNewFeature
+import ai.opencode.feature.settings.whatsnew.whatsNewVoiceAvailable
 
 /*
- * Port of iOS `HomeFeature+Settings.swift`: What's New's Try It, which leaves the page and the
- * drawer for the session, then opens where the feature is.
+ * Port of iOS `HomeFeature+Settings.swift`, and the Settings half of `HomeFeature` and
+ * `SettingsPresentation`: Home presents `:feature:settings`' [SettingsFeature] ([State.settings]),
+ * keeps it told about the connection and notifications, and answers what it asks for
+ * ([SettingsDelegate]) through Home's own actions and delegates. What's New's Try It leaves the
+ * page and the drawer for the session, then opens where the feature is.
  */
+
+/** Settings opened with Home's current connection and notification state already in it. */
+internal fun State.presentingSettings(settings: SettingsFeature.State): State {
+    val home = settingsHome
+    val notifications = settingsNotifications
+    return copy(
+        settings = settings.copy(
+            server = home.server,
+            connectionStatus = home.connectionStatus,
+            switchingTo = home.switchingTo,
+            connectionErrorMessage = home.connectionErrorMessage,
+            credentialsRejected = home.credentialsRejected,
+            notificationPermission = notifications.permission,
+            isRequestingNotifications = notifications.isRequesting,
+            notificationSetupError = notifications.setupError,
+        ),
+    )
+}
+
+private val State.settingsHome: SettingsFeature.Action.HomeChanged
+    get() = SettingsFeature.Action.HomeChanged(
+        server = server,
+        connectionStatus = when (connectionStatus) {
+            HomeConnectionFeature.State.ConnectionStatus.reconnecting -> ConnectionStatus.reconnecting
+            HomeConnectionFeature.State.ConnectionStatus.connected -> ConnectionStatus.connected
+            HomeConnectionFeature.State.ConnectionStatus.disconnected -> ConnectionStatus.disconnected
+        },
+        switchingTo = switchingTo,
+        connectionErrorMessage = connectionErrorMessage,
+        credentialsRejected = credentialsRejected,
+    )
+
+/** What Settings shows of Home's connection while it's up (null while it isn't). */
+internal val State.settingsHomeInput: SettingsFeature.Action.HomeChanged?
+    get() = if (settings == null) null else settingsHome
+
+private val State.settingsNotifications: SettingsFeature.Action.NotificationsChanged
+    get() = SettingsFeature.Action.NotificationsChanged(
+        permission = when (notificationPermission) {
+            null -> null
+            NotificationPermission.NotDetermined -> NotificationPermissionStatus.notDetermined
+            NotificationPermission.Denied -> NotificationPermissionStatus.disabled
+            NotificationPermission.Authorized, NotificationPermission.Provisional -> NotificationPermissionStatus.enabled
+        },
+        isRequesting = isRequestingNotifications,
+        setupError = notificationSetupError,
+    )
+
+/** What Settings shows of Home's notification state while it's up (null while it isn't). */
+internal val State.settingsNotificationsInput: SettingsFeature.Action.NotificationsChanged?
+    get() = if (settings == null) null else settingsNotifications
+
+/** The drawer's What's New row, read again from What's New's shared keys. */
+internal fun State.refreshingWhatsNewButton(): State {
+    val shows = WhatsNewFeature.State().showsButton
+    return if (shows == showsWhatsNewButton) this else copy(showsWhatsNewButton = shows)
+}
 
 /**
- * iOS `WhatsNewEntry.Destination`: where an entry's Try It goes.
- * TODO(merge): replace with `:feature:settings`' `WhatsNewEntry.Destination`; the bridge's
- * `WhatsNewAction.TryTapped` carries it as a string ([of] reads it).
+ * Settings closed, by whatever closed it: what was read in What's New is seen now (iOS
+ * `whatsNew(.closed)` on `isSettingsShown` turning off), so its dots stay while you read and the
+ * drawer's row leaves on the way back.
  */
-sealed interface WhatsNewDestination {
-    /** A new session. */
-    data object NewSession : WhatsNewDestination
-    /** A new session with this prompt typed in its composer, not sent. */
-    data class Prompt(val text: String) : WhatsNewDestination
-    /** The open session's model list. */
-    data object ModelList : WhatsNewDestination
-    /** A call in the open session; Voice's settings while Voice isn't set up. */
-    data object Call : WhatsNewDestination
-    /** A Settings page, pushed on What's New's own stack. */
-    data class Open(val page: String) : WhatsNewDestination
+internal fun settingsClosed(whatsNew: WhatsNewFeature.State, state: State): State {
+    WhatsNewFeature().reduce(whatsNew, WhatsNewFeature.Action.Closed)
+    return state.refreshingWhatsNewButton()
+}
 
-    companion object {
-        /** `newSession`, `modelList`, `call`, `prompt:<text>`, `open:<page>`. */
-        fun of(raw: String): WhatsNewDestination = when {
-            raw == "newSession" -> NewSession
-            raw == "modelList" -> ModelList
-            raw == "call" -> Call
-            raw.startsWith("prompt:") -> Prompt(raw.removePrefix("prompt:"))
-            else -> Open(raw.removePrefix("open:"))
+/** The drawer's What's New row (iOS `.whatsNew(.buttonTapped)`, `.whatsNew(.hideTapped)`). */
+internal fun HomeFeature.reduceWhatsNew(state: State, action: WhatsNewFeature.Action): HomeReduced = when (action) {
+    // Pushed over the open drawer, like Settings.
+    WhatsNewFeature.Action.ButtonTapped ->
+        if (state.settings != null) {
+            Reduced(state)
+        } else {
+            val whatsNew = SettingsFeature.State.whatsNew(state.server)
+            Reduced(state.presentingSettings(whatsNew.copy(whatsNew = whatsNew.whatsNew.copy(isPresented = true))))
         }
+    WhatsNewFeature.Action.HideTapped -> {
+        WhatsNewFeature().reduce(WhatsNewFeature.State(), action)
+        Reduced(state.refreshingWhatsNewButton())
+    }
+    else -> Reduced(state)
+}
+
+/**
+ * Preferences. Home's sidebar mirrors `SharedKeys.sidebarShown`, so its toggle is handled here (the
+ * mirror and the key move together); the rest go to `:feature:settings`' [HomeSettingsFeature].
+ */
+internal fun reducePreferences(state: State, action: HomeSettingsFeature.Action): HomeReduced = when (action) {
+    HomeSettingsFeature.Action.SidebarToggled -> {
+        val next = !state.isSidebarShown
+        shared(SharedKeys.sidebarShown).set(next)
+        Reduced(state.copy(isSidebarShown = next))
+    }
+    else -> {
+        val reduced = HomeSettingsFeature().reduce(HomeSettingsFeature.State(), action)
+        Reduced(state, reduced.effect.map { Action.Settings(it) })
     }
 }
 
-/** Home's What's New Try It (`WhatsNewAction.TryTapped`). */
-internal fun HomeFeature.reduceSettings(state: State, action: WhatsNewAction.TryTapped): HomeReduced =
-    tryWhatsNew(WhatsNewDestination.of(action.destination), action.entryID, state)
+/** What the presented Settings asks of Home. Its own actions are reduced by [SettingsFeature] first. */
+internal fun HomeFeature.reduceSettingsScreen(state: State, action: PresentationAction<SettingsFeature.Action>): HomeReduced {
+    val presented = (action as? PresentationAction.Presented)?.action ?: return Reduced(state)
+    return when (presented) {
+        // Leave this server to pick or pair another (AppFeature).
+        SettingsFeature.Action.ServersTapped -> Reduced(state, Effect.send(Action.Delegate(DelegateAction.ServersRequested)))
+        is SettingsFeature.Action.Delegate -> when (val delegate = presented.action) {
+            SettingsDelegate.Close -> Reduced(state.copy(settings = null))
+            is SettingsDelegate.SwitchServer -> Reduced(state, Effect.send(Action.Delegate(DelegateAction.ServerSwitchTapped(delegate.server))))
+            is SettingsDelegate.RenameServer ->
+                Reduced(state, Effect.send(Action.Delegate(DelegateAction.ServerRenamed(delegate.server, delegate.name))))
+            SettingsDelegate.RetryConnection -> Reduced(state, Effect.send(Action.RetryConnectionTapped))
+            is SettingsDelegate.EditServer -> Reduced(state, Effect.send(Action.Delegate(DelegateAction.EditServerRequested(delegate.server))))
+            SettingsDelegate.PairServer -> Reduced(state, Effect.send(Action.Delegate(DelegateAction.PairServerRequested)))
+            SettingsDelegate.AddServer -> Reduced(state, Effect.send(Action.Delegate(DelegateAction.AddServerRequested)))
+            is SettingsDelegate.RemoveServer ->
+                Reduced(state, Effect.send(Action.Delegate(DelegateAction.ServerRemovalConfirmed(delegate.server))))
+            SettingsDelegate.EnableNotificationsTapped -> Reduced(state, Effect.send(Action.EnableNotificationsTapped))
+            SettingsDelegate.NotificationSettingsRequested -> Reduced(state, Effect.send(Action.NotificationSettingsRequested))
+            is SettingsDelegate.TryWhatsNew -> tryWhatsNew(delegate.destination, delegate.entryID, state)
+        }
+        else -> Reduced(state)
+    }
+}
 
 /**
  * What's New's Try It: leaves the page and the drawer for the session, then opens where the
@@ -54,23 +162,21 @@ internal fun HomeFeature.reduceSettings(state: State, action: WhatsNewAction.Try
  * before Voice is set up (its settings push on the page instead).
  */
 @Suppress("UNUSED_PARAMETER")
-internal fun HomeFeature.tryWhatsNew(destination: WhatsNewDestination, entryID: String, state: State): HomeReduced {
+internal fun HomeFeature.tryWhatsNew(destination: WhatsNewEntry.Destination, entryID: String, state: State): HomeReduced {
     when (destination) {
         // Settings pages push on What's New's own stack (WhatsNewFeature).
-        is WhatsNewDestination.Open -> return Reduced(state)
-        WhatsNewDestination.NewSession, is WhatsNewDestination.Prompt ->
+        is WhatsNewEntry.Destination.Open -> return Reduced(state)
+        WhatsNewEntry.Destination.NewSession, is WhatsNewEntry.Destination.Prompt ->
             if (state.connectionStatus == HomeConnectionFeature.State.ConnectionStatus.disconnected) return Reduced(state)
-        // iOS: `guard state.voicePreferences.isAvailable(server:)` else
-        // `state.whatsNew.settingsPage = .init(destination: .voice, entryID:)`.
-        // TODO(merge): Voice isn't ported, so it's never set up; What's New's own page stack (and
-        // its `settingsPage`) belongs to `:feature:settings`. The page stays.
-        WhatsNewDestination.Call -> return Reduced(state)
-        WhatsNewDestination.ModelList -> Unit
+        // Before Voice is set up, Settings pushes Voice's page over the entry instead and never
+        // asks (`SettingsFeature`); checked again here as iOS does.
+        WhatsNewEntry.Destination.Call -> if (!whatsNewVoiceAvailable(state.server)) return Reduced(state)
+        WhatsNewEntry.Destination.ModelList -> Unit
     }
-    var s = state.copy(isSettingsShown = false, drawerCloseRequests = state.drawerCloseRequests + 1)
+    var s = state.copy(settings = null, drawerCloseRequests = state.drawerCloseRequests + 1)
     return when (destination) {
-        WhatsNewDestination.NewSession -> reduceDrawer(s, Action.NewSessionTapped)
-        is WhatsNewDestination.Prompt -> {
+        WhatsNewEntry.Destination.NewSession -> reduceDrawer(s, Action.NewSessionTapped)
+        is WhatsNewEntry.Destination.Prompt -> {
             // There's one new-session draft. Words already in it stay, and the prompt goes below
             // them; New Session over a draft would clear it.
             val detail = s.sessionDetail
@@ -82,7 +188,7 @@ internal fun HomeFeature.tryWhatsNew(destination: WhatsNewDestination, entryID: 
             val opened = reduceDrawer(s, Action.NewSessionTapped)
             Reduced(opened.state.updatingDetail { it.typingBelow(destination.text) }, opened.effect)
         }
-        WhatsNewDestination.ModelList, WhatsNewDestination.Call -> {
+        WhatsNewEntry.Destination.ModelList, WhatsNewEntry.Destination.Call -> {
             // The screen the reader comes back to: Catch Up's card opened as the session (or, with
             // no card left, where Catch Up returns), and no in-app page over it.
             val effects = mutableListOf<Effect<Action>>()
@@ -95,7 +201,7 @@ internal fun HomeFeature.tryWhatsNew(destination: WhatsNewDestination, entryID: 
             if (s.sessionDetail == null) s = s.openingDraft(reason = "What’s New’s Try It")
             // TODO(merge): close the top screen's in-app browser (`.browser(.closeTapped)`) once
             // `:feature:media` ports it.
-            if (destination == WhatsNewDestination.Call) {
+            if (destination == WhatsNewEntry.Destination.Call) {
                 // A pushed subagent's call belongs to the root, aimed at the top.
                 // TODO(merge): `startCallOnTop` for a pushed subagent once `:feature:voice` ports.
                 val call = startSystemCall(s)
@@ -106,7 +212,7 @@ internal fun HomeFeature.tryWhatsNew(destination: WhatsNewDestination, entryID: 
             // `:feature:session` ports it.
             Reduced(s, Effect.concatenate(effects))
         }
-        is WhatsNewDestination.Open -> Reduced(s)
+        is WhatsNewEntry.Destination.Open -> Reduced(s)
     }
 }
 

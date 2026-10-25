@@ -12,6 +12,7 @@ import ai.opencode.feature.drawer.bridge.SessionDraftState
 import ai.opencode.feature.drawer.bridge.SessionScreenMessage
 import ai.opencode.feature.drawer.bridge.SharedDraftTarget
 import ai.opencode.feature.drawer.bridge.SystemActionDestination
+import ai.opencode.feature.settings.whatsnew.whatsNewVoiceAvailable
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeSession
 
@@ -123,7 +124,7 @@ internal fun HomeFeature.openSystemDestination(
     startsCall: Boolean,
     inBackground: Boolean = false,
 ): HomeReduced {
-    var s = state.copy(isSettingsShown = false)
+    var s = state.copy(settings = null)
     val session: OpenCodeSession? = when (destination) {
         is SystemActionDestination.Session -> s.sessions.firstOrNull { it.id == destination.sessionID } ?: return Reduced(s)
         SystemActionDestination.NewSession -> null
@@ -163,11 +164,13 @@ internal fun HomeFeature.openSystemDestination(
  *
  * TODO(merge): with `:feature:voice`'s call state: clear a terminal call, keep a live one, and if
  * Voice is available send the screen `.voiceTapped` (then `.voice(.presented(.startIfNeeded))` in
- * the background). Until then Voice is never set up, so the call button's path opens Settings.
+ * the background). Until then a call set up has nothing to start here; without Voice set up
+ * (`:feature:settings`' `whatsNewVoiceAvailable`, the same keys) the call button's path opens Settings.
  */
 @Suppress("UnusedReceiverParameter", "UNUSED_PARAMETER")
 internal fun HomeFeature.startSystemCall(state: State, inBackground: Boolean = false): HomeReduced {
     if (state.sessionDetail == null) return Reduced(state)
+    if (whatsNewVoiceAvailable(state.server)) return Reduced(state)
     return Reduced(state.showingSettings())
 }
 

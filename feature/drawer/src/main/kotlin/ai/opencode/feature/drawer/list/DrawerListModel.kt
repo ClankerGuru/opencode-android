@@ -141,7 +141,7 @@ data class DrawerListModel(
                 catchUpCount = catchUpCount,
                 catchUpFinish = if (state.catchUpState.justFinished && catchUpCount == 0) state.catchUpState.finishes else null,
                 canMarkAllRead = catchUpSessions.any { status.indicator(it) == Indicator.unread },
-                showsWhatsNew = state.whatsNew.showsButton,
+                showsWhatsNew = state.showsWhatsNewButton,
                 catchUpMounted = state.search.isEmpty() && catchUpMounted,
                 whatsNewMounted = state.search.isEmpty() && whatsNewMounted,
             )

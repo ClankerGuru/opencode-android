@@ -13,10 +13,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.BlendMode
@@ -76,7 +78,7 @@ fun RollingNumber(
     modifier: Modifier = Modifier,
     style: TextStyle = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
     color: Color = Color.Unspecified,
-    motion: RollingNumberStyle = RollingNumberStyle.Native,
+    motion: RollingNumberStyle = RollingNumberTunables.style(),
     alignment: RollingNumberAlignment = RollingNumberAlignment.Start,
     monospacedDigits: Boolean = true,
     accessibilityLabel: String? = null,
@@ -97,6 +99,7 @@ fun RollingNumber(
         RollingNumberModel.isRollable(text) &&
         motion.duration > 0
 
+    SideEffect { RollingNumberTunables.register() }
     val model = remember { RollingNumberModel() }
     model.sync(text, locale, animated = canRoll, style = motion, nowSeconds = System.nanoTime() / 1e9)
 
@@ -126,7 +129,8 @@ fun RollingNumber(
         }
         val widthDp = with(density) { max(targetWidth, 1f).toDp() }
         val heightDp = with(density) { metrics.lineHeight.toDp() }
-        Canvas(Modifier.size(widthDp, heightDp).baselineAt(metrics.ascender)) {
+        // Clipped to its line, as iOS's Canvas and edge-fade mask are: outgoing digits roll out of view, not over neighbours.
+        Canvas(Modifier.size(widthDp, heightDp).clipToBounds().baselineAt(metrics.ascender)) {
             val time = if (frameNanos == 0L) System.nanoTime() / 1e9 else frameNanos / 1e9
             val frame = model.frame(time, metrics, motion, targetWidth, alignment)
             val fade = if (frame.isSettled) 0f else min(0.45f, max(0f, motion.edgeFade))
@@ -142,7 +146,7 @@ fun RollingNumber(
     modifier: Modifier = Modifier,
     style: TextStyle = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
     color: Color = Color.Unspecified,
-    motion: RollingNumberStyle = RollingNumberStyle.Native,
+    motion: RollingNumberStyle = RollingNumberTunables.style(),
     alignment: RollingNumberAlignment = RollingNumberAlignment.Start,
     accessibilityLabel: String? = null,
 ) {

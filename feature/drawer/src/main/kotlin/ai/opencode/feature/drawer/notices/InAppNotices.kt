@@ -3,7 +3,7 @@ package ai.opencode.feature.drawer.notices
 import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.dependencies.dependency
-import ai.opencode.core.sharing.SharedKey
+import ai.opencode.core.experiments.InAppNoticeMode
 import ai.opencode.core.sharing.shared
 import android.app.NotificationManager
 import android.content.Context
@@ -12,8 +12,6 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -26,40 +24,9 @@ import kotlin.time.Duration.Companion.seconds
 // `HomeFeatureNotifications.kt`.
 
 /**
- * In-App Notices (Settings → Experimental): what the drawer button says about other sessions
- * while the app is open. Off by default.
- *
- * TODO(merge): replace with `ai.opencode.core.experiments.InAppNoticeMode` (moved down to `:core`
- * by the settings area, commit 080700c on `area/settings`; same raw values, titles, key and
- * `effective`). [shows] is an extension so it carries over unchanged.
+ * Whether the mode shows a notice of this kind ([InAppNoticeMode] itself moved down to `:core`,
+ * `ai.opencode.core.experiments`, as Settings › Notifications writes it).
  */
-@Serializable
-enum class InAppNoticeMode(val rawValue: String) {
-    @SerialName("off") off("off"),
-    @SerialName("needs-input") needsInput("needs-input"),
-    @SerialName("all") all("all");
-
-    val id: String get() = rawValue
-
-    val title: String
-        get() = when (this) {
-            off -> "Off"
-            needsInput -> "Needs Your Input Only"
-            all -> "All Updates"
-        }
-
-    /**
-     * Off wherever the drawer button can't show the label (beside a large screen's sidebar): no
-     * haptic, announcement, or banner suppression either.
-     */
-    fun effective(showsDrawerLabel: Boolean): InAppNoticeMode = if (showsDrawerLabel) this else off
-
-    companion object {
-        /** iOS `SharedKey.inAppNoticeMode`. */
-        val key: SharedKey<InAppNoticeMode> by lazy { SharedKey.appStorage("experimental-in-app-notices", off) }
-    }
-}
-
 fun InAppNoticeMode.shows(kind: InAppNotice.Kind): Boolean = when (this) {
     InAppNoticeMode.off -> false
     InAppNoticeMode.needsInput -> kind == InAppNotice.Kind.needsInput

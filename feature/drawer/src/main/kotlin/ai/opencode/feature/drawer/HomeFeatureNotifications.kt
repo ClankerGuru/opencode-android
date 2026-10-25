@@ -12,7 +12,7 @@ import ai.opencode.feature.drawer.HomeFeature.State
 import ai.opencode.feature.drawer.bridge.SessionDraftState
 import ai.opencode.feature.drawer.notices.AccessibilityAnnouncer
 import ai.opencode.feature.drawer.notices.InAppNotice
-import ai.opencode.feature.drawer.notices.InAppNoticeMode
+import ai.opencode.core.experiments.InAppNoticeMode
 import ai.opencode.feature.drawer.notices.InAppNoticeSettings
 import ai.opencode.feature.drawer.notices.InAppNoticeSignal
 import ai.opencode.feature.drawer.notices.shows
@@ -41,7 +41,7 @@ internal fun HomeFeature.reduceNotifications(state: State, action: Action): Home
         if (state.connectionStatus == HomeConnectionFeature.State.ConnectionStatus.disconnected) {
             Reduced(state)
         } else {
-            val s = state.copy(isSettingsShown = false)
+            val s = state.copy(settings = null)
                 .leavingCatchUp()
                 .openingDraft(reason = "notification setup")
                 // iOS `sessionDetail?.setTyped(notifyPluginSetUpPrompt)`.

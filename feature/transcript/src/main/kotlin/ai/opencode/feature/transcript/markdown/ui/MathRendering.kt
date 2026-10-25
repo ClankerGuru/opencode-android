@@ -1,0 +1,115 @@
+package ai.opencode.feature.transcript.markdown.ui
+
+import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.util.LruCache
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import org.scilab.forge.jlatexmath.TeXConstants
+import org.scilab.forge.jlatexmath.TeXFormula
+import ru.noties.jlatexmath.awt.AndroidGraphics2D
+import ru.noties.jlatexmath.awt.Color as TeXColor
+
+/**
+ * iOS `MathRenderer` (SwiftMath → jlatexmath): TeX typeset into template images (alpha masks)
+ * that take the colour of the text around them via a tint, so light, dark and a done task's
+ * secondary all reuse one image. Null for source jlatexmath can't parse.
+ */
+object MathRenderer {
+    class Rendered(
+        val image: ImageBitmap,
+        /** How far the math reaches below its baseline, in px. */
+        val descent: Float,
+    )
+
+    private class Entry(val rendered: Rendered?)
+
+    private val cache = object : LruCache<String, Entry>(400) {}
+
+    /** [fontSizePx] is the typeset size in pixels (iOS points × the display scale). */
+    fun render(source: String, fontSizePx: Float, display: Boolean): Rendered? {
+        val key = "${if (display) "display" else "inline"}|$fontSizePx|$source"
+        cache.get(key)?.let { return it.rendered }
+        val rendered = runCatching {
+            val icon = TeXFormula(source).TeXIconBuilder()
+                .setStyle(if (display) TeXConstants.STYLE_DISPLAY else TeXConstants.STYLE_TEXT)
+                .setSize(fontSizePx)
+                .setFGColor(TeXColor(0xFF000000.toInt()))
+                .build()
+            val width = icon.iconWidth
+            val height = icon.iconHeight
+            if (width <= 0 || height <= 0) return@runCatching null
+            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            val graphics = AndroidGraphics2D()
+            graphics.setCanvas(Canvas(bitmap))
+            icon.paintIcon(null, graphics, 0, 0)
+            Rendered(bitmap.asImageBitmap(), icon.iconDepth.toFloat())
+        }.getOrNull()
+        cache.put(key, Entry(rendered))
+        return rendered
+    }
+}
+
+/**
+ * iOS `InlineMath`: the size inline math typesets at, and how a run reads. Typesetting into the
+ * text is part of the Markdown presentation (`MarkdownPresentation`), as inline content on the
+ * baseline at the text's size.
+ */
+object InlineMath {
+    /** Latin Modern sits smaller than SF at the same size; this evens it out (`(pointSize * 1.1).rounded()`). */
+    fun fontSize(pointSize: Float): Float = Math.round(pointSize * 1.1f).toFloat()
+
+    /** [fontSize] for a text size, in px for [density] (font scale included, like Dynamic Type). */
+    fun fontSizePx(textSize: TextUnit, density: Density): Float =
+        with(density) { fontSize(textSize.value).sp.toPx() }
+}
+
+/**
+ * iOS `MathDisplayView`: display math on the full-width band code blocks use, scrolling
+ * sideways when it's wider than the screen. Source jlatexmath can't typeset shows as code, as
+ * written.
+ */
+@Composable
+fun MathDisplayView(math: OpenCodeMarkdownBlock.MathBlock, modifier: Modifier = Modifier) {
+    val density = LocalDensity.current
+    val colors = OpenCodeTheme.colors
+    val fontSizePx = InlineMath.fontSizePx(MarkdownStyle.bodyTextSize, density) * 1.15f
+    val rendered = remember(math.source, fontSizePx) { MathRenderer.render(math.source, fontSizePx, display = true) }
+    MarkdownBand(
+        modifier.clearAndSetSemantics {
+            contentDescription = "Equation"
+            stateDescription = math.source
+        },
+    ) {
+        if (rendered != null) {
+            Image(
+                bitmap = rendered.image,
+                contentDescription = null,
+                colorFilter = ColorFilter.tint(colors.text),
+                modifier = Modifier.padding(vertical = 4.dp),
+            )
+        } else {
+            SelectionContainer {
+                Text(math.raw, style = MarkdownStyle.codeTextStyle(), color = colors.text, softWrap = false)
+            }
+        }
+    }
+}

@@ -11,6 +11,7 @@ import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.cancellable
 import ai.opencode.feature.drawer.HomeFeature.Action
 import ai.opencode.feature.drawer.HomeFeature.State
+import ai.opencode.feature.settings.SettingsFeature
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.model.OpenCodeSession
@@ -30,6 +31,9 @@ internal fun HomeFeature.reduceDrawer(state: State, action: Action): HomeReduced
     val haptics = dependency(HapticsClient)
     when (action) {
         Action.SettingsTapped -> return Reduced(state.showingSettings())
+
+        Action.ManageServersTapped ->
+            return Reduced(if (state.settings != null) state else state.presentingSettings(SettingsFeature.State.focusingServers(state.server)))
 
         is Action.SessionDrawerArrived -> {
             var s = state.copy(isDrawerOpen = action.isOpen)

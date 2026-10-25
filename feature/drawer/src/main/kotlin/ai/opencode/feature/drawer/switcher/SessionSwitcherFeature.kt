@@ -4,8 +4,8 @@ import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
-import ai.opencode.feature.drawer.ExperimentalFeature
-import ai.opencode.feature.drawer.ExperimentalFeatures
+import ai.opencode.core.sharing.ExperimentalFeature
+import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.feature.drawer.HomeFeature
 
 /**

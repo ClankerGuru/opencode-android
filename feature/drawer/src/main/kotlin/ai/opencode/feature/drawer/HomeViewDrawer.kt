@@ -1,5 +1,7 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.core.experiments.ExperimentalFeature
+import ai.opencode.core.experiments.key
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.StoreOf
@@ -18,6 +20,7 @@ import ai.opencode.feature.drawer.list.DrawerListRow
 import ai.opencode.feature.drawer.list.DrawerListView
 import ai.opencode.feature.drawer.list.DrawerPinDrag
 import ai.opencode.feature.drawer.list.DrawerRowMenuItem
+import ai.opencode.feature.settings.whatsnew.WhatsNewFeature
 import ai.opencode.feature.drawer.motion.DrawerControlsTraceView
 import ai.opencode.feature.drawer.motion.DrawerControlsTrace
 import ai.opencode.feature.drawer.motion.DrawerKeyboardMonitor
@@ -187,9 +190,7 @@ fun HomeDrawer(
             menu = { row -> rowMenu(store, row) },
             openCatchUp = viewState::openCatchUp,
             openWhatsNew = viewState::openWhatsNew,
-            // TODO(merge): `WhatsNewFeature.Action.hideTapped` (Settings' What’s New writes its
-            // `isButtonEnabled` key); the bridge's `WhatsNewAction` has no Hide yet.
-            hideWhatsNew = {},
+            hideWhatsNew = { store.send(HomeFeature.Action.WhatsNew(WhatsNewFeature.Action.HideTapped)) },
         )
     }
 

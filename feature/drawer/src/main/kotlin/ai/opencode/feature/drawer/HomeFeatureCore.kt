@@ -7,7 +7,6 @@ import ai.opencode.core.store.Reduced
 import ai.opencode.feature.drawer.HomeFeature.Action
 import ai.opencode.feature.drawer.HomeFeature.State
 import ai.opencode.feature.drawer.bridge.SessionScreenEvent
-import ai.opencode.feature.drawer.bridge.WhatsNewAction
 import ai.opencode.feature.drawer.notices.InAppNotice
 import ai.opencode.feature.drawer.switcher.reduceSessionSwitcher
 import ai.opencode.server.OpenCodeServerEvent
@@ -86,6 +85,7 @@ private fun HomeFeature.coreRoute(state: State, action: Action): Reduced<State, 
     is Action.SubagentsPopped -> Reduced(state.poppingSubagents(action.depth))
 
     Action.SettingsTapped,
+    Action.ManageServersTapped,
     is Action.SessionDrawerArrived,
     Action.NewSessionTapped,
     is Action.SessionTapped,
@@ -126,12 +126,8 @@ private fun HomeFeature.coreRoute(state: State, action: Action): Reduced<State, 
         Reduced(s)
     }
 
-    // Pushed over the open drawer, like Settings.
-    is Action.WhatsNew -> when (val whatsNew = action.action) {
-        WhatsNewAction.ButtonTapped -> Reduced(state.copy(isSettingsShown = true))
-        is WhatsNewAction.TryTapped -> reduceSettings(state, whatsNew)
-        WhatsNewAction.Closed -> Reduced(state.copy(whatsNew = state.whatsNew.copy(isPresented = false, wasViewed = false)))
-    }
+    is Action.WhatsNew -> reduceWhatsNew(state, action.action)
+    is Action.SettingsScreen -> reduceSettingsScreen(state, action.action)
 
     Action.InAppNoticeTapped -> {
         val notice = state.inAppNotice
@@ -163,10 +159,11 @@ private fun HomeFeature.coreRoute(state: State, action: Action): Reduced<State, 
     }
 
     is Action.SearchChanged -> Reduced(state.copy(search = action.text))
-    is Action.SettingsShownChanged -> Reduced(state.copy(isSettingsShown = action.isShown))
+    is Action.SettingsShownChanged ->
+        Reduced(if (action.isShown) state.showingSettings() else state.copy(settings = null))
 
-    // TODO(merge): `.settings(.onboardingPlaygroundOpened)` presents the Onboarding Playground (`:feature:settings`).
-    is Action.Settings -> Reduced(state)
+    // The Onboarding Playground opens inside Settings (`SettingsFeature`), which sends it there.
+    is Action.Settings -> reducePreferences(state, action.action)
 
     is Action.SessionDetail -> when (action.action) {
         is PresentationAction.Presented -> Reduced(state)
