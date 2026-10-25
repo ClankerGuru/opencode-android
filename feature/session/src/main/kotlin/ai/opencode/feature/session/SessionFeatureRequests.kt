@@ -13,7 +13,6 @@ import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.cancellable
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.State
-import ai.opencode.feature.session.seams.isFront
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.model.OpenCodeFormRequest
 import ai.opencode.server.model.OpenCodePermissionRequest

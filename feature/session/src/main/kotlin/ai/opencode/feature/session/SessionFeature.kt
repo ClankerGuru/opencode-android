@@ -45,7 +45,7 @@ import ai.opencode.server.model.ModelVisibility
 import ai.opencode.feature.transcript.list.NewMessagesMark
 import ai.opencode.feature.media.OpenURLClient
 import ai.opencode.feature.media.PageReaderClient
-import ai.opencode.feature.session.seams.SceneWindowClient
+import ai.opencode.feature.system.SceneWindowClient
 import ai.opencode.feature.transcript.SessionLinkTarget
 import ai.opencode.feature.system.notifications.SessionNotificationsClient
 import ai.opencode.feature.composer.SharedComposerDraft

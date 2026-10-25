@@ -23,7 +23,7 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 
 | iOS file | Lines | Kotlin file(s) | Status | Notes |
 | --- | ---: | --- | --- | --- |
-| `OpenCode/Core/ActiveScene.swift` | 143 | — | n/a | iPad multi-window scene tracking; Android has one activity (multi-window needs nothing app-side) |
+| `OpenCode/Core/ActiveScene.swift` | 143 | `feature/system/.../SceneWindowClient.kt` | n/a | iPad multi-window scene tracking; Android has one activity (multi-window needs nothing app-side). `SceneWindow` (`isFront`) is ported in `:feature:system` as `SceneWindowClient` (see system.md) |
 | `OpenCode/Core/AppGroup.swift` | 11 | — | n/a | App Group container for the share extension; the Android share target runs in the same app process and storage |
 | `OpenCode/Core/AppLog.swift` | 124 | `core/.../log/AppLog.kt` | done | logcat tag `OpenCode/<category>` + in-process ring buffer for `recentLines`; the `OpenCodeClientError`/`RetryVerdict`/`RetryPause.Kind` `logSummary` extensions live in `:server` (see server.md) |
 | `OpenCode/Core/AudioSessionOwner.swift` | 171 | — | todo | moves to `:feature:voice` (audio focus / `AudioManager` mode ownership for calls and dictation) |
