@@ -10,12 +10,14 @@ import ai.opencode.feature.session.SessionFeature.CancelID
 import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.feature.session.seams.BrowserFeature
 import ai.opencode.feature.session.seams.BrowserLinkPolicy
-import ai.opencode.feature.session.seams.ExperimentalFeature
-import ai.opencode.feature.session.seams.LinkMenuAction
+import ai.opencode.core.sharing.ExperimentalFeature
+import ai.opencode.feature.transcript.LinkMenuAction
 import ai.opencode.feature.session.seams.LinkProbe
-import ai.opencode.feature.session.seams.SessionLink
-import ai.opencode.feature.session.seams.SessionLinkTarget
-import ai.opencode.feature.session.seams.sessionLinkIDs
+import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
+import ai.opencode.feature.transcript.markdown.SessionLink
+import ai.opencode.feature.transcript.markdown.sessionLinkIDs
+import ai.opencode.feature.transcript.markdown.sessionLinkTarget
+import ai.opencode.feature.transcript.SessionLinkTarget
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodePairingLink
 import ai.opencode.server.model.OpenCodeDelivery
@@ -68,7 +70,9 @@ private fun SessionFeature.openWithoutApps(url: String): Effect<Action> {
  */
 internal fun SessionFeature.sessionLinksIn(items: List<OpenCodeTranscriptItem>): Effect<Action> {
     val seen = HashSet<String>()
-    val ids = items.flatMap { it.sessionLinkIDs }.filter { seen.add(it) }
+    val ids = items.flatMap { item ->
+        (item as? OpenCodeTranscriptItem.AssistantMarkdown)?.let { sessionLinkIDs(OpenCodeMarkdownBlock.blocks(it.text)) }.orEmpty()
+    }.filter { seen.add(it) }
     return if (ids.isEmpty()) Effect.none() else Effect.send(Action.SessionLinksAppeared(ids))
 }
 
@@ -126,7 +130,7 @@ internal fun SessionFeature.reduceBrowserAndBackgroundWork(state: State, action:
             if (links[id] != null) continue
             val session = if (state.session?.id == id) state.session else state.familySessions.firstOrNull { it.id == id }
             if (session != null) {
-                links[id] = SessionLinkTarget.of(session)
+                links[id] = sessionLinkTarget(session)
             } else {
                 links[id] = SessionLinkTarget.Resolving
                 unknown += id
@@ -290,14 +294,14 @@ private fun SessionFeature.askSent(state: State): Reduced<State, Action> {
 
 /** iOS `.linkMenu(action, url)` / `.browser(.linkMenu(action, url))`: a choice from a link's menu. */
 private fun SessionFeature.linkMenu(action: LinkMenuAction, url: String, state: State): Reduced<State, Action> = when (action) {
-    LinkMenuAction.openInAppBrowser -> {
+    LinkMenuAction.OpenInAppBrowser -> {
         // Navigation: quiet, like a tap on the link.
         val drop = dropLinkProbe(state)
         if (!experimentalFeatures(ExperimentalFeature.inAppBrowser) || !BrowserLinkPolicy.isPublicWebPage(url)) drop
         else Reduced(drop.state, Effect.merge(drop.effect, Effect.send(Action.Browser(BrowserFeature.Action.Open(url)))))
     }
 
-    LinkMenuAction.openInSafari -> {
+    LinkMenuAction.OpenInSafari -> {
         if (OpenCodePairingLink.shouldHandleOpenURL(url)) {
             dropLinkProbe(state)
         } else {
@@ -309,9 +313,9 @@ private fun SessionFeature.linkMenu(action: LinkMenuAction, url: String, state: 
     }
 
     // Navigation: quiet, like a tap on the link.
-    LinkMenuAction.openInApp -> openLink(url, state)
+    LinkMenuAction.OpenInApp -> openLink(url, state)
 
-    LinkMenuAction.copy -> {
+    LinkMenuAction.Copy -> {
         val shareURL = OpenCodePairingLink.shareableURL(url)
         if (shareURL == null) {
             Reduced(state)
@@ -322,17 +326,17 @@ private fun SessionFeature.linkMenu(action: LinkMenuAction, url: String, state: 
         }
     }
 
-    LinkMenuAction.share -> {
+    LinkMenuAction.Share -> {
         if (OpenCodePairingLink.shareableURL(url) != null) haptics.play(Haptic.selection)
         Reduced(state)
     }
 
-    LinkMenuAction.openSession -> {
+    LinkMenuAction.OpenSession -> {
         val id = SessionLink.id(url)
         if (id == null) Reduced(state) else openSessionLink(id, state)
     }
 
-    LinkMenuAction.copySessionID -> {
+    LinkMenuAction.CopySessionID -> {
         val id = SessionLink.id(url)
         if (id == null) {
             Reduced(state)

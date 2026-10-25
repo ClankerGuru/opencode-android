@@ -179,7 +179,7 @@ private fun SessionFeature.promptAdmitted(
     if (!SessionFeature.ownsDelivery(sessionID = sessionID, messageID = messageID, state = state)) return Reduced(state)
     val promptState = state.promptStates[messageID]
     if (promptState?.requestEpoch != action.requestEpoch) return Reduced(state)
-    ai.opencode.feature.session.seams.LabMarks.mark("prompt_admitted", sessionID = sessionID)
+    ai.opencode.core.diagnostics.LabMarks.mark("prompt_admitted", sessionID = sessionID)
     val sent = state.sentDeliveries[messageID]
     var s = state.copy(
         promptStates = state.promptStates + (messageID to promptState.copy(admission = SessionFeature.State.PromptState.Admission.admitted)),

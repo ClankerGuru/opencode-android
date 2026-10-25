@@ -7,7 +7,7 @@ import ai.opencode.core.store.cancellable
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.CancelID
 import ai.opencode.feature.session.SessionFeature.State.EarlierHistory
-import ai.opencode.feature.session.seams.ExperimentalFeature
+import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.model.OpenCodeTranscriptItem
 import ai.opencode.server.model.OpenCodeTranscriptPage

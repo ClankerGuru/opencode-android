@@ -1,50 +1,15 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.dependency
-import ai.opencode.feature.session.seams.ExperimentalFeature
-import ai.opencode.feature.session.seams.ExperimentalFeatures
-import ai.opencode.feature.session.seams.NewMessagesMark
-import ai.opencode.feature.session.seams.TranscriptEntry
-import ai.opencode.feature.session.seams.defaultLeaveDate
-import ai.opencode.server.model.OpenCodeTranscriptItem
+import ai.opencode.core.sharing.ExperimentalFeature
+import ai.opencode.core.sharing.ExperimentalFeatures
+import ai.opencode.feature.transcript.list.NewMessagesMark
 import java.time.Instant
 
 // The `SessionFeature.State` members of iOS `Transcript/NewMessagesMark.swift`. They extend the
 // session's state, so they live in this module; `NewMessagesMark` itself (and the list's
 // `NewMessagesPlacement`) belong to `:feature:transcript`.
-
-/**
- * iOS `NewMessagesMark.firstUnseen(in:seen:)`: the first item in [items] that isn't in [seen], or
- * null when nothing is new. Client-side rows (`info-` notices, send failures) never count as new,
- * nor do the reader's own messages, from this phone or another client: like a chat app, sending one
- * reads everything above it. Messages an agent sent into the session (`source`) are news.
- */
-internal fun newMessagesFirstUnseen(items: List<OpenCodeTranscriptItem>, seen: Set<String>): String? {
-    if (seen.isEmpty()) return null
-    // After the last row they saw: older rows paged in or a notice placed in an earlier turn aren't news.
-    val afterSeen = items.indexOfLast { it.id in seen }.let { if (it < 0) 0 else it + 1 }
-    val agentPrompts = items.mapNotNullTo(HashSet()) { item ->
-        if (item is OpenCodeTranscriptItem.UserText && item.source != null) item.id else null
-    }
-    fun isOwn(item: OpenCodeTranscriptItem): Boolean = TranscriptEntry.promptID(item)?.let { it !in agentPrompts } ?: false
-    var start = afterSeen
-    for (index in items.indices.reversed()) {
-        if (index < afterSeen) break
-        if (isOwn(items[index])) { start = index + 1; break }
-    }
-    for (index in start until items.size) {
-        val item = items[index]
-        if (item.id in seen || item.id.startsWith("info-")) continue
-        when (item) {
-            is OpenCodeTranscriptItem.SendFailure, is OpenCodeTranscriptItem.RunRetry, is OpenCodeTranscriptItem.Undone -> continue
-            else -> return item.id
-        }
-    }
-    return null
-}
-
-/** Rows kept above the New divider. */
-const val NEW_MESSAGES_CONTEXT = 20
 
 /** Whether the New Messages Divider experiment is on. Off, what arrived while away comes in at the end with no divider, as in a chat app. */
 val SessionFeature.State.Companion.showsNewMessagesDivider: Boolean
@@ -114,7 +79,7 @@ fun SessionFeature.State.absorbFittingNewMessages(): SessionFeature.State {
 fun SessionFeature.State.updateNewMessagesMark(settles: Boolean): SessionFeature.State {
     val seen = newMessagesBaseline ?: return this
     var s = this
-    val itemID = newMessagesFirstUnseen(items, seen)
+    val itemID = NewMessagesMark.firstUnseen(items, seen)
     if (itemID != null) {
         // The divider and what's below it show, however many arrived, with the usual window's
         // worth above it: landing at the divider mustn't put the reader at the top, paging in more
@@ -124,7 +89,7 @@ fun SessionFeature.State.updateNewMessagesMark(settles: Boolean): SessionFeature
         val index = items.indexOfFirst { it.id == itemID }
         if (index >= 0) {
             val needed = items.size - index + 1
-            val context = if (hasRenderedFirstContentFrame) needed else minOf(items.size - 1, items.size - index + NEW_MESSAGES_CONTEXT)
+            val context = if (hasRenderedFirstContentFrame) needed else minOf(items.size - 1, items.size - index + NewMessagesMark.NEW_MESSAGES_CONTEXT)
             val limit = maxOf(visibleLimit, needed, context)
             if (limit != visibleLimit) s = s.copy(visibleLimit = limit)
         }
@@ -148,4 +113,11 @@ fun SessionFeature.State.updateNewMessagesMark(settles: Boolean): SessionFeature
     }
     if (settles) s = s.copy(newMessagesBaseline = null)
     return s
+}
+
+/** iOS `SessionFeature.State.defaultLeaveDate()`: now, when Since You Left is on (it needs to know when the reader left). */
+fun SessionFeature.State.Companion.defaultLeaveDate(): Instant? {
+    if (!dependency(ExperimentalFeatures)(ExperimentalFeature.sinceYouLeft)) return null
+    val now = dependency(DateClient).now()
+    return if (now == Instant.EPOCH) null else now
 }

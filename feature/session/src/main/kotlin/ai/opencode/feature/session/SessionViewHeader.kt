@@ -20,7 +20,7 @@ import ai.opencode.feature.session.header.BreathingTitleHold
 import ai.opencode.feature.session.header.HeaderBlurTunables
 import ai.opencode.feature.session.header.SessionContextRing
 import ai.opencode.feature.session.header.SessionContextText
-import ai.opencode.feature.session.seams.TranscriptMetrics
+import ai.opencode.feature.transcript.TranscriptMetrics
 import ai.opencode.server.model.OpenCodeExportFormat
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
@@ -202,7 +202,7 @@ internal fun SessionHeaderControls(
         modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp)
-            .padding(top = if (onCatchUpOpen == null) TranscriptMetrics.clustered.dp else CATCH_UP_COMPOSER_INSET.dp)
+            .padding(top = if (onCatchUpOpen == null) TranscriptMetrics.clustered else CATCH_UP_COMPOSER_INSET.dp)
             .onSizeChanged { onHeaderHeight(with(density) { it.height.toDp().value }) },
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.Top,

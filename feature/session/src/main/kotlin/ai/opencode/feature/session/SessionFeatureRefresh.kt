@@ -8,7 +8,7 @@ import ai.opencode.core.store.cancellable
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.AuthoritativeRefresh
 import ai.opencode.feature.session.SessionFeature.CancelID
-import ai.opencode.feature.session.seams.LabMarks
+import ai.opencode.core.diagnostics.LabMarks
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeContextReading

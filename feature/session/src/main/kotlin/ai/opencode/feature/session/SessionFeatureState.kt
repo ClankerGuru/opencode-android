@@ -6,20 +6,17 @@ import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.feature.session.seams.ComposerAttachmentsFeature
 import ai.opencode.feature.session.seams.ComposerFileAttachment
 import ai.opencode.feature.session.seams.DictationFeature
-import ai.opencode.feature.session.seams.ExperimentalFeature
+import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.feature.session.seams.ModelSearch
-import ai.opencode.feature.session.seams.ModelVisibility
-import ai.opencode.feature.session.seams.OpenCodeMarkdownBlock
+import ai.opencode.server.model.ModelVisibility
+import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
 import ai.opencode.feature.session.seams.SharedComposerDraft
 import ai.opencode.feature.session.seams.SharedLocation
-import ai.opencode.feature.session.seams.TranscriptEntry
-import ai.opencode.feature.session.seams.TranscriptSubagent
+import ai.opencode.feature.transcript.TranscriptEntry
+import ai.opencode.feature.transcript.TranscriptSubagent
 import ai.opencode.feature.session.seams.VoiceBroker
 import ai.opencode.feature.session.seams.VoiceFeature
 import ai.opencode.feature.session.seams.VoiceRoute
-import ai.opencode.feature.session.seams.defaultLeaveDate
-import ai.opencode.feature.session.seams.entryStart
-import ai.opencode.feature.session.seams.hidingUndone
 import ai.opencode.server.model.OpenCodeDelivery
 import ai.opencode.server.model.OpenCodeFormRequest
 import ai.opencode.server.model.OpenCodeFormValue
@@ -466,12 +463,12 @@ fun State.Companion.peekText(markdown: String): String {
     val result = StringBuilder()
     for (block in OpenCodeMarkdownBlock.blocks(markdown)) {
         val piece = when (val kind = block.kind) {
-            is OpenCodeMarkdownBlock.Kind.Paragraph -> kind.text
-            is OpenCodeMarkdownBlock.Kind.Blockquote -> kind.text
-            is OpenCodeMarkdownBlock.Kind.Heading -> kind.text
-            is OpenCodeMarkdownBlock.Kind.NumberedItem -> "${kind.marker} ${kind.text}"
-            is OpenCodeMarkdownBlock.Kind.ListItem -> "${kind.marker} ${kind.text}"
-            is OpenCodeMarkdownBlock.Kind.Code -> kind.source
+            is OpenCodeMarkdownBlock.Kind.Paragraph -> kind.text.text
+            is OpenCodeMarkdownBlock.Kind.Blockquote -> kind.text.text
+            is OpenCodeMarkdownBlock.Kind.Heading -> kind.text.text
+            is OpenCodeMarkdownBlock.Kind.NumberedItem -> "${kind.marker} ${kind.text.text}"
+            is OpenCodeMarkdownBlock.Kind.ListItem -> "${kind.marker} ${kind.text.text}"
+            is OpenCodeMarkdownBlock.Kind.Code -> kind.code.source
             else -> null
         }
         if (piece.isNullOrEmpty()) continue

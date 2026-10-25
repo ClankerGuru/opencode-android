@@ -5,9 +5,10 @@ import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.store.Effect
 import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.feature.session.seams.ComposerFileAttachment
-import ai.opencode.feature.session.seams.ExperimentalFeature
-import ai.opencode.feature.session.seams.ExperimentalFeatures
-import ai.opencode.feature.session.seams.TranscriptEntry
+import ai.opencode.core.sharing.ExperimentalFeature
+import ai.opencode.core.sharing.ExperimentalFeatures
+import ai.opencode.feature.transcript.TranscriptEntry
+import ai.opencode.feature.transcript.rows.RunErrorState as TranscriptRunErrorState
 import ai.opencode.feature.session.seams.VoiceHandoff
 import ai.opencode.server.model.OpenCodeImageAttachment
 import ai.opencode.server.model.OpenCodeOutgoingAttachment
@@ -19,8 +20,12 @@ import ai.opencode.server.model.PastedText
 
 // Port of the `SessionFeature.State` members iOS declares in `Transcript/RunErrorState.swift`
 // (and `noteOwnSend()` from `Transcript/NewMessagesMark.swift`), which the send reducer uses.
-// They extend `SessionFeature.State`, so they land in this module. `hidingUndone` stays in
-// `seams/FoundationSeams.kt` until the transcript port lands.
+// They extend `SessionFeature.State`, so they land in this module; the pure parts are
+// `:feature:transcript`'s `RunErrorState`.
+
+/** What the transcript shows: everything before a staged undo, then one quiet row offering Redo. */
+fun State.hidingUndone(items: List<OpenCodeTranscriptItem>): List<OpenCodeTranscriptItem> =
+    TranscriptRunErrorState.hidingUndone(items, session?.revertMessageID)
 
 /**
  * The run error whose line offers its action: the newest turn's, while nothing runs or waits to

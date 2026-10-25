@@ -1,5 +1,6 @@
 package ai.opencode.feature.session.seams
 
+import ai.opencode.core.files.ComposerStagedFile
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.cancellable
@@ -10,13 +11,11 @@ import ai.opencode.server.model.ModelVariant
 import ai.opencode.server.model.OpenCodeDelivery
 import ai.opencode.server.model.OpenCodeModel
 import ai.opencode.server.model.OpenCodeOutgoingAttachment
-import ai.opencode.server.model.OpenCodeTranscriptItem
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.isActive
 import java.io.File
 import java.net.URI
 import java.net.URLDecoder
-import java.net.URLEncoder
 import java.text.Normalizer
 import java.time.Instant
 import java.util.UUID
@@ -168,18 +167,18 @@ data class ComposerUploadCancelID(val id: UUID)
 fun ComposerFileAttachment(
     file: ComposerStagedFile,
     status: ComposerFileAttachment.Status = ComposerFileAttachment.Status.Uploading(0),
-): ComposerFileAttachment = ComposerFileAttachment(file.id, file.name, file.mime, file.size, file.url, status)
+): ComposerFileAttachment = ComposerFileAttachment(file.id, file.name, file.mime, file.size, file.url.path, status)
 
 /** SEAM: iOS `ComposerAttachmentsFeature.readInlineFile(_:)`; delete when that area merges. */
 fun ComposerAttachmentsFeature.Companion.readInlineFile(file: ComposerStagedFile): Effect<ComposerAttachmentsFeature.Action> =
     Effect.run { send ->
         val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            runCatching { File(file.url.removePrefix("file://")).readBytes() }.getOrNull()
+            runCatching { file.url.readBytes() }.getOrNull()
         }
         if (data != null) {
             send(ComposerAttachmentsFeature.Action.AttachmentAdded(OpenCodeOutgoingAttachment(id = file.id.toString(), data = data, mime = file.mime, name = file.name)))
         }
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { runCatching { File(file.url.removePrefix("file://")).delete() } }
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { runCatching { file.url.delete() } }
     }
 
 /** SEAM: iOS `ComposerAttachmentsFeature.cancelUpload(_:discardURL:)`; delete when that area merges. */
@@ -190,13 +189,6 @@ fun ComposerAttachmentsFeature.Companion.cancelUpload(id: UUID, discardURL: Stri
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { runCatching { File(discardURL.removePrefix("file://")).delete() } }
         },
     )
-
-/** SEAM: iOS `AttachmentFileType.pdfMime` / `maxInlineBytes`; delete when :feature:composer merges. */
-object AttachmentLimits {
-    const val pdfMime = "application/pdf"
-    /** The largest file sent inline rather than uploaded. */
-    const val maxInlineBytes: Long = 20L * 1024 * 1024
-}
 
 // endregion
 
@@ -398,85 +390,6 @@ object BrowserLinkPolicy {
         return name in exact || listOf("token", "signature", "secret", "password").any { name.contains(it) }
     }
 }
-
-/**
- * SEAM: real type belongs to :feature:transcript (iOS `Transcript/SessionLinks.swift` `SessionLink`);
- * delete when that area merges. A session ID in a reply's Markdown, linked with a private
- * `opencode-session://` URL.
- */
-object SessionLink {
-    const val scheme = "opencode-session"
-
-    private val pattern = Regex("""(?<![\w/\\:@-])(?:@session:)?(ses_[A-Za-z0-9]{26})(?![\w/\\-])""")
-
-    data class Mention(val id: String, val range: IntRange)
-
-    fun mentions(text: String): List<Mention> {
-        if (!text.contains("ses_")) return emptyList()
-        return pattern.findAll(text).mapNotNull { match ->
-            val id = match.groups[1]?.value ?: return@mapNotNull null
-            Mention(id, match.range)
-        }.toList()
-    }
-
-    /** The ID when [text] is exactly one mention (an inline code span). */
-    fun exactID(text: String): String? {
-        val mention = mentions(text).firstOrNull() ?: return null
-        return if (mention.range.first == 0 && mention.range.last == text.length - 1) mention.id else null
-    }
-
-    /** The private link the rendered text carries. */
-    fun url(id: String, title: String? = null): String {
-        val query = "id=" + URLEncoder.encode(id, "UTF-8") + (title?.let { "&title=" + URLEncoder.encode(it, "UTF-8").replace("+", "%20") } ?: "")
-        return "$scheme://open?$query"
-    }
-
-    fun id(from: String): String? {
-        if (!from.startsWith("$scheme:")) return null
-        return query(from, "id")?.let(::exactID)
-    }
-
-    fun title(from: String): String? {
-        if (!from.startsWith("$scheme:")) return null
-        return query(from, "title")
-    }
-
-    fun shortID(id: String): String = if (id.length <= 16) id else "${id.take(8)}…${id.takeLast(4)}"
-
-    /** The session IDs mentioned in [text], once each, in order. */
-    fun ids(text: String): List<String> {
-        val seen = HashSet<String>()
-        return mentions(text).map { it.id }.filter { seen.add(it) }
-    }
-
-    private fun query(url: String, name: String): String? {
-        val query = url.substringAfter('?', "").substringBefore('#')
-        return query.split('&').firstNotNullOfOrNull { pair ->
-            if (pair.substringBefore('=') != name) null
-            else runCatching { URLDecoder.decode(pair.substringAfter('=', ""), "UTF-8") }.getOrNull()
-        }
-    }
-}
-
-/**
- * SEAM: real member belongs to :feature:transcript (iOS `OpenCodeTranscriptItem.sessionLinkIDs`);
- * delete when that area merges. The session IDs a reply links, in its prose blocks.
- */
-val OpenCodeTranscriptItem.sessionLinkIDs: List<String>
-    get() {
-        val markdown = this as? OpenCodeTranscriptItem.AssistantMarkdown ?: return emptyList()
-        val seen = HashSet<String>()
-        return OpenCodeMarkdownBlock.blocks(markdown.text).flatMap { block ->
-            when (val kind = block.kind) {
-                is OpenCodeMarkdownBlock.Kind.Paragraph -> SessionLink.ids(kind.text)
-                is OpenCodeMarkdownBlock.Kind.NumberedItem -> SessionLink.ids(kind.text)
-                is OpenCodeMarkdownBlock.Kind.ListItem -> SessionLink.ids(kind.text)
-                is OpenCodeMarkdownBlock.Kind.Blockquote -> SessionLink.ids(kind.text)
-                is OpenCodeMarkdownBlock.Kind.Heading -> SessionLink.ids(kind.text)
-                else -> emptyList()
-            }
-        }.filter { seen.add(it) }
-    }
 
 // endregion
 

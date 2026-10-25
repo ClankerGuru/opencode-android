@@ -1,12 +1,14 @@
 package ai.opencode.feature.session
 
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.experiments.key
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
+import ai.opencode.core.sharing.ExperimentalFeature
+import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
-import ai.opencode.core.store.rememberScope
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
@@ -15,16 +17,31 @@ import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.feature.session.header.HeaderBlurTunables
 import ai.opencode.feature.session.header.SessionHeaderStyle
 import ai.opencode.feature.session.header.titleBreathing
-import ai.opencode.feature.session.seams.ReplyCopyGlyph
-import ai.opencode.feature.session.seams.ReplyCopyGlyphView
-import ai.opencode.feature.session.seams.SessionScrollEdgeBridge
-import ai.opencode.feature.session.seams.TranscriptEntry
 import ai.opencode.feature.session.seams.TranscriptImageCache
-import ai.opencode.feature.session.seams.TranscriptMetrics
-import ai.opencode.feature.session.seams.endsInReply
-import ai.opencode.feature.transcript.TranscriptView
+import ai.opencode.feature.transcript.TranscriptAction
+import ai.opencode.feature.transcript.TranscriptConfiguration
+import ai.opencode.feature.transcript.TranscriptEntry
+import ai.opencode.feature.transcript.TranscriptMetrics
+import ai.opencode.feature.transcript.TranscriptTunables
+import ai.opencode.feature.transcript.LinkMenuAction
+import ai.opencode.feature.transcript.NewMessagesPlacement
+import ai.opencode.feature.transcript.list.NewMessagesMark
+import ai.opencode.feature.transcript.list.TranscriptList
+import ai.opencode.feature.transcript.list.TranscriptSlots
+import ai.opencode.feature.transcript.rows.AgentGlyphState
+import ai.opencode.feature.transcript.rows.LocalTranscriptRowSlots
+import ai.opencode.feature.transcript.rows.ReplyCopyGlyph
+import ai.opencode.feature.transcript.rows.TranscriptFonts
+import ai.opencode.feature.transcript.rows.TranscriptRowSlots
+import ai.opencode.feature.transcript.rows.TranscriptTimeStamps
+import ai.opencode.feature.transcript.user.TranscriptUserMessage
+import ai.opencode.server.OpenCodePairingLink
+import ai.opencode.server.model.OpenCodeModel
 import ai.opencode.server.model.OpenCodeTranscriptItem
+import android.content.Context
+import android.content.Intent
 import android.graphics.BitmapFactory
+import android.text.format.DateFormat
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -40,21 +57,32 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -66,6 +94,7 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
@@ -81,18 +110,24 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.currentStateAsState
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import java.time.Instant
+import java.time.ZoneId
+import java.util.Locale
 import kotlin.math.roundToLong
+import ai.opencode.feature.transcript.SinceYouLeft as TranscriptSinceYouLeft
 
 // Port of iOS `Session/SessionTranscriptView.swift`: the transcript host below the header and
 // above the composer, and the session-owned pieces the transcript draws (the title, the Working
 // line, cached attachment images).
 //
-// iOS hosts its UIKit `TranscriptListView` here with a `Configuration` projected from the store
-// (`ProjectionCache`: entries, time stamps, New divider placement). Android embeds
-// `:feature:transcript`'s public entry point, `TranscriptView(store.scope(...))`; the projection
-// (TranscriptEntry.build, TranscriptTimeStamps, NewMessagesPlacement) moves with the list when that
-// area lands. What stays session-owned is ported here: the Working line's activity and timing.
+// iOS hosts its UIKit `TranscriptListView` with a `Configuration` projected from the store
+// through a `ProjectionCache` (the visible window, entries, time stamps, the New divider's
+// placement). Android projects the same `TranscriptConfiguration` here and hands it to
+// `:feature:transcript`'s `TranscriptList`; the list's `TranscriptAction`s map to the
+// `SessionFeature` actions of the same names. The Working line and the rows' Session-owned views
+// (Since You Left, the activity orb, provider marks) go in through the list's slots.
 
 /**
  * Owns everything below the header and above the composer. The list runs full-bleed under both
@@ -103,7 +138,6 @@ import kotlin.math.roundToLong
  * @param scrollEdgeBridge geometry shared with the chrome, read per frame.
  * @param top where content rests below the header, the edge, and the backdrop's reveal distance.
  */
-@Suppress("UNUSED_PARAMETER") // [top] reaches the list once `TranscriptView` takes its insets.
 @Composable
 fun SessionTranscriptView(
     store: StoreOf<State, Action>,
@@ -111,8 +145,86 @@ fun SessionTranscriptView(
     top: SessionHeaderStyle.Resolved.TranscriptTop,
     modifier: Modifier = Modifier,
 ) {
-    val transcript = store.rememberScope({ it.transcript }, Action::Transcript)
-    TranscriptView(transcript, modifier.fillMaxSize())
+    val context = LocalContext.current
+    val host = LocalSessionComposerHost.current
+    val sinceYouLeftSetting by remember { shared(ExperimentalFeature.sinceYouLeft.key) }.flow
+        .collectAsState(shared(ExperimentalFeature.sinceYouLeft.key).value)
+    val imageLinkPreviewsSetting by remember { shared(ExperimentalFeature.imageLinkPreviews.key) }.flow
+        .collectAsState(shared(ExperimentalFeature.imageLinkPreviews.key).value)
+    val usesSinceYouLeft = ExperimentalFeature.sinceYouLeft.isActive(sinceYouLeftSetting)
+    val hour24 = remember(context) { DateFormat.is24HourFormat(context) }
+    val cache = remember { SessionTranscriptView.ProjectionCache() }
+
+    // iOS projects in `body`: here once per state change, off the cache, so a keystroke that
+    // changes nothing the list draws reuses every list and the configuration compares equal.
+    fun project(state: State) = SessionTranscriptView.projection(
+        state = state,
+        cache = cache,
+        scrollEdgeBridge = scrollEdgeBridge,
+        usesSinceYouLeft = usesSinceYouLeft,
+        hour24 = hour24,
+    )
+    val projection by remember(store, usesSinceYouLeft, hour24) {
+        store.states.map(::project).distinctUntilChanged()
+    }.collectAsState(remember(store, usesSinceYouLeft, hour24) { project(store.state) })
+    val latestProjection by rememberUpdatedState(projection)
+    val showsMoveToBackground by store.observe { it.showsMoveToBackground }
+
+    val send: (TranscriptAction) -> Unit = remember(store, context, host) {
+        { action -> SessionTranscriptView.handle(action, store, context, host) }
+    }
+    val slots = remember(store) {
+        TranscriptSlots(
+            workingLine = {
+                val working = latestProjection.working
+                if (working != null) {
+                    WorkingLineRow(
+                        activity = working,
+                        showsMoveToBackground = showsMoveToBackground,
+                        onMoveToBackground = { store.send(Action.MoveToBackgroundTapped) },
+                    )
+                }
+            },
+        )
+    }
+    val rowSlots = remember {
+        TranscriptRowSlots(
+            sinceYouLeft = { entryID, summary, onDismiss ->
+                SinceYouLeftRow(entryID, SessionTranscriptView.sinceYouLeft(summary), onDismiss)
+            },
+            agentGlyph = { glyph, glyphModifier ->
+                AgentActivityGlyph(
+                    source = AgentActivitySource.Subagent(SessionTranscriptView.subagentActivity(glyph)),
+                    modifier = glyphModifier,
+                    size = glyph.size,
+                )
+            },
+            providerMark = { providerID, markModifier -> ProviderIcon(providerID, markModifier) },
+        )
+    }
+    // A new screen starts without the jump button (iOS `resetShowsJumpButton`).
+    DisposableEffect(host) { onDispose { host?.showsJumpButton = false } }
+
+    val safeTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val bottomObstruction = WindowInsets.ime.union(WindowInsets.navigationBars).asPaddingValues().calculateBottomPadding()
+    // Separate from the projection, so geometry and jumps never rebuild the configuration.
+    CompositionLocalProvider(LocalTranscriptRowSlots provides rowSlots) {
+        TranscriptList(
+            configuration = projection.configuration,
+            send = send,
+            modifier = modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                top = safeTop + top.contentTop.dp,
+                bottom = bottomObstruction + scrollEdgeBridge.composerHeight.dp,
+            ),
+            jumpRequest = scrollEdgeBridge.jumpRequest,
+            onShowsJumpButtonChanged = { host?.showsJumpButton = it },
+            slots = slots,
+            layoutTuning = TranscriptTunables.layoutSnapshot(
+                imageLinkPreviews = ExperimentalFeature.imageLinkPreviews.isActive(imageLinkPreviewsSetting),
+            ),
+        )
+    }
 
     // Starting Up and the finale end on time, and a remount never replays them.
     val timedRunEvent by store.observe { SessionTranscriptView.timedRunEvent(it) }
@@ -127,8 +239,356 @@ fun SessionTranscriptView(
     }
 }
 
-/** iOS `SessionTranscriptView`'s statics and the Working line's projection. */
+/** iOS `SessionTranscriptView`'s statics: the projection, its cache, and the Working line's activity. */
 object SessionTranscriptView {
+    /** What the list draws, and the Working line beside it (iOS `Configuration.working`). */
+    @Immutable
+    data class Projection(val configuration: TranscriptConfiguration, val working: WorkingActivity?)
+
+    /**
+     * iOS `ProjectionCache`: rebuilds each stage of the projection only when its own inputs
+     * change, and patches a streaming reply's last text in place instead of regrouping the
+     * transcript. Lists handed out are never mutated afterwards (a new list replaces a patched
+     * one), so equal-by-reference checks downstream stay sound.
+     */
+    class ProjectionCache {
+        private data class WindowInputs(
+            val items: List<OpenCodeTranscriptItem>,
+            val visibleLimit: Int,
+            val browsingWindowStartID: String?,
+            val revertMessageID: String?,
+        )
+
+        private data class StructuralInputs(
+            val visibleItems: List<OpenCodeTranscriptItem>,
+            val allItems: List<OpenCodeTranscriptItem>,
+            val showsWorking: Boolean,
+            val failedFinale: Boolean,
+            val models: List<OpenCodeModel>,
+            val sinceYouLeft: TranscriptSinceYouLeft?,
+        )
+
+        private data class StampInputs(
+            val allItems: List<OpenCodeTranscriptItem>,
+            val sentNow: Boolean?,
+            val nowSecond: Long,
+            val zoneID: String,
+            val localeID: String,
+            val hour24: Boolean?,
+        )
+
+        private data class FinalInputs(
+            val structuralGeneration: Int,
+            val stamps: Map<String, String>,
+            val newMessages: NewMessagesMark?,
+        )
+
+        private var windowInputs: WindowInputs? = null
+        private var visibleItems: List<OpenCodeTranscriptItem> = emptyList()
+        private var structuralInputs: StructuralInputs? = null
+        private var structuralEntries: List<TranscriptEntry> = emptyList()
+        private var structuralGeneration = 0
+        private var stampInputs: StampInputs? = null
+        private var stamps: Map<String, String> = emptyMap()
+        private var finalInputs: FinalInputs? = null
+        private var entries: List<TranscriptEntry> = emptyList()
+        private var newMessages: NewMessagesPlacement? = null
+
+        fun resolveVisibleItems(
+            items: List<OpenCodeTranscriptItem>,
+            visibleLimit: Int,
+            browsingWindowStartID: String?,
+            revertMessageID: String?,
+            compute: () -> List<OpenCodeTranscriptItem>,
+        ): List<OpenCodeTranscriptItem> {
+            val inputs = WindowInputs(items, visibleLimit, browsingWindowStartID, revertMessageID)
+            val prev = windowInputs
+            // A streaming reply changes only its last item: patch it rather than re-window.
+            if (prev != null &&
+                prev.visibleLimit == visibleLimit &&
+                prev.browsingWindowStartID == browsingWindowStartID &&
+                prev.revertMessageID == revertMessageID &&
+                revertMessageID == null &&
+                prev.items.size == items.size &&
+                items.isNotEmpty() &&
+                visibleItems.isNotEmpty()
+            ) {
+                val lastIdx = items.size - 1
+                if (prev.items[lastIdx] != items[lastIdx] &&
+                    prev.items[lastIdx].id == items[lastIdx].id &&
+                    visibleItems.last().id == items[lastIdx].id &&
+                    prev.items.subList(0, lastIdx) == items.subList(0, lastIdx)
+                ) {
+                    windowInputs = inputs
+                    visibleItems = visibleItems.dropLast(1) + items[lastIdx]
+                    return visibleItems
+                }
+            }
+            if (inputs != windowInputs) {
+                windowInputs = inputs
+                visibleItems = compute()
+            }
+            return visibleItems
+        }
+
+        fun resolveEntries(
+            visibleItems: List<OpenCodeTranscriptItem>,
+            allItems: List<OpenCodeTranscriptItem>,
+            showsWorking: Boolean,
+            failedFinale: Boolean,
+            models: List<OpenCodeModel>,
+            sinceYouLeft: TranscriptSinceYouLeft? = null,
+            sentNow: Boolean?,
+            mark: NewMessagesMark?,
+            now: Instant = Instant.now(),
+            zone: ZoneId = ZoneId.systemDefault(),
+            locale: Locale = Locale.getDefault(),
+            hour24: Boolean? = null,
+        ): Pair<List<TranscriptEntry>, NewMessagesPlacement?> {
+            val nowSecond = now.epochSecond
+            val prevStructural = structuralInputs
+            val prevStamp = stampInputs
+            val prevFinal = finalInputs
+            // While a reply streams, only its last text changes: replace that entry in place.
+            if (showsWorking && !failedFinale &&
+                prevStructural != null && prevStamp != null && prevFinal != null &&
+                prevStructural.showsWorking == showsWorking &&
+                prevStructural.failedFinale == failedFinale &&
+                prevStructural.models == models &&
+                prevStamp.sentNow == sentNow &&
+                prevStamp.nowSecond == nowSecond &&
+                prevStamp.zoneID == zone.id &&
+                prevStamp.localeID == locale.toLanguageTag() &&
+                prevStamp.hour24 == hour24 &&
+                prevFinal.newMessages == mark &&
+                visibleItems.isNotEmpty() &&
+                visibleItems.size == prevStructural.visibleItems.size &&
+                allItems.isNotEmpty() &&
+                allItems.size == prevStructural.allItems.size &&
+                structuralEntries.isNotEmpty() &&
+                entries.isNotEmpty()
+            ) {
+                val vLast = visibleItems.size - 1
+                val aLast = allItems.size - 1
+                val newItem = visibleItems[vLast] as? OpenCodeTranscriptItem.AssistantMarkdown
+                val oldItem = prevStructural.visibleItems[vLast] as? OpenCodeTranscriptItem.AssistantMarkdown
+                val structuralLast = ((structuralEntries.last() as? TranscriptEntry.Single)?.item as? OpenCodeTranscriptItem.AssistantMarkdown)
+                val entryLast = ((entries.last() as? TranscriptEntry.Single)?.item as? OpenCodeTranscriptItem.AssistantMarkdown)
+                if (newItem != null && oldItem != null && newItem.id == oldItem.id &&
+                    allItems[aLast].id == prevStructural.allItems[aLast].id &&
+                    TranscriptEntry.promptID(allItems[aLast]) == null &&
+                    structuralLast?.id == newItem.id &&
+                    entryLast?.id == newItem.id &&
+                    visibleItems.subList(0, vLast) == prevStructural.visibleItems.subList(0, vLast) &&
+                    (visibleItems.size == allItems.size || allItems.subList(0, aLast) == prevStructural.allItems.subList(0, aLast))
+                ) {
+                    if (visibleItems[vLast] != prevStructural.visibleItems[vLast]) {
+                        val updatedEntry = TranscriptEntry.Single(visibleItems[vLast])
+                        structuralInputs = prevStructural.copy(visibleItems = visibleItems, allItems = allItems)
+                        structuralEntries = structuralEntries.dropLast(1) + updatedEntry
+                        structuralGeneration += 1
+                        stampInputs = prevStamp.copy(allItems = allItems)
+                        finalInputs = prevFinal.copy(structuralGeneration = structuralGeneration)
+                        entries = entries.dropLast(1) + updatedEntry
+                    }
+                    return entries to newMessages
+                }
+            }
+            val structural = StructuralInputs(visibleItems, allItems, showsWorking, failedFinale, models, sinceYouLeft)
+            if (structural != structuralInputs) {
+                structuralInputs = structural
+                // While the Working line plays Failed, it is the failure: the run's error line
+                // takes its place once the flash has played.
+                val items = if (failedFinale) withoutTurnRunError(visibleItems) else visibleItems
+                structuralEntries = TranscriptEntry.build(
+                    items = items,
+                    isRunning = showsWorking,
+                    models = models,
+                    sessionStartModels = TranscriptEntry.sessionStartModelIDs(allItems),
+                    sinceYouLeft = sinceYouLeft,
+                )
+                structuralGeneration += 1
+            }
+            val stampKey = StampInputs(allItems, sentNow, nowSecond, zone.id, locale.toLanguageTag(), hour24)
+            if (stampKey != stampInputs) {
+                stampInputs = stampKey
+                // Times read from every loaded message, so the window's first one is dated
+                // against the messages before it. A new session's sends count as sent now until
+                // their replies carry a time.
+                stamps = TranscriptTimeStamps.stamps(allItems, sentNow, now, zone, locale, hour24)
+            }
+            val finalKey = FinalInputs(structuralGeneration, stamps, mark)
+            if (finalKey != finalInputs) {
+                finalInputs = finalKey
+                val built = TranscriptTimeStamps.inserting(stamps, structuralEntries)
+                entries = built
+                newMessages = NewMessagesMark.resolve(mark, visibleItems, built)
+            }
+            return entries to newMessages
+        }
+    }
+
+    /**
+     * iOS `configuration(using:at:)`: everything the list draws, from the store. [now] is
+     * `AgentActivityClock` seconds (the Working line's clock); time stamps read the wall clock.
+     */
+    fun projection(
+        state: State,
+        cache: ProjectionCache,
+        scrollEdgeBridge: SessionScrollEdgeBridge,
+        usesSinceYouLeft: Boolean,
+        now: Double = AgentActivityClock.now(),
+        hour24: Boolean? = null,
+    ): Projection {
+        val visibleItems = cache.resolveVisibleItems(
+            items = state.items,
+            visibleLimit = state.visibleLimit,
+            browsingWindowStartID = state.browsingWindowStartID,
+            revertMessageID = state.session?.revertMessageID,
+            compute = { state.visibleItems },
+        )
+        val working = workingActivity(state, visibleItems, scrollEdgeBridge, now)
+        // The finale holds the transcript as it was running, so Working leaves and the reply's
+        // end arrives together, as they do without it.
+        val showsWorking = working != null
+        val isFailedFinale = working?.phase == WorkingActivity.Phase.failed
+        val sentNow: Boolean? = if (state.isDraft || state.draftBecameSessionID != null) true else null
+        val (entries, newMessages) = cache.resolveEntries(
+            visibleItems = visibleItems,
+            allItems = state.items,
+            showsWorking = showsWorking,
+            failedFinale = isFailedFinale,
+            models = state.models,
+            sinceYouLeft = if (usesSinceYouLeft && !state.isDraft) state.sinceYouLeft?.let(::transcriptSinceYouLeft) else null,
+            sentNow = sentNow,
+            mark = state.newMessages,
+            hour24 = hour24,
+        )
+        val queuedRows = if (state.queuedInputs.isEmpty()) emptyList() else state.queuedInputRows
+        val actionableErrorID = state.actionableRunErrorID
+        val configuration = TranscriptConfiguration(
+            server = state.server,
+            sessionID = state.session?.id,
+            directory = state.session?.directory,
+            historyGeneration = state.historyGeneration,
+            entries = entries,
+            hasEarlierItems = state.hasEarlierItems,
+            isLoadingEarlier = state.isLoadingEarlier,
+            earlierHistoryError = state.earlierHistoryError,
+            isLoading = state.isTranscriptLoading,
+            showsEmptyState = state.showsEmptyState,
+            isRunning = showsWorking,
+            hasPendingRequests = state.hasPendingRequests,
+            showsMoveToBackground = state.showsMoveToBackground,
+            actionableRunErrorID = actionableErrorID,
+            actionableRunErrorActions = if (actionableErrorID == null) emptyList() else state.actionableRunErrorActions,
+            subagents = state.transcriptSubagents,
+            sessionLinks = state.sessionLinks,
+            isDraft = state.isDraft,
+            // Steering messages land at the next step, so they sit in the transcript as dim
+            // bubbles; queued ones wait in the pill.
+            queuedInputs = if (queuedRows.isEmpty()) emptyList() else queuedRows.filter { !it.waitsInQueuedPill },
+            failedSends = if (state.failedSends.isEmpty()) {
+                emptyMap()
+            } else {
+                buildMap { for (failed in state.failedSends) putIfAbsent(failed.id, failed.reason) }
+            },
+            deliveryNotes = if (state.failedSends.isEmpty()) emptyMap() else state.deliveryNotes.mapValues { it.value.label },
+            queuedPillTexts = if (queuedRows.isEmpty()) {
+                emptyMap()
+            } else {
+                queuedRows.filter { it.waitsInQueuedPill }.distinctBy { it.id }
+                    .associate { it.id to (TranscriptUserMessage.from(it)?.displayText ?: it.text) }
+            },
+            sentItemID = state.lastSentItemID,
+            sendGeneration = state.sendGeneration,
+            newMessages = newMessages,
+        )
+        return Projection(configuration, working)
+    }
+
+    /**
+     * Maps what a row or the list asks for to the `SessionFeature` action of the same name (iOS
+     * rows send them directly). Share, files and image previews are the screen's: Share opens
+     * the system share sheet with the link; files and images end text focus first, as iOS does
+     * before presenting their viewers.
+     */
+    fun handle(action: TranscriptAction, store: StoreOf<State, Action>, context: Context, host: SessionComposerHost?) {
+        when (action) {
+            is TranscriptAction.LinkMenu -> {
+                store.send(Action.LinkMenu(action.action, action.url))
+                if (action.action == LinkMenuAction.Share) {
+                    val url = OpenCodePairingLink.shareableURL(action.url) ?: return
+                    val send = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_TEXT, url)
+                    }
+                    context.startActivity(Intent.createChooser(send, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                }
+            }
+            // The keyboard would stay up over the viewer. (The viewers belong to :feature:media.)
+            is TranscriptAction.OpenFile, is TranscriptAction.PreviewImage -> host?.dismissComposerKeyboard()
+            else -> sessionAction(action)?.let(store::send)
+        }
+    }
+
+    /** The `SessionFeature` action a [TranscriptAction] stands for; null for the screen's own. */
+    fun sessionAction(action: TranscriptAction): Action? = when (action) {
+        TranscriptAction.FirstContentFrameRendered -> Action.FirstContentFrameRendered
+        is TranscriptAction.TranscriptBrowsingChanged -> Action.TranscriptBrowsingChanged(action.isBrowsing)
+        is TranscriptAction.NewMessagesPassed -> Action.NewMessagesPassed(action.generation)
+        is TranscriptAction.NewMessagesFit -> Action.NewMessagesFit(action.generation)
+        TranscriptAction.SinceYouLeftTapped -> Action.SinceYouLeftTapped
+        TranscriptAction.ShowEarlierTapped -> Action.ShowEarlierTapped
+        is TranscriptAction.CopyTextTapped -> Action.CopyTextTapped(action.text)
+        is TranscriptAction.QuoteTextTapped -> Action.QuoteTextTapped(action.text)
+        is TranscriptAction.LinkMenu -> Action.LinkMenu(action.action, action.url)
+        is TranscriptAction.LinkTapped -> Action.LinkTapped(action.url)
+        is TranscriptAction.SessionLinksAppeared -> Action.SessionLinksAppeared(action.ids)
+        is TranscriptAction.SubagentTapped -> Action.SubagentTapped(action.sessionID)
+        TranscriptAction.MoveToBackgroundTapped -> Action.MoveToBackgroundTapped
+        is TranscriptAction.FailedSendRetryTapped -> Action.FailedSendRetryTapped(action.messageID)
+        is TranscriptAction.FailedSendEditTapped -> Action.FailedSendEditTapped(action.messageID)
+        is TranscriptAction.FailedSendDeleteTapped -> Action.FailedSendDeleteTapped(action.messageID)
+        is TranscriptAction.RunErrorActionTapped -> Action.RunErrorActionTapped(action.action)
+        is TranscriptAction.RevertToHereTapped -> Action.RevertToHereTapped(action.messageID)
+        TranscriptAction.RedoTapped -> Action.RedoTapped
+        is TranscriptAction.PendingInputSendNowTapped -> Action.PendingInputSendNowTapped(action.inputID)
+        is TranscriptAction.PendingInputMoveToQueueTapped -> Action.PendingInputMoveToQueueTapped(action.inputID)
+        is TranscriptAction.PendingInputCancelTapped -> Action.PendingInputCancelTapped(action.inputID)
+        is TranscriptAction.OpenFile, is TranscriptAction.PreviewImage -> null
+    }
+
+    /** The transcript's copy of the Since You Left value (`:feature:transcript` draws its row). */
+    fun transcriptSinceYouLeft(summary: SinceYouLeft) = TranscriptSinceYouLeft(
+        sessionID = summary.sessionID,
+        lastItemID = summary.lastItemID,
+        text = summary.text,
+        phase = if (summary.phase == SinceYouLeft.Phase.Generating) TranscriptSinceYouLeft.Phase.Generating else TranscriptSinceYouLeft.Phase.Done,
+        isFallback = summary.isFallback,
+    )
+
+    /** Back to the session's value for [SinceYouLeftRow]. */
+    fun sinceYouLeft(summary: TranscriptSinceYouLeft) = SinceYouLeft(
+        sessionID = summary.sessionID,
+        lastItemID = summary.lastItemID,
+        text = summary.text,
+        phase = if (summary.phase == TranscriptSinceYouLeft.Phase.Generating) SinceYouLeft.Phase.Generating else SinceYouLeft.Phase.Done,
+        isFallback = summary.isFallback,
+    )
+
+    /** A transcript row's subagent glyph as the activity orb reads it. */
+    fun subagentActivity(glyph: AgentGlyphState) = SubagentActivity(
+        sessionID = glyph.sessionID,
+        phase = when (glyph.phase) {
+            AgentGlyphState.Phase.Spawning -> SubagentActivity.Phase.spawning
+            AgentGlyphState.Phase.Running -> SubagentActivity.Phase.running
+            AgentGlyphState.Phase.Done -> SubagentActivity.Phase.done
+            AgentGlyphState.Phase.Failed -> SubagentActivity.Phase.failed
+        },
+        needsInput = glyph.needsInput,
+    )
+
     /** A Working-line event that ends on time: Starting Up, or a finale. */
     @Immutable
     data class TimedRunEvent(val id: Int, val duration: Double)
@@ -176,7 +636,7 @@ object SessionTranscriptView {
         // The line ends in the reply's copy button when the turn has reply text. A failed run's
         // line fades instead: its error line arrives in its place, with the copy button below it.
         val failed = finale.kind == WorkingRun.Finale.Kind.failed || live == WorkingRun.Outcome.failed
-        val replyEnds = !failed && TranscriptEntry.endsInReply(visibleItems)
+        val replyEnds = !failed && TranscriptEntry.build(visibleItems, isRunning = false).lastOrNull() is TranscriptEntry.ReplyEnd
         return WorkingActivity(
             phase = if (failed) WorkingActivity.Phase.failed else WorkingActivity.Phase.done,
             key = key,
@@ -301,7 +761,7 @@ fun WorkingIndicator(activity: WorkingActivity, modifier: Modifier = Modifier) {
             isPaused = activity.phase == WorkingActivity.Phase.stopping,
             modifier = Modifier.clearAndSetSemantics {},
         )
-        val style = TranscriptMetrics.metaFont(FontWeight.Medium)
+        val style = TranscriptFonts.metaFont(FontWeight.Medium)
         if (activity.retry != null && activity.phase == WorkingActivity.Phase.running && !activity.needsInput) {
             // The server's retry counts down once a second.
             var now by remember { mutableStateOf(Instant.now()) }
@@ -353,7 +813,7 @@ fun WorkingLineRow(
     Box(
         modifier
             .fillMaxWidth()
-            .padding(top = TranscriptMetrics.flowHalf.dp, bottom = TranscriptMetrics.turnHalf.dp),
+            .padding(top = TranscriptMetrics.flowHalf, bottom = TranscriptMetrics.turnHalf),
     ) {
         WorkingLine(activity, pose, offersMove, onMoveToBackground)
         // An overlay, so offering it never changes the row's height.
@@ -371,15 +831,15 @@ fun WorkingLineRow(
 /** SwiftUI `.snappy(duration: 0.35)`. */
 private val moveSnappy = MotionSpring(0.35, 0.15)
 
-/** The copy glyph's centre from the text edge (its 44 dp slot starts 13 dp out). */
-private const val COPY_CENTRE = 22f + ReplyCopyGlyph.leading
+/** The copy glyph's centre from the text edge (its slot starts [ReplyCopyGlyph.leading] out). */
+private val COPY_CENTRE = ReplyCopyGlyph.slot / 2 + ReplyCopyGlyph.leading
 
 @Composable
 private fun WorkingLine(activity: WorkingActivity, pose: WorkingHandoffPose, offersMove: Boolean, onMove: () -> Unit) {
     Box {
-        ReplyCopyGlyphView(
+        ReplyCopyGlyph.Glyph(
             Modifier
-                .offset(x = ReplyCopyGlyph.leading.dp)
+                .offset(x = ReplyCopyGlyph.leading)
                 .alpha(pose.copyOpacity.toFloat())
                 .blur(pose.copyBlur.dp)
                 .graphicsLayer {
@@ -394,7 +854,7 @@ private fun WorkingLine(activity: WorkingActivity, pose: WorkingHandoffPose, off
             activity,
             Modifier
                 .align(Alignment.CenterStart)
-                .offset(x = (COPY_CENTRE * (1 - scale)).dp)
+                .offset(x = COPY_CENTRE * (1 - scale))
                 .blur(pose.indicatorBlur.dp)
                 .graphicsLayer {
                     scaleX = scale
@@ -430,7 +890,7 @@ private fun MoveToBackgroundAction(activity: WorkingActivity, onMove: () -> Unit
             if (showsTitle) {
                 Text(
                     "Move to Background",
-                    style = TranscriptMetrics.metaFont().copy(fontSize = 17.sp),
+                    style = TranscriptFonts.metaFont().copy(fontSize = 17.sp),
                     color = OpenCodeTheme.colors.secondaryText,
                     maxLines = 1,
                 )

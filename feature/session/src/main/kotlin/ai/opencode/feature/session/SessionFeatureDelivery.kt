@@ -4,7 +4,7 @@ import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.log.AppLog
 import ai.opencode.core.log.logSummary
 import ai.opencode.feature.session.seams.PageReaderClient
-import ai.opencode.feature.session.seams.SessionNotificationsClient
+import ai.opencode.feature.system.notifications.SessionNotificationsClient
 import ai.opencode.feature.session.seams.read
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeClientError

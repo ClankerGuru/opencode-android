@@ -14,8 +14,9 @@ import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.seams.ComposerSwipeDown
 import ai.opencode.feature.session.seams.ComposerSwipeOwnership
 import ai.opencode.feature.session.seams.DictationFeature
-import ai.opencode.feature.session.seams.ExperimentalFeature
-import ai.opencode.feature.session.seams.ModelPickerStyle
+import ai.opencode.core.experiments.key
+import ai.opencode.core.sharing.ExperimentalFeature
+import ai.opencode.core.experiments.ModelPickerStyle
 import ai.opencode.feature.session.seams.QueuedMessagesSheet
 import ai.opencode.server.model.OpenCodeProject
 import ai.opencode.server.model.OpenCodeQueuedInput
@@ -303,7 +304,7 @@ fun SessionComposer(
     val snapshot by store.observe { ComposerSnapshot.of(it) }
     val returnKeySends by remember(store) { store.state.returnKeySends.flow }.collectAsState(store.state.returnKeySends.value)
     val modelPickerStyle by remember { shared(ModelPickerStyle.key).flow }.collectAsState(shared(ModelPickerStyle.key).value)
-    val agentSelection by remember { shared(ExperimentalFeature.key(ExperimentalFeature.agentSelection)).flow }
+    val agentSelection by remember { shared(ExperimentalFeature.agentSelection.key).flow }
         .collectAsState(false)
     val reducedMotion = rememberReduceMotion()
     val focusRequester = remember { FocusRequester() }

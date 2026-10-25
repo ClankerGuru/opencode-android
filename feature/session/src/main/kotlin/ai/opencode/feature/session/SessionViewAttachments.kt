@@ -9,15 +9,15 @@ import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.openCodeTapTarget
-import ai.opencode.feature.session.seams.AttachmentFileTypeLabels
 import ai.opencode.feature.session.seams.AttachmentMenuItem
 import ai.opencode.feature.session.seams.AttachmentPickerButton
 import ai.opencode.feature.session.seams.ComposerFileAttachment
 import ai.opencode.feature.session.seams.ComposerFileRouting
 import ai.opencode.feature.session.seams.ComposerImageSource
 import ai.opencode.feature.session.seams.ComposerMediaLoader
-import ai.opencode.feature.session.seams.ComposerStagedFile
-import ai.opencode.feature.session.seams.SharedImageEncoder
+import ai.opencode.core.files.AttachmentFileType
+import ai.opencode.core.files.ComposerStagedFile
+import ai.opencode.feature.system.share.SharedImageEncoder
 import ai.opencode.feature.session.seams.SharedLocation
 import ai.opencode.feature.session.seams.SharedLocationText
 import ai.opencode.server.model.OpenCodeOutgoingAttachment
@@ -128,7 +128,7 @@ class SessionAttachmentImporter internal constructor(
 
     /** Files over [LARGE_UPLOAD_BYTES] wait for this confirmation (iOS `SessionView.LargeUpload`). */
     data class LargeUpload(val files: List<ComposerStagedFile>, val onStaged: (() -> Unit)?) {
-        val title: String get() = "Upload ${AttachmentFileTypeLabels.formatFileSize(files.sumOf { it.size })}?"
+        val title: String get() = "Upload ${AttachmentFileType.byteCount(files.sumOf { it.size })}?"
 
         val message: String
             get() {
@@ -275,7 +275,7 @@ class SessionAttachmentImporter internal constructor(
             activeFileImports -= 1
             if (staged.isNotEmpty()) {
                 if (!sameComposer(identity)) {
-                    staged.forEach { loader.discard(it.url) }
+                    staged.forEach { loader.discard(it.url.absolutePath) }
                 } else if (staged.any { it.size > LARGE_UPLOAD_BYTES }) {
                     // The server holds an upload in memory, so very large files ask first.
                     largeUpload = LargeUpload(staged, onStaged)
@@ -302,7 +302,7 @@ class SessionAttachmentImporter internal constructor(
     /** Cancel in the large-upload alert: the staged copies go. */
     fun cancelLargeUpload() {
         val upload = largeUpload ?: return
-        upload.files.forEach { loader.discard(it.url) }
+        upload.files.forEach { loader.discard(it.url.absolutePath) }
         largeUpload = null
     }
 
@@ -549,7 +549,7 @@ fun PendingAttachmentsRow(
                     ) {
                         FileAttachmentCard(
                             name = name,
-                            symbolName = AttachmentFileTypeLabels.symbolName(name, attachment.mime),
+                            symbolName = AttachmentFileType.symbolName(name, attachment.mime),
                             width = PendingAttachmentMetrics.chipWidth,
                             height = PendingAttachmentMetrics.chipHeight,
                             modifier = Modifier
@@ -557,7 +557,7 @@ fun PendingAttachmentsRow(
                                 .clearAndSetSemantics { contentDescription = "File attachment $name" }
                                 .testTag("pending-file-$name"),
                         ) {
-                            Text(AttachmentFileTypeLabels.subtitle(name, attachment.mime, attachment.data.size.toLong()))
+                            Text(AttachmentFileType.subtitle(name, attachment.mime, attachment.data.size.toLong()))
                         }
                     }
                 }
@@ -796,14 +796,14 @@ fun ComposerFileChip(file: ComposerFileAttachment, canRetry: Boolean, onRetry: (
     val progress = file.progress
     val status = when (val s = file.status) {
         is ComposerFileAttachment.Status.Uploading -> "Uploading, ${percent(progress)}"
-        is ComposerFileAttachment.Status.Uploaded -> AttachmentFileTypeLabels.subtitle(file.name, file.mime, file.size)
+        is ComposerFileAttachment.Status.Uploaded -> AttachmentFileType.subtitle(file.name, file.mime, file.size)
         is ComposerFileAttachment.Status.Failed -> s.message
     }
     val retries = file.isFailed && canRetry
     val shape = RoundedCornerShape(PendingAttachmentMetrics.chipRadius)
     FileAttachmentCard(
         name = file.name,
-        symbolName = AttachmentFileTypeLabels.symbolName(file.name, file.mime),
+        symbolName = AttachmentFileType.symbolName(file.name, file.mime),
         width = PendingAttachmentMetrics.chipWidth,
         height = PendingAttachmentMetrics.chipHeight,
         detailLines = if (file.isFailed) 2 else 1,
@@ -827,7 +827,7 @@ fun ComposerFileChip(file: ComposerFileAttachment, canRetry: Boolean, onRetry: (
                 LinearProgressIndicator(progress = { progress.toFloat() }, modifier = Modifier.widthIn(max = 120.dp).fillMaxWidth())
             }
             is ComposerFileAttachment.Status.Uploaded -> Text(
-                AttachmentFileTypeLabels.subtitle(file.name, file.mime, file.size),
+                AttachmentFileType.subtitle(file.name, file.mime, file.size),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )

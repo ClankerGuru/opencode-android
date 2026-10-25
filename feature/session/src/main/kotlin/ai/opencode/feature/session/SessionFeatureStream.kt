@@ -10,8 +10,8 @@ import ai.opencode.feature.session.seams.DictationFeature
 import ai.opencode.feature.session.seams.DictationHoldRelease
 import ai.opencode.feature.session.seams.discardPending
 import ai.opencode.feature.session.seams.restorePersistedComposer
-import ai.opencode.feature.session.seams.LabMarks
-import ai.opencode.feature.session.seams.TranscriptEntry
+import ai.opencode.core.diagnostics.LabMarks
+import ai.opencode.feature.transcript.TranscriptEntry
 import ai.opencode.feature.session.seams.prepare
 import ai.opencode.feature.voice.ServerVoiceSupport
 import ai.opencode.server.OpenCodeLiveContentEvent

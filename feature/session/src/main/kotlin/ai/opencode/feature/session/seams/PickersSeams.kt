@@ -1,16 +1,15 @@
 package ai.opencode.feature.session.seams
 
+import ai.opencode.core.files.ComposerStagedFile
 import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.dependencies.dependency
-import ai.opencode.core.sharing.SharedKey
 import ai.opencode.feature.session.SessionFeature
 import ai.opencode.feature.session.pickerModels
 import ai.opencode.server.model.AttachmentFileType
 import ai.opencode.server.model.ModelProviderGroup
 import ai.opencode.server.model.OpenCodeModel
 import android.graphics.Bitmap
-import android.graphics.ImageDecoder
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import androidx.core.net.toUri
@@ -25,37 +24,6 @@ import java.util.UUID
 // Stand-ins for Composer/Settings/System types the VIEW-PICKERS group (SessionViewModelPicker.kt,
 // SessionViewAttachments.kt, SessionViewPhotoSheet.kt) needs whose real ports belong to other
 // areas. Each carries only what those views use.
-
-// region Settings
-
-/**
- * SEAM: real type belongs to :feature:settings (iOS `Settings/ExperimentalFeatures.swift`
- * `ModelPickerStyle`); delete when that area merges. Settings › Advanced › Model Picker.
- */
-enum class ModelPickerStyle(val rawValue: String) {
-    today("today"),
-    sheet("sheet"),
-    growFromComposer("grow-from-composer");
-
-    val title: String
-        get() = when (this) {
-            today -> "Today"
-            sheet -> "Sheet"
-            growFromComposer -> "Grow from Composer"
-        }
-
-    companion object {
-        const val STORAGE_KEY = "experimental-model-picker"
-
-        /** iOS `.modelPickerStyle`: Today by default. Stored as its raw value. */
-        val key = SharedKey.appStorage(STORAGE_KEY, today.rawValue)
-
-        /** The style in use: the saved one (unknown values read as Today). */
-        fun active(stored: String): ModelPickerStyle = entries.firstOrNull { it.rawValue == stored } ?: today
-    }
-}
-
-// endregion
 
 // region Model picker (Composer/ModelPicker)
 
@@ -158,40 +126,6 @@ object AttachmentPickerButton {
     const val MAX_PHOTO_SELECTION = 4
 }
 
-/** SEAM: real type belongs to :feature:system (iOS `System/Share/ShareHandoff.swift` `SharedImageEncoder`). */
-object SharedImageEncoder {
-    const val MAX_SOURCE_BYTES = 20_000_000L
-    const val MAX_PIXEL_SIZE = 1568
-    const val COMPRESSION_QUALITY = 80
-    const val MIME = "image/jpeg"
-
-    /** Downscaled (longest side [MAX_PIXEL_SIZE], orientation applied) and re-encoded as JPEG. */
-    fun jpeg(data: ByteArray): ByteArray? {
-        if (data.size > MAX_SOURCE_BYTES) return null
-        val bitmap = decode(data) ?: return null
-        return try {
-            ByteArrayOutputStream().use { out ->
-                if (!bitmap.compress(Bitmap.CompressFormat.JPEG, COMPRESSION_QUALITY, out)) null else out.toByteArray()
-            }
-        } finally {
-            bitmap.recycle()
-        }
-    }
-
-    private fun decode(data: ByteArray): Bitmap? = try {
-        ImageDecoder.decodeBitmap(ImageDecoder.createSource(java.nio.ByteBuffer.wrap(data))) { decoder, info, _ ->
-            decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-            val longest = maxOf(info.size.width, info.size.height)
-            if (longest > MAX_PIXEL_SIZE) {
-                val scale = MAX_PIXEL_SIZE.toDouble() / longest
-                decoder.setTargetSize(maxOf(1, (info.size.width * scale).toInt()), maxOf(1, (info.size.height * scale).toInt()))
-            }
-        }
-    } catch (_: Exception) {
-        null
-    }
-}
-
 /**
  * SEAM: real client belongs to :feature:composer / :feature:system (iOS `ComposerImageSource.load`,
  * `ComposerItemProviderLoader`, `ComposerFileStaging`); delete when those areas merge. Reads picked
@@ -274,7 +208,7 @@ class ComposerMediaLoader(
                                 name = fileName,
                                 mime = declared ?: "application/octet-stream",
                                 size = destination.length(),
-                                url = destination.absolutePath,
+                                url = destination,
                             )
                         } catch (_: Exception) {
                             null
@@ -290,76 +224,6 @@ class ComposerMediaLoader(
                 },
             )
         }
-    }
-}
-
-/**
- * SEAM: real members belong to :feature:composer (iOS `Composer/AttachmentFileType.swift`
- * `label`, `subtitle`, `symbolName`); the :server port has only the naming helpers.
- */
-object AttachmentFileTypeLabels {
-    const val PDF_MIME = "application/pdf"
-
-    /** The common subset of the language names desktop takes from Shiki. */
-    private val languageNames = mapOf(
-        "c" to "C", "cjs" to "JavaScript", "cpp" to "C++", "cs" to "C#", "css" to "CSS", "dart" to "Dart",
-        "go" to "Go", "html" to "HTML", "java" to "Java", "js" to "JavaScript",
-        "json" to "JSON", "jsx" to "JSX", "kt" to "Kotlin", "lua" to "Lua", "md" to "Markdown", "mjs" to "JavaScript",
-        "php" to "PHP", "py" to "Python", "rb" to "Ruby", "rs" to "Rust", "sh" to "Shell", "sql" to "SQL",
-        "swift" to "Swift", "toml" to "TOML", "ts" to "TypeScript", "tsx" to "TSX",
-        "xml" to "XML", "yaml" to "YAML", "yml" to "YAML", "zsh" to "Zsh",
-    )
-    private val archiveMimes = setOf(
-        "application/zip", "application/x-zip-compressed", "application/x-tar", "application/gzip", "application/x-gzip",
-        "application/x-7z-compressed", "application/x-rar-compressed", "application/vnd.rar", "application/x-bzip2",
-    )
-    private val spreadsheetMimes = setOf(
-        "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "application/vnd.oasis.opendocument.spreadsheet", "application/vnd.apple.numbers",
-    )
-    private val presentationMimes = setOf(
-        "application/vnd.ms-powerpoint", "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        "application/vnd.oasis.opendocument.presentation", "application/vnd.apple.keynote",
-    )
-
-    /** The chip subtitle: "PDF", a language name, or the extension in capitals. */
-    fun label(name: String, mime: String): String {
-        if (mime == PDF_MIME) return "PDF"
-        val suffix = AttachmentFileType.fileExtension(name)
-        if (suffix.isEmpty()) return "File"
-        return languageNames[suffix] ?: suffix.uppercase()
-    }
-
-    fun subtitle(name: String, mime: String, size: Long): String = "${label(name, mime)} · ${formatFileSize(size)}"
-
-    /** The SF Symbol name for the file's type glyph. */
-    fun symbolName(name: String, mime: String): String {
-        if (mime == PDF_MIME) return "doc.richtext"
-        if (mime.startsWith("image/")) return "photo"
-        if (mime.startsWith("video/")) return "film"
-        if (mime.startsWith("audio/")) return "waveform"
-        if (mime == "text/plain") {
-            return if (languageNames[AttachmentFileType.fileExtension(name)] == null) "doc.text" else "chevron.left.forwardslash.chevron.right"
-        }
-        if (mime in archiveMimes) return "doc.zipper"
-        if (mime in spreadsheetMimes) return "tablecells"
-        if (mime in presentationMimes) return "rectangle.on.rectangle"
-        return "doc"
-    }
-
-    /** Like `ByteCountFormatter` `.file`: decimal units. */
-    fun formatFileSize(bytes: Long): String {
-        if (bytes == 0L) return "Zero KB"
-        if (bytes < 1000) return "$bytes ${if (bytes == 1L) "byte" else "bytes"}"
-        val units = listOf("KB", "MB", "GB", "TB")
-        var value = bytes / 1000.0
-        var unit = 0
-        while (value >= 1000 && unit < units.lastIndex) {
-            value /= 1000
-            unit++
-        }
-        val text = if (unit == 0) Math.round(value).toString() else String.format(java.util.Locale.US, "%.1f", value).removeSuffix(".0")
-        return "$text ${units[unit]}"
     }
 }
 

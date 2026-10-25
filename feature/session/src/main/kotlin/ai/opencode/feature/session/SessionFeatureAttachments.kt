@@ -6,7 +6,7 @@ import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.map
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.State
-import ai.opencode.feature.session.seams.AttachmentLimits
+import ai.opencode.core.files.AttachmentFileType
 import ai.opencode.feature.session.seams.ComposerAttachmentsFeature
 import ai.opencode.feature.session.seams.ComposerFileAttachment
 import ai.opencode.feature.session.seams.cancelUpload
@@ -47,7 +47,7 @@ internal fun SessionFeature.reduceAttachments(state: State, action: Action): Red
             var staged = false
             for (file in attachments.files) {
                 // Like desktop, media the model reads natively travels inline.
-                if (file.mime == AttachmentLimits.pdfMime && file.size <= AttachmentLimits.maxInlineBytes && next.currentModelReads("pdf")) {
+                if (file.mime == AttachmentFileType.pdfMime && file.size <= AttachmentFileType.maxInlineBytes && next.currentModelReads("pdf")) {
                     effects += ComposerAttachmentsFeature.readInlineFile(file).map(Action::ComposerAttachments)
                     continue
                 }

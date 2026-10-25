@@ -1,5 +1,6 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticEffect
@@ -20,9 +21,11 @@ import ai.opencode.feature.session.header.HeaderBlurTunables
 import ai.opencode.feature.session.header.SessionHeaderBackdrop
 import ai.opencode.feature.session.header.SessionHeaderStyle
 import ai.opencode.feature.session.seams.AttachmentMenuItem
-import ai.opencode.feature.session.seams.ExperimentalFeature
+import ai.opencode.core.experiments.key
+import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.feature.session.seams.LocationClientError
-import ai.opencode.feature.session.seams.SessionScrollEdgeBridge
+import ai.opencode.feature.transcript.TranscriptMetrics
+import ai.opencode.feature.system.notifications.SessionNotificationsClient
 import ai.opencode.server.model.OpenCodeShell
 import ai.opencode.server.model.OpenCodeSession
 import androidx.compose.animation.EnterTransition
@@ -87,6 +90,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.currentStateAsState
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.svg.SvgDecoder
@@ -211,7 +215,7 @@ fun SessionView(
                         .imePadding()
                         .padding(bottom = if (onCatchUpOpen == null) 0.dp else CATCH_UP_COMPOSER_CLEARANCE.dp)
                         // The readable column (iOS `readableColumn()`): 720 wide at most.
-                        .widthIn(max = READABLE_COLUMN_WIDTH.dp)
+                        .widthIn(max = TranscriptMetrics.readableColumnWidth)
                         .onSizeChanged { scrollEdgeBridge.composerHeight = with(density) { it.height.toDp().value } },
                 ) {
                     SessionAttachmentMenu(store, composerHost, importer)
@@ -228,8 +232,6 @@ fun SessionView(
 /** iOS `CatchUpMetrics.composerClearance.bottom`. */
 private const val CATCH_UP_COMPOSER_CLEARANCE = 12f
 
-/** iOS `TranscriptMetrics.readableColumnWidth`. */
-private const val READABLE_COLUMN_WIDTH = 720f
 
 /** What the background-work panel reads from the session. */
 @Immutable
@@ -295,14 +297,30 @@ private fun SessionLifecycle(store: StoreOf<State, Action>) {
         }
     }
 
+    // iOS `markVisibleSession`: notifications learn which session is on screen, so its own don't
+    // show. Told again as the scene, the cover or the session changes; told it left on disappear.
+    val notifications = remember { dependency(SessionNotificationsClient) }
+    val lifecycleState by lifecycleOwner.lifecycle.currentStateAsState()
+    val sceneActive = lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
+    val sessionID by store.observe { it.session?.id }
+    val isVisible by store.observe { it.isVisible }
+    val isCovered by store.observe { it.isCovered }
+    val latestSessionID by rememberUpdatedState(sessionID)
+    LaunchedEffect(notifications, sceneActive, isVisible, isCovered, sessionID) {
+        notifications.setVisibleSession(sceneActive && isVisible && !isCovered, sessionID)
+    }
+    DisposableEffect(notifications) {
+        onDispose { notifications.setVisibleSession(false, latestSessionID) }
+    }
+
     // Switched off in Settings, an open session's divider goes at once.
     LaunchedEffect(store) {
-        shared(ExperimentalFeature.key(ExperimentalFeature.newMessagesDivider)).flow.drop(1).collect {
+        shared(ExperimentalFeature.newMessagesDivider.key).flow.drop(1).collect {
             store.send(Action.NewMessagesDividerChanged(it))
         }
     }
     LaunchedEffect(store) {
-        shared(ExperimentalFeature.key(ExperimentalFeature.sinceYouLeft)).flow.drop(1).collect {
+        shared(ExperimentalFeature.sinceYouLeft.key).flow.drop(1).collect {
             store.send(Action.SinceYouLeftChanged(it))
         }
     }

@@ -10,7 +10,7 @@ import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
 import ai.opencode.core.store.cancellable
-import ai.opencode.feature.session.seams.SessionNotificationsClient
+import ai.opencode.feature.system.notifications.SessionNotificationsClient
 import ai.opencode.feature.session.sheet.asClientError
 import ai.opencode.feature.session.sheet.clientError
 import ai.opencode.feature.session.sheet.clientResult

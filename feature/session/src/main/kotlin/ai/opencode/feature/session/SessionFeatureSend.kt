@@ -16,10 +16,10 @@ import ai.opencode.feature.session.seams.ComposerFileAttachment
 import ai.opencode.feature.session.seams.ComposerUploadCancelID
 import ai.opencode.feature.session.seams.DictationFeature
 import ai.opencode.feature.session.seams.DictationHoldRelease
-import ai.opencode.feature.session.seams.ExperimentalFeature
-import ai.opencode.feature.session.seams.LabMarks
+import ai.opencode.core.sharing.ExperimentalFeature
+import ai.opencode.core.diagnostics.LabMarks
 import ai.opencode.feature.session.seams.PageShareRequest
-import ai.opencode.feature.session.seams.SessionLinkTarget
+import ai.opencode.feature.transcript.SessionLinkTarget
 import ai.opencode.feature.session.seams.SharedComposerDraft
 import ai.opencode.feature.session.seams.SharedDraftTarget
 import ai.opencode.feature.session.seams.SharedLocationText

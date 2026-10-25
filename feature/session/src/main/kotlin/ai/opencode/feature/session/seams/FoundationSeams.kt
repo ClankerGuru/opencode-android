@@ -1,50 +1,32 @@
 package ai.opencode.feature.session.seams
 
-import ai.opencode.core.dependencies.DateClient
+import ai.opencode.feature.transcript.LinkMenuAction
+import ai.opencode.core.files.ComposerStagedFile
 import ai.opencode.core.dependencies.DependencyKey
-import ai.opencode.core.dependencies.dependency
-import ai.opencode.core.log.AppLog
 import ai.opencode.core.sharing.FileDirectory
 import ai.opencode.core.sharing.SharedKey
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
 import ai.opencode.feature.session.SessionFeature
-import ai.opencode.feature.session.callOwnsAudio
-import ai.opencode.feature.session.composerWithoutDictation
-import ai.opencode.feature.session.draftState
-import ai.opencode.feature.session.hasLiveDictation
-import ai.opencode.feature.session.hasPendingRequests
-import ai.opencode.feature.session.parkedComposer
 import ai.opencode.feature.session.sessionComposer
 import ai.opencode.feature.session.pendingAttachments
 import ai.opencode.feature.session.pendingFiles
 import ai.opencode.feature.session.pendingLocation
 import ai.opencode.feature.session.undoSnapshot
-import ai.opencode.feature.session.withDraft
-import ai.opencode.feature.session.withDraftState
-import ai.opencode.feature.session.withParkedComposer
-import ai.opencode.feature.session.withUndoSnapshot
 import ai.opencode.feature.voice.ServerVoiceProvider
 import ai.opencode.feature.voice.ServerVoiceSupport
 import ai.opencode.feature.voice.VoiceEngine
-import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.ServerSharedKeys
 import ai.opencode.server.model.OpenCodeAutocompleteAgent
 import ai.opencode.server.model.OpenCodeDelivery
 import ai.opencode.server.model.OpenCodeFileReference
-import ai.opencode.server.model.OpenCodeFormRequest
-import ai.opencode.server.model.OpenCodeFormValue
 import ai.opencode.server.model.OpenCodeModel
 import ai.opencode.server.model.OpenCodeModelRef
 import ai.opencode.server.model.OpenCodeOutgoingAttachment
-import ai.opencode.server.model.OpenCodePermissionReply
-import ai.opencode.server.model.OpenCodePermissionRequest
 import ai.opencode.server.model.OpenCodeProject
 import ai.opencode.server.model.OpenCodeSession
-import ai.opencode.server.model.OpenCodeToolCall
-import ai.opencode.server.model.OpenCodeTranscriptItem
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.PrimitiveKind
@@ -59,91 +41,7 @@ import java.util.UUID
 // on iOS and so must eventually live in this module). Each carries only what Session uses.
 // Reducer seams return `Reduced(state)` so composition works.
 
-// region Experimental features (Settings)
-
-/**
- * SEAM: real type belongs to :feature:settings (iOS `OpenCode/Settings/ExperimentalFeatures.swift`);
- * it must move down to :core so Session can read it. Delete when that area merges.
- */
-enum class ExperimentalFeature(val rawValue: String) {
-    composerAutocomplete("composer-autocomplete"),
-    plusMenuSheet("plus-menu-sheet"),
-    agentSelection("agent-selection"),
-    hideModels("hide-models"),
-    callTray("call-tray"),
-    floatingCall("floating-call"),
-    livingOrb("living-orb"),
-    newMessagesDivider("new-messages-divider"),
-    sinceYouLeft("since-you-left"),
-    imageLinkPreviews("image-link-previews"),
-    projectIcons("project-icons"),
-    sessionSwitcher("session-switcher"),
-    serverTitleSwitch("server-title-switch"),
-    serverDetails("server-details"),
-    inAppBrowser("in-app-browser"),
-    serverVoice("server-voice"),
-    backgroundCallIntent("background-call-intent");
-
-    /** Whether this experiment is on (iOS also honours lab overrides in DEBUG). */
-    fun isActive(stored: Boolean): Boolean = stored
-
-    companion object {
-        private val keys = HashMap<ExperimentalFeature, SharedKey<Boolean>>()
-
-        /** iOS `@Shared(.experimental(feature))`: `experimental-<raw>` in app storage, off by default. */
-        fun key(feature: ExperimentalFeature): SharedKey<Boolean> = synchronized(keys) {
-            keys.getOrPut(feature) { SharedKey.appStorage("experimental-${feature.rawValue}", false) }
-        }
-    }
-}
-
-/** SEAM: real type belongs to :feature:settings (iOS `ExperimentalFeatures` client); delete when that area merges. */
-class ExperimentalFeatures(val isEnabled: (ExperimentalFeature) -> Boolean) {
-    operator fun invoke(feature: ExperimentalFeature): Boolean = isEnabled(feature)
-
-    companion object Key : DependencyKey<ExperimentalFeatures> {
-        override val liveValue: ExperimentalFeatures = ExperimentalFeatures { shared(ExperimentalFeature.key(it)).value }
-        override val testValue: ExperimentalFeatures = ExperimentalFeatures { false }
-    }
-}
-
-// endregion
-
 // region Models (Composer/ModelPicker)
-
-/** SEAM: real type belongs to :feature:composer (iOS `Composer/ModelPicker/ModelVisibility.swift`); delete when that area merges. */
-@Serializable
-data class ModelVisibility(
-    val mode: Mode = Mode.hide,
-    val hiddenProviderIDs: Set<String> = emptySet(),
-    val hiddenModelIDs: Set<String> = emptySet(),
-    val shownModelIDs: Set<String> = emptySet(),
-) {
-    @Serializable
-    enum class Mode { hide, onlyShow }
-
-    private fun isVisible(model: OpenCodeModel, liveShownIDs: Set<String>): Boolean {
-        if (model.providerID in hiddenProviderIDs) return false
-        return when (mode) {
-            Mode.hide -> model.id !in hiddenModelIDs
-            Mode.onlyShow -> liveShownIDs.isEmpty() || model.id in liveShownIDs
-        }
-    }
-
-    private fun liveShownIDs(catalog: List<OpenCodeModel>): Set<String> = shownModelIDs.intersect(catalog.map { it.id }.toSet())
-
-    /** [models] as the picker lists them, keeping the current model so its checkmark never vanishes. */
-    fun visible(models: List<OpenCodeModel>, keeping: String?): List<OpenCodeModel> {
-        val live = liveShownIDs(models)
-        return models.filter { isVisible(it, live) || it.id == keeping }
-    }
-
-    companion object {
-        /** Each saved server's model visibility, keyed by its persistence ID. */
-        val modelVisibilityByServer =
-            SharedKey.fileStorage<Map<String, ModelVisibility>>(FileDirectory.Documents, "model-visibility.json", emptyMap())
-    }
-}
 
 /**
  * SEAM: real type belongs to :feature:composer (iOS `Composer/ModelPicker/ModelPickerSections.swift`
@@ -426,19 +324,6 @@ class BrowserFeature : Reducer<BrowserFeature.State, BrowserFeature.Action> {
 }
 
 /** SEAM: real type belongs to :feature:media (iOS `Browser/LinkMenu.swift`); delete when that area merges. */
-enum class LinkMenuAction(val title: String, val systemImage: String) {
-    openInAppBrowser("Open in App Browser", "globe"),
-    /** iOS "Open in Safari": the system's default browser on Android. */
-    openInSafari("Open in Browser", "safari"),
-    openInApp("Open in App", "arrow.up.forward.app"),
-    copy("Copy Link", "doc.on.doc"),
-    share("Share…", "square.and.arrow.up"),
-    /** A session ID in a reply (`SessionLink`): TalkBack's open action. */
-    openSession("Open Session", "arrow.up.right.square"),
-    copySessionID("Copy ID", "doc.on.doc"),
-}
-
-/** SEAM: real type belongs to :feature:media (iOS `Browser/LinkMenu.swift`); delete when that area merges. */
 data class LinkProbe(val id: UUID, val url: String, val sessionID: String?)
 
 /** SEAM: real type belongs to :feature:media (iOS `Browser/LinkMenu.swift` `UniversalLinkClient`); delete when that area merges. */
@@ -446,19 +331,6 @@ class UniversalLinkClient(val open: suspend (String) -> Boolean) {
     companion object Key : DependencyKey<UniversalLinkClient> {
         override val liveValue = UniversalLinkClient { false }
         override val testValue = UniversalLinkClient { false }
-    }
-}
-
-/** SEAM: real type belongs to :feature:transcript (iOS `Transcript/SessionLinks.swift`); delete when that area merges. */
-sealed interface SessionLinkTarget {
-    /** Asked for, not answered yet: shows the short ID. */
-    data object Resolving : SessionLinkTarget
-    data class Session(val title: String, val parentID: String?) : SessionLinkTarget
-    /** No such session on this server: stays the short ID. */
-    data object Missing : SessionLinkTarget
-
-    companion object {
-        fun of(session: OpenCodeSession): SessionLinkTarget = Session(session.title, session.parentID)
     }
 }
 
@@ -493,14 +365,6 @@ class SceneWindowClient {
     }
 }
 
-/** SEAM: real client belongs to :feature:transcript (iOS `MarkdownStream` client); delete when that area merges. */
-class MarkdownStreamClient {
-    companion object Key : DependencyKey<MarkdownStreamClient> {
-        override val liveValue = MarkdownStreamClient()
-        override val testValue = MarkdownStreamClient()
-    }
-}
-
 /** SEAM: real client belongs to :feature:composer (iOS `Composer/ComposerPersistence.swift`); delete when that area merges. */
 class ComposerPersistenceClient {
     companion object Key : DependencyKey<ComposerPersistenceClient> {
@@ -532,135 +396,9 @@ class DictationClient(
     }
 }
 
-/** SEAM: real type belongs to the Diagnostics port (iOS `Diagnostics/LabMarks.swift`); delete when it lands. */
-object LabMarks {
-    fun mark(name: String, sessionID: String? = null) {
-        AppLog.perf.debug { "$name session=${sessionID ?: "-"}" }
-    }
-}
-
-// endregion
-
-// region Transcript
-
-/**
- * SEAM: real member belongs to :feature:transcript (iOS `Transcript/TranscriptEntry.swift`
- * `entryStart(at:in:)`); delete when that area merges. Where a window of [items] starting at
- * [index] may start without splitting a tool group or a send's rows.
- */
-fun TranscriptEntry.entryStart(index: Int, items: List<OpenCodeTranscriptItem>): Int {
-    fun kind(item: OpenCodeTranscriptItem): String? = when (item) {
-        is OpenCodeTranscriptItem.Tool -> {
-            val call = item.call
-            val streaming = call.status == OpenCodeToolCall.Status.Running || call.status == OpenCodeToolCall.Status.Streaming
-            if (call.name == "question" && (call.questions != null || streaming)) {
-                if (streaming) PASSES else BREAKS
-            } else {
-                "tools"
-            }
-        }
-        is OpenCodeTranscriptItem.Notice -> "tools"
-        is OpenCodeTranscriptItem.UserText, is OpenCodeTranscriptItem.UserImages, is OpenCodeTranscriptItem.UserFiles ->
-            "user:${promptID(item) ?: item.id}"
-        is OpenCodeTranscriptItem.SendFailure, is OpenCodeTranscriptItem.RunRetry -> PASSES
-        else -> BREAKS
-    }
-    if (index <= 0 || index >= items.size) return index
-    var first = index
-    while (first < items.size && kind(items[first]) == PASSES) first++
-    if (first >= items.size) return index
-    val run = kind(items[first])
-    if (run == PASSES || run == BREAKS) return index
-    var start = index
-    var previous = index - 1
-    while (previous >= 0) {
-        when (kind(items[previous])) {
-            PASSES -> Unit
-            run -> start = previous
-            else -> return start
-        }
-        previous--
-    }
-    return start
-}
-
-private const val PASSES = "\u0000passes"
-private const val BREAKS = "\u0000breaks"
-
-/** SEAM: real type belongs to :feature:transcript (iOS `Transcript/TranscriptEntryView.swift`); delete when that area merges. */
-data class TranscriptSubagent(
-    val title: String?,
-    val agent: String?,
-    val isKnown: Boolean,
-    val isRunning: Boolean,
-    val needsInput: Boolean,
-)
-
-/** SEAM: real type belongs to :feature:transcript (iOS `Transcript/NewMessagesMark.swift`); delete when that area merges. */
-data class NewMessagesMark(
-    /** The first transcript item the reader hadn't seen. */
-    val itemID: String,
-    /** The last item it covered. */
-    val lastItemID: String? = null,
-    /** Changes whenever the divider moves to another item. */
-    val generation: Int,
-    /** The New Messages Divider experiment was on. */
-    val showsDivider: Boolean = true,
-)
-
-/** SEAM: real member belongs to :feature:transcript (iOS `Transcript/MarkdownQuote.swift`); delete when that area merges. */
-object MarkdownQuote {
-    fun blockquote(text: String): String? {
-        val normalized = normalizeNewlines(text).trim('\n')
-        if (normalized.isBlank()) return null
-        return normalized.split("\n").joinToString("\n") { "> $it" }
-    }
-
-    fun append(blockquote: String, draft: String): String {
-        val normalizedDraft = normalizeNewlines(draft)
-        if (normalizedDraft.isBlank()) return "$blockquote\n\n"
-        return "${normalizedDraft.trimEnd('\n')}\n\n$blockquote\n\n"
-    }
-
-    private fun normalizeNewlines(text: String) = text.replace("\r\n", "\n").replace("\r", "\n")
-}
-
-/**
- * SEAM: real member belongs to :feature:transcript's port of iOS `Transcript/NewMessagesMark.swift`
- * (`SessionFeature.State.defaultLeaveDate()`); it extends `SessionFeature.State`, so it lands here.
- */
-fun SessionFeature.State.Companion.defaultLeaveDate(): Instant? {
-    if (!dependency(ExperimentalFeatures)(ExperimentalFeature.sinceYouLeft)) return null
-    val now = dependency(DateClient).now()
-    return if (now == Instant.EPOCH) null else now
-}
-
-/**
- * SEAM: real member belongs to the port of iOS `Transcript/RunErrorState.swift` (`hidingUndone`),
- * which extends `SessionFeature.State`. What the transcript shows: everything before a staged
- * undo, then one quiet row offering Redo.
- */
-fun SessionFeature.State.hidingUndone(items: List<OpenCodeTranscriptItem>): List<OpenCodeTranscriptItem> {
-    val boundary = session?.revertMessageID ?: return items
-    val index = items.indexOfFirst { item ->
-        when (item) {
-            is OpenCodeTranscriptItem.UserText -> item.id == boundary
-            is OpenCodeTranscriptItem.UserImages -> item.id == "$boundary-images"
-            is OpenCodeTranscriptItem.UserFiles -> item.id == "$boundary-files"
-            else -> false
-        }
-    }
-    if (index < 0) return items
-    val hidden = items.subList(index, items.size).count { it is OpenCodeTranscriptItem.UserText }
-    return items.subList(0, index) + OpenCodeTranscriptItem.Undone("undone-$boundary", maxOf(1, hidden))
-}
-
 // endregion
 
 // region Composer: files, location, autocomplete, shares
-
-/** SEAM: real type belongs to :feature:system (iOS `System/Share/ShareHandoff.swift`); delete when that area merges. */
-data class ComposerStagedFile(val id: UUID, val name: String, val mime: String, val size: Long, val url: String)
 
 /** SEAM: real type belongs to :feature:composer (iOS `Composer/ComposerFileAttachment.swift`); delete when that area merges. */
 data class ComposerFileAttachment(

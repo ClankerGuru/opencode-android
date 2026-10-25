@@ -7,8 +7,8 @@ import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
-import ai.opencode.feature.session.seams.OpenCodeMarkdownBlock
-import ai.opencode.feature.session.seams.TranscriptEntry
+import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
+import ai.opencode.feature.transcript.TranscriptEntry
 import ai.opencode.server.model.OpenCodeFormRequest
 import ai.opencode.server.model.OpenCodePermissionRequest
 import ai.opencode.server.model.OpenCodePromptSource
@@ -368,10 +368,10 @@ data class SinceYouLeft(
          */
         private fun proseText(block: OpenCodeMarkdownBlock): String? {
             val text = when (val kind = block.kind) {
-                is OpenCodeMarkdownBlock.Kind.Paragraph -> kind.text
-                is OpenCodeMarkdownBlock.Kind.ListItem -> kind.text
-                is OpenCodeMarkdownBlock.Kind.NumberedItem -> kind.text
-                is OpenCodeMarkdownBlock.Kind.Blockquote -> kind.text
+                is OpenCodeMarkdownBlock.Kind.Paragraph -> kind.text.text
+                is OpenCodeMarkdownBlock.Kind.ListItem -> kind.text.text
+                is OpenCodeMarkdownBlock.Kind.NumberedItem -> kind.text.text
+                is OpenCodeMarkdownBlock.Kind.Blockquote -> kind.text.text
                 else -> return null
             }
             return compactSnippet(text, maxLength = 400).ifEmpty { null }

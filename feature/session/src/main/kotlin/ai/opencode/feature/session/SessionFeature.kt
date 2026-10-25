@@ -29,22 +29,23 @@ import ai.opencode.feature.session.seams.ComposerAutocompleteChip
 import ai.opencode.feature.session.seams.ComposerAutocompleteState
 import ai.opencode.feature.session.seams.ComposerFileAttachment
 import ai.opencode.feature.session.seams.ComposerPersistenceClient
-import ai.opencode.feature.session.seams.ComposerStagedFile
+import ai.opencode.core.files.ComposerStagedFile
 import ai.opencode.feature.session.seams.DictationClient
 import ai.opencode.feature.session.seams.DictationFeature
-import ai.opencode.feature.session.seams.ExperimentalFeature
-import ai.opencode.feature.session.seams.ExperimentalFeatures
-import ai.opencode.feature.session.seams.LabMarks
-import ai.opencode.feature.session.seams.LinkMenuAction
+import ai.opencode.core.experiments.key
+import ai.opencode.core.sharing.ExperimentalFeature
+import ai.opencode.core.sharing.ExperimentalFeatures
+import ai.opencode.core.diagnostics.LabMarks
+import ai.opencode.feature.transcript.LinkMenuAction
 import ai.opencode.feature.session.seams.LinkProbe
-import ai.opencode.feature.session.seams.MarkdownStreamClient
-import ai.opencode.feature.session.seams.ModelVisibility
-import ai.opencode.feature.session.seams.NewMessagesMark
+import ai.opencode.feature.transcript.markdown.MarkdownStreamClient
+import ai.opencode.server.model.ModelVisibility
+import ai.opencode.feature.transcript.list.NewMessagesMark
 import ai.opencode.feature.session.seams.OpenURLClient
 import ai.opencode.feature.session.seams.PageReaderClient
 import ai.opencode.feature.session.seams.SceneWindowClient
-import ai.opencode.feature.session.seams.SessionLinkTarget
-import ai.opencode.feature.session.seams.SessionNotificationsClient
+import ai.opencode.feature.transcript.SessionLinkTarget
+import ai.opencode.feature.system.notifications.SessionNotificationsClient
 import ai.opencode.feature.session.seams.SharedComposerDraft
 import ai.opencode.feature.session.seams.SharedDraftTarget
 import ai.opencode.feature.session.seams.SharedLocation
@@ -54,7 +55,6 @@ import ai.opencode.feature.session.seams.VoiceServerChoice
 import ai.opencode.feature.session.seams.VoiceViewingPage
 import ai.opencode.feature.session.seams.persistedComposerWatch
 import ai.opencode.feature.session.seams.reconcilePersistedComposer
-import ai.opencode.feature.transcript.TranscriptFeature
 import ai.opencode.feature.voice.ServerVoiceProvider
 import ai.opencode.feature.voice.ServerVoiceSupport
 import ai.opencode.feature.voice.VoiceEngine
@@ -295,14 +295,14 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         val sessionLinks: Map<String, SessionLinkTarget> = emptyMap(),
         val favoriteModelIDs: Shared<Set<String>> = shared(SharedKeys.favoriteModelIDs),
         val modelVisibilityByServer: Shared<Map<String, ModelVisibility>> = shared(ModelVisibility.modelVisibilityByServer),
-        val hideModelsExperiment: Shared<Boolean> = shared(ExperimentalFeature.key(ExperimentalFeature.hideModels)),
+        val hideModelsExperiment: Shared<Boolean> = shared(ExperimentalFeature.hideModels.key),
         val recentModelIDs: Shared<List<String>> = shared(SharedKeys.recentModelIDs),
         val modelVariants: Shared<Map<String, String>> = shared(SharedKeys.modelVariants),
         val voiceModeEnabled: Shared<Boolean> = shared(SharedKeys.voiceModeEnabled),
         val openAIAPIKey: Shared<String?> = shared(SharedKeys.openAIAPIKey),
         val xaiAPIKey: Shared<String?> = shared(SharedKeys.xaiAPIKey),
         val voiceEngine: Shared<VoiceEngine> = shared(VoiceSharedKeys.voiceEngine),
-        val serverVoiceExperiment: Shared<Boolean> = shared(ExperimentalFeature.key(ExperimentalFeature.serverVoice)),
+        val serverVoiceExperiment: Shared<Boolean> = shared(ExperimentalFeature.serverVoice.key),
         val serverVoiceProvider: Shared<ServerVoiceProvider> = shared(VoiceSharedKeys.serverVoiceProvider),
         val voiceServer: Shared<VoiceServerChoice> = shared(VoiceServerChoice.key),
         val serverVoiceSupportByServer: Shared<Map<String, ServerVoiceSupport>> = shared(VoiceSharedKeys.serverVoiceSupportByServer),
@@ -340,8 +340,6 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         val movedWorkKeys: Set<String> = emptySet(),
         /** Work a steering send has claimed to move before it's posted, by the send's message ID. */
         val autoBackgroundClaims: Map<String, String> = emptyMap(),
-        /** Android: the transcript area's row/disclosure state (`:feature:transcript`'s entry point). */
-        val transcript: TranscriptFeature.State = TranscriptFeature.State(),
         /** Android: the composer area's entry point (`:feature:composer`). */
         val composer: ComposerFeature.State = ComposerFeature.State(),
     ) {
@@ -772,8 +770,6 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         data class FolderBrowser(val action: PresentationAction<FolderBrowserFeature.Action>) : Action
         data class Autocomplete(val action: ComposerAutocompleteAction) : Action
         data class Delegate(val delegate: SessionFeature.Delegate) : Action
-        /** Android: `:feature:transcript`'s entry point. */
-        data class Transcript(val action: TranscriptFeature.Action) : Action
         /** Android: `:feature:composer`'s entry point. */
         data class Composer(val action: ComposerFeature.Action) : Action
 
@@ -1148,13 +1144,6 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
                 child = ComposerAttachmentsFeature(),
             ),
             scope(
-                state = State::transcript,
-                setState = { s, c -> s.copy(transcript = c) },
-                action = { (it as? Action.Transcript)?.action },
-                embed = Action::Transcript,
-                child = TranscriptFeature(),
-            ),
-            scope(
                 state = State::composer,
                 setState = { s, c -> s.copy(composer = c) },
                 action = { (it as? Action.Composer)?.action },
@@ -1167,7 +1156,7 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
                     action is Action.SessionSheet && state.sessionSheet == null -> Reduced(state)
                     action is Action.FolderBrowser && state.folderBrowser == null -> Reduced(state)
                     action is Action.Voice && state.voice == null -> Reduced(state)
-                    action is Action.Transcript || action is Action.Composer -> Reduced(state)
+                    action is Action.Composer -> Reduced(state)
                     else -> core.reduce(state, action)
                 }
             },

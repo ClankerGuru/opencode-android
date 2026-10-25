@@ -13,7 +13,7 @@ import ai.opencode.core.ui.openCodeTapTarget
 import ai.opencode.feature.session.seams.FusedModelPickerTunables
 import ai.opencode.feature.session.seams.ModelLevelScale
 import ai.opencode.feature.session.seams.ModelPickerSection
-import ai.opencode.feature.session.seams.ModelPickerStyle
+import ai.opencode.core.experiments.ModelPickerStyle
 import ai.opencode.feature.session.seams.ModelPickerTunables
 import ai.opencode.feature.session.seams.modelSheetSections
 import ai.opencode.server.model.ModelProviderGroup

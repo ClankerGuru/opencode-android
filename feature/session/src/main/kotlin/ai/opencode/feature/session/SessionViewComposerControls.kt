@@ -9,7 +9,7 @@ import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.openCodeTapTarget
 import ai.opencode.feature.session.SessionFeature.Action
-import ai.opencode.feature.session.seams.ModelPickerStyle
+import ai.opencode.core.experiments.ModelPickerStyle
 import ai.opencode.feature.session.seams.REQUEST_DOCK_EDGE
 import ai.opencode.feature.session.seams.SELECTION_MARK_WIDTH
 import ai.opencode.feature.session.seams.SelectionMark

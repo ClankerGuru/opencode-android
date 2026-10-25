@@ -11,7 +11,7 @@ import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.feature.session.seams.ComposerAutocompleteReducer
 import ai.opencode.feature.session.seams.DictationFeature
 import ai.opencode.feature.session.seams.DotScopeSimulation
-import ai.opencode.feature.session.seams.MarkdownQuote
+import ai.opencode.feature.transcript.markdown.MarkdownQuote
 import ai.opencode.feature.session.seams.VoiceFeature
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.model.OpenCodeProject
