@@ -107,6 +107,8 @@ private fun ProblemReportSheet(store: StoreOf<State, Action>, toast: State.Toast
         onDismissRequest = { store.send(Action.Dismissed) },
         sheetState = sheetState,
         containerColor = OpenCodeTheme.colors.groupedCanvas,
+        // The canvas isn't a scheme colour, so contentColorFor would fall back to a dimmed default.
+        contentColor = MaterialTheme.colorScheme.onSurface,
         modifier = Modifier.testTag("problem-report-sheet"),
     ) {
         ToastAboveSheet(toast)

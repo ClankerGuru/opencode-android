@@ -1,5 +1,8 @@
 package ai.opencode.devtools.tuning
 
+import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.collectState
 import ai.opencode.core.tuning.TuneKind
@@ -12,29 +15,47 @@ import ai.opencode.core.ui.OpenCodeIconSize
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.openCodeTapTarget
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationSpec
+import androidx.compose.animation.core.FiniteAnimationSpec
+import androidx.compose.animation.core.VectorConverter
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imeAnimationTarget
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -42,48 +63,325 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.ui.unit.sp
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChangeIgnoreConsumed
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import kotlin.math.PI
 import kotlin.math.roundToInt
+import kotlin.math.sqrt
 
 /** The orange iOS uses for a changed value. */
 private val ChangedColor = Color(0xFFFF9500)
 
+/** iOS `TuningOverlayView.Form`: what the panel shows as. */
+private enum class TuningForm { Panel, Pill, Tab }
+
+/** iOS `settle`: `.spring(duration: 0.38, bounce: 0.12)`. */
+private val SettleSpring = MotionSpring(duration = 0.38, bounce = 0.12)
+
 /**
- * The floating Tuning Panel (iOS `TuningPanelView` + `TuningPlacement`): a small M3 surface over
- * the app that takes touches only inside itself. Drag its header to move it (it settles against
- * the nearer side, at the height you leave it); Collapse folds it into a pill naming the screen
- * and how many values are changed. Rows: label, slider/switch/menu, and value (orange once
- * changed; tap it to reset). Presets show as numbered chips at the top of their group.
+ * iOS's throw spring, `.interpolatingSpring(stiffness: 240, damping: 26)`, in duration/bounce
+ * terms: ω = √240 (duration 2π/ω), ζ = 26 / (2√240) (bounce 1 − ζ).
  */
+private val ThrowSpring = MotionSpring(duration = 2 * PI / sqrt(240.0), bounce = 1 - 26 / (2 * sqrt(240.0)))
+
+/** A centre is settled within a tenth of a dp. */
+private val OffsetThreshold = Offset(0.1f, 0.1f)
+
+/** How the next settle runs: set by a throw, read once by the settle effect. Not state. */
+private class PendingSettle {
+    var spec: AnimationSpec<Offset>? = null
+    var velocity: Offset? = null
+    var snap = false
+    /** Forms measured at least once. */
+    val measured = mutableSetOf<TuningForm>()
+}
+
+/** One drag's callbacks, in dp (velocity dp a second). */
+private class ThrowHandler(
+    val onStart: () -> Unit,
+    val onDrag: (translation: Offset) -> Unit,
+    val onEnd: (translation: Offset, velocity: Offset) -> Unit,
+    val onCancel: () -> Unit,
+)
+
+/**
+ * The floating Tuning Panel (iOS `TuningOverlayView` + `TuningPanel`): a small M3 surface over
+ * the app that takes touches only inside itself and floats like picture-in-picture. Drag it by
+ * its header and throw it: it settles against the side the throw carries it to (into a corner
+ * near the top or bottom), at [TuningPlacementLayout]'s landing, with a spring that starts at the
+ * release speed. Thrown past an edge, it tucks into a tab there; tap or pull the tab to bring it
+ * back. Collapse folds it into a pill naming the screen and how many values are changed. Where
+ * it sits ([TuningPlacement], `tuning-placement`) and whether it's folded are kept across launches.
+ * Rows: label, slider/switch/menu, and value (orange once changed; tap it to reset). Presets show
+ * as numbered chips at the top of their group.
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun TuningPanel(store: StoreOf<TuningFeature.State, TuningFeature.Action>, modifier: Modifier = Modifier) {
     val state by store.collectState()
     LaunchedEffect(store) { store.send(TuningFeature.Action.Task) }
-    if (!state.isPanelShown) return
+    val reduceMotion = rememberReduceMotion()
+    val settleSpec: AnimationSpec<Offset> =
+        if (reduceMotion) Motion.easeInOut(0.2) else SettleSpring.spec(OffsetThreshold)
+
+    BoxWithConstraints(modifier.fillMaxSize()) {
+        val density = LocalDensity.current
+        val direction = LocalLayoutDirection.current
+        // The safe area as iOS has it (the keyboard apart), and the keyboard's final top.
+        val safe = WindowInsets.systemBars.union(WindowInsets.displayCutout)
+        val imeTarget = WindowInsets.imeAnimationTarget.getBottom(density) / density.density
+        val screenWidth = maxWidth.value
+        val screenHeight = maxHeight.value
+        val safeArea = Rect(
+            safe.getLeft(density, direction) / density.density,
+            safe.getTop(density) / density.density,
+            screenWidth - safe.getRight(density, direction) / density.density,
+            screenHeight - safe.getBottom(density) / density.density,
+        )
+        val layout = TuningPlacementLayout.of(
+            safeArea = safeArea,
+            screen = Rect(0f, 0f, screenWidth, screenHeight),
+            keyboardTop = if (imeTarget > 0f) screenHeight - imeTarget else null,
+        )
+        val placement = state.placement
+        val form = when {
+            placement.isTucked -> TuningForm.Tab
+            state.isCollapsed -> TuningForm.Pill
+            else -> TuningForm.Panel
+        }
+        var panelSize by remember { mutableStateOf(Size(300f, 160f)) }
+        var pillSize by remember { mutableStateOf(Size(110f, 44f)) }
+        fun sizeOf(form: TuningForm) = when (form) {
+            TuningForm.Panel -> panelSize
+            TuningForm.Pill -> pillSize
+            TuningForm.Tab -> TuningPlacementLayout.TabSize
+        }
+        val target = layout.center(placement, sizeOf(form))
+
+        // The centre springs to the target; while a finger holds it, `drag` follows the finger.
+        val position = remember { Animatable(target, Offset.VectorConverter, OffsetThreshold) }
+        var drag by remember { mutableStateOf(Offset.Zero) }
+        var dragging by remember { mutableStateOf(false) }
+        val pending = remember { PendingSettle() }
+        LaunchedEffect(target, dragging) {
+            if (dragging) return@LaunchedEffect
+            if (drag != Offset.Zero) {
+                position.snapTo(position.value + drag)
+                drag = Offset.Zero
+            }
+            val spec = pending.spec ?: settleSpec
+            val velocity = pending.velocity ?: position.velocity
+            val snap = pending.snap
+            pending.spec = null
+            pending.velocity = null
+            pending.snap = false
+            if (snap) position.snapTo(target) else position.animateTo(target, spec, velocity)
+        }
+
+        // iOS `throwGesture`: follows the finger, then throws to the layout's landing; a spring
+        // carries it there from the release speed along its path.
+        fun throwHandler(size: Size, tap: (() -> Unit)?) = ThrowHandler(
+            onStart = { dragging = true },
+            onDrag = { drag = it },
+            onEnd = { translation, velocity ->
+                if (tap != null && translation.getDistance() < 4f) {
+                    dragging = false
+                    tap()
+                } else {
+                    val released = position.value + translation
+                    val landing = layout.placement(releasedAt = released, velocity = velocity, size = size)
+                    val landed = layout.center(landing, if (landing.isTucked) TuningPlacementLayout.TabSize else size)
+                    val path = landed - released
+                    val distance = path.getDistance()
+                    val along = if (distance > 1f) (velocity.x * path.x + velocity.y * path.y) / distance else 0f
+                    val initial = if (distance > 1f) (along / distance).coerceIn(0f, 12f) else 0f
+                    // SwiftUI's unit initial velocity is a share of each axis' distance a second.
+                    pending.spec = if (reduceMotion) Motion.easeOut(0.2) else ThrowSpring.spec(OffsetThreshold)
+                    pending.velocity = path * initial
+                    dragging = false
+                    store.send(TuningFeature.Action.PlacementChanged(landing))
+                }
+            },
+            onCancel = { dragging = false },
+        )
+        val untuck = {
+            dragging = false
+            store.send(TuningFeature.Action.PlacementChanged(placement.copy(isTucked = false)))
+        }
+        // iOS `tabGesture`: the tab slides with the finger along its edge's normal; a tap, pull or
+        // flick inward brings the panel back, anything else settles it back.
+        val tabHandler = ThrowHandler(
+            onStart = { dragging = true },
+            onDrag = { translation ->
+                val inward = if (placement.side == TuningPlacement.Side.Leading) translation.x.coerceAtLeast(0f) else translation.x.coerceAtMost(0f)
+                drag = Offset(inward, 0f)
+            },
+            onEnd = { translation, velocity ->
+                if (TuningPlacementLayout.pullsOut(translation.x, velocity.x, placement.side)) {
+                    untuck()
+                } else {
+                    dragging = false
+                }
+            },
+            onCancel = { dragging = false },
+        )
+        val panelHandler = rememberUpdatedState(throwHandler(panelSize, null))
+        val pillHandler = rememberUpdatedState(throwHandler(pillSize) { store.send(TuningFeature.Action.ExpandTapped) })
+        val tabHandlerState = rememberUpdatedState(tabHandler)
+
+        val origin = TransformOrigin(if (placement.side == TuningPlacement.Side.Leading) 0f else 1f, 0.5f)
+        val fadeSpec: FiniteAnimationSpec<Float> = if (reduceMotion) Motion.easeInOut(0.2) else SettleSpring.spec<Float>()
+        AnimatedVisibility(state.isPanelShown, Modifier.fillMaxSize(), enter = EnterTransition.None, exit = ExitTransition.None) {
+            val visibility: AnimatedVisibilityScope = this
+            Crossfade(form, Modifier.fillMaxSize(), animationSpec = fadeSpec, label = "tuning-form") { shown ->
+                val size = sizeOf(shown)
+                val placed = Modifier
+                    .offset {
+                        val center = position.value + drag
+                        IntOffset(((center.x - size.width / 2) * density.density).roundToInt(), ((center.y - size.height / 2) * density.density).roundToInt())
+                    }
+                    .then(
+                        with(visibility) {
+                            Modifier.animateEnterExit(
+                                enter = if (reduceMotion) fadeIn(Motion.easeInOut(0.2)) else scaleIn(SettleSpring.spec<Float>(), initialScale = 0.6f, transformOrigin = origin) + fadeIn(fadeSpec),
+                                exit = if (reduceMotion) fadeOut(Motion.easeInOut(0.2)) else scaleOut(SettleSpring.spec<Float>(), targetScale = 0.6f, transformOrigin = origin) + fadeOut(fadeSpec),
+                            )
+                        },
+                    )
+                fun measured(update: (Size) -> Unit, current: Size): Modifier = Modifier.onSizeChanged {
+                    val next = Size(it.width / density.density, it.height / density.density)
+                    val first = pending.measured.add(shown)
+                    if (next != current) {
+                        // The first real size lands in place rather than sliding from the guess.
+                        if (first && !position.isRunning && !dragging) pending.snap = true
+                        update(next)
+                    }
+                }
+                when (shown) {
+                    TuningForm.Panel -> PanelForm(
+                        store = store,
+                        state = state,
+                        // iOS: `min(272, width − 2 × margin)` wide, `min(0.4 × height, 340)` tall in the safe area.
+                        width = minOf(272f, safeArea.width - 2 * TuningPlacementLayout.MARGIN).dp,
+                        maxHeight = minOf(safeArea.height * 0.4f, 340f).dp,
+                        drag = Modifier.throwGesture(4.dp, panelHandler),
+                        modifier = placed.then(measured({ panelSize = it }, panelSize)),
+                    )
+                    TuningForm.Pill -> TuningPill(
+                        state = state,
+                        expand = { store.send(TuningFeature.Action.ExpandTapped) },
+                        modifier = placed.then(measured({ pillSize = it }, pillSize)).throwGesture(0.dp, pillHandler),
+                    )
+                    TuningForm.Tab -> TuningTab(
+                        side = placement.side,
+                        pullOut = untuck,
+                        modifier = placed.throwGesture(0.dp, tabHandlerState),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * A SwiftUI `DragGesture` in the global space: starts once the finger has moved
+ * [minimumDistance] (at once for zero), reports the translation since touch-down, and the
+ * release velocity from a [VelocityTracker]. Both in dp (px ÷ density).
+ */
+private fun Modifier.throwGesture(minimumDistance: Dp, handler: State<ThrowHandler>): Modifier =
+    this.then(
+        Modifier.pointerInput(minimumDistance) {
+            val slop = minimumDistance.toPx()
+            awaitEachGesture {
+                val down = awaitFirstDown(requireUnconsumed = false)
+                val tracker = VelocityTracker()
+                // Summed deltas: the element moves with the finger, so its local positions don't.
+                var translation = Offset.Zero
+                tracker.addPosition(down.uptimeMillis, translation)
+                var started = slop == 0f
+                var ended = false
+                if (started) {
+                    down.consume()
+                    handler.value.onStart()
+                }
+                try {
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                        translation += change.positionChangeIgnoreConsumed()
+                        tracker.addPosition(change.uptimeMillis, translation)
+                        if (!started && translation.getDistance() >= slop) {
+                            started = true
+                            handler.value.onStart()
+                        }
+                        if (started) {
+                            change.consume()
+                            handler.value.onDrag(translation / density)
+                        }
+                        if (!change.pressed) {
+                            if (started) {
+                                val velocity = tracker.calculateVelocity()
+                                ended = true
+                                handler.value.onEnd(translation / density, Offset(velocity.x, velocity.y) / density)
+                            }
+                            break
+                        }
+                    }
+                } finally {
+                    if (started && !ended) handler.value.onCancel()
+                }
+            }
+        },
+    )
+
+@Composable
+private fun PanelForm(
+    store: StoreOf<TuningFeature.State, TuningFeature.Action>,
+    state: TuningFeature.State,
+    width: Dp,
+    maxHeight: Dp,
+    modifier: Modifier = Modifier,
+    drag: Modifier = Modifier,
+) {
     val tuning = TuningStore.shared
     // Observed: registration and value changes redraw the panel.
     tuning.catalogRevision
@@ -96,115 +394,137 @@ fun TuningPanel(store: StoreOf<TuningFeature.State, TuningFeature.Action>, modif
     )
     val changed = overrides.keys.count { key -> key.substringBefore('.') in groups }
     val title = if (state.showsAll) "All" else tuning.context.displayTitle
-
-    BoxWithConstraints(modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(8.dp)) {
-        val density = LocalDensity.current
-        val maxW = with(density) { maxWidth.toPx() }
-        val maxH = with(density) { maxHeight.toPx() }
-        var size by remember { mutableStateOf(IntSize.Zero) }
-        var dragX by remember { mutableFloatStateOf(Float.NaN) }
-        var dragY by remember { mutableFloatStateOf(Float.NaN) }
-        val freeW = (maxW - size.width).coerceAtLeast(0f)
-        val freeH = (maxH - size.height).coerceAtLeast(0f)
-        val x = if (dragX.isNaN()) state.placementX * freeW else dragX
-        val y = if (dragY.isNaN()) state.placementY * freeH else dragY
-        val drag = Modifier.pointerInputDrag(
-            onDrag = { dx, dy ->
-                dragX = ((if (dragX.isNaN()) x else dragX) + dx).coerceIn(0f, freeW)
-                dragY = ((if (dragY.isNaN()) y else dragY) + dy).coerceIn(0f, freeH)
-            },
-            onEnd = {
-                val endX = if (dragX.isNaN()) x else dragX
-                val endY = if (dragY.isNaN()) y else dragY
-                // Settles against the nearer side, at the height it was left.
-                store.send(TuningFeature.Action.PlacementChanged(if (endX + size.width / 2f > maxW / 2f) 1f else 0f, if (freeH > 0) endY / freeH else 0f))
-                dragX = Float.NaN
-                dragY = Float.NaN
-            },
-        )
-        Surface(
-            modifier = Modifier
-                .offset { IntOffset(x.roundToInt(), y.roundToInt()) }
-                .onSizeChanged { size = it }
-                .semantics { contentDescription = "Tuning Panel" },
-            shape = RoundedCornerShape(if (state.isCollapsed) 24.dp else 20.dp),
-            tonalElevation = 6.dp,
-            shadowElevation = 8.dp,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        ) {
-            if (state.isCollapsed) {
-                Row(
-                    drag.clickable(onClickLabel = "Expand") { store.send(TuningFeature.Action.ExpandTapped) }
-                        .openCodeTapTarget()
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    OpenCodeIcon(SFSymbol.SliderHorizontal3, null, size = OpenCodeIconSize.small)
-                    Text(title, style = MaterialTheme.typography.labelLarge)
-                    if (changed > 0) Text("$changed", style = MaterialTheme.typography.labelLarge, color = ChangedColor)
-                }
+    Surface(
+        modifier = modifier.semantics { contentDescription = "Tuning Panel" },
+        shape = RoundedCornerShape(20.dp),
+        tonalElevation = 6.dp,
+        shadowElevation = 8.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Column(Modifier.width(width).heightIn(max = maxHeight)) {
+            PanelHeader(store, state, title, changed, groups, drag)
+            HorizontalDivider()
+            if (groups.isEmpty()) {
+                Text(
+                    if (state.showsAll) "Nothing to tune yet" else "Nothing to tune here",
+                    Modifier.padding(16.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             } else {
-                Column(Modifier.widthIn(max = 360.dp).width(340.dp).heightIn(max = with(density) { (maxH * 0.6f).toDp() })) {
-                    PanelHeader(store, state, title, changed, groups, drag)
-                    HorizontalDivider()
-                    if (groups.isEmpty()) {
-                        Text(
-                            if (state.showsAll) "Nothing to tune yet" else "Nothing to tune here",
-                            Modifier.padding(16.dp),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    } else {
-                        LazyColumn(Modifier.fillMaxWidth()) {
-                            for (group in groups) {
-                                item(key = "header-$group") {
-                                    GroupHeader(store, group, isFolded = group in state.foldedGroups, overrides = overrides)
-                                }
-                                if (group !in state.foldedGroups) {
-                                    val presets = tuning.presets.filter { it.group == group }
-                                    for (set in presets) {
-                                        item(key = "presets-${set.key}") { PresetChips(store, set, overrides) }
+                LazyColumn(Modifier.fillMaxWidth()) {
+                    for (group in groups) {
+                        item(key = "header-$group") {
+                            GroupHeader(store, group, isFolded = group in state.foldedGroups, overrides = overrides)
+                        }
+                        if (group !in state.foldedGroups) {
+                            val presets = tuning.presets.filter { it.group == group }
+                            for (set in presets) {
+                                item(key = "presets-${set.key}") { PresetChips(store, set, overrides) }
+                            }
+                            for ((sectionTitle, rows) in sections(tuning.descriptors.filter { it.group == group })) {
+                                if (sectionTitle.isNotEmpty()) {
+                                    item(key = "section-$group-$sectionTitle") {
+                                        Text(
+                                            sectionTitle,
+                                            Modifier.padding(start = 16.dp, top = 8.dp, bottom = 2.dp),
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
                                     }
-                                    for ((sectionTitle, rows) in sections(tuning.descriptors.filter { it.group == group })) {
-                                        if (sectionTitle.isNotEmpty()) {
-                                            item(key = "section-$group-$sectionTitle") {
-                                                Text(
-                                                    sectionTitle,
-                                                    Modifier.padding(start = 16.dp, top = 8.dp, bottom = 2.dp),
-                                                    style = MaterialTheme.typography.labelMedium,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                )
-                                            }
-                                        }
-                                        items(rows, key = { it.key }) { descriptor ->
-                                            TunableRow(descriptor, overrides[descriptor.key]) { value ->
-                                                store.send(TuningFeature.Action.ValueChanged(descriptor.key, value))
-                                            }
-                                        }
+                                }
+                                items(rows, key = { it.key }) { descriptor ->
+                                    TunableRow(descriptor, overrides[descriptor.key]) { value ->
+                                        store.send(TuningFeature.Action.ValueChanged(descriptor.key, value))
                                     }
                                 }
                             }
                         }
                     }
-                    if (state.didCopy) {
-                        Text("Copied", Modifier.padding(12.dp).align(Alignment.CenterHorizontally), style = MaterialTheme.typography.labelMedium)
-                    }
                 }
+            }
+            if (state.didCopy) {
+                Text("Copied", Modifier.padding(12.dp).align(Alignment.CenterHorizontally), style = MaterialTheme.typography.labelMedium)
             }
         }
     }
 }
 
-private fun Modifier.pointerInputDrag(onDrag: (Float, Float) -> Unit, onEnd: () -> Unit): Modifier =
-    this.then(
-        Modifier.pointerInput(Unit) {
-            detectDragGestures(onDragEnd = onEnd, onDragCancel = onEnd) { change, amount ->
-                change.consume()
-                onDrag(amount.x, amount.y)
-            }
-        },
+/** iOS `TuningPill`: the panel folded, naming what it tunes and how many values are changed. A still finger unfolds it. */
+@Composable
+private fun TuningPill(state: TuningFeature.State, expand: () -> Unit, modifier: Modifier = Modifier) {
+    val tuning = TuningStore.shared
+    tuning.catalogRevision
+    val groups = TuningPanelGroups.shown(
+        registered = tuning.descriptors.map { it.group }.distinct(),
+        context = tuning.context,
+        showsAll = state.showsAll,
+        hidden = tuning.hiddenGroups,
     )
+    val changed = tuning.observedOverrides.keys.count { key -> key.substringBefore('.') in groups }
+    val title = if (state.showsAll) "All" else tuning.context.displayTitle
+    Surface(
+        modifier = modifier.semantics(mergeDescendants = true) {
+            contentDescription = "Tuning Panel"
+            stateDescription = if (changed > 0) "$changed changed" else ""
+            role = Role.Button
+            onClick(label = "Expand") { expand(); true }
+        },
+        shape = RoundedCornerShape(24.dp),
+        tonalElevation = 6.dp,
+        shadowElevation = 8.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Row(
+            Modifier.openCodeTapTarget(accessibility = false).padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            OpenCodeIcon(SFSymbol.SliderHorizontal3, null, size = OpenCodeIconSize.small)
+            Text(title, style = MaterialTheme.typography.labelLarge, maxLines = 1)
+            if (changed > 0) Text("$changed", style = MaterialTheme.typography.labelLarge, color = ChangedColor)
+        }
+    }
+}
+
+/**
+ * iOS `TuningTab`: the panel tucked against an edge, a slim tab to pull it back out. The whole
+ * 44×72 dp is on screen (Compose extends its touch area to 48 dp), with the slim
+ * [TuningPlacementLayout.TAB_GLASS_WIDTH] face against the same edge and a chevron pointing inward.
+ */
+@Composable
+private fun TuningTab(side: TuningPlacement.Side, pullOut: () -> Unit, modifier: Modifier = Modifier) {
+    val leading = side == TuningPlacement.Side.Leading
+    Box(
+        modifier
+            .size(TuningPlacementLayout.TabSize.width.dp, TuningPlacementLayout.TabSize.height.dp)
+            .semantics(mergeDescendants = true) {
+                contentDescription = "Tuning Panel"
+                role = Role.Button
+                // iOS `accessibilityHint`: TalkBack's click label (“Double tap to …”).
+                onClick(label = "Brings the panel back") { pullOut(); true }
+            },
+        contentAlignment = if (leading) Alignment.CenterStart else Alignment.CenterEnd,
+    ) {
+        Surface(
+            modifier = Modifier.size(TuningPlacementLayout.TAB_GLASS_WIDTH.dp, TuningPlacementLayout.TabSize.height.dp),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            tonalElevation = 6.dp,
+            shadowElevation = 8.dp,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                OpenCodeIcon(
+                    if (leading) SFSymbol.ChevronCompactRight else SFSymbol.ChevronCompactLeft,
+                    null,
+                    size = OpenCodeIconSize.small,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
 
 @Composable
 private fun PanelHeader(
@@ -320,12 +640,18 @@ private fun TunableRow(descriptor: TunableDescriptor, override: TuneValue?, set:
     val current = override ?: descriptor.defaultValue
     val isChanged = override != null
     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp).heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(
+        // iOS: caption2 on one line, 0.36 of the panel's width.
+        val labelStyle = MaterialTheme.typography.labelSmall
+        val labelSize = if (labelStyle.fontSize.isSp) labelStyle.fontSize else 11.sp
+        BasicText(
             descriptor.label,
-            Modifier.width(118.dp),
-            style = MaterialTheme.typography.bodySmall,
-            maxLines = 2,
+            Modifier.fillMaxWidth(0.36f).padding(end = 8.dp),
+            style = labelStyle.copy(color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (isChanged) 1f else 0.72f)),
+            maxLines = 1,
+            softWrap = false,
             overflow = TextOverflow.Ellipsis,
+            // iOS `.minimumScaleFactor(0.75)`.
+            autoSize = TextAutoSize.StepBased(minFontSize = labelSize * 0.75f, maxFontSize = labelSize),
         )
         when (descriptor.kind) {
             TuneKind.Number -> {
@@ -333,6 +659,12 @@ private fun TunableRow(descriptor: TunableDescriptor, override: TuneValue?, set:
                 val range = descriptor.effectiveRange
                 // Continuous track (no stop marks for 100+ positions), snapped to the step grid.
                 val step = descriptor.step ?: if (descriptor.valueType == "Int") 1.0 else null
+                // iOS `.controlSize(.mini)`, tinted orange once changed.
+                val sliderColors = if (isChanged) {
+                    SliderDefaults.colors(thumbColor = ChangedColor, activeTrackColor = ChangedColor)
+                } else {
+                    SliderDefaults.colors()
+                }
                 Slider(
                     value = number.toFloat().coerceIn(range.start.toFloat(), range.endInclusive.toFloat()),
                     onValueChange = { raw ->
@@ -340,6 +672,7 @@ private fun TunableRow(descriptor: TunableDescriptor, override: TuneValue?, set:
                         set(TuneValue.Number(snapped))
                     },
                     valueRange = range.start.toFloat()..range.endInclusive.toFloat(),
+                    colors = sliderColors,
                     modifier = Modifier.weight(1f).semantics { contentDescription = descriptor.label },
                 )
                 ValueText(descriptor.valueText(current), isChanged) { set(null) }
