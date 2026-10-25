@@ -279,7 +279,7 @@ private fun TranscriptListContent(
                         .animateItem(
                             fadeInSpec = null,
                             placementSpec = if (controller.animatesPlacement) ai.opencode.feature.transcript.user.PromotionMotion.spring.spec() else null,
-                            fadeOutSpec = if (item == TranscriptItemID.Empty) null else androidx.compose.animation.core.tween((RowEntrance.EXIT_DURATION * 1000).toInt()),
+                            fadeOutSpec = if (item == TranscriptItemID.Empty) null else androidx.compose.animation.core.tween((RowEntrance.EXIT_DURATION * 1000).toInt(), easing = androidx.compose.animation.core.CubicBezierEasing(0f, 0f, 0.58f, 1f)) /* iOS .curveEaseOut */,
                         )
                         .fillMaxWidth()
                         .wrapContentWidth()
