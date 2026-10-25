@@ -193,6 +193,8 @@ fun SessionView(
         LocalAgentActivityScope provides agentScope,
         LocalSessionComposerHost provides composerHost,
     ) {
+        // The + menu draws above the background-work capsule (iOS: the menu's glass covers it).
+        Box(modifier) {
         BackgroundWorkPresentation(
             anchor = backgroundWorkAnchor,
             sessionID = work.sessionID,
@@ -204,7 +206,6 @@ fun SessionView(
             onPresentedChange = { showsBackgroundWork = it },
             onOpenSubagent = { store.send(Action.SubagentTapped(it)) },
             onOpenShell = { store.send(Action.ShellOutputTapped(it)) },
-            modifier = modifier,
             isCovered = composerHost.composerPanelCovers,
             inCall = work.inCall,
             // The capsule draws above the + menu's dismiss area: tapping it closes the menu.
@@ -253,9 +254,10 @@ fun SessionView(
                     SessionComposer(store)
                 }
                 RequestPanelRoomProbe(composerHost, Modifier.matchParentSize())
-                SessionAttachmentMenu(store, composerHost, importer)
                 SessionModelPickerOverlays(store, modelPickerAnchors, headerHeight, composerHost.attachmentAnchors.composer)
             }
+        }
+        SessionAttachmentMenu(store, composerHost, importer)
         }
         SessionSheets(store, listContext)
         LocationErrorAlert(store)
