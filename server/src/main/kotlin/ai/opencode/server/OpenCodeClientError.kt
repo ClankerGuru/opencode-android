@@ -1,0 +1,105 @@
+package ai.opencode.server
+
+import ai.opencode.server.retry.TransportFailure
+import java.time.Instant
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+
+/**
+ * Port of iOS `OpenCodeClientError`: the one error every client call throws.
+ * A value type (`copy` to change it); the message is user-facing copy.
+ */
+data class OpenCodeClientError(
+    override val message: String,
+    val statusCode: Int? = null,
+    /** Seconds the server asked to wait before trying again (`Retry-After`). */
+    val retryAfter: Double? = null,
+    /** The server predates the route; callers hide the feature rather than retry. */
+    val isUnsupported: Boolean = false,
+    /** Set when no HTTP status arrived: how the connection failed. */
+    val transport: TransportFailure? = null,
+    /** How many times the request was sent before this error ended it. */
+    val attempts: Int = 1,
+    /** An earlier attempt failed after it may have reached the server. */
+    val earlierAttemptMayHaveArrived: Boolean = false,
+    /** A prompt whose sending ended in doubt and that the server didn't show when read back. */
+    val unconfirmedPromptID: String? = null,
+    val connectionFailures: List<ConnectionFailureDetail> = emptyList(),
+    /** The iOS `URLError` code equivalent of the transport exception (see [UrlErrorCode]). */
+    val urlErrorCode: Int? = null,
+) : Exception(message) {
+
+    val isRetryableWaitError: Boolean
+        get() {
+            if (isUnsupported) return false
+            statusCode?.let { return it == 408 || it == 429 || it >= 500 }
+            val lowercased = message.lowercase()
+            return !lowercased.startsWith("run failed:") &&
+                !lowercased.contains("no longer in the recent transcript") &&
+                !lowercased.contains("does not match the current opencode")
+        }
+
+    /**
+     * The request may have been carried out though no success came back: the connection
+     * broke or timed out after it was sent, or a proxy answered 502/504 (or a Cloudflare
+     * origin error). A mutation that isn't repeatable reads the server's state instead.
+     */
+    val mayHaveReachedServer: Boolean
+        get() {
+            if (earlierAttemptMayHaveArrived) return true
+            transport?.let { return it != TransportFailure.NotSent }
+            return statusCode?.let(::isGatewayFailure) ?: false
+        }
+
+    /** The error's status, transport and attempts: never the server's message text. */
+    val logSummary: String
+        get() {
+            val parts = mutableListOf<String>()
+            statusCode?.let { parts += "HTTP $it" }
+            transport?.let { parts += "transport ${it.rawValue}" }
+            if (isUnsupported) parts += "unsupported"
+            if (parts.isEmpty()) parts += if (message == UNREACHABLE_MESSAGE) "unclassified connection error" else "client error"
+            retryAfter?.let { parts += "Retry-After ${formatUpToOneFraction(it)} s" }
+            if (attempts > 1) parts += "after $attempts attempts"
+            return parts.joinToString(", ")
+        }
+
+    // Exceptions are values here; skip the stack walk Kotlin would do on every copy.
+    override fun fillInStackTrace(): Throwable = this
+
+    companion object {
+        const val UNREACHABLE_MESSAGE = "Couldn’t reach the OpenCode server"
+
+        /** A request that got no answer from the server. */
+        fun unreachable(transport: TransportFailure) = OpenCodeClientError(UNREACHABLE_MESSAGE, transport = transport)
+
+        val uploadsUnsupported = OpenCodeClientError(
+            "This server doesn’t support file attachments. Update OpenCode on your computer.",
+            isUnsupported = true,
+        )
+
+        /**
+         * A proxy in front of the server couldn't get an answer from it: 502 and 504, and
+         * Cloudflare's origin errors (520–527 and 530).
+         */
+        fun isGatewayFailure(status: Int): Boolean = status == 502 || status == 504 || status in 520..527 || status == 530
+
+        private val httpDate = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.US)
+
+        /** A `Retry-After` value: seconds, or an HTTP date. */
+        fun retryAfter(header: String?, now: Instant = Instant.now()): Double? {
+            val text = header?.trim()?.ifEmpty { null } ?: return null
+            text.toDoubleOrNull()?.let { if (it.isFinite()) return maxOf(0.0, it) }
+            val parsed = try { ZonedDateTime.parse(text, httpDate).toInstant() } catch (_: Exception) {
+                try { ZonedDateTime.parse(text, DateTimeFormatter.RFC_1123_DATE_TIME).toInstant() } catch (_: Exception) { null }
+            } ?: return null
+            return maxOf(0.0, (parsed.toEpochMilli() - now.toEpochMilli()) / 1000.0)
+        }
+
+        private fun formatUpToOneFraction(value: Double): String {
+            val rounded = Math.round(value * 10) / 10.0
+            return if (rounded == Math.rint(rounded)) rounded.toLong().toString() else rounded.toString()
+        }
+    }
+}
