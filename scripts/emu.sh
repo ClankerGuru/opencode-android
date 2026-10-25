@@ -24,8 +24,13 @@ case "$command" in
     if [[ -f "$avd_home/$AVD.avd/config.ini" ]]; then
       gpu_mode=$(sed -n 's/^hw\.gpu\.mode[[:space:]]*=[[:space:]]*//p' "$avd_home/$AVD.avd/config.ini" | tr -d '\r')
     fi
+    launcher=("$EMULATOR")
+    if [[ "$gpu_mode" == host && "$(uname -s)" == Linux && -z "${DISPLAY:-}" ]]; then
+      # Mesa needs an X display here even with -no-window. Each lane owns its Xvfb.
+      launcher=(env LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe xvfb-run -a "$EMULATOR")
+    fi
     # 37.2.12 can load legacy SwiftShader despite a swangle AVD setting unless -gpu is explicit.
-    nohup "$EMULATOR" -avd "$AVD" -port "$port" -gpu "${gpu_mode:-auto}" -read-only -no-window -no-audio -no-boot-anim -no-snapshot-save \
+    nohup "${launcher[@]}" -avd "$AVD" -port "$port" -gpu "${gpu_mode:-auto}" -read-only -no-window -no-audio -no-boot-anim -no-snapshot-save \
       >"${TMPDIR:-/tmp}/opencode-emulator-$port.log" 2>&1 &
     "$ADB" -s "emulator-$port" wait-for-device
     until [[ "$("$ADB" -s "emulator-$port" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == 1 ]]; do sleep 2; done
