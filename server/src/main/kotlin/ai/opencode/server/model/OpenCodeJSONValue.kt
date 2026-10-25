@@ -141,13 +141,16 @@ private fun jsonString(text: String): String = buildString {
     append('"')
 }
 
-/** Swift's `Double.formatted()`: grouped, up to a few fraction digits, POSIX-like. */
+/**
+ * Swift's `Double.formatted()`: the current locale, grouped, and ICU's default of at most six
+ * fraction digits, rounded half to even (`0.26575467567788` → "0.265755").
+ */
 internal fun formatGroupedNumber(value: Double): String =
-    DecimalFormat("#,##0.###", DecimalFormatSymbols(Locale.US)).format(value)
+    DecimalFormat("#,##0.######", DecimalFormatSymbols(Locale.getDefault())).format(value)
 
-/** Swift's `Double.formatted(.number.grouping(.never))`. */
+/** Swift's `Double.formatted(.number.grouping(.never))`: as [formatGroupedNumber], ungrouped. */
 internal fun formatPlainNumber(value: Double): String =
-    DecimalFormat("0.###", DecimalFormatSymbols(Locale.US)).format(value)
+    DecimalFormat("0.######", DecimalFormatSymbols(Locale.getDefault())).format(value)
 
 internal fun utf8Length(text: String): Int {
     var count = 0

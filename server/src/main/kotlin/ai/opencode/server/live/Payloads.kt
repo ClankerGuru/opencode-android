@@ -351,7 +351,11 @@ internal data class FilePayload(
 }
 
 /** Foundation's `Data(base64Encoded:)`: strict padding-aware base64, else null. */
-internal fun decodeBase64(text: String): ByteArray? = try { Base64.getDecoder().decode(text) } catch (_: IllegalArgumentException) { null }
+internal fun decodeBase64(text: String): ByteArray? {
+    // Foundation requires the padding Java's decoder would let go.
+    if (text.length % 4 != 0) return null
+    return try { Base64.getDecoder().decode(text) } catch (_: IllegalArgumentException) { null }
+}
 
 @Serializable
 internal data class ErrorPayload(val type: String? = null, val message: String? = null, val status: Int? = null)

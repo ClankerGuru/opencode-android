@@ -227,12 +227,13 @@ internal fun standardCollator(): Collator = Collator.getInstance(Locale.getDefau
 internal suspend fun requestServerCapabilities(server: OpenCodeServer): OpenCodeServerCapabilities {
     try {
         return coroutineScope {
-            val mcp = async { request<LocatedPayload<List<MCPServerPayload>>>("/api/mcp", timeout = 20.seconds, server = server) }
-            val skills = async { request<LocatedPayload<List<OpenCodeAutocompleteSkill>>>("/api/skill", timeout = 20.seconds, server = server) }
-            val integrations = async { request<LocatedPayload<List<IntegrationPayload>>>("/api/integration", timeout = 20.seconds, server = server) }
-            val mcpPayload = mcp.await()
-            val skillPayload = skills.await()
-            val integrationPayload = integrations.await()
+            // Failures are values until awaited in order, as Swift's `async let` tuple awaits them.
+            val mcp = async { capturedRequest<LocatedPayload<List<MCPServerPayload>>>("/api/mcp", timeout = 20.seconds, server = server) }
+            val skills = async { capturedRequest<LocatedPayload<List<OpenCodeAutocompleteSkill>>>("/api/skill", timeout = 20.seconds, server = server) }
+            val integrations = async { capturedRequest<LocatedPayload<List<IntegrationPayload>>>("/api/integration", timeout = 20.seconds, server = server) }
+            val mcpPayload = mcp.await().getOrThrow()
+            val skillPayload = skills.await().getOrThrow()
+            val integrationPayload = integrations.await().getOrThrow()
             OpenCodeServerCapabilities(
                 location = mcpPayload.location?.directory,
                 mcpServers = mcpPayload.data.map { it.server() },
