@@ -163,10 +163,12 @@ class VoiceAudioEngine(
     owner: AudioSessionOwner = dependency(AudioSessionOwner),
     private val claimSession: () -> Int = AudioSessionGeneration::bump,
     private val note: (VoiceCallLog.Note.Kind, String) -> Unit = dependency(VoiceCallLogClient)::noteCurrent,
-    val externalOwner: Boolean = false,
-    private val externalControl: VoiceExternalAudioControl? = null,
-    private val lab: VoiceAudioLabHooks? = dependency(VoiceAudioLabHooks),
+    externalOwner: Boolean = false,
+    externalControl: VoiceExternalAudioControl? = null,
+    private val lab: VoiceAudioLabHooks? = dependency(VoiceAudioLabHooks) ?: VoiceLabDemo.audioHooks,
 ) {
+    @Volatile var externalOwner = externalOwner; private set
+    @Volatile private var externalControl = externalControl
     private val id = dependency(UuidClient).next()
     private val holder = owner.holder(session::deactivate)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -187,8 +189,6 @@ class VoiceAudioEngine(
     private var underruns = 0
     private data class Buffer(val samples: FloatArray, val start: Long, val end: Long)
     private val queue = ArrayDeque<Buffer>()
-    private val cues = ArrayDeque<FloatArray>()
-    private var cueOffset = 0
     private var queueEnd = 0L
     private var writtenFrames = 0L
     private var playedFrames = 0L
@@ -204,6 +204,8 @@ class VoiceAudioEngine(
     private var labTask: Job? = null
     private var rampTask: Job? = null
     private val cueJobs = mutableSetOf<Job>()
+    private var lastCue: Job? = null
+    private val cueTracks = mutableSetOf<AudioTrack>()
     private var muteOutput = false
     private var telemetry = false
     @Volatile var atEar = atEar; private set
@@ -247,7 +249,7 @@ class VoiceAudioEngine(
                 AppLog.voice.notice(first.logLine); note(VoiceCallLog.Note.Kind.audio, first.logLine)
             }, ::playCue)
             VoiceAudioSession(capture.receiveAsFlow(), events.receiveAsFlow(), ::enqueue, ::flush, ::setMuted, ::stop,
-                ::setAtEar, ::noteConnected, ::cancelAudioSession, quality)
+                ::setAtEar, ::noteConnected, ::cancelAudioSession, quality, this@VoiceAudioEngine)
         }
         } catch (error: Throwable) {
             withContext(NonCancellable + Dispatchers.IO) {
@@ -279,7 +281,7 @@ class VoiceAudioEngine(
     }
     private fun startHardwareThreads() {
         val input = record ?: return; val output = track ?: return
-        input.startRecording(); output.play()
+        if (!interrupted) { input.startRecording(); output.play() }
         captureThread = Thread({
             Process.setThreadPriority(Process.THREAD_PRIORITY_AUDIO)
             val samples = ShortArray(1200)
@@ -298,13 +300,13 @@ class VoiceAudioEngine(
     private fun renderLoop(output: AudioTrack) {
         // Continuous silence keeps a sample timeline during network gaps. Fixed
         // render buffers, no per-buffer PCM allocation on this thread.
-        val samples = FloatArray(240); val voice = FloatArray(240); val cue = FloatArray(240)
+        val samples = FloatArray(240); val voice = FloatArray(240)
         val meterRing = Array(32) { FloatArray(240) }; val meterEnds = LongArray(32)
         var meterWrite = 0; var meterRead = 0; var lastHead = 0L; var wraps = 0L
         var seenEpoch = playbackEpoch
         while (alive) {
             if (interrupted) { Thread.sleep(10); continue }
-            samples.fill(0f); voice.fill(0f); cue.fill(0f)
+            samples.fill(0f); voice.fill(0f)
             val epoch: Int
             synchronized(lock) {
                 if (seenEpoch != playbackEpoch) {
@@ -325,15 +327,10 @@ class VoiceAudioEngine(
                     buffer.samples.copyInto(voice, (start - writtenFrames).toInt(), (start - buffer.start).toInt(), (end - buffer.start).toInt())
                 }
                 for (i in samples.indices) {
-                    if (cues.isNotEmpty()) {
-                        cue[i] = cues.first()[cueOffset++]
-                        if (cueOffset == cues.first().size) { cues.removeFirst(); cueOffset = 0 }
-                    }
-                    samples[i] = ((voice[i] + cue[i]) * playbackVolume).coerceIn(-1f, 1f)
+                    samples[i] = (voice[i] * playbackVolume).coerceIn(-1f, 1f)
                 }
                 epoch = playbackEpoch
             }
-            if (telemetry) sounds.recordMixerBuffer(cue)
             if (muteOutput) samples.fill(0f)
             var offset = 0
             while (offset < samples.size && alive && !interrupted) {
@@ -369,13 +366,44 @@ class VoiceAudioEngine(
     }
     private fun reportQuality() { quality.takeWindow()?.let { note(VoiceCallLog.Note.Kind.audio, (if (it.problem) "⚠︎ " else "") + it.text) } }
     private fun playCue(samples: FloatArray) {
-        if (externalOwner) {
-            // Cues use a separate short-lived AudioTrack, never a second microphone.
-            val job = scope.launch(start = CoroutineStart.LAZY) { playStandaloneCue(samples) }
-            synchronized(lock) { cueJobs.add(job) }
-            job.invokeOnCompletion { synchronized(lock) { cueJobs.remove(job) } }
-            job.start()
-        } else synchronized(lock) { if (alive && samples.isNotEmpty()) cues.addLast(samples) }
+        if (!running || interrupted || samples.isEmpty()) return
+        // A cue must outlive a prewarm/RTC/WS hardware handoff. Its short-lived
+        // AudioTrack never owns a microphone and is stopped only with this call.
+        val job = synchronized(lock) {
+            val previous = lastCue
+            scope.launch(start = CoroutineStart.LAZY) {
+                previous?.join() // AVAudioPlayerNode schedules cues in FIFO order.
+                playStandaloneCue(samples)
+            }.also { cueJobs.add(it); lastCue = it }
+        }
+        job.invokeOnCompletion { synchronized(lock) { cueJobs.remove(job) } }
+        job.start()
+    }
+    /** Move the same call engine between AudioRecord/Track and WebRTC's ADM.
+     * Stop the previous hardware synchronously before the caller activates the
+     * next ADM. Keep the session, gate, mute, lab cursor, cues and consumers alive. */
+    internal suspend fun useExternalOwner(next: VoiceExternalAudioControl?) = withContext(Dispatchers.IO + NonCancellable) {
+        control.withLock {
+            check(running && !stopped) { "The voice connection is closed." }
+            if (externalOwner == (next != null)) return@withLock
+            alive = false
+            if (externalOwner) externalControl?.stop() else releaseHardware()
+            while (capture.tryReceive().isSuccess) { /* No old-transport telemetry on the new uplink. */ }
+            forwarder.reset()
+            synchronized(lock) {
+                resetPlaybackQueue(); externalFrames = 0
+                levels.clearAssistant()
+                externalControl = next; externalOwner = next != null
+            }
+            if (!externalOwner) buildHardware()
+            alive = true
+            if (!externalOwner) {
+                if (interrupted) startHardwareThreads() else holder.withActive { startHardwareThreads() }
+            }
+            next?.setMuted(levels.isMuted)
+            next?.setPlaybackVolume(playbackVolume)
+            next?.interrupted(interrupted)
+        }
     }
     suspend fun enqueue(pcm: ByteArray, itemID: String?) = withContext(Dispatchers.IO) {
         val samples = PCM.playbackBuffer(pcm) ?: return@withContext
@@ -464,7 +492,10 @@ class VoiceAudioEngine(
         setPlaybackVolume(volume); if (finished) rampTask = null
     }
     fun cancelSpeakerRamp() { rampGeneration++; rampTask?.cancel(); rampTask = null; setPlaybackVolume(1f) }
-    private fun setPlaybackVolume(volume: Float) { playbackVolume = volume; externalControl?.setPlaybackVolume(volume) }
+    private fun setPlaybackVolume(volume: Float) {
+        playbackVolume = volume; externalControl?.setPlaybackVolume(volume)
+        synchronized(lock) { cueTracks.forEach { it.setVolume(if (muteOutput) 0f else volume) } }
+    }
     suspend fun handleConfigurationChange() = control.withLock {
         if (!running || interrupted || activationCancelled) return@withLock
         val external = VoiceAudioRoute.hasExternalOutput(session.outputPorts)
@@ -482,7 +513,7 @@ class VoiceAudioEngine(
             if (interrupted) return@withLock
             interrupted = true; holder.invalidateActivation(); cancelSpeakerRamp(); flush()
             runCatching { record?.stop() }
-            synchronized(lock) { cues.clear(); cueOffset = 0 }
+            synchronized(lock) { cueJobs.toList() }.forEach { it.cancel() }
             externalControl?.interrupted(true)
             note(VoiceCallLog.Note.Kind.audio, "⚠︎ Audio interrupted (another app or call took it)")
             levels.reset(); events.trySend(VoiceAudioEvent.interrupted)
@@ -503,7 +534,7 @@ class VoiceAudioEngine(
         try {
             if (stopped) return@withContext
             stopped = true; running = false; alive = false; gate.close(); cancelSpeakerRamp(); qualityTask?.cancel(); labTask?.cancel()
-            val playingCues = synchronized(lock) { cueJobs.toList().also { cueJobs.clear() } }
+            val playingCues = synchronized(lock) { cueJobs.toList().also { cueJobs.clear(); lastCue = null } }
             playingCues.forEach { it.cancelAndJoin() }
             reportQuality(); releaseHardware(); session.unobserve(id); externalControl?.stop()
             capture.close(); events.close()
@@ -535,11 +566,18 @@ class VoiceAudioEngine(
             .setTransferMode(AudioTrack.MODE_STATIC).setBufferSizeInBytes(samples.size * 4).build()
         try {
             output.write(samples, 0, samples.size, AudioTrack.WRITE_BLOCKING)
-            output.setVolume(if (muteOutput) 0f else playbackVolume)
+            if (telemetry) sounds.recordMixerBuffer(samples)
+            synchronized(lock) {
+                cueTracks.add(output)
+                output.setVolume(if (muteOutput) 0f else playbackVolume)
+            }
             holder.withActive { output.play() }
             if (tail) AudioSessionGeneration.onNext(generation) { runCatching { output.stop() } }
-            clock.sleep(VoiceCallSynthesizer.endTailWait(samples).seconds)
-        } finally { runCatching { output.stop() }; output.release() }
+            clock.sleep((if (tail) VoiceCallSynthesizer.endTailWait(samples) else samples.size / PCM.sampleRate).seconds)
+        } finally {
+            synchronized(lock) { cueTracks.remove(output) }
+            runCatching { output.stop() }; output.release()
+        }
     }
     companion object {
         val speakerRampDuration = 280.milliseconds
@@ -564,6 +602,7 @@ class CaptureForwarder(
     private var used = 0
     private var phase = 0.0
     private var previous = 0.0
+    fun reset() { used = 0; phase = 0.0; previous = 0.0 }
     fun receive(samples: ShortArray, count: Int, sampleRate: Int = 24000, channels: Int = 1) {
         if (!gate.isOpen || levels.isMuted) { used = 0; phase = 0.0; return }
         if (sampleRate <= 0 || channels <= 0) return

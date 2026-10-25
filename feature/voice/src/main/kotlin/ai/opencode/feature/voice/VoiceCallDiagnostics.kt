@@ -16,7 +16,7 @@ class VoiceCallDiagnostics(
         AppLog.voice.notice("$name ${diagnostic.logSummary}")
         recordSocketEvent(SocketEvent(name, diagnostic.domain, diagnostic.code, diagnostic.closeCode,
             diagnostic.underlyingDomain, diagnostic.underlyingCode, diagnostic.closeReason,
-            if (error != null) errorCategory(diagnostic) else null))
+            if (error != null) diagnostic.errorCategory.description else null))
     }
     fun recordVoiceLoss(expiredReason: String?, error: Throwable?, defaultDomain: String, expiredDomain: String,
         connected: Boolean, diagnostic: RealtimeTransportDiagnostic? = null) {
@@ -28,27 +28,12 @@ class VoiceCallDiagnostics(
         if (detail.closeCode == 1001) recordVoiceSocket("voice_session_expired", detail, null)
         else recordVoiceSocket(if (connected) "voice_socket_dropped" else "voice_connect_failed", detail, error)
     }
+    /** :app installs `this[VoiceCallDiagnostics] = VoiceCallDiagnostics(recordMark,
+     * recordSocketEvent)` in DependencyValues.installRoot before creating a call.
+     * Pass the persistent diagnostics recorder's mark and socket-event callbacks;
+     * socket events include private close reasons, never send those to AppLog. */
     companion object Key : DependencyKey<VoiceCallDiagnostics> {
         override val liveValue = VoiceCallDiagnostics()
         override val testValue = VoiceCallDiagnostics()
-        private fun errorCategory(diagnostic: RealtimeTransportDiagnostic): String {
-            fun category(domain: String, code: Int): String = when (domain) {
-                "NSURLErrorDomain" -> when (code) {
-                    -1001 -> "timeout"
-                    -1009, -1005, -1018, -1020 -> "offline"
-                    -999 -> "cancelled"
-                    else -> "transport"
-                }
-                "NSPOSIXErrorDomain" -> when (code) {
-                    60 -> "timeout"
-                    57, 54, 53, 32, 50, 51, 64, 65 -> "offline"
-                    else -> "transport"
-                }
-                else -> "transport"
-            }
-            val own = category(diagnostic.domain, diagnostic.code)
-            return if (own == "transport" && diagnostic.underlyingDomain != null && diagnostic.underlyingCode != null)
-                category(diagnostic.underlyingDomain, diagnostic.underlyingCode) else own
-        }
     }
 }

@@ -76,6 +76,11 @@ data class VoiceCallLog(
 
 /** :app/devtools installs upload when Developer Mode is enabled; no upward edge. */
 class VoiceCallLogUploadClient(val upload: suspend (VoiceCallLog) -> Unit = {}) {
+    /** :app passes `this[VoiceCallLogUploadClient] = VoiceCallLogUploadClient { log -> … }`
+     * to DependencyValues.installRoot before resolving VoiceCallLogClient. The suspend
+     * callback uploads the completed log through Developer Mode's diagnostics uploader,
+     * honoring its transcript/privacy settings. The recorder gates automatic uploads
+     * on Developer Mode; the adapter must not put log contents or upload URLs in AppLog. */
     companion object Key : DependencyKey<VoiceCallLogUploadClient> {
         override val liveValue = VoiceCallLogUploadClient()
         override val testValue = VoiceCallLogUploadClient()

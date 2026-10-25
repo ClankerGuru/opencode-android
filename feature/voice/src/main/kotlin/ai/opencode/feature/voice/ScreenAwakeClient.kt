@@ -37,11 +37,16 @@ class VoiceScreenActivityRegistry {
         }
         changed.removeAll { it.get() == null }
     }
+    /** :app creates one registry and passes `this[VoiceScreenActivityRegistry] = registry`
+     * to DependencyValues.installRoot before resolving ScreenAwakeClient. Its Activity
+     * lifecycle callbacks call registry.attach(activity) on resume and detach on pause. */
     companion object Key : DependencyKey<VoiceScreenActivityRegistry> {
         override val liveValue by lazy { VoiceScreenActivityRegistry() }
     }
 }
 class ScreenAwakeClient(val set: (Boolean) -> Unit) {
+    /** Uses :app's installed VoiceScreenActivityRegistry; no Activity is retained here.
+     * Install the registry before this lazy live client is first resolved. */
     companion object Key : DependencyKey<ScreenAwakeClient> {
         override val liveValue by lazy {
             val registry = dependency(VoiceScreenActivityRegistry)

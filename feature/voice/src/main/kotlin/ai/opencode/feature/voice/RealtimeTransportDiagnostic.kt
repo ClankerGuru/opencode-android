@@ -20,6 +20,13 @@ data class RealtimeTransportDiagnostic(
     val underlyingCode: Int? = null,
     val closeReason: String? = null,
 ) {
+    val errorCategory: DiagnosticsErrorCategory
+        get() {
+            val category = DiagnosticsErrorCategory.of(domain, code)
+            return if (category == DiagnosticsErrorCategory.transport && underlyingDomain != null && underlyingCode != null)
+                DiagnosticsErrorCategory.of(underlyingDomain, underlyingCode) else category
+        }
+
     /** For the app log: codes only, never the close reason, which is the service's own text. */
     val logSummary: String
         get() {
@@ -72,7 +79,18 @@ data class RealtimeTransportDiagnostic(
         }
 
         private fun domainAndCode(error: Throwable): Pair<String, Int> {
-            UrlErrorCode.fromThrowable(error)?.let { return URL_ERROR_DOMAIN to it }
+            val category = DiagnosticsErrorCategory.of(error)
+            when (category) {
+                DiagnosticsErrorCategory.timeout -> return URL_ERROR_DOMAIN to UrlErrorCode.TIMED_OUT
+                DiagnosticsErrorCategory.offline -> return URL_ERROR_DOMAIN to (UrlErrorCode.fromThrowable(error) ?: UrlErrorCode.NETWORK_CONNECTION_LOST)
+                DiagnosticsErrorCategory.cancelled -> return URL_ERROR_DOMAIN to UrlErrorCode.CANCELLED
+                else -> Unit
+            }
+            // The shared URL helper treats every IOException as network loss.
+            // Diagnostics must leave unclassified I/O/socket failures as transport.
+            UrlErrorCode.fromThrowable(error)?.takeUnless {
+                it == UrlErrorCode.NETWORK_CONNECTION_LOST || it == UrlErrorCode.TIMED_OUT || it == UrlErrorCode.CANCELLED
+            }?.let { return URL_ERROR_DOMAIN to it }
             return (error::class.java.simpleName.ifEmpty { "Throwable" }) to 0
         }
     }

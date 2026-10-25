@@ -86,7 +86,7 @@ class LiveCallCoordinator(
 
     suspend fun start(apiKey: String, config: LiveSessionConfig, live: LiveClient, audio: VoiceAudioClient): Flow<VoiceCallEvent> = serialized {
         this.apiKey = apiKey; this.config = config; this.live = live
-        startAudioThenSocket(config.isAtEar, audio, rtcPossible = true)
+        startAudioThenSocket(config.isAtEar, audio)
     }
     internal fun handleResponseEvent(delegationID: String?, event: LiveResponseEvent) {
         val id = delegationID ?: serverDelegations.keys.singleOrNull() ?: return

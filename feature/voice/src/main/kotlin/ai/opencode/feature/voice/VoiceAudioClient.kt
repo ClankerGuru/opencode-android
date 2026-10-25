@@ -1,6 +1,8 @@
 package ai.opencode.feature.voice
 
 import ai.opencode.core.dependencies.DependencyKey
+import ai.opencode.core.dependencies.DependencyValues
+import ai.opencode.core.dependencies.asContextElement
 import ai.opencode.core.dependencies.dependency
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
@@ -60,6 +62,8 @@ class VoiceAudioSession(
     val noteConnected: suspend () -> Unit = {},
     val cancel: () -> Unit = {},
     val quality: VoiceAudioQuality? = null,
+    /** Live engine adoption only; injected audio clients need not own hardware. */
+    internal val engine: VoiceAudioEngine? = null,
 )
 enum class VoiceAudioEvent { playbackDrained, interrupted, resumed, routeChanged, mediaServicesReset }
 
@@ -77,7 +81,7 @@ class VoiceAudioClient(
         ?: start().also { if (atEar) it.setAtEar(true) }
     companion object Key : DependencyKey<VoiceAudioClient> {
         override val liveValue by lazy {
-            if (dependency(VoiceAudioLabHooks)?.isScriptedDemo == true) {
+            if ((dependency(VoiceAudioLabHooks) ?: VoiceLabDemo.audioHooks).isScriptedDemo) {
                 // The scripted call has no coordinator to adopt a prepared engine.
                 VoiceAudioClient(start = { VoiceAudioEngine().start() }, startAtEar = { VoiceAudioEngine(atEar = it).start() })
             } else VoiceAudioClient(VoiceAudioPrestart { VoiceAudioEngine(atEar = it).start() })
@@ -90,7 +94,7 @@ class VoiceAudioClient(
 
 /** Prepared starts don't wait for an earlier engine's stop. Each has its own holder. */
 class VoiceAudioPrestart(private val begin: suspend (Boolean) -> VoiceAudioSession) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO + DependencyValues.current.asContextElement())
     private class Pending(val token: Int) {
         lateinit var task: Deferred<VoiceAudioSession>
         var session: VoiceAudioSession? = null

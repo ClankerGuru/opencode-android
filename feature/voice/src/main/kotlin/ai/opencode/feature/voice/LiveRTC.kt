@@ -492,7 +492,8 @@ private open class VoiceSDPObserver : SdpObserver {
  * stops it at call end. A standby doesn't attach until startAudio is called.
  * Moving devices keeps focus, meters, mute, audio event consumers and the call
  * sound clock: no false hang-up/connect cues on a rotation or a network switch.
- * If a replacement uses WebSocket, stop this context before starting normal audio.
+ * WebSocket temporarily returns the same engine to local hardware; only call end
+ * stops the context, so RTC → WebSocket → RTC retains one session and consumer.
  */
 class VoiceRTCAudioContext {
     private val lock = Mutex()
@@ -511,6 +512,30 @@ class VoiceRTCAudioContext {
         override fun stop() { device?.stop() }
     }
 
+    /** Adopt the reducer's prewarm before opening a socket. An injected session
+     * without a live engine keeps its own lifecycle and is never cast to hardware. */
+    internal suspend fun adopt(session: VoiceAudioSession): VoiceAudioSession = lock.withLock {
+        check(!stopped)
+        val engine = session.engine ?: return@withLock session
+        check(this.engine == null)
+        this.engine = engine
+        wrap(session)
+    }
+
+    private fun wrap(session: VoiceAudioSession): VoiceAudioSession = VoiceAudioSession(
+        session.capture, session.events, session.enqueue, session.flush, session.setMuted,
+        ::stop, session.setAtEar, session.noteConnected, session.cancel, session.quality, session.engine,
+    ).also { audio = it }
+
+    internal fun owns(session: VoiceAudioSession?) = session != null && session === audio
+
+    internal suspend fun useWebSocket(): VoiceAudioSession? = lock.withLock {
+        check(!stopped)
+        device?.stop(); device?.engine = null; device = null
+        engine?.useExternalOwner(null)
+        audio
+    }
+
     internal suspend fun start(atEar: Boolean, next: LiveRTCAudioDevice): VoiceAudioSession = lock.withLock {
         check(!stopped) { "The voice connection is closed." }
         if (device !== next) {
@@ -523,9 +548,9 @@ class VoiceRTCAudioContext {
                 this.engine = engine
                 next.engine = engine
                 val session = engine.start()
-                audio = VoiceAudioSession(session.capture, session.events, session.enqueue, session.flush,
-                    session.setMuted, ::stop, session.setAtEar, session.noteConnected, session.cancel, session.quality)
+                wrap(session)
             } else {
+                engine?.useExternalOwner(control)
                 next.engine = engine
                 engine?.setAtEar(atEar)
             }

@@ -14,10 +14,11 @@ interface VoiceSocketConnection<ServerEvent, Command> {
     val send: suspend (Command) -> Unit
     val close: suspend () -> Unit
 
-    /** Android WebRTC owns the hardware. Activate this INSTEAD of VoiceAudioClient.start.
-     * Leave standbys inactive. Install one VoiceRTCAudioContext dependency per call
-     * to retain its engine/cues across RTC rotation; startAudio moves hardware to
-     * the replacement, and the coordinator stops the returned audio at call end.
+    /** Android WebRTC owns the hardware. The coordinator first adopts prepared
+     * VoiceAudioClient audio into its call-scoped VoiceRTCAudioContext, then invokes
+     * this to release local hardware and activate ADM. Leave standbys inactive.
+     * startAudio retains the engine/cues across RTC rotation and WS fallback;
+     * the coordinator stops the returned audio only at call end.
      * Without that context the connection owns/stops its own engine on close.
      * Null means WebSocket: use VoiceAudioClient and forward capture/output normally. */
     val startAudio: (suspend (atEar: Boolean) -> VoiceAudioSession)? get() = null
@@ -138,22 +139,24 @@ abstract class VoiceSessionCoordinator<E, C, A>(
     }
     override suspend fun end() = serialized { finish(null) }
 
-    /** WebRTC owns capture hardware; never start a second AudioRecord beside its ADM.
-     * WebSocket starts audio before opening the billed session when its route is known.
+    /** Start/adopt prewarmed audio before opening a billed session, as on iOS.
+     * RTC negotiates with its ADM inactive, then adopts this engine and releases
+     * local hardware before activating its own microphone.
      */
-    internal suspend fun startAudioThenSocket(atEar: Boolean, audioClient: VoiceAudioClient, rtcPossible: Boolean = false): Flow<VoiceCallEvent> {
+    internal suspend fun startAudioThenSocket(atEar: Boolean, audioClient: VoiceAudioClient): Flow<VoiceCallEvent> {
         check(!streamMade)
         if (!running()) throw CancellationException()
         lifecycle.atEar = atEar
         this.audioClient = audioClient
         try {
-            if (!rtcPossible) adoptAudio(audioClient.start(atEar))
+            val started = audioClient.start(atEar)
+            adoptAudio(started) // Cancellation while prewarm starts must still stop it.
+            adoptAudio(rtcAudio.adopt(started))
             if (!running()) throw CancellationException()
             val socket = open(false)
             if (!running()) { discard(socket); throw CancellationException() }
             active = socket
-            audioUsesRTC = socket.connection.startAudio != null
-            if (rtcPossible) adoptAudio(socket.connection.startAudio?.invoke(lifecycle.atEar) ?: audioClient.start(lifecycle.atEar))
+            activateAudio(socket)
             if (!running()) throw CancellationException()
             audio?.setAtEar?.invoke(lifecycle.atEar)
             startSocketEvents(socket)
@@ -249,18 +252,23 @@ abstract class VoiceSessionCoordinator<E, C, A>(
         if (!running()) { discard(socket); return }
         val start = socket.connection.startAudio
         if (start != null) {
-            if (!audioUsesRTC) { audio?.stop?.invoke(); audio = null }
+            if (!audioUsesRTC && !rtcAudio.owns(audio)) { audio?.stop?.invoke(); audio = null }
             val previous = audio
             adoptAudio(start(lifecycle.atEar))
             audioUsesRTC = true
             if (audio !== previous && streamMade) wireAudio(requireNotNull(audio))
         } else if (audioUsesRTC) {
-            // The replacement fell back to WebSocket: release the ADM before
-            // starting ordinary capture, and move both consumers with the engine.
-            audio?.stop?.invoke(); audio = null
-            adoptAudio(requireNotNull(audioClient).start(lifecycle.atEar))
+            // Release the ADM before ordinary capture. A live engine keeps the
+            // exact same session/consumers; injected clients may replace theirs.
+            val previous = audio
+            val reused = rtcAudio.useWebSocket()
+            if (reused != null) adoptAudio(reused)
+            else {
+                audio?.stop?.invoke(); audio = null
+                adoptAudio(requireNotNull(audioClient).start(lifecycle.atEar))
+            }
             audioUsesRTC = false
-            if (streamMade) wireAudio(requireNotNull(audio))
+            if (audio !== previous && streamMade) wireAudio(requireNotNull(audio))
         }
         if (lifecycle.hasConnected) audio?.noteConnected?.invoke()
         startSocketEvents(socket)
