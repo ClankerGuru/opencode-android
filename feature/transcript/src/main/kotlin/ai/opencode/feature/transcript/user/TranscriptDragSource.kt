@@ -1,6 +1,34 @@
 package ai.opencode.feature.transcript.user
 
 import ai.opencode.core.files.AttachmentFileType
+import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.feature.media.AgentFileDrag
+import ai.opencode.feature.media.TranscriptLiftHold
+import ai.opencode.feature.media.fileReadRequest
+import ai.opencode.server.OpenCodePairingLink
+import android.content.Context
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draganddrop.DragAndDropSourceModifierNode
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.addOutline
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.SuspendingPointerInputModifierNode
+import androidx.compose.ui.node.DelegatingNode
+import androidx.compose.ui.node.DrawModifierNode
+import androidx.compose.ui.node.LayoutAwareModifierNode
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.toSize
+import androidx.compose.ui.node.ModifierNodeElement
+import androidx.compose.ui.node.requireGraphicsContext
+import androidx.compose.ui.graphics.drawscope.ContentDrawScope
+import androidx.compose.ui.platform.InspectorInfo
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
 import ai.opencode.server.OpenCodeServer
@@ -10,20 +38,15 @@ import android.content.ClipDescription
 import android.net.Uri
 import android.view.View
 import android.webkit.MimeTypeMap
-import androidx.compose.foundation.draganddrop.dragAndDropSource
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draganddrop.DragAndDropTransferData
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.pointer.PointerInputScope
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.Dp
 import java.util.Locale
@@ -104,11 +127,11 @@ sealed interface TranscriptDragPayload {
             is ImageAttachment -> sanitizedSuggestedName(name, "image", imageMimeType(data, name))
             is Image -> sanitizedSuggestedName(name, "image", "image/png")
             is AgentFile -> {
-                val fileName = displayName ?: fileName(file.path)
-                sanitizedSuggestedName(fileName, "file", fileMimeType(fileName, mime))
+                val fileName = displayName ?: file.name
+                sanitizedSuggestedName(fileName, "file", fileMimeType(fileName, mime ?: file.mime, file.kind))
             }
             is PastedText -> sanitizedSuggestedName(name, "pasted-text", "text/plain")
-            is Url -> Uri.parse(url).host ?: "link"
+            is Url -> Uri.parse(OpenCodePairingLink.shareableURL(url) ?: url).host ?: "link"
             is Text, is MarkdownBlocks -> "message.txt"
             is InlineFileLinks -> "message.txt"
         }
@@ -125,33 +148,65 @@ sealed interface TranscriptDragPayload {
             }
             is ImageAttachment -> listOf(imageMimeType(data, name))
             is Image -> listOf("image/png")
-            is AgentFile -> listOf(fileMimeType(displayName ?: fileName(file.path), mime))
+            is AgentFile -> listOf(fileMimeType(displayName ?: file.name, mime ?: file.mime, file.kind))
             is Url -> listOf(ClipDescription.MIMETYPE_TEXT_URILIST, ClipDescription.MIMETYPE_TEXT_PLAIN)
             is PastedText, is Text, is MarkdownBlocks, is InlineFileLinks -> listOf(ClipDescription.MIMETYPE_TEXT_PLAIN)
         }
 
     /**
-     * The drag's data, or null when this payload needs bytes behind a `content://` URI (images,
-     * agent files): those wait for a FileProvider and `AgentFileLoader` from `:feature:media`.
-     * A path the server doesn't resolve drags as its plain text, as on iOS.
+     * The drag's data, built when the drag starts (iOS `makeItemProvider`). Text travels as
+     * text; images and files as `content://` URIs from media's [AgentFileDrag], whose bytes a
+     * server file starts downloading now (the reader waits for them). A path no server resolves
+     * drags as its plain text, as on iOS. [appContext] serves the URIs; without it (no drag in
+     * progress) only text payloads have data.
      */
-    fun clipData(context: TranscriptDragContext = TranscriptDragContext()): ClipData? {
+    fun clipData(context: TranscriptDragContext = TranscriptDragContext(), appContext: Context? = null): ClipData? {
         val label = suggestedName
         fun plain(text: String, mimes: List<String> = mimeTypes) =
             ClipData(ClipDescription(label, mimes.toTypedArray()), ClipData.Item(text))
+        fun uri(uri: Uri?, mimes: List<String>, name: String = label) =
+            uri?.let { ClipData(ClipDescription(name, mimes.toTypedArray()), ClipData.Item(it)) }
         return when (this) {
             is Code -> plain(source)
             is PastedText -> plain(text)
             is Text -> plain(text)
             is MarkdownBlocks -> plain(OpenCodeMarkdownBlock.markdown(blocks))
             is InlineFileLinks -> plain(text.text)
-            is Url -> ClipData(ClipDescription(label, mimeTypes.toTypedArray()), ClipData.Item(url, null, Uri.parse(url)))
-            is AgentFile -> {
-                val server = server ?: context.server
-                // A file a server can serve needs a lazy download (hand-off); without one, its path.
-                if (server == null && cachedImage == null) plain(file.path, listOf(ClipDescription.MIMETYPE_TEXT_PLAIN)) else null
+            is Url -> {
+                val share = OpenCodePairingLink.shareableURL(url) ?: url
+                ClipData(ClipDescription(label, mimeTypes.toTypedArray()), ClipData.Item(share, null, Uri.parse(share)))
             }
-            is ImageAttachment, is Image -> null
+            is ImageAttachment -> appContext?.let { uri(AgentFileDrag.bytes(it, label, data), mimeTypes) }
+            is Image -> {
+                val resolvedServer = server ?: context.server
+                val resolvedDirectory = directory ?: context.directory
+                if (file != null && resolvedServer != null && file.target(resolvedDirectory) != null) {
+                    AgentFile(file, resolvedServer, resolvedDirectory, displayName = name, cachedImage = image).clipData(context, appContext)
+                } else {
+                    appContext?.let { uri(AgentFileDrag.png(it, label, image.asAndroidBitmap()), mimeTypes) }
+                }
+            }
+            is AgentFile -> {
+                val resolvedServer = server ?: context.server
+                val resolvedDirectory = directory ?: context.directory
+                val fileName = displayName ?: file.name
+                val target = file.target(resolvedDirectory)
+                val type = mimeTypes.first()
+                when {
+                    resolvedServer != null && target != null && resolvedServer.fileReadRequest(target) != null -> appContext?.let {
+                        // A text file also offers itself as text: a reader coerces the URI's contents.
+                        val mimes = if (file.kind == AgentFileReference.Kind.Text && type != ClipDescription.MIMETYPE_TEXT_PLAIN) {
+                            listOf(type, ClipDescription.MIMETYPE_TEXT_PLAIN)
+                        } else listOf(type)
+                        uri(AgentFileDrag.serverFile(it, resolvedServer, target, fileName, cachedImage?.asAndroidBitmap()), mimes)
+                    }
+                    cachedImage != null && !file.path.startsWith("/") -> appContext?.let {
+                        val name = sanitizedSuggestedName(fileName, "image", "image/png")
+                        uri(AgentFileDrag.png(it, name, cachedImage.asAndroidBitmap()), listOf("image/png"), name)
+                    }
+                    else -> plain(file.path, listOf(ClipDescription.MIMETYPE_TEXT_PLAIN))
+                }
+            }
         }
     }
 
@@ -242,15 +297,23 @@ sealed interface TranscriptDragPayload {
             return "image/png"
         }
 
-        /** The MIME type for an agent or attached file (iOS `fileUTType`, without the kind fallback). */
-        fun fileMimeType(fileName: String, mime: String?): String {
+        /** The MIME type for an agent or attached file (iOS `fileUTType(fileName:mime:kind:)`). */
+        fun fileMimeType(fileName: String, mime: String?, kind: AgentFileReference.Kind = AgentFileReference.Kind.of(fileName)): String {
             val ext = AttachmentFileType.fileExtension(fileName)
             if (ext.isNotEmpty()) {
                 MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext)?.let { return it }
-                codeMimeType(ext)?.let { return it }
+                val code = codeMimeType(ext)
+                if (code != null && (code != ClipDescription.MIMETYPE_TEXT_PLAIN || kind == AgentFileReference.Kind.Text)) return code
             }
             if (mime != null && mime != "application/octet-stream") return mime
-            return "application/octet-stream"
+            return when (kind) {
+                AgentFileReference.Kind.Image -> "image/png"
+                AgentFileReference.Kind.Pdf -> "application/pdf"
+                AgentFileReference.Kind.Video -> "video/*"
+                AgentFileReference.Kind.Audio -> "audio/*"
+                AgentFileReference.Kind.Text -> ClipDescription.MIMETYPE_TEXT_PLAIN
+                AgentFileReference.Kind.Document -> "application/octet-stream"
+            }
         }
 
         fun sanitizedSuggestedName(name: String, defaultName: String, mime: String): String {
@@ -259,24 +322,23 @@ sealed interface TranscriptDragPayload {
             val ext = MimeTypeMap.getSingleton().getExtensionFromMimeType(mime) ?: if (mime.startsWith("text/")) "txt" else null
             return if (ext != null) "$sanitized.$ext" else sanitized
         }
-
-        private fun fileName(path: String): String = path.substringAfterLast('/')
     }
 }
 
 /**
  * Makes this transcript surface draggable into other apps and the composer (iOS
- * `.transcriptDragSource`, shipped for everyone). Holding it lifts it: [onLift] runs (a row
- * opens its menu there, as iOS's context menu lifts the same surface), and moving the held
- * finger past the touch slop starts the drag with [payload]'s [ClipData] and a snapshot of the
- * surface as its shadow. A payload with no clip data on Android ([TranscriptDragPayload.clipData])
- * only lifts. Scrolling, taps and text selection inside stay untouched: the hold has to land
- * before the finger moves.
+ * `.transcriptDragSource`, shipped for everyone), with iOS's arbitration between its menu and
+ * its drag: holding it lifts it ([onLift] runs, where a row opens its menu, as iOS's context
+ * menu lifts the same surface), and moving the held finger past the touch slop starts the drag
+ * (closing that menu through [onDragStart]) with [payload]'s [ClipData]. A tap, a scroll, or a
+ * move before the hold lands stays the surface's and the list's; once the hold lands, the rest
+ * of the gesture is the drag source's, so the release doesn't also tap the surface under it and
+ * the list doesn't scroll under the open menu.
  *
- * [cornerRadius] and [surface] are kept for parity with iOS's lift preview; the shadow is the
- * surface as drawn (its own fill and corners).
+ * The drag's shadow is iOS's lift preview: the surface as drawn, over its fill
+ * ([TranscriptDragSurfaceStyle.Card] on the card fill, the rest on the transcript's background),
+ * clipped to [cornerRadius] (at least 10 dp for a band).
  */
-@Suppress("UNUSED_PARAMETER")
 fun Modifier.transcriptDragSource(
     payload: TranscriptDragPayload?,
     cornerRadius: Dp = TranscriptMetrics.cardCornerRadius,
@@ -284,42 +346,136 @@ fun Modifier.transcriptDragSource(
     context: TranscriptDragContext = TranscriptDragContext(),
     onLift: (() -> Unit)? = null,
     onDragStart: (() -> Unit)? = null,
-): Modifier = composed {
-    val clip = remember(payload, context) { payload?.clipData(context) }
-    val currentLift by rememberUpdatedState(onLift)
-    val currentDragStart by rememberUpdatedState(onDragStart)
-    val currentClip by rememberUpdatedState(clip)
-    var modifier: Modifier = this
-    // Outer, so the drag detector inside reads each event first (Main pass runs inner to outer).
-    if (onLift != null) {
-        val consumes = clip == null
-        modifier = modifier.pointerInput(consumes) { awaitLift(onLift = { currentLift?.invoke() }, consumes = consumes) }
+): Modifier {
+    if (payload == null && onLift == null) return this
+    return composed {
+        val colors = OpenCodeTheme.colors
+        val appContext = LocalContext.current.applicationContext
+        val fill = if (surface == TranscriptDragSurfaceStyle.Card) colors.userBubble else colors.canvas
+        val radius = if (surface == TranscriptDragSurfaceStyle.Band) maxOf(cornerRadius, 10.dp) else cornerRadius
+        this then TranscriptDragSourceElement(payload, context, appContext, fill, radius, onLift, onDragStart)
     }
-    if (clip != null) {
-        // The platform's hold-then-move start, with the surface as drawn for its shadow.
-        modifier = modifier.dragAndDropSource { _ ->
-            val data = currentClip ?: return@dragAndDropSource null
-            currentDragStart?.invoke()
-            DragAndDropTransferData(data, flags = View.DRAG_FLAG_GLOBAL)
-        }
+}
+
+private class TranscriptDragSourceElement(
+    val payload: TranscriptDragPayload?,
+    val context: TranscriptDragContext,
+    val appContext: Context,
+    val fill: Color,
+    val radius: Dp,
+    val onLift: (() -> Unit)?,
+    val onDragStart: (() -> Unit)?,
+) : ModifierNodeElement<TranscriptDragSourceNode>() {
+    override fun create() = TranscriptDragSourceNode(payload, context, appContext, fill, radius, onLift, onDragStart)
+
+    override fun update(node: TranscriptDragSourceNode) {
+        node.payload = payload
+        node.dragContext = context
+        node.appContext = appContext
+        node.fill = fill
+        node.radius = radius
+        node.onLift = onLift
+        node.onDragStart = onDragStart
     }
-    modifier
+
+    override fun InspectorInfo.inspectableProperties() {
+        name = "transcriptDragSource"
+    }
+
+    override fun equals(other: Any?): Boolean = other is TranscriptDragSourceElement && other.payload == payload &&
+        other.context == context && other.fill == fill && other.radius == radius &&
+        other.onLift === onLift && other.onDragStart === onDragStart
+
+    override fun hashCode(): Int = ((payload.hashCode() * 31 + context.hashCode()) * 31 + fill.hashCode()) * 31 + radius.hashCode()
 }
 
 /**
- * [onLift] when a long press lands. With no drag source to take the moves, it then holds the
- * gesture ([consumes]) so the list doesn't scroll under the open menu.
+ * One gesture for the hold, the menu and the drag (iOS `UIContextMenuInteraction` and
+ * `UIDragInteraction` on one view), and the surface recorded as drawn for the drag's lift
+ * preview.
  */
-private suspend fun PointerInputScope.awaitLift(onLift: () -> Unit, consumes: Boolean) {
-    awaitEachGesture {
-        val down = awaitFirstDown(requireUnconsumed = false)
-        val longPress = awaitLongPressOrCancellation(down.id) ?: return@awaitEachGesture
-        onLift()
-        while (true) {
-            val event = awaitPointerEvent()
-            val change = event.changes.firstOrNull { it.id == longPress.id } ?: break
-            if (consumes) change.consume()
-            if (!change.pressed) break
+private class TranscriptDragSourceNode(
+    var payload: TranscriptDragPayload?,
+    var dragContext: TranscriptDragContext,
+    var appContext: Context,
+    var fill: Color,
+    var radius: Dp,
+    var onLift: (() -> Unit)?,
+    var onDragStart: (() -> Unit)?,
+) : DelegatingNode(), DrawModifierNode, LayoutAwareModifierNode {
+    private var layer: GraphicsLayer? = null
+    private var size = IntSize.Zero
+
+    override fun onRemeasured(size: IntSize) {
+        this.size = size
+    }
+
+    private val dragAndDrop = delegate(
+        DragAndDropSourceModifierNode { _ ->
+            val clip = payload?.clipData(dragContext, appContext) ?: return@DragAndDropSourceModifierNode
+            onDragStart?.invoke()
+            val hasUri = (0 until clip.itemCount).any { clip.getItemAt(it).uri?.scheme == "content" }
+            val flags = View.DRAG_FLAG_GLOBAL or (if (hasUri) View.DRAG_FLAG_GLOBAL_URI_READ else 0)
+            val shape = RoundedCornerShape(radius)
+            val recorded = layer
+            val shadowFill = fill
+            startDragAndDropTransfer(DragAndDropTransferData(clip, flags = flags), size.toSize()) {
+                // iOS's lift snapshot: the surface over its fill, in its rounded shape.
+                val outline = shape.createOutline(size, layoutDirection, this)
+                val path = Path().apply { addOutline(outline) }
+                clipPath(path) {
+                    drawRect(shadowFill)
+                    recorded?.let { drawLayer(it) }
+                }
+            }
+        },
+    )
+
+    init {
+        delegate(SuspendingPointerInputModifierNode { liftThenDrag() })
+    }
+
+    private suspend fun PointerInputScope.liftThenDrag() {
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false)
+            val longPress = awaitLongPressOrCancellation(down.id) ?: return@awaitEachGesture
+            // The menu the lift opens stays unfocusable while held, so this touch isn't cancelled.
+            TranscriptLiftHold.isHeld = onLift != null
+            onLift?.invoke()
+            val origin = longPress.position
+            try {
+                while (true) {
+                    // First, so the surface's own tap (inside) and the list's scroll (outside) see
+                    // the rest of the gesture taken.
+                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                    val change = event.changes.firstOrNull { it.id == longPress.id } ?: break
+                    change.consume()
+                    if (!change.pressed) break
+                    if (payload != null && (change.position - origin).getDistance() > viewConfiguration.touchSlop) {
+                        // Unspecified: Compose's own hit test against the node's size would drop
+                        // a request from a finger that has already moved past its edge.
+                        dragAndDrop.requestDragAndDropTransfer(androidx.compose.ui.geometry.Offset.Unspecified)
+                        break
+                    }
+                }
+            } finally {
+                TranscriptLiftHold.isHeld = false
+            }
         }
+    }
+
+    override fun ContentDrawScope.draw() {
+        if (payload == null) {
+            drawContent()
+            return
+        }
+        val recording = layer ?: requireGraphicsContext().createGraphicsLayer().also { layer = it }
+        recording.record { this@draw.drawContent() }
+        drawLayer(recording)
+    }
+
+    override fun onDetach() {
+        layer?.let { requireGraphicsContext().releaseGraphicsLayer(it) }
+        layer = null
     }
 }

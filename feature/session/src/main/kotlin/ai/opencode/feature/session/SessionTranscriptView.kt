@@ -1,5 +1,6 @@
 package ai.opencode.feature.session
 
+import ai.opencode.feature.composer.PastedTextViewer
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.experiments.key
 import ai.opencode.core.motion.Motion
@@ -566,6 +567,18 @@ object SessionTranscriptView {
                     )
                 }
             }
+            is TranscriptAction.OpenPastedText -> {
+                host?.dismissComposerKeyboard()
+                presenter?.present(sourceID = action.sourceID, isMedia = false, reducesMotion = reducedMotion, screenName = "Pasted Text Viewer") { viewer ->
+                    PastedTextViewer(
+                        text = action.text,
+                        summary = action.summary,
+                        onCopy = { store.send(Action.CopyTextTapped(it)) },
+                        onShare = { shareText(context, it) },
+                        onDone = { viewer.dismiss() },
+                    )
+                }
+            }
             else -> sessionAction(action)?.let(store::send)
         }
     }
@@ -594,7 +607,7 @@ object SessionTranscriptView {
         is TranscriptAction.PendingInputSendNowTapped -> Action.PendingInputSendNowTapped(action.inputID)
         is TranscriptAction.PendingInputMoveToQueueTapped -> Action.PendingInputMoveToQueueTapped(action.inputID)
         is TranscriptAction.PendingInputCancelTapped -> Action.PendingInputCancelTapped(action.inputID)
-        is TranscriptAction.OpenFile, is TranscriptAction.PreviewImage -> null
+        is TranscriptAction.OpenFile, is TranscriptAction.PreviewImage, is TranscriptAction.OpenPastedText -> null
     }
 
     /** The transcript's copy of the Since You Left value (`:feature:transcript` draws its row). */
