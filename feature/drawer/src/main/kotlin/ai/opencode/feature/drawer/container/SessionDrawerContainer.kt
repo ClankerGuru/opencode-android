@@ -1,0 +1,548 @@
+package ai.opencode.feature.drawer.container
+
+import ai.opencode.core.motion.rememberFrameDurationSeconds
+import ai.opencode.core.ui.LocalDrawerKeyboardSignals
+import ai.opencode.core.ui.LocalDrawerPanExclusion
+import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.feature.drawer.catchup.CatchUpMetrics
+import ai.opencode.feature.drawer.catchup.CatchUpStack
+import ai.opencode.feature.drawer.catchup.CatchUpStage
+import ai.opencode.feature.drawer.catchup.CatchUpStageProxy
+import ai.opencode.feature.drawer.catchup.rememberCatchUpStackController
+import ai.opencode.feature.drawer.motion.DrawerCorner
+import ai.opencode.feature.drawer.motion.DrawerDepth
+import ai.opencode.feature.drawer.motion.DrawerDim
+import ai.opencode.feature.drawer.motion.DrawerKeyboardHold
+import ai.opencode.feature.drawer.motion.DrawerPanEvent
+import ai.opencode.feature.drawer.motion.DrawerPanRegions
+import ai.opencode.feature.drawer.motion.DrawerRevealPhase
+import ai.opencode.feature.drawer.motion.drawerDirectionalPan
+import ai.opencode.feature.drawer.motion.drawerPanCard
+import ai.opencode.feature.drawer.motion.drawerPanDrawer
+import ai.opencode.feature.drawer.motion.rememberDisplayCornerRadius
+import ai.opencode.feature.drawer.motion.rememberDrawerMotionState
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.movableContentOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.lerp
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
+
+/**
+ * Port of `OpenCode/Drawer/SessionDrawerContainer.swift`: the frame-locked drawer and Catch Up
+ * container. The session card recedes over the drawer under the finger and rides
+ * `DrawerSpring` when released ([SessionDrawerController.motion]); every per-frame value is
+ * snapshot state read in layout/draw blocks, so dragging never recomposes [content] (the session
+ * and its pushed subagents) or [drawer]. Home hears only [onArrived] and the commit haptic.
+ *
+ * During Catch Up the same card, with the same composed session ([content] is movable content),
+ * insets into [CatchUpStack] above [chrome], and morphs back out onto the session or the open
+ * drawer (`SessionDrawerController.updateCatchUp`). A window at least
+ * [SidebarMetrics.minimumWindowWidth] wide shows [drawer] as a sidebar beside the card instead
+ * ([sidebarShown] non-null), and only Catch Up's card swipes remain.
+ *
+ * iOS hosting plumbing maps as: `UIHostingController`s → composables (the drawer is composed
+ * only while it can show, as iOS defers `pendingDrawer`); `CADisplayLink` → `motionFrameLoop`;
+ * `UIViewPropertyAnimator` morphs → one frame loop with UIKit's duration-spring curves;
+ * `snapshotView` → [SessionDrawerController.captureCardThen] pictures; `safeAreaRegions` →
+ * `LocalDrawerKeyboardSignals` (the session leaves the IME out while the hold excludes it);
+ * `accessibilityPerformEscape` → system back.
+ *
+ * @param isPresented whether the phone's drawer is open (Home's `isSessionDrawerPresented`);
+ *   [onPresentationChanged] writes a drag's or tap's decision back.
+ * @param width the drawer's (or sidebar's) width.
+ * @param sidebarShown beside a sidebar, whether it shows; `null` slides the phone's drawer.
+ * @param catchUp the Catch Up stage, or `null` outside Catch Up.
+ * @param onArrived the drawer visually arrived open (`true`) or shut, away from where it last rested.
+ * @param onCommitted a release or tap commits to the other side: play `Haptic.snap` now.
+ * @param onTouchDown a touch that may move the drawer began: prepare its haptic.
+ * @param onReveal a drag on the open drawer toward the card, which reveals the rows' times.
+ * @param onDrawerProgress how far the phone's drawer is open (0..1) each frame the card moves,
+ *   and whether it got there by moving (`false`: Catch Up took the screen or handed it back).
+ * @param dismissesKeyboardOnOpen opening the drawer dismisses the composer's keyboard instead
+ *   of holding it beside the card.
+ * @param contentSessionID the session the card shows or is about to show (`null` for a draft): a
+ *   drawer that closes on another session than it opened on leaves the keyboard down.
+ * @param isContentPushed a subagent is pushed over the session (its back gesture has the drag).
+ * @param isSheetPresented something is presented over Home (Settings): closing never restores focus.
+ * @param preview the inert card behind the open one in Catch Up.
+ */
+@Composable
+fun SessionDrawerContainer(
+    controller: SessionDrawerController,
+    isPresented: Boolean,
+    onPresentationChanged: (Boolean) -> Unit,
+    width: Dp,
+    sidebarShown: Boolean?,
+    reducedMotion: Boolean,
+    catchUp: CatchUpStage?,
+    catchUpProxy: CatchUpStageProxy,
+    keyboardHold: DrawerKeyboardHold,
+    panRegions: DrawerPanRegions,
+    content: @Composable () -> Unit,
+    drawer: @Composable () -> Unit,
+    chrome: @Composable () -> Unit,
+    preview: @Composable (sessionID: String, revision: Int) -> Unit,
+    modifier: Modifier = Modifier,
+    previewRevision: Int = 0,
+    onArrived: (Boolean) -> Unit = {},
+    onCommitted: () -> Unit = {},
+    onTouchDown: () -> Unit = {},
+    onReveal: (DrawerRevealPhase) -> Unit = {},
+    onDrawerProgress: (Float, Boolean) -> Unit = { _, _ -> },
+    dismissesKeyboardOnOpen: Boolean = false,
+    contentSessionID: String? = null,
+    isContentPushed: Boolean = false,
+    isSheetPresented: Boolean = false,
+) {
+    val motion = controller.motion
+    val density = LocalDensity.current
+    val colors = OpenCodeTheme.colors
+    val isDark = colors.isDark
+    val focusManager = LocalFocusManager.current
+    val displayRadius = rememberDisplayCornerRadius()
+    val frameDuration = rememberFrameDurationSeconds()
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    val safe = WindowInsets.systemBars.union(WindowInsets.displayCutout)
+    val layoutDirection = LocalLayoutDirection.current
+    val safeLeft = safe.getLeft(density, layoutDirection).toFloat()
+    val safeTop = safe.getTop(density).toFloat()
+    val safeRight = safe.getRight(density, layoutDirection).toFloat()
+    val safeBottom = safe.getBottom(density).toFloat()
+
+    val currentContent by rememberUpdatedState(content)
+    val currentOnReveal by rememberUpdatedState(onReveal)
+    val pushed by rememberUpdatedState(isContentPushed)
+    val sheet by rememberUpdatedState(isSheetPresented)
+    val currentCatchUp by rememberUpdatedState(catchUp)
+
+    val cardLayer = rememberGraphicsLayer()
+    val chromeLayer = rememberGraphicsLayer()
+    // One composed session moves between the full-screen card and Catch Up's stack, so entering
+    // and leaving Catch Up never rebuilds it (iOS keeps one hosted `SessionView`).
+    val cardContent = remember(cardLayer, keyboardHold, panRegions) {
+        movableContentOf {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .drawWithContent {
+                        cardLayer.record { this@drawWithContent.drawContent() }
+                        drawLayer(cardLayer)
+                    },
+            ) {
+                CompositionLocalProvider(
+                    LocalDrawerKeyboardSignals provides keyboardHold,
+                    LocalDrawerPanExclusion provides panRegions,
+                ) {
+                    currentContent()
+                }
+            }
+        }
+    }
+
+    val morph = controller.morph
+    val exitMorph = morph == CatchUpModeMorph.OpenIntoSession ||
+        morph == CatchUpModeMorph.FinishIntoSession ||
+        morph == CatchUpModeMorph.ReturnToDrawer
+    // Catch Up just ended and the morph hasn't started yet (it starts in this pass's effects):
+    // the stage stays mounted so the morph can fade it.
+    val exiting = catchUp == null && controller.catchUp != null
+    val stackStage = catchUp ?: if (exiting || exitMorph) controller.lastStage else null
+    val cardInStack = catchUp != null
+    val chromeMounted = catchUp != null || exiting || exitMorph
+    // Catch Up began this pass; its morph (which fades the drawer out) starts in this pass's effects.
+    val entering = catchUp != null && controller.catchUp == null
+    val drawerShows = morph == CatchUpModeMorph.EnterCatchUp || morph == CatchUpModeMorph.ReturnToDrawer || entering ||
+        (catchUp == null && (motion.isDrawerAvailable || controller.isSidebarComposed))
+    // Once shown, the drawer stays composed (hidden while it can't show), so its list keeps its
+    // place across visits, as iOS keeps its hosted drawer.
+    val drawerEverShown = remember { booleanArrayOf(false) }
+    if (drawerShows) drawerEverShown[0] = true
+    val drawerComposed = drawerShows || drawerEverShown[0]
+    val scrimColor = DrawerScrim.color(isDark, colors.highContrast)
+    val chromeBackground = if (isDark) Color(0.04f, 0.04f, 0.04f, 1f) else colors.userBubble
+    val borderColor = CatchUpMetrics.borderColor(isDark, colors.border)
+    val borderWidthPx = if (isDark) with(density) { 1.dp.toPx() } else 1f
+
+    Box(
+        modifier
+            .fillMaxSize()
+            .background(colors.canvas)
+            .onSizeChanged { controller.containerSizePx = it }
+            .drawerDirectionalPan(
+                regions = panRegions,
+                isDrawerPresented = { motion.isPresented },
+                isContentPushed = { pushed },
+                // Beside a sidebar the drawer doesn't move; Catch Up's stack runs its own swipe.
+                enabled = { controller.sidebarShown == null && controller.catchUp == null },
+                onTouchDown = motion::touchDown,
+            ) { event ->
+                if (!controller.acceptsPan(event)) return@drawerDirectionalPan
+                when (event) {
+                    is DrawerPanEvent.Began -> if (event.isRevealingTimes) {
+                        currentOnReveal(DrawerRevealPhase.Began)
+                        currentOnReveal(DrawerRevealPhase.Changed(event.translation))
+                    } else {
+                        controller.panBegan()
+                        motion.beginDrag()
+                        motion.drag(event.fingerTranslation)
+                    }
+                    is DrawerPanEvent.Changed -> if (event.isRevealingTimes) {
+                        currentOnReveal(DrawerRevealPhase.Changed(event.translation))
+                    } else {
+                        motion.drag(event.fingerTranslation)
+                    }
+                    is DrawerPanEvent.Ended ->
+                        if (event.isRevealingTimes) currentOnReveal(DrawerRevealPhase.Ended) else motion.endDrag(event.velocity)
+                    is DrawerPanEvent.Cancelled ->
+                        if (event.isRevealingTimes) currentOnReveal(DrawerRevealPhase.Ended) else motion.cancelDrag()
+                }
+            },
+    ) {
+        // The drawer (or sidebar), under the card; it recedes the more shut it is.
+        if (drawerComposed) {
+            val hiddenFromAccessibility = !drawerShows || catchUp != null ||
+                if (sidebarShown != null) !controller.isSidebarVisible else motion.isDrawerHiddenFromAccessibility.value
+            Box(
+                Modifier
+                    .width(width)
+                    .fillMaxHeight()
+                    .align(Alignment.CenterStart)
+                    .drawerPanDrawer(panRegions)
+                    .graphicsLayer {
+                        val override = controller.drawerScale.floatValue
+                        val scale = if (!override.isNaN()) override else DrawerDepth.scale(motion.progress, motion.reducedMotion || !motion.recedes)
+                        scaleX = scale
+                        scaleY = scale
+                        alpha = if (drawerShows) controller.drawerAlpha.floatValue else 0f
+                    }
+                    .then(if (hiddenFromAccessibility) Modifier.clearAndSetSemantics {} else Modifier),
+            ) {
+                drawer()
+                if (sidebarShown != null) {
+                    // The sidebar's edge against the session.
+                    Box(
+                        Modifier
+                            .align(Alignment.CenterEnd)
+                            .fillMaxHeight()
+                            .width(with(density) { 1f.toDp() })
+                            .background(colors.border),
+                    )
+                }
+            }
+            if (sidebarShown == null && drawerShows) {
+                // Full size, outside the scaled drawer: the receding list never shows a bright strip.
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .drawBehind {
+                            val override = controller.dimAlpha.floatValue
+                            val alpha = if (!override.isNaN()) override else DrawerDim.alpha(motion.progress, DrawerDim.maximum(isDark))
+                            if (alpha > 0f) drawRect(DrawerDim.color, alpha = alpha)
+                        },
+                )
+            }
+        }
+
+        // Catch Up's stage: the drift field, progress, Undo and the dispositions.
+        if (chromeMounted) {
+            val stageSnapshot = controller.stageSnapshot
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        alpha = controller.chromeAlpha.floatValue
+                        val scale = controller.chromeScale.floatValue
+                        scaleX = scale
+                        scaleY = scale
+                    }
+                    .background(chromeBackground),
+            ) {
+                if (catchUp == null && stageSnapshot != null) {
+                    // Leaving: the stage fades as a picture of itself, out of reach of touches.
+                    Image(stageSnapshot, contentDescription = null, contentScale = ContentScale.FillBounds, modifier = Modifier.fillMaxSize().clearAndSetSemantics {})
+                } else {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .drawWithContent {
+                                chromeLayer.record { this@drawWithContent.drawContent() }
+                                drawLayer(chromeLayer)
+                            }
+                            .then(if (catchUp == null) Modifier.clearAndSetSemantics {} else Modifier),
+                    ) {
+                        chrome()
+                    }
+                }
+            }
+        }
+
+        if (stackStage != null) {
+            val outgoing = controller.outgoing
+            CatchUpStack(
+                stage = stackStage,
+                controller = controller.catchUpStack,
+                proxy = catchUpProxy,
+                previewRevision = previewRevision,
+                revealsPreviewOnBegin = false,
+                modifier = Modifier.graphicsLayer {
+                    translationX = controller.stackOffset.floatValue.dp.toPx() * if (rtl) -1 else 1
+                },
+                card = {
+                    if (cardInStack) {
+                        Box(Modifier.fillMaxSize()) {
+                            cardContent()
+                            if (outgoing != null && controller.outgoingRect == null) {
+                                Image(
+                                    outgoing,
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clearAndSetSemantics {}
+                                        .graphicsLayer { alpha = controller.outgoingAlpha.floatValue },
+                                )
+                            }
+                        }
+                    }
+                },
+                preview = preview,
+            )
+        }
+
+        // The session card: slides over the drawer, or sits beside the sidebar.
+        if (!cardInStack) {
+            val scrimInteractive = motion.isScrimInteractive.value
+            val contentHidden = motion.isContentHiddenFromAccessibility.value
+            val outgoing = controller.outgoing
+            val outgoingRect = controller.outgoingRect
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .sidebarLeading(controller)
+                    .graphicsLayer {
+                        if (controller.cardPosed) {
+                            translationX = controller.cardTx.floatValue.dp.toPx() * if (rtl) -1 else 1
+                            translationY = controller.cardTy.floatValue.dp.toPx()
+                            val scale = controller.cardScale.floatValue
+                            scaleX = scale
+                            scaleY = scale
+                            alpha = controller.cardAlpha.floatValue
+                            shape = MaskShape(controller.currentMask(), controller.cardRadius.floatValue.dp.toPx())
+                            clip = true
+                        } else {
+                            val offset = motion.offset
+                            translationX = offset.dp.toPx() * if (rtl) -1 else 1
+                            val radius = DrawerCorner.radius(motion.isCardMoving, offset, displayRadius.value)
+                            shape = if (radius > 0f) RoundedCornerShape(radius.dp) else RectangleShape
+                            clip = radius > 0f
+                        }
+                    }
+                    .drawerPanCard(panRegions)
+                    .background(colors.canvas),
+            ) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .graphicsLayer { alpha = controller.contentAlpha.floatValue }
+                        .then(if (contentHidden) Modifier.clearAndSetSemantics {} else Modifier),
+                ) {
+                    cardContent()
+                }
+                if (outgoing != null && outgoingRect != null) {
+                    Image(
+                        outgoing,
+                        contentDescription = null,
+                        contentScale = ContentScale.FillBounds,
+                        modifier = Modifier
+                            .placedAt(outgoingRect)
+                            .clip(RoundedCornerShape(CatchUpMetrics.cornerRadius))
+                            .clearAndSetSemantics {}
+                            .graphicsLayer { alpha = controller.outgoingAlpha.floatValue },
+                    )
+                }
+                // The stack card's border, fading as its frame grows to the card's bounds.
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .drawBehind {
+                            val alpha = controller.borderAlpha.floatValue
+                            if (!controller.cardPosed || alpha <= 0f) return@drawBehind
+                            val mask = controller.currentMask() ?: Rect(Offset.Zero, size)
+                            val radius = controller.cardRadius.floatValue.dp.toPx()
+                            drawRoundRect(
+                                color = borderColor.copy(alpha = borderColor.alpha * alpha),
+                                topLeft = mask.topLeft,
+                                size = mask.size,
+                                cornerRadius = CornerRadius(radius),
+                                style = Stroke(borderWidthPx),
+                            )
+                        },
+                )
+                // Mutes the card while the drawer is open; a tap on it closes the drawer.
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .drawBehind {
+                            val override = controller.scrimAlpha.floatValue
+                            val progress = if (!override.isNaN()) override else motion.progress
+                            if (progress > 0f) drawRect(scrimColor, alpha = scrimColor.alpha * progress)
+                        }
+                        .then(
+                            if (scrimInteractive) {
+                                Modifier
+                                    .pointerInput(controller) { detectTapGestures { controller.closeDrawer() } }
+                                    .semantics {
+                                        contentDescription = "Close session list"
+                                        role = Role.Button
+                                        onClick { controller.closeDrawer() }
+                                    }
+                            } else {
+                                Modifier
+                            },
+                        ),
+                )
+            }
+        }
+
+        // Back: Catch Up exits; an open drawer closes (a pushed subagent's own back sits beneath).
+        BackHandler(enabled = catchUp != null) { currentCatchUp?.onExit?.invoke() }
+        BackHandler(enabled = catchUp == null && motion.isPresented) { controller.closeDrawer() }
+    }
+
+    DisposableEffect(controller) { onDispose { controller.dispose() } }
+
+    SideEffect {
+        controller.reducedMotion = reducedMotion
+        motion.reducedMotion = reducedMotion
+        controller.frameDuration = frameDuration
+        motion.frameDurationSeconds = frameDuration
+        controller.density = density.density
+        controller.safeLeftPx = safeLeft
+        controller.safeTopPx = safeTop
+        controller.safeRightPx = safeRight
+        controller.safeBottomPx = safeBottom
+        controller.displayCornerRadius = displayRadius.value
+        controller.isDark = isDark
+        controller.keyboardHold = keyboardHold
+        motion.keyboardHold = keyboardHold
+        controller.isSheetPresented = { sheet }
+        controller.isContentPushed = { pushed }
+        controller.clearFocus = { focusManager.clearFocus(force = true) }
+        controller.cardLayer = cardLayer
+        controller.chromeLayer = chromeLayer
+        controller.onArrived = onArrived
+        controller.onCommitted = onCommitted
+        controller.onTouchDown = onTouchDown
+        controller.onPresentationChanged = onPresentationChanged
+        controller.onDrawerProgress = onDrawerProgress
+        if (controller.drawerWidth != width.value) {
+            controller.finishModeTransition()
+            controller.drawerWidth = width.value
+            motion.updateWidth(width.value)
+            controller.sidebarWidthChanged()
+        }
+        controller.dismissesKeyboardOnOpen = dismissesKeyboardOnOpen
+        controller.contentSessionID = contentSessionID
+        // Before `setPresented`: leaving Catch Up for the open drawer is the stack's own exit,
+        // not an opening to feel.
+        controller.updateCatchUp(catchUp, returnsToDrawer = isPresented, animated = !reducedMotion)
+        controller.updatePushed(isContentPushed)
+        controller.setSidebar(sidebarShown, animated = !reducedMotion)
+        controller.setPresented(isPresented, animated = true)
+    }
+}
+
+/** A [SessionDrawerController] on this composition's frame clock. */
+@Composable
+fun rememberSessionDrawerController(initiallyPresented: Boolean = false): SessionDrawerController {
+    val scope = rememberCoroutineScope()
+    val motion = rememberDrawerMotionState(initiallyPresented)
+    val stack = rememberCatchUpStackController()
+    return remember(scope, motion, stack) { SessionDrawerController(scope, motion, stack) }
+}
+
+/** The card's leading edge at the sidebar's (read in layout only, so the toggle never recomposes the card). */
+private fun Modifier.sidebarLeading(controller: SessionDrawerController): Modifier = layout { measurable, constraints ->
+    val lead = controller.sidebarLeading.value.dp.roundToPx().coerceIn(0, constraints.maxWidth)
+    val width = (constraints.maxWidth - lead).coerceAtLeast(0)
+    val placeable = measurable.measure(Constraints.fixed(width, constraints.maxHeight))
+    layout(constraints.maxWidth, constraints.maxHeight) { placeable.placeRelative(lead, 0) }
+}
+
+/** Places this element at [rect] (px) in its parent, at that size. */
+private fun Modifier.placedAt(rect: Rect): Modifier = layout { measurable, constraints ->
+    val placeable = measurable.measure(
+        Constraints.fixed(rect.width.roundToInt().coerceAtLeast(0), rect.height.roundToInt().coerceAtLeast(0)),
+    )
+    layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(rect.left.roundToInt(), rect.top.roundToInt()) }
+}
+
+/** The card's frame mask (iOS `installCardFrameMaskAndBorder`): [rect] in px, or the whole card. */
+private class MaskShape(private val rect: Rect?, private val radius: Float) : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
+        val bounds = rect ?: Rect(Offset.Zero, size)
+        return Outline.Rounded(RoundRect(bounds, CornerRadius(radius)))
+    }
+}
+
+/** The mask between its start and end frames at the morph's progress, or `null` for the whole card. */
+internal fun SessionDrawerController.currentMask(): Rect? {
+    val start = cardMaskStart ?: return null
+    val end = cardMaskEnd ?: return null
+    return lerp(start, end, maskProgress.floatValue)
+}
