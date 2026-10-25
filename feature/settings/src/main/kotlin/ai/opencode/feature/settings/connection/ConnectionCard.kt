@@ -11,6 +11,7 @@ import ai.opencode.core.ui.RollingNumber
 import ai.opencode.core.ui.RollingNumberAlignment
 import ai.opencode.core.ui.RollingNumberStyle
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.core.ui.openCodeTapTarget
 import ai.opencode.feature.settings.ConnectionStatus
 import ai.opencode.feature.settings.SettingsButtonRow
 import ai.opencode.feature.settings.SettingsDivider
@@ -262,14 +263,20 @@ private fun ConnectionCardContent(
             val shown = remember { mutableStateOf(action) }
             if (action != null) shown.value = action
             shown.value?.let { current ->
+                // iOS `RetryStyle`: dims to 55 % while pressed; a 44 pt (here 48 dp) target.
+                val actionInteraction = remember { MutableInteractionSource() }
+                val actionPressed by actionInteraction.collectIsPressedAsState()
                 RetryLabel(
                     title = current.title,
-                    modifier = Modifier.clickable(role = Role.Button) {
-                        when (current) {
-                            CardAction.retry -> onRetry()
-                            CardAction.editServer -> onEditServer()
+                    modifier = Modifier
+                        .clickable(interactionSource = actionInteraction, indication = null, role = Role.Button) {
+                            when (current) {
+                                CardAction.retry -> onRetry()
+                                CardAction.editServer -> onEditServer()
+                            }
                         }
-                    },
+                        .openCodeTapTarget()
+                        .graphicsLayer { alpha = if (actionPressed) 0.55f else 1f },
                 )
             }
         }
@@ -462,9 +469,11 @@ private fun ConnectionStatusLabel(
                 if (reduceMotion) {
                     fadeIn(Motion.reducedFadeSpec()) togetherWith fadeOut(Motion.reducedFadeSpec())
                 } else {
-                    val spring = MotionSpring(0.4).spec<androidx.compose.ui.unit.IntOffset>()
-                    (slideInVertically(spring) { it / 2 } + fadeIn(Motion.easeOut(Motion.fadeStandard))) togetherWith
-                        (slideOutVertically(spring) { -it / 2 } + fadeOut(Motion.easeOut(Motion.fadeFast)))
+                    // iOS `ConnectionCard`: the monitor's changes animate `.smooth(duration: 0.42)`.
+                    val smooth = MotionSpring(0.42)
+                    val spring = smooth.spec<androidx.compose.ui.unit.IntOffset>()
+                    (slideInVertically(spring) { it / 2 } + fadeIn(smooth.spec())) togetherWith
+                        (slideOutVertically(spring) { -it / 2 } + fadeOut(smooth.spec()))
                 }
             },
             contentAlignment = Alignment.CenterEnd,

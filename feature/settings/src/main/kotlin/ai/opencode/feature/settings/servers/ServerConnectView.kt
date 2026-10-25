@@ -9,11 +9,13 @@ import ai.opencode.core.ui.OpenCodeSecondaryButton
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.feature.settings.SettingsDivider
+import ai.opencode.feature.settings.SettingsSection
 import ai.opencode.feature.settings.SettingsTint
 import ai.opencode.feature.settings.settingsSection
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -36,6 +38,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.relocation.BringIntoViewRequester
@@ -235,6 +238,15 @@ private fun MethodPicker(method: ServerTitleFeature.Method, modifier: Modifier =
     }
 }
 
+/**
+ * Scan Code / Enter Address swap their rows in place, animated as iOS's
+ * `$store.method.animation(.smooth(duration: 0.3))`.
+ */
+private fun Modifier.methodSwap(scope: LazyItemScope): Modifier = with(scope) {
+    val smooth = MotionSpring(0.3)
+    animateItem(fadeInSpec = smooth.spec(), placementSpec = smooth.spec(IntOffset.VisibilityThreshold), fadeOutSpec = smooth.spec())
+}
+
 private fun LazyListScope.scanSection(
     store: ServerTitleStore,
     busy: Boolean,
@@ -242,10 +254,11 @@ private fun LazyListScope.scanSection(
     connectRequester: BringIntoViewRequester,
 ) {
     item(key = "camera") {
-        ScanCamera(store, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+        ScanCamera(store, Modifier.methodSwap(this).padding(horizontal = 16.dp, vertical = 8.dp))
     }
     item(key = "paste") {
         ConnectAction(
+            modifier = Modifier.methodSwap(this),
             title = "Paste Pairing Link",
             symbol = "clipboard",
             prominent = false,
@@ -316,12 +329,15 @@ private fun LazyListScope.addressSection(
     onConnect: () -> Unit,
     connectRequester: BringIntoViewRequester,
 ) {
-    settingsSection(key = "address-form") {
-        AddressForm(store, onFocus, onConnect)
+    item(key = "address-form", contentType = "settings-section") {
+        SettingsSection(Modifier.methodSwap(this)) {
+            AddressForm(store, onFocus, onConnect)
+        }
     }
     item(key = "connect") {
         val address by store.observe { it.address }
         ConnectAction(
+            modifier = Modifier.methodSwap(this),
             title = "Connect",
             symbol = null,
             prominent = true,
@@ -437,10 +453,11 @@ private fun ConnectAction(
     error: String?,
     tag: String,
     requester: BringIntoViewRequester,
+    modifier: Modifier = Modifier,
     enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+    Column(modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
         val content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {
             Box(contentAlignment = Alignment.Center) {
                 Row(

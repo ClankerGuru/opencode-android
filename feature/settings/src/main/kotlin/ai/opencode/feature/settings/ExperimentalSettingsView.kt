@@ -8,7 +8,7 @@ import ai.opencode.core.experiments.ExperimentalCallStyle
 import ai.opencode.core.experiments.ExperimentalFeature
 import ai.opencode.core.experiments.ExperimentalGroup
 import ai.opencode.core.experiments.ModelPickerStyle
-import ai.opencode.core.motion.rememberReduceMotion
+import ai.opencode.core.motion.Motion
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
 import ai.opencode.devtools.DevTools
@@ -17,7 +17,10 @@ import ai.opencode.feature.voice.LivingOrbStyle
 import ai.opencode.feature.voice.VoiceSharedKeys
 import ai.opencode.feature.voice.livingOrbStyle
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.AnimationSpec
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import kotlinx.coroutines.delay
@@ -56,12 +60,20 @@ fun ExperimentalSettingsView(store: SettingsStore, focus: ExperimentalFeature?) 
     val callStyle = ExperimentalCallStyle.of(callTray = callTray, floatingCall = floatingCall)
     val listState = rememberLazyListState()
     var highlighted by remember { mutableStateOf<ExperimentalFeature?>(null) }
-    val reduceMotion = rememberReduceMotion()
 
-    // Scroll to the focused row (each group's section is one list item, in order) and tint it.
+    // Scroll to the focused row (each group's section is one list item, in order), centred as
+    // iOS `scrollTo(_, anchor: .center)`, and tint it.
     LaunchedEffect(focus) {
         val target = focus?.settingsRowID ?: return@LaunchedEffect
-        listState.scrollToItem(ExperimentalGroup.entries.indexOf(target.group))
+        val index = ExperimentalGroup.entries.indexOf(target.group)
+        // A frame for the list to lay out its rows first.
+        withFrameNanos {}
+        listState.scrollToItem(index)
+        val info = listState.layoutInfo
+        info.visibleItemsInfo.firstOrNull { it.index == index }?.let { item ->
+            val viewportCenter = (info.viewportStartOffset + info.viewportEndOffset) / 2
+            listState.scrollBy((item.offset + item.size / 2 - viewportCenter).toFloat())
+        }
         highlighted = target
         delay(1200)
         highlighted = null
@@ -75,7 +87,6 @@ fun ExperimentalSettingsView(store: SettingsStore, focus: ExperimentalFeature?) 
                 feature = feature,
                 enabled = enabled.getValue(feature),
                 highlighted = highlighted == feature,
-                reduceMotion = reduceMotion,
                 onChange = { send(HomeSettingsFeature.Action.ExperimentalFeatureChanged(feature, it)) },
             )
         }
@@ -109,7 +120,7 @@ fun ExperimentalSettingsView(store: SettingsStore, focus: ExperimentalFeature?) 
         ) {
             val highlight by animateColorAsState(
                 if (highlighted == ExperimentalFeature.callTray) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) else Color.Transparent,
-                tween(if (reduceMotion || highlighted == ExperimentalFeature.callTray) 0 else 600),
+                highlightSpec(highlighted == ExperimentalFeature.callTray),
                 label = "call-style-highlight",
             )
             SettingsMenuRow(
@@ -168,12 +179,10 @@ fun ExperimentalFeatureToggle(
     enabled: Boolean,
     onChange: (Boolean) -> Unit,
     highlighted: Boolean = false,
-    reduceMotion: Boolean = false,
 ) {
     val highlight by animateColorAsState(
         if (highlighted) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) else Color.Transparent,
-        // Tinted at once, then fades out over 0.6 s (iOS `.easeOut(duration: 0.6)`).
-        tween(if (reduceMotion || highlighted) 0 else 600),
+        highlightSpec(highlighted),
         label = "experiment-highlight",
     )
     SettingsToggleRow(
@@ -186,6 +195,10 @@ fun ExperimentalFeatureToggle(
         modifier = Modifier.background(highlight),
     )
 }
+
+/** Tinted at once, then fades out over 0.6 s (iOS `withAnimation(.easeOut(duration: 0.6))`). */
+private fun highlightSpec(highlighted: Boolean): AnimationSpec<Color> =
+    if (highlighted) snap() else tween(durationMillis = 600, easing = Motion.EaseOut)
 
 /** The row an experiment lives on: Call Style's for the styles it writes. */
 val ExperimentalFeature.settingsRowID: ExperimentalFeature
