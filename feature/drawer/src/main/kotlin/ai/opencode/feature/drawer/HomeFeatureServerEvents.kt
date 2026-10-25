@@ -1,0 +1,299 @@
+package ai.opencode.feature.drawer
+
+import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.store.Effect
+import ai.opencode.core.store.Reduced
+import ai.opencode.feature.drawer.HomeFeature.Action
+import ai.opencode.feature.drawer.HomeFeature.State
+import ai.opencode.feature.drawer.bridge.SessionDetail
+import ai.opencode.feature.drawer.bridge.SessionScreenMessage
+import ai.opencode.server.OpenCodeLiveContentEvent
+import ai.opencode.server.OpenCodeServerEvent
+
+/*
+ * Port of iOS `HomeFeature+ServerEvents.swift`: the event stream projected onto Home's list and
+ * forwarded to the screens that care. REST snapshots stay authoritative: anything an event can't
+ * settle on its own asks for a fresh snapshot (`refreshSnapshot`).
+ */
+
+
+internal fun HomeFeature.reduceServerEvent(state: State, event: OpenCodeServerEvent): HomeReduced {
+    when (event) {
+        is OpenCodeServerEvent.SessionViewChanged -> {
+            // The event carries the watermark, so unread updates in place rather than refetching the list.
+            return Reduced(state.updatingSession(event.sessionID) { it.copy(viewedMilliseconds = maxOf(it.viewedMilliseconds ?: 0, event.idle)) })
+        }
+
+        OpenCodeServerEvent.Connected -> {
+            // A new stream may have missed events; its snapshot is the truth.
+            // TODO(merge): clear `serverVoiceSupportByServer[serverID]` and the call's support once `:feature:voice` ports.
+            return familyAndListRefresh(state.copy(runChangesDuringRefresh = emptyMap()))
+        }
+
+        is OpenCodeServerEvent.SessionCreated -> {
+            val parentID = event.parentID ?: return familyAndListRefresh(state)
+            // A subagent: the root list is unchanged, and its parent never changes.
+            var s = state
+            if (s.activeSessionParents[event.sessionID] != parentID) {
+                s = s.copy(activeSessionParents = s.activeSessionParents + (event.sessionID to parentID))
+            }
+            val parents = s.knownParents
+            s = s.invalidatingSnapshotFamilyReads { snapshot -> snapshot.family.any { it.id == parentID } }
+            val detail = s.sessionDetail
+            val rereadDetail = detail != null && (
+                detail.session == null ||
+                    detail.familySessions.any { it.id == parentID } ||
+                    joinsUnlisted(detail, event.sessionID, parents) ||
+                    !s.isAttributed(parentID, parents)
+                )
+            if (rereadDetail && s.sessionDetail?.familyReadAt != null) s = s.updatingDetail { it.copy(familyReadAt = null) }
+            s = s.updatingSubagents { screen ->
+                if (screen.familySessions.any { it.id == parentID } || joinsUnlisted(screen, event.sessionID, parents)) {
+                    screen.copy(familyReadAt = null)
+                } else {
+                    screen
+                }
+            }
+            return Reduced(
+                s,
+                Effect.merge(
+                    if (rereadDetail) sendToDetail(s, SessionScreenMessage.FamilyRefreshRequested) else Effect.none(),
+                    forwardToSubagentFamilies(s, parentID, SessionScreenMessage.FamilyRefreshRequested),
+                ),
+            )
+        }
+
+        is OpenCodeServerEvent.ContentBatch -> {
+            // A cached session's copy follows its live events, one read per pause.
+            var s = state
+            val refresh = if (event.sessionID !in s.transcriptCache) {
+                Effect.none()
+            } else {
+                val reduced = refreshCachedTranscript(s, event.sessionID, after = HomeFeature.cachedTranscriptRefreshDelay, force = true)
+                s = reduced.state
+                reduced.effect
+            }
+            val notify = Effect.merge(notifyContentBatch(s, event.sessionID, event.events), refresh)
+            // Like the TUI's subagent footer, a new step means the session runs, even when its start
+            // came before this stream connected.
+            if (event.sessionID in s.activeSessionIDs || event.events.none { it is OpenCodeLiveContentEvent.StepStarted }) {
+                return Reduced(s, notify)
+            }
+            val started = noteRunStarted(s, event.sessionID)
+            return Reduced(started.state, Effect.merge(started.effect, notify))
+        }
+
+        is OpenCodeServerEvent.MessageInvalidated ->
+            return Reduced(state, forwardToSession(state, event.sessionID, SessionScreenMessage.MessageInvalidated(event.sessionID)))
+
+        is OpenCodeServerEvent.RevertChanged -> {
+            val s = state.updatingSession(event.sessionID) { it.copy(revertMessageID = event.messageID) }
+                .updatingSnapshot(event.sessionID) { it.copy(session = it.session.copy(revertMessageID = event.messageID)) }
+            if (s.sessionDetail?.session?.id != event.sessionID) return Reduced(s)
+            return Reduced(s, sendToDetail(s, SessionScreenMessage.RevertChanged(event.sessionID, event.messageID, event.committed)))
+        }
+
+        is OpenCodeServerEvent.InputQueueChanged -> {
+            // A send of this phone's delivered while its session was off screen shows as sent when it opens.
+            // TODO(merge): `promptOutbox.markDelivered(inputID)` once `:feature:composer` ports the outbox.
+            var s = state
+            event.inputID?.let { s = removingSnapshotQueuedInput(s, event.sessionID, it) }
+            return Reduced(s, forwardToSession(s, event.sessionID, SessionScreenMessage.InputQueueChanged(event.inputID)))
+        }
+
+        is OpenCodeServerEvent.InputEnqueued ->
+            return Reduced(state, forwardToSession(state, event.sessionID, SessionScreenMessage.InputEnqueued(event.input)))
+
+        is OpenCodeServerEvent.InputCancelled -> {
+            // TODO(merge): `promptOutbox.forgetAdmitted(inputID)`.
+            val s = removingSnapshotQueuedInput(state, event.sessionID, event.inputID)
+            return Reduced(s, forwardToSession(s, event.sessionID, SessionScreenMessage.InputCancelled(event.inputID)))
+        }
+
+        is OpenCodeServerEvent.AttentionChanged -> {
+            // A request on a root we already list can light up now; the authoritative refetch settles
+            // child-owned requests and removals.
+            var s = state
+            val asked = event.askedSessionID
+            if (asked != null && s.sessions.any { it.id == asked }) s = s.copy(attentionSessionIDs = s.attentionSessionIDs + asked)
+            return Reduced(
+                s,
+                Effect.merge(refreshAttention(s), forwardToScreens(s, SessionScreenMessage.RequestsChanged) { it.session != null }),
+            )
+        }
+
+        is OpenCodeServerEvent.ShellStarted -> {
+            val sessionID = event.shell.sessionID ?: return Reduced(state)
+            return Reduced(state, forwardToSession(state, sessionID, SessionScreenMessage.ShellStarted(event.shell)))
+        }
+
+        is OpenCodeServerEvent.ShellEnded -> {
+            val s = state.copy(
+                sessionSnapshots = state.sessionSnapshots.mapValues { (_, snapshot) ->
+                    if (snapshot.shells.any { it.id == event.shellID }) snapshot.copy(shells = snapshot.shells.filterNot { it.id == event.shellID })
+                    else snapshot
+                },
+            )
+            return Reduced(s, forwardToScreens(s, SessionScreenMessage.ShellEnded(event.shellID)))
+        }
+
+        is OpenCodeServerEvent.ExecutionStarted -> {
+            val sessionID = event.sessionID
+            var s = state
+            val parents = s.knownParents
+            val unattributed = !s.isAttributed(sessionID, parents)
+            if (unattributed) s = s.invalidatingSnapshotFamilyReads { snapshot -> snapshot.family.none { it.id == sessionID } }
+            // TODO(merge): `voice.replyWatch.setSessionActive(sessionID, true)`.
+            val changed = SessionScreenMessage.FamilyRunStateChanged(sessionID, isRunning = true)
+            val started = noteRunStarted(s, sessionID)
+            s = started.state
+            // Every open screen whose family it may belong to hears it, listed or not. One whose family
+            // Home's parent links say it joins, but that hasn't listed it, reads again.
+            val reread = { screen: SessionDetail -> joinsUnlisted(screen, sessionID, parents) }
+            val receivesRunState = { screen: SessionDetail -> shouldForwardFamilyRunState(screen, sessionID, unattributed, parents) }
+            val pushed = Effect.merge(
+                forwardToSubagents(s, changed, receivesRunState),
+                forwardToSubagents(s, SessionScreenMessage.FamilyRefreshRequested, reread),
+            )
+            val detail = s.sessionDetail
+            if (detail?.session == null) return Reduced(s, Effect.merge(started.effect, pushed))
+            return Reduced(
+                s,
+                Effect.merge(
+                    started.effect,
+                    pushed,
+                    if (receivesRunState(detail)) sendToDetail(s, changed) else Effect.none(),
+                    if (reread(detail)) sendToDetail(s, SessionScreenMessage.FamilyRefreshRequested) else Effect.none(),
+                ),
+            )
+        }
+
+        is OpenCodeServerEvent.ExecutionEnded -> {
+            val sessionID = event.sessionID
+            var s = state
+            if (sessionID in s.activeSessionIDs) {
+                s = s.copy(activeSessionIDs = s.activeSessionIDs - sessionID).persistingSnapshot(dependency(HomeSnapshotDate).now())
+            }
+            s = s.copy(runChangesDuringRefresh = s.runChangesDuringRefresh + (sessionID to false))
+            val parents = s.knownParents
+            val unattributed = !s.isAttributed(sessionID, parents)
+            val receivesRunState = { screen: SessionDetail -> shouldForwardFamilyRunState(screen, sessionID, unattributed, parents) }
+            val ended = SessionScreenMessage.FamilyRunStateChanged(sessionID, isRunning = false)
+            // TODO(merge): `notifyVoiceExecutionEnded` (the call's reply watch) once `:feature:voice` ports.
+            val notify = forwardToSubagents(s, ended, receivesRunState)
+            // Refetch for updatedAt/ordering; if the finished run belongs to the open session, stop its
+            // working indicator and pull the reply. Unlisted members too, as for a start.
+            val refreshed = refreshSnapshot(s)
+            s = refreshed.state
+            val detail = s.sessionDetail
+            if (detail?.session == null) return Reduced(s, Effect.merge(refreshed.effect, notify))
+            return Reduced(
+                s,
+                Effect.merge(
+                    refreshed.effect,
+                    if (receivesRunState(detail)) sendToDetail(s, ended) else Effect.none(),
+                    notify,
+                ),
+            )
+        }
+
+        is OpenCodeServerEvent.SessionRenamed -> {
+            val sessionID = event.sessionID
+            val title = event.title
+            val s = state.copy(
+                sessionSnapshots = state.sessionSnapshots.mapValues { (id, snapshot) ->
+                    snapshot.copy(
+                        session = if (id == sessionID) snapshot.session.copy(title = title) else snapshot.session,
+                        family = snapshot.family.map { if (it.id == sessionID) it.copy(title = title) else it },
+                    )
+                },
+            ).updatingSession(sessionID) { it.copy(title = title) }
+                // The open screen's own copy follows. TODO(merge): the screen handles `familySessionRenamed`.
+                .updatingDetail { detail ->
+                    detail.copy(
+                        session = detail.session?.let { if (it.id == sessionID) it.copy(title = title) else it },
+                        familySessions = detail.familySessions.map { if (it.id == sessionID) it.copy(title = title) else it },
+                        feature = if (detail.session?.id == sessionID) detail.feature.copy(title = title) else detail.feature,
+                    )
+                }
+            val renamed = SessionScreenMessage.FamilySessionRenamed(sessionID, title)
+            val pushed = forwardToSubagentFamilies(s, sessionID, renamed)
+            val detail = s.sessionDetail
+            if (detail == null || detail.familySessions.none { it.id == sessionID }) return Reduced(s, pushed)
+            return Reduced(s, Effect.merge(sendToDetail(s, renamed), pushed))
+        }
+
+        is OpenCodeServerEvent.SessionDeleted -> {
+            val sessionID = event.sessionID
+            var s = state
+            // A pushed subagent that went away goes back to its parent, before the purge, so popping can't save it again.
+            val index = s.subagentStack.indexOfFirst { it.session?.id == sessionID }
+            if (index >= 0) s = s.poppingSubagents(toDepth = index)
+            val cancelSelected = if (s.selectedTranscriptFetch?.sessionID == sessionID) {
+                s = s.copy(selectedTranscriptFetch = null)
+                Effect.cancel(HomeFeature.CancelID.SelectedTranscript)
+            } else {
+                Effect.none()
+            }
+            s = s.purgingSession(sessionID)
+            s = s.copy(recentlyDeletedIDs = s.recentlyDeletedIDs - sessionID)
+            val deleted = SessionScreenMessage.FamilySessionDeleted(sessionID)
+            val pushed = forwardToSubagentFamilies(s, sessionID, deleted)
+            // A subagent the family read hasn't listed may still own a docked request.
+            val detail = s.sessionDetail
+            if (detail == null || (detail.familySessions.none { it.id == sessionID } && sessionID !in detail.waitingSessionIDs)) {
+                return Reduced(s, Effect.merge(cancelSelected, pushed))
+            }
+            if (detail.familyRootID == sessionID) {
+                return Reduced(s.openingDraft(reason = "the session went away on the server"), cancelSelected)
+            }
+            s = s.updatingDetail { d -> d.copy(familySessions = d.familySessions.filterNot { it.id == sessionID }) }
+            return Reduced(s, Effect.merge(cancelSelected, sendToDetail(s, deleted), pushed))
+        }
+
+        is OpenCodeServerEvent.ProjectUpdated -> {
+            val project = event.project
+            val index = state.projects.indexOfFirst { it.id == project.id }
+            val projects = if (index >= 0) state.projects.toMutableList().also { it[index] = project } else listOf(project) + state.projects
+            val s = state.copy(projects = projects)
+                .updatingDetail { detail ->
+                    detail.copy(
+                        projects = detail.projects.map { if (it.id == project.id) project else it },
+                        draftProject = if (detail.draftProject?.id == project.id) project else detail.draftProject,
+                    )
+                }
+                .updatingSubagents { screen -> screen.copy(projects = screen.projects.map { if (it.id == project.id) project else it }) }
+            return Reduced(s)
+        }
+    }
+}
+
+/**
+ * Home's record of a run starting: kept over the next snapshot, with the family link that keeps its
+ * root lit after a switch away, and persisted. A newly spawned child may not be discovered yet:
+ * refreshes metadata so its ancestors light up even when that parent isn't open.
+ */
+internal fun HomeFeature.noteRunStarted(state: State, sessionID: String): HomeReduced {
+    val parents = state.knownParents
+    var s = state.recordingActiveAncestry(setOf(sessionID), parents)
+    val started = sessionID !in s.activeSessionIDs
+    s = s.copy(activeSessionIDs = s.activeSessionIDs + sessionID, runChangesDuringRefresh = s.runChangesDuringRefresh + (sessionID to true))
+    if (started) s = s.persistingSnapshot(dependency(HomeSnapshotDate).now())
+    return if (s.isAttributed(sessionID, parents)) Reduced(s) else refreshSnapshot(s)
+}
+
+/** A new stream or a new root: every family may have changed. */
+internal fun HomeFeature.familyAndListRefresh(state: State): HomeReduced {
+    val s = state.invalidatingSnapshotFamilyReads()
+        .updatingDetail { it.copy(familyReadAt = null) }
+        .updatingSubagents { it.copy(familyReadAt = null) }
+    val refreshed = refreshSnapshot(s)
+    val refresh = Effect.merge(refreshed.effect, forwardToSubagents(refreshed.state, SessionScreenMessage.FamilyRefreshRequested))
+    if (refreshed.state.sessionDetail == null) return Reduced(refreshed.state, refresh)
+    return Reduced(refreshed.state, Effect.merge(refresh, sendToDetail(refreshed.state, SessionScreenMessage.FamilyRefreshRequested)))
+}
+
+private fun removingSnapshotQueuedInput(state: State, sessionID: String, inputID: String): State =
+    state.updatingSnapshot(sessionID) { snapshot ->
+        snapshot.copy(queued = snapshot.queued.filterNot { it.id == inputID }, positions = snapshot.positions - inputID)
+    }
