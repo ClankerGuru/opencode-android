@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Release: cleartext follows the platform default (off). OpenCode servers on a LAN or
+     tailnet are often plain http, so the server agent decides the release policy with
+     the iOS ATS settings (NSAllowsArbitraryLoads / local networking) as the reference. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+</network-security-config>
