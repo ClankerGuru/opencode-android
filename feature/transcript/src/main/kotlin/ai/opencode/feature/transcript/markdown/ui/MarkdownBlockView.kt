@@ -16,6 +16,10 @@ import ai.opencode.feature.transcript.markdown.InlineText
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock.Kind
 import ai.opencode.server.model.AgentFileReference
+import ai.opencode.feature.transcript.user.TranscriptDragContext
+import ai.opencode.feature.transcript.user.TranscriptDragPayload
+import ai.opencode.feature.transcript.user.transcriptDragSource
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -40,7 +44,6 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
@@ -104,7 +107,7 @@ private fun BlockContent(kind: Kind, grown: List<TranscriptTextReveal.Arrival>, 
         Kind.Divider ->
             // Runs the screen's full width, like the code and table bands, with the block gap on each side.
             HairlineRule(Modifier.bleedHorizontal(gutter).clearAndSetSemantics {})
-        is Kind.PullRequest -> PullRequestCard(kind.title) { send(TranscriptAction.LinkTapped(kind.url)) }
+        is Kind.PullRequest -> PullRequestCard(kind.title, kind.url) { send(TranscriptAction.LinkTapped(kind.url)) }
         is Kind.Files -> FileCards(kind.files)
         // A Markdown image outside the session's folder loads through that folder's location once
         // it's on screen; a file that can't be shown inline falls back to its card.
@@ -123,7 +126,12 @@ private fun BlockContent(kind: Kind, grown: List<TranscriptTextReveal.Arrival>, 
         }
         is Kind.Table -> MarkdownTable(kind.header, kind.rows)
         is Kind.Math -> MathDisplayView(kind.math)
-        is Kind.Mermaid -> MermaidDiagramCard(kind.source) { send(TranscriptAction.PreviewImage(it)) }
+        // The diagram drags out as `diagram.png` (iOS `.transcriptDragSource(.image(...))`).
+        is Kind.Mermaid -> androidx.compose.runtime.CompositionLocalProvider(
+            ai.opencode.feature.media.LocalTranscriptImageDragSource provides MermaidImageDragSource,
+        ) {
+            MermaidDiagramCard(kind.source) { send(TranscriptAction.PreviewImage(it)) }
+        }
     }
 }
 
@@ -153,7 +161,7 @@ private fun BlockText(
     val linkStore = LocalLinkPreviewStore.current
     val linkRevision = LocalLinkPreviewRevision.current
     val linkRow = LocalLinkPreviewRow.current
-    val siteIcon = remember(linkStore) { linkStore?.let { store -> { url: String -> store.inlineIcon(url)?.image?.asImageBitmap() } } }
+    val siteIcon = remember(linkStore) { linkStore?.let { store -> { url: String -> store.inlineIcon(url) } } }
     val listener = rememberLinkListener()
     val options = PresentationOptions(
         foreground = color,
@@ -214,9 +222,18 @@ private fun ListItem(kind: Kind, marker: String, level: Int, text: InlineText, g
     }
 }
 
+private val MermaidImageDragSource = { image: android.graphics.Bitmap, name: String, radius: androidx.compose.ui.unit.Dp, onLift: () -> Unit, onDragStart: () -> Unit ->
+    Modifier.transcriptDragSource(
+        TranscriptDragPayload.Image(image.asImageBitmap(), name),
+        cornerRadius = radius,
+        onLift = onLift,
+        onDragStart = onDragStart,
+    )
+}
+
 /** iOS's pull request link card: purple branch glyph, the title, and an outward arrow. */
 @Composable
-private fun PullRequestCard(title: String, onOpen: () -> Unit) {
+private fun PullRequestCard(title: String, url: String, onOpen: () -> Unit) {
     val colors = currentMarkdownStyle().colors
     val shape = RoundedCornerShape(TranscriptMetrics.cardCornerRadius)
     val purple = if (colors.isDark) Color(0xFFBF5AF2) else Color(0xFFAF52DE)
@@ -224,6 +241,7 @@ private fun PullRequestCard(title: String, onOpen: () -> Unit) {
         Modifier
             .fillMaxWidth()
             .heightIn(min = TranscriptMetrics.minimumHitSide)
+            .transcriptDragSource(TranscriptDragPayload.Url(url), cornerRadius = TranscriptMetrics.cardCornerRadius)
             .clip(shape)
             .background(colors.userBubble, shape)
             .clickable(onClick = onOpen)
@@ -254,11 +272,37 @@ private fun FileCards(files: List<AgentFileReference>) {
     val context = LocalTranscriptRowContext.current
     val server = context.server
     val onOpenFile = { file: AgentFileReference -> context.send(TranscriptAction.OpenFile(file)) }
-    if (context.imagePreviews && server != null && files.any { it.kind == AgentFileReference.Kind.Image }) {
+    // iOS `.transcriptDragSource(.agentFile(...))` on the gallery's tiles and the file cards:
+    // media draws them, so the transcript hands it the drag source.
+    val directory = context.directory
+    val dragSource = remember(server, directory) {
+        { file: AgentFileReference, cachedImage: android.graphics.Bitmap?, radius: androidx.compose.ui.unit.Dp ->
+            Modifier.transcriptDragSource(
+                TranscriptDragPayload.AgentFile(file, server, directory, cachedImage = cachedImage?.asImageBitmap()),
+                cornerRadius = radius,
+                context = TranscriptDragContext(server, directory),
+            )
+        }
+    }
+    androidx.compose.runtime.CompositionLocalProvider(ai.opencode.feature.media.LocalAgentFileDragSource provides dragSource) {
+        FileCardsContent(files, server, context.imagePreviews, directory, onOpenFile)
+    }
+}
+
+@Composable
+private fun FileCardsContent(
+    files: List<AgentFileReference>,
+    server: ai.opencode.server.OpenCodeServer?,
+    imagePreviews: Boolean,
+    directory: String?,
+    onOpenFile: (AgentFileReference) -> Unit,
+) {
+    val context = LocalTranscriptRowContext.current
+    if (imagePreviews && server != null && files.any { it.kind == AgentFileReference.Kind.Image }) {
         AgentImageGallery(
             files = files,
             server = server,
-            directory = context.directory,
+            directory = directory,
             onPreviewImage = { context.send(TranscriptAction.PreviewImage(it)) },
             onOpenFile = onOpenFile,
         )

@@ -15,8 +15,9 @@ import ai.opencode.feature.transcript.TranscriptSubagent
 import ai.opencode.feature.transcript.markdown.ui.BandClock
 import ai.opencode.feature.transcript.markdown.ui.DisclosedTransition
 import ai.opencode.feature.transcript.markdown.ui.TranscriptBand
+import ai.opencode.feature.transcript.user.TranscriptDragPayload
+import ai.opencode.feature.transcript.user.transcriptDragSource
 import ai.opencode.server.model.AgentDisplayName
-import ai.opencode.server.model.AgentFileReference
 import ai.opencode.server.model.OpenCodeQuestion
 import ai.opencode.server.model.OpenCodeToolCall
 import ai.opencode.server.model.OpenCodeTranscriptItem
@@ -358,21 +359,25 @@ private fun ToolBody(entry: TranscriptEntry, id: String, call: OpenCodeToolCall)
                 }
             }
         }
-        val file = toolFileReference(call)
+        val file = call.fileReference
         if (file != null && !call.isRunningOrStreaming()) {
             HorizontalDivider(thickness = 0.5.dp, color = colors.border)
             Row(
                 Modifier
                     .fillMaxWidth()
                     .heightIn(min = TranscriptMetrics.minimumHitSide)
+                    .transcriptDragSource(
+                        TranscriptDragPayload.AgentFile(file, context.server, context.directory),
+                        cornerRadius = TranscriptMetrics.controlCornerRadius,
+                    )
                     .clickable(role = Role.Button) { context.send(TranscriptAction.OpenFile(file)) }
                     .padding(horizontal = TranscriptMetrics.standard),
                 horizontalArrangement = Arrangement.spacedBy(TranscriptMetrics.clustered),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                val name = fileName(file)
+                val name = file.name
                 val style = OpenCodeTextStyles.footnote.copy(fontWeight = FontWeight.Medium)
-                OpenCodeIcon(fileSymbol(name), contentDescription = null, size = OpenCodeIconSize.small, tint = colors.secondaryText)
+                OpenCodeIcon(file.symbolName, contentDescription = null, size = OpenCodeIconSize.small, tint = colors.secondaryText)
                 Text("Open $name", Modifier.weight(1f), style = style, color = colors.text, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
                 OpenCodeIcon("chevron.right", contentDescription = null, size = 14.dp, tint = colors.tertiaryText)
             }
@@ -383,48 +388,6 @@ private fun ToolBody(entry: TranscriptEntry, id: String, call: OpenCodeToolCall)
 @Composable
 private fun WrappedCode(text: String, color: Color, maxLines: Int = Int.MAX_VALUE) {
     Text(text, Modifier.fillMaxWidth(), style = TranscriptFonts.toolFont, color = color, maxLines = maxLines, overflow = TextOverflow.Clip)
-}
-
-// Files (minimal `AgentFileReference` helpers until the media port lands)
-
-private val LOCATION_SUFFIX = Regex(""":(\d+)(?::\d+)?$""")
-private val LINE_ANCHOR = Regex("""#L(\d+)(?:-L?\d+)?$""")
-
-private fun fileName(file: AgentFileReference): String = file.path.split('/', '\\').lastOrNull { it.isNotEmpty() } ?: file.path
-
-/**
- * iOS `OpenCodeToolCall.fileReference`: the file a read, write, or edit touched, when its name is
- * one the viewer can open (folders and globs are not). `hasViewableName` is approximated (a name
- * with an extension) until `AgentFileReference`'s extension tables are ported.
- */
-internal fun toolFileReference(call: OpenCodeToolCall): AgentFileReference? {
-    if (call.isShell) return null
-    val raw = call.inputPath ?: return null
-    if (raw.contains("*")) return null
-    var path = raw
-    var line: Int? = null
-    val location = LOCATION_SUFFIX.find(path) ?: LINE_ANCHOR.find(path)
-    if (location != null) {
-        line = location.groupValues[1].toIntOrNull()
-        path = path.substring(0, location.range.first)
-    }
-    if (path.isEmpty() || path in setOf("/", "~", ".", "..") || path.endsWith("/")) return null
-    val name = path.split('/', '\\').last()
-    if (name.lastIndexOf('.') <= 0 && name.lowercase() !in knownFileNames) return null
-    return AgentFileReference(path, line)
-}
-
-private val knownFileNames = setOf("makefile", "dockerfile", "license", "readme", "gemfile", "podfile", "procfile", "brewfile", "rakefile", "justfile")
-
-private fun fileSymbol(name: String): String {
-    val ext = name.substringAfterLast('.', "").lowercase()
-    return when (ext) {
-        "png", "jpg", "jpeg", "gif", "webp", "heic", "heif", "bmp", "tiff", "svg" -> "photo"
-        "mp4", "mov", "m4v", "webm", "mkv" -> "film"
-        "mp3", "m4a", "wav", "aac", "flac", "ogg" -> "waveform"
-        "pdf" -> "doc.richtext"
-        else -> "doc.text"
-    }
 }
 
 // Answered questions

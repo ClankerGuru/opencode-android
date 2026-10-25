@@ -3,6 +3,16 @@ package ai.opencode.feature.transcript.markdown.ui
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
+import ai.opencode.core.motion.rememberReduceMotion
+import androidx.compose.ui.graphics.BlurEffect
+import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.unit.IntSize
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
@@ -45,6 +55,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.LinkInteractionListener
 import androidx.compose.ui.text.TextLayoutResult
@@ -109,6 +120,23 @@ internal fun ArrivingText(
     val active = if (presented.hasMath) emptyList() else arrivals.filter { now - it.time < it.duration }
     val ends = active.maxOfOrNull { it.time + it.duration }
     val frame = rememberRevealFrame(ends, reveal.now)
+    // iOS reads the style each body pass: a change shows on the next chunk.
+    val revealStyle = StreamTextRevealStyle.current
+    val reduceMotion = rememberReduceMotion()
+    val sweep = if (revealStyle == StreamTextRevealStyle.Chunk) {
+        null
+    } else {
+        SweepParameters(
+            focus = revealStyle == StreamTextRevealStyle.Focus,
+            feather = TextRevealTunables.feather.value,
+            // Points → px; Reduce Motion drops the blur (iOS `StreamSweepOverlay`).
+            blurRadius = if (reduceMotion) 0f else with(density) { TextRevealTunables.blurRadius.value.toFloat().dp.toPx() },
+            blurPoints = if (reduceMotion) 0.0 else TextRevealTunables.blurRadius.value,
+            lift = TextRevealTunables.phosphorLift.value,
+        )
+    }
+    // Focus's blur steps share a few layers, one per step (iOS: `ctx.drawLayer` per step).
+    val blurLayers = if (sweep?.focus == true) List(SweepParameters.STEPS) { rememberGraphicsLayer() } else null
     var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
     var pressed by remember { mutableStateOf<String?>(null) }
     var menu by remember { mutableStateOf<Pair<String, Offset>?>(null) }
@@ -149,7 +177,11 @@ internal fun ArrivingText(
                     }
                     if (result != null && active.isNotEmpty()) {
                         frame.longValue
-                        eraseArriving(result, active, reveal.now())
+                        if (sweep == null) {
+                            eraseArriving(result, active, reveal.now())
+                        } else {
+                            sweepArriving(result, active, reveal.now(), sweep, blurLayers)
+                        }
                     }
                 }
                 .then(
@@ -201,6 +233,8 @@ internal fun ArrivingText(
                     },
                 )
                 .semantics {
+                    // iOS `.accessibilityHint("Links to …")`: read after the text.
+                    presented.linkHint?.let { stateDescription = it }
                     if (links.isNotEmpty()) {
                         customActions = links.flatMap { url ->
                             MarkdownLinks.accessibilityActions(url).map { action ->
@@ -263,17 +297,98 @@ private fun DrawScope.eraseArriving(layout: TextLayoutResult, active: List<Trans
     }
 }
 
+/** The Frontier and Focus sweeps' knobs, read once per composition (iOS `StreamSweepOverlay`). */
+private class SweepParameters(
+    val focus: Boolean,
+    val feather: Double,
+    /** Px. */
+    val blurRadius: Float,
+    val blurPoints: Double,
+    val lift: Double,
+) {
+    companion object {
+        /** Focus blurs glyphs in this many steps, one layer each. */
+        const val STEPS = 6
+    }
+}
+
+/**
+ * Frontier and Focus (iOS `StreamSweepRenderer`): each arriving chunk's glyphs reveal in reading
+ * order, a feathered frontier crossing the chunk ([StreamTextRevealStyle.sweepAlpha]). A glyph
+ * still sharp is erased by `1 - alpha` in place; under Focus one still arriving is erased whole
+ * and drawn again into the layer of its blur step (blurred by how far it still has to go and
+ * brightened by the phosphor lift), so glyphs share a few layers instead of one each. Untouched
+ * text never moves; by the end every glyph is at full opacity, so handing the chunk back to the
+ * plain text never changes a pixel.
+ */
+private fun DrawScope.sweepArriving(
+    layout: TextLayoutResult,
+    active: List<TranscriptTextReveal.Arrival>,
+    now: Double,
+    sweep: SweepParameters,
+    blurLayers: List<GraphicsLayer>?,
+) {
+    val length = layout.layoutInput.text.length
+    val sorted = active.sortedBy { it.offset }
+    val steps = SweepParameters.STEPS
+    val blurred = if (sweep.focus && sweep.blurPoints > 0 && blurLayers != null) Array(steps + 1) { mutableListOf<Pair<Rect, Float>>() } else null
+    for ((index, arrival) in sorted.withIndex()) {
+        val start = arrival.offset.coerceIn(0, length)
+        val end = (if (index + 1 < sorted.size) sorted[index + 1].offset else length).coerceIn(start, length)
+        if (end <= start) continue
+        val u = ((now - arrival.time) / maxOf(0.01, arrival.duration)).coerceIn(0.0, 1.0)
+        if (u >= 1) continue
+        val count = end - start
+        for (offset in start until end) {
+            val position = (offset - start + 0.5) / count
+            val alpha = StreamTextRevealStyle.sweepAlpha(u, position, sweep.feather)
+            if (alpha >= 0.996) continue
+            val box = layout.getBoundingBox(offset)
+            if (box.width <= 0f || box.height <= 0f) continue
+            val step = if (blurred != null) ((1 - alpha) * steps).roundToInt() else 0
+            if (step == 0 || alpha <= 0.004) {
+                drawRect(Color.Black, box.topLeft, box.size, alpha = (1 - alpha).toFloat(), blendMode = BlendMode.DstOut)
+            } else {
+                drawRect(Color.Black, box.topLeft, box.size, blendMode = BlendMode.DstOut)
+                blurred!![step] += box to alpha.toFloat()
+            }
+        }
+    }
+    if (blurred == null || blurLayers == null) return
+    for (step in 1..steps) {
+        val glyphs = blurred[step]
+        if (glyphs.isEmpty()) continue
+        val layer = blurLayers[step - 1]
+        val remaining = step.toDouble() / steps
+        val radius = (remaining * sweep.blurRadius).toFloat()
+        layer.renderEffect = if (remaining * sweep.blurPoints >= 0.25) BlurEffect(radius, radius, TileMode.Decal) else null
+        val boost = (1 + sweep.lift * remaining).toFloat()
+        layer.colorFilter = if (boost > 1.001f) {
+            ColorFilter.colorMatrix(ColorMatrix().apply { setToScale(boost, boost, boost, 1f) })
+        } else {
+            null
+        }
+        layer.record(IntSize(size.width.roundToInt(), size.height.roundToInt())) {
+            for ((box, alpha) in glyphs) {
+                clipRect(box.left, box.top, box.right, box.bottom) { drawText(layout, alpha = alpha) }
+            }
+        }
+        drawLayer(layer)
+    }
+}
+
 private class ChipGlyphs(val session: Painter, val subagent: Painter, val muted: Painter)
 
 private class ChipStyle(val ink: Color, val glyph: Color, val fillScale: Float)
 
+/** The chip's box (iOS `SessionChipMetrics`), on the live [SessionLinkTunables]. */
 private object SessionChipMetrics {
-    /** The chip's height and how far its centre sits above the baseline, in ems (iOS `SessionLinkTunables`). */
-    const val height = 1.16f
-    const val rise = 0.31f
-    const val fill = 0.08f
+    /** The chip's height and how far its centre sits above the baseline, in ems. */
+    val height: Float get() = SessionLinkTunables.height.value
+    val rise: Float get() = SessionLinkTunables.rise.value
+    val fill: Float get() = SessionLinkTunables.fill.value.toFloat()
     /** The chip's corner radius at body size (17 pt); it scales with the text. */
-    const val radius = 4.5f
+    val radius: Float get() = SessionLinkTunables.radius.value
 }
 
 /** Each line's run of the chip, as boxes around the text (iOS `SessionChipMetrics.box`). */

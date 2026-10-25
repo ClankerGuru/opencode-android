@@ -156,5 +156,6 @@ fun Modifier.inlineRowPulse(isActive: Boolean): Modifier {
             }
         }
     }
-    return this.graphicsLayer { alpha = (0.45 + 0.55 * InlineRowPulse.level(now / 1000.0)).toFloat() }
+    // iOS reads `timeIntervalSinceReferenceDate` (seconds since 2001), so the phase matches.
+    return this.graphicsLayer { alpha = (0.45 + 0.55 * InlineRowPulse.level(now / 1000.0 - 978_307_200.0)).toFloat() }
 }

@@ -6,6 +6,8 @@ import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
+import ai.opencode.feature.transcript.user.TranscriptDragPayload
+import ai.opencode.feature.transcript.user.transcriptDragSource
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -87,6 +89,8 @@ fun ReplyActions(texts: List<String>, modifier: Modifier = Modifier, onCopy: (St
         onCopy(OpenCodeMarkdownBlock.markdown(texts.flatMap { OpenCodeMarkdownBlock.blocks(it) }))
         copied = true
     }
+    // Dragging the glyph carries the reply as Markdown (iOS `.markdownBlocks(blocks)`).
+    val dragPayload = remember(texts) { TranscriptDragPayload.MarkdownBlocks(texts.flatMap { OpenCodeMarkdownBlock.blocks(it) }) }
     val label = if (copied) "Copied" else "Copy reply"
     // Its slot already starts 15 dp out from the text, 1 dp from the screen's edge; the target goes no further.
     ReplyCopyGlyph.Glyph(
@@ -98,6 +102,7 @@ fun ReplyActions(texts: List<String>, modifier: Modifier = Modifier, onCopy: (St
                 bottom = ReplyCopyGlyph.targetBottom,
                 leading = 0.dp,
                 target = Modifier
+                    .transcriptDragSource(dragPayload, cornerRadius = 8.dp)
                     .clickable(role = Role.Button, onClick = copy)
                     .clearAndSetSemantics {
                         contentDescription = label
