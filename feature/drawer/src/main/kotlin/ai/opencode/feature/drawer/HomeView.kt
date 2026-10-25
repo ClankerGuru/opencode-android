@@ -75,9 +75,11 @@ import ai.opencode.server.model.OpenCodeTranscriptItem
 import androidx.compose.runtime.DisposableEffect
 import ai.opencode.feature.session.SessionView
 import ai.opencode.feature.settings.HomeSettingsFeature
+import ai.opencode.feature.settings.LocalAppearanceTranscriptPreview
 import ai.opencode.feature.settings.SettingsFeature
 import ai.opencode.feature.settings.SettingsPresentation
 import ai.opencode.feature.settings.SettingsView
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -808,7 +810,7 @@ private fun HomeSettings(store: StoreOf<HomeFeature.State, HomeFeature.Action>) 
             action = { HomeFeature.Action.SettingsScreen(PresentationAction.Presented(it)) },
         )
     }
-    SettingsView(settings)
+    CompositionLocalProvider(LocalAppearanceTranscriptPreview provides AppearanceTranscriptPreviewRows) { SettingsView(settings) }
 }
 
 /**

@@ -17,6 +17,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -68,6 +69,32 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import androidx.compose.animation.core.EaseInOut
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.BlurEffect
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.roundToInt
 
 /**
  * Port of iOS `Settings/AppearanceSettingsView.swift`.
@@ -105,14 +132,30 @@ fun AppearanceSettingsView(store: SettingsStore) {
                 },
                 onClick = { store.send(SettingsFeature.Action.PagePushed(SettingsPage.Themes)) },
             ) {
-                Text("Theme", style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
-                ThemeSwatchTile(
-                    ThemePalette.definition(appTheme),
-                    isDark = isDark,
-                    size = ThemeSwatchTile.Size.Compact,
-                    cardBackground = OpenCodeTheme.colors.groupedCard,
-                )
-                Text(appTheme.title, style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.secondaryText, maxLines = 1)
+                val swatch = @Composable {
+                    ThemeSwatchTile(
+                        ThemePalette.definition(appTheme),
+                        isDark = isDark,
+                        size = ThemeSwatchTile.Size.Compact,
+                        cardBackground = OpenCodeTheme.colors.groupedCard,
+                    )
+                }
+                if (isAccessibilitySize()) {
+                    // iOS stacks the label over the swatch and value at the accessibility sizes.
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Theme", style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text)
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            swatch()
+                            Text(appTheme.title, style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.secondaryText)
+                        }
+                    }
+                } else {
+                    Text("Theme", style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        swatch()
+                        Text(appTheme.title, style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.secondaryText, maxLines = 1)
+                    }
+                }
                 SettingsChevron()
             }
         }
@@ -121,9 +164,8 @@ fun AppearanceSettingsView(store: SettingsStore) {
 
 /**
  * Settings → Appearance → Themes (D-109 Split + D-110 Palette Dots): the top is a session preview
- * edge to edge in the theme's own canvas, and the curated theme list scrolls independently below,
- * dissolving under a soft edge (iOS `ThemesSoftEdgeBackdrop`: feather 22 pt; Android draws the
- * smoothstep gradient without the progressive blur, opaque under high contrast).
+ * edge to edge in the theme's own canvas, pinned, and the curated theme list scrolls
+ * independently beneath it, dissolving across a soft edge (iOS `ThemesSoftEdgeBackdrop`).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -134,6 +176,10 @@ fun ThemesSettingsView(store: SettingsStore) {
     val reduceMotion = rememberReduceMotion()
     val colors = OpenCodeTheme.colors
     val canvas = ThemePalette.definition(appTheme).variant(isDark).canvas.color
+    val density = LocalDensity.current
+    /** The pinned preview header's height (px), content plus its 14 pt bottom inset. */
+    var headerHeight by remember { mutableIntStateOf(0) }
+    val listLayer = rememberGraphicsLayer()
 
     Scaffold(
         containerColor = colors.groupedCanvas,
@@ -149,58 +195,160 @@ fun ThemesSettingsView(store: SettingsStore) {
             )
         },
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(top = padding.calculateTopPadding())) {
-            Box(Modifier.fillMaxWidth().background(canvas)) {
-                Crossfade(appTheme to isDark, animationSpec = tween(if (reduceMotion) 0 else 220), label = "theme-preview") { (theme, dark) ->
-                    AppearanceTranscriptPreview(theme, dark)
-                }
-            }
-            Box(Modifier.weight(1f)) {
-                LazyColumn(
-                    contentPadding = PaddingValues(top = SoftEdgeHeight + 4.dp, bottom = padding.calculateBottomPadding() + 24.dp),
-                    modifier = Modifier.fillMaxSize(),
-                ) {
-                    settingsSection(key = "themes") {
-                        AppTheme.entries.forEachIndexed { index, theme ->
-                            if (index > 0) SettingsDivider(inset = true)
-                            ThemeOptionRow(
-                                theme = theme,
-                                definition = ThemePalette.definition(theme),
-                                isDark = isDark,
-                                isSelected = appTheme == theme,
-                                onClick = { store.send(SettingsFeature.Action.Settings(HomeSettingsFeature.Action.AppThemeChanged(theme))) },
-                            )
-                        }
+        Box(Modifier.fillMaxSize().padding(top = padding.calculateTopPadding())) {
+            LazyColumn(
+                contentPadding = PaddingValues(
+                    top = with(density) { headerHeight.toDp() } + AppearanceTunables.softEdgeHeight + 4.dp,
+                    bottom = padding.calculateBottomPadding() + 24.dp,
+                ),
+                modifier = Modifier
+                    .fillMaxSize()
+                    // Recorded once and drawn twice: here, and blurred under the soft edge.
+                    .drawWithContent {
+                        listLayer.record { this@drawWithContent.drawContent() }
+                        drawLayer(listLayer)
+                    },
+            ) {
+                settingsSection(key = "themes") {
+                    AppTheme.entries.forEachIndexed { index, theme ->
+                        if (index > 0) SettingsDivider(inset = true)
+                        ThemeOptionRow(
+                            theme = theme,
+                            definition = ThemePalette.definition(theme),
+                            isDark = isDark,
+                            isSelected = appTheme == theme,
+                            onClick = { store.send(SettingsFeature.Action.Settings(HomeSettingsFeature.Action.AppThemeChanged(theme))) },
+                        )
                     }
                 }
-                // Soft scroll edge: the preview's canvas eases into the grouped canvas (smoothstep).
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(SoftEdgeHeight)
-                        .background(
-                            Brush.verticalGradient(
-                                (0..8).map { step ->
-                                    val t = step / 8f
-                                    val ease = 1 - t * t * (3 - 2 * t)
-                                    lerpColor(colors.groupedCanvas, canvas, ease)
-                                },
-                            ),
-                        ),
+            }
+            if (headerHeight > 0) {
+                ThemesSoftEdgeBackdrop(
+                    header = headerHeight,
+                    list = listLayer,
+                    topBackground = canvas,
+                    bottomBackground = colors.groupedCanvas,
+                    opaque = colors.highContrast,
                 )
+            }
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    // iOS `.padding(.top, -6)`: the rows' own top inset tucks under the bar.
+                    .layout { measurable, constraints ->
+                        val pull = PreviewTopPull.roundToPx()
+                        val placeable = measurable.measure(constraints)
+                        layout(placeable.width, (placeable.height - pull).coerceAtLeast(0)) { placeable.place(0, -pull) }
+                    }
+                    .padding(bottom = SoftEdgeBottomInset)
+                    .onSizeChanged { headerHeight = it.height },
+            ) {
+                Crossfade(
+                    appTheme to isDark,
+                    animationSpec = tween(if (reduceMotion) 0 else 220, easing = EaseInOut),
+                    label = "theme-preview",
+                ) { (theme, dark) ->
+                    AppearanceTranscriptPreview(theme, dark)
+                }
             }
         }
     }
 }
 
-private val SoftEdgeHeight = 22.dp
+/** iOS `AppearanceTunables` (the soft scroll edge under the pinned preview), at their defaults. */
+internal object AppearanceTunables {
+    /** Soft edge feather (pt). */
+    val softEdgeHeight = 22.dp
+    /** Soft edge blur. */
+    val softEdgeBlur = 12.dp
+}
 
-private fun lerpColor(a: Color, b: Color, t: Float) = Color(
-    red = a.red + (b.red - a.red) * t,
-    green = a.green + (b.green - a.green) * t,
-    blue = a.blue + (b.blue - a.blue) * t,
-    alpha = 1f,
-)
+private val PreviewTopPull = 6.dp
+private val SoftEdgeBottomInset = 14.dp
+
+/**
+ * Soft scroll-edge backdrop behind the pinned split preview (iOS `ThemesSoftEdgeBackdrop`): full
+ * [topBackground] through `fadeOrigin`, then a progressive blur of the list (full strength over
+ * the bottom inset, a smoothstep falloff over the feather) over just the `bottomInset + span`
+ * band, and a smoothstep gradient easing to transparent over the feather below the preview, so
+ * scrolling theme rows dissolve before they reach it. Under high contrast it is opaque.
+ */
+@Composable
+private fun ThemesSoftEdgeBackdrop(
+    header: Int,
+    list: GraphicsLayer,
+    topBackground: Color,
+    bottomBackground: Color,
+    opaque: Boolean,
+) {
+    val density = LocalDensity.current
+    val bottomInset = with(density) { SoftEdgeBottomInset.toPx() }
+    val feather = with(density) { AppearanceTunables.softEdgeHeight.toPx() }
+    val blurRadius = with(density) { AppearanceTunables.softEdgeBlur.toPx() }
+    val headerPx = max(header.toFloat(), 1f)
+    val fadeOrigin = max(headerPx - bottomInset, 1f)
+    val span = if (opaque) 0f else max(feather, 1f)
+    val blurBand = bottomInset + span
+    val total = fadeOrigin + blurBand
+    val splitStop = (fadeOrigin / total).coerceIn(0f, 1f)
+    val blurFadeStart = (bottomInset / max(blurBand, 1f)).coerceIn(0f, 1f)
+
+    if (opaque) {
+        Box(Modifier.fillMaxWidth().height(with(density) { headerPx.toDp() }).background(topBackground).clearAndSetSemantics { })
+        return
+    }
+    // The progressive blur: the list again, blurred, masked by its strength profile.
+    val strengths = remember(blurFadeStart) { blurStrengths(blurFadeStart) }
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(with(density) { blurBand.toDp() })
+            .offset { IntOffset(0, fadeOrigin.roundToInt()) }
+            .clearAndSetSemantics { }
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+            .drawWithContent {
+                drawContent()
+                drawRect(
+                    Brush.verticalGradient(*strengths.map { (y, a) -> y to Color.Black.copy(alpha = a) }.toTypedArray()),
+                    blendMode = BlendMode.DstIn,
+                )
+            }
+            .graphicsLayer {
+                clip = true
+                renderEffect = if (blurRadius > 0.01f) BlurEffect(blurRadius, blurRadius, TileMode.Clamp) else null
+            }
+            .drawBehind { translate(top = -fadeOrigin) { drawLayer(list) } },
+    )
+    // The feather: the preview's canvas, then the grouped canvas easing to transparent.
+    val stops = remember(topBackground, bottomBackground, splitStop) {
+        buildList {
+            add(0f to topBackground)
+            add(splitStop to topBackground)
+            val rest = max(1 - splitStop, 0.001f)
+            for (step in 1..8) {
+                val t = step / 8f
+                val ease = 1 - t * t * (3 - 2 * t)
+                add(splitStop + rest * t to bottomBackground.copy(alpha = bottomBackground.alpha * ease))
+            }
+        }.toTypedArray()
+    }
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(with(density) { total.toDp() })
+            .clearAndSetSemantics { }
+            .background(Brush.verticalGradient(*stops)),
+    )
+}
+
+/** iOS `DrawerEdgeBlur.strengths(fadeStart:curve: .smoothstep, edge: .top)` as gradient stops. */
+private fun blurStrengths(fadeStart: Float, samples: Int = 32): List<Pair<Float, Float>> =
+    (0..samples).map { step ->
+        val y = step.toFloat() / samples
+        if (y <= fadeStart) return@map y to 1f
+        val t = ((y - fadeStart) / max(1 - fadeStart, 0.001f)).coerceIn(0f, 1f)
+        y to (1 - t * t * (3 - 2 * t))
+    }
 
 @Composable
 private fun ThemeOptionRow(
@@ -224,7 +372,7 @@ private fun ThemeOptionRow(
             theme.title,
             style = OpenCodeTextStyles.body.copy(fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal),
             color = OpenCodeTheme.colors.text,
-            maxLines = 1,
+            maxLines = if (isAccessibilitySize()) Int.MAX_VALUE else 1,
             modifier = Modifier.weight(1f),
         )
         if (isSelected) {
@@ -288,24 +436,56 @@ fun ThemeSwatchTile(
 }
 
 /**
- * The Themes stage: a slice of a session in the theme's own colours (D-109 Split). iOS renders
- * real `TranscriptMessageRow`s; `:feature:settings` sits beside `:feature:transcript`, not above
- * it, so this draws the same user bubble, Markdown reply with inline code and a scrolling code
- * band from the theme's palette.
+ * The real transcript rows for the Themes stage (iOS `TranscriptMessageRow`s), provided by a
+ * module that sees `:feature:transcript` (Home provides it where it hosts Settings). Without one,
+ * [ImitationTranscriptPreview] draws the same slice from the theme's palette.
+ */
+val LocalAppearanceTranscriptPreview = staticCompositionLocalOf<(@Composable () -> Unit)?> { null }
+
+/**
+ * The Themes stage: an actual slice of the session timeline edge to edge (D-109 Split), in the
+ * theme's own colours, its type capped at iOS's xLarge, read as one element and inert.
  */
 @Composable
 private fun AppearanceTranscriptPreview(theme: AppTheme, isDark: Boolean) {
+    val rows = LocalAppearanceTranscriptPreview.current
+    val density = LocalDensity.current
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .clearAndSetSemantics {
+                contentDescription = "Transcript preview"
+                stateDescription = theme.title
+            }
+            // iOS `.allowsHitTesting(false)`: the preview takes no touches.
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
+                }
+            },
+    ) {
+        OpenCodeTheme(theme = theme, appearance = if (isDark) AppearanceColorScheme.Dark else AppearanceColorScheme.Light) {
+            // iOS `.dynamicTypeSize(...DynamicTypeSize.xLarge)`.
+            CompositionLocalProvider(LocalDensity provides Density(density.density, min(density.fontScale, PreviewMaxFontScale))) {
+                if (rows != null) rows() else ImitationTranscriptPreview(theme, isDark)
+            }
+        }
+    }
+}
+
+/** iOS xLarge body (19 pt) over Large (17 pt). */
+private const val PreviewMaxFontScale = 19f / 17f
+
+/** The palette-drawn stand-in for [LocalAppearanceTranscriptPreview] when no host provides rows. */
+@Composable
+private fun ImitationTranscriptPreview(theme: AppTheme, isDark: Boolean) {
     val v = ThemePalette.definition(theme).variant(isDark)
     val mono = FontFamily.Monospace
     Column(
         Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
-            .padding(top = 2.dp, bottom = 14.dp)
-            .clearAndSetSemantics {
-                contentDescription = "Transcript preview"
-                stateDescription = theme.title
-            },
+            .padding(top = 8.dp),
     ) {
         Box(Modifier.fillMaxWidth().padding(start = 48.dp), contentAlignment = Alignment.CenterEnd) {
             Surface(
