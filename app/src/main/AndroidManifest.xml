@@ -24,6 +24,32 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- opencode://session/<id>, last-session, new-session (system actions) and opencode://pair|connect (pairing). -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="opencode" />
+            </intent-filter>
+            <!-- The pairing link's non-fetching deep link (`OpenCodePairingLink.deepLinkURL`). -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="opencode-ios" />
+                <data android:host="pair" />
+                <data android:host="connect" />
+            </intent-filter>
+            <!-- https://opencode.ai/pair#… (App Link; iOS universal link). -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:host="opencode.ai" />
+                <data android:path="/pair" />
+                <data android:path="/pair/" />
+            </intent-filter>
         </activity>
     </application>
 </manifest>

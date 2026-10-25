@@ -20,12 +20,14 @@ okhttp = "5.5.1"
 coil = "3.6.3"
 glance = "1.2.0"
 camerax = "1.6.2"
+zxing = "3.5.4"
 media3 = "1.11.1"
 browser = "1.10.0"
 webkit = "1.18.0"
 work = "2.12.0"
 firebaseMessaging = "26.0.1"
 webrtc = "1.3.10"
+codeScanner = "16.1.0"
 commonmark = "0.31.0"
 highlights = "1.1.0"
 jlatexmath = "0.2.0"
@@ -83,6 +85,8 @@ camerax-core = { module = "androidx.camera:camera-core", version.ref = "camerax"
 camerax-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "camerax" }
 camerax-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "camerax" }
 camerax-compose = { module = "androidx.camera:camera-compose", version.ref = "camerax" }
+# :feature:settings (pairing QR decoding; iOS uses AVFoundation's QR metadata output)
+zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
 # :feature:media (video playback, in-app browser, Mermaid via WebView renderer)
 media3-exoplayer = { module = "androidx.media3:media3-exoplayer", version.ref = "media3" }
 media3-ui-compose = { module = "androidx.media3:media3-ui-compose", version.ref = "media3" }
@@ -90,6 +94,9 @@ androidx-browser = { module = "androidx.browser:browser", version.ref = "browser
 androidx-webkit = { module = "androidx.webkit:webkit", version.ref = "webkit" }
 # :feature:voice (GPT-Live over WebRTC; iOS uses Google's libwebrtc via stasel/WebRTC)
 webrtc = { module = "io.getstream:stream-webrtc-android", version.ref = "webrtc" }
+
+# :app (Scan Pairing Code)
+play-services-code-scanner = { module = "com.google.android.gms:play-services-code-scanner", version.ref = "codeScanner" }
 # :feature:transcript. iOS's Markdown parser/renderer is self-written
 # (OpenCodeMarkdownBlock); port it. commonmark is a fallback parser only.
 # highlights = syntax highlighting (iOS: self-written CodeHighlighter; port first).

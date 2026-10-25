@@ -1,0 +1,64 @@
+package ai.opencode.core.tuning
+
+import ai.opencode.core.dependencies.AppContext
+import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.sharing.SharedKey
+import ai.opencode.core.sharing.SharedKeys
+import ai.opencode.core.sharing.shared
+import android.content.pm.ApplicationInfo
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+
+/**
+ * Port of iOS `InternalBuild` (`DiagnosticsJournal.swift`): Debug or TestFlight vs App Store.
+ * Android: [isDebug] is the app's debuggable flag; [isEnabled] (iOS Debug || TestFlight) is a
+ * debuggable build or one not installed by Google Play (sideloaded, Firebase App Distribution,
+ * internal test APKs). Play's own testing tracks look like release, as TestFlight can't on iOS.
+ */
+object InternalBuild {
+    val isDebug: Boolean by lazy {
+        runCatching { dependency(AppContext).applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0 }.getOrDefault(false)
+    }
+
+    val isEnabled: Boolean by lazy {
+        isDebug || runCatching {
+            val context = dependency(AppContext)
+            context.packageManager.getInstallSourceInfo(context.packageName).installingPackageName != "com.android.vending"
+        }.getOrDefault(false)
+    }
+}
+
+/**
+ * Port of iOS `TuningAccess`: who gets tuning and the other developer tools. Debug builds always;
+ * any other build only while Settings › Advanced › Developer › Developer Mode is on.
+ */
+object TuningAccess {
+    /** Debug lab runs set this (intent extra `tuning-as-release`) to check the gate. Ignored outside debug builds. */
+    @Volatile var actsAsReleaseOverride: Boolean = false
+
+    val actsAsRelease: Boolean get() = InternalBuild.isDebug && actsAsReleaseOverride
+
+    val isAvailable: Boolean get() = (InternalBuild.isDebug && !actsAsRelease) || DeveloperMode.isEnabled
+}
+
+/** Port of the gate half of iOS `DeveloperMode` (the upload half is `:devtools`). */
+object DeveloperMode {
+    val isEnabled: Boolean get() = runCatching { shared(SharedKeys.developerMode).value }.getOrDefault(false)
+}
+
+/** iOS `tuningEnabled` shared key (`Tuning/TuningFeature.swift`): the Tuning switch, kept across launches. */
+object TuningSharedKeys {
+    val tuningEnabled: SharedKey<Boolean> = SharedKey.appStorage("tuning-enabled", false)
+}
+
+/**
+ * iOS `.tuningContext(_:)`: names what's on screen for the tuning panel, which then lists only
+ * this context's groups (unless All is on). Put it once in a screen's root composable.
+ */
+@Composable
+fun TuningContextEffect(context: TuningContext, isPlayground: Boolean = false) {
+    LaunchedEffect(context, isPlayground) {
+        if (!isPlayground) TuningStore.shared.setContext(context)
+    }
+}
+

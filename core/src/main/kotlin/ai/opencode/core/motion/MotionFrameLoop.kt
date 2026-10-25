@@ -1,5 +1,6 @@
 package ai.opencode.core.motion
 
+import ai.opencode.core.tuning.AnimationTimeScale
 import android.provider.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -53,7 +54,7 @@ data class MotionTick(val dt: Double, val now: Double, val rawFrameDuration: Dou
 suspend fun motionFrameLoop(
     frameDurationSeconds: Double = 1.0 / 60.0,
     maxFrames: Double = 2.0,
-    timeScale: Double = 1.0,
+    timeScale: Double = AnimationTimeScale.shared.scale,
     onTick: (MotionTick) -> MotionFrameAction,
 ) {
     val rawFrame = max(1.0 / 240.0, frameDurationSeconds)

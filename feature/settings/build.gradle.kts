@@ -12,3 +12,18 @@ dependencies {
     api(project(":feature:voice"))
     api(project(":feature:system"))
 }
+
+dependencies {
+    implementation(libs.androidx.navigation3.runtime)
+    implementation(libs.androidx.navigation3.ui)
+}
+
+// Pairing scanner (servers/): CameraX frames decoded by ZXing; the camera permission launcher.
+dependencies {
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.camerax.core)
+    implementation(libs.camerax.camera2)
+    implementation(libs.camerax.lifecycle)
+    implementation(libs.camerax.compose)
+    implementation(libs.zxing.core)
+}
