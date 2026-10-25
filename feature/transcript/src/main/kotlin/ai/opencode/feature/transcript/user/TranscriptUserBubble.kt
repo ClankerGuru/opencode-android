@@ -104,6 +104,8 @@ internal fun TranscriptUserBubble(
 
     // The bubble lifts while its menu is open, as iOS's context menu lifts its preview.
     val lift by animateFloatAsState(if (menu) 1.03f else 1f, if (reduceMotion) Motion.reducedFadeSpec() else Motion.microPop.spec(), label = "lift")
+    // iOS `SendLandingProbe(itemID:)` on the bubble: a send flies into it.
+    val landingProbe = rememberSendLandingProbe(itemID)
     TrailingFractionLayout(TranscriptMetrics.maximumUserBubbleFraction, modifier) {
         Box {
             val face: @Composable (Modifier) -> Unit = { faceModifier ->
@@ -117,7 +119,7 @@ internal fun TranscriptUserBubble(
                     folds = folds,
                     reduceMotion = reduceMotion,
                     onEndSelection = { isSelecting = false },
-                    modifier = faceModifier.graphicsLayer {
+                    modifier = faceModifier.sendLandingProbe(landingProbe).graphicsLayer {
                         scaleX = lift
                         scaleY = lift
                     },

@@ -213,7 +213,10 @@ fun SessionTranscriptView(
     val safeTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottomObstruction = WindowInsets.ime.union(WindowInsets.navigationBars).asPaddingValues().calculateBottomPadding()
     // Separate from the projection, so geometry and jumps never rebuild the configuration.
-    CompositionLocalProvider(LocalTranscriptRowSlots provides rowSlots) {
+    CompositionLocalProvider(
+        LocalTranscriptRowSlots provides rowSlots,
+        ai.opencode.feature.transcript.user.LocalSendLanding provides scrollEdgeBridge.sendLanding,
+    ) {
         TranscriptList(
             configuration = projection.configuration,
             send = send,

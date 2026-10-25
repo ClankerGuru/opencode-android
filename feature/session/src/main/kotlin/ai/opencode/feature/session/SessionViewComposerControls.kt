@@ -17,6 +17,8 @@ import ai.opencode.core.ui.openCodeTapTarget
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.core.experiments.ModelPickerStyle
 import ai.opencode.feature.composer.AttachmentPickerButton
+import ai.opencode.feature.composer.ComposerAgentChip
+import ai.opencode.core.store.observe
 import ai.opencode.feature.composer.RequestDockMetrics
 import ai.opencode.feature.composer.SelectionMark
 import ai.opencode.feature.composer.SelectionMarkWidth
@@ -100,6 +102,7 @@ internal fun SessionComposerEnv.ComposerLeadingControls(
             modifier = Modifier.weight(1f).alpha(rowAlpha),
             revealed = {
                 Row(horizontalArrangement = Arrangement.spacedBy(ComposerTunables.leadingSpacing.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (agentSelection) AgentButton()
                     ModelButton(enabled = expanded && !recording)
                 }
             },
@@ -108,6 +111,27 @@ internal fun SessionComposerEnv.ComposerLeadingControls(
                     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) { SecondaryMicButton() }
                 }
             },
+        )
+    }
+}
+
+/**
+ * iOS `ComposerAgentChip` (Agent Selection, Experimental): the current agent's name, opening a
+ * menu of the server's primary agents; mounted as the composer expands, which refreshes the list.
+ */
+@Composable
+private fun SessionComposerEnv.AgentButton() {
+    val name by store.observe { it.currentAgentName }
+    val currentID by store.observe { it.currentAgentID }
+    val agents by store.observe { it.primaryAgents }
+    ComposerHidden(foldsComposerControls) {
+        ComposerAgentChip(
+            isEnabled = true,
+            name = name,
+            currentID = currentID,
+            agents = agents,
+            onOpen = { store.send(Action.AgentsRequested) },
+            onPick = { store.send(Action.AgentPicked(it)) },
         )
     }
 }

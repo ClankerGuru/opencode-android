@@ -29,6 +29,12 @@ class SessionScrollEdgeBridge {
     /** Bumped to scroll the list to its latest row. */
     var jumpRequest by mutableIntStateOf(0)
 
+    /**
+     * iOS `sendTransition`'s list half: the transcript's landing markers and its send hand-off,
+     * which `SessionSendFlightOverlay` flies into (the composer's capture is the composer host's).
+     */
+    val sendLanding = ai.opencode.feature.transcript.user.SendLanding()
+
     private val workingRunStamps = HashMap<String, Double>()
     private val workingRunOrder = ArrayDeque<String>()
 

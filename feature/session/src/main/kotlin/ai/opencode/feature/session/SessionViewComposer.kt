@@ -81,6 +81,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
@@ -102,6 +103,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.draw.clipToBounds
@@ -162,6 +164,13 @@ class SessionComposerHost {
     var swipeYields by mutableStateOf(false)
     /** The screen's imports (iOS `imageImporter`/`fileImporter`): pastes and drops on the field start them. */
     var importer: SessionAttachmentImporter? by mutableStateOf(null)
+    /**
+     * iOS `scrollEdgeBridge.sendTransition`: the field's words captured as a send leaves, for the
+     * screen's send flight (`SessionSendFlightOverlay`).
+     */
+    val sendTransition = ai.opencode.feature.composer.ComposerSendTransition()
+    /** iOS `scrollEdgeBridge.queuedPillFrame`: the queued pill (window px) while it shows. */
+    var queuedPillFrame: Rect? = null
     /** iOS `attachmentMenuAnchors`: the + button, the composer, the menu's rows (root px). */
     val attachmentAnchors = AttachmentMenuAnchors()
     /** iOS `attachmentMenuPress`; set by the screen's attachment menu. */
@@ -574,7 +583,14 @@ internal class SessionComposerEnv(
         }
         val state = store.state
         if (!state.canSendPrompt || state.hasPendingRequests) return
+        // A send that waits for uploads lands later; the flight would capture now.
+        val flies = !state.isUploadingFiles && (state.session != null || state.draftProject != null)
+        if (flies) host.sendTransition.prepare(reduceMotion = reducedMotion)
+        // The list lands it: on its bubble, its dim steering row, or the pill.
+        val generation = state.sendGeneration
         store.send(action)
+        // Nothing went (a failed upload): the capture mustn't linger.
+        if (flies && store.state.sendGeneration == generation) host.sendTransition.cancelPrepared()
     }
 
     /** iOS `showsDraftProjects`: a draft lists its recent projects above the composer until its first send leaves. */
@@ -804,6 +820,7 @@ private fun SessionComposerEnv.BackgroundActivity() {
 @Composable
 private fun SessionComposerEnv.QueuedActivity(hasQueued: Boolean) {
     val count = s.queuedMessages.size
+    DisposableEffect(Unit) { onDispose { host.queuedPillFrame = null } }
     AnimatedVisibility(
         visible = hasQueued,
         enter = if (reducedMotion) fadeIn(Motion.easeInOut(0.2)) else scaleIn(MotionSpring(0.35, 0.15).spec(), initialScale = 0.92f) + fadeIn(MotionSpring(0.35, 0.15).spec()),
@@ -814,6 +831,8 @@ private fun SessionComposerEnv.QueuedActivity(hasQueued: Boolean) {
             rolls = true,
             onClick = { view.showsQueuedMessages = true },
             modifier = Modifier
+                // A queued send's words shrink into it (iOS `scrollEdgeBridge.queuedPillFrame`).
+                .onGloballyPositioned { host.queuedPillFrame = it.boundsInWindow() }
                 .coveredByBackgroundWork()
                 .semantics {
                     contentDescription = if (count == 1) "1 queued message" else "$count queued messages"
@@ -1269,6 +1288,7 @@ private fun SessionComposerEnv.ComposerInput(expanded: Boolean, recording: Boole
             lineLimit = if (bar == null) null else 4,
             accessibilityLabel = bar?.fieldLabel ?: "Message",
             isHoldingMic = s.dictationHold != null,
+            sendTransition = host.sendTransition,
         )
     }
 }

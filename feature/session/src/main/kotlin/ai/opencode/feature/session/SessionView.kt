@@ -40,8 +40,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import ai.opencode.feature.composer.RequestDockContext
 import ai.opencode.feature.composer.RequestReviewSheet
 import ai.opencode.feature.media.LocalMediaPresenter
-import ai.opencode.feature.media.MediaFeature
-import ai.opencode.feature.media.MediaView
 import ai.opencode.core.store.Store
 import ai.opencode.core.motion.rememberReduceMotion
 import android.Manifest
@@ -271,6 +269,8 @@ fun SessionView(
                     SessionCallCards(callStore)
                     SessionComposer(store, callStore = callStore)
                 }
+                // A send's words fly from the field into its bubble, over both.
+                SessionSendFlightOverlay(composerHost, scrollEdgeBridge, Modifier.matchParentSize())
                 RequestPanelRoomProbe(composerHost, Modifier.matchParentSize())
                 SessionModelPickerOverlays(store, modelPickerAnchors, headerHeight, composerHost.attachmentAnchors.composer)
             }
@@ -394,8 +394,9 @@ private fun SessionLifecycle(store: StoreOf<State, Action>) {
  * choosing a picker gives the keyboard up, which returns once something is attached if the field
  * had it. System Back closes it (iOS's escape action).
  *
- * Android has no in-menu camera or Paste row yet (iOS `AttachmentCamera`, the system PasteButton):
- * Android pastes images straight into the field.
+ * Camera (when the device has one) opens the composer's full-screen [AttachmentCameraView]
+ * ([SessionAttachmentCamera]); Paste (while the clipboard holds an image, checked as the menu
+ * opens) attaches the clipboard's images through `PasteboardClient` and brings the keyboard back.
  */
 @Composable
 private fun SessionAttachmentMenu(store: StoreOf<State, Action>, host: SessionComposerHost, importer: SessionAttachmentImporter) {
@@ -404,6 +405,11 @@ private fun SessionAttachmentMenu(store: StoreOf<State, Action>, host: SessionCo
     var keepingLocationRow by remember { mutableStateOf(false) }
     var showsPhotoPicker by remember { mutableStateOf(false) }
     var showsPlusSheet by remember { mutableStateOf(false) }
+    var showsCamera by remember { mutableStateOf(false) }
+    var clipboardHasImages by remember { mutableStateOf(false) }
+    val pasteboard = remember { dependency(ai.opencode.core.dependencies.PasteboardClient) }
+    val packageManager = androidx.compose.ui.platform.LocalContext.current.packageManager
+    val hasCamera = remember(packageManager) { packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_CAMERA_ANY) }
     var tapped by remember { mutableIntStateOf(0) }
     val press = remember { AttachmentMenuPress() }
     val taskIdentity by store.observe { it.taskIdentity }
@@ -433,6 +439,7 @@ private fun SessionAttachmentMenu(store: StoreOf<State, Action>, host: SessionCo
         if (phase == AttachmentMenuPhase.Closed) {
             keepingLocationRow = false
             restoresFocus = host.messageFieldFocused
+            clipboardHasImages = pasteboard.hasImages()
             phase = AttachmentMenuPhase.Menu
             press.menuOpened()
         } else {
@@ -464,7 +471,13 @@ private fun SessionAttachmentMenu(store: StoreOf<State, Action>, host: SessionCo
                 store.send(Action.locationTapped)
                 phase = AttachmentMenuPhase.Closed
             }
-            AttachmentMenuItem.Camera, AttachmentMenuItem.Paste -> phase = AttachmentMenuPhase.Closed
+            AttachmentMenuItem.Camera -> {
+                restoresFocus = false
+                showsCamera = true
+                phase = AttachmentMenuPhase.Closed
+            }
+            // A paste control: tapped only (`onPaste`), never chosen by a slide.
+            AttachmentMenuItem.Paste -> Unit
         }
     }
 
@@ -480,11 +493,11 @@ private fun SessionAttachmentMenu(store: StoreOf<State, Action>, host: SessionCo
     BackHandler(enabled = phase != AttachmentMenuPhase.Closed && !showsPlusSheet) { close() }
 
     val items = sessionAttachmentMenuItems(
-        hasCamera = false,
+        hasCamera = hasCamera,
         supportsFileUploads = supportsFileUploads,
         wantsLocationAttachment = wantsLocation,
         keepingLocationRowWhileMenuCloses = keepingLocationRow,
-        clipboardHasImages = false,
+        clipboardHasImages = clipboardHasImages,
     )
     AttachmentMenuOverlay(
         phase = phase,
@@ -497,7 +510,14 @@ private fun SessionAttachmentMenu(store: StoreOf<State, Action>, host: SessionCo
             tapped += 1
             choose(item)
         },
-        onPaste = { phase = AttachmentMenuPhase.Closed },
+        // iOS `pasteAttachments`: the keyboard comes back as the menu closes.
+        onPaste = {
+            if (phase == AttachmentMenuPhase.Menu) {
+                restoresFocus = true
+                importer.pasteClipboardImages()
+                close()
+            }
+        },
         modifier = Modifier.fillMaxSize(),
         // The New Plus Menu's morphing glass (`ComposerMorph`) isn't hosted: its menu stays this overlay's.
         overComposer = false,
@@ -511,6 +531,9 @@ private fun SessionAttachmentMenu(store: StoreOf<State, Action>, host: SessionCo
             onDismiss = { showsPhotoPicker = false },
             onAdded = if (restoresFocus) host::focusComposer else null,
         )
+    }
+    if (showsCamera) {
+        SessionAttachmentCamera(importer, onDismiss = { showsCamera = false }, onAdded = host::focusComposer)
     }
     if (showsPlusSheet) {
         SessionPlusPhotoSheet(
@@ -607,19 +630,11 @@ private fun SessionPermissionPrompts() {
 }
 
 /**
- * Full-screen media over the session (iOS `MediaPresenter`): the app's [MediaView] when one hosts
- * this screen ([LocalMediaPresenter]), else the session's own, so transcript images, files and
- * pasted text always open in the viewer.
+ * Full-screen media over the session (iOS `MediaPresenter`): the app's one root [MediaView]
+ * (`AppView`) provides [LocalMediaPresenter]; the session draws inside it.
  */
 @Composable
-private fun SessionMediaHost(content: @Composable () -> Unit) {
-    if (LocalMediaPresenter.current != null) {
-        content()
-        return
-    }
-    val media = remember { Store(MediaFeature.State(), MediaFeature()) }
-    MediaView(media, content = content)
-}
+private fun SessionMediaHost(content: @Composable () -> Unit) = content()
 
 /** What the composer holds, above its field (iOS `pendingAttachmentsRow`). */
 @Composable

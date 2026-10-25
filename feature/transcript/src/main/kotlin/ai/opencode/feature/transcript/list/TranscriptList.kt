@@ -127,6 +127,7 @@ private fun TranscriptListContent(
     controller.density = density.density
     controller.reduceMotion = reduceMotion
     controller.isShowingToReader = resumed.isAtLeast(Lifecycle.State.RESUMED)
+    controller.sendLanding = ai.opencode.feature.transcript.user.LocalSendLanding.current
     // Applied in composition so this frame draws the new rows with their stable keys.
     controller.update(configuration)
     SideEffect { controller.flushEffects() }

@@ -3,6 +3,7 @@ package ai.opencode.core.dependencies
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.net.Uri
 import androidx.core.net.toUri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -19,6 +20,8 @@ class PasteboardClient(
     /** The clipboard's text if it isn't blank, else its URL. Main thread. */
     val string: () -> String? = { null },
     val hasImages: () -> Boolean = { false },
+    /** The clipboard's images (content URIs), for the composer's + menu Paste (iOS `PasteButton`'s item providers). Main thread. */
+    val imageURIs: () -> List<Uri> = { emptyList() },
 ) {
     companion object Key : DependencyKey<PasteboardClient> {
         override val liveValue: PasteboardClient by lazy {
@@ -35,6 +38,16 @@ class PasteboardClient(
                     val description = clipboard.primaryClipDescription
                     description != null && (0 until description.mimeTypeCount).any { description.getMimeType(it).startsWith("image/") }
                 },
+                imageURIs = {
+                    val clip = clipboard.primaryClip
+                    val resolver = context.contentResolver
+                    if (clip == null) emptyList() else (0 until clip.itemCount).mapNotNull { index ->
+                        clip.getItemAt(index).uri?.takeIf { uri ->
+                            val type = runCatching { resolver.getType(uri) }.getOrNull()
+                            type?.startsWith("image/") ?: clip.description.hasMimeType("image/*")
+                        }
+                    }
+                },
             )
         }
         override val testValue = PasteboardClient(
@@ -42,6 +55,7 @@ class PasteboardClient(
             setString = {},
             string = { null },
             hasImages = { false },
+            imageURIs = { emptyList() },
         )
     }
 }

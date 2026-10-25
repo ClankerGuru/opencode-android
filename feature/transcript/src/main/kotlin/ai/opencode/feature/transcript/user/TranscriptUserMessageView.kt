@@ -132,6 +132,9 @@ private fun UserMessage(
         else -> emptyList()
     }
     val noteSpec = if (reduceMotion) androidx.compose.animation.core.snap() else Motion.easeOut<Float>(0.25)
+    // iOS `SendLandingProbe`s above the bubble: its surfaces and its pending label.
+    val surfacesProbe = rememberSendLandingProbe(message.id, SendLanding.SURFACES_SUFFIX)
+    val labelProbe = rememberSendLandingProbe(message.id, SendLanding.LABEL_SUFFIX)
 
     Column(
         // A message joining or leaving a run gains or lets go of the label on the same spring
@@ -160,13 +163,19 @@ private fun UserMessage(
                         TranscriptPendingLabel(
                             it,
                             Modifier
+                                .sendLandingProbe(labelProbe)
                                 .graphicsLayer { alpha = reveal.body.toFloat() }
                                 // Its text lines up with the bubble's.
                                 .padding(end = TranscriptMetrics.contentGutter, bottom = TranscriptMetrics.clustered - TranscriptMetrics.compact / 2),
                         )
                     }
                 }
-                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(UserMessageRun.spacing)) {
+                Column(
+                    // Where the message's surfaces start: what sits above the bubble lands with it.
+                    Modifier.sendLandingProbe(surfacesProbe),
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(UserMessageRun.spacing),
+                ) {
                     if (message.images.isNotEmpty()) {
                         UserMessageImages(message.images, isPending, corners(Surface.Images), onPreviewImage)
                     }

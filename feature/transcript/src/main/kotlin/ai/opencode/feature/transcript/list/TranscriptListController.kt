@@ -148,20 +148,69 @@ class TranscriptListController(
         if ((old.isLoadingEarlier && !configuration.isLoadingEarlier) || earlierWindowAdvanced) {
             pendingEffects += { execute(behavior.handle(TranscriptScrollBehavior.Event.EarlierHistoryRequestCompleted)) }
         }
-        // A browsing reader's send takes them back to the end the way Jump to latest does.
+        // A following reader's send arrives under its flight from the composer. A browsing reader's
+        // send takes them back to the end the way Jump to latest does, and the message arrives there.
         if (configuration.sendGeneration != old.sendGeneration && !sessionChanged) {
             pendingEffects += {
-                if (wasBrowsing || behavior.mode == TranscriptScrollBehavior.Mode.Browsing) {
-                    jumpToLatest(TranscriptScrollBehavior.Event.MessageSent, fromBrowsing = wasBrowsing)
-                }
+                val returnsToEnd = wasBrowsing || behavior.mode == TranscriptScrollBehavior.Mode.Browsing
+                // A send during a jump's glide arrives under that glide: a flight on top would be a second motion.
+                val flies = !returnsToEnd && bottomSpring?.kind != SpringKind.Jump
+                if (returnsToEnd) jumpToLatest(TranscriptScrollBehavior.Event.MessageSent, fromBrowsing = wasBrowsing)
+                scheduleSendLanding(flies)
             }
+        } else if (sessionChanged && sendLanding?.let { configuration.sendGeneration != it.lastSendGeneration && it.isAwaitingSend() } == true) {
+            // A draft's first send can arrive with the session it made, in a new list: it still lands.
+            pendingEffects += { scheduleSendLanding(flies = true) }
         }
+        sendLanding?.lastSendGeneration = configuration.sendGeneration
         val mark = configuration.newMessages
         if (mark != null && mark.generation != old.newMessages?.generation && landedNewMessages != mark.generation) {
             pendingNewMessagesLanding = mark.generation
         }
         if (configuration.isLoading && emptyLoadingSince == null && configuration.entries.isEmpty()) emptyLoadingSince = transcriptNow()
         if (!configuration.isLoading) emptyLoadingSince = if (configuration.entries.isEmpty()) emptyLoadingSince else null
+    }
+
+    /** The session's send flights (iOS `scrollEdgeBridge.sendTransition`); null: sends arrive as rows. */
+    var sendLanding: ai.opencode.feature.transcript.user.SendLanding? = null
+
+    /**
+     * iOS `scheduleSendLanding` / `landSentMessage`'s list half: hands the send to [sendLanding]
+     * with its row, its words and whether it flies. A send flying into its bubble enters with the
+     * flight, not on its own; the time stamp a first message of the day brings settles in as it lands.
+     */
+    private fun scheduleSendLanding(flies: Boolean) {
+        val landing = sendLanding ?: return
+        val itemID = configuration.sentItemID
+        // An idle send lands on its bubble; a steering send on its dim row.
+        val stableID = itemID?.let { id ->
+            TranscriptEntry.entryID(containing = id, entries = configuration.entries)?.let { entryStableIDs[it] ?: it }
+                ?: queuedStableIDs[id]
+        }
+        val row = stableID?.let { snapshot.rows[it] }
+        val rowText = when (row) {
+            is MessageRow.Entry -> ai.opencode.feature.transcript.user.TranscriptUserMessage.from(row.entry)?.displayText
+            is MessageRow.Queued -> ai.opencode.feature.transcript.user.TranscriptUserMessage.from(row.input)?.displayText
+            null -> null
+        }
+        val text = rowText?.takeIf { it.isNotEmpty() } ?: itemID?.let { configuration.queuedPillTexts[it] }?.takeIf { it.isNotEmpty() }
+        val isQueued = itemID != null && configuration.queuedPillTexts.containsKey(itemID)
+        val flying = landing.send(
+            ai.opencode.feature.transcript.user.SendLanding.Send(
+                itemID = itemID,
+                hasRow = stableID != null,
+                flies = flies,
+                isQueued = isQueued,
+                text = text,
+            ),
+        )
+        if (!flying || stableID == null) return
+        // The flight is its entrance; the stamp above it settles in over the flight's last stretch.
+        pendingEntrances.remove(TranscriptItemID.Message(stableID).key)
+        val promptID = (row as? MessageRow.Entry)?.entry?.userMessageID ?: return
+        val stampID = ai.opencode.feature.transcript.rows.TranscriptTimeStamps.PREFIX + promptID
+        val stampKey = TranscriptItemID.Message(entryStableIDs[stampID] ?: stampID).key
+        pendingEntrances[stampKey]?.let { (start, _) -> pendingEntrances[stampKey] = start to RowEntranceStyle.WithFlight }
     }
 
     private fun resetForSessionChange() {
@@ -699,7 +748,11 @@ class TranscriptListController(
     fun entrance(key: String): Pair<Float, RowEntranceStyle>? {
         val (start, style) = pendingEntrances[key] ?: return null
         @Suppress("UNUSED_VARIABLE") val tick = frameTick
-        val duration = if (style == RowEntranceStyle.Arrival) RowEntrance.DURATION else RowEntrance.SETTLING_DURATION
+        val duration = when (style) {
+            RowEntranceStyle.Arrival -> RowEntrance.DURATION
+            RowEntranceStyle.Settling -> RowEntrance.SETTLING_DURATION
+            RowEntranceStyle.WithFlight -> RowEntrance.WITH_FLIGHT_DURATION
+        }
         val progress = ((transcriptNow() - start) / duration).toFloat()
         if (progress >= 1f) {
             pendingEntrances.remove(key)

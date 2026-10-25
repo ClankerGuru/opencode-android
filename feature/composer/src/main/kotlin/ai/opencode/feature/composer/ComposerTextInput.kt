@@ -60,6 +60,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -190,27 +191,35 @@ class ComposerSwipeOwnership {
 /**
  * The composer's text handed off to its bubble (iOS `ComposerSendTransition`). On iOS it
  * snapshots the field's pixels and flies them into the transcript cell (`SendLandingProbe`
- * markers). Here the field reports its text bounds ([inputBounds]); [prepare] captures the
- * send's words and where they sat as a [Prepared], which the session area's overlay renders
- * and flies toward the bubble's bounds (it owns both ends, as the transcript's list and the
- * composer meet there). Flights overlap: each is keyed by the message it lands on, and
- * preparing the next send never touches one already in the air.
+ * markers). Here the field reports its laid-out text and where it sits ([ComposerTextInput]);
+ * [prepare] captures the send's words, their layout and their visible rect as a [Prepared],
+ * which the session screen's flight overlay draws and flies toward the bubble (it owns both
+ * ends, as the transcript's list and the composer meet there). Flights overlap: each is keyed
+ * by the message it lands on, and preparing the next send never touches one already in the air.
  */
 @Stable
 class ComposerSendTransition {
-    /** The next send's words and their window rect (px) as they leave the composer. */
+    /** The next send's words as they leave the composer (window px). */
     data class Prepared(
         val text: String,
+        /** The words' visible rect: what iOS snapshots (`usedRect` ∩ the field's bounds). */
         val bounds: Rect,
         /** Whether these are the composer's own laid-out words, not words laid out again where it was. */
         val fromComposer: Boolean,
+        /** The words as laid out, drawn with their top-left at [origin] and clipped to [bounds]. */
+        val layout: TextLayoutResult? = null,
+        val origin: Offset = bounds.topLeft,
     )
 
-    /** The field's text and its laid-out bounds in the window (px), updated by [ComposerTextInput]. */
+    /** The field's text and its visible bounds in the window (px), updated by [ComposerTextInput]. */
     var inputText: String = ""
         internal set
     var inputBounds: Rect? = null
         internal set
+
+    /** The field's laid-out text and the window position (px) its layout starts at. */
+    internal var textLayout: TextLayoutResult? = null
+    internal var textOrigin: Offset? = null
 
     var prepared: Prepared? by mutableStateOf(null)
         private set
@@ -219,22 +228,42 @@ class ComposerSendTransition {
 
     fun prepare(reduceMotion: Boolean) {
         cancelPrepared()
-        val bounds = inputBounds
-        if (reduceMotion || inputText.isEmpty() || bounds == null || bounds.isEmpty) return
-        prepared = Prepared(inputText, bounds, fromComposer = true)
+        val visible = inputBounds
+        val layout = textLayout
+        val origin = textOrigin
+        if (reduceMotion || inputText.isEmpty() || visible == null || layout == null || origin == null || layout.lineCount == 0) return
+        var left = Float.MAX_VALUE
+        var right = 0f
+        for (line in 0 until layout.lineCount) {
+            left = min(left, layout.getLineLeft(line))
+            right = max(right, layout.getLineRight(line))
+        }
+        val used = Rect(origin.x + left, origin.y, origin.x + right, origin.y + layout.size.height)
+        val bounds = used.intersect(visible)
+        if (bounds.isEmpty) return
+        prepared = Prepared(inputText, bounds, fromComposer = true, layout = layout, origin = origin)
     }
 
     /**
      * A send the composer didn't capture as it left: its words laid out as the composer lays
      * them out, starting where the field (or the dictation bar in its place) sits. [composer]
-     * is in window px; [measure] lays out [text] at a width and returns its height (px).
+     * is in window px; [measure] lays out [text] at a maximum width (px).
      */
-    fun prepare(text: String, composer: Rect, expandedTopInsetPx: Float, contentGutterPx: Float, measure: (String, Float) -> Pair<Float, Float>) {
+    fun prepare(
+        text: String,
+        composer: Rect,
+        expandedTopInsetPx: Float,
+        contentGutterPx: Float,
+        measure: (String, Float) -> TextLayoutResult,
+    ) {
         cancelPrepared()
-        val (width, height) = measure(text, max(composer.width - contentGutterPx * 2, 40f))
+        val layout = measure(text, max(composer.width - contentGutterPx * 2, 40f))
+        val width = layout.size.width.toFloat()
+        val height = layout.size.height.toFloat()
         // The field's first line: the capsule's top when it's tall, its middle when it's one row.
         val top = min(composer.top + expandedTopInsetPx, composer.center.y - height / 2)
-        prepared = Prepared(text, Rect(composer.left + contentGutterPx, top, composer.left + contentGutterPx + width, top + height), fromComposer = false)
+        val bounds = Rect(composer.left + contentGutterPx, top, composer.left + contentGutterPx + width, top + height)
+        prepared = Prepared(text, bounds, fromComposer = false, layout = layout, origin = bounds.topLeft)
     }
 
     /** The prepared send taken for its flight (the overlay now owns it); null when nothing was prepared. */
@@ -654,6 +683,7 @@ fun ComposerTextInput(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = if (expanded) topInset else 0.dp)
+                .onGloballyPositioned { coordinates -> sendTransition?.textOrigin = coordinates.positionInWindow() }
                 .focusRequester(focusRequester)
                 .onFocusChanged { focus ->
                     if (focus.isFocused && controller.isSuppressingFocusAfterSwipe) {
@@ -706,6 +736,7 @@ fun ComposerTextInput(
             onTextLayout = { getResult ->
                 val result = getResult()
                 controller.layout = result
+                sendTransition?.textLayout = result
                 autocompleteBridge?.textLayout = result
                 controller.layoutTick += 1
             },

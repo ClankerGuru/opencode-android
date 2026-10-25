@@ -1,5 +1,7 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.dependencies.PasteboardClient
+import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.files.AttachmentFileType
 import ai.opencode.core.files.ComposerFileStaging
 import ai.opencode.core.files.ComposerStagedFile
@@ -9,6 +11,7 @@ import ai.opencode.core.store.StoreOf
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.openCodeTapTarget
+import ai.opencode.feature.composer.AttachmentCameraView
 import ai.opencode.feature.composer.AttachmentMenuItem
 import ai.opencode.feature.composer.AttachmentPickerButton
 import ai.opencode.feature.composer.ComposerFileAttachment
@@ -72,6 +75,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -288,6 +293,12 @@ class SessionAttachmentImporter internal constructor(
         startImageImport(sources, onAdded = onAdded)
     }
 
+    /** The + menu's Paste: the clipboard's images, read through [PasteboardClient] (iOS `PasteButton`'s providers). */
+    fun pasteClipboardImages() {
+        val uris = dependency(PasteboardClient).imageURIs()
+        if (uris.isNotEmpty()) pasteAttachments(uris.map(ComposerImageSource::ItemProvider))
+    }
+
     /** iOS `removeComposerAttachment`: an image, paste or inline file by its ID, or an upload. */
     fun removeComposerAttachment(id: String) {
         val state = store.state
@@ -365,6 +376,29 @@ fun sessionAttachmentMenuItems(
     if (supportsFileUploads) add(AttachmentMenuItem.Files)
     if (!wantsLocationAttachment || keepingLocationRowWhileMenuCloses) add(AttachmentMenuItem.Location)
     if (clipboardHasImages) add(AttachmentMenuItem.Paste)
+}
+
+/**
+ * iOS `AttachmentCameraView` in a `fullScreenCover` (black, dark): the + menu's Camera. A photo
+ * attaches like a picked one and brings the keyboard back ([onAdded], iOS `focusComposer`);
+ * Close or system Back puts the camera away.
+ */
+@Composable
+fun SessionAttachmentCamera(importer: SessionAttachmentImporter, onDismiss: () -> Unit, onAdded: () -> Unit) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    ) {
+        Box(Modifier.fillMaxSize().background(Color.Black)) {
+            AttachmentCameraView(
+                onCapture = { data ->
+                    onDismiss()
+                    importer.captureCameraPhoto(data, onAdded = onAdded)
+                },
+                onBack = onDismiss,
+            )
+        }
+    }
 }
 
 // endregion
