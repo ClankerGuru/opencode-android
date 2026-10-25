@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings
 
+import ai.opencode.feature.system.notifications.NotificationPermission
 import ai.opencode.core.experiments.key
 import ai.opencode.core.experiments.ExperimentalFeature
 import ai.opencode.core.sharing.SharedKeys
@@ -106,6 +107,7 @@ private fun SettingsPageContent(store: SettingsStore, page: SettingsPage) {
         SettingsPage.Voice -> VoiceSettingsView(store)
         SettingsPage.CallVoicePicker -> CallVoicePickerView(store)
         SettingsPage.CallHistory -> CallHistoryView(store)
+        is SettingsPage.CallReplay -> CallReplayView(store, page.log)
         SettingsPage.Notifications -> NotificationSettingsView(store)
         SettingsPage.WhatsNew -> WhatsNewListPage(store)
         is SettingsPage.WhatsNewDetail -> WhatsNewDetailPage(store, page.entryID)
@@ -219,7 +221,7 @@ private fun SettingsRootPage(store: SettingsStore) {
                     "Notifications",
                     "bell.badge.fill",
                     SettingsTint.Red,
-                    value = if (permission == NotificationPermissionStatus.enabled) "On" else "Off",
+                    value = if (permission == NotificationPermission.Enabled) "On" else "Off",
                 ) { push(SettingsPage.Notifications) }
             }
             SettingsDivider(inset = true)

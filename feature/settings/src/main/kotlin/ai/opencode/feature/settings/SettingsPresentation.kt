@@ -127,20 +127,29 @@ fun SettingsPresentation(
                         .clearAndSetSemantics {},
                 )
             }
+            // Registered with Settings' content, each time Settings mounts, so it is the newest
+            // back handler: it takes the gesture over anything Home registered beneath (the
+            // session's stack, the drawer), whose handlers would otherwise win and close Settings
+            // without following the finger. Settings' own stack (composed just above) handles
+            // pushed pages; this one is enabled only at the root. It stays registered through the
+            // slide out, so a commit never restarts it mid-gesture.
+            PredictiveBackHandler(enabled = isShown && atRoot) { events ->
+                try {
+                    events.collect { event ->
+                        // The page follows the finger: progress 1 is open, 0 is closed.
+                        if (!reduceMotion) progress.snapTo(1f - event.progress)
+                    }
+                    // Committed: close from where the finger left it (isShown → false animates to 0).
+                    onClose()
+                } catch (cancelled: CancellationException) {
+                    // Cancelled: spring back open.
+                    scope.launch { progress.animateTo(1f, if (reduceMotion) FadeSpec else PushSpec) }
+                    throw cancelled
+                }
+            }
         }
     }
 
-    PredictiveBackHandler(enabled = isShown && atRoot) { events ->
-        try {
-            events.collect { event ->
-                if (!reduceMotion) progress.snapTo(1f - event.progress)
-            }
-            onClose()
-        } catch (cancelled: CancellationException) {
-            scope.launch { progress.animateTo(1f, if (reduceMotion) FadeSpec else PushSpec) }
-            throw cancelled
-        }
-    }
 }
 
 /** How far Home moves left, and how much it dims, under open Settings. */
