@@ -1,7 +1,10 @@
 package ai.opencode.feature.media
 
 import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.tuning.Tunable
+import ai.opencode.core.tuning.TuningStore
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.Layout
@@ -347,6 +350,7 @@ fun AgentImageBentoLayout(
     loneMaxHeight: Dp = 360.dp,
     content: @Composable () -> Unit,
 ) {
+    SideEffect { AgentImageTunables.register() }
     val cache = remember(aspects, spacing, loneMaxHeight) { BentoCache() }
     Layout(content = content, modifier = modifier) { measurables, constraints ->
         val widthPoints = if (constraints.hasBoundedWidth) constraints.maxWidth / density.toDouble() else 360.0
@@ -383,28 +387,43 @@ private class BentoCache {
 
 /**
  * What Kit judges on a phone about Image Previews' bentos and their grow (iOS
- * `AgentImageTunables`; baked defaults, Android has no Tuning Panel).
+ * `AgentImageTunables`): live tunables in the Tuning Panel, same keys, labels, defaults, ranges
+ * and steps. The plain properties read the live value (the default while tuning is off).
  */
 object AgentImageTunables {
-    /**
-     * The row opens to the bento's height on a critically damped spring of this duration
-     * (`transcript.images.grow`, bounce 0: a row never grows past its content), ω = 2π / 0.5 s.
-     */
-    const val grow: Double = 0.5
+    /** The row opens to the bento's height on a critically damped spring (bounce 0: a row never grows past its content). */
+    val growTunable = Tunable("transcript.images.grow", "Image grow spring", default = 0.5, range = 0.2..1.2, step = 0.02)
+    val gutterTunable = Tunable("transcript.images.gutter", "Bento gutter (pt)", default = 4.dp, range = 0.0..12.0, step = 0.5)
+    val linkMaxHeightTunable = Tunable("transcript.images.linkMaxHeight", "Image link height (pt)", default = 220.dp, range = 160.0..300.0, step = 10.0)
+    /** Corners inside the bento; its outer ones are the card corner radius. */
+    val innerRadiusTunable = Tunable("transcript.images.innerRadius", "Bento inner corners (pt)", default = 4.dp, range = 0.0..14.0, step = 1.0)
+    val pixelFadeTunable = Tunable("transcript.images.pixelFade", "Pixel cross-fade (s)", default = 0.32, range = 0.1..0.8, step = 0.02)
+    val pixelStaggerTunable = Tunable("transcript.images.pixelStagger", "Pixel stagger per tile (s)", default = 0.05, range = 0.0..0.2, step = 0.01)
+    /** A placeholder's own fade in, and the whole cross-fade under Reduce Motion. */
+    val appearTunable = Tunable("transcript.images.appear", "Tile appear (s)", default = 0.2, range = 0.05..0.5, step = 0.01)
+
+    /** The grow spring's duration, seconds (`transcript.images.grow`), ω = 2π / duration. */
+    val grow: Double get() = growTunable.value
     /** ω of [grow] (iOS `RowGrowth.springOmega`: `2π / max(0.05, duration)`). */
     val growOmega: Double get() = 2 * PI / max(0.05, grow)
     /** [grow] as a spring. */
-    val growSpring: MotionSpring = MotionSpring(grow, 0.0)
-    /** Bento gutter (`transcript.images.gutter`). */
-    val gutter: Dp = 4.dp
-    /** Image link height (`transcript.images.linkMaxHeight`). */
-    val linkMaxHeight: Dp = 220.dp
-    /** Corners inside the bento; its outer ones are the card corner radius (`transcript.images.innerRadius`). */
-    val innerRadius: Dp = 4.dp
-    /** Pixel cross-fade, seconds (`transcript.images.pixelFade`). */
-    const val pixelFade: Double = 0.32
-    /** Pixel stagger per tile, seconds (`transcript.images.pixelStagger`). */
-    const val pixelStagger: Double = 0.05
-    /** A placeholder's own fade in, and the whole cross-fade under Reduce Motion, seconds (`transcript.images.appear`). */
-    const val appear: Double = 0.2
+    val growSpring: MotionSpring get() = MotionSpring(grow, 0.0)
+    /** Bento gutter. */
+    val gutter: Dp get() = gutterTunable.value
+    /** Image link height. */
+    val linkMaxHeight: Dp get() = linkMaxHeightTunable.value
+    /** Corners inside the bento. */
+    val innerRadius: Dp get() = innerRadiusTunable.value
+    /** Pixel cross-fade, seconds. */
+    val pixelFade: Double get() = pixelFadeTunable.value
+    /** Pixel stagger per tile, seconds. */
+    val pixelStagger: Double get() = pixelStaggerTunable.value
+    /** Tile appear, seconds. */
+    val appear: Double get() = appearTunable.value
+
+    /** iOS `register(in:)` (the transcript's entry view calls it there; here the bento does, once). */
+    fun register(store: TuningStore = TuningStore.shared) {
+        store.register(growTunable, pixelFadeTunable, pixelStaggerTunable, appearTunable)
+        store.register(gutterTunable, innerRadiusTunable, linkMaxHeightTunable)
+    }
 }

@@ -6,6 +6,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -95,7 +98,11 @@ fun AgentCodeView(document: AgentTextDocument, wrapsLines: Boolean, modifier: Mo
             LazyColumn(
                 state = listState,
                 modifier = Modifier.width(contentWidth).fillMaxHeight(),
-                contentPadding = PaddingValues(vertical = TranscriptMetrics.standard),
+                // The last lines clear the navigation bar (iOS insets a scroll view's content by the safe area).
+                contentPadding = PaddingValues(
+                    top = TranscriptMetrics.standard,
+                    bottom = TranscriptMetrics.standard + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding(),
+                ),
             ) {
                 items(count = document.displayLineCount, key = { it }, contentType = { 0 }) { index ->
                     val focused = document.isFocused(index)

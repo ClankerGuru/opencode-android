@@ -190,6 +190,7 @@ enum class SFSymbol(val sfName: String, @DrawableRes val drawable: Int) {
     Pin("pin", R.drawable.ms_keep),
     PinFill("pin.fill", R.drawable.ms_keep_fill),
     PinSlash("pin.slash", R.drawable.ms_keep_off),
+    PipEnter("pip.enter", R.drawable.ms_picture_in_picture_alt),
     PlayFill("play.fill", R.drawable.ms_play_arrow_fill),
     PlayRectangleOnRectangle("play.rectangle.on.rectangle", R.drawable.ms_video_library),
     Plus("plus", R.drawable.ms_add),

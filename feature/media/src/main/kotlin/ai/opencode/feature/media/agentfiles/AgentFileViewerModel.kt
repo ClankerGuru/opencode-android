@@ -99,6 +99,13 @@ class AgentFileViewerModel(
 
     var shareError: AgentFileError? by mutableStateOf(null)
 
+    /**
+     * No app on this device opened the document (Android only: iOS previews every document in
+     * Quick Look). Cleared by the next try.
+     */
+    var noAppOpens: Boolean by mutableStateOf(false)
+        private set
+
     private val wrapsLinesShared = shared(SharedKeys.fileViewerWrapsLines)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var streamLoader: StreamingFileLoader? = null
@@ -258,7 +265,7 @@ class AgentFileViewerModel(
     /** Opens a document that can't show here (not a PDF) in another app. */
     fun openExternally() {
         val file = ((phase as? Phase.Ready)?.content as? Content.QuickLook)?.file ?: return
-        shareClient.view(file, reference.mime)
+        noAppOpens = !shareClient.view(file, reference.mime)
     }
 
     private fun shareDownloaded(received: Long, expected: Long?) {

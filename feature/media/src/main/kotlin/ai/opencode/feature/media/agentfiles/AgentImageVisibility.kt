@@ -246,7 +246,11 @@ class AgentImageRowGrowth(private val now: () -> Double = ::agentImageNow) {
         baseRemaining = start
         if (abs(start) < 0.5f || abs(remaining) < 0.5f || Math.signum(remaining) != Math.signum(start)) return endFollowing()
         val fraction = minOf(1f, remaining / start)
-        followingNow = following.mapValues { Math.round(it.value * fraction * 2) / 2f }
+        // Swift `.rounded()`: to the nearest half, ties away from zero (Math.round ties up).
+        followingNow = following.mapValues { entry ->
+            val doubled = entry.value * fraction * 2
+            Math.copySign(kotlin.math.floor(abs(doubled) + 0.5f), doubled) / 2f
+        }
         publish()
     }
 
