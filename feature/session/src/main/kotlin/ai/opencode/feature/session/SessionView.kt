@@ -1,5 +1,8 @@
 package ai.opencode.feature.session
 
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.stateDescription
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.haptics.Haptic
@@ -519,6 +522,23 @@ private fun SessionSheets(store: StoreOf<State, Action>, listContext: SessionLis
                 onModelTapped = { store.send(Action.ModelButtonTapped) },
                 onDismissRequest = dismiss,
                 providerIcon = { providerID, canonical, size -> ProviderIcon(providerID, Modifier.size(size), canonical) },
+                statusOrb = { status, size ->
+                    // iOS: the session's own activity, drawn like a subagent's elsewhere.
+                    val activity = SubagentActivity(
+                        sessionID = details.session?.id,
+                        phase = if (status == SessionSheetStatus.Idle) SubagentActivity.Phase.idle else SubagentActivity.Phase.running,
+                        needsInput = status == SessionSheetStatus.Waiting,
+                    )
+                    CompositionLocalProvider(
+                        LocalAgentActivityScope provides "${sheet.state.server.persistenceID}|${details.session?.id ?: "draft"}|sheet",
+                    ) {
+                        AgentActivityGlyph(
+                            AgentActivitySource.Subagent(activity),
+                            Modifier.semantics { contentDescription = "Status"; stateDescription = status.text },
+                            size = size,
+                        )
+                    }
+                },
             )
         }
         State.ActivePicker.model -> SessionModelPicker(store)

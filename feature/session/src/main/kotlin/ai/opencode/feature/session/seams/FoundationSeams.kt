@@ -106,8 +106,16 @@ sealed interface VoiceServerChoice {
         }
 
         /** Settings › Voice › Voice Server. The connected server by default. */
-        val key: SharedKey<VoiceServerChoice> = SharedKey.appStorage("voice-server", Connected)
+        val key: SharedKey<VoiceServerChoice> get() = VoiceServerChoiceKey.key
     }
+}
+
+/**
+ * Outside the companion: building the key resolves `VoiceServerChoice.serializer()` through the
+ * companion, which would still be initialising (ExceptionInInitializerError on first use).
+ */
+private object VoiceServerChoiceKey {
+    val key: SharedKey<VoiceServerChoice> = SharedKey.appStorage("voice-server", VoiceServerChoice.Connected)
 }
 
 internal object VoiceServerChoiceSerializer : KSerializer<VoiceServerChoice> {

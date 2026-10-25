@@ -223,6 +223,7 @@ fun SessionTranscriptView(
             layoutTuning = TranscriptTunables.layoutSnapshot(
                 imageLinkPreviews = ExperimentalFeature.imageLinkPreviews.isActive(imageLinkPreviewsSetting),
             ),
+            onScrolledUnderHeader = { scrollEdgeBridge.scrolled(underHeader = it, revealDistance = top.revealDistance) },
         )
     }
 

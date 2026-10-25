@@ -352,7 +352,7 @@ private fun PlainModelRow(model: OpenCodeModel, isCurrent: Boolean, isFavorite: 
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        ModelProviderMark(Modifier.size(20.dp))
+        ProviderIcon(model.providerID, Modifier.size(20.dp))
         Text(
             model.name,
             style = OpenCodeTextStyles.body,
@@ -365,17 +365,6 @@ private fun PlainModelRow(model: OpenCodeModel, isCurrent: Boolean, isFavorite: 
         Spacer(Modifier.weight(0.001f).width(4.dp))
         if (isFavorite) OpenCodeIcon(SFSymbol.StarFill, contentDescription = null, size = 14.dp, tint = FavoriteYellow)
         if (isCurrent) OpenCodeIcon(SFSymbol.Checkmark, contentDescription = null, size = 18.dp, tint = OpenCodeTheme.colors.accent)
-    }
-}
-
-/**
- * Stand-in for iOS `ProviderIcon` (the provider's own mark, owned by VIEW-MAIN's `SessionView`);
- * the neutral placeholder until the provider icon assets are ported.
- */
-@Composable
-private fun ModelProviderMark(modifier: Modifier) {
-    Box(modifier, contentAlignment = Alignment.Center) {
-        OpenCodeIcon(SFSymbol.Cpu, contentDescription = null, size = 20.dp, tint = OpenCodeTheme.colors.secondaryText)
     }
 }
 

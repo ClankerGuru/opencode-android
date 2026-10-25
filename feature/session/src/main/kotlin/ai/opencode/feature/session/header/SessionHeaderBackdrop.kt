@@ -64,7 +64,7 @@ fun SessionHeaderBackdrop(
         appBlur?.let { max(it.fadeStart, it.fadeEnd) } ?: 0f,
         backdrop?.fadeEnd ?: 0f,
     )
-    val height = max(top + bandEnd, 0f)
+    val height = max(top + bandEnd + SCRIM_FADE / 2, 0f)
     Spacer(
         modifier
             .fillMaxWidth()
@@ -74,9 +74,16 @@ fun SessionHeaderBackdrop(
                 val scrolled = scrolledUnderHeader()
                 if (appBlur != null && appBlur.radius > 0) {
                     val end = max(appBlur.fadeStart, appBlur.fadeEnd)
-                    val mask = SessionHeaderStyle.Appearance(opacity = 1.0, fadeStart = appBlur.fadeStart, fadeEnd = end)
                     val revealed = if (appBlur.fadeIn > 0) min(max(scrolled / appBlur.fadeIn, 0f), 1f) else 1f
-                    if (revealed > 0) drawBand(mask.stops(top, scrim, 1.0), top + end, revealed)
+                    // Without a blur, iOS's strength curve leaves text readable behind the header's
+                    // controls; an opaque scrim through the header row that fades out over
+                    // [SCRIM_FADE] below it hides what the blur hid (M3 scrolled top bar).
+                    val bandHeight = top + end + SCRIM_FADE / 2
+                    val solidEnd = max(top + end - SCRIM_FADE / 2, 0f)
+                    if (revealed > 0 && bandHeight > 0) {
+                        val stops = listOf(0f to scrim, solidEnd / bandHeight to scrim, 1f to scrim.copy(alpha = 0f))
+                        drawBand(stops, bandHeight, revealed)
+                    }
                 }
                 if (backdrop != null) {
                     val revealed = backdrop.revealed(scrolled).toFloat()
@@ -99,3 +106,6 @@ private fun DrawScope.drawBand(stops: List<Pair<Float, Color>>, heightDp: Float,
         alpha = alpha,
     )
 }
+
+/** How far below the header row the app band's opaque scrim fades out (dp). */
+private const val SCRIM_FADE = 24f
