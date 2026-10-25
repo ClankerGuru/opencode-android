@@ -389,8 +389,9 @@ private fun HomeFloatingCall(call: VoiceStoreOf?) {
 /**
  * What the session's stack shows, bottom first: the session (or draft), then each subagent pushed
  * over it (iOS `stackPages` / `StackEntry`). Back (the back button, the predictive back gesture)
- * goes to the screen beneath. TODO(merge): web pages over the screen that opened them
- * (`StackEntry.web`) once `:feature:media` ports the in-app browser.
+ * goes to the screen beneath. TODO(merge) round 2b / `:feature:session`: web pages over the screen
+ * that opened them (`StackEntry.web`: `:feature:media`'s `BrowserPage` for the screen's
+ * `SessionFeature.browser.pageID`, Back closing it with `.browser(.closeTapped)`).
  */
 @Composable
 private fun HomeSessionStack(

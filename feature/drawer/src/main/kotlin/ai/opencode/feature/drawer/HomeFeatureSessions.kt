@@ -159,7 +159,7 @@ private fun HomeFeature.reduceSessionDelegate(state: State, delegate: SessionDel
     }
     is SessionDelegate.ResolveSessionLinks -> resolveSessionLinks(state, delegate.ids)
     is SessionDelegate.OpenSessionLink -> openSessionLink(state, delegate.id)
-    // TODO(merge): `startCallOnTop` once `:feature:voice` ports; until then Voice set-up shows Settings.
+    // TODO(merge) round 2b / `:feature:session`: `startCallOnTop` (the screen's `VoiceFeature`); until then Voice set-up shows Settings.
     SessionDelegate.CallRequested -> Reduced(state.showingSettings())
     is SessionDelegate.TogglePin -> Reduced(state, Effect.send(Action.TogglePin(delegate.sessionID)))
     is SessionDelegate.SetPinned -> {

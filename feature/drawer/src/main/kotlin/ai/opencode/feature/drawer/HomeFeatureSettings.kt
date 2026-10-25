@@ -202,7 +202,7 @@ internal fun HomeFeature.tryWhatsNew(destination: WhatsNewEntry.Destination, ent
             // (`SessionFeature.browser`).
             if (destination == WhatsNewEntry.Destination.Call) {
                 // A pushed subagent's call belongs to the root, aimed at the top.
-                // TODO(merge): `startCallOnTop` for a pushed subagent once `:feature:voice` ports.
+                // TODO(merge) round 2b / `:feature:session`: `startCallOnTop` for a pushed subagent.
                 val call = startSystemCall(s)
                 s = call.state
                 effects += call.effect

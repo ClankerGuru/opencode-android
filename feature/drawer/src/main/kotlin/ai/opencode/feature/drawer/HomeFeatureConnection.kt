@@ -36,10 +36,11 @@ import kotlin.time.Duration.Companion.milliseconds
 internal fun HomeFeature.reduceConnection(state: State, action: Action): HomeReduced = when (action) {
     Action.Task -> {
         val s = if (state.isConnected) state.initializingInbox() else state
-        // TODO(merge): iOS also listens to the call's and the recording's Live Activity commands here
+        // TODO(merge) round 2b / `:feature:session`: iOS also listens to the call's and the recording's Live Activity commands here
         // (`voiceLiveActivity.commands()` → `.voiceCallCommand`, `dictationLiveActivity.commands()` →
-        // `.dictationCommand`, cancellable by `CancelID.voiceCallCommands` / `.dictationCommands`)
-        // once `:feature:voice` / `:feature:system` port their ongoing-notification clients.
+        // `.dictationCommand`, cancellable by `CancelID.voiceCallCommands` / `.dictationCommands`;
+        // `:feature:system`'s `VoiceLiveActivityClient`/`DictationLiveActivityClient`). Listening waits
+        // for the handlers, which need the screen's call and recording.
         if (s.isConnected) Reduced(s, Effect.merge(refreshAttention(s), resolveActiveAncestry(s))) else refreshSnapshot(s)
     }
 
@@ -256,8 +257,8 @@ private fun HomeFeature.snapshotRefreshed(state: State, action: Action.SnapshotR
     val drained = drainDirtyCachedTranscripts(s)
     s = drained.state
     val prefetch = prefetchTranscripts(s)
-    // TODO(merge): `notifyVoiceSnapshot(&state, activeIDs:)` (a live call hears the list) once
-    // `:feature:voice` ports.
+    // TODO(merge) round 2b / `:feature:session`: `notifyVoiceSnapshot(&state, activeIDs:)` (a live
+    // call hears the list; the call is the screen's `VoiceFeature`).
     var retry: Effect<Action> = Effect.none()
     if (unattributed) {
         val refreshed = refreshSnapshot(s)

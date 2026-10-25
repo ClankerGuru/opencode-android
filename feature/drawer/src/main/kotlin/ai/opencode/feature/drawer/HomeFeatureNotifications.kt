@@ -273,7 +273,7 @@ internal fun HomeFeature.inAppNoticeSignalChanged(oldInput: InAppNoticeInput, ne
     if (added.isEmpty()) return Reduced(s)
     val urgent = added.any { it.kind == InAppNotice.Kind.needsInput }
     // A call has its own sounds.
-    // TODO(merge): `sessionDetail?.voice.map { !$0.phase.isTerminal }` once `:feature:voice` ports.
+    // TODO(merge) round 2b / `:feature:session`: `sessionDetail?.voice.map { !$0.phase.isTerminal }`.
     val inCall = false
     // iOS speaks up only from the window in use (Multiple Windows, `sceneWindow.isFront`); the
     // Android app has one task, so the window is always the one in use.

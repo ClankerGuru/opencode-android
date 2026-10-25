@@ -914,7 +914,7 @@ fun HomeFeature.State.makeDetail(
     val (restored, withDraft) = s.restoringPersistedDraft(detail)
     s = restored
     if (cachedItems != null) s = s.touchingCachedTranscript(session)
-    // TODO(merge): a live call follows the screen (`voice.retarget`), logging `transition.reason`.
+    // TODO(merge) round 2b / `:feature:session`: a live call follows the screen (`voice.retarget`), logging `transition.reason`.
     return s to withDraft
 }
 
@@ -992,7 +992,7 @@ private fun HomeFeature.State.beginningDetailTransition(
     var s = poppingSubagents(toDepth = 0).rememberingSession().syncingOutgoingDetailDraft(targetIsDraft)
     val reason = s.nextMoveReason ?: defaultReason
     // Keeping the identity keeps a live call's or recording's effects alive.
-    // TODO(merge): `keepsIdentity` is true while the outgoing screen has a live call or carried dictation.
+    // TODO(merge) round 2b / `:feature:session`: `keepsIdentity` is true while the outgoing screen has a live call or carried dictation.
     val keepsIdentity = false
     // Every move counts, identity kept or not (`selectedTranscriptFetch`).
     val fresh = s.detailGeneration + 1
@@ -1124,7 +1124,7 @@ fun HomeFeature.State.pushingSubagent(session: OpenCodeSession): HomeFeature.Sta
     )
     val (restored, withDraft) = s.restoringPersistedDraft(detail)
     s = restored.copy(subagentStack = restored.subagentStack + withDraft)
-    // TODO(merge): `retargetCallToTop(reason: "you opened a subagent")` once voice ports.
+    // TODO(merge) round 2b / `:feature:session`: `retargetCallToTop(reason: "you opened a subagent")`.
     return s.markingTopScreen().absorbingSharedDrafts()
 }
 
@@ -1166,7 +1166,7 @@ fun HomeFeature.State.poppingSubagents(toDepth: Int): HomeFeature.State {
             s.updatingDetail { it.copy(familyTranscriptCache = it.familyTranscriptCache + (sessionID to items)) }
         }
     }
-    // TODO(merge): `retargetCallToTop(reason: "you went back")` once voice ports.
+    // TODO(merge) round 2b / `:feature:session`: `retargetCallToTop(reason: "you went back")`.
     return s.markingTopScreen()
 }
 

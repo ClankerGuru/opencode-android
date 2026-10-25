@@ -226,8 +226,8 @@ private fun HomeFeature.detailSessionsCore(): Reducer<State, Action> {
 /**
  * Home's own actions and the screens, then what follows them: a link tap dropped when its screen
  * stops being the one on top, and background reads resuming once the foreground read settles.
- * (iOS also discards a gone screen's in-app browser page and stops its recording here; those wait
- * for `:feature:media` and `:feature:voice`.)
+ * (iOS also discards a gone screen's in-app browser page (`discardPage`) and stops its recording
+ * here. TODO(merge) round 2b / `:feature:session`: the page and the recording are the screen's.)
  */
 private fun HomeFeature.detailSessions(): Reducer<State, Action> =
     detailSessionsCore()
