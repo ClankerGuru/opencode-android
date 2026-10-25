@@ -99,7 +99,7 @@ data class BrowserPeek(val text: CharSequence?)
 /**
  * The page pushed over the session (D-40, Push In): the web view edge to edge, a back button
  * where the drawer button sits, and a bar at the bottom (the page's back and forward, its title
- * and host, Share, Safari, and Ask). Ask raises a composer over the bar; the question goes to the
+ * and host, Share, Open in Browser, and Ask). Ask raises a composer over the bar; the question goes to the
  * session with the page attached, and a capsule shows the reply's progress. Going back from the
  * first page closes it: the back button, or the stack's back gesture (which steps back through
  * the page's history first: see [browserBackAction] and [BrowserWebViews.canGoBack]).
@@ -256,7 +256,7 @@ private fun Bar(browser: BrowserFeature.State, onAction: (BrowserFeature.Action)
                     BarButton("square.and.arrow.up", "Share", "browser-share", enabled = true) {
                         dependency(LinkShareSheet).present(url)
                     }
-                    BarButton("safari", "Open in Safari", "browser-safari", enabled = true) {
+                    BarButton("safari", "Open in Browser", "browser-safari", enabled = true) {
                         val opener = dependency(OpenURLClient)
                         scope.launch { opener.openInBrowser(url) }
                     }

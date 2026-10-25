@@ -72,11 +72,11 @@ import kotlin.math.roundToInt
 
 /**
  * What holding a web link in a reply offers (Markdown links, bare URLs, and link cards): Open in
- * Safari, Open in App, Copy Link, and Share…; a tap still opens it as before. With the In-App
+ * Browser, Open in App, Copy Link, and Share…; a tap still opens it as before. With the In-App
  * Browser on, a public page also offers Open in App Browser first, since a tap tries the app
  * that claims the link before the browser. TalkBack gets the same as custom actions.
- * Port of iOS `LinkMenuAction`; the copy keeps iOS's “Open in Safari” (it opens the default
- * browser on Android).
+ * Port of iOS `LinkMenuAction`. iOS's “Open in Safari” reads “Open in Browser” here (it opens the
+ * default browser); the case keeps iOS's name and raw value so the two codebases diff side by side.
  */
 enum class LinkMenuAction(val rawValue: String) {
     OpenInAppBrowser("openInAppBrowser"),
@@ -91,7 +91,7 @@ enum class LinkMenuAction(val rawValue: String) {
     val title: String
         get() = when (this) {
             OpenInAppBrowser -> "Open in App Browser"
-            OpenInSafari -> "Open in Safari"
+            OpenInSafari -> "Open in Browser"
             OpenInApp -> "Open in App"
             Copy -> "Copy Link"
             Share -> "Share…"
@@ -125,7 +125,7 @@ enum class LinkMenuAction(val rawValue: String) {
         fun actions(url: String, experimental: ExperimentalFeatures): List<LinkMenuAction> {
             if (SessionLink.id(url) != null) return listOf(CopySessionID)
             if (OpenCodePairingLink.shouldHandleOpenURL(url)) {
-                // Never offer Open in Safari, Open in App, or Open in App Browser for a single-use pairing URL.
+                // Never offer Open in Browser, Open in App, or Open in App Browser for a single-use pairing URL.
                 return if (OpenCodePairingLink.shareableURL(url) != null) listOf(Copy, Share) else emptyList()
             }
             val publicWebPage = BrowserLinkPolicy.isPublicWebPage(url)
@@ -202,7 +202,7 @@ class UniversalLinkClient(
 
 /**
  * Opens a URL in the system (iOS `\.openURL` / `ActiveScene.open`): [open] hands it to whatever
- * claims it (an app or the browser); [openInBrowser] is “Open in Safari”: the default browser
+ * claims it (an app or the browser); [openInBrowser] is “Open in Browser”: the default browser
  * as a Custom Tab. Both return whether something took it. Lives here because no lower module has
  * a URL opener yet; the session reducer reads it too.
  */
@@ -308,7 +308,7 @@ object LinkMenuText {
         val host = displayHost(url)
         return when (action) {
             LinkMenuAction.OpenInAppBrowser -> "Open $host in App Browser"
-            LinkMenuAction.OpenInSafari -> "Open $host in Safari"
+            LinkMenuAction.OpenInSafari -> "Open $host in Browser"
             LinkMenuAction.OpenInApp -> "Open $host in App"
             LinkMenuAction.Copy -> "Copy Link to $host"
             LinkMenuAction.Share -> "Share Link to $host"
