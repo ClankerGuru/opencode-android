@@ -14,7 +14,6 @@ import ai.opencode.feature.drawer.bridge.SessionDetail
 import ai.opencode.feature.drawer.catchup.CatchUpFeature
 import ai.opencode.feature.settings.ConnectionStatus
 import ai.opencode.feature.settings.HomeSettingsFeature
-import ai.opencode.feature.settings.NotificationPermissionStatus
 import ai.opencode.feature.settings.SettingsFeature
 import ai.opencode.feature.settings.SettingsFeature.SettingsDelegate
 import ai.opencode.feature.settings.whatsnew.WhatsNewEntry
@@ -66,12 +65,7 @@ internal val State.settingsHomeInput: SettingsFeature.Action.HomeChanged?
 
 private val State.settingsNotifications: SettingsFeature.Action.NotificationsChanged
     get() = SettingsFeature.Action.NotificationsChanged(
-        permission = when (notificationPermission) {
-            null -> null
-            NotificationPermission.NotDetermined -> NotificationPermissionStatus.notDetermined
-            NotificationPermission.Disabled -> NotificationPermissionStatus.disabled
-            NotificationPermission.Enabled -> NotificationPermissionStatus.enabled
-        },
+        permission = notificationPermission,
         isRequesting = isRequestingNotifications,
         setupError = notificationSetupError,
     )
@@ -124,7 +118,7 @@ internal fun reducePreferences(state: State, action: HomeSettingsFeature.Action)
         Reduced(state.copy(isSidebarShown = next))
     }
     else -> {
-        val reduced = HomeSettingsFeature().reduce(HomeSettingsFeature.State(), action)
+        val reduced = HomeSettingsFeature().reduce(HomeSettingsFeature.State(server = state.server), action)
         Reduced(state, reduced.effect.map { Action.Settings(it) })
     }
 }
