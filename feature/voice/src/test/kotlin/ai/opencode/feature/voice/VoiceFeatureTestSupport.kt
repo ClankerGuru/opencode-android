@@ -4,6 +4,7 @@ import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.DependencyValues
 import ai.opencode.core.dependencies.UuidClient
+import ai.opencode.core.dependencies.asContextElement
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.sharing.SharedKeys
@@ -18,6 +19,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -156,6 +158,10 @@ internal object VoiceFeatureTestSupport {
             harness.skipInFlightEffects()
         }
     }
+
+    /** iOS `withDependencies { … } operation: { … }` in a test: a test container with these overrides. */
+    suspend fun <R> withTestDependencies(update: DependencyValues.Builder.() -> Unit, block: suspend () -> R): R =
+        withContext(DependencyValues.testing().update(update).asContextElement()) { block() }
 
     fun TestStore<VoiceFeature.State, VoiceFeature.Action>.setAPIKey(key: String?) =
         withDependencies { shared(SharedKeys.openAIAPIKey).set(key) }
