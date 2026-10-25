@@ -216,6 +216,7 @@ literals that aren't symbols). `(fill)` is the filled variant. Weak matches: `st
 | `pin` | `keep` | `ms_keep` | `SFSymbol.Pin` | DrawerStyle, HomeView+Drawer, SessionSheetView, SessionView+Header, VoiceActionClaim, WhatsNewList |
 | `pin.fill` | `keep` (fill) | `ms_keep_fill` | `SFSymbol.PinFill` | DrawerStyle, SessionSheetView |
 | `pin.slash` | `keep_off` | `ms_keep_off` | `SFSymbol.PinSlash` | HomeView+Drawer, SessionView+Header |
+| `pip.enter` | `picture_in_picture_alt` | `ms_picture_in_picture_alt` | `SFSymbol.PipEnter` | AgentFileViewer (AVKit’s Picture in Picture button) |
 | `play.fill` | `play_arrow` (fill) | `ms_play_arrow_fill` | `SFSymbol.PlayFill` | FileAttachmentViews, LinkPreviewViews, PlusPhotoSheet, RecentPhotoPeek, SettingsView, VoiceCallLogView |
 | `play.rectangle.on.rectangle` | `video_library` | `ms_video_library` | `SFSymbol.PlayRectangleOnRectangle` | DiagnosticsView |
 | `plus` | `add` | `ms_add` | `SFSymbol.Plus` | AppView, AttachmentPicker, FloatingCall, OpenCodeClient+Models, ServerTitleView, SessionSwitcher, ShareView, WhatsNewList |
