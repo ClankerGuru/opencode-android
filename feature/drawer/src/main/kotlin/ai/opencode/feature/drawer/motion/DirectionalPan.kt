@@ -184,11 +184,18 @@ fun Modifier.drawerPanSwitcherStrip(isEnabled: Boolean): Modifier = composed {
         excludedFromDrawerPan(isEnabled)
     } else {
         val id = remember { Any() }
+        // The strip's last layout, so enabling it again (the keyboard gone) registers it at once
+        // rather than at its next placement.
+        val placed = remember { arrayOfNulls<LayoutCoordinates>(1) }
         DisposableEffect(regions, isEnabled) {
-            if (!isEnabled) regions.switcherStrips.remove(id)
+            val coordinates = placed[0]
+            if (isEnabled && coordinates != null) regions.switcherStrips[id] = coordinates else regions.switcherStrips.remove(id)
             onDispose { regions.switcherStrips.remove(id) }
         }
-        onGloballyPositioned { if (isEnabled) regions.switcherStrips[id] = it }
+        onGloballyPositioned {
+            placed[0] = it
+            if (isEnabled) regions.switcherStrips[id] = it
+        }
     }
 }
 

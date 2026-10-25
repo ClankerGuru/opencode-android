@@ -377,18 +377,22 @@ class SessionSwitcherController internal constructor(private val scope: Coroutin
         when (phase) {
             Phase.Began, Phase.Changed -> {
                 if (phase == Phase.Began) {
+                    // UIKit always has a velocity when its pan begins; Android's tracker can have
+                    // none after two samples, so the finger's travel past the slop decides then
+                    // (`delta` is caught up to zero here).
+                    val direction = if (velocity == Offset.Zero) fingerTranslation else velocity
                     clock?.cancel()
                     dragging = true
                     when (mode) {
                         Mode.idle -> {
                             prepare()
-                            if (abs(velocity.x) > abs(velocity.y) || (velocity == Offset.Zero && abs(delta.x) > abs(delta.y))) {
+                            if (abs(direction.x) > abs(direction.y)) {
                                 beginSwipe()
                             } else {
                                 beginZoom(activeIndex, activeIndex.toFloat())
                             }
                         }
-                        Mode.deck -> if (abs(velocity.y) > abs(velocity.x) || (velocity == Offset.Zero && abs(delta.y) > abs(delta.x))) {
+                        Mode.deck -> if (abs(direction.y) > abs(direction.x)) {
                             // Pulling the stack down grows the nearest card back to full screen.
                             beginZoom(nearest(value), value)
                             value = 1f
