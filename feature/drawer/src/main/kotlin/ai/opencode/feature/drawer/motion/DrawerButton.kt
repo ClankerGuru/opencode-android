@@ -268,7 +268,7 @@ private object DrawerBadgeColors {
 }
 
 @Composable
-private fun isDarkTheme(): Boolean = MaterialTheme.colorScheme.surface.run { (red * 0.299f + green * 0.587f + blue * 0.114f) < 0.5f }
+private fun isDarkTheme(): Boolean = OpenCodeTheme.colors.isDark
 
 /** The capsule's grow (iOS `.spring(duration: 0.5, bounce: 0.12)`). */
 private val growSpring = MotionSpring(0.5, 0.12)
@@ -331,9 +331,13 @@ fun DrawerButton(
             shown = null
         }
     }
-    // The label measured a new width, or the header gave it more room.
-    LaunchedEffect(labelFrame) {
+    // The label measured a new width: the capsule grows to it (iOS `onGeometryChange` → `grow`).
+    LaunchedEffect(labelWidthPx) {
         if (expanded && !reducedMotion) scope.launch { reveal.animateTo(labelFrame, growSpring.spec()) }
+    }
+    // The header gave it more or less room: the capsule takes it at once (iOS `onChange(of: maxWidth)`).
+    LaunchedEffect(maxWidth) {
+        if (expanded && !reducedMotion) scope.launch { reveal.snapTo(labelFrame) }
     }
 
     val dotBadge = if (notice == null && shown == null) badge else null
