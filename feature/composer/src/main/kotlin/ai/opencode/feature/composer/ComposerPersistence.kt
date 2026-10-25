@@ -7,6 +7,8 @@ import ai.opencode.feature.voice.VoiceLabEnvironment
 import ai.opencode.server.model.OpenCodeDelivery
 import ai.opencode.server.model.OpenCodeProject
 import ai.opencode.server.model.OpenCodeSession
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.time.Instant
 import kotlin.time.Duration
@@ -112,7 +114,8 @@ class ComposerPersistence(
                 settlePrompts = writer::settlePrompts,
                 removeSession = writer::removeSession,
                 removeServer = writer::removeServer,
-                flush = { writer.flush() },
+                // iOS `await writer.flush()` runs off the main actor; the write never blocks the caller's thread.
+                flush = { withContext(Dispatchers.IO) { writer.flush() } },
                 removeAll = writer::removeAll,
             )
         }
