@@ -1,0 +1,422 @@
+package ai.opencode.feature.drawer.list
+
+import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.motion.Motion
+import ai.opencode.core.ui.OpenCodeTextStyles
+import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.feature.drawer.icons.ProjectAvatarPalette
+import ai.opencode.feature.drawer.icons.ProjectIcon
+import ai.opencode.feature.drawer.icons.ProjectIconClient
+import ai.opencode.feature.drawer.icons.ProjectIconRequest
+import ai.opencode.feature.drawer.icons.iconRequest
+import ai.opencode.feature.drawer.style.DrawerFontWeight
+import ai.opencode.feature.drawer.style.DrawerTextStyle
+import ai.opencode.feature.drawer.style.DrawerTunables
+import ai.opencode.server.OpenCodeServer
+import ai.opencode.server.model.OpenCodeProject
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.roundToInt
+
+// The pieces of a drawer session row (iOS `DrawerListCellParts.swift`).
+
+/** The drawer's row fonts (iOS `DrawerListFonts`). */
+object DrawerListFonts {
+    /**
+     * A text style at a weight. iOS steps the weight up itself under Bold Text; Android's
+     * Bold Text (`Configuration.fontWeightAdjustment`) is applied by Compose's font
+     * resolution, so it isn't added again here.
+     */
+    fun font(style: TextStyle, weight: FontWeight): TextStyle = style.copy(fontWeight = weight)
+
+    /** A heading at a style: Headline is already semibold. */
+    fun heading(style: DrawerTextStyle, weight: DrawerFontWeight): TextStyle {
+        val resolved = if (weight == DrawerFontWeight.Semibold && style == DrawerTextStyle.Headline) FontWeight.SemiBold else weight.weight
+        return font(style.font, resolved)
+    }
+
+    /** Tabular figures (iOS `kMonospacedNumbersSelector`). */
+    fun monospacedDigits(style: TextStyle): TextStyle = style.copy(fontFeatureSettings = "tnum")
+}
+
+/**
+ * The Working ring (iOS `DrawerListActivityRing`): an open arc (72 % of the circle, 1.8 dp,
+ * round caps) with a fading tail, turned once every 0.8 s in the layer (no recomposition per
+ * frame). Pass `isSpinning = running && !reduceMotion`: it stops under reduce motion.
+ * [opaqueTail] (high contrast) draws the tail at full strength. Size it with [modifier].
+ */
+@Composable
+fun DrawerListActivityRing(isSpinning: Boolean, opaqueTail: Boolean, modifier: Modifier = Modifier) {
+    val color = OpenCodeTheme.colors.secondaryText
+    val tail = if (opaqueTail) color else color.copy(alpha = 0f)
+    val rotation = if (isSpinning) {
+        val transition = rememberInfiniteTransition(label = "drawer-activity-ring")
+        transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = infiniteRepeatable(tween(durationMillis = 800, easing = LinearEasing)),
+            label = "spin",
+        )
+    } else {
+        null
+    }
+    Canvas(
+        modifier
+            .clearAndSetSemantics {}
+            .graphicsLayer { rotationZ = rotation?.value ?: 0f },
+    ) {
+        val inset = 0.9.dp.toPx()
+        val brush = Brush.sweepGradient(
+            0f to tail,
+            0.72f to color,
+            0.78f to color,
+            0.9f to tail,
+            center = center,
+        )
+        drawArc(
+            brush = brush,
+            startAngle = 0f,
+            sweepAngle = 360f * 0.72f,
+            useCenter = false,
+            topLeft = Offset(inset, inset),
+            size = Size(size.width - inset * 2, size.height - inset * 2),
+            style = Stroke(width = 1.8.dp.toPx(), cap = StrokeCap.Round),
+        )
+    }
+}
+
+/** Metrics of the project tile (iOS `DrawerListProjectTile` statics). */
+object DrawerListProjectTile {
+    /**
+     * The tile's side at the current font scale: a little larger from XXXL. iOS steps by
+     * content size category; these are the categories' body sizes over Large (17 pt):
+     * XXXL 23 (≈1.35), AX Medium 28 (≈1.65), AX Extra Large 40 (≈2.35).
+     */
+    fun side(base: Dp, fontScale: Float): Dp = when {
+        fontScale >= 40f / 17f -> base + 4.dp
+        fontScale >= 28f / 17f -> base + 3.dp
+        fontScale >= 23f / 17f -> base + 2.dp
+        else -> base
+    }
+}
+
+/**
+ * The project's icon to show: the cached one at once, else the initial tile until loading
+ * brings one (iOS's tile asked `ProjectIconClient` cached first, then loaded). Loading runs in
+ * [ProjectIconClient]'s own scope; leaving composition stops observing, not the shared fetch.
+ */
+@Composable
+fun rememberProjectIcon(
+    request: ProjectIconRequest?,
+    client: ProjectIconClient = remember { dependency(ProjectIconClient) },
+): ProjectIcon? {
+    val key = request?.cacheKey
+    val initial = remember(key, client) { request?.let { client.cached(it)?.icon } }
+    val icons = remember(key, client) { request?.let(client::observe) }
+    if (icons == null) return null
+    val icon by icons.collectAsState(initial = initial)
+    return icon
+}
+
+/**
+ * The project tile leading a drawer row (OC-419), loading its icon through
+ * [ProjectIconClient], cached first. See the overload taking an icon.
+ */
+@Composable
+fun DrawerListProjectTile(
+    project: OpenCodeProject,
+    server: OpenCodeServer,
+    muted: Boolean,
+    side: Dp,
+    increasedContrast: Boolean,
+    reducedMotion: Boolean,
+    modifier: Modifier = Modifier,
+    client: ProjectIconClient = remember { dependency(ProjectIconClient) },
+) {
+    val request = remember(project, server) { project.iconRequest(server) }
+    val icon = rememberProjectIcon(request, client)
+    DrawerListProjectTile(
+        project = project,
+        icon = icon,
+        muted = muted,
+        side = side,
+        increasedContrast = increasedContrast,
+        reducedMotion = reducedMotion,
+        modifier = modifier,
+    )
+}
+
+/**
+ * The [side]-square project tile leading a drawer row (iOS `DrawerListProjectTile`, OC-419):
+ * the project's [icon] (full-bleed, or padded on a neutral backing) or its initial on its
+ * palette colour, a top sheen and a hairline inner border. An arriving icon cross-fades in
+ * over 0.18 s (cut under reduce motion). Decorative: hidden from TalkBack.
+ */
+@Composable
+fun DrawerListProjectTile(
+    project: OpenCodeProject,
+    icon: ProjectIcon?,
+    muted: Boolean,
+    side: Dp,
+    increasedContrast: Boolean,
+    reducedMotion: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val dark = OpenCodeTheme.colors.isDark
+    val palette = remember(project.icon?.color, dark) { ProjectAvatarPalette.resolve(project.icon?.color, dark) }
+    val radius = DrawerTunables.projectIconCornerRadius * (side / 20.dp)
+    val shape = RoundedCornerShape(radius)
+    val borderWidth = if (increasedContrast) 1.dp else 0.5.dp
+    val borderColor = palette.border.copy(alpha = if (increasedContrast) 1f else DrawerTunables.projectIconBorderOpacity)
+    Box(
+        modifier
+            .size(side)
+            .graphicsLayer { alpha = if (muted) 0.65f else 1f }
+            .clip(shape)
+            .clearAndSetSemantics {},
+    ) {
+        Crossfade(
+            targetState = icon,
+            animationSpec = if (reducedMotion) snap() else tween(durationMillis = 180, easing = Motion.EaseOut),
+            label = "project-tile",
+        ) { shown ->
+            if (shown != null) {
+                val background = when (shown.backing) {
+                    ProjectIcon.Backing.FullBleed -> palette.background
+                    ProjectIcon.Backing.PaddedDark -> ProjectAvatarPalette.hex(0x161618)
+                    ProjectIcon.Backing.PaddedLight -> if (dark) ProjectAvatarPalette.hex(0xf2f2f7) else ProjectAvatarPalette.hex(0xe5e5ea)
+                }
+                val inset = if (shown.backing == ProjectIcon.Backing.FullBleed) 0.dp else (side.value * 0.15f).roundToInt().dp
+                Box(Modifier.fillMaxSize().background(background)) {
+                    Image(
+                        bitmap = shown.image,
+                        contentDescription = null,
+                        contentScale = if (shown.backing == ProjectIcon.Backing.FullBleed) ContentScale.Crop else ContentScale.Fit,
+                        modifier = Modifier.fillMaxSize().padding(inset),
+                    )
+                    TileSheen(top = 0.12f)
+                }
+            } else {
+                Box(Modifier.fillMaxSize().background(palette.background), contentAlignment = Alignment.Center) {
+                    TileInitial(project.initial, palette.foreground, side)
+                    TileSheen(top = 0.16f)
+                }
+            }
+        }
+        Canvas(Modifier.matchParentSize()) {
+            val width = borderWidth.toPx()
+            val r = max(radius.toPx() - width / 2, 0f)
+            drawRoundRect(
+                color = borderColor,
+                topLeft = Offset(width / 2, width / 2),
+                size = Size(size.width - width, size.height - width),
+                cornerRadius = CornerRadius(r, r),
+                style = Stroke(width),
+            )
+        }
+    }
+}
+
+@Composable
+private fun TileInitial(initial: String, color: Color, side: Dp) {
+    val density = LocalDensity.current
+    // A fixed size from the tile's side (which already follows the font scale), as iOS's systemFont(ofSize:).
+    val fontSize = with(density) { (side.value * 0.55f).roundToInt().dp.toSp() }
+    val shadowBlur = with(density) { 2.dp.toPx() }
+    Text(
+        text = initial,
+        color = color,
+        textAlign = TextAlign.Center,
+        maxLines = 1,
+        style = TextStyle(
+            fontSize = fontSize,
+            fontWeight = FontWeight.SemiBold,
+            fontFeatureSettings = "tnum",
+            shadow = Shadow(color = Color.Black.copy(alpha = 0.2f), offset = Offset.Zero, blurRadius = shadowBlur),
+        ),
+    )
+}
+
+@Composable
+private fun TileSheen(top: Float) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = top), Color.White.copy(alpha = 0f)))),
+    )
+}
+
+/** Writing-direction helpers for [DrawerListTitleView]. */
+object DrawerListTitle {
+    /**
+     * The direction of the title's first strongly directional character: Hebrew, Arabic and
+     * the other right-to-left scripts, or any other letter. Null for a title with neither
+     * (digits, symbols).
+     */
+    fun writingDirection(title: String): LayoutDirection? {
+        var i = 0
+        while (i < title.length) {
+            val cp = title.codePointAt(i)
+            when (cp) {
+                in 0x0590..0x08FF, in 0xFB1D..0xFDFF, in 0xFE70..0xFEFF, in 0x10800..0x10FFF, in 0x1E800..0x1EFFF ->
+                    return LayoutDirection.Rtl
+                else -> if (Character.isAlphabetic(cp)) return LayoutDirection.Ltr
+            }
+            i += Character.charCount(cp)
+        }
+        return null
+    }
+}
+
+/**
+ * A session row's title (iOS `DrawerListTitleView`): one line that, when it doesn't fit,
+ * keeps its own start in view whatever the layout direction (an English title in a
+ * right-to-left layout still shows its first words) and fades out over its last [fade]
+ * instead of an ellipsis (a mask, so it works on any highlight, the selected row's included).
+ * The card-edge fade during the time reveal is the whole row's. Under reduce motion the
+ * reveal cross-fades the title into the session's [time] instead; [revealProgress] is read
+ * in the draw phase only, so a per-frame reveal never recomposes the row.
+ */
+@Composable
+fun DrawerListTitleView(
+    text: String,
+    style: TextStyle,
+    color: Color,
+    fade: Dp,
+    time: String,
+    reducedMotion: Boolean,
+    modifier: Modifier = Modifier,
+    revealProgress: () -> Float = { 0f },
+) {
+    val layoutRTL = LocalLayoutDirection.current == LayoutDirection.Rtl
+    val titleRTL = remember(text, layoutRTL) {
+        when (DrawerListTitle.writingDirection(text)) {
+            LayoutDirection.Rtl -> true
+            LayoutDirection.Ltr -> false
+            null -> layoutRTL
+        }
+    }
+    val timeStyle = remember { DrawerListFonts.monospacedDigits(DrawerListFonts.font(OpenCodeTextStyles.footnote, FontWeight.Normal)) }
+    Box(modifier) {
+        FadingTitle(
+            text = text,
+            style = style,
+            color = color,
+            fade = fade,
+            titleRTL = titleRTL,
+            layoutRTL = layoutRTL,
+            modifier = Modifier
+                .fillMaxWidth()
+                .graphicsLayer { alpha = if (reducedMotion) 1f - revealProgress().coerceIn(0f, 1f) else 1f },
+        )
+        Box(Modifier.matchParentSize(), contentAlignment = Alignment.CenterStart) {
+            Text(
+                text = time,
+                style = timeStyle,
+                color = OpenCodeTheme.colors.secondaryText,
+                maxLines = 1,
+                overflow = TextOverflow.Clip,
+                modifier = Modifier.graphicsLayer { alpha = if (reducedMotion) revealProgress().coerceIn(0f, 1f) else 0f },
+            )
+        }
+    }
+}
+
+/** The title measured at its natural width, placed by direction, and masked when it overflows. */
+@Composable
+private fun FadingTitle(
+    text: String,
+    style: TextStyle,
+    color: Color,
+    fade: Dp,
+    titleRTL: Boolean,
+    layoutRTL: Boolean,
+    modifier: Modifier,
+) {
+    // Written in measure, read in draw: an overflow change only redraws.
+    val overflows = remember { mutableStateOf(false) }
+    Layout(
+        content = { Text(text = text, style = style, color = color, maxLines = 1, softWrap = false, overflow = TextOverflow.Visible) },
+        modifier = modifier
+            .clipToBounds()
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+            .drawWithContent {
+                drawContent()
+                if (!overflows.value) return@drawWithContent
+                val stop = (fade.toPx() / max(size.width, 1f)).coerceIn(0f, 1f)
+                val brush = if (titleRTL) {
+                    Brush.horizontalGradient(0f to Color.Transparent, stop to Color.Black, 1f to Color.Black)
+                } else {
+                    Brush.horizontalGradient(0f to Color.Black, (1f - stop) to Color.Black, 1f to Color.Transparent)
+                }
+                drawRect(brush = brush, blendMode = BlendMode.DstIn)
+            },
+    ) { measurables, constraints ->
+        val placeable = measurables.first().measure(Constraints(maxHeight = constraints.maxHeight))
+        val width = if (constraints.hasBoundedWidth) constraints.maxWidth else placeable.width
+        val height = min(max(constraints.minHeight, placeable.height), constraints.maxHeight)
+        val overflow = placeable.width > width + 0.5.dp.toPx()
+        if (overflows.value != overflow) overflows.value = overflow
+        layout(width, height) {
+            val x = if (overflow) {
+                // Keeps its own start in view, whatever the layout direction.
+                if (titleRTL) width - placeable.width else 0
+            } else {
+                // Fits: plain text on the layout's leading edge.
+                if (layoutRTL) width - placeable.width else 0
+            }
+            placeable.place(x, (height - placeable.height) / 2)
+        }
+    }
+}
