@@ -87,7 +87,6 @@ import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
@@ -234,12 +233,8 @@ fun ThemesSettingsView(store: SettingsStore) {
             Box(
                 Modifier
                     .fillMaxWidth()
-                    // iOS `.padding(.top, -6)`: the rows' own top inset tucks under the bar.
-                    .layout { measurable, constraints ->
-                        val pull = PreviewTopPull.roundToPx()
-                        val placeable = measurable.measure(constraints)
-                        layout(placeable.width, (placeable.height - pull).coerceAtLeast(0)) { placeable.place(0, -pull) }
-                    }
+                    // iOS pulls the rows 6 pt up under its translucent bar (`.padding(.top, -6)`);
+                    // Android's bar is opaque, so that would cut the bubble's top: no pull.
                     .padding(bottom = SoftEdgeBottomInset)
                     .onSizeChanged { headerHeight = it.height },
             ) {
@@ -263,7 +258,6 @@ internal object AppearanceTunables {
     val softEdgeBlur = 12.dp
 }
 
-private val PreviewTopPull = 6.dp
 private val SoftEdgeBottomInset = 14.dp
 
 /**
