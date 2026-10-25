@@ -122,6 +122,24 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.animation.core.animate
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.layout.offset
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.Velocity
+import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 import java.net.URI
 import androidx.compose.material3.LocalContentColor
 
@@ -153,7 +171,10 @@ fun ShareView(state: ShareModel.State, actions: ShareActions) {
             modifier = Modifier
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.statusBars)
-                .padding(top = 8.dp),
+                .padding(top = 8.dp)
+                // A swipe down cancels, as the system sheet's does on iOS; from Send until it
+                // closes the sheet is the send's to end, so it springs back.
+                .swipeDownToDismiss(enabled = !state.isBusy, reduceMotion = reduceMotion, onDismiss = actions.onCancel),
             shape = OpenCodeShape.sheetTop,
             color = colors.canvas,
             contentColor = colors.text,
@@ -184,6 +205,87 @@ fun ShareView(state: ShareModel.State, actions: ShareActions) {
         ShareSessionSearch(state, onChoose = actions.onChoose) { showsSessionSearch = false }
     }
 }
+
+/**
+ * iOS's page-sheet swipe: the sheet follows a downward drag (on itself, or past the top of
+ * what scrolls inside it), and goes when let go past half its height or flung down; anything
+ * less springs back. Dismissal runs [onDismiss] once the sheet has slid away.
+ */
+@Composable
+private fun Modifier.swipeDownToDismiss(enabled: Boolean, reduceMotion: Boolean, onDismiss: () -> Unit): Modifier {
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    var offset by remember { mutableFloatStateOf(0f) }
+    var height by remember { mutableIntStateOf(0) }
+    var settling by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    var dismissed by remember { mutableStateOf(false) }
+    val currentEnabled by rememberUpdatedState(enabled)
+    val currentDismiss by rememberUpdatedState(onDismiss)
+    val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    val flingVelocity = with(density) { SWIPE_DISMISS_VELOCITY.toPx() }
+    // The dimming behind the sheet fades with how far it has been pulled down, as iOS's
+    // sheet's dimming view does, so nothing pops when it closes.
+    val window = androidx.activity.compose.LocalActivity.current?.window
+    androidx.compose.runtime.LaunchedEffect(window) {
+        if (window == null) return@LaunchedEffect
+        val dim = window.attributes.dimAmount
+        androidx.compose.runtime.snapshotFlow { if (height > 0) (offset / height).coerceIn(0f, 1f) else 0f }
+            .collect { pulled -> window.setDimAmount(dim * (1f - pulled)) }
+    }
+
+    fun drag(delta: Float): Float {
+        if (dismissed) return 0f
+        settling?.cancel()
+        val next = (offset + delta).coerceAtLeast(0f)
+        val used = next - offset
+        offset = next
+        return used
+    }
+
+    fun settle(velocity: Float) {
+        if (dismissed) return
+        settling?.cancel()
+        val goes = currentEnabled && offset > 0f && (offset > height / 2f || velocity > flingVelocity)
+        if (goes) {
+            dismissed = true
+            // As a committed sheet dismissal on iOS: the keyboard goes down alongside the sheet.
+            keyboard?.hide()
+        }
+        settling = scope.launch {
+            val target = if (goes) height.toFloat() else 0f
+            val spec = if (goes) Motion.morphClose.animation<Float>(reduceMotion) else Motion.settle.animation(reduceMotion)
+            animate(offset, target, initialVelocity = velocity, animationSpec = spec) { value, _ -> offset = value }
+            if (goes) currentDismiss()
+        }
+    }
+
+    val connection = remember {
+        object : NestedScrollConnection {
+            // Raised sheet: an upward drag lowers it back before the content scrolls.
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset =
+                if (source == NestedScrollSource.UserInput && offset > 0f && available.y < 0f) Offset(0f, drag(available.y)) else Offset.Zero
+
+            // Content at its top: the rest of a downward drag pulls the sheet.
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset =
+                if (source == NestedScrollSource.UserInput && currentEnabled && available.y > 0f) Offset(0f, drag(available.y)) else Offset.Zero
+
+            override suspend fun onPreFling(available: Velocity): Velocity {
+                if (offset <= 0f) return Velocity.Zero
+                settle(available.y)
+                return available
+            }
+        }
+    }
+    val draggableState = rememberDraggableState { delta -> if (currentEnabled || delta < 0f) drag(delta) }
+    // The drag is read outside the offset, in coordinates that don't move with the sheet.
+    return this
+        .onSizeChanged { height = it.height }
+        .draggable(draggableState, Orientation.Vertical, onDragStopped = { velocity -> settle(velocity) })
+        .nestedScroll(connection)
+        .offset { IntOffset(0, offset.roundToInt()) }
+}
+
+private val SWIPE_DISMISS_VELOCITY = 1000.dp
 
 @Composable
 private fun TopBar(state: ShareModel.State, actions: ShareActions) {
@@ -657,6 +759,17 @@ private fun MessageBar(state: ShareModel.State, actions: ShareActions, reduceMot
     val fieldBlur by animateDpAsState(if (phase == ShareModel.Phase.Sent && !reduceMotion) 6.dp else 0.dp, phaseAnimation(reduceMotion), label = "fieldBlur")
     val fieldLift by animateDpAsState(if (phase == ShareModel.Phase.Sent && !reduceMotion) (-6).dp else 0.dp, phaseAnimation(reduceMotion), label = "fieldLift")
     val density = LocalDensity.current
+    // How far the centre of the field's last-line capitals sits above the field's bottom
+    // edge (iOS `lastLineCapCentre`, 11.8 pt at the default size, scaling with it): measured
+    // from the laid-out text, so the last line's capitals centre on the arrow at any size.
+    val bodySize = with(density) { OpenCodeTextStyles.body.fontSize.toPx() }
+    val capHeight = remember(bodySize) {
+        val bounds = android.graphics.Rect()
+        android.graphics.Paint().apply { textSize = bodySize; typeface = android.graphics.Typeface.DEFAULT }
+            .getTextBounds("H", 0, 1, bounds)
+        bounds.height().toFloat()
+    }
+    var lastLineCapCentre by remember { mutableStateOf(with(density) { 11.8.sp.toDp() }) }
 
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -666,7 +779,9 @@ private fun MessageBar(state: ShareModel.State, actions: ShareActions, reduceMot
     ) {
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             Box(
-                Modifier.weight(1f).padding(start = 16.dp, top = 12.dp, bottom = 14.dp),
+                // Centre the last line's capitals on the arrow (26 dp up: the 48 dp button's
+                // middle plus its 2 dp inset), as the icon centres on caps.
+                Modifier.weight(1f).padding(start = 16.dp, top = 12.dp, bottom = maxOf(26.dp - lastLineCapCentre, 4.dp)),
                 contentAlignment = Alignment.BottomStart,
             ) {
                 BasicTextField(
@@ -678,6 +793,13 @@ private fun MessageBar(state: ShareModel.State, actions: ShareActions, reduceMot
                     cursorBrush = SolidColor(if (state.isBusy) androidx.compose.ui.graphics.Color.Transparent else colors.accent),
                     minLines = 1,
                     maxLines = 6,
+                    onTextLayout = { layout ->
+                        if (layout.lineCount == 0) return@BasicTextField
+                        val last = layout.lineCount - 1
+                        val centre = layout.size.height - layout.getLineBaseline(last) + capHeight / 2
+                        val measured = with(density) { centre.toDp() }
+                        if (measured != lastLineCapCentre) lastLineCapCentre = measured
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .focusRequester(focus)
