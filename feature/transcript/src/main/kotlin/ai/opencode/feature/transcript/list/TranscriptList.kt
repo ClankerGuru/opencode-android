@@ -88,10 +88,11 @@ fun TranscriptList(
     onShowsJumpButtonChanged: (Boolean) -> Unit = {},
     slots: TranscriptSlots = TranscriptSlots(),
     layoutTuning: TranscriptLayoutTuning = LocalTranscriptLayoutTuning.current,
+    onScrolledUnderHeader: (Float) -> Unit = {},
 ) {
     // A new session is a new list (iOS resets the controller; the draft becoming its session keeps it).
     key(configuration.sessionID ?: "draft", configuration.historyGeneration) {
-        TranscriptListContent(configuration, send, modifier, contentPadding, jumpRequest, onShowsJumpButtonChanged, slots, layoutTuning)
+        TranscriptListContent(configuration, send, modifier, contentPadding, jumpRequest, onShowsJumpButtonChanged, slots, layoutTuning, onScrolledUnderHeader)
     }
 }
 
@@ -105,6 +106,7 @@ private fun TranscriptListContent(
     onShowsJumpButtonChanged: (Boolean) -> Unit,
     slots: TranscriptSlots,
     layoutTuning: TranscriptLayoutTuning,
+    onScrolledUnderHeader: (Float) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val initialIndex = remember { (configuration.entries.size + configuration.queuedInputs.size + 2).coerceAtLeast(0) }
@@ -128,6 +130,15 @@ private fun TranscriptListContent(
 
     LaunchedEffect(controller) {
         snapshotFlow { listState.layoutInfo }.collect { controller.onLayout(it) }
+    }
+    // iOS `reportHeaderGeometry`: how far content sits above its resting top (dp), for the
+    // session header's backdrop reveal. Past the first row it's simply "far".
+    val currentScrolledUnderHeader by rememberUpdatedState(onScrolledUnderHeader)
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            if (listState.firstVisibleItemIndex > 0) Float.MAX_VALUE
+            else listState.firstVisibleItemScrollOffset / density.density
+        }.collect { currentScrolledUnderHeader(it) }
     }
     var lastJump by remember { androidx.compose.runtime.mutableIntStateOf(jumpRequest) }
     LaunchedEffect(jumpRequest) {
