@@ -64,11 +64,11 @@ class ServerVoiceTests {
      * iOS resets the process-wide shared values before each test; here every test gets a fresh
      * in-memory store, which starts at those same defaults.
      */
-    private fun resetSharedVoiceState(): VoiceTestShared = VoiceTestShared()
+    private fun resetSharedVoiceState(): SpeechTestShared = SpeechTestShared()
 
     private fun startedTarget() = VoiceWorkTarget(server = server, sessionID = session.id, directory = session.directory)
 
-    private fun transcriptRecord(shared: VoiceTestShared): VoiceTranscriptRecord? =
+    private fun transcriptRecord(shared: SpeechTestShared): VoiceTranscriptRecord? =
         shared.run { shared(VoiceSharedKeys.voiceTranscripts).value["${server.id}:${session.id}"] }
 
     @Test fun openAPIDetectsWhetherServerSupportsVoiceSessionEndpoint() = runBlocking {
@@ -211,7 +211,7 @@ class ServerVoiceTests {
 
     /** iOS's `withDependencies` for the Server Voice starts; Android adds the presence ID. */
     private fun serverVoiceDependencies(
-        shared: VoiceTestShared,
+        shared: SpeechTestShared,
         at: Long,
         start: suspend (String, RealtimeSessionConfig) -> kotlinx.coroutines.flow.Flow<VoiceCallEvent>,
         end: suspend () -> Unit = {},
@@ -228,7 +228,7 @@ class ServerVoiceTests {
         this[VoiceWorkClient] = VoiceWorkClient.testValue.let { work ->
             VoiceWorkClient(submit = work.submit, awaitReply = work.awaitReply, checkSessionActive = work.checkSessionActive, recentMessages = { _, _, _ -> emptyList() })
         }
-        this[VoiceCallClient] = testVoiceCall(start = start, end = end)
+        this[VoiceCallClient] = speechVoiceCall(start = start, end = end)
     }
 
     @Test fun serverVoiceStartsOpenAIAndGeminiCallsWithoutPhoneKey() = runBlocking {
@@ -844,7 +844,7 @@ class ServerVoiceTests {
             this[OpenCodeClient] = OpenCodeClient.testValue.copy(
                 homeSnapshot = { OpenCodeHomeSnapshot(projects = listOf(project), sessions = emptyList(), activeSessionIDs = emptySet()) },
             )
-            this[VoiceCallClient] = testVoiceCall(
+            this[VoiceCallClient] = speechVoiceCall(
                 start = { key, config ->
                     assertTrue(key.isEmpty())
                     configs.update { it + config }
@@ -1026,7 +1026,7 @@ class ServerVoiceTests {
             this[OpenCodeClient] = OpenCodeClient.testValue.copy(
                 homeSnapshot = { OpenCodeHomeSnapshot(projects = listOf(project), sessions = emptyList(), activeSessionIDs = emptySet()) },
             )
-            this[VoiceCallClient] = testVoiceCall(
+            this[VoiceCallClient] = speechVoiceCall(
                 delegatorRound = {
                     callRoundAsked.set(true)
                     Result.failure(OpenCodeClientError("unused"))

@@ -45,7 +45,7 @@ fun VoiceFeature.State.recording(role: VoiceTranscriptTail.Role, text: String, i
  * One test's shared values. A `VoiceFeature.State` reads `@Shared` values where they're used,
  * so it is built (and its shared values set) in the same in-memory store the TestStore gets.
  */
-class VoiceTestShared {
+class SpeechTestShared {
     val store: SharedStore = SharedStore.inMemory()
 
     fun <R> run(block: () -> R): R =

@@ -64,26 +64,26 @@ class VoiceServerPickerTests {
     private val presenceID = UUID(0, 0)
 
     /** iOS resets the process-wide shared values; each test here gets a fresh in-memory store. */
-    private fun resetSharedState(): VoiceTestShared = VoiceTestShared()
+    private fun resetSharedState(): SpeechTestShared = SpeechTestShared()
 
     /** `servers` saved and `server` the one in use, with Server Voice on and `choice` in Voice Server. */
-    private fun VoiceTestShared.save(servers: List<OpenCodeServer>, choice: VoiceServerChoice = VoiceServerChoice.Connected) = run {
+    private fun SpeechTestShared.save(servers: List<OpenCodeServer>, choice: VoiceServerChoice = VoiceServerChoice.Connected) = run {
         shared(ServerSharedKeys.savedServers).set(servers)
         shared(ServerSharedKeys.savedServer).set(server)
         shared(experimental(ExperimentalFeature.serverVoice)).set(true)
         shared(VoiceSharedKeys.voiceServerChoice).set(choice)
     }
 
-    private fun VoiceTestShared.setSupport(support: Map<String, ServerVoiceSupport>) = run {
+    private fun SpeechTestShared.setSupport(support: Map<String, ServerVoiceSupport>) = run {
         shared(VoiceSharedKeys.serverVoiceSupportByServer).set(support)
     }
 
-    private fun VoiceTestShared.savePhoneKey() = run {
+    private fun SpeechTestShared.savePhoneKey() = run {
         shared(SharedKeys.openAIAPIKey).set("sk-phone")
         shared(SharedKeys.verifiedVoiceKeyFingerprint).set(VoiceKeyFingerprint.make(key = "sk-phone", model = VoiceEngine.gptLive.modelID))
     }
 
-    private fun transcriptRecord(shared: VoiceTestShared): VoiceTranscriptRecord? =
+    private fun transcriptRecord(shared: SpeechTestShared): VoiceTranscriptRecord? =
         shared.run { shared(VoiceSharedKeys.voiceTranscripts).value["${server.id}:${session.id}"] }
 
     // MARK: Which servers offer it
@@ -187,7 +187,7 @@ class VoiceServerPickerTests {
     // MARK: Calls
 
     private fun callDependencies(
-        shared: VoiceTestShared,
+        shared: SpeechTestShared,
         at: Long,
         checkSupport: suspend (OpenCodeServer) -> ServerVoiceSupport,
         recentMessages: suspend (OpenCodeServer, String, Int) -> List<String> = { _, _, _ -> emptyList() },
@@ -204,7 +204,7 @@ class VoiceServerPickerTests {
         this[VoiceWorkClient] = VoiceWorkClient.testValue.let { work ->
             VoiceWorkClient(submit = work.submit, awaitReply = work.awaitReply, checkSessionActive = work.checkSessionActive, recentMessages = recentMessages)
         }
-        this[VoiceCallClient] = testVoiceCall(start = start, end = end)
+        this[VoiceCallClient] = speechVoiceCall(start = start, end = end)
     }
 
     /**

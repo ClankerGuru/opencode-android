@@ -42,7 +42,7 @@ class CallVoiceTests {
     private val session = OpenCodeSession(id = "ses_voice", title = "Voice lab", projectID = "p", directory = "/Users/kit/project", updatedAt = Instant.parse("0001-01-01T00:00:00Z"))
 
     @Test fun defaultsToMarinAndPersists() {
-        VoiceTestShared().run {
+        SpeechTestShared().run {
             val callVoice = shared(VoiceSharedKeys.callVoice)
             callVoice.set(CallVoice.default)
             assertEquals(CallVoice.marin, callVoice.value)
@@ -113,7 +113,7 @@ class CallVoiceTests {
     }
 
     @Test fun callsStartWithTheChosenVoiceForTheirEngine() = runTest {
-        val shared = VoiceTestShared()
+        val shared = SpeechTestShared()
         val started = Locked(listOf<RealtimeSessionConfig>())
         val store = TestStore(shared.run { VoiceFeature.State(server, session) }, VoiceFeature(), this) {
             this[SharedStore] = shared.store
@@ -121,7 +121,7 @@ class CallVoiceTests {
             // Android: the call's ongoing-notification ID (iOS's Home owns that Live Activity).
             this[UuidClient] = UuidClient.incrementing()
             this[RealtimePreflightClient] = RealtimePreflightClient(verify = { _, _ -> })
-            this[VoiceCallClient] = testVoiceCall(start = { _, config ->
+            this[VoiceCallClient] = speechVoiceCall(start = { _, config ->
                 started.update { it + config }
                 emptyFlow()
             })
@@ -176,7 +176,7 @@ class CallVoiceTests {
     }
 
     @Test fun theCallLogNamesTheVoice() = runTest {
-        val shared = VoiceTestShared()
+        val shared = SpeechTestShared()
         shared.run {
             shared(VoiceSharedKeys.voiceEngine).set(VoiceEngine.gptLive)
             shared(VoiceSharedKeys.callVoice).set(CallVoice.cedar)
@@ -193,7 +193,7 @@ class CallVoiceTests {
                 this[DateClient] = date
                 this[UuidClient] = UuidClient { id }
                 this[RealtimePreflightClient] = RealtimePreflightClient(verify = { _, _ -> })
-                this[VoiceCallClient] = testVoiceCall(start = { _, _ -> emptyFlow() })
+                this[VoiceCallClient] = speechVoiceCall(start = { _, _ -> emptyFlow() })
                 this[VoiceCallLogClient] = VoiceCallLogClient(recorder = recorder)
             }
             store.exhaustive = false

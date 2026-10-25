@@ -43,7 +43,7 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /** Builds a [VoiceCallClient] the way iOS tests override single closures of `voiceCall`. */
-internal fun testVoiceCall(
+internal fun speechVoiceCall(
     start: suspend (String, RealtimeSessionConfig) -> Flow<VoiceCallEvent> = { _, _ -> kotlinx.coroutines.flow.emptyFlow() },
     completeFunction: suspend (String, String) -> Unit = { _, _ -> },
     noteProgress: suspend (String, String) -> Unit = { _, _ -> },
@@ -73,7 +73,6 @@ internal fun testVoiceCall(
 private val epoch: DateClient = DateClient.constant(Instant.EPOCH)
 private val distantPast: Instant = Instant.parse("0001-01-01T00:00:00Z")
 private val emptyArguments: RealtimeJSON = JsonObject(emptyMap())
-private fun isDelegatorFinished(action: VoiceFeature.Action) = action is VoiceFeature.Action.DelegatorFinished
 private fun isReplyWatch(action: VoiceFeature.Action) = action is VoiceFeature.Action.ReplyWatch
 
 /**
@@ -138,7 +137,7 @@ class VoiceLateResultTests {
      * and is announced, not silenced.
      */
     @Test fun theCallAnnouncesAResultAfterAStatusCheck() = runTest {
-        val shared = VoiceTestShared()
+        val shared = SpeechTestShared()
         val voice = shared.run {
             VoiceFeature.State(server, OpenCodeSession(id = "ses_ios", title = "OpenCode iOS", projectID = "p", directory = "/Users/kit/ios", updatedAt = distantPast))
                 .withPhase(VoiceFeature.State.Phase.Live)
@@ -150,7 +149,7 @@ class VoiceLateResultTests {
             this[SharedStore] = shared.store
             this[Clock] = ImmediateClock()
             this[DateClient] = epoch
-            this[VoiceCallClient] = testVoiceCall(
+            this[VoiceCallClient] = speechVoiceCall(
                 announce = { text -> announced.update { it + text } },
                 announceSession = { _, _, text -> announced.update { it + text } },
                 noteProgress = { callID, text -> if (callID.isEmpty()) noted.update { it + text } },
@@ -318,7 +317,7 @@ class VoiceSuppressionTests {
      * resolved ones whose results may still be held included.
      */
     @Test fun aReadCancelsHeldResultsForEveryPromptInTheSession() = runBlocking {
-        val shared = VoiceTestShared()
+        val shared = SpeechTestShared()
         val session = OpenCodeSession(id = home, title = "HOME", projectID = "p", directory = "/Users/kit/home", updatedAt = distantPast)
         val voice = shared.run {
             shared(SharedKeys.openAIAPIKey).set("sk-test")
@@ -347,7 +346,7 @@ class VoiceSuppressionTests {
                 isSessionActive = { _, _ -> false },
                 transcript = { _, _, _ -> decodeTranscript("""{"data":[]}""".toByteArray()) },
             )
-            this[VoiceCallClient] = testVoiceCall(cancelPendingAnnouncements = { ids -> cancelled.update { it + listOf(ids) } })
+            this[VoiceCallClient] = speechVoiceCall(cancelPendingAnnouncements = { ids -> cancelled.update { it + listOf(ids) } })
         }
         store.exhaustive = false
         store.send(VoiceFeature.Action.CallEvent(VoiceCallEvent.FunctionCall(callID = "d1", name = "delegate", arguments = emptyArguments)))
@@ -375,7 +374,7 @@ class VoiceSuppressionTests {
     private val homeSession: OpenCodeSession
         get() = OpenCodeSession(id = home, title = "HOME", projectID = "p", directory = "/Users/kit/home", updatedAt = distantPast)
 
-    private fun delegatorCall(shared: VoiceTestShared): VoiceFeature.State = shared.run {
+    private fun delegatorCall(shared: SpeechTestShared): VoiceFeature.State = shared.run {
         shared(SharedKeys.openAIAPIKey).set("sk-test")
         VoiceFeature.State(server, homeSession)
             .withPhase(VoiceFeature.State.Phase.Live)
@@ -416,7 +415,7 @@ class VoiceSuppressionTests {
     }
 
     private fun runCafeRequest(finalRoundFails: Boolean, check: (List<Announced>) -> Unit) = runBlocking {
-        val shared = VoiceTestShared()
+        val shared = SpeechTestShared()
         val released = CompletableDeferred<Unit>()
         // iOS sleeps 300 ms so the watched reads land while the delegator writes its answer;
         // here the answer waits until all four reads came back.
@@ -464,7 +463,7 @@ class VoiceSuppressionTests {
                     recentMessages = work.recentMessages,
                 )
             }
-            this[VoiceCallClient] = testVoiceCall(
+            this[VoiceCallClient] = speechVoiceCall(
                 announceSession = { _, ids, text -> announced.update { it + Announced(ids, text) } },
             )
         }
@@ -482,7 +481,7 @@ class VoiceSuppressionTests {
      * older prompt the call tracked, when a newer one (typed here) followed.
      */
     @Test fun aReadReportsTheSessionsNewestReply() = runBlocking {
-        val shared = VoiceTestShared()
+        val shared = SpeechTestShared()
         val voice = delegatorCall(shared)
             .stepping(ReplyWatch.Event.Sent(listOf(ReplyWatch.Prompt(promptID = "msg_turn1", sessionID = home, title = "HOME"))))
             .stepping(ReplyWatch.Event.WaitSucceeded(promptID = "msg_turn1", reply = "Turn one reply."))
@@ -512,7 +511,7 @@ class VoiceSuppressionTests {
                     )
                 },
             )
-            this[VoiceCallClient] = testVoiceCall()
+            this[VoiceCallClient] = speechVoiceCall()
         }
         store.exhaustive = false
         store.send(VoiceFeature.Action.CallEvent(VoiceCallEvent.FunctionCall(callID = "d1", name = "delegate", arguments = emptyArguments)))
@@ -529,7 +528,7 @@ class VoiceSuppressionTests {
      * still speaks.
      */
     @Test fun aWaitCoversOnlyThePromptsItsReplyAnswers() = runBlocking {
-        val shared = VoiceTestShared()
+        val shared = SpeechTestShared()
         val voice = delegatorCall(shared).stepping(
             ReplyWatch.Event.Sent(
                 listOf(
@@ -565,7 +564,7 @@ class VoiceSuppressionTests {
                     )
                 },
             )
-            this[VoiceCallClient] = testVoiceCall(cancelPendingAnnouncements = { ids -> cancelled.update { it + listOf(ids) } })
+            this[VoiceCallClient] = speechVoiceCall(cancelPendingAnnouncements = { ids -> cancelled.update { it + listOf(ids) } })
         }
         store.exhaustive = false
         store.send(VoiceFeature.Action.CallEvent(VoiceCallEvent.FunctionCall(callID = "d1", name = "delegate", arguments = emptyArguments)))
@@ -619,7 +618,7 @@ class VoiceSuppressionTests {
      * one landing first doesn't drop the others' text.
      */
     @Test fun aRunWaitsForEveryPromptsRead() = runTest {
-        val shared = VoiceTestShared()
+        val shared = SpeechTestShared()
         val released = mapOf("msg_inbox" to CompletableDeferred<Unit>(), "msg_dms" to CompletableDeferred(), "msg_narrow" to CompletableDeferred())
         val announced = Locked(listOf<String>())
         val replies: Map<String, String?> = mapOf("msg_inbox" to "Inbox: Olive asked about dinner.", "msg_dms" to null, "msg_narrow" to combined)
@@ -636,7 +635,7 @@ class VoiceSuppressionTests {
                     recentMessages = work.recentMessages,
                 )
             }
-            this[VoiceCallClient] = testVoiceCall(announceSession = { _, _, text -> announced.update { it + text } })
+            this[VoiceCallClient] = speechVoiceCall(announceSession = { _, _, text -> announced.update { it + text } })
         }
         store.exhaustive = false
         store.send(VoiceFeature.Action.ReplyWatch(ReplyWatch.Event.Sent(steered)))
@@ -662,7 +661,7 @@ class VoiceSuppressionTests {
      * its result.
      */
     @Test fun aSentPromptIsTrackedFromTheMomentItsSent() = runBlocking {
-        val shared = VoiceTestShared()
+        val shared = SpeechTestShared()
         val failNow = CompletableDeferred<Unit>()
         val round = Locked(0)
         val announced = Locked(listOf<Announced>())
@@ -693,7 +692,7 @@ class VoiceSuppressionTests {
                     recentMessages = work.recentMessages,
                 )
             }
-            this[VoiceCallClient] = testVoiceCall(announceSession = { _, ids, text -> announced.update { it + Announced(ids, text) } })
+            this[VoiceCallClient] = speechVoiceCall(announceSession = { _, ids, text -> announced.update { it + Announced(ids, text) } })
         }
         store.exhaustive = false
         store.send(VoiceFeature.Action.CallEvent(VoiceCallEvent.FunctionCall(callID = "d1", name = "delegate", arguments = emptyArguments)))
@@ -1045,7 +1044,7 @@ class VoiceSuppressionTests {
      * announced once the grace passes, not when the request ends.
      */
     @Test fun aResultSpeaksWithinTheGraceWhileTheDelegatorIsBusy() = runTest {
-        val shared = VoiceTestShared()
+        val shared = SpeechTestShared()
         val voice = delegatorCall(shared)
             .stepping(ReplyWatch.Event.DelegatorStarted(requestID = "d1"))
             .copy(delegatorWork = listOf("d1"))
@@ -1059,7 +1058,7 @@ class VoiceSuppressionTests {
             this[VoiceWorkClient] = VoiceWorkClient.testValue.let { work ->
                 VoiceWorkClient(submit = work.submit, awaitReply = { _, _, _ -> "All tests pass." }, checkSessionActive = work.checkSessionActive, recentMessages = work.recentMessages)
             }
-            this[VoiceCallClient] = testVoiceCall(announceSession = { _, _, text -> announced.update { it + text } })
+            this[VoiceCallClient] = speechVoiceCall(announceSession = { _, _, text -> announced.update { it + text } })
         }
         store.exhaustive = false
         store.send(VoiceFeature.Action.ReplyWatch(ReplyWatch.Event.Sent(listOf(upload))))
@@ -1080,7 +1079,7 @@ class VoiceSuppressionTests {
      * stale snapshot never marks a result as told.
      */
     @Test fun aReadChecksTheSessionIsIdleBeforeReadingIt() = runBlocking {
-        val shared = VoiceTestShared()
+        val shared = SpeechTestShared()
         val calls = Locked(listOf<String>())
         val effects = detachedScope(coroutineContext)
         val store = TestStore(delegatorCall(shared), VoiceFeature(), effects) {
@@ -1098,7 +1097,7 @@ class VoiceSuppressionTests {
                 isSessionActive = { _, _ -> calls.update { it + "status" }; false },
                 transcript = { _, _, _ -> calls.update { it + "transcript" }; emptyList() },
             )
-            this[VoiceCallClient] = testVoiceCall()
+            this[VoiceCallClient] = speechVoiceCall()
         }
         store.exhaustive = false
         store.send(VoiceFeature.Action.CallEvent(VoiceCallEvent.FunctionCall(callID = "d1", name = "delegate", arguments = emptyArguments)))
@@ -1210,7 +1209,7 @@ class VoiceSuppressionTests {
      * is left running once the store finishes, with no clock advanced.
      */
     @Test fun aCallEndingMidAnswerLeavesNothingRunning() = runBlocking {
-        val shared = VoiceTestShared()
+        val shared = SpeechTestShared()
         val clock = TestClock()
         val answerNow = CompletableDeferred<Unit>()
         val completing = CompletableDeferred<Unit>()
@@ -1228,7 +1227,7 @@ class VoiceSuppressionTests {
             this[VoiceWorkClient] = VoiceWorkClient.testValue.let { work ->
                 VoiceWorkClient(submit = work.submit, awaitReply = { _, _, _ -> "All tests pass." }, checkSessionActive = work.checkSessionActive, recentMessages = work.recentMessages)
             }
-            this[VoiceCallClient] = testVoiceCall(
+            this[VoiceCallClient] = speechVoiceCall(
                 completeFunction = { _, _ -> completing.complete(Unit); releaseComplete.await() },
                 announceSession = { _, _, text -> announced.update { it + text } },
             )
@@ -1257,7 +1256,7 @@ class VoiceSuppressionTests {
      * their timers, and a late finish from the old call is ignored.
      */
     @Test fun aDroppedCallsAnswerNeverReachesTheRejoinedCall() = runBlocking {
-        val shared = VoiceTestShared()
+        val shared = SpeechTestShared()
         val clock = TestClock()
         val answerNow = CompletableDeferred<Unit>()
         val completing = CompletableDeferred<Unit>()
@@ -1279,7 +1278,7 @@ class VoiceSuppressionTests {
             this[VoiceWorkClient] = VoiceWorkClient.testValue.let { work ->
                 VoiceWorkClient(submit = work.submit, awaitReply = { _, _, _ -> "All tests pass." }, checkSessionActive = work.checkSessionActive, recentMessages = work.recentMessages)
             }
-            this[VoiceCallClient] = testVoiceCall(
+            this[VoiceCallClient] = speechVoiceCall(
                 start = { _, _ -> events.consumeAsFlow() },
                 completeFunction = { callID, _ ->
                     completing.complete(Unit)

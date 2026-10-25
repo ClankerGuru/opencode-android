@@ -188,7 +188,7 @@ class VoiceAudioPrestartTests {
         // A newer tap replaced it before the first call's failure discarded it.
         val second = prestart.prepare(atEar = false)
         prestart.discard(first)
-        assertTrue("The replaced start is stopped", eventually { fake.stops.get() == 1 })
+        assertTrue("The replaced start is stopped", pollUntil { fake.stops.get() == 1 })
         prestart.start(atEar = false)
         assertEquals("The second call adopts the newer start", 2, fake.begins.size)
         prestart.discard(second)
@@ -198,7 +198,7 @@ class VoiceAudioPrestartTests {
         val failed = prestart.prepare(atEar = false)
         delay(20)
         prestart.discard(failed)
-        assertTrue("A start no call adopted is stopped", eventually { fake.stops.get() == 2 })
+        assertTrue("A start no call adopted is stopped", pollUntil { fake.stops.get() == 2 })
 
         // Discarded before it began: no engine starts at all. (iOS discards before its task is
         // scheduled; here the start is held queued behind other work until the discard.)
@@ -222,7 +222,7 @@ class VoiceAudioPrestartTests {
         call.cancel()
         gate.trySend(Unit)
         assertThrowsSuspending<CancellationException> { call.await() }
-        assertTrue(eventually { fake.stops.get() == 1 })
+        assertTrue(pollUntil { fake.stops.get() == 1 })
         assertEquals(1, fake.stops.get())
     }
 }
@@ -270,7 +270,7 @@ class VoiceAudioStuckStopTests {
         stopping.await()
         assertTrue(
             "The completed start task and its session must be gone",
-            eventually { System.gc(); weakPayload?.get() == null },
+            pollUntil { System.gc(); weakPayload?.get() == null },
         )
         assertEquals(0, owner.activeCount)
         assertEquals(1, deactivated.get())
@@ -314,7 +314,7 @@ class VoiceAudioStuckStopTests {
         prestart = null
         assertTrue(
             "No task inside the prestart is left waiting on the stuck stop",
-            eventually { System.gc(); released.get() == null },
+            pollUntil { System.gc(); released.get() == null },
         )
         hung.cancel()
         ledger.never.complete(Unit)

@@ -87,7 +87,7 @@ class FakeExternalAudioControl(private val session: FakeVoiceAudioSession) : Voi
 }
 
 /** Polls [condition] until it holds or [timeoutMillis] passes (iOS `eventually`). */
-suspend fun eventually(timeoutMillis: Long = 3_000, condition: () -> Boolean): Boolean {
+suspend fun pollUntil(timeoutMillis: Long = 3_000, condition: () -> Boolean): Boolean {
     val deadline = System.nanoTime() + timeoutMillis * 1_000_000
     while (!condition()) {
         if (System.nanoTime() > deadline) return false
