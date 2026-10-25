@@ -116,6 +116,7 @@ fun FileAttachmentDetail(text: String, modifier: Modifier = Modifier, color: Col
 @Composable
 fun AgentFileCards(files: List<AgentFileReference>, onOpen: (AgentFileReference) -> Unit, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(TranscriptMetrics.cardCornerRadius)
+    val dragSource = LocalAgentFileDragSource.current
     LazyRow(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(TranscriptMetrics.clustered)) {
         items(files, key = { it.path }) { file ->
             FileAttachmentCard(
@@ -124,6 +125,7 @@ fun AgentFileCards(files: List<AgentFileReference>, onOpen: (AgentFileReference)
                 width = if (files.size == 1) 260.dp else 220.dp,
                 trailingSymbolName = if (file.kind.isTimeBased) "play.fill" else "chevron.right",
                 modifier = Modifier
+                    .then(dragSource?.invoke(file, null, TranscriptMetrics.cardCornerRadius) ?: Modifier)
                     .heightIn(min = 48.dp)
                     .clip(shape)
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh)

@@ -529,9 +529,11 @@ private fun AgentImageGalleryTile(
 ) {
     val appear = rememberAgentImageAppearance(sighting.mediaID)
     val loaded = entry.phase == AgentImagePreviews.Phase.Loaded
+    val dragSource = LocalAgentFileDragSource.current
     Box(
         Modifier
             .fillMaxSize()
+            .then(dragSource?.invoke(file, image, radius) ?: Modifier)
             .clickable(onClickLabel = "Open the image", onClick = onClick)
             .semantics(mergeDescendants = true) {
                 contentDescription = file.name

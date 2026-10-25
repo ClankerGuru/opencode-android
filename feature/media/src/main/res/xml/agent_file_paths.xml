@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- AgentFileProvider: only the file viewer's downloads (AgentFileLoader.cacheURL). -->
+<!-- AgentFileProvider: the file viewer's downloads (AgentFileLoader.cacheURL) and transcript drags (AgentFileDrag). -->
 <paths>
     <cache-path name="agent-files" path="AgentFiles/" />
+    <cache-path name="transcript-drag" path="TranscriptDrag/" />
 </paths>

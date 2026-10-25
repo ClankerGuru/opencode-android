@@ -5,11 +5,20 @@
             android:name="ai.opencode.feature.media.MediaFileProvider"
             android:authorities="${applicationId}.media.files"
             android:exported="false"
-            android:grantUriPermissions="true" />
+            android:grantUriPermissions="true">
+            <!-- FileProvider.getUriForFile reads the paths from here, not from the constructor's resource. -->
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/media_file_paths" />
+        </provider>
         <provider
             android:name="ai.opencode.feature.media.AgentFileProvider"
             android:authorities="${applicationId}.agentfiles"
             android:exported="false"
-            android:grantUriPermissions="true" />
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/agent_file_paths" />
+        </provider>
     </application>
 </manifest>

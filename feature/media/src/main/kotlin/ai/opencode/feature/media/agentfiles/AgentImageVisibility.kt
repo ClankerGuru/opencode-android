@@ -441,3 +441,30 @@ fun AgentImageMarker(
     }
     Spacer(modifier.onGloballyPositioned(marker::positioned).clearAndSetSemantics {})
 }
+
+/**
+ * A marker that only reports whether it's on screen, for other inline media that reuse the
+ * transcript's viewport test (iOS `ImageLinkVisibilityMarker`: an `AgentImageMarkerView` without a
+ * sighting). [changed] gets the visibility and the marker, whose [AgentImageMarkerView.contentRevised]
+ * tells the list its row is about to change height.
+ */
+@Composable
+fun AgentImageVisibilityMarker(modifier: Modifier = Modifier, changed: (Boolean, AgentImageMarkerView) -> Unit) {
+    val viewport = LocalAgentImageViewport.current
+    val row = LocalAgentImageRow.current
+    val marker = remember { AgentImageMarkerView(dependency(AgentImagePreviews), dependency(AgentImageVisibility)) }
+    val current by androidx.compose.runtime.rememberUpdatedState(changed)
+    DisposableEffect(marker) {
+        marker.attach()
+        onDispose {
+            marker.onVisibilityChange = null
+            marker.dismantle()
+        }
+    }
+    SideEffect {
+        marker.viewport = viewport
+        marker.rowKey = row
+        if (marker.onVisibilityChange == null) marker.onVisibilityChange = { visible -> current(visible, marker) }
+    }
+    Spacer(modifier.onGloballyPositioned(marker::positioned).clearAndSetSemantics {})
+}

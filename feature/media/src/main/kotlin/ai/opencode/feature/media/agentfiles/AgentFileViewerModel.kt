@@ -512,8 +512,22 @@ class AgentFileShareClient(
     }
 }
 
-/** Shares the file viewer's downloads (`<cache>/AgentFiles/`) and nothing else. */
+/**
+ * Shares the file viewer's downloads (`<cache>/AgentFiles/`) and files dragged out of the
+ * transcript (`<cache>/TranscriptDrag/`), and nothing else. A dragged file still downloading
+ * ([AgentFileDrag]) is opened once it's there.
+ */
 class AgentFileProvider : FileProvider(R.xml.agent_file_paths) {
+    override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor? {
+        AgentFileDrag.awaitPending(uri)
+        return super.openFile(uri, mode)
+    }
+
+    override fun query(uri: Uri, projection: Array<String>?, selection: String?, selectionArgs: Array<String>?, sortOrder: String?): android.database.Cursor {
+        AgentFileDrag.awaitPending(uri)
+        return super.query(uri, projection, selection, selectionArgs, sortOrder)
+    }
+
     companion object {
         fun authority(context: Context): String = "${context.packageName}.agentfiles"
     }
