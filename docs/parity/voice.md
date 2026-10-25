@@ -105,6 +105,12 @@ another module are left to that module's port ("skipped"); "dropped" tests can't
 | `VoiceSessionToolsTests.swift` (+`VoiceModelToolsTests`) | `VoiceSessionToolsTests.kt` | 24 | `homePublishesTheDrawerState…` (drawer), `theScreenFollowsOnlyItsOwnSessionsSwitch` (`:feature:session`) | – |
 | `FloatingCallModelTests.swift` | `FloatingCallModelTests.kt` | 21 | `canStartCallFromTap` half of `tapIntoProjectPicker…`, `ComposerTunables.bottomGap` (`:feature:session`) | Preset/registry parts of 3 tunables tests (tuning store not ported); 8 `TestWindowHost`/SessionView hosting tests (`onlyTopSessionViewDrivesCallTrayController`, `callTrayReserveGlides…`, `callTrayOverlayResetsReserve…`, `pushingAndPoppingSubagent…`, two `subagentStartedCall…`, `subagentPopDuringEnding…`, `growModelListCloseAndReset…`) |
 | `FloatingCallModelTests+Dock.swift` | `FloatingCallModelTestsDock.kt` | 3 | – | – |
+| `VoiceFeatureTests.swift` | `VoiceFeatureTests.kt` | 8 | `voiceAvailabilityRequires…` (`:feature:session`); 3 Home delegator/switch tests (drawer) | – |
+| `VoiceFeatureTests+Delegation.swift` | `VoiceFeatureTestsDelegation.kt` | 30 | – | – |
+| `VoiceFeatureTests+CallLog.swift` | `VoiceFeatureTestsCallLog.kt` | 9 | 4 Home tests (drawer) | – |
+| `VoiceFeatureTests+Screen.swift` | `VoiceFeatureTestsScreen.kt` | 7 | 10 SessionFeature tests and the session half of `aDraftCallsRefusedModelSendsNothing` (`:feature:session`) | – |
+| `VoiceResumeTests.swift` | `VoiceResumeTests.kt` | 21 | – | – |
+| `VoiceLatencyBudgetTests.swift` | `VoiceLatencyBudgetTests.kt` | 22 | – | – |
 
 Voice-named iOS files whose subject lives elsewhere (left to those modules' ports): `LabVoiceKeysTests`,
 `ScreenAwakeTests`, `VoiceLiveActivityTests` (`:app`/drawer stores), `VoiceRoutingBaselineTests`,
@@ -117,4 +123,6 @@ Production bugs the ported tests found (each fixed in its own `fix(voice)` commi
 rounded its pitch half-to-even (10 px dots instead of 11 at 3×); AudioEngineGuard reported the
 exception class instead of its reason and turned cancellation into an engine error; a reactivation
 that failed when an interruption ended was never retried by the next route/configuration change;
-a just-finished call log was missing from `list()` while its save was still writing; End landed 2 dp left of the call button (48 dp slot kept the 6 dp padding).
+a just-finished call log was missing from `list()` while its save was still writing; End landed 2 dp left of the call button (48 dp slot kept the 6 dp padding); a reconnect or rotation replayed the connect chord; `RetryBudget.bounded` (`:server`) timed its limit on the scripted clock, so a lost send's answer was never read back.
+
+Total: 480 voice tests, all passing (`--rerun` ×3).
