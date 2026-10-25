@@ -1000,6 +1000,9 @@ object LiveCapture {
             throw DictationError.AudioFormatUnavailable()
         }
         DictationAudioSession.isRecording = true
+        // iOS's background audio: the mic keeps going if the app leaves mid-recording.
+        val appContext = context.applicationContext
+        DictationRecordingService.start(appContext)
 
         val audioManager = context.getSystemService(AudioManager::class.java)
         val main = Handler(Looper.getMainLooper())
@@ -1027,7 +1030,10 @@ object LiveCapture {
 
         val running = Running(
             record = record,
-            onStop = { audio.recordingStopped(recording) },
+            onStop = {
+                DictationRecordingService.stop(appContext)
+                audio.recordingStopped(recording)
+            },
             removeObservers = {
                 record.removeOnRoutingChangedListener(routing)
                 audioManager.removeOnModeChangedListener(modes)

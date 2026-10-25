@@ -2,6 +2,9 @@
 <!-- What the composer asks for: dictation (mic), camera, photos, location. Merged into :app. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- A recording keeps its mic when the app leaves (iOS background audio): DictationRecordingService. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera.any" android:required="false" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
@@ -15,4 +18,8 @@
             <action android:name="android.speech.RecognitionService" />
         </intent>
     </queries>
+    <application>
+        <service android:name="ai.opencode.feature.composer.DictationRecordingService"
+            android:exported="false" android:foregroundServiceType="microphone" />
+    </application>
 </manifest>
