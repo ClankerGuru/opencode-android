@@ -62,6 +62,8 @@ enum class TransportFailure(val rawValue: String) {
     TimedOut("timedOut");
 
     companion object {
+        private val CLEARTEXT_REFUSAL = Regex("CLEARTEXT communication to (\\S+) not permitted")
+
         /** iOS's `URLError` code table. Nil for cancellation and failures sending again won't change. */
         fun ofUrlErrorCode(code: Int): TransportFailure? = when (code) {
             UrlErrorCode.NOT_CONNECTED_TO_INTERNET, UrlErrorCode.CANNOT_FIND_HOST, UrlErrorCode.CANNOT_CONNECT_TO_HOST,
@@ -94,6 +96,9 @@ enum class TransportFailure(val rawValue: String) {
         fun of(error: Throwable, requestUrl: HttpUrl, contact: ServerContact): TransportFailure? {
             of(error)?.let { return it }
             if (error !is UnknownServiceException || !contact.hasAnsweredHTTPOrigin(requestUrl)) return null
+            // A rejected redirect to another host isn't evidence of this failure (OkHttp names the refused host).
+            val refusedHost = CLEARTEXT_REFUSAL.find(error.message.orEmpty())?.groupValues?.get(1)
+            if (refusedHost != null && !refusedHost.equals(requestUrl.host, ignoreCase = true)) return null
             return Interrupted
         }
     }
