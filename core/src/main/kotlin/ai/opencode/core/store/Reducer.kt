@@ -61,8 +61,7 @@ fun <S, A, CS, CA> scope(
  *   cleared afterwards unless the parent replaced it (TCA order).
  * - When the child goes away or is replaced by a child with a different [childID] (e.g. another
  *   session), every effect the old child started is cancelled, so presented work lives and dies
- *   with its presentation. Effects that must outlive dismissal belong in the parent, or use the
- *   plain-optional [ifLet] overload.
+ *   with its presentation. Effects that must outlive dismissal belong in the parent.
  *
  * [id] distinguishes this presentation slot from others in the same store; pass a stable
  * private object. [childID] is the child's identity (TCA's `Identifiable` id); default: its class.
@@ -87,7 +86,8 @@ fun <S, A, CS : Any, CA> ifLet(
         next = setState(next, reduced.state)
         effects += reduced.effect
             .map { embed(PresentationAction.Presented(it)) }
-            .cancellable(beforeID!!)
+            .navigationScoped(beforeID!!)
+            .cancellable(beforeID)
     }
     val childBeforeParent = state(next)
     val parentReduced = parent.reduce(next, parentAction)
@@ -104,8 +104,10 @@ fun <S, A, CS : Any, CA> ifLet(
 
 /**
  * Port of TCA's plain-optional `.ifLet(\.child, action: \.child)` (no `@Presents`): runs [child]
- * while its state exists; nothing is cancelled when it goes away (iOS `AppFeature.home`,
- * `SessionFeature.sessionSheet`, whose effects intentionally outlive dismissal).
+ * while its state exists, with the same navigation isolation and lifetime as a presentation.
+ * A UI dismissal that keeps the child state (e.g. `SessionFeature.sessionSheet`) keeps its work.
+ * [slot] identifies the slot, defaulting to this combinator instance; pass a stable value when
+ * rebuilding a reducer. [childID] distinguishes replacements within the slot.
  */
 fun <S, A, CS : Any, CA> ifLet(
     parent: Reducer<S, A>,
@@ -114,18 +116,23 @@ fun <S, A, CS : Any, CA> ifLet(
     action: (A) -> CA?,
     embed: (CA) -> A,
     child: Reducer<CS, CA>,
+    slot: Any = Any(),
+    childID: (CS) -> Any? = { it::class },
 ): Reducer<S, A> = Reducer { current, parentAction ->
     var next = current
     val effects = ArrayList<Effect<A>>(2)
     val childAction = action(parentAction)
     val childState = state(next)
+    val beforeID = childState?.let { PresentationCancelID(slot, childID(it)) }
     if (childAction != null && childState != null) {
         val reduced = child.reduce(childState, childAction)
         next = setState(next, reduced.state)
-        effects += reduced.effect.map(embed)
+        effects += reduced.effect.map(embed).navigationScoped(beforeID!!).cancellable(beforeID)
     }
     val parentReduced = parent.reduce(next, parentAction)
     effects += parentReduced.effect
+    val afterID = state(parentReduced.state)?.let { PresentationCancelID(slot, childID(it)) }
+    if (beforeID != null && beforeID != afterID) effects += Effect.cancel(beforeID)
     Reduced(parentReduced.state, Effect.merge(effects))
 }
 
@@ -138,10 +145,8 @@ sealed interface PresentationAction<out A> {
 }
 
 /**
- * Port of TCA's `.forEach(\.items, action: \.items)` over an identified list. Unlike TCA's
- * `IdentifiedArray` `forEach`, child effects are cancelled when their element is removed, so a
- * removed element's late actions (delegate actions included) never arrive. (iOS
- * `HomeFeature+Composition.swift` cancels leftovers by hand for the same reason.)
+ * Port of TCA's `.forEach(\.items, action: \.items)` over an identified list. Each element has
+ * its own navigation path and its effects are cancelled when the element is removed.
  */
 fun <S, A, ID : Any, CS, CA> forEach(
     slot: Any,
@@ -161,7 +166,8 @@ fun <S, A, ID : Any, CS, CA> forEach(
         if (index >= 0) {
             val reduced = child.reduce(list[index], childAction)
             next = setElements(next, list.toMutableList().also { it[index] = reduced.state })
-            effects += reduced.effect.map { embed(id, it) }.cancellable(ForEachCancelID(slot, id))
+            val navigationID = ForEachCancelID(slot, id)
+            effects += reduced.effect.map { embed(id, it) }.navigationScoped(navigationID).cancellable(navigationID)
         }
     }
     val before = elements(current).map(elementID).toSet()

@@ -6,6 +6,9 @@ import java.time.Instant
 import java.time.format.DateTimeFormatter
 import java.math.BigDecimal
 import java.math.RoundingMode
+import java.util.Locale
+import java.util.Collections
+import java.util.IdentityHashMap
 import kotlin.time.Duration
 
 /**
@@ -81,6 +84,21 @@ class AppLog private constructor(val category: String, subsystem: String = SUBSY
         }
     }
 }
+
+/** Throwable metadata only: messages, file names and suppressed exceptions may contain private data. */
+internal val Throwable.logSummary: String
+    get() {
+        val seen = Collections.newSetFromMap(IdentityHashMap<Throwable, Boolean>())
+        val classes = ArrayList<String>()
+        var error: Throwable? = this
+        while (error != null && seen.add(error)) {
+            classes += error.javaClass.simpleName
+            error = error.cause
+        }
+        val frame = stackTrace.firstOrNull()
+        return classes.joinToString(" <- ") +
+            (frame?.let { " at ${it.className}.${it.methodName}:${it.lineNumber}" } ?: "")
+    }
 
 /** "1.25 s", "320 ms" (iOS `Duration.logSummary`). */
 val Duration.logSummary: String

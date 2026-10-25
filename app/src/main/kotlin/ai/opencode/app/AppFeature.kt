@@ -475,6 +475,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         action = { (it as? Action.Home)?.action },
         embed = Action::Home,
         child = HomeFeature(),
+        childID = { it.id },
     )
 
     /** iOS `.keepingWhatsNewAcrossHomes()` (`AppFeatureWhatsNew.kt`). */

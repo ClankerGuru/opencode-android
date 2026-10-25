@@ -376,8 +376,7 @@ private fun SessionFeature.familyPicked(id: String, state: State): Reduced<State
             Effect.cancel(CancelID.AutocompleteCommand),
             Effect.cancel(CancelID.AutocompleteCommandWait),
             Effect.cancel(CancelID.Revert),
-            // TODO(MODELS): iOS also cancels `SessionSheetFeature.CancelID.autoRenameFailure`; the
-            // Kotlin ID is private to SessionSheetFeature.kt, so it needs to become internal.
+            // Clearing sessionSheet above cancels its auto-rename failure through ifLet teardown.
             endedCall,
             closesPage.effect,
             abandon.effect,
