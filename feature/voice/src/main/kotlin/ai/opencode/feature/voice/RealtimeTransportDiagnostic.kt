@@ -1,5 +1,6 @@
 package ai.opencode.feature.voice
 
+import ai.opencode.core.diagnostics.DiagnosticsErrorCategory
 import ai.opencode.server.UrlErrorCode
 
 /**
@@ -23,7 +24,7 @@ data class RealtimeTransportDiagnostic(
     val errorCategory: DiagnosticsErrorCategory
         get() {
             val category = DiagnosticsErrorCategory.of(domain, code)
-            return if (category == DiagnosticsErrorCategory.transport && underlyingDomain != null && underlyingCode != null)
+            return if (category == DiagnosticsErrorCategory.Transport && underlyingDomain != null && underlyingCode != null)
                 DiagnosticsErrorCategory.of(underlyingDomain, underlyingCode) else category
         }
 
@@ -81,9 +82,9 @@ data class RealtimeTransportDiagnostic(
         private fun domainAndCode(error: Throwable): Pair<String, Int> {
             val category = DiagnosticsErrorCategory.of(error)
             when (category) {
-                DiagnosticsErrorCategory.timeout -> return URL_ERROR_DOMAIN to UrlErrorCode.TIMED_OUT
-                DiagnosticsErrorCategory.offline -> return URL_ERROR_DOMAIN to (UrlErrorCode.fromThrowable(error) ?: UrlErrorCode.NETWORK_CONNECTION_LOST)
-                DiagnosticsErrorCategory.cancelled -> return URL_ERROR_DOMAIN to UrlErrorCode.CANCELLED
+                DiagnosticsErrorCategory.Timeout -> return URL_ERROR_DOMAIN to UrlErrorCode.TIMED_OUT
+                DiagnosticsErrorCategory.Offline -> return URL_ERROR_DOMAIN to (UrlErrorCode.fromThrowable(error) ?: UrlErrorCode.NETWORK_CONNECTION_LOST)
+                DiagnosticsErrorCategory.Cancelled -> return URL_ERROR_DOMAIN to UrlErrorCode.CANCELLED
                 else -> Unit
             }
             // The shared URL helper treats every IOException as network loss.

@@ -58,13 +58,50 @@ sealed interface DiagnosticsErrorCategory {
             else -> Server(status)
         }
 
-        /** iOS `init(_ error:)`: cancellation, timeouts and lost networks by type, else transport. */
+        /**
+         * iOS `init(_ error:)`: cancellation, timeouts and lost networks by type, else
+         * transport. A socket error reads its errno from the message, as iOS reads
+         * `NSPOSIXErrorDomain` codes (ETIMEDOUT → timeout; a lost connection → offline).
+         */
         fun of(error: Throwable): DiagnosticsErrorCategory = when (error) {
             is kotlinx.coroutines.CancellationException -> Cancelled
-            is java.net.SocketTimeoutException, is java.io.InterruptedIOException -> if (error.message == "Canceled") Cancelled else Timeout
-            is java.net.UnknownHostException, is java.net.ConnectException, is java.net.NoRouteToHostException, is java.net.SocketException -> Offline
-            else -> if (error.message == "Canceled") Cancelled else Transport
+            is java.net.SocketTimeoutException -> Timeout
+            is java.net.UnknownHostException, is java.net.ConnectException, is java.net.NoRouteToHostException,
+            is java.net.PortUnreachableException -> Offline
+            is java.net.SocketException -> when {
+                error.message.orEmpty().contains("ETIMEDOUT", ignoreCase = true) -> Timeout
+                offlineSocket.containsMatchIn(error.message.orEmpty()) -> Offline
+                else -> Transport
+            }
+            is java.io.InterruptedIOException -> when {
+                error.message.equals("timeout", ignoreCase = true) -> Timeout
+                error.message.equals("Canceled", ignoreCase = true) -> Cancelled
+                else -> Transport
+            }
+            else -> if (error.message.equals("Canceled", ignoreCase = true)) Cancelled else Transport
         }
+
+        /** Persisted iOS diagnostics keep their original NSError domains/codes (moved down from `:feature:voice`). */
+        fun of(domain: String, code: Int): DiagnosticsErrorCategory = when (domain) {
+            "NSURLErrorDomain" -> when (code) {
+                -1001 -> Timeout
+                -1003, -1004, -1005, -1006, -1009, -1018, -1020 -> Offline
+                -999 -> Cancelled
+                else -> Transport
+            }
+            "NSPOSIXErrorDomain" -> when (code) {
+                60 -> Timeout
+                57, 54, 53, 32, 50, 51, 64, 65 -> Offline
+                else -> Transport
+            }
+            else -> Transport
+        }
+
+        private val offlineSocket = Regex(
+            "ENOTCONN|ECONNRESET|ECONNABORTED|EPIPE|ENETDOWN|ENETUNREACH|EHOSTDOWN|EHOSTUNREACH|" +
+                "connection reset|connection aborted|broken pipe|not connected|network is (?:down|unreachable)|no route to host",
+            RegexOption.IGNORE_CASE,
+        )
     }
 
     object Serializer : KSerializer<DiagnosticsErrorCategory> {
