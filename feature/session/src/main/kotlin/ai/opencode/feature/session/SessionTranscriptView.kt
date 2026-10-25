@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package ai.opencode.feature.session
 
 import ai.opencode.core.dependencies.dependency
@@ -71,7 +73,7 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Text
@@ -210,7 +212,7 @@ fun SessionTranscriptView(
     // A new screen starts without the jump button (iOS `resetShowsJumpButton`).
     DisposableEffect(host) { onDispose { host?.showsJumpButton = false } }
 
-    val safeTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val safeTop = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding()
     val bottomObstruction = WindowInsets.ime.union(WindowInsets.navigationBars).asPaddingValues().calculateBottomPadding()
     // Separate from the projection, so geometry and jumps never rebuild the configuration.
     CompositionLocalProvider(
