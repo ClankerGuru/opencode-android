@@ -7,7 +7,9 @@ import ai.opencode.core.store.Reducer
 import ai.opencode.core.store.forEach
 import ai.opencode.core.store.ifLet
 import ai.opencode.feature.session.SessionFeature
+import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeSession
+import java.time.Instant
 import ai.opencode.feature.settings.SettingsFeature
 
 /**
@@ -28,11 +30,13 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
     data class State(
         val serverID: String,
         val serverName: String,
+        /** The connected server (iOS `server`); null only in `AppView`'s fallback before Home exists. */
+        val server: OpenCodeServer? = null,
         /** Placeholder for iOS's `snapshot: OpenCodeHomeSnapshot`: root sessions, newest first. */
         val sessions: List<OpenCodeSession> = emptyList(),
         val isDrawerOpen: Boolean = false,
         /** The draft at the root, then opened sessions on top (iOS session stack). */
-        val draft: SessionFeature.State = SessionFeature.State(),
+        val draft: SessionFeature.State = SessionFeature.State.draft(server ?: unconnected, draftProject = null, projects = emptyList()),
         val stack: List<SessionFeature.State> = emptyList(),
         val settings: SettingsFeature.State? = null,
     )
@@ -57,6 +61,11 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         data object ServersRequested : DelegateAction
     }
 
+    companion object {
+        /** Stands in for the server while Home has none (placeholder Home). */
+        internal val unconnected = OpenCodeServer(url = "", username = "", password = "")
+    }
+
     private object SettingsSlot
     private object StackSlot
 
@@ -65,11 +74,13 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
             Action.Task -> Reduced(state)
             is Action.DrawerOpenChanged -> Reduced(state.copy(isDrawerOpen = action.isOpen))
             is Action.SessionTapped -> {
-                val stack = state.stack.filterNot { it.sessionID == action.sessionID } +
-                    SessionFeature.State(sessionID = action.sessionID, title = action.title)
+                val session = state.sessions.firstOrNull { it.id == action.sessionID }
+                    ?: OpenCodeSession(action.sessionID, action.title, projectID = "", directory = "", updatedAt = Instant.EPOCH)
+                val stack = state.stack.filterNot { it.session?.id == action.sessionID } +
+                    SessionFeature.State.session(state.server ?: unconnected, session)
                 Reduced(state.copy(stack = stack, isDrawerOpen = false))
             }
-            Action.NewSessionTapped -> Reduced(state.copy(stack = emptyList(), draft = SessionFeature.State(), isDrawerOpen = false))
+            Action.NewSessionTapped -> Reduced(state.copy(stack = emptyList(), draft = SessionFeature.State.draft(state.server ?: unconnected, draftProject = null, projects = emptyList()), isDrawerOpen = false))
             Action.StackPopped -> Reduced(state.copy(stack = state.stack.dropLast(1)))
             Action.SettingsTapped -> Reduced(state.copy(settings = SettingsFeature.State(serverName = state.serverName), isDrawerOpen = false))
             is Action.Settings -> when (val presented = action.action) {
@@ -109,7 +120,7 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
             ),
             elements = { it.stack },
             setElements = { s, list -> s.copy(stack = list) },
-            elementID = { it.sessionID.orEmpty() },
+            elementID = { it.session?.id.orEmpty() },
             action = { (it as? Action.Session)?.let { a -> a.sessionID to a.action } },
             embed = Action::Session,
             child = SessionFeature(),

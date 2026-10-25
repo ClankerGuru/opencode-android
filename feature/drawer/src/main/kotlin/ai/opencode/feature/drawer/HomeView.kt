@@ -50,7 +50,7 @@ fun HomeView(store: StoreOf<HomeFeature.State, HomeFeature.Action>, modifier: Mo
     LaunchedEffect(store) { store.send(HomeFeature.Action.Task) }
     val isDrawerOpen by store.observe { it.isDrawerOpen }
     val serverName by store.observe { it.serverName }
-    val stackIDs by store.observe { state -> state.stack.mapNotNull { it.sessionID } }
+    val stackIDs by store.observe { state -> state.stack.mapNotNull { it.session?.id } }
     val sessions by store.observe { it.sessions }
     val settingsShown by store.observe { it.settings != null }
     val drawerState = rememberDrawerState(if (isDrawerOpen) DrawerValue.Open else DrawerValue.Closed)
@@ -107,7 +107,7 @@ fun HomeView(store: StoreOf<HomeFeature.State, HomeFeature.Action>, modifier: Mo
                     is HomeRoute.Session -> NavEntry(route) {
                         val session = remember(store, route) {
                             store.scope<HomeFeature.State, HomeFeature.Action, SessionFeature.State, SessionFeature.Action>(
-                                state = { home -> home.stack.lastOrNull { it.sessionID == route.sessionID } ?: SessionFeature.State(sessionID = route.sessionID) },
+                                state = { home -> home.stack.lastOrNull { it.session?.id == route.sessionID } ?: home.draft },
                                 action = { HomeFeature.Action.Session(route.sessionID, it) },
                             )
                         }

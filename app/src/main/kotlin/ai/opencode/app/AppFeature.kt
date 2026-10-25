@@ -160,7 +160,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
                 var state = State(savedServer = saved, savedServers = shared(ServerSharedKeys.savedServers))
                 val server = saved.value ?: return state
                 state = state.load(server)
-                return state.copy(home = HomeFeature.State(serverID = server.persistenceID, serverName = server.friendlyName))
+                return state.copy(home = HomeFeature.State(serverID = server.persistenceID, serverName = server.friendlyName, server = server))
             }
         }
     }
@@ -380,6 +380,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
                 home = HomeFeature.State(
                     serverID = server.persistenceID,
                     serverName = server.friendlyName,
+                    server = server,
                     sessions = snapshot.sessions.filter { it.parentID == null }.sortedByDescending { it.updatedAt },
                 ),
                 isEditingServer = false,
