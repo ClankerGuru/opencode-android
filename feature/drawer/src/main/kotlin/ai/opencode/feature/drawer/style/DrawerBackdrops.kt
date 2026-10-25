@@ -45,6 +45,14 @@ class DrawerHeaderScrollState {
 }
 
 /**
+ * Android has no backdrop blur behind the drawer's edges, and iOS's 70% wash only reads because
+ * its blur already hides what scrolls beneath. Without the blur the wash runs solid over the
+ * header and the controls, then fades out over the same distance as on iOS, so a row passing
+ * under the title or between New Session and Settings never shows through.
+ */
+private const val NoBlurWashOpacity: Float = 1f
+
+/**
  * Behind the drawer's title and search, which rows scroll on beneath (iOS
  * `DrawerHeaderBackdrop`): a wash of the drawer's colour, solid through the status bar,
  * that eases out a little below the header ([DrawerTunables.fade]) and keeps the title
@@ -87,7 +95,7 @@ fun DrawerHeaderBackdrop(
                         background = background,
                         safeStop = safeStop,
                         washStop = washStop,
-                        washOpacity = DrawerTunables.washOpacity,
+                        washOpacity = NoBlurWashOpacity,
                         curve = DrawerTunables.blurCurve,
                     )
                     drawRect(
@@ -164,7 +172,7 @@ fun DrawerFooterBackdrop(
                     background = background,
                     safeStop = safeStop,
                     washStop = washStop,
-                    washOpacity = DrawerTunables.bottomWashOpacity,
+                    washOpacity = NoBlurWashOpacity,
                     curve = DrawerTunables.bottomBlurCurve,
                 )
                 drawRect(

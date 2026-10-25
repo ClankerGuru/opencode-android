@@ -271,7 +271,7 @@ enum class ModelPickerStyle(val rawValue: String) {
 
     companion object {
         /** Settings › Advanced › Model Picker. Today by default. */
-        val key: SharedKey<ModelPickerStyle> = SharedKey.appStorage("experimental-model-picker", today)
+        val key: SharedKey<ModelPickerStyle> by lazy { SharedKey.appStorage("experimental-model-picker", today) }
     }
 }
 
@@ -284,7 +284,7 @@ enum class LivingOrbStyle(val title: String) {
     silkRibbons("Silk Ribbons");
 
     companion object {
-        val key: SharedKey<LivingOrbStyle> = SharedKey.appStorage("living-orb-style", polarBloom)
+        val key: SharedKey<LivingOrbStyle> by lazy { SharedKey.appStorage("living-orb-style", polarBloom) }
     }
 }
 
@@ -332,7 +332,7 @@ sealed interface VoiceServerChoice {
         fun of(server: OpenCodeServer): VoiceServerChoice = Saved(VoiceBroker.serverID(server))
 
         /** Settings › Voice › Voice Server. The connected server by default. */
-        val key: SharedKey<VoiceServerChoice> = SharedKey.appStorage("voice-server", Connected)
+        val key: SharedKey<VoiceServerChoice> by lazy { SharedKey.appStorage("voice-server", Connected) }
     }
 
     object Serializer : KSerializer<VoiceServerChoice> {

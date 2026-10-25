@@ -322,7 +322,7 @@ fun DrawerListSessionCell(
                             fade = DrawerTunables.titleFade,
                             time = row.time,
                             reducedMotion = row.reducedMotion,
-                            modifier = Modifier.fillMaxWidth().padding(end = statusInset),
+                            modifier = Modifier.fillMaxWidth().padding(end = statusInset.coerceAtLeast(0.dp)),
                             revealProgress = { reveal.progress },
                         )
                         if (twoLine) {
@@ -359,9 +359,10 @@ fun DrawerListSessionCell(
                     )
                 }
             }
+            // Anchored on the row's frame so the menu opens beside the held row.
+            DrawerRowMenu(hold) { currentActions.menu() }
         }
     }
-    DrawerRowMenu(hold) { currentActions.menu() }
 }
 
 /** The selected row's mark: the shipped fill, the accent behind it, an outline, or a bar at its leading edge. */

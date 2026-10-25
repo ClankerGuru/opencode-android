@@ -580,14 +580,18 @@ private fun SettingsPresentation(
         }
     }
 
-    // Back closes Settings, following the finger while the predictive gesture runs.
-    PredictiveBackHandler(enabled = shown) { events ->
-        try {
-            events.collect { event -> progress.snapTo(1f - event.progress) }
-            store.send(HomeFeature.Action.SettingsShownChanged(false))
-        } catch (cancelled: CancellationException) {
-            // The gesture was cancelled: Settings springs back open.
-            progress.animateTo(1f, spec)
+    // Back closes Settings, following the finger while the predictive gesture runs. Keyed on
+    // `shown` so the handler registers anew (and so last, ahead of the drawer's and Catch Up's,
+    // which compose after Home's first frame) each time Settings opens.
+    key(shown) {
+        PredictiveBackHandler(enabled = shown) { events ->
+            try {
+                events.collect { event -> progress.snapTo(1f - event.progress) }
+                store.send(HomeFeature.Action.SettingsShownChanged(false))
+            } catch (cancelled: CancellationException) {
+                // The gesture was cancelled: Settings springs back open.
+                progress.animateTo(1f, spec)
+            }
         }
     }
 }

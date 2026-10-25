@@ -56,7 +56,7 @@ enum class InAppNoticeMode(val rawValue: String) {
 
     companion object {
         /** iOS `SharedKey.inAppNoticeMode`. */
-        val key = SharedKey.appStorage("experimental-in-app-notices", off)
+        val key: SharedKey<InAppNoticeMode> by lazy { SharedKey.appStorage("experimental-in-app-notices", off) }
     }
 }
 

@@ -323,6 +323,21 @@ fun DrawerListView(
         }
     }
 
+    // A list resting at its top stays there when a row arrives above the first one (Catch Up
+    // or Pinned coming back), as iOS's collection view keeps its zero offset; LazyColumn would
+    // otherwise keep the old first row in place and leave the new one scrolled under the title.
+    val restsAtTop = remember { booleanArrayOf(true) }
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0 }
+            .collect { restsAtTop[0] = it }
+    }
+    val firstKey = model.items.firstOrNull()?.key
+    val shownFirstKey = remember { arrayOfNulls<String>(1) }
+    if (shownFirstKey[0] != firstKey) {
+        if (shownFirstKey[0] != null && restsAtTop[0]) listState.requestScrollToItem(0, 0)
+        shownFirstKey[0] = firstKey
+    }
+
     Box(modifier) {
         LazyColumn(
             state = listState,
