@@ -1,5 +1,97 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.dependencies.AppContext
+import ai.opencode.core.dependencies.DependencyKey
+import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.log.AppLog
+import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionBlurReveal
+import ai.opencode.core.motion.motionBlurReveal
+import ai.opencode.core.motion.rememberReduceMotion
+import ai.opencode.core.ui.OpenCodeIcon
+import ai.opencode.core.ui.OpenCodeIconSize
+import ai.opencode.core.ui.OpenCodeTextStyles
+import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.core.ui.SFSymbol
+import ai.opencode.core.ui.openCodeTapTarget
+import android.Manifest
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.content.res.Configuration
+import android.location.Address
+import android.location.Geocoder
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
+import android.location.LocationRequest
+import android.net.Uri
+import android.provider.Settings
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTag
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import java.util.concurrent.Executor
+import kotlin.coroutines.resume
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource
 import java.time.Instant
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
@@ -101,3 +193,558 @@ data class SharedLocation(
         }
     }
 }
+
+// region LocationClient
+
+/** Why Location couldn't be shared (iOS `LocationClientError`); [message] is the user-facing copy. */
+sealed class LocationClientError(message: String) : Exception(message) {
+    data object Denied : LocationClientError("Location access is off for OpenCode. Turn it on in Settings.")
+    data object Unavailable : LocationClientError("Couldn’t find your location.")
+
+    /** iOS `localizedDescription`. */
+    val localizedDescription: String get() = message ?: ""
+}
+
+/**
+ * One fix of where the phone is, with its nearest address (iOS `LocationClient`,
+ * `@Dependency(\.location)`).
+ *
+ * Android differences:
+ * - The fix comes from `LocationManager` (fused, GPS and network providers) and the address from
+ *   `Geocoder`; Play Services' fused client isn't in the catalog.
+ * - Android asks for permission from an Activity, so the live client awaits the prompt the
+ *   screen installs with [LocationPermissionPrompt.install] (iOS asks inside `CLServiceSession`
+ *   the first time).
+ * - There is no MapKit: [snapshot] and [cachedSnapshot] are kept as seams for a static map
+ *   provider, and live returns `null`, so the card draws its neutral map tile and pin.
+ * - [openSettings] opens the app's system settings page (iOS `openURL(openSettingsURLString)`).
+ */
+class LocationClient(
+    val current: suspend () -> SharedLocation,
+    /** A still map of the spot at [IntSize] pixels, dark or light; rendered once per place and size and cached. */
+    val snapshot: suspend (location: SharedLocation, size: IntSize, dark: Boolean) -> ImageBitmap? = { _, _, _ -> null },
+    val cachedSnapshot: (location: SharedLocation, size: IntSize, dark: Boolean) -> ImageBitmap? = { _, _, _ -> null },
+    val prefetchTimeout: Duration = DEFAULT_PREFETCH_TIMEOUT,
+    /** The composer's compact map in pixels, and whether the app is dark (iOS reads the key window's traits). */
+    val compactSnapshotTraits: () -> Pair<IntSize, Boolean> = { IntSize.Zero to true },
+    val openSettings: suspend () -> Unit = {},
+) {
+    /**
+     * Pre-renders the composer's compact map snapshot before the location response lands so
+     * the card reveals with its map already in cache, bounded by [timeout] (1.2 s default) so
+     * slow tiles never hold the card on “Finding Location…”.
+     */
+    suspend fun prefetchCompactSnapshot(location: SharedLocation, timeout: Duration? = null) {
+        val limit = timeout ?: prefetchTimeout
+        val (size, dark) = compactSnapshotTraits()
+        withTimeoutOrNull(limit) { snapshot(location, size, dark) }
+    }
+
+    companion object Key : DependencyKey<LocationClient> {
+        /** Maximum time `locationTapped` waits for the compact map snapshot before delivering the fix. */
+        val DEFAULT_PREFETCH_TIMEOUT: Duration = 1200.milliseconds
+
+        override val liveValue: LocationClient by lazy {
+            val context = dependency(AppContext).applicationContext
+            LocationClient(
+                current = { LiveLocation.current(context) },
+                compactSnapshotTraits = {
+                    val metrics = context.resources.displayMetrics
+                    val size = IntSize(
+                        (SharedLocationCard.compactWidth.value * metrics.density).toInt(),
+                        (SharedLocationCard.compactMapHeight.value * metrics.density).toInt(),
+                    )
+                    val night = context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+                    size to (night == Configuration.UI_MODE_NIGHT_YES)
+                },
+                openSettings = {
+                    withContext(Dispatchers.Main) {
+                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        runCatching { context.startActivity(intent) }
+                            .onFailure { AppLog.app.error { "Location settings didn’t open: ${it::class.java.simpleName}" } }
+                    }
+                },
+            )
+        }
+
+        override val testValue: LocationClient = LocationClient(
+            current = { throw LocationClientError.Unavailable },
+        )
+    }
+}
+
+/**
+ * The bridge from [LocationClient]'s live value to the runtime permission prompt, which only an
+ * Activity can show. The screen hosting the composer installs a prompt (an
+ * `ActivityResultContracts.RequestMultiplePermissions` launcher for [permissions]) while it's
+ * on screen and removes it with the returned handle. Without one, a missing permission is
+ * [LocationClientError.Denied].
+ */
+object LocationPermissionPrompt {
+    /** When In Use on iOS: precise or approximate. */
+    val permissions: Array<String> = arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+
+    @Volatile private var prompt: (suspend () -> Boolean)? = null
+
+    /** [prompt] returns whether either permission was granted. Returns the uninstall handle. */
+    fun install(prompt: suspend () -> Boolean): () -> Unit {
+        this.prompt = prompt
+        return { if (this.prompt === prompt) this.prompt = null }
+    }
+
+    fun isGranted(context: Context): Boolean = permissions.any {
+        context.checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED
+    }
+
+    internal suspend fun request(): Boolean {
+        val prompt = prompt ?: return false
+        return withContext(Dispatchers.Main) { prompt() }
+    }
+}
+
+/** iOS `LiveLocation`: the best fix within a few seconds, then its nearest address. */
+private object LiveLocation {
+    /** Good enough to name a street; the first fix is often coarse. */
+    const val WANTED_ACCURACY = 65f
+    /** How long to wait for that before taking the best fix so far. */
+    val settle: Duration = 4.seconds
+    val timeout: Duration = 15.seconds
+    /** Android's `Geocoder` callback can go quiet; MapKit's request always answers. */
+    val geocodeTimeout: Duration = 10.seconds
+
+    suspend fun current(context: Context): SharedLocation {
+        // Asks the first time, like When In Use; refusal is Denied.
+        if (!LocationPermissionPrompt.isGranted(context)) {
+            if (!LocationPermissionPrompt.request() || !LocationPermissionPrompt.isGranted(context)) {
+                throw LocationClientError.Denied
+            }
+        }
+        val manager = context.getSystemService(LocationManager::class.java) ?: throw LocationClientError.Unavailable
+        // Location turned off for the whole phone: iOS `authorizationDeniedGlobally`.
+        if (!manager.isLocationEnabled) throw LocationClientError.Denied
+        val fix = bestFix(context, manager)
+        var location = SharedLocation(
+            latitude = fix.latitude,
+            longitude = fix.longitude,
+            accuracy = if (fix.hasAccuracy() && fix.accuracy >= 0) fix.accuracy.toDouble() else null,
+            capturedAt = Instant.ofEpochMilli(fix.time),
+        )
+        val item = reverseGeocode(context, fix)
+        if (item != null) {
+            val address = fullAddress(item)
+            location = location.copy(address = address)
+            // "Apple Park, 1 Apple Park Way, …": the place as the title, the street address
+            // under it. A bare street address stays as is.
+            val name = item.featureName
+            if (!name.isNullOrEmpty()) {
+                if (address != null && address.startsWith("$name, ")) {
+                    location = location.copy(place = name, address = address.substring(name.length + 2))
+                } else if (!(address ?: "").startsWith(name)) {
+                    location = location.copy(place = name)
+                }
+            }
+        }
+        return location
+    }
+
+    @Suppress("MissingPermission") // Checked in current().
+    private fun updates(context: Context, manager: LocationManager) = callbackFlow {
+        val providers = listOf(LocationManager.FUSED_PROVIDER, LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
+            .filter { it in manager.allProviders && manager.isProviderEnabled(it) }
+        if (providers.isEmpty()) {
+            close(LocationClientError.Unavailable)
+            return@callbackFlow
+        }
+        val listener = LocationListener { trySend(it) }
+        val request = LocationRequest.Builder(1_000L).setQuality(LocationRequest.QUALITY_HIGH_ACCURACY).build()
+        val executor: Executor = context.mainExecutor
+        for (provider in providers) {
+            runCatching { manager.requestLocationUpdates(provider, request, executor, listener) }
+        }
+        awaitClose { manager.removeUpdates(listener) }
+    }
+
+    private suspend fun bestFix(context: Context, manager: LocationManager): Location {
+        val started = TimeSource.Monotonic.markNow()
+        var best: Location? = null
+        fun record(fix: Location): Boolean {
+            if (!fix.hasAccuracy() || fix.accuracy < 0) return false
+            val current = best
+            if (current == null || fix.accuracy < current.accuracy) best = fix
+            return true
+        }
+        // Until the settle time: a fix good enough to name a street.
+        val good = withTimeoutOrNull(settle) {
+            updates(context, manager).first { fix -> record(fix) && fix.accuracy <= WANTED_ACCURACY }
+        }
+        good?.let { return it }
+        best?.let { return it }
+        // Nothing usable yet: the first one before the timeout.
+        val remaining = timeout - started.elapsedNow()
+        if (remaining.isPositive()) {
+            withTimeoutOrNull(remaining) { updates(context, manager).first { record(it) } }
+        }
+        return best ?: throw LocationClientError.Unavailable
+    }
+
+    private suspend fun reverseGeocode(context: Context, fix: Location): Address? {
+        if (!Geocoder.isPresent()) return null
+        return withTimeoutOrNull(geocodeTimeout) {
+            suspendCancellableCoroutine { continuation ->
+                runCatching {
+                    Geocoder(context).getFromLocation(fix.latitude, fix.longitude, 1, object : Geocoder.GeocodeListener {
+                        override fun onGeocode(addresses: MutableList<Address>) {
+                            if (continuation.isActive) continuation.resume(addresses.firstOrNull())
+                        }
+
+                        override fun onError(errorMessage: String?) {
+                            if (continuation.isActive) continuation.resume(null)
+                        }
+                    })
+                }.onFailure { if (continuation.isActive) continuation.resume(null) }
+            }
+        }
+    }
+
+    /** One line without the country (MapKit `fullAddress(includingRegion: false, singleLine: true)`). */
+    private fun fullAddress(item: Address): String? {
+        val street = listOfNotNull(item.subThoroughfare, item.thoroughfare).joinToString(" ").ifEmpty { null }
+        val region = listOfNotNull(item.adminArea, item.postalCode).joinToString(" ").ifEmpty { null }
+        val parts = listOfNotNull(street, item.locality, region)
+        if (parts.isNotEmpty()) return parts.joinToString(", ")
+        val line = item.getAddressLine(0)?.trim()?.ifEmpty { null } ?: return null
+        val country = item.countryName
+        return if (country != null && line.endsWith(", $country")) line.dropLast(country.length + 2) else line
+    }
+}
+
+// endregion
+
+// region SharedLocationCard
+
+/**
+ * A shared location in the transcript and the composer: a map with a pin, the place or
+ * address, and the coordinates. A tap opens it in Maps ([onOpen] gets [SharedLocation.mapsURL]).
+ *
+ * No MapKit on Android: the map is a neutral tile with the pin unless [LocationClient.snapshot]
+ * provides an image.
+ */
+object SharedLocationCard {
+    val compactWidth: Dp = 220.dp
+    val fullWidth: Dp = 260.dp
+    val compactMapHeight: Dp = 72.dp
+    val fullMapHeight: Dp = 120.dp
+    val defaultCompactFooterHeight: Dp = 64.dp
+
+    /** `TranscriptMetrics.cardCornerRadius`. */
+    val cornerRadius: Dp = FileAttachmentMetrics.cardCornerRadius
+
+    /** iOS `@ScaledMetric(relativeTo: .subheadline)`: the footer grows with the font size. */
+    @Composable
+    fun compactFooterHeight(): Dp = defaultCompactFooterHeight * LocalDensity.current.fontScale
+}
+
+@Composable
+fun SharedLocationCard(
+    location: SharedLocation,
+    onOpen: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    isPending: Boolean = false,
+    compact: Boolean = false,
+    /** Tight trailing corners where a sent card meets another surface of its run (`UserSurfaceCorners`). */
+    shape: Shape = RoundedCornerShape(SharedLocationCard.cornerRadius),
+) {
+    val title = location.place ?: location.address ?: "Shared Location"
+    val subtitle = if (location.place != null) location.address else null
+    val footerHeight = SharedLocationCard.compactFooterHeight()
+    val label = "Location: $title${subtitle?.let { ", $it" } ?: ""}"
+    Column(
+        modifier
+            .width(if (compact) SharedLocationCard.compactWidth else SharedLocationCard.fullWidth)
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .alpha(if (isPending) 0.6f else 1f)
+            .clickable { onOpen(location.mapsURL) }
+            .clearAndSetSemantics {
+                contentDescription = label
+                onClick(label = "Opens in Maps") { onOpen(location.mapsURL); true }
+                testTag = if (compact) "composer-location-card" else "shared-location-card"
+            },
+    ) {
+        SharedLocationMap(
+            location,
+            Modifier.fillMaxWidth().height(if (compact) SharedLocationCard.compactMapHeight else SharedLocationCard.fullMapHeight),
+        )
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .then(if (compact) Modifier.height(footerHeight) else Modifier)
+                .padding(horizontal = 12.dp, vertical = if (compact) 8.dp else 10.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp, if (compact) Alignment.CenterVertically else Alignment.Top),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                OpenCodeIcon(SFSymbol.LocationFill, contentDescription = null, size = 14.dp, tint = SystemBlue)
+                Text(
+                    title,
+                    style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold),
+                    color = OpenCodeTheme.colors.text,
+                    maxLines = if (compact) 1 else 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (subtitle != null) {
+                Text(
+                    subtitle,
+                    style = OpenCodeTextStyles.caption1,
+                    color = OpenCodeTheme.colors.secondaryText,
+                    maxLines = if (compact) 1 else 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            val accuracy = if (compact) "" else location.accuracy?.let { " · ±${Math.round(it)} m" } ?: ""
+            Text(
+                location.coordinateText + accuracy,
+                style = OpenCodeTextStyles.caption2.copy(fontFamily = FontFamily.Monospace),
+                color = OpenCodeTheme.colors.tertiaryText,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/** iOS `.blue` for the location glyph and `.red` for the pin. */
+private val SystemBlue = Color(0xFF0A84FF)
+private val SystemRed = Color(0xFFFF3B30)
+
+/** A still map of the spot, rendered once per place and size and cached; neutral without a provider. */
+@Composable
+private fun SharedLocationMap(location: SharedLocation, modifier: Modifier = Modifier) {
+    val client = remember { dependency(LocationClient) }
+    val dark = isSystemInDarkTheme()
+    BoxWithConstraints(modifier.background(MaterialTheme.colorScheme.surfaceContainerHighest), contentAlignment = Alignment.Center) {
+        val density = LocalDensity.current
+        val size = with(density) { IntSize(maxWidth.roundToPx(), maxHeight.roundToPx()) }
+        var image by remember(location.coordinateText, size, dark) { mutableStateOf(client.cachedSnapshot(location, size, dark)) }
+        val shown by animateFloatAsState(
+            if (image != null) 1f else 0f,
+            Motion.easeOut(Motion.fadeStandard),
+            label = "location-map",
+        )
+        LaunchedEffect(location.coordinateText, size, dark) {
+            if (image == null) image = client.snapshot(location, size, dark)
+        }
+        image?.let {
+            Image(it, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().alpha(shown))
+        }
+        MapPin()
+    }
+}
+
+/** `mappin.circle.fill` in the palette white on red. */
+@Composable
+private fun MapPin() {
+    Box(contentAlignment = Alignment.Center) {
+        Box(Modifier.size(16.dp).background(Color.White, RoundedCornerShape(50)))
+        OpenCodeIcon(SFSymbol.MappinCircleFill, contentDescription = null, size = OpenCodeIconSize.large, tint = SystemRed)
+    }
+}
+
+// endregion
+
+// region ComposerLocationAttachment
+
+/**
+ * Unified composer location attachment card that keeps a single stable
+ * `220 × (72 + compactFooterHeight)` frame across “Finding Location…” and the resolved
+ * [SharedLocationCard], animating in once (the session's `PresenceGate` drives [gateProgress]:
+ * `Motion.panelOpen` in, `Motion.disclosureClose` out) and revealing the map and address in
+ * place with [motionBlurReveal] when ready, without a second pop or height snap.
+ *
+ * [gateProgress] is the gate's target (0 or 1); this animates toward it and reports
+ * [onGateSettled] when it lands, so the session can complete its gate generation (iOS
+ * `withAnimation(completionCriteria: .removed)`).
+ */
+@Composable
+fun ComposerLocationAttachment(
+    location: SharedLocation?,
+    isLocating: Boolean,
+    gateProgress: Float,
+    onAppear: () -> Unit,
+    onRemove: () -> Unit,
+    onOpen: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    onGateSettled: (Float) -> Unit = {},
+) {
+    val reduceMotion = rememberReduceMotion()
+    val footerHeight = SharedLocationCard.compactFooterHeight()
+    val cardHeight = SharedLocationCard.compactMapHeight + footerHeight
+    var displayedLocation by remember { mutableStateOf(location) }
+    val resolved = remember { Animatable(if (location != null) 1f else 0f) }
+    // Mounted already presented (a reset gate) it shows at once; mounted by a request it waits for onAppear.
+    val gate = remember { Animatable(gateProgress) }
+    val activeLocation = location ?: displayedLocation
+
+    LaunchedEffect(Unit) { onAppear() }
+    LaunchedEffect(gateProgress) {
+        val spec = if (gateProgress >= 1f) Motion.panelOpen.animation<Float>(reduceMotion) else Motion.disclosureClose.animation(reduceMotion)
+        if (gate.value == gateProgress) return@LaunchedEffect
+        gate.animateTo(gateProgress, spec)
+        onGateSettled(gateProgress)
+    }
+    LaunchedEffect(location) {
+        if (location != null) {
+            displayedLocation = location
+            if (resolved.value < 1f) resolved.animateTo(1f, Motion.panelOpen.animation(reduceMotion))
+        }
+    }
+    LaunchedEffect(isLocating) {
+        if (isLocating && location == null) {
+            displayedLocation = null
+            resolved.snapTo(0f)
+        }
+    }
+
+    val metrics = ComposerLocationEntrance.metrics(gate.value, resolved.value, cardHeight.value, reduceMotion)
+    Box(
+        modifier
+            .graphicsLayer {
+                scaleX = metrics.scale
+                scaleY = metrics.scale
+                transformOrigin = TransformOrigin(0f, 1f)
+                alpha = metrics.opacity
+            }
+            .then(if (metrics.blur > 0f) Modifier.blur(metrics.blur.dp) else Modifier),
+        contentAlignment = Alignment.TopEnd,
+    ) {
+        val progress = resolved.value
+        Box(
+            Modifier
+                .size(SharedLocationCard.compactWidth, cardHeight)
+                .clip(RoundedCornerShape(SharedLocationCard.cornerRadius))
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+        ) {
+            if (progress < 1f) {
+                LocatingSurface(
+                    footerHeight = footerHeight,
+                    cardHeight = cardHeight,
+                    isHidden = activeLocation != null,
+                    modifier = Modifier
+                        .alpha(maxOf(0f, 1f - progress * 2.2f))
+                        .then(if (!reduceMotion && progress > 0f) Modifier.blur(Motion.blurSubtle * progress.coerceIn(0f, 1f)) else Modifier),
+                )
+            }
+            if (activeLocation != null) {
+                SharedLocationCard(
+                    activeLocation,
+                    onOpen = onOpen,
+                    compact = true,
+                    modifier = Modifier.motionBlurReveal(progress, Motion.blurSubtle, reduceMotion = reduceMotion),
+                )
+            }
+        }
+        val removeLabel = if (location != null) "Remove location" else "Cancel location"
+        ComposerRemoveBadge(
+            label = removeLabel,
+            testTag = if (location != null) "remove-pending-location" else "cancel-pending-location",
+            onClick = onRemove,
+            modifier = Modifier.offset(x = 8.dp, y = (-8).dp),
+        )
+    }
+}
+
+@Composable
+private fun LocatingSurface(footerHeight: Dp, cardHeight: Dp, isHidden: Boolean, modifier: Modifier = Modifier) {
+    Column(
+        modifier
+            .size(SharedLocationCard.compactWidth, cardHeight)
+            .then(
+                if (isHidden) Modifier.clearAndSetSemantics {}
+                else Modifier.clearAndSetSemantics {
+                    contentDescription = "Finding Location…"
+                    testTag = "composer-location-card"
+                },
+            ),
+    ) {
+        Box(
+            Modifier
+                .size(SharedLocationCard.compactWidth, SharedLocationCard.compactMapHeight)
+                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+            contentAlignment = Alignment.Center,
+        ) { MapPin() }
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .height(footerHeight)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
+                Text(
+                    "Finding Location…",
+                    style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold),
+                    color = OpenCodeTheme.colors.text,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Text(
+                "Current coordinates",
+                style = OpenCodeTextStyles.caption1,
+                color = OpenCodeTheme.colors.secondaryText,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/**
+ * The composer attachments' remove button (`xmark.circle.fill`, white on 65 % black) over a
+ * card's top trailing corner, with a 48 dp target.
+ */
+@Composable
+internal fun ComposerRemoveBadge(label: String, testTag: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Box(
+        modifier
+            .clickable(role = Role.Button, onClickLabel = null, onClick = onClick)
+            .openCodeTapTarget()
+            .semantics {
+                contentDescription = label
+                this.testTag = testTag
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(Modifier.size(12.dp).background(Color.White, RoundedCornerShape(50)))
+        OpenCodeIcon(SFSymbol.XmarkCircleFill, contentDescription = null, size = 22.dp, tint = Color.Black.copy(alpha = 0.65f))
+    }
+}
+
+/**
+ * The card's single continuous scale + blur + opacity entrance (iOS
+ * `ComposerLocationEntranceModifier`); the per-frame lab trace is n/a.
+ */
+object ComposerLocationEntrance {
+    /** Subtle scale origin for the entrance (0.965 → 1), keeping each frame's height step small. */
+    const val ENTRANCE_SCALE = 0.965f
+
+    data class Metrics(val scale: Float, val opacity: Float, val blur: Float, val height: Float, val resolved: Float)
+
+    fun metrics(
+        gateProgress: Float,
+        resolvedProgress: Float,
+        cardHeight: Float = (SharedLocationCard.compactMapHeight + SharedLocationCard.defaultCompactFooterHeight).value,
+        reduceMotion: Boolean,
+    ): Metrics {
+        val clamped = gateProgress.coerceIn(0f, 1f)
+        val resolved = resolvedProgress.coerceIn(0f, 1f)
+        val scale = if (reduceMotion) 1f else ENTRANCE_SCALE + (1 - ENTRANCE_SCALE) * clamped
+        val opacity = if (clamped <= 0.02f) 0f else clamped
+        val blur = MotionBlurReveal.blurRadius(clamped, Motion.blurSubtle.value, reduceMotion)
+        return Metrics(scale, opacity, blur, cardHeight * scale, resolved)
+    }
+}
+
+// endregion
