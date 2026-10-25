@@ -184,7 +184,8 @@ object SyntaxHighlighter {
     }
 
     /** The UTF-16 offset [utf8Count] bytes in, or null when that falls inside a scalar or past the end. */
-    private fun utf16Offset(s: String, utf8Count: Int): Int? {
+    /** The UTF-16 offset that ends [utf8Count] UTF-8 bytes of [s], or null when it splits a scalar or runs past the end. */
+    fun utf16Offset(s: String, utf8Count: Int): Int? {
         var bytes = 0
         var i = 0
         while (i < s.length && bytes < utf8Count) {

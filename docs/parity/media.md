@@ -32,7 +32,7 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 | `OpenCode/Media/Mermaid/MermaidDiagramView.swift` | 231 | feature/media/.../mermaid/MermaidDiagramView.kt | done |  |
 | `OpenCode/Media/Mermaid/MermaidRenderer.swift` | 363 | feature/media/.../mermaid/MermaidRenderer.kt | done | one offscreen WebView, assets/mermaid; cached as SVG (iOS PDF) |
 | `OpenCode/Media/Mermaid/MermaidSyntax.swift` | 79 | feature/media/.../mermaid/MermaidSyntax.kt | done |  |
-| `OpenCode/Media/SyntaxHighlighter.swift` | 391 | feature/media/.../SyntaxHighlighter.kt | done | public; colour-free tokens + `Palette.current`; CRLF ends a line |
+| `OpenCode/Media/SyntaxHighlighter.swift` | 391 | feature/media/.../SyntaxHighlighter.kt | done | public; colour-free tokens + `Palette.current`; CRLF ends a line; the one highlighter (transcript's duplicate removed on integration; its code blocks use `highlightIncremental(previous:)` and `utf16Offset`) |
 | `OpenCode/Media/TranscriptImageViewer.swift` | 352 | feature/media/.../TranscriptImageViewer.kt | done | MediaStore save; FileProvider share |
 | `OpenCode/Media/ZoomableImagePage.swift` | 338 | feature/media/.../ZoomableImagePage.kt | done | `MediaZoomState`; fling stops flush instead of bouncing |
 
@@ -43,6 +43,6 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 | `OpenCode/Core/DecodedImageCache.swift` | `feature/media/.../MediaFoundation.kt` (`DecodedImageCache`) | done | 48 MB `rowBytes × height` LRU, ≤ 64 entries, SHA-256 keys; `onTrimMemory`/`onLowMemory` purge = memory warning; Coil's own memory cache holds Coil-loaded images |
 | `TranscriptImagePreview` (`Transcript/TranscriptEntryView.swift`) | `feature/media/.../MediaFoundation.kt` | done | moved down: viewer, gallery and Mermaid build it; `Page.image` is an Android `Bitmap` |
 | `TranscriptMetrics` constants (`Transcript/TranscriptEntryView.swift`) | `feature/media/.../MediaFoundation.kt` | done | tunable defaults (gutter 16, card radius 14); transcript should reuse rather than redeclare |
-| `ExperimentalFeature(s)` (`Settings/ExperimentalFeatures.swift`) | `core/.../dependencies/ExperimentalFeatures.kt` | done | moved down (shared commit); Settings owns titles/summaries |
+| `ExperimentalFeature(s)` (`Settings/ExperimentalFeatures.swift`) | `core/.../sharing/ExperimentalFeature.kt` | done | one `:core` copy shared with settings/voice (media's duplicate in `core/.../dependencies/` removed on integration); Settings owns groups and the list UI |
 | `SessionLink` URL helpers (`Transcript/SessionLinks.swift`) | `server/.../model/SessionLink.kt` | done | moved down (shared commit); Transcript owns the rich-text marking |
 

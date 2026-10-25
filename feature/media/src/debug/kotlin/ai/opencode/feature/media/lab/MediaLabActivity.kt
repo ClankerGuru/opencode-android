@@ -1,8 +1,8 @@
 package ai.opencode.feature.media.lab
 
 import ai.opencode.core.dependencies.DependencyValues
-import ai.opencode.core.dependencies.ExperimentalFeature
-import ai.opencode.core.dependencies.ExperimentalFeatures
+import ai.opencode.core.sharing.ExperimentalFeature
+import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.Store
@@ -124,7 +124,7 @@ class MediaLabActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         DependencyValues.installRoot {
-            this[ExperimentalFeatures] = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.InAppBrowser, ExperimentalFeature.ImageLinkPreviews))
+            this[ExperimentalFeatures] = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.inAppBrowser, ExperimentalFeature.imageLinkPreviews))
         }
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)

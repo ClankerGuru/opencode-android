@@ -2,7 +2,7 @@ package ai.opencode.feature.media
 
 import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.DependencyKey
-import ai.opencode.core.dependencies.ExperimentalFeatures
+import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.log.AppLog
 import ai.opencode.server.OpenCodePairingLink

@@ -71,8 +71,7 @@ data class InlineRun(
 @Immutable
 data class SessionChip(val id: String, val muted: Boolean, val isSubagent: Boolean)
 
-/** A token the syntax highlighter coloured: `[start, end)` in UTF-16 chars of the source. */
-@Immutable
-data class SyntaxToken(val start: Int, val end: Int, val kind: SyntaxTokenKind)
+/** A token the syntax highlighter coloured: `[start, end)` in UTF-16 chars of the source (media's [SyntaxHighlighter]). */
+typealias SyntaxToken = ai.opencode.feature.media.SyntaxHighlighter.Token
 
-enum class SyntaxTokenKind { Keyword, String, Number, Comment, Type }
+typealias SyntaxTokenKind = ai.opencode.feature.media.SyntaxHighlighter.TokenKind

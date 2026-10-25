@@ -2,7 +2,7 @@ package ai.opencode.feature.media
 
 import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.DependencyKey
-import ai.opencode.core.dependencies.ExperimentalFeatures
+import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticEffect
@@ -129,7 +129,7 @@ enum class LinkMenuAction(val rawValue: String) {
                 return if (OpenCodePairingLink.shareableURL(url) != null) listOf(Copy, Share) else emptyList()
             }
             val publicWebPage = BrowserLinkPolicy.isPublicWebPage(url)
-            val appBrowser = experimental(ai.opencode.core.dependencies.ExperimentalFeature.InAppBrowser) && publicWebPage
+            val appBrowser = experimental(ai.opencode.core.sharing.ExperimentalFeature.inAppBrowser) && publicWebPage
             return entries.filter { action ->
                 when (action) {
                     OpenInAppBrowser -> appBrowser
