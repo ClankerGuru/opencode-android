@@ -44,6 +44,15 @@ import ai.opencode.core.experiments.ModelPickerStyle
 import ai.opencode.feature.composer.QueuedMessagesSheet
 import ai.opencode.server.model.OpenCodeProject
 import ai.opencode.server.model.OpenCodeQueuedInput
+import ai.opencode.feature.voice.VoiceCallComposer
+import ai.opencode.feature.voice.VoiceCallSurface
+import ai.opencode.feature.voice.VoiceStoreOf
+import ai.opencode.feature.voice.hiddenUnderVoiceTranscript
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.togetherWith
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
@@ -334,6 +343,7 @@ internal data class ComposerSnapshot(
 fun SessionComposer(
     store: StoreOf<SessionFeature.State, SessionFeature.Action>,
     modifier: Modifier = Modifier,
+    callStore: VoiceStoreOf? = null,
 ) {
     val host = LocalSessionComposerHost.current ?: remember { SessionComposerHost() }
     val view = remember { SessionComposerViewState() }
@@ -349,6 +359,11 @@ fun SessionComposer(
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
+    val floatsCall = rememberFloatsCall()
+    val callShowsCard by remember(callStore) { callStore?.let { call -> call.states.map { it.phase.showsCard } } ?: flowOf(false) }
+        .collectAsState(callStore?.state?.phase?.showsCard ?: false)
+    val callShowsCaptions by remember(callStore) { callStore?.let { call -> call.states.map { it.showsCaptions } } ?: flowOf(false) }
+        .collectAsState(callStore?.state?.showsCaptions ?: false)
 
     val env = SessionComposerEnv(
         store = store,
@@ -372,6 +387,11 @@ fun SessionComposer(
             keyboard?.hide()
         },
         scope = scope,
+        callStore = callStore,
+        // iOS `voiceStore`: the bar takes the composer's place unless the call floats or shows a card.
+        voiceStore = if (floatsCall || callShowsCard) null else callStore,
+        floatsCall = floatsCall,
+        showsCallTranscript = callShowsCaptions,
     )
 
     // iOS `attachComposerAutocomplete`: the controller follows the reducer's state and the composer's size.
@@ -478,7 +498,18 @@ internal class SessionComposerEnv(
     val focus: () -> Unit,
     val dismissKeyboard: () -> Unit,
     val scope: kotlinx.coroutines.CoroutineScope,
+    /** iOS `callStore`: the screen's call, or its root's. */
+    val callStore: VoiceStoreOf? = null,
+    /** iOS `voiceStore`: the call whose bar stands in the composer's place. */
+    val voiceStore: VoiceStoreOf? = null,
+    /** iOS `floatsCall`. */
+    val floatsCall: Boolean = false,
+    /** iOS `showsCallTranscript`: the call's open transcript covers what stands above the composer. */
+    val showsCallTranscript: Boolean = false,
 ) {
+    /** iOS `hasCall`: the screen's own call or its root's. */
+    val hasCall: Boolean get() = s.hasCall || callStore != null
+
     val messageFieldFocused: Boolean get() = host.messageFieldFocused
 
     /** iOS `settledRecording`. */
@@ -501,10 +532,10 @@ internal class SessionComposerEnv(
     private val hasComposerAttachments: Boolean get() = s.hasNonLocationAttachments || s.wantsLocationAttachment
 
     /** iOS `docksRequest`: answering a request, its panel grows out of the composer (never under a call). */
-    val docksRequest: Boolean get() = !s.hasCall && s.isAnsweringRequest
+    val docksRequest: Boolean get() = voiceStore == null && s.isAnsweringRequest
 
     /** iOS `showsVoiceControl`: Voice is set up and no call is running. */
-    val showsVoiceControl: Boolean get() = s.isVoiceAvailable && !s.hasCall
+    val showsVoiceControl: Boolean get() = s.isVoiceAvailable && !hasCall
 
     /** iOS `holdingStopStartsCall`: mid-run, holding Stop starts the call the empty composer would offer. */
     val holdingStopStartsCall: Boolean get() = showsVoiceControl && !s.hasPromptContent && s.isRunning
@@ -646,10 +677,10 @@ private fun SessionComposerEnv.ComposerArea(modifier: Modifier) {
             .padding(top = 6.dp, bottom = bottom),
     ) {
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(pillGap.dp)) {
-            HiddenUnderComposerPanel(host.composerPanelCovers) { ComposerPills() }
+            HiddenUnderComposerPanel(host.composerPanelCovers, Modifier.hiddenUnderVoiceTranscript(showsCallTranscript)) { ComposerPills() }
             val error = s.settledRequestLoadError
             if (error != null) {
-                HiddenUnderComposerPanel(host.composerPanelCovers) {
+                HiddenUnderComposerPanel(host.composerPanelCovers, Modifier.hiddenUnderVoiceTranscript(showsCallTranscript)) {
                     ComposerBanner(
                         symbol = SFSymbol.ExclamationmarkTriangleFill,
                         iconTint = androidx.compose.ui.graphics.Color(0xFFFF9500),
@@ -672,7 +703,8 @@ private fun SessionComposerEnv.ComposerArea(modifier: Modifier) {
                     .align(Alignment.TopEnd)
                     .offset(y = -(48 + pillGap).dp),
             ) {
-                JumpToLatestPill(isShown = host.showsJumpButton, onClick = host.onJumpToLatest)
+                // The call's open transcript covers where it would float.
+                JumpToLatestPill(isShown = host.showsJumpButton && !showsCallTranscript, onClick = host.onJumpToLatest)
             }
         }
         // A draft's recent projects stand above the composer as an overlay, so folding them, or
@@ -703,7 +735,7 @@ private fun SessionComposerEnv.DraftProjectsOverlay(modifier: Modifier) {
         contentAlignment = Alignment.BottomCenter,
     ) {
         AnimatedVisibility(visible = showsDraftProjects, enter = enter, exit = exit) {
-            HiddenUnderComposerPanel(host.composerPanelCovers) {
+            HiddenUnderComposerPanel(host.composerPanelCovers, Modifier.hiddenUnderVoiceTranscript(showsCallTranscript)) {
                 DraftProjectList(
                     identity = s.taskIdentity,
                     projects = s.recentProjects,
@@ -803,11 +835,33 @@ private fun SessionComposerEnv.QueuedActivity(hasQueued: Boolean) {
  */
 @Composable
 private fun SessionComposerEnv.ComposerCapsule() {
-    val density = LocalDensity.current
-    val current by rememberUpdatedState(this)
     // A pending request's panel grows up out of the composer on its surface; with Composer
     // Autocomplete on (and no panel or call), the suggestions grow there instead.
-    val showsAutocomplete = usesAutocomplete && !docksRequest && view.requestPanelHeight <= 0f && !s.hasCall
+    val showsAutocomplete = usesAutocomplete && !docksRequest && view.requestPanelHeight <= 0f && voiceStore == null
+    // The composer and a call share one place: starting or ending a call swaps what stands there,
+    // + becoming Mute and the call button End, and the call's transcript grows out of its surface.
+    AnimatedContent(
+        targetState = voiceStore,
+        contentKey = { it != null },
+        transitionSpec = {
+            val spec: androidx.compose.animation.core.FiniteAnimationSpec<Float> = if (reducedMotion) Motion.easeInOut(0.2) else MotionSpring(0.32).spec()
+            fadeIn(spec) togetherWith fadeOut(spec) using SizeTransform(clip = false)
+        },
+        label = "composerCallSwap",
+    ) { call ->
+        if (call != null) {
+            VoiceCallSurface(call, Modifier.fillMaxWidth()) { VoiceCallComposer(call) }
+        } else {
+            ComposerSurface(showsAutocomplete)
+        }
+    }
+}
+
+/** The composer's own surface: a request's panel, autocomplete, the composer and the dictation hold layer. */
+@Composable
+private fun SessionComposerEnv.ComposerSurface(showsAutocomplete: Boolean) {
+    val density = LocalDensity.current
+    val current by rememberUpdatedState(this)
     Box(Modifier.fillMaxWidth()) {
         Surface(
             modifier = Modifier

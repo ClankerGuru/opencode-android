@@ -19,6 +19,10 @@ import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.State
+import ai.opencode.feature.voice.DotScopeRenderer
+import ai.opencode.feature.voice.LocalDotScopeCovered
+import ai.opencode.feature.voice.VoiceStoreOf
+import ai.opencode.feature.voice.floatingCallComposer
 import ai.opencode.feature.session.header.HeaderBlurTunables
 import ai.opencode.feature.session.header.SessionHeaderBackdrop
 import ai.opencode.feature.session.header.SessionHeaderStyle
@@ -137,6 +141,8 @@ import kotlin.math.roundToInt
  * @param listContext what Home knows about this session (project, pin, unread, mute, notices).
  * @param onBack set on a subagent pushed over its parent: the header trades the drawer button for Back.
  * @param onCatchUpOpen set while the session is a catch-up card: the title leaves Catch Up for the session.
+ * @param hostedCall the call its root owns, on a pushed subagent (iOS `hostedCall`): its cards and
+ *   bar show here, as the screen's own call would.
  */
 @Composable
 fun SessionView(
@@ -146,6 +152,7 @@ fun SessionView(
     listContext: SessionListContext = SessionListContext(),
     onBack: (() -> Unit)? = null,
     onCatchUpOpen: (() -> Unit)? = null,
+    hostedCall: VoiceStoreOf? = null,
 ) {
     val scrollEdgeBridge = remember { SessionScrollEdgeBridge() }
     val backgroundWorkAnchor = rememberBackgroundWorkAnchor()
@@ -170,6 +177,11 @@ fun SessionView(
     val resolvedHeader = remember(headerEnvironment) { HeaderBlurTunables.resolved(headerEnvironment) }
 
     SessionLifecycle(store)
+    val callStore = store.rememberCallStore(hostedCall)
+    val ownsCall by store.observe { it.voice != null }
+    SessionCallTasks(store, callStore, hasCall = ownsCall || hostedCall != null)
+    val isCovered by store.observe { it.isCovered }
+    val floatsCall = rememberFloatsCall()
 
     val work by store.observe(BackgroundWorkModel::from)
     val agentScope by store.observe { "${it.server.persistenceID}|${it.session?.id ?: "draft"}" }
@@ -192,6 +204,8 @@ fun SessionView(
     CompositionLocalProvider(
         LocalAgentActivityScope provides agentScope,
         LocalSessionComposerHost provides composerHost,
+        // Covered (a pushed subagent, a browser page), every scope underneath stops drawing.
+        LocalDotScopeCovered provides isCovered,
     ) {
         // The + menu draws above the background-work capsule (iOS: the menu's glass covers it).
         Box(modifier) {
@@ -208,6 +222,7 @@ fun SessionView(
             onOpenShell = { store.send(Action.ShellOutputTapped(it)) },
             isCovered = composerHost.composerPanelCovers,
             inCall = work.inCall,
+            showsCallTranscript = work.showsCallTranscript,
             // The capsule draws above the + menu's dismiss area: tapping it closes the menu.
             onToggle = composerHost::dismissComposerKeyboard,
         ) {
@@ -249,9 +264,12 @@ fun SessionView(
                         .padding(bottom = if (onCatchUpOpen == null) 0.dp else CATCH_UP_COMPOSER_CLEARANCE.dp)
                         // The readable column (iOS `readableColumn()`): 720 wide at most.
                         .widthIn(max = TranscriptMetrics.readableColumnWidth)
-                        .onSizeChanged { scrollEdgeBridge.composerHeight = with(density) { it.height.toDp().value } },
+                        .onSizeChanged { scrollEdgeBridge.composerHeight = with(density) { it.height.toDp().value } }
+                        // A floating call rests above the composer.
+                        .then(if (floatsCall) Modifier.floatingCallComposer() else Modifier),
                 ) {
-                    SessionComposer(store)
+                    SessionCallCards(callStore)
+                    SessionComposer(store, callStore = callStore)
                 }
                 RequestPanelRoomProbe(composerHost, Modifier.matchParentSize())
                 SessionModelPickerOverlays(store, modelPickerAnchors, headerHeight, composerHost.attachmentAnchors.composer)
@@ -279,6 +297,7 @@ private data class BackgroundWorkModel(
     val waitingSessionIDs: Set<String>,
     val probe: ShellGlyphProbe?,
     val inCall: Boolean,
+    val showsCallTranscript: Boolean,
 ) {
     companion object {
         fun from(state: State) = BackgroundWorkModel(
@@ -287,8 +306,9 @@ private data class BackgroundWorkModel(
             shells = state.backgroundShells,
             waitingSessionIDs = state.waitingSessionIDs,
             probe = state.shellGlyphProbe,
-            // The call takes the composer's place while it shows its bar (not a failure card).
-            inCall = state.voice?.let { !it.phase.showsCard } ?: false,
+            // A call takes the composer's place; its transcript covers the pills.
+            inCall = state.voice != null,
+            showsCallTranscript = state.voice?.showsCaptions == true,
         )
     }
 }
@@ -307,6 +327,8 @@ private fun SessionLifecycle(store: StoreOf<State, Action>) {
     // Keyed by visit and session: the drawer swaps the screen in place, a draft opened from another
     // draft starts a fresh task, and a draft becoming its own session continues the one it started.
     LaunchedEffect(taskIdentity) { store.send(Action.Task) }
+    // A held mic's bar shows its scope at once.
+    LaunchedEffect(Unit) { DotScopeRenderer.prepare() }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     val currentStore by rememberUpdatedState(store)

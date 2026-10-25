@@ -1,5 +1,9 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.dependencies.dependency
+import ai.opencode.feature.voice.FloatingCallCenter
+import ai.opencode.feature.voice.floatingCallButton
+
 import ai.opencode.feature.composer.MicPressCallbacks
 import ai.opencode.feature.composer.RequestBar
 import ai.opencode.core.motion.Motion
@@ -380,7 +384,7 @@ internal fun SessionComposerEnv.TrailingButton(control: ComposerTrailingControl)
     }
     val label: @Composable () -> Unit = {
         ComposerControlLabel(
-            systemImage = control.symbolName,
+            systemImage = if (control == ComposerTrailingControl.Call && floatsCall) "phone.fill" else control.symbolName,
             showsProgress = s.isWaitingForUploads || (control == ComposerTrailingControl.Stop && s.isInterrupting),
             foreground = control.foreground(),
             background = control.background(),
@@ -428,9 +432,15 @@ internal fun SessionComposerEnv.TrailingButton(control: ComposerTrailingControl)
                         role = Role.Button,
                     ) {
                         // Only ever starts a call; End is the call bar's.
-                        if (!s.hasCall) store.send(Action.VoiceTapped)
+                        if (floatsCall) {
+                            val center = dependency(FloatingCallCenter)
+                            center.breakoutFrom = center.callButton
+                        }
+                        if (!hasCall) store.send(Action.VoiceTapped)
                     }
                     .openCodeTapTarget(accessibility = false)
+                    // Where a floating call breaks out of: the circle, in window space.
+                    .then(if (floatsCall) Modifier.floatingCallButton() else Modifier)
                     .then(semantics),
                 contentAlignment = Alignment.Center,
             ) { label() }

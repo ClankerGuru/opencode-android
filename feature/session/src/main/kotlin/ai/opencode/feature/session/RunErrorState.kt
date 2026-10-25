@@ -10,7 +10,7 @@ import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.feature.transcript.TranscriptEntry
 import ai.opencode.feature.transcript.rows.RunErrorState as TranscriptRunErrorState
-import ai.opencode.feature.session.seams.VoiceHandoff
+import ai.opencode.feature.voice.VoiceHandoff
 import ai.opencode.server.model.OpenCodeImageAttachment
 import ai.opencode.server.model.OpenCodeOutgoingAttachment
 import ai.opencode.server.model.OpenCodePromptSource

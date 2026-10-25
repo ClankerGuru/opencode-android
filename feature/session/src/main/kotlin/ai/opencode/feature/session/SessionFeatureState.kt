@@ -17,9 +17,9 @@ import ai.opencode.feature.composer.SharedComposerDraft
 import ai.opencode.feature.composer.SharedLocation
 import ai.opencode.feature.transcript.TranscriptEntry
 import ai.opencode.feature.transcript.TranscriptSubagent
-import ai.opencode.feature.session.seams.VoiceBroker
-import ai.opencode.feature.session.seams.VoiceFeature
-import ai.opencode.feature.session.seams.VoiceRoute
+import ai.opencode.feature.voice.VoiceBroker
+import ai.opencode.feature.voice.VoiceFeature
+import ai.opencode.feature.voice.VoiceRoute
 import ai.opencode.server.model.OpenCodeDelivery
 import ai.opencode.server.model.OpenCodeFormRequest
 import ai.opencode.server.model.OpenCodeFormValue
@@ -495,7 +495,7 @@ val State.voiceRoute: VoiceRoute
             serverVoice = ExperimentalFeature.serverVoice.isActive(serverVoiceExperiment.value),
             choice = voiceServer.value,
             connected = server,
-            saved = { VoiceFeature.State.savedServers },
+            saved = { VoiceFeature.savedServers },
         )
         return VoiceRoute.resolve(
             selectedEngine = voiceEngine.value,

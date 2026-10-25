@@ -8,8 +8,7 @@ import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.cancellable
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.CancelID
-import ai.opencode.feature.session.seams.VoiceDraftSessionCreated
-import ai.opencode.feature.session.seams.isOnDraft
+import ai.opencode.feature.voice.VoiceFeature
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeDelivery
@@ -140,7 +139,7 @@ private fun SessionFeature.sessionCreated(
         undeliveredPrompts.keep(failed.pending, reason = failed.reason, serverKey = s.server.persistenceID, sessionID = session.id)
     }
     // A call on the draft moves onto its session, as if it started there.
-    val call: Effect<Action> = if (s.voice?.isOnDraft == true) Effect.send(Action.voicePresented(VoiceDraftSessionCreated(session))) else Effect.none()
+    val call: Effect<Action> = if (s.voice?.isOnDraft == true) Effect.send(Action.voicePresented(VoiceFeature.Action.DraftSessionCreated(session))) else Effect.none()
     val pending = startPendingWork(s, attempt = RequestDockFeature.State.LoadAttempt.Initial)
     return Reduced(pending.state, Effect.merge(pending.effect, call))
 }

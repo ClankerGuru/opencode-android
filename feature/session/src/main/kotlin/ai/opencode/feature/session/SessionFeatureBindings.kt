@@ -16,9 +16,9 @@ import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.feature.composer.ComposerAutocompleteReducer
 import ai.opencode.feature.composer.DictationFeature
-import ai.opencode.feature.session.seams.DotScopeSimulation
+import ai.opencode.feature.voice.DotScopeSimulation
 import ai.opencode.feature.transcript.markdown.MarkdownQuote
-import ai.opencode.feature.session.seams.VoiceFeature
+import ai.opencode.feature.voice.VoiceFeature
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.model.OpenCodeProject
 import kotlin.time.Duration.Companion.seconds
@@ -208,29 +208,29 @@ private fun SessionFeature.reduceVoice(state: State, action: PresentationAction<
         val yielded = yieldDictation(state)
         return Reduced(yielded.state, Effect.merge(Effect.cancel(SessionFeature.CancelID.VoiceExit), yielded.effect))
     }
-    val delegate = (presented as? VoiceFeature.Action.Delegate)?.delegate ?: return Reduced(state)
+    val delegate = (presented as? VoiceFeature.Action.Delegate)?.action ?: return Reduced(state)
     return when (delegate) {
         // The call's first request on this draft created its session.
-        is VoiceFeature.Delegate.SessionCreated ->
+        is VoiceFeature.DelegateAction.SessionCreated ->
             if (state.session != null) Reduced(state) else Reduced(state, Effect.send(Action.SessionCreated(delegate.session)))
 
-        is VoiceFeature.Delegate.PromptAdmitted ->
+        is VoiceFeature.DelegateAction.PromptAdmitted ->
             if (state.session?.id != delegate.sessionID) Reduced(state)
             else Reduced(state, Effect.send(Action.VoicePromptAdmitted(delegate.sessionID)))
 
         // The delegator moved the screen; Home switches sessions, and the call follows.
-        is VoiceFeature.Delegate.OpenSession ->
+        is VoiceFeature.DelegateAction.OpenSession ->
             Reduced(state, Effect.send(Action.Delegate(SessionFeature.Delegate.OpenSession(delegate.session))))
 
-        is VoiceFeature.Delegate.SetPinned ->
+        is VoiceFeature.DelegateAction.SetPinned ->
             Reduced(state, Effect.send(Action.Delegate(SessionFeature.Delegate.SetPinned(delegate.session, delegate.pinned))))
 
-        is VoiceFeature.Delegate.OpenDraft ->
+        is VoiceFeature.DelegateAction.OpenDraft ->
             Reduced(state, Effect.send(Action.Delegate(SessionFeature.Delegate.OpenDraft(delegate.directory))))
 
         // The delegator already saved it on the server (a draft keeps it for its first send); only
         // the model button follows, and a pick waiting for the next send gives way to it.
-        is VoiceFeature.Delegate.ModelSwitched -> {
+        is VoiceFeature.DelegateAction.ModelSwitched -> {
             val sessionID = delegate.sessionID
             if (sessionID != state.session?.id) {
                 // A family member off screen: its pick gives way too.
@@ -253,17 +253,20 @@ private fun SessionFeature.reduceVoice(state: State, action: PresentationAction<
         }
 
         // A delegation applied the pick before its prompt, as a typed send would; one picked since still waits.
-        is VoiceFeature.Delegate.PendingModelApplied -> Reduced(state.modelApplied(delegate.model, delegate.sessionID))
+        is VoiceFeature.DelegateAction.PendingModelApplied -> Reduced(state.modelApplied(delegate.model, delegate.sessionID))
 
         // A session the call created couldn't take the draft's model: it waits here, shown on the
         // model button, for the next send.
-        is VoiceFeature.Delegate.PickWaiting ->
+        is VoiceFeature.DelegateAction.PickWaiting ->
             if (state.session?.id != delegate.sessionID) Reduced(state)
             else Reduced(state.copy(currentModel = delegate.model, pendingModel = delegate.model))
 
+        // Home answers Check API Key (it opens Settings); support changes are the call's own.
+        VoiceFeature.DelegateAction.CheckAPIKey, is VoiceFeature.DelegateAction.ServerVoiceSupportChanged -> Reduced(state)
+
         // A call hung up from its bar stays while the scope sweeps out, then the composer returns;
         // a dismissed failure was never showing the bar.
-        VoiceFeature.Delegate.Ended -> {
+        VoiceFeature.DelegateAction.Ended -> {
             if (state.voice?.phase != VoiceFeature.State.Phase.Ended) {
                 Reduced(state.copy(voice = null))
             } else {
@@ -305,10 +308,10 @@ private fun SessionFeature.startCall(state: State): Reduced<State, Action> {
         val yielded = yieldDictation(state)
         val stopped = yielded.state
         val active = if (stopped.isRunning) stopped.activeFamilySessionIDs + session.id else stopped.activeFamilySessionIDs
-        val voice = VoiceFeature.State.session(stopped.server, session).copy(
-            replyWatch = VoiceFeature.State.ReplyWatch(active),
+        val voice = VoiceFeature.State(stopped.server, session).let { it.copy(
+            replyWatch = it.replyWatch.copy(activeSessionIDs = active),
             viewing = stopped.browser.viewing,
-        )
+        ) }
         return Reduced(stopped.copy(voice = voice).syncVoiceTarget(), yielded.effect)
     }
     // On a draft the call starts at once and an empty session is created in the draft's project for
@@ -316,10 +319,10 @@ private fun SessionFeature.startCall(state: State): Reduced<State, Action> {
     val project = state.draftProject ?: return Reduced(state.openProjectPicker())
     val yielded = yieldDictation(state)
     var next = yielded.state
-    val voice = VoiceFeature.State.draft(next.server, project.directory, next.currentModel).copy(
-        replyWatch = VoiceFeature.State.ReplyWatch(next.activeFamilySessionIDs),
+    val voice = VoiceFeature.State(next.server, project.directory, next.currentModel).let { it.copy(
+        replyWatch = it.replyWatch.copy(activeSessionIDs = next.activeFamilySessionIDs),
         viewing = next.browser.viewing,
-    )
+    ) }
     next = next.copy(voice = voice)
     if (!next.canChooseProject) return Reduced(next, yielded.effect)
     val sessionID = serverID.sessionID()

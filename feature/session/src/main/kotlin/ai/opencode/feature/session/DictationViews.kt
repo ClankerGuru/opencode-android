@@ -10,7 +10,9 @@ import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.openCodeTapTarget
-import ai.opencode.feature.session.seams.DictationDotScope
+import ai.opencode.feature.voice.DotScopeLevelSource
+import ai.opencode.feature.voice.DotScopeMode
+import ai.opencode.feature.voice.DotScopeView
 import ai.opencode.feature.composer.DictationFeature
 import ai.opencode.feature.composer.DictationLatency
 import ai.opencode.feature.composer.DictationLevels
@@ -293,10 +295,9 @@ fun DictationScopeBar(
             .heightIn(min = 48.dp)
             .onSizeChanged { width = it.width / density.density },
     ) {
-        DictationDotScope(
-            leadingInset = leadingInset,
-            trailingInset = trailingInset,
-            modifier = Modifier.matchParentSize().padding(horizontal = 0.dp).alpha(scopeAlpha).clearAndSetSemantics { },
+        DotScopeView(
+            mode = DotScopeMode.Dictation(leadingInset, trailingInset, DictationLevelSource),
+            modifier = Modifier.matchParentSize().alpha(scopeAlpha),
         )
         Row(Modifier.matchParentSize(), verticalAlignment = Alignment.CenterVertically) {
             // The composer's × beneath takes these touches.
@@ -608,3 +609,6 @@ class DictationLevelFollower {
         return value
     }
 }
+
+/** iOS `DictationLevels.shared.level`, read by the dictation bar's scope once per frame. */
+private val DictationLevelSource = DotScopeLevelSource { DictationLevels.level }

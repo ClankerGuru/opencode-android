@@ -14,8 +14,6 @@ import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.feature.composer.ComposerAutocompleteState
 import ai.opencode.feature.composer.modelpicker.ModelLevelScale
 import ai.opencode.feature.composer.modelpicker.ModelSearch
-import ai.opencode.feature.session.seams.isTerminal
-import ai.opencode.feature.session.seams.moveDraft
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.model.OpenCodeModel
 import ai.opencode.server.model.OpenCodeModelRef

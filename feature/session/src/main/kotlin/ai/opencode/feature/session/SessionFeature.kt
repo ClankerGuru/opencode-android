@@ -53,8 +53,8 @@ import ai.opencode.feature.composer.SharedDraftTarget
 import ai.opencode.feature.composer.SharedLocation
 import ai.opencode.feature.composer.LocationClientError
 import ai.opencode.feature.media.UniversalLinkClient
-import ai.opencode.feature.session.seams.VoiceFeature
-import ai.opencode.feature.session.seams.VoiceServerChoice
+import ai.opencode.feature.voice.VoiceFeature
+import ai.opencode.feature.voice.VoiceServerChoice
 import ai.opencode.feature.media.VoiceViewingPage
 import ai.opencode.feature.voice.ServerVoiceProvider
 import ai.opencode.feature.voice.ServerVoiceSupport
@@ -305,7 +305,7 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         val voiceEngine: Shared<VoiceEngine> = shared(VoiceSharedKeys.voiceEngine),
         val serverVoiceExperiment: Shared<Boolean> = shared(ExperimentalFeature.serverVoice.key),
         val serverVoiceProvider: Shared<ServerVoiceProvider> = shared(VoiceSharedKeys.serverVoiceProvider),
-        val voiceServer: Shared<VoiceServerChoice> = shared(VoiceServerChoice.key),
+        val voiceServer: Shared<VoiceServerChoice> = shared(VoiceSharedKeys.voiceServerChoice),
         val serverVoiceSupportByServer: Shared<Map<String, ServerVoiceSupport>> = shared(VoiceSharedKeys.serverVoiceSupportByServer),
         val uploadUnsupportedServerIDs: Shared<Set<String>> = shared(SharedKeys.uploadUnsupportedServerIDs),
         val returnKeySends: Shared<Boolean> = shared(SharedKeys.returnKeySends),
