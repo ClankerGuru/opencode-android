@@ -12,6 +12,8 @@ dependencies {
     api(project(":feature:media"))
     api(project(":feature:voice"))
     implementation(libs.coil.compose)
+    // Activity-result launchers for the Photos/Files pickers and the mic, camera and location prompts.
+    implementation(libs.androidx.activity.compose)
     implementation(libs.camerax.core)
     implementation(libs.camerax.camera2)
     implementation(libs.camerax.lifecycle)

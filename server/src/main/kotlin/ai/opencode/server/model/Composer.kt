@@ -425,3 +425,15 @@ internal object OpenCodeAutocompleteAgentSerializer : ElementSerializer<OpenCode
         })
     },
 )
+
+/**
+ * What a send asks of the in-app browser's open page (iOS `PageShareRequest`,
+ * `Browser/BrowserFeature.swift`). Here because the composer's `PendingPrompt` carries it
+ * and `:feature:composer` sits beside, not above, the browser's module.
+ */
+data class PageShareRequest(
+    val pageID: java.util.UUID,
+    val url: String,
+    val title: String,
+    val includesScreenshot: Boolean,
+)

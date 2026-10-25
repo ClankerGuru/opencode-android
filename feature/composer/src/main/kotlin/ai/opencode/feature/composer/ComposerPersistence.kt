@@ -1,0 +1,108 @@
+package ai.opencode.feature.composer
+
+import ai.opencode.core.dependencies.AppContext
+import ai.opencode.core.dependencies.DependencyKey
+import ai.opencode.core.dependencies.dependency
+import ai.opencode.server.model.OpenCodeDelivery
+import ai.opencode.server.model.OpenCodeProject
+import ai.opencode.server.model.OpenCodeSession
+import java.io.File
+import java.time.Instant
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+
+/**
+ * Typed drafts, unsent outbox lanes and failed sends that outlive the process (iOS
+ * `ComposerPersistence`, `Composer/ComposerPersistence.swift`), keyed by server persistence ID
+ * and session ID (null: the New Session draft).
+ *
+ * Typing is debounced (500 ms) off the main path and written at once by [flush] (the app
+ * backgrounding). Inline attachments (images, Pasted Text) are stored as blobs beside the
+ * state; uploaded files keep only their server path, and staged files still uploading stay in
+ * memory across in-process session switches. Entries untouched for 30 days, and every entry
+ * of a deleted session ([removeSession]) or server ([removeServer]), are removed with their
+ * blobs. Draft text is never logged.
+ *
+ * The session and drawer areas own the iOS `SessionFeature`/`HomeFeature` extensions in the
+ * same Swift file; their logic is in `ComposerPersistenceIntegration.kt` as plain functions.
+ */
+class ComposerPersistence(
+    val identity: String = "",
+    val loadDraft: (serverID: String, sessionID: String?) -> RestoredComposerDraft? = { _, _ -> null },
+    val scheduleDraft: (serverID: String, sessionID: String?, project: OpenCodeProject?, draft: DraftState) -> Unit = { _, _, _, _ -> },
+    val clearDraft: (serverID: String, sessionID: String?, discardFiles: Boolean) -> Unit = { _, _, _ -> },
+    val draftSessionIDs: (serverID: String) -> List<String> = { emptyList() },
+    val sharedDrafts: (serverID: String) -> Map<SharedDraftTarget, SharedComposerDraft> = { emptyMap() },
+    val sharedDraft: (serverID: String, sessionID: String?) -> SharedComposerDraft? = { _, _ -> null },
+    val sharedDraftForAppend: (serverID: String, sessionID: String?, isLiveOnScreen: Boolean) -> SharedComposerDraft = { _, _, _ -> SharedComposerDraft() },
+    val setSharedDraft: (serverID: String, sessionID: String?, project: OpenCodeProject?, shared: SharedComposerDraft?) -> Unit = { _, _, _, _ -> },
+    val takeSharedDraft: (serverID: String, sessionID: String?) -> SharedComposerDraft? = { _, _ -> null },
+    val parkDraft: (serverID: String, sessionID: String?, project: OpenCodeProject?, composer: DraftState) -> Unit = { _, _, _, _ -> },
+    val loadOutbox: (serverID: String, sessionID: String?) -> List<RestoredOutboxEntry> = { _, _ -> emptyList() },
+    val recordOutbox: (
+        serverID: String,
+        sessionID: String?,
+        draftID: String?,
+        directory: String?,
+        newSessionID: String,
+        createdSession: OpenCodeSession?,
+        pending: PendingPrompt,
+        isHeld: Boolean,
+        backgroundKey: String?,
+    ) -> Unit = { _, _, _, _, _, _, _, _, _ -> },
+    val updateOutboxDelivery: (messageID: String, delivery: OpenCodeDelivery, backgroundKey: String?) -> Unit = { _, _, _ -> },
+    val noteDraftSessionCreated: (serverID: String, draftID: String?, session: OpenCodeSession) -> Unit = { _, _, _ -> },
+    val promoteDraftOutboxToSession: (serverID: String, draftID: String?, sessionID: String) -> Unit = { _, _, _ -> },
+    val loadUndelivered: (serverID: String, sessionID: String?) -> List<UndeliveredPrompts.Entry> = { _, _ -> emptyList() },
+    val markUndelivered: (pending: PendingPrompt, reason: String, serverID: String, sessionID: String?) -> Unit = { _, _, _, _ -> },
+    val settlePrompts: (messageIDs: Set<String>) -> Unit = {},
+    val removeSession: (serverID: String, sessionID: String?) -> Unit = { _, _ -> },
+    val removeServer: (serverID: String) -> Unit = {},
+    val flush: suspend () -> Unit = {},
+    val removeAll: () -> Unit = {},
+) {
+    companion object Key : DependencyKey<ComposerPersistence> {
+        /** `filesDir/support` (iOS Application Support/OpenCode), where `TranscriptCachePersistence` also writes. */
+        fun defaultDirectory(): File = File(dependency(AppContext).applicationContext.filesDir, "support")
+
+        override val liveValue: ComposerPersistence by lazy { make(ComposerPersistenceStorage.live(defaultDirectory())) }
+
+        override val testValue: ComposerPersistence get() = inMemory()
+
+        fun inMemory(debounce: Duration = 500.milliseconds, now: () -> Instant = { Instant.now() }): ComposerPersistence =
+            make(ComposerPersistenceStorage.inMemory(), debounce, now)
+
+        fun make(
+            storage: ComposerPersistenceStorage,
+            debounce: Duration = 500.milliseconds,
+            now: () -> Instant = { Instant.now() },
+        ): ComposerPersistence {
+            val writer = ComposerPersistenceWriter(storage, debounce, now)
+            return ComposerPersistence(
+                identity = storage.identity,
+                loadDraft = writer::loadDraft,
+                scheduleDraft = writer::scheduleDraft,
+                clearDraft = { serverID, sessionID, _ -> writer.clearDraft(serverID, sessionID) },
+                draftSessionIDs = writer::draftSessionIDs,
+                sharedDrafts = writer::sharedDrafts,
+                sharedDraft = writer::sharedDraft,
+                sharedDraftForAppend = writer::sharedDraftForAppend,
+                setSharedDraft = writer::setSharedDraft,
+                takeSharedDraft = writer::takeSharedDraft,
+                parkDraft = writer::parkDraft,
+                loadOutbox = writer::loadOutbox,
+                recordOutbox = writer::recordOutbox,
+                updateOutboxDelivery = writer::updateOutboxDelivery,
+                noteDraftSessionCreated = writer::noteDraftSessionCreated,
+                promoteDraftOutboxToSession = writer::promoteDraftOutboxToSession,
+                loadUndelivered = writer::loadUndelivered,
+                markUndelivered = writer::markUndelivered,
+                settlePrompts = writer::settlePrompts,
+                removeSession = writer::removeSession,
+                removeServer = writer::removeServer,
+                flush = { writer.flush() },
+                removeAll = writer::removeAll,
+            )
+        }
+    }
+}
