@@ -13,6 +13,8 @@ import ai.opencode.core.ui.OpenCodeIconSize
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.core.ui.ThemeSharedKeys
+import ai.opencode.core.sharing.shared
 import ai.opencode.core.ui.openCodeTapTarget
 import android.Manifest
 import android.content.Context
@@ -32,7 +34,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -79,6 +80,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.callbackFlow
@@ -96,6 +98,7 @@ import java.time.Instant
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Locale
+import kotlin.math.roundToInt
 
 /**
  * A location shared from the composer's + menu: one fix and its nearest address. It
@@ -215,8 +218,9 @@ sealed class LocationClientError(message: String) : Exception(message) {
  * - Android asks for permission from an Activity, so the live client awaits the prompt the
  *   screen installs with [LocationPermissionPrompt.install] (iOS asks inside `CLServiceSession`
  *   the first time).
- * - There is no MapKit: [snapshot] and [cachedSnapshot] are kept as seams for a static map
- *   provider, and live returns `null`, so the card draws its neutral map tile and pin.
+ * - There is no MapKit: live [snapshot] composes OpenStreetMap tiles into the same 600 m region
+ *   MapKit's snapshotter draws ([SharedLocationSnapshots]), cached in memory per place, size
+ *   and appearance (tiles on disk), and [cachedSnapshot] reads that cache.
  * - [openSettings] opens the app's system settings page (iOS `openURL(openSettingsURLString)`).
  */
 class LocationClient(
@@ -246,16 +250,23 @@ class LocationClient(
 
         override val liveValue: LocationClient by lazy {
             val context = dependency(AppContext).applicationContext
+            val snapshots = SharedLocationSnapshots(context)
+            val scale = { context.resources.displayMetrics.density }
             LocationClient(
                 current = { LiveLocation.current(context) },
+                snapshot = { location, size, dark -> snapshots.image(location, size, scale(), dark) },
+                cachedSnapshot = { location, size, dark -> snapshots.cachedImage(location, size, scale(), dark) },
                 compactSnapshotTraits = {
                     val metrics = context.resources.displayMetrics
                     val size = IntSize(
-                        (SharedLocationCard.compactWidth.value * metrics.density).toInt(),
-                        (SharedLocationCard.compactMapHeight.value * metrics.density).toInt(),
+                        // As the card's map measures itself (`roundToPx`), so the prefetch lands in its cache key.
+                        (SharedLocationCard.compactWidth.value * metrics.density).roundToInt(),
+                        (SharedLocationCard.compactMapHeight.value * metrics.density).roundToInt(),
                     )
+                    // iOS reads the key window's style, which follows the app's Appearance override.
                     val night = context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
-                    size to (night == Configuration.UI_MODE_NIGHT_YES)
+                    val appearance = shared(ThemeSharedKeys.appearanceColorScheme).value
+                    size to appearance.resolveIsDark(night == Configuration.UI_MODE_NIGHT_YES)
                 },
                 openSettings = {
                     withContext(Dispatchers.Main) {
@@ -427,8 +438,8 @@ private object LiveLocation {
  * A shared location in the transcript and the composer: a map with a pin, the place or
  * address, and the coordinates. A tap opens it in Maps ([onOpen] gets [SharedLocation.mapsURL]).
  *
- * No MapKit on Android: the map is a neutral tile with the pin unless [LocationClient.snapshot]
- * provides an image.
+ * The map is [LocationClient.snapshot]'s OpenStreetMap still (credited on the map), over a
+ * neutral tile with the pin until it lands.
  */
 object SharedLocationCard {
     val compactWidth: Dp = 220.dp
@@ -518,11 +529,11 @@ fun SharedLocationCard(
 private val SystemBlue = Color(0xFF0A84FF)
 private val SystemRed = Color(0xFFFF3B30)
 
-/** A still map of the spot, rendered once per place and size and cached; neutral without a provider. */
+/** A still map of the spot, rendered once per place and size and cached, credited to OpenStreetMap's contributors. */
 @Composable
 private fun SharedLocationMap(location: SharedLocation, modifier: Modifier = Modifier) {
     val client = remember { dependency(LocationClient) }
-    val dark = isSystemInDarkTheme()
+    val dark = OpenCodeTheme.colors.isDark
     BoxWithConstraints(modifier.background(MaterialTheme.colorScheme.surfaceContainerHighest), contentAlignment = Alignment.Center) {
         val density = LocalDensity.current
         val size = with(density) { IntSize(maxWidth.roundToPx(), maxHeight.roundToPx()) }
@@ -539,6 +550,21 @@ private fun SharedLocationMap(location: SharedLocation, modifier: Modifier = Mod
             Image(it, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().alpha(shown))
         }
         MapPin()
+        if (image != null) {
+            // The tile licence's attribution (ODbL), on the map it credits.
+            Text(
+                "© OpenStreetMap contributors",
+                style = OpenCodeTextStyles.caption2.copy(fontSize = 8.sp, lineHeight = 10.sp),
+                color = OpenCodeTheme.colors.secondaryText,
+                maxLines = 1,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .alpha(shown)
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f), RoundedCornerShape(topStart = 4.dp))
+                    .padding(horizontal = 3.dp, vertical = 1.dp)
+                    .clearAndSetSemantics {},
+            )
+        }
     }
 }
 

@@ -234,7 +234,8 @@ fun AttachmentCameraView(
             }
             if (!showsControls && !camera.canCapture) {
                 Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHighest), contentAlignment = Alignment.Center) {
-                    OpenCodeIcon(SFSymbol.Camera, contentDescription = null, size = 28.dp, tint = MaterialTheme.colorScheme.onSurface)
+                    // iOS `.font(.title2)`.
+                    OpenCodeIcon(SFSymbol.Camera, contentDescription = null, size = 22.dp, tint = MaterialTheme.colorScheme.onSurface)
                 }
             }
         }
@@ -400,8 +401,8 @@ fun AttachmentCameraControls(
                 Spacer(Modifier.weight(1f))
                 AnimatedVisibility(
                     visible = isFocusLocked,
-                    enter = fadeIn(tween(200)),
-                    exit = fadeOut(tween(200)),
+                    enter = fadeIn(Motion.easeOut(0.2)),
+                    exit = fadeOut(Motion.easeOut(0.2)),
                 ) {
                     Text(
                         "AE/AF Lock",
@@ -495,7 +496,8 @@ private fun CameraCircleButton(
             },
         contentAlignment = Alignment.Center,
     ) {
-        OpenCodeIcon(symbol, contentDescription = null, size = 22.dp, tint = tint)
+        // iOS `.font(.system(size: 20))`.
+        OpenCodeIcon(symbol, contentDescription = null, size = 20.dp, tint = tint)
     }
 }
 
@@ -523,7 +525,8 @@ private fun AttachmentLensPicker(
             val isActive = preset == active
             val side by animateFloatAsState(
                 targetValue = if (isActive) 38f else 30f,
-                animationSpec = if (reduceMotion) tween(0) else MotionSpring(0.2, 0.0).spec(),
+                // SwiftUI `.snappy(duration: 0.2)`: bounce 0.15.
+                animationSpec = if (reduceMotion) tween(0) else MotionSpring(0.2, 0.15).spec(),
                 label = "lens-side",
             )
             Box(

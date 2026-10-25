@@ -61,6 +61,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -99,6 +100,7 @@ fun PastedTextCard(
             .semantics {
                 contentDescription = PastedText.NAME
                 stateDescription = summary.summary
+                testTag = "pasted-text-card"
             }
             .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
@@ -188,7 +190,7 @@ fun PastedTextViewer(
         if (document == null) document = withContext(Dispatchers.Default) { PastedTextDocument.make(text, summary.opensAsPlainText) }
     }
     Scaffold(
-        modifier = modifier,
+        modifier = modifier.semantics { testTag = "pasted-text-viewer" },
         containerColor = OpenCodeTheme.colors.canvas,
         topBar = {
             CenterAlignedTopAppBar(
@@ -203,7 +205,7 @@ fun PastedTextViewer(
                     }
                 },
                 navigationIcon = {
-                    TextButton(onClick = onDone) { Text("Done") }
+                    TextButton(onClick = onDone, modifier = Modifier.semantics { testTag = "pasted-text-done" }) { Text("Done") }
                 },
                 actions = {
                     if (!summary.opensAsPlainText) {
@@ -214,11 +216,14 @@ fun PastedTextViewer(
                             )
                         }
                     }
-                    IconButton(onClick = {
-                        copyPresses += 1
-                        onCopy(text)
-                        copied = true
-                    }) {
+                    IconButton(
+                        onClick = {
+                            copyPresses += 1
+                            onCopy(text)
+                            copied = true
+                        },
+                        modifier = Modifier.semantics { testTag = "pasted-text-copy" },
+                    ) {
                         OpenCodeIcon(
                             if (copied) SFSymbol.Checkmark else SFSymbol.DocOnDoc,
                             contentDescription = if (copied) "Copied" else "Copy",
@@ -235,7 +240,7 @@ fun PastedTextViewer(
         Box(Modifier.fillMaxSize().padding(padding)) {
             when {
                 current == null -> CircularProgressIndicator(Modifier.align(Alignment.Center))
-                summary.opensAsPlainText -> PlainTextContent(current)
+                summary.opensAsPlainText -> Box(Modifier.semantics { testTag = "pasted-text-plain" }) { PlainTextContent(current) }
                 else -> NumberedTextContent(current, wrapsLines)
             }
         }

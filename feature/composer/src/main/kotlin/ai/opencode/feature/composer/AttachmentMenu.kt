@@ -4,17 +4,27 @@ import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeIcon
-import ai.opencode.core.ui.OpenCodeIconButton
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.openCodeTapTarget
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.snap
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector4D
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.TwoWayConverter
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -49,6 +59,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -206,8 +217,8 @@ object PlusMenuTunables {
 }
 
 /**
- * Media kinds the inline picker can narrow to (iOS `InlinePhotoFilter`). Android's system
- * photo picker has no Screenshots filter; a grid that reads `MediaStore` itself can apply it.
+ * Media kinds the inline picker can narrow to (iOS `InlinePhotoFilter`; `PHPickerFilter.images`,
+ * `.videos`, `.screenshots` map to [InlinePhotoLibraryClient]'s `MediaStore` queries).
  */
 enum class InlinePhotoFilter(val title: String, val systemImage: SFSymbol) {
     All("All Photos", SFSymbol.PhotoOnRectangle),
@@ -291,7 +302,7 @@ private val AttachmentMenuRowHighlightRadius: Dp = AttachmentMenuMetrics.cornerR
 private fun AttachmentMenuRowLabel(item: AttachmentMenuItem, iconWidth: Dp, inset: Dp, height: Dp, isLit: Boolean) {
     val lit by animateFloatAsState(
         if (isLit) 1f else 0f,
-        tween(if (isLit) 80 else 200, easing = Motion.EaseInOut),
+        MotionSpring(if (isLit) 0.08 else 0.2).spec(),
         label = "menu-row-highlight",
     )
     Row(
@@ -346,21 +357,27 @@ fun Modifier.menuRowEntranceReveal(progress: Float, bottomIndex: Int, totalCount
  * always above the composer, so the + (a × while it's open) stays visible and the composer and
  * transcript never move (iOS `AttachmentMenuOverlay`). Closed, nothing is drawn. Opening grows
  * the surface up out of a seed just above the + into the menu; Photos grows it on into the
- * card, which frames [photoGrid]; Back shrinks it onto the menu and closing shrinks it into the
- * seed. Liquid Glass maps to a tonal Material surface. Under Reduce Motion the menu and the
- * card cross-fade in place.
+ * card, which frames the inline photo picker; Back shrinks it onto the menu and closing shrinks
+ * it into the seed. Liquid Glass maps to a tonal Material surface. Under Reduce Motion the menu
+ * and the card cross-fade in place.
  *
- * Android has no inline system photo picker to frame: [photoGrid] supplies the card's grid
- * (for example the New Plus Menu's `PhotoLibraryClient` grid). When the session has none, it
- * launches the system picker for Photos instead of opening the card ([ComposerPickers]).
+ * The picker: iOS frames the inline system `PhotosPicker`; Android has no inline system picker
+ * with a Screenshots filter, so the card frames [InlinePhotoPicker] (a `MediaStore` grid read
+ * through [PhotoLibraryClient] / [InlinePhotoLibraryClient]) bound to [selection], which the
+ * session mirrors onto attachments as iOS's `syncPickedPhotos` does. It mounts as soon as the
+ * menu opens (parked out of sight, unreachable by touch and TalkBack) so the card shows a
+ * loaded grid, stands at its final frame on the card while the surface resizes around it
+ * (clipped to the surface's inside), and dissolves in and out under a cover of the card's
+ * colour, as iOS's picker does. [photoGrid], when given, replaces the built-in grid.
  *
- * Put this in a full-screen box over the session; it positions itself from [anchors]. The
- * session pairs it with [AttachmentMenuDismissArea] and handles system Back (iOS's escape
- * action) by closing it.
+ * Put this in a full-screen box over the session; it positions itself from [anchors]. System
+ * Back (iOS's escape action) closes it; the session pairs it with [AttachmentMenuDismissArea].
  *
  * @param onPhaseChange the overlay's own Back, drag-dismiss and outside dismissals.
  * @param identity the session screen's identity, so lingering exit layers never bleed into
  *   another session or draft.
+ * @param selection the picker's continuous selection (iOS `@Bindable var selection`); without
+ *   one the card keeps a local selection nothing reads.
  */
 @Composable
 fun AttachmentMenuOverlay(
@@ -374,15 +391,16 @@ fun AttachmentMenuOverlay(
     onChoose: (AttachmentMenuItem) -> Unit,
     onPaste: () -> Unit,
     modifier: Modifier = Modifier,
-    /** The card's grid, below its controls; `null` keeps the card empty. */
+    /** Replaces the card's built-in grid, below its controls. */
     photoGrid: (@Composable (filter: InlinePhotoFilter, modifier: Modifier) -> Unit)? = null,
-    /** New Plus Menu: Photos opens the plus-menu sheet instead of this card's grid. */
+    /** New Plus Menu: Photos opens the plus-menu sheet instead of this card's picker, which is never mounted. */
     usesSystemPicker: Boolean = true,
     /** New Plus Menu: the menu grows out of the + itself and stands over the composer and the keyboard's top. */
     overComposer: Boolean = false,
     /** The photo sheet has taken the menu's place: the menu's surface gives way and its rows blur out. */
     handedOff: Boolean = false,
     identity: Any = 0,
+    selection: InlinePhotoSelection? = null,
 ) {
     val reduceMotion = rememberReduceMotion()
     val density = LocalDensity.current
@@ -391,12 +409,15 @@ fun AttachmentMenuOverlay(
     var linger by remember { mutableStateOf(AttachmentMenuLinger()) }
     var rowsSize by remember { mutableStateOf(Size.Zero) }
     val rowFrames = remember { mutableStateMapOf<AttachmentMenuItem, Rect>() }
-    var dragOffset by remember { mutableStateOf(0f) }
+    var dragOffset by remember { mutableFloatStateOf(0f) }
     /** A drag that carries the menu also carries a row under the finger; its release must not count as a tap. */
     var isDragging by remember { mutableStateOf(false) }
     var origin by remember { mutableStateOf(Offset.Zero) }
     var overlaySize by remember { mutableStateOf(Size.Zero) }
     var previousPhase by remember { mutableStateOf(phase) }
+    val library = remember { InlinePhotoLibrary() }
+    val localSelection = remember { InlinePhotoSelection() }
+    val pickerSelection = selection ?: localSelection
 
     // A new session or draft: nothing of the old one lingers.
     LaunchedEffect(identity) {
@@ -468,10 +489,11 @@ fun AttachmentMenuOverlay(
         val from = previousPhase
         previousPhase = phase
         val spec: FiniteAnimationSpec<Rect> = when {
-            from == phase -> if (reduceMotion) tween(0) else tween(300, easing = Motion.EaseInOut)
+            // Attachments and the keyboard move the composer; what stands on it follows.
+            from == phase -> MotionSpring(0.3).spec()
             phase == AttachmentMenuPhase.Closed -> AttachmentMenuMotion.close(reduceMotion, overComposer)
             from == AttachmentMenuPhase.Closed -> AttachmentMenuMotion.open(reduceMotion, overComposer)
-            // Back: the grid dissolves away, then the card shrinks back onto the menu.
+            // Back: the picker dissolves away, then the card shrinks back onto the menu.
             phase == AttachmentMenuPhase.Menu -> AttachmentMenuMotion.morph(reduceMotion, if (reduceMotion) 0.0 else PickerDissolve.BACK_DELAY)
             else -> AttachmentMenuMotion.morph(reduceMotion)
         }
@@ -481,20 +503,30 @@ fun AttachmentMenuOverlay(
     // The seed is clear; the surface gathers as it grows.
     val surfaceAlpha by animateFloatAsState(
         if (isOpen) 1f else 0f,
-        if (isOpen) Motion.easeInOut(0.16) else Motion.easeInOut(0.22, delaySeconds = 0.1),
+        if (isOpen) MotionSpring(0.16).spec() else MotionSpring(0.22).animation(false, delaySeconds = 0.1),
         label = "attachment-surface-alpha",
     )
+    // The rows arrive once the surface has mostly grown, and leave first.
     val rowsAlpha by animateFloatAsState(
         if (phase == AttachmentMenuPhase.Closed) 0f else 1f,
-        if (phase == AttachmentMenuPhase.Closed) Motion.easeInOut(0.1) else Motion.easeInOut(0.22, delaySeconds = if (reduceMotion) 0.0 else 0.08),
+        if (phase == AttachmentMenuPhase.Closed) MotionSpring(0.1).spec() else MotionSpring(0.22).animation(false, delaySeconds = if (reduceMotion) 0.0 else 0.08),
         label = "attachment-rows-alpha",
     )
     val glassShown = isOpen || linger.glassLingers(identity)
     val showsRows = phase == AttachmentMenuPhase.Menu || (linger.rowsLinger(identity) && !reduceMotion)
-    val showsCard = phase == AttachmentMenuPhase.Photos || linger.keepsPickerDrawn(identity)
+    val keepsPickerDrawn = linger.keepsPickerDrawn(identity)
+    /** The picker mounts (parked) as soon as the menu opens, so it has loaded by the time it's chosen. */
+    val mountsPicker = usesSystemPicker && when (phase) {
+        AttachmentMenuPhase.Photos, AttachmentMenuPhase.Menu -> true
+        AttachmentMenuPhase.Closed -> keepsPickerDrawn
+    }
+    val showsCardControls = phase == AttachmentMenuPhase.Photos || keepsPickerDrawn
 
     fun dismiss() = onPhaseChange(AttachmentMenuPhase.Closed)
     fun back() = onPhaseChange(AttachmentMenuPhase.Menu)
+
+    // iOS's escape action (`accessibilityAction(.escape)`): Back closes the menu or the card.
+    BackHandler(enabled = isOpen && !handedOff && !overComposer) { dismiss() }
 
     val dragModifier = Modifier.pointerInput(isOpen) {
         if (!isOpen) return@pointerInput
@@ -507,7 +539,8 @@ fun AttachmentMenuOverlay(
                 tracker.resetTracking()
             },
             onDragEnd = {
-                isDragging = false
+                // Released after the row under the finger saw the up: it must not count as a tap.
+                scope.launch { isDragging = false }
                 val velocity = tracker.calculateVelocity().y
                 if (AttachmentMenuOverlay.dragDismisses(total.toDp().value, (total + velocity * 0.5f).toDp().value)) {
                     dismiss()
@@ -528,6 +561,9 @@ fun AttachmentMenuOverlay(
             change.consume()
         }
     }
+
+    /** The glass shape's current rect: seed, menu or card, carried by a drag while open (iOS `surfaceRect`). */
+    fun surfaceRect(): Rect = surface.value.translate(Offset(0f, if (isOpen) dragOffset else 0f))
 
     Box(
         modifier
@@ -561,48 +597,98 @@ fun AttachmentMenuOverlay(
                 AttachmentMenuPanel(
                     rect = frames.menu,
                     radius = AttachmentMenuMetrics.cornerRadius,
-                    modifier = Modifier.alpha(menuAlpha * (1 - handoff)).then(dragModifier),
+                    modifier = Modifier.alpha(menuAlpha * (1 - handoff)).then(if (handedOff) Modifier else dragModifier),
                     isModal = true,
+                    hidden = handedOff,
                 ) {
                     MenuRowsSlot(frames, items, buttonCenterX, press, isDragging, onChoose, onPaste, rowsAlpha = 1f, cardFade = 1f, handoff = handoff)
                 }
             }
             if (cardAlpha > 0f) {
-                AttachmentMenuPanel(rect = frames.card, radius = AttachmentMenuMetrics.cornerRadius, modifier = Modifier.alpha(cardAlpha).then(dragModifier)) {
-                    CardContent(frames.card, filter, { filter = it }, includesVideos, photoGrid, controlsAlpha = 1f, dragOffset = 0f, onBack = ::back)
-                }
+                AttachmentMenuPanel(
+                    rect = frames.card,
+                    radius = AttachmentMenuMetrics.cornerRadius,
+                    modifier = Modifier.alpha(cardAlpha).then(dragModifier),
+                    hidden = true,
+                ) {}
             }
         } else if (glassShown || isOpen) {
-            val rect = surface.value.translate(Offset(0f, if (isOpen) dragOffset else 0f))
-            val radius = if (isOpen) AttachmentMenuMetrics.cornerRadius else AttachmentMenuMetrics.seedSize / 2
             AttachmentMenuPanel(
-                rect = rect,
-                radius = radius,
+                rect = surfaceRect(),
+                radius = if (isOpen) AttachmentMenuMetrics.cornerRadius else AttachmentMenuMetrics.seedSize / 2,
                 modifier = Modifier
                     .alpha(surfaceAlpha * (1 - handoff))
                     .then(if (isOpen && !handedOff) dragModifier else Modifier),
                 isModal = showsRows && phase == AttachmentMenuPhase.Menu,
-                hidden = phase != AttachmentMenuPhase.Menu && phase != AttachmentMenuPhase.Photos || handedOff,
+                hidden = phase != AttachmentMenuPhase.Menu || handedOff,
             ) {
                 if (showsRows) {
                     MenuRowsSlot(
                         frames, items, buttonCenterX, press, isDragging, onChoose, onPaste,
                         rowsAlpha = rowsAlpha,
-                        // They fade out in place before the grid shows, and back in once it has gone.
+                        // They fade out in place before the picker shows, and back in once it has gone.
                         cardFade = morphFade(cardProgress, clear = PickerDissolve.SHOWS, shown = 0.05f),
                         handoff = handoff,
                     )
                 }
-                if (showsCard && usesSystemPicker) {
-                    CardContent(
-                        rect, filter, { filter = it }, includesVideos, photoGrid,
-                        controlsAlpha = morphFade(cardProgress, clear = 0.55f, shown = 1f),
-                        gridAlpha = PickerDissolve.gridOpacity(cardProgress),
-                        dragOffset = 0f,
-                        onBack = ::back,
+            }
+        }
+
+        if (mountsPicker) {
+            val visible = phase == AttachmentMenuPhase.Photos
+            // With Reduce Motion the card stays put and the picker simply fades.
+            val reducedAlpha by animateFloatAsState(
+                if (!reduceMotion || visible) 1f else 0f,
+                if (reduceMotion) MotionSpring(0.2).spec() else snap(),
+                label = "inline-picker-fade",
+            )
+            val window: () -> Rect = {
+                if (reduceMotion) frames.card.translate(Offset(0f, if (visible) dragOffset else 0f)) else surfaceRect()
+            }
+            InlinePickerLayer(
+                frames = frames,
+                window = window,
+                // Never translucent but under Reduce Motion: drawn or not, a cover above it does the dissolve.
+                opacity = { if (reduceMotion) reducedAlpha else PickerDissolve.pickerOpacity(cardProgress) },
+                dragOffset = { if (visible) dragOffset else 0f },
+                visible = visible,
+            ) {
+                if (photoGrid != null) {
+                    photoGrid(filter, Modifier.fillMaxSize())
+                } else {
+                    InlinePhotoPicker(
+                        library = library,
+                        selection = pickerSelection,
+                        filter = filter,
+                        includesVideos = includesVideos,
+                        isActive = visible,
+                        modifier = Modifier.fillMaxSize(),
                     )
                 }
             }
+            if (!reduceMotion) {
+                // The card's colour over the picker, fading out to dissolve it in and back in to dissolve it away.
+                PickerCover(
+                    frames = frames,
+                    window = ::surfaceRect,
+                    opacity = { PickerDissolve.coverOpacity(cardProgress) },
+                    dragOffset = { if (phase == AttachmentMenuPhase.Photos) dragOffset else 0f },
+                )
+            }
+        }
+
+        // Mounted only on the card or while it folds away.
+        if (showsCardControls) {
+            CardControls(
+                card = { if (reduceMotion) frames.card.translate(Offset(0f, dragOffset)) else surfaceRect() },
+                fade = { morphFade(cardProgress, clear = 0.55f, shown = 1f) },
+                interactive = phase == AttachmentMenuPhase.Photos,
+                reduceMotion = reduceMotion,
+                filter = filter,
+                onFilter = { filter = it },
+                includesVideos = includesVideos,
+                onBack = ::back,
+            )
         }
     }
 }
@@ -628,7 +714,7 @@ internal data class AttachmentMenuFrames(
     val seed: Rect,
     val menu: Rect,
     val card: Rect,
-    /** The grid's place inside the card, below its controls. */
+    /** The picker's place inside the card, below its controls. */
     val grid: Rect,
 )
 
@@ -674,6 +760,10 @@ internal fun attachmentMenuFrames(
     return AttachmentMenuFrames(button, seed, menu, card, grid)
 }
 
+/** The card's colour: what the cover fades in and out as (iOS `SystemPasteControl.glass`, the panel's opaque colour). */
+@Composable
+private fun panelColor(): androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.surfaceContainer
+
 @Composable
 private fun AttachmentMenuPanel(
     rect: Rect,
@@ -701,7 +791,7 @@ private fun AttachmentMenuPanel(
                 },
             ),
         shape = shape,
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        color = panelColor(),
         tonalElevation = 3.dp,
         shadowElevation = 6.dp,
     ) {
@@ -748,56 +838,172 @@ private fun MenuRowsSlot(
     }
 }
 
-/** Back and the filter along the card's top edge, then the grid. */
+/** A rounded rect in the overlay's coordinates, read at draw time (iOS `GlassClip`'s mask). */
+private class WindowShape(private val window: Rect, private val radius: Float) : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline =
+        if (window.isEmpty || window.width <= 0f || window.height <= 0f) Outline.Rectangle(Rect.Zero)
+        else Outline.Rounded(RoundRect(window, CornerRadius(radius)))
+}
+
+/**
+ * Clips a layer to the inside of the surface as it resizes, on the surface's own spring, so
+ * nothing shows past it (iOS `GlassClip`). Read in the layer block, so the surface's frames
+ * redraw only this layer.
+ */
+private fun Modifier.glassClip(window: () -> Rect): Modifier = graphicsLayer {
+    val inset = AttachmentMenuMetrics.cardInset.toPx()
+    val inside = window().deflate(inset)
+    clip = true
+    shape = WindowShape(if (inside.width > 0f && inside.height > 0f) inside else Rect.Zero, PickerDissolve.gridRadius.toPx())
+}
+
+/**
+ * The picker at its final frame on the card (iOS `picker(_:)`): parked out of sight while it
+ * isn't drawn, and while it shows but isn't the card's (folding away), it takes no touches and
+ * is hidden from TalkBack, so the menu's rows stay reachable.
+ */
 @Composable
-private fun CardContent(
-    card: Rect,
+private fun InlinePickerLayer(
+    frames: AttachmentMenuFrames,
+    window: () -> Rect,
+    opacity: () -> Float,
+    dragOffset: () -> Float,
+    visible: Boolean,
+    content: @Composable () -> Unit,
+) {
+    val density = LocalDensity.current
+    val grid = frames.grid
+    Box(Modifier.fillMaxSize().glassClip(window)) {
+        Box(
+            Modifier
+                .offset {
+                    // Waiting behind the menu, it parks below the screen; it parks and unparks unseen.
+                    val parked = if (!visible && opacity() == 0f) grid.bottom + grid.height + 200.dp.toPx() else 0f
+                    IntOffset(grid.left.roundToInt(), (grid.top + dragOffset() + parked).roundToInt())
+                }
+                .requiredSize(with(density) { grid.width.toDp() }, with(density) { grid.height.toDp() })
+                .graphicsLayer { alpha = opacity() }
+                .clip(RoundedCornerShape(PickerDissolve.gridRadius))
+                .background(OpenCodeTheme.colors.canvas)
+                .then(
+                    if (visible) Modifier.semantics { testTag = "inline-photo-picker" }
+                    else Modifier
+                        .clearAndSetSemantics {}
+                        .pointerInput(Unit) {
+                            awaitPointerEventScope {
+                                while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
+                            }
+                        },
+                ),
+        ) { content() }
+    }
+}
+
+/** The card's colour over the picker (iOS `pickerCover(_:)`). */
+@Composable
+private fun PickerCover(frames: AttachmentMenuFrames, window: () -> Rect, opacity: () -> Float, dragOffset: () -> Float) {
+    val density = LocalDensity.current
+    val grid = frames.grid
+    val color = panelColor()
+    Box(Modifier.fillMaxSize().glassClip(window).clearAndSetSemantics {}) {
+        Box(
+            Modifier
+                .offset { IntOffset(grid.left.roundToInt(), (grid.top + dragOffset()).roundToInt()) }
+                .requiredSize(with(density) { grid.width.toDp() }, with(density) { grid.height.toDp() })
+                .graphicsLayer { alpha = opacity() }
+                .background(color, RoundedCornerShape(PickerDissolve.gridRadius)),
+        )
+    }
+}
+
+/**
+ * Back and the filter along the card's top edge (iOS `cardControls(_:)`). They ride the
+ * surface's edge, show only near the card, and arrive once it has mostly grown; on the way back
+ * they fade with the morph. Only the card's take touches.
+ */
+@Composable
+private fun CardControls(
+    card: () -> Rect,
+    fade: () -> Float,
+    interactive: Boolean,
+    reduceMotion: Boolean,
     filter: InlinePhotoFilter,
     onFilter: (InlinePhotoFilter) -> Unit,
     includesVideos: Boolean,
-    photoGrid: (@Composable (InlinePhotoFilter, Modifier) -> Unit)?,
-    controlsAlpha: Float,
-    gridAlpha: Float = 1f,
-    dragOffset: Float,
     onBack: () -> Unit,
 ) {
     val inset = AttachmentMenuMetrics.cardInset
     val header = AttachmentMenuMetrics.cardHeaderHeight
-    Column(Modifier.fillMaxSize().padding(inset).offset { IntOffset(0, dragOffset.roundToInt()) }) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .height(header)
-                .graphicsLayer { alpha = controlsAlpha }
-                .semantics { isTraversalGroup = true },
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            OpenCodeIconButton(SFSymbol.ChevronLeft, contentDescription = "Back", onClick = onBack, size = header)
+    val arrival = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { arrival.animateTo(1f, MotionSpring(0.2).animation(false, delaySeconds = if (reduceMotion) 0.0 else 0.14)) }
+    val density = LocalDensity.current
+    val headerPx = with(density) { header.toPx() }
+    val insetPx = with(density) { inset.toPx() }
+    Box(
+        Modifier
+            .layout { measurable, constraints ->
+                val rect = card()
+                val width = max(rect.width, headerPx + insetPx * 2).roundToInt()
+                val height = (headerPx + insetPx * 2).roundToInt()
+                val placeable = measurable.measure(Constraints.fixed(width, height))
+                layout(constraints.maxWidth, constraints.maxHeight) {
+                    placeable.place((rect.center.x - width / 2f).roundToInt(), rect.top.roundToInt())
+                }
+            }
+            .graphicsLayer { alpha = fade() * arrival.value }
+            .then(if (interactive) Modifier.semantics { isTraversalGroup = true } else Modifier.clearAndSetSemantics {})
+            .padding(inset),
+    ) {
+        Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier
+                    .size(header)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest, CircleShape)
+                    .then(
+                        if (interactive) {
+                            Modifier
+                                .clickable(onClickLabel = "Returns to attachment options", role = Role.Button, onClick = onBack)
+                                .openCodeTapTarget(header)
+                        } else Modifier,
+                    )
+                    .semantics { contentDescription = "Back" },
+                contentAlignment = Alignment.Center,
+            ) {
+                OpenCodeIcon(SFSymbol.ChevronLeft, contentDescription = null, tint = OpenCodeTheme.colors.text)
+            }
             Spacer(Modifier.weight(1f).widthIn(min = 12.dp))
             var expanded by remember { mutableStateOf(false) }
+            if (!interactive && expanded) expanded = false
             Box {
-                Surface(
-                    onClick = { expanded = true },
-                    shape = RoundedCornerShape(percent = 50),
-                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                    modifier = Modifier
+                Row(
+                    Modifier
                         .heightIn(min = header)
-                        .semantics {
+                        .clip(RoundedCornerShape(percent = 50))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                        .then(
+                            if (interactive) {
+                                Modifier
+                                    .clickable(role = Role.DropdownList) { expanded = true }
+                                    .openCodeTapTarget(header)
+                            } else Modifier,
+                        )
+                        .semantics(mergeDescendants = true) {
                             contentDescription = "Show"
                             stateDescription = filter.title
                         }
-                        .openCodeTapTarget(header),
+                        .padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(
-                            filter.title,
-                            style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold),
-                            color = OpenCodeTheme.colors.text,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        OpenCodeIcon(SFSymbol.ChevronUpChevronDown, contentDescription = null, size = 14.dp, tint = OpenCodeTheme.colors.secondaryText)
-                    }
+                    Text(
+                        filter.title,
+                        style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold),
+                        color = OpenCodeTheme.colors.text,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.clearAndSetSemantics {},
+                    )
+                    OpenCodeIcon(SFSymbol.ChevronUpChevronDown, contentDescription = null, size = 14.dp, tint = OpenCodeTheme.colors.secondaryText)
                 }
                 DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                     for (option in InlinePhotoFilter.entries.filter { includesVideos || it != InlinePhotoFilter.Videos }) {
@@ -814,38 +1020,35 @@ private fun CardContent(
                 }
             }
         }
-        Spacer(Modifier.height(inset))
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .clip(RoundedCornerShape(PickerDissolve.gridRadius))
-                .graphicsLayer { alpha = gridAlpha }
-                .semantics { testTag = "inline-photo-picker" },
-        ) {
-            photoGrid?.invoke(filter, Modifier.fillMaxSize())
-        }
     }
 }
 
 /**
- * The grid's dissolve with the menu (iOS `PickerDissolve`). iOS covers its out-of-process picker
- * with a glass-coloured layer because the picker can't fade; a Compose grid can, so the cover
- * folds into [gridOpacity] (shown once the rows have faded at [SHOWS], fully by 0.96).
+ * The picker's cross-dissolve with the menu (iOS `PickerDissolve`). The picker stands at its
+ * final frame on the card while the surface resizes around it ([glassClip]), and its content
+ * cross-fades with the menu's rows. It is either drawn or not ([pickerOpacity]), under a cover
+ * of the card's colour that fades instead ([coverOpacity]): the cover gathers over the fading
+ * rows, the picker switches on beneath it once they're gone, and the cover clears to reveal it.
+ * The dissolve runs on its own clock: toward the card a little behind the surface's spring; on
+ * Back quickly, before the surface shrinks.
  */
 internal object PickerDissolve {
-    /** Where the rows have faded out and the grid shows. */
+    /** Where the rows have faded out and the picker shows under its cover. */
     const val SHOWS = 0.38f
     val gridRadius: Dp = AttachmentMenuMetrics.cornerRadius - AttachmentMenuMetrics.cardInset
-    /** Back waits this long for the grid to dissolve before the surface shrinks. */
+    /** Back waits this long for the picker to dissolve before the surface shrinks. */
     const val BACK_DELAY = 0.08
 
     /** Toward the card, a little behind the surface's spring; back to the menu, quickly, ahead of it. */
     fun <T> animation(toCard: Boolean): FiniteAnimationSpec<T> =
         if (toCard) Motion.easeInOut(0.42) else Motion.easeOut(0.2)
 
-    fun gridOpacity(progress: Float): Float =
-        if (progress < SHOWS) 0f else smoothstep(SHOWS + 0.04f, 0.96f, progress)
+    /** Exactly drawn or not: never translucent. */
+    fun pickerOpacity(progress: Float): Float = if (progress < SHOWS) 0f else 1f
+
+    /** Gathers over the rows as they fade, then clears to reveal the picker. */
+    fun coverOpacity(progress: Float): Float =
+        if (progress < SHOWS) smoothstep(0.16f, SHOWS, progress) else 1 - smoothstep(SHOWS + 0.04f, 0.96f, progress)
 
     fun smoothstep(from: Float, to: Float, x: Float): Float {
         val t = ((x - from) / (to - from)).coerceIn(0f, 1f)
