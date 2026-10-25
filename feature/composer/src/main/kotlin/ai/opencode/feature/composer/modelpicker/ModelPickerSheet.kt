@@ -44,6 +44,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -95,6 +97,7 @@ fun ModelPickerSheet(
     val sections = state.modelSheetSections(recentsAtOpen, roundHalfAwayFromZero(FusedModelPickerTunables.recents).toInt())
 
     ModelPickerDetentsSheet(onClose = { onEvent(ModelPickerEvent.Dismiss) }, onClosed = { onEvent(ModelPickerEvent.ModelListClosed) }) {
+        @Suppress("NAME_SHADOWING") val onEvent = closingAfterHide(onEvent)
         Column(Modifier.fillMaxSize().testTag("screen-Model Picker")) {
             ModelSheetTitleBar(
                 title = "Model",
@@ -360,12 +363,42 @@ fun ModelPickerDetentsSheet(
         }
     }
 
+    // A pick, Cancel or Done closes the sheet by removing it (`activePicker = nil`), which on
+    // its own would drop it from the screen in one frame: it slides down first, then the event
+    // goes (iOS dismisses the sheet with its own animation).
+    var hiding by remember { mutableStateOf(false) }
+    val hideThen: (() -> Unit) -> Unit = { action ->
+        if (!hiding) {
+            hiding = true
+            scope.launch { sheetState.hide() }.invokeOnCompletion { action() }
+        }
+    }
     ModalBottomSheet(
         onDismissRequest = { currentOnClose() },
         sheetState = sheetState,
         dragHandle = { Box(probe) { BottomSheetDefaults.DragHandle() } },
     ) {
-        Box(probe.fillMaxWidth()) { content() }
+        CompositionLocalProvider(LocalModelSheetHideThen provides hideThen) {
+            Box(probe.fillMaxWidth()) { content() }
+        }
+    }
+}
+
+/** The enclosing [ModelPickerDetentsSheet]'s slide-down, run before an event that closes it. */
+private val LocalModelSheetHideThen = staticCompositionLocalOf<((() -> Unit) -> Unit)?> { null }
+
+/**
+ * [onEvent] with the events that close the sheet (a pick, Cancel, Done) sent once it has slid
+ * down. Call inside a [ModelPickerDetentsSheet]'s content.
+ */
+@Composable
+internal fun closingAfterHide(onEvent: (ModelPickerEvent) -> Unit): (ModelPickerEvent) -> Unit {
+    val hideThen = LocalModelSheetHideThen.current ?: return onEvent
+    return { event ->
+        when (event) {
+            ModelPickerEvent.Dismiss, is ModelPickerEvent.ModelPicked, is ModelPickerEvent.ModelPickedWithLevel -> hideThen { onEvent(event) }
+            else -> onEvent(event)
+        }
     }
 }
 
@@ -380,6 +413,7 @@ fun PlainModelPickerSheet(
     onEvent: (ModelPickerEvent) -> Unit,
 ) {
     ModelPickerDetentsSheet(onClose = { onEvent(ModelPickerEvent.Dismiss) }, onClosed = { onEvent(ModelPickerEvent.ModelListClosed) }) {
+        @Suppress("NAME_SHADOWING") val onEvent = closingAfterHide(onEvent)
         Column(Modifier.fillMaxSize().testTag("screen-Model Picker")) {
             val variants = state.currentModelInfo?.let { model ->
                 ModelVariant.sorted(model.variants.filter { it != "default" }).takeIf { it.isNotEmpty() }

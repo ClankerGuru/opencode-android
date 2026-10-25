@@ -378,6 +378,7 @@ fun ModelPickerSheetContent(
     // Gone (picked, cancelled, swiped away): its search is cleared, as the composer's list
     // clears its own, so neither carries into the other.
     ModelPickerDetentsSheet(onClose = { onEvent(ModelPickerEvent.Dismiss) }, onClosed = { onEvent(ModelPickerEvent.ModelListClosed) }) {
+        @Suppress("NAME_SHADOWING") val onEvent = closingAfterHide(onEvent)
         Column(Modifier.fillMaxSize().testTag("screen-Model Picker")) {
             ModelSheetTitleBar(
                 title = "Model",
