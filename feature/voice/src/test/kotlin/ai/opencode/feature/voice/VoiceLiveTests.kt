@@ -2319,7 +2319,7 @@ class LiveDelegationFeatureTests {
         shared: VoiceTestShared,
         dependencies: DependencyValues.Builder.() -> Unit,
     ): TestStore<VoiceFeature.State, VoiceFeature.Action> {
-        val store = voiceTestStore(shared, { VoiceFeature.State(server, session) }, dependencies)
+        val store = voiceTestStore(shared, { VoiceFeature.State(server, session) }, dependencies = dependencies)
         store.exhaustive = false
         shared.set(SharedKeys.openAIAPIKey, "sk-test")
         shared.set(VoiceSharedKeys.voiceEngine, VoiceEngine.gptLive)

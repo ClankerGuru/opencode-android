@@ -313,6 +313,7 @@ class VoiceTestShared(val store: SharedStore = SharedStore.inMemory()) {
 fun TestScope.voiceTestStore(
     sharedValues: VoiceTestShared,
     initialState: () -> VoiceFeature.State,
+    effectScope: CoroutineScope = this,
     dependencies: DependencyValues.Builder.() -> Unit = {},
 ): TestStore<VoiceFeature.State, VoiceFeature.Action> {
     val clock = virtualClock()
@@ -324,7 +325,7 @@ fun TestScope.voiceTestStore(
         dependencies()
     }
     val state = DependencyValues.withValues(DependencyValues.testing().update(all), initialState)
-    return TestStore(state, VoiceFeature(), this, all)
+    return TestStore(state, VoiceFeature(), effectScope, all)
 }
 
 /** iOS's per-closure `$0.voiceCall.x = …` overrides: a client whose unset closures do nothing. */
@@ -398,3 +399,34 @@ fun isWorkFailed(action: VoiceFeature.Action) = action is VoiceFeature.Action.Wo
 fun isCallEnded(action: VoiceFeature.Action) = action is VoiceFeature.Action.CallEnded
 fun isDelegatorFinished(action: VoiceFeature.Action) = action is VoiceFeature.Action.DelegatorFinished
 fun isDelegateEnded(action: VoiceFeature.Action) = action == VoiceFeature.Action.Delegate(VoiceFeature.DelegateAction.Ended)
+
+/**
+ * iOS `receive(_:timeout:)` for an action that follows work on a real-thread actor
+ * (`VoiceDelegatorWorkspace`'s confined lane): waits on real time, as iOS does, without
+ * moving virtual time, so the effects' own sleeps stay where they are.
+ */
+suspend fun <S, A> TestStore<S, A>.receiveAfterActorWork(
+    matches: (A) -> Boolean,
+    timeout: Duration = 5.seconds,
+) {
+    val deadline = System.nanoTime() + timeout.inWholeNanoseconds
+    while (true) {
+        try {
+            receive(matches, timeout = 1.milliseconds)
+            return
+        } catch (error: kotlinx.coroutines.TimeoutCancellationException) {
+            if (System.nanoTime() > deadline) throw AssertionError("Timed out waiting for the action", error)
+            Thread.sleep(1)
+        }
+    }
+}
+
+/** Real-time polling for an actor's side effect (see [receiveAfterActorWork]). */
+suspend fun untilAfterActorWork(timeout: Duration = 5.seconds, condition: () -> Boolean): Boolean {
+    val deadline = System.nanoTime() + timeout.inWholeNanoseconds
+    while (!condition() && System.nanoTime() < deadline) {
+        Thread.sleep(1)
+        yield()
+    }
+    return condition()
+}
