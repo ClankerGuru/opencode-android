@@ -6,6 +6,8 @@ import ai.opencode.feature.system.SystemAction
 import ai.opencode.feature.system.share.ShareConversation
 import ai.opencode.server.OpenCodePairingLink
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.diagnostics.PerfFrameSampler
+import ai.opencode.core.diagnostics.PerfTimeline
 import ai.opencode.feature.composer.DictationPermissionClient
 import ai.opencode.feature.system.notifications.NotificationPermission
 import ai.opencode.feature.system.notifications.NotificationPermissionClient
@@ -72,7 +74,12 @@ class MainActivity : ComponentActivity() {
             },
         )
         // Developer tools (summon gesture, Tuning Panel, perf HUD): inert outside debug builds unless Developer Mode is on.
-        if (savedInstanceState == null) DevTools.handleLaunchIntent(intent)
+        if (savedInstanceState == null) {
+            DevTools.handleLaunchIntent(intent)
+            // iOS starts these as it makes the app's store, once the lab's launch switches are read.
+            PerfTimeline.appLaunched()
+            PerfFrameSampler.startIfRequested()
+        }
         setContent { DevToolsOverlay { AppView(store) } }
         // A recreated activity already handled its launch intent.
         if (savedInstanceState == null) handle(intent)

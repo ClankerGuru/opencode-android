@@ -1,5 +1,7 @@
 package ai.opencode.feature.transcript.list
 
+import ai.opencode.core.diagnostics.MotionFrame
+import ai.opencode.core.diagnostics.PerfTimeline
 import ai.opencode.core.log.AppLog
 import ai.opencode.core.motion.MotionFrameAction
 import ai.opencode.core.motion.motionFrameLoop
@@ -72,7 +74,18 @@ class TranscriptListController(
     private val measuredHeights = HashMap<String, Float>()
     private var lastLayout: LazyListLayoutInfo? = null
     var hasLaidOutContent = false
-        private set
+        private set(value) {
+            if (value == field) return
+            field = value
+            if (perfRows == null) return
+            if (value) PerfTimeline.rowsShown(configuration.sessionID, perfRows) else PerfTimeline.rowsHidden(perfRows)
+        }
+
+    /** iOS `perfRows`: this list's rows for `PerfTimeline` (null unless measuring); released when the list leaves composition. */
+    val perfRows = PerfTimeline.makeRowsToken()
+
+    /** A configuration was taken that `PerfTimeline` hasn't heard rendered. */
+    private var perfRenderPending = false
     private var firstFrameSent = false
     private var arrivalsGlideAfter = Double.POSITIVE_INFINITY
     private var catchUpLandsUntil = 0.0
@@ -131,12 +144,23 @@ class TranscriptListController(
     fun update(configuration: TranscriptConfiguration) {
         val old = this.configuration
         if (configuration == old && snapshot !== TranscriptListSnapshot.empty) return
+        if (perfRows != null) perfRenderPending = true
+        // iOS `differsOnlyInSnapshotRevision`: the rows on screen already show it.
+        if (snapshot !== TranscriptListSnapshot.empty && configuration.snapshotRevision != old.snapshotRevision &&
+            configuration.copy(snapshotRevision = old.snapshotRevision) == old
+        ) {
+            this.configuration = configuration
+            return
+        }
         val draftBecameSession = old.isDraft && old.sessionID == null && !configuration.isDraft && configuration.sessionID != null
         val sessionChanged = (configuration.sessionID != old.sessionID && !draftBecameSession) ||
             configuration.historyGeneration != old.historyGeneration
         if (sessionChanged) {
             resetForSessionChange()
             pendingEffects += { execute(behavior.handle(TranscriptScrollBehavior.Event.SessionChanged)) }
+        } else if (draftBecameSession && hasLaidOutContent && perfRows != null) {
+            // The draft's first content frame was drawn before there was a session to tell.
+            PerfTimeline.rowsShown(configuration.sessionID, perfRows)
         }
         val wasBrowsing = !sessionChanged && behavior.mode == TranscriptScrollBehavior.Mode.Browsing
         this.configuration = configuration
@@ -245,6 +269,7 @@ class TranscriptListController(
 
     /** Runs what [update] decided outside composition (sends, scrolls). Call from `SideEffect`. */
     fun flushEffects() {
+        if (perfRenderPending) reportRenderedSnapshot()
         if (pendingEffects.isEmpty()) return
         val effects = pendingEffects.toList()
         pendingEffects.clear()
@@ -252,6 +277,7 @@ class TranscriptListController(
     }
 
     private fun applySnapshot(configuration: TranscriptConfiguration, previous: TranscriptConfiguration?) {
+        if (TranscriptMotionTrace.isActive) TranscriptMotionTrace.willChange()
         val plan = TranscriptRowIdentityPlan.make(
             previousEntries = previousEntries,
             previousQueued = previousQueued,
@@ -299,7 +325,85 @@ class TranscriptListController(
                 contentArrivedDuringDrag = true
             }
         }
+        if (TranscriptMotionTrace.isActive) {
+            val oldIDs = old.items.mapTo(HashSet(), ::traceID)
+            val nextIDs = next.items.map(::traceID)
+            val nextSet = nextIDs.toHashSet()
+            TranscriptMotionTrace.note(
+                MotionFrame.Event(
+                    name = "apply",
+                    inserted = nextIDs.filter { it !in oldIDs }.sorted(),
+                    removed = oldIDs.filter { it !in nextSet }.sorted(),
+                    order = nextIDs,
+                    isInitial = previous == null || old === TranscriptListSnapshot.empty,
+                ),
+            )
+        }
         snapshot = next
+    }
+
+    /** iOS `traceID`: a message row by its stable ID, the others by name. Never message text. */
+    private fun traceID(item: TranscriptItemID): String = when (item) {
+        is TranscriptItemID.Message -> item.stableID
+        else -> item.key
+    }
+
+    /**
+     * iOS `motionProbe` (`-lab-motion-trace` and Motion Watch): the rows on screen as laid out
+     * this frame and the motions running now; null before the list has laid anything out.
+     */
+    internal fun motionProbe(): TranscriptMotionTrace.Probe? {
+        val info = lastLayout ?: return null
+        val items = snapshot.items
+        val before = info.beforeContentPadding
+        val rows = info.visibleItemsInfo.mapNotNull { visible ->
+            val item = items.getOrNull(visible.index)?.takeIf { it.key == visible.key } ?: return@mapNotNull null
+            var kind = traceID(item)
+            var key: String? = null
+            if (item is TranscriptItemID.Message) {
+                when (val row = snapshot.rows[item.stableID]) {
+                    is MessageRow.Entry -> { kind = row.entry.layoutKind; key = row.entry.userMessageID }
+                    is MessageRow.Queued -> { kind = "pending"; key = row.input.id }
+                    null -> kind = "row"
+                }
+            }
+            val animated = item.key in enteringItems || item.key in growths || item.key in disclosureSprings
+            MotionFrame.Row(
+                id = traceID(item),
+                y = TranscriptMotionTrace.round(((visible.offset + before) / density).toDouble()),
+                h = TranscriptMotionTrace.round((visible.size / density).toDouble()),
+                alpha = 1.0,
+                kind = kind,
+                animated = animated,
+                key = key,
+            )
+        }
+        val motions = ArrayList<String>()
+        bottomSpring?.kind?.let { motions += it.rawValue }
+        if (jumpGlide != null && "jump" !in motions) motions += "jump"
+        if (growths.isNotEmpty()) motions += "grow"
+        if (disclosureSprings.isNotEmpty()) motions += "disclosure"
+        val phase = when {
+            !hasLaidOutContent -> "opening"
+            transcriptNow() < arrivalsGlideAfter -> "settle"
+            else -> "live"
+        }
+        val viewport = viewport(info)
+        return TranscriptMotionTrace.Probe(
+            sessionID = configuration.sessionID,
+            rows = rows,
+            motions = motions,
+            phase = phase,
+            reduceMotion = reduceMotion,
+            browsing = behavior.mode == TranscriptScrollBehavior.Mode.Browsing,
+            gesture = isUserGestureActive || state.isScrollInProgress,
+            offset = TranscriptMotionTrace.round(viewport.offsetY.toDouble()),
+            contentHeight = TranscriptMotionTrace.round(viewport.contentHeight.toDouble()),
+            insetTop = TranscriptMotionTrace.round((before / density).toDouble()),
+            insetBottom = TranscriptMotionTrace.round((info.afterContentPadding / density).toDouble()),
+            height = TranscriptMotionTrace.round((info.viewportSize.height / density).toDouble()),
+            width = TranscriptMotionTrace.round((info.viewportSize.width / density).toDouble()),
+        )
     }
 
     /** Arrivals land rather than glide for the opening settle's length (iOS `landArrivals`). */
@@ -363,6 +467,25 @@ class TranscriptListController(
 
     /** Called after every LazyColumn layout (iOS `viewDidLayoutSubviews` + `reportLayoutChanged`). */
     fun onLayout(info: LazyListLayoutInfo) {
+        layout(info)
+        if (TranscriptMotionTrace.isActive) TranscriptMotionTrace.wake()
+        if (perfRenderPending) reportRenderedSnapshot()
+    }
+
+    /**
+     * iOS `reportRenderedSnapshot`: tells `PerfTimeline` the current configuration is on its way
+     * to the screen (composed and its rows laid out). Composition and layout share a frame, so
+     * from [flushEffects] (after composition) or [onLayout] the frame drawing it has its rows.
+     * Until then it stays pending and is asked again after the next layout.
+     */
+    private fun reportRenderedSnapshot() {
+        val perfRows = perfRows ?: return
+        if (!perfRenderPending || !hasLaidOutContent) return
+        perfRenderPending = false
+        PerfTimeline.snapshotRendered(configuration.sessionID, configuration.snapshotRevision, perfRows)
+    }
+
+    private fun layout(info: LazyListLayoutInfo) {
         lastLayout = info
         val keys = snapshot.items
         for (item in info.visibleItemsInfo) {
@@ -381,6 +504,7 @@ class TranscriptListController(
             arrivalsGlideAfter = transcriptNow() + BottomSpring.OPENING_SETTLE
             if (!firstFrameSent && keys.any { it is TranscriptItemID.Message || it is TranscriptItemID.Empty }) {
                 firstFrameSent = true
+                if (TranscriptMotionTrace.isActive) TranscriptMotionTrace.note(MotionFrame.Event("first-frame"))
                 send(TranscriptAction.FirstContentFrameRendered)
             }
             return
@@ -575,6 +699,7 @@ class TranscriptListController(
     // MARK: Motion loop
 
     private fun startMotion() {
+        if (TranscriptMotionTrace.isActive) TranscriptMotionTrace.wake()
         if (motionJob?.isActive == true) return
         motionJob = scope.launch {
             motionFrameLoop { tick ->

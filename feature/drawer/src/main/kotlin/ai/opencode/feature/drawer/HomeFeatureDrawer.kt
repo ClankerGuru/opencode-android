@@ -1,5 +1,6 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.core.diagnostics.LabMarks
 import ai.opencode.feature.composer.SharedDraftTarget
 import ai.opencode.feature.composer.SharedComposerDraft
 import ai.opencode.feature.composer.DraftState
@@ -9,6 +10,7 @@ import ai.opencode.feature.system.share.ShareInboxClient
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.diagnostics.PerfTimeline
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.log.AppLog
@@ -298,6 +300,8 @@ private fun HomeFeature.sessionTapped(state: State, sessionID: String): HomeRedu
         val cancelled = cancelBackgroundTranscriptReads(s, setOf(sessionID, pushedID))
         return Reduced(cancelled.state, Effect.merge(cancelled.effect, viewed.effect))
     }
+    LabMarks.mark("session_tap", sessionID)
+    PerfTimeline.switchStarted(sessionID)
     // The opened session reads itself; background reads step aside so it gets the connection.
     val cachedItems = s.cachedTranscriptItems(session)
     if (cachedItems == null) {

@@ -1,5 +1,7 @@
 package ai.opencode.feature.drawer.motion
 
+import ai.opencode.core.diagnostics.PerfTimeline
+import ai.opencode.feature.transcript.list.TranscriptMotionTrace
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionFrameAction
 import ai.opencode.core.motion.MotionSpring
@@ -524,6 +526,16 @@ class DrawerMotionState(
     /** The card is under the finger or on its spring (corners rounded). */
     val isCardMoving: Boolean get() = movingState.value
 
+    /** iOS `isCardMoving`'s `didSet`: Session Switch waits for the card to rest. */
+    private var cardMoving: Boolean
+        get() = movingState.value
+        set(value) {
+            if (value == movingState.value) return
+            movingState.value = value
+            PerfTimeline.cardMoving(value)
+            if (TranscriptMotionTrace.isActive) TranscriptMotionTrace.noteDrawerMoving(value)
+        }
+
     /** Where the drawer is headed (iOS `isPresented`). */
     val isPresented: Boolean get() = presentedState.value
 
@@ -583,7 +595,7 @@ class DrawerMotionState(
         ignoresDragUntilItEnds = false
         isDragging = true
         dragStartOffset = stopAnimationAtCurrentOffset()
-        movingState.value = true
+        cardMoving = true
         holdKeyboardIfShut()
         // The card moves again: the keys come back up with it.
         keyboardHold?.bringKeysBack()
@@ -642,7 +654,7 @@ class DrawerMotionState(
         stopAnimationAtCurrentOffset()
         if (target > 0) holdKeyboardIfShut() else keyboardHold?.bringKeysBack()
         if (!animated || reducedMotion) {
-            movingState.value = false
+            cardMoving = false
             apply(target)
             setContentInteractive(target == 0f)
             setDrawerAvailable(target > 0)
@@ -654,7 +666,7 @@ class DrawerMotionState(
             suspendContent()
             setDrawerAvailable(true)
         }
-        movingState.value = true
+        cardMoving = true
         // Rounded from this frame, before the spring's first step.
         apply(offset)
         val drawerSpring = DrawerSpring(offset.toDouble(), velocity.toDouble(), target.toDouble(), 0.0..max(width, 0f).toDouble())
@@ -664,7 +676,7 @@ class DrawerMotionState(
                 val events = drawerSpring.step(tick.dt)
                 val open = drawerSpring.target > 0
                 val settled = Event.Settled in events
-                if (settled) movingState.value = false
+                if (settled) cardMoving = false
                 apply(drawerSpring.position.toFloat().coerceIn(0f, width))
                 if (Event.Arrived in events) arrive(open)
                 // Resting open, the keys step out of the drawer's way.
