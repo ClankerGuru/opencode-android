@@ -613,9 +613,10 @@ fun VoiceCallSurface(
                     .reachFade(reach = { if (reduceMotion) reducedReach else reachBox.value }, range = ComposerExpansion.barFade, showsAbove = false)
                     .then(if (expansionOpen) Modifier.clearAndSetSemantics {} else Modifier),
             ) { content() }
-            if (panel != null && store == null && panelRevealValue > 0) {
+            if (panel != null && store == null) {
                 // A request's panel sits on the bar, its position fixed there; only the clip (the
-                // surface's reach) grows and folds, so the panel never moves under it.
+                // surface's reach) grows and folds, so the panel never moves under it. Laid out
+                // even before the surface reveals any of it, so its height is known to grow to.
                 val reveal = min(panelRevealValue, extent)
                 Box(
                     Modifier
@@ -678,7 +679,8 @@ private fun surfaceMeasurePolicy(extent: Float, fullExtent: Float, panelExtent: 
         val c = when (measurable.layoutId) {
             SurfaceSlot.glass -> Constraints.fixed(width, bar.height + extentPx)
             SurfaceSlot.transcript -> Constraints.fixed(width, extentPx)
-            SurfaceSlot.panel -> Constraints(minWidth = width, maxWidth = width, maxHeight = max(0, panelExtent.dp.roundToPx()))
+            // At its own height (it caps itself): [panelExtent] is the room the session keeps for it.
+            SurfaceSlot.panel -> Constraints(minWidth = width, maxWidth = width)
             SurfaceSlot.expansion -> Constraints.fixed(width, bar.height + extentPx)
             else -> Constraints()
         }
@@ -705,6 +707,7 @@ private fun surfaceMeasurePolicy(extent: Float, fullExtent: Float, panelExtent: 
         }
         @Suppress("UNUSED_EXPRESSION") expansionHeight
         @Suppress("UNUSED_EXPRESSION") transcriptHeight
+        @Suppress("UNUSED_EXPRESSION") panelExtent
     }
 }
 
