@@ -11,6 +11,7 @@ import ai.opencode.feature.composer.DictationFeature
 import ai.opencode.feature.composer.DictationHoldRelease
 import ai.opencode.core.diagnostics.LabMarks
 import ai.opencode.feature.transcript.TranscriptEntry
+import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
 import ai.opencode.feature.voice.ServerVoiceSupport
 import ai.opencode.server.OpenCodeLiveContentEvent
 import ai.opencode.server.model.OpenCodeContextReading
@@ -755,7 +756,7 @@ internal fun SessionFeature.upsertLiveText(
     streaming: Boolean = false,
     items: MutableList<OpenCodeTranscriptItem>,
 ): Boolean {
-    val shown = if (streaming) holdingPendingMarker(text) else text
+    val shown = if (streaming) OpenCodeMarkdownBlock.holdingPendingMarker(text) else text
     if (shown.isBlank()) return false
     val index = items.indexOfLast { it.id == id }
     val item = OpenCodeTranscriptItem.AssistantMarkdown(id = id, text = shown)
@@ -827,33 +828,6 @@ private fun upsertLiveTool(
         val sessionID = call.metadata["sessionID"]?.string
         if (!sessionID.isNullOrEmpty()) projection.noteSubagent(sessionID)
     }
-}
-
-/**
- * iOS `OpenCodeMarkdownBlock.holdingPendingMarker(_:)` (`Transcript/OpenCodeMarkdownBlock.swift`):
- * streaming text without a last line that holds only the start of a block (`-`, `##`, `1.`, `>`,
- * a fence's first backticks). That line waits for its first word: drawn now, it would show as a
- * paragraph and then turn into a list item, heading or quote, reflowing the row. The ended text is
- * shown whole. Kept here until `:feature:transcript` ports its Markdown model.
- */
-internal fun holdingPendingMarker(text: String): String {
-    val lineStart = text.lastIndexOf('\n').let { if (it < 0) 0 else it + 1 }
-    val line = text.substring(lineStart).trim(' ', '\t')
-    if (line.isEmpty() || !isPendingMarker(line)) return text
-    return text.substring(0, lineStart)
-}
-
-private fun isPendingMarker(line: String): Boolean {
-    val first = line.firstOrNull() ?: return false
-    if (line.length > 10) return false
-    if (first in "#`~" || first in "-*_") {
-        return line.all { it == first } && line.length <= (if (first == '#') 6 else 2)
-    }
-    if (line == "+" || line == "•" || line == ">") return true
-    val digits = line.takeWhile { it.isDigit() }
-    if (digits.isEmpty()) return false
-    val rest = line.drop(digits.length)
-    return rest.isEmpty() || rest == "." || rest == ")"
 }
 
 // endregion

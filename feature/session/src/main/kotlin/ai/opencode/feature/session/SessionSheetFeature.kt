@@ -110,7 +110,7 @@ class SessionSheetFeature : Reducer<SessionSheetFeature.State, SessionSheetFeatu
         data object DeleteSession : Delegate
     }
 
-    private enum class CancelID { AutoRenameFailure }
+    enum class CancelID { AutoRenameFailure }
 
     override fun reduce(state: State, action: Action): Reduced<State, Action> {
         val haptics = dependency(HapticsClient)
