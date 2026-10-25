@@ -124,7 +124,7 @@ import kotlinx.coroutines.delay
 fun AppView(store: StoreOf<AppFeature.State, AppFeature.Action>) {
     LaunchedEffect(store) {
         store.send(AppFeature.Action.Task)
-        store.send(AppFeature.Action.SystemActionsTask)
+        // The system action inbox is started by `AppWideWork`, in the window that owns it.
         store.send(AppFeature.Action.PendingSharesRequested)
     }
     val hasHome by store.observe { it.home != null }

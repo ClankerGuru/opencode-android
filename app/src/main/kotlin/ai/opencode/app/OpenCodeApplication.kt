@@ -53,6 +53,8 @@ class OpenCodeApplication : Application() {
         // Voice's admitted sends, log uploads, diagnostics sinks and screen hold (installed
         // before anything resolves their keys).
         AppDependencies.install(this)
+        // Open in New Window (tablet multi-instance windows).
+        SceneWindows.install()
         // iOS `OpenCodeApp.init`'s launch line: version, distribution, model, system.
         val device = dependency(DevToolsClient).device()
         AppLog.app.notice { "Launch: ${AppVersion.current.label}, ${device.distribution}, ${device.model}, ${device.system}" }

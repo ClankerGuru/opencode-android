@@ -424,6 +424,11 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         data object NotificationErrorDismissed : Action
         /** Listens for shortcuts, widgets and intents for as long as the app runs. */
         data object SystemActionsTask : Action
+        /**
+         * The app-wide work moved to another window's store (`AppWideWork`): stop listening, as iOS
+         * cancels this store's `systemActionsTask` task.
+         */
+        data object SystemActionsTaskEnded : Action
         /** From an app shortcut, a widget, an intent or an `opencode://` link. */
         data class SystemActionReceived(val action: SystemAction) : Action
         /** A session the action names that the list doesn't have. */
@@ -555,6 +560,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
                     .cancellable(CancelID.SystemActions, cancelInFlight = true),
             )
         }
+        Action.SystemActionsTaskEnded -> Reduced(state, Effect.cancel(CancelID.SystemActions))
         is Action.SystemActionReceived -> systemActionReceived(state, action.action)
         is Action.SystemSessionLoaded -> systemSessionLoaded(state, action)
         Action.SystemActionErrorDismissed -> Reduced(state.copy(systemActionError = null))
