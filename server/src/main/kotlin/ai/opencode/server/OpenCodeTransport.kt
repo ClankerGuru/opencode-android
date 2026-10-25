@@ -6,8 +6,8 @@ import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 
 /**
- * The OkHttp client pools behind the live client (iOS `URLSession`s). Tests supply clients
- * with an interceptor or point servers at a `MockWebServer`, without production flags.
+ * The OkHttp client pools behind the live client (iOS `URLSession`s). Under tests every pool
+ * runs behind [TestNetworkBlock] (fixtures register hosts; unmocked network fails).
  * Per-request timeouts are applied on top with `newBuilder()`, sharing these pools.
  */
 class OpenCodeTransport(
@@ -35,7 +35,19 @@ class OpenCodeTransport(
             )
         }
 
-        /** The same pools: a test reaches only the servers it creates (or intercepts). */
-        override val testValue: OpenCodeTransport get() = liveValue
+        /**
+         * The same pools behind [TestNetworkBlock]: a test reaches only the hosts its fixtures
+         * register (iOS `WireFixture`) and loopback (`MockWebServer`); anything else fails.
+         */
+        override val testValue: OpenCodeTransport by lazy {
+            fun OkHttpClient.blocked() = newBuilder().addInterceptor(TestNetworkBlock.interceptor).build()
+            val live = liveValue
+            OpenCodeTransport(
+                request = live.request.blocked(),
+                measuredRequest = live.measuredRequest.blocked(),
+                longPoll = live.longPoll.blocked(),
+                eventStream = live.eventStream.blocked(),
+            )
+        }
     }
 }
