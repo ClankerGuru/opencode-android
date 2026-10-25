@@ -138,3 +138,20 @@ Add a new library only with a one-line justification here.
   unless the iOS behaviour itself can't exist on Android (then delete it and note why in the
   parity row).
 - Other new test files (beyond ports of iOS tests) still need the coordinator's approval.
+- Isolation (iOS `TestIsolationGuard`): under JVM unit tests `DependencyValues.root` resolves
+  `testValue`s, so even code outside a `TestStore` never reaches live storage or the network.
+  Shared test support lives in Gradle test fixtures; feature modules get it through the
+  convention plugin, `:core`/`:server` through their own `testFixtures`:
+  - `ai.opencode.core.testing` (`:core` fixtures): `TestIsolationRule` (`@get:Rule val
+    isolation = TestIsolationRule()`) fails a test that leaks process-wide state
+    (`AnimationTimeScale.shared`, `TuningStore.shared`, shared keys written through the root,
+    open `WireFixture`s, blocked network) and resets it; `TestIsolationGuard` (probes,
+    `capturingViolations`, `Plugin`s via `META-INF/services`); `eventually { }`.
+  - `ai.opencode.server.testing` (`:server` fixtures): `WireFixture` (iOS `WireFixture`: scripted
+    replies for a unique `wire-<uuid>.invalid` host, captured requests). Every
+    `OpenCodeTransport.testValue` pool runs behind `TestNetworkBlock`: fixture hosts are answered,
+    loopback (`MockWebServer`) passes, anything else fails as an unreachable host and is reported.
+  - Requests are sent once under tests (`NetworkRetry`) unless a test sets a policy.
+  - Opt-in live checks (iOS `liveServerReadContract`) run only when `OPENCODE_LIVE_SERVER`,
+    `OPENCODE_LIVE_PASSWORD`, `OPENCODE_LIVE_SESSION_ID` and `OPENCODE_LIVE_DIRECTORY` are set
+    (e.g. against session-lab); otherwise they're skipped, so `scripts/check.sh` stays offline.

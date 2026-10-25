@@ -32,7 +32,7 @@
     <capability android:name="actions.intent.OPEN_APP_FEATURE">
         <intent
             android:action="ai.opencode.mobilecode.SYSTEM_ACTION"
-            android:targetClass="ai.opencode.feature.system.intents.SystemActionActivity"
+            android:targetClass="ai.opencode.feature.system.intents.AppActionActivity"
             android:targetPackage="ai.opencode.mobilecode">
             <parameter android:name="feature" android:key="appFeature" />
         </intent>

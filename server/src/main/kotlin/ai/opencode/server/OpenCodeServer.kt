@@ -2,6 +2,7 @@ package ai.opencode.server
 
 import ai.opencode.server.internal.UrlParts
 import ai.opencode.server.internal.percentEncodePath
+import ai.opencode.server.internal.percentEncodeQueryComponent
 import ai.opencode.server.model.trimmedWhitespace
 import kotlinx.serialization.Serializable
 import okhttp3.HttpUrl
@@ -165,7 +166,8 @@ data class OpenCodeServer(
             .encodedPath(percentEncodePath(path).let { if (it.startsWith("/")) it else "/$it" })
             .query(null)
             .fragment(null)
-        for ((name, value) in query) builder.addQueryParameter(name, value)
+        // Encoded as `URLComponents.queryItems` does: `/`, `:`, `?` stay literal, `[` `]` don't.
+        for ((name, value) in query) builder.addEncodedQueryParameter(percentEncodeQueryComponent(name), percentEncodeQueryComponent(value))
         return builder.build()
     }
 
