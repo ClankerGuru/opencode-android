@@ -6,7 +6,7 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 
 | iOS file | Lines | Kotlin file(s) | Status | Notes |
 | --- | ---: | --- | --- | --- |
-| `OpenCode/Browser/BrowserFeature.swift` | 172 | feature/media/.../browser/BrowserFeature.kt | done | URLs are `String`; `browserHost()` gives Unicode hosts |
+| `OpenCode/Browser/BrowserFeature.swift` | 172 | feature/media/.../browser/BrowserFeature.kt | done | URLs are `String`; `browserHost()` gives Unicode hosts; `PageShareRequest` is `:server`'s (`model/Composer.kt`, shared with the composer's `PendingPrompt`; media's duplicate removed) |
 | `OpenCode/Browser/BrowserLinkPolicy.swift` | 85 | feature/media/.../browser/BrowserLinkPolicy.kt | done | lab loopback switch: env or `debug.opencode.lab_browser_loopback` (debuggable only) |
 | `OpenCode/Browser/BrowserPageContext.swift` | 92 | server/.../model/Composer.kt | n/a: already in :server | `OpenCodePageContext`, `pageBlock`, `removingPageBlock`, `PromptContext.page` |
 | `OpenCode/Browser/BrowserView.swift` | 475 | feature/media/.../browser/BrowserView.kt | partial: page padded clear of bars (WebView has no obscured insets); back gesture is wired by the session stack via `BrowserWebViews.shared.canGoBack(id)` / `browserBackAction` / `backProgress` (no BackHandler in media); `WorkingIndicator` is a slot from session |  |

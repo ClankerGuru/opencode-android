@@ -222,7 +222,7 @@ internal fun HomeFeature.reduceServerEvent(state: State, event: OpenCodeServerEv
                     detail.copy(
                         session = detail.session?.let { if (it.id == sessionID) it.copy(title = title) else it },
                         familySessions = detail.familySessions.map { if (it.id == sessionID) it.copy(title = title) else it },
-                        feature = if (detail.session?.id == sessionID) detail.feature.copy(title = title) else detail.feature,
+                        feature = detail.feature.copy(session = detail.feature.session?.let { if (it.id == sessionID) it.copy(title = title) else it }),
                     )
                 }
             val renamed = SessionScreenMessage.FamilySessionRenamed(sessionID, title)

@@ -412,7 +412,7 @@ private fun HomeSessionStack(
                 HomeRoute.Root -> NavEntry(route) {
                     val detail = remember(store) {
                         store.scope<HomeFeature.State, HomeFeature.Action, SessionFeature.State, SessionFeature.Action>(
-                            state = { it.sessionDetail?.feature ?: SessionFeature.State() },
+                            state = { it.sessionDetail?.feature ?: SessionFeature.State.draft(it.server, null, emptyList()) },
                             action = { HomeFeature.Action.SessionDetail(PresentationAction.Presented(it)) },
                         )
                     }
@@ -431,7 +431,7 @@ private fun HomeSessionStack(
                     val detail = remember(store, route) {
                         store.scope<HomeFeature.State, HomeFeature.Action, SessionFeature.State, SessionFeature.Action>(
                             state = { home ->
-                                home.subagentStack.firstOrNull { it.navigationID == route.navigationID }?.feature ?: SessionFeature.State()
+                                home.subagentStack.firstOrNull { it.navigationID == route.navigationID }?.feature ?: SessionFeature.State.draft(home.server, null, emptyList())
                             },
                             action = { HomeFeature.Action.SubagentStack(route.navigationID, it) },
                         )
@@ -503,7 +503,7 @@ private fun CatchUpPreviewCard(store: StoreOf<HomeFeature.State, HomeFeature.Act
         Box(Modifier.fillMaxSize().background(OpenCodeTheme.colors.canvas))
         return
     }
-    val inert = remember(session.id, session.title) { InertStore<SessionFeature.State, SessionFeature.Action>(SessionFeature.State(sessionID = session.id, title = session.title)) }
+    val inert = remember(session.id, session.title) { InertStore<SessionFeature.State, SessionFeature.Action>(SessionFeature.State.session(store.state.server, session)) }
     SessionView(inert, Modifier.fillMaxSize().clearAndSetSemantics {})
 }
 

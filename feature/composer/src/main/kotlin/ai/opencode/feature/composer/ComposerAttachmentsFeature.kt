@@ -51,11 +51,9 @@ class ComposerAttachmentsFeature : Reducer<ComposerAttachmentsFeature.State, Com
         val unstartedUploadIDs: List<UUID> = emptyList(),
         /**
          * The composer as an undo/revert left it, plus the pre-undo snapshot that Undo/Redo
-         * restores when the reverted draft is still untouched. iOS types it
-         * `SessionFeature.State.UndoSnapshot`, which lives in `:feature:session` above this
-         * module, so it is opaque here: the session area stores and casts its own value.
+         * restores when the reverted draft is still untouched.
          */
-        val undoSnapshot: Any? = null,
+        val undoSnapshot: UndoSnapshot? = null,
     ) {
         val isUploadingFiles: Boolean get() = pendingFiles.any { it.isUploading }
         val isWaitingForUploads: Boolean get() = sendAfterUploads != null

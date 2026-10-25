@@ -14,4 +14,9 @@ dependencies {
     api(project(":feature:voice"))
     api(project(":feature:media"))
     api(project(":feature:system"))
+    // PredictiveBackHandler / LocalOnBackPressedDispatcherOwner for SessionPageStack's back.
+    implementation(libs.androidx.activity.compose)
+    // ProviderIcon: OpenCode's provider logos ship as the iOS SVGs (assets/provider-icons), drawn by Coil.
+    implementation(libs.coil.compose)
+    implementation(libs.coil.svg)
 }

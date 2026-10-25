@@ -892,6 +892,7 @@ fun HomeFeature.State.makeDetail(
     val (begun, transition) = beginningDetailTransition(defaultReason = reason)
     var s = begun
     var detail = SessionDetail.forSession(
+        server = server,
         session = session,
         navigationID = transition.navID,
         visit = transition.visit,
@@ -940,6 +941,7 @@ fun HomeFeature.State.makeDraft(directory: String? = null, reason: String = "you
         if (index >= 0) projects = listOf(projects[index]) + projects.filterIndexed { i, _ -> i != index }
     }
     var draft = SessionDetail.draft(
+        server = s.server,
         draftProject = directory?.let { OpenCodeProject.folder(it, projects) } ?: projects.firstOrNull(),
         projects = projects,
         inheritedModel = s.lastUsedModel,
@@ -1086,6 +1088,7 @@ fun HomeFeature.State.pushingSubagent(session: OpenCodeSession): HomeFeature.Sta
     val pushedCount = pushedDetailCount + 1
     var s = copy(pushedDetailCount = pushedCount)
     var detail = SessionDetail.forSession(
+        server = server,
         session = session,
         navigationID = -pushedCount,
         cachedItems = parent.familyTranscriptCache[session.id] ?: s.cachedTranscriptItems(session),

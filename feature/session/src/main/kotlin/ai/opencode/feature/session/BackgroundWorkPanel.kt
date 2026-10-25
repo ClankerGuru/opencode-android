@@ -1,0 +1,1033 @@
+package ai.opencode.feature.session
+
+import ai.opencode.core.haptics.Haptic
+import ai.opencode.core.haptics.HapticEffect
+import ai.opencode.core.haptics.HapticsClient
+import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionFrameAction
+import ai.opencode.core.motion.motionFrameLoop
+import ai.opencode.core.motion.rememberFrameDurationSeconds
+import ai.opencode.core.motion.rememberReduceMotion
+import ai.opencode.core.ui.OpenCodeFonts
+import ai.opencode.core.ui.OpenCodeIcon
+import ai.opencode.core.ui.OpenCodeTextStyles
+import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.core.ui.RollingNumber
+import ai.opencode.core.ui.SFSymbol
+import ai.opencode.server.model.OpenCodeSession
+import ai.opencode.server.model.OpenCodeShell
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.EaseOut
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.Velocity
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.util.lerp
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import java.time.Duration
+import java.time.Instant
+import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.roundToInt
+
+// Port of iOS `Session/BackgroundWorkPanel.swift`. iOS reads `SessionFeature` state inside the
+// presentation; here every view takes immutable values and action lambdas so `SessionView` can
+// wire it (`activeSubagents`, `backgroundShells`, `waitingSessionIDs`, `shellGlyphProbe`, and
+// `.subagentTapped` / `.shellOutputTapped`). The shell output sheet iOS presents from this
+// modifier (`.sheet(item: $store.scope(\.shellOutput, …))`) is SessionView's to present.
+//
+// Liquid Glass → one M3 surface (`surfaceContainerHigh`) whose bounds morph between the
+// capsule's and the panel's on the same springs. Lengths are dp.
+
+// MARK: Anchor and covered pills
+
+/**
+ * The background-activity capsule's bounds, so the panel can grow out of it (iOS
+ * `BackgroundActivityAnchorKey`). Create one per session screen with
+ * [rememberBackgroundWorkAnchor], mark the capsule's place with [backgroundActivityAnchor], and
+ * hand the same anchor to [BackgroundWorkPresentation].
+ */
+@Stable
+class BackgroundWorkAnchor {
+    /** Root coordinates in px; null while the capsule's place isn't laid out. */
+    internal var bounds by mutableStateOf<Rect?>(null)
+}
+
+@Composable
+fun rememberBackgroundWorkAnchor(): BackgroundWorkAnchor = remember { BackgroundWorkAnchor() }
+
+/** Marks the capsule the background-work panel anchors to. */
+fun Modifier.backgroundActivityAnchor(anchor: BackgroundWorkAnchor): Modifier = onGloballyPositioned { anchor.bounds = it.boundsInRoot() }
+
+/** The open panel covers the composer pills beside and above the capsule. */
+val LocalBackgroundWorkCoversPills = compositionLocalOf { false }
+
+/** A composer pill the open panel grows over: it steps aside rather than show through the panel. */
+fun Modifier.coveredByBackgroundWork(): Modifier = composed {
+    val covered = LocalBackgroundWorkCoversPills.current
+    if (covered) {
+        this.alpha(0f).clearAndSetSemantics { }.pointerInput(Unit) { detectTapGestures { } }
+    } else {
+        this
+    }
+}
+
+// MARK: Copy and sizes
+
+/** The panel's copy and sizing rules (iOS `BackgroundWorkPanel`'s statics). */
+object BackgroundWorkSummary {
+    /** “1 subagent · 2 shells”, as the capsule reads. */
+    fun summary(agents: List<OpenCodeSession>, shells: List<OpenCodeShell>): String = summary(agents.size, shells.size)
+
+    fun summary(agents: Int, shells: Int): String = listOfNotNull(
+        if (agents == 0) null else if (agents == 1) "1 subagent" else "$agents subagents",
+        if (shells == 0) null else if (shells == 1) "1 shell" else "$shells shells",
+    ).joinToString(" · ")
+
+    /** Before the first measurement: rows, headers, and padding (dp). */
+    fun estimatedHeight(agents: List<OpenCodeSession>, shells: List<OpenCodeShell>): Float =
+        (agents.size + shells.size) * 48f + (if (agents.isEmpty()) 0f else 30f) + (if (shells.isEmpty()) 0f else 30f) + 20f
+}
+
+/** iOS `ComposerTunables.pillGlyphGap` default (dp). */
+private const val PILL_GLYPH_GAP = 5f
+
+private val countsStyle: TextStyle
+    get() = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium, fontFeatureSettings = "tnum")
+
+// MARK: Capsule
+
+/**
+ * The background-work capsule's place in the composer pill row: its size, invisible. The capsule
+ * itself is drawn, and tapped, in [BackgroundWorkPresentation] above, where its surface can morph
+ * into the panel's. Put [backgroundActivityAnchor] on this.
+ */
+@Composable
+fun BackgroundWorkCapsuleSpace(agents: Int, shells: Int, modifier: Modifier = Modifier) {
+    BackgroundWorkCapsuleLabel(
+        agents = agents,
+        shells = shells,
+        modifier = modifier.padding(vertical = BackgroundWorkMotion.capsuleInset.dp).alpha(0f).clearAndSetSemantics { },
+        sizingOnly = true,
+    ) { Box(Modifier.width(18.dp)) }
+}
+
+/**
+ * The capsule's glyph and counts, laid out like a composer pill's.
+ *
+ * @param sizingOnly an invisible layout copy: its counts don't roll (iOS `isRollingNumberSizingOnly`).
+ */
+@Composable
+fun BackgroundWorkCapsuleLabel(
+    agents: Int,
+    shells: Int,
+    modifier: Modifier = Modifier,
+    sizingOnly: Boolean = false,
+    leading: @Composable () -> Unit,
+) {
+    Row(
+        // The glyph's ink as far from the surface's leading edge as from its top and bottom,
+        // concentric with the capsule's end (OC-477).
+        modifier
+            .heightIn(min = 34.dp)
+            .padding(start = BackgroundWorkTunables.glyphLeading.dp, end = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(PILL_GLYPH_GAP.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.width(glyphWidth(agents, shells).dp).clearAndSetSemantics { }, contentAlignment = Alignment.CenterStart) { leading() }
+        if (sizingOnly) {
+            Text(BackgroundWorkSummary.summary(agents, shells), style = countsStyle, maxLines = 1, softWrap = false)
+        } else {
+            BackgroundWorkCounts(agents, shells, Modifier.offset(y = BackgroundWorkTunables.countNudge.dp))
+        }
+    }
+}
+
+/** One 18 dp disc, or the orb and the shell disc side by side. */
+fun glyphWidth(agents: Int, shells: Int): Float = if (agents > 0 && shells > 0) 36 + BackgroundWorkTunables.pairGap else 18f
+
+/**
+ * “1 subagent · 2 shells”, animated where it stands as the counts change: digits roll, a plural’s
+ * “s”, a group, or the dot between groups opens or closes its own width on the resize spring
+ * while it fades and blurs, and the rest slides over. Under Reduce Motion the words cross-fade.
+ */
+@Composable
+fun BackgroundWorkCounts(agents: Int, shells: Int, modifier: Modifier = Modifier) {
+    val reduceMotion = rememberReduceMotion()
+    // What a group last counted, shown while it closes.
+    var lastAgents by remember { mutableIntStateOf(max(1, agents)) }
+    var lastShells by remember { mutableIntStateOf(max(1, shells)) }
+    if (agents > 0 && agents != lastAgents) lastAgents = agents
+    if (shells > 0 && shells != lastShells) lastShells = shells
+    if (reduceMotion) {
+        Crossfade(BackgroundWorkSummary.summary(agents, shells), modifier, animationSpec = Motion.reducedFadeSpec(), label = "BackgroundWorkCounts") {
+            Text(it, style = countsStyle, maxLines = 1, softWrap = false)
+        }
+        return
+    }
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        Opening(agents > 0) { CountGroup(if (agents > 0) agents else lastAgents, "subagent") }
+        Opening(agents > 0 && shells > 0) { Text(" · ", style = countsStyle, maxLines = 1, softWrap = false) }
+        Opening(shells > 0) { CountGroup(if (shells > 0) shells else lastShells, "shell") }
+    }
+}
+
+@Composable
+private fun CountGroup(count: Int, noun: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        RollingNumber(count, style = countsStyle)
+        Text(" $noun", style = countsStyle, maxLines = 1, softWrap = false)
+        Opening(count != 1) { Text("s", style = countsStyle, maxLines = 1, softWrap = false) }
+    }
+}
+
+/**
+ * Opens to its own width or closes to none, clipped to it, fading and blurring as it goes:
+ * quickly out, so what the clip crosses is already faint, and in a little behind the opening.
+ */
+@Composable
+private fun Opening(isOpen: Boolean, content: @Composable () -> Unit) {
+    val resize = BackgroundWorkMotion.resize
+    AnimatedVisibility(
+        visible = isOpen,
+        enter = expandHorizontally(resize.spec(), expandFrom = Alignment.Start) +
+            fadeIn(tween(durationMillis = 280, delayMillis = 40, easing = EaseOut)),
+        exit = shrinkHorizontally(resize.spec(), shrinkTowards = Alignment.Start) + fadeOut(tween(durationMillis = 140, easing = EaseOut)),
+    ) {
+        Box(Modifier.blurringWith(this)) { content() }
+    }
+}
+
+/** Blurs 3 dp while arriving or leaving (iOS `BlurFade`), never at rest. */
+private fun Modifier.blurringWith(scope: AnimatedVisibilityScope): Modifier = composed {
+    val blur by scope.transition.animateFloat(label = "blur") { if (it == EnterExitState.Visible) 0f else 3f }
+    if (blur > 0.01f) blur(blur.dp, BlurredEdgeTreatment.Unbounded) else this
+}
+
+/**
+ * The capsule's glyph: its most telling subagent's orb, the shell glyph driven by its shells'
+ * combined output, or both side by side. Both are the same disc, placed alike (Kit, Oct 19:
+ * "so they're both circles").
+ */
+@Composable
+fun BackgroundWorkGlyph(
+    agents: List<OpenCodeSession>,
+    shells: List<OpenCodeShell>,
+    waiting: Set<String>,
+    probe: ShellGlyphProbe?,
+    modifier: Modifier = Modifier,
+) {
+    val reduceMotion = rememberReduceMotion()
+    // Swapped in place as subagents come and go, like the words beside it. The disc's dot field
+    // sits a little high in its frame: dropped, it is concentric with the capsule's end (OC-477).
+    Row(modifier.offset(y = BackgroundWorkTunables.orbGlyphNudgeY.dp), horizontalArrangement = Arrangement.spacedBy(BackgroundWorkTunables.pairGap.dp)) {
+        AnimatedVisibility(agents.isNotEmpty(), enter = fadeIn(Motion.reducedFadeSpec()), exit = fadeOut(Motion.reducedFadeSpec())) {
+            AgentActivityGlyph(
+                source = AgentActivitySource.summary(agents, emptyList(), waiting),
+                modifier = if (reduceMotion) Modifier else Modifier.blurringWith(this),
+            )
+        }
+        AnimatedVisibility(shells.isNotEmpty(), enter = fadeIn(Motion.reducedFadeSpec()), exit = fadeOut(Motion.reducedFadeSpec())) {
+            val ids = shells.map { it.id }
+            ShellGlyph(
+                shellIDs = ids,
+                modifier = if (reduceMotion) Modifier else Modifier.blurringWith(this),
+                key = "capsule|" + ids.joinToString(","),
+                probe = probe,
+            )
+        }
+    }
+}
+
+// MARK: Presentation
+
+/** The surface's shape: the panel's 28 dp corners, never more than half its height (iOS `GlassGeometry.radius`). */
+private class BackgroundWorkShape(private val radius: Float) : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
+        val r = min(max(0f, radius * density.density), max(0f, size.height) / 2)
+        return Outline.Rounded(RoundRect(0f, 0f, size.width, size.height, CornerRadius(r, r)))
+    }
+}
+
+/** What the surface last showed. When the work ends, the capsule and its rows leave the session at once; the panel closes over what it had. */
+private class Retained {
+    var capsule: Rect? = null
+    var agents: List<OpenCodeSession> = emptyList()
+    var shells: List<OpenCodeShell> = emptyList()
+}
+
+/**
+ * The background-work panel above the composer (iOS `View.backgroundWork(store:isPresented:…)`).
+ * Wraps [content] (the session screen) and draws the capsule, the scrim and the panel over it,
+ * anchored to the capsule's place marked with [backgroundActivityAnchor].
+ *
+ * @param anchor the capsule's place, shared with [BackgroundWorkCapsuleSpace].
+ * @param sessionID the session shown; a change resets the surface at once (the drawer swaps sessions in place).
+ * @param agents running subagents (`SessionFeature.State.activeSubagents`).
+ * @param shells background shells (`SessionFeature.State.backgroundShells`).
+ * @param waitingSessionIDs subagents waiting on the user (`waitingSessionIDs`).
+ * @param probe where shells' output is read (`shellGlyphProbe`).
+ * @param isPresented the panel is open; [onPresentedChange] asks to change it (the capsule, a
+ *   tap on the scrim, a drag, Back, or the work ending).
+ * @param isCovered a panel grown out of the composer (the model list, the level picker) stands
+ *   over the capsule's place, so it hides like the pills.
+ * @param inCall a voice call takes the composer's place: the panel closes.
+ * @param showsCallTranscript the call's captions cover the pills: the capsule hides.
+ * @param onToggle before the capsule toggles the panel (the composer gives up focus).
+ * @param onOpenSubagent a subagent row tapped (`.subagentTapped(id)`); the panel closes first.
+ * @param onOpenShell a shell row tapped (`.shellOutputTapped(id)`); the panel closes first.
+ */
+@Composable
+fun BackgroundWorkPresentation(
+    anchor: BackgroundWorkAnchor,
+    sessionID: String?,
+    agents: List<OpenCodeSession>,
+    shells: List<OpenCodeShell>,
+    waitingSessionIDs: Set<String>,
+    probe: ShellGlyphProbe?,
+    isPresented: Boolean,
+    onPresentedChange: (Boolean) -> Unit,
+    onOpenSubagent: (String) -> Unit,
+    onOpenShell: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    isCovered: Boolean = false,
+    inCall: Boolean = false,
+    showsCallTranscript: Boolean = false,
+    onToggle: () -> Unit = {},
+    content: @Composable () -> Unit,
+) {
+    val hasWork = agents.isNotEmpty() || shells.isNotEmpty()
+    val reduceMotion = rememberReduceMotion()
+    val density = LocalDensity.current
+    val dark = OpenCodeTheme.colors.isDark
+    val scope = rememberCoroutineScope()
+    val frameDuration = rememberFrameDurationSeconds()
+    val haptics = remember { dependency(HapticsClient) }
+    val dragController = remember { BackgroundWorkDragController(haptics) }
+    val scrollState = rememberScrollState()
+
+    var stage by remember { mutableStateOf(BackgroundWorkStage.closed) }
+    // Landed open: accessibility meets the panel. (The orbs run throughout.)
+    var settled by remember { mutableStateOf(false) }
+    // The rows' height (dp), measured while the capsule shows, so the panel is laid out at its real height before it morphs.
+    var contentHeight by remember { mutableStateOf<Float?>(null) }
+    val contentHeightAnim = remember { Animatable(0f) }
+    val retained = remember { mutableStateOf(Retained()) }
+    // The session whose work the surface shows.
+    var glassSession by remember { mutableStateOf<String?>(null) }
+    // Each open, close, or reset starts a new motion; a superseded one's completion must not settle or close the surface mid-flight.
+    var motion by remember { mutableIntStateOf(0) }
+    // A session that opens on running work shows its capsule at once.
+    var capsuleShown by remember { mutableStateOf(hasWork) }
+    var capsuleMounted by remember { mutableStateOf(hasWork) }
+    // 0 = the capsule's bounds, 1 = the panel's.
+    val progress = remember { Animatable(0f) }
+    val capsuleAlpha = remember { Animatable(if (hasWork) 1f else 0f) }
+    var origin by remember { mutableStateOf(Offset.Zero) }
+    var overlayWidth by remember { mutableFloatStateOf(0f) }
+
+    val latestPresented by rememberUpdatedState(isPresented)
+    val latestHasWork by rememberUpdatedState(hasWork)
+    val latestSession by rememberUpdatedState(sessionID)
+    val latestCovered by rememberUpdatedState(isCovered)
+    val latestCallTranscript by rememberUpdatedState(showsCallTranscript)
+
+    fun setCapsuleShown(shown: Boolean, animated: Boolean, completion: (() -> Unit)? = null) {
+        capsuleShown = shown
+        scope.launch {
+            try {
+                if (animated) capsuleAlpha.animateTo(if (shown) 1f else 0f, Motion.reducedFadeSpec()) else capsuleAlpha.snapTo(if (shown) 1f else 0f)
+                completion?.invoke()
+            } catch (_: CancellationException) {
+            }
+        }
+    }
+
+    fun displayedContentHeight(): Float? = contentHeight?.let { if (contentHeightAnim.isRunning) contentHeightAnim.value else it }
+
+    // The rows' height. Open, a change (work starting or ending) moves the panel's top on the morph spring.
+    fun measured(height: Float) {
+        if (height == contentHeight) return
+        val animate = stage == BackgroundWorkStage.panel && !reduceMotion && contentHeight != null
+        val from = displayedContentHeight() ?: height
+        contentHeight = height
+        scope.launch {
+            if (animate) {
+                contentHeightAnim.snapTo(from)
+                contentHeightAnim.animateTo(height, BackgroundWorkMotion.morph.spec())
+            } else {
+                contentHeightAnim.snapTo(height)
+            }
+        }
+    }
+
+    // The drawer swaps sessions in place: nothing of the last session's surface, mid-morph or measured, carries over to the next.
+    fun reset() {
+        motion += 1
+        dragController.reset()
+        scope.launch { scrollState.scrollTo(0) }
+        if (latestPresented) onPresentedChange(false)
+        stage = BackgroundWorkStage.closed
+        settled = false
+        contentHeight = null
+        capsuleShown = latestHasWork
+        capsuleMounted = latestHasWork
+        scope.launch {
+            progress.snapTo(0f)
+            capsuleAlpha.snapTo(if (latestHasWork) 1f else 0f)
+        }
+        retained.value = Retained()
+        glassSession = null
+    }
+
+    // The capsule's surface becomes the panel's. Mid-close, it turns back.
+    fun open() {
+        glassSession = latestSession
+        motion += 1
+        val current = motion
+        settled = false
+        scope.launch { scrollState.scrollTo(0) }
+        dragController.reset()
+        stage = BackgroundWorkStage.panel
+        scope.launch {
+            try {
+                progress.animateTo(1f, BackgroundWorkMotion.of(reduceMotion))
+                if (current == motion && latestPresented && stage == BackgroundWorkStage.panel) settled = true
+            } catch (_: CancellationException) {
+            }
+        }
+    }
+
+    // The work ended with the capsule at rest: its surface fades, and the overlay leaves once it has.
+    fun dismissCapsule() {
+        motion += 1
+        val current = motion
+        setCapsuleShown(false, animated = !reduceMotion) {
+            if (current == motion && !latestHasWork) capsuleMounted = false
+        }
+    }
+
+    // The panel morphs back into the capsule on the spring it opened on. Without a capsule to land in, it leaves where it is.
+    fun close(releaseVelocity: Float = 0f, remainingDistance: Float = 180f) {
+        if (stage == BackgroundWorkStage.closed) return
+        // Opening a subagent swaps the session before the close begins.
+        if (latestSession != glassSession) return reset()
+        dragController.stopReturn()
+        settled = false
+        motion += 1
+        val current = motion
+        if (!latestHasWork) {
+            // The panel's frame and rows are kept (stage `capsule`) until it has left.
+            stage = BackgroundWorkStage.capsule
+            capsuleShown = false
+            scope.launch {
+                try {
+                    launch { capsuleAlpha.animateTo(0f, Motion.reducedFadeSpec()) }
+                    progress.animateTo(0f, Motion.reducedFadeSpec())
+                    if (current == motion && !latestPresented && stage == BackgroundWorkStage.capsule) {
+                        stage = BackgroundWorkStage.closed
+                        dragController.reset()
+                        if (!latestHasWork) capsuleMounted = false
+                    }
+                } catch (_: CancellationException) {
+                }
+            }
+            return
+        }
+        val (spec, velocity) = BackgroundWorkMotion.closeAnimation(releaseVelocity, remainingDistance, reduceMotion)
+        stage = BackgroundWorkStage.capsule
+        if (latestCallTranscript || latestCovered) setCapsuleShown(false, animated = !reduceMotion)
+        scope.launch {
+            try {
+                progress.animateTo(0f, spec, initialVelocity = -velocity)
+                if (current == motion && !latestPresented && stage == BackgroundWorkStage.capsule) {
+                    stage = BackgroundWorkStage.closed
+                    dragController.reset()
+                    if (!latestCallTranscript && !latestCovered && latestHasWork) setCapsuleShown(true, animated = false)
+                }
+            } catch (_: CancellationException) {
+            }
+        }
+    }
+
+    fun finishDrag(velocity: Float, remainingDistance: Float? = null) {
+        dragController.end(velocity) { releaseVelocity ->
+            val remaining = remainingDistance ?: max(40f, (contentHeight ?: 180f) - dragController.drag.offset)
+            close(releaseVelocity, remaining)
+            onPresentedChange(false)
+        }
+    }
+
+    OnChange(isPresented) { _, presented ->
+        if (presented) {
+            if (stage != BackgroundWorkStage.panel) open()
+        } else if (stage == BackgroundWorkStage.panel) {
+            close()
+        }
+    }
+    OnChange(hasWork) { _, work ->
+        if (work) {
+            // Work returning mid-fade starts a capsule at rest.
+            motion += 1
+            if (!latestPresented) {
+                stage = BackgroundWorkStage.closed
+                dragController.reset()
+                scope.launch { progress.snapTo(0f) }
+            }
+            capsuleMounted = true
+            setCapsuleShown(true, animated = !reduceMotion)
+        } else if (latestPresented) {
+            // The presented change closes it.
+            onPresentedChange(false)
+        } else if (stage != BackgroundWorkStage.closed) {
+            // Mid-close: the surface leaves where it is.
+            close()
+        } else {
+            dismissCapsule()
+        }
+    }
+    // Opening taps, closing is quiet, like the attachment menu.
+    HapticEffect(Haptic.tap, isPresented) { _, open -> open }
+    OnChange(sessionID) { _, _ -> reset() }
+    // A call takes the composer's place; its transcript covers the pills.
+    OnChange(inCall) { _, call -> if (call) onPresentedChange(false) }
+    OnChange(showsCallTranscript) { _, shows ->
+        if (shows) {
+            if (latestPresented) onPresentedChange(false) else if (stage != BackgroundWorkStage.closed) close()
+        } else if (!latestCovered && latestHasWork) {
+            setCapsuleShown(true, animated = !reduceMotion)
+        }
+    }
+    OnChange(isCovered) { _, covered ->
+        if (covered) {
+            if (latestPresented) onPresentedChange(false) else if (stage != BackgroundWorkStage.closed) close()
+        } else if (!latestCallTranscript && latestHasWork) {
+            setCapsuleShown(true, animated = !reduceMotion)
+        }
+    }
+    // The drag's return spring, stepped on the frame clock.
+    LaunchedEffect(dragController.isReturning) {
+        if (!dragController.isReturning) return@LaunchedEffect
+        motionFrameLoop(frameDurationSeconds = frameDuration) { tick ->
+            if (dragController.stepReturn(tick.dt)) MotionFrameAction.Stop else MotionFrameAction.Continue
+        }
+    }
+    BackHandler(enabled = stage == BackgroundWorkStage.panel && isPresented) { onPresentedChange(false) }
+
+    val isPanel = stage == BackgroundWorkStage.panel
+
+    Box(modifier.onGloballyPositioned { origin = it.positionInRoot(); overlayWidth = it.size.width.toFloat() }) {
+        CompositionLocalProvider(LocalBackgroundWorkCoversPills provides isPanel) { content() }
+
+        // The capsule's frame (dp, overlay-local), or while the panel is up or closing, where it last was.
+        val live = anchor.bounds?.let { b ->
+            Rect((b.left - origin.x) / density.density, (b.top - origin.y) / density.density, (b.right - origin.x) / density.density, (b.bottom - origin.y) / density.density)
+        }
+        val keep = retained.value
+        if (live != null) keep.capsule = live
+        val capsule = live ?: if (stage == BackgroundWorkStage.closed && !capsuleMounted) null else keep.capsule
+        if (capsule == null && !capsuleMounted) return@Box
+
+        // The rows the work has, or once it has ended, the rows it last had.
+        val rows: Pair<List<OpenCodeSession>, List<OpenCodeShell>> = if (agents.isNotEmpty() || shells.isNotEmpty()) {
+            keep.agents = agents
+            keep.shells = shells
+            agents to shells
+        } else if (stage == BackgroundWorkStage.closed && !capsuleMounted) {
+            emptyList<OpenCodeSession>() to emptyList()
+        } else {
+            keep.agents to keep.shells
+        }
+        val (rowAgents, rowShells) = rows
+
+        // Scrim.
+        val scrimAlpha by androidx.compose.animation.core.animateFloatAsState(if (isPanel) 1f else 0f, Motion.reducedFadeSpec(), label = "scrim")
+        Box(
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer { alpha = scrimAlpha }
+                .background(Color.Black.copy(alpha = if (dark) 0.32f else 0.1f))
+                .then(if (isPanel) Modifier.pointerInput(Unit) { detectTapGestures { onPresentedChange(false) } } else Modifier)
+                .clearAndSetSemantics { },
+        )
+
+        if (capsule == null) return@Box
+        val safeTop = WindowInsets.safeDrawing.getTop(density) / density.density - origin.y / density.density
+        val pill = Rect(capsule.left, capsule.top + BackgroundWorkMotion.capsuleInset, capsule.right, capsule.bottom - BackgroundWorkMotion.capsuleInset)
+        val maxHeight = max(160f, pill.bottom - max(0f, safeTop) - 72f)
+        val measuredHeight = displayedContentHeight()
+        val height = max(pill.height, min(measuredHeight ?: BackgroundWorkSummary.estimatedHeight(rowAgents, rowShells), maxHeight))
+        // Rooted on the capsule: its bottom and leading edges are the capsule's, and it widens across the composer's column and up.
+        val widthDp = overlayWidth / density.density
+        val panel = Rect(pill.left, pill.bottom - height, pill.left + max(pill.width, widthDp - 2 * pill.left), pill.bottom)
+        val isScrollable = (contentHeight ?: 0f) > maxHeight + 0.5f
+        // Like the pills it grows from, it hides under the call's transcript and under a panel grown out of the composer.
+        val hidden = showsCallTranscript || isCovered
+        val hiddenAlpha by androidx.compose.animation.core.animateFloatAsState(if (hidden) 0f else 1f, Motion.reducedFadeSpec(), label = "hidden")
+        val summary = BackgroundWorkSummary.summary(rowAgents, rowShells)
+        val surfaceColor = MaterialTheme.colorScheme.surfaceContainerHigh
+        val shape = remember { BackgroundWorkShape(BackgroundWorkMotion.panelRadius) }
+
+        val nestedScroll = remember(isScrollable) {
+            object : NestedScrollConnection {
+                var translation = 0f
+
+                override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                    if (source != NestedScrollSource.UserInput || stage != BackgroundWorkStage.panel) return Offset.Zero
+                    translation += available.y / density.density
+                    dragController.update(translation, 0f, scrollState.value / density.density, isScrollable)
+                    return if (dragController.drag.isDragging) available else Offset.Zero
+                }
+
+                override suspend fun onPreFling(available: Velocity): Velocity {
+                    translation = 0f
+                    if (!dragController.drag.isDragging || stage != BackgroundWorkStage.panel) return Velocity.Zero
+                    val velocity = available.y / density.density
+                    val (placed, _) = dragController.drag.placed(panel, pill, reduceMotion)
+                    finishDrag(velocity, max(40f, pill.top - placed.top))
+                    return available
+                }
+            }
+        }
+
+        // The surface: one shape morphing between the capsule's bounds and the (dragged) panel's.
+        Box(
+            Modifier
+                .graphicsLayer { alpha = hiddenAlpha * max(capsuleAlpha.value, progress.value) }
+                .layout { measurable, _ ->
+                    val t = progress.value
+                    val (placed, _) = dragController.drag.copy(offset = dragController.offset).placed(panel, pill, reduceMotion)
+                    val target = if (stage == BackgroundWorkStage.closed) pill else placed
+                    val left = lerp(pill.left, target.left, t)
+                    val top = lerp(pill.top, target.top, t)
+                    val right = lerp(pill.right, target.right, t)
+                    val bottom = lerp(pill.bottom, target.bottom, t)
+                    val w = max(0, ((right - left) * density.density).roundToInt())
+                    val h = max(0, ((bottom - top) * density.density).roundToInt())
+                    val placeable = measurable.measure(Constraints.fixed(w, h))
+                    layout(0, 0) { placeable.place((left * density.density).roundToInt(), (top * density.density).roundToInt()) }
+                }
+                .shadow(if (isPanel) 6.dp else 2.dp, shape, clip = false)
+                .clip(shape)
+                .background(surfaceColor)
+                .then(if (hidden) Modifier.clearAndSetSemantics { } else Modifier),
+        ) {
+            // The capsule's label, a button while the surface is at rest.
+            if (stage != BackgroundWorkStage.panel || progress.value < 1f) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .graphicsLayer { alpha = 1f - progress.value }
+                        .then(
+                            if (stage == BackgroundWorkStage.closed && !hidden) {
+                                Modifier
+                                    .clickable(onClickLabel = "Shows running subagents and shells") {
+                                        onToggle()
+                                        onPresentedChange(!isPresented)
+                                    }
+                                    .testTag("background-activity")
+                                    .semantics {
+                                        contentDescription = summary
+                                        // Open, the panel replaces it, so it only ever reads collapsed.
+                                        stateDescription = "Collapsed"
+                                    }
+                            } else {
+                                Modifier.clearAndSetSemantics { }
+                            },
+                        ),
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    BackgroundWorkCapsuleLabel(rowAgents.size, rowShells.size, Modifier.clearAndSetSemantics { }) {
+                        BackgroundWorkGlyph(rowAgents, rowShells, waitingSessionIDs, probe)
+                    }
+                }
+            }
+            // The rows run from the morph's first frame, both ways: only accessibility waits for the panel to land.
+            if (stage != BackgroundWorkStage.closed || progress.value > 0f) {
+                Box(
+                    Modifier
+                        .layout { measurable, constraints ->
+                            val w = (panel.width * density.density).roundToInt()
+                            val h = (panel.height * density.density).roundToInt()
+                            val placeable = measurable.measure(Constraints.fixed(w, h))
+                            layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(0, 0) }
+                        }
+                        .graphicsLayer {
+                            alpha = progress.value
+                            val scale = dragController.drag.copy(offset = dragController.offset).placed(panel, pill, reduceMotion).second
+                            scaleX = scale
+                            scaleY = scale
+                            transformOrigin = TransformOrigin(0f, 0f)
+                        }
+                        .nestedScroll(nestedScroll)
+                        .then(if (settled && !hidden) Modifier.testTag("background-work-panel") else Modifier.clearAndSetSemantics { }),
+                    contentAlignment = Alignment.BottomStart,
+                ) {
+                    BackgroundWorkPanel(
+                        agents = rowAgents,
+                        waitingSessionIDs = waitingSessionIDs,
+                        shells = rowShells,
+                        probe = probe,
+                        scrollState = scrollState,
+                        isLive = true,
+                        onContentHeight = ::measured,
+                        onOpenSubagent = { id ->
+                            if (!dragController.drag.isDragging) {
+                                onPresentedChange(false)
+                                onOpenSubagent(id)
+                            }
+                        },
+                        onOpenShell = { id ->
+                            if (!dragController.drag.isDragging) {
+                                onPresentedChange(false)
+                                onOpenShell(id)
+                            }
+                        },
+                    )
+                }
+            }
+        }
+
+        if (!isPanel && live != null) {
+            // Measured while the capsule shows, out of sight and touch, so opening lays the panel out at its real height at once.
+            Box(
+                Modifier
+                    .layout { measurable, _ ->
+                        val w = (panel.width * density.density).roundToInt()
+                        val placeable = measurable.measure(Constraints(minWidth = w, maxWidth = w))
+                        measured(placeable.height / density.density)
+                        layout(0, 0) { }
+                    }
+                    .clearAndSetSemantics { },
+            ) {
+                BackgroundWorkRows(rowAgents, waitingSessionIDs, rowShells, probe, isLive = false, onOpenSubagent = {}, onOpenShell = {})
+            }
+        }
+    }
+}
+
+/** Runs [action] with the old and new value when [value] changes (iOS `.onChange(of:)`), never on first composition. */
+@Composable
+private fun <T> OnChange(value: T, action: (old: T, new: T) -> Unit) {
+    val previous = remember { arrayOfNulls<Any?>(1).also { it[0] = value } }
+    val latest by rememberUpdatedState(action)
+    LaunchedEffect(value) {
+        @Suppress("UNCHECKED_CAST")
+        val old = previous[0] as T
+        previous[0] = value
+        if (old != value) latest(old, value)
+    }
+}
+
+// MARK: Panel
+
+/**
+ * Running subagents and background shells, full width so titles never wrap.
+ * [BackgroundWorkPresentation] supplies its surface and frame.
+ *
+ * @param agents running subagents, one row each (tap: [onOpenSubagent] with its session ID).
+ * @param waitingSessionIDs subagents waiting on the user: their orbs show Waiting for Input.
+ * @param shells background shells, one row each with its command and running time (tap: [onOpenShell]).
+ * @param probe where the shells' output is read, for their glyphs.
+ * @param scrollState the list's scroll position; scrolls once the rows outgrow the panel.
+ * @param isLive the orbs, shell glyphs and clocks run. A hidden measuring copy holds still.
+ * @param onContentHeight the rows' natural height in dp, whenever it changes.
+ */
+@Composable
+fun BackgroundWorkPanel(
+    agents: List<OpenCodeSession>,
+    shells: List<OpenCodeShell>,
+    onOpenSubagent: (String) -> Unit,
+    onOpenShell: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    waitingSessionIDs: Set<String> = emptySet(),
+    probe: ShellGlyphProbe? = null,
+    scrollState: ScrollState = rememberScrollState(),
+    isLive: Boolean = true,
+    onContentHeight: (Float) -> Unit = {},
+) {
+    val density = LocalDensity.current
+    Box(modifier.fillMaxWidth().verticalScroll(scrollState)) {
+        BackgroundWorkRows(
+            agents, waitingSessionIDs, shells, probe, isLive, onOpenSubagent, onOpenShell,
+            Modifier.onSizeChanged { onContentHeight(it.height / density.density) },
+        )
+    }
+}
+
+@Composable
+private fun BackgroundWorkRows(
+    agents: List<OpenCodeSession>,
+    waitingSessionIDs: Set<String>,
+    shells: List<OpenCodeShell>,
+    probe: ShellGlyphProbe?,
+    isLive: Boolean,
+    onOpenSubagent: (String) -> Unit,
+    onOpenShell: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier.fillMaxWidth().padding(vertical = 10.dp)) {
+        if (agents.isNotEmpty()) {
+            SectionHeader("Subagents")
+            for (agent in agents) {
+                androidx.compose.runtime.key(agent.id) {
+                    BackgroundWorkRow(
+                        title = agent.title,
+                        accessibilityHint = "Opens the subagent’s session",
+                        onTap = { onOpenSubagent(agent.id) },
+                        modifier = Modifier.testTag("background-subagent-${agent.id}"),
+                    ) {
+                        AgentActivityGlyph(
+                            source = AgentActivitySource.Subagent(
+                                SubagentActivity(sessionID = agent.id, phase = SubagentActivity.Phase.running, needsInput = agent.id in waitingSessionIDs),
+                            ),
+                            isPaused = !isLive,
+                        )
+                    }
+                }
+            }
+        }
+        if (agents.isNotEmpty() && shells.isNotEmpty()) {
+            HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 6.dp), color = OpenCodeTheme.colors.border)
+        }
+        if (shells.isNotEmpty()) {
+            SectionHeader("Shells")
+            for (shell in shells) {
+                androidx.compose.runtime.key(shell.id) {
+                    BackgroundWorkRow(
+                        title = shell.title,
+                        isCommand = true,
+                        startedAt = shell.startedAt,
+                        isLive = isLive,
+                        accessibilityHint = "Shows the shell’s output",
+                        onTap = { onOpenShell(shell.id) },
+                        modifier = Modifier.testTag("background-shell-${shell.id}"),
+                    ) {
+                        ShellGlyph(shellIDs = listOf(shell.id), probe = probe, isPaused = !isLive)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SectionHeader(title: String) {
+    Text(
+        title,
+        style = OpenCodeTextStyles.footnote.copy(fontWeight = FontWeight.SemiBold),
+        color = OpenCodeTheme.colors.secondaryText,
+        modifier = Modifier
+            .padding(start = 20.dp, end = 20.dp, top = 6.dp, bottom = 2.dp)
+            .semantics { heading() },
+    )
+}
+
+@Composable
+private fun BackgroundWorkRow(
+    title: String,
+    accessibilityHint: String,
+    onTap: () -> Unit,
+    modifier: Modifier = Modifier,
+    isCommand: Boolean = false,
+    startedAt: Instant? = null,
+    isLive: Boolean = true,
+    leading: @Composable () -> Unit,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val highlight = LocalContentColor.current.copy(alpha = 0.08f)
+    Row(
+        modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            // A pressed row lifts a soft highlight inset from the panel's edges.
+            .drawBehind {
+                if (pressed) {
+                    val inset = 8.dp.toPx()
+                    drawRoundRect(highlight, Offset(inset, 0f), Size(size.width - 2 * inset, size.height), CornerRadius(16.dp.toPx()))
+                }
+            }
+            .clickable(interactionSource = interaction, indication = null, onClickLabel = accessibilityHint, onClick = onTap)
+            .semantics(mergeDescendants = true) {
+                contentDescription = title
+                onClick(label = accessibilityHint) { onTap(); true }
+            }
+            .padding(horizontal = 20.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.width(20.dp).clearAndSetSemantics { }, contentAlignment = Alignment.Center) { leading() }
+        Text(
+            title,
+            style = if (isCommand) OpenCodeTextStyles.subheadline.copy(fontFamily = OpenCodeFonts.monospace) else OpenCodeTextStyles.body,
+            maxLines = 1,
+            overflow = if (isCommand) TextOverflow.MiddleEllipsis else TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f).clearAndSetSemantics { },
+        )
+        if (startedAt != null) {
+            ShellElapsedTime(
+                since = startedAt,
+                isPaused = !isLive,
+                style = OpenCodeTextStyles.subheadline.copy(fontFeatureSettings = "tnum"),
+                color = OpenCodeTheme.colors.secondaryText,
+            )
+        }
+        OpenCodeIcon(SFSymbol.ChevronRight, contentDescription = null, size = 16.dp, tint = OpenCodeTheme.colors.tertiaryText)
+    }
+}
+
+// MARK: Elapsed time
+
+/**
+ * Running time as a clock (`0:42`, `12:03`, `1:02:03`), ticking each second.
+ *
+ * @param since when the shell started.
+ * @param until when it ended; a fixed time then.
+ * @param isPaused hidden or moving: shows the time once instead of ticking.
+ */
+@Composable
+fun ShellElapsedTime(
+    since: Instant,
+    modifier: Modifier = Modifier,
+    until: Instant? = null,
+    isPaused: Boolean = false,
+    style: TextStyle = OpenCodeTextStyles.subheadline.copy(fontFeatureSettings = "tnum"),
+    color: Color = Color.Unspecified,
+) {
+    var now by remember { mutableStateOf(Instant.now()) }
+    LaunchedEffect(since, until, isPaused) {
+        now = Instant.now()
+        if (until != null || isPaused) return@LaunchedEffect
+        while (true) {
+            // Ticks on the whole seconds since it started.
+            val elapsedMillis = Duration.between(since, Instant.now()).toMillis()
+            delay(1000 - Math.floorMod(elapsedMillis, 1000L) + 1)
+            now = Instant.now()
+        }
+    }
+    val seconds = max(0L, Duration.between(since, until ?: now).seconds)
+    Text(
+        ShellElapsedTimeFormat.clock(seconds),
+        style = style,
+        color = color,
+        maxLines = 1,
+        modifier = modifier.clearAndSetSemantics { contentDescription = ShellElapsedTimeFormat.spoken(seconds) },
+    )
+}
+
+/** iOS `Duration.formatted(.time(pattern:))` and `.units(allowed: [.hours, .minutes, .seconds], width: .wide)`. */
+object ShellElapsedTimeFormat {
+    fun clock(seconds: Long): String {
+        val h = seconds / 3600
+        val m = (seconds % 3600) / 60
+        val s = seconds % 60
+        return if (seconds >= 3600) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(seconds / 60, s)
+    }
+
+    fun spoken(seconds: Long): String {
+        val h = seconds / 3600
+        val m = (seconds % 3600) / 60
+        val s = seconds % 60
+        fun unit(n: Long, noun: String) = if (n == 1L) "1 $noun" else "$n ${noun}s"
+        val parts = listOfNotNull(
+            if (h > 0) unit(h, "hour") else null,
+            if (m > 0) unit(m, "minute") else null,
+            if (s > 0) unit(s, "second") else null,
+        )
+        return if (parts.isEmpty()) "0 seconds" else parts.joinToString(", ")
+    }
+}

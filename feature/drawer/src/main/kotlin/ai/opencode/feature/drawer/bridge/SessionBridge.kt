@@ -7,6 +7,7 @@ import ai.opencode.feature.composer.DraftState
 import ai.opencode.feature.composer.SharedComposerDraft
 import ai.opencode.feature.composer.SharedDraftTarget
 import ai.opencode.feature.session.SessionFeature
+import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeFormRequest
 import ai.opencode.server.model.OpenCodeModelRef
 import ai.opencode.server.model.OpenCodePendingInput
@@ -122,6 +123,7 @@ data class SessionDetail(
     companion object {
         /** iOS `SessionFeature.State(server:session:cachedItems:…)`. */
         fun forSession(
+            server: OpenCodeServer,
             session: OpenCodeSession,
             navigationID: Int,
             visit: Int = navigationID,
@@ -129,7 +131,7 @@ data class SessionDetail(
             externalTranscript: Boolean = false,
             isRunning: Boolean = false,
         ) = SessionDetail(
-            feature = SessionFeature.State(sessionID = session.id, title = session.title),
+            feature = SessionFeature.State.session(server, session, cachedItems, externalTranscript, isRunning, navigationID, visit),
             session = session,
             navigationID = navigationID,
             visit = visit,
@@ -141,13 +143,14 @@ data class SessionDetail(
 
         /** iOS `SessionFeature.State(server:draftProject:projects:inheritedModel:…)`. */
         fun draft(
+            server: OpenCodeServer,
             draftProject: OpenCodeProject?,
             projects: List<OpenCodeProject>,
             inheritedModel: OpenCodeModelRef?,
             navigationID: Int,
             visit: Int = navigationID,
         ) = SessionDetail(
-            feature = SessionFeature.State(),
+            feature = SessionFeature.State.draft(server, draftProject, projects, inheritedModel, navigationID, visit),
             session = null,
             navigationID = navigationID,
             visit = visit,

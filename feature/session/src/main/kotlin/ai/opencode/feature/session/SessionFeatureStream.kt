@@ -1,0 +1,859 @@
+package ai.opencode.feature.session
+
+import ai.opencode.feature.composer.RequestDockFeature
+import ai.opencode.core.store.Effect
+import ai.opencode.core.store.Reduced
+import ai.opencode.core.store.cancellable
+import ai.opencode.core.store.map
+import ai.opencode.feature.session.SessionFeature.Action
+import ai.opencode.feature.session.SessionFeature.CancelID
+import ai.opencode.feature.composer.DictationFeature
+import ai.opencode.feature.composer.DictationHoldRelease
+import ai.opencode.core.diagnostics.LabMarks
+import ai.opencode.feature.transcript.TranscriptEntry
+import ai.opencode.feature.voice.ServerVoiceSupport
+import ai.opencode.server.OpenCodeLiveContentEvent
+import ai.opencode.server.model.OpenCodeContextReading
+import ai.opencode.server.model.OpenCodeJSONValue
+import ai.opencode.server.model.OpenCodeToolCall
+import ai.opencode.server.model.OpenCodeTranscriptItem
+import kotlin.time.Duration
+
+// Port of iOS `SessionFeature+Stream.swift`.
+
+/**
+ * iOS `SessionFeature.mergeTranscript(fetched:into:…)`: splices a freshly fetched window of newest
+ * messages into what we show.
+ *
+ * Every fetch returns the *newest N messages*, so a poll's window is often shorter than a
+ * transcript already expanded by the full-history fetch — and its item count can even shrink as
+ * the window slides over tool-heavy messages. Comparing counts therefore froze the transcript and
+ * new messages stopped appearing, so instead: keep everything older than the window, adopt the
+ * window, and carry client-only rows forward.
+ */
+internal fun SessionFeature.Companion.mergeTranscript(
+    fetched: List<OpenCodeTranscriptItem>,
+    existing: List<OpenCodeTranscriptItem>,
+    optimisticPromptIDs: Set<String> = emptySet(),
+    projectedMessageIDs: Set<String> = emptySet(),
+    echoedPromptIDs: Set<String> = emptySet(),
+    pendingNoticeIDs: Set<String> = emptySet(),
+): List<OpenCodeTranscriptItem> {
+    if (fetched.isEmpty()) return existing
+    val windowIDs = fetched.mapTo(HashSet(fetched.size)) { it.id }
+    fun isOptimistic(item: OpenCodeTranscriptItem): Boolean =
+        optimisticPromptIDs.isNotEmpty() && TranscriptEntry.promptID(item)?.let { it in optimisticPromptIDs } == true
+    // The usual watchdog/reconnect response is the same trailing window. Prove only that window's
+    // content; the older prefix needs ID checks, not classification, copying, or deep equality.
+    // Rewritten history and local rows that must move to the tail still take the general merge below.
+    if (existing.size >= fetched.size) {
+        val prefixCount = existing.size - fetched.size
+        var sameWindow = true
+        for (index in fetched.indices) {
+            if (existing[prefixCount + index] != fetched[index]) { sameWindow = false; break }
+        }
+        if (sameWindow) {
+            for (index in 0 until prefixCount) {
+                val item = existing[index]
+                if (item.id in windowIDs || item.id.startsWith("info-") || isOptimistic(item)) { sameWindow = false; break }
+            }
+        }
+        if (sameWindow) return existing
+    }
+    // REST has no unfinished text/tool payload until its durable boundary. A page fetched while an
+    // SSE projection is live must not erase a row merely because that message's part is still
+    // absent from the snapshot.
+    val windowStart: Int? = existing.indexOfFirst { it.id == fetched[0].id }.takeIf { it >= 0 }
+    val older = ArrayList<OpenCodeTranscriptItem>()
+    val trailing = ArrayList<OpenCodeTranscriptItem>()
+    val retainedIDs = HashSet<String>()
+    var hasServerRows = false
+    val protectedMessages = projectedMessageIDs + echoedPromptIDs
+    // Classify once. Only the overlapping suffix can contain unpersisted parts; don't build two
+    // full-history arrays and then filter them again.
+    for ((index, item) in existing.withIndex()) {
+        if (item.id in windowIDs) {
+            hasServerRows = true
+        } else if (index >= (windowStart ?: 0) &&
+            (item.id in pendingNoticeIDs || (protectedMessages.isNotEmpty() && messageID(item) in protectedMessages))
+        ) {
+            retainedIDs += item.id
+        } else if (item.id.startsWith("info-") || isOptimistic(item)) {
+            trailing += item
+        } else {
+            hasServerRows = true
+            if (windowStart == null || index < windowStart) older += item
+        }
+    }
+
+    val merged = older + fetched
+    if (retainedIDs.isEmpty()) return merged + trailing
+    // Keep an unpersisted part before the next surviving row, rather than moving it behind later
+    // steering messages on every page refresh.
+    val survivingIDs = merged.mapTo(HashSet(merged.size)) { it.id }
+    val nextSurvivor = HashMap<String, String?>()
+    var successor: String? = null
+    for (item in existing.asReversed()) {
+        if (item.id in retainedIDs) {
+            nextSurvivor[item.id] = successor
+        } else if (item.id in survivingIDs) {
+            successor = item.id
+        }
+    }
+    // A new steering echo may have no old successor. Anchor after the part's own fetched siblings,
+    // then fall back to its predecessor's whole message.
+    val messageEnds = HashMap<String, Int>()
+    val positions = HashMap<String, Int>(merged.size)
+    for ((index, item) in merged.withIndex()) {
+        positions[item.id] = index
+        messageEnds[messageID(item)] = index + 1
+    }
+    val buckets = HashMap<Int, MutableList<OpenCodeTranscriptItem>>()
+    var predecessor: OpenCodeTranscriptItem? = null
+    for (item in existing) {
+        if (item.id in retainedIDs) {
+            val insertion = nextSurvivor[item.id]?.let { positions[it] }
+                ?: messageEnds[messageID(item)]
+                ?: predecessor?.let { messageEnds[messageID(it)] }
+                // An echo older than a window that jumped ahead of held history goes before it;
+                // with no history held (a session still loading) it's the newest row.
+                ?: if (messageID(item) in echoedPromptIDs && hasServerRows) 0 else merged.size
+            buckets.getOrPut(insertion) { ArrayList() } += item
+        } else if (item.id in survivingIDs) {
+            predecessor = item
+        }
+    }
+    val result = ArrayList<OpenCodeTranscriptItem>(merged.size + retainedIDs.size + trailing.size)
+    for (index in merged.indices) {
+        buckets[index]?.let(result::addAll)
+        result += merged[index]
+    }
+    buckets[merged.size]?.let(result::addAll)
+    result += trailing
+    return result
+}
+
+/** iOS `SessionFeature.messageID(for:)`: the server message an item belongs to. */
+internal fun SessionFeature.Companion.messageID(item: OpenCodeTranscriptItem): String {
+    TranscriptEntry.promptID(item)?.let { return it }
+    return when (item) {
+        is OpenCodeTranscriptItem.Tool ->
+            item.call.messageID ?: item.id.indexOf("-tool-").takeIf { it >= 0 }?.let { item.id.substring(0, it) } ?: item.id
+        is OpenCodeTranscriptItem.AssistantMarkdown ->
+            item.id.lastIndexOf("-text-").takeIf { it >= 0 }?.let { item.id.substring(0, it) } ?: item.id
+        // An assistant message's error carries its ID with `-error`; an idle message's is its own.
+        is OpenCodeTranscriptItem.RunError -> if (item.error.beforeReply) item.id else item.id.dropLast("-error".length)
+        is OpenCodeTranscriptItem.RunRetry -> item.id.dropLast("-retry".length)
+        else -> item.id
+    }
+}
+
+/** iOS `SessionFeature.promptIDs(in:)`. */
+internal fun SessionFeature.Companion.promptIDs(items: List<OpenCodeTranscriptItem>): Set<String> =
+    items.mapNotNullTo(HashSet()) { TranscriptEntry.promptID(it) }
+
+/** The event stream, transcript refreshes, and the screen's lifecycle. Null: the action passes on. */
+internal fun SessionFeature.reduceStream(
+    state: SessionFeature.State,
+    action: Action,
+): Reduced<SessionFeature.State, Action>? = when (action) {
+    is Action.EventStreamConnected -> eventStreamConnected(state, action)
+    is Action.ContentBatch -> contentBatch(state, action)
+    is Action.WatchdogElapsed -> watchdogElapsed(state, action.generation)
+    is Action.MessageInvalidated ->
+        if (state.session?.id != action.sessionID) Reduced(state)
+        else Reduced(state, Effect.send(Action.RefreshRequested(RefreshReason.Invalidation)))
+    is Action.RefreshRequested -> refreshRequested(state, action.reason)
+    is Action.RefreshResponse -> refreshResponse(state, action)
+    is Action.SceneActiveChanged -> sceneActiveChanged(state, action.isActive)
+    is Action.VisibilityChanged -> visibilityChanged(state, action.isVisible)
+    is Action.ResyncDelayElapsed -> resyncDelayElapsed(state, action.refreshID)
+    is Action.ResyncMinimumElapsed -> {
+        // Counts from when the cue first showed, across the reads it carries; clearing the cue
+        // cancels it, so it never outlives its cue.
+        val resync = state.resync
+        when {
+            resync == null || !resync.isShown -> Reduced(state)
+            resync.responseReceived -> Reduced(state.copy(resync = null))
+            else -> Reduced(state.copy(resync = resync.copy(minimumElapsed = true)))
+        }
+    }
+    is Action.AcceptedTranscriptUpdated -> Reduced(state)
+    is Action.ViewAcknowledged -> {
+        val viewed = maxOf(state.viewedIdle[action.sessionID] ?: 0L, action.idle)
+        var s = state.copy(viewedIdle = state.viewedIdle + (action.sessionID to viewed))
+        val session = s.session
+        if (session?.id == action.sessionID) {
+            s = s.copy(session = session.copy(viewedMilliseconds = maxOf(session.viewedMilliseconds ?: 0L, action.idle)))
+        }
+        Reduced(s)
+    }
+    is Action.Task -> task(state)
+    is Action.WorkingRunElapsed -> Reduced(state.copy(workingRun = state.workingRun.elapsed(action.id)))
+    is Action.PreviewStateReplaced -> Reduced(action.state)
+    is Action.FirstContentFrameRendered -> firstContentFrameRendered(state)
+    else -> null
+}
+
+private fun SessionFeature.eventStreamConnected(
+    state: SessionFeature.State,
+    action: Action.EventStreamConnected,
+): Reduced<SessionFeature.State, Action> {
+    var s = state.copy(server = action.server, streamIsHealthy = true)
+    val support = s.voice?.serverVoiceSupport
+    if (support != null && support != ServerVoiceSupport.unknown) {
+        s = s.copy(voice = s.voice?.copy(serverVoiceSupport = ServerVoiceSupport.unknown))
+    }
+    val retune = retunePendingWork(s)
+    // A new socket epoch invalidates delta accumulators, not rendered parts: unfinished
+    // text/tools are still absent from REST. Keep their row protection until reconciliation can
+    // echo them or the run ends. Shell events are ephemeral: an exit may have been missed. The
+    // reconnect's re-list replaces every listed shell.
+    s = retune.state.copy(
+        streamSupportsProjection = false,
+        liveText = emptyMap(),
+        lastProjectedMessageID = null,
+        shells = retune.state.shells.map { if (it.isListed) it else it.copy(isListed = true) },
+    )
+    // A resume read that beat the socket handshake is already the REST hydration for this epoch.
+    // Do not cancel it and start the same bytes again; subsequent events are buffered against
+    // that in-flight read.
+    val watched = watchdog(s)
+    if (watched.state.refresh != null) return Reduced(watched.state, Effect.merge(retune.effect, watched.effect))
+    return Reduced(
+        watched.state,
+        Effect.merge(Effect.send(Action.RefreshRequested(RefreshReason.Reconnect)), retune.effect, watched.effect),
+    )
+}
+
+private fun SessionFeature.contentBatch(
+    state: SessionFeature.State,
+    action: Action.ContentBatch,
+): Reduced<SessionFeature.State, Action> {
+    val sessionID = action.sessionID
+    val events = action.events
+    if (state.session?.id != sessionID) return Reduced(state)
+    var s = state.copy(
+        workingRun = state.workingRun.batchArriving(events, sessionID = sessionID, isRunning = state.isRunning, items = state.items),
+        isExternallyActive = true,
+        streamIsHealthy = true,
+        streamSupportsProjection = true,
+    )
+    val retune = retunePendingWork(s)
+    s = retune.state
+    // Streaming text survives a refresh through `liveText`; replaying its deltas afterwards would
+    // append them a second time. Reasoning events project no transcript items and need not be
+    // buffered either.
+    s.refresh?.let { refresh ->
+        var raced = refresh.racedEvents + events.filter {
+            it !is OpenCodeLiveContentEvent.TextDelta &&
+                it !is OpenCodeLiveContentEvent.ReasoningStarted &&
+                it !is OpenCodeLiveContentEvent.ReasoningDelta &&
+                it !is OpenCodeLiveContentEvent.ReasoningEnded
+        }
+        if (raced.size > 512) raced = raced.drop(raced.size - 512)
+        s = s.copy(refresh = refresh.copy(racedEvents = raced))
+    }
+    val previousFirstID = s.firstVisibleItemID
+    val projection = LiveProjection(s)
+    var projected = s.projectedMessageIDs
+    var lastProjected = s.lastProjectedMessageID
+    var contextNeedsRead = s.contextNeedsRead
+    for (event in events) {
+        if (event.projectsRows) {
+            if (event.messageID !in projected) projected = projected + event.messageID
+            lastProjected = event.messageID
+        }
+        if (event is OpenCodeLiveContentEvent.StepEnded) contextNeedsRead = true
+        applyLiveEvent(event, projection)
+    }
+    s = projection.applied(s).copy(
+        projectedMessageIDs = projected,
+        lastProjectedMessageID = lastProjected,
+        contextNeedsRead = contextNeedsRead,
+    )
+    s = s.retainRenderedWindowStart(previousFirstID).pinBrowsingWindowIfNeeded()
+    // Kept alive in the background, the stream brings what arrives while the reader is away.
+    if (!s.isVisible) s = s.updateNewMessagesMark(settles = false)
+    LabMarks.mark("stream_delta_batch", sessionID = sessionID)
+    // A flush can contain text.ended followed by step.ended for a different bookkeeping message.
+    // Prefer the durable boundary that actually projected a row; that is the message REST must settle.
+    val settledEvent = events.lastOrNull { it.isDurableBoundary && it.projectsRows }
+        ?: events.lastOrNull { it.isDurableBoundary }
+    val settledMessageID = settledEvent?.let {
+        if (it.projectsRows) it.messageID else (s.lastProjectedMessageID ?: it.messageID)
+    }
+    if (settledMessageID != null) LabMarks.mark("stream_settled", sessionID = sessionID)
+    val watched = watchdog(s)
+    return Reduced(
+        watched.state,
+        Effect.merge(
+            settledMessageID?.let { Effect.send(Action.RefreshRequested(RefreshReason.Settlement(it))) } ?: Effect.none(),
+            retune.effect,
+            watched.effect,
+        ),
+    )
+}
+
+private fun SessionFeature.refreshRequested(
+    state: SessionFeature.State,
+    reason: RefreshReason,
+): Reduced<SessionFeature.State, Action> {
+    val session = state.session ?: return Reduced(state)
+    val backgroundWork = refreshBackgroundWork(state, reason)
+    var s = backgroundWork.state
+    val inFlight = s.refresh
+    if (inFlight != null) {
+        // A terminal page read must not be downgraded by a later part or inbox invalidation while
+        // this older request is still in flight.
+        if (inFlight.followup == RefreshReason.RunState) return backgroundWork
+        // Lifecycle duplicates coalesce into the read already in flight. Only a content/run
+        // invalidation proves that read may have raced a newer server mutation and therefore
+        // earns one follow-up.
+        if (reason is RefreshReason.Settlement && inFlight.reason == RefreshReason.Settlement(reason.messageID)) {
+            // Text/tool/step boundaries for one assistant message commonly arrive together. The
+            // in-flight read has a 200 ms coalescing delay and will observe all of them.
+        } else if (inFlight.reason is RefreshReason.Settlement) {
+            // A later request for a complete window must run after the targeted read; neither
+            // scope may overwrite a newer read.
+            s = s.copy(refresh = inFlight.copy(followup = reason))
+        } else if (reason.requiresFollowup) {
+            s = s.copy(refresh = inFlight.copy(followup = reason))
+        }
+        return Reduced(s, backgroundWork.effect)
+    }
+    val requestID = s.nextRefreshID + 1
+    s = s.copy(nextRefreshID = requestID, refresh = SessionFeature.State.Refresh(id = requestID, reason = reason))
+    LabMarks.mark("refresh_start(${reason.label})", sessionID = session.id)
+    var cue: Effect<Action> = Effect.none()
+    if (s.isVisible &&
+        (reason == RefreshReason.Resume || reason == RefreshReason.Reconnect || (reason == RefreshReason.Open && !s.initialTranscriptIsFresh))
+    ) {
+        val began = beginResync(s, refreshID = requestID)
+        s = began.state
+        cue = began.effect
+    }
+    return Reduced(
+        s,
+        Effect.merge(
+            cue,
+            backgroundWork.effect,
+            authoritativeRefresh(
+                server = s.server,
+                session = session,
+                requestID = requestID,
+                reason = reason,
+                messageIsInWindow = reason.messageID?.let { SessionFeature.containsMessage(it, s.items) } ?: false,
+                readsContext = s.contextNeedsRead,
+            ),
+        ),
+    )
+}
+
+private fun SessionFeature.refreshResponse(
+    state: SessionFeature.State,
+    action: Action.RefreshResponse,
+): Reduced<SessionFeature.State, Action> {
+    val sessionID = action.sessionID
+    val inFlight = state.refresh
+    if (state.session?.id != sessionID || inFlight == null || inFlight.id != action.requestID) {
+        LabMarks.mark("refresh_rejected_stale", sessionID = sessionID)
+        return Reduced(state)
+    }
+    var s = state.copy(refresh = null)
+    val followup: Effect<Action> = inFlight.followup?.let { Effect.send(Action.RefreshRequested(it)) } ?: Effect.none()
+    LabMarks.mark("refresh_end(${inFlight.reason.label})", sessionID = sessionID)
+    val settled = settleResync(s, refreshID = action.requestID)
+    s = settled.state
+    val settleCue = settled.effect
+    val refresh = action.result.getOrElse { failure ->
+        val error = failure.asClientError()
+        s = s.copy(isLoading = false, refreshFailed = s.items.isNotEmpty())
+        // A failed read after the return can't say what's new; a later one mustn't call what
+        // arrived in front of the reader new.
+        if (s.isVisible && inFlight.followup == null) {
+            s = s.copy(newMessagesBaseline = null, sinceYouLeftSeen = null, sinceYouLeftAt = null)
+        }
+        if (s.cacheableItems.isEmpty() && !s.initialTranscriptIsFresh) s = s.copy(loadError = error.message)
+        return Reduced(
+            s,
+            Effect.merge(
+                settleCue,
+                followup,
+                if (!s.hasRenderedFirstContentFrame && s.items.isEmpty()) Effect.send(Action.FirstContentFrameRendered) else Effect.none(),
+            ),
+        )
+    }
+    if (!s.isExternallyActive) {
+        // Any read can be the first to echo a prompt delivered after idle. Retire its wait before
+        // deciding whether projection can settle.
+        s = reconcilePromptEchoes(refresh.items, s)
+        if (!s.hasPendingLocalPrompt) s = s.copy(isAwaitingReply = false)
+    }
+    val preserveProjection = s.isRunning || inFlight.followup == RefreshReason.RunState
+    val previousIDs = s.items.mapTo(HashSet()) { it.id }
+    s = when (val scope = refresh.scope) {
+        SessionFeature.AuthoritativeRefresh.Scope.Page ->
+            applyAuthoritative(refresh.items, refresh.pageCursor, s, preserveProjection)
+        is SessionFeature.AuthoritativeRefresh.Scope.Message ->
+            applyAuthoritativeMessage(refresh.items, scope.messageID, s, preserveProjection)
+    }
+    s = s.copy(refreshFailed = false)
+    // A carried row already contains the events received during this read. Replay only onto
+    // replaced/missing parts; otherwise a tool's input deltas append twice (or input.started
+    // resets its payload).
+    val fetchedIDs = refresh.items.mapTo(HashSet()) { it.id }
+    val retainedIDs = s.items.mapNotNullTo(HashSet()) { item -> item.id.takeIf { it in previousIDs && it !in fetchedIDs } }
+    val replayEvents = inFlight.racedEvents.filter { event ->
+        preserveProjection && event.transcriptItemID?.let { it in retainedIDs } != true
+    }
+    if (replayEvents.isNotEmpty()) {
+        val previousFirstID = s.firstVisibleItemID
+        val projection = LiveProjection(s)
+        for (event in replayEvents) applyLiveEvent(event, projection)
+        s = projection.applied(s).retainRenderedWindowStart(previousFirstID).pinBrowsingWindowIfNeeded()
+    }
+    s = when (val context = refresh.context) {
+        is OpenCodeContextReading.Measured -> s.copy(contextUsage = context.usage, contextNeedsRead = false)
+        OpenCodeContextReading.Empty -> s.copy(contextUsage = null, contextNeedsRead = false)
+        OpenCodeContextReading.Inconclusive -> s
+    }
+    // The page read after the reader's return settles what arrived while they were away.
+    val settles = s.isVisible && refresh.scope == SessionFeature.AuthoritativeRefresh.Scope.Page
+    s = s.updateNewMessagesMark(settles = settles)
+    val sinceYouLeft = evaluateSinceYouLeft(s, settles = settles)
+    s = sinceYouLeft.state
+    var observed = refresh.observed
+    val current = s.session
+    if ((!refresh.observedIsRead || inFlight.revertChanged) && observed.id == current?.id) {
+        observed = observed.copy(revertMessageID = current?.revertMessageID)
+    }
+    val model = current?.model
+    if ((!refresh.observedIsRead || inFlight.modelChanged) && model != null && observed.id == current?.id) {
+        observed = observed.copy(model = model)
+    } else if (refresh.observedIsRead && observed.id == current?.id) {
+        s = s.adoptServerModel(observed.model)
+    }
+    s = s.updateObservedSession(observed)
+    return Reduced(
+        s,
+        Effect.merge(
+            settleCue,
+            sinceYouLeft.effect,
+            Effect.send(Action.AcceptedTranscriptUpdated(sessionID = sessionID, items = s.cacheableItems)),
+            acknowledgeViewed(refresh.observed, s),
+            followup,
+            if (!s.hasRenderedFirstContentFrame && s.items.isEmpty()) Effect.send(Action.FirstContentFrameRendered) else Effect.none(),
+        ),
+    )
+}
+
+private fun SessionFeature.sceneActiveChanged(state: SessionFeature.State, isActive: Boolean): Reduced<SessionFeature.State, Action> {
+    val returning = isActive && !state.isSceneActive
+    var s = state.copy(isSceneActive = isActive)
+    if (isActive) s = s.copy(isBackgrounded = false)
+    if (!returning) return Reduced(s)
+    // Reads wait out the background: a Stop the server took reads on from here, and a read that
+    // failed or was dropped must not leave Working up with nothing running.
+    if (s.isInterrupting && s.stopAttempt?.acknowledged == true) return Reduced(s, settleStop(s))
+    if (!s.isAwaitingReply || s.isExternallyActive || s.isSubmittingPrompt) return Reduced(s)
+    return Reduced(s, confirmRunState(s, after = Duration.ZERO))
+}
+
+private fun SessionFeature.visibilityChanged(state: SessionFeature.State, visible: Boolean): Reduced<SessionFeature.State, Action> {
+    if (visible == state.isVisible) return Reduced(state)
+    val isForegroundResume = visible && !state.isVisible && state.hasRenderedFirstContentFrame
+    var s = state.copy(isVisible = visible)
+    if (isForegroundResume) LabMarks.mark("session_resume", sessionID = s.session?.id)
+    // In front of the reader again: what fit on screen while they were away is what they're looking at.
+    if (visible) s = s.absorbFittingNewMessages()
+    if (!visible) {
+        // Leaving the screen; a glance at the notification shade (the scene going inactive) isn't
+        // leaving, but going on into the background is.
+        if (s.hasRenderedFirstContentFrame && s.isSceneActive) s = s.noteLeaving()
+        if (!s.initialTranscriptRequestIsExternal) s = s.copy(isLoading = false)
+        s = s.copy(sinceYouLeft = null)
+        val abandoned = abandonRefresh(s)
+        return Reduced(
+            abandoned.state,
+            Effect.merge(
+                releaseDictationHold(DictationHoldRelease.Left),
+                Effect.cancel(CancelID.ViewReceipt),
+                Effect.cancel(CancelID.SinceYouLeft),
+                Effect.cancel(CancelID.FamilyRefresh),
+                Effect.cancel(CancelID.Shells),
+                abandoned.effect,
+            ),
+        )
+    }
+    val sinceYouLeft = evaluateSinceYouLeft(s, settles = false)
+    s = sinceYouLeft.state
+    if (!s.hasRenderedFirstContentFrame) {
+        val opens = s.session != null && s.cacheableItems.isEmpty() && !s.initialTranscriptIsFresh &&
+            !s.initialTranscriptRequestIsExternal && !s.inheritsLiveWork && s.refresh == null && s.loadError == null
+        return Reduced(
+            s,
+            Effect.merge(
+                sinceYouLeft.effect,
+                if (opens) Effect.send(Action.RefreshRequested(RefreshReason.Open)) else Effect.none(),
+            ),
+        )
+    }
+    // A message's read started while away doesn't read the page: the return still needs one, after it.
+    val refresh = s.refresh
+    if (refresh != null && !s.initialTranscriptIsFresh && refresh.reason.messageID == null) {
+        val began = beginResync(s, refreshID = refresh.id)
+        val background = refreshBackgroundWork(began.state, RefreshReason.Resume)
+        return Reduced(background.state, Effect.merge(sinceYouLeft.effect, began.effect, background.effect))
+    }
+    return Reduced(
+        s,
+        Effect.merge(
+            sinceYouLeft.effect,
+            Effect.send(Action.RefreshRequested(if (isForegroundResume) RefreshReason.Resume else RefreshReason.Open)),
+        ),
+    )
+}
+
+private fun SessionFeature.resyncDelayElapsed(state: SessionFeature.State, refreshID: Int): Reduced<SessionFeature.State, Action> {
+    val resync = state.resync
+    if (resync == null || resync.refreshID != refreshID) return Reduced(state)
+    if (resync.responseReceived) return Reduced(state.copy(resync = null))
+    val clock = clock
+    return Reduced(
+        state.copy(resync = resync.copy(isShown = true)),
+        Effect.run<Action> { send ->
+            clock.sleep(SessionFeature.resyncCueMinimum)
+            send(Action.ResyncMinimumElapsed)
+        }.cancellable(CancelID.ResyncMinimum, cancelInFlight = true),
+    )
+}
+
+private fun SessionFeature.task(state: SessionFeature.State): Reduced<SessionFeature.State, Action> {
+    // Failed sends, and sends still on their way, outlive the screen that sent them.
+    var s = restorePersistedComposer(state)
+    s = restoreFailedSends(s)
+    val outbox = restoreOutbox(s)
+    s = outbox.state
+    // A screen that opens on a waiting request answers it from the bar.
+    if (s.wantsRequestDock && !s.isAnsweringRequest) s = s.beginAnswering()
+    // An answer's recording carried from the last screen ends here. Audio held after dictating
+    // into the last session's draft lets go.
+    val discarded = DictationFeature.discardPending(s.dictation, dictation)
+    s = s.copy(dictation = discarded.state)
+    val discard: Effect<Action> = Effect.merge(
+        discarded.effect.map { Action.Dictation(it) },
+        releaseDictationHold(DictationHoldRelease.Left),
+    )
+    // A live call or recording carried here keeps this screen's identity, so the previous
+    // session's loops must stop before this one's start.
+    val stopSessionWork: Effect<Action> = Effect.merge(
+        discard,
+        if (!s.inheritsLiveWork) {
+            Effect.none()
+        } else {
+            Effect.cancel(
+                listOf(
+                    CancelID.Models, CancelID.Requests, CancelID.Inbox, CancelID.InboxFetch, CancelID.PromptEcho,
+                    CancelID.RequestsRetry, CancelID.RequestsChanged, CancelID.Freshness, CancelID.Watchdog,
+                    CancelID.EarlierHistory, CancelID.FamilyRefresh, CancelID.Shells, CancelID.Revert,
+                    CancelID.BackgroundHint, CancelID.ViewReceipt, CancelID.ResyncDelay, CancelID.ResyncMinimum,
+                    CancelID.SinceYouLeft, CancelID.AutocompleteCatalog, CancelID.AutocompleteCommands,
+                    CancelID.AutocompleteFiles, CancelID.AutocompleteSessions, CancelID.AutocompleteAutoRun,
+                    CancelID.AutocompleteCommand, CancelID.AutocompleteCommandWait,
+                ),
+            )
+        },
+    )
+    if (s.inheritsLiveWork) {
+        if (sessionTimers.watchdog || s.watchdogSchedule != null) {
+            s = s.copy(watchdogSchedule = null, watchdogGeneration = s.watchdogGeneration + 1)
+        }
+        s = s.copy(isUndoingLastMessage = false).supersedeRunWork()
+    }
+    s = s.copy(inheritsLiveWork = false)
+    val dictation = dictation
+    if (s.session == null) {
+        val loadModels = loadModelsIfNeeded(s)
+        return Reduced(
+            loadModels.state,
+            Effect.merge(stopSessionWork, loadModels.effect, outbox.effect, Effect.run<Action> { dictation.prepare() }),
+        )
+    }
+    if (s.loadError != null && s.items.isEmpty()) s = s.copy(isLoading = true)
+    s = s.copy(loadError = null)
+    val sinceYouLeft = evaluateSinceYouLeft(s, settles = false)
+    s = sinceYouLeft.state
+    if (s.initialTranscriptRequestIsExternal) {
+        return Reduced(s, Effect.merge(stopSessionWork, sinceYouLeft.effect, outbox.effect))
+    }
+    // Navigation activation owns freshness; cached paint does not wait for visibility or the first frame.
+    return Reduced(
+        s,
+        Effect.merge(
+            Effect.concatenate(stopSessionWork, Effect.send(Action.RefreshRequested(RefreshReason.Open))),
+            sinceYouLeft.effect,
+            outbox.effect,
+        ),
+    )
+}
+
+private fun SessionFeature.firstContentFrameRendered(state: SessionFeature.State): Reduced<SessionFeature.State, Action> {
+    if (state.hasRenderedFirstContentFrame || state.session == null) return Reduced(state)
+    LabMarks.mark(
+        "session_chrome_first_frame:background=${state.hasBackgroundWork},context=${state.contextFraction != null}," +
+            "queued=${state.queuedInputs.size},requests=${state.permissionRequests.size + state.formRequests.size}," +
+            "working=${state.isRunning}",
+        sessionID = state.session.id,
+    )
+    var s = state.copy(hasRenderedFirstContentFrame = true, initialTranscriptRequestIsExternal = false)
+    val loadModels = loadModelsIfNeeded(s)
+    s = loadModels.state
+    // Pending work polls once the family is known (see familyResponse); record the attempt so a
+    // failure there counts as the initial one.
+    s = s.withRequestLoadAttempt(RequestDockFeature.State.LoadAttempt.Initial)
+        .withRequestLoadError(null)
+    val backgroundHint = scheduleBackgroundHint(s)
+    s = backgroundHint.state
+    val sinceYouLeft = evaluateSinceYouLeft(s, settles = false)
+    s = sinceYouLeft.state
+    val familyIsFresh = s.familyReadAt?.let { (date.now().toEpochMilli() - it.toEpochMilli()) / 1000.0 < 5 } == true
+    val family = if (familyIsFresh) pollPendingWork(s) else refreshFamily(s)
+    s = family.state
+    val shells = refreshShells(s)
+    s = shells.state
+    val dictation = dictation
+    return Reduced(
+        s,
+        Effect.merge(
+            Effect.run<Action> { dictation.prepare() },
+            family.effect,
+            shells.effect,
+            backgroundHint.effect,
+            loadModels.effect,
+            sinceYouLeft.effect,
+            if (s.initialTranscriptIsFresh || s.loadError != null) Effect.none() else Effect.send(Action.RefreshRequested(RefreshReason.Open)),
+        ),
+    )
+}
+
+/** iOS `Result.failure(OpenCodeClientError)`: a failure that isn't one reads as a generic client error. */
+internal fun Throwable.asClientError(): ai.opencode.server.OpenCodeClientError =
+    this as? ai.opencode.server.OpenCodeClientError ?: ai.opencode.server.OpenCodeClientError(message ?: "Something went wrong")
+
+// region Live projection
+
+/**
+ * The rows a run of live events writes, copied out of [SessionFeature.State] once and written back
+ * once ([applied]), so a batch of deltas doesn't copy the whole state per event.
+ */
+internal class LiveProjection(state: SessionFeature.State) {
+    val items: MutableList<OpenCodeTranscriptItem> = ArrayList(state.items)
+    val liveText: MutableMap<String, String> = LinkedHashMap(state.liveText)
+    private val shellToolStatuses = HashMap(state.shellToolStatuses)
+    private val subagentToolSessionIDs = HashSet(state.subagentToolSessionIDs)
+    private var shellsChanged = false
+    private var subagentsChanged = false
+    /** A live event replaced or inserted a row. */
+    var itemsChanged = false
+
+    fun noteShell(shellID: String, status: OpenCodeToolCall.Status) {
+        if (shellToolStatuses[shellID] != status) {
+            shellToolStatuses[shellID] = status
+            shellsChanged = true
+        }
+    }
+
+    fun noteSubagent(sessionID: String) {
+        if (subagentToolSessionIDs.add(sessionID)) subagentsChanged = true
+    }
+
+    fun applied(state: SessionFeature.State): SessionFeature.State {
+        var next = state
+        if (itemsChanged) next = next.copy(items = items.toList())
+        if (liveText != state.liveText) next = next.copy(liveText = liveText.toMap())
+        if (shellsChanged) next = next.copy(shellToolStatuses = shellToolStatuses.toMap())
+        if (subagentsChanged) next = next.copy(subagentToolSessionIDs = subagentToolSessionIDs.toSet())
+        return next
+    }
+}
+
+/**
+ * REST can already be ahead of a raced event. Tool input is writable only while streaming, and
+ * progress must never restart a settled tool.
+ */
+private fun SessionFeature.applyLiveEvent(event: OpenCodeLiveContentEvent, projection: LiveProjection) {
+    when (event) {
+        is OpenCodeLiveContentEvent.TextStarted -> {
+            val id = "${event.messageID}-text-${event.ordinal}"
+            projection.liveText[id] = projection.liveText[id] ?: ""
+        }
+        is OpenCodeLiveContentEvent.TextDelta -> {
+            val id = "${event.messageID}-text-${event.ordinal}"
+            val text = (projection.liveText[id] ?: "") + event.delta
+            projection.liveText[id] = text
+            if (upsertLiveText(id, text, streaming = true, items = projection.items)) projection.itemsChanged = true
+        }
+        is OpenCodeLiveContentEvent.TextEnded -> {
+            val id = "${event.messageID}-text-${event.ordinal}"
+            if (upsertLiveText(id, event.text, items = projection.items)) projection.itemsChanged = true
+            projection.liveText.remove(id)
+        }
+        is OpenCodeLiveContentEvent.ToolInputStarted ->
+            upsertLiveTool(event.messageID, event.toolID, OpenCodeJSONValue.Str(""), projection) { call ->
+                if (call.status != OpenCodeToolCall.Status.Streaming) call else call.copy(name = event.name)
+            }
+        is OpenCodeLiveContentEvent.ToolInputDelta ->
+            upsertLiveTool(event.messageID, event.toolID, OpenCodeJSONValue.Str(""), projection) { call ->
+                if (call.status != OpenCodeToolCall.Status.Streaming || call.input !is OpenCodeJSONValue.Str) call
+                else call.copy(input = OpenCodeJSONValue.Str((call.input.string ?: "") + event.delta))
+            }
+        is OpenCodeLiveContentEvent.ToolInputEnded ->
+            upsertLiveTool(event.messageID, event.toolID, OpenCodeJSONValue.Str(""), projection) { call ->
+                if (call.status != OpenCodeToolCall.Status.Streaming || call.input !is OpenCodeJSONValue.Str) call
+                else call.copy(input = OpenCodeJSONValue.Str(event.text))
+            }
+        is OpenCodeLiveContentEvent.ToolCalled ->
+            upsertLiveTool(event.messageID, event.toolID, projection = projection) { call ->
+                if (call.status != OpenCodeToolCall.Status.Streaming) call
+                else call.copy(status = OpenCodeToolCall.Status.Running, input = event.input)
+            }
+        is OpenCodeLiveContentEvent.ToolProgress ->
+            upsertLiveTool(event.messageID, event.toolID, projection = projection) { call ->
+                if (call.status != OpenCodeToolCall.Status.Streaming && call.status != OpenCodeToolCall.Status.Running) call
+                else call.copy(status = OpenCodeToolCall.Status.Running, metadata = event.metadata)
+            }
+        is OpenCodeLiveContentEvent.ToolSucceeded ->
+            upsertLiveTool(event.messageID, event.toolID, projection = projection) { call ->
+                call.copy(status = OpenCodeToolCall.Status.Completed, output = event.output, metadata = event.metadata)
+            }
+        is OpenCodeLiveContentEvent.ToolFailed ->
+            upsertLiveTool(event.messageID, event.toolID, projection = projection) { call ->
+                call.copy(
+                    status = OpenCodeToolCall.Status.Error,
+                    error = event.error,
+                    errorType = event.errorType,
+                    output = event.output,
+                    metadata = event.metadata,
+                )
+            }
+        is OpenCodeLiveContentEvent.StepStarted, is OpenCodeLiveContentEvent.StepStreamed, is OpenCodeLiveContentEvent.StepEnded,
+        is OpenCodeLiveContentEvent.ReasoningStarted, is OpenCodeLiveContentEvent.ReasoningDelta, is OpenCodeLiveContentEvent.ReasoningEnded,
+        -> Unit
+    }
+}
+
+/**
+ * iOS `upsertLiveText(id:text:streaming:in:)`. [streaming] text is still arriving: a last line
+ * holding only a block's marker waits for its first word (`holdingPendingMarker`). iOS projects
+ * Markdown blocks here (`markdownStream.blocks`); the Android item carries its text and the
+ * transcript parses it. True when [items] changed.
+ */
+internal fun SessionFeature.upsertLiveText(
+    id: String,
+    text: String,
+    streaming: Boolean = false,
+    items: MutableList<OpenCodeTranscriptItem>,
+): Boolean {
+    val shown = if (streaming) holdingPendingMarker(text) else text
+    if (shown.isBlank()) return false
+    val index = items.indexOfLast { it.id == id }
+    val item = OpenCodeTranscriptItem.AssistantMarkdown(id = id, text = shown)
+    if (index >= 0) {
+        if (items[index] == item) return false
+        items[index] = item
+    } else {
+        items.add(liveInsertionIndex(SessionFeature.messageID(item), items), item)
+    }
+    return true
+}
+
+/**
+ * Where a message's new live part goes: at the end, but ahead of a model switch recorded while
+ * the message was under way (a steering send's), since history keeps the message's parts together
+ * before it. IDs are ascending, so a switch with a later ID than the message came after it began;
+ * a later step's message starts after the switch and goes below.
+ */
+private fun liveInsertionIndex(messageID: String, items: List<OpenCodeTranscriptItem>): Int {
+    val floor = items.indexOfLast { SessionFeature.item(it, messageID) }.takeIf { it >= 0 }
+        ?: items.indexOfLast { TranscriptEntry.promptID(it) != null }.takeIf { it >= 0 }
+    val start = floor?.let { it + 1 } ?: 0
+    for (index in start until items.size) {
+        val item = items[index]
+        if (item is OpenCodeTranscriptItem.ModelSwitch &&
+            messageID.startsWith("msg_") && item.id.startsWith("msg_") && item.id > messageID
+        ) {
+            return index
+        }
+    }
+    return items.size
+}
+
+private fun upsertLiveTool(
+    messageID: String,
+    toolID: String,
+    defaultInput: OpenCodeJSONValue = OpenCodeJSONValue.Object(emptyMap()),
+    projection: LiveProjection,
+    update: (OpenCodeToolCall) -> OpenCodeToolCall,
+) {
+    val items = projection.items
+    val id = "$messageID-tool-$toolID"
+    val index = items.indexOfLast { it.id == id }
+    val existing = (items.getOrNull(index) as? OpenCodeTranscriptItem.Tool)?.call
+    val call = update(
+        existing ?: OpenCodeToolCall(
+            callID = toolID,
+            messageID = messageID,
+            name = "tool",
+            status = OpenCodeToolCall.Status.Streaming,
+            input = defaultInput,
+            output = emptyList(),
+            error = null,
+            metadata = emptyMap(),
+        ),
+    )
+    val item = OpenCodeTranscriptItem.Tool(id = id, call = call)
+    if (index >= 0) {
+        if (items[index] != item) {
+            items[index] = item
+            projection.itemsChanged = true
+        }
+    } else {
+        items.add(liveInsertionIndex(messageID, items), item)
+        projection.itemsChanged = true
+    }
+    call.metadata["shellID"]?.string?.let { projection.noteShell(it, call.status) }
+    if (call.name == "subagent" || call.name == "task") {
+        val sessionID = call.metadata["sessionID"]?.string
+        if (!sessionID.isNullOrEmpty()) projection.noteSubagent(sessionID)
+    }
+}
+
+/**
+ * iOS `OpenCodeMarkdownBlock.holdingPendingMarker(_:)` (`Transcript/OpenCodeMarkdownBlock.swift`):
+ * streaming text without a last line that holds only the start of a block (`-`, `##`, `1.`, `>`,
+ * a fence's first backticks). That line waits for its first word: drawn now, it would show as a
+ * paragraph and then turn into a list item, heading or quote, reflowing the row. The ended text is
+ * shown whole. Kept here until `:feature:transcript` ports its Markdown model.
+ */
+internal fun holdingPendingMarker(text: String): String {
+    val lineStart = text.lastIndexOf('\n').let { if (it < 0) 0 else it + 1 }
+    val line = text.substring(lineStart).trim(' ', '\t')
+    if (line.isEmpty() || !isPendingMarker(line)) return text
+    return text.substring(0, lineStart)
+}
+
+private fun isPendingMarker(line: String): Boolean {
+    val first = line.firstOrNull() ?: return false
+    if (line.length > 10) return false
+    if (first in "#`~" || first in "-*_") {
+        return line.all { it == first } && line.length <= (if (first == '#') 6 else 2)
+    }
+    if (line == "+" || line == "•" || line == ">") return true
+    val digits = line.takeWhile { it.isDigit() }
+    if (digits.isEmpty()) return false
+    val rest = line.drop(digits.length)
+    return rest.isEmpty() || rest == "." || rest == ")"
+}
+
+// endregion

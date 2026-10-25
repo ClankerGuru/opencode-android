@@ -1,5 +1,6 @@
 package ai.opencode.feature.media
 
+import ai.opencode.server.model.PageShareRequest
 import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.sharing.ExperimentalFeatures

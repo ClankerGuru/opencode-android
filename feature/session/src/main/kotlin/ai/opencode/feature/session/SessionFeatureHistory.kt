@@ -1,0 +1,432 @@
+package ai.opencode.feature.session
+
+import ai.opencode.core.log.AppLog
+import ai.opencode.core.store.Effect
+import ai.opencode.core.store.Reduced
+import ai.opencode.core.store.cancellable
+import ai.opencode.feature.session.SessionFeature.Action
+import ai.opencode.feature.session.SessionFeature.CancelID
+import ai.opencode.feature.session.SessionFeature.State.EarlierHistory
+import ai.opencode.core.sharing.ExperimentalFeature
+import ai.opencode.server.OpenCodeClientError
+import ai.opencode.server.model.OpenCodeTranscriptItem
+import ai.opencode.server.model.OpenCodeTranscriptPage
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
+import kotlin.time.Duration.Companion.milliseconds
+
+// Port of iOS `SessionFeature+History.swift`.
+
+/** The New divider, earlier history, and transcript reads. Null: the action passes on. */
+internal fun SessionFeature.reduceHistory(
+    state: SessionFeature.State,
+    action: Action,
+): Reduced<SessionFeature.State, Action>? = when (action) {
+    is Action.NewMessagesPassed ->
+        Reduced(if (state.newMessages?.generation == action.generation) state.copy(newMessages = null) else state)
+
+    is Action.NewMessagesDividerChanged ->
+        // Off, no divider stays up; on, the next mark may show one.
+        Reduced(if (!action.isOn && state.newMessages?.showsDivider == true) state.copy(newMessages = null) else state)
+
+    is Action.SinceYouLeftChanged ->
+        if (!action.isOn) Reduced(state.copy(sinceYouLeft = null), Effect.cancel(CancelID.SinceYouLeft))
+        else evaluateSinceYouLeft(state, settles = false)
+
+    is Action.SinceYouLeftTapped -> Reduced(
+        state.copy(sinceYouLeft = null, sinceYouLeftSeen = null, sinceYouLeftAt = null, sinceYouLeftDismissed = true),
+        Effect.cancel(CancelID.SinceYouLeft),
+    )
+
+    is Action.SinceYouLeftChunkReceived -> {
+        val current = state.sinceYouLeft
+        if (state.session?.id != action.sessionID || state.sinceYouLeftDismissed ||
+            current?.sessionID != action.sessionID || current.lastItemID != action.lastItemID
+        ) {
+            Reduced(state)
+        } else {
+            Reduced(state.copy(sinceYouLeft = current.copy(text = action.text)))
+        }
+    }
+
+    is Action.SinceYouLeftFinished -> sinceYouLeftFinished(state, action)
+
+    is Action.NewMessagesFit -> {
+        val mark = state.newMessages
+        if (mark == null || mark.generation != action.generation) {
+            Reduced(state)
+        } else {
+            var s = state.copy(newMessages = null, newMessagesFitThrough = mark.lastItemID ?: state.items.lastOrNull()?.id)
+            if (s.isVisible) s = s.absorbFittingNewMessages()
+            Reduced(s)
+        }
+    }
+
+    is Action.TranscriptBrowsingChanged ->
+        if (action.isBrowsing) {
+            Reduced(if (state.browsingWindowStartID == null) state.copy(browsingWindowStartID = state.firstVisibleItemID) else state)
+        } else {
+            val previousFirstID = state.visibleItems.firstOrNull()?.id
+            Reduced(state.copy(browsingWindowStartID = null).retainRenderedWindowStart(previousFirstID))
+        }
+
+    is Action.ShowEarlierTapped ->
+        if (state.isLoadingEarlier || !state.hasEarlierItems || state.session == null) Reduced(state)
+        else loadEarlierHistory(state.copy(visibleLimit = state.visibleLimit + 40).pinBrowsingWindowIfNeeded())
+
+    is Action.FillEarlierHistory -> loadEarlierHistory(state)
+
+    is Action.EarlierHistoryResponse -> earlierHistoryResponse(state, action)
+
+    is Action.TranscriptResponse -> transcriptResponse(state, action)
+
+    // Every other action matched a case earlier in the chain.
+    else -> null
+}
+
+private fun SessionFeature.sinceYouLeftFinished(
+    state: SessionFeature.State,
+    action: Action.SinceYouLeftFinished,
+): Reduced<SessionFeature.State, Action> {
+    var current = state.sinceYouLeft
+    if (state.session?.id != action.sessionID || state.sinceYouLeftDismissed || current == null ||
+        current.sessionID != action.sessionID || current.lastItemID != action.lastItemID
+    ) {
+        return Reduced(state)
+    }
+    val final = SinceYouLeft.sanitize(current.text, trimTrailingPeriod = true)
+    current = if (final.isEmpty()) current.copy(text = action.fallback, isFallback = true) else current.copy(text = final)
+    current = current.copy(phase = SinceYouLeft.Phase.Done)
+    val s = state.copy(sinceYouLeft = current).cacheSinceYouLeft(lastItemID = action.lastItemID, text = current.text, sessionID = action.sessionID)
+    AppLog.app.info { "since_you_left done session=${action.sessionID} length=${current.text.length}" }
+    return Reduced(s)
+}
+
+private fun SessionFeature.earlierHistoryResponse(
+    state: SessionFeature.State,
+    action: Action.EarlierHistoryResponse,
+): Reduced<SessionFeature.State, Action> {
+    val sessionID = action.sessionID
+    val cursor = action.cursor
+    val loading = state.earlierHistory as? EarlierHistory.Loading
+    if (state.session?.id != sessionID || state.earlierHistoryGeneration != action.generation ||
+        loading == null || loading.cursor != cursor
+    ) {
+        return Reduced(state)
+    }
+    val reachedLoadedItems = loading.reachedLoadedItems
+    val retryPhase: EarlierHistory = if (reachedLoadedItems) EarlierHistory.Paging(cursor) else EarlierHistory.SeekingOverlap(cursor)
+    var s = state.copy(earlierHistory = retryPhase)
+    // Only rows this page added can link sessions not looked up yet.
+    var added: List<OpenCodeTranscriptItem> = emptyList()
+    val page: OpenCodeTranscriptPage? = action.result.getOrNull()
+    if (page == null) {
+        val error = action.result.exceptionOrNull()?.asClientError() ?: OpenCodeClientError("Something went wrong")
+        // No HTTP status means the request never reached the server. The connection state already
+        // covers that; don't open a session on an error banner for a page nobody asked for yet.
+        s = if (error.statusCode == null) s.copy(earlierHistoryRetriesOnReconnect = true) else s.copy(earlierHistoryError = error.message)
+    } else {
+        if (page.next != null && page.next == cursor) {
+            return Reduced(s.copy(earlierHistoryError = "The server returned the same history page. Try again."))
+        }
+        val merged = SessionFeature.mergeOlderPage(
+            page.items, s.items, before = s.earlierHistoryInsertionID, reachedLoadedItems = reachedLoadedItems,
+        ) { it.id }
+        if (merged != null) {
+            if (merged != s.items) {
+                added = page.items
+                s = s.copy(items = merged).syncShellToolStatuses()
+            }
+            s = s.copy(
+                earlierHistoryInsertionID = page.items.firstOrNull()?.id ?: s.earlierHistoryInsertionID,
+                earlierHistory = page.next?.let { EarlierHistory.Paging(it) } ?: EarlierHistory.Exhausted,
+            )
+        } else {
+            // A busy session can advance past the initial window while paging starts. Walk back to
+            // an overlap before treating unknown rows as older content.
+            if (page.next == null && page.items.isNotEmpty()) {
+                return Reduced(
+                    s.copy(
+                        earlierHistory = EarlierHistory.SeekingOverlap(null),
+                        earlierHistoryError = "The conversation changed while loading history. Try again.",
+                    ),
+                )
+            }
+            s = s.copy(earlierHistory = page.next?.let { EarlierHistory.SeekingOverlap(it) } ?: EarlierHistory.Exhausted)
+        }
+        s = s.copy(earlierHistoryError = null).pinBrowsingWindowIfNeeded()
+    }
+    // The first cursor page mostly overlaps the newest REST window. Keep filling the visible limit
+    // the user already requested instead of relying on another top-edge callback during the
+    // prepend transition. (iOS `PerfTimeline.olderPageApplied` is perf-build only.)
+    if (page == null) return Reduced(s)
+    return Reduced(
+        s,
+        Effect.merge(
+            sessionLinksIn(added),
+            Effect.send(Action.AcceptedTranscriptUpdated(sessionID = sessionID, items = s.cacheableItems)),
+            if (s.earlierHistory != EarlierHistory.Exhausted && s.visibleLimit >= s.items.size) Effect.send(Action.FillEarlierHistory) else Effect.none(),
+        ),
+    )
+}
+
+private fun SessionFeature.transcriptResponse(
+    state: SessionFeature.State,
+    action: Action.TranscriptResponse,
+): Reduced<SessionFeature.State, Action> {
+    val sessionID = action.sessionID
+    if (state.session?.id != sessionID) return Reduced(state)
+    val items = action.result.getOrNull()
+    if (items == null) {
+        val error = action.result.exceptionOrNull()?.asClientError() ?: OpenCodeClientError("Something went wrong")
+        var s = state.copy(initialTranscriptRequestIsExternal = false, isLoading = false)
+        if (s.cacheableItems.isEmpty() && !s.initialTranscriptIsFresh) s = s.copy(loadError = error.message)
+        return Reduced(s, if (s.items.isEmpty()) Effect.send(Action.FirstContentFrameRendered) else Effect.none())
+    }
+    val completedInitialRequest = state.initialTranscriptRequestIsExternal
+    var s = if (completedInitialRequest) state.copy(initialTranscriptIsFresh = true) else state
+    s = acceptWindow(items, action.pageCursor, s)
+    s = s.updateNewMessagesMark(settles = s.isVisible)
+    val sinceYouLeft = evaluateSinceYouLeft(s, settles = s.isVisible)
+    s = sinceYouLeft.state
+    return Reduced(
+        s,
+        Effect.merge(
+            sessionLinksIn(items),
+            sinceYouLeft.effect,
+            Effect.send(Action.AcceptedTranscriptUpdated(sessionID = sessionID, items = s.cacheableItems)),
+            // An empty transcript never renders a content frame of its own.
+            if (completedInitialRequest && s.items.isEmpty()) Effect.send(Action.FirstContentFrameRendered) else Effect.none(),
+        ),
+    )
+}
+
+/**
+ * iOS `SessionFeature.mergeOlderPage(_:into:before:reachedLoadedItems:id:)`: O(loaded + page)
+ * reconciliation. Index IDs once, splice through integer links, then materialize once. Older
+ * values never replace newer ones, and unknown rows after the last known anchor remain ignored.
+ * Indexing newly inserted nodes also preserves the reverse-scan rule for repeated page IDs.
+ * `null` means a disjoint page must keep seeking overlap.
+ */
+internal fun <Item, ID> SessionFeature.Companion.mergeOlderPage(
+    page: List<Item>,
+    existing: List<Item>,
+    before: ID?,
+    reachedLoadedItems: Boolean,
+    id: (Item) -> ID,
+): List<Item>? {
+    val positions = HashMap<ID, Int>(existing.size + page.size)
+    for ((index, item) in existing.withIndex()) positions.putIfAbsent(id(item), index)
+    val pageIDs = page.map(id)
+    if (pageIDs.none { it in positions }) {
+        if (!reachedLoadedItems && existing.isNotEmpty()) return null
+        if (page.isEmpty()) return existing
+        val insertion = before?.let { positions[it] } ?: 0
+        return existing.subList(0, insertion) + page + existing.subList(insertion, existing.size)
+    }
+    if (pageIDs.all { it in positions }) return existing
+    val values = ArrayList(existing)
+    val previous = ArrayList<Int>(existing.size + page.size).apply { for (index in existing.indices) add(index - 1) }
+    val next = ArrayList<Int>(existing.size + page.size).apply { for (index in existing.indices) add(if (index + 1 < existing.size) index + 1 else -1) }
+    var first = if (existing.isEmpty()) -1 else 0
+    var insertion: Int? = before?.let { positions[it] }
+    for (index in page.indices.reversed()) {
+        val known = positions[pageIDs[index]]
+        if (known != null) {
+            insertion = known
+        } else {
+            val anchor = insertion ?: continue
+            val node = values.size
+            val predecessor = previous[anchor]
+            values += page[index]
+            previous += predecessor
+            next += anchor
+            if (predecessor < 0) first = node else next[predecessor] = node
+            previous[anchor] = node
+            positions[pageIDs[index]] = node
+            // The old reverse loop inserted at the same numeric index, so the next unknown row
+            // belongs immediately before this inserted row.
+            insertion = node
+        }
+    }
+    if (values.size == existing.size) return existing
+    val result = ArrayList<Item>(values.size)
+    var node = first
+    while (node >= 0) {
+        result += values[node]
+        node = next[node]
+    }
+    return result
+}
+
+/** iOS `evaluateSinceYouLeft(_:settles:)`. */
+internal fun SessionFeature.evaluateSinceYouLeft(
+    state: SessionFeature.State,
+    settles: Boolean,
+): Reduced<SessionFeature.State, Action> {
+    if (state.isBackgrounded) return Reduced(state)
+    var s = state
+    fun clearBaselineIfSettling() {
+        if (settles) s = s.copy(sinceYouLeftSeen = null, sinceYouLeftAt = null)
+    }
+    if (!experimentalFeatures(ExperimentalFeature.sinceYouLeft)) {
+        s = s.copy(sinceYouLeft = null)
+        clearBaselineIfSettling()
+        return Reduced(s, Effect.cancel(CancelID.SinceYouLeft))
+    }
+    val sessionID = s.session?.id
+    if (s.sinceYouLeftDismissed || sessionID == null || s.isDraft) {
+        clearBaselineIfSettling()
+        return Reduced(s)
+    }
+    val seen = s.sinceYouLeftSeen ?: s.newMessagesBaseline ?: return Reduced(s)
+
+    // iOS ignores the minimum absence in DEBUG/PERF lab runs (`SinceYouLeftLab`); not ported.
+    val input = SinceYouLeft.buildInput(
+        sessionID = sessionID,
+        items = s.items,
+        seen = seen,
+        ownSentPromptIDs = s.optimisticPromptIDs,
+        leftAt = s.sinceYouLeftAt,
+        now = date.now(),
+        hasPendingRequest = s.hasPendingRequests,
+        pendingRequests = SinceYouLeft.pendingRequestLines(
+            permissions = s.permissionRequests,
+            forms = s.formRequests,
+            sessionID = sessionID,
+        ),
+        ignoreMinimumAbsenceDuration = false,
+    )
+
+    clearBaselineIfSettling()
+
+    if (input == null) {
+        if (settles) return Reduced(s.copy(sinceYouLeft = null), Effect.cancel(CancelID.SinceYouLeft))
+        return Reduced(s)
+    }
+
+    val cached = s.sinceYouLeftCache[sessionID]
+    if (cached != null && cached.lastItemID == input.lastItemID) {
+        return Reduced(
+            s.copy(sinceYouLeft = SinceYouLeft(sessionID = sessionID, lastItemID = input.lastItemID, text = cached.text, phase = SinceYouLeft.Phase.Done)),
+            Effect.cancel(CancelID.SinceYouLeft),
+        )
+    }
+
+    if (s.sinceYouLeft?.sessionID == sessionID && s.sinceYouLeft?.lastItemID == input.lastItemID) return Reduced(s)
+
+    val client = sinceYouLeftClient
+    if (!client.isAvailable()) {
+        val fallback = input.structuralFallback
+        s = s.copy(
+            sinceYouLeft = SinceYouLeft(
+                sessionID = sessionID,
+                lastItemID = input.lastItemID,
+                text = fallback,
+                phase = SinceYouLeft.Phase.Done,
+                isFallback = true,
+            ),
+        ).cacheSinceYouLeft(lastItemID = input.lastItemID, text = fallback, sessionID = sessionID)
+        return Reduced(s, Effect.cancel(CancelID.SinceYouLeft))
+    }
+
+    s = s.copy(sinceYouLeft = SinceYouLeft(sessionID = sessionID, lastItemID = input.lastItemID, text = "", phase = SinceYouLeft.Phase.Generating))
+    AppLog.app.info { "since_you_left start session=$sessionID turns=${input.turnCount} tokens=${input.estimatedTokens}" }
+    return Reduced(
+        s,
+        Effect.run<Action> { send ->
+            try {
+                client.summarize(input).collect { chunk ->
+                    if (!currentCoroutineContext().isActive) return@collect
+                    send(Action.SinceYouLeftChunkReceived(sessionID = sessionID, lastItemID = input.lastItemID, text = chunk))
+                }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Throwable) {
+                AppLog.app.error { "since_you_left failed session=$sessionID" }
+            }
+            if (!currentCoroutineContext().isActive) return@run
+            send(Action.SinceYouLeftFinished(sessionID = sessionID, lastItemID = input.lastItemID, fallback = input.structuralFallback))
+        }.cancellable(CancelID.SinceYouLeft, cancelInFlight = true),
+    )
+}
+
+private fun SessionFeature.loadEarlierHistory(state: SessionFeature.State): Reduced<SessionFeature.State, Action> {
+    val sessionID = state.session?.id
+    if (state.isLoadingEarlier || !state.hasEarlierItems || sessionID == null ||
+        state.visibleLimit < state.items.size || state.earlierHistory == EarlierHistory.Exhausted
+    ) {
+        return Reduced(state)
+    }
+    val (cursor, reachedLoadedItems) = when (val phase = state.earlierHistory) {
+        EarlierHistory.UnknownEdge -> null to false
+        is EarlierHistory.SeekingOverlap -> phase.cursor to false
+        is EarlierHistory.Paging -> phase.cursor to true
+        is EarlierHistory.Loading, EarlierHistory.Exhausted -> return Reduced(state)
+    }
+    val s = state.copy(
+        earlierHistory = EarlierHistory.Loading(cursor = cursor, reachedLoadedItems = reachedLoadedItems),
+        earlierHistoryError = null,
+    )
+    // iOS `PerfTimeline.olderPageRequested` is perf-build only.
+    val server = s.server
+    val generation = s.earlierHistoryGeneration
+    val client = openCodeClient
+    return Reduced(
+        s,
+        Effect.run<Action> { send ->
+            val result = try {
+                Result.success(client.historyPage(server, sessionID, cursor))
+            } catch (error: OpenCodeClientError) {
+                Result.failure(error)
+            }
+            if (!currentCoroutineContext().isActive) return@run
+            send(Action.EarlierHistoryResponse(sessionID = sessionID, generation = generation, cursor = cursor, result = result))
+        }.cancellable(CancelID.EarlierHistory, cancelInFlight = true),
+    )
+}
+
+/** Drops the in-flight read and its resync cue. A late response no longer matches `refresh` and is rejected as stale. */
+internal fun SessionFeature.abandonRefresh(state: SessionFeature.State): Reduced<SessionFeature.State, Action> = Reduced(
+    state.copy(refresh = null, resync = null),
+    Effect.cancel(listOf(CancelID.Freshness, CancelID.ResyncDelay, CancelID.ResyncMinimum)),
+)
+
+/** iOS `SessionFeature.prune(_:to:)`: drops entries whose keys are no longer in [live]. */
+internal fun <V> SessionFeature.Companion.prune(values: Map<String, V>, live: Set<String>): Map<String, V> =
+    if (values.keys.any { it !in live }) values.filterKeys { it in live } else values
+
+/** A quick read never shows the cue; once shown it holds long enough to read as one breath rather than a flicker. */
+internal val SessionFeature.Companion.resyncCueDelay get() = 350.milliseconds
+internal val SessionFeature.Companion.resyncCueMinimum get() = 900.milliseconds
+
+/** iOS `beginResync(_:refreshID:)`. */
+internal fun SessionFeature.beginResync(state: SessionFeature.State, refreshID: Int): Reduced<SessionFeature.State, Action> {
+    if (state.session == null) return Reduced(state)
+    // A read starting while the title breathes keeps it breathing: it now waits on this read, and
+    // its minimum still counts from when it showed.
+    val resync = state.resync
+    if (resync != null && resync.isShown) {
+        return Reduced(state.copy(resync = resync.copy(refreshID = refreshID, responseReceived = false)))
+    }
+    val clock = clock
+    return Reduced(
+        state.copy(resync = SessionFeature.State.ResyncState(refreshID = refreshID)),
+        Effect.run<Action> { send ->
+            clock.sleep(SessionFeature.resyncCueDelay)
+            send(Action.ResyncDelayElapsed(refreshID = refreshID))
+        }.cancellable(CancelID.ResyncDelay, cancelInFlight = true),
+    )
+}
+
+/** iOS `settleResync(_:refreshID:)`. */
+internal fun SessionFeature.settleResync(state: SessionFeature.State, refreshID: Int): Reduced<SessionFeature.State, Action> {
+    val resync = state.resync
+    if (resync == null || resync.refreshID != refreshID) return Reduced(state)
+    return if (!resync.isShown || resync.minimumElapsed) {
+        Reduced(state.copy(resync = null), Effect.cancel(listOf(CancelID.ResyncDelay, CancelID.ResyncMinimum)))
+    } else {
+        Reduced(state.copy(resync = resync.copy(responseReceived = true)))
+    }
+}
