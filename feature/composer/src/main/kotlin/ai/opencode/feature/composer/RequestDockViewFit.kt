@@ -13,7 +13,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
@@ -202,7 +202,9 @@ private fun RequestPanelStack(content: @Composable () -> Unit) {
     Layout(
         content = content,
         modifier = Modifier
-            .clipToBounds()
+            // Clipped top and bottom only: the header's × sits out past the panel's side padding,
+            // on the surface's corner arc (`outset`), which a full `clipToBounds` cut in half.
+            .clip(VerticalOnlyClip)
             .scrollable(scrollState, Orientation.Vertical, enabled = true)
             .testTag("request-panel-scroll"),
     ) { measurables, constraints ->
@@ -325,4 +327,9 @@ internal fun Modifier.bleedHorizontally(edge: Dp): Modifier = layout { measurabl
     val placeable = measurable.measure(widened)
     val width = (placeable.width - extra).coerceIn(constraints.minWidth, constraints.maxWidth)
     layout(width, placeable.height) { placeable.place(-edge.roundToPx(), 0) }
+}
+
+/** Bounds only the vertical extent; the sides stay open for content placed past them. */
+private val VerticalOnlyClip = androidx.compose.foundation.shape.GenericShape { size, _ ->
+    addRect(androidx.compose.ui.geometry.Rect(-size.width, 0f, size.width * 2, size.height))
 }

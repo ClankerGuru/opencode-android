@@ -1052,7 +1052,9 @@ private fun SessionComposerEnv.RequestPanel() {
         Modifier
             .fillMaxWidth()
             .height(shown.value.dp)
-            .clipToBounds(),
+            // Clipped top and bottom only: the panel's × reaches past the band's sides onto the
+            // surface's corner arc (`outset`), which a full `clipToBounds` cut in half.
+            .clip(VerticalBandClip),
     ) {
         Box(
             Modifier
@@ -1364,3 +1366,8 @@ private fun SessionComposerEnv.onDraftEdited(new: String, recording: Boolean) {
 }
 
 // endregion
+
+/** A clip that bounds only the vertical extent (the band's sides stay open). */
+private val VerticalBandClip = androidx.compose.foundation.shape.GenericShape { size, _ ->
+    addRect(androidx.compose.ui.geometry.Rect(-size.width, 0f, size.width * 2, size.height))
+}
