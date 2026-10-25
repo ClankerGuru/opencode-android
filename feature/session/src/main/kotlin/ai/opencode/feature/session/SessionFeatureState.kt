@@ -10,7 +10,6 @@ import ai.opencode.feature.session.seams.ExperimentalFeature
 import ai.opencode.feature.session.seams.ModelSearch
 import ai.opencode.feature.session.seams.ModelVisibility
 import ai.opencode.feature.session.seams.OpenCodeMarkdownBlock
-import ai.opencode.feature.session.seams.RequestDockFeature
 import ai.opencode.feature.session.seams.SharedComposerDraft
 import ai.opencode.feature.session.seams.SharedLocation
 import ai.opencode.feature.session.seams.TranscriptEntry
@@ -18,15 +17,9 @@ import ai.opencode.feature.session.seams.TranscriptSubagent
 import ai.opencode.feature.session.seams.VoiceBroker
 import ai.opencode.feature.session.seams.VoiceFeature
 import ai.opencode.feature.session.seams.VoiceRoute
-import ai.opencode.feature.session.seams.beginAnswering
-import ai.opencode.feature.session.seams.clearEditedUndoDraft
 import ai.opencode.feature.session.seams.defaultLeaveDate
-import ai.opencode.feature.session.seams.endAnswering
 import ai.opencode.feature.session.seams.entryStart
 import ai.opencode.feature.session.seams.hidingUndone
-import ai.opencode.feature.session.seams.isAnsweringRequest
-import ai.opencode.feature.session.seams.sessionComposer
-import ai.opencode.feature.session.seams.wantsRequestDock
 import ai.opencode.server.model.OpenCodeDelivery
 import ai.opencode.server.model.OpenCodeFormRequest
 import ai.opencode.server.model.OpenCodeFormValue

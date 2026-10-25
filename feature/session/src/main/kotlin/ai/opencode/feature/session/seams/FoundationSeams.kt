@@ -9,7 +9,6 @@ import ai.opencode.core.sharing.SharedKey
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
-import ai.opencode.feature.session.PendingRequest
 import ai.opencode.feature.session.SessionFeature
 import ai.opencode.feature.session.callOwnsAudio
 import ai.opencode.feature.session.composerWithoutDictation
@@ -17,10 +16,10 @@ import ai.opencode.feature.session.draftState
 import ai.opencode.feature.session.hasLiveDictation
 import ai.opencode.feature.session.hasPendingRequests
 import ai.opencode.feature.session.parkedComposer
+import ai.opencode.feature.session.sessionComposer
 import ai.opencode.feature.session.pendingAttachments
 import ai.opencode.feature.session.pendingFiles
 import ai.opencode.feature.session.pendingLocation
-import ai.opencode.feature.session.prune
 import ai.opencode.feature.session.undoSnapshot
 import ai.opencode.feature.session.withDraft
 import ai.opencode.feature.session.withDraftState
@@ -386,8 +385,26 @@ class BrowserFeature : Reducer<BrowserFeature.State, BrowserFeature.Action> {
         val url: String? = null,
         val title: String = "",
         val peekMessageID: String? = null,
+        /** The Ask composer over the bar, and what's typed in it. */
+        val isAsking: Boolean = false,
+        val askDraft: String = "",
     ) {
         val isOpen: Boolean get() = pageID != null
+
+        /** The title the bar shows: the page's, or its host while loading. */
+        val displayTitle: String
+            get() = title.trim().ifEmpty {
+                val host = url?.let { runCatching { java.net.URI(it).host }.getOrNull() } ?: ""
+                if (host.startsWith("www.")) host.drop(4) else host
+            }
+
+        /** What a question from here asks the page reader for. */
+        val shareRequest: PageShareRequest?
+            get() {
+                val pageID = pageID ?: return null
+                val url = url ?: return null
+                return PageShareRequest(pageID, url, displayTitle, includesScreenshot = false)
+            }
 
         val viewing: VoiceViewingPage?
             get() {
@@ -399,13 +416,27 @@ class BrowserFeature : Reducer<BrowserFeature.State, BrowserFeature.Action> {
 
     sealed interface Action {
         data class Open(val url: String) : Action
+        /** Ask about this page: the question goes with the page attached. */
+        data object AskSent : Action
+        /** A choice from a link's menu inside the page. */
+        data class LinkMenu(val action: LinkMenuAction, val url: String) : Action
     }
 
     override fun reduce(state: State, action: Action): Reduced<State, Action> = Reduced(state)
 }
 
 /** SEAM: real type belongs to :feature:media (iOS `Browser/LinkMenu.swift`); delete when that area merges. */
-enum class LinkMenuAction { open, openInBrowser, copy, share }
+enum class LinkMenuAction(val title: String, val systemImage: String) {
+    openInAppBrowser("Open in App Browser", "globe"),
+    /** iOS "Open in Safari": the system's default browser on Android. */
+    openInSafari("Open in Browser", "safari"),
+    openInApp("Open in App", "arrow.up.forward.app"),
+    copy("Copy Link", "doc.on.doc"),
+    share("Share…", "square.and.arrow.up"),
+    /** A session ID in a reply (`SessionLink`): TalkBack's open action. */
+    openSession("Open Session", "arrow.up.right.square"),
+    copySessionID("Copy ID", "doc.on.doc"),
+}
 
 /** SEAM: real type belongs to :feature:media (iOS `Browser/LinkMenu.swift`); delete when that area merges. */
 data class LinkProbe(val id: UUID, val url: String, val sessionID: String?)
@@ -444,7 +475,10 @@ class OpenURLClient(val open: suspend (String) -> Boolean) {
 }
 
 /** SEAM: real client belongs to :feature:media (iOS `PageReaderClient`); delete when that area merges. */
-class PageReaderClient {
+class PageReaderClient(
+    /** Forgets a closed page's web view and what was read from it. */
+    val discard: suspend (UUID) -> Unit = {},
+) {
     companion object Key : DependencyKey<PageReaderClient> {
         override val liveValue = PageReaderClient()
         override val testValue = PageReaderClient()
@@ -475,24 +509,20 @@ class ComposerPersistenceClient {
     }
 }
 
-/** SEAM: real client belongs to :feature:composer (iOS `Composer/ComposerPersistence.swift` `UndeliveredPrompts`); delete when that area merges. */
-class UndeliveredPrompts {
-    companion object Key : DependencyKey<UndeliveredPrompts> {
-        override val liveValue = UndeliveredPrompts()
-        override val testValue = UndeliveredPrompts()
-    }
-}
-
-/** SEAM: real client belongs to :feature:composer (iOS `Composer/PromptOutbox.swift`); delete when that area merges. */
-class PromptOutbox {
-    companion object Key : DependencyKey<PromptOutbox> {
-        override val liveValue = PromptOutbox()
-        override val testValue = PromptOutbox()
-    }
-}
-
 /** SEAM: real client belongs to :feature:composer (iOS `Composer/DictationClient.swift`); delete when that area merges. */
 class DictationClient(
+    /** Starts the mic for a new press, from the touch; returns the press's token. */
+    val begin: () -> Int = { 0 },
+    /** The press's whole-session transcripts as they grow; ends when the recording does. */
+    val start: suspend (press: Int) -> kotlinx.coroutines.flow.Flow<String> = { kotlinx.coroutines.flow.emptyFlow() },
+    /** Stops capture, letting the engine finalize its last words. */
+    val stop: suspend (press: Int) -> Unit = {},
+    /** Tears the recording down at once, dropping audio not yet transcribed. */
+    val cancel: suspend (press: Int) -> Unit = {},
+    /** How [press] ends, for the audio hold after it. */
+    val ends: (press: Int, end: DictationEnd) -> Unit = { _, _ -> },
+    /** Ends a hold kept after a recording when [DictationHoldRelease] applies to it. */
+    val releaseHold: suspend (reason: DictationHoldRelease) -> Unit = {},
     /** Dictation still holds the audio session (recording, finalizing, or not yet released). */
     val holdsAudio: () -> Boolean = { false },
 ) {
@@ -766,6 +796,9 @@ class ComposerAttachmentsFeature : Reducer<ComposerAttachmentsFeature.State, Com
     }
 
     override fun reduce(state: State, action: Action): Reduced<State, Action> = Reduced(state)
+
+    /** iOS's static helpers (`readInlineFile`, `cancelUpload`) are in `ModelsSeams.kt`. */
+    companion object
 }
 
 /**
@@ -884,185 +917,17 @@ class DictationFeature : Reducer<DictationFeature.State, DictationFeature.Action
     }
 
     override fun reduce(state: State, action: Action): Reduced<State, Action> = Reduced(state)
+
+    /** iOS's static helpers (`start`, `stop`, `finish`, `ends`) are in `ModelsSeams.kt`. */
+    companion object
 }
 
 // endregion
 
 // region Request dock and answers (Composer/RequestAnswer.swift)
 
-/**
- * SEAM: real type belongs to iOS `Composer/RequestAnswer.swift` (`RequestDockFeature`). Its state
- * carries `SessionFeature.State.DraftState`, so the port lands in this module. Stored state and
- * actions are complete; form paging (`dockedFormPage`, `requestBar`) and the reducer are stand-ins.
- */
-class RequestDockFeature : Reducer<RequestDockFeature.State, RequestDockFeature.Action> {
-    data class State(
-        val permissionRequests: List<OpenCodePermissionRequest> = emptyList(),
-        val formRequests: List<OpenCodeFormRequest> = emptyList(),
-        val formAnswers: Map<String, Map<String, OpenCodeFormValue>> = emptyMap(),
-        val respondingRequestIDs: Set<String> = emptySet(),
-        val questionPageIndices: Map<String, Int> = emptyMap(),
-        val requestLoadError: String? = null,
-        val requestLoadAttempt: LoadAttempt? = null,
-        val requestFailureAwaitingReconnect: Boolean = false,
-        val requestsConnectionIsAvailable: Boolean = true,
-        val requestErrors: Map<String, String> = emptyMap(),
-        val parkedComposer: SessionFeature.State.DraftState? = null,
-        val answerDrafts: Map<String, String> = emptyMap(),
-        val answerShownTarget: String? = null,
-        val answerBarBaseline: String = "",
-        val selectedRequestID: String? = null,
-        val failedReplyIDs: Set<String> = emptySet(),
-        val completedRequestIDs: Set<String> = emptySet(),
-    ) {
-        enum class LoadAttempt { initial, reconnect, manual }
-
-        val isAnswering: Boolean get() = parkedComposer != null
-        val hasPendingRequests: Boolean get() = permissionRequests.isNotEmpty() || formRequests.isNotEmpty()
-        val reviewRequestIDs: List<String> get() = formRequests.map { it.id } + permissionRequests.map { it.id }
-        val waitingSessionIDs: Set<String>
-            get() = (formRequests.map { it.sessionID }.filter { it != "global" } + permissionRequests.map { it.sessionID }).toSet()
-
-        val dockRequestID: String?
-            get() {
-                val selected = selectedRequestID
-                if (selected != null && selected in reviewRequestIDs) return selected
-                return reviewRequestIDs.firstOrNull()
-            }
-
-        fun isOnlyReturn(text: String): Boolean = isAnswering && text == answerBarBaseline + "\n"
-
-        /** Stand-in: the docked request (the real one names the docked form page's field). */
-        val answerTarget: String? get() = dockRequestID
-
-        fun answerText(target: String?): String = target?.let { answerDrafts[it] } ?: ""
-
-        /** Stand-in: the real one makes the bar's words the docked page's answer. */
-        @Suppress("UNUSED_PARAMETER")
-        fun applyBarEdit(draft: String): State = this
-
-        /** Returns the pruned state and whether a selected request was cleared. */
-        fun prune(
-            removing: (PendingRequest) -> Boolean = { false },
-            keepingSelection: Set<String> = emptySet(),
-        ): Pair<State, Boolean> {
-            val hadSelection = selectedRequestID != null
-            val permissions = permissionRequests.filterNot { removing(PendingRequest.Permission(it)) }
-            val forms = formRequests.filterNot { removing(PendingRequest.Form(it)) }
-            var next = copy(permissionRequests = permissions, formRequests = forms)
-            val live = next.reviewRequestIDs.toSet()
-            next = next.copy(
-                formAnswers = SessionFeature.prune(next.formAnswers, live),
-                questionPageIndices = SessionFeature.prune(next.questionPageIndices, live),
-                requestErrors = SessionFeature.prune(next.requestErrors, live),
-                failedReplyIDs = if (live.containsAll(next.failedReplyIDs)) next.failedReplyIDs else next.failedReplyIDs.intersect(live),
-            )
-            val selected = next.selectedRequestID
-            if (selected != null && selected !in live && selected !in keepingSelection) next = next.copy(selectedRequestID = null)
-            return next to (hadSelection && next.selectedRequestID == null)
-        }
-    }
-
-    sealed interface Action {
-        data class PermissionReplyTapped(val id: String, val reply: OpenCodePermissionReply, val message: String? = null) : Action
-        data class ResponseFinished(val sessionID: String, val requestID: String, val error: OpenCodeClientError?) : Action
-        data class ReviewRequestSelected(val id: String) : Action
-        data class SheetTapped(val id: String) : Action
-        data object RefreshTapped : Action
-        data object AutoRetry : Action
-        data class QuestionPageChanged(val requestID: String, val index: Int) : Action
-        data class FormValueChanged(val formID: String, val key: String, val value: OpenCodeFormValue?) : Action
-        data class FormSubmitTapped(val id: String) : Action
-        data class FormCancelTapped(val id: String, val message: String? = null) : Action
-        data object DismissTapped : Action
-        data object CustomMarkTapped : Action
-        data class BarSent(val requestID: String) : Action
-    }
-
-    override fun reduce(state: State, action: Action): Reduced<State, Action> = Reduced(state)
-}
-
-/** SEAM: iOS `SessionFeature.State.AnswerContext` (`Composer/RequestAnswer.swift`). */
-data class AnswerContext(val wants: Boolean, val target: String?)
-
-/** iOS `isAnsweringRequest` (`Composer/RequestAnswer.swift`): the composer is a pending request's answer. */
-val SessionFeature.State.isAnsweringRequest: Boolean get() = requestDock.isAnswering
-
-/** iOS `takesPasteAttachments`. */
-val SessionFeature.State.takesPasteAttachments: Boolean get() = !isAnsweringRequest
-
-/** iOS `wantsRequestDock`: a pending request takes the composer, except under a call and until dictation into the message has finished. */
-val SessionFeature.State.wantsRequestDock: Boolean
-    get() {
-        if (!hasPendingRequests || callOwnsAudio || dictation.sendPending) return false
-        return isAnsweringRequest || (!hasLiveDictation && dictation.hold == null && dictation.sending == null)
-    }
-
-/** iOS `isOnlyReturn(_:)`: the draft differs from the bar's last answer only by Return's newline. */
-fun SessionFeature.State.isOnlyReturn(text: String): Boolean =
-    returnKeySends.value && nonSendNewlineDraft != text && requestDock.isOnlyReturn(text)
-
-/** iOS `answerTarget`. */
-val SessionFeature.State.answerTarget: String? get() = requestDock.answerTarget
-
-/** iOS `answerText(for:)`. */
-fun SessionFeature.State.answerText(target: String?): String = requestDock.answerText(target)
-
-/** iOS `applyBarEdit()`. */
-fun SessionFeature.State.applyBarEdit(): SessionFeature.State =
-    copy(requestDock = requestDock.applyBarEdit(draft)).clearEditedUndoDraft()
-
-/** iOS `clearEditedUndoDraft()`. */
-fun SessionFeature.State.clearEditedUndoDraft(): SessionFeature.State {
-    val current = parkedComposer?.text ?: draft
-    val restored = undoSnapshot?.restoredDraft
-    return if (restored != null && current != restored) withUndoSnapshot(null) else this
-}
-
-/** iOS `sessionComposer`: the session's own composer, parked while a request takes its place. */
-val SessionFeature.State.sessionComposer: SessionFeature.State.DraftState get() = parkedComposer ?: composerWithoutDictation
-
-/** iOS `setSessionComposer(_:)`. */
-fun SessionFeature.State.setSessionComposer(composer: SessionFeature.State.DraftState): SessionFeature.State =
-    if (parkedComposer != null) withParkedComposer(composer) else withDraftState(composer)
-
-/** iOS `beginAnswering()`: the composer becomes the answer. */
-fun SessionFeature.State.beginAnswering(): SessionFeature.State {
-    if (parkedComposer != null) return this
-    return copy(autocomplete = autocomplete.closePopover())
-        .withParkedComposer(draftState)
-        .withDraftState(SessionFeature.State.DraftState())
-        .loadAnswerTarget()
-}
-
-/** iOS `moveAnswer()`. */
-fun SessionFeature.State.moveAnswer(): SessionFeature.State {
-    val shown = requestDock.answerShownTarget
-    val next = if (shown != null) copy(requestDock = requestDock.copy(answerDrafts = requestDock.answerDrafts + (shown to draft))) else this
-    return next.loadAnswerTarget()
-}
-
-private fun SessionFeature.State.loadAnswerTarget(): SessionFeature.State {
-    val target = answerTarget
-    val text = answerText(target)
-    return withDraft(text).let { it.copy(requestDock = it.requestDock.copy(answerShownTarget = target, answerBarBaseline = text)) }
-}
-
-/** iOS `endAnswering()`: the composer is the session's again, as it was before the request. */
-fun SessionFeature.State.endAnswering(): SessionFeature.State {
-    val parked = parkedComposer ?: return this
-    val restored = parked.copy(
-        attachments = parked.attachments + pendingAttachments,
-        files = parked.files + pendingFiles,
-        location = parked.location ?: pendingLocation,
-    )
-    return copy(
-        requestDock = requestDock.copy(parkedComposer = null, answerDrafts = emptyMap(), answerShownTarget = null, answerBarBaseline = ""),
-    ).withDraftState(restored)
-}
-
-/** iOS `answerContext`. */
-val SessionFeature.State.answerContext: AnswerContext get() = AnswerContext(wantsRequestDock, answerTarget)
+// `RequestDockFeature`, `RequestBar`, `AnswerContext` and the answering members of
+// `SessionFeature.State` are ported in `SessionFeatureRequestAnswer.kt`.
 
 // endregion
 

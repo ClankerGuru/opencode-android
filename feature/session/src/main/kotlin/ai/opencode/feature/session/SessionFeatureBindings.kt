@@ -13,10 +13,6 @@ import ai.opencode.feature.session.seams.DictationFeature
 import ai.opencode.feature.session.seams.DotScopeSimulation
 import ai.opencode.feature.session.seams.MarkdownQuote
 import ai.opencode.feature.session.seams.VoiceFeature
-import ai.opencode.feature.session.seams.applyBarEdit
-import ai.opencode.feature.session.seams.clearEditedUndoDraft
-import ai.opencode.feature.session.seams.isAnsweringRequest
-import ai.opencode.feature.session.seams.isOnlyReturn
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.model.OpenCodeProject
 import kotlin.time.Duration.Companion.seconds
