@@ -1,140 +1,44 @@
 package ai.opencode.core.experiments
 
-import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.sharing.SharedKey
-import ai.opencode.core.sharing.shared
+import ai.opencode.core.sharing.experimental
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Port of iOS `OpenCode/Settings/ExperimentalFeatures.swift` (moved down to `:core` because
- * every feature module reads it; see docs/parity/settings.md).
- *
- * Features still being tried out on phones: listed in Settings → Advanced, off by default,
- * and kept on this phone. Adding one is a case here (with its title, summary, symbol and
- * group); Settings lists every case, and code reads it with `dependency(ExperimentalFeatures)`
- * or `shared(ExperimentalFeature.x.key)`. Separate from Developer Mode, which uploads
- * diagnostics.
- *
- * Declared in Settings order: grouped, then by importance within a group.
+ * Settings' half of iOS `OpenCode/Settings/ExperimentalFeatures.swift`, in `:core` beside the
+ * enum itself (`ai.opencode.core.sharing.ExperimentalFeature`, `experimental(feature)`,
+ * `ExperimentalFeatures`): each case's Settings group, the groups, Call Style and Model Picker.
+ * The typealiases let code import everything experimental from this package.
  */
-enum class ExperimentalFeature(val rawValue: String) {
-    composerAutocomplete("composer-autocomplete"),
-    plusMenuSheet("plus-menu-sheet"),
-    agentSelection("agent-selection"),
-    hideModels("hide-models"),
-    callTray("call-tray"),
-    floatingCall("floating-call"),
-    livingOrb("living-orb"),
-    newMessagesDivider("new-messages-divider"),
-    sinceYouLeft("since-you-left"),
-    imageLinkPreviews("image-link-previews"),
-    projectIcons("project-icons"),
-    sessionSwitcher("session-switcher"),
-    serverTitleSwitch("server-title-switch"),
-    serverDetails("server-details"),
-    inAppBrowser("in-app-browser"),
-    serverVoice("server-voice"),
-    backgroundCallIntent("background-call-intent"),
-    ;
+typealias ExperimentalFeature = ai.opencode.core.sharing.ExperimentalFeature
+typealias ExperimentalFeatures = ai.opencode.core.sharing.ExperimentalFeatures
 
-    val id: String get() = rawValue
+/** One experimental feature's switch (iOS `.experimental(feature)`): `experimental-<raw>`, off by default. */
+val ExperimentalFeature.key: SharedKey<Boolean> get() = experimentalKeys.getValue(this)
 
-    val title: String
-        get() = when (this) {
-            inAppBrowser -> "In-App Browser"
-            newMessagesDivider -> "New Messages Divider"
-            agentSelection -> "Agent Selection"
-            hideModels -> "Hide Unused Models"
-            floatingCall -> "Floating Call"
-            livingOrb -> "Living Orb"
-            callTray -> "Call Tray"
-            plusMenuSheet -> "New Plus Menu"
-            imageLinkPreviews -> "Image Link Previews"
-            projectIcons -> "Project Icons"
-            sessionSwitcher -> "Session Switcher"
-            serverTitleSwitch -> "Title Is the Switch"
-            sinceYouLeft -> "Since You Left"
-            composerAutocomplete -> "Composer Autocomplete"
-            serverVoice -> "Server Voice"
-            backgroundCallIntent -> "Background Action Button Call"
-            serverDetails -> "Server Details"
-        }
+private val experimentalKeys: Map<ExperimentalFeature, SharedKey<Boolean>> =
+    ExperimentalFeature.entries.associateWith { experimental(it) }
 
-    /** Settings section the switch sits in. */
-    val group: ExperimentalGroup
-        get() = when (this) {
-            composerAutocomplete, plusMenuSheet, agentSelection, hideModels -> ExperimentalGroup.composer
-            callTray, floatingCall, livingOrb -> ExperimentalGroup.calls
-            newMessagesDivider, sinceYouLeft, imageLinkPreviews -> ExperimentalGroup.transcript
-            projectIcons, sessionSwitcher, serverTitleSwitch, serverDetails -> ExperimentalGroup.drawer
-            inAppBrowser -> ExperimentalGroup.transcript
-            serverVoice, backgroundCallIntent -> ExperimentalGroup.calls
-        }
+/** SF Symbol name (iOS `systemImage`). */
+val ExperimentalFeature.systemImage: String get() = symbol
 
-    /** A few words under the title, one line. */
-    val summary: String
-        get() = when (this) {
-            composerAutocomplete -> "Grow composer for @ and /"
-            plusMenuSheet -> "Photos in place of the keyboard"
-            agentSelection -> "Choose Build, Plan, or your own"
-            hideModels -> "Choose models the picker lists"
-            callTray -> "Call scope beneath the composer"
-            floatingCall -> "Keep calls in a floating orb"
-            livingOrb -> "Voice-reactive phosphor with state colours"
-            newMessagesDivider -> "Mark long unread replies"
-            sinceYouLeft -> "Recap activity since you left"
-            imageLinkPreviews -> "Load linked images in replies"
-            projectIcons -> "Project icons beside session titles"
-            sessionSwitcher -> "Swipe sideways or up through sessions"
-            serverTitleSwitch -> "Connect and switch from the title"
-            inAppBrowser -> "Open web pages inside a session"
-            serverVoice -> "Server-key calls and Gemini Live"
-            backgroundCallIntent -> "Calls start without opening the app"
-            serverDetails -> "MCP servers, skills, and accounts"
-        }
-
-    /** SF Symbol name (draw with `OpenCodeIcon(sfName, …)`). */
-    val systemImage: String
-        get() = when (this) {
-            inAppBrowser -> "safari"
-            newMessagesDivider -> "text.line.first.and.arrowtriangle.forward"
-            agentSelection -> "person.crop.circle"
-            hideModels -> "eye.slash"
-            floatingCall -> "phone.circle.fill"
-            livingOrb -> "circle.hexagongrid.fill"
-            callTray -> "rectangle.bottomhalf.inset.filled"
-            plusMenuSheet -> "plus.circle"
-            imageLinkPreviews -> "photo"
-            projectIcons -> "app.dashed"
-            sessionSwitcher -> "square.stack"
-            serverTitleSwitch -> "server.rack"
-            sinceYouLeft -> "clock.arrow.circlepath"
-            composerAutocomplete -> "at"
-            serverVoice -> "waveform"
-            backgroundCallIntent -> "button.programmable"
-            serverDetails -> "server.rack"
-        }
-
-    /** One experimental feature's switch (iOS `.experimental(feature)`): `experimental-<raw>`, off by default. */
-    val key: SharedKey<Boolean> get() = keys.getValue(this)
-
-    /**
-     * Whether this experiment is on in a view. iOS also honours `OPENCODE_LAB_EXPERIMENTS` in
-     * DEBUG lab runs; Android has no launch environment, so the stored switch decides.
-     */
-    fun isActive(stored: Boolean): Boolean = stored
-
-    /** Written by Settings' Call Style menu rather than shown as a switch. */
-    val isCallStyle: Boolean get() = ExperimentalCallStyle.entries.any { it.feature == this }
-
-    companion object {
-        fun fromRaw(raw: String): ExperimentalFeature? = entries.firstOrNull { it.rawValue == raw }
-
-        private val keys: Map<ExperimentalFeature, SharedKey<Boolean>> =
-            entries.associateWith { SharedKey.appStorage("experimental-${it.rawValue}", false) }
+/** Settings section the switch sits in. */
+val ExperimentalFeature.group: ExperimentalGroup
+    get() = when (this) {
+        ExperimentalFeature.composerAutocomplete, ExperimentalFeature.plusMenuSheet,
+        ExperimentalFeature.agentSelection, ExperimentalFeature.hideModels -> ExperimentalGroup.composer
+        ExperimentalFeature.callTray, ExperimentalFeature.floatingCall, ExperimentalFeature.livingOrb -> ExperimentalGroup.calls
+        ExperimentalFeature.newMessagesDivider, ExperimentalFeature.sinceYouLeft,
+        ExperimentalFeature.imageLinkPreviews -> ExperimentalGroup.transcript
+        ExperimentalFeature.projectIcons, ExperimentalFeature.sessionSwitcher,
+        ExperimentalFeature.serverTitleSwitch, ExperimentalFeature.serverDetails -> ExperimentalGroup.drawer
+        ExperimentalFeature.inAppBrowser -> ExperimentalGroup.transcript
+        ExperimentalFeature.serverVoice, ExperimentalFeature.backgroundCallIntent -> ExperimentalGroup.calls
     }
-}
+
+/** Written by Settings' Call Style menu rather than shown as a switch. */
+val ExperimentalFeature.isCallStyle: Boolean get() = ExperimentalCallStyle.entries.any { it.feature == this }
 
 /** The sections of Settings › Advanced's experiments, in order, all open. */
 enum class ExperimentalGroup {
@@ -268,19 +172,5 @@ enum class ModelPickerStyle(val rawValue: String) {
 
         /** Settings › Advanced › Model Picker. Today by default. */
         val key: SharedKey<ModelPickerStyle> = SharedKey.appStorage(STORAGE_KEY, today)
-    }
-}
-
-/** The experimental switches as reducers read them, overridable in tests (iOS `ExperimentalFeatures`). */
-class ExperimentalFeatures(val isEnabled: (ExperimentalFeature) -> Boolean) {
-    operator fun invoke(feature: ExperimentalFeature): Boolean = isEnabled(feature)
-
-    companion object Key : DependencyKey<ExperimentalFeatures> {
-        override val liveValue: ExperimentalFeatures = ExperimentalFeatures { feature -> shared(feature.key).value }
-        override val testValue: ExperimentalFeatures = ExperimentalFeatures { false }
-
-        /** Every experiment on, or only [features]. */
-        fun enabling(features: Set<ExperimentalFeature> = ExperimentalFeature.entries.toSet()) =
-            ExperimentalFeatures { it in features }
     }
 }
