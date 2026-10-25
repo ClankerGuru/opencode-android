@@ -227,6 +227,9 @@ class RootStore : ViewModel(), WindowRosterMember {
     var isClosed = false
         private set
 
+    /** The store exists (it is made on the first `onCreate`). */
+    val isResolved: Boolean get() = ::store.isInitialized && !isClosed
+
     /** iOS: a tablet's window follows the session it shows. A phone's one window is the app exactly as it was. */
     val follows: Boolean get() = SceneWindows.roster.multipleWindows
 

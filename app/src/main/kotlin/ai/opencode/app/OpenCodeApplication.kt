@@ -2,6 +2,7 @@ package ai.opencode.app
 
 import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.DependencyValues
+import ai.opencode.core.haptics.AudioSessionHaptics
 import ai.opencode.core.log.AppLog
 import ai.opencode.devtools.DevTools
 import ai.opencode.feature.session.AgentActivityLedger
@@ -55,6 +56,9 @@ class OpenCodeApplication : Application() {
         AppDependencies.install(this)
         // Open in New Window (tablet multi-instance windows).
         SceneWindows.install()
+        // The haptics diagnostics trace's `dictating=`/`call=` (iOS reads the audio session owner).
+        AudioSessionHaptics.isCallActive = { SceneWindows.all.any { it.isResolved && it.store.state.hasLiveCall } }
+        AudioSessionHaptics.isDictating = { SceneWindows.all.any { it.isResolved && it.store.state.home?.dictationActivity != null } }
         // iOS `OpenCodeApp.init`'s launch line: version, distribution, model, system.
         val device = dependency(DevToolsClient).device()
         AppLog.app.notice { "Launch: ${AppVersion.current.label}, ${device.distribution}, ${device.model}, ${device.system}" }
