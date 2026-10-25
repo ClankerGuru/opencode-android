@@ -4,6 +4,8 @@ import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.DependencyValues
 import ai.opencode.core.log.AppLog
 import ai.opencode.devtools.DevTools
+import ai.opencode.feature.transcript.markdown.withMarkdownStream
+import ai.opencode.server.EventBatcherHooks
 import ai.opencode.server.retry.AppPhases
 import android.app.Application
 import android.util.Log
@@ -18,6 +20,9 @@ class OpenCodeApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         DependencyValues.installRoot { this[AppContext] = applicationContext }
+        // The batcher projects streaming text through the transcript's Markdown stream, so a
+        // row's blocks for the same text are a lookup (iOS `EventBatcher.prepareMarkdown`).
+        DependencyValues.installRoot { this[EventBatcherHooks] = this[EventBatcherHooks].withMarkdownStream() }
         // Foreground/background phases for retries and reconnects, from the first activity start.
         AppPhases.install(this)
         if (BuildConfig.DEBUG) AppLog.minimumPriority = Log.DEBUG
