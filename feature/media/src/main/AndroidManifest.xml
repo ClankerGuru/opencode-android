@@ -11,5 +11,10 @@
             android:authorities="${applicationId}.agentfiles"
             android:exported="false"
             android:grantUriPermissions="true" />
+        <provider
+            android:name="ai.opencode.feature.media.AgentFileDragProvider"
+            android:authorities="${applicationId}.agentfiles.drag"
+            android:exported="false"
+            android:grantUriPermissions="true" />
     </application>
 </manifest>

@@ -30,6 +30,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.compositionLocalOf
@@ -49,8 +50,11 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -416,6 +420,7 @@ fun AgentImageGallery(
                                         val image = if (entry.phase == AgentImagePreviews.Phase.Loaded && previews.isVisible(sighting)) previews.image(sighting.key) else null
                                         AgentImageGalleryTile(
                                             file = file,
+                                            drag = MediaDragPayload.AgentFile(file, server, directory, cachedImage = image),
                                             sighting = sighting,
                                             entry = entry,
                                             image = image,
@@ -442,12 +447,11 @@ fun AgentImageGallery(
                                 AgentImageStatusCard(
                                     file,
                                     AgentImageStatusCard.Status.NotFound,
-                                    Modifier
-                                        .semantics(mergeDescendants = true) {
-                                            contentDescription = file.name
-                                            stateDescription = "Not found"
-                                        }
-                                        .testTag("agent-image-not-found"),
+                                    Modifier.clearAndSetSemantics {
+                                        contentDescription = file.name
+                                        stateDescription = "Not found"
+                                        testTag = "agent-image-not-found"
+                                    },
                                 )
                             }
                         }
@@ -462,11 +466,17 @@ fun AgentImageGallery(
                                     .clickable(onClickLabel = "Load the image", role = Role.Button) {
                                         targets[segment.index]?.let { previews.allow(key(it)) }
                                     }
-                                    .semantics {
+                                    // The button's own label and value, not the card's text (iOS `.accessibilityLabel` on the Button).
+                                    .clearAndSetSemantics {
+                                        role = Role.Button
                                         contentDescription = file.name
                                         stateDescription = value
-                                    }
-                                    .testTag("agent-image-outside"),
+                                        testTag = "agent-image-outside"
+                                        onClick(label = "Load the image") {
+                                            targets[segment.index]?.let { previews.allow(key(it)) }
+                                            true
+                                        }
+                                    },
                             )
                         }
                         is AgentImageSegment.Cards -> Box {
@@ -478,7 +488,10 @@ fun AgentImageGallery(
                                     key(index) { marker(target, Modifier.matchParentSize()) }
                                 }
                             }
-                            AgentFileCards(segment.indices.map { files[it] }, onOpenFile)
+                            // The row's drag context (iOS `\.transcriptDragContext`): cards drag the server's file.
+                            CompositionLocalProvider(LocalMediaDragContext provides MediaDragContext(server, directory)) {
+                                AgentFileCards(segment.indices.map { files[it] }, onOpenFile)
+                            }
                         }
                     }
                 }
@@ -524,6 +537,7 @@ private fun AgentImageGalleryTile(
     image: Bitmap?,
     radius: Dp,
     pixelsNotBefore: Double,
+    drag: MediaDragPayload,
     marker: @Composable BoxScope.() -> Unit,
     onClick: () -> Unit,
 ) {
@@ -532,7 +546,8 @@ private fun AgentImageGalleryTile(
     Box(
         Modifier
             .fillMaxSize()
-            .clickable(onClickLabel = "Open the image", onClick = onClick)
+            .mediaDragSource(drag)
+            .clickable(onClickLabel = "Open the image", role = Role.Button, onClick = onClick)
             .semantics(mergeDescendants = true) {
                 contentDescription = file.name
                 if (!loaded) stateDescription = "Loading"

@@ -8,21 +8,23 @@ import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticEffect
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
+import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.server.OpenCodePairingLink
 import ai.opencode.server.model.AgentFileReference
 import ai.opencode.server.model.SessionLink
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.ApplicationInfo
+import android.graphics.Point
+import android.view.View
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,24 +48,33 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.graphics.Canvas
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextPainter
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.isSpecified
+import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -358,8 +369,25 @@ class LinkHitLayout(
     /** The inline `opencode-file://` link under [point], with the rects it covers. */
     fun fileLink(point: Offset): Hit<AgentFileReference>? = hit(fileLinks, point)
 
-    /** The session chip under [point]: the line rects it covers, for the pressed highlight. */
-    fun sessionChipRects(point: Offset): List<Rect>? = hit(links, point) { SessionLink.id(it) != null }?.rects
+    /** The em session chips are sized by: the text's base font size (iOS `sessionChipEm`, 17 before any font). */
+    val sessionChipEm: Float
+        get() {
+            val size = layout.layoutInput.style.fontSize
+            return with(layout.layoutInput.density) { if (size.isSpecified) size.toPx() else 17.sp.toPx() }
+        }
+
+    /**
+     * The session chip under [point]: its box on each line it covers, as the transcript's chip
+     * renderer draws it (iOS `SessionChipRenderer`), for the pressed highlight.
+     */
+    fun sessionChipRects(point: Offset): List<Rect>? {
+        val rects = hit(links, point) { SessionLink.id(it) != null }?.rects ?: return null
+        val em = sessionChipEm
+        return rects.map { rect ->
+            val line = layout.getLineForVerticalPosition(rect.center.y)
+            SessionChipMetrics.box(rect.left, rect.right, layout.getLineBaseline(line), em)
+        }
+    }
 
     /** Every web link in the laid-out text and the line rects it covers. */
     val laidOutLinks: List<Hit<String>> get() = links.map { (range, url) -> Hit(url, rects(range)) }
@@ -425,14 +453,16 @@ fun LinkMenu(
         return
     }
     val density = LocalDensity.current
+    val view = LocalView.current
     val slopX = with(density) { 6.dp.toPx() }
     val slopY = with(density) { 5.dp.toPx() }
     var menu by remember { mutableStateOf<LinkHitLayout.Hit<String>?>(null) }
-    var pressed by remember { mutableStateOf<List<Rect>>(emptyList()) }
+    var pressed by remember { mutableStateOf<Path?>(null) }
     val pressAlpha = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
-    val isDark = isSystemInDarkTheme()
-    val pressColor = MaterialTheme.colorScheme.onSurface.copy(alpha = if (isDark) 0.16f else 0.1f)
+    val colors = OpenCodeTheme.colors
+    val pressColor = colors.text.copy(alpha = if (colors.isDark) 0.16f else 0.1f)
+    val liftFill = MaterialTheme.colorScheme.surface
     HapticEffect(Haptic.threshold, menu?.value) { old, new -> old == null && new != null }
 
     Box(
@@ -447,19 +477,15 @@ fun LinkMenu(
                     }
                 }
             }
-            .drawBehind {
+            // A session chip darkens while a finger is on it: over the text, as iOS's press layer.
+            .drawWithContent {
+                drawContent()
                 val alpha = pressAlpha.value
-                if (alpha <= 0f) return@drawBehind
-                for (rect in pressed) {
-                    drawRoundRect(
-                        color = pressColor.copy(alpha = pressColor.alpha * alpha),
-                        topLeft = rect.topLeft,
-                        size = rect.size,
-                        cornerRadius = CornerRadius(rect.height * 0.3f),
-                    )
-                }
+                val path = pressed
+                if (alpha <= 0f || path == null) return@drawWithContent
+                drawPath(path, pressColor.copy(alpha = pressColor.alpha * alpha))
             }
-            .pointerInput(webRanges, handler, onOpen) {
+            .pointerInput(webRanges, handler, onOpen, liftFill) {
                 awaitEachGesture {
                     // Only a link's own touches; everything else reaches the text.
                     val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
@@ -467,26 +493,50 @@ fun LinkMenu(
                     val hits = LinkHitLayout(layout, webRanges, slopX = slopX, slopY = slopY)
                     val hit = hits.link(down.position) ?: return@awaitEachGesture
                     down.consume()
-                    // A session chip darkens while a finger is on it.
-                    hits.sessionChipRects(down.position)?.let { rects ->
-                        pressed = rects
+                    hits.sessionChipRects(down.position)?.let { boxes ->
+                        val em = hits.sessionChipEm
+                        pressed = Path().apply { for (box in boxes) addPath(SessionChipMetrics.shape(box, em)) }
                         scope.launch { pressAlpha.snapTo(1f) }
                     }
-                    val up = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
-                        waitForUpOrCancellation(PointerEventPass.Initial)
-                    }
-                    if (up != null) {
-                        up.consume()
-                        onOpen(hit.value)
-                    } else {
-                        menu = hit
-                        // Swallow the rest of the hold.
-                        do {
+                    val slop = viewConfiguration.touchSlop
+                    // A tap opens; moving first leaves the touch to the list's scroll; holding opens the menu.
+                    val tapped: Boolean? = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                        var result: Boolean? = null
+                        while (result == null) {
                             val event = awaitPointerEvent(PointerEventPass.Initial)
-                            event.changes.forEach { it.consume() }
-                        } while (event.changes.any { it.pressed })
+                            val change = event.changes.firstOrNull { it.id == down.id }
+                            result = when {
+                                change == null -> false
+                                !change.pressed -> { change.consume(); true }
+                                change.isConsumed || (change.position - down.position).getDistance() > slop -> false
+                                else -> null
+                            }
+                        }
+                        result
                     }
-                    if (pressAlpha.value > 0f) scope.launch { pressAlpha.animateTo(0f, tween(180)) }
+                    when (tapped) {
+                        true -> onOpen(hit.value)
+                        false -> Unit
+                        null -> {
+                            menu = hit
+                            // Held: the rest of the touch belongs to the menu, until the finger moves
+                            // and drags the link out instead (iOS's context menu and drag interaction).
+                            val drag = linkDrag(hit, layout)
+                            var dragged = false
+                            while (true) {
+                                val event = awaitPointerEvent(PointerEventPass.Initial)
+                                val change = event.changes.firstOrNull { it.id == down.id }
+                                event.changes.forEach { it.consume() }
+                                if (change == null || !change.pressed) break
+                                if (!dragged && drag != null && (change.position - down.position).getDistance() > slop) {
+                                    dragged = true
+                                    menu = null
+                                    drag.start(view, change.position, liftFill)
+                                }
+                            }
+                        }
+                    }
+                    if (pressAlpha.value > 0f) scope.launch { pressAlpha.animateTo(0f, tween(180, easing = LinearEasing)) }
                 }
             },
     ) {
@@ -514,6 +564,89 @@ fun LinkMenu(
                 )
             }
         }
+    }
+}
+
+/**
+ * The chip's box around a run of text, shared by the transcript's chip renderer and the pressed
+ * highlight ([LinkHitLayout.sessionChipRects]) so both agree. Port of iOS `SessionChipMetrics`
+ * with `SessionLinkTunables`' defaults; it lives here, below the transcript, so the transcript's
+ * renderer can adopt it.
+ */
+object SessionChipMetrics {
+    /** SF's ascent plus descent, in ems (iOS derives a run's em from its typographic bounds; Android's em is the font size). */
+    const val lineEms = 1.178f
+    /** The chip's height and how far its centre sits above the baseline, in ems. */
+    const val height = 1.16f
+    const val rise = 0.31f
+    /** The chip's fill opacity. */
+    const val fill = 0.08f
+    /** The chip's corner radius at body size (17 pt); it scales with the text. */
+    const val radius = 4.5f
+
+    /** The corner radius for text whose em is [em]. */
+    fun cornerRadius(em: Float): Float = radius * em / 17f
+
+    fun box(minX: Float, maxX: Float, baseline: Float, em: Float): Rect {
+        val h = em * height
+        val centre = baseline - em * rise
+        return Rect(minX, centre - h / 2, maxX, centre + h / 2)
+    }
+
+    /** Rounded corners, the radius scaled with the text (iOS continuous corners). */
+    fun shape(box: Rect, em: Float): Path {
+        val r = minOf(cornerRadius(em), box.height / 2)
+        return Path().apply { addRoundRect(RoundRect(box, CornerRadius(r, r))) }
+    }
+}
+
+/** A held web link's drag: its URL out to other apps, lifting the link's own lines (iOS `LinkMenuView`'s drag interaction). */
+private class LinkDrag(
+    private val url: String,
+    private val layout: TextLayoutResult,
+    private val rects: List<Rect>,
+) {
+    fun start(view: View, at: Offset, fill: Color) {
+        val clip = MediaDragPayload.Url(url).clipData(view.context) ?: return
+        markDragBegin()
+        view.startDragAndDrop(clip, LinkDragShadow(layout, rects, at, fill, view.resources.displayMetrics.density), null, View.DRAG_FLAG_GLOBAL)
+    }
+}
+
+/** Session links don't drag (iOS returns no items for them). */
+private fun linkDrag(hit: LinkHitLayout.Hit<String>, layout: TextLayoutResult): LinkDrag? =
+    if (SessionLink.id(hit.value) != null || hit.rects.isEmpty()) null else LinkDrag(hit.value, layout, hit.rects)
+
+/**
+ * The lifted link (iOS `UIPreviewParameters(textLineRects:)`): each line it covers, a little
+ * outset (4 × 2 points), on the surface, with the link's text drawn in it.
+ */
+private class LinkDragShadow(
+    private val layout: TextLayoutResult,
+    rects: List<Rect>,
+    private val touch: Offset,
+    private val fill: Color,
+    density: Float,
+) : View.DragShadowBuilder() {
+    private val lines = rects.map { Rect(it.left - 4 * density, it.top - 2 * density, it.right + 4 * density, it.bottom + 2 * density) }
+    private val bounds = lines.reduce { a, b -> Rect(minOf(a.left, b.left), minOf(a.top, b.top), maxOf(a.right, b.right), maxOf(a.bottom, b.bottom)) }
+    private val corner = 4 * density
+
+    override fun onProvideShadowMetrics(outShadowSize: Point, outShadowTouchPoint: Point) {
+        outShadowSize.set(bounds.width.roundToInt().coerceAtLeast(1), bounds.height.roundToInt().coerceAtLeast(1))
+        outShadowTouchPoint.set(
+            (touch.x - bounds.left).roundToInt().coerceIn(0, outShadowSize.x),
+            (touch.y - bounds.top).roundToInt().coerceIn(0, outShadowSize.y),
+        )
+    }
+
+    override fun onDrawShadow(canvas: android.graphics.Canvas) {
+        val shape = Path().apply { for (line in lines) addRoundRect(RoundRect(line, CornerRadius(corner, corner))) }
+        val compose = Canvas(canvas)
+        compose.translate(-bounds.left, -bounds.top)
+        compose.clipPath(shape)
+        compose.drawPath(shape, Paint().apply { color = fill })
+        TextPainter.paint(compose, layout)
     }
 }
 
