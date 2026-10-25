@@ -4,16 +4,19 @@ import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
 
 /**
- * Phase 0 placeholder for this area's root reducer (iOS TCA feature).
+ * The system area's public reducer name, kept for parents that wire it. iOS has no
+ * `SystemFeature`: its `OpenCode/System/` is clients and system entry points that
+ * `AppFeature` and `HomeFeature` drive. The same holds here; the entry points are:
  *
- * Will port `System/Intents/` (→ App Actions, app shortcuts, `opencode://` deep links), `System/LiveActivity/` (→ Live Updates / ongoing notifications), `System/Notifications/` (badges, session notifications), `System/Share/` + `OpenCodeShare/` (→ share target activity), `OpenCodeWidgets/` (→ Glance widgets), `OpenCodeNotifications/` (→ FCM bridge, stubbed behind an interface until credentials exist)
- * from `/Users/vogel/dev/opencode-ios/OpenCode/System/` (all of: OpenCode/System/, OpenCodeShare/, OpenCodeWidgets/, OpenCodeNotifications/).
- * Track every file in `docs/parity/system.md`.
- *
- * `SystemAction` handoffs route through `AppFeature` → `HomeFeature`, as on iOS.
- *
- * Keep the public names (`SystemFeature`, `SystemFeature.State`, `SystemFeature.Action`, `SystemView`) stable: `:app`
- * and parent features already wire them. Replace the placeholder state and actions freely.
+ * - `intents/`: [ai.opencode.feature.system.intents.SystemAction],
+ *   [ai.opencode.feature.system.intents.SystemIntegrationClient] (actions in, directory out),
+ *   `SystemActionActivity` (shortcuts, links, tiles, widgets, notification taps),
+ *   `AskOpenCodeActivity`, `BackgroundCallActivity`, `SystemPromptSender`.
+ * - `liveactivity/`: `VoiceLiveActivityClient`, `DictationLiveActivityClient` (Live Updates).
+ * - `notifications/`: `SessionNotificationsClient`, `NotificationPermissionClient`,
+ *   `AppIconBadgeClient`, `SessionPushNotifications`.
+ * - `share/`: `ShareInboxClient` and the share target (`ShareActivity`).
+ * - `widgets/`: Quick Settings tiles and Glance widgets.
  */
 class SystemFeature : Reducer<SystemFeature.State, SystemFeature.Action> {
     data class State(

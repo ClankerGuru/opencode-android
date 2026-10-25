@@ -1,0 +1,66 @@
+package ai.opencode.feature.system.share
+
+import ai.opencode.core.sharing.SharedKey
+import ai.opencode.core.sharing.shared
+import ai.opencode.server.OpenCodeServer
+import kotlinx.serialization.Serializable
+
+/**
+ * Port of iOS `ShareCredentials`: what the share sheet needs to send on its own: the server it
+ * offers sessions on (address, password, custom headers) and the relay callback that tells this
+ * phone when the run ends. The app writes it to a keychain item whenever it publishes the share
+ * sheet's sessions ([ShareTargets]), and removes it with the server.
+ */
+@Serializable
+data class ShareCredentials(
+    val version: Int = CURRENT_VERSION,
+    /** `OpenCodeServer.persistenceID`; matches [ShareTargets.serverID]. */
+    val serverID: String,
+    val server: OpenCodeServer,
+    /**
+     * The notify relay's callback for this server, when notifications are on: a send from the
+     * share sheet asks for the same "done" push as the app's.
+     */
+    val callbackURL: String? = null,
+) {
+    constructor(server: OpenCodeServer, callbackURL: String? = null) :
+        this(CURRENT_VERSION, server.persistenceID, server, callbackURL)
+
+    companion object {
+        const val CURRENT_VERSION = 1
+    }
+}
+
+/**
+ * The shared keychain item, or an in-memory stand-in for tests (iOS `ShareCredentialStore`).
+ * On Android the share target runs in the app's own process, so the item is a
+ * [SharedKey.keychain] (Keystore-encrypted, no backup) both read.
+ */
+class ShareCredentialStore(
+    val load: () -> ShareCredentials?,
+    val save: (ShareCredentials) -> Unit,
+    val remove: () -> Unit,
+) {
+    companion object {
+        val key = SharedKey.keychain<ShareCredentials?>("share-credentials", null)
+
+        val live: ShareCredentialStore by lazy {
+            val item = shared(key)
+            ShareCredentialStore(
+                load = { item.value?.takeIf { it.version == ShareCredentials.CURRENT_VERSION } },
+                save = { item.set(it) },
+                remove = { item.set(null) },
+            )
+        }
+
+        fun inMemory(): ShareCredentialStore {
+            var stored: ShareCredentials? = null
+            val lock = Any()
+            return ShareCredentialStore(
+                load = { synchronized(lock) { stored } },
+                save = { synchronized(lock) { stored = it } },
+                remove = { synchronized(lock) { stored = null } },
+            )
+        }
+    }
+}
