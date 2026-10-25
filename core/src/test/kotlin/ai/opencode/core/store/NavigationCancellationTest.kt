@@ -3,6 +3,7 @@ package ai.opencode.core.store
 import ai.opencode.core.log.logSummary
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.yield
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -173,7 +174,10 @@ class NavigationCancellationTest {
                     Effect.send(ChildAction.Tick),
                     Effect.merge(work.cancellable(WorkID, cancelInFlight = true), work),
                 )
-                ChildAction.Cancel -> Effect.concatenate(Effect.cancel(WorkID), Effect.none())
+                ChildAction.Cancel -> Effect.concatenate(
+                    Effect.run<ChildAction> { yield() },
+                    Effect.cancel(WorkID),
+                )
                 ChildAction.Tick -> Effect.none()
             })
         }
