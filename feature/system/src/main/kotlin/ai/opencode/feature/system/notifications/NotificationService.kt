@@ -88,5 +88,27 @@ object SessionPushNotifications {
         }
     }
 
+    /**
+     * The app icon's count (iOS `setBadgeCount`): Android launchers count from the shown
+     * notifications' `number`, so the session notifications still in the shade are posted
+     * again with the ledger's count, silently. With none showing the launcher shows nothing,
+     * as an app can't badge its icon by itself.
+     */
+    @SuppressLint("MissingPermission")
+    fun applyBadge(context: Context, count: Int) {
+        val manager = context.getSystemService(NotificationManager::class.java) ?: return
+        if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return
+        for (shown in manager.activeNotifications) {
+            if (shown.id != NOTIFICATION_ID || shown.notification.number == count) continue
+            runCatching {
+                val updated = android.app.Notification.Builder.recoverBuilder(context, shown.notification)
+                    .setNumber(count)
+                    .setOnlyAlertOnce(true)
+                    .build()
+                manager.notify(shown.tag, shown.id, updated)
+            }.onFailure { AppLog.app.debug { "App badge not set: ${it::class.java.simpleName}" } }
+        }
+    }
+
     private const val NOTIFICATION_ID = 4201
 }

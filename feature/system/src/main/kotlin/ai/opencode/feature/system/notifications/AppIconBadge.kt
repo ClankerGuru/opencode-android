@@ -12,9 +12,10 @@ import kotlinx.coroutines.withContext
  * the server in use.
  *
  * Android has no app-set icon count: launchers draw a dot while notifications show, and a
- * count from the notifications' `number`. So the count rides on the session notifications
- * the push handler posts ([SessionPushNotifications]), and the ledger keeps it close between
- * launches exactly as iOS's does.
+ * count from the notifications' `number`. So the count rides on the session notifications:
+ * the push handler posts new ones with the ledger's count, and each publish re-posts the ones
+ * still showing with the new count ([SessionPushNotifications.applyBadge]). The ledger keeps
+ * it close between launches exactly as iOS's does.
  */
 class AppIconBadgeClient(
     /**
@@ -76,6 +77,7 @@ internal class AppIconBadge private constructor() {
         if (shownCount != count) AppLog.app.info { "App badge count=$count" }
         shownCount = count
         this.count = count
+        SessionPushNotifications.applyBadge(dependency(AppContext), count)
     }
 
     companion object {
