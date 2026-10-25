@@ -168,9 +168,13 @@ sealed class VoiceAudioError(message: String) : Exception(message) {
     class engineRejected(val operation: String, val reason: String) : VoiceAudioError("Couldn’t start call audio. Try again in a moment.")
 }
 object AudioEngineGuard {
+    /** The framework's `IllegalStateException`s (iOS: raised `NSException`s) become errors; a
+     * cancellation (itself an `IllegalStateException` on the JVM) passes through, as iOS's does. */
     fun <T> perform(operation: String, body: () -> T): T = try { body() } catch (error: IllegalStateException) {
-        dependency(VoiceCallLogClient).noteCurrent(VoiceCallLog.Note.Kind.audio, "⚠︎ $operation raised ${error.javaClass.simpleName}")
-        throw VoiceAudioError.engineRejected(operation, error.javaClass.simpleName)
+        if (error is CancellationException) throw error
+        val reason = error.message ?: "no reason given"
+        dependency(VoiceCallLogClient).noteCurrent(VoiceCallLog.Note.Kind.audio, "⚠︎ $operation raised ${error.javaClass.simpleName}: $reason")
+        throw VoiceAudioError.engineRejected(operation, reason)
     }
 }
 object VoiceAudioHardware {
