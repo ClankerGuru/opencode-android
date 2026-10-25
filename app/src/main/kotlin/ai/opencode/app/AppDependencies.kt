@@ -16,6 +16,12 @@ import ai.opencode.feature.voice.VoiceDiagnostics
 import ai.opencode.feature.voice.VoiceLogUploader
 import ai.opencode.feature.voice.VoiceScreenActivityRegistry
 import ai.opencode.server.DeveloperModeUploads
+import ai.opencode.devtools.SavedVoiceLogUploads
+import ai.opencode.feature.voice.VoiceCallLogClient
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import android.app.Activity
 import android.app.Application
 import android.os.Bundle
@@ -28,6 +34,9 @@ import java.util.Locale
  * recorder, and its screen hold to the resumed activity.
  */
 internal object AppDependencies {
+    /** Detached uploads (iOS `Task.detached(priority: .utility)`). */
+    private val uploadScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     fun install(application: Application) {
         val registry = VoiceScreenActivityRegistry()
         DependencyValues.installRoot {
@@ -56,6 +65,12 @@ internal object AppDependencies {
             // A finished call's log, uploaded when Developer Mode is on (the recorder gates it).
             this[VoiceCallLogUploadClient] = VoiceCallLogUploadClient { log ->
                 DeveloperModeUploads.uploadVoiceLog(log.id, log.boundedJSON())
+            }
+            // iOS `developerModeChanged(true)`: every saved call log goes up, detached.
+            this[SavedVoiceLogUploads] = SavedVoiceLogUploads {
+                uploadScope.launch {
+                    for (log in dependency(VoiceCallLogClient).list()) DeveloperModeUploads.uploadVoiceLog(log.id, log.boundedJSON())
+                }
             }
             // iOS `DiagnosticsClient.voice` and `LabMarks.mark`.
             this[VoiceDiagnostics] = VoiceDiagnostics(

@@ -1,6 +1,7 @@
 package ai.opencode.devtools
 
 import ai.opencode.core.diagnostics.DiagnosticsEvent
+import ai.opencode.core.diagnostics.MotionWatchEvent
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.collectState
 import ai.opencode.core.tuning.AnimationTimeScale
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -49,6 +51,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -129,7 +132,7 @@ private fun Actions(state: DevToolsFeature.State, send: (DevToolsFeature.Action)
                     DropdownMenuItem(text = { Text("JSON") }, onClick = { menu = false; send(DevToolsFeature.Action.ShareTimelineTapped(json = true)) })
                 }
             }
-            IconButton(onClick = { send(DevToolsFeature.Action.ClearTapped) }, enabled = state.events.isNotEmpty()) {
+            IconButton(onClick = { send(DevToolsFeature.Action.ClearTapped) }, enabled = state.events.isNotEmpty() || state.motionJumps.isNotEmpty()) {
                 OpenCodeIcon(SFSymbol.Trash, "Clear", tint = MaterialTheme.colorScheme.error)
             }
         }
@@ -173,6 +176,16 @@ private fun MainPage(state: DevToolsFeature.State, send: (DevToolsFeature.Action
             }
         }
         if (state.developerMode) {
+            if (state.isInternalBuild) {
+                item {
+                    SwitchRow(
+                        "Motion Watch",
+                        "Record layout jumps with 2 seconds of surrounding frames for bug reports",
+                        state.motionWatch,
+                        modifier = Modifier.testTag("diagnostics-motion-watch"),
+                    ) { send(DevToolsFeature.Action.MotionWatchChanged(it)) }
+                }
+            }
             item {
                 SwitchRow("Demo Call Audio", "Play the next voice call as media so a screen recording captures it", state.demoCallAudio) {
                     send(DevToolsFeature.Action.DemoCallAudioChanged(it))
@@ -255,10 +268,11 @@ private fun SwitchRow(
     checked: Boolean,
     enabled: Boolean = true,
     hint: String? = null,
+    modifier: Modifier = Modifier,
     onChange: (Boolean) -> Unit,
 ) {
     Row(
-        Modifier.fillMaxWidth()
+        modifier.fillMaxWidth()
             .clickable(enabled = enabled, role = Role.Switch, onClickLabel = hint) { onChange(!checked) }
             .heightIn(min = 56.dp)
             .padding(horizontal = 16.dp, vertical = 8.dp),
@@ -316,7 +330,25 @@ private fun TroubleshootingPage(state: DevToolsFeature.State) {
     val metrics = remember(events) { Troubleshooting.metricsByRequest(events) }
     LazyColumn(Modifier.fillMaxSize()) {
         section("Summary")
-        item { SummaryCard(events) }
+        item { SummaryCard(events, motionJumps = state.motionJumps.size.takeIf { state.motionWatchActive || state.motionJumps.isNotEmpty() }) }
+        if (state.motionWatchActive || state.motionJumps.isNotEmpty()) {
+            section("Motion Watch")
+            if (state.motionJumps.isEmpty()) {
+                item(key = "motion-watch-empty") {
+                    Text(
+                        "No jumps recorded",
+                        Modifier.padding(horizontal = 16.dp, vertical = 8.dp).testTag("diagnostics-motion-watch-empty"),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = OpenCodeTheme.colors.secondaryText,
+                    )
+                }
+            } else {
+                items(state.motionJumps.asReversed(), key = { "jump-${it.id}" }) { jump ->
+                    MotionJumpRow(jump)
+                    HorizontalDivider(Modifier.padding(start = 16.dp))
+                }
+            }
+        }
         for (group in groups) {
             section(group.title)
             items(group.events.filter { it.kind != DiagnosticsEvent.Kind.RequestStart && it.kind != DiagnosticsEvent.Kind.NetworkMetrics }, key = { it.id }) { event ->
@@ -327,9 +359,33 @@ private fun TroubleshootingPage(state: DevToolsFeature.State) {
     }
 }
 
+/** iOS's Motion Watch row: kind, row kinds, frame count, row IDs and detail; monospaced. */
 @Composable
-private fun SummaryCard(events: List<DiagnosticsEvent>) {
-    val summary = remember(events) { Troubleshooting.summary(events) }
+private fun MotionJumpRow(jump: MotionWatchEvent) {
+    val mono = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+            .semantics(mergeDescendants = true) {}.testTag("diagnostics-motion-jump-row"),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(jump.kind.rawValue, style = MaterialTheme.typography.titleSmall.copy(fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold))
+            if (jump.rowKinds.isNotEmpty()) {
+                Text(jump.rowKinds.joinToString(", "), Modifier.padding(start = 8.dp), style = mono, color = OpenCodeTheme.colors.secondaryText)
+            }
+            Spacer(Modifier.weight(1f).widthIn(min = 4.dp))
+            Text("${jump.frames.size}f · 2 s", style = mono, color = OpenCodeTheme.colors.secondaryText)
+        }
+        if (jump.rows.isNotEmpty()) {
+            Text(jump.rows.joinToString(", "), style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace), color = OpenCodeTheme.colors.secondaryText)
+        }
+        Text(jump.detail, style = mono, color = OpenCodeTheme.colors.secondaryText)
+    }
+}
+
+@Composable
+private fun SummaryCard(events: List<DiagnosticsEvent>, motionJumps: Int? = null) {
+    val summary = remember(events, motionJumps) { Troubleshooting.summary(events, motionJumps) }
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         for ((label, value) in summary) {
             Row(Modifier.fillMaxWidth().semantics(mergeDescendants = true) {}) {
