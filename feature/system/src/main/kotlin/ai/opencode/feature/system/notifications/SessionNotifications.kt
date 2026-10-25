@@ -149,11 +149,14 @@ enum class NotificationPresentation { None, Banner, ListOnly }
  * the token and the relay keeps nothing. The `ref` exists only so a tap can find the saved
  * server; it is random, never derived from the server's address or credentials.
  *
- * The relay (`packages/notify-relay`) speaks APNs only today: it accepts hex tokens with an
- * environment of `development`/`production`. Android pushes would ride FCM, whose tokens it
- * can't seal yet, so [environment] stays null and [isAvailable] false until it does. The
- * whole path (permission, token wait, mint, saved callbacks, tap routing, the push handler)
- * is in place behind [PushTokenProvider].
+ * Android pushes ride FCM: the build's push environment is [FCM_ENVIRONMENT] (`"fcm"`, iOS
+ * `development`/`production`), and the token is the FCM registration token. The relay
+ * (`packages/notify-relay`) seals APNs tokens only today, so it answers this registration
+ * with 400 and every send goes without a callback, failing open as any relay outage does;
+ * docs/parity/system.md lists the relay change FCM needs. Until a build carries a Firebase
+ * configuration there is no environment at all ([isAvailable] false) and nothing is asked
+ * of the relay. The whole path (permission, token wait, mint, saved callbacks, tap routing,
+ * the push handler) is in place behind [PushTokenProvider].
  */
 class SessionNotifications internal constructor(private val tokens: PushTokenProvider) {
     /** The session on screen while the app is in the foreground. Its own "finished" notifications aren't shown. */
@@ -343,11 +346,17 @@ class SessionNotifications internal constructor(private val tokens: PushTokenPro
         /** The relay's origin (`NotifyRelayURL`). */
         const val RELAY_URL = "https://opencode-notify-relay.anomalyco.workers.dev"
 
+        /** The push environment an Android registration asks the relay to seal. */
+        const val FCM_ENVIRONMENT = "fcm"
+
         /**
-         * The push environment the relay seals (`APNSEnvironment` on iOS). Null: the relay has
-         * no FCM delivery yet (see the class comment), so Android builds offer no callback.
+         * The push environment the relay seals (`APNSEnvironment` on iOS): [FCM_ENVIRONMENT]
+         * when the build carries a Firebase configuration (FCM can mint tokens), else null and
+         * the build offers no callback.
          */
-        val environment: String? = null
+        val environment: String? by lazy {
+            FCM_ENVIRONMENT.takeIf { FcmPushTokenProvider.isConfigured(dependency(AppContext).applicationContext) }
+        }
 
         /** Whether this build can offer notifications at all. */
         val isAvailable: Boolean get() = environment != null && RELAY_URL.toHttpUrlOrNull()?.isHttps == true
@@ -412,9 +421,9 @@ class SessionNotifications internal constructor(private val tokens: PushTokenPro
 }
 
 /**
- * The push channel's token, behind an interface (iOS: APNs registration). Inert until a
- * Firebase configuration ships with the build: no `google-services.json` exists, so the live
- * provider reports failure at once and every send goes without a callback.
+ * The push channel's token, behind an interface (iOS: APNs registration). The live provider
+ * is FCM's ([FcmPushTokenProvider]); it reports failure at once until a Firebase
+ * configuration ships with the build, and every send goes without a callback.
  */
 fun interface PushTokenProvider {
     /** Asks for the token; exactly one of the callbacks runs, now or later. */

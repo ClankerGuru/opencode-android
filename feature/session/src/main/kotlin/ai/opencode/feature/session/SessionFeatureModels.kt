@@ -376,7 +376,7 @@ private fun SessionFeature.familyPicked(id: String, state: State): Reduced<State
             Effect.cancel(CancelID.AutocompleteCommand),
             Effect.cancel(CancelID.AutocompleteCommandWait),
             Effect.cancel(CancelID.Revert),
-            Effect.cancel(SessionSheetFeature.CancelID.AutoRenameFailure),
+            // Clearing sessionSheet above cancels its auto-rename failure through ifLet teardown.
             endedCall,
             closesPage.effect,
             abandon.effect,

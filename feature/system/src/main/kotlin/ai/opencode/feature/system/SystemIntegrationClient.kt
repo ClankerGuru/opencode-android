@@ -5,6 +5,7 @@ import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.log.AppLog
 import ai.opencode.feature.system.intents.SystemQuickAction
+import ai.opencode.feature.system.intents.SystemSearchIndex
 import ai.opencode.feature.system.widgets.OpenCodeControls
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeProject
@@ -196,10 +197,8 @@ class SystemIntegrationPublisher(
 }
 
 /**
- * Writes the directory and the controls' copy, then brings the widgets, tiles and quick
- * actions in line with it. iOS also indexes Spotlight here; Android has no system search
- * index third-party apps feed (see docs/parity/system.md), and launcher search reads the
- * quick actions.
+ * Writes the directory and the controls' copy, then brings system search (iOS Spotlight:
+ * [SystemSearchIndex]), the widgets, tiles and quick actions in line with it.
  */
 internal object SystemIntegrationEffects {
     suspend fun perform(context: Context, job: SystemIntegrationPublisher.Job) {
@@ -212,6 +211,7 @@ internal object SystemIntegrationEffects {
                     directory = directory.publish(job.server)
                     directory.write(file)
                     AppLog.app.debug { "System directory published sessions=${job.server.sessions.size}" }
+                    SystemSearchIndex.index(context, job.server, previous)
                 }
                 updateControls(context, directory)
                 setQuickActions(context, SystemQuickAction.items(job.server, job.voiceAvailable))
@@ -222,6 +222,7 @@ internal object SystemIntegrationEffects {
                 directory = directory.removeServer(job.key)
                 directory.write(file)
                 updateControls(context, directory)
+                SystemSearchIndex.remove(context, job.key)
                 if (wasCurrent) setQuickActions(context, emptyList())
             }
         }

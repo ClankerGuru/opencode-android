@@ -103,10 +103,10 @@ data class SessionDirectory(
             file.parentFile?.mkdirs()
             val temporary = File(file.parentFile, ".${file.name}.tmp")
             temporary.writeText(data)
-            if (!temporary.renameTo(file)) {
-                file.delete()
-                temporary.renameTo(file)
-            }
+            java.nio.file.Files.move(
+                temporary.toPath(), file.toPath(),
+                java.nio.file.StandardCopyOption.ATOMIC_MOVE, java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+            )
         }
     }
 

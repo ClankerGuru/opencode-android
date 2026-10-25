@@ -66,7 +66,7 @@ class ShareInboxClient(
                     withContext(Dispatchers.IO) {
                         ShareHandoffStore.live?.consumeAll(
                             now = Instant.now(),
-                            filesDirectory = File(context.cacheDir, "ComposerFiles"),
+                            filesDirectory = ComposerFileStaging.directory,
                         ) ?: emptyList()
                     }
                 },
@@ -214,15 +214,5 @@ class ShareTargetsPublication(
             recents = recents.map(::target),
             projects = offered,
         )
-    }
-}
-
-/** iOS `[OpenCodeSession].hasSameDirectoryMetadata(as:)`. */
-private fun List<OpenCodeSession>.hasSameDirectoryMetadata(other: List<OpenCodeSession>): Boolean {
-    if (size != other.size) return false
-    if (this === other) return true
-    return zip(other).all { (a, b) ->
-        a.id == b.id && a.title == b.title && a.projectID == b.projectID &&
-            a.directory == b.directory && a.updatedAt == b.updatedAt && a.parentID == b.parentID
     }
 }
