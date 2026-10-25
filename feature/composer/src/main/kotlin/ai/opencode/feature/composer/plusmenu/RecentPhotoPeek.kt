@@ -8,6 +8,13 @@ import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.feature.composer.AttachmentPlusPeek
 import ai.opencode.feature.composer.PlusMenuTunables
+import ai.opencode.feature.composer.progressiveBlurEffect
+import ai.opencode.feature.composer.rememberReduceTransparency
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.composed
+import androidx.compose.ui.graphics.BlurEffect
+import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -139,28 +146,78 @@ class RecentPhotoPeek(private val haptics: HapticsClient = dependency(HapticsCli
     }
 }
 
-/** Android has no backdrop blur here: the bottom band dims instead of iOS's progressive blur. */
+/**
+ * Until the host blurs its content with [recentPhotoPeekBackdrop], the overlay dims the bottom
+ * band with this instead (a fallback: iOS blurs, with no dim by default).
+ */
 private const val PEEK_SCRIM_DIM = 0.32f
 private const val PEEK_RADIUS = 14f
 private const val PEEK_LIFT = 1.14f
 private const val PEEK_RISE = 6f
 
+/** iOS `.smooth(duration: peekOpen.duration × 0.8)` in, `.smooth(duration: peekClose)` out: springs with no bounce. */
+private fun peekBackdropSpec(shown: Boolean) =
+    if (shown) MotionSpring(PlusMenuTunables.peekOpen.duration * 0.8).spec<Float>() else MotionSpring(PlusMenuTunables.PEEK_CLOSE).spec()
+
 /**
- * The strip over a dimmed bottom band (iOS `RecentPhotoPeekOverlay` + `RecentPhotoPeekBackdrop`).
- * Mount it full-screen over the session; it takes no touches (the + button's gesture drives
- * [RecentPhotoPeek]) and is hidden from TalkBack. Tiles arrive out of + one after another and
- * leave the same way; Reduce Motion fades them in place.
+ * iOS `RecentPhotoPeekBackdrop`'s blur on the content beneath the strip: put it on the host's
+ * screen content under [RecentPhotoPeekOverlay] (and pass `backdropBlurApplied = true` there).
+ * Only the bottom band blurs, from [PlusMenuTunables.PEEK_FEATHER] above the strip down,
+ * ramping in over the feather (iOS `ProgressiveBlur(band:)`), its radius
+ * ([PlusMenuTunables.PEEK_BLUR]) growing with the peek; off under Reduce Transparency.
+ * Values are read in the draw phase, so the content isn't recomposed.
+ */
+fun Modifier.recentPhotoPeekBackdrop(peek: RecentPhotoPeek): Modifier = composed {
+    val density = LocalDensity.current.density
+    val reduceTransparency = rememberReduceTransparency()
+    val progress = animateFloatAsState(if (peek.isShown) 1f else 0f, peekBackdropSpec(peek.isShown), label = "peek-backdrop-blur")
+    var top by remember { mutableFloatStateOf(0f) }
+    this
+        .onGloballyPositioned { top = it.positionOnScreen().y }
+        .graphicsLayer {
+            val strength = progress.value.coerceIn(0f, 1f)
+            val blur = if (reduceTransparency) 0f else PlusMenuTunables.PEEK_BLUR * density
+            val r = (blur * strength * 2).roundToInt() / 2f
+            renderEffect = if (r < 0.5f || size.height <= 0f) {
+                null
+            } else {
+                val stripTop = (peek.tiles.firstOrNull()?.frame?.top ?: (top + size.height - 160 * density)) - top
+                val feather = PlusMenuTunables.PEEK_FEATHER * density
+                val bandTop = max(stripTop - feather, 0f)
+                val band = max(size.height - bandTop, 1f)
+                val rampEnd = (feather / band).coerceIn(0.05f, 0.85f)
+                progressiveBlurEffect(startY = bandTop, fullY = bandTop + rampEnd * band, radiusPx = r).asComposeRenderEffect()
+            }
+        }
+}
+
+/**
+ * The strip (iOS `RecentPhotoPeekOverlay` + `RecentPhotoPeekBackdrop`). Mount it full-screen over
+ * the session; it takes no touches (the + button's gesture drives [RecentPhotoPeek]) and is
+ * hidden from TalkBack. Tiles arrive out of + one after another, out of a blur, and leave the
+ * same way; Reduce Motion fades them in place.
+ *
+ * @param backdropBlurApplied the host blurs its content with [recentPhotoPeekBackdrop]: the
+ *   overlay then draws only iOS's own dim ([PlusMenuTunables.PEEK_DIM], ×1.6 under Reduce
+ *   Transparency). Otherwise it dims the bottom band as a fallback.
  */
 @Composable
-fun RecentPhotoPeekOverlay(peek: RecentPhotoPeek, library: PlusPhotoLibrary, flights: PhotoFlights, modifier: Modifier = Modifier) {
+fun RecentPhotoPeekOverlay(
+    peek: RecentPhotoPeek,
+    library: PlusPhotoLibrary,
+    flights: PhotoFlights,
+    modifier: Modifier = Modifier,
+    backdropBlurApplied: Boolean = false,
+) {
     val reduceMotion = rememberReduceMotion()
+    val reduceTransparency = rememberReduceTransparency()
     val density = LocalDensity.current.density
     peek.density = density
     var origin by remember { mutableStateOf(Offset.Zero) }
     var size by remember { mutableStateOf(Size.Zero) }
     val progress by animateFloatAsState(
         targetValue = if (peek.isShown) 1f else 0f,
-        animationSpec = if (peek.isShown) Motion.easeInOut(PlusMenuTunables.peekOpen.duration * 0.8) else Motion.easeInOut(PlusMenuTunables.PEEK_CLOSE),
+        animationSpec = peekBackdropSpec(peek.isShown),
         label = "peek-backdrop",
     )
     Box(
@@ -175,8 +232,8 @@ fun RecentPhotoPeekOverlay(peek: RecentPhotoPeek, library: PlusPhotoLibrary, fli
         if (peek.isShown || progress > 0.001f) {
             val stripTop = (peek.tiles.firstOrNull()?.frame?.top ?: (size.height + origin.y - 160 * density)) - origin.y
             val top = max(stripTop - PlusMenuTunables.PEEK_FEATHER * density, 0f)
-            val dim = max(PlusMenuTunables.PEEK_DIM, PEEK_SCRIM_DIM)
-            Canvas(Modifier.fillMaxSize()) {
+            val dim = if (backdropBlurApplied) PlusMenuTunables.PEEK_DIM * (if (reduceTransparency) 1.6f else 1f) else max(PlusMenuTunables.PEEK_DIM, PEEK_SCRIM_DIM)
+            if (dim > 0f) Canvas(Modifier.fillMaxSize()) {
                 drawRect(
                     Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = dim * progress)), startY = top, endY = this.size.height),
                     topLeft = Offset(0f, top),
@@ -191,7 +248,8 @@ fun RecentPhotoPeekOverlay(peek: RecentPhotoPeek, library: PlusPhotoLibrary, fli
                 animationSpec = when {
                     reduceMotion -> Motion.easeInOut(0.18)
                     peek.isShown -> PlusMenuTunables.peekOpen.animation(false, delaySeconds = index * PlusMenuTunables.PEEK_STAGGER)
-                    else -> Motion.easeInOut(PlusMenuTunables.PEEK_CLOSE)
+                    // iOS `.smooth(duration: peekClose)`.
+                    else -> MotionSpring(PlusMenuTunables.PEEK_CLOSE).spec()
                 },
                 label = "peek-tile",
             )
@@ -222,7 +280,11 @@ fun RecentPhotoPeekOverlay(peek: RecentPhotoPeek, library: PlusPhotoLibrary, fli
                         transformOrigin = TransformOrigin(0f, 1f)
                         translationX = fromX * away
                         translationY = fromY * away
-                        alpha = shown.coerceIn(0f, 1f)
+                        val clamped = shown.coerceIn(0f, 1f)
+                        alpha = clamped
+                        // Out of a blur (iOS `PeekArrival`: (1 − shown) × 10).
+                        val blur = if (reduceMotion || clamped > 0.98f || clamped < 0.02f) 0f else (1 - clamped) * 10f * density
+                        renderEffect = if (blur > 0.25f) BlurEffect(blur, blur, TileMode.Decal) else null
                     },
             )
         }
