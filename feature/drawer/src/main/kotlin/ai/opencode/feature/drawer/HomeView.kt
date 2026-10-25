@@ -2,6 +2,8 @@ package ai.opencode.feature.drawer
 
 import ai.opencode.core.store.PresentationAction
 import ai.opencode.core.store.StoreOf
+import ai.opencode.core.ui.OpenCodeIcon
+import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.store.observe
 import ai.opencode.core.store.scope
 import ai.opencode.feature.session.SessionFeature
@@ -49,6 +51,7 @@ fun HomeView(store: StoreOf<HomeFeature.State, HomeFeature.Action>, modifier: Mo
     val isDrawerOpen by store.observe { it.isDrawerOpen }
     val serverName by store.observe { it.serverName }
     val stackIDs by store.observe { state -> state.stack.mapNotNull { it.sessionID } }
+    val sessions by store.observe { it.sessions }
     val settingsShown by store.observe { it.settings != null }
     val drawerState = rememberDrawerState(if (isDrawerOpen) DrawerValue.Open else DrawerValue.Closed)
 
@@ -74,6 +77,13 @@ fun HomeView(store: StoreOf<HomeFeature.State, HomeFeature.Action>, modifier: Mo
                         selected = stackIDs.isEmpty(),
                         onClick = { store.send(HomeFeature.Action.NewSessionTapped) },
                     )
+                    sessions.forEach { session ->
+                        NavigationDrawerItem(
+                            label = { Text(session.title.ifBlank { "Untitled" }, maxLines = 1) },
+                            selected = stackIDs.lastOrNull() == session.id,
+                            onClick = { store.send(HomeFeature.Action.SessionTapped(session.id, session.title)) },
+                        )
+                    }
                     HorizontalDivider(Modifier.padding(vertical = 8.dp))
                     NavigationDrawerItem(
                         label = { Text("Settings") },
@@ -128,6 +138,6 @@ fun HomeView(store: StoreOf<HomeFeature.State, HomeFeature.Action>, modifier: Mo
 @Composable
 private fun DrawerButton(onClick: () -> Unit) {
     IconButton(onClick = onClick) {
-        Text("☰", style = MaterialTheme.typography.titleLarge)
+        OpenCodeIcon(SFSymbol.Line3Horizontal, contentDescription = "Sessions")
     }
 }

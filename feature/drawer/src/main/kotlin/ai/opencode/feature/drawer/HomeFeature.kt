@@ -7,6 +7,7 @@ import ai.opencode.core.store.Reducer
 import ai.opencode.core.store.forEach
 import ai.opencode.core.store.ifLet
 import ai.opencode.feature.session.SessionFeature
+import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.feature.settings.SettingsFeature
 
 /**
@@ -27,6 +28,8 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
     data class State(
         val serverID: String,
         val serverName: String,
+        /** Placeholder for iOS's `snapshot: OpenCodeHomeSnapshot`: root sessions, newest first. */
+        val sessions: List<OpenCodeSession> = emptyList(),
         val isDrawerOpen: Boolean = false,
         /** The draft at the root, then opened sessions on top (iOS session stack). */
         val draft: SessionFeature.State = SessionFeature.State(),
