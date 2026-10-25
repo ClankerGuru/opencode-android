@@ -72,8 +72,9 @@ data class SystemAction(
             return SystemAction(scoped.serverKey, Destination.Session(scoped.id))
         }
 
+        /** Percent-decoding only, as `URLComponents`: a `+` stays a `+`. */
         private fun decode(value: String): String? =
-            runCatching { URLDecoder.decode(value, Charsets.UTF_8) }.getOrNull()
+            runCatching { URLDecoder.decode(value.replace("+", "%2B"), Charsets.UTF_8) }.getOrNull()
     }
 }
 
