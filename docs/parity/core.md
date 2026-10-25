@@ -10,8 +10,8 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 
 | iOS concept | Kotlin file(s) | Status | Notes |
 | --- | --- | --- | --- |
-| `@Reducer`, `Reduce`, `Scope`, `CombineReducers`, `.onChange`, `.ifLet(\.$x)`, `.forEach`, `@Presents`/`PresentationAction` | `core/.../store/Reducer.kt` | done | `inout State` → returns `Reduced(state, effect)`; `ifLet`/`forEach` cancel child effects on dismissal/removal |
-| `Effect` (`.none/.run/.send/.merge/.concatenate/.cancellable/.cancel/.map/.debounce`) | `core/.../store/Effect.kt`, `EffectRunner.kt` | done | `.run` captures the creating `DependencyValues` (TCA escaping-dependency semantics) |
+| `@Reducer`, `Reduce`, `Scope`, `CombineReducers`, `.onChange`, `.ifLet(\.$x)`, `.forEach`, `@Presents`/`PresentationAction` | `core/.../store/Reducer.kt` | done | `inout State` → returns `Reduced(state, effect)`; both `ifLet` forms and `forEach` namespace nested cancellation IDs by the complete navigation path (slot + child identity) and cancel all child work on removal/replacement |
+| `Effect` (`.none/.run/.send/.merge/.concatenate/.cancellable/.cancel/.map/.debounce`) | `core/.../store/Effect.kt`, `EffectRunner.kt` | done | `.run` captures the creating `DependencyValues` (TCA escaping-dependency semantics); cancellation uses `(navigation path, id)`. Deliberate contract difference from TCA 1.26.2's prefix registration: an explicit parent cancel affects only its own level, not descendants; navigation teardown still cancels the whole child subtree |
 | `Store`, `store.scope`, view observation | `core/.../store/Store.kt` | done | main-thread `send`; `collectState()` / `observe {}` for Compose |
 | `TestStore` (exhaustive) | `core/.../store/TestStore.kt` | done | `send/receive/skipReceivedActions/finish`, `exhaustive = false` for non-exhaustive |
 | `@Dependency`, `DependencyKey`, `withDependencies`, `liveValue/testValue` | `core/.../dependencies/DependencyValues.kt` | done | thread/coroutine-local container; test values cached per test container |
@@ -25,7 +25,7 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 | --- | ---: | --- | --- | --- |
 | `OpenCode/Core/ActiveScene.swift` | 143 | `feature/system/.../SceneWindowClient.kt` | n/a | iPad multi-window scene tracking; Android has one activity (multi-window needs nothing app-side). `SceneWindow` (`isFront`) is ported in `:feature:system` as `SceneWindowClient` (see system.md) |
 | `OpenCode/Core/AppGroup.swift` | 11 | — | n/a | App Group container for the share extension; the Android share target runs in the same app process and storage |
-| `OpenCode/Core/AppLog.swift` | 124 | `core/.../log/AppLog.kt` | done | logcat tag `OpenCode/<category>` + in-process ring buffer for `recentLines`; the `OpenCodeClientError`/`RetryVerdict`/`RetryPause.Kind` `logSummary` extensions live in `:server` (see server.md) |
+| `OpenCode/Core/AppLog.swift` | 124 | `core/.../log/AppLog.kt` | done | logcat tag `OpenCode/<category>` + in-process ring buffer for `recentLines`; unhandled effects log only throwable/cause class names and the top frame's class/method/line (no messages, file names or full stacks); the `OpenCodeClientError`/`RetryVerdict`/`RetryPause.Kind` `logSummary` extensions live in `:server` (see server.md) |
 | `OpenCode/Core/AudioSessionOwner.swift` | 171 | — | todo | moves to `:feature:voice` (audio focus / `AudioManager` mode ownership for calls and dictation) |
 | `OpenCode/Core/BackSwipe.swift` | 390 | see core-ui.md | — | |
 | `OpenCode/Core/BackgroundTaskClient.swift` | 42 | `core/.../dependencies/BackgroundClients.kt` | partial | Android has no begin/endBackgroundTask; live value is a logged marker. Durable work (outbox sends) uses WorkManager in its feature |

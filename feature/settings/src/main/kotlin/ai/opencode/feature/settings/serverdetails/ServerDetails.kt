@@ -36,8 +36,8 @@ import kotlin.time.Duration.Companion.seconds
  * skills as three tiles that open into trays, with problems as banners on top. One read of each,
  * for the server's own folder; actions use the routes the server has.
  *
- * Its effects are keyed by the server, and [Action.Disappeared] cancels them: SettingsFeature
- * sends it when the page leaves the stack or the server changes.
+ * Its effects are keyed by the server, and [Action.Disappeared] cancels them. SettingsFeature's
+ * `ifLet` also cancels them on removal/replacement, keeping server-side sign-in cleanup alive.
  */
 class ServerDetailsFeature : Reducer<ServerDetailsFeature.State, ServerDetailsFeature.Action> {
     /** What a tray shows: a tile's full list, or one MCP server. */
@@ -144,29 +144,32 @@ class ServerDetailsFeature : Reducer<ServerDetailsFeature.State, ServerDetailsFe
         const val signInPollLimit = 150
     }
 
+    internal fun cancelSignIn(state: State): Effect<Action> {
+        val signIn = state.signIn ?: return Effect.none()
+        val server = state.server
+        return Effect.run {
+            try {
+                dependency(OpenCodeClient).cancelIntegrationOAuth(server, signIn.integrationID, signIn.attempt.attemptID)
+            } catch (_: OpenCodeClientError) {
+            }
+        }
+    }
+
     override fun reduce(state: State, action: Action): Reduced<State, Action> = when (action) {
         Action.Task ->
             if (state.capabilities != null) Reduced(state) else load(state)
 
         Action.Disappeared -> {
-            val signIn = state.signIn
             var next = state.copy(isLoading = false, signIn = null, awaitingCode = false)
             state.signingIn?.let { name ->
                 next = next.copy(changingMCP = next.changingMCP - name, signingIn = null)
             }
-            val server = state.server
             Reduced(
                 next,
                 Effect.merge(
                     Effect.cancel(loadID(state)),
                     Effect.cancel(signInID(state)),
-                    Effect.run { _ ->
-                        if (signIn == null) return@run
-                        try {
-                            dependency(OpenCodeClient).cancelIntegrationOAuth(server, signIn.integrationID, signIn.attempt.attemptID)
-                        } catch (_: OpenCodeClientError) {
-                        }
-                    },
+                    cancelSignIn(state),
                 ),
             )
         }

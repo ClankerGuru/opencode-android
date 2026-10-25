@@ -2,6 +2,7 @@ package ai.opencode.core.store
 
 import ai.opencode.core.dependencies.asContextElement
 import ai.opencode.core.log.AppLog
+import ai.opencode.core.log.logSummary
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -26,11 +27,13 @@ internal class EffectRunner<A>(
     private val sendFromEffect: suspend (A) -> Unit,
     /** An effect threw (not cancellation): `Store` logs it, `TestStore` fails the test. */
     private val onUnhandledError: (Throwable) -> Unit = { error ->
-        AppLog.app.error { "Unhandled effect error: ${error::class.java.simpleName}: ${error.stackTraceToString().take(2_000)}" }
+        AppLog.app.error { "Unhandled effect error: ${error.logSummary}" }
     },
 ) {
     private val lock = Any()
-    private val inFlight = HashMap<Any, MutableSet<Job>>()
+    private data class CancelKey(val path: List<Any>, val id: Any)
+
+    private val inFlight = HashMap<CancelKey, MutableSet<Job>>()
     private val running = HashSet<Job>()
 
     /** Whether any effect coroutine is still running (`TestStore.finish` asserts none are). */
@@ -46,24 +49,26 @@ internal class EffectRunner<A>(
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun <B> execute(effect: Effect<B>, now: (B) -> Unit, later: suspend (B) -> Unit) {
+    private fun <B> execute(effect: Effect<B>, now: (B) -> Unit, later: suspend (B) -> Unit, path: List<Any> = emptyList()) {
         when (effect) {
             is Effect.None -> Unit
             is Effect.SendAction -> now(effect.action)
-            is Effect.Cancel -> cancel(effect.ids)
-            is Effect.Merge -> effect.effects.forEach { execute(it, now, later) }
+            is Effect.Cancel -> cancel(effect.ids.map { CancelKey(path, it) })
+            is Effect.Merge -> effect.effects.forEach { execute(it, now, later, path) }
+            is Effect.NavigationScoped -> execute(effect.effect, now, later, path + effect.id)
             is Effect.Mapped<*, *> -> {
                 val mapped = effect as Effect.Mapped<Any?, B>
-                execute(mapped.effect, { now(mapped.transform(it)) }, { later(mapped.transform(it)) })
+                execute(mapped.effect, { now(mapped.transform(it)) }, { later(mapped.transform(it)) }, path)
             }
             is Effect.Cancellable -> {
-                if (effect.cancelInFlight) cancel(listOf(effect.id))
+                val key = CancelKey(path, effect.id)
+                if (effect.cancelInFlight) cancel(listOf(key))
                 // A body with nothing to suspend (send/cancel only) stays synchronous, so a
                 // child's `.send` or `.cancel` under `ifLet`/`forEach` keeps TCA's ordering.
-                if (isSynchronous(effect.effect)) execute(effect.effect, now, later)
-                else launchTracked(effect.id) { runToCompletion(effect.effect, later) }
+                if (isSynchronous(effect.effect)) execute(effect.effect, now, later, path)
+                else launchTracked(key) { runToCompletion(effect.effect, later, path) }
             }
-            is Effect.Run, is Effect.Concatenate -> launchTracked(null) { runToCompletion(effect, later) }
+            is Effect.Run, is Effect.Concatenate -> launchTracked(null) { runToCompletion(effect, later, path) }
         }
     }
 
@@ -72,10 +77,11 @@ internal class EffectRunner<A>(
         is Effect.Merge -> effect.effects.all(::isSynchronous)
         is Effect.Mapped<*, *> -> isSynchronous(effect.effect)
         is Effect.Cancellable -> isSynchronous(effect.effect)
+        is Effect.NavigationScoped -> isSynchronous(effect.effect)
         is Effect.Run, is Effect.Concatenate -> false
     }
 
-    private fun launchTracked(id: Any?, block: suspend () -> Unit) {
+    private fun launchTracked(id: CancelKey?, block: suspend () -> Unit) {
         val job = scope.launch(start = CoroutineStart.LAZY) { block() }
         synchronized(lock) {
             running += job
@@ -90,17 +96,18 @@ internal class EffectRunner<A>(
         job.start()
     }
 
-    private fun cancel(ids: List<Any>) {
+    private fun cancel(ids: List<CancelKey>) {
         val jobs = synchronized(lock) { ids.flatMap { inFlight.remove(it).orEmpty() } }
         jobs.forEach { it.cancel() }
     }
 
     @Suppress("UNCHECKED_CAST")
-    private suspend fun <B> runToCompletion(effect: Effect<B>, send: suspend (B) -> Unit) {
+    private suspend fun <B> runToCompletion(effect: Effect<B>, send: suspend (B) -> Unit, path: List<Any>) {
         when (effect) {
             is Effect.None -> Unit
             is Effect.SendAction -> send(effect.action)
-            is Effect.Cancel -> cancel(effect.ids)
+            is Effect.Cancel -> cancel(effect.ids.map { CancelKey(path, it) })
+            is Effect.NavigationScoped -> runToCompletion(effect.effect, send, path + effect.id)
             is Effect.Run -> withContext(effect.dependencies.asContextElement()) {
                 try {
                     effect.operation(Send { send(it) })
@@ -111,20 +118,21 @@ internal class EffectRunner<A>(
                     onUnhandledError(error)
                 }
             }
-            is Effect.Merge -> coroutineScope { effect.effects.forEach { launch { runToCompletion(it, send) } } }
-            is Effect.Concatenate -> effect.effects.forEach { runToCompletion(it, send) }
+            is Effect.Merge -> coroutineScope { effect.effects.forEach { launch { runToCompletion(it, send, path) } } }
+            is Effect.Concatenate -> effect.effects.forEach { runToCompletion(it, send, path) }
             is Effect.Mapped<*, *> -> {
                 val mapped = effect as Effect.Mapped<Any?, B>
-                runToCompletion(mapped.effect) { send(mapped.transform(it)) }
+                runToCompletion(mapped.effect, { send(mapped.transform(it)) }, path)
             }
             is Effect.Cancellable -> {
-                if (effect.cancelInFlight) cancel(listOf(effect.id))
+                val key = CancelKey(path, effect.id)
+                if (effect.cancelInFlight) cancel(listOf(key))
                 coroutineScope {
-                    val child = launch(start = CoroutineStart.LAZY) { runToCompletion(effect.effect, send) }
-                    synchronized(lock) { inFlight.getOrPut(effect.id) { HashSet() } += child }
+                    val child = launch(start = CoroutineStart.LAZY) { runToCompletion(effect.effect, send, path) }
+                    synchronized(lock) { inFlight.getOrPut(key) { HashSet() } += child }
                     child.start()
                     child.invokeOnCompletion {
-                        synchronized(lock) { inFlight[effect.id]?.let { set -> set -= child; if (set.isEmpty()) inFlight.remove(effect.id) } }
+                        synchronized(lock) { inFlight[key]?.let { set -> set -= child; if (set.isEmpty()) inFlight.remove(key) } }
                     }
                 }
             }
