@@ -644,8 +644,9 @@ private fun TitleAndLabel(
 /**
  * Renders in-flight chips lifting off from the chosen highlight row and landing on their
  * inline chip slot in the composer (iOS `AutocompleteFlightOverlay`). Solid opaque throughout.
- * Place it over the composer with its origin at the composer's top-left: flight rects are
- * composer-local dp (rows sit above, at negative y). Never clips; not hit-testable.
+ * Flight rects are composer-local dp (rows sit above, at negative y); the overlay shifts them
+ * by where the composer ([AutocompleteMotionController.composerAnchor]) sits inside it, so it
+ * can be mounted over the whole surface (the rows included). Never clips; not hit-testable.
  */
 @Composable
 fun AutocompleteFlightOverlay(controller: AutocompleteMotionController, modifier: Modifier = Modifier) {
@@ -653,8 +654,18 @@ fun AutocompleteFlightOverlay(controller: AutocompleteMotionController, modifier
     val scale = max(density.density.toDouble(), 1.0)
     val frame = controller.currentFrame
     val params = controller.simulation.params
+    var origin by remember { mutableStateOf(Offset.Zero) }
     if (frame.flights.isEmpty()) return
-    Box(modifier.fillMaxSize().clearAndSetSemantics {}) {
+    Box(
+        modifier
+            .fillMaxSize()
+            .onGloballyPositioned { overlay ->
+                val composer = controller.composerAnchor?.invoke()
+                origin = if (composer != null && overlay.isAttached) overlay.localPositionOf(composer, Offset.Zero) else Offset.Zero
+            }
+            .graphicsLayer { translationX = origin.x; translationY = origin.y }
+            .clearAndSetSemantics {},
+    ) {
         for (flight in frame.flights) {
             key(flight.id) { AutocompleteFlightView(flight, params, scale) }
         }
@@ -1281,6 +1292,7 @@ fun SyncComposerAutocomplete(
     SideEffect {
         bridge.configure(state, isEnabled, controller) { currentSend(it) }
         controller.chipSlotProvider = { id -> bridge.chipSlotInComposer(id, density) }
+        controller.composerAnchor = { bridge.composerCoordinates?.takeIf { it.isAttached } }
         // iOS `.onChange(of: store.autocomplete / composerFrame / usesComposerAutocomplete)`.
         val inputs = listOf(state, isEnabled, composerWidth, composerHeight, density, reducedMotion)
         if (last[0] == inputs) return@SideEffect
