@@ -6,7 +6,8 @@ import kotlin.math.*
 
 /** Pixel-exact LED grid. An odd row count puts a flat trace on one row. */
 data class DotScopeGrid(val pixelWidth: Int, val pixelHeight: Int, val scale: Float, val requestedPitch: Float = 3.5f) {
-    val pitch = max(3f, round(requestedPitch * scale))
+    // Swift `rounded()` rounds half away from zero; Kotlin `round` would round 10.5 to 10.
+    val pitch = max(3f, (requestedPitch * scale).roundToInt().toFloat())
     val width = pixelWidth / scale
     val height = pixelHeight / scale
     val rows = max(5, floor(pixelHeight / pitch).toInt() - 1).let { if (it % 2 == 0) it - 1 else it }
