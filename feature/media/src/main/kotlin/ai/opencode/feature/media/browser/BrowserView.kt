@@ -1,6 +1,8 @@
 package ai.opencode.feature.media
 
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeShape
@@ -11,6 +13,10 @@ import ai.opencode.server.OpenCodePairingLink
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -28,14 +34,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.union
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -59,6 +63,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
@@ -74,6 +85,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.launch
@@ -133,33 +145,46 @@ fun BrowserPage(
         onAction(BrowserFeature.Action.CloseTapped)
     }
 
-    val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    val navigationBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    // The safe area (the keyboard's too, as iOS's bottom safe area is while it shows).
+    val safeArea = WindowInsets.safeDrawing.asPaddingValues()
+    val safeTop = safeArea.calculateTopPadding()
+    val canvas = OpenCodeTheme.colors.canvas
     Box(
         modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surface)
+            .background(canvas)
+            .onPreviewKeyEvent { event ->
+                // iOS's ⌘[ on the back button.
+                val back = event.type == KeyEventType.KeyDown && event.key == Key.LeftBracket && (event.isMetaPressed || event.isCtrlPressed)
+                if (back) close()
+                back
+            }
             .testTag("browser"),
     ) {
         val pageID = shown.pageID
         val url = shown.openedURL ?: shown.url
         if (pageID != null && url != null) {
-            // The back button above and the bar below; the page stays clear of them.
+            // Edge to edge; the back button above and the bar below are the page's obscured
+            // insets, so it scrolls under them and fixed elements' first/last pixels clear them.
             BrowserWebViewHost(
                 pageID = pageID,
                 url = url,
+                insets = BrowserInsets(
+                    top = (safeTop + BrowserMetrics.headerClearance).value,
+                    left = safeArea.calculateLeftPadding(LayoutDirection.Ltr).value,
+                    bottom = (safeArea.calculateBottomPadding() + bottomHeight + 8.dp).value,
+                    right = safeArea.calculateRightPadding(LayoutDirection.Ltr).value,
+                ),
                 onEvent = onAction,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(top = statusBar + BrowserMetrics.headerClearance, bottom = navigationBar + bottomHeight + 8.dp),
+                modifier = Modifier.fillMaxSize(),
             )
         }
         // Legibility behind the status bar and the back button, like the session header's wash.
-        val surface = MaterialTheme.colorScheme.surface
+        val surface = canvas
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(statusBar + BrowserMetrics.headerClearance)
+                .height(safeTop + BrowserMetrics.headerClearance)
                 .background(Brush.verticalGradient(0f to surface, 0.5f to surface.copy(alpha = 0.85f), 1f to surface.copy(alpha = 0f)))
                 .clearAndSetSemantics {},
         )
@@ -167,6 +192,7 @@ fun BrowserPage(
         Surface(
             onClick = ::close,
             shape = CircleShape,
+            contentColor = OpenCodeTheme.colors.text,
             tonalElevation = 3.dp,
             shadowElevation = 2.dp,
             modifier = Modifier
@@ -185,10 +211,10 @@ fun BrowserPage(
             Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime))
+                .windowInsetsPadding(WindowInsets.safeDrawing)
+                .onSizeChanged { bottomHeight = with(density) { it.height.toDp() } }
                 .padding(horizontal = 16.dp)
-                .padding(bottom = 4.dp)
-                .onSizeChanged { bottomHeight = with(density) { it.height.toDp() } },
+                .padding(bottom = 4.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             AnimatedVisibility(
@@ -227,11 +253,20 @@ fun browserBackAction(browser: BrowserFeature.State): BrowserFeature.Action = wh
  */
 fun browserStackID(pageID: UUID): Long = pageID.mostSignificantBits or (1L shl 62)
 
-private fun appear(reduceMotion: Boolean) =
-    if (reduceMotion) fadeIn(tween(300)) else slideInVertically(tween(300)) { it } + fadeIn(tween(300))
+/** SwiftUI `.snappy(duration: 0.3)`: a 0.3 s spring with 0.15 bounce. */
+private val snappy = MotionSpring(duration = 0.3, bounce = 0.15)
 
-private fun disappear(reduceMotion: Boolean) =
-    if (reduceMotion) fadeOut(tween(300)) else slideOutVertically(tween(300)) { it } + fadeOut(tween(300))
+/**
+ * iOS `appear`: moves up from the bottom and fades in on `.snappy(duration: 0.3)`; under Reduce
+ * Motion iOS drops the animation (`animation(nil)`), so it just appears.
+ */
+private fun appear(reduceMotion: Boolean): EnterTransition =
+    if (reduceMotion) EnterTransition.None
+    else slideInVertically(snappy.spec(IntOffset.VisibilityThreshold)) { it } + fadeIn(snappy.spec())
+
+private fun disappear(reduceMotion: Boolean): ExitTransition =
+    if (reduceMotion) ExitTransition.None
+    else slideOutVertically(snappy.spec(IntOffset.VisibilityThreshold)) { it } + fadeOut(snappy.spec())
 
 @Composable
 private fun Bar(browser: BrowserFeature.State, onAction: (BrowserFeature.Action) -> Unit) {
@@ -273,8 +308,11 @@ private fun Bar(browser: BrowserFeature.State, onAction: (BrowserFeature.Action)
                 .semantics { contentDescription = if (browser.isAsking) "Cancel" else "Ask About This Page" }
                 .testTag("browser-ask"),
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                OpenCodeIcon(if (browser.isAsking) "xmark" else "text.bubble", contentDescription = null)
+            // iOS `.contentTransition(.symbolEffect(.replace))`.
+            Crossfade(browser.isAsking, animationSpec = tween((Motion.fadeStandard * 1000).toInt()), label = "browser-ask") { asking ->
+                Box(contentAlignment = Alignment.Center) {
+                    OpenCodeIcon(if (asking) "xmark" else "text.bubble", contentDescription = null, tint = OpenCodeTheme.colors.text)
+                }
             }
         }
     }
@@ -290,8 +328,9 @@ private fun BarButton(systemImage: String, label: String, tag: String, enabled: 
             .testTag(tag),
         contentAlignment = Alignment.Center,
     ) {
-        val color = MaterialTheme.colorScheme.onSurface
-        OpenCodeIcon(systemImage, contentDescription = null, tint = if (enabled) color else color.copy(alpha = 0.3f))
+        // iOS `.primary` / `.tertiary`.
+        val colors = OpenCodeTheme.colors
+        OpenCodeIcon(systemImage, contentDescription = null, tint = if (enabled) colors.text else colors.tertiaryText)
     }
 }
 
@@ -318,11 +357,12 @@ private fun Address(browser: BrowserFeature.State, modifier: Modifier) {
         Text(
             browser.displayTitle,
             style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold),
+            color = OpenCodeTheme.colors.text,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.CenterVertically) {
-            val secondary = MaterialTheme.colorScheme.onSurfaceVariant
+            val secondary = OpenCodeTheme.colors.secondaryText
             if (browser.isLoading) {
                 CircularProgressIndicator(Modifier.size(10.dp), strokeWidth = 1.5.dp, color = secondary)
             } else if (browser.url?.startsWith("https:", ignoreCase = true) == true) {
@@ -370,7 +410,7 @@ private fun AskComposer(browser: BrowserFeature.State, onAction: (BrowserFeature
                     .focusRequester(focus)
                     .testTag("browser-ask-field"),
             )
-            val onSurface = MaterialTheme.colorScheme.onSurface
+            val colors = OpenCodeTheme.colors
             Box(
                 Modifier
                     .padding(end = 2.dp, bottom = 4.dp)
@@ -383,10 +423,14 @@ private fun AskComposer(browser: BrowserFeature.State, onAction: (BrowserFeature
                 Box(
                     Modifier
                         .size(34.dp)
-                        .background(if (canSend) onSurface else onSurface.copy(alpha = 0.4f), CircleShape),
+                        // iOS `Color.primary` / `Color.secondary.opacity(0.4)` under `systemBackground`.
+                        .background(
+                            if (canSend) colors.text else colors.secondaryText.copy(alpha = colors.secondaryText.alpha * 0.4f),
+                            CircleShape,
+                        ),
                     contentAlignment = Alignment.Center,
                 ) {
-                    OpenCodeIcon("arrow.up", contentDescription = null, tint = MaterialTheme.colorScheme.surface)
+                    OpenCodeIcon("arrow.up", contentDescription = null, tint = colors.canvas)
                 }
             }
         }
@@ -429,7 +473,7 @@ private fun ReplyCapsule(
                 workingIndicator(needsInput)
             } else {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    val secondary = MaterialTheme.colorScheme.onSurfaceVariant
+                    val secondary = OpenCodeTheme.colors.secondaryText
                     OpenCodeIcon("text.bubble", contentDescription = null, tint = secondary, size = 17.dp)
                     Text("Reply ready", style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold), maxLines = 1)
                     Text("· Back to read it", style = OpenCodeTextStyles.subheadline, color = secondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -448,6 +492,8 @@ private fun ReplyCapsule(
 fun BrowserWebViewHost(
     pageID: UUID,
     url: String,
+    /** The back button above and the bar below; the page scrolls under them, clear at either end. */
+    insets: BrowserInsets,
     onEvent: (BrowserFeature.Action) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -471,6 +517,9 @@ fun BrowserWebViewHost(
             container.addView(webView, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         }
         pages.setHostContext(pageID, container.context)
+        // The app's appearance, live (iOS: the web view follows its trait collection).
+        pages.setAppearance(pageID, isDark)
+        pages.setObscuredInsets(pageID, insets)
         pages.setEventHandler(pageID, onEvent)
         pages.setLinkHeldHandler(pageID) { link, x, y -> held = Triple(link, x, y) }
         pages.resume(pageID)
@@ -498,7 +547,7 @@ fun BrowserWebViewHost(
                 pages.setLinkHeldHandler(coordinator.pageID, null)
                 pages.setHostContext(coordinator.pageID, null)
             },
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().testTag("browser-page"),
         )
         held?.let { (link, x, y) ->
             val previewURL = OpenCodePairingLink.shareableURL(link) ?: link
