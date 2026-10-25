@@ -127,7 +127,7 @@ fun SettingsServersSection(
             title = { Text("Rename Server") },
             text = {
                 Column {
-                    Text("Only this phone uses the name. Leave it blank to use the computer’s.")
+                    Text("Only this ${ai.opencode.core.ui.ThisDevice.name} uses the name. Leave it blank to use the computer’s.")
                     OutlinedTextField(
                         value = nameDraft,
                         onValueChange = { nameDraft = it },
@@ -153,7 +153,7 @@ fun SettingsServersSection(
         AlertDialog(
             onDismissRequest = { removing = null },
             title = { Text("Remove ${server.friendlyName}?") },
-            text = { Text("This forgets the address and password on this phone. Sessions on the server are not affected.") },
+            text = { Text("This forgets the address and password on this ${ai.opencode.core.ui.ThisDevice.name}. Sessions on the server are not affected.") },
             confirmButton = {
                 TextButton(onClick = {
                     removing = null

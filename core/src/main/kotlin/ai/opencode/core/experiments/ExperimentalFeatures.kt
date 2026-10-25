@@ -170,7 +170,7 @@ enum class ModelPickerStyle(val rawValue: String) {
             return null
         }
 
-        /** Settings › Advanced › Model Picker. Today by default. */
-        val key: SharedKey<ModelPickerStyle> = SharedKey.appStorage(STORAGE_KEY, today)
+        /** Settings › Advanced › Model Picker. Today by default. Lazy: the enum serializer isn't ready during companion init. */
+        val key: SharedKey<ModelPickerStyle> by lazy { SharedKey.appStorage(STORAGE_KEY, today) }
     }
 }

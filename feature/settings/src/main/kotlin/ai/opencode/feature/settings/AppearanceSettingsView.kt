@@ -307,12 +307,10 @@ private fun AppearanceTranscriptPreview(theme: AppTheme, isDark: Boolean) {
                 stateDescription = theme.title
             },
     ) {
-        Row(Modifier.fillMaxWidth()) {
-            Spacer(Modifier.weight(1f, fill = false).width(48.dp))
+        Box(Modifier.fillMaxWidth().padding(start = 48.dp), contentAlignment = Alignment.CenterEnd) {
             Surface(
                 color = v.userBubble.color,
                 shape = RoundedCornerShape(OpenCodeRadius.card),
-                modifier = Modifier.weight(1f, fill = false),
             ) {
                 Text(
                     "Help me improve the session screen. Show me what you find and explain the changes.",

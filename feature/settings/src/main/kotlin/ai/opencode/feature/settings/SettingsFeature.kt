@@ -14,7 +14,9 @@ import ai.opencode.feature.settings.whatsnew.WhatsNewEntry
 import ai.opencode.feature.settings.whatsnew.WhatsNewFeature
 import ai.opencode.feature.settings.whatsnew.canTryWhatsNew
 import ai.opencode.feature.settings.whatsnew.whatsNewVoiceAvailable
+import ai.opencode.core.sharing.shared
 import ai.opencode.server.OpenCodeServer
+import ai.opencode.server.ServerSharedKeys
 import ai.opencode.server.friendlyName
 
 /**
@@ -227,7 +229,11 @@ class SettingsFeature : Reducer<SettingsFeature.State, SettingsFeature.Action> {
     override fun reduce(state: State, action: Action): Reduced<State, Action> = body.reduce(state, action)
 
     private fun reduceCore(state: State, action: Action): Reduced<State, Action> = when (action) {
-        Action.Task -> Reduced(state.copy(voice = state.voice.copy(server = state.server)))
+        Action.Task -> {
+            // Until Home hands the server over (HomeChanged), Settings shows the last connected one.
+            val server = state.server ?: shared(ServerSharedKeys.savedServer).value
+            Reduced(state.copy(server = server, voice = state.voice.copy(server = server)))
+        }
         Action.ServersTapped -> Reduced(state)
         is Action.HomeChanged -> {
             val serverChanged = state.server?.persistenceID != action.server?.persistenceID

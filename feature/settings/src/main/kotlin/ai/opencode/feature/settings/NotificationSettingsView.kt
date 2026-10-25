@@ -78,5 +78,5 @@ fun NotificationSettingsView(store: SettingsStore) {
     }
 }
 
-/** iOS `ThisDevice.name` (“iPhone”/“iPad”); Android says “phone”. */
-const val ThisDeviceName = "phone"
+/** iOS `ThisDevice.name` (“iPhone”/“iPad”): “phone” or “tablet”. */
+val ThisDeviceName: String get() = ai.opencode.core.ui.ThisDevice.name
