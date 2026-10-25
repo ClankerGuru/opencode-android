@@ -165,7 +165,11 @@ private fun TranscriptListContent(
     // One per list, so a row LazyColumn recreates never fades its text again (iOS controller-owned).
     val textReveal = remember(controller.disclosure) { TranscriptTextReveal() }
     if (controller.runEnded) textReveal.settleAll()
-    val rowSlots = remember { TranscriptRowSlots(replyEnd = { key, entryID, texts, actions -> LinkPreviewReplyEnd(texts, key, entryID, actions = actions) }) }
+    // Keeps the slots a host provided above (session's Since You Left, agent glyph, provider mark).
+    val hostSlots = LocalTranscriptRowSlots.current
+    val rowSlots = remember(hostSlots) {
+        hostSlots.copy(replyEnd = hostSlots.replyEnd ?: { key, entryID, texts, actions -> LinkPreviewReplyEnd(texts, key, entryID, actions = actions) })
+    }
     CompositionLocalProvider(
         LocalTranscriptRowContext provides rowContext,
         LocalTranscriptLayoutTuning provides layoutTuning,
