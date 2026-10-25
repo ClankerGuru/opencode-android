@@ -162,14 +162,14 @@ class VoiceWebSocket internal constructor(url: String, apiKey: String? = null) {
         if (finished) throw failure ?: RealtimeClientError.Closed("The voice connection is closed.")
     } }
     internal fun <Event> voiceEventStream(decode: (ByteArray) -> List<Event>): Flow<Event> = flow {
-        try {
-            for (data in messages) {
-                val decoded = try { decode(data) } catch (error: Exception) {
-                    throw RealtimeClientError.from(error, closeCode, closeReason)
-                }
-                decoded.forEach { emit(it) }
+        // Collection owns receiving only. The coordinator explicitly closes the
+        // connection, allowing LiveSocket to send session.close before teardown.
+        for (data in messages) {
+            val decoded = try { decode(data) } catch (error: Exception) {
+                throw RealtimeClientError.from(error, closeCode, closeReason)
             }
-        } finally { close() }
+            decoded.forEach { emit(it) }
+        }
     }
     suspend fun close() = withContext(NonCancellable + dispatcher) { finish(null) }
     internal suspend fun beginGracefulClose() = withContext(dispatcher) { localClosing = true }

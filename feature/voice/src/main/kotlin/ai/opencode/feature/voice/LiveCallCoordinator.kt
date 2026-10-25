@@ -86,7 +86,7 @@ class LiveCallCoordinator(
 
     suspend fun start(apiKey: String, config: LiveSessionConfig, live: LiveClient, audio: VoiceAudioClient): Flow<VoiceCallEvent> = serialized {
         this.apiKey = apiKey; this.config = config; this.live = live
-        startAudioThenSocket(config.isAtEar, audio)
+        startAudioAndSocket(config.isAtEar, audio, concurrently = true)
     }
     internal fun handleResponseEvent(delegationID: String?, event: LiveResponseEvent) {
         val id = delegationID ?: serverDelegations.keys.singleOrNull() ?: return
@@ -202,7 +202,7 @@ class LiveCallCoordinator(
         socket.attached = false; active = socket
         if (standby?.id == socket.id) standby = null
         retireSessionState()
-        if (previous != null && previous.id != socket.id) previous.task?.cancel()
+        if (previous != null && previous.id != socket.id && previous.task != currentCoroutineContext()[Job]) previous.task?.cancel()
         activateAudio(socket)
         if (!finished && socket.ready && active?.id == socket.id) attached(socket)
         if (previous != null && previous.id != socket.id) previous.connection.close()

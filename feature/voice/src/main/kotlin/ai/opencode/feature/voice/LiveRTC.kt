@@ -184,8 +184,8 @@ class VoiceRTCSession private constructor(private val setup: VoiceRTCSetup) {
     }
 
     fun <Event> eventStream(map: (VoiceRTCSignal) -> Event?): Flow<Event> = flow {
-        try { for (signal in signals) map(signal)?.let { emit(it) } }
-        finally { close() }
+        // Cancellation stops receiving, not the coordinator-owned RTC session.
+        for (signal in signals) map(signal)?.let { emit(it) }
     }
 
     private fun requireOpen() {

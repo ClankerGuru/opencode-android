@@ -35,7 +35,7 @@ class VoiceCallCoordinator(
 
     suspend fun start(apiKey: String, config: RealtimeSessionConfig, realtime: RealtimeClient, audio: VoiceAudioClient): Flow<VoiceCallEvent> = serialized {
         this.apiKey = apiKey; this.config = config; this.realtime = realtime
-        startAudioThenSocket(config.isAtEar, audio)
+        startAudioAndSocket(config.isAtEar, audio)
     }
 
     override suspend fun completeFunctionImpl(callID: String, output: String) {

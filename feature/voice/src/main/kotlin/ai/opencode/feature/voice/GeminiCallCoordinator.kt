@@ -30,7 +30,7 @@ class GeminiCallCoordinator(
 
     suspend fun start(apiKey: String, config: GeminiLiveSessionConfig, gemini: GeminiLiveClient, audio: VoiceAudioClient): Flow<VoiceCallEvent> = serialized {
         this.apiKey = apiKey; this.config = config; this.gemini = gemini
-        startAudioThenSocket(config.isAtEar, audio)
+        startAudioAndSocket(config.isAtEar, audio)
     }
     override suspend fun open(seeded: Boolean): VoiceCallSocket<GeminiLiveServerEvent, GeminiLiveCommand, GeminiLiveContentTurn> {
         val client = gemini ?: throw RealtimeClientError.Closed("The voice connection is closed.")
@@ -82,7 +82,7 @@ class GeminiCallCoordinator(
         }
         if (finished || active?.id != socket) return
         when (event) {
-            GeminiLiveServerEvent.SetupComplete -> { noteSessionConfirmed(null); active?.let(::scheduleRotation); attachActiveSocket() }
+            GeminiLiveServerEvent.SetupComplete -> { noteSessionConfirmed(null); attachActiveSocket() }
             GeminiLiveServerEvent.Interrupted -> { assistantSpeaking = false; audio?.flush?.invoke(); flushAssistantTextIfNeeded(); emit(VoiceCallEvent.UserSpeechStarted) }
             is GeminiLiveServerEvent.InputTranscription -> {
                 if (currentUserItemID == null) {
@@ -170,6 +170,7 @@ class GeminiCallCoordinator(
             }
             if (finished || active?.id != socket.id) return
             active?.attached = true; noteSocketAttached(resetLinkQuality = true)
+            scheduleRotation(socket)
         } catch (error: CancellationException) { throw error }
         catch (error: Exception) { socketLost(socket.id, VoiceSessionLoss.Closed(error)) }
         finally { if (attachingSocketID == socket.id) attachingSocketID = null }

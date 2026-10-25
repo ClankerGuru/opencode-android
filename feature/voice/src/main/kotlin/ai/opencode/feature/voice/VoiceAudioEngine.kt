@@ -61,12 +61,29 @@ class LiveVoiceAudioSession(private val context: Context) : VoiceAudioSessionCon
     private var request: AudioFocusRequest? = null
     private var savedMode: Int? = null
     private var registered = false
+    private var observedMode: Int? = null
+    private val deviceIDs = mutableSetOf<Int>()
     private val handler = Handler(Looper.getMainLooper())
-    private val modeListener = AudioManager.OnModeChangedListener { routeChanged() }
-    private val communicationListener = AudioManager.OnCommunicationDeviceChangedListener { routeChanged() }
+    private val modeListener = AudioManager.OnModeChangedListener {
+        val changed = synchronized(this) {
+            val current = manager.mode
+            (registered && current != observedMode).also { observedMode = current }
+        }
+        if (changed) routeChanged()
+    }
     private val devices = object : AudioDeviceCallback() {
-        override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>) { routeChanged() }
-        override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>) { routeChanged() }
+        override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>) {
+            val changed = synchronized(this@LiveVoiceAudioSession) {
+                addedDevices.map { deviceIDs.add(it.id) }.any { it }
+            }
+            if (changed) routeChanged()
+        }
+        override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>) {
+            val changed = synchronized(this@LiveVoiceAudioSession) {
+                removedDevices.map { deviceIDs.remove(it.id) }.any { it }
+            }
+            if (changed) routeChanged()
+        }
     }
     private fun routeChanged() { synchronized(this) { listeners.values.map { it.second } }.forEach { it() } }
     override val mode get() = manager.mode
@@ -84,11 +101,13 @@ class LiveVoiceAudioSession(private val context: Context) : VoiceAudioSessionCon
         request = focus // Retain teardown responsibility on a refused request too.
         if (manager.requestAudioFocus(focus) != AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
             throw VoiceAudioError.engineRejected("Activating call audio", "audio focus denied")
-        manager.mode = if (demo) AudioManager.MODE_NORMAL else AudioManager.MODE_IN_COMMUNICATION
+        val mode = if (demo) AudioManager.MODE_NORMAL else AudioManager.MODE_IN_COMMUNICATION
+        observedMode = mode // Ignore our own category write, including its async callback.
+        manager.mode = mode
     }
     @Synchronized override fun deactivate() {
         manager.clearCommunicationDevice()
-        savedMode?.let { manager.mode = it }; savedMode = null
+        savedMode?.let { observedMode = it; manager.mode = it }; savedMode = null
         request?.let { manager.abandonAudioFocusRequest(it) }; request = null
     }
     override fun route(atEar: Boolean, demo: Boolean) {
@@ -107,9 +126,14 @@ class LiveVoiceAudioSession(private val context: Context) : VoiceAudioSessionCon
     @Synchronized override fun observe(id: UUID, focus: (Int) -> Unit, route: () -> Unit) {
         listeners[id] = focus to route
         if (!registered) {
+            observedMode = manager.mode
+            deviceIDs.clear()
+            // registerAudioDeviceCallback immediately reports every existing device.
+            deviceIDs.addAll(manager.getDevices(AudioManager.GET_DEVICES_INPUTS or AudioManager.GET_DEVICES_OUTPUTS).map { it.id })
             manager.registerAudioDeviceCallback(devices, handler)
             manager.addOnModeChangedListener(context.mainExecutor, modeListener)
-            manager.addOnCommunicationDeviceChangedListener(context.mainExecutor, communicationListener)
+            // A selected communication device is an output override, not an iOS
+            // category/old-device/new-device change. Our route() writes it too.
             registered = true
         }
     }
@@ -118,8 +142,8 @@ class LiveVoiceAudioSession(private val context: Context) : VoiceAudioSessionCon
         if (listeners.isEmpty() && registered) {
             manager.unregisterAudioDeviceCallback(devices)
             manager.removeOnModeChangedListener(modeListener)
-            manager.removeOnCommunicationDeviceChangedListener(communicationListener)
             registered = false
+            deviceIDs.clear()
         }
     }
     companion object Key : DependencyKey<VoiceAudioSessionControlling> {

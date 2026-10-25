@@ -30,7 +30,9 @@ interface VoiceSocketConnection<ServerEvent, Command> {
         }
     }
     suspend fun sendControlIfPossible(command: Command, named: String): Boolean =
-        try { sendControl(command, named); true } catch (_: Exception) { false }
+        try { sendControl(command, named); true }
+        catch (error: CancellationException) { throw error }
+        catch (_: Exception) { false }
 }
 
 class VoiceCallSocket<E, C, A>(
@@ -68,7 +70,6 @@ class VoiceSessionLifecycle<E, C, A> {
     val tasks = mutableListOf<Job>()
     var rotationTask: Job? = null
     var reconnectTask: Job? = null
-    var reconnectNoticeTask: Job? = null
     var uplink = VoiceUplinkWatch()
     var uplinkTask: Job? = null
     var linkPoor = false
@@ -139,23 +140,30 @@ abstract class VoiceSessionCoordinator<E, C, A>(
     }
     override suspend fun end() = serialized { finish(null) }
 
-    /** Start/adopt prewarmed audio before opening a billed session, as on iOS.
-     * RTC negotiates with its ADM inactive, then adopts this engine and releases
-     * local hardware before activating its own microphone.
+    /** Realtime/Gemini prepare audio first; Live overlaps audio with negotiation.
+     * RTC always negotiates with its ADM inactive, then adopts the prepared engine
+     * and releases local hardware before activating its own microphone.
      */
-    internal suspend fun startAudioThenSocket(atEar: Boolean, audioClient: VoiceAudioClient): Flow<VoiceCallEvent> {
+    internal suspend fun startAudioAndSocket(atEar: Boolean, audioClient: VoiceAudioClient, concurrently: Boolean = false): Flow<VoiceCallEvent> {
         check(!streamMade)
         if (!running()) throw CancellationException()
         lifecycle.atEar = atEar
         this.audioClient = audioClient
         try {
-            val started = audioClient.start(atEar)
-            adoptAudio(started) // Cancellation while prewarm starts must still stop it.
-            adoptAudio(rtcAudio.adopt(started))
-            if (!running()) throw CancellationException()
-            val socket = open(false)
-            if (!running()) { discard(socket); throw CancellationException() }
-            active = socket
+            coroutineScope {
+                val startedAudio = async(start = CoroutineStart.UNDISPATCHED) {
+                    val started = audioClient.start(atEar)
+                    adoptAudio(started) // Cancellation while prewarm starts must still stop it.
+                    adoptAudio(rtcAudio.adopt(started))
+                }
+                if (!concurrently) startedAudio.await()
+                if (!running()) throw CancellationException()
+                val socket = open(false)
+                if (!running()) { discard(socket); throw CancellationException() }
+                active = socket // Retain teardown responsibility while audio starts.
+                startedAudio.await()
+            }
+            val socket = requireNotNull(active)
             activateAudio(socket)
             if (!running()) throw CancellationException()
             audio?.setAtEar?.invoke(lifecycle.atEar)
@@ -238,8 +246,6 @@ abstract class VoiceSessionCoordinator<E, C, A>(
 
     internal fun noteSocketAttached(resetLinkQuality: Boolean = false) {
         lifecycle.reconnectAttempts = 0
-        lifecycle.reconnectNoticeTask?.cancel()
-        lifecycle.reconnectNoticeTask = null
         if (resetLinkQuality) { lifecycle.linkPoor = false; reportConnectionQuality() }
         if (lifecycle.isReconnecting) {
             diagnostics.recordVoiceMark("voice_socket_reconnected")
@@ -305,7 +311,12 @@ abstract class VoiceSessionCoordinator<E, C, A>(
         standby = socket
         startSocketEvents(socket)
     }
-    internal suspend fun discard(socket: VoiceCallSocket<E, C, A>) { socket.task?.cancel(); socket.connection.close() }
+    internal suspend fun discard(socket: VoiceCallSocket<E, C, A>) {
+        // A turn-boundary swap can run inside the retired socket's collector.
+        // Closing its connection ends that collector after attachment completes.
+        if (socket.task != currentCoroutineContext()[Job]) socket.task?.cancel()
+        socket.connection.close()
+    }
     internal suspend fun swapToStandby(force: Boolean = false) {
         val next = standby?.takeIf { it.ready } ?: return
         if (finished || active == null || (!force && !canSwapToStandby)) return
@@ -313,7 +324,7 @@ abstract class VoiceSessionCoordinator<E, C, A>(
         activate(next)
     }
     internal suspend fun socketClosed(id: Int, error: Throwable?) {
-        if (standby?.id == id) { standby = null; return }
+        if (standby?.id == id) { discardStandby(); return }
         socketLost(id, VoiceSessionLoss.Closed(error))
     }
     internal suspend fun socketLost(id: Int, loss: VoiceSessionLoss) {
@@ -342,14 +353,9 @@ abstract class VoiceSessionCoordinator<E, C, A>(
         val failed = standby
         standby = null
         failed?.task?.cancel()
-        if (lifecycle.reconnectNoticeTask == null && !lifecycle.isReconnecting) {
-            lifecycle.reconnectNoticeTask = scope.launch {
-                clock.sleep(1.seconds)
-                if (!finished && active?.attached != true) {
-                    lifecycle.isReconnecting = true
-                    emit(VoiceCallEvent.Reconnecting)
-                }
-            }
+        if (!lifecycle.isReconnecting) {
+            lifecycle.isReconnecting = true
+            emit(VoiceCallEvent.Reconnecting)
         }
         lifecycle.reconnectTask = scope.launch { reconnect(loss.transportError) }
         withContext(NonCancellable) { lost.connection.close(); failed?.connection?.close?.invoke() }
