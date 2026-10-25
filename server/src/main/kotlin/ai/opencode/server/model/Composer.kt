@@ -427,21 +427,6 @@ internal object OpenCodeAutocompleteAgentSerializer : ElementSerializer<OpenCode
 )
 
 /**
- * A file copied into the app's (or the share extension's) temporary storage, waiting to
- * upload (iOS `ComposerStagedFile`, `System/Share/ShareHandoff.swift`). Here because both the
- * composer and the share flow (`:feature:system`) stage files; `mime` is resolved by the
- * caller (`AttachmentFileType`).
- */
-data class ComposerStagedFile(
-    val id: java.util.UUID,
-    val name: String,
-    val mime: String,
-    val size: Long,
-    /** Absolute path of the staged copy. */
-    val path: String,
-)
-
-/**
  * What a send asks of the in-app browser's open page (iOS `PageShareRequest`,
  * `Browser/BrowserFeature.swift`). Here because the composer's `PendingPrompt` carries it
  * and `:feature:composer` sits beside, not above, the browser's module.
