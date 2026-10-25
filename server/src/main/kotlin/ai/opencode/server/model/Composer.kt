@@ -287,24 +287,6 @@ data class PastedTextSummary(
     }
 }
 
-object AttachmentFileType {
-    /** A file name safe to write on the server: no path separators, no leading dots. */
-    fun sanitizedName(name: String): String {
-        val cleaned = name.replace("/", "-").replace("\\", "-")
-            .trim { it.isWhitespace() || Character.isISOControl(it) || Character.isSpaceChar(it) }
-        val trimmed = cleaned.dropWhile { it == '.' }
-        return trimmed.ifEmpty { "file" }
-    }
-
-    /** The lowercased extension of the last path component; a leading dot is a dotfile, not an extension. */
-    fun fileExtension(name: String): String {
-        val base = name.split("/").lastOrNull() ?: name
-        val dot = base.lastIndexOf('.')
-        if (dot <= 0) return ""
-        return base.substring(dot + 1).lowercase()
-    }
-}
-
 /** A skill returned by `GET /api/skill`. */
 @Serializable
 data class OpenCodeAutocompleteSkill(val id: String, val name: String, val description: String? = null)
@@ -424,4 +406,16 @@ internal object OpenCodeAutocompleteAgentSerializer : ElementSerializer<OpenCode
             put("hidden", JsonPrimitive(agent.hidden))
         })
     },
+)
+
+/**
+ * What a send asks of the in-app browser's open page (iOS `PageShareRequest`,
+ * `Browser/BrowserFeature.swift`). Here because the composer's `PendingPrompt` carries it
+ * and `:feature:composer` sits beside, not above, the browser's module.
+ */
+data class PageShareRequest(
+    val pageID: java.util.UUID,
+    val url: String,
+    val title: String,
+    val includesScreenshot: Boolean,
 )

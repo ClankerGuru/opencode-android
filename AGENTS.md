@@ -31,7 +31,7 @@ Local-only repo: never create a remote or push.
 | `:feature:system` | `OpenCode/System/`, `OpenCodeShare/`, `OpenCodeWidgets/` (Glance), `OpenCodeNotifications/` (FCM bridge behind an interface) | core, server |
 | `:feature:transcript` | `OpenCode/Transcript/` | media |
 | `:feature:composer` | `OpenCode/Composer/` | media, voice |
-| `:feature:settings` | `OpenCode/Settings/` (incl. Onboarding, What’s New) | voice, system |
+| `:feature:settings` | `OpenCode/Settings/` (incl. Onboarding, What’s New) | voice, system, devtools |
 | `:feature:session` | `OpenCode/Session/` | transcript, composer, voice, media, system |
 | `:feature:drawer` | `OpenCode/Drawer/` (`HomeFeature`, drawer, Catch Up) | session, settings, system |
 | `:devtools` | Android-native developer tools (not a port of iOS `Tuning/`/`Diagnostics/`) | core, server |

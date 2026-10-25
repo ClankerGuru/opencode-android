@@ -61,7 +61,8 @@ import java.util.Locale
 
 /**
  * Settings › Advanced › Developer (iOS `DiagnosticsView`), with Android's developer tools. Pass
- * [onClose] to show a back arrow on the main page (the settings stack owns navigation into it).
+ * [onClose] to show a back arrow on the main page (the settings stack owns navigation into it),
+ * and [onOpenPlaygrounds] to list Settings' Playgrounds under Tuning, as iOS does.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,6 +70,7 @@ fun DevToolsView(
     store: StoreOf<DevToolsFeature.State, DevToolsFeature.Action>,
     modifier: Modifier = Modifier,
     onClose: (() -> Unit)? = null,
+    onOpenPlaygrounds: (() -> Unit)? = null,
 ) {
     LaunchedEffect(store) { store.send(DevToolsFeature.Action.Task) }
     val state by store.collectState()
@@ -97,7 +99,7 @@ fun DevToolsView(
     ) { padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {
             when (state.route) {
-                DevToolsFeature.Route.Main -> MainPage(state, send)
+                DevToolsFeature.Route.Main -> MainPage(state, send, onOpenPlaygrounds)
                 DevToolsFeature.Route.Troubleshooting -> TroubleshootingPage(state)
                 DevToolsFeature.Route.Logs -> LogsPage(state, send)
                 DevToolsFeature.Route.Network -> NetworkPage(state, send)
@@ -143,7 +145,7 @@ private fun Actions(state: DevToolsFeature.State, send: (DevToolsFeature.Action)
 // Main page
 
 @Composable
-private fun MainPage(state: DevToolsFeature.State, send: (DevToolsFeature.Action) -> Unit) {
+private fun MainPage(state: DevToolsFeature.State, send: (DevToolsFeature.Action) -> Unit, onOpenPlaygrounds: (() -> Unit)?) {
     LazyColumn(Modifier.fillMaxSize()) {
         section("Recording and Diagnostics")
         item {
@@ -191,6 +193,9 @@ private fun MainPage(state: DevToolsFeature.State, send: (DevToolsFeature.Action
                 }
             }
             item { NavigationRow("Open Tuning Panel", SFSymbol.SliderHorizontal3) { send(DevToolsFeature.Action.OpenTuningPanelTapped) } }
+            if (onOpenPlaygrounds != null) {
+                item { NavigationRow("Playgrounds", SFSymbol.PlayRectangleOnRectangle, onClick = onOpenPlaygrounds) }
+            }
             footer("Use three-finger double tap, or hold four fingers, to tune springs and spacing live.")
 
             section("Motion and Rendering")

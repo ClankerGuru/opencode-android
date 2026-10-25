@@ -1,6 +1,6 @@
 package ai.opencode.feature.transcript.user
 
-import ai.opencode.server.model.AttachmentFileType
+import ai.opencode.core.files.AttachmentFileType
 import android.net.Uri
 import androidx.compose.runtime.Immutable
 import kotlinx.serialization.json.Json

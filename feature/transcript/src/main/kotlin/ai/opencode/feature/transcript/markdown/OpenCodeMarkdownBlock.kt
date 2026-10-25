@@ -1,5 +1,6 @@
 package ai.opencode.feature.transcript.markdown
 
+import ai.opencode.feature.media.SyntaxHighlighter
 import ai.opencode.server.model.AgentFileReference
 import androidx.compose.runtime.Immutable
 
@@ -44,14 +45,17 @@ data class OpenCodeMarkdownBlock(val id: Int, val kind: Kind) {
         private val result: SyntaxHighlighter.Result = SyntaxHighlighter.highlightIncremental(
             source,
             language,
-            reusing = reusing?.takeIf { it.language == language }?.result,
-            reusingSource = reusing?.source,
+            previous = reusing?.takeIf { it.language == language }?.let {
+                SyntaxHighlighter.Previous(it.source, it.result.safePrefixUTF8Count, it.result.safePrefixTokens)
+            },
         )
 
         val tokens: List<SyntaxToken> get() = result.tokens
         val safePrefixUTF8Count: Int get() = result.safePrefixUTF8Count
         /** The safe prefix in UTF-16 chars, for reuse checks against Kotlin strings. */
-        internal val safePrefixLength: Int get() = result.safePrefixLength
+        internal val safePrefixLength: Int by lazy(LazyThreadSafetyMode.PUBLICATION) {
+            SyntaxHighlighter.utf16Offset(source, result.safePrefixUTF8Count) ?: 0
+        }
 
         /** Whether [code] still starts with this highlight's safe prefix. */
         internal fun prefixMatches(code: String): Boolean =

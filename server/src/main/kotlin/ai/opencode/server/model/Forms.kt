@@ -34,7 +34,8 @@ sealed interface OpenCodeFormValue {
             if (symbols.decimalSeparator != '.') cleaned = cleaned.replace(symbols.decimalSeparator, '.')
             if (cleaned.isEmpty()) return null
             if (cleaned.endsWith(".")) cleaned = cleaned.dropLast(1)
-            if (cleaned.last() in "dDfF") return null
+            // Swift's `Double(".")` is nil; so is a bare separator here.
+            if (cleaned.isEmpty() || cleaned.last() in "dDfF") return null
             return cleaned.toDoubleOrNull()?.let(::Number)
         }
     }
