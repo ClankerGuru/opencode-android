@@ -1,0 +1,409 @@
+package ai.opencode.feature.session
+
+import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.rememberReduceMotion
+import ai.opencode.core.store.StoreOf
+import ai.opencode.core.store.collectState
+import ai.opencode.core.ui.OpenCodeIcon
+import ai.opencode.core.ui.OpenCodeIconButton
+import ai.opencode.core.ui.OpenCodeIconButtonStyle
+import ai.opencode.core.ui.OpenCodeTextStyles
+import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.core.ui.SFSymbol
+import ai.opencode.server.model.OpenCodeShell
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.interaction.DragInteraction
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.currentStateAsState
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
+import java.time.Duration
+import java.time.Instant
+
+/**
+ * Port of iOS `ShellOutputView`: a shell's live output in a bottom sheet. Tails while running,
+ * follows the bottom unless the reader scrolls up, and ends with the command's exit status.
+ * Polls only while on screen and the app is resumed.
+ *
+ * @param onClose Close (or swipe away): the parent dismisses the presentation (quietly).
+ * @param runningGlyph the running shell's glyph (iOS `ShellGlyph(shellIDs:)`).
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ShellOutputView(
+    store: StoreOf<ShellOutputFeature.State, ShellOutputFeature.Action>,
+    onClose: () -> Unit,
+    runningGlyph: @Composable (shellID: String) -> Unit = { ShellGlyph(shellIDs = listOf(it)) },
+) {
+    val state by store.collectState()
+    val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
+    val isActive = lifecycle.isAtLeast(Lifecycle.State.RESUMED)
+    // Polls only while on screen and the app is active (iOS `.task(id: scenePhase == .active)`).
+    DisposableEffect(isActive) {
+        if (isActive) store.send(ShellOutputFeature.Action.Task)
+        onDispose { if (isActive) store.send(ShellOutputFeature.Action.TaskEnded) }
+    }
+    ModalBottomSheet(
+        onDismissRequest = onClose,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false),
+        modifier = Modifier.semantics { contentDescription = "Shell output" },
+    ) {
+        var isFollowing by remember { mutableStateOf(true) }
+        var jumpRequest by remember { mutableIntStateOf(0) }
+        Column(Modifier.fillMaxSize().navigationBarsPadding()) {
+            Toolbar(state, onClose, send = store::send)
+            EarlierOutputBar(state) { store.send(ShellOutputFeature.Action.LoadEarlierTapped) }
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                Content(state, isFollowing, jumpRequest, onFollowingChanged = { isFollowing = it })
+                JumpToLatest(visible = !isFollowing && state.output.isNotEmpty(), modifier = Modifier.align(Alignment.BottomEnd)) {
+                    jumpRequest += 1
+                }
+            }
+            StatusBar(state, runningGlyph, send = store::send)
+        }
+    }
+    if (state.isConfirmingStop) {
+        AlertDialog(
+            onDismissRequest = { store.send(ShellOutputFeature.Action.IsConfirmingStopChanged(false)) },
+            title = { Text("Stop This Shell?") },
+            text = { Text("The command ends now. The output shown here stays until you close it.") },
+            confirmButton = {
+                TextButton(onClick = { store.send(ShellOutputFeature.Action.StopConfirmed) }) {
+                    Text("Stop Shell", color = OpenCodeTheme.colors.destructive)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { store.send(ShellOutputFeature.Action.IsConfirmingStopChanged(false)) }) { Text("Cancel") }
+            },
+        )
+    }
+}
+
+@Composable
+private fun Toolbar(state: ShellOutputFeature.State, onClose: () -> Unit, send: (ShellOutputFeature.Action) -> Unit) {
+    var didCopy by remember { mutableStateOf(false) }
+    LaunchedEffect(didCopy) {
+        if (!didCopy) return@LaunchedEffect
+        delay(1500)
+        didCopy = false
+    }
+    Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        OpenCodeIconButton(SFSymbol.Xmark, contentDescription = "Close", onClick = onClose, style = OpenCodeIconButtonStyle.Standard)
+        Text(
+            state.shell.title,
+            style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Monospace),
+            color = OpenCodeTheme.colors.text,
+            maxLines = 1,
+            overflow = TextOverflow.MiddleEllipsis,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.weight(1f).semantics { heading() },
+        )
+        OpenCodeIconButton(
+            if (didCopy) SFSymbol.Checkmark else SFSymbol.SquareOnSquare,
+            contentDescription = if (didCopy) "Copied" else "Copy Output",
+            onClick = {
+                send(ShellOutputFeature.Action.CopyOutputTapped)
+                didCopy = true
+            },
+            style = OpenCodeIconButtonStyle.Standard,
+            enabled = state.output.isNotEmpty(),
+        )
+        OpenCodeIconButton(
+            SFSymbol.SquareAndArrowUp,
+            contentDescription = "Share Output",
+            onClick = { send(ShellOutputFeature.Action.ShareOutputTapped) },
+            style = OpenCodeIconButtonStyle.Standard,
+            enabled = state.output.isNotEmpty(),
+        )
+    }
+}
+
+@Composable
+private fun EarlierOutputBar(state: ShellOutputFeature.State, onLoadEarlier: () -> Unit) {
+    if (!state.hasEarlierOutput || state.output.isEmpty()) return
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(
+            if (state.canLoadEarlier) "Earlier output hidden" else "Showing the last 4 MB",
+            style = OpenCodeTextStyles.footnote,
+            color = OpenCodeTheme.colors.secondaryText,
+            modifier = Modifier.weight(1f),
+        )
+        if (state.canLoadEarlier && !state.isUnavailable) {
+            TextButton(onClick = onLoadEarlier, enabled = !state.isLoadingEarlier, modifier = Modifier.heightIn(min = 48.dp)) {
+                if (state.isLoadingEarlier) {
+                    CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                } else {
+                    Text("Load Earlier", style = OpenCodeTextStyles.footnote.copy(fontWeight = FontWeight.SemiBold))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun Content(state: ShellOutputFeature.State, isFollowing: Boolean, jumpRequest: Int, onFollowingChanged: (Boolean) -> Unit) {
+    when {
+        state.output.isNotEmpty() -> ShellOutputTextView(state.output, state.startCursor, isFollowing, jumpRequest, onFollowingChanged)
+        state.isUnavailable -> EmptyState("Output Unavailable", "The server no longer has this shell’s output.")
+        !state.isLoaded -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+        else -> EmptyState(
+            if (state.isRunning) "No Output Yet" else "No Output",
+            if (state.isRunning) "Output appears here as the command writes it." else null,
+        )
+    }
+}
+
+@Composable
+private fun EmptyState(title: String, description: String?) {
+    Column(
+        Modifier.fillMaxSize().padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
+    ) {
+        OpenCodeIcon(SFSymbol.Terminal, contentDescription = null, size = 48.dp, tint = OpenCodeTheme.colors.secondaryText)
+        Text(title, style = OpenCodeTextStyles.title3.copy(fontWeight = FontWeight.Bold), color = OpenCodeTheme.colors.text, textAlign = TextAlign.Center)
+        if (description != null) {
+            Text(description, style = OpenCodeTextStyles.callout, color = OpenCodeTheme.colors.secondaryText, textAlign = TextAlign.Center)
+        }
+    }
+}
+
+/** One output line and its absolute byte offset, its stable key: trimming or loading earlier keeps the reader's place. */
+private data class OutputLine(val offset: Long, val text: String)
+
+private fun outputLines(text: String, startCursor: Int): List<OutputLine> {
+    val lines = ArrayList<OutputLine>()
+    var offset = startCursor.toLong()
+    var lineStart = 0
+    while (lineStart <= text.length) {
+        val newline = text.indexOf('\n', lineStart)
+        val end = if (newline < 0) text.length else newline
+        val line = text.substring(lineStart, end)
+        if (newline < 0 && line.isEmpty() && lines.isNotEmpty()) break
+        lines += OutputLine(offset, line)
+        offset += ShellOutputFeature.utf8Count(line) + 1
+        if (newline < 0) break
+        lineStart = newline + 1
+    }
+    return lines
+}
+
+/**
+ * Port of iOS `ShellOutputTextView`: monospaced, wrapped, selectable output. Lines are lazy rows
+ * keyed by byte offset, so new output appends in place instead of re-laying out the capture.
+ * Following: the reader's own scrolling within 32 dp of the bottom follows; anything else stops.
+ */
+@Composable
+private fun ShellOutputTextView(text: String, startCursor: Int, isFollowing: Boolean, jumpRequest: Int, onFollowingChanged: (Boolean) -> Unit) {
+    val lines = remember(text, startCursor) { outputLines(text, startCursor) }
+    val listState = rememberLazyListState()
+    val reduceMotion = rememberReduceMotion()
+    val followThreshold = with(LocalDensity.current) { 32.dp.toPx() }
+    var userScrolling by remember { mutableStateOf(false) }
+    var lastJump by remember { mutableIntStateOf(jumpRequest) }
+    val following by rememberUpdatedState(isFollowing)
+    val reportFollowing by rememberUpdatedState(onFollowingChanged)
+
+    LaunchedEffect(listState) {
+        listState.interactionSource.interactions.collect { if (it is DragInteraction.Start) userScrolling = true }
+    }
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.isScrollInProgress }.collect { if (!it) userScrolling = false }
+    }
+    // Only the reader's own scrolling changes whether we follow.
+    LaunchedEffect(listState, followThreshold) {
+        snapshotFlow {
+            val info = listState.layoutInfo
+            val last = info.visibleItemsInfo.lastOrNull()
+            val distance = if (last == null) 0f else if (last.index < info.totalItemsCount - 1) Float.MAX_VALUE
+            else (last.offset + last.size - info.viewportEndOffset + info.afterContentPadding).toFloat()
+            distance < followThreshold
+        }.distinctUntilChanged().collect {
+            if (userScrolling && it != following) reportFollowing(it)
+        }
+    }
+    LaunchedEffect(lines.size, isFollowing) {
+        if (isFollowing && lines.isNotEmpty()) listState.scrollToItem(lines.size - 1, Int.MAX_VALUE / 2)
+    }
+    LaunchedEffect(jumpRequest) {
+        if (jumpRequest == lastJump) return@LaunchedEffect
+        lastJump = jumpRequest
+        onFollowingChanged(true)
+        if (lines.isNotEmpty()) {
+            if (reduceMotion) listState.scrollToItem(lines.size - 1, Int.MAX_VALUE / 2)
+            else listState.animateScrollToItem(lines.size - 1, Int.MAX_VALUE / 2)
+        }
+    }
+    val style = OpenCodeTextStyles.footnote.copy(fontFamily = FontFamily.Monospace, fontSize = 13.sp, color = OpenCodeTheme.colors.text)
+    SelectionContainer {
+        LazyColumn(
+            state = listState,
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 24.dp),
+            modifier = Modifier.fillMaxSize().semantics { contentDescription = "Shell output" },
+        ) {
+            itemsIndexed(lines, key = { _, line -> line.offset }, contentType = { _, _ -> 0 }) { _, line ->
+                Text(line.text, style = style, softWrap = true)
+            }
+        }
+    }
+}
+
+@Composable
+private fun JumpToLatest(visible: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    val reduceMotion = rememberReduceMotion()
+    AnimatedVisibility(
+        visible = visible,
+        modifier = modifier.padding(16.dp),
+        enter = if (reduceMotion) fadeIn(Motion.reducedFadeSpec()) else fadeIn() + scaleIn(initialScale = 0.8f),
+        exit = if (reduceMotion) fadeOut(Motion.reducedFadeSpec()) else fadeOut() + scaleOut(targetScale = 0.8f),
+    ) {
+        OpenCodeIconButton(SFSymbol.ArrowDown, contentDescription = "Scroll to latest", onClick = onClick, iconSize = 20.dp)
+    }
+}
+
+@Composable
+private fun StatusBar(state: ShellOutputFeature.State, runningGlyph: @Composable (String) -> Unit, send: (ShellOutputFeature.Action) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 16.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        ShellStatusLabel(state, runningGlyph, Modifier.weight(1f))
+        if (state.isRunning || state.isStopping) {
+            OutlinedButton(
+                onClick = { send(ShellOutputFeature.Action.StopTapped) },
+                enabled = !state.isStopping,
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = OpenCodeTheme.colors.destructive),
+                modifier = Modifier.heightIn(min = 48.dp),
+            ) {
+                if (state.isStopping) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                else Text("Stop Shell")
+            }
+        }
+    }
+}
+
+private val successGreen = Color(0xFF34C759)
+private val warningOrange = Color(0xFFFF9500)
+
+/** “Running · 1:23”, “Exited with code 1”, “Interrupted”: sentence-case status. */
+@Composable
+private fun ShellStatusLabel(state: ShellOutputFeature.State, runningGlyph: @Composable (String) -> Unit, modifier: Modifier) {
+    val shell = state.shell
+    val title = when {
+        state.isStopping -> "Stopping…"
+        shell.status == OpenCodeShell.Status.Running && state.isUnavailable -> "Unavailable"
+        shell.status == OpenCodeShell.Status.Running -> "Running"
+        shell.status == OpenCodeShell.Status.Killed -> "Interrupted"
+        shell.status == OpenCodeShell.Status.Timeout -> "Timed out"
+        else -> shell.exitCode?.takeIf { it != 0 }?.let { "Exited with code $it" } ?: "Exited"
+    }
+    Row(modifier.semantics(mergeDescendants = true) {}, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box(Modifier.width(18.dp), contentAlignment = Alignment.Center) {
+            when {
+                shell.status == OpenCodeShell.Status.Running && !state.isUnavailable -> runningGlyph(shell.id)
+                shell.status == OpenCodeShell.Status.Running || shell.status == OpenCodeShell.Status.Killed ->
+                    OpenCodeIcon(SFSymbol.HandRaisedFill, contentDescription = null, size = 18.dp, tint = OpenCodeTheme.colors.secondaryText)
+                shell.status == OpenCodeShell.Status.Timeout ->
+                    OpenCodeIcon(SFSymbol.ClockBadgeExclamationmark, contentDescription = null, size = 18.dp, tint = warningOrange)
+                (shell.exitCode ?: 0) == 0 ->
+                    OpenCodeIcon(SFSymbol.CheckmarkCircleFill, contentDescription = null, size = 18.dp, tint = successGreen)
+                else -> OpenCodeIcon(SFSymbol.XmarkCircleFill, contentDescription = null, size = 18.dp, tint = OpenCodeTheme.colors.destructive)
+            }
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                val labelStyle = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium)
+                Text(title, style = labelStyle, color = OpenCodeTheme.colors.text)
+                val startedAt = shell.startedAt
+                if (startedAt != null && (shell.status == OpenCodeShell.Status.Running || shell.completedAt != null)) {
+                    Text("·", style = labelStyle, color = OpenCodeTheme.colors.text, modifier = Modifier.semantics { contentDescription = "" })
+                    ElapsedTime(startedAt, if (shell.status == OpenCodeShell.Status.Running) null else shell.completedAt, labelStyle)
+                }
+            }
+            state.errorMessage?.let { Text(it, style = OpenCodeTextStyles.caption1, color = OpenCodeTheme.colors.destructive) }
+        }
+    }
+}
+
+/** The elapsed time, ticking each second while [until] is null (iOS `ShellElapsedTime`). */
+@Composable
+private fun ElapsedTime(since: Instant, until: Instant?, style: androidx.compose.ui.text.TextStyle) {
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    if (until == null) {
+        LaunchedEffect(since) {
+            while (true) {
+                now = System.currentTimeMillis()
+                delay(1000 - (now - since.toEpochMilli()).mod(1000L))
+            }
+        }
+    }
+    val end = until ?: Instant.ofEpochMilli(now)
+    val seconds = maxOf(0L, Duration.between(since, end).seconds)
+    val text = if (seconds >= 3600) "%d:%02d:%02d".format(seconds / 3600, seconds % 3600 / 60, seconds % 60)
+    else "%d:%02d".format(seconds / 60, seconds % 60)
+    val spoken = buildList {
+        if (seconds >= 3600) add("${seconds / 3600} ${if (seconds / 3600 == 1L) "hour" else "hours"}")
+        if (seconds >= 60) add("${seconds % 3600 / 60} ${if (seconds % 3600 / 60 == 1L) "minute" else "minutes"}")
+        add("${seconds % 60} ${if (seconds % 60 == 1L) "second" else "seconds"}")
+    }.joinToString(", ")
+    Text(text, style = style.copy(fontFeatureSettings = "tnum"), color = OpenCodeTheme.colors.text, modifier = Modifier.semantics { contentDescription = spoken })
+}

@@ -14,4 +14,6 @@ dependencies {
     api(project(":feature:voice"))
     api(project(":feature:media"))
     api(project(":feature:system"))
+    // PredictiveBackHandler / LocalOnBackPressedDispatcherOwner for SessionPageStack's back.
+    implementation(libs.androidx.activity.compose)
 }

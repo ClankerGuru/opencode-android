@@ -35,7 +35,7 @@ fun SessionView(
     navigationIcon: @Composable () -> Unit = {},
 ) {
     LaunchedEffect(store) { store.send(SessionFeature.Action.Task) }
-    val title by store.observe { it.title }
+    val title by store.observe { it.session?.title ?: "New Session" }
     val transcript = remember(store) { store.scope({ it.transcript }, SessionFeature.Action::Transcript) }
     val composer = remember(store) { store.scope({ it.composer }, SessionFeature.Action::Composer) }
     Scaffold(
