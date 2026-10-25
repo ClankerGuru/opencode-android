@@ -1,0 +1,23 @@
+plugins {
+    id("opencode.android.library")
+}
+
+android {
+    namespace = "ai.opencode.core"
+}
+
+dependencies {
+    api(platform(libs.compose.bom))
+    api(libs.kotlinx.coroutines.core)
+    api(libs.kotlinx.serialization.json)
+    api(libs.compose.ui)
+    api(libs.compose.foundation)
+    api(libs.compose.animation)
+    api(libs.compose.material3)
+    api(libs.compose.ui.tooling.preview)
+    debugApi(libs.compose.ui.tooling)
+    api(libs.androidx.core.ktx)
+    api(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.lifecycle.process)
+    implementation(libs.androidx.datastore.preferences)
+}
