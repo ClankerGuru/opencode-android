@@ -278,7 +278,7 @@ private fun TranscriptListContent(
                     val rowModifier = Modifier
                         .animateItem(
                             fadeInSpec = null,
-                            placementSpec = if (controller.animatesPlacement) ai.opencode.feature.transcript.user.PromotionMotion.spring.spec() else null,
+                            placementSpec = controller.placementSpring?.spec(),
                             fadeOutSpec = if (item == TranscriptItemID.Empty) null else androidx.compose.animation.core.tween((RowEntrance.EXIT_DURATION * 1000).toInt(), easing = androidx.compose.animation.core.CubicBezierEasing(0f, 0f, 0.58f, 1f)) /* iOS .curveEaseOut */,
                         )
                         .fillMaxWidth()

@@ -129,8 +129,15 @@ class TranscriptListController(
     private var readingAnchor: Pair<String, Int>? = null
     private var promotionUntil = 0.0
     private var followsSentRow = false
-    var animatesPlacement by mutableStateOf(false)
+    /**
+     * The spring rows move on when an update moves them (null: they move at once): a promotion's
+     * [ai.opencode.feature.transcript.user.PromotionMotion.spring], or the disclosure's closing
+     * spring when a row leaves a transcript shorter than the screen (iOS `closeTopGap`: the rows
+     * glide up into its place instead of jumping in one frame).
+     */
+    var placementSpring by mutableStateOf<ai.opencode.core.motion.MotionSpring?>(null)
         private set
+    private var placementUntil = 0.0
 
     // New messages.
     private var newMessagesDecision: Pair<String, Boolean>? = null
@@ -382,14 +389,11 @@ class TranscriptListController(
             if (promoted) {
                 finishGrowths()
                 promotionUntil = transcriptNow() + ai.opencode.feature.transcript.user.PromotionMotion.duration * 1.5
-                animatesPlacement = !reduceMotion
-                val until = promotionUntil
-                pendingEffects += {
-                    scope.launch {
-                        kotlinx.coroutines.delay((ai.opencode.core.tuning.AnimationTimeScale.shared.wallSeconds(until - transcriptNow()) * 1000).toLong())
-                        if (promotionUntil == until) animatesPlacement = false
-                    }
-                }
+                if (!reduceMotion) animatePlacement(ai.opencode.feature.transcript.user.PromotionMotion.spring, promotionUntil)
+            } else if (!reduceMotion && old.items.any { it.key !in nextKeys && it != TranscriptItemID.Empty } && fitsOnScreen()) {
+                // iOS `closeTopGap`: a row leaving a transcript shorter than the screen.
+                val spring = ai.opencode.feature.transcript.rows.DisclosureMotion.spring(opening = false)
+                animatePlacement(spring, transcriptNow() + spring.duration * 1.5)
             }
             // Working and waiting messages don't fence off arrivals in the reply above them.
             val lastKept = next.items.indexOfLast {
@@ -545,6 +549,21 @@ class TranscriptListController(
      */
     val imagesSettling: Boolean
         get() = !hasLaidOutContent || transcriptNow() < arrivalsGlideAfter
+
+    /** Every row is on screen: nothing to scroll in either direction. */
+    private fun fitsOnScreen(): Boolean = !state.canScrollBackward && !state.canScrollForward &&
+        lastLayout?.let { it.visibleItemsInfo.size == it.totalItemsCount } == true
+
+    private fun animatePlacement(spring: ai.opencode.core.motion.MotionSpring, until: Double) {
+        placementSpring = spring
+        placementUntil = until
+        pendingEffects += {
+            scope.launch {
+                kotlinx.coroutines.delay((ai.opencode.core.tuning.AnimationTimeScale.shared.wallSeconds(until - transcriptNow()) * 1000).toLong())
+                if (placementUntil == until) placementSpring = null
+            }
+        }
+    }
 
     fun imageGrowth(stableID: String): ai.opencode.feature.media.AgentImageRowGrowth =
         imageGrowths.getOrPut(stableID) { ai.opencode.feature.media.AgentImageRowGrowth() }
