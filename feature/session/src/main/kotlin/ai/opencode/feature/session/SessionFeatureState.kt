@@ -10,7 +10,7 @@ import ai.opencode.feature.composer.ComposerAttachmentsFeature
 import ai.opencode.feature.composer.ComposerFileAttachment
 import ai.opencode.feature.composer.DictationFeature
 import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.feature.composer.modelpicker.ModelSearch
+import ai.opencode.server.model.ModelSearch
 import ai.opencode.server.model.ModelVisibility
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
 import ai.opencode.feature.composer.SharedComposerDraft

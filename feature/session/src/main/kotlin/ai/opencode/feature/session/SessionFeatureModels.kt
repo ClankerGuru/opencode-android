@@ -13,7 +13,7 @@ import ai.opencode.feature.session.SessionFeature.CancelID
 import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.feature.composer.ComposerAutocompleteState
 import ai.opencode.feature.composer.modelpicker.ModelLevelScale
-import ai.opencode.feature.composer.modelpicker.ModelSearch
+import ai.opencode.server.model.ModelSearch
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.model.OpenCodeModel
 import ai.opencode.server.model.OpenCodeModelRef

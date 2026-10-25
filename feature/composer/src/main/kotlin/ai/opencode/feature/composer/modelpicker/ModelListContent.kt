@@ -2,6 +2,7 @@
 
 package ai.opencode.feature.composer.modelpicker
 
+import ai.opencode.core.ui.ProviderIcon as CoreProviderIcon
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodePrimaryButton
 import ai.opencode.core.ui.OpenCodeTextStyles
@@ -426,28 +427,11 @@ internal fun FavoriteSwipeBox(
 }
 
 /**
- * The provider's mark. iOS draws `provider-<id>` template images (its own, else its canonical
- * provider's, else a Console connection's upstream, else a neutral placeholder; `ProviderIcon`,
- * `Session/SessionView.swift`). Android has no provider artwork yet, so this draws the
- * provider's initial in a ring. Decorative (TalkBack hidden).
+ * The provider's mark: iOS `ProviderIcon` (`Session/SessionView.swift`), the `provider-<id>`
+ * template image (its own, else its canonical provider's, else a Console connection's upstream,
+ * else a neutral placeholder), drawn in [tint]. Decorative (TalkBack hidden).
  */
 @Composable
 internal fun ProviderIcon(providerID: String, canonical: String?, size: Dp, tint: Color, modifier: Modifier = Modifier) {
-    val id = canonical?.takeIf { providerID.startsWith("console-") } ?: providerID.removePrefix("console-")
-    val initial = ModelProviderGroup.canonicalVendorTitle(id).firstOrNull()?.uppercaseChar()?.toString() ?: "·"
-    Box(
-        modifier
-            .size(size)
-            .background(tint.copy(alpha = 0.16f), CircleShape)
-            .clearAndSetSemantics {},
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            initial,
-            color = tint,
-            style = OpenCodeTextStyles.caption2.copy(fontSize = OpenCodeTextStyles.caption2.fontSize * (size.value / 20f)),
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-        )
-    }
+    CoreProviderIcon(providerID, modifier.size(size), canonical, tint)
 }

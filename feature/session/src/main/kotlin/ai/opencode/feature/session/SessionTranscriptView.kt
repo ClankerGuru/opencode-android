@@ -1,5 +1,6 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.ui.ProviderIcon
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.experiments.key
 import ai.opencode.core.motion.Motion

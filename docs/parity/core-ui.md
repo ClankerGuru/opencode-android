@@ -33,6 +33,7 @@ Paths below are relative to `core/src/main/kotlin/ai/opencode/core/`.
 - Controls: `OpenCodePrimaryButton` / `OpenCodeSecondaryButton` (`role = Destructive` for red), `OpenCodeIconButton(SFSymbol.X, "Label", onClick)`, `Modifier.openCodeTapTarget()` after `clickable`.
 - Icons: `OpenCodeIcon(SFSymbol.ArrowUpCircleFill, contentDescription)` or `OpenCodeIcon("arrow.up", …)` / `sfSymbol(name)` for names held as strings. New icon: add a line to `scripts/material-symbols.txt`, run `python3 scripts/fetch-material-symbols.py`, add the `SFSymbol` entry and a row below.
 - Gallery: `DesignSystemGallery()` (`ui/DesignSystemGallery.kt`).
+- Brand artwork (`ui/ProviderIcon.kt`, moved down from Session so Settings and Composer can draw it): iOS `ProviderIcons.xcassets` SVGs ship as `core/src/main/assets/provider-icons/<id>.svg` (`provider-*`, 98) and `mcp-icons/<name>.svg` (`mcp-*`, 14), drawn with Coil SVG. `ProviderIcon(providerID, modifier, canonical, tint)` + `ProviderIcon.assetName/available` (iOS `ProviderIcon`, `Session/SessionView.swift`: own → canonical → Console upstream → `provider-synthetic`, template-tinted, TalkBack hidden); `BrandAssets.exists/path(asset)` answers iOS `UIImage(named:) != nil` by iOS asset name; `TemplateAssetImage(asset, modifier, tint)` draws one as a template image.
 
 ## SF Symbol → Material Symbol
 
