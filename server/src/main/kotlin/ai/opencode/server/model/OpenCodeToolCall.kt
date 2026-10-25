@@ -53,6 +53,15 @@ data class OpenCodeToolCall(
     /** The path a read, write, or edit touched (`path`, `filePath`, `file_path`). */
     val inputPath: String? get() = listOf("path", "filePath", "file_path").firstNotNullOfOrNull(::inputString)
 
+    /** The file a read, write, or edit touched, when its name is one the viewer can open (folders and globs are not). */
+    val fileReference: AgentFileReference?
+        get() {
+            if (isShell) return null
+            val path = inputPath ?: return null
+            if (path.contains("*")) return null
+            return AgentFileReference.withLocation(path)?.takeIf { it.hasViewableName }
+        }
+
     /** The row's one-line detail: the command, file name, pattern, URL, or query. */
     val subtitle: String?
         get() {

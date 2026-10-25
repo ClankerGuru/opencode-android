@@ -11,6 +11,8 @@ android {
 dependencies {
     api(project(":feature:voice"))
     api(project(":feature:system"))
+    // Settings › Advanced › Developer shows the devtools screen (devtools depends only on core and server).
+    implementation(project(":devtools"))
 }
 
 dependencies {

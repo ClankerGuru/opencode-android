@@ -84,10 +84,6 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         /** Addresses discovered from a pairing code, tried alongside `serverURL`. */
         val alternateURLs: List<String> = emptyList(),
         val isScanningPairingCode: Boolean = false,
-        /** The scanner couldn't open (no camera, scanner unavailable): offer Paste instead. */
-        val isScannerUnavailable: Boolean = false,
-        /** The scanner fallback's Paste found nothing (iOS "Nothing to Paste"). */
-        val scannerPasteFailed: Boolean = false,
         val pendingPairing: PendingPairing? = null,
         val ignoredPendingPairingCount: Int = 0,
         val pairingError: String? = null,
@@ -392,11 +388,6 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         data class ServerDeleted(val server: OpenCodeServer) : Action
         data object ScanPairingCodeTapped : Action
         data object ScannerDismissed : Action
-        /** The scanner couldn't open; its fallback offers Paste. */
-        data object ScannerUnavailable : Action
-        /** The scanner fallback's Paste Pairing Link. */
-        data object ScannerPasteTapped : Action
-        data object ScannerPasteFailedDismissed : Action
         data object PastePairingCodeTapped : Action
         data class PairingCodeScanned(val text: String) : Action
         data class PairingURLOpened(val url: String) : Action
@@ -479,20 +470,13 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         Action.ReturnToServerTapped -> state.returnServer?.let { selectServer(it, state) } ?: Reduced(state)
         is Action.ServerDeleted -> serverDeleted(state, action.server)
         Action.ScanPairingCodeTapped -> cancelConnection(
-            state.copy(pasteError = null, isScanningPairingCode = true, isScannerUnavailable = false, editingSavedServer = null),
+            state.copy(pasteError = null, isScanningPairingCode = true, editingSavedServer = null),
         )
         Action.ScannerDismissed -> {
-            val next = state.copy(isScanningPairingCode = false, isScannerUnavailable = false, scannerPasteFailed = false)
+            val next = state.copy(isScanningPairingCode = false)
             // Opened over Home, there's no attempt to cancel and Home carries on.
             if (next.home != null) Reduced(next) else cancelConnection(next)
         }
-        Action.ScannerUnavailable -> Reduced(if (state.isScanningPairingCode) state.copy(isScannerUnavailable = true) else state)
-        Action.ScannerPasteTapped -> {
-            val text = dependency(PasteboardClient).string()
-            if (text.isNullOrBlank()) Reduced(state.copy(scannerPasteFailed = true))
-            else Reduced(state, Effect.send(Action.PairingCodeScanned(text)))
-        }
-        Action.ScannerPasteFailedDismissed -> Reduced(state.copy(scannerPasteFailed = false))
         Action.PastePairingCodeTapped -> pastePairingCode(state)
         is Action.PairingCodeScanned -> pairingCodeScanned(state, action.text)
         is Action.PairingURLOpened -> {
@@ -731,8 +715,6 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
                 ignoredPendingPairingCount = 0,
                 pairingError = null,
                 isScanningPairingCode = false,
-                isScannerUnavailable = false,
-                scannerPasteFailed = false,
                 isEditingServer = false,
                 editingSavedServer = null,
                 manualEntryDraft = null,

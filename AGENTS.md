@@ -31,7 +31,7 @@ Local-only repo: never create a remote or push.
 | `:feature:system` | `OpenCode/System/`, `OpenCodeShare/`, `OpenCodeWidgets/` (Glance), `OpenCodeNotifications/` (FCM bridge behind an interface) | core, server |
 | `:feature:transcript` | `OpenCode/Transcript/` | media |
 | `:feature:composer` | `OpenCode/Composer/` | media, voice |
-| `:feature:settings` | `OpenCode/Settings/` (incl. Onboarding, What’s New) | voice, system |
+| `:feature:settings` | `OpenCode/Settings/` (incl. Onboarding, What’s New) | voice, system, devtools |
 | `:feature:session` | `OpenCode/Session/` | transcript, composer, voice, media, system |
 | `:feature:drawer` | `OpenCode/Drawer/` (`HomeFeature`, drawer, Catch Up) | session, settings, system |
 | `:devtools` | Android-native developer tools (not a port of iOS `Tuning/`/`Diagnostics/`) | core, server |
@@ -103,8 +103,6 @@ jlatexmath), Firebase Messaging (push; keep it behind an interface until credent
 Add a new library only with a one-line justification here.
 - `com.google.zxing:core` (settings): decodes the pairing QR from CameraX frames, as iOS's
   AVFoundation QR metadata output does; pure Java, no Play services (ML Kit would need them).
-- `play-services-code-scanner` (`:app`): Scan Pairing Code reads one QR symbology; Google's
-  code scanner shows its own camera UI with no CAMERA permission, CameraX or bundled ML model.
 
 ## Check and run
 

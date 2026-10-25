@@ -2,6 +2,11 @@ package ai.opencode.server.live
 
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.diagnostics.DiagnosticsErrorCategory
+import ai.opencode.core.diagnostics.DiagnosticsFailurePhase
+import ai.opencode.core.diagnostics.DiagnosticsRecorder
+import ai.opencode.core.diagnostics.DiagnosticsStreamName
+import ai.opencode.core.diagnostics.DiagnosticsStreamProgress
 import ai.opencode.core.log.AppLog
 import ai.opencode.server.EventBatcher
 import ai.opencode.server.EventBatcherHooks
@@ -66,6 +71,7 @@ internal fun subscribeEvents(server: OpenCodeServer): Flow<OpenCodeServerEvent> 
     )
     val activeCall = AtomicReference<Call?>(null)
     val operationID = NetworkRetry.streamOperationID.current() ?: UUID.randomUUID().toString().uppercase()
+    val stream = StreamDiagnostics(operationID)
     launch(Dispatchers.IO) {
         try {
             val url = server.endpoint("/api/event") ?: throw OpenCodeClientError("Enter a valid HTTP or HTTPS server URL.")
@@ -74,17 +80,24 @@ internal fun subscribeEvents(server: OpenCodeServer): Flow<OpenCodeServerEvent> 
             builder.header("X-OpenCode-Op", operationID).header("X-OpenCode-Req", UUID.randomUUID().toString().uppercase())
             val call = dependency(OpenCodeTransport).eventStream.newCall(builder.build())
             activeCall.set(call)
+            stream.record(DiagnosticsStreamName.ConnectStart)
             call.execute().use { response ->
-                if (response.code == 401) throw OpenCodeClientError("The server rejected these credentials.", statusCode = 401)
+                if (response.code == 401) {
+                    stream.record(DiagnosticsStreamName.Disconnected, 401, DiagnosticsErrorCategory.Unauthorized, DiagnosticsFailurePhase.HttpStatus)
+                    throw OpenCodeClientError("The server rejected these credentials.", statusCode = 401)
+                }
                 if (response.code !in 200..299) {
+                    stream.record(DiagnosticsStreamName.Disconnected, response.code, DiagnosticsErrorCategory.of(response.code), DiagnosticsFailurePhase.HttpStatus)
                     throw OpenCodeClientError("The event stream returned HTTP ${response.code}.", statusCode = response.code)
                 }
+                stream.connected(response.code)
                 ServerContact.shared.heard(server.persistenceID)
                 // The server frames one `data: {json}` line per event (no event:/id: fields, no
                 // multi-line data) plus `: heartbeat` comment lines.
                 val source = response.body.source()
                 while (true) {
                     val line = source.readUtf8Line() ?: break
+                    stream.line(line.length)
                     if (!line.startsWith("data:")) continue
                     if (line.length - 5 > MAX_FRAME_BYTES ||
                         (line.length * 3 - 5 > MAX_FRAME_BYTES && utf8Length(line) - 5 > MAX_FRAME_BYTES)
@@ -97,19 +110,54 @@ internal fun subscribeEvents(server: OpenCodeServer): Flow<OpenCodeServerEvent> 
                 }
             }
             batches.flush()
+            stream.record(DiagnosticsStreamName.Disconnected)
             close(OpenCodeClientError("The event stream ended."))
         } catch (cancelled: CancellationException) {
+            stream.record(DiagnosticsStreamName.Disconnected, errorCategory = DiagnosticsErrorCategory.Cancelled, failurePhase = DiagnosticsFailurePhase.Cancelled)
             throw cancelled
         } catch (error: OpenCodeClientError) {
             batches.flush()
+            if (error.statusCode == null) stream.record(DiagnosticsStreamName.Disconnected, errorCategory = DiagnosticsErrorCategory.Transport)
             close(error)
         } catch (error: Exception) {
             batches.flush()
+            stream.record(DiagnosticsStreamName.Disconnected, errorCategory = DiagnosticsErrorCategory.of(error), failurePhase = DiagnosticsFailurePhase.BodyRead)
             close(streamTransportError(error))
         }
     }
     awaitClose { activeCall.get()?.cancel() }
 }.buffer(EVENT_BUFFER)
+
+/** The event stream's diagnostics marks (iOS `DiagnosticsRecorder.stream`): line counts and timings only. */
+private class StreamDiagnostics(private val operationID: String) {
+    private val recorder = DiagnosticsRecorder.shared
+    private val requestID = UUID.randomUUID().toString().uppercase()
+    private val progress = DiagnosticsStreamProgress(startedAt = recorder.now())
+    private var disconnected = false
+
+    fun record(
+        name: DiagnosticsStreamName,
+        statusCode: Int? = null,
+        errorCategory: DiagnosticsErrorCategory? = null,
+        failurePhase: DiagnosticsFailurePhase? = null,
+    ) {
+        if (name == DiagnosticsStreamName.Disconnected) {
+            if (disconnected) return
+            disconnected = true
+        }
+        recorder.stream(name, requestID, operationID, progress, statusCode, errorCategory, failurePhase)
+    }
+
+    fun connected(statusCode: Int) {
+        progress.connectedAt = recorder.now()
+        record(DiagnosticsStreamName.Connected, statusCode)
+    }
+
+    fun line(byteCount: Int) {
+        if (!recorder.isEnabled) return
+        if (progress.receiveLine(byteCount, recorder.now())) record(DiagnosticsStreamName.Resumed)
+    }
+}
 
 private fun streamTransportError(error: Exception): OpenCodeClientError =
     transportError(error, ai.opencode.server.retry.TransportFailure.of(error))

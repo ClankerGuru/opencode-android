@@ -7,6 +7,8 @@ import ai.opencode.server.OpenCodePairingLink
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import ai.opencode.devtools.DevTools
+import ai.opencode.devtools.DevToolsOverlay
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -42,7 +44,9 @@ class MainActivity : ComponentActivity() {
                 }
             },
         )
-        setContent { AppView(store) }
+        // Developer tools (summon gesture, Tuning Panel, perf HUD): inert outside debug builds unless Developer Mode is on.
+        if (savedInstanceState == null) DevTools.handleLaunchIntent(intent)
+        setContent { DevToolsOverlay { AppView(store) } }
         // A recreated activity already handled its launch intent.
         if (savedInstanceState == null) handle(intent)
     }
