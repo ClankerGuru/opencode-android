@@ -6,13 +6,13 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 
 | iOS file | Lines | Kotlin file(s) | Status | Notes |
 | --- | ---: | --- | --- | --- |
-| `OpenCode/Diagnostics/Diagnostics.swift` | 698 | | todo | |
+| `OpenCode/Diagnostics/Diagnostics.swift` | 698 | `core/.../diagnostics/DiagnosticsRecorder.kt` | partial: no journal (previous-run tail) | moved to `:core` (`:server` records into it). `DiagnosticsErrorCategory`, `DiagnosticsEvent` (all fields, iOS JSON names), recorder (5,000 events / 15 min default-on in internal builds, else opt-in 2,000 / 10 min; `diagnostics.enabled`/`diagnostics.includeTranscripts`), marks/voice/socket/request/metrics/decode/stream records, navigation epochs, excerpts, `exportText`/`exportJSON`, `redactedPath` (`/auth/<route>/<redacted>`, `/api/fs/read/<redacted>`, query names only), coalesced 0.25 s `changes`. n/a: header-style resolution (session area), MetricKit bundle |
 | `OpenCode/Diagnostics/DiagnosticsClient.swift` | 105 | | todo | |
 | `OpenCode/Diagnostics/DiagnosticsJournal.swift` | 227 | | todo | |
-| `OpenCode/Diagnostics/DiagnosticsNetwork.swift` | 113 | | todo | |
+| `OpenCode/Diagnostics/DiagnosticsNetwork.swift` | 113 | `core/.../diagnostics/DiagnosticsRecorder.kt`, `server/.../DiagnosticsInstrumentation.kt` | done | failure phases, interface/family/scope enums, `DiagnosticsNetworkAddress` scope rules, stream names and `DiagnosticsStreamProgress` (30 s resume). `URLSessionTaskMetrics` → OkHttp `EventListener` (DNS/connect/TLS/TTFB/download/upload, header/body bytes, protocol, reuse); in-flight count in the interceptor |
 | `OpenCode/Diagnostics/DiagnosticsView.swift` | 421 | | todo | |
 | `OpenCode/Diagnostics/GlassMorphTrace.swift` | 491 | | todo | |
-| `OpenCode/Diagnostics/LabMarks.swift` | 221 | | todo | |
+| `OpenCode/Diagnostics/LabMarks.swift` | 221 | `core/.../diagnostics/LabMarks.kt` | partial: trace payload helpers (`promotionTrace`, `motionTrace`, `transcriptSnapshot`, …) and `observe`/`forward` not ported | moved to `:core`. `mark`/`markOnce` (AppLog.perf line, Perfetto instant, diagnostics mark, POST to the lab endpoint with `footprintKB` = PSS), `post(event:)`, `needsNetworkMetrics`. Endpoint = intent extra `lab-marks-url` (debug builds only). `PerfTrace` adds `android.os.Trace` sections/async intervals/counters |
 | `OpenCode/Diagnostics/LabTapAudit.swift` | 294 | | todo | |
 | `OpenCode/Diagnostics/MetricKitClient.swift` | 482 | | todo | |
 | `OpenCode/Diagnostics/PerfFrameSampler.swift` | 201 | | todo | |

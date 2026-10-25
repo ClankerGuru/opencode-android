@@ -1,5 +1,6 @@
 package ai.opencode.core.log
 
+import android.os.Trace
 import android.util.Log
 import java.time.Instant
 import java.time.format.DateTimeFormatter
@@ -18,7 +19,7 @@ import kotlin.time.Duration
  *
  * Messages are lambdas, built only when the level is collected (iOS's autoclosure).
  */
-class AppLog private constructor(val category: String, subsystem: String = SUBSYSTEM) {
+class AppLog private constructor(val category: String, subsystem: String = SUBSYSTEM, private val traces: Boolean = false) {
     private val tag = if (subsystem == SUBSYSTEM) "OpenCode/$category" else "$subsystem/$category"
 
     fun debug(message: () -> String) = log(Log.DEBUG, "debug", message)
@@ -35,6 +36,11 @@ class AppLog private constructor(val category: String, subsystem: String = SUBSY
         if (priority < minimumPriority) return
         val text = message().replace('\r', ' ').replace('\n', ' ')
         Log.println(priority, tag, text)
+        // `opencode.perf` lines double as Perfetto instants named by their first word (iOS signposts).
+        if (traces && Trace.isEnabled()) {
+            Trace.beginSection("oc:" + text.substringBefore(' ').take(117))
+            Trace.endSection()
+        }
         Ring.append("${DateTimeFormatter.ISO_INSTANT.format(Instant.now())} $level $category: $text")
     }
 
@@ -52,7 +58,7 @@ class AppLog private constructor(val category: String, subsystem: String = SUBSY
         val app = AppLog("app")
 
         /** The responsiveness gauntlet's timing marks (`LabMarks`), under the `opencode.perf` subsystem. */
-        val perf = AppLog("session", subsystem = "opencode.perf")
+        val perf = AppLog("session", subsystem = "opencode.perf", traces = true)
 
         /** Recent `AppLog` lines from this process, oldest first. */
         fun recentLines(since: Instant): List<String> = Ring.since(since)

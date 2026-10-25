@@ -65,3 +65,8 @@ Wire models the client decodes or encodes, needed below the feature modules: `Op
 `Transcript/`; task locals `PromptPageContext`, `PromptNotification.callbackURL`,
 `PromptAutocompleteMentions`, `PromptMessageID`, `FormLocationDirectory` → `model/Composer.kt`
 `PromptContext`. Feature modules should use these rather than redeclare them.
+
+
+## Diagnostics hooks (shared edit from `:devtools`)
+
+`server/.../DiagnosticsInstrumentation.kt` adds an OkHttp interceptor + `EventListener` to the request pools in `OpenCodeTransport.liveValue` (iOS `OpenCodeClient+Transport` calling `DiagnosticsRecorder.requestStarted/requestEnded/networkMetrics`); `LiveEvents.subscribeEvents` records `sse_connect_start/connected/resumed/disconnected` (iOS `DiagnosticsRecorder.stream`). Only method, redacted path, status, sizes and timings are kept. See devtools.md.
