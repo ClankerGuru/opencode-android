@@ -627,7 +627,7 @@ fun CallTrayBar(
         Row(
             Modifier
                 .fillMaxSize()
-                .padding(horizontal = CallTrayComposerMetrics.innerHorizontal.dp),
+                .padding(start = CallTrayComposerMetrics.innerHorizontal.dp, end = CallTrayBarLayout.trailingPadding.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             VoiceCallCenterButton(

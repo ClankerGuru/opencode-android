@@ -525,7 +525,7 @@ class RetryBudget(val total: Duration, private val clock: Clock = dependency(Clo
     suspend fun <T> optional(limit: Duration, operation: suspend () -> T): T? {
         val bounded = minOf(limit, remaining)
         if (bounded <= Duration.ZERO) return null
-        return bounded(bounded, clock) {
+        return bounded(bounded) {
             withRetryPolicy(RetryPolicy.once) {
                 try { operation() } catch (_: OpenCodeClientError) { null }
             }
@@ -536,9 +536,12 @@ class RetryBudget(val total: Duration, private val clock: Clock = dependency(Clo
         /** A budget on `NetworkRetry.clock` when one is set, so the budget and its retries share a clock. */
         suspend fun start(total: Duration): RetryBudget = RetryBudget(total, NetworkRetry.resolvedClock())
 
-        /** The work's result, or null if it takes longer than [limit]; the work is cancelled then. */
+        /**
+         * The work's result, or null if it takes longer than [limit] (wall time, as iOS: never a
+         * retry loop's scripted `NetworkRetry.clock`); the work is cancelled then.
+         */
         suspend fun <T> bounded(limit: Duration, clock: Clock? = null, work: suspend () -> T?): T? {
-            val resolved = NetworkRetry.resolvedClock(clock)
+            val resolved = clock ?: Clock.liveValue
             return coroutineScope {
                 val result = async { work() }
                 val timer = async { resolved.sleep(limit); null }
