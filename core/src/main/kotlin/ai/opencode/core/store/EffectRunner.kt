@@ -2,6 +2,7 @@ package ai.opencode.core.store
 
 import ai.opencode.core.dependencies.asContextElement
 import ai.opencode.core.log.AppLog
+import ai.opencode.core.log.logSummary
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -26,7 +27,7 @@ internal class EffectRunner<A>(
     private val sendFromEffect: suspend (A) -> Unit,
     /** An effect threw (not cancellation): `Store` logs it, `TestStore` fails the test. */
     private val onUnhandledError: (Throwable) -> Unit = { error ->
-        AppLog.app.error { "Unhandled effect error: ${error::class.java.simpleName}: ${error.stackTraceToString().take(2_000)}" }
+        AppLog.app.error { "Unhandled effect error: ${error.logSummary}" }
     },
 ) {
     private val lock = Any()
