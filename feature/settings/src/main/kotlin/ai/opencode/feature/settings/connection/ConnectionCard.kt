@@ -654,7 +654,6 @@ fun ServerPage(store: SettingsStore) {
                     OutlinedTextField(
                         value = nameDraft,
                         onValueChange = { nameDraft = it },
-                        label = { Text("Name") },
                         placeholder = { Text(current.friendlyName) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),

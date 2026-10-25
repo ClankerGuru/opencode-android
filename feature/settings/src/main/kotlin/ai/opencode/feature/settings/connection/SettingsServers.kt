@@ -131,7 +131,6 @@ fun SettingsServersSection(
                     OutlinedTextField(
                         value = nameDraft,
                         onValueChange = { nameDraft = it },
-                        label = { Text("Name") },
                         placeholder = { Text(server.friendlyName) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
