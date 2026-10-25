@@ -7,6 +7,7 @@ import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,8 +44,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.semantics.toggleableState
-import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
@@ -171,7 +170,7 @@ fun SettingsSection(
 @Composable
 fun SettingsDivider(inset: Boolean = false) {
     HorizontalDivider(
-        modifier = Modifier.padding(start = if (inset) 62.dp else 16.dp),
+        modifier = Modifier.padding(start = if (inset) 58.dp else 16.dp),
         color = OpenCodeTheme.colors.border,
         thickness = with(LocalDensity.current) { 1f.toDp() },
     )
@@ -260,12 +259,8 @@ fun SettingsToggleRow(
     enabled: Boolean = true,
 ) {
     SettingsRowFrame(
-        modifier.semantics(mergeDescendants = true) {
-            toggleableState = ToggleableState(checked)
-        },
-        onClick = { onCheckedChange(!checked) },
-        enabled = enabled,
-        role = Role.Switch,
+        modifier.toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = onCheckedChange),
+        onClick = null,
     ) {
         if (symbol != null) SettingsIcon(symbol, tint)
         Column(Modifier.weight(1f)) {

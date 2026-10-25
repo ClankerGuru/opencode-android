@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings
 
+import ai.opencode.core.experiments.key
 import ai.opencode.core.dependencies.Dependency
 import ai.opencode.core.experiments.ExperimentalFeature
 import ai.opencode.core.experiments.InAppNoticeMode

@@ -6,11 +6,14 @@ import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
 import ai.opencode.core.store.combine
 import ai.opencode.core.store.ifLet
+import ai.opencode.core.store.map
 import ai.opencode.core.store.scope
 import ai.opencode.feature.settings.onboarding.OnboardingPlaygroundFeature
 import ai.opencode.feature.settings.serverdetails.ServerDetailsFeature
 import ai.opencode.feature.settings.whatsnew.WhatsNewEntry
 import ai.opencode.feature.settings.whatsnew.WhatsNewFeature
+import ai.opencode.feature.settings.whatsnew.canTryWhatsNew
+import ai.opencode.feature.settings.whatsnew.whatsNewVoiceAvailable
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.friendlyName
 
@@ -38,6 +41,8 @@ sealed interface SettingsPage {
     data object Composer : SettingsPage
     /** Settings › Models (experimental `hideModels`). */
     data object Models : SettingsPage
+    /** Settings › Models › one provider (`ModelVisibilityProviderView`). */
+    data class ModelProvider(val providerID: String) : SettingsPage
     data object Voice : SettingsPage
     /** Settings › Voice › Voice (`CallVoicePicker`). */
     data object CallVoicePicker : SettingsPage
@@ -47,6 +52,8 @@ sealed interface SettingsPage {
     data object WhatsNew : SettingsPage
     /** One entry's page in What's New. */
     data class WhatsNewDetail(val entryID: String) : SettingsPage
+    /** What's New › Smaller Changes (iOS `WhatsNewSmallerList`). */
+    data object WhatsNewSmallerChanges : SettingsPage
     /** Settings › Server Details (experimental `serverDetails`). */
     data object ServerDetails : SettingsPage
     /** Settings › Advanced; [focus] scrolls to and tints that experiment's row (What's New). */
@@ -130,8 +137,11 @@ class SettingsFeature : Reducer<SettingsFeature.State, SettingsFeature.Action> {
         data class PagePushed(val page: SettingsPage) : Action
         /** Back from the top page; at the root it closes Settings (`SettingsNavigator.escape`). */
         data object BackTapped : Action
-        /** The stack was set by the system back gesture (predictive back pops one). */
-        data class PathChanged(val path: List<SettingsPage>) : Action
+        /**
+         * iOS `showSettings()`: Settings asked for while What's New is the page up cross-fades to
+         * Settings' root, keeping what was read.
+         */
+        data object ShowSettingsRoot : Action
 
         data class Settings(val action: HomeSettingsFeature.Action) : Action
         data class WhatsNew(val action: WhatsNewFeature.Action) : Action
@@ -236,7 +246,17 @@ class SettingsFeature : Reducer<SettingsFeature.State, SettingsFeature.Action> {
             if (serverChanged && next.modelVisibility != null) {
                 next = next.copy(modelVisibility = action.server?.let { ModelVisibilityFeature.State(it) })
             }
-            Reduced(next)
+            Reduced(
+                next,
+                if (serverChanged) {
+                    Effect.merge(
+                        leaveServerDetails(state.serverDetails),
+                        if (next.modelVisibility != null) Effect.send(Action.ModelVisibility(ModelVisibilityFeature.Action.Task)) else Effect.none(),
+                    )
+                } else {
+                    Effect.none()
+                },
+            )
         }
         is Action.NotificationsChanged -> Reduced(
             state.copy(
@@ -248,7 +268,9 @@ class SettingsFeature : Reducer<SettingsFeature.State, SettingsFeature.Action> {
         is Action.PagePushed -> push(state, action.page)
         Action.BackTapped ->
             if (state.path.isEmpty()) close(state) else setPath(state, state.path.dropLast(1))
-        is Action.PathChanged -> setPath(state, action.path)
+        Action.ShowSettingsRoot -> Reduced(
+            state.copy(root = State.Root.settings, path = emptyList(), whatsNew = state.whatsNew.copy(isPresented = false)),
+        )
         is Action.Settings -> when (action.action) {
             HomeSettingsFeature.Action.OnboardingPlaygroundOpened ->
                 Reduced(state.copy(onboardingPlayground = OnboardingPlaygroundFeature.State()))
@@ -258,14 +280,22 @@ class SettingsFeature : Reducer<SettingsFeature.State, SettingsFeature.Action> {
         is Action.ServerDetails, is Action.ModelVisibility, is Action.Voice -> Reduced(state)
         is Action.OnboardingPlayground -> Reduced(state)
         is Action.Delegate -> when (action.action) {
-            // Settings closing marks what was read in What's New as seen.
-            SettingsDelegate.Close -> Reduced(state, Effect.send(Action.WhatsNew(WhatsNewFeature.Action.Closed)))
             else -> Reduced(state)
         }
     }
 
     private fun close(state: State): Reduced<State, Action> =
-        Reduced(state, Effect.send(Action.Delegate(SettingsDelegate.Close)))
+        markWhatsNewRead(state, Effect.send(Action.Delegate(SettingsDelegate.Close)))
+
+    /**
+     * Settings closing marks what was read in What's New as seen (iOS `whatsNew(.closed)` on
+     * `isSettingsShown` turning off). Reduced inline, before the close delegate, because Home drops
+     * this state when it handles the delegate.
+     */
+    private fun markWhatsNewRead(state: State, then: Effect<Action>): Reduced<State, Action> {
+        val closed = WhatsNewFeature().reduce(state.whatsNew, WhatsNewFeature.Action.Closed)
+        return Reduced(state.copy(whatsNew = closed.state), Effect.merge(closed.effect.map { Action.WhatsNew(it) }, then))
+    }
 
     private fun push(state: State, page: SettingsPage): Reduced<State, Action> {
         var next = state.copy(path = state.path + page)
@@ -288,22 +318,45 @@ class SettingsFeature : Reducer<SettingsFeature.State, SettingsFeature.Action> {
     private fun setPath(state: State, path: List<SettingsPage>): Reduced<State, Action> {
         var next = state.copy(path = path)
         if (SettingsPage.ServerDetails !in path) next = next.copy(serverDetails = null)
-        if (SettingsPage.Models !in path) next = next.copy(modelVisibility = null)
+        if (path.none { it == SettingsPage.Models || it is SettingsPage.ModelProvider }) next = next.copy(modelVisibility = null)
         var effect: Effect<Action> = Effect.none()
         if (SettingsPage.CallVoicePicker in state.path && SettingsPage.CallVoicePicker !in path) {
             effect = Effect.send(Action.Voice(VoiceSettingsFeature.Action.VoicePickerDisappeared))
         }
+        if (next.serverDetails == null) effect = Effect.merge(effect, leaveServerDetails(state.serverDetails))
+        if (next.modelVisibility == null && state.modelVisibility != null) {
+            effect = Effect.merge(effect, Effect.cancel(ModelVisibilityFeature.LoadID))
+        }
         return Reduced(next, effect)
+    }
+
+    /**
+     * Server Details' state is dropped as it leaves (the plain `ifLet` cancels nothing), so run its
+     * `Disappeared` here: it cancels the read, the polling and the sign-in attempt.
+     */
+    private fun leaveServerDetails(old: ServerDetailsFeature.State?): Effect<Action> {
+        old ?: return Effect.none()
+        return ServerDetailsFeature().reduce(old, ServerDetailsFeature.Action.Disappeared).effect.map { Action.ServerDetails(it) }
     }
 
     private fun whatsNew(state: State, action: WhatsNewFeature.Action): Reduced<State, Action> = when (action) {
         is WhatsNewFeature.Action.TryTapped -> when (val destination = action.destination) {
             // A Settings page pushes over the entry's page; the rest leave through Home.
             is WhatsNewEntry.Destination.Open -> push(state, destination.page.settingsPage())
-            else -> Reduced(
-                state,
-                Effect.send(Action.Delegate(SettingsDelegate.TryWhatsNew(destination, action.entryID))),
-            )
+            // A call before Voice is set up keeps the page and pushes Voice's settings over it
+            // (iOS `HomeFeature.tryWhatsNew`).
+            WhatsNewEntry.Destination.Call ->
+                if (whatsNewVoiceAvailable(state.server)) {
+                    Reduced(state, Effect.send(Action.Delegate(SettingsDelegate.TryWhatsNew(destination, action.entryID))))
+                } else {
+                    push(state, SettingsPage.Voice)
+                }
+            // A new session needs the server: offline the page stays (iOS `canTryWhatsNew`).
+            else -> if (!state.canTryWhatsNew(destination)) {
+                Reduced(state)
+            } else {
+                Reduced(state, Effect.send(Action.Delegate(SettingsDelegate.TryWhatsNew(destination, action.entryID))))
+            }
         }
         else -> Reduced(state)
     }

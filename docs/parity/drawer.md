@@ -44,7 +44,7 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 | `OpenCode/Drawer/HomeFeature+Transcripts.swift` | 202 | | todo | |
 | `OpenCode/Drawer/HomeFeature.swift` | 1156 | | todo | |
 | `OpenCode/Drawer/HomeNotificationsFeature.swift` | 132 | | todo | |
-| `OpenCode/Drawer/HomeSettingsFeature.swift` | 211 | | todo | |
+| `OpenCode/Drawer/HomeSettingsFeature.swift` | 211 | `feature/settings/.../HomeSettingsFeature.kt` | partial | moved down to `:feature:settings` (Settings' pages write their own preferences; Home can embed it for `sidebarToggled`). Missing: voice-server actions, `livingOrbStyleChanged`, Tuning/Diagnostics hooks (wait for voice/devtools) |
 | `OpenCode/Drawer/HomeView+Drawer.swift` | 394 | | todo | |
 | `OpenCode/Drawer/HomeView.swift` | 525 | | todo | |
 | `OpenCode/Drawer/InAppNotices.swift` | 264 | | todo | `InAppNoticeMode` + its `experimental-in-app-notices` key moved down to `core/.../experiments/InAppNoticeMode.kt` (Settings › Notifications writes it); `shows(kind)` and the rest stay here |

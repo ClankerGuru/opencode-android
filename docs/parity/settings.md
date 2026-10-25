@@ -6,41 +6,43 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 
 | iOS file | Lines | Kotlin file(s) | Status | Notes |
 | --- | ---: | --- | --- | --- |
-| `OpenCode/Settings/AppearanceSettingsView.swift` | 517 | | todo | |
-| `OpenCode/Settings/ComposerSettingsView.swift` | 24 | | todo | |
-| `OpenCode/Settings/ConnectionCard.swift` | 511 | | todo | |
-| `OpenCode/Settings/ConnectionHealth.swift` | 383 | | todo | |
-| `OpenCode/Settings/ConnectionMonitor.swift` | 439 | | todo | |
-| `OpenCode/Settings/ConnectionScope.swift` | 305 | | todo | |
-| `OpenCode/Settings/ConnectionScopeShaders.metal` | 66 | | todo | |
+| `OpenCode/Settings/AppearanceSettingsView.swift` | 517 | `feature/settings/.../AppearanceSettingsView.kt` | partial: the Themes stage draws a palette-coloured user bubble, Markdown reply and code band instead of real `TranscriptMessageRow`s (`:feature:transcript` is a sibling, not below Settings); the soft edge is the smoothstep gradient without the progressive blur | Mode segmented control, Theme row + swatch, Themes list, swatch tile, live re-theme via `OpenCodeAppTheme`; haptics in `HomeSettingsFeature` |
+| `OpenCode/Settings/ComposerSettingsView.swift` | 24 | `feature/settings/.../ComposerSettingsView.kt` | done | + `DefaultAgentSection` from `Composer/AgentPicker.swift` (keys `default-agent`, `primary-agents.json` moved to `:core`/`:server`) |
+| `OpenCode/Settings/ConnectionCard.swift` | 511 | `feature/settings/.../connection/ConnectionCard.kt` | done | card, `ConnectionStatusPresentation`, status label, Retry reservation, `ServerPage`; `credentialsRejectedStatus = 401`; one monitor per Settings store shared by card and page |
+| `OpenCode/Settings/ConnectionHealth.swift` | 383 | `feature/settings/.../connection/ConnectionHealth.kt` | done | incl. `BeatShape`, `ConnectionTrace`, `ServerCardName` |
+| `OpenCode/Settings/ConnectionMonitor.swift` | 439 | `feature/settings/.../connection/ConnectionMonitor.kt` | done | single-shot `GET /api/info` probe (4 s, retry `.once`, `ServerContact` noted), machine names under `connection-card-machine-names`. `ConnectionLabScenario` n/a: no lab launch arguments on Android; fixture servers drive the states |
+| `OpenCode/Settings/ConnectionScope.swift` | 305 | `feature/settings/.../connection/ConnectionScope.kt` | done | Canvas + AGSL at 30 fps, paused when not resumed; reduce motion draws a still trace |
+| `OpenCode/Settings/ConnectionScopeShaders.metal` | 66 | `feature/settings/.../connection/ConnectionScopeShaders.kt` | done | AGSL `RuntimeShader` |
 | `OpenCode/Settings/ExperimentalFeatures.swift` | 333 | `core/.../sharing/ExperimentalFeature.kt` (enum, `experimental(f)`, `ExperimentalFeatures`; same file as the voice area's), `core/.../experiments/ExperimentalFeatures.kt` (group, `key`, `ExperimentalGroup`, `ExperimentalCallStyle`, `ModelPickerStyle`) | done | moved down to `:core` (every feature reads it). `OPENCODE_LAB_EXPERIMENTS` lab overrides n/a (no launch environment on Android) |
-| `OpenCode/Settings/ExperimentalSettingsView.swift` | 211 | | todo | |
-| `OpenCode/Settings/ModelVisibilitySettings.swift` | 273 | | todo | |
-| `OpenCode/Settings/NotificationSettingsView.swift` | 107 | | todo | |
-| `OpenCode/Settings/Onboarding/OnboardingCamera.swift` | 140 | | todo | |
-| `OpenCode/Settings/Onboarding/OnboardingPlaygroundControls.swift` | 119 | | todo | |
-| `OpenCode/Settings/Onboarding/OnboardingPlaygroundFeature.swift` | 372 | | todo | |
-| `OpenCode/Settings/Onboarding/OnboardingPlaygroundView.swift` | 601 | | todo | |
-| `OpenCode/Settings/Onboarding/SignalField.swift` | 357 | | todo | |
-| `OpenCode/Settings/Onboarding/SignalFieldShaders.metal` | 101 | | todo | |
-| `OpenCode/Settings/PairingScanner.swift` | 259 | | todo | |
-| `OpenCode/Settings/ServerBrand.swift` | 218 | | todo | |
-| `OpenCode/Settings/ServerConnectView.swift` | 204 | | todo | |
-| `OpenCode/Settings/ServerDetails.swift` | 303 | | todo | |
-| `OpenCode/Settings/ServerDetailsTrays.swift` | 322 | | todo | |
-| `OpenCode/Settings/ServerDetailsView.swift` | 368 | | todo | |
-| `OpenCode/Settings/ServerPulseScope.swift` | 167 | | todo | |
-| `OpenCode/Settings/ServerQuietStyle.swift` | 272 | | todo | |
-| `OpenCode/Settings/ServerTitleFeature.swift` | 257 | | todo | |
-| `OpenCode/Settings/ServerTitleView.swift` | 323 | | todo | |
-| `OpenCode/Settings/SettingsPresentation.swift` | 333 | | todo | |
-| `OpenCode/Settings/SettingsRows.swift` | 141 | | todo | |
-| `OpenCode/Settings/SettingsServers.swift` | 137 | | todo | |
-| `OpenCode/Settings/SettingsView.swift` | 1153 | | todo | |
-| `OpenCode/Settings/VoiceKeySource.swift` | 53 | | todo | |
-| `OpenCode/Settings/VoiceServerPicker.swift` | 109 | | todo | |
-| `OpenCode/Settings/WhatsNew/WhatsNewActions.swift` | 84 | | todo | |
-| `OpenCode/Settings/WhatsNew/WhatsNewEntries.swift` | 150 | | todo | |
-| `OpenCode/Settings/WhatsNew/WhatsNewFeature.swift` | 166 | | todo | |
-| `OpenCode/Settings/WhatsNew/WhatsNewList.swift` | 131 | | todo | |
-| `OpenCode/Settings/WhatsNew/WhatsNewView.swift` | 553 | | todo | |
+| `OpenCode/Settings/ExperimentalSettingsView.swift` | 211 | `feature/settings/.../ExperimentalSettingsView.kt` | partial: Living Orb's Orb Style menu waits for `:feature:voice`'s `LivingOrbStyle` | groups with on-counts, Model Picker and Call Style menus, focus scroll + 1.2 s tint; also hosts the Developer page (Settings parts of iOS `DiagnosticsView`) and `PlaygroundsSettingsView` |
+| `OpenCode/Settings/ModelVisibilitySettings.swift` | 273 | `feature/settings/.../ModelVisibilitySettings.kt` | partial: provider search is a word match (iOS ranks with the composer's `ModelSearch`, not reachable from Settings); rows show a generic `cpu` glyph instead of `ProviderIcon` (Session area) | `ModelVisibility` type in `:server` |
+| `OpenCode/Settings/NotificationSettingsView.swift` | 107 | `feature/settings/.../NotificationSettingsView.kt` | done | permission comes from Home (`NotificationsChanged`); enabling/opening settings is `SettingsDelegate.EnableNotificationsTapped`; notify-plugin section hidden as on iOS (`showsNotifyPlugin = false`) |
+| `OpenCode/Settings/Onboarding/OnboardingCamera.swift` | 140 | `feature/settings/.../onboarding/OnboardingCamera.kt` | done | live camera via `servers/QRCameraPreview` (`once = false`) |
+| `OpenCode/Settings/Onboarding/OnboardingPlaygroundControls.swift` | 119 | `feature/settings/.../onboarding/OnboardingPlaygroundControls.kt` | done |  |
+| `OpenCode/Settings/Onboarding/OnboardingPlaygroundFeature.swift` | 372 | `feature/settings/.../onboarding/OnboardingPlaygroundFeature.kt` | done | + `OnboardingCameraClient` |
+| `OpenCode/Settings/Onboarding/OnboardingPlaygroundView.swift` | 601 | `feature/settings/.../onboarding/OnboardingPlaygroundView.kt` | done | “OpenCode on iPhone” → “OpenCode on Android” |
+| `OpenCode/Settings/Onboarding/SignalField.swift` | 357 | `feature/settings/.../onboarding/SignalField.kt` | done | Tunables baked to iOS defaults; no slow-motion time scale |
+| `OpenCode/Settings/Onboarding/SignalFieldShaders.metal` | 101 | `feature/settings/.../onboarding/SignalFieldShaders.kt` | done | AGSL `RuntimeShader` |
+| `OpenCode/Settings/PairingScanner.swift` | 259 | `feature/settings/.../servers/PairingScanner.kt`, `servers/QRCameraPreview.kt`, `servers/ServerCameraClient.kt` | done | CameraX + ZXing; no camera → paste; denied → Open Settings + paste; raw text handed to `:app` (`OpenCodePairingLink.decode`) |
+| `OpenCode/Settings/ServerBrand.swift` | 218 | `feature/settings/.../serverdetails/ServerBrand.kt` | partial: no `mcp-*`/`provider-*` drawables yet, so every service draws its monogram tile | brand table, colours, monogram hash and status ring ported |
+| `OpenCode/Settings/ServerConnectView.swift` | 204 | `feature/settings/.../servers/ServerConnectView.kt` | done |  |
+| `OpenCode/Settings/ServerDetails.swift` | 303 | `feature/settings/.../serverdetails/ServerDetails.kt` | done | + `OpenURLClient` (opens sign-in pages in the browser); `Disappeared` cancels read, polling and sign-in when the page leaves |
+| `OpenCode/Settings/ServerDetailsTrays.swift` | 322 | `feature/settings/.../serverdetails/ServerDetailsTrays.kt` | done | “in Safari” → “in your browser” |
+| `OpenCode/Settings/ServerDetailsView.swift` | 368 | `feature/settings/.../serverdetails/ServerDetailsView.kt` | done | sheets are Material bottom sheets (no zoom-out-of-tile transition) |
+| `OpenCode/Settings/ServerPulseScope.swift` | 167 | `feature/settings/.../servers/ServerPulseScope.kt` | done |  |
+| `OpenCode/Settings/ServerQuietStyle.swift` | 272 | `feature/settings/.../servers/ServerQuietStyle.kt` | done | `ServerWireframeMark` n/a (unused on iOS) |
+| `OpenCode/Settings/ServerTitleFeature.swift` | 257 | `feature/settings/.../servers/ServerTitleFeature.kt` | done | incl. `ServerCameraClient`; `:app`/drawer present `ServerTitleView` and handle its delegates |
+| `OpenCode/Settings/ServerTitleView.swift` | 323 | `feature/settings/.../servers/ServerTitleView.kt` | done |  |
+| `OpenCode/Settings/SettingsPresentation.swift` | 333 | `feature/settings/.../SettingsPresentation.kt` | done | overlay push with 30 % parallax, 12 % dim, edge shadow, touch shield; predictive back at the root follows the finger; reduce motion cross-fades. `SettingsNavigator` → `SettingsFeature.path` + `NavDisplay`. Drawer wraps Home with it |
+| `OpenCode/Settings/SettingsRows.swift` | 141 | `feature/settings/.../SettingsRows.kt` | done | + inset-grouped section chrome (`settingsSection`, toggles, buttons, value rows) |
+| `OpenCode/Settings/SettingsServers.swift` | 137 | `feature/settings/.../connection/SettingsServers.kt` | done | local `switchableServers` (drawer is above Settings); long press opens the row menu |
+| `OpenCode/Settings/SettingsView.swift` | 1153 | `feature/settings/.../SettingsView.kt`, `SettingsFeature.kt`, `AppVersion.kt`, `ExperimentalSettingsView.kt` (`PlaygroundsSettingsView`) | partial: `VoiceSettingsFeature`/Voice page/`CallVoicePicker` wait for `:feature:voice` (VoiceRoute, ServerVoiceClient, RealtimePreflightClient, DotScopeView, VoiceCallLogList); stubs in place | root page, stack, delegates to Home; `SettingsNavigator` → `SettingsFeature.path` |
+| `OpenCode/Settings/VoiceKeySource.swift` | 53 |  | todo | waits for `:feature:voice`'s `VoiceRoute.keySource` (likely lives in voice since `VoiceRoute` needs it) |
+| `OpenCode/Settings/VoiceServerPicker.swift` | 109 |  | todo | waits for `:feature:voice` (`VoiceServerChoice`, `VoiceBroker`, `ServerVoiceModels`) |
+| `OpenCode/Settings/WhatsNew/WhatsNewActions.swift` | 84 | `feature/settings/.../whatsnew/WhatsNewActions.kt` | done | voice availability ignores the Voice Server choice until `:feature:voice` ports `VoiceServerChoice` |
+| `OpenCode/Settings/WhatsNew/WhatsNewEntries.swift` | 150 | `feature/settings/.../whatsnew/WhatsNewEntries.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/WhatsNewFeature.swift` | 166 | `feature/settings/.../whatsnew/WhatsNewFeature.kt` | done | `settingsPage` folds into Settings' stack; `WhatsNewAcrossHomes` belongs to `:app`/drawer (not yet wired); lab launch state n/a |
+| `OpenCode/Settings/WhatsNew/WhatsNewList.swift` | 131 | `feature/settings/.../whatsnew/WhatsNewList.kt` | done | all 119 entries verbatim (some name iOS-only features: ipad-multiple-windows, control-center-sessions, siri-shortcuts-spotlight, uikit-drawer-experiment, return-newline-default) |
+| `OpenCode/Settings/WhatsNew/WhatsNewView.swift` | 553 | `feature/settings/.../whatsnew/WhatsNewView.kt` | done | the entry page's inline title switches instead of fading; button hint is TalkBack's click label |
+
+Also here: `HomeSettingsFeature.kt` (iOS `Drawer/HomeSettingsFeature.swift`, moved down; see drawer.md). Settings-owned Android extras: `SettingsPresentation.kt` is the overlay Home wraps itself in.

@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings
 
+import ai.opencode.core.experiments.key
 import ai.opencode.core.experiments.ExperimentalFeature
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
@@ -18,6 +19,7 @@ import ai.opencode.feature.settings.onboarding.OnboardingPlaygroundView
 import ai.opencode.feature.settings.serverdetails.ServerDetailsPage
 import ai.opencode.feature.settings.whatsnew.WhatsNewDetailPage
 import ai.opencode.feature.settings.whatsnew.WhatsNewListPage
+import ai.opencode.feature.settings.whatsnew.WhatsNewSmallerListPage
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -100,14 +102,16 @@ private fun SettingsPageContent(store: SettingsStore, page: SettingsPage) {
         SettingsPage.Themes -> ThemesSettingsView(store)
         SettingsPage.Composer -> ComposerSettingsView(store)
         SettingsPage.Models -> ModelVisibilitySettingsView(store)
+        is SettingsPage.ModelProvider -> ModelVisibilityProviderView(store, page.providerID)
         SettingsPage.Voice -> VoiceSettingsView(store)
         SettingsPage.CallVoicePicker -> CallVoicePickerView(store)
         SettingsPage.CallHistory -> CallHistoryView(store)
         SettingsPage.Notifications -> NotificationSettingsView(store)
         SettingsPage.WhatsNew -> WhatsNewListPage(store)
         is SettingsPage.WhatsNewDetail -> WhatsNewDetailPage(store, page.entryID)
+        SettingsPage.WhatsNewSmallerChanges -> WhatsNewSmallerListPage(store)
         SettingsPage.ServerDetails -> ServerDetailsPage(store)
-        is SettingsPage.Advanced -> ExperimentalSettingsView(store, focus = page.focus?.let(ExperimentalFeature::fromRaw))
+        is SettingsPage.Advanced -> ExperimentalSettingsView(store, focus = page.focus?.let(ExperimentalFeature::fromRawValue))
         SettingsPage.Developer -> DeveloperSettingsView(store)
         SettingsPage.Playgrounds -> PlaygroundsSettingsView(store)
     }
@@ -223,7 +227,7 @@ private fun SettingsRootPage(store: SettingsStore) {
         }
         if (ExperimentalFeature.serverDetails.isActive(serverDetails)) {
             settingsSection(key = "server-details") {
-                SettingsRow("Server Details", "server.rack", SettingsTint.Blue) { push(SettingsPage.ServerDetails) }
+                SettingsRow("Server Details", "server.rack", SettingsTint.Teal) { push(SettingsPage.ServerDetails) }
             }
         }
         settingsSection(
