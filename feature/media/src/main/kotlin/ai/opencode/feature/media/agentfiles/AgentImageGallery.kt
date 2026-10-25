@@ -43,6 +43,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -408,7 +409,7 @@ fun AgentImageGallery(
                                 // Its outer corners are a card's; inside, tiles meet at small ones.
                                 modifier = Modifier
                                     .clip(shape)
-                                    .border(0.5.dp, OpenCodeTheme.colors.border.copy(alpha = 0.6f), shape)
+                                    .border(0.5.dp, imageOutline(), shape)
                                     .testTag("agent-image-gallery"),
                             ) {
                                 for ((n, pair) in run.withIndex()) {
@@ -592,7 +593,7 @@ private fun AgentImageTile(
             // Behind transparent images, and while it reads.
             .background(OpenCodeTheme.colors.userBubble)
             // Keeps a white image's edge visible on a white transcript.
-            .border(0.5.dp, OpenCodeTheme.colors.border.copy(alpha = 0.6f), shape)
+            .border(0.5.dp, imageOutline(), shape)
             .clearAndSetSemantics {},
         contentAlignment = Alignment.Center,
     ) {
@@ -742,3 +743,12 @@ fun AgentImageStatusCard(file: AgentFileReference, status: AgentImageStatusCard.
         Spacer(Modifier.size(0.dp))
     }
 }
+
+/**
+ * iOS `Color(.separator).opacity(0.6)`: UIKit's own separator whatever the app theme, so a
+ * palette's opaque border doesn't make the outline heavier than iOS draws it.
+ */
+@Composable
+private fun imageOutline(): Color =
+    (if (OpenCodeTheme.colors.isDark) Color(0.3294f, 0.3294f, 0.3451f, 0.6f) else Color(0.2353f, 0.2353f, 0.2627f, 0.29f))
+        .let { it.copy(alpha = it.alpha * 0.6f) }

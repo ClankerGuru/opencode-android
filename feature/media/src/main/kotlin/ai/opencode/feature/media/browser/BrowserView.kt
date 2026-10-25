@@ -345,7 +345,7 @@ private fun Address(browser: BrowserFeature.State, modifier: Modifier) {
                 contentDescription = browser.displayTitle
                 stateDescription = browser.url ?: ""
                 role = Role.Button
-                onClick(label = "Scrolls to the top of the page") {
+                onClick(label = "Scroll to the top of the page") {
                     browser.pageID?.let { BrowserWebViews.shared.scrollToTop(it) }
                     true
                 }
@@ -458,12 +458,12 @@ private fun ReplyCapsule(
         shadowElevation = 2.dp,
         modifier = Modifier
             .heightIn(min = BrowserMetrics.controlSize)
-            .then(if (goesBack) Modifier.clickable(role = Role.Button, onClickLabel = "Goes back to the session", onClick = close) else Modifier)
+            .then(if (goesBack) Modifier.clickable(role = Role.Button, onClickLabel = "Go back to the session", onClick = close) else Modifier)
             .clearAndSetSemantics {
                 contentDescription = if (peek.text != null) "Reply ready" else if (needsInput) "Needs your input" else "Working"
                 if (goesBack) {
                     role = Role.Button
-                    onClick(label = "Goes back to the session") { close(); true }
+                    onClick(label = "Go back to the session") { close(); true }
                 }
             }
             .testTag("browser-reply"),
