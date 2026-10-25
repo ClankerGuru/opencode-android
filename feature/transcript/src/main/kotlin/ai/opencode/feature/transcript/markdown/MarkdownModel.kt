@@ -20,6 +20,18 @@ data class InlineText(val runs: List<InlineRun>) {
     companion object {
         val empty = InlineText(emptyList())
         fun plain(text: String): InlineText = if (text.isEmpty()) empty else InlineText(listOf(InlineRun(text)))
+
+        /** Runs with empty ones dropped and adjacent equal-attribute runs merged (as `AttributedString` coalesces them). */
+        fun coalesced(runs: List<InlineRun>): InlineText {
+            val out = ArrayList<InlineRun>(runs.size)
+            for (run in runs) {
+                if (run.text.isEmpty()) continue
+                val last = out.lastOrNull()
+                if (last != null && last.sameAttributes(run)) out[out.size - 1] = last.copy(text = last.text + run.text)
+                else out.add(run)
+            }
+            return if (out.isEmpty()) empty else InlineText(out)
+        }
     }
 }
 
@@ -29,6 +41,8 @@ data class InlineText(val runs: List<InlineRun>) {
  * `opencode-file://`, `opencode-session://`); [languageIdentifier] marks lifted math
  * (`MathSyntax.Delimiter.languageIdentifier`, `x-math-…`); [secondary] is iOS's
  * `foregroundColor = .secondary` (inline code that is not a file link, and math source).
+ * [sessionChip] is iOS's `SessionChipKey`, set only by `SessionLinkText.present` on the padding
+ * and label of a session link drawn as a chip.
  */
 @Immutable
 data class InlineRun(
@@ -40,7 +54,22 @@ data class InlineRun(
     val link: String? = null,
     val languageIdentifier: String? = null,
     val secondary: Boolean = false,
-)
+    val sessionChip: SessionChip? = null,
+) {
+    /** Same attributes (everything but the text): adjacent runs that are can merge. */
+    fun sameAttributes(other: InlineRun): Boolean =
+        emphasized == other.emphasized && strong == other.strong && code == other.code &&
+            strikethrough == other.strikethrough && link == other.link &&
+            languageIdentifier == other.languageIdentifier && secondary == other.secondary &&
+            sessionChip == other.sessionChip
+}
+
+/**
+ * iOS `SessionChip` (`SessionChipKey`'s value): one session link drawn as a chip. [muted] while
+ * nothing named it yet (the short ID in code); [isSubagent] picks the subagent glyph.
+ */
+@Immutable
+data class SessionChip(val id: String, val muted: Boolean, val isSubagent: Boolean)
 
 /** A token the syntax highlighter coloured: `[start, end)` in UTF-16 chars of the source. */
 @Immutable
