@@ -8,6 +8,7 @@ import ai.opencode.feature.drawer.HomeFeature.Action
 import ai.opencode.feature.drawer.HomeFeature.State
 import ai.opencode.feature.drawer.bridge.SessionDelegate
 import ai.opencode.feature.drawer.bridge.SessionDetail
+import ai.opencode.feature.drawer.bridge.SessionDraftState
 import ai.opencode.feature.drawer.bridge.SessionScreenEvent
 import ai.opencode.feature.drawer.bridge.SessionScreenMessage
 import ai.opencode.server.OpenCodeLiveContentEvent
@@ -122,7 +123,8 @@ internal fun HomeFeature.reduceSessionDetail(state: State, event: SessionScreenE
                 .updatingDetail { if (it.isDraft) it.copy(session = session, familyRootID = session.parentID ?: session.id, familySessions = listOf(session)) else it }
                 .updatingSessionReadDates { it + (state.sessionKey(session.id) to session.updatedAt) }
                 .updatingLastViewedSessionIDs { it + (state.server.persistenceID to session.id) }
-            return Reduced(s.persistingSnapshot(dependency(HomeSnapshotDate).now()))
+            // `core` persists the snapshot after this action.
+            return Reduced(s)
         }
 
         is SessionScreenEvent.Delegate -> return reduceSessionDelegate(state, event.delegate)
@@ -173,8 +175,7 @@ private fun HomeFeature.reduceSessionDelegate(state: State, delegate: SessionDel
         else Reduced(state.leavingCatchUp().openingDraft(delegate.directory, reason = "the voice agent opened a draft"))
     is SessionDelegate.ToggleMute -> Reduced(state, Effect.send(Action.ToggleMute(delegate.sessionID)))
     is SessionDelegate.KeepDraft -> {
-        val existing = state.sharedDrafts[delegate.target]
-        val merged = if (existing == null || existing.isEmpty) delegate.draft else existing.copy(text = existing.text + "\n" + delegate.draft.text)
+        val merged = (state.sharedDrafts[delegate.target] ?: SessionDraftState()).appending(delegate.draft)
         Reduced(state.copy(sharedDrafts = state.sharedDrafts + (delegate.target to merged)))
     }
     is SessionDelegate.ToggleRead -> {

@@ -55,6 +55,11 @@ data class SessionDetail(
     val isExternallyActive: Boolean = isRunning,
     val isVisible: Boolean = false,
     val isSceneActive: Boolean = true,
+    /**
+     * iOS `presentsOverSession`: the screen shows a sheet, alert or other presentation over the
+     * session. TODO(merge): use `SessionFeature.State.presentsOverSession`.
+     */
+    val presentsOverSession: Boolean = false,
     val isCovered: Boolean = false,
     /** Catch Up's cards don't read on view: the reader's swipe does. */
     val readsOnView: Boolean = true,
@@ -159,6 +164,18 @@ data class SessionDetail(
 /** TODO(merge): replace with `SessionFeature.State.DraftState` (the composer's text, attachments …). */
 data class SessionDraftState(val text: String = "") {
     val isEmpty: Boolean get() = text.isEmpty()
+
+    /** iOS `SharedComposerDraft.append(_:)`: shares for one composer join into one message. */
+    fun appending(other: SessionDraftState): SessionDraftState = SessionDraftState(joined(text, other.text))
+
+    companion object {
+        /** iOS `SharedComposerDraft.joined(_:_:)`: shared text follows what's there after a blank line. */
+        fun joined(first: String, second: String): String = when {
+            first.isEmpty() -> second
+            second.isEmpty() -> first
+            else -> first + "\n\n" + second
+        }
+    }
 }
 
 /**

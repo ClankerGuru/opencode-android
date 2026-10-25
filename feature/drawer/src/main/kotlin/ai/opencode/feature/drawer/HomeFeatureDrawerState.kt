@@ -1,5 +1,6 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.core.sharing.SharedKey
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
 import ai.opencode.feature.drawer.bridge.DrawerBadge
@@ -23,60 +24,49 @@ import java.time.Instant
 
 // region Shared-key write-through
 
-/** `$pinnedSessionKeys.withLock { … }`. */
-internal fun HomeFeature.State.updatingPinnedSessionKeys(transform: (List<String>) -> List<String>): HomeFeature.State {
-    val next = transform(pinnedSessionKeys)
-    if (next == pinnedSessionKeys) return this
-    shared(SharedKeys.pinnedSessionKeys).set(next)
-    return copy(pinnedSessionKeys = next)
+/**
+ * `$key.withLock { … }`: transforms the live shared value (another store may have written it since
+ * this state's mirror was read), then mirrors the result into [HomeFeature.State].
+ */
+private fun <T> HomeFeature.State.writingThrough(
+    key: SharedKey<T>,
+    mirror: T,
+    transform: (T) -> T,
+    mirroring: HomeFeature.State.(T) -> HomeFeature.State,
+): HomeFeature.State {
+    val reference = shared(key)
+    reference.update(transform)
+    val live = reference.value
+    return if (live == mirror) this else mirroring(live)
 }
+
+/** `$pinnedSessionKeys.withLock { … }`. */
+internal fun HomeFeature.State.updatingPinnedSessionKeys(transform: (List<String>) -> List<String>): HomeFeature.State =
+    writingThrough(SharedKeys.pinnedSessionKeys, pinnedSessionKeys, transform) { copy(pinnedSessionKeys = it) }
 
 /** `$lastViewedSessionIDs.withLock { … }`. */
-internal fun HomeFeature.State.updatingLastViewedSessionIDs(transform: (Map<String, String>) -> Map<String, String>): HomeFeature.State {
-    val next = transform(lastViewedSessionIDs)
-    if (next == lastViewedSessionIDs) return this
-    shared(SharedKeys.lastViewedSessionIDs).set(next)
-    return copy(lastViewedSessionIDs = next)
-}
+internal fun HomeFeature.State.updatingLastViewedSessionIDs(transform: (Map<String, String>) -> Map<String, String>): HomeFeature.State =
+    writingThrough(SharedKeys.lastViewedSessionIDs, lastViewedSessionIDs, transform) { copy(lastViewedSessionIDs = it) }
 
 /** `$sessionReadDates.withLock { … }`. */
-internal fun HomeFeature.State.updatingSessionReadDates(transform: (Map<String, Instant>) -> Map<String, Instant>): HomeFeature.State {
-    val next = transform(sessionReadDates)
-    if (next == sessionReadDates) return this
-    shared(SharedKeys.sessionReadDates).set(next)
-    return copy(sessionReadDates = next)
-}
+internal fun HomeFeature.State.updatingSessionReadDates(transform: (Map<String, Instant>) -> Map<String, Instant>): HomeFeature.State =
+    writingThrough(SharedKeys.sessionReadDates, sessionReadDates, transform) { copy(sessionReadDates = it) }
 
 /** `$manuallyUnreadSessionKeys.withLock { … }`. */
-internal fun HomeFeature.State.updatingManuallyUnreadSessionKeys(transform: (Set<String>) -> Set<String>): HomeFeature.State {
-    val next = transform(manuallyUnreadSessionKeys)
-    if (next == manuallyUnreadSessionKeys) return this
-    shared(SharedKeys.manuallyUnreadSessionKeys).set(next)
-    return copy(manuallyUnreadSessionKeys = next)
-}
+internal fun HomeFeature.State.updatingManuallyUnreadSessionKeys(transform: (Set<String>) -> Set<String>): HomeFeature.State =
+    writingThrough(SharedKeys.manuallyUnreadSessionKeys, manuallyUnreadSessionKeys, transform) { copy(manuallyUnreadSessionKeys = it) }
 
 /** `$mutedSessionKeys.withLock { … }`. */
-internal fun HomeFeature.State.updatingMutedSessionKeys(transform: (Set<String>) -> Set<String>): HomeFeature.State {
-    val next = transform(mutedSessionKeys)
-    if (next == mutedSessionKeys) return this
-    shared(SharedKeys.mutedSessionKeys).set(next)
-    return copy(mutedSessionKeys = next)
-}
+internal fun HomeFeature.State.updatingMutedSessionKeys(transform: (Set<String>) -> Set<String>): HomeFeature.State =
+    writingThrough(SharedKeys.mutedSessionKeys, mutedSessionKeys, transform) { copy(mutedSessionKeys = it) }
 
 /** `$initializedInboxServerIDs.withLock { … }`. */
-internal fun HomeFeature.State.updatingInitializedInboxServerIDs(transform: (Set<String>) -> Set<String>): HomeFeature.State {
-    val next = transform(initializedInboxServerIDs)
-    if (next == initializedInboxServerIDs) return this
-    shared(SharedKeys.initializedInboxServerIDs).set(next)
-    return copy(initializedInboxServerIDs = next)
-}
+internal fun HomeFeature.State.updatingInitializedInboxServerIDs(transform: (Set<String>) -> Set<String>): HomeFeature.State =
+    writingThrough(SharedKeys.initializedInboxServerIDs, initializedInboxServerIDs, transform) { copy(initializedInboxServerIDs = it) }
 
 /** `$isSidebarShown.withLock { … }`. */
-internal fun HomeFeature.State.settingSidebarShown(shown: Boolean): HomeFeature.State {
-    if (shown == isSidebarShown) return this
-    shared(SharedKeys.sidebarShown).set(shown)
-    return copy(isSidebarShown = shown)
-}
+internal fun HomeFeature.State.settingSidebarShown(shown: Boolean): HomeFeature.State =
+    writingThrough(SharedKeys.sidebarShown, isSidebarShown, { shown }) { copy(isSidebarShown = it) }
 
 /** Replaces one listed session in place. */
 internal inline fun HomeFeature.State.updatingSession(sessionID: String, transform: (OpenCodeSession) -> OpenCodeSession): HomeFeature.State {

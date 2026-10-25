@@ -30,8 +30,9 @@ import ai.opencode.server.OpenCodeServerEvent
  * selected transcript read, the pairing's drawer open, In-App Notices, the foreground read
  * settling, the What's New close).
  *
- * iOS's `bodyCache` and the fast path for streaming actions are build-time and type-checker
- * optimisations with no Kotlin counterpart: the body is built once per `HomeFeature` instance.
+ * Fast streaming actions ([isFastStreamAction]) skip the observer chain and run only Home's own
+ * reducer and the screens, as iOS does. iOS's `bodyCache` is a build-time optimisation with no
+ * Kotlin counterpart: the body is built once per `HomeFeature` instance.
  */
 
 private object SessionDetailSlot
@@ -39,8 +40,9 @@ private object SubagentStackSlot
 
 internal fun HomeFeature.builtBody(): Reducer<State, Action> {
     val full = fullBody()
+    val sessions = detailSessionsCore()
     return Reducer { state, action ->
-        val reduced = full.reduce(state, action)
+        val reduced = if (isFastStreamAction(state, action)) sessions.reduce(state, action) else full.reduce(state, action)
         var s = reduced.state
         // The Catch Up preview's revision bumps when its inputs change for the same session.
         val oldSlice = state.catchUpPreviewSlice
@@ -225,7 +227,10 @@ private fun HomeFeature.detailSessions(): Reducer<State, Action> =
             if (!wasInFlight || state.isInitialTranscriptInFlight) Reduced(state) else settleForegroundTranscriptLoad(state)
         }
 
-/** Whether a server event is fast streaming traffic (iOS `isFastStreamAction`), kept for parity notes. */
+/**
+ * Streaming traffic that skips the observer chain (iOS `isFastStreamAction`): it moves neither the
+ * list, Catch Up, notices nor navigation.
+ */
 internal fun isFastStreamAction(state: State, action: Action): Boolean = when (action) {
     is Action.ServerEvent -> when (val event = action.event) {
         is OpenCodeServerEvent.ContentBatch ->
@@ -234,6 +239,11 @@ internal fun isFastStreamAction(state: State, action: Action): Boolean = when (a
         else -> false
     }
     is Action.TranscriptPrefetched, is Action.CachedTranscriptRefreshed -> true
+    // iOS `.sessionDetail(.presented(.contentBatch | .familyRunStateChanged))`.
+    // TODO(merge): match the real `SessionFeature` actions once `:feature:session` ports them.
+    is Action.ScreenMessage ->
+        (action.message is SessionScreenMessage.ContentBatch || action.message is SessionScreenMessage.FamilyRunStateChanged) &&
+            state.sessionDetail?.navigationID == action.navigationID
     else -> false
 }
 

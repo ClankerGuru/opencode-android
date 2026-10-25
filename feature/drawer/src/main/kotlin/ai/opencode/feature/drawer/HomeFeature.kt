@@ -2,6 +2,7 @@ package ai.opencode.feature.drawer
 
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.DependencyKey
+import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.PresentationAction
@@ -384,6 +385,7 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         val opensDrawerForPairing: Boolean
             get() = drawerOpenRequest == detailGeneration &&
                 sessionDetail?.isDraft != false &&
+                sessionDetail?.presentsOverSession != true &&
                 !presentsOverHome
 
         /**
@@ -446,9 +448,9 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
                 return projects.sortedByDescending { lastUsed[it.id] ?: Instant.MIN }
             }
 
-        /** The model a new session inherits: the newest listed session's (iOS `lastUsedModel`). */
+        /** The model a new session inherits: the newest session's (iOS `lastUsedModel`). */
         val lastUsedModel: OpenCodeModelRef?
-            get() = sessions.filter { it.model != null }.maxByOrNull { it.updatedAt }?.model
+            get() = sessions.firstOrNull { it.model != null }?.model
 
         companion object {
             /**
@@ -781,8 +783,9 @@ fun HomeFeature.State.absorbingSharedDrafts(): HomeFeature.State {
     return s.copy(sharedDrafts = s.sharedDrafts - key).updatingDetail { it.copy(draft = it.draft.absorbing(shared)) }
 }
 
+/** iOS `absorb(_:)`: shared text follows whatever is already typed. */
 private fun SessionDraftState.absorbing(shared: SessionDraftState): SessionDraftState =
-    if (text.isEmpty()) shared else if (shared.text.isEmpty()) this else SessionDraftState("$text\n${shared.text}")
+    SessionDraftState(SessionDraftState.joined(text, shared.text))
 
 /** Opens the remembered session for this server, else a draft (iOS `restoreInitialSession`). */
 fun HomeFeature.State.restoringInitialSession(): HomeFeature.State {
@@ -847,7 +850,7 @@ fun HomeFeature.State.openingDetail(
 
 /** iOS `makeDraft(directory:reason:)`. */
 fun HomeFeature.State.makeDraft(directory: String? = null, reason: String = "you started a new session"): Pair<HomeFeature.State, SessionDetail> {
-    val (begun, transition) = beginningDetailTransition(defaultReason = reason)
+    val (begun, transition) = beginningDetailTransition(defaultReason = reason, targetIsDraft = true)
     var s = begun
     var projects = s.projectsByRecency
     // The voice agent can ask for a draft in a particular project, or in a folder no project holds yet.
@@ -900,9 +903,12 @@ fun HomeFeature.State.notingModel(model: OpenCodeModelRef, sessionID: String, re
 
 internal data class DetailTransition(val navID: Int, val visit: Int, val reason: String, val keepsIdentity: Boolean)
 
-private fun HomeFeature.State.beginningDetailTransition(defaultReason: String): Pair<HomeFeature.State, DetailTransition> {
+private fun HomeFeature.State.beginningDetailTransition(
+    defaultReason: String,
+    targetIsDraft: Boolean = false,
+): Pair<HomeFeature.State, DetailTransition> {
     // Another session replaces the root: whatever was pushed over it goes.
-    var s = poppingSubagents(toDepth = 0).rememberingSession().syncingOutgoingDetailDraft()
+    var s = poppingSubagents(toDepth = 0).rememberingSession().syncingOutgoingDetailDraft(targetIsDraft)
     val reason = s.nextMoveReason ?: defaultReason
     // Keeping the identity keeps a live call's or recording's effects alive.
     // TODO(merge): `keepsIdentity` is true while the outgoing screen has a live call or carried dictation.
@@ -918,15 +924,22 @@ private fun HomeFeature.State.finishingDetailTransition(detail: SessionDetail): 
     // The screen swaps details in place without appearing again, so the new one inherits whether it is on screen.
     detail.copy(isVisible = sessionDetail?.isVisible ?: false)
 
-/** The outgoing screen's composer waits for its session (iOS `syncOutgoingDetailDraft`). */
-private fun HomeFeature.State.syncingOutgoingDetailDraft(): HomeFeature.State {
+/**
+ * The outgoing screen's composer waits for its session (iOS `syncOutgoingDetailDraft`). New
+ * Session over a draft starts empty: the old draft's words go.
+ */
+private fun HomeFeature.State.syncingOutgoingDetailDraft(targetIsDraft: Boolean = false): HomeFeature.State {
     val detail = sessionDetail ?: return this
     if (catchUp != null || !detail.readsOnView) return this
+    // TODO(merge): also skip while the outgoing screen carries dictation (`carriedDictation != nil`).
+    if (targetIsDraft && detail.isDraft) return parkingDraft(null, null)
     return parkingDraft(detail.sessionComposer, detail.session?.id)
 }
 
 /** A parked composer comes back with its session (iOS `restorePersistedDraft(into:)`). */
 private fun HomeFeature.State.restoringPersistedDraft(detail: SessionDetail): Pair<HomeFeature.State, SessionDetail> {
+    // Catch Up's cards keep no composer: the parked one waits for the session's own screen.
+    if (catchUp != null || !detail.readsOnView) return this to detail
     val key = detail.session?.id ?: DRAFT_KEY
     val parked = parkedDrafts[key] ?: return this to detail
     return copy(parkedDrafts = parkedDrafts - key) to detail.copy(draft = parked)
@@ -1028,8 +1041,13 @@ fun HomeFeature.State.poppingSubagents(toDepth: Int): HomeFeature.State {
     val targetDepth = maxOf(toDepth, 0)
     if (subagentStack.size <= targetDepth) return this
     var s = this
+    val now by lazy { dependency(DateClient).now() }
     val stack = s.subagentStack.mapIndexed { index, child ->
-        if (index >= targetDepth) child.copy(isVisible = false) else child
+        if (index < targetDepth) return@mapIndexed child
+        // iOS `noteLeaving()`: a screen the reader saw marks when they left it.
+        // TODO(merge): `hasRenderedFirstContentFrame` instead of `isVisible`, and the screen's own `noteLeaving`.
+        val left = if (child.isVisible && child.isSceneActive && !child.isDraft) child.copy(leftAt = now) else child
+        left.copy(isVisible = false)
     }.toMutableList()
     s = s.copy(subagentStack = stack.toList())
     while (s.subagentStack.size > targetDepth) {

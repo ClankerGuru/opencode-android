@@ -69,7 +69,7 @@ private fun HomeFeature.sharesReceived(state: State, shares: List<ReceivedShare>
         val existing = s.sharedDrafts[target] ?: SessionDraftState()
         // iOS `SharedComposerDraft.append` (text joined by a blank line; attachments, files and the
         // project follow). TODO(merge): `:feature:system`'s `SharedComposerDraft`.
-        s = s.copy(sharedDrafts = s.sharedDrafts + (target to SessionDraftState(joined(existing.text, share.text))))
+        s = s.copy(sharedDrafts = s.sharedDrafts + (target to existing.appending(SessionDraftState(share.text))))
         newestTarget = target
     }
     s = s.leavingCatchUp()
@@ -94,13 +94,6 @@ private fun HomeFeature.sharesReceived(state: State, shares: List<ReceivedShare>
 private fun State.resolvedShareTarget(share: ReceivedShare): SharedDraftTarget = when (val target = share.target) {
     is SharedDraftTarget.Session -> if (sessions.any { it.id == target.id }) target else SharedDraftTarget.NewSession
     SharedDraftTarget.NewSession -> SharedDraftTarget.NewSession
-}
-
-/** iOS `SharedComposerDraft.joined`. */
-private fun joined(first: String, second: String): String = when {
-    first.isEmpty() -> second
-    second.isEmpty() -> first
-    else -> "$first\n\n$second"
 }
 
 /**

@@ -20,7 +20,7 @@ import kotlin.time.Duration.Companion.seconds
 // Port of iOS `OpenCode/Drawer/InAppNotices.swift`, the model and rules half: the mode, the
 // notice and its timing and copy, the signal Home derives from its live state, and the clients
 // that clear delivered notifications and speak to TalkBack. The drawer button's label (the view)
-// lives in `notices/InAppNoticesView.kt`, which reads only [InAppNotice] (its [InAppNotice.title],
+// is `DrawerNoticeLabel` in `motion/DrawerButton.kt`, which reads only [InAppNotice] (its [InAppNotice.title],
 // [InAppNotice.status], [InAppNotice.needsInput], [InAppNotice.target]) and sends Home's
 // `inAppNoticeTapped`; Home's wiring (queueing, the timer, the haptic and the announcement) is in
 // `HomeFeatureNotifications.kt`.
