@@ -1,6 +1,6 @@
 package ai.opencode.feature.composer
 
-import ai.opencode.server.model.ComposerStagedFile
+import ai.opencode.core.files.ComposerStagedFile
 import ai.opencode.server.model.OpenCodeFileReference
 import java.util.UUID
 
@@ -28,7 +28,7 @@ data class ComposerFileAttachment(
     }
 
     constructor(file: ComposerStagedFile, status: Status = Status.Uploading(sent = 0)) :
-        this(id = file.id, name = file.name, mime = file.mime, size = file.size, localPath = file.path, status = status)
+        this(id = file.id, name = file.name, mime = file.mime, size = file.size, localPath = file.url.path, status = status)
 
     /** A file already on the server, as a sent message references it. */
     constructor(uploaded: OpenCodeFileReference, id: UUID = UUID.randomUUID()) :

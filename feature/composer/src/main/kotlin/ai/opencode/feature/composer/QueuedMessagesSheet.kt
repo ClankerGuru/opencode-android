@@ -1,5 +1,6 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.files.AttachmentFileType
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeIcon

@@ -1,6 +1,6 @@
 package ai.opencode.feature.composer
 
-import ai.opencode.server.model.ComposerStagedFile
+import ai.opencode.core.files.ComposerStagedFile
 import ai.opencode.server.model.OpenCodeDelivery
 import ai.opencode.server.model.OpenCodeOutgoingAttachment
 import ai.opencode.server.model.OpenCodeProject
@@ -570,7 +570,7 @@ internal class ComposerPersistenceWriter(
             name = record.name,
             mime = record.mime,
             size = record.size,
-            path = File(System.getProperty("java.io.tmpdir") ?: "/tmp", record.name).path,
+            url = File(System.getProperty("java.io.tmpdir") ?: "/tmp", record.name),
         ),
         status = ComposerFileAttachment.Status.Uploaded(record.uploadedPath),
     )

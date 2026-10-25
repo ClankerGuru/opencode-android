@@ -1,5 +1,6 @@
 package ai.opencode.feature.composer.modelpicker
 
+import ai.opencode.server.model.ModelVisibility
 import ai.opencode.server.model.ModelProviderGroup
 import ai.opencode.server.model.ModelVariant
 import ai.opencode.server.model.OpenCodeModel

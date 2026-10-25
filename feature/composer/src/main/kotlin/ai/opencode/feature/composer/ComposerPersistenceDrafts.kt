@@ -1,7 +1,7 @@
 package ai.opencode.feature.composer
 
 import ai.opencode.core.sharing.InstantSerializer
-import ai.opencode.server.model.ComposerStagedFile
+import ai.opencode.core.files.ComposerStagedFile
 import ai.opencode.server.model.OpenCodeOutgoingAttachment
 import ai.opencode.server.model.OpenCodeProject
 import ai.opencode.server.model.OpenCodeSession

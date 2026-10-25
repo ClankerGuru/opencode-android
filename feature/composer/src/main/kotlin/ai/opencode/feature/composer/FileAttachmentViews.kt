@@ -1,5 +1,6 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.files.AttachmentFileType
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeIconSize
 import ai.opencode.core.ui.OpenCodeTextStyles

@@ -1,8 +1,10 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.files.ComposerFileStaging
+import ai.opencode.core.files.AttachmentFileType
 import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.dependency
-import ai.opencode.server.model.ComposerStagedFile
+import ai.opencode.core.files.ComposerStagedFile
 import android.app.Activity
 import android.content.ClipData
 import android.content.Context
@@ -91,8 +93,8 @@ class ComposerFileImporter(private val scope: CoroutineScope) {
 
     private suspend fun stage(source: ComposerFileSource): ComposerStagedFile? = withContext(Dispatchers.IO) {
         when (source) {
-            is ComposerFileSource.Url -> runCatching { ComposerFileStaging.stage(source.uri) }.getOrNull()
-            is ComposerFileSource.PhotosPickerItem -> runCatching { ComposerFileStaging.stage(source.uri, id = source.id) }.getOrNull()
+            is ComposerFileSource.Url -> runCatching { ComposerUriStaging.stage(source.uri) }.getOrNull()
+            is ComposerFileSource.PhotosPickerItem -> runCatching { ComposerUriStaging.stage(source.uri, id = source.id) }.getOrNull()
         }
     }
 }
@@ -123,20 +125,11 @@ internal object ComposerContentInfo {
 }
 
 /**
- * Where picked and shared files wait while they upload (iOS `ComposerFileStaging`,
- * `System/Share/ShareHandoff.swift`). Upload streams read from these copies, so the original's
- * permission grant and lifetime don't matter once staging finishes.
- *
- * Local to the composer until it moves down to `:server` beside [ComposerStagedFile] (the
- * share sheet in `:feature:system` stages the same way); iOS's `stageBoundedRegularFile`,
- * `verifyStagedSize` and `rename` belong to the share path and move with it.
+ * Copies a content `Uri` into `:core`'s [ComposerFileStaging] folder (iOS `ComposerFileStaging.stage(_:)`
+ * reads a URL; Android pickers hand out `Uri`s). Everything else (bytes, bounded copies, verify,
+ * rename, discard) is `:core`'s `ComposerFileStaging`.
  */
-object ComposerFileStaging {
-    class FileTooLarge : Exception("The file is too large.")
-
-    /** `<cache>/ComposerFiles` (iOS `temporaryDirectory/ComposerFiles`). */
-    fun directory(context: Context = dependency(AppContext)): File = File(context.cacheDir, "ComposerFiles")
-
+object ComposerUriStaging {
     /**
      * Copies [source] into a fresh per-file directory that keeps the original name. Blocking:
      * call off the main thread.
@@ -146,7 +139,7 @@ object ComposerFileStaging {
         val fileName = AttachmentFileType.sanitizedName(
             name ?: ComposerContentInfo.displayName(context, source) ?: source.lastPathSegment ?: "file",
         )
-        val folder = File(directory(context), id.toString().uppercase(Locale.ROOT))
+        val folder = File(ComposerFileStaging.directory, id.toString().uppercase(Locale.ROOT))
         if (!folder.isDirectory && !folder.mkdirs()) throw java.io.IOException("Couldn’t create the staging folder.")
         val destination = File(folder, fileName)
         try {
@@ -157,45 +150,14 @@ object ComposerFileStaging {
             throw error
         }
         val declared = resolver.getType(source)?.takeIf { it != "application/octet-stream" }
+        val head = runCatching { destination.inputStream().use { it.readNBytes(4096) } }.getOrDefault(ByteArray(0))
         return ComposerStagedFile(
             id = id,
             name = fileName,
-            mime = AttachmentFileType.mime(destination, fileName, declared),
+            mime = AttachmentFileType.mime(fileName, declared, head),
             size = destination.length(),
-            path = destination.absolutePath,
+            url = destination,
         )
-    }
-
-    /** Writes in-memory bytes into a fresh per-file directory without decoding or reformatting them. */
-    fun stage(data: ByteArray, name: String, id: UUID = UUID.randomUUID(), maximumBytes: Long? = null, context: Context = dependency(AppContext)): ComposerStagedFile {
-        if (maximumBytes != null && data.size.toLong() > maximumBytes) throw FileTooLarge()
-        val fileName = AttachmentFileType.sanitizedName(name)
-        val folder = File(directory(context), id.toString().uppercase(Locale.ROOT))
-        if (!folder.isDirectory && !folder.mkdirs()) throw java.io.IOException("Couldn’t create the staging folder.")
-        val destination = File(folder, fileName)
-        try {
-            val temp = File(folder, ".$fileName.tmp")
-            temp.writeBytes(data)
-            if (!temp.renameTo(destination)) throw java.io.IOException("Couldn’t write the file.")
-        } catch (error: Throwable) {
-            folder.deleteRecursively()
-            throw error
-        }
-        return ComposerStagedFile(
-            id = id,
-            name = fileName,
-            mime = AttachmentFileType.mime(destination, fileName),
-            size = data.size.toLong(),
-            path = destination.absolutePath,
-        )
-    }
-
-    /** Removes a staged copy's folder, only when it is inside [directory]. */
-    fun discard(path: String, context: Context = dependency(AppContext)) {
-        val folder = File(path).parentFile ?: return
-        val root = directory(context)
-        if (folder.parentFile?.canonicalPath != root.canonicalPath) return
-        folder.deleteRecursively()
     }
 }
 

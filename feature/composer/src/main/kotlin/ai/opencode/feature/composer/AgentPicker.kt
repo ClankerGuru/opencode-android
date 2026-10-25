@@ -53,16 +53,14 @@ import androidx.compose.ui.unit.dp
 
 /** iOS `SharedKey` extensions declared in `AgentPicker.swift`. */
 object AgentPickerSharedKeys {
-    /** The agent new sessions start with (an agent ID); empty is the server's default. */
-    val defaultAgentID = SharedKey.appStorage("default-agent", "")
+    /** The agent new sessions start with (an agent ID); empty is the server's default. Declared in `:core` (Settings writes it). */
+    val defaultAgentID = ai.opencode.core.sharing.SharedKeys.defaultAgentID
 
-    /** The agent picked in each session (session ID → agent ID). */
-    val sessionAgents = SharedKey.fileStorage<Map<String, String>>(FileDirectory.Documents, "session-agents.json", emptyMap())
+    /** The agent picked in each session (session ID → agent ID). Declared in `:server`. */
+    val sessionAgents = ai.opencode.server.ServerSharedKeys.sessionAgents
 
-    /** The primary agents last listed, for Settings' Default Agent. */
-    val knownPrimaryAgents = SharedKey.fileStorage<List<OpenCodeAutocompleteAgent>>(
-        FileDirectory.Documents, "primary-agents.json", emptyList(),
-    )
+    /** The primary agents last listed, for Settings' Default Agent. Declared in `:server`. */
+    val knownPrimaryAgents = ai.opencode.server.ServerSharedKeys.knownPrimaryAgents
 }
 
 /** The description's first sentence, for a menu's subtitle (iOS `shortDescription`). */

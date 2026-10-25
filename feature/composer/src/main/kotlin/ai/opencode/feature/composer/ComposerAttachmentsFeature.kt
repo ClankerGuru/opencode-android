@@ -1,5 +1,6 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.files.ComposerFileStaging
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
@@ -10,7 +11,7 @@ import ai.opencode.core.store.cancellable
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
-import ai.opencode.server.model.ComposerStagedFile
+import ai.opencode.core.files.ComposerStagedFile
 import ai.opencode.server.model.OpenCodeDelivery
 import ai.opencode.server.model.OpenCodeOutgoingAttachment
 import ai.opencode.server.model.OpenCodeUploadEvent
@@ -156,11 +157,11 @@ class ComposerAttachmentsFeature : Reducer<ComposerAttachmentsFeature.State, Com
     companion object {
         /** Reads a staged file the model takes inline (a PDF) and discards the staged copy. */
         fun readInlineFile(file: ComposerStagedFile): Effect<Action> = Effect.run { send ->
-            val data = withContext(Dispatchers.IO) { runCatching { File(file.path).readBytes() }.getOrNull() }
+            val data = withContext(Dispatchers.IO) { runCatching { file.url.readBytes() }.getOrNull() }
             if (data != null) {
                 send(Action.AttachmentAdded(OpenCodeOutgoingAttachment(id = file.id.toString(), data = data, mime = file.mime, name = file.name)))
             }
-            withContext(Dispatchers.IO) { ComposerFileStaging.discard(file.path) }
+            withContext(Dispatchers.IO) { ComposerFileStaging.discard(file.url) }
         }
 
         fun upload(
@@ -189,7 +190,7 @@ class ComposerAttachmentsFeature : Reducer<ComposerAttachmentsFeature.State, Com
                                 is OpenCodeUploadEvent.Finished -> {
                                     finished = true
                                     // The server has its copy; drop ours even if the session changed.
-                                    withContext(Dispatchers.IO) { ComposerFileStaging.discard(file.localPath) }
+                                    withContext(Dispatchers.IO) { ComposerFileStaging.discard(java.io.File(file.localPath)) }
                                     send(Action.FileUploadFinished(id, Outcome.Success(event.path)))
                                 }
                             }
@@ -209,7 +210,7 @@ class ComposerAttachmentsFeature : Reducer<ComposerAttachmentsFeature.State, Com
 
         fun cancelUpload(id: UUID, discardPath: String): Effect<Action> = Effect.merge(
             Effect.cancel(CancelID.Upload(id)),
-            Effect.run { withContext(Dispatchers.IO) { ComposerFileStaging.discard(discardPath) } },
+            Effect.run { withContext(Dispatchers.IO) { ComposerFileStaging.discard(java.io.File(discardPath)) } },
         )
     }
 }
