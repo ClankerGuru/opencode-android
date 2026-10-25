@@ -236,7 +236,9 @@ internal suspend fun requestServerCapabilities(server: OpenCodeServer): OpenCode
             OpenCodeServerCapabilities(
                 location = mcpPayload.location?.directory,
                 mcpServers = mcpPayload.data.map { it.server() },
-                skills = skillPayload.data.sortedWith(compareBy(standardCollator()) { it.name }),
+                skills = standardCollator().let { collator ->
+                    skillPayload.data.sortedWith { a, b -> naturalCompare(a.name, b.name, collator) }
+                },
                 accounts = integrationPayload.data.flatMap { it.accounts() },
             )
         }

@@ -1,7 +1,9 @@
 package ai.opencode.server
 
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.HttpUrl
 import java.io.EOFException
@@ -191,16 +193,20 @@ data class ConnectionFailureDetail(
          */
         suspend fun resolve(host: String): List<String> {
             if (host.isEmpty()) return emptyList()
+            // The lookup blocks and can't be interrupted, so it runs detached: a late answer is
+            // dropped instead of holding the connection flow past the second (iOS finishes the
+            // continuation on a 1 s timer and lets getaddrinfo complete on its own).
+            val lookup = LOOKUP_SCOPE.async {
+                runCatching { InetAddress.getAllByName(host).mapNotNull { it.hostAddress }.toSortedSet().toList() }
+                    .getOrDefault(emptyList())
+            }
             return try {
-                withTimeoutOrNull(1.seconds) {
-                    withContext(Dispatchers.IO) {
-                        runCatching { InetAddress.getAllByName(host).mapNotNull { it.hostAddress }.toSortedSet().toList() }
-                            .getOrDefault(emptyList())
-                    }
-                } ?: emptyList()
+                withTimeoutOrNull(1.seconds) { lookup.await() } ?: emptyList()
             } catch (_: CancellationException) {
                 emptyList()
             }
         }
+
+        private val LOOKUP_SCOPE = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     }
 }

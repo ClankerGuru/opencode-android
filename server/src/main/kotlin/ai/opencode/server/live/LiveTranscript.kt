@@ -89,7 +89,8 @@ internal fun decodeTranscriptPage(data: ByteArray, capture: TranscriptContextCap
 private fun runErrorText(error: ErrorPayload): String {
     // Provider errors embed raw JSON; keep only the human-readable prefix.
     val raw = error.message ?: ""
-    val human = raw.split("{").firstOrNull()?.trim(' ', ':') ?: raw
+    // Swift's `split(separator:)` drops empty pieces: the first non-empty one.
+    val human = raw.split("{").firstOrNull { it.isNotEmpty() }?.trim(' ', ':') ?: raw
     val kind = error.type ?: "error"
     return if (human.isEmpty()) "Run failed: $kind" else "Run failed: $kind — $human"
 }

@@ -98,7 +98,8 @@ data class OpenCodeClientError(
         }
 
         private fun formatUpToOneFraction(value: Double): String {
-            val rounded = Math.round(value * 10) / 10.0
+            // Foundation's number formatting rounds half to even.
+            val rounded = Math.rint(value * 10) / 10.0
             return if (rounded == Math.rint(rounded)) rounded.toLong().toString() else rounded.toString()
         }
     }
