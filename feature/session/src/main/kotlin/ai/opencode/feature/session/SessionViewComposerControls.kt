@@ -12,9 +12,13 @@ import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.openCodeTapTarget
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.core.experiments.ModelPickerStyle
-import ai.opencode.feature.session.seams.REQUEST_DOCK_EDGE
-import ai.opencode.feature.session.seams.SELECTION_MARK_WIDTH
-import ai.opencode.feature.session.seams.SelectionMark
+import ai.opencode.feature.composer.AttachmentPickerButton
+import ai.opencode.feature.composer.RequestDockMetrics
+import ai.opencode.feature.composer.SelectionMark
+import ai.opencode.feature.composer.SelectionMarkWidth
+import ai.opencode.feature.composer.micPressGesture
+import ai.opencode.feature.composer.modelpicker.FusedModelChip
+import ai.opencode.feature.composer.modelpicker.ModelPickerChip
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -105,125 +109,67 @@ internal fun SessionComposerEnv.ComposerLeadingControls(
 }
 
 /**
- * The model control: Model Picker › Today shows the full name, › Sheet the short name and its level;
- * › Grow from Composer is VIEW-PICKERS' fused chip ([SessionComposerHost.fusedModelChip]).
+ * The model control (iOS `modelButton`): Model Picker › Today and › Sheet show composer's
+ * [ModelPickerChip]; › Grow from Composer its [FusedModelChip] (tap opens the list, a vertical
+ * drag raises the level stack, a sideways drag scrubs the level).
  */
 @Composable
 private fun SessionComposerEnv.ModelButton(enabled: Boolean) {
-    val fused = host.fusedModelChip
-    if (modelPickerStyle == ModelPickerStyle.growFromComposer && fused != null) {
-        ComposerHidden(foldsComposerControls) { fused(enabled) }
-        return
-    }
-    val usesSheet = modelPickerStyle == ModelPickerStyle.sheet
-    val value = if (usesSheet) listOfNotNull(s.modelShortName, s.chipLevelLabel).joinToString(", ") else s.modelLabel
-    val style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium)
+    val picker = rememberModelPickerState(store)
+    val anchors = host.modelPickerAnchors
     ComposerHidden(foldsComposerControls) {
-        Row(
-            Modifier
-                .heightIn(min = 48.dp)
-                .clickable(enabled = enabled, onClickLabel = null, role = Role.Button) {
+        if (modelPickerStyle == ModelPickerStyle.growFromComposer && anchors != null) {
+            FusedModelChip(
+                state = picker,
+                anchors = anchors,
+                composerTop = host.attachmentAnchors.composer.top,
+                onEvent = { store.send(modelPickerAction(it)) },
+                onOpenList = {
+                    dismissKeyboard()
+                    store.send(Action.ModelButtonTapped)
+                },
+                isEnabled = enabled,
+            )
+        } else {
+            val usesSheet = modelPickerStyle == ModelPickerStyle.sheet
+            ModelPickerChip(
+                state = picker,
+                usesModelPickerSheet = usesSheet,
+                onClick = {
+                    if (!enabled) return@ModelPickerChip
                     // Put away, or a row's level menu raises the composer's keyboard over the sheet.
                     if (usesSheet) dismissKeyboard()
                     store.send(Action.ModelButtonTapped)
-                }
-                .semantics(mergeDescendants = true) {
-                    contentDescription = "Choose model"
-                    stateDescription = value
-                    testTag = "composer-model"
                 },
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (usesSheet) {
-                Text(s.modelShortName, style = style, color = OpenCodeTheme.colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-                val level = s.chipLevelLabel
-                if (level != null) Text(level, style = style, color = OpenCodeTheme.colors.secondaryText, maxLines = 1, softWrap = false)
-            } else {
-                Text(
-                    s.modelLabel,
-                    style = style,
-                    color = OpenCodeTheme.colors.secondaryText,
-                    maxLines = 1,
-                    overflow = TextOverflow.MiddleEllipsis,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-            }
-            OpenCodeIcon(SFSymbol.ChevronDown, contentDescription = null, size = 12.dp, tint = OpenCodeTheme.colors.secondaryText)
+            )
         }
     }
 }
 
 /**
- * iOS `attachmentButton` (`AttachmentPickerButton`): + opens the attachment menu (VIEW-PICKERS,
- * [SessionComposerHost.onPlusTapped]); turned 45° it's the menu's close and, on its tinted circle,
- * the recording's × (red while sliding has armed cancel).
+ * iOS `attachmentButton`: :feature:composer's [AttachmentPickerButton]. + opens the attachment
+ * menu (a hold opens it under the finger, and sliding to a row and releasing chooses it); turned
+ * 45° it's the menu's close and, on its tinted circle, the recording's × (red while sliding has
+ * armed cancel).
  */
 @Composable
 private fun SessionComposerEnv.AttachmentButton() {
+    val press = host.attachmentPress ?: return
     val hold = s.dictationHold
     val pose = hold?.let { dictationPose(it) }
-    val isDictating = hold != null
-    val cancelArmed = pose?.cancelArmed == true
-    val isEnabled = if (isDictating) pose?.isFinishing != true else !host.isImportingAttachments
-    val showsX = host.isAttachmentMenuOpen || isDictating
-    val isLoading = host.isImportingAttachments && !isDictating
-    val spring = if (reducedMotion) Motion.easeInOut<Float>(0.15) else MotionSpring(0.22, 0.25).spec()
-    val turn by animateFloatAsState(if (showsX) 45f else 0f, if (reducedMotion) Motion.easeInOut(0.2) else Motion.morphOpen.spec(), label = "plusTurn")
-    val circle by animateFloatAsState(if (isDictating) 1f else 0f, if (reducedMotion) Motion.easeInOut(0.2) else Motion.morphOpen.spec(), label = "plusCircle")
-    val armed by animateFloatAsState(if (cancelArmed) 1f else 0f, spring, label = "plusArmed")
-    val diameter = min(34f * LocalDensity.current.fontScale * (ComposerTunables.buttonDiameter / 34f), 44f)
-    val label = when {
-        isDictating -> "Cancel dictation"
-        isLoading -> "Adding attachment"
-        host.isAttachmentMenuOpen -> "Close"
-        else -> "Add attachment"
-    }
-    val action: () -> Unit = {
-        if (isDictating) {
-            if (isEnabled) store.send(Action.micPressCancelled)
-        } else if (!host.isImportingAttachments) {
-            host.onPlusTapped?.invoke()
-        }
-    }
-    Box(
-        Modifier
-            .size(SLOT.dp)
-            .clickable(
-                enabled = isEnabled,
-                interactionSource = remember { MutableInteractionSource() },
-                indication = ripple(bounded = false, radius = 22.dp),
-                role = Role.Button,
-                onClick = action,
-            )
-            .semantics(mergeDescendants = true) {
-                contentDescription = label
-                testTag = "attachment-menu-button"
-            },
-        contentAlignment = Alignment.Center,
-    ) {
-        Box(
-            Modifier
-                .size(diameter.dp)
-                .scale(if (reducedMotion) 1f else 0.6f + 0.4f * circle + 0.1f * armed)
-                .alpha(circle)
-                .background(if (cancelArmed) OpenCodeTheme.colors.destructive else OpenCodeTheme.colors.variant.surfaceStrong.color, OpenCodeShape.circle),
-        )
-        if (isLoading) {
-            CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-        } else {
-            OpenCodeIcon(
-                SFSymbol.Plus,
-                contentDescription = null,
-                size = (ComposerTunables.plusScale + 5).dp,
-                tint = if (cancelArmed) Color.White else OpenCodeTheme.colors.text,
-                modifier = Modifier
-                    .offset(x = if (isDictating) 0.dp else ComposerTunables.plusInkOffset.dp)
-                    .rotate(turn)
-                    .scale(1f + 0.1f * armed),
-            )
-        }
-    }
+    AttachmentPickerButton(
+        isLoading = host.isImportingAttachments,
+        isOpen = host.isAttachmentMenuOpen,
+        anchors = host.attachmentAnchors,
+        press = press,
+        rows = host.attachmentMenuRows,
+        onToggle = { host.onPlusTapped?.invoke() },
+        onChoose = host.onAttachmentChoose,
+        dictation = pose?.let { AttachmentPickerButton.Dictation(isCancelArmed = it.cancelArmed, isEnabled = !it.isFinishing) },
+        onCancelDictation = { store.send(Action.micPressCancelled) },
+        // Its ink as far from the surface's leading edge as from its top; the expanded text inset starts on the same line.
+        glyphOffset = ComposerTunables.plusInkOffset,
+    )
 }
 
 /**
@@ -273,11 +219,9 @@ internal fun SessionComposerEnv.AnswerLeadingControls(bar: RequestBar, recording
                     contentAlignment = Alignment.Center,
                 ) {
                     // On the choices' marks, 20 dp in from the surface.
-                    SelectionMark(
-                        selected = bar.isCustom,
-                        multiple = bar.multiple,
-                        modifier = Modifier.offset(x = (REQUEST_DOCK_EDGE - 6 - (SLOT - SELECTION_MARK_WIDTH) / 2).dp),
-                    )
+                    Box(Modifier.offset(x = RequestDockMetrics.edge - 6.dp - (SLOT.dp - SelectionMarkWidth) / 2)) {
+                        SelectionMark(selected = bar.isCustom, multiple = bar.multiple)
+                    }
                 }
             }
         }
@@ -394,10 +338,10 @@ private fun SessionComposerEnv.HoldToDictate(label: String, content: @Composable
         onLocked = { store.send(Action.micPressLocked) },
         onInterrupted = { store.send(Action.micPressInterrupted) },
     )
-    HoldToDictateButton(
-        isEnabled = s.dictationHold?.isLocked != true,
-        callbacks = callbacks,
-        modifier = Modifier
+    Box(
+        Modifier
+            // :feature:composer's press: recording starts at the first touch; tap vs hold is decided at the lift.
+            .micPressGesture(isEnabled = s.dictationHold?.isLocked != true, callbacks = callbacks)
             .onGloballyPositioned { view.dictationMicFrame = it.boundsInRoot() }
             .openCodeTapTarget(accessibility = false)
             .semantics(mergeDescendants = true) {
@@ -414,8 +358,8 @@ private fun SessionComposerEnv.HoldToDictate(label: String, content: @Composable
                     true
                 }
             },
-        label = content,
-    )
+        contentAlignment = Alignment.Center,
+    ) { content() }
 }
 
 /**

@@ -1,55 +1,48 @@
 package ai.opencode.feature.session
 
-import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.files.AttachmentFileType
+import ai.opencode.core.files.ComposerFileStaging
+import ai.opencode.core.files.ComposerStagedFile
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.ui.OpenCodeIcon
-import ai.opencode.core.ui.OpenCodeTextStyles
-import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.openCodeTapTarget
 import ai.opencode.feature.composer.AttachmentMenuItem
 import ai.opencode.feature.composer.AttachmentPickerButton
 import ai.opencode.feature.composer.ComposerFileAttachment
+import ai.opencode.feature.composer.ComposerFileChip
+import ai.opencode.feature.composer.ComposerFileImporter
 import ai.opencode.feature.composer.ComposerFileRouting
-import ai.opencode.feature.session.seams.ComposerImageSource
-import ai.opencode.feature.session.seams.ComposerMediaLoader
-import ai.opencode.core.files.AttachmentFileType
-import ai.opencode.core.files.ComposerStagedFile
-import ai.opencode.feature.system.share.SharedImageEncoder
+import ai.opencode.feature.composer.ComposerFileSource
+import ai.opencode.feature.composer.ComposerImageImporter
+import ai.opencode.feature.composer.ComposerImageSource
+import ai.opencode.feature.composer.ComposerLocationAttachment
+import ai.opencode.feature.composer.ComposerPickers
+import ai.opencode.feature.composer.PastedTextCard
 import ai.opencode.feature.composer.SharedLocation
+import ai.opencode.feature.media.FileAttachmentCard
 import ai.opencode.server.model.OpenCodeOutgoingAttachment
 import ai.opencode.server.model.PastedText
 import android.graphics.BitmapFactory
-import androidx.compose.animation.Crossfade
+import android.net.Uri
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -57,7 +50,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -66,12 +59,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
@@ -81,30 +69,21 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.onClick
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.text.NumberFormat
-import java.util.Locale
 import java.util.UUID
 
 // Port of iOS `Session/SessionView+Attachments.swift`: the composer's pending attachments row
 // (images, pasted text, inline PDFs, uploading files, the location card), image and file imports
 // with their errors and the large-upload confirmation, dropped text, and the + menu's items. The
-// + menu's open/close/morph state is VIEW-COMPOSER's (iOS keeps it in `SessionView`'s @State);
-// the photo sheet is `SessionViewPhotoSheet.kt`.
+// imports run on :feature:composer's `ComposerImageImporter` / `ComposerFileImporter`; the cards
+// are the composer's (`PastedTextCard`, `ComposerFileChip`, `ComposerLocationAttachment`) and
+// media's `FileAttachmentCard`. The + menu's open/close/morph state lives in `SessionView`.
 
 // region Imports (iOS `startImageImport`, `startFileImport`, `importPickedFiles`, drops)
 
@@ -120,11 +99,7 @@ import java.util.UUID
 class SessionAttachmentImporter internal constructor(
     private val store: StoreOf<SessionFeature.State, SessionFeature.Action>,
     private val scope: CoroutineScope,
-    private val loader: ComposerMediaLoader,
 ) {
-    /** iOS `ComposerImageImporter.Result`. */
-    data class ImageImportResult(val addedCount: Int = 0, val sawOversizedSource: Boolean = false)
-
     /** Files over [LARGE_UPLOAD_BYTES] wait for this confirmation (iOS `SessionView.LargeUpload`). */
     data class LargeUpload(val files: List<ComposerStagedFile>, val onStaged: (() -> Unit)?) {
         val title: String get() = "Upload ${AttachmentFileType.byteCount(files.sumOf { it.size })}?"
@@ -137,6 +112,12 @@ class SessionAttachmentImporter internal constructor(
             }
     }
 
+    /** iOS `imageImporter`. */
+    val imageImporter = ComposerImageImporter(scope)
+
+    /** iOS `fileImporter`. */
+    val fileImporter = ComposerFileImporter(scope)
+
     /** “Couldn’t Add Image” alert's message (iOS `attachmentError`). */
     var attachmentError: String? by mutableStateOf(null)
 
@@ -144,15 +125,11 @@ class SessionAttachmentImporter internal constructor(
     var largeUpload: LargeUpload? by mutableStateOf(null)
         private set
 
-    private var imageJob: Job? by mutableStateOf(null)
-    private var imageCancelHandler: (() -> Unit)? = null
-    private var activeFileImports by mutableIntStateOf(0)
-
     /** iOS `imageImporter.isLoading`. */
-    val isLoadingImages: Boolean get() = imageJob != null
+    val isLoadingImages: Boolean get() = imageImporter.isLoading
 
     /** iOS `fileImporter.isLoading`. */
-    val isLoadingFiles: Boolean get() = activeFileImports > 0
+    val isLoadingFiles: Boolean get() = fileImporter.isLoading
 
     /** The composer an import started in is still the one on screen. */
     private fun sameComposer(identity: SessionFeature.State.TaskIdentity): Boolean = store.state.taskIdentity == identity
@@ -165,116 +142,59 @@ class SessionAttachmentImporter internal constructor(
     fun startImageImport(
         sources: List<ComposerImageSource>,
         onAdded: (() -> Unit)? = null,
-        onFailure: (String?) -> Unit = {},
+        onFailure: (UUID?) -> Unit = {},
         onCancel: () -> Unit = {},
-        onCompletion: (ImageImportResult) -> Unit = {},
+        onCompletion: (ComposerImageImporter.Result) -> Unit = {},
     ) {
         val identity = store.state.taskIdentity
         attachmentError = null
-        cancelImageImportJob()
-        for (dropped in sources.drop(AttachmentPickerButton.MAX_PHOTO_SELECTION)) onFailure(dropped.attachmentID)
-        val limited = sources.take(AttachmentPickerButton.MAX_PHOTO_SELECTION)
-        if (limited.isEmpty()) {
-            onCancel()
-            return
-        }
-        imageCancelHandler = onCancel
-        lateinit var job: Job
-        job = scope.launch {
-            var result = ImageImportResult()
-            for (source in limited) {
-                ensureActive()
-                val data = load(source)
-                ensureActive()
-                if (data == null) {
-                    onFailure(source.attachmentID)
-                    continue
-                }
-                if (data.size > SharedImageEncoder.MAX_SOURCE_BYTES) {
-                    result = result.copy(sawOversizedSource = true)
-                    onFailure(source.attachmentID)
-                    continue
-                }
-                val jpeg = withContext(Dispatchers.Default) { SharedImageEncoder.jpeg(data) }
-                ensureActive()
-                if (jpeg == null) {
-                    onFailure(source.attachmentID)
-                    continue
-                }
-                val attachment = OpenCodeOutgoingAttachment(
-                    id = source.attachmentID ?: UUID.randomUUID().toString(),
-                    data = jpeg,
-                    mime = SharedImageEncoder.MIME,
-                )
+        imageImporter.start(
+            sources = sources,
+            onAttachment = { attachment ->
                 if (sameComposer(identity)) store.send(SessionFeature.Action.attachmentAdded(attachment))
-                result = result.copy(addedCount = result.addedCount + 1)
-            }
-            ensureActive()
-            if (imageJob === job) {
-                imageCancelHandler = null
-                imageJob = null
-            }
-            onCompletion(result)
-            if (!sameComposer(identity)) return@launch
-            if (result.addedCount > 0) {
-                onAdded?.invoke()
-            } else {
-                attachmentError = if (result.sawOversizedSource) {
-                    "Choose an image smaller than 20 MB."
+            },
+            onFailure = onFailure,
+            onCancel = onCancel,
+            onCompletion = { result ->
+                onCompletion(result)
+                if (!sameComposer(identity)) return@start
+                if (result.addedCount > 0) {
+                    onAdded?.invoke()
                 } else {
-                    "This image couldn’t be loaded. Try another photo."
+                    attachmentError = if (result.sawOversizedSource) {
+                        "Choose an image smaller than 20 MB."
+                    } else {
+                        "This image couldn’t be loaded. Try another photo."
+                    }
                 }
-            }
-        }
-        imageJob = job
-    }
-
-    private suspend fun load(source: ComposerImageSource): ByteArray? = when (source) {
-        is ComposerImageSource.Content -> loader.loadImage(source.uri)
-        is ComposerImageSource.Data -> source.data
-        is ComposerImageSource.Loader -> source.load()
-    }
-
-    private fun cancelImageImportJob() {
-        imageJob?.cancel()
-        imageJob = null
-        val handler = imageCancelHandler
-        imageCancelHandler = null
-        handler?.invoke()
+            },
+        )
     }
 
     /** iOS `cancelImageImport`. */
     fun cancelImageImport() {
-        cancelImageImportJob()
+        imageImporter.cancel()
         attachmentError = null
     }
 
     /**
      * iOS `startFileImport`: stages each picked file (a private copy the upload streams from). A
      * file over 200 MB asks first ([largeUpload]); otherwise they go to the reducer as
-     * `filesStaged`. [ids] gives each staged file its ID (a picked video keeps its pick's).
+     * `filesStaged`. A picked video keeps its pick's ID ([ComposerFileSource.PhotosPickerItem]).
      */
     fun startFileImport(
-        uris: List<String>,
-        ids: List<UUID>? = null,
+        sources: List<ComposerFileSource>,
         onStaged: (() -> Unit)? = null,
         onFailed: (() -> Unit)? = null,
     ) {
-        if (uris.isEmpty()) return
+        if (sources.isEmpty()) return
         val identity = store.state.taskIdentity
         attachmentError = null
-        activeFileImports += 1
-        scope.launch {
-            val staged = mutableListOf<ComposerStagedFile>()
-            var failures = 0
-            uris.forEachIndexed { index, uri ->
-                val file = loader.stage(uri, ids?.getOrNull(index) ?: UUID.randomUUID())
-                if (file != null) staged += file else failures += 1
-            }
-            activeFileImports -= 1
-            if (staged.isNotEmpty()) {
+        fileImporter.start(
+            sources = sources,
+            onStaged = { staged ->
                 if (!sameComposer(identity)) {
-                    staged.forEach { loader.discard(it.url.absolutePath) }
+                    staged.forEach { ComposerFileStaging.discard(it.url) }
                 } else if (staged.any { it.size > LARGE_UPLOAD_BYTES }) {
                     // The server holds an upload in memory, so very large files ask first.
                     largeUpload = LargeUpload(staged, onStaged)
@@ -282,12 +202,13 @@ class SessionAttachmentImporter internal constructor(
                     store.send(SessionFeature.Action.filesStaged(staged))
                     onStaged?.invoke()
                 }
-            }
-            if (failures > 0 && sameComposer(identity)) {
+            },
+            onFailure = { failures ->
+                if (!sameComposer(identity)) return@start
                 onFailed?.invoke()
                 attachmentError = if (failures == 1) "This file couldn’t be added. Try another file." else "$failures files couldn’t be added."
-            }
-        }
+            },
+        )
     }
 
     /** Upload in the large-upload alert. */
@@ -301,22 +222,22 @@ class SessionAttachmentImporter internal constructor(
     /** Cancel in the large-upload alert: the staged copies go. */
     fun cancelLargeUpload() {
         val upload = largeUpload ?: return
-        upload.files.forEach { loader.discard(it.url.absolutePath) }
+        upload.files.forEach { ComposerFileStaging.discard(it.url) }
         largeUpload = null
     }
 
     /**
-     * iOS `importPickedFiles`: from Files (`OpenMultipleDocuments`), images keep the inline image
-     * path and everything else uploads. [onFocus] is `focusComposer`.
+     * iOS `importPickedFiles`: from Files, images keep the inline image path and everything else
+     * uploads. [onFocus] is `focusComposer`.
      */
-    fun importPickedFiles(uris: List<String>, onFocus: () -> Unit) {
+    fun importPickedFiles(uris: List<Uri>, onFocus: () -> Unit) {
         if (uris.isEmpty()) return
         scope.launch {
-            val described = uris.map { it to loader.describe(it) }
-            val images = described.filter { (_, info) -> ComposerFileRouting.isInlineImage(info.first, info.second) }.map { it.first }
-            val files = described.filter { (_, info) -> !ComposerFileRouting.isInlineImage(info.first, info.second) }.map { it.first }
-            if (images.isNotEmpty()) startImageImport(images.map { ComposerImageSource.Content(it) }, onAdded = onFocus)
-            if (files.isNotEmpty()) startFileImport(files, onStaged = onFocus)
+            val images = withContext(Dispatchers.IO) { uris.map { it to ComposerFileRouting.isInlineImage(it) } }
+            val inline = images.filter { it.second }.map { it.first }
+            val files = images.filterNot { it.second }.map { it.first }
+            if (inline.isNotEmpty()) startImageImport(inline.map(ComposerImageSource::ItemProvider), onAdded = onFocus)
+            if (files.isNotEmpty()) startFileImport(files.map(ComposerFileSource::Url), onStaged = onFocus)
         }
     }
 
@@ -342,23 +263,23 @@ class SessionAttachmentImporter internal constructor(
      * once — images on the inline image path, videos as uploads (when the server takes them).
      * At most [AttachmentPickerButton.MAX_PHOTO_SELECTION]. [onAdded] is `focusComposer`.
      */
-    fun importPickedMedia(uris: List<String>, onAdded: (() -> Unit)? = null) {
+    fun importPickedMedia(uris: List<Uri>, onAdded: (() -> Unit)? = null) {
         if (uris.isEmpty()) return
         scope.launch {
             val picks = uris.take(AttachmentPickerButton.MAX_PHOTO_SELECTION)
-            val kinds = picks.map { it to loader.isVideo(it) }
+            val kinds = withContext(Dispatchers.IO) { picks.map { it to ComposerPickers.isVideo(it) } }
             val videos = kinds.filter { it.second }.map { it.first }
-            val images = kinds.filter { !it.second }.map { it.first }
-            if (videos.isNotEmpty() && store.state.supportsFileUploads) startFileImport(videos, onStaged = onAdded)
+            val images = kinds.filterNot { it.second }.map { it.first }
+            val uploads = store.state.supportsFileUploads
+            if (videos.isNotEmpty() && uploads) startFileImport(videos.map { ComposerFileSource.PhotosPickerItem(it) }, onStaged = onAdded)
             // A video the server can't take as a file attaches as its first frame, as iOS's loader does.
-            val imageSources = images + if (store.state.supportsFileUploads) emptyList() else videos
-            if (imageSources.isNotEmpty()) startImageImport(imageSources.map { ComposerImageSource.Content(it) }, onAdded = onAdded)
+            val imageSources = images + if (uploads) emptyList() else videos
+            if (imageSources.isNotEmpty()) startImageImport(imageSources.map { ComposerImageSource.PhotosPickerItem(it) }, onAdded = onAdded)
         }
     }
 
     /** iOS `captureCameraPhoto`: a photo taken in the composer's camera attaches like a picked one. */
     fun captureCameraPhoto(data: ByteArray, onAdded: (() -> Unit)? = null) {
-        cancelImageImportJob()
         startImageImport(listOf(ComposerImageSource.Data(data)), onAdded = onAdded)
     }
 
@@ -393,7 +314,7 @@ class SessionAttachmentImporter internal constructor(
 @Composable
 fun rememberSessionAttachmentImporter(store: StoreOf<SessionFeature.State, SessionFeature.Action>): SessionAttachmentImporter {
     val scope = rememberCoroutineScope()
-    return remember(store, scope) { SessionAttachmentImporter(store, scope, dependency(ComposerMediaLoader)) }
+    return remember(store, scope) { SessionAttachmentImporter(store, scope) }
 }
 
 /**
@@ -450,23 +371,10 @@ fun sessionAttachmentMenuItems(
 
 // region Pending attachments row
 
-/** iOS `PhotoFlights.slotSide` / `slotRadius` and `ComposerFileChip` metrics. */
+/** iOS `PhotoFlights.slotSide` / `slotRadius`. */
 object PendingAttachmentMetrics {
     val slotSide: Dp = 76.dp
     val slotRadius: Dp = 22.dp
-    val chipWidth: Dp = 220.dp
-    val chipHeight: Dp = 76.dp
-    val chipRadius: Dp = 22.dp
-    /** iOS `TranscriptMetrics.cardCornerRadius`. */
-    val cardRadius: Dp = 14.dp
-    /** iOS `TranscriptMetrics.standard`. */
-    val standard: Dp = 12.dp
-    /** Location card: `SharedLocationCard.compactWidth`, `compactMapHeight`, `defaultCompactFooterHeight`. */
-    val locationWidth: Dp = 220.dp
-    val locationMapHeight: Dp = 72.dp
-    const val LOCATION_FOOTER_HEIGHT = 64f
-    /** iOS `ComposerLocationAttachment.entranceScale`. */
-    const val LOCATION_ENTRANCE_SCALE = 0.965f
 }
 
 /**
@@ -484,7 +392,7 @@ object PendingAttachmentMetrics {
  * @param onRemoveFile `.fileRemoved(id)` (cancels an upload in flight).
  * @param onRetryFile `.fileRetryTapped(id)`.
  * @param onRemoveLocation `.locationRemoved`.
- * @param onOpenPastedText opens a paste's viewer (iOS `PastedTextCard` tap); null: not tappable.
+ * @param onOpenPastedText opens a paste's viewer (iOS `PastedTextCard` tap).
  * @param onOpenLocation opens the card's maps URL (iOS `openURL(location.mapsURL)`).
  */
 @Composable
@@ -499,9 +407,9 @@ fun PendingAttachmentsRow(
     onRemoveFile: (UUID) -> Unit,
     onRetryFile: (UUID) -> Unit,
     onRemoveLocation: () -> Unit,
+    onOpenPastedText: (OpenCodeOutgoingAttachment) -> Unit,
+    onOpenLocation: (String) -> Unit,
     modifier: Modifier = Modifier,
-    onOpenPastedText: ((OpenCodeOutgoingAttachment) -> Unit)? = null,
-    onOpenLocation: ((String) -> Unit)? = null,
 ) {
     val reduceMotion = rememberReduceMotion()
     LazyRow(
@@ -531,9 +439,15 @@ fun PendingAttachmentsRow(
                     onRemove = { onRemoveAttachment(index) },
                     modifier = item,
                 ) {
-                    ComposerPastedTextCard(
+                    // iOS `pastedTextChip`: 220 × 76 on the secondary fill, room for the remove button.
+                    PastedTextCard(
                         summary = summary,
-                        onOpen = onOpenPastedText?.let { open -> { open(attachment) } },
+                        onOpen = { onOpenPastedText(attachment) },
+                        width = ComposerFileChip.width,
+                        height = ComposerFileChip.height,
+                        fill = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        shape = RoundedCornerShape(ComposerFileChip.cornerRadius),
+                        headerTrailingInset = 14.dp,
                     )
                 }
                 else -> {
@@ -549,10 +463,10 @@ fun PendingAttachmentsRow(
                         FileAttachmentCard(
                             name = name,
                             symbolName = AttachmentFileType.symbolName(name, attachment.mime),
-                            width = PendingAttachmentMetrics.chipWidth,
-                            height = PendingAttachmentMetrics.chipHeight,
+                            width = ComposerFileChip.width,
+                            height = ComposerFileChip.height,
                             modifier = Modifier
-                                .background(secondarySystemFill(), RoundedCornerShape(PendingAttachmentMetrics.chipRadius))
+                                .background(MaterialTheme.colorScheme.surfaceContainerHighest, RoundedCornerShape(ComposerFileChip.cornerRadius))
                                 .clearAndSetSemantics { contentDescription = "File attachment $name" }
                                 .testTag("pending-file-$name"),
                         ) {
@@ -575,9 +489,13 @@ fun PendingAttachmentsRow(
         }
         if (showsLocation) {
             item(key = "location") {
+                // iOS `locationGate`: mounted hidden, presented once it appears.
+                var gate by remember { mutableFloatStateOf(0f) }
                 ComposerLocationAttachment(
                     location = location,
                     isLocating = isLocating,
+                    gateProgress = gate,
+                    onAppear = { gate = 1f },
                     onRemove = onRemoveLocation,
                     onOpen = onOpenLocation,
                     modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null),
@@ -650,7 +568,7 @@ private fun AttachmentThumbnail(attachment: OpenCodeOutgoingAttachment, index: I
         Modifier
             .size(PendingAttachmentMetrics.slotSide)
             .clip(RoundedCornerShape(PendingAttachmentMetrics.slotRadius))
-            .background(secondarySystemFill())
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
             .semantics { contentDescription = "Image attachment ${index + 1}" }
             .testTag("pending-attachment-$index"),
     ) {
@@ -670,333 +588,5 @@ private fun decodeThumbnail(data: ByteArray, target: Int): ImageBitmap? = try {
 } catch (_: Exception) {
     null
 }
-
-/**
- * The composer's Pasted Text card (iOS `PastedTextCard` as `pastedTextChip` configures it:
- * 220 × 76, the secondary fill, 22 dp corners, room for the remove button): the name, its length
- * and its first lines fading out. A tap opens the text.
- */
-@Composable
-fun ComposerPastedTextCard(
-    summary: ai.opencode.server.model.PastedTextSummary,
-    onOpen: (() -> Unit)?,
-    modifier: Modifier = Modifier,
-) {
-    val shape = RoundedCornerShape(PendingAttachmentMetrics.chipRadius)
-    Column(
-        modifier
-            .width(PendingAttachmentMetrics.chipWidth)
-            .heightIn(min = PendingAttachmentMetrics.chipHeight)
-            .clip(shape)
-            .background(secondarySystemFill(), shape)
-            .then(if (onOpen != null) Modifier.clickable(role = Role.Button, onClickLabel = "Opens the text", onClick = onOpen) else Modifier)
-            .clearAndSetSemantics {
-                contentDescription = PastedText.NAME
-                stateDescription = summary.summary
-                if (onOpen != null) {
-                    role = Role.Button
-                    onClick("Opens the text") { onOpen(); true }
-                }
-            }
-            .testTag("pasted-text-card")
-            .padding(horizontal = PendingAttachmentMetrics.standard, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Row(Modifier.fillMaxWidth().padding(end = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            OpenCodeIcon(SFSymbol.DocPlaintext, contentDescription = null, size = 16.dp, tint = OpenCodeTheme.colors.secondaryText)
-            Text(
-                PastedText.NAME,
-                style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium),
-                color = OpenCodeTheme.colors.text,
-                maxLines = 1,
-                modifier = Modifier.weight(1f),
-            )
-            Text(summary.length, style = OpenCodeTextStyles.caption1.copy(fontFeatureSettings = "tnum"), color = OpenCodeTheme.colors.secondaryText, maxLines = 1)
-        }
-        // The text goes on past the card.
-        Column(
-            Modifier
-                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                .drawWithContent {
-                    drawContent()
-                    drawRect(
-                        Brush.verticalGradient(0.45f to Color.Black, 1f to Color.Black.copy(alpha = 0.25f)),
-                        blendMode = BlendMode.DstIn,
-                    )
-                },
-            verticalArrangement = Arrangement.spacedBy(1.dp),
-        ) {
-            for (line in summary.preview) {
-                Text(
-                    line,
-                    style = OpenCodeTextStyles.caption2.copy(fontFamily = FontFamily.Monospace),
-                    color = OpenCodeTheme.colors.secondaryText,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-    }
-}
-
-/**
- * iOS `FileAttachmentCard`: the two-line file card desktop uses — a type glyph, the name above a
- * type label ([detail]), and an optional quiet trailing glyph.
- */
-@Composable
-fun FileAttachmentCard(
-    name: String,
-    symbolName: String,
-    modifier: Modifier = Modifier,
-    width: Dp = 200.dp,
-    height: Dp? = null,
-    detailLines: Int = 1,
-    trailingSymbolName: String? = null,
-    detail: @Composable () -> Unit,
-) {
-    Row(
-        modifier
-            .width(width)
-            .heightIn(min = height ?: 0.dp)
-            .padding(horizontal = PendingAttachmentMetrics.standard, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Box(Modifier.width(28.dp), contentAlignment = Alignment.Center) {
-            OpenCodeIcon(symbolName, contentDescription = null, size = 24.dp, tint = OpenCodeTheme.colors.secondaryText)
-        }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(
-                name,
-                style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium),
-                color = OpenCodeTheme.colors.text,
-                maxLines = 1,
-                overflow = TextOverflow.MiddleEllipsis,
-            )
-            androidx.compose.runtime.CompositionLocalProvider(
-                androidx.compose.material3.LocalContentColor provides OpenCodeTheme.colors.secondaryText,
-                androidx.compose.material3.LocalTextStyle provides OpenCodeTextStyles.caption1.copy(color = OpenCodeTheme.colors.secondaryText),
-            ) {
-                Box(Modifier.heightIn(max = with(LocalDensity.current) { (16 * detailLines + 20).dp })) { detail() }
-            }
-        }
-        if (trailingSymbolName != null) {
-            OpenCodeIcon(trailingSymbolName, contentDescription = null, size = 14.dp, tint = OpenCodeTheme.colors.tertiaryText)
-        }
-    }
-}
-
-/**
- * iOS `ComposerFileChip`: a composer file's name, size and upload progress, or its failure with
- * a retry when the server takes uploads.
- */
-@Composable
-fun ComposerFileChip(file: ComposerFileAttachment, canRetry: Boolean, onRetry: () -> Unit, modifier: Modifier = Modifier) {
-    val progress = file.progress
-    val status = when (val s = file.status) {
-        is ComposerFileAttachment.Status.Uploading -> "Uploading, ${percent(progress)}"
-        is ComposerFileAttachment.Status.Uploaded -> AttachmentFileType.subtitle(file.name, file.mime, file.size)
-        is ComposerFileAttachment.Status.Failed -> s.message
-    }
-    val retries = file.isFailed && canRetry
-    val shape = RoundedCornerShape(PendingAttachmentMetrics.chipRadius)
-    FileAttachmentCard(
-        name = file.name,
-        symbolName = AttachmentFileType.symbolName(file.name, file.mime),
-        width = PendingAttachmentMetrics.chipWidth,
-        height = PendingAttachmentMetrics.chipHeight,
-        detailLines = if (file.isFailed) 2 else 1,
-        modifier = modifier
-            .clip(shape)
-            .background(secondarySystemFill(), shape)
-            .then(if (retries) Modifier.clickable(role = Role.Button, onClick = onRetry) else Modifier)
-            .clearAndSetSemantics {
-                contentDescription = if (retries) "Retry uploading ${file.name}" else "File attachment ${file.name}"
-                stateDescription = status
-                if (retries) {
-                    role = Role.Button
-                    onClick { onRetry(); true }
-                }
-            }
-            .testTag("pending-file-${file.name}"),
-    ) {
-        when (val s = file.status) {
-            is ComposerFileAttachment.Status.Uploading -> Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text("Uploading ${percent(progress)}", style = OpenCodeTextStyles.caption1.copy(fontFeatureSettings = "tnum"), color = OpenCodeTheme.colors.secondaryText)
-                LinearProgressIndicator(progress = { progress.toFloat() }, modifier = Modifier.widthIn(max = 120.dp).fillMaxWidth())
-            }
-            is ComposerFileAttachment.Status.Uploaded -> Text(
-                AttachmentFileType.subtitle(file.name, file.mime, file.size),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            is ComposerFileAttachment.Status.Failed -> Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.Top) {
-                val red = OpenCodeTheme.colors.destructive
-                OpenCodeIcon(if (canRetry) SFSymbol.ArrowClockwise else SFSymbol.ExclamationmarkTriangle, contentDescription = null, size = 14.dp, tint = red)
-                Text(s.message, color = red, maxLines = 2, overflow = TextOverflow.Ellipsis, style = OpenCodeTextStyles.caption1)
-            }
-        }
-    }
-}
-
-/** iOS `ComposerFileAttachment.progress`: an upload's share sent; 1 once uploaded, 0 after a failure. */
-private val ComposerFileAttachment.progress: Double
-    get() = when (val s = status) {
-        is ComposerFileAttachment.Status.Uploading -> if (size > 0) minOf(1.0, s.sent.toDouble() / size.toDouble()) else 0.0
-        is ComposerFileAttachment.Status.Uploaded -> 1.0
-        is ComposerFileAttachment.Status.Failed -> 0.0
-    }
-
-/** iOS `ComposerFileChip.percent`: “42%”. */
-private fun percent(value: Double): String =
-    NumberFormat.getPercentInstance(Locale.getDefault()).apply { maximumFractionDigits = 0 }.format(value)
-
-/**
- * iOS `ComposerLocationAttachment`: one stable 220 × (72 + footer) card across “Finding
- * Location…” and the resolved location, entering once from a 0.965 scale and revealing the
- * place in place when it's found. The remove button cancels while locating.
- *
- * @param onOpen opens [SharedLocationLinks.mapsURL] (a tap on the resolved card); null: inert.
- */
-@Composable
-fun ComposerLocationAttachment(
-    location: SharedLocation?,
-    isLocating: Boolean,
-    onRemove: () -> Unit,
-    modifier: Modifier = Modifier,
-    onOpen: ((String) -> Unit)? = null,
-) {
-    val reduceMotion = rememberReduceMotion()
-    val fontScale = LocalDensity.current.fontScale
-    val footerHeight = (PendingAttachmentMetrics.LOCATION_FOOTER_HEIGHT * fontScale).dp
-    var displayed by remember { mutableStateOf(location) }
-    LaunchedEffect(location, isLocating) {
-        if (location != null) displayed = location else if (isLocating) displayed = null
-    }
-    val entrance = remember { Animatable(if (reduceMotion) 1f else PendingAttachmentMetrics.LOCATION_ENTRANCE_SCALE) }
-    LaunchedEffect(Unit) { if (entrance.value < 1f) entrance.animateTo(1f, Motion.panelOpen.spec()) }
-    val shape = RoundedCornerShape(PendingAttachmentMetrics.cardRadius)
-    val active = location ?: displayed
-    val label = if (location != null) "Remove location" else "Cancel location"
-    RemovableAttachment(
-        label = label,
-        identifier = if (location != null) "remove-pending-location" else "cancel-pending-location",
-        onRemove = onRemove,
-        reduceMotion = true,
-        modifier = modifier.scale(entrance.value),
-    ) {
-        Crossfade(
-            targetState = active,
-            animationSpec = if (reduceMotion) tween(0) else Motion.panelOpen.spec(),
-            label = "locationReveal",
-            modifier = Modifier
-                .width(PendingAttachmentMetrics.locationWidth)
-                .height(PendingAttachmentMetrics.locationMapHeight + footerHeight)
-                .clip(shape)
-                .background(MaterialTheme.colorScheme.surfaceContainer),
-        ) { resolved ->
-            if (resolved == null) {
-                LocatingSurface(footerHeight)
-            } else {
-                SharedLocationCompactCard(resolved, footerHeight, onOpen)
-            }
-        }
-    }
-}
-
-@Composable
-private fun LocatingSurface(footerHeight: Dp) {
-    Column(Modifier.fillMaxSize().semantics(mergeDescendants = true) {}) {
-        MapPlaceholder(Modifier.fillMaxWidth().height(PendingAttachmentMetrics.locationMapHeight))
-        Column(
-            Modifier.fillMaxWidth().height(footerHeight).padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically),
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
-                Text(
-                    "Finding Location…",
-                    style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold),
-                    color = OpenCodeTheme.colors.text,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            Text("Current coordinates", style = OpenCodeTextStyles.caption1, color = OpenCodeTheme.colors.secondaryText, maxLines = 1)
-        }
-    }
-}
-
-/** iOS `SharedLocationCard(compact: true)`: the spot, its place or address, and its coordinates. */
-@Composable
-private fun SharedLocationCompactCard(location: SharedLocation, footerHeight: Dp, onOpen: ((String) -> Unit)?) {
-    val title = location.place ?: location.address ?: "Shared Location"
-    val subtitle = if (location.place != null) location.address else null
-    Column(
-        Modifier
-            .fillMaxSize()
-            .then(if (onOpen != null) Modifier.clickable(role = Role.Button) { onOpen(SharedLocationLinks.mapsURL(location)) } else Modifier)
-            .clearAndSetSemantics {
-                contentDescription = "Location: $title" + (subtitle?.let { ", $it" } ?: "")
-                if (onOpen != null) {
-                    role = Role.Button
-                    onClick("Opens in Maps") { onOpen(SharedLocationLinks.mapsURL(location)); true }
-                }
-            }
-            .testTag("composer-location-card"),
-    ) {
-        MapPlaceholder(Modifier.fillMaxWidth().height(PendingAttachmentMetrics.locationMapHeight))
-        Column(
-            Modifier.fillMaxWidth().height(footerHeight).padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically),
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                OpenCodeIcon(SFSymbol.LocationFill, contentDescription = null, size = 12.dp, tint = Color(0xFF0A84FF))
-                Text(
-                    title,
-                    style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold),
-                    color = OpenCodeTheme.colors.text,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            if (subtitle != null) {
-                Text(subtitle, style = OpenCodeTextStyles.caption1, color = OpenCodeTheme.colors.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            Text(
-                SharedLocationLinks.coordinateText(location),
-                style = OpenCodeTextStyles.caption2.copy(fontFamily = FontFamily.Monospace),
-                color = OpenCodeTheme.colors.tertiaryText,
-                maxLines = 1,
-            )
-        }
-    }
-}
-
-/** The map's place: the tertiary fill with the red pin (Android has no MapKit snapshot). */
-@Composable
-private fun MapPlaceholder(modifier: Modifier) {
-    Box(modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh), contentAlignment = Alignment.Center) {
-        Box(Modifier.size(30.dp).background(Color.White, CircleShape), contentAlignment = Alignment.Center) {
-            OpenCodeIcon(SFSymbol.MappinCircleFill, contentDescription = null, size = 30.dp, tint = Color(0xFFFF3B30))
-        }
-    }
-}
-
-/** iOS `SharedLocation.coordinateText` / `mapsURL`, for the composer's card. */
-object SharedLocationLinks {
-    fun coordinateText(location: SharedLocation): String = location.coordinateText
-
-    /** Android's maps link: a `geo:` URI at the spot, labelled as iOS's Apple Maps link is. */
-    fun mapsURL(location: SharedLocation): String {
-        val ll = String.format(Locale.US, "%.6f,%.6f", location.latitude, location.longitude)
-        val label = android.net.Uri.encode(location.place ?: location.address ?: "Shared Location")
-        return "geo:$ll?q=$ll($label)"
-    }
-}
-
-/** iOS `Color(.secondarySystemFill)`. */
-@Composable
-private fun secondarySystemFill(): Color = MaterialTheme.colorScheme.surfaceContainerHighest
 
 // endregion

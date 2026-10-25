@@ -7,7 +7,6 @@ import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticEffect
-import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.PresentationAction
 import ai.opencode.core.store.StoreOf
@@ -23,7 +22,30 @@ import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.feature.session.header.HeaderBlurTunables
 import ai.opencode.feature.session.header.SessionHeaderBackdrop
 import ai.opencode.feature.session.header.SessionHeaderStyle
+import ai.opencode.feature.composer.AttachmentMenuDismissArea
 import ai.opencode.feature.composer.AttachmentMenuItem
+import ai.opencode.feature.composer.AttachmentMenuOverlay
+import ai.opencode.feature.composer.AttachmentMenuPhase
+import ai.opencode.feature.composer.AttachmentMenuPress
+import ai.opencode.feature.composer.ComposerAutocompleteAction
+import ai.opencode.feature.composer.DictationPermissionClient
+import ai.opencode.feature.composer.LocationPermissionPrompt
+import ai.opencode.feature.composer.PastedTextViewer
+import ai.opencode.feature.composer.modelpicker.ModelPickerAnchors
+import androidx.compose.runtime.rememberCoroutineScope
+import ai.opencode.feature.composer.RequestDockContext
+import ai.opencode.feature.composer.RequestReviewSheet
+import ai.opencode.feature.media.LocalMediaPresenter
+import ai.opencode.feature.media.MediaFeature
+import ai.opencode.feature.media.MediaView
+import ai.opencode.core.store.Store
+import ai.opencode.core.motion.rememberReduceMotion
+import android.Manifest
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.runtime.collectAsState
+import kotlinx.coroutines.CompletableDeferred
 import ai.opencode.core.experiments.key
 import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.feature.composer.LocationClientError
@@ -33,7 +55,6 @@ import ai.opencode.server.model.OpenCodeShell
 import ai.opencode.server.model.OpenCodeSession
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -58,8 +79,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -133,6 +152,8 @@ fun SessionView(
     // What the composer shares with the screen around it (the capsule's place, jump to latest, the + menu).
     val composerHost = remember { SessionComposerHost() }
     val importer = rememberSessionAttachmentImporter(store)
+    val anchorScope = rememberCoroutineScope()
+    val modelPickerAnchors = remember { ModelPickerAnchors(anchorScope) }
     val colors = OpenCodeTheme.colors
     val density = LocalDensity.current
 
@@ -160,9 +181,14 @@ fun SessionView(
         composerHost.isCatchUpCard = onCatchUpOpen != null
         composerHost.onJumpToLatest = { scrollEdgeBridge.jumpRequest += 1 }
         composerHost.isImportingAttachments = importer.isLoadingImages || importer.isLoadingFiles
+        composerHost.importer = importer
+        composerHost.modelPickerAnchors = modelPickerAnchors
+        composerHost.headerHeight = headerHeight
         if (composerHost.pendingAttachmentsRow == null) composerHost.pendingAttachmentsRow = { SessionPendingAttachments(store) }
     }
+    SessionPermissionPrompts()
 
+    SessionMediaHost {
     CompositionLocalProvider(
         LocalAgentActivityScope provides agentScope,
         LocalSessionComposerHost provides composerHost,
@@ -201,6 +227,9 @@ fun SessionView(
                     scrolledUnderHeader = { scrollEdgeBridge.scrolledUnderHeader },
                     modifier = Modifier.align(Alignment.TopCenter),
                 )
+                // Behind the composer, so its × stays reachable: a tap anywhere else or a downward
+                // drag dismisses the menu, or Composer Autocomplete's suggestions.
+                SessionComposerDismissArea(store, composerHost)
                 SessionHeaderControls(
                     store = store,
                     listContext = listContext,
@@ -221,14 +250,17 @@ fun SessionView(
                         .widthIn(max = TranscriptMetrics.readableColumnWidth)
                         .onSizeChanged { scrollEdgeBridge.composerHeight = with(density) { it.height.toDp().value } },
                 ) {
-                    SessionAttachmentMenu(store, composerHost, importer)
                     SessionComposer(store)
                 }
+                RequestPanelRoomProbe(composerHost, Modifier.matchParentSize())
+                SessionAttachmentMenu(store, composerHost, importer)
+                SessionModelPickerOverlays(store, modelPickerAnchors, headerHeight, composerHost.attachmentAnchors.composer)
             }
         }
         SessionSheets(store, listContext)
         LocationErrorAlert(store)
         SessionAttachmentAlerts(importer)
+    }
     }
 }
 
@@ -329,75 +361,99 @@ private fun SessionLifecycle(store: StoreOf<State, Action>) {
     }
 }
 
-/** iOS `AttachmentMenuPhase`: the + menu closed, open, or morphed into the photo picker. */
-private enum class AttachmentMenuPhase { closed, menu, photos }
-
 /**
- * The + menu (iOS `attachmentMenuOverlay` and `chooseAttachment`) and what it opens: Photos (the
- * system Photo Picker, `SessionPhotoSheet`), Files (the system document picker) and Location
- * (one at a time). It floats above the composer and keeps the field's focus; choosing a picker
- * gives the keyboard up, and the keyboard returns once something is attached if the field had it.
- * The menu taps as it opens and as a row is chosen; closing plays nothing, like the system's menus.
+ * The + menu (iOS `attachmentMenuOverlay`, `toggleAttachmentMenu` and `chooseAttachment`) and what
+ * it opens: Photos (the system Photo Picker, or with the New Plus Menu experiment the composer's
+ * photo sheet), Files (the system document picker) and Location (one at a time). The menu is
+ * :feature:composer's [AttachmentMenuOverlay], growing out of the + ([AttachmentPickerButton] in
+ * the composer's row, which also chooses a row by sliding to it); it keeps the field's focus, and
+ * choosing a picker gives the keyboard up, which returns once something is attached if the field
+ * had it. System Back closes it (iOS's escape action).
  *
  * Android has no in-menu camera or Paste row yet (iOS `AttachmentCamera`, the system PasteButton):
- * Camera needs the composer's capture view, and Android pastes images straight into the field.
+ * Android pastes images straight into the field.
  */
 @Composable
 private fun SessionAttachmentMenu(store: StoreOf<State, Action>, host: SessionComposerHost, importer: SessionAttachmentImporter) {
-    var phase by remember { mutableStateOf(AttachmentMenuPhase.closed) }
+    var phase by remember { mutableStateOf(AttachmentMenuPhase.Closed) }
     var restoresFocus by remember { mutableStateOf(false) }
     var keepingLocationRow by remember { mutableStateOf(false) }
-    var chosen by remember { mutableIntStateOf(0) }
+    var showsPhotoPicker by remember { mutableStateOf(false) }
+    var showsPlusSheet by remember { mutableStateOf(false) }
+    var tapped by remember { mutableIntStateOf(0) }
+    val press = remember { AttachmentMenuPress() }
     val taskIdentity by store.observe { it.taskIdentity }
     val supportsFileUploads by store.observe { it.supportsFileUploads }
     val wantsLocation by store.observe { it.pendingLocation != null || it.isLocating }
+    val plusSheetSetting by remember { shared(ExperimentalFeature.plusMenuSheet.key).flow }.collectAsState(false)
+    val usesPlusMenuSheet = ExperimentalFeature.plusMenuSheet.isActive(plusSheetSetting)
     val files = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
-        if (uris.isNotEmpty()) importer.importPickedFiles(uris.map { it.toString() }, onFocus = host::focusComposer)
+        if (uris.isNotEmpty()) importer.importPickedFiles(uris, onFocus = host::focusComposer)
     }
 
     // Another session in place: the menu closes at once.
     LaunchedEffect(taskIdentity) {
-        phase = AttachmentMenuPhase.closed
+        phase = AttachmentMenuPhase.Closed
         restoresFocus = false
+        showsPlusSheet = false
     }
-    SideEffect {
-        host.isAttachmentMenuOpen = phase != AttachmentMenuPhase.closed
-        host.onPlusTapped = {
-            if (phase == AttachmentMenuPhase.closed) {
-                keepingLocationRow = false
-                restoresFocus = host.messageFieldFocused
-                phase = AttachmentMenuPhase.menu
-            } else {
-                phase = AttachmentMenuPhase.closed
-            }
+    HapticEffect(Haptic.tap, tapped)
+
+    fun close() {
+        phase = AttachmentMenuPhase.Closed
+        showsPlusSheet = false
+        if (restoresFocus) host.focusComposer()
+    }
+
+    fun toggle() {
+        if (phase == AttachmentMenuPhase.Closed) {
+            keepingLocationRow = false
+            restoresFocus = host.messageFieldFocused
+            phase = AttachmentMenuPhase.Menu
+            press.menuOpened()
+        } else {
+            close()
         }
     }
-    HapticEffect(Haptic.tap, phase) { _, new -> new == AttachmentMenuPhase.menu }
-    HapticEffect(Haptic.tap, chosen)
 
     fun choose(item: AttachmentMenuItem) {
-        if (phase != AttachmentMenuPhase.menu) return
-        chosen += 1
+        if (phase != AttachmentMenuPhase.Menu) return
         when (item) {
             AttachmentMenuItem.Photos -> {
                 // Choosing the photo picker gives it the room the keyboard had.
                 host.dismissComposerKeyboard()
-                phase = AttachmentMenuPhase.photos
+                if (usesPlusMenuSheet) {
+                    showsPlusSheet = true
+                } else {
+                    phase = AttachmentMenuPhase.Closed
+                    showsPhotoPicker = true
+                }
             }
             AttachmentMenuItem.Files -> {
                 restoresFocus = false
-                phase = AttachmentMenuPhase.closed
+                phase = AttachmentMenuPhase.Closed
                 files.launch(arrayOf("*/*"))
             }
             AttachmentMenuItem.Location -> {
                 restoresFocus = false
                 keepingLocationRow = true
                 store.send(Action.locationTapped)
-                phase = AttachmentMenuPhase.closed
+                phase = AttachmentMenuPhase.Closed
             }
-            AttachmentMenuItem.Camera, AttachmentMenuItem.Paste -> phase = AttachmentMenuPhase.closed
+            AttachmentMenuItem.Camera, AttachmentMenuItem.Paste -> phase = AttachmentMenuPhase.Closed
         }
     }
+
+    SideEffect {
+        host.attachmentPress = press
+        host.isAttachmentMenuOpen = phase != AttachmentMenuPhase.Closed
+        host.onPlusTapped = ::toggle
+        host.attachmentMenuRows = if (phase == AttachmentMenuPhase.Menu && !showsPlusSheet) host.attachmentAnchors.rows else emptyMap()
+        // A slide from + chose it; the press already answered with its haptic.
+        host.onAttachmentChoose = ::choose
+        host.closeAttachmentMenu = { if (phase != AttachmentMenuPhase.Closed) close() }
+    }
+    BackHandler(enabled = phase != AttachmentMenuPhase.Closed && !showsPlusSheet) { close() }
 
     val items = sessionAttachmentMenuItems(
         hasCamera = false,
@@ -406,38 +462,139 @@ private fun SessionAttachmentMenu(store: StoreOf<State, Action>, host: SessionCo
         keepingLocationRowWhileMenuCloses = keepingLocationRow,
         clipboardHasImages = false,
     )
-    Box(Modifier.padding(start = 12.dp)) {
-        DropdownMenu(
-            expanded = phase == AttachmentMenuPhase.menu,
-            onDismissRequest = {
-                phase = AttachmentMenuPhase.closed
-                if (restoresFocus) host.focusComposer()
-            },
-        ) {
-            for (item in items) {
-                val (title, symbol) = when (item) {
-                    AttachmentMenuItem.Camera -> "Camera" to SFSymbol.Camera
-                    AttachmentMenuItem.Photos -> "Photos" to SFSymbol.PhotoOnRectangle
-                    AttachmentMenuItem.Files -> "Files" to SFSymbol.Folder
-                    AttachmentMenuItem.Location -> "Location" to SFSymbol.Location
-                    AttachmentMenuItem.Paste -> "Paste" to SFSymbol.DocOnClipboard
-                }
-                DropdownMenuItem(
-                    text = { Text(title) },
-                    leadingIcon = { OpenCodeIcon(symbol, contentDescription = null, size = OpenCodeIconSize.small) },
-                    onClick = { choose(item) },
-                )
-            }
-        }
-    }
-    if (phase == AttachmentMenuPhase.photos) {
+    AttachmentMenuOverlay(
+        phase = phase,
+        onPhaseChange = { next -> if (next == AttachmentMenuPhase.Closed) close() else phase = next },
+        anchors = host.attachmentAnchors,
+        press = press,
+        items = items,
+        includesVideos = supportsFileUploads,
+        onChoose = { item ->
+            tapped += 1
+            choose(item)
+        },
+        onPaste = { phase = AttachmentMenuPhase.Closed },
+        modifier = Modifier.fillMaxSize(),
+        // The New Plus Menu's morphing glass (`ComposerMorph`) isn't hosted: its menu stays this overlay's.
+        overComposer = false,
+        handedOff = showsPlusSheet,
+        identity = taskIdentity,
+    )
+    if (showsPhotoPicker) {
         SessionPhotoSheet(
             store = store,
             importer = importer,
-            onDismiss = { phase = AttachmentMenuPhase.closed },
+            onDismiss = { showsPhotoPicker = false },
             onAdded = if (restoresFocus) host::focusComposer else null,
         )
     }
+    if (showsPlusSheet) {
+        SessionPlusPhotoSheet(
+            importer = importer,
+            onBack = { showsPlusSheet = false },
+            onDismiss = { close() },
+            onAdded = if (restoresFocus) host::focusComposer else null,
+            onClosed = {
+                showsPlusSheet = false
+                phase = AttachmentMenuPhase.Closed
+            },
+        )
+    }
+}
+
+/**
+ * Behind the composer (iOS the capsule's `.background`): while the + menu is open, or Composer
+ * Autocomplete's suggestions are, a tap anywhere else or a downward drag dismisses them.
+ */
+@Composable
+private fun SessionComposerDismissArea(store: StoreOf<State, Action>, host: SessionComposerHost) {
+    val autocompleteOpen by store.observe { it.autocomplete.isOpen }
+    val autocompleteSetting by remember { shared(ExperimentalFeature.composerAutocomplete.key).flow }.collectAsState(false)
+    when {
+        host.isAttachmentMenuOpen -> AttachmentMenuDismissArea(onDismiss = host.closeAttachmentMenu)
+        ExperimentalFeature.composerAutocomplete.isActive(autocompleteSetting) && autocompleteOpen ->
+            AttachmentMenuDismissArea(onDismiss = { store.send(Action.Autocomplete(ComposerAutocompleteAction.Dismissed)) })
+    }
+}
+
+/**
+ * The room the request panel's cap is made from (iOS `requestPanelInputs.room`): the screen's
+ * height between the top safe area and the keyboard (or the bottom safe area). Its own
+ * composable, so the keyboard's frames recompose only it.
+ */
+@Composable
+private fun RequestPanelRoomProbe(host: SessionComposerHost, modifier: Modifier) {
+    val density = LocalDensity.current
+    var height by remember { mutableIntStateOf(0) }
+    val top = WindowInsets.statusBars.getTop(density)
+    val bottom = maxOf(WindowInsets.ime.getBottom(density), WindowInsets.navigationBars.getBottom(density))
+    Box(modifier.onSizeChanged { height = it.height })
+    SideEffect {
+        val room = with(density) { (height - top - bottom).coerceAtLeast(0).toDp().value }
+        if (host.availableHeight != room) host.availableHeight = room
+    }
+}
+
+/**
+ * Registers the screen's permission prompts while it's shown: the microphone for dictation
+ * ([DictationPermissionClient.register]) and location for the + menu's Location
+ * ([LocationPermissionPrompt.install]), each through an activity-result launcher the screen owns.
+ */
+@Composable
+private fun SessionPermissionPrompts() {
+    val mic = remember { arrayOfNulls<CompletableDeferred<Boolean>>(1) }
+    val location = remember { arrayOfNulls<CompletableDeferred<Boolean>>(1) }
+    val micLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        mic[0]?.complete(granted)
+        mic[0] = null
+    }
+    val locationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
+        location[0]?.complete(grants.values.any { it })
+        location[0] = null
+    }
+    DisposableEffect(micLauncher) {
+        val remove = dependency(DictationPermissionClient).register {
+            val answer = CompletableDeferred<Boolean>()
+            mic[0]?.complete(false)
+            mic[0] = answer
+            micLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            answer.await()
+        }
+        onDispose {
+            remove()
+            mic[0]?.complete(false)
+            mic[0] = null
+        }
+    }
+    DisposableEffect(locationLauncher) {
+        val remove = LocationPermissionPrompt.install {
+            val answer = CompletableDeferred<Boolean>()
+            location[0]?.complete(false)
+            location[0] = answer
+            locationLauncher.launch(LocationPermissionPrompt.permissions)
+            answer.await()
+        }
+        onDispose {
+            remove()
+            location[0]?.complete(false)
+            location[0] = null
+        }
+    }
+}
+
+/**
+ * Full-screen media over the session (iOS `MediaPresenter`): the app's [MediaView] when one hosts
+ * this screen ([LocalMediaPresenter]), else the session's own, so transcript images, files and
+ * pasted text always open in the viewer.
+ */
+@Composable
+private fun SessionMediaHost(content: @Composable () -> Unit) {
+    if (LocalMediaPresenter.current != null) {
+        content()
+        return
+    }
+    val media = remember { Store(MediaFeature.State(), MediaFeature()) }
+    MediaView(media, content = content)
 }
 
 /** What the composer holds, above its field (iOS `pendingAttachmentsRow`). */
@@ -448,6 +605,9 @@ private fun SessionPendingAttachments(store: StoreOf<State, Action>) {
     val canRetry by store.observe { it.supportsFileUploads }
     val location by store.observe { it.pendingLocation }
     val isLocating by store.observe { it.isLocating }
+    val presenter = LocalMediaPresenter.current
+    val reducedMotion = rememberReduceMotion()
+    val context = LocalContext.current
     PendingAttachmentsRow(
         attachments = attachments,
         files = files,
@@ -459,7 +619,32 @@ private fun SessionPendingAttachments(store: StoreOf<State, Action>) {
         onRemoveFile = { store.send(Action.fileRemoved(it)) },
         onRetryFile = { store.send(Action.fileRetryTapped(it)) },
         onRemoveLocation = { store.send(Action.locationRemoved) },
+        onOpenPastedText = { attachment ->
+            val text = attachment.pastedText
+            val summary = attachment.pasted
+            if (text != null && summary != null) {
+                presenter?.present(sourceID = null, isMedia = false, reducesMotion = reducedMotion, screenName = "Pasted Text") { viewer ->
+                    PastedTextViewer(
+                        text = text,
+                        summary = summary,
+                        onCopy = { store.send(Action.CopyTextTapped(it)) },
+                        onShare = { shareText(context, it) },
+                        onDone = { viewer.dismiss() },
+                    )
+                }
+            }
+        },
+        onOpenLocation = { store.send(Action.LinkTapped(it)) },
     )
+}
+
+/** The system share sheet with [text] (iOS `ShareLink`). */
+internal fun shareText(context: android.content.Context, text: String) {
+    val send = android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain").putExtra(android.content.Intent.EXTRA_TEXT, text)
+    try {
+        context.startActivity(android.content.Intent.createChooser(send, null).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+    } catch (_: android.content.ActivityNotFoundException) {
+    }
 }
 
 /** iOS `ContentUnavailableView` for a session that couldn't load. */
@@ -558,8 +743,20 @@ private fun SessionSheets(store: StoreOf<State, Action>, listContext: SessionLis
                 folderBrowser = folderBrowser,
             )
         }
-        // iOS `RequestReviewView` (Composer/RequestReviewView.swift) is not ported yet: the sheet closes.
-        State.ActivePicker.requests -> LaunchedEffect(Unit) { dismiss() }
+        State.ActivePicker.requests -> {
+            val dock by store.observe { it.requestDock }
+            val context by store.observe { RequestDockContext(currentSessionID = it.session?.id, familySessions = it.familySessions, isVisible = it.isVisible) }
+            // What the composer's row holds goes with Dismiss, as with the panel's ×.
+            val dismissMessage by store.observe { if (it.isAnsweringRequest) it.draft else null }
+            RequestReviewSheet(
+                dock = dock,
+                context = context,
+                dismissMessage = dismissMessage,
+                send = { store.send(Action.RequestDock(it)) },
+                onClose = dismiss,
+                onOpenURL = { store.send(Action.LinkTapped(it)) },
+            )
+        }
         null -> Unit
     }
 
@@ -709,35 +906,6 @@ object RequestBarSwap {
 
     /** SwiftUI `.easeIn`. */
     private val EaseIn = androidx.compose.animation.core.CubicBezierEasing(0.42f, 0f, 1f, 1f)
-}
-
-/**
- * The request panel grows up out of the composer's bar and folds back into it: one surface
- * anchored to the bar's bottom edge. Reduce Motion cross-fades.
- */
-object RequestPanelReveal {
-    private val opening = MotionSpring.fromResponse(0.42, 1.0)
-    private val folding = MotionSpring.fromResponse(0.32, 1.0)
-    private val contentShowing = MotionSpring.fromResponse(0.42, 0.86)
-    private val contentHiding = MotionSpring.fromResponse(0.22, 1.0)
-
-    /**
-     * Unbouncy, and quicker to fold than to grow, like the call's transcript. Folding waits a beat
-     * for the content to blur away, so the surface's edge never cuts through legible text.
-     */
-    fun <T> animation(opening: Boolean): FiniteAnimationSpec<T> =
-        if (opening) this.opening.spec() else folding.animation(reduceMotion = false, delaySeconds = 0.08)
-
-    /**
-     * The panel's content: it rises and sharpens in as the surface grows, and sinks and fades away
-     * ahead of the surface folding over it. Springs, so a request arriving or leaving mid-flight
-     * retargets from where it is.
-     */
-    fun <T> content(showing: Boolean, reducedMotion: Boolean): FiniteAnimationSpec<T> = when {
-        reducedMotion -> tween(durationMillis = 200, easing = Motion.EaseInOut)
-        showing -> contentShowing.spec()
-        else -> contentHiding.spec()
-    }
 }
 
 /** The composer and the call trade places on one surface: iOS blur-replaces; a cross-fade under Reduce Motion. */

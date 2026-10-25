@@ -1,7 +1,5 @@
 package ai.opencode.feature.session
 
-import ai.opencode.feature.composer.MicPress
-import ai.opencode.feature.composer.MicPressCallbacks
 import ai.opencode.feature.composer.DictationDrag
 import ai.opencode.feature.composer.DictationHoldTracker
 import ai.opencode.core.motion.Motion
@@ -23,8 +21,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -58,7 +54,6 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -75,7 +70,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.CancellationException
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -84,60 +78,9 @@ import kotlin.math.roundToInt
 
 typealias DictationHoldArm = DictationFeature.Hold.Arm
 
-// `DictationHoldTracker`, `DictationDrag`, `MicPressCallbacks` and `MicPress` are
-// `:feature:composer`'s (`MicPressGesture.kt`, moved down from iOS `DictationViews.swift`).
-
-/**
- * iOS `HoldToDictateButton` (+ `MicPressGesture`): touch and hold to record and let go to send;
- * sliding up arms lock and left arms cancel; a quick tap locks. Recording starts the moment the
- * finger lands (the press is the first pointer down, never waiting for slop); which it was is
- * decided at the lift. The press consumes its pointer, so the drawer and the composer's own swipe
- * don't take it. Off ([isEnabled] false) while the recording is hands-free.
- */
-@Composable
-fun HoldToDictateButton(
-    isEnabled: Boolean,
-    callbacks: MicPressCallbacks,
-    modifier: Modifier = Modifier,
-    label: @Composable () -> Unit,
-) {
-    val current by rememberUpdatedState(callbacks)
-    val press = remember { MicPress(callbacks) }
-    press.callbacks = current
-    Box(
-        Modifier.pointerInput(isEnabled) {
-            if (!isEnabled) return@pointerInput
-            awaitEachGesture {
-                val down = awaitFirstDown(requireUnconsumed = false)
-                down.consume()
-                press.began(down.uptimeMillis)
-                var cancelled = true
-                var upTime = down.uptimeMillis
-                try {
-                    while (true) {
-                        val event = awaitPointerEvent(PointerEventPass.Initial)
-                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                        val translation = (change.position - down.position) / density
-                        if (!change.pressed) {
-                            press.moved(translation)
-                            upTime = change.uptimeMillis
-                            change.consume()
-                            cancelled = false
-                            break
-                        }
-                        press.moved(translation)
-                        change.consume()
-                    }
-                } catch (error: CancellationException) {
-                    press.ended(0.0, cancelled = true)
-                    throw error
-                }
-                press.ended((upTime - down.uptimeMillis) / 1000.0, cancelled = cancelled)
-            }
-        }.then(modifier),
-        contentAlignment = Alignment.Center,
-    ) { label() }
-}
+// `HoldToDictateButton`'s press is :feature:composer's `Modifier.micPressGesture` (with
+// `DictationHoldTracker`, `DictationDrag`, `MicPressCallbacks`, moved down from iOS
+// `DictationViews.swift`); the session's mic (`SessionViewComposerControls.kt`) wears it.
 
 /**
  * iOS `DictationHoldVisuals`: one recording's view-only progress through its hold. Starts over

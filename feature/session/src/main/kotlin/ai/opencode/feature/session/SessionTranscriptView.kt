@@ -18,6 +18,9 @@ import ai.opencode.feature.session.header.HeaderBlurTunables
 import ai.opencode.feature.session.header.SessionHeaderStyle
 import ai.opencode.feature.session.header.titleBreathing
 import ai.opencode.feature.media.DecodedImageCache
+import ai.opencode.feature.media.LocalMediaPresenter
+import ai.opencode.feature.media.MediaPresenter
+import ai.opencode.feature.media.AgentFileViewer
 import ai.opencode.feature.transcript.TranscriptAction
 import ai.opencode.feature.transcript.TranscriptConfiguration
 import ai.opencode.feature.transcript.TranscriptEntry
@@ -147,6 +150,8 @@ fun SessionTranscriptView(
 ) {
     val context = LocalContext.current
     val host = LocalSessionComposerHost.current
+    val presenter = LocalMediaPresenter.current
+    val reducedMotion = rememberReduceMotion()
     val sinceYouLeftSetting by remember { shared(ExperimentalFeature.sinceYouLeft.key) }.flow
         .collectAsState(shared(ExperimentalFeature.sinceYouLeft.key).value)
     val imageLinkPreviewsSetting by remember { shared(ExperimentalFeature.imageLinkPreviews.key) }.flow
@@ -170,8 +175,8 @@ fun SessionTranscriptView(
     val latestProjection by rememberUpdatedState(projection)
     val showsMoveToBackground by store.observe { it.showsMoveToBackground }
 
-    val send: (TranscriptAction) -> Unit = remember(store, context, host) {
-        { action -> SessionTranscriptView.handle(action, store, context, host) }
+    val send: (TranscriptAction) -> Unit = remember(store, context, host, presenter, reducedMotion) {
+        { action -> SessionTranscriptView.handle(action, store, context, host, presenter, reducedMotion) }
     }
     val slots = remember(store) {
         TranscriptSlots(
@@ -512,9 +517,17 @@ object SessionTranscriptView {
      * Maps what a row or the list asks for to the `SessionFeature` action of the same name (iOS
      * rows send them directly). Share, files and image previews are the screen's: Share opens
      * the system share sheet with the link; files and images end text focus first, as iOS does
-     * before presenting their viewers.
+     * before presenting their viewers (media's [MediaPresenter]: the image viewer, or
+     * [AgentFileViewer] for a file, iOS `presentImage` / `presentFile`).
      */
-    fun handle(action: TranscriptAction, store: StoreOf<State, Action>, context: Context, host: SessionComposerHost?) {
+    fun handle(
+        action: TranscriptAction,
+        store: StoreOf<State, Action>,
+        context: Context,
+        host: SessionComposerHost?,
+        presenter: MediaPresenter? = null,
+        reducedMotion: Boolean = false,
+    ) {
         when (action) {
             is TranscriptAction.LinkMenu -> {
                 store.send(Action.LinkMenu(action.action, action.url))
@@ -527,8 +540,29 @@ object SessionTranscriptView {
                     context.startActivity(Intent.createChooser(send, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 }
             }
-            // The keyboard would stay up over the viewer. (The viewers belong to :feature:media.)
-            is TranscriptAction.OpenFile, is TranscriptAction.PreviewImage -> host?.dismissComposerKeyboard()
+            is TranscriptAction.PreviewImage -> {
+                // The keyboard would stay up over the image.
+                host?.dismissComposerKeyboard()
+                presenter?.presentImage(action.preview)
+            }
+            is TranscriptAction.OpenFile -> {
+                host?.dismissComposerKeyboard()
+                val file = action.file
+                val server = store.state.server
+                val directory = store.state.session?.directory
+                presenter?.present(sourceID = file.zoomSourceID, isMedia = file.kind.isMedia, reducesMotion = reducedMotion) { viewer ->
+                    AgentFileViewer(
+                        reference = file,
+                        server = server,
+                        directory = directory,
+                        onDone = { viewer.dismiss() },
+                        isInMediaViewer = true,
+                        onImageShown = { sourceID, image -> viewer.show(sourceID, image) },
+                        onZoomChange = { viewer.isZoomed = it },
+                        onImageFrame = { sourceID, frame -> viewer.mediaFrames[sourceID] = frame },
+                    )
+                }
+            }
             else -> sessionAction(action)?.let(store::send)
         }
     }

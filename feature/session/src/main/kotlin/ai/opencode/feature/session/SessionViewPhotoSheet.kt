@@ -3,6 +3,13 @@ package ai.opencode.feature.session
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
 import ai.opencode.feature.composer.AttachmentPickerButton
+import ai.opencode.feature.composer.ComposerImageSource
+import ai.opencode.feature.composer.plusmenu.PhotoFlights
+import ai.opencode.feature.composer.plusmenu.PlusCameraPresentation
+import ai.opencode.feature.composer.plusmenu.PlusPhotoLibrary
+import ai.opencode.feature.composer.plusmenu.PlusPhotoSheet
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.remember
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -48,7 +55,7 @@ fun SessionPhotoSheet(
     val launcher = rememberLauncherForActivityResult(
         ActivityResultContracts.PickMultipleVisualMedia(maxItems = AttachmentPickerButton.MAX_PHOTO_SELECTION),
     ) { uris ->
-        if (uris.isNotEmpty()) importer.importPickedMedia(uris.map { it.toString() }, currentOnAdded)
+        if (uris.isNotEmpty()) importer.importPickedMedia(uris, currentOnAdded)
         currentOnDismiss()
     }
     var launched by rememberSaveable { mutableStateOf(false) }
@@ -67,4 +74,49 @@ fun SessionPhotoSheet(
             currentOnDismiss()
         }
     }
+}
+
+/**
+ * The New Plus Menu's photo sheet (iOS `PlusPhotoSheet` as `SessionView+PhotoSheet` presents it,
+ * Experimental): the composer's [PlusPhotoSheet] over the + menu, the camera tile first, then the
+ * newest photos. Add attaches the picks in tap order through the screen's importer; a photo from
+ * the sheet's camera attaches at once. Videos picked here attach as their first frame.
+ *
+ * Android: the photos land without the flights into their thumbnails (`PhotoFlights` isn't driven
+ * here), and the sheet is a modal bottom sheet rather than the + menu's morphing surface.
+ *
+ * @param onBack ‹ Back: the + menu again.
+ * @param onDismiss swiped or tapped away: the menu closes too.
+ * @param onClosed Add or a capture closed it.
+ */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+fun SessionPlusPhotoSheet(
+    importer: SessionAttachmentImporter,
+    onBack: () -> Unit,
+    onDismiss: () -> Unit,
+    onAdded: (() -> Unit)?,
+    onClosed: () -> Unit,
+) {
+    val library = remember { PlusPhotoLibrary() }
+    val flights = remember { PhotoFlights() }
+    val camera = remember { PlusCameraPresentation() }
+    DisposableEffect(library) { onDispose { library.stop() } }
+    PlusPhotoSheet(
+        library = library,
+        flights = flights,
+        camera = camera,
+        onBack = onBack,
+        onAdd = { ids ->
+            if (ids.isNotEmpty()) {
+                importer.startImageImport(ids.map { id -> ComposerImageSource.Loader { library.imageData(id) } }, onAdded = onAdded)
+            }
+            onClosed()
+        },
+        onCapture = { data ->
+            importer.captureCameraPhoto(data, onAdded)
+            onClosed()
+        },
+        onDismiss = onDismiss,
+    )
 }

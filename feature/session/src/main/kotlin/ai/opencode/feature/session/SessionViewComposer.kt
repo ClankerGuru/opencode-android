@@ -14,8 +14,29 @@ import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.feature.session.SessionFeature.Action
-import ai.opencode.feature.session.seams.ComposerSwipeDown
-import ai.opencode.feature.session.seams.ComposerSwipeOwnership
+import ai.opencode.feature.composer.AttachmentMenuAnchors
+import ai.opencode.feature.composer.AttachmentMenuItem
+import ai.opencode.feature.composer.AttachmentMenuPress
+import ai.opencode.feature.composer.AutocompleteFlightOverlay
+import ai.opencode.feature.composer.AutocompleteMotionController
+import ai.opencode.feature.composer.AutocompleteMotionDriver
+import ai.opencode.feature.composer.ComposerAutocompleteAction
+import ai.opencode.feature.composer.ComposerAutocompletePanel
+import ai.opencode.feature.composer.ComposerAutocompleteState
+import ai.opencode.feature.composer.ComposerAutocompleteTextBridge
+import ai.opencode.feature.composer.ComposerFileSource
+import ai.opencode.feature.composer.ComposerImageSource
+import ai.opencode.feature.composer.ComposerSwipeDown
+import ai.opencode.feature.composer.ComposerSwipeOwnership
+import ai.opencode.feature.composer.ComposerTextInput
+import ai.opencode.feature.composer.RequestDockContext
+import ai.opencode.feature.composer.RequestDockView
+import ai.opencode.feature.composer.RequestPanelFit
+import ai.opencode.feature.composer.RequestPanelReveal
+import ai.opencode.feature.composer.SyncComposerAutocomplete
+import ai.opencode.feature.composer.autocompleteComposerAnchor
+import ai.opencode.feature.composer.requestPanelCap
+import ai.opencode.server.model.PastedText
 import ai.opencode.feature.composer.DictationFeature
 import ai.opencode.core.experiments.key
 import ai.opencode.core.sharing.ExperimentalFeature
@@ -46,8 +67,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -58,7 +77,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -68,38 +87,25 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.isCtrlPressed
-import androidx.compose.ui.input.key.isMetaPressed
-import androidx.compose.ui.input.key.isShiftPressed
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
-import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -137,16 +143,34 @@ class SessionComposerHost {
     var isImportingAttachments by mutableStateOf(false)
     /** iOS `pendingAttachmentsRow` (VIEW-PICKERS): shown above the field when the composer has attachments. */
     var pendingAttachmentsRow: (@Composable () -> Unit)? by mutableStateOf(null)
-    /** Model Picker › Grow from Composer: the fused chip (VIEW-PICKERS), given whether it takes taps. */
-    var fusedModelChip: (@Composable (enabled: Boolean) -> Unit)? by mutableStateOf(null)
+    /** Model Picker › Grow from Composer: the chip's level stack and label flight (iOS `modelPickerAnchors`). */
+    var modelPickerAnchors: ai.opencode.feature.composer.modelpicker.ModelPickerAnchors? by mutableStateOf(null)
     /** A panel grown out of the composer (model list, level panel) stands over what sits above it. */
     var composerPanelCovers by mutableStateOf(false)
     /** The model list or level panel is shown: the composer stays expanded under it. */
     var keepsComposerExpanded by mutableStateOf(false)
     /** A control outside this file owns downward drags now (iOS `composerSwipeYields`' panels). */
     var swipeYields by mutableStateOf(false)
+    /** The screen's imports (iOS `imageImporter`/`fileImporter`): pastes and drops on the field start them. */
+    var importer: SessionAttachmentImporter? by mutableStateOf(null)
+    /** iOS `attachmentMenuAnchors`: the + button, the composer, the menu's rows (root px). */
+    val attachmentAnchors = AttachmentMenuAnchors()
+    /** iOS `attachmentMenuPress`; set by the screen's attachment menu. */
+    var attachmentPress: AttachmentMenuPress? by mutableStateOf(null)
+    /** The rows a slide from + can reach: the menu's, only while it rests open. */
+    var attachmentMenuRows: Map<AttachmentMenuItem, androidx.compose.ui.geometry.Rect> by mutableStateOf(emptyMap())
+    /** iOS `chooseAttachment`: a row chosen by sliding from + and releasing on it. */
+    var onAttachmentChoose: (AttachmentMenuItem) -> Unit by mutableStateOf({})
+    /** iOS `closeAttachmentMenu`: a request docking closes the menu. */
+    var closeAttachmentMenu: () -> Unit = {}
+    /**
+     * The screen's height between the top safe area and the keyboard (or the bottom safe area),
+     * and the header's height, both dp: the request panel's cap (iOS `requestPanelInputs.room`, `headerHeight`).
+     */
+    var availableHeight by mutableFloatStateOf(0f)
+    var headerHeight by mutableFloatStateOf(0f)
 
-    /** Written by the composer: the message field has the keyboard (iOS `messageFieldFocused`). */
+    /** The message field has the keyboard (iOS `messageFieldFocused`); the field follows it. */
     var messageFieldFocused by mutableStateOf(false)
         internal set
     internal var focusAction: () -> Unit = {}
@@ -179,12 +203,21 @@ internal class SessionComposerViewState {
     /** The composer's controls as a press began, kept until its recording ends. */
     var heldComposerPresentation by mutableStateOf<ComposerPresentation?>(null)
     var holdGuides: Job? = null
-    /** The text field's bounds in the composer surface's coordinates (px). */
+    /** The text field's bounds in root px. */
     var textFieldBounds by mutableStateOf(Rect.Zero)
     var surfaceBounds by mutableStateOf(Rect.Zero)
     val capsuleSwipeOwnership = ComposerSwipeOwnership()
     var handledFocusRequest by mutableStateOf<Pair<Int, Int>?>(null)
-    var focusGeneration by mutableIntStateOf(0)
+    /** iOS `autocompleteController` / `autocompleteBridge`. */
+    val autocompleteController = AutocompleteMotionController()
+    val autocompleteBridge = ComposerAutocompleteTextBridge()
+    /** The composer surface's size (dp), for the autocomplete simulation. */
+    var surfaceSize by mutableStateOf(androidx.compose.ui.geometry.Size.Zero)
+    /** The composer area's height (dp), for the request panel's cap. */
+    var areaHeight by mutableFloatStateOf(0f)
+    /** iOS `requestPanelHeight`: the panel's measured height (dp), and what the surface shows of it. */
+    var requestPanelHeight by mutableFloatStateOf(0f)
+    val requestPanelEasing = RequestPanelFit.Easing()
 }
 
 /** iOS `composerPresentation`'s tuple. */
@@ -309,8 +342,10 @@ fun SessionComposer(
     val modelPickerStyle by remember { shared(ModelPickerStyle.key).flow }.collectAsState(shared(ModelPickerStyle.key).value)
     val agentSelection by remember { shared(ExperimentalFeature.agentSelection.key).flow }
         .collectAsState(false)
+    val autocompleteSetting by remember { shared(ExperimentalFeature.composerAutocomplete.key).flow }.collectAsState(false)
+    val usesAutocomplete = ExperimentalFeature.composerAutocomplete.isActive(autocompleteSetting)
+    val autocomplete by store.observe { it.autocomplete }
     val reducedMotion = rememberReduceMotion()
-    val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
@@ -324,18 +359,32 @@ fun SessionComposer(
         returnKeySends = returnKeySends,
         modelPickerStyle = ModelPickerStyle.active(modelPickerStyle),
         agentSelection = ExperimentalFeature.agentSelection.isActive(agentSelection),
-        focusRequester = focusRequester,
+        usesAutocomplete = usesAutocomplete,
+        autocomplete = autocomplete,
         focus = {
-            if (!host.messageFieldFocused) {
-                runCatching { focusRequester.requestFocus() }
-            }
+            // The field follows `messageFieldFocused` (iOS `focusComposer()`); the keyboard comes up even if it already had focus.
+            host.messageFieldFocused = true
             keyboard?.show()
         },
         dismissKeyboard = {
+            host.messageFieldFocused = false
             focusManager.clearFocus()
             keyboard?.hide()
         },
         scope = scope,
+    )
+
+    // iOS `attachComposerAutocomplete`: the controller follows the reducer's state and the composer's size.
+    AutocompleteMotionDriver(view.autocompleteController)
+    SyncComposerAutocomplete(
+        state = autocomplete,
+        isEnabled = usesAutocomplete,
+        controller = view.autocompleteController,
+        bridge = view.autocompleteBridge,
+        composerWidth = view.surfaceSize.width.toDouble(),
+        composerHeight = view.surfaceSize.height.toDouble(),
+        reducedMotion = reducedMotion,
+        send = { store.send(Action.Autocomplete(it)) },
     )
     host.focusAction = env.focus
     host.dismissAction = env.dismissKeyboard
@@ -391,6 +440,8 @@ fun SessionComposer(
             onCopy = { store.send(Action.CopyTextTapped(it)) },
             onCancel = { store.send(Action.PendingInputCancelTapped(it)) },
             onClose = { view.showsQueuedMessages = false },
+            // A call's delegation shows the voice agent's words, as the transcript does.
+            displayText = { ai.opencode.feature.transcript.user.VoiceHandoff.parse(it)?.displayText ?: it },
         )
     }
 }
@@ -422,7 +473,8 @@ internal class SessionComposerEnv(
     val returnKeySends: Boolean,
     val modelPickerStyle: ModelPickerStyle,
     val agentSelection: Boolean,
-    val focusRequester: FocusRequester,
+    val usesAutocomplete: Boolean,
+    val autocomplete: ComposerAutocompleteState,
     val focus: () -> Unit,
     val dismissKeyboard: () -> Unit,
     val scope: kotlinx.coroutines.CoroutineScope,
@@ -447,6 +499,9 @@ internal class SessionComposerEnv(
     val canSend: Boolean get() = s.hasPromptContent && !s.hasFailedFiles
 
     private val hasComposerAttachments: Boolean get() = s.hasNonLocationAttachments || s.wantsLocationAttachment
+
+    /** iOS `docksRequest`: answering a request, its panel grows out of the composer (never under a call). */
+    val docksRequest: Boolean get() = !s.hasCall && s.isAnsweringRequest
 
     /** iOS `showsVoiceControl`: Voice is set up and no call is running. */
     val showsVoiceControl: Boolean get() = s.isVoiceAvailable && !s.hasCall
@@ -582,9 +637,11 @@ private fun SessionComposerEnv.ComposerArea(modifier: Modifier) {
         if (reducedMotion) tween(0) else MotionSpring(0.25).spec(),
         label = "composerBottomGap",
     )
+    val density = LocalDensity.current
     Box(
         modifier
             .fillMaxWidth()
+            .onSizeChanged { view.areaHeight = with(density) { it.height.toDp().value } }
             .padding(horizontal = horizontalMargin.dp)
             .padding(top = 6.dp, bottom = bottom),
     ) {
@@ -748,11 +805,17 @@ private fun SessionComposerEnv.QueuedActivity(hasQueued: Boolean) {
 private fun SessionComposerEnv.ComposerCapsule() {
     val density = LocalDensity.current
     val current by rememberUpdatedState(this)
+    // A pending request's panel grows up out of the composer on its surface; with Composer
+    // Autocomplete on (and no panel or call), the suggestions grow there instead.
+    val showsAutocomplete = usesAutocomplete && !docksRequest && view.requestPanelHeight <= 0f && !s.hasCall
     Box(Modifier.fillMaxWidth()) {
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .onGloballyPositioned { view.surfaceBounds = it.boundsInRoot() }
+                .onGloballyPositioned {
+                    view.surfaceBounds = it.boundsInRoot()
+                    host.attachmentAnchors.composer = view.surfaceBounds
+                }
                 .composerSwipes({ current }, density.density)
                 .semantics { testTag = "session-composer" },
             shape = RoundedCornerShape(ComposerTunables.cornerRadius.dp),
@@ -760,7 +823,26 @@ private fun SessionComposerEnv.ComposerCapsule() {
             tonalElevation = 3.dp,
             shadowElevation = 3.dp,
         ) {
-            Composer()
+            Column(Modifier.fillMaxWidth()) {
+                RequestPanel()
+                if (showsAutocomplete) {
+                    ComposerAutocompletePanel(
+                        controller = view.autocompleteController,
+                        onSelectRow = { store.send(Action.Autocomplete(ComposerAutocompleteAction.RowChosen(it))) },
+                    )
+                }
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .autocompleteComposerAnchor(view.autocompleteBridge)
+                        .onSizeChanged { size ->
+                            view.surfaceSize = with(density) { androidx.compose.ui.geometry.Size(size.width.toDp().value, size.height.toDp().value) }
+                        },
+                ) { Composer() }
+            }
+        }
+        if (usesAutocomplete && view.autocompleteController.currentFrame.flights.isNotEmpty()) {
+            AutocompleteFlightOverlay(view.autocompleteController, Modifier.matchParentSize())
         }
         // Above the surface, so its edge never crosses the hold circle.
         val hold = shownDictationHold
@@ -773,6 +855,94 @@ private fun SessionComposerEnv.ComposerCapsule() {
                     modifier = Modifier.matchParentSize(),
                 )
             }
+        }
+    }
+}
+
+/**
+ * iOS `requestPanel(isShown:)` with the room the session keeps for it: the docked request's
+ * [RequestDockView], capped so the composer stays under the header ([RequestPanelFit]), on a
+ * band of the composer's surface that grows with the panel's measured height and folds back
+ * when it leaves (after its content has faded, `RequestPanelReveal.glass`). Changes the cap
+ * made (the keyboard, the room) follow at once; the panel's own content changes ease.
+ */
+@Composable
+private fun SessionComposerEnv.RequestPanel() {
+    val docks = docksRequest
+    val dock by store.observe { it.requestDock }
+    val context by store.observe { state ->
+        if (!state.isAnsweringRequest && state.dockRequestID == null) {
+            RequestDockContext(currentSessionID = state.session?.id, draftBecameSessionID = state.draftBecameSessionID, isVisible = state.isVisible)
+        } else {
+            RequestDockContext(
+                currentSessionID = state.session?.id,
+                draftBecameSessionID = state.draftBecameSessionID,
+                familySessions = state.familySessions,
+                transcripts = listOf(state.items) + state.familyTranscriptCache.values,
+                isVisible = state.isVisible,
+                isDictating = state.hasLiveDictation || state.dictationHold != null,
+            )
+        }
+    }
+    val chrome = RequestPanelFit.chrome(composer = view.areaHeight, capsule = view.surfaceBounds.height / LocalDensity.current.density, bar = view.surfaceSize.height)
+    val cap = RequestPanelFit.panelCap(room = host.availableHeight, header = host.headerHeight, chrome = chrome)
+    val room = RequestPanelFit.room(measured = if (docks) view.requestPanelHeight else 0f, cap = cap)
+    val shown = remember { androidx.compose.animation.core.Animatable(0f) }
+    var opened by remember { mutableStateOf(false) }
+
+    // The keyboard never carries over: the message's into an answer, or an answer's back into the message.
+    var lastDocks by remember { mutableStateOf(docks) }
+    LaunchedEffect(docks) {
+        if (lastDocks == docks) return@LaunchedEffect
+        lastDocks = docks
+        host.messageFieldFocused = false
+        if (docks) host.closeAttachmentMenu()
+    }
+    LaunchedEffect(room, docks) {
+        val eases = view.requestPanelEasing.eases(room, cap, keyboardUp = messageFieldFocused)
+        when {
+            reducedMotion || (!eases && docks && opened) -> shown.snapTo(room)
+            docks && !opened -> {
+                opened = room > 0f
+                shown.animateTo(room, RequestPanelReveal.glass(opening = true))
+            }
+            docks -> shown.animateTo(room, MotionSpring(0.3).spec())
+            else -> {
+                opened = false
+                // Folded and faded: the band goes once the content has sunk away.
+                shown.animateTo(0f, RequestPanelReveal.glass(opening = false))
+            }
+        }
+    }
+    if (shown.value <= 0.5f && !docks && dock.dockRequestID == null) {
+        // Nothing lingers: unmounted so a leaving panel can't keep the room.
+        if (view.requestPanelHeight != 0f) SideEffect { view.requestPanelHeight = 0f }
+        return
+    }
+    val density = LocalDensity.current
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(shown.value.dp)
+            .clipToBounds(),
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .wrapContentHeight(Alignment.Top, unbounded = true)
+                .requestPanelCap(cap?.dp)
+                .onSizeChanged { size ->
+                    // A leaving panel keeps its height while the surface folds over it.
+                    val height = with(density) { size.height.toDp().value }
+                    if (docks && store.state.dockRequestID != null && height > 0f) view.requestPanelHeight = height
+                },
+        ) {
+            RequestDockView(
+                dock = dock,
+                context = context,
+                isKeyboardUp = messageFieldFocused,
+                send = { store.send(Action.RequestDock(it)) },
+            )
         }
     }
 }
@@ -798,25 +968,25 @@ private fun Modifier.composerSwipes(envNow: () -> SessionComposerEnv, density: F
                 val event = awaitPointerEvent(PointerEventPass.Final)
                 val change = event.changes.firstOrNull { it.id == down.id } ?: break
                 tracker.addPosition(change.uptimeMillis, change.position)
-                val dx = (change.position.x - down.position.x) / density
-                val dy = (change.position.y - down.position.y) / density
-                if (!acted && abs(dx) + abs(dy) >= 10f) {
+                val translation = (change.position - down.position) / density
+                if (!acted && abs(translation.x) + abs(translation.y) >= 10f) {
                     val velocity = tracker.calculateVelocity()
                     // UIKit's projection at the normal deceleration rate (≈ v × 0.5 s).
-                    val predictedEndY = dy + velocity.y / density * 0.5f
+                    val predicted = translation + Offset(velocity.x, velocity.y) / density * 0.5f
                     val focused = env.messageFieldFocused
-                    val beganFocused = ownership.beganFocused(focused)
-                    val yields = ownership.yields(focused) { env.composerSwipeYields(start) || change.isConsumed }
+                    val beganFocused = ownership.beganFocused(start, focused)
+                    val yields = ownership.yields(start, focused) { env.composerSwipeYields(start) || change.isConsumed }
                     if (beganFocused) {
-                        if (ComposerSwipeDown.shouldDismissKeyboard(dx, dy, predictedEndY, isFocused = focused, isHoldingMic = yields)) {
+                        if (ComposerSwipeDown.shouldDismissKeyboard(translation, predicted, isFocused = focused, isHoldingMic = yields)) {
                             acted = true
                             env.dismissKeyboard()
                         }
                     } else if (env.composerSwipeUpBandContains(start) &&
+                        // Over the field itself, the field's own swipe raises the keyboard.
+                        !env.view.textFieldBounds.contains(start) &&
                         ComposerSwipeDown.shouldFocusKeyboard(
-                            dx,
-                            dy,
-                            predictedEndY,
+                            translation,
+                            predicted,
                             isFocused = focused,
                             isHoldingMic = yields,
                             minimumDistance = ComposerTunables.swipeUpDistance,
@@ -992,6 +1162,8 @@ private fun SessionComposerEnv.Composer() {
 /**
  * The placeholder over the field: one at a time, hidden without animation when the draft has
  * text, so a programmatic insert (Quote, Share, paste) never cross-fades “Message” over the words.
+ * The field is :feature:composer's [ComposerTextInput], bound to the draft and to
+ * [SessionComposerHost.messageFieldFocused].
  */
 @Composable
 private fun SessionComposerEnv.ComposerInput(expanded: Boolean, recording: Boolean, bar: RequestBar?) {
@@ -1012,23 +1184,37 @@ private fun SessionComposerEnv.ComposerInput(expanded: Boolean, recording: Boole
                     .clearAndSetSemantics { },
             )
         }
-        SessionComposerTextField(
+        val takesPaste = s.takesPasteAttachments
+        ComposerTextInput(
             text = s.draft,
-            readOnly = recording,
-            expanded = expanded,
-            lineLimit = if (bar == null) null else 4,
-            accessibilityLabel = bar?.fieldLabel ?: "Message",
-            returnKeySends = returnKeySends,
+            // Folded while dictating: keys typed into the hidden field don't reach the draft.
             onTextChange = { new -> onDraftEdited(new, recording) },
-            onNonSendNewline = { text -> if (!recording) store.send(Action.NonSendNewlineInserted(text)) },
+            isFocused = host.messageFieldFocused,
+            onFocusedChange = { host.messageFieldFocused = it },
+            expanded = expanded,
+            textStyle = ComposerTunables.textStyle.textStyle,
+            topInset = ComposerTunables.expandedTopInset.dp,
+            onImagePaste = { uris ->
+                // An answer or a reason takes text, never an attachment.
+                if (store.state.takesPasteAttachments) host.importer?.startImageImport(uris.map(ComposerImageSource::ItemProvider))
+            },
+            // Null while answering a request: the paste goes in as text.
+            onLongTextPaste = if (takesPaste) { text -> store.send(Action.attachmentAdded(PastedText.attachment(text))) } else null,
+            onFileDrop = if (takesPaste) { uris -> host.importer?.startFileImport(uris.map(ComposerFileSource::Url)) } else null,
+            onDismissKeyboard = dismissKeyboard,
+            onFocusKeyboard = ::focusComposerFromSwipe,
             onCommandReturn = {
                 if (!recording) {
                     if (s.isAnsweringRequest) store.send(Action.CommandReturnTapped)
                     else if (!host.isImportingAttachments) sendMessage(Action.CommandReturnTapped)
                 }
             },
-            onFocusChanged = { host.messageFieldFocused = it },
-            focusRequester = focusRequester,
+            onNonSendNewline = { text -> if (!recording) store.send(Action.NonSendNewlineInserted(text)) },
+            returnKeySends = returnKeySends,
+            autocompleteBridge = if (usesAutocomplete) view.autocompleteBridge else null,
+            lineLimit = if (bar == null) null else 4,
+            accessibilityLabel = bar?.fieldLabel ?: "Message",
+            isHoldingMic = s.dictationHold != null,
         )
     }
 }
@@ -1046,82 +1232,6 @@ private fun SessionComposerEnv.onDraftEdited(new: String, recording: Boolean) {
     val state = store.state
     if (!returnKeySends || state.nonSendNewlineDraft == new || new != old + "\n") return
     if (state.isAnsweringRequest) store.send(Action.ReturnKeyTapped) else sendMessage(Action.ReturnKeyTapped)
-}
-
-// endregion
-
-// region Text field
-
-/**
- * The session-side stand-in for iOS `ComposerTextInput` (`Composer/ComposerTextInput.swift`): a
- * [BasicTextField] bound to `state.draft` through the draft binding action. Replaced by
- * :feature:composer's text input (image paste, long-text paste cards, file drop, autocomplete
- * chips, swipe arbitration) when that area merges; keep everything field-specific in here.
- *
- * Return sends when [returnKeySends] (the caller detects the appended newline); ⇧↩ on a hardware
- * keyboard inserts a newline that never sends ([onNonSendNewline]); ⌘/Ctrl-↩ sends
- * ([onCommandReturn]). Expanded it shows up to 6 lines (a request's bar [lineLimit] 4), collapsed 1.
- */
-@Composable
-fun SessionComposerTextField(
-    text: String,
-    readOnly: Boolean,
-    expanded: Boolean,
-    lineLimit: Int?,
-    accessibilityLabel: String,
-    returnKeySends: Boolean,
-    onTextChange: (String) -> Unit,
-    onNonSendNewline: (String) -> Unit,
-    onCommandReturn: () -> Unit,
-    onFocusChanged: (Boolean) -> Unit,
-    focusRequester: FocusRequester,
-    modifier: Modifier = Modifier,
-) {
-    var value by remember { mutableStateOf(TextFieldValue(text, TextRange(text.length))) }
-    if (value.text != text) value = TextFieldValue(text, TextRange(text.length))
-    val lines = lineLimit ?: if (expanded) 6 else 1
-    BasicTextField(
-        value = value,
-        onValueChange = { next ->
-            value = next
-            if (next.text != text) onTextChange(next.text)
-        },
-        readOnly = readOnly,
-        textStyle = ComposerTunables.textStyle.textStyle.copy(color = OpenCodeTheme.colors.text),
-        cursorBrush = SolidColor(OpenCodeTheme.colors.accent),
-        maxLines = lines,
-        keyboardOptions = KeyboardOptions(
-            capitalization = KeyboardCapitalization.Sentences,
-            imeAction = if (returnKeySends) ImeAction.Send else ImeAction.Default,
-        ),
-        keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSend = {
-            // The IME's Send key: the same path as an appended return.
-            onTextChange(value.text + "\n")
-        }),
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(top = if (expanded) ComposerTunables.expandedTopInset.dp else 0.dp)
-            .focusRequester(focusRequester)
-            .onFocusChanged { onFocusChanged(it.isFocused) }
-            .onPreviewKeyEvent { event ->
-                if (event.type != KeyEventType.KeyDown || event.key != Key.Enter) return@onPreviewKeyEvent false
-                when {
-                    event.isMetaPressed || event.isCtrlPressed -> {
-                        onCommandReturn()
-                        true
-                    }
-                    event.isShiftPressed -> {
-                        val selection = value.selection
-                        val inserted = value.text.replaceRange(selection.min, selection.max, "\n")
-                        value = TextFieldValue(inserted, TextRange(selection.min + 1))
-                        onNonSendNewline(inserted)
-                        true
-                    }
-                    else -> false
-                }
-            }
-            .semantics { contentDescription = accessibilityLabel },
-    )
 }
 
 // endregion
