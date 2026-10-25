@@ -62,7 +62,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.layout
@@ -325,25 +325,31 @@ private fun GrowingRow(controller: TranscriptListController, key: String, modifi
         modifier
             .rowEntrance { controller.entrance(key) }
             // Outside the layout below, so the clip and soft edge sit at the reported (growing) height.
-            .graphicsLayer {
-                clip = controller.isClipping(key)
-                compositingStrategy = if (controller.softEdge(key) > 0f) CompositingStrategy.Offscreen else CompositingStrategy.Auto
-            }
+            .graphicsLayer { clip = controller.isClipping(key) }
             .drawWithContent {
-                drawContent()
                 val edge = controller.softEdge(key) * density
-                if (edge > 0.5f) {
-                    // The soft edge only ever brightens what it covers (iOS growth mask).
-                    drawRect(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(Color.Transparent, Color.Black),
-                            startY = size.height - edge,
-                            endY = size.height,
-                        ),
-                        topLeft = Offset(0f, size.height - edge),
-                        blendMode = BlendMode.DstOut,
-                    )
+                if (edge <= 0.5f) {
+                    drawContent()
+                    return@drawWithContent
                 }
+                // The erase needs its own layer in this very draw: a growth starts in the measure
+                // pass just before it, after the graphics layer's properties were applied, so an
+                // offscreen compositing strategy chosen there lands a frame late and the DstOut
+                // gradient painted the window black for that frame (found against a live server).
+                val bounds = Rect(0f, 0f, size.width, size.height)
+                drawContext.canvas.saveLayer(bounds, Paint())
+                drawContent()
+                // The soft edge only ever brightens what it covers (iOS growth mask).
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, Color.Black),
+                        startY = size.height - edge,
+                        endY = size.height,
+                    ),
+                    topLeft = Offset(0f, size.height - edge),
+                    blendMode = BlendMode.DstOut,
+                )
+                drawContext.canvas.restore()
             }
             .layout { measurable, constraints ->
                 val placeable = measurable.measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
