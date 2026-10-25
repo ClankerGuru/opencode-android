@@ -21,6 +21,7 @@ import ai.opencode.feature.settings.SettingsRow
 import ai.opencode.feature.settings.SettingsRowFrame
 import ai.opencode.feature.settings.SettingsStore
 import ai.opencode.feature.settings.SettingsTint
+import ai.opencode.feature.settings.isAccessibilitySize
 import ai.opencode.feature.settings.settingsSection
 import ai.opencode.feature.voice.VoiceSharedKeys
 import ai.opencode.server.OpenCodeServer
@@ -34,6 +35,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -223,7 +225,7 @@ private val WhatsNewEntry.Tint.settingsTint: SettingsTint
  */
 @Composable
 private fun WhatsNewFeatureRow(entry: WhatsNewEntry, isNew: Boolean, onClick: () -> Unit) {
-    val accessibilitySize = LocalDensity.current.fontScale >= 1.5f
+    val accessibilitySize = isAccessibilitySize()
     SettingsRowFrame(
         Modifier
             .semantics { if (isNew) stateDescription = "New" }
@@ -291,7 +293,8 @@ fun WhatsNewDetailPage(store: SettingsStore, entryID: String) {
     }
     val current = entry
     SettingsPageScaffold(
-        title = if (current != null && showsTitle) current.title else "",
+        title = current?.title.orEmpty(),
+        titleVisible = showsTitle,
         store = store,
         listState = listState,
         bottomBar = { if (current != null) WhatsNewTryBar(store, current) },
@@ -362,7 +365,7 @@ fun WhatsNewDetailPage(store: SettingsStore, entryID: String) {
         current.example?.let { example ->
             item(key = "example") {
                 Row(
-                    Modifier.padding(horizontal = 26.dp).padding(top = 22.dp, bottom = 8.dp),
+                    Modifier.padding(horizontal = 26.dp).padding(top = 22.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     OpenCodeIcon(
@@ -375,6 +378,8 @@ fun WhatsNewDetailPage(store: SettingsStore, entryID: String) {
                 }
             }
         }
+        // iOS pads the page's foot by 32: the list's own 24 plus this.
+        item(key = "foot") { Spacer(Modifier.height(8.dp)) }
     }
 }
 

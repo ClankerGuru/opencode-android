@@ -21,6 +21,10 @@ import ai.opencode.feature.settings.serverdetails.ServerDetailsPage
 import ai.opencode.feature.settings.whatsnew.WhatsNewDetailPage
 import ai.opencode.feature.settings.whatsnew.WhatsNewListPage
 import ai.opencode.feature.settings.whatsnew.WhatsNewSmallerListPage
+import ai.opencode.core.motion.Motion
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -45,7 +49,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -82,9 +88,13 @@ fun SettingsView(store: SettingsStore, modifier: Modifier = Modifier) {
             entryProvider = { route ->
                 when (route) {
                     SettingsRoute.Root -> NavEntry(route) {
-                        when (root) {
-                            SettingsFeature.State.Root.settings -> SettingsRootPage(store)
-                            SettingsFeature.State.Root.whatsNew -> WhatsNewListPage(store)
+                        // Settings asked for while What’s New is the page up cross-fades to
+                        // Settings' root (iOS `SettingsPresentation.fade`, 0.3 s ease-in-out).
+                        Crossfade(root, animationSpec = tween(300, easing = Motion.EaseInOut), label = "settings-root") { shown ->
+                            when (shown) {
+                                SettingsFeature.State.Root.settings -> SettingsRootPage(store)
+                                SettingsFeature.State.Root.whatsNew -> WhatsNewListPage(store)
+                            }
                         }
                     }
                     is SettingsRoute.Page -> NavEntry(route) { SettingsPageContent(store, route.page) }
@@ -151,6 +161,8 @@ fun SettingsPageScaffold(
     title: String,
     store: SettingsStore,
     modifier: Modifier = Modifier,
+    /** False hides the bar's title (fading over 0.15 s, ease-out), as What's New's entry page does until its own title scrolls under the bar. */
+    titleVisible: Boolean = true,
     listState: LazyListState = rememberLazyListState(),
     actions: @Composable RowScope.() -> Unit = {},
     bottomBar: @Composable () -> Unit = {},
@@ -162,7 +174,16 @@ fun SettingsPageScaffold(
         containerColor = OpenCodeTheme.colors.groupedCanvas,
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text(title, style = OpenCodeTextStyles.headline) },
+                title = {
+                    val alpha by animateFloatAsState(if (titleVisible) 1f else 0f, tween(150, easing = Motion.EaseOut), label = "settings-title")
+                    Text(
+                        title,
+                        style = OpenCodeTextStyles.headline,
+                        modifier = Modifier
+                            .graphicsLayer { this.alpha = alpha }
+                            .then(if (titleVisible) Modifier else Modifier.clearAndSetSemantics {}),
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = { store.send(SettingsFeature.Action.BackTapped) }) {
                         OpenCodeIcon(SFSymbol.ChevronBackward, contentDescription = "Back")
@@ -236,6 +257,7 @@ private fun SettingsRootPage(store: SettingsStore) {
             key = "advanced",
             footer = {
                 SettingsFooterText("Experimental features, diagnostics, and developer tools.")
+                // iOS stacks the footer's lines 14 apart; the footer column already spaces them 6.
                 SelectionContainer(Modifier.fillMaxWidth().padding(top = 8.dp)) {
                     Text(
                         AppVersion.current.label,

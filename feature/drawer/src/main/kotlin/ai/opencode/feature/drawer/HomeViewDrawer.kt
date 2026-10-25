@@ -1,5 +1,8 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.core.dependencies.dependency
+import ai.opencode.feature.system.SessionWindowTarget
+import ai.opencode.feature.system.WindowsClient
 import ai.opencode.core.experiments.ExperimentalFeature
 import ai.opencode.core.experiments.key
 import ai.opencode.core.motion.rememberReduceMotion
@@ -364,8 +367,8 @@ private fun rememberIsDrawerVisible(store: StoreOf<HomeFeature.State, HomeFeatur
 
 /**
  * A row's hold menu (iOS `rowMenu(_:isPinned:)`): Pin or Unpin, Mark as Read or Unread, Mute or
- * Unmute, and Delete (which asks first, [HomeDeleteConfirmation]). iOS's "Open in New Window"
- * (iPad Multiple Windows) is n/a.
+ * Unmute, and Delete (which asks first, [HomeDeleteConfirmation]). Where the device has several
+ * windows (a tablet, iOS's iPad), Open in New Window comes first ([WindowsClient]).
  */
 private fun rowMenu(store: StoreOf<HomeFeature.State, HomeFeature.Action>, row: DrawerListRow): List<DrawerRowMenuItem> {
     val state = store.state
@@ -373,7 +376,18 @@ private fun rowMenu(store: StoreOf<HomeFeature.State, HomeFeature.Action>, row: 
     val unread = state.isUnread(session)
     val muted = state.isMuted(session.id)
     val isPinned = row.isPinnedSection
-    return listOf(
+    val windows = dependency(WindowsClient)
+    // Multiple Windows (tablet): the session in a window of its own.
+    val newWindow = if (windows.isAvailable()) {
+        listOf(
+            DrawerRowMenuItem("Open in New Window", SFSymbol.MacwindowBadgePlus) {
+                windows.open(SessionWindowTarget(serverID = state.server.persistenceID, sessionID = session.id))
+            },
+        )
+    } else {
+        emptyList()
+    }
+    return newWindow + listOf(
         DrawerRowMenuItem(if (isPinned) "Unpin" else "Pin", if (isPinned) SFSymbol.PinSlash else SFSymbol.Pin) {
             store.send(HomeFeature.Action.TogglePin(session.id))
         },

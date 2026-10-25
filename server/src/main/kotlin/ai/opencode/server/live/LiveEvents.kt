@@ -97,7 +97,7 @@ internal fun subscribeEvents(server: OpenCodeServer): Flow<OpenCodeServerEvent> 
                 val source = response.body.source()
                 while (true) {
                     val line = source.readUtf8Line() ?: break
-                    stream.line(line.length)
+                    stream.line(line)
                     if (!line.startsWith("data:")) continue
                     if (line.length - 5 > MAX_FRAME_BYTES ||
                         (line.length * 3 - 5 > MAX_FRAME_BYTES && utf8Length(line) - 5 > MAX_FRAME_BYTES)
@@ -121,7 +121,9 @@ internal fun subscribeEvents(server: OpenCodeServer): Flow<OpenCodeServerEvent> 
             close(error)
         } catch (error: Exception) {
             batches.flush()
-            stream.record(DiagnosticsStreamName.Disconnected, errorCategory = DiagnosticsErrorCategory.of(error), failurePhase = DiagnosticsFailurePhase.BodyRead)
+            val category = DiagnosticsErrorCategory.of(error)
+            if (category == DiagnosticsErrorCategory.Timeout) stream.record(DiagnosticsStreamName.Stalled, errorCategory = category)
+            stream.record(DiagnosticsStreamName.Disconnected, errorCategory = category, failurePhase = DiagnosticsFailurePhase.BodyRead)
             close(streamTransportError(error))
         }
     }
@@ -153,9 +155,13 @@ private class StreamDiagnostics(private val operationID: String) {
         record(DiagnosticsStreamName.Connected, statusCode)
     }
 
-    fun line(byteCount: Int) {
+    fun line(line: String) {
         if (!recorder.isEnabled) return
-        if (progress.receiveLine(byteCount, recorder.now())) record(DiagnosticsStreamName.Resumed)
+        val now = recorder.now()
+        // Silence of 30 s or more between lines (heartbeats included) is a stall.
+        val last = progress.lastLineAt
+        if (last != null && now - last >= 30) record(DiagnosticsStreamName.Stalled)
+        if (progress.receiveLine(utf8Length(line), now)) record(DiagnosticsStreamName.Resumed)
     }
 }
 

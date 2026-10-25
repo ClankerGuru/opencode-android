@@ -9,7 +9,6 @@ import ai.opencode.feature.settings.SettingsTint
 import ai.opencode.server.OpenCodeServer
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -24,6 +23,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -81,6 +84,9 @@ fun ServerTitleFeature.State.tone(server: OpenCodeServer): ServerStatusTone = wh
 }
 
 private val smooth = MotionSpring(0.3, 0.0)
+
+/** iOS `ServerCommandRow`'s `.animation(.smooth(duration: 0.25))`. */
+private val copySmooth = MotionSpring(0.25)
 
 /** The status dot: 7 dp, filled by tone, a hollow ring while asleep. */
 @Composable
@@ -143,16 +149,30 @@ fun ServerCommandRow(command: String, onCopy: (String) -> Unit, modifier: Modifi
         modifier.fillMaxWidth().heightIn(min = 52.dp).padding(start = 16.dp, end = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        AnimatedContent(command, transitionSpec = { fadeIn(tween(250)) togetherWith fadeOut(tween(250)) }, label = "command") {
-            Text(
-                it,
-                style = OpenCodeTextStyles.body.copy(fontFamily = ai.opencode.core.ui.OpenCodeFonts.monospace),
-                color = OpenCodeTheme.colors.text,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+        val commandStyle = OpenCodeTextStyles.body.copy(
+            fontFamily = ai.opencode.core.ui.OpenCodeFonts.monospace,
+            color = OpenCodeTheme.colors.text,
+        )
+        AnimatedContent(
+            command,
+            transitionSpec = { fadeIn(copySmooth.spec()) togetherWith fadeOut(copySmooth.spec()) },
+            modifier = Modifier.weight(1f),
+            contentAlignment = Alignment.CenterStart,
+            label = "command",
+        ) {
+            // iOS `.lineLimit(1).minimumScaleFactor(0.8).textSelection(.enabled)`.
+            SelectionContainer {
+                BasicText(
+                    it,
+                    style = commandStyle,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                    autoSize = TextAutoSize.StepBased(minFontSize = commandStyle.fontSize * 0.8f, maxFontSize = commandStyle.fontSize),
+                )
+            }
         }
-        Spacer(Modifier.weight(1f))
+        Spacer(Modifier.width(12.dp))
         Box(
             Modifier
                 .clickable {
@@ -167,7 +187,7 @@ fun ServerCommandRow(command: String, onCopy: (String) -> Unit, modifier: Modifi
                 },
             contentAlignment = Alignment.Center,
         ) {
-            AnimatedContent(copied, transitionSpec = { fadeIn(tween(250)) togetherWith fadeOut(tween(250)) }, label = "copied") {
+            AnimatedContent(copied, transitionSpec = { fadeIn(copySmooth.spec()) togetherWith fadeOut(copySmooth.spec()) }, label = "copied") {
                 Text(
                     if (it) "Copied" else "Copy",
                     style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold),

@@ -45,6 +45,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -196,7 +197,16 @@ private fun ServerSheetPage(
         topBar = {
             if (large) {
                 LargeTopAppBar(
-                    title = { Text(title) },
+                    // iOS `.navigationBarTitleDisplayMode(.large)`: a bold 34 pt large title that
+                    // collapses into the semibold headline. The bar draws the title twice (expanded,
+                    // then collapsed row), each under its own style; the expanded one is headlineMedium.
+                    title = {
+                        val expanded = LocalTextStyle.current.fontSize == MaterialTheme.typography.headlineMedium.fontSize
+                        Text(
+                            title,
+                            style = if (expanded) OpenCodeTextStyles.largeTitle.copy(fontWeight = FontWeight.Bold) else OpenCodeTextStyles.headline,
+                        )
+                    },
                     navigationIcon = back,
                     actions = close,
                     colors = colors,

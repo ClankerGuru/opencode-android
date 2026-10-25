@@ -32,18 +32,20 @@ private typealias ActivePayload = DataPayload<Map<String, ActiveSessionPayload>>
 internal suspend fun requestHomeSnapshot(server: OpenCodeServer): OpenCodeHomeSnapshot {
     try {
         return coroutineScope {
-            val projects = async { request<List<ProjectPayload>>("/api/project", server = server) }
+            // Failures are values until awaited, in order, as Swift's `async let` tuple awaits
+            // them: a projects error wins over a sessions error that came back first.
+            val projects = async { capturedRequest<List<ProjectPayload>>("/api/project", server = server) }
             val sessions = async {
-                request<DataPayload<List<SessionPayload>>>(
+                capturedRequest<DataPayload<List<SessionPayload>>>(
                     "/api/session",
                     query = listOf("parentID" to "null", "order" to "desc", "limit" to "50"),
                     server = server,
                 )
             }
-            val active = async { request<ActivePayload>("/api/session/active", server = server) }
-            val projectPayloads = projects.await()
-            val roots = sessions.await().data.map(::session)
-            val activeIDs = active.await().data.keys
+            val active = async { capturedRequest<ActivePayload>("/api/session/active", server = server) }
+            val projectPayloads = projects.await().getOrThrow()
+            val roots = sessions.await().getOrThrow().data.map(::session)
+            val activeIDs = active.await().getOrThrow().data.keys
             val parents = cachedActiveSessionParents(server, activeIDs, roots.map { it.id })
             OpenCodeHomeSnapshot(
                 projects = projectPayloads.map { it.project() },
@@ -178,7 +180,9 @@ internal suspend fun requestActiveSessionParents(server: OpenCodeServer, activeI
 internal suspend fun requestSessionFamily(server: OpenCodeServer, root: OpenCodeSession): OpenCodeSessionFamily {
     try {
         return coroutineScope {
-            val active = async { request<ActivePayload>("/api/session/active", server = server) }
+            // Captured: an active-status failure surfaces after the walk (whose own error wins),
+            // as Swift's `async let` does, instead of cancelling it.
+            val active = async { capturedRequest<ActivePayload>("/api/session/active", server = server) }
             val sessions = mutableListOf(root)
             val queue = mutableListOf(root.id)
             var queueIndex = 0
@@ -214,7 +218,7 @@ internal suspend fun requestSessionFamily(server: OpenCodeServer, root: OpenCode
                     if (sessions.size >= 100) coroutineContext.cancelChildren()
                 }
             }
-            val activeIDs = active.await().data.keys
+            val activeIDs = active.await().getOrThrow().data.keys
             val running = activeDescendants(server, sessions, activeIDs)
             OpenCodeSessionFamily(sessions + running, activeIDs)
         }

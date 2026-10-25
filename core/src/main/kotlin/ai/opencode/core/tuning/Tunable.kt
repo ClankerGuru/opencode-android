@@ -23,6 +23,8 @@ import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.sign
+import kotlin.math.truncate
 import kotlin.random.Random
 
 /**
@@ -450,4 +452,9 @@ data class TuningPresets(
 }
 
 /** Swift's `Double.rounded()`: to nearest, halves away from zero. */
-internal fun swiftRounded(value: Double): Double = if (value >= 0) floor(value + 0.5) else -floor(-value + 0.5)
+internal fun swiftRounded(value: Double): Double {
+    if (!value.isFinite()) return value
+    // Exact: `value - whole` never rounds, unlike `floor(value + 0.5)` (0.49999999999999994 → 1).
+    val whole = truncate(value)
+    return if (abs(value - whole) >= 0.5) whole + sign(value) else whole
+}

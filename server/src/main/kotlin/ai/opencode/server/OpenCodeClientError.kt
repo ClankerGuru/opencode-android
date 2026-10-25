@@ -1,6 +1,9 @@
 package ai.opencode.server
 
 import ai.opencode.server.retry.TransportFailure
+import java.math.RoundingMode
+import java.text.DecimalFormat
+import java.text.DecimalFormatSymbols
 import java.time.Instant
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -97,9 +100,11 @@ data class OpenCodeClientError(
             return maxOf(0.0, (parsed.toEpochMilli() - now.toEpochMilli()) / 1000.0)
         }
 
-        private fun formatUpToOneFraction(value: Double): String {
-            val rounded = Math.round(value * 10) / 10.0
-            return if (rounded == Math.rint(rounded)) rounded.toLong().toString() else rounded.toString()
-        }
+        /**
+         * `formatted(.number.precision(.fractionLength(0...1)).locale(.posix))`: grouped
+         * ("1,234.5") and rounded half to even, as Foundation formats.
+         */
+        private fun formatUpToOneFraction(value: Double): String =
+            DecimalFormat("#,##0.#", DecimalFormatSymbols(Locale.US)).apply { roundingMode = RoundingMode.HALF_EVEN }.format(value)
     }
 }
