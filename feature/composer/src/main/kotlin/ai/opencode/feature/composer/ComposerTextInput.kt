@@ -744,6 +744,7 @@ fun ComposerTextInput(
                 controller.layout = result
                 sendTransition?.textLayout = result
                 autocompleteBridge?.textLayout = result
+                if (result != null) autocompleteBridge?.updateLineBreaks(result)
                 controller.layoutTick += 1
             },
             decorator = { innerTextField ->

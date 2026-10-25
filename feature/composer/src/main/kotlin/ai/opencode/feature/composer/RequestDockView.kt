@@ -68,6 +68,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.BlurEffect
+import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layout
@@ -76,6 +78,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.heading
@@ -123,6 +126,8 @@ object RequestDockMetrics {
     val headerTop: Dp = cornerRadius - 22.dp
     /** How far a request's content rises out of the bar as it arrives. */
     val rise: Dp = 28.dp
+    /** The blur a request's content sharpens in from and blurs away to (iOS `.blur(radius: 8)`). */
+    val revealBlur: Dp = 8.dp
     /** Caps scaled down with small text, never up (OC-471): larger text scrolls inside them. */
     val questionCap: Dp = 220.dp
     val rowsCap: Dp = 300.dp
@@ -221,12 +226,13 @@ fun RequestDockView(
     // Each request starts folded, with nothing sent.
     val focus = remember { FocusRequester() }
     val androidContext = LocalContext.current
+    val accessibility = remember(androidContext) { androidContext.getSystemService(Context.ACCESSIBILITY_SERVICE) as? AccessibilityManager }
+    val screenReaderOn = { accessibility?.isTouchExplorationEnabled == true }
     LaunchedEffect(dock.dockRequestID) {
         state.sentAction = null
         state.expandedPermissionID = null
         state.scopeShownForID = null
-        val accessibility = androidContext.getSystemService(Context.ACCESSIBILITY_SERVICE) as? AccessibilityManager
-        if (dock.dockRequestID == null || !context.isVisible || accessibility?.isTouchExplorationEnabled != true) return@LaunchedEffect
+        if (dock.dockRequestID == null || !context.isVisible || !screenReaderOn()) return@LaunchedEffect
         delay(400)
         runCatching { focus.requestFocus() }
     }
@@ -246,6 +252,10 @@ fun RequestDockView(
             else -> RequestDockMetrics.rise.value
         }
         val rise by animateFloatAsState(riseTarget, RequestPanelReveal.content(showing, reducedMotion), label = "requestRise")
+        // Arriving it sharpens in as the surface grows; leaving it blurs away in place just
+        // ahead of the surface folding over it (one motion). Reduce Motion only fades.
+        val blurTarget = if (reducedMotion || showing) 0f else RequestDockMetrics.revealBlur.value
+        val blur by animateFloatAsState(blurTarget, RequestPanelReveal.content(showing, reducedMotion), label = "requestBlur")
         val leaving = live == null
         Box(
             modifier
@@ -254,6 +264,8 @@ fun RequestDockView(
                 .graphicsLayer {
                     this.alpha = alpha
                     translationY = rise.dp.toPx()
+                    val radius = blur.dp.toPx()
+                    renderEffect = if (radius > 0.01f) BlurEffect(radius, radius, TileMode.Decal) else null
                 }
                 .testTag(if (leaving) "request-dock-leaving" else "request-dock")
                 .semantics {
@@ -265,6 +277,7 @@ fun RequestDockView(
             val scope = DockScope(
                 dock, context, isKeyboardUp, send, state, focus, reducedMotion,
                 enabled = !leaving, pickScope = pickScope, latest = { latestDock to latestDictating },
+                screenReaderOn = screenReaderOn,
             )
             scope.Content(shown)
         }
@@ -295,6 +308,20 @@ private fun liveShown(dock: RequestDockFeature.State<*>, context: RequestDockCon
 
 private enum class DockAction { Once, Always }
 
+/** A question page as it was drawn: what [DockScope.LeavingPage] keeps on screen as it leaves. */
+private data class PageSnapshot(
+    val key: String,
+    val field: OpenCodeFormField?,
+    val answers: Map<String, OpenCodeFormValue>,
+    val autoAdvance: Int?,
+)
+
+/** Measured and drawn at its own height, but takes none in its parent: an overlay over what follows. */
+private fun Modifier.overlayWithoutHeight(): Modifier = layout { measurable, constraints ->
+    val placeable = measurable.measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
+    layout(placeable.width, 0) { placeable.place(0, 0) }
+}
+
 /** The view's own per-request state (iOS `@State`). */
 private class DockViewState {
     /** The action last sent, so only its button shows progress. */
@@ -318,6 +345,8 @@ private class DockScope(
     /** Where a pick's auto-advance waits, and the dock as it is when it wakes. */
     val pickScope: CoroutineScope,
     val latest: () -> Pair<RequestDockFeature.State<*>, Boolean>,
+    /** TalkBack is on (iOS `UIAccessibility.isVoiceOverRunning`). */
+    val screenReaderOn: () -> Boolean,
 ) {
     fun responding(id: String) = id in dock.respondingRequestIDs
 
@@ -340,12 +369,13 @@ private class DockScope(
         closes: Boolean,
         progress: Pair<Int, Int>? = null,
         onBack: (() -> Unit)? = null,
+        busy: Boolean = false,
     ) {
         val colors = OpenCodeTheme.colors
         val idle = dock.respondingRequestIDs.isEmpty()
         // Top-aligned, each item centred in its own 48 dp, so × stays on the corner arc however tall larger text makes the row.
         Row(
-            Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(top = RequestDockMetrics.headerTop),
+            Modifier.fillMaxWidth().padding(top = RequestDockMetrics.headerTop).heightIn(min = 48.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.Top,
         ) {
@@ -354,7 +384,8 @@ private class DockScope(
                     Modifier
                         .outset(start = 14.dp, end = 8.dp)
                         .size(48.dp)
-                        .clickable(enabled = enabled, onClickLabel = "Back", role = Role.Button, onClick = onBack)
+                        // The panel's `.disabled(responding)` covers Back too.
+                        .clickable(enabled = enabled && !busy, onClickLabel = "Back", role = Role.Button, onClick = onBack)
                         .semantics { contentDescription = "Back" }
                         .testTag("request-back"),
                     contentAlignment = Alignment.Center,
@@ -383,7 +414,7 @@ private class DockScope(
                 Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.Center) {
                     RollingNumber(
                         text = "${page + 1} of $count",
-                        style = OpenCodeTextStyles.footnote,
+                        style = OpenCodeTextStyles.footnote.copy(fontFeatureSettings = "tnum"),
                         color = colors.secondaryText,
                         alignment = RollingNumberAlignment.End,
                         accessibilityLabel = "Question ${page + 1} of $count",
@@ -397,7 +428,7 @@ private class DockScope(
                     Modifier
                         .outset(end = RequestDockMetrics.edge - (RequestDockMetrics.cornerRadius - 22.dp))
                         .size(48.dp)
-                        .clickable(enabled = enabled && idle, onClickLabel = "Dismiss", role = Role.Button) {
+                        .clickable(enabled = enabled && idle && !busy, onClickLabel = "Dismiss", role = Role.Button) {
                             send(RequestDockFeature.Action.DismissTapped)
                         }
                         .semantics { contentDescription = "Dismiss" }
@@ -475,18 +506,34 @@ private class DockScope(
             form.sessionID,
             form.mcpServer,
         )
-        val firstPage = remember { "${form.id}/$page" }
+        val pageKey = "${form.id}/$page"
+        val firstPage = remember { pageKey }
+        val autoAdvance = if (form.isQuestion && page < pageCount - 1) page + 1 else null
+        // The page on screen until the last composition, so a new page can slide the old one out.
+        var lastPage by remember { mutableStateOf<PageSnapshot?>(null) }
+        val leavingPage = remember(pageKey) { lastPage?.takeIf { it.key != pageKey } }
+        val current = PageSnapshot(pageKey, field, answers, autoAdvance)
+        SideEffect { lastPage = current }
+        // iOS posts `.screenChanged` with each page: TalkBack starts again at the caption.
+        LaunchedEffect(pageKey) {
+            if (pageKey != firstPage && enabled && screenReaderOn()) runCatching { focus.requestFocus() }
+        }
         RequestPanelFallback(Modifier.padding(bottom = 6.dp)) {
             Header(
                 AnnotatedString(caption), caption, closes = true,
                 progress = page to pageCount,
                 onBack = if (page > 0) ({ changePage(form.id, page - 1) }) else null,
+                busy = responding(form.id),
             )
+            // The old page fades out sliding the other way, drawn over the new one (it takes no
+            // room in the stack, so the panel measures the new page alone).
+            if (leavingPage != null) {
+                key("leaving/${leavingPage.key}/$pageKey") { LeavingPage(form, leavingPage) }
+            }
             // Each page measures afresh and slides in from the side it comes from.
-            key("${form.id}/$page") {
-                val entrance = rememberEntrance(animate = "${form.id}/$page" != firstPage, slide = true)
+            key(pageKey) {
+                val entrance = rememberEntrance(animate = pageKey != firstPage, slide = true)
                 if (field != null) {
-                    val autoAdvance = if (form.isQuestion && page < pageCount - 1) page + 1 else null
                     FieldView(field, form, answers, autoAdvance, entrance)
                 }
             }
@@ -498,6 +545,36 @@ private class DockScope(
         send(RequestDockFeature.Action.QuestionPageChanged(formID, page))
     }
 
+    /**
+     * iOS `pageTransition`'s removal (`.opacity` + `.offset(x: -24)`; opacity only under Reduce
+     * Motion): the page just left, inert and hidden from TalkBack, overlaid where the new page
+     * starts until it has faded.
+     */
+    @Composable
+    fun LeavingPage(form: OpenCodeFormRequest, snapshot: PageSnapshot) {
+        val field = snapshot.field ?: return
+        val progress = remember { Animatable(0f) }
+        var done by remember { mutableStateOf(false) }
+        LaunchedEffect(Unit) {
+            progress.animateTo(1f, MotionSpring(0.3).animation(reducedMotion))
+            done = true
+        }
+        if (done) return
+        val offset = if (reducedMotion) 0.dp else (-24).dp
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .overlayWithoutHeight()
+                .graphicsLayer {
+                    alpha = 1f - progress.value
+                    translationX = progress.value * offset.toPx()
+                }
+                .clearAndSetSemantics {},
+        ) {
+            FieldView(field, form, snapshot.answers, snapshot.autoAdvance, Modifier, interactive = false)
+        }
+    }
+
     @Composable
     fun FieldView(
         field: OpenCodeFormField,
@@ -505,13 +582,14 @@ private class DockScope(
         answers: Map<String, OpenCodeFormValue>,
         autoAdvance: Int?,
         entrance: Modifier,
+        interactive: Boolean = true,
     ) {
         val colors = OpenCodeTheme.colors
         val options = RequestDockAnswer.options(field)
         val multiple = field.type == OpenCodeFormFieldType.Multiselect
         val fontScale = LocalDensity.current.fontScale
         val scale = min(fontScale, 1f)
-        val formEnabled = enabled && !responding(form.id)
+        val formEnabled = interactive && enabled && !responding(form.id)
         // A long question scrolls on its own; the choices stay in reach.
         FadingScroll(
             cap = RequestDockMetrics.questionCap * scale * (if (isKeyboardUp) 0.5f else 1f),
@@ -594,7 +672,7 @@ private class DockScope(
         val colors = OpenCodeTheme.colors
         val caption = captionText("", form.sessionID, form.mcpServer)
         Column(Modifier.fillMaxWidth()) {
-            Header(AnnotatedString(caption.ifEmpty { "Form" }), spoken = caption.ifEmpty { form.title }, closes = true)
+            Header(AnnotatedString(caption.ifEmpty { "Form" }), spoken = caption.ifEmpty { form.title }, closes = true, busy = responding(form.id))
             Text(form.title, style = OpenCodeTextStyles.body, color = colors.text, modifier = Modifier.fillMaxWidth())
             ErrorLines(form.id, isForm = true)
             Box(Modifier.fillMaxWidth().padding(vertical = 10.dp), contentAlignment = Alignment.CenterEnd) {
@@ -661,7 +739,10 @@ private class DockScope(
         val colors = OpenCodeTheme.colors
         val summary = remember(permission, command) { PermissionSummary(permission, command) }
         val turn by animateFloatAsState(if (expanded) 180f else 0f, MotionSpring(0.3).animation(reducedMotion), label = "summaryChevron")
-        Row(
+        val textStyle = if (summary.isCode) RequestTranscriptMetrics.toolFont else OpenCodeTextStyles.subheadline
+        val firstLine = with(LocalDensity.current) { if (textStyle.lineHeight.isSp) textStyle.lineHeight.toDp() else 0.dp }
+        // Centred in its 48 dp while one line; the chevron stays on the first line's baseline as it wraps.
+        Box(
             Modifier
                 .fillMaxWidth()
                 .heightIn(min = 48.dp)
@@ -678,18 +759,22 @@ private class DockScope(
                 }
                 .padding(vertical = 6.dp)
                 .testTag("request-summary"),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            contentAlignment = Alignment.CenterStart,
         ) {
-            Text(
-                summary.text,
-                style = if (summary.isCode) RequestTranscriptMetrics.toolFont else OpenCodeTextStyles.subheadline,
-                color = colors.text,
-                maxLines = if (expanded) 1 else 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            OpenCodeIcon(SFSymbol.ChevronDown, contentDescription = null, size = 16.dp, tint = colors.secondaryText, modifier = Modifier.rotate(turn))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
+                Text(
+                    summary.text,
+                    style = textStyle,
+                    color = colors.text,
+                    maxLines = if (expanded) 1 else 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Box(Modifier.heightIn(min = firstLine), contentAlignment = Alignment.Center) {
+                    // `.caption.weight(.semibold)`.
+                    OpenCodeIcon(SFSymbol.ChevronDown, contentDescription = null, size = 12.dp, tint = colors.secondaryText, modifier = Modifier.rotate(turn))
+                }
+            }
         }
     }
 
@@ -722,6 +807,11 @@ private class DockScope(
                             .semantics {
                                 contentDescription = "Always Allow"
                                 stateDescription = scope
+                                // iOS hint “Shows what won’t ask again”.
+                                onClick(label = "Show what won’t ask again") {
+                                    if (actionsEnabled) state.scopeShownForID = permission.id
+                                    actionsEnabled
+                                }
                             }
                             .testTag("request-always"),
                     ) { ButtonLabel("Always Allow", sending = busy && state.sentAction == DockAction.Always) }
