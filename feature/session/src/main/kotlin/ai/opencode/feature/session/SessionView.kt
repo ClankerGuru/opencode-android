@@ -352,13 +352,20 @@ private fun SessionLifecycle(store: StoreOf<State, Action>) {
 
     val lifecycleOwner = LocalLifecycleOwner.current
     val currentStore by rememberUpdatedState(store)
+    // A configuration change (dark mode, font size, rotation) recreates the activity; the reader
+    // never left, as an iOS appearance change never leaves the scene, so it isn't a leave.
+    val activity = androidx.activity.compose.LocalActivity.current
+    val changingConfigurations = { activity?.isChangingConfigurations == true }
     DisposableEffect(lifecycleOwner, store) {
         val lifecycle = lifecycleOwner.lifecycle
-        currentStore.send(Action.VisibilityChanged(lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)))
+        // Recreated by a configuration change, the screen comes back before its activity resumes:
+        // that's not a leave either, and ON_RESUME follows.
+        val resumed = lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+        if (resumed || !currentStore.state.isVisible) currentStore.send(Action.VisibilityChanged(resumed))
         var catchingUp = true
         val observer = LifecycleEventObserver { _, event ->
             // `addObserver` replays the events up to the current state: the appearance above covers them.
-            if (catchingUp) return@LifecycleEventObserver
+            if (catchingUp || changingConfigurations()) return@LifecycleEventObserver
             val active = when (event) {
                 Lifecycle.Event.ON_RESUME -> true
                 Lifecycle.Event.ON_PAUSE, Lifecycle.Event.ON_STOP, Lifecycle.Event.ON_START -> false
@@ -372,7 +379,7 @@ private fun SessionLifecycle(store: StoreOf<State, Action>) {
         catchingUp = false
         onDispose {
             lifecycle.removeObserver(observer)
-            if (currentStore.state.isVisible) currentStore.send(Action.VisibilityChanged(false))
+            if (currentStore.state.isVisible && !changingConfigurations()) currentStore.send(Action.VisibilityChanged(false))
         }
     }
 
