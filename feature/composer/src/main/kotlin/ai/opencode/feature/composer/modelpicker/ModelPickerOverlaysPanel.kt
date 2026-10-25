@@ -20,7 +20,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,6 +50,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -60,6 +65,15 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.semantics.dismiss
+import kotlinx.coroutines.launch
+import kotlin.math.min
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -100,18 +114,15 @@ import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.roundToInt
 
-/** UIKit's normal deceleration (0.998 per ms): a throw's predicted travel is velocity × 0.499 s (SwiftUI `predictedEndTranslation`). */
-private const val PREDICTED_TRAVEL_SECONDS = 0.499
-
 /**
  * Port of iOS `FusedModelPickerPanel` (Grow from Composer, WIP): the grabber, Favorites /
  * Recent / All Models (or flat search results) and Search Models at the foot. Drags on the
  * grabber move the list between its rests ([onDrag], dp; [onDragEnded] with the predicted
  * travel and velocity, dp and dp/s); scrolling the rows up or pulling them down past their top
  * reports [onScrollEdge]. Enter in the search picks the best match at any level named in it.
- *
- * Partial: the rows' top and bottom edge fade and the pinned header's progressive blur are
- * dropped (no blur imitation); the pinned header is a `stickyHeader`.
+ * The rows fade out at the bottom edge, and at the top once scrolled ([FusedModelPickerTunables.edgeFade]);
+ * the header of the section scrolled past holds at the top over a real progressive blur of the rows.
+ * Capped at iOS's `accessibility2` text size.
  */
 @Composable
 fun FusedModelPickerPanel(
@@ -158,10 +169,21 @@ fun FusedModelPickerPanel(
         anchors.listIsScrolling = false
     }
 
+    val baseDensity = LocalDensity.current
+    // iOS `.dynamicTypeSize(...DynamicTypeSize.accessibility2)`: body 17 → 28 pt at most.
+    val cappedDensity = remember(baseDensity) {
+        if (baseDensity.fontScale <= MAX_FONT_SCALE) baseDensity else Density(baseDensity.density, MAX_FONT_SCALE)
+    }
+    val scope = rememberCoroutineScope()
+    CompositionLocalProvider(LocalDensity provides cappedDensity) {
     Column(
         modifier
             .fillMaxSize()
-            .semantics { if (modalOverlayOpen) invisibleToUser() }
+            .semantics {
+                if (modalOverlayOpen) invisibleToUser()
+                // The stack and menu are modal while up; escape (back) closes the list otherwise.
+                if (isOpen && !modalOverlayOpen) dismiss { onDismiss(); true }
+            }
             .testTag("model-list"),
     ) {
         Grabber(
@@ -217,13 +239,20 @@ fun FusedModelPickerPanel(
                     val level = if (resolved.hasExplicitLevel) resolved.variant else state.rememberedLevel(resolved.model)
                     onSearchHoldsKeyboard(true)
                     submitPickPending = true
-                    onPickModel(resolved.model, level, null, false)
-                    submitPickPending = false
+                    // iOS picks on the next main-queue turn (`DispatchQueue.main.async`).
+                    scope.launch {
+                        submitPickPending = false
+                        onPickModel(resolved.model, level, null, false)
+                    }
                 }
             },
         )
     }
+    }
 }
+
+/** iOS caps the panel at `accessibility2` (body 28 pt over the default 17). */
+private const val MAX_FONT_SCALE = 28f / 17f
 
 /** While folding, the list stands still so Recent only reorders after close. */
 private fun activeSections(state: ModelPickerState, anchors: ModelPickerAnchors, isOpen: Boolean): List<ModelPickerSection> {
@@ -256,23 +285,39 @@ private fun Grabber(
             .clickable(enabled = enabled, onClick = toggle)
             .pointerInput(enabled) {
                 if (!enabled) return@pointerInput
-                val tracker = VelocityTracker()
-                var total = 0f
-                var ended = false
-                detectVerticalDragGestures(
-                    onDragStart = { tracker.resetTracking(); total = 0f; ended = false },
-                    onDragEnd = {
-                        ended = true
+                // SwiftUI `DragGesture(minimumDistance: dragMinimum)`: it starts once the finger
+                // has moved `dragMinimum` from where it went down, and its translation runs from there.
+                val minimum = ModelPickerTunables.dragMinimum.dp.toPx()
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val tracker = VelocityTracker()
+                    tracker.addPosition(down.uptimeMillis, down.position)
+                    var dragging = false
+                    var ended = false
+                    var translation = Offset.Zero
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                        tracker.addPosition(change.uptimeMillis, change.position)
+                        translation = change.position - down.position
+                        if (!change.pressed) {
+                            ended = true
+                            break
+                        }
+                        if (!dragging && hypot(translation.x, translation.y) >= minimum) dragging = true
+                        if (dragging) {
+                            change.consume()
+                            if (currentOpen) onDrag(with(density) { translation.y.toDp().value.toDouble() })
+                        }
+                    }
+                    if (!dragging) return@awaitEachGesture
+                    if (ended) {
                         val v = with(density) { tracker.calculateVelocity().y.toDp().value.toDouble() }
-                        val t = with(density) { total.toDp().value.toDouble() }
-                        onDragEnded(t + v * PREDICTED_TRAVEL_SECONDS, v)
-                    },
-                    onDragCancel = { if (!ended) onDragCancelled() },
-                ) { change, amount ->
-                    change.consume()
-                    tracker.addPosition(change.uptimeMillis, change.position)
-                    total += amount
-                    if (currentOpen) onDrag(with(density) { total.toDp().value.toDouble() })
+                        val t = with(density) { translation.y.toDp().value.toDouble() }
+                        onDragEnded(predictedEndTranslation(t, v), v)
+                    } else {
+                        onDragCancelled()
+                    }
                 }
             }
             .clearAndSetSemantics {
@@ -311,12 +356,27 @@ private fun RowsList(
     val recentIDs = sections.firstOrNull { it.kind == ModelPickerSection.Kind.Recent }?.models?.mapTo(HashSet()) { it.id } ?: emptySet()
     val currentOpen by rememberUpdatedState(isOpen)
     val currentOnScrollEdge by rememberUpdatedState(onScrollEdge)
+    val rowsSource = remember { BlurSource() }
+    // The header row each titled section starts with (its LazyColumn index).
+    val headerIndices = remember(sections, showHeaders) {
+        var index = 0
+        sections.map { section ->
+            val header = if (showHeaders && section.title.isNotEmpty()) index++ else -1
+            index += section.models.size
+            header
+        }
+    }
+    // How far the rows are scrolled (px; iOS `contentOffset.y`): past the first row, far.
+    val scrollOffset by remember(listState) {
+        derivedStateOf {
+            if (listState.firstVisibleItemIndex == 0) listState.firstVisibleItemScrollOffset.toFloat() else Float.MAX_VALUE / 4
+        }
+    }
 
     // The rows' scroll: past `scrollUpTrigger` they take the list to its large rest.
     LaunchedEffect(listState) {
-        snapshotFlow { Triple(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset, listState.isScrollInProgress) }
-            .collect { (index, offset, scrolling) ->
-                val px = if (index == 0) offset.toFloat() else Float.MAX_VALUE / 4
+        snapshotFlow { scrollOffset to listState.isScrollInProgress }
+            .collect { (px, scrolling) ->
                 anchors.listScrollOffset = px
                 anchors.listIsScrolling = scrolling
                 if (scrolling && currentOpen && px > with(density) { ModelPickerTunables.scrollUpTrigger.dp.toPx() }) {
@@ -331,12 +391,14 @@ private fun RowsList(
             var startedAtTop = false
             var dragging = false
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                anchors.listScrollTravel += consumed.y
                 if (source == NestedScrollSource.UserInput) {
                     if (!dragging) {
                         dragging = true
                         deepest = 0f
                         startedAtTop = !listState.canScrollBackward
                     }
+                    // Scrolled into the rows, a bounce back at the top is not a pull.
                     if (listState.canScrollBackward) startedAtTop = false
                     if (available.y > 0) deepest += available.y
                 }
@@ -354,23 +416,63 @@ private fun RowsList(
         }
     }
 
-    Box(Modifier.fillMaxSize()) {
+    // A header's top in the rows' frame (px), or null when it isn't laid out (above: −∞).
+    fun headerTop(sectionIndex: Int): Float? {
+        val index = headerIndices.getOrNull(sectionIndex)?.takeIf { it >= 0 } ?: return null
+        val info = listState.layoutInfo
+        info.visibleItemsInfo.firstOrNull { it.index == index }?.let { return (it.offset - info.viewportStartOffset).toFloat() }
+        return if (index < listState.firstVisibleItemIndex) Float.NEGATIVE_INFINITY else null
+    }
+    val threshold = with(density) { 2.dp.toPx() }
+    val pinnedIndex by remember(listState, headerIndices) {
+        derivedStateOf {
+            if (scrollOffset <= threshold) return@derivedStateOf null
+            sections.indices.lastOrNull { i -> headerTop(i)?.let { it < threshold } == true }
+        }
+    }
+
+    Box(
+        Modifier
+            .fillMaxSize()
+            // The rows fade into the panel at the bottom, and at the top once anything's under it
+            // (the pinned header fades with them, as on iOS where the mask covers its overlay).
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+            .drawWithContent {
+                drawContent()
+                val edgeFade = FusedModelPickerTunables.edgeFade.dp.toPx()
+                if (edgeFade > 0f) {
+                    if (scrollOffset > 0.5f * density.density) {
+                        drawRect(Brush.verticalGradient(0f to Color.Transparent, edgeFade / size.height to Color.Black), blendMode = BlendMode.DstIn)
+                    }
+                    val bottom = min(edgeFade, 18.dp.toPx())
+                    drawRect(Brush.verticalGradient((size.height - bottom) / size.height to Color.Black, 1f to Color.Transparent), blendMode = BlendMode.DstIn)
+                }
+            },
+    ) {
         LazyColumn(
             state = listState,
-            // A raised stack or menu holds the rows still.
+            // A raised stack or menu holds the rows still: a hold that raised the stack drags
+            // through it rather than scrolling the rows away under it.
             userScrollEnabled = !isFocusingRow,
             modifier = Modifier
                 .fillMaxSize()
+                .blurSource(rowsSource)
                 .nestedScroll(pull)
                 .semantics { if (blocksTouches) invisibleToUser() },
             contentPadding = PaddingValues(horizontal = FusedModelPickerTunables.padding.dp),
         ) {
-            for (section in sections) {
-                if (showHeaders && section.title.isNotEmpty()) {
-                    stickyHeader(key = "header-${section.id}") { FusedSectionHeader(section) }
+            for ((sectionIndex, section) in sections.withIndex()) {
+                if (headerIndices[sectionIndex] >= 0) {
+                    item(key = "header-${section.id}", contentType = "header") {
+                        FusedSectionHeader(
+                            section,
+                            // Under its pinned copy, the row's own header steps aside.
+                            hidden = { scrollOffset > 0.5f * density.density && headerTop(sectionIndex)?.let { it < threshold } == true },
+                        )
+                    }
                 }
                 val models = if (FusedModelPickerTunables.searchOrder == 1 && section.kind == ModelPickerSection.Kind.SearchResults) section.models.reversed() else section.models
-                items(models, key = { "${section.id}-${it.id}" }) { model ->
+                items(models, key = { "${section.id}-${it.id}" }, contentType = { "row" }) { model ->
                     val rowFocus = if (isFocusingRow && focusModelID != null && focusModelID != model.id) 1 - FusedModelPickerTunables.focusDim else 1.0
                     val isDuplicateInAllModels = section.kind == ModelPickerSection.Kind.AllModels && model.id in recentIDs
                     val isPrimaryFlightRow = section.kind != ModelPickerSection.Kind.AllModels || (model.id !in favoriteIDs && model.id !in recentIDs)
@@ -390,6 +492,29 @@ private fun RowsList(
                 }
             }
         }
+        val pinned = pinnedIndex?.let { sections.getOrNull(it) }
+        if (showHeaders && pinned != null && pinned.title.isNotEmpty()) {
+            Box(Modifier.fillMaxWidth()) {
+                // iOS: `ProgressiveBlur(edge: .top, radius: headerBlur)`, headerHeight + 16 tall.
+                ProgressiveBlur(
+                    source = rowsSource,
+                    profile = ProgressiveBlurProfile.Edge(top = true),
+                    radius = ModelPickerTunables.headerBlur.dp,
+                    modifier = Modifier.fillMaxWidth().height((FusedModelPickerTunables.headerHeight + 16).dp),
+                )
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(FusedModelPickerTunables.headerHeight.dp)
+                        .padding(horizontal = (12 + FusedModelPickerTunables.padding).dp)
+                        .semantics(mergeDescendants = true) { heading() }
+                        .testTag("model-pinned-header"),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    FusedSectionHeaderTitle(pinned.title)
+                }
+            }
+        }
         if (sections.isEmpty() && !state.isLoadingModels) {
             ModelListEmptyState(state, includesLoadError = false, onTryAgain = { onEvent(ModelPickerEvent.ModelListOpened) })
         }
@@ -397,18 +522,23 @@ private fun RowsList(
 }
 
 @Composable
-private fun FusedSectionHeader(section: ModelPickerSection) {
+private fun FusedSectionHeaderTitle(title: String) {
+    Text(title, style = OpenCodeTextStyles.footnote, fontWeight = FontWeight.SemiBold, color = OpenCodeTheme.colors.secondaryText)
+}
+
+@Composable
+private fun FusedSectionHeader(section: ModelPickerSection, hidden: () -> Boolean) {
     Row(
         Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .height(FusedModelPickerTunables.headerHeight.dp)
+            .graphicsLayer { alpha = if (hidden()) 0f else 1f }
             .padding(horizontal = 12.dp)
             .semantics(mergeDescendants = true) { heading() }
             .testTag("model-section-${section.id}"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(section.title, style = OpenCodeTextStyles.footnote, fontWeight = FontWeight.SemiBold, color = OpenCodeTheme.colors.secondaryText)
+        FusedSectionHeaderTitle(section.title)
     }
 }
 
@@ -417,8 +547,6 @@ private fun FusedSectionHeader(section: ModelPickerSection) {
 /** iOS `FusedLevelGesturePhase`. */
 enum class FusedLevelGesturePhase { Began, Changed, Ended, Cancelled }
 
-/** How far the list may move under a still finger before a hold no longer counts (dp). */
-private const val HOLD_SLOP = 10.0
 /** A short hold on the level raises its stack to drag through (s). */
 private const val LEVEL_HOLD_DURATION = 0.2
 
@@ -478,6 +606,15 @@ private fun FusedModelRow(
     val isFlying = anchors.flight?.modelID == model.id && !reduceMotion
     val modalOverlayOpen = anchors.isOverlayActive
     val favTitle = if (isFavorite) "Remove from Favorites" else "Add to Favorites"
+    // iOS `FusedRowButtonStyle`: no highlight, the label at 0.6 while pressed; the press's start
+    // is where the list stood, so a hold that rode a scroll doesn't count.
+    val interactions = remember { MutableInteractionSource() }
+    val pressed by interactions.collectIsPressedAsState()
+    var pressScrollStart by remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(interactions) {
+        interactions.interactions.collect { if (it is PressInteraction.Press) pressScrollStart = anchors.listScrollTravel }
+    }
+    val holdSlopPx = with(LocalDensity.current) { HOLD_SLOP.dp.toPx() }
     val baseConfig = LocalViewConfiguration.current
     // The row's hold is `holdToFavorite` (0.45 s), not the system's long-press timeout.
     val holdConfig = remember(baseConfig) {
@@ -509,6 +646,8 @@ private fun FusedModelRow(
                     .weight(1f)
                     .heightIn(min = FusedModelPickerTunables.rowHeight.dp)
                     .combinedClickable(
+                        interactionSource = interactions,
+                        indication = null,
                         enabled = !modalOverlayOpen,
                         hapticFeedbackEnabled = false,
                         role = Role.Button,
@@ -518,13 +657,16 @@ private fun FusedModelRow(
                             onPick(rememberedLevel, null, false)
                         },
                         onLongClick = {
-                            // The list's own movement rules a hold out.
-                            if (!currentOpen || anchors.isOverlayActive || anchors.listIsScrolling) return@combinedClickable
+                            // The row moves with the finger while the list scrolls, so its press
+                            // can't see it: the list's own movement rules a hold out.
+                            val rodeScroll = anchors.listIsScrolling || abs(anchors.listScrollTravel - pressScrollStart) > holdSlopPx
+                            if (!currentOpen || anchors.isOverlayActive || rodeScroll) return@combinedClickable
                             syncFlightFrames()
                             haptics.play(Haptic.threshold)
                             anchors.openRowMenu(model, rowFrame, reduceMotion)
                         },
                     )
+                    .graphicsLayer { this.alpha = if (pressed) 0.6f else 1f }
                     .padding(start = 12.dp, end = 8.dp)
                     .clearAndSetSemantics {
                         if (modalOverlayOpen) invisibleToUser()

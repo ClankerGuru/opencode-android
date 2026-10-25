@@ -461,7 +461,7 @@ private fun ThinkingMenu(state: ModelPickerState, variants: List<String>, onEven
 private fun PlainModelRow(model: OpenCodeModel, state: ModelPickerState, onEvent: (ModelPickerEvent) -> Unit) {
     val isCurrent = state.currentModelInfo?.id == model.id
     val isFavorite = model.id in state.favoriteModelIDs
-    FavoriteSwipeBox(isFavorite = isFavorite, onToggle = { onEvent(ModelPickerEvent.ToggleFavoriteModel(model)) }) {
+    FavoriteSwipeBox(isFavorite = isFavorite, favoriteSymbol = SFSymbol.Star, onToggle = { onEvent(ModelPickerEvent.ToggleFavoriteModel(model)) }) {
         Row(
             Modifier
                 .fillMaxWidth()

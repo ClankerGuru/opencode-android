@@ -45,6 +45,24 @@ import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.invisibleToUser
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.min
+import kotlin.math.roundToInt
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -82,11 +100,12 @@ import kotlinx.coroutines.launch
  * Use This Model, or swipe it to favorite. Picking only changes the composer; the model goes
  * with the next send.
  *
- * The section header scrolled past sticks under the search field until the next pushes it up
- * (`stickyHeader`); iOS's progressive blur under it and the rows' fade under the field are
- * dropped (no blur imitation).
+ * The rows run on up under the search field and fade out there (no hard edge,
+ * [ModelPickerTunables.searchFade]); the header of the section scrolled past holds just below
+ * the field ([ModelPickerTunables.pinnedInset]) until the next pushes it up, over a real
+ * progressive blur of the rows ([ModelPickerTunables.headerBlur], reaching
+ * [ModelPickerTunables.headerBlurReach] past it).
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ModelListContent(
     state: ModelPickerState,
@@ -95,12 +114,22 @@ fun ModelListContent(
     modifier: Modifier = Modifier,
     searchFocusRequester: FocusRequester = remember { FocusRequester() },
 ) {
-    Column(modifier.fillMaxSize()) {
+    val density = LocalDensity.current
+    // The search field's band at the top (px): the list scrolls on up under it.
+    var searchBand by remember { mutableFloatStateOf(with(density) { 52.dp.toPx() }) }
+    Box(modifier.fillMaxSize()) {
+        if (state.isLoadingModels && state.models.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+        } else {
+            ModelSectionsList(state, onEvent, onPick, searchBand = { searchBand })
+        }
         ModelSearchCapsuleField(
             text = state.modelFilter,
             onTextChange = { onEvent(ModelPickerEvent.FilterChanged(it)) },
             modifier = Modifier
                 .padding(horizontal = ModelPickerTunables.searchInset.dp)
+                // The band is the field and its bottom gap.
+                .onSizeChanged { searchBand = it.height.toFloat() }
                 .padding(bottom = ModelPickerTunables.searchBottom.dp),
             focusRequester = searchFocusRequester,
             spacing = 6.dp,
@@ -108,40 +137,125 @@ fun ModelListContent(
             minHeight = ModelPickerTunables.searchHeight,
             imeAction = ImeAction.Search,
         )
-        Box(Modifier.fillMaxWidth().weight(1f)) {
-            if (state.isLoadingModels && state.models.isEmpty()) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-            } else {
-                val sections = state.modelSections
-                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 12.dp)) {
-                    for ((index, section) in sections.withIndex()) {
-                        stickyHeader(key = "header-${section.id}") {
-                            ModelListSectionHeader(section, isFirst = index == 0)
-                        }
-                        items(section.models, key = { "${section.id}-${it.id}" }) { model ->
-                            ModelListRow(model, inFavorites = section.kind == ModelPickerSection.Kind.Favorites, state, onEvent, onPick)
-                        }
+    }
+}
+
+@Composable
+private fun ModelSectionsList(
+    state: ModelPickerState,
+    onEvent: (ModelPickerEvent) -> Unit,
+    onPick: (OpenCodeModel) -> Unit,
+    searchBand: () -> Float,
+) {
+    val density = LocalDensity.current
+    val sections = state.modelSections
+    val listState = rememberLazyListState()
+    val rowsSource = remember { BlurSource() }
+    var pinnedHeight by remember { mutableFloatStateOf(with(density) { 20.dp.toPx() }) }
+    val pinnedInset = with(density) { ModelPickerTunables.pinnedInset.dp.toPx() }
+    val sectionGap = with(density) { ModelPickerTunables.sectionGap.dp.toPx() }
+    val pinnedTop = { searchBand() + pinnedInset }
+    // Each section's header row (its LazyColumn index).
+    val headerIndices = remember(sections) {
+        var index = 0
+        sections.map { section -> index.also { index += 1 + section.models.size } }
+    }
+    // How far the rows are scrolled (iOS `contentOffset.y + contentInsets.top`).
+    val isPinning by remember(listState) {
+        derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0.5f * density.density }
+    }
+
+    // A header label's top in the list's frame (px): above the visible rows −∞, below them null.
+    fun labelTop(sectionIndex: Int): Float? {
+        val index = headerIndices.getOrNull(sectionIndex) ?: return null
+        val info = listState.layoutInfo
+        info.visibleItemsInfo.firstOrNull { it.index == index }?.let {
+            return (it.offset - info.viewportStartOffset).toFloat() + if (sectionIndex == 0) pinnedInset else sectionGap
+        }
+        return if (index < listState.firstVisibleItemIndex) Float.NEGATIVE_INFINITY else null
+    }
+    val pinnedIndex by remember(listState, headerIndices) {
+        derivedStateOf {
+            if (!isPinning) return@derivedStateOf null
+            val threshold = pinnedTop() - 0.5f
+            sections.indices.lastOrNull { i -> labelTop(i)?.let { it < threshold } == true }
+        }
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxSize()
+                .blurSource(rowsSource)
+                // The rows fade out under the search field.
+                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                .drawWithContent {
+                    drawContent()
+                    val fade = searchBand() * ModelPickerTunables.searchFade.toFloat()
+                    if (fade > 0f) {
+                        drawRect(Brush.verticalGradient(0f to Color.Transparent, fade / size.height to Color.Black), blendMode = BlendMode.DstIn)
                     }
+                },
+            contentPadding = PaddingValues(top = with(density) { searchBand().toDp() }, bottom = 12.dp),
+        ) {
+            for ((index, section) in sections.withIndex()) {
+                item(key = "header-${section.id}", contentType = "header") {
+                    ModelListSectionHeader(
+                        section,
+                        isFirst = index == 0,
+                        // Once it reaches the pinned header's place, the pinned copy takes over.
+                        hidden = { isPinning && labelTop(index)?.let { it < pinnedTop() - 0.5f } == true },
+                    )
                 }
-                if (sections.isEmpty() && !state.isLoadingModels) {
-                    ModelListEmptyState(state, includesLoadError = true, onTryAgain = { onEvent(ModelPickerEvent.ModelListOpened) })
+                items(section.models, key = { "${section.id}-${it.id}" }, contentType = { "row" }) { model ->
+                    ModelListRow(model, inFavorites = section.kind == ModelPickerSection.Kind.Favorites, state, onEvent, onPick)
                 }
             }
+        }
+        val pinned = pinnedIndex
+        if (pinned != null && pinned in sections.indices) {
+            // One soft blur from the top edge down past the pinned header, fading out with no line.
+            ProgressiveBlur(
+                source = rowsSource,
+                profile = ProgressiveBlurProfile.Edge(top = true),
+                radius = ModelPickerTunables.headerBlur.dp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(with(density) { (pinnedTop() + pinnedHeight).toDp() } + ModelPickerTunables.headerBlurReach.dp),
+            )
+            // Clipped at the search field: a pushed label slides away under it.
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .padding(top = with(density) { searchBand().toDp() })
+                    .clipToBounds(),
+            ) {
+                Box(
+                    Modifier
+                        .offset {
+                            val next = labelTop(pinned + 1) ?: Float.POSITIVE_INFINITY
+                            IntOffset(0, min(0f, next - (pinnedTop() + pinnedHeight + 10.dp.toPx())).roundToInt())
+                        }
+                        .padding(top = ModelPickerTunables.pinnedInset.dp, bottom = 6.dp)
+                        .onSizeChanged { pinnedHeight = it.height.toFloat() - with(density) { (ModelPickerTunables.pinnedInset + 6).dp.toPx() } }
+                        .semantics(mergeDescendants = true) { heading() }
+                        .testTag("model-pinned-header"),
+                ) {
+                    ModelListSectionHeaderLabel(sections[pinned])
+                }
+            }
+        }
+        if (sections.isEmpty() && !state.isLoadingModels) {
+            ModelListEmptyState(state, includesLoadError = true, onTryAgain = { onEvent(ModelPickerEvent.ModelListOpened) })
         }
     }
 }
 
 @Composable
-private fun ModelListSectionHeader(section: ModelPickerSection, isFirst: Boolean) {
+private fun ModelListSectionHeaderLabel(section: ModelPickerSection) {
     Row(
-        Modifier
-            .fillMaxWidth()
-            .background(BottomSheetDefaults.ContainerColor)
-            .padding(horizontal = ModelPickerTunables.rowLeading.dp)
-            // The first rests exactly where the pinned copy would sit.
-            .padding(top = if (isFirst) ModelPickerTunables.pinnedInset.dp else ModelPickerTunables.sectionGap.dp, bottom = 4.dp)
-            .semantics(mergeDescendants = true) { heading() }
-            .testTag("model-section-${section.id}"),
+        Modifier.fillMaxWidth().padding(horizontal = ModelPickerTunables.rowLeading.dp),
         horizontalArrangement = Arrangement.spacedBy(7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -150,6 +264,24 @@ private fun ModelListSectionHeader(section: ModelPickerSection, isFirst: Boolean
             ProviderIcon(kind.id, section.models.firstOrNull()?.canonicalProviderID, size = 16.dp, tint = OpenCodeTheme.colors.secondaryText)
         }
         Text(section.title, style = OpenCodeTextStyles.footnote, fontWeight = FontWeight.SemiBold, color = OpenCodeTheme.colors.secondaryText)
+    }
+}
+
+@Composable
+private fun ModelListSectionHeader(section: ModelPickerSection, isFirst: Boolean, hidden: () -> Boolean) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            // The first rests exactly where the pinned copy would sit.
+            .padding(top = if (isFirst) ModelPickerTunables.pinnedInset.dp else ModelPickerTunables.sectionGap.dp, bottom = 4.dp)
+            .graphicsLayer { alpha = if (hidden()) 0f else 1f }
+            .semantics(mergeDescendants = true) {
+                heading()
+                if (hidden()) invisibleToUser()
+            }
+            .testTag("model-section-${section.id}"),
+    ) {
+        ModelListSectionHeaderLabel(section)
     }
 }
 
@@ -172,11 +304,13 @@ private fun ModelListRow(
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 10.dp, vertical = ModelPickerTunables.rowPadding.dp)
+                    // iOS `listRowBackground`: the whole cell (its row padding too), inset 10 at the sides.
+                    .padding(horizontal = 10.dp)
                     .background(
                         if (isCurrent) OpenCodeTheme.colors.text.copy(alpha = ModelPickerTunables.highlight.toFloat()) else Color.Transparent,
                         RoundedCornerShape(ModelPickerTunables.highlightRadius.dp),
                     )
+                    .padding(vertical = ModelPickerTunables.rowPadding.dp)
                     .combinedClickable(role = Role.Button, onClick = { onPick(model) }, onLongClick = { menuOpen = true })
                     .heightIn(min = ModelPickerTunables.rowHeight.dp)
                     .padding(start = (ModelPickerTunables.rowLeading - 10).dp, end = (ModelPickerTunables.rowTrailing - 10).dp)
@@ -398,6 +532,8 @@ internal fun FavoriteSwipeBox(
     isFavorite: Boolean,
     onToggle: () -> Unit,
     tint: Color = FavoriteYellow,
+    /** The Favorite action's glyph (the Sheet and composer lists `star.fill`, Today's `star`). */
+    favoriteSymbol: SFSymbol = SFSymbol.StarFill,
     content: @Composable () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -411,7 +547,7 @@ internal fun FavoriteSwipeBox(
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                OpenCodeIcon(if (isFavorite) SFSymbol.StarSlash else SFSymbol.StarFill, null, size = 20.dp, tint = Color.White)
+                OpenCodeIcon(if (isFavorite) SFSymbol.StarSlash else favoriteSymbol, null, size = 20.dp, tint = Color.White)
                 Spacer(Modifier.width(6.dp))
                 Text(if (isFavorite) "Unfavorite" else "Favorite", color = Color.White, style = OpenCodeTextStyles.subheadline)
             }
@@ -426,13 +562,25 @@ internal fun FavoriteSwipeBox(
 }
 
 /**
- * The provider's mark. iOS draws `provider-<id>` template images (its own, else its canonical
- * provider's, else a Console connection's upstream, else a neutral placeholder; `ProviderIcon`,
- * `Session/SessionView.swift`). Android has no provider artwork yet, so this draws the
- * provider's initial in a ring. Decorative (TalkBack hidden).
+ * Draws a provider's mark for the pickers: `(providerID, canonical, size, tint)`. iOS's
+ * `ProviderIcon` (`Session/SessionView.swift`) and its artwork live with the session here, above
+ * this module, so the session provides it; without one, [ProviderIcon] draws the provider's
+ * initial in a ring.
+ */
+val LocalModelPickerProviderIcon = staticCompositionLocalOf<(@Composable (providerID: String, canonical: String?, size: Dp, tint: Color) -> Unit)?> { null }
+
+/**
+ * The provider's mark (iOS `ProviderIcon`: its own template image, else its canonical
+ * provider's, else a Console connection's upstream, else a neutral placeholder), tinted like
+ * text. Decorative (TalkBack hidden).
  */
 @Composable
 internal fun ProviderIcon(providerID: String, canonical: String?, size: Dp, tint: Color, modifier: Modifier = Modifier) {
+    val provided = LocalModelPickerProviderIcon.current
+    if (provided != null) {
+        Box(modifier.size(size).clearAndSetSemantics {}, contentAlignment = Alignment.Center) { provided(providerID, canonical, size, tint) }
+        return
+    }
     val id = canonical?.takeIf { providerID.startsWith("console-") } ?: providerID.removePrefix("console-")
     val initial = ModelProviderGroup.canonicalVendorTitle(id).firstOrNull()?.uppercaseChar()?.toString() ?: "·"
     Box(
