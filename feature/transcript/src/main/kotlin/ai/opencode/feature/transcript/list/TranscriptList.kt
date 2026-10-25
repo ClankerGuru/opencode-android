@@ -6,6 +6,7 @@ import ai.opencode.feature.media.AgentImageMarkerView
 import ai.opencode.feature.media.LocalAgentImageViewport
 import ai.opencode.feature.media.LocalAgentImageRow
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.diagnostics.PerfTimeline
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInWindow
@@ -164,6 +165,21 @@ private fun TranscriptListContent(
     LaunchedEffect(listState) {
         snapshotFlow { listState.isScrollInProgress }.collect(controller::scrollInProgressChanged)
     }
+    // iOS `viewWillAppear`/`viewDidDisappear` + the token's `deinit`: one list per session here.
+    // iOS `TranscriptMotionTrace.shared.attach(self)` / `detach(self)` (Motion Watch).
+    val motionCoordinates = remember { arrayOfNulls<androidx.compose.ui.layout.LayoutCoordinates>(1) }
+    val motionSource = remember(controller) { TranscriptMotionTrace.Source(controller) { motionCoordinates[0] } }
+    DisposableEffect(motionSource) {
+        TranscriptMotionTrace.attach(motionSource)
+        onDispose { TranscriptMotionTrace.detach(motionSource) }
+    }
+    DisposableEffect(controller) {
+        PerfTimeline.transcriptAppeared(controller.perfRows)
+        onDispose {
+            PerfTimeline.transcriptDisappeared(controller.perfRows)
+            controller.perfRows?.release()
+        }
+    }
     // iOS `reportHeaderGeometry`: how far content sits above its resting top (dp), for the
     // session header's backdrop reveal. Past the first row it's simply "far".
     val currentScrolledUnderHeader by rememberUpdatedState(onScrolledUnderHeader)
@@ -250,7 +266,11 @@ private fun TranscriptListContent(
                     .semantics { customActions = listOf(CustomAccessibilityAction("Scroll to top", controller::scrollToTop)) }
                     .graphicsLayer { alpha = controller.handoffProgress() }
                     .then(if (controller.emptyHandoff != null) Modifier.clearAndSetSemantics { } else Modifier)
-                    .onGloballyPositioned { imageViewport.bounds = it.boundsInWindow(); imageVisibility.setNeedsUpdate() },
+                    .onGloballyPositioned {
+                        motionCoordinates[0] = it
+                        imageViewport.bounds = it.boundsInWindow()
+                        imageVisibility.setNeedsUpdate()
+                    },
                 contentPadding = listPadding,
             ) {
                 items(snapshot.items, key = { it.key }, contentType = { it.contentType }) { item ->

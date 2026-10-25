@@ -5,12 +5,10 @@ import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.server.model.OpenCodePermissionRequest
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -26,6 +24,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -58,7 +59,19 @@ data class PermissionSummary(val text: String, val isCode: Boolean) {
             return PermissionSummary(flattened(permission.resources.joinToString(" ")), isCode = permission.resources.isNotEmpty())
         }
 
-        fun flattened(text: String): String = text.split(Regex("\\s+")).filter { it.isNotEmpty() }.joinToString(" ")
+        /** Swift `split(whereSeparator: \.isWhitespace)`: every Unicode whitespace, newlines included. */
+        fun flattened(text: String): String = buildString {
+            var pending = false
+            for (char in text) {
+                if (char.isWhitespace()) {
+                    pending = isNotEmpty()
+                } else {
+                    if (pending) append(' ')
+                    pending = false
+                    append(char)
+                }
+            }
+        }
     }
 }
 
@@ -185,27 +198,25 @@ private fun PermissionBand(text: String) {
             append(text)
         }
     }
-    Column(Modifier.fillMaxWidth()) {
-        Hairline()
-        SelectionContainer {
-            Text(
-                styled,
-                style = RequestTranscriptMetrics.codeFont,
-                color = colors.text,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(colors.text.copy(alpha = if (colors.isDark) 0.035f else 0.025f))
-                    .padding(vertical = RequestTranscriptMetrics.bandVerticalPadding, horizontal = RequestDockMetrics.edge),
-            )
-        }
-        Hairline()
+    val rule = colors.border
+    SelectionContainer {
+        Text(
+            styled,
+            style = RequestTranscriptMetrics.codeFont,
+            color = colors.text,
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(colors.text.copy(alpha = if (colors.isDark) 0.035f else 0.025f))
+                // iOS overlays the hairlines on the band's top and bottom edges (they add no height).
+                .drawWithContent {
+                    drawContent()
+                    val px = 1f
+                    drawRect(rule, topLeft = Offset.Zero, size = Size(size.width, px))
+                    drawRect(rule, topLeft = Offset(0f, size.height - px), size = Size(size.width, px))
+                }
+                .padding(vertical = RequestTranscriptMetrics.bandVerticalPadding, horizontal = RequestDockMetrics.edge),
+        )
     }
-}
-
-/** iOS `HairlineRule`: one physical pixel in the border colour. */
-@Composable
-internal fun Hairline(modifier: Modifier = Modifier) {
-    Box(modifier.fillMaxWidth().height(androidx.compose.ui.unit.Dp.Hairline).background(OpenCodeTheme.colors.border))
 }
 
 /** A unified diff's changed lines, tinted, without the file headers. */

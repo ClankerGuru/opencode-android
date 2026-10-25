@@ -39,6 +39,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
@@ -71,9 +75,10 @@ import kotlin.math.roundToInt
 /**
  * Port of iOS `FusedLevelStackOverlay`: the vertical level stack, right-aligned to the tapped
  * level's trailing edge, the current level at the tapped height, higher levels above and lower
- * below, a soft capsule on the chosen one. Mount it full-screen over the panel and composer.
- *
- * Partial: the feathered local blur behind the stack is a dim band (no blur imitation).
+ * below, a soft capsule on the chosen one, over a feathered local blur of what's behind (a band
+ * strongest mid-height, [FusedModelPickerTunables.stripBlur] × the stack's fade, under a dim
+ * fill; it blurs [ModelPickerAnchors.backdrop], which the session records with
+ * [modelPickerBackdropSource]). Mount it full-screen over the panel and composer.
  *
  * [composerFrame] is the composer's frame in root px; [headerHeight] the session header's.
  */
@@ -152,7 +157,9 @@ fun FusedLevelStackOverlay(
                         .clearAndSetSemantics {},
                 )
             }
-            // The stack's backdrop: a dim band fading at its ends (iOS: a feathered progressive blur).
+            // The stack's backdrop (iOS `stackBackdropBlur`): a progressive blur peaking over
+            // 0.14…0.86 of its height under a dim fill, feathered 40 dp on its leading edge and
+            // 28 dp at the top and bottom.
             val bandWidth = px(176.0)
             val bandLeft = max(0f, rightX - bandWidth + px(18.0))
             val frameW = max(sizePx.width - bandLeft, px(120.0))
@@ -161,10 +168,31 @@ fun FusedLevelStackOverlay(
                 Modifier
                     .offset(bandLeft, (topY + bottomY) / 2 - frameH / 2)
                     .size(with(density) { frameW.toDp() }, with(density) { frameH.toDp() })
-                    .graphicsLayer { this.alpha = alpha }
-                    .background(Color.Black.copy(alpha = if (dark) 0.35f else 0.16f), RoundedCornerShape(28.dp))
+                    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                    .drawWithContent {
+                        drawContent()
+                        val lead = 40.dp.toPx() / size.width
+                        drawRect(Brush.horizontalGradient(0f to Color.Transparent, lead to Color.Black), blendMode = BlendMode.DstIn)
+                        val edge = 28.dp.toPx() / size.height
+                        drawRect(
+                            Brush.verticalGradient(0f to Color.Transparent, edge to Color.Black, 1f - edge to Color.Black, 1f to Color.Transparent),
+                            blendMode = BlendMode.DstIn,
+                        )
+                    }
                     .clearAndSetSemantics {},
-            )
+            ) {
+                ProgressiveBlur(
+                    source = anchors.backdrop,
+                    profile = ProgressiveBlurProfile.Band(0.14, 0.86),
+                    radius = (FusedModelPickerTunables.stripBlur * alpha).dp,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = (if (dark) 0.35f else 0.16f) * alpha), RoundedCornerShape(28.dp)),
+                )
+            }
             // The soft capsule on the chosen level.
             val activeLabel = ModelLevelScale.label(stack.scale.level(stack.currentIndex))
             val estWidth = max(activeLabel.length * (wordSize * 0.56) + 28, 68.0)
@@ -240,7 +268,8 @@ private fun clampedCenterY(anchorY: Float, startIndex: Int, count: Int, gap: Flo
 /**
  * Port of iOS `FusedRowMenuOverlay`: the small menu that pops from a held row (0.45 s): Add /
  * Remove from Favorites, then every level with a checkmark on the current one. Mount it
- * full-screen; a tap outside closes it. An M3 surface (iOS: glass); its arrival blur is dropped.
+ * full-screen; a tap outside closes it. An M3 surface (iOS: glass), blurred by (1 − fade) × 4 dp as
+ * it pops (scale 0.5 → 1 from its trailing corner on [FusedModelPickerTunables.menuIn]) and folds.
  */
 @Composable
 fun FusedRowMenuOverlay(
@@ -271,7 +300,8 @@ fun FusedRowMenuOverlay(
         val remembered = state.rememberedLevel(menu.model)
         val levels = menu.scale.levels
         val menuW = px(230.0)
-        val menuH = px(44.0 + (if (levels.size > 1) 9.0 + levels.size * 40.0 else 0.0) + 12.0)
+        // iOS 44 + (9 + n × 40) + 12 with 44 / 40 pt rows; Android's rows keep 48 dp targets.
+        val menuH = px(MENU_FAVORITE_ROW + (if (levels.size > 1) 9.0 + levels.size * MENU_LEVEL_ROW else 0.0) + 12.0)
         val known = menu.rowFrame != Rect.Zero
         val row = menu.rowFrame.translate(-origin.x, -origin.y)
         val x = if (known) min(max(row.right - menuW, px(16.0)), sizePx.width - menuW - px(16.0)) else sizePx.width - menuW - px(16.0)
@@ -304,6 +334,8 @@ fun FusedRowMenuOverlay(
                     transformOrigin = TransformOrigin((menuW - px(30.0)) / menuW, if (above) 1f else 0f)
                     this.alpha = alpha
                 }
+                // iOS `.blur(radius: (1 − alpha) × 4)` as it pops and folds.
+                .layerBlur { if (reduceMotion) 0f else (1 - anchors.rowMenuAlpha.value) * 4f }
                 .semantics {
                     paneTitle = "${menu.model.shortName} options"
                     if (menu.isClosing) invisibleToUser()
@@ -313,7 +345,7 @@ fun FusedRowMenuOverlay(
         ) {
             Column(Modifier.padding(vertical = 6.dp)) {
                 MenuRow(
-                    height = 44.dp,
+                    height = MENU_FAVORITE_ROW.dp,
                     testTag = "model-menu-favorite",
                     onClick = {
                         onEvent(ModelPickerEvent.ToggleFavoriteModel(menu.model))
@@ -328,7 +360,7 @@ fun FusedRowMenuOverlay(
                     for (lv in levels.reversed()) {
                         val isSelected = lv == remembered
                         MenuRow(
-                            height = 40.dp,
+                            height = MENU_LEVEL_ROW.dp,
                             testTag = "model-menu-level-${lv ?: "default"}",
                             selected = isSelected,
                             onClick = {
@@ -348,6 +380,10 @@ fun FusedRowMenuOverlay(
     }
 }
 
+/** The menu's rows: iOS 44 pt (favorite) and 40 pt (levels), at Android's 48 dp minimum target. */
+private const val MENU_FAVORITE_ROW = 48.0
+private const val MENU_LEVEL_ROW = 48.0
+
 @Composable
 private fun MenuRow(
     height: Dp,
@@ -359,7 +395,7 @@ private fun MenuRow(
     Row(
         Modifier
             .fillMaxWidth()
-            .height(max(height.value, 48f).dp)
+            .height(height)
             .clickable(role = Role.Button, onClick = onClick)
             .semantics(mergeDescendants = true) { this.selected = selected }
             .testTag(testTag)
@@ -402,7 +438,7 @@ fun FusedLabelFlightOverlay(anchors: ModelPickerAnchors) {
         val targetName = if (open) liveRowName ?: flight.fromName.translate(px(12f), -px(160f))
         else anchors.chipNameFrame.takeIf { it != Rect.Zero } ?: flight.fromName
         val namePt = FusedPickerMotionTrace.labelPoint(flight.fromName, targetName, t, flight.direction, liftPx)
-        FlyingLabel(flight.modelShortName, fontSize, OpenCodeTheme.colors.text, namePt - origin)
+        FlyingLabel(flight.modelShortName, fontSize, OpenCodeTheme.colors.text, namePt - origin, flightWidth(flight.fromName, targetName, clamped))
 
         val levelLabel = flight.levelLabel
         if (levelLabel != null) {
@@ -410,20 +446,29 @@ fun FusedLabelFlightOverlay(anchors: ModelPickerAnchors) {
             val targetLv = if (open) anchors.rowLevelFrames[flight.modelID] ?: targetName.translate(px(180f), 0f)
             else anchors.chipLevelFrame.takeIf { it != Rect.Zero } ?: targetName.translate(targetName.width + px(6f), 0f)
             val levelPt = FusedPickerMotionTrace.labelPoint(fromLv, targetLv, t, flight.direction, liftPx)
-            FlyingLabel(levelLabel, fontSize, OpenCodeTheme.colors.text.copy(alpha = FusedModelPickerTunables.levelAlpha.toFloat()), levelPt - origin)
+            FlyingLabel(levelLabel, fontSize, OpenCodeTheme.colors.text.copy(alpha = FusedModelPickerTunables.levelAlpha.toFloat()), levelPt - origin, flightWidth(fromLv, targetLv, clamped))
         }
     }
 }
 
-/** A label whose leading edge sits at [point].x and vertical centre at [point].y (overlay px). */
+/**
+ * iOS `FusedLabelFlightBody.width(from:to:progress:)`: the label's frame width on its way, so its
+ * leading edge lands where the target's does (a name truncated on the chip opens out to the row's).
+ */
+fun flightWidth(from: Rect, to: Rect, progress: Float): Float = from.width + (to.width - from.width) * progress
+
+/**
+ * A label centred in a frame [frameWidth] wide whose leading edge is [point].x, at [point].y
+ * (overlay px), as iOS's `.position(x: point.x + width / 2)`.
+ */
 @Composable
-private fun BoxScope.FlyingLabel(text: String, fontSize: Float, color: Color, point: Offset) {
+private fun BoxScope.FlyingLabel(text: String, fontSize: Float, color: Color, point: Offset, frameWidth: Float) {
     Layout(content = {
         Text(text, style = TextStyle(fontSize = fontSize.sp, fontWeight = FontWeight.Medium), color = color, maxLines = 1, softWrap = false)
     }) { measurables, constraints ->
         val placeable = measurables.first().measure(constraints.copy(minWidth = 0, minHeight = 0, maxWidth = androidx.compose.ui.unit.Constraints.Infinity))
         layout(constraints.maxWidth, constraints.maxHeight) {
-            placeable.place(IntOffset(point.x.roundToInt(), (point.y - placeable.height / 2f).roundToInt()))
+            placeable.place(IntOffset((point.x + frameWidth / 2f - placeable.width / 2f).roundToInt(), (point.y - placeable.height / 2f).roundToInt()))
         }
     }
 }

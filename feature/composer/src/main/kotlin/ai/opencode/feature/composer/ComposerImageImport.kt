@@ -233,8 +233,9 @@ class ComposerImageImporter(private val scope: CoroutineScope) {
             }
             if (!isActive) return@launch
             cancelHandler = null
-            if (job === current) job = null
             onCompletion(result)
+            // iOS's `defer`: still loading while `onCompletion` runs, unless it superseded this import.
+            if (job === current && isActive) job = null
         }
         job = current
     }

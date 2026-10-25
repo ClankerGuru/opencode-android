@@ -34,7 +34,8 @@ object ImageLinkPolicy {
     }
 
     fun allows(url: String): Boolean {
-        val last = url.toHttpUrlOrNull()?.pathSegments?.lastOrNull() ?: return false
+        // iOS `url.pathExtension`: of the last path component, a trailing slash ignored.
+        val last = url.toHttpUrlOrNull()?.pathSegments?.lastOrNull { it.isNotEmpty() } ?: return false
         val pathExtension = if (last.contains('.')) last.substringAfterLast('.').lowercase() else ""
         return pathExtension in setOf("png", "jpg", "jpeg", "gif", "webp") &&
             LinkPreviewPolicy.isPublicWebURL(url, allowsTailnetImages = true)

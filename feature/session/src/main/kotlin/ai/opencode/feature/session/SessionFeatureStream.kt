@@ -10,6 +10,7 @@ import ai.opencode.feature.session.SessionFeature.CancelID
 import ai.opencode.feature.composer.DictationFeature
 import ai.opencode.feature.composer.DictationHoldRelease
 import ai.opencode.core.diagnostics.LabMarks
+import ai.opencode.core.diagnostics.PerfFrameLatency
 import ai.opencode.feature.transcript.TranscriptEntry
 import ai.opencode.feature.voice.ServerVoiceSupport
 import ai.opencode.server.OpenCodeLiveContentEvent
@@ -233,6 +234,7 @@ private fun SessionFeature.contentBatch(
     val sessionID = action.sessionID
     val events = action.events
     if (state.session?.id != sessionID) return Reduced(state)
+    PerfFrameLatency.begin("delta_batch", mapOf("events" to events.size))
     var s = state.copy(
         workingRun = state.workingRun.batchArriving(events, sessionID = sessionID, isRunning = state.isRunning, items = state.items),
         isExternallyActive = true,

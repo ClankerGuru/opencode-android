@@ -9,7 +9,7 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 | `OpenCode/Core/AudioSessionOwner.swift` | 171 | `AudioSessionOwner.kt`, `VoiceAudioEngine.kt` | done | Moved to :feature:voice for composer/dictation reuse. Shared-holder activation/release, epoch-guarded retries and generation cancellation; live controller maps to Android focus/mode/communication device. |
 | Android ongoing-call foreground service (Live Activity equivalent) | — | `VoiceCallService.kt`, `AndroidManifest.xml` | done | Microphone FGS, ongoing chronometer, Connecting…/Reconnecting…/Call ended, Mute/End commands guarded by call ID. Reducer starts/updates/stops via VoiceCallServiceClient and collects VoiceCallCommands; app owns runtime permission prompts. |
 | `OpenCode/Voice/CallTray.swift` | 1109 | `CallTray.kt` | done | `CallTrayController` as a plain object: `SpringSolver`s stepped by `motionFrameLoop` in the host's scope (`attach`), snapshot-state flags, `frameTick` so only geometry readers redraw per frame. Phases, tap seed, queued unfold/widen/sink/scan/reveal/descend, 0.24/0.10 s staggers, shoot widen with wind-up/punch/squash, spin open/close, disc colour blend (`buttonLook`), phone→phone.down cross-dissolve, composer mic look, Reduce Motion cross-fades. Droplet glass merge n/a (Material surfaces). DEBUG Motion X-ray and `OPENCODE_LAB_ANIMATION_SCALE` hooks n/a (lab). |
-| `OpenCode/Voice/CallTrayBarLayout.swift` | 324 | `CallTrayBarLayout.kt` | done | Tunables baked at iOS defaults with keys (`CallTrayTunables`), enums, `CallTrayBarLayout` math with 48 dp slots (Android target) so the mic gaps stay exact, mic glyph width from the Material `mic` ink, `CallTrayComposerMetrics` (iOS `ComposerTunables` values the tray uses; Composer is above voice), `CallTrayScopeSurface`, `Modifier.callTrayPart`. Tuning presets/registration n/a. |
+| `OpenCode/Voice/CallTrayBarLayout.swift` | 324 | `CallTrayBarLayout.kt` | done | Tunables baked at iOS defaults with keys (`CallTrayTunables`), enums, `CallTrayBarLayout` math with 48 dp slots (Android target) so the mic gaps stay exact, trailing padding 4 dp (iOS 6 beside a 44 pt slot) so End's disc centre lands under the composer's call button as on iOS, mic glyph width from the Material `mic` ink, `CallTrayComposerMetrics` (iOS `ComposerTunables` values the tray uses; Composer is above voice), `CallTrayScopeSurface`, `Modifier.callTrayPart`. Tuning presets/registration n/a. |
 | `OpenCode/Voice/CallTrayDock.swift` | 573 | `CallTrayDock.kt` | done | `CallTrayDock` (trip/arming/return tail, origin ease, travel frame with width lead, `tray_handoff` notices with the same flags/counts), `CallTrayDockOverlay(controller, store, reducedMotion, drawerProgress, drawerTravels, mayDock, drawer)`, `CallTraySessionAnchor`, `CallTrayDockSlot` (TalkBack Mute/End Call actions). UIKit presentation-layer/keyboard-guide plumbing maps to Compose layout + `WindowInsets.ime` (the traveller's bottom stays above the keys); the return tail waits for the anchor to hold still two frames. Lab X-ray n/a. |
 | `OpenCode/Voice/CallTrayViews.swift` | 786 | `CallTrayViews.kt` | done | `CallTrayHost` (composer wrapper: reserve padding animated once per flip, stage/backdrop/transcript overlays drawn outside its frame, phase/tap/scene/captions sync), `callTrayReserveAnimation`, `Modifier.callTrayDip`/`callTrayMic`, `CallTrayBar`, seed view, `VoiceCallCenterButton`, `VoiceCaptionsDismissBackdrop`, `PoorConnectionBadge`. TalkBack hints map to click labels “Show/Hide the call transcript”. `CallTrayChromeProbe` (DEBUG) n/a. |
 | `OpenCode/Voice/CallVoice.swift` | 483 | `CallVoice.kt`, `VoiceHttp.kt` | done | Preview via `MediaPlayer` over the clip's bytes; cache in cacheDir/OpenCode/voice-previews. `VoiceLabDemo` preview key/demo fallbacks not ported (VoiceLabDemo is a lab demo). |
@@ -76,3 +76,53 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 | `OpenCode/Voice/VoiceUplinkWatch.swift` | 52 | `VoiceUplinkWatch.kt` | done | Immutable; methods return (watch, change). |
 | `OpenCode/Voice/VoiceView.swift` | 1199 | `VoiceView.kt` | done | `VoiceView(store, modifier, onOpenSettings)`, `VoiceCallComposer`, `VoiceCallSurface` (transcript growth, request panel, `ComposerExpansion` reach/detents, Reduce Motion cross-fade, 1 s linger, `TopInsetRect` clip pass-through), `hiddenUnderVoiceTranscript`/`hiddenUnderComposerPanel` modifiers (Modifier.Node), the expansion's dismiss backdrop `excludedFromDrawerPan(expansionOpen)`, `VoiceCallTranscript`, `CallDuration`, `CaptionReveal`/`CaptionGlide`/`CaptionWordRenderer`/word flow, one long-lived pacer, `VoiceCallEnded`, `VoiceCallFailure`. Open Settings is the host's `onOpenSettings`. Liquid Glass → M3 tonal surfaces; interactive glass and expansion-latency probe n/a; `ridesKeyboard` follows a 0.25 s spring (keyboard motion can't be shared). |
 | `OpenCode/Voice/VoiceWorkClient.swift` | 515 | `VoiceWorkClient.kt` | done | `VoiceWorkCoordinator` actor → Mutex-guarded class; `PromptOutbox.newSessionID()` → `ServerIDClient.sessionID()`; `OpenCodeMarkdownBlock.markdown(from:)` → `AssistantMarkdown.text` (raw Markdown). Character counts are UTF-16 lengths (Swift counts graphemes). |
+
+## Tests
+
+iOS `OpenCodeTests` files that test `:feature:voice` code, ported into `feature/voice/src/test` (JVM,
+`./gradlew :feature:voice:testDebugUnitTest`). Test class and method names match iOS; parameterized
+iOS tests loop over their arguments inside one test. Tests whose store or subject belongs to
+another module are left to that module's port ("skipped"); "dropped" tests can't exist as JVM unit tests.
+
+| iOS file | Kotlin file | Ported | Skipped (owner) | Dropped (reason) |
+| --- | --- | ---: | --- | --- |
+| `VoiceTurnTakingTests.swift` | `VoiceTurnTakingTests.kt` | 11 | – | – |
+| `VoiceUplinkWatchTests.swift` (+`ReplyWatchCoreTests`) | `VoiceUplinkWatchTests.kt` | 5 | – | – |
+| `VoiceHandoffParseTests.swift` (+`VoiceFramingTests`, `VoiceSteeringInstructionsTests`) | `VoiceHandoffParseTests.kt` | 23 | `promptsFromBeforeTheFramingStillRender`, `aDelegationProjectsToAVoiceMessage…`, `aVoiceMessageWearsTheBadge…`, `theLabelRowFallback…` and the `TranscriptUserMessage` asserts of two more (`:feature:transcript`) | – |
+| `RealtimeProtocolTests.swift` | `RealtimeProtocolTests.kt` | 24 | – | – |
+| `VoiceCaptionAndQualityTests.swift` | `VoiceCaptionAndQualityTests.kt` | 8 | – | `appendingWordsNeverMovesEarlierWords`, `wordsFadeInWhereTheyLie` (SwiftUI `ImageRenderer` pixel probes) |
+| `LivingOrbTests.swift` | `LivingOrbTests.kt` | 3 | `flagRestoresEveryExistingCallStyleWhenOff` (`:core`), `settingsPersistStyle…` (`:feature:settings`) | `colourAndShapePresets…` (tuning store not ported; tunables are baked) |
+| `VoiceHapticTests.swift` (+teardown, tick race, startup, hang-up engine suites) | `VoiceHapticTests.kt` | 26 | – | `patternsBecomeCorePatterns` (Core Haptics players; Android mixes one waveform), `endingACallReleasesItsHapticEngine…` (needs a real `Vibrator`) |
+| `DotScopeSimulationTests.swift` | `DotScopeSimulationTests.kt` | 20 | – | 5 `MTKView`/`UIHostingController` draw/pause probes |
+| `VoiceAudioAndTranscriptTests.swift` | `VoiceAudioAndTranscriptTests.kt` | 48 | – | `LiveRTCSetupTests` (no `LiveRTCLocked` counterpart) |
+| `VoiceLiveTests.swift` | `VoiceLiveTests.kt` | 83 | 8 `VoiceEnginePersistenceTests` migrations (`:app`), 3 compaction/retarget tests (`:feature:session`, drawer) | – |
+| `VoiceReconnectReplyTests.swift` | `VoiceReconnectReplyTests.kt` | 7 | – | – |
+| `VoiceRouteTests.swift` | `VoiceRouteTests.kt` | 6 | `inactiveGeminiNeverDisablesThePhoneKey…`, `grokSuppressesUnrelatedServerErrors` (session/settings) | – |
+| `VoiceResultSpeechTests.swift` | `VoiceResultSpeechTests.kt` | 41 | – | – |
+| `CallVoiceTests.swift` | `CallVoiceTests.kt` | 7 | 2 `VoiceSettingsFeature` tests (`:feature:settings`) | – |
+| `ServerVoiceTests.swift` | `ServerVoiceTests.kt` | 16 | HomeFeature half of `serverVoiceReprobesOnce…` (drawer) | – |
+| `VoiceServerPickerTests.swift` | `VoiceServerPickerTests.kt` | 7 | 4 `VoiceSettingsFeature` (`:feature:settings`), `homeSavesTheChoice…` (drawer) | – |
+| `VoiceSessionToolsTests.swift` (+`VoiceModelToolsTests`) | `VoiceSessionToolsTests.kt` | 24 | `homePublishesTheDrawerState…` (drawer), `theScreenFollowsOnlyItsOwnSessionsSwitch` (`:feature:session`) | – |
+| `FloatingCallModelTests.swift` | `FloatingCallModelTests.kt` | 21 | `canStartCallFromTap` half of `tapIntoProjectPicker…`, `ComposerTunables.bottomGap` (`:feature:session`) | Preset/registry parts of 3 tunables tests (tuning store not ported); 8 `TestWindowHost`/SessionView hosting tests (`onlyTopSessionViewDrivesCallTrayController`, `callTrayReserveGlides…`, `callTrayOverlayResetsReserve…`, `pushingAndPoppingSubagent…`, two `subagentStartedCall…`, `subagentPopDuringEnding…`, `growModelListCloseAndReset…`) |
+| `FloatingCallModelTests+Dock.swift` | `FloatingCallModelTestsDock.kt` | 3 | – | – |
+| `VoiceFeatureTests.swift` | `VoiceFeatureTests.kt` | 8 | `voiceAvailabilityRequires…` (`:feature:session`); 3 Home delegator/switch tests (drawer) | – |
+| `VoiceFeatureTests+Delegation.swift` | `VoiceFeatureTestsDelegation.kt` | 30 | – | – |
+| `VoiceFeatureTests+CallLog.swift` | `VoiceFeatureTestsCallLog.kt` | 9 | 4 Home tests (drawer) | – |
+| `VoiceFeatureTests+Screen.swift` | `VoiceFeatureTestsScreen.kt` | 7 | 10 SessionFeature tests and the session half of `aDraftCallsRefusedModelSendsNothing` (`:feature:session`) | – |
+| `VoiceResumeTests.swift` | `VoiceResumeTests.kt` | 21 | – | – |
+| `VoiceLatencyBudgetTests.swift` | `VoiceLatencyBudgetTests.kt` | 22 | – | – |
+
+Voice-named iOS files whose subject lives elsewhere (left to those modules' ports): `LabVoiceKeysTests`,
+`ScreenAwakeTests`, `VoiceLiveActivityTests` (`:app`/drawer stores), `VoiceRoutingBaselineTests`,
+`ServerQuietStyleTests` (`:feature:settings`), `SessionVoiceTests`, `RaiseToTalkTests(+Routing)`,
+`AgentRevealAndOrbModelTests` (`:feature:session`), `LiveDelegationFeatureTests+Session`,
+`DictationLiveActivityTests` (drawer), `AudioSessionHapticsTests` (`:core` `HapticsClient`; its live
+dictation suite is opt-in device-only), `DictationAudioTests`, `LiveDictationTests` (`:feature:composer`).
+
+Production bugs the ported tests found (each fixed in its own `fix(voice)` commit): DotScopeGrid
+rounded its pitch half-to-even (10 px dots instead of 11 at 3×); AudioEngineGuard reported the
+exception class instead of its reason and turned cancellation into an engine error; a reactivation
+that failed when an interruption ended was never retried by the next route/configuration change;
+a just-finished call log was missing from `list()` while its save was still writing; End landed 2 dp left of the call button (48 dp slot kept the 6 dp padding); a reconnect or rotation replayed the connect chord; `RetryBudget.bounded` (`:server`) timed its limit on the scripted clock, so a lost send's answer was never read back.
+
+Total: 480 voice tests, all passing (`--rerun` ×3).

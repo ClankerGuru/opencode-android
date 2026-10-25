@@ -1,24 +1,13 @@
 package ai.opencode.feature.composer
 
-import ai.opencode.core.ui.excludedFromDrawerPan
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
-import ai.opencode.core.motion.rememberReduceMotion
+import ai.opencode.core.tuning.AnimationTimeScale
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -30,20 +19,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.layout
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.invisibleToUser
+import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -52,6 +32,7 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.roundToInt
+import kotlin.math.sqrt
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -78,7 +59,7 @@ object ComposerMorphTunables {
     val contentIn = MotionSpring(0.36, 0.0)
     const val contentDelay = 0.05
     val contentOut = MotionSpring(0.28, 0.0)
-    /** What it grows out of dissolves into a blur this strong (n/a: no blur) and grows this much with the glass. */
+    /** What it grows out of (the + menu's rows) dissolves into a blur this strong (dp) as the content arrives, and grows this much with the glass. */
     const val outgoingBlur = 10.0
     const val outgoingGrowth = 0.12
     const val contentBlur = 14.0
@@ -107,7 +88,26 @@ object ComposerMorphTunables {
 
     /** iOS `animation(opening:reduceMotion:)`: Reduce Motion is a 0.2 s ease-in-out. */
     fun animation(opening: Boolean, reduceMotion: Boolean): FiniteAnimationSpec<Float> =
-        if (reduceMotion) Motion.reducedFadeSpec() else (if (opening) open else close).spec()
+        if (reduceMotion) tween(200, easing = Motion.EaseInOut) else (if (opening) open else close).spec()
+
+    /**
+     * iOS `DockedKeyboard.animation` (`interpolatingSpring(mass: 1, stiffness: 555.0265, damping:
+     * 47.118)`, critically damped): the curve the morph's bottom edge rides when a keyboard
+     * leaves or returns beneath it, and a rest that follows a keyboard switching on or off.
+     * While the IME itself animates, the rest reads `WindowInsets.ime` frame by frame instead.
+     */
+    fun keyboard(): FiniteAnimationSpec<Float> {
+        // Slow motion scales time: stiffness × s² (as `MotionSpring.spec`).
+        val scale = AnimationTimeScale.shared.observedScale.toFloat()
+        return spring(dampingRatio = (47.118 / (2 * sqrt(555.0265))).toFloat(), stiffness = 555.0265f * scale * scale)
+    }
+
+    /**
+     * iOS `.interpolatingSpring(duration: photoOpen.duration, bounce: photoOpen.bounce,
+     * initialVelocity:)` as `settlePhotoSheet` builds it: duration ≥ 0.05, bounce in ±0.95.
+     */
+    fun photoSettle(): FiniteAnimationSpec<Float> =
+        MotionSpring(max(photoOpen.duration, 0.05), photoOpen.bounce.coerceIn(-0.95, 0.95)).spec()
 }
 
 /**
@@ -141,6 +141,21 @@ class ComposerMorph(private val scope: CoroutineScope) {
     private var settleTask: Job? = null
     private var dragTask: Job? = null
 
+    /**
+     * Where the surface last drew its rest and how strongly to blur what's behind it, for
+     * [composerMorphBackdrop] on the content beneath: Compose can't blur a sibling, so the
+     * host's content blurs itself from these (iOS `ComposerMorphBackdrop`'s `ProgressiveBlur`).
+     */
+    @Stable
+    class Backdrop {
+        /** The sheet's resting top, in root px. */
+        var sheetTop by mutableFloatStateOf(0f)
+        /** The full blur radius (px) at progress 1; 0 under Reduce Transparency. */
+        var blurPx by mutableFloatStateOf(0f)
+    }
+
+    val backdrop = Backdrop()
+
     val isOpen: Boolean get() = phase == Phase.Open
     /** Drawn: armed, open, or shrinking back into its source. */
     val isShown: Boolean get() = phase != Phase.Closed
@@ -162,11 +177,10 @@ class ComposerMorph(private val scope: CoroutineScope) {
         phase = Phase.Open
         scope.launch { progress.animateTo(1f, animation) }
         scope.launch { bottomProgress.animateTo(1f, edge ?: animation) }
-        val delayMs = ((contentDelay ?: ComposerMorphTunables.contentDelay) * 1000).roundToInt()
-        scope.launch {
-            delay(delayMs.toLong())
-            content.animateTo(1f, ComposerMorphTunables.contentIn.spec())
-        }
+        // The delay is part of the spec, so a fold that starts meanwhile retargets it (as a
+        // later `withAnimation` does on iOS) instead of a pending arrival landing after it.
+        val arrival = ComposerMorphTunables.contentIn.animation<Float>(reduceMotion = false, delaySeconds = contentDelay ?: ComposerMorphTunables.contentDelay)
+        scope.launch { content.animateTo(1f, arrival) }
     }
 
     /**
@@ -259,7 +273,7 @@ class ComposerMorph(private val scope: CoroutineScope) {
         )
         settleTask?.cancel()
         settleTask = scope.launch {
-            delay((rawSettle * 1000).roundToInt().toLong())
+            delay((AnimationTimeScale.shared.wallSeconds(rawSettle) * 1000).roundToInt().toLong())
             if (phase != Phase.Closing) return@launch
             phase = Phase.Closed
             drag = 0f
@@ -280,8 +294,11 @@ class ComposerMorph(private val scope: CoroutineScope) {
         scope.launch { progress.snapTo(0f); bottomProgress.snapTo(0f); content.snapTo(0f) }
     }
 
-    /** Animates [drag] (a release springing back, or a fold). */
-    fun animateDrag(to: Float, animation: FiniteAnimationSpec<Float>?) {
+    /**
+     * Animates [drag] (a release springing back, or a fold), starting at [initialVelocity]
+     * (dp/s) so a settle continues the finger (iOS `interpolatingSpring(initialVelocity:)`).
+     */
+    fun animateDrag(to: Float, animation: FiniteAnimationSpec<Float>?, initialVelocity: Float = 0f) {
         dragTask?.cancel()
         if (animation == null) {
             drag = to
@@ -290,8 +307,14 @@ class ComposerMorph(private val scope: CoroutineScope) {
         val from = drag
         dragTask = scope.launch {
             val a = Animatable(from)
-            a.animateTo(to, animation) { drag = value }
+            a.animateTo(to, animation, initialVelocity) { drag = value }
         }
+    }
+
+    /** Sets [drag] at once, stopping any spring on it (a finger tracking 1:1). */
+    fun dragTo(value: Float) {
+        dragTask?.cancel()
+        drag = value
     }
 
     /** Runs [work] after [delay] unless the morph opened, closed or reset meanwhile. */
@@ -477,126 +500,6 @@ data class ComposerMorphGeometry(
 }
 
 /**
- * Port of iOS `ComposerMorphSurface`, simplified: the morph on screen, always mounted (it draws
- * nothing closed) so opening grows it from the source. A dim scrim (iOS: a progressive blur
- * plus dim; no blur imitation) grows with the glass and takes a tap to dismiss; one M3 surface
- * travels from [source] to its rest on the morph's spring (width leading, corners
- * interpolating), drawn down by the finger's drag; the content is laid out once where it rests
- * and revealed by the surface's shape, fading in on its own clock.
- *
- * Partial (see the parity row): no content blur, no outgoing cross-fade (`outgoing`), no
- * unified `+` menu phase (`seed`/`menuRows`), no foot slot riding the bottom edge; a keyboard
- * under the content raises the rest by the IME inset without riding its curve.
- *
- * Frames are root px. [target] receives the surface's own frame and the keyboard's top (or null).
- */
-@Composable
-fun ComposerMorphSurface(
-    morph: ComposerMorph,
-    source: Rect,
-    sourceRadiusDp: Double,
-    target: (screen: Rect, keyboardTop: Float?) -> Rect,
-    onDismiss: () -> Unit,
-    modifier: Modifier = Modifier,
-    openedFrom: Rect? = null,
-    landsOn: Rect? = null,
-    contentHasKeyboard: Boolean = false,
-    stretchesUpward: Boolean = false,
-    backdropDim: Double? = null,
-    content: @Composable () -> Unit,
-) {
-    val reduceMotion = rememberReduceMotion()
-    val density = LocalDensity.current
-    val dark = isSystemInDarkTheme()
-    var screen by remember { mutableStateOf(Rect.Zero) }
-    val imeBottom = WindowInsets.ime.getBottom(density)
-    val shown = morph.isShown
-    val sheetActive = morph.isOpening || morph.foldPending
-    // Until its fold starts it is still open, so it keeps growing from where it opened.
-    val from = if (sheetActive) openedFrom ?: source else landsOn ?: source
-
-    Box(
-        modifier
-            .fillMaxSize()
-            .onGloballyPositioned { screen = it.boundsInRoot() },
-    ) {
-        if (!shown || screen == Rect.Zero) return@Box
-        val keyboardTop = if (contentHasKeyboard && morph.isOpen && imeBottom > 0) screen.bottom - imeBottom else null
-        val rest = target(screen, keyboardTop)
-        val px = density.density
-        val geometry = ComposerMorphGeometry(
-            source = from.translate(-screen.left, -screen.top),
-            sourceRadius = (sourceRadiusDp * px).toFloat(),
-            target = rest.translate(-screen.left, -screen.top),
-            topRadius = (ComposerMorphTunables.topRadius * px).toFloat(),
-            bottomRadius = (ComposerMorphTunables.bottomRadius * px).toFloat(),
-        )
-        val progress = morph.progress.value
-        val travel = if (reduceMotion) 1f else progress
-        val bottomTravel = if (reduceMotion) 1f else morph.bottomProgress.value
-        val frame = geometry.frame(travel, bottomTravel, 0f)
-        val pull = if (reduceMotion) 0f else morph.drag * px
-        val (stretchedRect, downward) = ComposerMorphGeometry.stretched(frame.rect, pull, stretchesUpward, 120 * px)
-        val (stretchedTarget, _) = ComposerMorphGeometry.stretched(geometry.target, pull, stretchesUpward, 120 * px)
-        val fade = ComposerMorphGeometry.glassFade(
-            progress = progress, armed = morph.phase == ComposerMorph.Phase.Armed,
-            continuousGlass = false, reduceMotion = reduceMotion,
-        )
-        val dim = (backdropDim ?: if (dark) ComposerMorphTunables.dimDark else ComposerMorphTunables.dimLight).toFloat()
-
-        // The backdrop: everything above the sheet dims, growing with the morph.
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = dim * progress.coerceIn(0f, 1f)))
-                .let { if (morph.isOpen) it.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onDismiss) else it }
-                .excludedFromDrawerPan(morph.isOpen)
-                .clearAndSetSemantics {},
-        )
-        val shape = RoundedCornerShape(
-            topStart = with(density) { frame.top.toDp() }, topEnd = with(density) { frame.top.toDp() },
-            bottomStart = with(density) { frame.bottom.toDp() }, bottomEnd = with(density) { frame.bottom.toDp() },
-        )
-        val glassRect = stretchedRect.translate(0f, downward)
-        val contentY = min(stretchedTarget.top, stretchedRect.top)
-        val reveal = if (reduceMotion) progress.coerceIn(0f, 1f) else morph.content.value
-        Box(
-            Modifier
-                .placeAt(glassRect.topLeft)
-                .size(with(density) { glassRect.width.toDp() }, with(density) { glassRect.height.toDp() })
-                .graphicsLayer { alpha = fade }
-                .clip(shape)
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                .semantics { if (!morph.isOpening) invisibleToUser() },
-        ) {
-            // The content, where it rests, in the glass's own frame: the glass's shape reveals it.
-            Box(
-                Modifier
-                    .placeAt(Offset(stretchedTarget.left - stretchedRect.left, contentY - stretchedRect.top))
-                    .size(with(density) { stretchedTarget.width.toDp() }, with(density) { stretchedTarget.height.toDp() })
-                    .alpha(reveal.coerceIn(0f, 1f)),
-            ) {
-                content()
-                // Taps reach the content only once it has mostly grown (iOS `allowsHitTesting(progress > 0.5)`).
-                if (progress <= 0.5f && !reduceMotion) {
-                    Box(
-                        Modifier
-                            .fillMaxSize()
-                            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
-                            .clearAndSetSemantics {},
-                    )
-                }
-            }
-        }
-    }
-}
-
-private fun Modifier.placeAt(offset: Offset): Modifier = layout { measurable, constraints ->
-    val placeable = measurable.measure(constraints.copy(minWidth = 0, minHeight = 0, maxWidth = androidx.compose.ui.unit.Constraints.Infinity, maxHeight = androidx.compose.ui.unit.Constraints.Infinity))
-    layout(placeable.width, placeable.height) { placeable.place(offset.x.roundToInt(), offset.y.roundToInt()) }
-}
-
-/**
  * iOS `View.handsGlassOver(to:...)`: the morph's source under it hands its surface over to the
  * morph as the morph starts to grow (fading out in 0.12 s), and takes it back as the morph lands
  * on it (after `close.duration × 0.62`, or [closeDelay]). [sinksUnderSheet]: the composer sinks
@@ -622,7 +525,7 @@ fun Modifier.handsGlassOver(
         val opacity = if (reduceMotion) 1 - clamped else 1 - (clamped / 0.65f).coerceIn(0f, 1f)
         this
             .graphicsLayer { translationY = offsetY; alpha = opacity }
-            .semantics { if (clamped >= 0.65f) invisibleToUser() }
+            .semantics { if (clamped >= 0.65f) hideFromAccessibility() }
     } else {
         val open = morph.isOpen
         val delaySeconds = closeDelay ?: (ComposerMorphTunables.close.duration * 0.62)

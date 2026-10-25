@@ -162,6 +162,30 @@ data class DiagnosticsNetworkAddress(val family: DiagnosticsAddressFamily, val s
     }
 }
 
+/**
+ * iOS `DiagnosticsNetworkPhases`: timestamp evidence only; a missing phase stays unknown. TLS
+ * is nested in connect, so an unfinished handshake takes precedence over unfinished TCP.
+ * Timestamps are any monotonic reading (OkHttp `EventListener` callbacks use `System.nanoTime`).
+ */
+data class DiagnosticsNetworkPhases(
+    var dnsStart: Long? = null, var dnsEnd: Long? = null,
+    var connectStart: Long? = null, var connectEnd: Long? = null,
+    var tlsStart: Long? = null, var tlsEnd: Long? = null,
+    var requestStart: Long? = null, var requestEnd: Long? = null,
+    var responseStart: Long? = null, var responseEnd: Long? = null,
+) {
+    val unfinished: DiagnosticsFailurePhase?
+        get() = when {
+            dnsStart != null && dnsEnd == null -> DiagnosticsFailurePhase.Dns
+            tlsStart != null && tlsEnd == null -> DiagnosticsFailurePhase.Tls
+            connectStart != null && connectEnd == null -> DiagnosticsFailurePhase.Tcp
+            requestStart != null && requestEnd == null -> DiagnosticsFailurePhase.RequestWrite
+            requestEnd != null && responseStart == null -> DiagnosticsFailurePhase.Ttfb
+            responseStart != null && responseEnd == null -> DiagnosticsFailurePhase.BodyRead
+            else -> null
+        }
+}
+
 /** One request's transport timings (iOS `URLSessionTaskMetrics`, from OkHttp's `EventListener`). */
 data class DiagnosticsNetworkMetrics(
     val wireBytes: Long? = null,
@@ -286,6 +310,8 @@ class DiagnosticsRecorder(
     private val retentionSeconds: Double = DEFAULT_RETENTION_SECONDS,
     private val settings: DiagnosticsSettings? = null,
     defaultEnabled: Boolean = false,
+    /** Persists every recorded event (iOS `journal`): internal builds keep the run before a crash. */
+    private val journal: DiagnosticsJournal? = null,
     private val monotonicNow: () -> Double = { processElapsedSeconds() },
     private val wallNow: () -> Instant = Instant::now,
 ) {
@@ -302,11 +328,27 @@ class DiagnosticsRecorder(
     private val _changes = MutableStateFlow(0)
     @Volatile private var notifyPending = false
 
+    /** What the journal held at launch: the tail of the previous run. */
+    val previousRun: DiagnosticsJournal.PreviousRun?
+
     init {
         val stored = settings?.bool(DEFAULTS_KEY)
         val initial = enabled ?: (stored ?: defaultEnabled)
         val transcripts = settings?.bool(TRANSCRIPTS_DEFAULTS_KEY) ?: defaultEnabled
         state = State(initial, transcripts)
+        previousRun = journal?.open(recording = initial)
+    }
+
+
+    private val unexpectedEndTaken = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    /** True once per launch when the previous run ended unexpectedly in the foreground (iOS `DiagnosticsClient.takeUnexpectedEnd`). */
+    fun takeUnexpectedEnd(): Boolean = previousRun?.endedUnexpectedly == true && !unexpectedEndTaken.getAndSet(true)
+
+    /** The previous run's journaled events, oldest first; empty without a journal. */
+    fun previousRunEvents(): List<DiagnosticsEvent> {
+        val events = journal?.previousRunEvents().orEmpty()
+        return if (includesTranscripts) events else withoutExcerpts(events)
     }
 
     /** Bumps (coalesced to every 0.25 s) when the timeline changes; screens reload on it. */
@@ -323,6 +365,7 @@ class DiagnosticsRecorder(
             state.includesTranscripts = value
             if (!value) state.events = ArrayDeque(withoutExcerpts(state.events))
         }
+        if (!value) journal?.removeExcerpts()
         notifyChange()
     }
 
@@ -332,6 +375,8 @@ class DiagnosticsRecorder(
             if (!enabled) state.requestStarts.clear()
         }
         settings?.set(DEFAULTS_KEY, enabled)
+        // Turning recording off also forgets what this phone kept on disk.
+        if (!enabled) journal?.clear()
         notifyChange()
     }
 
@@ -342,6 +387,7 @@ class DiagnosticsRecorder(
             state.currentNavigationEpoch = null
             state.currentSessionID = null
         }
+        journal?.clear()
         notifyChange()
     }
 
@@ -365,6 +411,20 @@ class DiagnosticsRecorder(
             else -> DiagnosticsEvent.Kind.Mark
         }
         DiagnosticsEvent(kind = kind, monotonicSeconds = now, wallDate = wall, name = name, sessionID = sessionID, navigationEpoch = state.currentNavigationEpoch)
+    }
+
+    /** One live Motion Watch jump (kind, row kinds, stable IDs and detail only; never message text). */
+    fun recordMotionJump(kind: String, sessionID: String?, rowKinds: List<String>, rows: List<String>, detail: String) {
+        val name = "motion_jump_" + kind.replace("-", "_")
+        val kinds = if (rowKinds.isEmpty()) "transcript" else rowKinds.joinToString(",")
+        val ids = if (rows.isEmpty()) "—" else rows.joinToString(",")
+        val summary = "kinds=$kinds rows=$ids $detail"
+        record { now, wall ->
+            DiagnosticsEvent(
+                kind = DiagnosticsEvent.Kind.Mark, monotonicSeconds = now, wallDate = wall, name = name,
+                sessionID = sessionID ?: state.currentSessionID, navigationEpoch = state.currentNavigationEpoch, reason = summary,
+            )
+        }
     }
 
     /** One mark on a voice call's turn timeline; [excerpt] is dropped unless Include Transcripts is on. */
@@ -479,13 +539,15 @@ class DiagnosticsRecorder(
         val now = monotonicNow()
         val wall = wallNow()
         val inserted = synchronized(lock) {
-            if (!state.enabled) return@synchronized false
-            state.events.addLast(event(now, wall))
+            if (!state.enabled) return@synchronized null
+            val value = event(now, wall)
+            state.events.addLast(value)
             prune(now)
             while (state.events.size > maximumEvents) state.events.removeFirst()
-            true
-        }
-        if (inserted) notifyChange()
+            value
+        } ?: return
+        journal?.append(inserted)
+        notifyChange()
     }
 
     private fun prune(now: Double) {
@@ -520,7 +582,7 @@ class DiagnosticsRecorder(
                 ?: return@lazy DiagnosticsRecorder()
             val settings = SharedPreferencesDiagnosticsSettings(context)
             if (InternalBuild.isEnabled) {
-                DiagnosticsRecorder(maximumEvents = 5_000, retentionSeconds = 900.0, settings = settings, defaultEnabled = true)
+                DiagnosticsRecorder(maximumEvents = 5_000, retentionSeconds = 900.0, settings = settings, defaultEnabled = true, journal = DiagnosticsJournal.live(context))
             } else {
                 DiagnosticsRecorder(settings = settings)
             }

@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package ai.opencode.feature.session
 
 import androidx.compose.ui.semantics.semantics
@@ -76,8 +78,8 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -241,7 +243,7 @@ fun SessionView(
                 SessionHeaderBackdrop(
                     backdrop = resolvedHeader.backdrop,
                     appBlur = resolvedHeader.appBlur,
-                    safeTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
+                    safeTop = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding(),
                     scrolledUnderHeader = { scrollEdgeBridge.scrolledUnderHeader },
                     modifier = Modifier.align(Alignment.TopCenter),
                 )
@@ -255,7 +257,7 @@ fun SessionView(
                     onBack = onBack,
                     onCatchUpOpen = onCatchUpOpen,
                     onHeaderHeight = { headerHeight = it.roundToInt().toFloat() },
-                    modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding(),
+                    modifier = Modifier.align(Alignment.TopCenter).windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility),
                 )
                 Column(
                     Modifier
@@ -577,7 +579,7 @@ private fun SessionComposerDismissArea(store: StoreOf<State, Action>, host: Sess
 private fun RequestPanelRoomProbe(host: SessionComposerHost, modifier: Modifier) {
     val density = LocalDensity.current
     var height by remember { mutableIntStateOf(0) }
-    val top = WindowInsets.statusBars.getTop(density)
+    val top = WindowInsets.statusBarsIgnoringVisibility.getTop(density)
     val bottom = maxOf(WindowInsets.ime.getBottom(density), WindowInsets.navigationBars.getBottom(density))
     Box(modifier.onSizeChanged { height = it.height })
     SideEffect {

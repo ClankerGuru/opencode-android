@@ -71,6 +71,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.onClick
@@ -378,7 +379,8 @@ fun ComposerAutocompletePanel(
             .semantics {
                 isTraversalGroup = true
                 contentDescription = "Autocomplete suggestions"
-            },
+            }
+            .testTag("composer-autocomplete-list"),
         contentAlignment = Alignment.BottomStart,
     ) {
         if (frame.isShown && frame.listHeight > 0.5) {
@@ -524,7 +526,8 @@ private fun AutocompleteRowSlot(
                     selected = row.isHighlighted
                     onClick { onSelect(); true }
                 }
-            },
+            }
+            .testTag("autocomplete-row-${row.id}"),
         contentAlignment = Alignment.TopStart,
     ) {
         Box(
@@ -562,24 +565,76 @@ private fun AutocompleteRowContent(item: AutocompleteItem, params: AutocompleteP
     ) {
         AutocompleteKindIcon(item.kind, params.iconSize, iconColor)
         Spacer(Modifier.width(10.dp))
-        Text(
-            item.title,
+        // iOS `HStack { title; Spacer(minLength: 8); label }`: SwiftUI offers the room to the
+        // least flexible text first, an equal share each, so a short command name stays whole
+        // and a long description truncates (a weighted title let the label take it all).
+        TitleAndLabel(
+            title = {
+                Text(
+                    item.title,
+                    style = OpenCodeTextStyles.body,
+                    color = titleColor,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            },
+            label = if (item.label.isEmpty()) null else ({
+                Text(
+                    item.label,
+                    style = OpenCodeTextStyles.subheadline.copy(fontFeatureSettings = "tnum"),
+                    color = kindColor,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }),
+            // HStack(spacing: 10) around Spacer(minLength: 8): at least 10 + 8 + 10.
+            gap = 28.dp,
             modifier = Modifier.weight(1f),
-            style = OpenCodeTextStyles.body,
-            color = titleColor,
-            maxLines = 1,
-            softWrap = false,
-            overflow = TextOverflow.Ellipsis,
         )
-        if (item.label.isNotEmpty()) {
-            Spacer(Modifier.width(8.dp))
-            Text(
-                item.label,
-                style = OpenCodeTextStyles.subheadline.copy(fontFeatureSettings = "tnum"),
-                color = kindColor,
-                maxLines = 1,
-                softWrap = false,
-            )
+    }
+}
+
+/**
+ * Lays out [title] leading and [label] trailing on one line, as SwiftUI's HStack sizes two
+ * one-line texts: the one with the narrower ideal width is offered half the room first and
+ * takes what it needs; the other gets the rest. Either truncates only past that.
+ */
+@Composable
+private fun TitleAndLabel(
+    title: @Composable () -> Unit,
+    label: (@Composable () -> Unit)?,
+    gap: androidx.compose.ui.unit.Dp,
+    modifier: Modifier = Modifier,
+) {
+    androidx.compose.ui.layout.Layout(
+        contents = listOf(title, label ?: {}),
+        modifier = modifier,
+    ) { (titles, labels), constraints ->
+        val width = constraints.maxWidth
+        val t = titles.first()
+        val l = labels.firstOrNull()
+        if (l == null) {
+            val placeable = t.measure(constraints.copy(minWidth = 0))
+            return@Layout layout(width, placeable.height) { placeable.place(0, 0) }
+        }
+        val room = (width - gap.roundToPx()).coerceAtLeast(0)
+        val titleIdeal = t.maxIntrinsicWidth(Int.MAX_VALUE)
+        val labelIdeal = l.maxIntrinsicWidth(Int.MAX_VALUE)
+        val (titleWidth, labelWidth) = if (titleIdeal <= labelIdeal) {
+            val first = minOf(titleIdeal, room / 2)
+            first to minOf(labelIdeal, room - first)
+        } else {
+            val first = minOf(labelIdeal, room / 2)
+            minOf(titleIdeal, room - first) to first
+        }
+        val tp = t.measure(androidx.compose.ui.unit.Constraints(maxWidth = titleWidth.coerceAtLeast(0)))
+        val lp = l.measure(androidx.compose.ui.unit.Constraints(maxWidth = labelWidth.coerceAtLeast(0)))
+        val height = maxOf(tp.height, lp.height)
+        layout(width, height) {
+            tp.place(0, (height - tp.height) / 2)
+            lp.place(width - lp.width, (height - lp.height) / 2)
         }
     }
 }
@@ -589,8 +644,9 @@ private fun AutocompleteRowContent(item: AutocompleteItem, params: AutocompleteP
 /**
  * Renders in-flight chips lifting off from the chosen highlight row and landing on their
  * inline chip slot in the composer (iOS `AutocompleteFlightOverlay`). Solid opaque throughout.
- * Place it over the composer with its origin at the composer's top-left: flight rects are
- * composer-local dp (rows sit above, at negative y). Never clips; not hit-testable.
+ * Flight rects are composer-local dp (rows sit above, at negative y); the overlay shifts them
+ * by where the composer ([AutocompleteMotionController.composerAnchor]) sits inside it, so it
+ * can be mounted over the whole surface (the rows included). Never clips; not hit-testable.
  */
 @Composable
 fun AutocompleteFlightOverlay(controller: AutocompleteMotionController, modifier: Modifier = Modifier) {
@@ -598,8 +654,18 @@ fun AutocompleteFlightOverlay(controller: AutocompleteMotionController, modifier
     val scale = max(density.density.toDouble(), 1.0)
     val frame = controller.currentFrame
     val params = controller.simulation.params
+    var origin by remember { mutableStateOf(Offset.Zero) }
     if (frame.flights.isEmpty()) return
-    Box(modifier.fillMaxSize().clearAndSetSemantics {}) {
+    Box(
+        modifier
+            .fillMaxSize()
+            .onGloballyPositioned { overlay ->
+                val composer = controller.composerAnchor?.invoke()
+                origin = if (composer != null && overlay.isAttached) overlay.localPositionOf(composer, Offset.Zero) else Offset.Zero
+            }
+            .graphicsLayer { translationX = origin.x; translationY = origin.y }
+            .clearAndSetSemantics {},
+    ) {
         for (flight in frame.flights) {
             key(flight.id) { AutocompleteFlightView(flight, params, scale) }
         }
@@ -688,6 +754,7 @@ fun AutocompleteChip(
                 role = Role.Button,
             ) { onActivate(chip.id) }
             .semantics(mergeDescendants = true) { contentDescription = label }
+            .testTag("composer-chip-${chip.item.id}")
             .padding(start = AutocompleteChipMetrics.leadingPad.dp, end = AutocompleteChipMetrics.trailingPad.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -715,7 +782,25 @@ data class AutocompleteTextStyling(
     val trigger: AutocompleteChipRun?,
     val triggerColor: Color,
     val chips: List<AutocompleteChipRun>,
-)
+    /** Chips drawn from the start of the next line: the space before each becomes a line break. */
+    val breaksBefore: Set<UUID> = emptySet(),
+    /** The width of the space before a chip in the base font (px), for [ComposerAutocompleteTextBridge.updateLineBreaks]. */
+    val spaceWidthPx: Float = 0f,
+) {
+    /**
+     * The text as the field lays it out: [text] with the same-length substitutions the
+     * transformations make (non-breaking chip tokens, line breaks before [breaksBefore]).
+     */
+    val visualText: String by lazy {
+        val chars = text.toCharArray()
+        for (run in chips) {
+            if (run.end > chars.size || run.end <= run.start) continue
+            text.substring(run.start, run.end).toNonBreaking().forEachIndexed { i, ch -> chars[run.start + i] = ch }
+            if (run.chip?.id in breaksBefore && run.start > 0 && text[run.start - 1] == ' ') chars[run.start - 1] = '\n'
+        }
+        String(chars)
+    }
+}
 
 /** One styled run: a trigger or a chip token at UTF-16 `start until end`. */
 data class AutocompleteChipRun(
@@ -760,6 +845,14 @@ class ComposerAutocompleteTextBridge {
     var onDismiss: (() -> Unit)? = null
     var onDeleteChip: ((UUID) -> Unit)? = null
     var onCaretChanged: ((Int?) -> Unit)? = null
+
+    /**
+     * Chips that would wrap mid-token where they stand, so they start the next line instead
+     * (iOS `shouldBreakLineByWordBeforeCharacterAt` refuses every break inside a chip, so TextKit
+     * breaks before it). Kept by [updateLineBreaks] from each layout.
+     */
+    var breaksBefore: Set<UUID> by mutableStateOf(emptySet())
+        internal set
 
     /** The latest styling, published by [rememberAutocompleteTextStyling]; read by the transformations. */
     var styling: AutocompleteTextStyling? by mutableStateOf(null)
@@ -954,7 +1047,43 @@ class ComposerAutocompleteTextBridge {
                 val extra = with(density) { extraPx.toSp() }
                 AutocompleteChipRun(entry.chip, entry.start, entry.end, targetWidthPx, fontSize, extra)
             }
-        return AutocompleteTextStyling(text, trigger, triggerColor, runs)
+        val spaceWidthPx = measurer.measure(" ", baseStyle, softWrap = false, maxLines = 1, density = density).size.width.toFloat()
+        val chipIDs = runs.mapNotNull { it.chip?.id }.toSet()
+        return AutocompleteTextStyling(text, trigger, triggerColor, runs, breaksBefore.intersect(chipIDs), spaceWidthPx)
+    }
+
+    /**
+     * Keeps each chip whole on one line (call it from the field's `onTextLayout`). The
+     * non-breaking substitutions remove the common break opportunities inside a token; any
+     * other (after `/`, `?`, an en dash, between CJK characters…) still lets a chip split at a
+     * line's end. Such a chip starts the next line instead: the space before it is drawn as a
+     * line break (same length, so offsets and the caret are unchanged) until the chip fits
+     * after the previous line again.
+     */
+    fun updateLineBreaks(layout: TextLayoutResult) {
+        val current = styling ?: return
+        if (!isEnabled || layout.layoutInput.text.length != current.text.length) return
+        val constraints = layout.layoutInput.constraints
+        if (!constraints.hasBoundedWidth) return
+        val maxWidth = constraints.maxWidth.toFloat()
+        val next = current.breaksBefore.toMutableSet()
+        for (run in current.chips) {
+            val id = run.chip?.id ?: continue
+            if (run.start <= 0 || current.text[run.start - 1] != ' ' || run.end > current.text.length) {
+                next -= id
+                continue
+            }
+            val startLine = layout.getLineForOffset(run.start)
+            if (id in current.breaksBefore) {
+                // Restored to a space, would it sit whole after the previous line's text?
+                val fits = startLine == 0 ||
+                    layout.getLineRight(startLine - 1) + current.spaceWidthPx + run.chipWidthPx <= maxWidth - 1f
+                if (fits) next -= id
+            } else if (layout.getLineForOffset(run.end - 1) != startLine) {
+                next += id
+            }
+        }
+        if (next != breaksBefore) breaksBefore = next
     }
 
     /** Applies [styling] to a buffer or builder: styles plus same-length non-breaking replacements. */
@@ -970,6 +1099,9 @@ class ComposerAutocompleteTextBridge {
             addStyle(SpanStyle(color = Color.Transparent, fontSize = run.fontSize ?: androidx.compose.ui.unit.TextUnit.Unspecified), run.start, run.end)
             if (run.extraSpacing.value > 0f) addStyle(SpanStyle(letterSpacing = run.extraSpacing), run.end - 1, run.end)
             replace(run.start, run.end, styling.text.substring(run.start, run.end).toNonBreaking())
+            if (run.chip?.id in styling.breaksBefore && run.start > 0 && styling.text[run.start - 1] == ' ') {
+                replace(run.start - 1, run.start, "\n")
+            }
         }
     }
 
@@ -1092,7 +1224,8 @@ fun rememberAutocompleteTextStyling(
     val chips = bridge.chips
     val trigger = bridge.activeTrigger
     val open = bridge.isOpen
-    val styling = remember(enabled, text, chips, trigger, open, baseStyle, density, maxTextWidthPx, isDark) {
+    val breaks = bridge.breaksBefore
+    val styling = remember(enabled, text, chips, trigger, open, baseStyle, density, maxTextWidthPx, isDark, breaks) {
         if (!enabled) null else bridge.buildStyling(text, baseStyle, measurer, density, maxTextWidthPx, isDark)
     }
     val lineHeightDp = remember(density) {
@@ -1114,7 +1247,7 @@ fun rememberAutocompleteTextStyling(
 fun AutocompleteInlineChips(bridge: ComposerAutocompleteTextBridge, modifier: Modifier = Modifier) {
     val styling = bridge.styling ?: return
     val layout = bridge.textLayout ?: return
-    if (!bridge.isEnabled || styling.chips.isEmpty() || layout.layoutInput.text.text != styling.text) return
+    if (!bridge.isEnabled || styling.chips.isEmpty() || layout.layoutInput.text.text != styling.visualText) return
     val density = LocalDensity.current
     val controller = bridge.motionController
     Box(modifier) {
@@ -1159,6 +1292,7 @@ fun SyncComposerAutocomplete(
     SideEffect {
         bridge.configure(state, isEnabled, controller) { currentSend(it) }
         controller.chipSlotProvider = { id -> bridge.chipSlotInComposer(id, density) }
+        controller.composerAnchor = { bridge.composerCoordinates?.takeIf { it.isAttached } }
         // iOS `.onChange(of: store.autocomplete / composerFrame / usesComposerAutocomplete)`.
         val inputs = listOf(state, isEnabled, composerWidth, composerHeight, density, reducedMotion)
         if (last[0] == inputs) return@SideEffect

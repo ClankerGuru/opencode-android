@@ -1,5 +1,6 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.devtools.traces.TraceUploadsFeature
 import ai.opencode.feature.session.*
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.dependency
@@ -262,9 +263,10 @@ private fun HomeFeature.reduceSessionDelegate(state: State, delegate: SessionFea
         if (session == null) Reduced(state)
         else Reduced(state.copy(pendingDeletion = session, deletionError = null), Effect.send(Action.DeleteSessionConfirmed))
     }
-    // iOS uploads a Developer Mode trace (`traces(.reportProblemTapped)`); Android's developer tools
-    // are `:devtools`' own (not a port of iOS `Diagnostics/Traces`), so there's nothing to send.
-    SessionFeature.Delegate.ReportProblem -> Reduced(state)
+    SessionFeature.Delegate.ReportProblem -> {
+        val context = state.problemReportContext
+        Reduced(state, Effect.send(Action.Traces(TraceUploadsFeature.Action.ReportProblemTapped(context, state.problemReportDestination(context)))))
+    }
 }
 
 /** Sends pushed subagents' screens what Home sends the session's, to those [matching] picks: they stay live while covered. */

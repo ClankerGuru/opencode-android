@@ -20,7 +20,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalTextStyle
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -111,12 +110,12 @@ fun FileAttachmentDetail(text: String, modifier: Modifier = Modifier, color: Col
 
 /**
  * Media and documents the agent pointed at, beneath the paragraph that names them (iOS
- * `AgentFileCards`). Each opens in the viewer, which flies from its card.
+ * `AgentFileCards`). Each opens in the viewer, which flies from its card, and drags the file out
+ * to other apps with [LocalMediaDragContext]'s server.
  */
 @Composable
 fun AgentFileCards(files: List<AgentFileReference>, onOpen: (AgentFileReference) -> Unit, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(TranscriptMetrics.cardCornerRadius)
-    val dragSource = LocalAgentFileDragSource.current
     LazyRow(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(TranscriptMetrics.clustered)) {
         items(files, key = { it.path }) { file ->
             FileAttachmentCard(
@@ -125,10 +124,12 @@ fun AgentFileCards(files: List<AgentFileReference>, onOpen: (AgentFileReference)
                 width = if (files.size == 1) 260.dp else 220.dp,
                 trailingSymbolName = if (file.kind.isTimeBased) "play.fill" else "chevron.right",
                 modifier = Modifier
-                    .then(dragSource?.invoke(file, null, TranscriptMetrics.cardCornerRadius) ?: Modifier)
                     .heightIn(min = 48.dp)
+                    // Holding drags the file out (iOS `.transcriptDragSource(.agentFile(file:))`), served by
+                    // the row's context; outside the clip and fill so the lifted card is the card as drawn.
+                    .mediaDragSource(MediaDragPayload.AgentFile(file))
                     .clip(shape)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .background(OpenCodeTheme.colors.userBubble)
                     .mediaZoomSource(file.zoomSourceID, TranscriptMetrics.cardCornerRadius)
                     .clickable(role = Role.Button) { onOpen(file) }
                     .clearAndSetSemantics {

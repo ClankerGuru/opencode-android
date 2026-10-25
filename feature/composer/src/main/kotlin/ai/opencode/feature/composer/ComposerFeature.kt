@@ -23,8 +23,15 @@ import ai.opencode.server.model.OpenCodeModelRef
 import ai.opencode.server.model.OpenCodePendingRequests
 import ai.opencode.server.retry.RetryPolicy
 import ai.opencode.server.retry.withRetryPolicy
+import ai.opencode.server.OpenCodeServerEvent
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * The composer's host reducer: the pieces ported from iOS `OpenCode/Composer/` composed into
@@ -84,6 +91,13 @@ class ComposerFeature : Reducer<ComposerFeature.State, ComposerFeature.Action> {
 
     private enum class CancelID { Requests, Models, Send }
 
+    private companion object {
+        /** iOS `pendingWorkPollSeconds(streamIsHealthy: true)`. */
+        val PENDING_WORK_HEALTHY = 12.seconds
+        /** iOS `pendingWorkPollSeconds(streamIsHealthy: false)`. */
+        val PENDING_WORK_UNHEALTHY = 2.seconds
+    }
+
     private val attachmentsReducer = ComposerAttachmentsFeature()
     private val dockReducer = RequestDockFeature<DraftState>()
 
@@ -100,7 +114,7 @@ class ComposerFeature : Reducer<ComposerFeature.State, ComposerFeature.Action> {
 
         is Action.SessionResolved -> {
             val next = state.copy(directory = action.directory, familySessionIDs = action.familySessionIDs)
-            Reduced(next, refreshRequests(next, polls = true))
+            Reduced(next, refreshRequests(next, watches = true))
         }
 
         is Action.DraftChanged -> {
@@ -364,27 +378,62 @@ class ComposerFeature : Reducer<ComposerFeature.State, ComposerFeature.Action> {
                 }
             }.cancellable(CancelID.Requests, cancelInFlight = true)
         }
-        return refreshRequests(state, polls = true)
+        return refreshRequests(state, watches = true)
     }
 
-    /** The session's pending requests. iOS refreshes on SSE `permission.*`/`form.*`; this host polls every 2 s. */
-    private fun refreshRequests(state: State, polls: Boolean = false): Effect<Action> {
+    /**
+     * The session's pending requests, as iOS's session keeps them: read now, again whenever the
+     * server's event stream says a request was asked or settled (`permission.*`/`form.*` →
+     * [OpenCodeServerEvent.AttentionChanged]) or the stream (re)connects, and otherwise every
+     * [PENDING_WORK_HEALTHY] while the stream is healthy or [PENDING_WORK_UNHEALTHY] while it
+     * isn't (iOS `pollPendingWork`/`pendingWorkPollSeconds`). [watches] false reads once.
+     */
+    private fun refreshRequests(state: State, watches: Boolean = false): Effect<Action> {
         val server = state.server ?: return Effect.none()
         val sessionID = state.sessionID ?: return Effect.none()
         val directory = state.directory ?: ""
-        val read = Effect.run<Action> { send ->
-            val client = dependency(OpenCodeClient)
-            do {
-                try {
-                    send(Action.PendingRequestsLoaded(client.familyPendingRequests(server, (state.familySessionIDs + sessionID).toList(), directory)))
-                } catch (cancellation: CancellationException) {
-                    throw cancellation
-                } catch (_: OpenCodeClientError) {
-                }
-                if (polls) delay(2_000)
-            } while (polls)
+        val family = (state.familySessionIDs + sessionID).toList()
+        suspend fun read(send: ai.opencode.core.store.Send<Action>) {
+            try {
+                send(Action.PendingRequestsLoaded(dependency(OpenCodeClient).familyPendingRequests(server, family, directory)))
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: OpenCodeClientError) {
+            }
         }
-        return if (polls) read.cancellable(CancelID.Requests, cancelInFlight = true) else read
+        if (!watches) return Effect.run<Action> { send -> read(send) }
+        return Effect.run<Action> { send ->
+            val client = dependency(OpenCodeClient)
+            val isHealthy = AtomicBoolean(false)
+            val changed = Channel<Unit>(Channel.CONFLATED)
+            coroutineScope {
+                launch {
+                    while (true) {
+                        try {
+                            client.events(server).collect { event ->
+                                when (event) {
+                                    OpenCodeServerEvent.Connected -> {
+                                        isHealthy.set(true)
+                                        changed.trySend(Unit)
+                                    }
+                                    is OpenCodeServerEvent.AttentionChanged -> changed.trySend(Unit)
+                                    else -> Unit
+                                }
+                            }
+                        } catch (cancellation: CancellationException) {
+                            throw cancellation
+                        } catch (_: Exception) {
+                        }
+                        isHealthy.set(false)
+                        delay(PENDING_WORK_UNHEALTHY)
+                    }
+                }
+                while (true) {
+                    read(send)
+                    withTimeoutOrNull(if (isHealthy.get()) PENDING_WORK_HEALTHY else PENDING_WORK_UNHEALTHY) { changed.receive() }
+                }
+            }
+        }.cancellable(CancelID.Requests, cancelInFlight = true)
     }
 
     private fun loadModels(state: State): Effect<Action> {

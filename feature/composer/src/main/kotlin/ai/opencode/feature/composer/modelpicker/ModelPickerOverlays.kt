@@ -14,7 +14,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import ai.opencode.core.tuning.AnimationTimeScale
+import androidx.compose.ui.Modifier
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -379,6 +382,15 @@ class ModelPickerAnchors(private val scope: CoroutineScope) {
     /** The Fused list's scroll position (px) and whether it's moving, read by row gestures (not observed). */
     var listScrollOffset: Float = 0f
     var listIsScrolling: Boolean = false
+    /** How far the Fused list has scrolled in all (px, both ways summed signed): a row's hold rules itself out past [HOLD_SLOP]. */
+    var listScrollTravel: Float = 0f
+
+    /**
+     * What lies behind the level stack, for its feathered blur (iOS `ProgressiveBlur` over the
+     * session). The session records it with [modelPickerBackdropSource]; until it does, the stack
+     * draws its dim fill alone.
+     */
+    val backdrop = BlurSource()
 
     private var flightCounter = 0
     private var flightClearTask: Job? = null
@@ -420,10 +432,10 @@ class ModelPickerAnchors(private val scope: CoroutineScope) {
         flightCounter += 1
         val currentID = flightCounter
         flight = FusedLabelFlight(currentID, direction, model.id, model.shortName, levelText, fromName, fromLevel)
-        flightClearTask = scope.launch {
+        flightClearTask = scope.launch(start = CoroutineStart.UNDISPATCHED) {
             flightProgress.snapTo(0f)
             launch { flightProgress.animateTo(1f, FusedModelPickerTunables.flight.spec()) }
-            delay(((FusedModelPickerTunables.flight.duration + 0.08) * 1000).roundToInt().toLong())
+            delay(wallMillis(FusedModelPickerTunables.flight.duration + 0.08))
             if (flight?.id == currentID) flight = null
         }
     }
@@ -449,7 +461,7 @@ class ModelPickerAnchors(private val scope: CoroutineScope) {
             tapMode = tapMode, isClosing = false,
         )
         stackFadeTask?.cancel()
-        stackFadeTask = scope.launch {
+        stackFadeTask = scope.launch(start = CoroutineStart.UNDISPATCHED) {
             levelStackSettle.snapTo(0f)
             levelStackAlpha.snapTo(0f)
             levelStackAlpha.animateTo(1f, FusedModelPickerTunables.animation(FusedModelPickerTunables.scrubIn, reduceMotion))
@@ -498,7 +510,7 @@ class ModelPickerAnchors(private val scope: CoroutineScope) {
         levelStack = stack.copy(isClosing = true, rawPosition = to)
         val outSpring = if (commit) FusedModelPickerTunables.contentOut else FusedModelPickerTunables.scrubOut
         stackFadeTask?.cancel()
-        stackFadeTask = scope.launch {
+        stackFadeTask = scope.launch(start = CoroutineStart.UNDISPATCHED) {
             launch {
                 levelStackSettle.snapTo((from - to).toFloat())
                 levelStackSettle.animateTo(0f, FusedModelPickerTunables.animation(FusedModelPickerTunables.scrubSettle, reduceMotion))
@@ -506,7 +518,7 @@ class ModelPickerAnchors(private val scope: CoroutineScope) {
             levelStackAlpha.animateTo(0f, FusedModelPickerTunables.animation(outSpring, reduceMotion))
         }
         stackClearTask = scope.launch {
-            delay(((outSpring.duration + 0.05) * 1000).roundToInt().toLong())
+            delay(wallMillis(outSpring.duration + 0.05))
             levelStack = null
             stackWordFrames.clear()
         }
@@ -516,7 +528,7 @@ class ModelPickerAnchors(private val scope: CoroutineScope) {
         menuClearTask?.cancel()
         rowMenu = FusedRowMenuState(model, ModelLevelScale(model.variants), rowFrame)
         menuFadeTask?.cancel()
-        menuFadeTask = scope.launch {
+        menuFadeTask = scope.launch(start = CoroutineStart.UNDISPATCHED) {
             rowMenuAlpha.snapTo(0f)
             rowMenuAlpha.animateTo(1f, FusedModelPickerTunables.animation(FusedModelPickerTunables.menuIn, reduceMotion))
         }
@@ -528,11 +540,11 @@ class ModelPickerAnchors(private val scope: CoroutineScope) {
         menuClearTask?.cancel()
         rowMenu = menu.copy(isClosing = true)
         menuFadeTask?.cancel()
-        menuFadeTask = scope.launch {
+        menuFadeTask = scope.launch(start = CoroutineStart.UNDISPATCHED) {
             rowMenuAlpha.animateTo(0f, FusedModelPickerTunables.animation(FusedModelPickerTunables.scrubOut, reduceMotion))
         }
         menuClearTask = scope.launch {
-            delay(((FusedModelPickerTunables.scrubOut.duration + 0.05) * 1000).roundToInt().toLong())
+            delay(wallMillis(FusedModelPickerTunables.scrubOut.duration + 0.05))
             rowMenu = null
         }
     }
@@ -548,7 +560,7 @@ class ModelPickerAnchors(private val scope: CoroutineScope) {
         levelStack = null
         rowMenu = null
         frozenSections = null
-        scope.launch {
+        scope.launch(start = CoroutineStart.UNDISPATCHED) {
             levelStackAlpha.snapTo(0f)
             rowMenuAlpha.snapTo(0f)
         }
@@ -571,6 +583,34 @@ class ModelPickerAnchors(private val scope: CoroutineScope) {
         levelControl = Rect.Zero
     }
 }
+
+/** iOS waits `AnimationTimeScale.shared.wallSeconds(forVirtual:)`: slow motion stretches the clears with the springs. */
+private fun wallMillis(virtualSeconds: Double): Long =
+    (AnimationTimeScale.shared.wallSeconds(virtualSeconds) * 1000).roundToInt().toLong()
+
+/**
+ * Records what lies behind the Fused level stack (mount on the session content under the
+ * overlays, never on a parent of them) so the stack's backdrop is a real blur of it.
+ */
+fun Modifier.modelPickerBackdropSource(anchors: ModelPickerAnchors): Modifier = blurSource(anchors.backdrop)
+
+/** How far a row's press may ride the list's scroll before its hold no longer counts (iOS `FusedModelRow.holdSlop`, dp). */
+internal const val HOLD_SLOP = 10.0
+
+/** `UIScrollView.DecelerationRate.normal`: the share of velocity kept per millisecond. */
+const val UIKIT_DECELERATION_RATE_NORMAL = 0.998
+
+/**
+ * UIKit's throw projection, the one SwiftUI's `DragGesture.Value.predictedEndTranslation` applies
+ * (Apple, WWDC18 “Designing Fluid Interfaces” `project(initialVelocity:decelerationRate:)`):
+ * how far a throw at [velocity] (per second) coasts while decelerating at [decelerationRate]
+ * per millisecond, `(v / 1000) · r / (1 − r)`.
+ */
+fun projectedTravel(velocity: Double, decelerationRate: Double = UIKIT_DECELERATION_RATE_NORMAL): Double =
+    velocity / 1000.0 * decelerationRate / (1.0 - decelerationRate)
+
+/** SwiftUI `predictedEndTranslation`: where a drag at [translation] released at [velocity] would come to rest. */
+fun predictedEndTranslation(translation: Double, velocity: Double): Double = translation + projectedTravel(velocity)
 
 // MARK: - Per-Frame Motion Trace Verification
 

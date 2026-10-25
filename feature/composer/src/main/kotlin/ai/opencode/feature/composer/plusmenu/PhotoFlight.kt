@@ -1,6 +1,7 @@
 package ai.opencode.feature.composer.plusmenu
 
 import ai.opencode.core.motion.MotionFrameAction
+import ai.opencode.core.tuning.AnimationTimeScale
 import ai.opencode.feature.composer.PlusMenuTunables
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.SpringSolver
@@ -591,7 +592,8 @@ class PhotoFlights {
         const val SLOT_RADIUS = 22f
         const val SLOT_SPACING = 8f
 
-        private fun now(): Double = System.nanoTime() / 1e9
+        /** iOS `AnimationTimeScale.shared.now()`: geometry time follows Developer Mode slow motion. */
+        private fun now(): Double = AnimationTimeScale.shared.now()
     }
 }
 

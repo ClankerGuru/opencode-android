@@ -32,9 +32,8 @@ class TuningFeature : Reducer<TuningFeature.State, TuningFeature.Action> {
         val isCollapsed: Boolean = false,
         val didCopy: Boolean = false,
         val lastCopied: String? = null,
-        /** Where the panel sits, as fractions of the free area (x 0 = left edge, 1 = right). */
-        val placementX: Float = 1f,
-        val placementY: Float = 0.12f,
+        /** Where the panel floats (iOS `@AppStorage("tuning-placement")`). Kept across launches. */
+        val placement: TuningPlacement = TuningPlacement(),
         /** Groups folded to their header. Kept across launches. */
         val foldedGroups: Set<String> = emptySet(),
         /** The Developer screen, opened over the app from the panel's menu. */
@@ -60,8 +59,8 @@ class TuningFeature : Reducer<TuningFeature.State, TuningFeature.Action> {
         data class CopyValuesTapped(val group: String?) : Action
         data class CopyKotlinTapped(val group: String?) : Action
         data object CopiedShown : Action
-        /** The header was dragged and released here (fractions of the free area). */
-        data class PlacementChanged(val x: Float, val y: Float) : Action
+        /** The panel, pill or tab was thrown, or the tab pulled out: where it lands. */
+        data class PlacementChanged(val placement: TuningPlacement) : Action
         data class GroupFolded(val group: String, val folded: Boolean) : Action
         data object DeveloperToolsTapped : Action
         data object DeveloperToolsClosed : Action
@@ -75,8 +74,7 @@ class TuningFeature : Reducer<TuningFeature.State, TuningFeature.Action> {
             Action.Task -> Reduced(
                 state.copy(
                     isCollapsed = shared(TuningPanelKeys.collapsed).value,
-                    placementX = shared(TuningPanelKeys.placementX).value,
-                    placementY = shared(TuningPanelKeys.placementY).value,
+                    placement = TuningPlacement.fromText(shared(TuningPanelKeys.placement).value),
                     foldedGroups = shared(TuningPanelKeys.foldedGroups).value.split(',').filter { it.isNotEmpty() }.toSet(),
                 ),
             )
@@ -129,11 +127,9 @@ class TuningFeature : Reducer<TuningFeature.State, TuningFeature.Action> {
             is Action.CopyKotlinTapped -> copySnippet(tuning.kotlinSnippet(action.group), state)
             Action.CopiedShown -> Reduced(state.copy(didCopy = false))
             is Action.PlacementChanged -> {
-                val x = action.x.coerceIn(0f, 1f)
-                val y = action.y.coerceIn(0f, 1f)
-                if (x != state.placementX) shared(TuningPanelKeys.placementX).set(x)
-                if (y != state.placementY) shared(TuningPanelKeys.placementY).set(y)
-                Reduced(state.copy(placementX = x, placementY = y))
+                if (action.placement == state.placement) return Reduced(state)
+                shared(TuningPanelKeys.placement).set(action.placement.text)
+                Reduced(state.copy(placement = action.placement))
             }
             Action.DeveloperToolsTapped -> Reduced(state.copy(showsDeveloperTools = true, isPanelShown = false))
             Action.DeveloperToolsClosed -> Reduced(state.copy(showsDeveloperTools = false))
@@ -161,13 +157,12 @@ class TuningFeature : Reducer<TuningFeature.State, TuningFeature.Action> {
     }
 }
 
-/** iOS tuning panel keys (`tuning-panel-collapsed`, folded groups and placement). */
+/** iOS tuning panel keys (`tuning-panel-collapsed`, folded groups and `tuning-placement`). */
 object TuningPanelKeys {
     val collapsed: SharedKey<Boolean> = SharedKey.appStorage("tuning-panel-collapsed", false)
     val foldedGroups: SharedKey<String> = SharedKey.appStorage("tuning-folded-groups", "")
-    /** Where the panel sits: fractions of the free area, as iOS keeps its placement across launches. */
-    val placementX: SharedKey<Float> = SharedKey.appStorage("tuning-panel-x", 1f)
-    val placementY: SharedKey<Float> = SharedKey.appStorage("tuning-panel-y", 0.12f)
+    /** iOS `@AppStorage("tuning-placement")`: [TuningPlacement.text], JSON; anything unreadable is the default. */
+    val placement: SharedKey<String> = SharedKey.appStorage("tuning-placement", "")
 }
 
 /** iOS `TuningPanelGroups.shown`: this screen's groups that have tunables and aren't settled; with All, every unsettled group, this screen's first. */

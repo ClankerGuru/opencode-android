@@ -6,7 +6,6 @@
             android:authorities="${applicationId}.media.files"
             android:exported="false"
             android:grantUriPermissions="true">
-            <!-- FileProvider.getUriForFile reads the paths from here, not from the constructor's resource. -->
             <meta-data
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/media_file_paths" />
@@ -19,6 +18,16 @@
             <meta-data
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/agent_file_paths" />
+        </provider>
+        <provider
+            android:name="ai.opencode.feature.media.AgentFileDragProvider"
+            android:authorities="${applicationId}.agentfiles.drag"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <!-- FileProvider.getUriForFile reads the paths from here, not the constructor's resource. -->
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/agent_file_drag_paths" />
         </provider>
     </application>
 </manifest>

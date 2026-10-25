@@ -1,6 +1,5 @@
 package ai.opencode.feature.composer
 
-import ai.opencode.core.sharing.InstantSerializer
 import ai.opencode.server.model.OpenCodeAutocompleteMentions
 import ai.opencode.server.model.OpenCodeDelivery
 import ai.opencode.server.model.OpenCodeModelRef
@@ -10,6 +9,8 @@ import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.PageShareRequest
 import ai.opencode.server.model.PastedTextSummary
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Required
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
@@ -17,6 +18,9 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.double
 import java.time.Instant
 import java.util.UUID
 
@@ -27,10 +31,12 @@ import java.util.UUID
  */
 @Serializable
 data class PersistedComposerState(
-    val version: Int = CURRENT_VERSION,
-    val drafts: List<DraftRecord> = emptyList(),
-    val outbox: List<OutboxRecord> = emptyList(),
-    val undelivered: List<UndeliveredRecord> = emptyList(),
+    // Swift's synthesized `Decodable` ignores property defaults: a file missing any of these
+    // fails to decode (and the composer starts afresh), as on iOS.
+    @Required val version: Int = CURRENT_VERSION,
+    @Required val drafts: List<DraftRecord> = emptyList(),
+    @Required val outbox: List<OutboxRecord> = emptyList(),
+    @Required val undelivered: List<UndeliveredRecord> = emptyList(),
 ) {
     @Serializable
     data class AttachmentRecord(
@@ -76,7 +82,7 @@ data class PersistedComposerState(
         @Serializable(with = SharedLocationSerializer::class) val location: SharedLocation? = null,
         val chips: List<ComposerAutocompleteChip> = emptyList(),
         val undoSnapshot: UndoSnapshot? = null,
-        @Serializable(with = InstantSerializer::class) val updatedAt: Instant,
+        @Serializable(with = ComposerDateSerializer::class) val updatedAt: Instant,
     ) {
         val hasPersistedContent: Boolean
             get() = text.isNotEmpty() || attachments.isNotEmpty() || files.isNotEmpty() || location != null || undoSnapshot != null
@@ -108,7 +114,7 @@ data class PersistedComposerState(
         val pending: PendingPromptRecord,
         val isHeld: Boolean,
         val backgroundKey: String? = null,
-        @Serializable(with = InstantSerializer::class) val updatedAt: Instant,
+        @Serializable(with = ComposerDateSerializer::class) val updatedAt: Instant,
     )
 
     @Serializable
@@ -117,7 +123,7 @@ data class PersistedComposerState(
         val sessionID: String? = null,
         val pending: PendingPromptRecord,
         val reason: String,
-        @Serializable(with = InstantSerializer::class) val updatedAt: Instant,
+        @Serializable(with = ComposerDateSerializer::class) val updatedAt: Instant,
     )
 
     val isEmpty: Boolean
@@ -170,7 +176,40 @@ data class PersistedComposerState(
 internal object DeliverySerializer : KSerializer<OpenCodeDelivery> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("OpenCodeDelivery", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: OpenCodeDelivery) = encoder.encodeString(value.rawValue)
-    override fun deserialize(decoder: Decoder): OpenCodeDelivery = OpenCodeDelivery.of(decoder.decodeString()) ?: OpenCodeDelivery.Steer
+    // An unknown raw value fails the decode (the whole state starts afresh), as Swift's `RawRepresentable` `Decodable` does.
+    override fun deserialize(decoder: Decoder): OpenCodeDelivery {
+        val raw = decoder.decodeString()
+        return OpenCodeDelivery.of(raw) ?: throw SerializationException("Unknown delivery")
+    }
+}
+
+/**
+ * iOS `JSONEncoder`'s default date strategy (`.deferredToDate`): seconds since
+ * 2001-01-01T00:00:00Z as a JSON number. Decoding also takes the ISO-8601 strings earlier
+ * Android builds wrote.
+ */
+internal object ComposerDateSerializer : KSerializer<Instant> {
+    /** 2001-01-01T00:00:00Z (`Date.timeIntervalSinceReferenceDate`'s zero). */
+    private const val REFERENCE_EPOCH_SECONDS = 978_307_200L
+
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("ComposerDate", PrimitiveKind.DOUBLE)
+
+    override fun serialize(encoder: Encoder, value: Instant) {
+        val seconds = (value.epochSecond - REFERENCE_EPOCH_SECONDS).toDouble() + value.nano / 1_000_000_000.0
+        encoder.encodeDouble(seconds)
+    }
+
+    override fun deserialize(decoder: Decoder): Instant {
+        val primitive = (decoder as? JsonDecoder)?.decodeJsonElement() as? JsonPrimitive
+            ?: return fromReference(decoder.decodeDouble())
+        return if (primitive.isString) Instant.parse(primitive.content) else fromReference(primitive.double)
+    }
+
+    private fun fromReference(seconds: Double): Instant {
+        val whole = Math.floor(seconds)
+        val nanos = ((seconds - whole) * 1_000_000_000.0).toLong().coerceIn(0, 999_999_999)
+        return Instant.ofEpochSecond(whole.toLong() + REFERENCE_EPOCH_SECONDS, nanos)
+    }
 }
 
 /** iOS `PageShareRequest: Codable`: `pageID`, `url`, `title`, `includesScreenshot`. */

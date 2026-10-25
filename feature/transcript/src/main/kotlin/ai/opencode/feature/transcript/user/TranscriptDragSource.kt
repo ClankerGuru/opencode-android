@@ -2,7 +2,9 @@ package ai.opencode.feature.transcript.user
 
 import ai.opencode.core.files.AttachmentFileType
 import ai.opencode.core.ui.OpenCodeTheme
-import ai.opencode.feature.media.AgentFileDrag
+import ai.opencode.feature.media.AgentFileDragProvider
+import ai.opencode.feature.media.MediaDragContext
+import ai.opencode.feature.media.MediaDragPayload
 import ai.opencode.feature.media.TranscriptLiftHold
 import ai.opencode.feature.media.fileReadRequest
 import ai.opencode.server.OpenCodePairingLink
@@ -155,8 +157,8 @@ sealed interface TranscriptDragPayload {
 
     /**
      * The drag's data, built when the drag starts (iOS `makeItemProvider`). Text travels as
-     * text; images and files as `content://` URIs from media's [AgentFileDrag], whose bytes a
-     * server file starts downloading now (the reader waits for them). A path no server resolves
+     * text; images and files as `content://` URIs from media's [AgentFileDragProvider], which
+     * reads a server file only when the drop target opens it. A path no server resolves
      * drags as its plain text, as on iOS. [appContext] serves the URIs; without it (no drag in
      * progress) only text payloads have data.
      */
@@ -164,8 +166,6 @@ sealed interface TranscriptDragPayload {
         val label = suggestedName
         fun plain(text: String, mimes: List<String> = mimeTypes) =
             ClipData(ClipDescription(label, mimes.toTypedArray()), ClipData.Item(text))
-        fun uri(uri: Uri?, mimes: List<String>, name: String = label) =
-            uri?.let { ClipData(ClipDescription(name, mimes.toTypedArray()), ClipData.Item(it)) }
         return when (this) {
             is Code -> plain(source)
             is PastedText -> plain(text)
@@ -176,38 +176,33 @@ sealed interface TranscriptDragPayload {
                 val share = OpenCodePairingLink.shareableURL(url) ?: url
                 ClipData(ClipDescription(label, mimeTypes.toTypedArray()), ClipData.Item(share, null, Uri.parse(share)))
             }
-            is ImageAttachment -> appContext?.let { uri(AgentFileDrag.bytes(it, label, data), mimeTypes) }
+            is ImageAttachment -> appContext?.let { app ->
+                // Decoded once the drag starts; media's drag provider writes the PNG when read.
+                android.graphics.BitmapFactory.decodeByteArray(data, 0, data.size)?.let { decoded ->
+                    imageClip(app, sanitizedSuggestedName(name.substringBeforeLast('.'), "image", "image/png"), decoded)
+                }
+            }
             is Image -> {
                 val resolvedServer = server ?: context.server
                 val resolvedDirectory = directory ?: context.directory
                 if (file != null && resolvedServer != null && file.target(resolvedDirectory) != null) {
                     AgentFile(file, resolvedServer, resolvedDirectory, displayName = name, cachedImage = image).clipData(context, appContext)
                 } else {
-                    appContext?.let { uri(AgentFileDrag.png(it, label, image.asAndroidBitmap()), mimeTypes) }
+                    appContext?.let { imageClip(it, label, image.asAndroidBitmap()) }
                 }
             }
-            is AgentFile -> {
-                val resolvedServer = server ?: context.server
-                val resolvedDirectory = directory ?: context.directory
-                val fileName = displayName ?: file.name
-                val target = file.target(resolvedDirectory)
-                val type = mimeTypes.first()
-                when {
-                    resolvedServer != null && target != null && resolvedServer.fileReadRequest(target) != null -> appContext?.let {
-                        // A text file also offers itself as text: a reader coerces the URI's contents.
-                        val mimes = if (file.kind == AgentFileReference.Kind.Text && type != ClipDescription.MIMETYPE_TEXT_PLAIN) {
-                            listOf(type, ClipDescription.MIMETYPE_TEXT_PLAIN)
-                        } else listOf(type)
-                        uri(AgentFileDrag.serverFile(it, resolvedServer, target, fileName, cachedImage?.asAndroidBitmap()), mimes)
-                    }
-                    cachedImage != null && !file.path.startsWith("/") -> appContext?.let {
-                        val name = sanitizedSuggestedName(fileName, "image", "image/png")
-                        uri(AgentFileDrag.png(it, name, cachedImage.asAndroidBitmap()), listOf("image/png"), name)
-                    }
-                    else -> plain(file.path, listOf(ClipDescription.MIMETYPE_TEXT_PLAIN))
-                }
-            }
+            // Media's `.agentFile` payload: served lazily through `AgentFileDragProvider`.
+            is AgentFile -> appContext?.let {
+                MediaDragPayload.AgentFile(file, server, directory, mime, displayName, cachedImage?.asAndroidBitmap())
+                    .clipData(it, MediaDragContext(context.server, context.directory))
+            } ?: plain(file.path, listOf(ClipDescription.MIMETYPE_TEXT_PLAIN))
         }
+    }
+
+    /** An in-memory image as a PNG `content://` URI from media's drag provider. */
+    private fun imageClip(appContext: Context, name: String, image: android.graphics.Bitmap): ClipData {
+        val uri = AgentFileDragProvider.register(appContext, AgentFileDragProvider.Source.Image(name), mime = "image/png", suggestedName = name, cachedImage = image)
+        return ClipData(ClipDescription(name, arrayOf("image/png")), ClipData.Item(uri))
     }
 
     companion object {

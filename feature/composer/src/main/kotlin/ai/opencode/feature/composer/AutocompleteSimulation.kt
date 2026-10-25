@@ -1102,6 +1102,12 @@ class AutocompleteMotionController {
     /** The landing slot of an inline chip in composer-local dp (iOS `chipSlotProvider`). */
     var chipSlotProvider: ((UUID) -> AutocompleteRect?)? = null
 
+    /**
+     * The composer's coordinates, the origin of flight rects, so an overlay mounted elsewhere
+     * (over the whole surface, above the rows) can place flights in its own space.
+     */
+    var composerAnchor: (() -> androidx.compose.ui.layout.LayoutCoordinates?)? = null
+
     /** Called when a chip flight lands, so the text field shows the inline chip (iOS `onChipFlightLanded`). */
     var onChipFlightLanded: (() -> Unit)? = null
 

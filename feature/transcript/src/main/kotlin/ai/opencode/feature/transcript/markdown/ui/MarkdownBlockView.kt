@@ -272,19 +272,10 @@ private fun FileCards(files: List<AgentFileReference>) {
     val context = LocalTranscriptRowContext.current
     val server = context.server
     val onOpenFile = { file: AgentFileReference -> context.send(TranscriptAction.OpenFile(file)) }
-    // iOS `.transcriptDragSource(.agentFile(...))` on the gallery's tiles and the file cards:
-    // media draws them, so the transcript hands it the drag source.
+    // iOS `\.transcriptDragContext`: media's gallery tiles and file cards drag their files
+    // (`.agentFile`) and read the server and folder from here.
     val directory = context.directory
-    val dragSource = remember(server, directory) {
-        { file: AgentFileReference, cachedImage: android.graphics.Bitmap?, radius: androidx.compose.ui.unit.Dp ->
-            Modifier.transcriptDragSource(
-                TranscriptDragPayload.AgentFile(file, server, directory, cachedImage = cachedImage?.asImageBitmap()),
-                cornerRadius = radius,
-                context = TranscriptDragContext(server, directory),
-            )
-        }
-    }
-    androidx.compose.runtime.CompositionLocalProvider(ai.opencode.feature.media.LocalAgentFileDragSource provides dragSource) {
+    androidx.compose.runtime.CompositionLocalProvider(ai.opencode.feature.media.LocalMediaDragContext provides ai.opencode.feature.media.MediaDragContext(server, directory)) {
         FileCardsContent(files, server, context.imagePreviews, directory, onOpenFile)
     }
 }

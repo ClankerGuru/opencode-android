@@ -141,4 +141,6 @@ data class TranscriptConfiguration(
     val sendGeneration: Int = 0,
     /** The New divider, above the first row that arrived while the reader was away. */
     val newMessages: NewMessagesPlacement? = null,
+    /** `PerfTimeline`'s revision of the REST snapshot this was made from; null unless measuring. */
+    val snapshotRevision: Int? = null,
 )

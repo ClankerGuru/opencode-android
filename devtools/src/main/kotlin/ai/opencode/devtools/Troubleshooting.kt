@@ -19,7 +19,8 @@ object Troubleshooting {
         events.filter { it.kind == DiagnosticsEvent.Kind.NetworkMetrics && it.requestID != null }.associateBy { it.requestID!! }
 
     /** iOS `summary`: last session open, tap → first frame / fresh content, SSE, last 60 seconds. */
-    fun summary(events: List<DiagnosticsEvent>): List<Pair<String, String>> {
+    /** [motionJumps]: the Motion Watch count, shown while it's on or has jumps (iOS), else null. */
+    fun summary(events: List<DiagnosticsEvent>, motionJumps: Int? = null): List<Pair<String, String>> {
         val open = events.lastOrNull { it.name == "session_tap" || it.name == "session_navigation_started" }
         val frame = after(events, open, setOf("session_first_frame"))
         val fresh = after(events, open, setOf("fresh_content_laid_out", "snapshot_apply", "transcript_response"))
@@ -29,8 +30,8 @@ object Troubleshooting {
             "Tap → first frame" to duration(open, frame),
             "Tap → first fresh content" to duration(open, fresh),
             "SSE" to (stream?.name ?: "No event recorded"),
-            "Last 60 seconds" to lastMinute(events),
-        )
+        ) + listOfNotNull(motionJumps?.let { "Motion Watch" to (if (it == 1) "1 jump" else "$it jumps") }) +
+            listOf("Last 60 seconds" to lastMinute(events))
     }
 
     fun lastMinute(events: List<DiagnosticsEvent>): String {
@@ -58,8 +59,11 @@ object Troubleshooting {
 
     fun ms(value: Double?): String = value?.let { String.format(Locale.ROOT, "%.0f ms", it) } ?: "—"
 
+    /** iOS `ByteCountFormatter` (`.file`): decimal units, “Zero KB”, “1 byte”, KB whole, MB one decimal. */
     fun bytes(value: Long?): String = when {
         value == null -> "—"
+        value == 0L -> "Zero KB"
+        value == 1L -> "1 byte"
         value < 1000 -> "$value bytes"
         value < 1_000_000 -> String.format(Locale.ROOT, "%.0f KB", value / 1000.0)
         else -> String.format(Locale.ROOT, "%.1f MB", value / 1_000_000.0)

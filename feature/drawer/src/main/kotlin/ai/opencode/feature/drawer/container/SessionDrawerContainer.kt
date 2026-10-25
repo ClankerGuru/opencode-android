@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package ai.opencode.feature.drawer.container
 
 import ai.opencode.core.motion.rememberFrameDurationSeconds
@@ -30,7 +32,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.systemBarsIgnoringVisibility
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -158,7 +160,7 @@ fun SessionDrawerContainer(
     val displayRadius = rememberDisplayCornerRadius()
     val frameDuration = rememberFrameDurationSeconds()
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-    val safe = WindowInsets.systemBars.union(WindowInsets.displayCutout)
+    val safe = WindowInsets.systemBarsIgnoringVisibility.union(WindowInsets.displayCutout)
     val layoutDirection = LocalLayoutDirection.current
     val safeLeft = safe.getLeft(density, layoutDirection).toFloat()
     val safeTop = safe.getTop(density).toFloat()
