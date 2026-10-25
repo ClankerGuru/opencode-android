@@ -26,7 +26,7 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 | `OpenCode/Diagnostics/Traces/TeamFeedback.swift` | 499 | | todo | |
 | `OpenCode/Diagnostics/Traces/TraceTriggers.swift` | 672 | | todo | |
 | `OpenCode/Diagnostics/Traces/TraceUploads.swift` | 537 | | todo | |
-| `OpenCode/Tuning/AnimationTimeScale.swift` | 309 | | todo | |
+| `OpenCode/Tuning/AnimationTimeScale.swift` | 309 | `core/.../tuning/AnimationTimeScale.kt` | done | moved to `:core`. Virtual clock, `scaledDelta`, `wallSeconds`, `setScale` (access-gated), `normalizeScale`, `requestedLabScale`. `window.layer.speed` → applied in `Motion.*`/`MotionSpring.spec` (stiffness × s²), tween durations ÷ s, `motionFrameLoop` dt × s. n/a: Darwin-notification lab bridge |
 | `OpenCode/Tuning/MotionXRay+Autocomplete.swift` | 108 | | todo | |
 | `OpenCode/Tuning/MotionXRay+Findings.swift` | 382 | | todo | |
 | `OpenCode/Tuning/MotionXRay+Surfaces.swift` | 477 | | todo | |
@@ -42,11 +42,11 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 | `OpenCode/Tuning/Playgrounds/PlaygroundHostView.swift` | 897 | | todo | |
 | `OpenCode/Tuning/Playgrounds/PlaygroundScenario.swift` | 46 | | todo | |
 | `OpenCode/Tuning/Playgrounds/PlaygroundSessionHost.swift` | 273 | | todo | |
-| `OpenCode/Tuning/Tunable.swift` | 538 | | todo | |
+| `OpenCode/Tuning/Tunable.swift` | 538 | `core/.../tuning/Tunable.kt` | done | moved to `:core`. `Tunable` (Double/Float/Dp/Int/Boolean/`TunableChoice` overloads), `TunableSpring` (→ `MotionSpring`), `TuningTitle`, `TuningContext` (+ iOS contexts), `TuneValue`/`TuneKind`, `TunableDescriptor` (`accepting`, `valueText`, `effectiveRange`, step grid, `randomValue`, `alternateValue`, `decimal`), `TuningPreset(s)`. `swiftLiteral` → `kotlinLiteral`; `.tuningContext(_:)` → `TuningContextEffect` |
 | `OpenCode/Tuning/TuningFeature.swift` | 632 | | todo | |
 | `OpenCode/Tuning/TuningGestures.swift` | 98 | | todo | |
 | `OpenCode/Tuning/TuningOverlay.swift` | 179 | | todo | |
 | `OpenCode/Tuning/TuningPanelView.swift` | 781 | | todo | |
 | `OpenCode/Tuning/TuningPlacement.swift` | 106 | | todo | |
 | `OpenCode/Tuning/TuningRemote.swift` | 485 | | todo | |
-| `OpenCode/Tuning/TuningStore.swift` | 698 | | todo | |
+| `OpenCode/Tuning/TuningStore.swift` | 698 | `core/.../tuning/TuningStore.kt` | done | moved to `:core`. Same registry semantics (register on first read while on, sanitize stale overrides, presets ordering, hidden groups, contexts, dice + undo, batch `set`, events as `SharedFlow`), persisted keys `tuning-overrides`/`tuning-hidden-groups` (SharedPreferences `tuning`). Observation → Compose snapshot state. Copy as Swift → `kotlinSnippet`; bake → `scripts/tune.py bake`. n/a: `labHeaderStyle`, playground status/jumps/captures (Mac page events) |
