@@ -1,11 +1,12 @@
 package ai.opencode.feature.transcript
 
+import ai.opencode.feature.media.LinkMenuAction
+import ai.opencode.feature.media.TranscriptImagePreview
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.AgentFileReference
 import ai.opencode.server.model.OpenCodeQueuedInput
 import ai.opencode.server.model.OpenCodeRunError
 import androidx.compose.runtime.Immutable
-import androidx.compose.ui.graphics.ImageBitmap
 
 /**
  * What a transcript row or the list asks the session to do. iOS rows call
@@ -39,30 +40,6 @@ sealed interface TranscriptAction {
     data class OpenFile(val file: AgentFileReference) : TranscriptAction
     /** An image was tapped (iOS `onPreviewImage`): the session opens the zoom viewer. */
     data class PreviewImage(val preview: TranscriptImagePreview) : TranscriptAction
-}
-
-/**
- * The link long-press menu's actions (iOS `Browser/LinkMenu.swift` `LinkMenuAction`). Defined
- * here until `:feature:media` ports the in-app browser's menu; the titles and icons match iOS.
- */
-enum class LinkMenuAction(val title: String, val systemImage: String) {
-    OpenInAppBrowser("Open in App Browser", "globe"),
-    OpenInSafari("Open in Browser", "safari"),
-    OpenInApp("Open in App", "arrow.up.forward.app"),
-    Copy("Copy Link", "doc.on.doc"),
-    Share("Share…", "square.and.arrow.up"),
-    /** A session ID in a reply (`SessionLink`): TalkBack's open action. */
-    OpenSession("Open Session", "arrow.up.right.square"),
-    CopySessionID("Copy ID", "doc.on.doc"),
-}
-
-/** iOS `TranscriptImagePreview`: decoded pages the zoom viewer shows, in order. */
-@Immutable
-data class TranscriptImagePreview(val id: String, val pages: List<Page>) {
-    @Immutable
-    data class Page(val id: String, val image: ImageBitmap, val label: String)
-
-    constructor(id: String, image: ImageBitmap, label: String) : this(id, listOf(Page(id, image, label)))
 }
 
 /**

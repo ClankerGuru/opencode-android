@@ -51,11 +51,6 @@ data class TranscriptRowSlots(
     val agentGlyph: (@Composable (state: AgentGlyphState, modifier: Modifier) -> Unit)? = null,
     /** iOS `ProviderIcon(providerID:)`; without one, model switches show filled sparkles. */
     val providerMark: (@Composable (providerID: String, modifier: Modifier) -> Unit)? = null,
-    /**
-     * iOS `LinkPreviewReplyEnd`: wraps the reply-end row's actions with the reply's link stack.
-     * Arguments: the row's key (`rowID`), the entry ID, the reply's texts, and the actions row.
-     */
-    val replyEnd: (@Composable (key: String, entryID: String, texts: List<String>, actions: @Composable () -> Unit) -> Unit)? = null,
 )
 
 val LocalTranscriptRowSlots = staticCompositionLocalOf { TranscriptRowSlots() }

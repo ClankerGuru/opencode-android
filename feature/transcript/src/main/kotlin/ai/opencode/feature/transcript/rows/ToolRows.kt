@@ -5,12 +5,12 @@ import ai.opencode.core.ui.OpenCodeIconSize
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.RollingNumber
+import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.InlineRowMetrics
 import ai.opencode.feature.transcript.LocalTranscriptRowContext
 import ai.opencode.feature.transcript.TranscriptAction
 import ai.opencode.feature.transcript.TranscriptDisclosureState
 import ai.opencode.feature.transcript.TranscriptEntry
-import ai.opencode.feature.transcript.TranscriptMetrics
 import ai.opencode.feature.transcript.TranscriptSubagent
 import ai.opencode.feature.transcript.markdown.ui.BandClock
 import ai.opencode.feature.transcript.markdown.ui.DisclosedTransition

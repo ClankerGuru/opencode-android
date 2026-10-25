@@ -2,6 +2,7 @@ package ai.opencode.feature.transcript.markdown
 
 import ai.opencode.feature.media.SyntaxHighlighter
 import ai.opencode.server.model.AgentFileReference
+import ai.opencode.server.model.SessionLink
 import androidx.compose.runtime.Immutable
 
 /**

@@ -5,10 +5,10 @@ import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.feature.media.TranscriptImagePreview
+import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.LocalTranscriptRowContext
 import ai.opencode.feature.transcript.TranscriptAction
-import ai.opencode.feature.transcript.TranscriptImagePreview
-import ai.opencode.feature.transcript.TranscriptMetrics
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.AgentFileReference
@@ -42,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -109,7 +110,7 @@ fun MarkdownImage(
                     .heightIn(max = 360.dp)
                     .clip(shape)
                     .background(colors.userBubble, shape)
-                    .clickable { send(TranscriptAction.PreviewImage(TranscriptImagePreview(cacheKey, load.image, label))) }
+                    .clickable { send(TranscriptAction.PreviewImage(TranscriptImagePreview(cacheKey, load.image.asAndroidBitmap(), label))) }
                     .semantics { contentDescription = "Open ${alt.ifEmpty { "image" }}" },
                 contentAlignment = Alignment.Center,
             ) {

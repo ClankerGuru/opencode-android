@@ -4,15 +4,23 @@ import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.feature.media.GitHubLink
+import ai.opencode.feature.media.GitHubPreview
+import ai.opencode.feature.media.LinkPreview
+import ai.opencode.feature.media.LinkPreviewBitmap
+import ai.opencode.feature.media.LocalLinkPreviewRevision
+import ai.opencode.feature.media.LocalLinkPreviewStore
+import ai.opencode.feature.media.RichLinkSource
+import ai.opencode.feature.media.SiteIcon
+import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.LocalTranscriptRowContext
 import ai.opencode.feature.transcript.TranscriptAction
 import ai.opencode.feature.transcript.TranscriptDisclosureState
-import ai.opencode.feature.transcript.TranscriptMetrics
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
+import ai.opencode.feature.transcript.markdown.ui.DisclosedTransition
 import ai.opencode.feature.transcript.markdown.ui.HairlineRule
 import ai.opencode.feature.transcript.markdown.ui.MarkdownLinks
 import ai.opencode.feature.transcript.markdown.ui.MarkdownStyle
-import ai.opencode.feature.transcript.markdown.ui.DisclosedTransition
 import ai.opencode.feature.transcript.rows.DisclosureMotion
 import ai.opencode.feature.transcript.rows.ReplyCopyGlyph
 import ai.opencode.feature.transcript.rows.isAccessibilityTextSize
@@ -63,6 +71,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
@@ -109,14 +118,14 @@ fun LinkPreviewReplyEnd(
     modifier: Modifier = Modifier,
     actions: @Composable () -> Unit,
 ) {
-    val store = LocalTranscriptLinkPreviews.current
+    val store = LocalLinkPreviewStore.current
     if (store == null) {
         Box(modifier) { actions() }
         return
     }
-    val blocks = remember(texts) { texts.flatMap { OpenCodeMarkdownBlock.blocks(it) } }
-    // Read so an arrival redraws the links.
-    store.revision(key)
+    val blocks = remember(texts) { texts.flatMap { OpenCodeMarkdownBlock.blocks(it) }.linkTextBlocks() }
+    // The row's revision (set by the list when its links' metadata or icons arrive) redraws them.
+    @Suppress("UNUSED_VARIABLE") val revision = LocalLinkPreviewRevision.current
     val targets = store.targets(blocks, entryID)
     if (targets.isEmpty()) {
         Box(modifier) { actions() }
@@ -134,7 +143,7 @@ fun LinkPreviewReplyEnd(
             .padding(top = MarkdownStyle.blockGap - TranscriptMetrics.flowHalf * 2),
         verticalArrangement = Arrangement.spacedBy(TranscriptMetrics.clustered),
     ) {
-        LinkPreviewEntries(previews, isOpen = disclosure.isOpen(TranscriptDisclosureState.Kind.LinkLists, key), presentation = store.presentation(key))
+        LinkPreviewEntries(previews, isOpen = disclosure.isOpen(TranscriptDisclosureState.Kind.LinkLists, key), presentation = store.presentation(key) { LinkPreviewRowPresentation() })
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             actions()
             Spacer(Modifier.weight(1f))
@@ -776,7 +785,8 @@ fun LinkPreviewCard(preview: LinkPreview, modifier: Modifier = Modifier) {
             Column {
                 PictureBand(aspect = if (summary.isVideo) 16f / 9f else 1.91f, maxHeight = 240.dp) {
                     Box(Modifier.fillMaxSize().background(tertiarySystemFill()).clearAndSetSemantics {}, contentAlignment = Alignment.Center) {
-                        Image(image.image, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                        val bitmap = remember(image) { image.image.asImageBitmap() }
+                        Image(bitmap, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                         if (summary.isVideo) {
                             Box(Modifier.background(Color.Black.copy(alpha = 0.4f), CircleShape).padding(14.dp)) {
                                 OpenCodeIcon("play.fill", contentDescription = null, size = 20.dp, tint = Color.White)
@@ -808,8 +818,8 @@ fun LinkPreviewCard(preview: LinkPreview, modifier: Modifier = Modifier) {
 /** Under a picture the site line names who made it: the channel, else the site. */
 private fun siteLine(preview: LinkPreview, summary: LinkPreviewSummary): String {
     val display = preview.display
-    if (!summary.isVideo || display !is LinkPreview.Display.Video || display.author == null) return summary.site
-    return display.author
+    if (!summary.isVideo || display !is LinkPreview.Display.Video) return summary.site
+    return display.author ?: summary.site
 }
 
 /**
@@ -845,8 +855,9 @@ fun SiteIconSlot(icon: SiteIcon?, side: Dp, modifier: Modifier = Modifier, scale
                 icon.tone == SiteIcon.Tone.Light && !dark -> Color(0.2f, 0.2f, 0.2f)
                 else -> Color.Transparent
             }
+            val bitmap = remember(icon) { icon.image.asImageBitmap() }
             Image(
-                icon.image,
+                bitmap,
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(size * 0.225f)).background(plate),
                 filterQuality = FilterQuality.High,

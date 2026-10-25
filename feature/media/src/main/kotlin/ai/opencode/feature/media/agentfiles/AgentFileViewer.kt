@@ -40,6 +40,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
@@ -49,7 +50,6 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -61,6 +61,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -70,11 +71,11 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.progressBarRangeInfo
-import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
@@ -85,8 +86,8 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.compose.ContentFrame
 import androidx.media3.ui.compose.state.rememberPlayPauseButtonState
 import androidx.media3.ui.compose.state.rememberProgressStateWithTickInterval
-import kotlinx.coroutines.delay
 import java.util.Locale
+import kotlinx.coroutines.delay
 
 /** A file opened from a document, resolved against that document's folder. */
 data class AgentFileDestination(val reference: AgentFileReference, val directory: String?)
@@ -96,7 +97,14 @@ data class AgentFileDestination(val reference: AgentFileReference, val directory
  * sits below the transcript). [onOpenFile] pushes a file the document links to; web links are
  * the renderer's own. Laid out in a vertically scrolling column, so it must not scroll itself.
  */
-typealias AgentFileMarkdown = @Composable (source: String, directory: String?, onOpenFile: (AgentFileReference) -> Unit) -> Unit
+typealias AgentFileMarkdown = @Composable (source: String, server: OpenCodeServer, directory: String?, onOpenFile: (AgentFileReference) -> Unit) -> Unit
+
+/**
+ * The app's Markdown renderer for file pages that aren't handed one (iOS `AgentFileViewer`
+ * renders `MarkdownBlocksView` itself; here the renderer is `:feature:transcript`'s, provided
+ * at the app root by `TranscriptMediaProviders`). Null: Markdown files open as source.
+ */
+val LocalAgentFileMarkdown = staticCompositionLocalOf<AgentFileMarkdown?> { null }
 
 /**
  * Opens a file the agent mentioned (iOS `AgentFileViewer`): streams media when the server
@@ -107,7 +115,8 @@ typealias AgentFileMarkdown = @Composable (source: String, directory: String?, o
  * @param onDone closes the viewer (iOS Done: the media viewer's dismissal, else the sheet's).
  * @param isInMediaViewer the media viewer hosts it: the root page's dark room is the viewer's own
  *   (clear), which lifts as it's dragged away.
- * @param markdown renders Markdown files; without it they open as source.
+ * @param markdown renders Markdown files; without it [LocalAgentFileMarkdown] does, and without
+ *   either they open as source.
  * @param onImageShown the root page decoded its image (iOS `viewer.show(sourceID:image:)`).
  * @param onZoomChange iOS `viewer.isZoomed`.
  * @param onImageFrame where the root page's image sits (iOS `viewer.mediaFrames[zoomSourceID]`).
@@ -167,13 +176,14 @@ fun AgentFilePage(
     onImageFrame: (sourceID: String, frame: Rect) -> Unit = { _, _ -> },
 ) {
     val reference = model.reference
+    val renderer = markdown ?: LocalAgentFileMarkdown.current
     if (reference.kind.isMedia) {
         // Media plays in a dark room, like Photos.
         OpenCodeTheme(theme = rememberAppAppearance().theme, appearance = AppearanceColorScheme.Dark) {
-            AgentFilePageContent(model, isRoot, onOpen, onBack, onDone, modifier, isInMediaViewer, markdown, onImageShown, onZoomChange, onImageFrame)
+            AgentFilePageContent(model, isRoot, onOpen, onBack, onDone, modifier, isInMediaViewer, renderer, onImageShown, onZoomChange, onImageFrame)
         }
     } else {
-        AgentFilePageContent(model, isRoot, onOpen, onBack, onDone, modifier, isInMediaViewer, markdown, onImageShown, onZoomChange, onImageFrame)
+        AgentFilePageContent(model, isRoot, onOpen, onBack, onDone, modifier, isInMediaViewer, renderer, onImageShown, onZoomChange, onImageFrame)
     }
 }
 
@@ -387,7 +397,7 @@ private fun ReadyContent(
                             .padding(horizontal = TranscriptMetrics.contentGutter, vertical = TranscriptMetrics.turn)
                             .navigationBarsPadding(),
                     ) {
-                        markdown(content.source, fileDirectory) { file -> onOpen(AgentFileDestination(file, fileDirectory)) }
+                        markdown(content.source, model.server, fileDirectory) { file -> onOpen(AgentFileDestination(file, fileDirectory)) }
                     }
                 }
             }

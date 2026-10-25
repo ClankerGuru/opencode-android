@@ -1,7 +1,7 @@
 package ai.opencode.feature.transcript.markdown.ui
 
 import ai.opencode.core.ui.OpenCodeTextStyles
-import ai.opencode.feature.transcript.TranscriptMetrics
+import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.markdown.InlineText
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable

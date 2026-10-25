@@ -1,7 +1,7 @@
 package ai.opencode.feature.transcript.rows
 
 import ai.opencode.core.ui.OpenCodeTheme
-import ai.opencode.feature.transcript.TranscriptImagePreview
+import ai.opencode.feature.media.TranscriptImagePreview
 import ai.opencode.server.model.OpenCodeImageAttachment
 import android.graphics.BitmapFactory
 import android.util.LruCache
@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
@@ -28,11 +29,11 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Decoded tool images by attachment ID (iOS `CachedImage.decoded`), bounded by bytes. A view
@@ -60,13 +61,8 @@ private object ToolImageCache {
  * iOS `TranscriptImagePreview.init?(attachments:selectedID:label:)`: every decoded image, in
  * order, opened at [selectedID]; null when the selected one didn't decode.
  */
-fun transcriptImagePreview(decoded: List<Pair<String, ImageBitmap>>, selectedID: String, label: String): TranscriptImagePreview? {
-    if (decoded.none { it.first == selectedID }) return null
-    return TranscriptImagePreview(
-        selectedID,
-        decoded.mapIndexed { index, (id, image) -> TranscriptImagePreview.Page(id, image, "$label ${index + 1} of ${decoded.size}") },
-    )
-}
+fun transcriptImagePreview(decoded: List<Pair<String, ImageBitmap>>, selectedID: String, label: String): TranscriptImagePreview? =
+    TranscriptImagePreview.fromAttachments(decoded.map { (id, image) -> id to image.asAndroidBitmap() }, selectedID, label)
 
 /**
  * Every image a tool read, whole and in order, so it can be read without opening it (iOS

@@ -3,8 +3,8 @@ package ai.opencode.feature.transcript.markdown.ui
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.LocalTranscriptLayoutTuning
-import ai.opencode.feature.transcript.TranscriptMetrics
 import ai.opencode.feature.transcript.TranscriptTunables
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition

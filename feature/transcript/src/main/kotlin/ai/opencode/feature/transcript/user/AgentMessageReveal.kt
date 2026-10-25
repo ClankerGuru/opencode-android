@@ -2,7 +2,7 @@ package ai.opencode.feature.transcript.user
 
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeTheme
-import ai.opencode.feature.transcript.TranscriptMetrics
+import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.TranscriptTunables
 import android.graphics.RuntimeShader
 import androidx.compose.foundation.layout.Box

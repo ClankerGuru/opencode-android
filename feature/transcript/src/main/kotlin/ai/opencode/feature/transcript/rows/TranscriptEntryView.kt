@@ -3,12 +3,14 @@ package ai.opencode.feature.transcript.rows
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.LocalTranscriptRowContext
 import ai.opencode.feature.transcript.RowProps
+import ai.opencode.feature.transcript.SinceYouLeft
 import ai.opencode.feature.transcript.TranscriptAction
 import ai.opencode.feature.transcript.TranscriptDisclosureState
 import ai.opencode.feature.transcript.TranscriptEntry
-import ai.opencode.feature.transcript.TranscriptMetrics
+import ai.opencode.feature.transcript.links.LinkPreviewReplyEnd
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
 import ai.opencode.feature.transcript.markdown.rememberMarkdownBlocks
 import ai.opencode.feature.transcript.markdown.ui.DisclosedTransition
@@ -17,7 +19,6 @@ import ai.opencode.feature.transcript.markdown.ui.LocalSessionLinks
 import ai.opencode.feature.transcript.markdown.ui.MarkdownBlocksView
 import ai.opencode.feature.transcript.markdown.ui.QuoteTextHandler
 import ai.opencode.feature.transcript.markdown.ui.SessionLinkContext
-import ai.opencode.feature.transcript.SinceYouLeft
 import ai.opencode.server.model.OpenCodeCompaction
 import ai.opencode.server.model.OpenCodeTranscriptItem
 import androidx.compose.animation.AnimatedVisibility
@@ -72,9 +73,8 @@ fun TranscriptEntryView(
                 val actions: @Composable () -> Unit = {
                     ReplyActions(entry.texts) { context.send(TranscriptAction.CopyTextTapped(it)) }
                 }
-                // Seam: `LinkPreviewReplyEnd` (the reply's link stack) wraps the actions once ported.
-                val replyEnd = LocalTranscriptRowSlots.current.replyEnd
-                if (replyEnd != null) replyEnd(rowID, entry.id, entry.texts, actions) else actions()
+                // The reply's links sit above its Copy row (iOS `LinkPreviewReplyEnd`).
+                LinkPreviewReplyEnd(entry.texts, key = rowID, entryID = entry.id, actions = actions)
             }
             is TranscriptEntry.SinceYouLeftEntry -> {
                 val onDismiss = { context.send(TranscriptAction.SinceYouLeftTapped) }

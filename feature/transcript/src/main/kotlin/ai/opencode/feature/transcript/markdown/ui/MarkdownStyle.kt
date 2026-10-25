@@ -4,9 +4,9 @@ import ai.opencode.core.ui.OpenCodeColors
 import ai.opencode.core.ui.OpenCodeFonts
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.LocalTranscriptLayoutTuning
 import ai.opencode.feature.transcript.TranscriptLayoutTuning
-import ai.opencode.feature.transcript.TranscriptMetrics
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable

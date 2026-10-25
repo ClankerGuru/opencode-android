@@ -3,20 +3,21 @@ package ai.opencode.feature.transcript.list
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.feature.media.LinkPreviewStore
+import ai.opencode.feature.media.LocalLinkPreviewRevision
+import ai.opencode.feature.media.LocalLinkPreviewStore
+import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.LocalTranscriptLayoutTuning
 import ai.opencode.feature.transcript.LocalTranscriptRowContext
 import ai.opencode.feature.transcript.RowProps
 import ai.opencode.feature.transcript.TranscriptAction
 import ai.opencode.feature.transcript.TranscriptConfiguration
 import ai.opencode.feature.transcript.TranscriptLayoutTuning
-import ai.opencode.feature.transcript.TranscriptMetrics
 import ai.opencode.feature.transcript.TranscriptRowContext
-import ai.opencode.feature.transcript.rows.NewMessagesDivider
-import ai.opencode.feature.transcript.rows.LocalTranscriptRowSlots
-import ai.opencode.feature.transcript.rows.TranscriptRowSlots
-import ai.opencode.feature.transcript.links.LinkPreviewReplyEnd
+import ai.opencode.feature.transcript.markdown.ui.LocalLinkPreviewRow
 import ai.opencode.feature.transcript.markdown.ui.LocalTranscriptTextReveal
 import ai.opencode.feature.transcript.markdown.ui.TranscriptTextReveal
+import ai.opencode.feature.transcript.rows.NewMessagesDivider
 import ai.opencode.feature.transcript.user.TranscriptMessageRow
 import ai.opencode.feature.transcript.user.UserMessageRun
 import androidx.compose.foundation.layout.Box
@@ -32,17 +33,17 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,6 +60,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlin.math.roundToInt
 
 /**
@@ -154,12 +157,22 @@ private fun TranscriptListContent(
     // One per list, so a row LazyColumn recreates never fades its text again (iOS controller-owned).
     val textReveal = remember(controller.disclosure) { TranscriptTextReveal() }
     if (controller.runEnded) textReveal.settleAll()
-    val rowSlots = remember { TranscriptRowSlots(replyEnd = { key, entryID, texts, actions -> LinkPreviewReplyEnd(texts, key, entryID, actions = actions) }) }
+    // The list owns the session's link previews (iOS `TranscriptListViewController.linkPreviews`,
+    // made anew for each session): an arrival bumps only its rows' revisions, which redraws them.
+    val linkPreviews = remember { LinkPreviewStore() }
+    val linkRevisions = remember { mutableStateMapOf<String, Int>() }
+    DisposableEffect(linkPreviews) {
+        linkPreviews.onArrival = { rows -> for (row in rows) linkRevisions[row] = linkPreviews.revision(row) }
+        onDispose {
+            linkPreviews.onArrival = null
+            linkPreviews.close()
+        }
+    }
     CompositionLocalProvider(
         LocalTranscriptRowContext provides rowContext,
         LocalTranscriptLayoutTuning provides layoutTuning,
         LocalTranscriptTextReveal provides textReveal,
-        LocalTranscriptRowSlots provides rowSlots,
+        LocalLinkPreviewStore provides linkPreviews,
     ) {
         Box(modifier.nestedScroll(controller.nestedScrollConnection)) {
             LazyColumn(
@@ -203,30 +216,35 @@ private fun TranscriptListContent(
                             val props = snapshot.props[item.stableID] ?: RowProps()
                             val run = snapshot.runs[item.stableID] ?: UserMessageRun.alone
                             GrowingRow(controller, item.key, rowModifier) {
-                                when (row) {
-                                    is MessageRow.Entry -> TranscriptMessageRow(
-                                        rowID = item.stableID,
-                                        entry = row.entry,
-                                        queued = null,
-                                        failure = row.failure,
-                                        deliveryNote = row.note,
-                                        props = props,
-                                        run = run,
-                                        revealArrival = row.entry.userMessageID?.let(controller.agentReveal::arrival),
-                                    )
-                                    is MessageRow.Queued -> if (row.input.isCompaction) {
-                                        TranscriptQueuedInputView(row.input, Modifier.padding(vertical = TranscriptMetrics.sectionHalf))
-                                    } else {
-                                        TranscriptMessageRow(
+                                CompositionLocalProvider(
+                                    LocalLinkPreviewRevision provides (linkRevisions[item.stableID] ?: 0),
+                                    LocalLinkPreviewRow provides item.stableID,
+                                ) {
+                                    when (row) {
+                                        is MessageRow.Entry -> TranscriptMessageRow(
                                             rowID = item.stableID,
-                                            entry = null,
-                                            queued = row.input,
-                                            failure = null,
+                                            entry = row.entry,
+                                            queued = null,
+                                            failure = row.failure,
                                             deliveryNote = row.note,
                                             props = props,
                                             run = run,
-                                            revealArrival = controller.agentReveal.arrival(row.input.id),
+                                            revealArrival = row.entry.userMessageID?.let(controller.agentReveal::arrival),
                                         )
+                                        is MessageRow.Queued -> if (row.input.isCompaction) {
+                                            TranscriptQueuedInputView(row.input, Modifier.padding(vertical = TranscriptMetrics.sectionHalf))
+                                        } else {
+                                            TranscriptMessageRow(
+                                                rowID = item.stableID,
+                                                entry = null,
+                                                queued = row.input,
+                                                failure = null,
+                                                deliveryNote = row.note,
+                                                props = props,
+                                                run = run,
+                                                revealArrival = controller.agentReveal.arrival(row.input.id),
+                                            )
+                                        }
                                     }
                                 }
                             }

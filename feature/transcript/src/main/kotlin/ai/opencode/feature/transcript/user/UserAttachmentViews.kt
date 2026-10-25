@@ -1,10 +1,13 @@
 package ai.opencode.feature.transcript.user
 
+import ai.opencode.core.files.AttachmentFileType
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
-import ai.opencode.feature.transcript.TranscriptImagePreview
-import ai.opencode.feature.transcript.TranscriptMetrics
+import ai.opencode.feature.media.FileAttachmentCard
+import ai.opencode.feature.media.FileAttachmentDetail
+import ai.opencode.feature.media.TranscriptImagePreview
+import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.server.model.AgentFileReference
 import ai.opencode.server.model.OpenCodeImageAttachment
 import ai.opencode.server.model.OpenCodeTranscriptFile
@@ -42,6 +45,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -93,14 +97,12 @@ internal fun rememberDecodedImage(attachment: OpenCodeImageAttachment): ImageBit
  * The zoom viewer's pages for a message's images, opening at [selectedID] (iOS
  * `TranscriptImagePreview(attachments:selectedID:label:)`).
  */
-internal fun transcriptImagePreview(attachments: List<OpenCodeImageAttachment>, selectedID: String, label: String): TranscriptImagePreview? {
-    val decoded = attachments.mapNotNull { a -> UserImageCache.decoded(a.id, a.data)?.let { a.id to it } }
-    if (decoded.none { it.first == selectedID }) return null
-    return TranscriptImagePreview(
-        id = selectedID,
-        pages = decoded.mapIndexed { index, (id, image) -> TranscriptImagePreview.Page(id, image, "$label ${index + 1} of ${decoded.size}") },
+internal fun transcriptImagePreview(attachments: List<OpenCodeImageAttachment>, selectedID: String, label: String): TranscriptImagePreview? =
+    TranscriptImagePreview.fromAttachments(
+        attachments.map { a -> a.id to UserImageCache.decoded(a.id, a.data)?.asAndroidBitmap() },
+        selectedID,
+        label,
     )
-}
 
 /** The fill iOS gives cards (`secondarySystemBackground`): the user bubble's colour. */
 @Composable
@@ -109,7 +111,7 @@ internal fun cardFill(): Color = OpenCodeTheme.colors.userBubble
 /**
  * Sent files on a user message, trailing like the message's images. An uploaded file opens in
  * the viewer from the server's copy (iOS `Composer/FileAttachmentViews.swift`
- * `TranscriptFileChips`; minimal port, hand-off to `:feature:composer`).
+ * `TranscriptFileChips`, with media's `FileAttachmentCard`).
  */
 @Composable
 internal fun TranscriptFileChips(
@@ -139,14 +141,13 @@ internal fun TranscriptFileChips(
 
 @Composable
 private fun FileChip(file: OpenCodeTranscriptFile, onOpen: ((AgentFileReference) -> Unit)?, corners: UserSurfaceCorners) {
-    val typeLabel = UserFileType.label(file.name, file.mime)
+    val typeLabel = AttachmentFileType.label(file.name, file.mime)
     val path = file.path
     val shape = corners.shape(TranscriptMetrics.cardCornerRadius)
     val open = if (onOpen != null && path != null) ({ onOpen(AgentFileReference(path)) }) else null
     FileAttachmentCard(
         name = file.name,
-        symbolName = UserFileType.symbolName(file.name, file.mime),
-        detail = typeLabel,
+        symbolName = AttachmentFileType.symbolName(file.name, file.mime),
         modifier = Modifier
             .then(
                 if (path != null && open != null) {
@@ -163,36 +164,7 @@ private fun FileChip(file: OpenCodeTranscriptFile, onOpen: ((AgentFileReference)
                 contentDescription = "Attached file ${file.name}"
                 stateDescription = typeLabel
             },
-    )
-}
-
-/**
- * The two-line file card desktop uses for attachments: the name above a type label, with a type
- * glyph (iOS `FileAttachmentCard`).
- */
-@Composable
-private fun FileAttachmentCard(name: String, symbolName: String, detail: String, modifier: Modifier = Modifier) {
-    Row(
-        modifier
-            .width(200.dp)
-            .padding(horizontal = TranscriptMetrics.standard, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(Modifier.width(28.dp), contentAlignment = Alignment.Center) {
-            OpenCodeIcon(symbolName, contentDescription = null, tint = OpenCodeTheme.colors.secondaryText)
-        }
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(
-                name,
-                style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium),
-                color = OpenCodeTheme.colors.text,
-                maxLines = 1,
-                overflow = TextOverflow.MiddleEllipsis,
-            )
-            Text(detail, style = OpenCodeTextStyles.caption1, color = OpenCodeTheme.colors.secondaryText, maxLines = 1)
-        }
-    }
+    ) { FileAttachmentDetail(typeLabel) }
 }
 
 /**

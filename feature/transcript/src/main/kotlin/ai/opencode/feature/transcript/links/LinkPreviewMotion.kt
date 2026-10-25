@@ -2,6 +2,7 @@ package ai.opencode.feature.transcript.links
 
 import ai.opencode.core.motion.motionBlurReveal
 import ai.opencode.core.motion.rememberReduceMotion
+import ai.opencode.feature.media.LinkPreview
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -40,7 +41,8 @@ object LinkPreviewMotion {
 internal fun referenceNow(): Double = System.nanoTime() / 1e9
 
 /**
- * Lives with the transcript, not a row's composition (iOS `LinkPreviewRowPresentation`).
+ * Lives with the transcript, not a row's composition (iOS `LinkPreviewRowPresentation`): the
+ * list's `LinkPreviewStore` keeps one per row (`presentation(row) { LinkPreviewRowPresentation() }`).
  * Recomposing or disposing a row must neither replay an arrival nor lose the pixels from before
  * metadata landed.
  */
