@@ -3,6 +3,9 @@ package ai.opencode.core.diagnostics
 import ai.opencode.core.log.AppLog
 import ai.opencode.core.tuning.InternalBuild
 import android.os.Trace
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import java.net.HttpURLConnection
@@ -67,23 +70,110 @@ object LabMarks {
         info.totalPss
     }.getOrDefault(0)
 
-    /** A lab-only event with scalar fields (counts, kinds, never content). */
+    /**
+     * iOS `networkTask`: records the task's transport metrics in the diagnostics timeline and, on a
+     * lab run, posts `network_task` (path, connection reuse, protocol, connect and TLS times).
+     */
+    fun networkTask(requestID: String, path: String, metrics: DiagnosticsNetworkMetrics, operationID: String? = null, attempt: Int? = null) {
+        DiagnosticsRecorder.shared.networkMetrics(requestID, path, metrics, operationID, attempt)
+        endpoint ?: return
+        val body = LinkedHashMap<String, Any>()
+        body["name"] = "network_task"
+        body["t"] = System.currentTimeMillis()
+        body["path"] = path
+        body["reused"] = metrics.connectionReused ?: false
+        metrics.protocolName?.let { body["protocol"] = it }
+        metrics.connectMilliseconds?.let { body["connectMs"] = it.toInt() }
+        metrics.tlsMilliseconds?.let { body["tlsMs"] = it.toInt() }
+        post(body)
+    }
+
+    /** A lab-only event with scalar fields (counts, kinds, never content): the smoothness suite's frame windows, stalls and motion findings. */
     fun post(event: String, fields: Map<String, Any>) {
         endpoint ?: return
         post(fields + mapOf("name" to event, "t" to System.currentTimeMillis()))
     }
 
+    /** `lab-promotion-trace`'s frames: `[ms, bubbleY, bubbleAlpha, workingY, offset]`. */
+    fun promotionTrace(sessionID: String?, frames: List<List<Double>>) {
+        endpoint ?: return
+        post(mapOf("name" to "promotion_trace", "t" to System.currentTimeMillis(), "sessionID" to (sessionID ?: ""), "frames" to frames))
+    }
+
+    /** A send flight's frames under `lab-promotion-trace` (see `ComposerSendTransition`). */
+    fun sendFlightTrace(frames: List<List<Double>>) {
+        endpoint ?: return
+        post(mapOf("name" to "send_flight_trace", "t" to System.currentTimeMillis(), "frames" to frames))
+    }
+
+    /**
+     * `lab-working-trace`'s frames: `[ms, row (0 Working, 1 reply end), rowTop, rowHeight,
+     * indicatorBlur, indicatorAlpha, copyBlur, copyAlpha, offset]`.
+     */
+    fun workingTrace(sessionID: String?, frames: List<List<Double>>) {
+        endpoint ?: return
+        post(mapOf("name" to "working_trace", "t" to System.currentTimeMillis(), "sessionID" to (sessionID ?: ""), "frames" to frames))
+    }
+
+    /** `lab-motion-trace`'s frames (see `TranscriptMotionTrace`). Split so every post stays under the lab's 128 KB body limit. */
+    fun motionTrace(frames: List<Map<String, Any>>) {
+        endpoint ?: return
+        if (frames.isEmpty()) return
+        val body = encode(mapOf("name" to "motion_trace", "t" to System.currentTimeMillis(), "frames" to frames))
+        if (body.toByteArray().size > 100_000 && frames.size > 1) {
+            motionTrace(frames.subList(0, frames.size / 2))
+            motionTrace(frames.subList(frames.size / 2, frames.size))
+            return
+        }
+        send(body)
+    }
+
+    fun transcriptSnapshot(
+        sessionID: String?,
+        ids: List<String>,
+        vanished: List<String>,
+        reappeared: List<String>,
+        rows: List<Map<String, String>> = emptyList(),
+        inserted: List<String> = emptyList(),
+        reconfigured: List<String> = emptyList(),
+        reloaded: List<String> = emptyList(),
+        order: List<String> = emptyList(),
+    ) {
+        endpoint ?: return
+        post(
+            mapOf(
+                "name" to "transcript_snapshot", "t" to System.currentTimeMillis(),
+                "sessionID" to (sessionID ?: ""), "ids" to ids, "vanished" to vanished, "reappeared" to reappeared,
+                "rows" to rows, "insertedIDs" to inserted, "reconfigured" to reconfigured, "reloaded" to reloaded, "order" to order,
+            ),
+        )
+    }
+
     private val poster = Executors.newSingleThreadExecutor { Thread(it, "lab-marks").apply { isDaemon = true } }
 
     private fun post(body: Map<String, Any>) {
+        endpoint ?: return
+        send(encode(body))
+    }
+
+    /** iOS `JSONSerialization`: numbers, booleans, strings, lists and maps (nested). */
+    private fun encode(body: Map<String, Any>): String = json(body).toString()
+
+    private fun json(value: Any?): JsonElement = when (value) {
+        null -> JsonNull
+        is JsonElement -> value
+        is Number -> JsonPrimitive(value)
+        is Boolean -> JsonPrimitive(value)
+        is Map<*, *> -> JsonObject(value.entries.associate { (key, item) -> key.toString() to json(item) })
+        is Iterable<*> -> JsonArray(value.map(::json))
+        is DoubleArray -> JsonArray(value.map(::JsonPrimitive))
+        is IntArray -> JsonArray(value.map(::JsonPrimitive))
+        is Array<*> -> JsonArray(value.map(::json))
+        else -> JsonPrimitive(value.toString())
+    }
+
+    private fun send(json: String) {
         val endpoint = endpoint ?: return
-        val json = JsonObject(body.mapValues { (_, value) ->
-            when (value) {
-                is Number -> JsonPrimitive(value)
-                is Boolean -> JsonPrimitive(value)
-                else -> JsonPrimitive(value.toString())
-            }
-        }).toString()
         poster.execute {
             runCatching {
                 val connection = endpoint.openConnection() as HttpURLConnection

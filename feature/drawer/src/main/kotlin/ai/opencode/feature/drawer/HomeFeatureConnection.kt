@@ -3,6 +3,7 @@ package ai.opencode.feature.drawer
 import ai.opencode.feature.session.*
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.diagnostics.LabMarks
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.cancellable
@@ -32,12 +33,12 @@ import kotlin.time.Duration.Companion.milliseconds
  * Port of iOS `HomeFeature+Connection.swift`: what Home does as the connection comes and goes
  * (before `HomeConnectionFeature` settles the same action), the authoritative snapshot's
  * reconciliation into the list and the open screens, the active-ancestry merge, and the attention
- * read. iOS's DEBUG `LabMarks` (`home_task_started`, `home_snapshot_request/response`) have no
- * Android lab harness and are left out.
+ * read.
  */
 
 internal fun HomeFeature.reduceConnection(state: State, action: Action): HomeReduced = when (action) {
     Action.Task -> {
+        LabMarks.mark("home_task_started")
         val s = if (state.isConnected) state.initializingInbox() else state
         val load = if (s.isConnected) Reduced(s, Effect.merge(refreshAttention(s), resolveActiveAncestry(s))) else refreshSnapshot(s)
         // The call's and the recording's ongoing-notification buttons.
@@ -347,7 +348,8 @@ internal fun HomeFeature.refreshSnapshot(state: State): HomeReduced {
         Effect.run<Action> { send ->
             clock.sleep(250.milliseconds)
             val snapshot = try {
-                client.homeSnapshot(server)
+                LabMarks.mark("home_snapshot_request")
+                client.homeSnapshot(server).also { LabMarks.mark("home_snapshot_response") }
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (_: Exception) {

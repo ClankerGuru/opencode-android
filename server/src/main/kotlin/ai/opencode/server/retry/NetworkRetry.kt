@@ -18,6 +18,7 @@ import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl
 import okhttp3.Request
+import java.net.SocketException
 import java.net.UnknownServiceException
 import java.util.UUID
 import kotlin.coroutines.cancellation.CancellationException
@@ -61,6 +62,8 @@ enum class TransportFailure(val rawValue: String) {
     TimedOut("timedOut");
 
     companion object {
+        private val CLEARTEXT_REFUSAL = Regex("CLEARTEXT communication to (\\S+) not permitted")
+
         /** iOS's `URLError` code table. Nil for cancellation and failures sending again won't change. */
         fun ofUrlErrorCode(code: Int): TransportFailure? = when (code) {
             UrlErrorCode.NOT_CONNECTED_TO_INTERNET, UrlErrorCode.CANNOT_FIND_HOST, UrlErrorCode.CANNOT_CONNECT_TO_HOST,
@@ -80,6 +83,8 @@ enum class TransportFailure(val rawValue: String) {
          */
         fun of(error: Throwable): TransportFailure? {
             if (error is CancellationException) return null
+            // iOS reads only the listed POSIX codes; EACCES (no permission to open a socket) is none of them.
+            if (error is SocketException && error.message?.contains("EACCES") == true) return null
             return UrlErrorCode.fromThrowable(error)?.let(::ofUrlErrorCode)
         }
 
@@ -91,6 +96,9 @@ enum class TransportFailure(val rawValue: String) {
         fun of(error: Throwable, requestUrl: HttpUrl, contact: ServerContact): TransportFailure? {
             of(error)?.let { return it }
             if (error !is UnknownServiceException || !contact.hasAnsweredHTTPOrigin(requestUrl)) return null
+            // A rejected redirect to another host isn't evidence of this failure (OkHttp names the refused host).
+            val refusedHost = CLEARTEXT_REFUSAL.find(error.message.orEmpty())?.groupValues?.get(1)
+            if (refusedHost != null && !refusedHost.equals(requestUrl.host, ignoreCase = true)) return null
             return Interrupted
         }
     }
@@ -517,7 +525,7 @@ class RetryBudget(val total: Duration, private val clock: Clock = dependency(Clo
     suspend fun <T> optional(limit: Duration, operation: suspend () -> T): T? {
         val bounded = minOf(limit, remaining)
         if (bounded <= Duration.ZERO) return null
-        return bounded(bounded, clock) {
+        return bounded(bounded) {
             withRetryPolicy(RetryPolicy.once) {
                 try { operation() } catch (_: OpenCodeClientError) { null }
             }
@@ -528,9 +536,12 @@ class RetryBudget(val total: Duration, private val clock: Clock = dependency(Clo
         /** A budget on `NetworkRetry.clock` when one is set, so the budget and its retries share a clock. */
         suspend fun start(total: Duration): RetryBudget = RetryBudget(total, NetworkRetry.resolvedClock())
 
-        /** The work's result, or null if it takes longer than [limit]; the work is cancelled then. */
+        /**
+         * The work's result, or null if it takes longer than [limit] (wall time, as iOS: never a
+         * retry loop's scripted `NetworkRetry.clock`); the work is cancelled then.
+         */
         suspend fun <T> bounded(limit: Duration, clock: Clock? = null, work: suspend () -> T?): T? {
-            val resolved = NetworkRetry.resolvedClock(clock)
+            val resolved = clock ?: Clock.liveValue
             return coroutineScope {
                 val result = async { work() }
                 val timer = async { resolved.sleep(limit); null }

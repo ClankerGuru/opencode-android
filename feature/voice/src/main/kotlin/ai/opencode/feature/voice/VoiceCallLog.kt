@@ -169,11 +169,18 @@ class VoiceCallLogRecorder(
             dir.mkdirs()
             val file = File(dir, "${log.id}.json"); val temp = File(dir, "${log.id}.pending")
             temp.writeText(VoiceCallLog.json.encodeToString(log)); check(temp.renameTo(file))
-            for (old in list().drop(keep)) delete(old.id)
+            for (old in savedLogs().drop(keep)) delete(old.id)
         }
     }
     /** Disk I/O: callers must invoke off the main thread (the reducer uses an effect). */
-    fun list(): List<VoiceCallLog> = synchronized(diskLock) {
+    /** Saved logs, including one whose save is still writing (iOS saves before `finish` returns). */
+    fun list(): List<VoiceCallLog> {
+        if (directory == null) return emptyList()
+        val pending = synchronized(lock) { saving.values.toList() }
+        val saved = savedLogs()
+        return (pending.filter { log -> saved.none { it.id == log.id } } + saved).sortedByDescending { it.startedAt }
+    }
+    private fun savedLogs(): List<VoiceCallLog> = synchronized(diskLock) {
         directory?.listFiles()?.filter { it.extension == "json" }?.mapNotNull { runCatching { VoiceCallLog.json.decodeFromString<VoiceCallLog>(it.readText()) }.getOrNull() }
             ?.sortedByDescending { it.startedAt } ?: emptyList()
     }

@@ -77,7 +77,7 @@ internal suspend fun requestHistoryPage(server: OpenCodeServer, sessionID: Strin
     return decodeTranscriptPage(data.data, TranscriptContextCapture.current.current())
 }
 
-internal fun decodeTranscript(data: ByteArray): List<OpenCodeTranscriptItem> = decodeTranscriptPage(data, null).items
+fun decodeTranscript(data: ByteArray): List<OpenCodeTranscriptItem> = decodeTranscriptPage(data, null).items
 
 internal fun decodeTranscriptPage(data: ByteArray, capture: TranscriptContextCapture?): OpenCodeTranscriptPage {
     val payload = decoded(data, "transcript", MessagesPayload::decode)
@@ -282,7 +282,7 @@ private fun decodeReplyMessage(element: JsonElement): ReplyMessage {
  * The reply to one prompt from a newest-first `/message` page. By default a voice delegation
  * steered in before any text ends it; [acrossSteers] reads on past such delegations.
  */
-internal fun assistantReply(data: ByteArray, afterMessageID: String, acrossSteers: Boolean = false): String? {
+fun assistantReply(data: ByteArray, afterMessageID: String, acrossSteers: Boolean = false): String? {
     val messages = decoded(data, "transcript") { it.obj().req("data") { d -> d.list(::decodeReplyMessage) } }.asReversed()
     val anchor = messages.indexOfFirst { it.id == afterMessageID }
     if (anchor < 0) throw OpenCodeClientError("The voice request is no longer in the recent transcript.")

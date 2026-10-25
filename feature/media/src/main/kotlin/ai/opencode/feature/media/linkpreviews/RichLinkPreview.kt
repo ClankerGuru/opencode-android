@@ -64,7 +64,8 @@ sealed interface RichLinkSource {
             GitHubLink.of(url)?.let { return Github(it) }
             val parsed = url.toHttpUrlOrNull() ?: return null
             val host = parsed.host.lowercase()
-            val parts = parsed.encodedPath.split("/").filter { it.isNotEmpty() }
+            // iOS `url.path`: decoded.
+            val parts = parsed.pathSegments.filter { it.isNotEmpty() }
             val id: String? = when (host) {
                 "youtu.be" -> if (parts.size == 1) parts[0] else null
                 "youtube.com", "www.youtube.com", "m.youtube.com" -> when {

@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings
 
+import ai.opencode.core.diagnostics.HidesFromProblemReports
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
@@ -113,6 +114,8 @@ fun SettingsPresentation(
                         alpha = if (reduceMotion) p else 1f
                     },
             ) {
+                // iOS `.hidesFromProblemReports()`: Settings shows server credentials.
+                HidesFromProblemReports()
                 settings()
                 // The soft shadow the incoming page casts on what it covers.
                 Box(

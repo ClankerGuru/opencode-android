@@ -48,3 +48,22 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 | `OpenCode/Core/TapTarget.swift` | 37 | see core-ui.md | — | |
 | `OpenCode/Core/Theme/Theme.swift` | 792 | see core-ui.md | — | |
 | `OpenCode/Core/Theme/ThemePalette+Generated.swift` | 397 | see core-ui.md | — | |
+
+## Tests
+
+Ported from iOS `OpenCodeTests/` into `core/src/test` (JVM, same names). Shared fixtures:
+`core/src/testFixtures` (`ai.opencode.core.testing`: `TestIsolationGuard`, `TestIsolationRule`,
+`eventually`); see AGENTS.md "Tests". Under unit tests `DependencyValues.root` resolves test values
+(`isProcessTesting`) and the guard resets it after each test.
+
+| iOS file | Kotlin | Ported | Left elsewhere / deleted (reason) |
+| --- | --- | --- | --- |
+| `TestIsolationGuardTests.swift` | `testing/TestIsolationGuardTests.kt` | 4 (+1 in `:server`) | deleted: keyboard frame, window/first responder, `UIView` animations (UIKit), seeded order (Swift Testing hook) |
+| `DiagnosticsRecorderTests.swift` | `diagnostics/DiagnosticsRecorderTests.kt` | 12 of 13 | `headerResolutionNotifiesObserversWhenChanged` → `:feature:session` (`SessionHeaderStyle`); `RealtimeTransportDiagnostic` half → `:feature:voice` |
+| `PrivacyManifestTests.swift` | `diagnostics/DiagnosticsRecorderTests.kt` | 1 of 2 | manifest plist test deleted (iOS `PrivacyInfo.xcprivacy`) |
+| `ExperimentalFeatureTests.swift` | `experiments/ExperimentalFeatureTests.kt` | 8 | `VoiceAudioDemoMode` half → `:feature:voice` |
+| `HapticsAuditTests.swift` | `haptics/HapticsAuditTests.kt` | 1 (`LiveHapticsTests` source scan) | `HapticsAuditTests` suite → `:feature:session`/`:feature:drawer`; `VoiceCallHaptic` fallbacks → `:feature:voice`; background gate needs an Android runtime (no Robolectric) |
+| `TuningTests.swift` | `tuning/TuningTests.kt` | 27 | TuningFeature/Wire/Placement/summon gesture → `:devtools`; drawer/composer/transcript tunables → features; MotionXRay not ported; CALayer checks deleted |
+| `MotionSystemTests.swift` | `motion/MotionSystemTests.kt` | 5 | empty-state → `:feature:transcript`; drawer shortcuts (4) → `:feature:drawer`; window probe deleted |
+| `RollingNumberTests.swift` | `ui/RollingNumberTests.kt` | 8 of 9 | `rollingTitleSurvivesPixelSnapping` deleted (UIWindow pixel snapping) |
+| `ThemePaletteTests.swift` | `ui/ThemePaletteTests.kt` | 5 of 8 | appearance settings → `:feature:settings`/`:feature:drawer`; `legacyTranscriptRhythmStorageIsCleanedUp` deleted (Android never wrote the key) |

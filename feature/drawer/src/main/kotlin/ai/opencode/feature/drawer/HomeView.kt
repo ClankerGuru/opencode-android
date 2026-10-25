@@ -1,5 +1,7 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.devtools.traces.TraceUploadsHost
+import ai.opencode.core.store.rememberScope
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
@@ -160,6 +162,8 @@ fun HomeView(
     HomeLifecycle(store, view)
     // iOS hosts it on Home, so deletes from the session's own menu confirm too.
     HomeDeleteConfirmation(store)
+    // iOS `.traceUploads(store.scope(\.traces, action: \.traces))`: Report a Problem and its toast.
+    TraceUploadsHost(store.rememberScope({ it.traces }, HomeFeature.Action::Traces))
 }
 
 /** iOS `homeLayout`: the container with the session, the drawer, and Catch Up. */

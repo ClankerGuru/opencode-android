@@ -1,7 +1,9 @@
 package ai.opencode.core.ui
 
+import androidx.compose.foundation.ScrollState
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
@@ -37,6 +39,13 @@ interface DrawerKeyboardSignals {
      * [clearFocus] lets the drawer take the focus away when the card changes.
      */
     fun cardFieldFocusChanged(key: Any, focused: Boolean, clearFocus: () -> Unit)
+
+    /**
+     * Where the text field named [key] is laid out ([coordinates] `null` once it leaves): the
+     * session switcher's strip never takes a touch that starts on it (iOS's `UITextView` ancestor
+     * test), so the field keeps its own editing gestures.
+     */
+    fun cardFieldPlaced(key: Any, coordinates: LayoutCoordinates?) {}
 }
 
 /** The drawer's keyboard hold, provided by the drawer container around the card. */
@@ -53,11 +62,16 @@ fun Modifier.drawerKeyboardField(key: Any): Modifier = composed {
         Modifier
     } else {
         DisposableEffect(signals, key) {
-            onDispose { signals.cardFieldFocusChanged(key, focused = false, clearFocus = {}) }
+            onDispose {
+                signals.cardFieldFocusChanged(key, focused = false, clearFocus = {})
+                signals.cardFieldPlaced(key, null)
+            }
         }
-        Modifier.onFocusChanged { state ->
-            signals.cardFieldFocusChanged(key, state.isFocused) { focusManager.clearFocus(force = true) }
-        }
+        Modifier
+            .onFocusChanged { state ->
+                signals.cardFieldFocusChanged(key, state.isFocused) { focusManager.clearFocus(force = true) }
+            }
+            .onGloballyPositioned { signals.cardFieldPlaced(key, it) }
     }
 }
 
@@ -69,10 +83,47 @@ fun Modifier.drawerKeyboardField(key: Any): Modifier = composed {
 interface DrawerPanExclusion {
     /** Records ([coordinates] non-null) or clears the excluded region named [id]. */
     fun updateExclusion(id: Any, coordinates: LayoutCoordinates?)
+
+    /**
+     * Records ([coordinates] non-null) or clears the horizontal scroller named [id] (code, tables,
+     * attachments). iOS's drawer pan yields a rightward drag on the shut card to a scroller that
+     * can still scroll back toward its start, and Catch Up's swipe yields either way while the
+     * scroller can move that way.
+     */
+    fun updateHorizontalScroller(
+        id: Any,
+        coordinates: LayoutCoordinates?,
+        canScrollBackward: () -> Boolean,
+        canScrollForward: () -> Boolean,
+    ) {}
 }
 
 /** The drawer's pan regions, provided by the drawer container around the card. */
 val LocalDrawerPanExclusion = staticCompositionLocalOf<DrawerPanExclusion?> { null }
+
+/**
+ * This element scrolls sideways with [state] (`Modifier.horizontalScroll(state)`): the session
+ * drawer's pan and Catch Up's swipe leave it the drags it can still scroll
+ * (iOS `DirectionalPanGestureRecognizer`'s horizontal scroll view test).
+ */
+fun Modifier.drawerPanHorizontalScroller(state: ScrollState): Modifier =
+    drawerPanHorizontalScroller({ state.canScrollBackward }, { state.canScrollForward })
+
+/** As [drawerPanHorizontalScroller] for any scroller (a `LazyRow`'s state, say). */
+fun Modifier.drawerPanHorizontalScroller(canScrollBackward: () -> Boolean, canScrollForward: () -> Boolean): Modifier = composed {
+    val exclusion = LocalDrawerPanExclusion.current
+    if (exclusion == null) {
+        Modifier
+    } else {
+        val id = remember { Any() }
+        val backward = rememberUpdatedState(canScrollBackward)
+        val forward = rememberUpdatedState(canScrollForward)
+        DisposableEffect(exclusion) {
+            onDispose { exclusion.updateHorizontalScroller(id, null, { false }, { false }) }
+        }
+        Modifier.onGloballyPositioned { exclusion.updateHorizontalScroller(id, it, { backward.value() }, { forward.value() }) }
+    }
+}
 
 /**
  * The session drawer's pan never starts on this element while [isEnabled]

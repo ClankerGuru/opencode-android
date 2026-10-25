@@ -239,7 +239,10 @@ class VoiceAudioEngine(
     @Volatile var atEar = atEar; private set
     @Volatile var running = false; private set
     @Volatile private var alive = false
+    /** Audio was taken and hasn't come back (iOS `recoveryPending`). */
     @Volatile private var interrupted = false
+    /** Between an interruption's start and its end (iOS `interruptionInProgress`). */
+    @Volatile private var interruptionInProgress = false
     private var didConnect = false
     private var mediaReset = false
     private var stopped = false
@@ -525,7 +528,9 @@ class VoiceAudioEngine(
         synchronized(lock) { cueTracks.forEach { it.setVolume(if (muteOutput) 0f else volume) } }
     }
     suspend fun handleConfigurationChange() = control.withLock {
-        if (!running || interrupted || activationCancelled) return@withLock
+        if (!running || interruptionInProgress || activationCancelled) return@withLock
+        // A reactivation that failed when the interruption ended retries on the next change.
+        if (interrupted) { recoverFromInterruption(); return@withLock }
         val external = VoiceAudioRoute.hasExternalOutput(session.outputPorts)
         if (!demo && !atEar && !external) beginSpeakerRamp() else cancelSpeakerRamp()
         holder.withActive { session.route(atEar, demo) }
@@ -538,22 +543,29 @@ class VoiceAudioEngine(
     suspend fun handleInterruption(began: Boolean) = control.withLock {
         if (!running || activationCancelled) return@withLock
         if (began) {
-            if (interrupted) return@withLock
+            if (interruptionInProgress) return@withLock
+            interruptionInProgress = true
             interrupted = true; holder.invalidateActivation(); cancelSpeakerRamp(); flush()
             runCatching { record?.stop() }
             synchronized(lock) { cueJobs.toList() }.forEach { it.cancel() }
             externalControl?.interrupted(true)
             note(VoiceCallLog.Note.Kind.audio, "⚠︎ Audio interrupted (another app or call took it)")
             levels.reset(); events.trySend(VoiceAudioEvent.interrupted)
-        } else try {
+        } else {
+            interruptionInProgress = false
             if (!interrupted) return@withLock
-            holder.activate { session.activate(demo); session.route(atEar, demo) }
-            cancelSpeakerRamp()
-            holder.withActive { record?.startRecording(); synchronized(trackLock) { track?.play() }; externalControl?.interrupted(false) }
-            interrupted = false
-            events.trySend(VoiceAudioEvent.resumed)
-        } catch (error: Exception) { AppLog.voice.error("Couldn’t resume call audio (${error.javaClass.simpleName})") }
+            recoverFromInterruption()
+        }
     }
+    /** `interrupted` stays set (iOS `recoveryPending`) until this succeeds. */
+    private fun recoverFromInterruption() = try {
+        holder.activate { session.activate(demo); session.route(atEar, demo) }
+        cancelSpeakerRamp()
+        holder.withActive { record?.startRecording(); synchronized(trackLock) { track?.play() }; externalControl?.interrupted(false) }
+        interrupted = false
+        events.trySend(VoiceAudioEvent.resumed)
+        Unit
+    } catch (error: Exception) { AppLog.voice.error("Couldn’t resume call audio (${error.javaClass.simpleName})") }
     suspend fun handleMediaReset() { mediaReset = true; holder.release(); if (running) { events.trySend(VoiceAudioEvent.mediaServicesReset); stop() } }
     private fun cancelAudioSession() { activationCancelled = true; holder.release() }
     suspend fun stop() = withContext(Dispatchers.IO + NonCancellable) {

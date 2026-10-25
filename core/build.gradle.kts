@@ -4,6 +4,8 @@ plugins {
 
 android {
     namespace = "ai.opencode.core"
+    // Shared test support (TestIsolationGuard, eventually) for every module's unit tests.
+    testFixtures { enable = true }
 }
 
 dependencies {
@@ -23,4 +25,6 @@ dependencies {
     // ProviderIcon/TemplateAssetImage draw the bundled iOS provider and MCP SVG marks (assets/).
     implementation(libs.coil.compose)
     implementation(libs.coil.svg)
+    testFixturesApi(libs.junit)
+    testFixturesApi(libs.kotlinx.coroutines.test)
 }

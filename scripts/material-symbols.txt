@@ -165,6 +165,7 @@ phone_in_talk fill                  # phone.and.waveform.fill
 photo_camera                        # camera
 photo_camera fill                   # camera.fill
 photo_library                       # photo.on.rectangle, photo.on.rectangle.angled
+picture_in_picture_alt              # pip.enter
 plagiarism                          # doc.text.magnifyingglass
 play_arrow fill                     # play.fill
 post_add                            # text.badge.plus

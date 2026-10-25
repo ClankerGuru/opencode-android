@@ -48,6 +48,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.clipPath
@@ -395,8 +396,10 @@ val LocalMediaViewer = staticCompositionLocalOf<MediaViewerState?> { null }
  * Full-screen media and files (iOS `MediaPresenter`). Media opens the Photos way: it flies out
  * of what was tapped, follows a drag down while shrinking, rounding toward the thumbnail's
  * corners and letting the session show through, and flies back on release (or springs back
- * from a short drag). Documents zoom out of their source. Under Reduce Motion both
- * cross-fade, and a drag down fades them out. One viewer at a time.
+ * from a short drag). Documents zoom out of their source, and a swipe down (from anywhere a
+ * scroll view doesn't take it) shrinks them toward it and zooms them home, as the system zoom's
+ * does. Under Reduce Motion both cross-fade, and a drag down fades them out. One viewer at a
+ * time.
  *
  * [MediaView] owns the presenter and provides it as [LocalMediaPresenter] to the content it
  * hosts; the transcript image viewer goes through the store ([presentImage]).
@@ -543,6 +546,15 @@ internal class MediaViewerController(
     var backdropAlpha by mutableFloatStateOf(1f)
     var hostAlpha by mutableFloatStateOf(1f)
     var hostTransform by mutableStateOf(HostTransform.Identity)
+    /**
+     * Zoom style: the page's corner radius in its own (unscaled) pixels, so on screen it rounds
+     * toward its source's corners as it shrinks (the system zoom's rounded page).
+     */
+    var hostCornerRadius by mutableFloatStateOf(0f)
+    /** Zoom style: the corners [hostCornerRadius] rounds (the source's). */
+    var hostCorners: MediaCorners by mutableStateOf(MediaCorners.All)
+    /** Where the finger is, for a dismissal a scroll view hands over (nested scroll has no position). */
+    internal var lastPointer = Offset.Zero
     /** Fade style: the whole viewer's opacity. */
     var viewAlpha by mutableFloatStateOf(1f)
     var flight: Flight? by mutableStateOf(null)
@@ -701,13 +713,19 @@ internal class MediaViewerController(
 
     /** Documents: the system zoom out of their source (or a small scale-up without one). */
     private fun zoomIn() {
+        val source = source
         val from = source?.let(::sourceFrame)
         val start = from?.let { transform(bounds, it) } ?: HostTransform(scale = 0.94f)
+        val (radius, corners) = shape(source.takeIf { from != null })
+        val startRadius = radius / max(start.scale, 0.01f)
         hostTransform = start
+        hostCorners = corners
+        hostCornerRadius = startRadius
         hostAlpha = 0f
         flightJob = scope.launch {
             spring(MediaMotion.open) { p ->
                 hostTransform = lerp(start, HostTransform.Identity, p)
+                hostCornerRadius = startRadius * (1 - p)
                 hostAlpha = p.coerceIn(0f, 1f)
             }
         }
@@ -728,12 +746,18 @@ internal class MediaViewerController(
 
     // MARK: Drag
 
-    /** iOS `gestureRecognizerShouldBegin`: down and steeper than sideways; never on a zoomed image. */
-    fun shouldBegin(translation: Offset): Boolean {
-        if (isLeaving || style == Style.Zoom) return false
+    /**
+     * iOS `gestureRecognizerShouldBegin`: down and steeper than sideways; never on a zoomed image.
+     * Media claims the drag before its content ([fromContent] false: pages turn only once a drag
+     * has shown it isn't a dismissal). Documents (the system zoom's swipe down, or the fade) take
+     * only a drag their content left alone ([fromContent] true): a scroll view scrolled away from
+     * its top keeps it, and one at its top hands it over through [documentDismissConnection].
+     */
+    fun shouldBegin(translation: Offset, fromContent: Boolean): Boolean {
+        if (isLeaving) return false
         if (translation.y <= abs(translation.x)) return false
-        // Documents fade only from a drag their scroll view can't take ([documentFadeConnection]).
-        if (!isMedia) return false
+        if (!isMedia) return fromContent
+        if (fromContent) return false
         return !state.isZoomed
     }
 
@@ -741,7 +765,7 @@ internal class MediaViewerController(
         when (style) {
             Style.Photos -> if (state.image != null) dragImageBegan(anchor) else dragContentBegan(anchor)
             Style.Fade -> lastFadeDistance = 0f
-            Style.Zoom -> Unit
+            Style.Zoom -> zoomDragBegan(anchor)
         }
     }
 
@@ -749,7 +773,7 @@ internal class MediaViewerController(
         when (style) {
             Style.Photos -> if (state.image != null) dragImageChanged(translation) else dragContentChanged(translation)
             Style.Fade -> fadeChanged(max(0f, translation.y))
-            Style.Zoom -> Unit
+            Style.Zoom -> zoomDragChanged(translation)
         }
     }
 
@@ -768,7 +792,10 @@ internal class MediaViewerController(
                 }
             }
             Style.Fade -> fadeEnded(max(0f, translation.y), velocity.y)
-            Style.Zoom -> Unit
+            Style.Zoom -> {
+                val distance = translation.y + dragStartDistance
+                if (MediaDismissDrag.dismisses(toDp(distance), toDp(velocity.y))) zoomOut(velocity) else zoomSpringBack(velocity)
+            }
         }
     }
 
@@ -872,6 +899,64 @@ internal class MediaViewerController(
         updateStatusBarLight(true)
     }
 
+    // MARK: Zoom
+
+    /**
+     * Documents: the system zoom's interactive swipe down. The page follows the finger, shrinking
+     * about it (the spot it holds stays under it, as [dragContentBegan]) and rounding toward its
+     * source's corners; a release past [MediaDismissDrag.dismisses] zooms it home, else it springs
+     * back. Chrome stays put, as the system zoom leaves the presented page alone.
+     */
+    private fun zoomDragBegan(anchor: Offset) {
+        // Catch an opening zoom or a spring-back where it is.
+        flightJob?.cancel()
+        val current = hostTransform
+        dragAnchor = anchor
+        val center = bounds.center
+        dragStartDistance = drag.distance(atScale = current.scale)
+        dragCarry = Offset(
+            current.tx - (dragAnchor.x - center.x) * (1 - current.scale),
+            current.ty - (dragAnchor.y - center.y) * (1 - current.scale),
+        )
+        hostCorners = shape(source).second
+        hostAlpha = 1f
+    }
+
+    private fun zoomDragChanged(translation: Offset) {
+        val distance = translation.y + dragStartDistance
+        val scale = drag.scale(distance)
+        val center = bounds.center
+        hostTransform = HostTransform(
+            scale = scale,
+            tx = (dragAnchor.x - center.x) * (1 - scale) + translation.x + dragCarry.x,
+            ty = (dragAnchor.y - center.y) * (1 - scale) + translation.y + dragCarry.y,
+        )
+        hostCornerRadius = drag.cornerRadius(distance, toward = shape(source).first) / max(scale, 0.01f)
+    }
+
+    private fun zoomSpringBack(velocity: Velocity) {
+        val start = hostTransform
+        val radius = hostCornerRadius
+        val speed = springVelocity(velocity, transformed(bounds, start), bounds)
+        flightJob?.cancel()
+        flightJob = scope.launch {
+            spring(MediaMotion.springBack, speed) { p ->
+                hostTransform = lerp(start, HostTransform.Identity, p)
+                hostCornerRadius = radius * (1 - p)
+            }
+        }
+    }
+
+    /** Where [rect] lands under [transform] (about the host's centre). */
+    private fun transformed(rect: Rect, transform: HostTransform): Rect {
+        val center = bounds.center
+        fun map(point: Offset) = Offset(
+            center.x + (point.x - center.x) * transform.scale + transform.tx,
+            center.y + (point.y - center.y) * transform.scale + transform.ty,
+        )
+        return Rect(map(rect.topLeft), map(rect.bottomRight))
+    }
+
     private fun setChromeHidden(hidden: Boolean) {
         if (state.chromeHidden == hidden) return
         state.chromeFadeSeconds = if (hidden) 0.15 else 0.25
@@ -957,18 +1042,25 @@ internal class MediaViewerController(
         }
     }
 
-    /** Documents: back into their source (the system zoom's dismissal). */
-    private fun zoomOut() {
+    /** Documents: back into their source (the system zoom's dismissal), carrying a release's velocity. */
+    private fun zoomOut(velocity: Velocity = Velocity.Zero) {
         if (isLeaving) return
         isLeaving = true
+        val source = source
         val target = source?.let(::sourceFrame)
         val start = hostTransform
         val end = target?.let { transform(bounds, it) } ?: HostTransform(scale = 0.94f)
+        val (radius, corners) = shape(source.takeIf { target != null })
+        if (target != null) hostCorners = corners
+        val fromRadius = hostCornerRadius
+        val toRadius = radius / max(end.scale, 0.01f)
+        val speed = target?.let { springVelocity(velocity, transformed(bounds, start), it) } ?: 0f
         val alpha = hostAlpha
         flightJob?.cancel()
         flightJob = scope.launch {
-            spring(MediaMotion.open) { p ->
+            spring(MediaMotion.open, speed) { p ->
                 hostTransform = lerp(start, end, p)
+                hostCornerRadius = fromRadius + (toRadius - fromRadius) * p
                 hostAlpha = alpha * (1 - p)
             }
             finish()
@@ -1005,34 +1097,41 @@ internal class MediaViewerController(
         }
     }
 
-    /** Fade style for documents: a drag down their scroll view can't take. */
-    val documentFadeConnection: NestedScrollConnection = object : NestedScrollConnection {
+    /**
+     * Documents (zoom or fade): a drag down their scroll view can't take. iOS begins the
+     * dismissal only when the scroll view under the finger is at its top as the drag starts
+     * (`gestureRecognizerShouldBegin`); here a scroll view at its top hands over the downward
+     * delta it can't use. A drag that already scrolled keeps scrolling. Once dismissing, the
+     * scroll view gets nothing (the finger drives the page) and the fling is the release.
+     */
+    val documentDismissConnection: NestedScrollConnection = object : NestedScrollConnection {
         private var dragging = false
-        private var distance = 0f
-
-        override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-            if (style != Style.Fade || isMedia || isLeaving || source != NestedScrollSource.UserInput) return Offset.Zero
-            if (available.y <= 0f) return Offset.Zero
-            dragging = true
-            distance += available.y
-            fadeChanged(distance)
-            return Offset(0f, available.y)
-        }
+        private var scrolled = false
+        private var anchor = Offset.Zero
 
         override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-            if (!dragging || available.y >= 0f) return Offset.Zero
-            val take = max(available.y, -distance)
-            distance += take
-            fadeChanged(distance)
-            return Offset(0f, take)
+            if (!dragging || source != NestedScrollSource.UserInput) return Offset.Zero
+            dragChanged(lastPointer - anchor)
+            return available
+        }
+
+        override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+            if (isMedia || isLeaving || dragging || source != NestedScrollSource.UserInput) return Offset.Zero
+            if (consumed.y != 0f) scrolled = true
+            if (scrolled || available.y <= 0f || available.y <= abs(available.x + consumed.x)) return Offset.Zero
+            dragging = true
+            // Where the finger was before this delta, so the page moves with all of it.
+            anchor = lastPointer - Offset(0f, available.y)
+            dragBegan(anchor)
+            dragChanged(lastPointer - anchor)
+            return available
         }
 
         override suspend fun onPreFling(available: Velocity): Velocity {
+            scrolled = false
             if (!dragging) return Velocity.Zero
             dragging = false
-            val ended = distance
-            distance = 0f
-            fadeEnded(ended, available.y)
+            dragEnded(lastPointer - anchor, Velocity(0f, available.y))
             return available
         }
     }
@@ -1140,8 +1239,10 @@ internal fun MediaViewerHost(
             }
             .graphicsLayer { alpha = controller.viewAlpha }
             .semantics { paneTitle = screenName }
-            .pointerInput(controller) { dismissDrag(controller, slop) }
-            .nestedScroll(controller.documentFadeConnection),
+            .pointerInput(controller) { trackPointer(controller) }
+            .pointerInput(controller) { dismissDrag(controller, slop, fromContent = false) }
+            .pointerInput(controller) { dismissDrag(controller, slop, fromContent = true) }
+            .nestedScroll(controller.documentDismissConnection),
     ) {
         if (controller.style != MediaViewerController.Style.Zoom) {
             Box(
@@ -1163,6 +1264,20 @@ internal fun MediaViewerHost(
                         translationX = transform.tx
                         translationY = transform.ty
                         transformOrigin = TransformOrigin.Center
+                        val radius = controller.hostCornerRadius
+                        if (radius > 0.5f) {
+                            val c = controller.hostCorners
+                            shape = RoundedCornerShape(
+                                topStart = if (c.topLeft) radius else 0f,
+                                topEnd = if (c.topRight) radius else 0f,
+                                bottomEnd = if (c.bottomRight) radius else 0f,
+                                bottomStart = if (c.bottomLeft) radius else 0f,
+                            )
+                            clip = true
+                        } else {
+                            shape = RectangleShape
+                            clip = false
+                        }
                     }
                     .then(
                         if (controller.style == MediaViewerController.Style.Zoom) {
@@ -1218,28 +1333,33 @@ private fun FlightLayer(controller: MediaViewerController) {
 }
 
 /**
- * The dismiss pan (iOS `dismissPan`, one finger): it looks at every touch before the content
- * (the initial pass), and claims a drag heading down more than sideways once it passes the
- * touch slop, unless the image is zoomed. Claimed drags are consumed, so the pager and the
- * zoom never see them: pages turn only once a drag has shown it isn't a dismissal.
+ * The dismiss pan (iOS `dismissPan`, one finger). For media ([fromContent] false) it looks at
+ * every touch before the content (the initial pass), and claims a drag heading down more than
+ * sideways once it passes the touch slop, unless the image is zoomed. Claimed drags are
+ * consumed, so the pager and the zoom never see them: pages turn only once a drag has shown it
+ * isn't a dismissal. For documents ([fromContent] true) it looks after the content (the main
+ * pass) and claims only a drag nothing in it took: a scroll view (scrolled or not) consumes
+ * its drags, and one at its top hands its overscroll over through
+ * [MediaViewerController.documentDismissConnection].
  */
-private suspend fun PointerInputScope.dismissDrag(controller: MediaViewerController, slop: Float) {
+private suspend fun PointerInputScope.dismissDrag(controller: MediaViewerController, slop: Float, fromContent: Boolean) {
+    val pass = if (fromContent) PointerEventPass.Main else PointerEventPass.Initial
     awaitEachGesture {
-        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+        val down = awaitFirstDown(requireUnconsumed = false, pass = pass)
         if (controller.isLeaving) return@awaitEachGesture
         val tracker = VelocityTracker()
         tracker.addPosition(down.uptimeMillis, down.position)
         var total = Offset.Zero
         var anchor = Offset.Zero
         while (true) {
-            val event = awaitPointerEvent(PointerEventPass.Initial)
+            val event = awaitPointerEvent(pass)
             if (event.changes.count { it.pressed } > 1) return@awaitEachGesture
             val change = event.changes.firstOrNull { it.id == down.id } ?: return@awaitEachGesture
             if (!change.pressed || change.isConsumed) return@awaitEachGesture
             tracker.addPosition(change.uptimeMillis, change.position)
             total += change.positionChange()
             if (total.getDistance() > slop) {
-                if (!controller.shouldBegin(total)) return@awaitEachGesture
+                if (!controller.shouldBegin(total, fromContent)) return@awaitEachGesture
                 change.consume()
                 anchor = change.position
                 break
@@ -1250,6 +1370,7 @@ private suspend fun PointerInputScope.dismissDrag(controller: MediaViewerControl
         var ended = false
         try {
             while (true) {
+                // Claimed: consumed before the content sees it, so nothing under it scrolls along.
                 val event = awaitPointerEvent(PointerEventPass.Initial)
                 val change = event.changes.firstOrNull { it.id == down.id }
                 if (change == null || !change.pressed) {
@@ -1265,6 +1386,16 @@ private suspend fun PointerInputScope.dismissDrag(controller: MediaViewerControl
             }
         } finally {
             if (!ended) controller.dragEnded(translation, Velocity.Zero)
+        }
+    }
+}
+
+/** Records where the finger is (without consuming), for a dismissal a scroll view hands over. */
+private suspend fun PointerInputScope.trackPointer(controller: MediaViewerController) {
+    awaitPointerEventScope {
+        while (true) {
+            val event = awaitPointerEvent(PointerEventPass.Initial)
+            event.changes.firstOrNull { it.pressed }?.let { controller.lastPointer = it.position }
         }
     }
 }

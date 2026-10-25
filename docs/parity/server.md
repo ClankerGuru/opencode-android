@@ -71,3 +71,31 @@ Wire models the client decodes or encodes, needed below the feature modules: `Op
 ## Diagnostics hooks (shared edit from `:devtools`)
 
 `server/.../DiagnosticsInstrumentation.kt` adds an OkHttp interceptor + `EventListener` to the request pools in `OpenCodeTransport.liveValue` (iOS `OpenCodeClient+Transport` calling `DiagnosticsRecorder.requestStarted/requestEnded/networkMetrics`); `LiveEvents.subscribeEvents` records `sse_connect_start/connected/resumed/disconnected` (iOS `DiagnosticsRecorder.stream`). Only method, redacted path, status, sizes and timings are kept. See devtools.md.
+
+## Tests
+
+Ported from iOS `OpenCodeTests/` into `server/src/test` (JVM, same suite and method names). Shared
+fixtures: `server/src/testFixtures` (`WireFixture`, `ServerTestIsolation`); the network block is
+`TestNetworkBlock` behind `OpenCodeTransport.testValue`.
+
+| iOS file | Kotlin | Ported | Left elsewhere / deleted (reason) |
+| --- | --- | --- | --- |
+| `OpenCodeClientDecodingTests.swift` | `OpenCodeClientDecodingTests.kt` | 36 of 37 | `aFailedRunShowsItsStepsErrorOnceNotTheIdleRepeat` → `:feature:transcript` (`TranscriptEntry`); voice/transcript halves of `completeHomeSnapshotResolves…`, `aRetryingStepCountsDown…`, `decodesCompactionStatesLikeTheTUI` → their modules. `liveServerReadContract`/`liveServerTransferDiagnostics` opt-in (`OPENCODE_LIVE_*`); read contract verified against session-lab |
+| `OpenCodeClientFamilyTests.swift` | `OpenCodeClientFamilyTests.kt` | 11 | — |
+| `OpenCodeEventDecodingTests.swift` | `OpenCodeEventDecodingTests.kt` | 8 | — |
+| `WireRequestTests.swift` | `WireRequestTests.kt` | 16 | — |
+| `PassiveNetworkWireTests.swift` | `PassiveNetworkWireTests.kt` | 5 | — |
+| `AppLogTests.swift` | `AppLogTests.kt` | 3 | — |
+| `PairingDeviceNameTests.swift` | `PairingDeviceNameTests.kt` | 3 | — |
+| `NetworkRetryTests.swift` | `retry/NetworkRetryTests.kt` | 44 of 51 | 6 `EventStreamReconnectTests` → `:feature:drawer` (`HomeFeature`); `actionsALoopThatOwnsItsRetries…` → `:feature:voice` (`runOwningRetries`); CFNetwork/`NWError` sub-checks deleted (iOS-only domains) |
+| `ServerIDTests.swift` | `ServerIDTests.kt` | 6 of 7 | `shareSheetIDsUseTheSameShape` → `:feature:system`; `TranscriptTimeStamps` readback → `:feature:transcript` |
+| `PairPageLinkTests.swift` | `PairPageLinkTests.kt` | 6 | — |
+| `MultipleWindowsTests.swift` | `EventBatcherTests.kt` | 1 (`batcherOverflowFinishesAndCancelsFurtherEmission`) | 5 `SharedEventStreams`/window tests → `:app`/`:feature:drawer` |
+| `ModelVisibilityTests.swift` | `model/ModelVisibilityTests.kt` | 6 (Rules) | Pickers/Settings tests → `:feature:session`/`:feature:settings` |
+| `SessionLinkTests.swift` | `model/SessionLinkTests.kt` | 1 (`linkURLRoundTripsItsIDAndTitle`) | parsing/presentation → `:feature:transcript`; session/Home/menu → features |
+| `TestIsolationGuardTests.swift` | `testing/ServerTestIsolationTests.kt` | 1 (network block) | rest in `:core` (see core.md) |
+
+Bugs the ports found (fixed): EACCES socket errors were retried; a refused cleartext redirect to
+another host read as interrupted; OkHttp's 5-per-host cap queued family fan-out; endpoint
+queries encoded `/` as `%2F`; transport failures recorded no failure phase
+(`DiagnosticsNetworkPhases`, found by the core `DiagnosticsRecorderTests`).

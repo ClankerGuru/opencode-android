@@ -3,6 +3,7 @@ package ai.opencode.feature.drawer.list
 import ai.opencode.core.motion.MotionFrameAction
 import ai.opencode.core.motion.SpringSolver
 import ai.opencode.core.motion.motionFrameLoop
+import ai.opencode.core.tuning.AnimationTimeScale
 import ai.opencode.feature.drawer.style.DrawerMetrics
 import ai.opencode.feature.drawer.style.DrawerTunables
 import androidx.compose.runtime.Stable
@@ -146,6 +147,8 @@ class DrawerPinDrag {
     internal var isLandingPlatter = false
     internal var isCancellingEmptyZone = false
     private var hasNotifiedDropReleased = false
+    /** The landing fallback fired: commit in the next frame (see [scheduleLandingFallback]). */
+    private var commitRequested = false
     /** The Pinned header's start after the first pin lands, applied once it's laid out. */
     internal var pendingPinnedHeaderOffset: Float? = null
 
@@ -188,7 +191,10 @@ class DrawerPinDrag {
 
     fun detach(host: DrawerPinDragHost) {
         if (this.host !== host) return
+        // The list is gone (iOS: the collection view left its window): end the drag and leave
+        // no spring, translation or drop zone behind for the next list.
         cancelDrag()
+        resetAllCellsAndCleanup()
         this.host = null
     }
 
@@ -233,6 +239,7 @@ class DrawerPinDrag {
         isLandingPlatter = false
         isCancellingEmptyZone = false
         hasNotifiedDropReleased = false
+        commitRequested = false
         pendingPinnedHeaderOffset = null
 
         initialFingerY = fingerY
@@ -417,6 +424,7 @@ class DrawerPinDrag {
         }
         hasCommittedDrop = true
         isLandingPlatter = false
+        commitRequested = false
 
         val host = host
         if (host == null) {
@@ -439,13 +447,12 @@ class DrawerPinDrag {
 
         // Each row lands where its target was (the targets are its slot after the drop): after the
         // store change this frame lays it out there, so its translation is what's left of its spring.
+        // The lifted row included: iOS snaps its hidden cell because the system's platter has
+        // already landed; here the row itself is still settling, so it keeps what's left too (a
+        // fallback commit just before it settles never jumps it).
         val visible = host.visibleItems()
         for (item in visible) {
             val spring = cellSprings[item.key] ?: continue
-            if (item.key == ItemKey.Row(draggedID)) {
-                spring.value = spring.target
-                spring.velocity = 0.0
-            }
             val residual = (spring.value - spring.target).toFloat()
             setTranslation(item.key, residual)
         }
@@ -482,9 +489,17 @@ class DrawerPinDrag {
         landingFallback?.cancel()
         val host = host ?: return
         landingFallback = host.scope.launch {
-            delay(LANDING_FALLBACK_MILLIS)
+            // iOS: 0.55 s of the system's drop animation, slowed with the lab time scale.
+            delay((LANDING_FALLBACK_MILLIS / max(0.1, AnimationTimeScale.shared.scale)).toLong())
             landingFallback = null
-            if (activeSessionID != null && !hasCommittedDrop) completeDrop() else finishLanding()
+            if (activeSessionID != null && !hasCommittedDrop) {
+                // Commit from the frame loop, so the store change is laid out in the frame that
+                // publishes the rows' carried-over translations (a commit between frames would
+                // let the next step read the old layout as the new one).
+                if (isDisplayLinkRunning) commitRequested = true else completeDrop()
+            } else {
+                finishLanding()
+            }
         }
     }
 
@@ -511,6 +526,7 @@ class DrawerPinDrag {
         isLandingPlatter = false
         isCancellingEmptyZone = false
         hasNotifiedDropReleased = false
+        commitRequested = false
     }
 
     internal fun setTranslation(key: ItemKey, value: Float) {
@@ -577,7 +593,7 @@ class DrawerPinDrag {
         if (isLandingPlatter && !hasCommittedDrop) {
             val draggedID = activeSessionID
             val dragged = draggedID?.let { cellSprings[ItemKey.Row(it)] }
-            if (dragged == null || dragged.isSettled) completeDrop()
+            if (commitRequested || dragged == null || dragged.isSettled) completeDrop()
             return MotionFrameAction.Continue
         }
         if (hasCommittedDrop && !isLandingPlatter && pendingResiduals == null && allSpringsSettled(keyed)) {

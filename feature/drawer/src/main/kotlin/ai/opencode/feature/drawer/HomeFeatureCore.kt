@@ -36,6 +36,8 @@ internal fun HomeFeature.core(state: State, action: Action): Reduced<State, Acti
 private fun HomeFeature.coreRoute(state: State, action: Action): Reduced<State, Action> = when (action) {
     is Action.SessionSwitcher -> reduceSessionSwitcher(state, action.action)
     is Action.CatchUp -> reduceCatchUp(state, action.action)
+    // The scoped `TraceUploadsFeature` reduces it (`HomeFeature+Composition`).
+    is Action.Traces -> Reduced(state)
 
     Action.NotificationSettingsRequested,
     is Action.NotificationPermissionLoaded,

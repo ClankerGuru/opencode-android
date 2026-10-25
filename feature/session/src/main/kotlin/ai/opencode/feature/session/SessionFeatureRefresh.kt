@@ -11,6 +11,7 @@ import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.AuthoritativeRefresh
 import ai.opencode.feature.session.SessionFeature.CancelID
 import ai.opencode.core.diagnostics.LabMarks
+import ai.opencode.core.diagnostics.PerfTimeline
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeContextReading
@@ -398,8 +399,7 @@ internal fun SessionFeature.acceptWindow(
     if (merged != s.items) s = s.copy(items = merged).syncShellToolStatuses()
     s = s.retainRenderedWindowStart(previousFirstID).pinBrowsingWindowIfNeeded()
     s = settleFailedSends(SessionFeature.promptIDs(items), s)
-    // iOS `PerfTimeline.snapshotApplied` (perf builds only) sets `perfSnapshotRevision`; no perf
-    // timeline on Android, so it stays null.
+    PerfTimeline.snapshotApplied(s.session?.id)?.let { s = s.copy(perfSnapshotRevision = it) }
     return s
 }
 

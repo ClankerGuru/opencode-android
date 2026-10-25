@@ -229,7 +229,7 @@ data class CallTrayBarLayout(
     val muteGap: Float,
     /** The mic glyph's drawn width. */
     val glyphWidth: Float,
-    /** The tray's trailing padding ([CallTrayComposerMetrics.innerHorizontal]). */
+    /** The tray's trailing padding ([CallTrayBarLayout.trailingPadding]). */
     val trailingPadding: Float,
     /** The scope's edge fade ([CallTrayTunables.scopeFade]). */
     val scopeFade: Float,
@@ -250,10 +250,17 @@ data class CallTrayBarLayout(
         const val slot = 48f
         const val disc = 40f
 
+        /**
+         * The tray's trailing padding: iOS's `innerHorizontal` (6) beside a 44 pt slot, less half
+         * the 4 dp Android's 48 dp slot adds, so End's disc centre stays exactly where iOS's is,
+         * under the composer's call button (`innerHorizontal + 22` from the trailing edge).
+         */
+        const val trailingPadding = CallTrayComposerMetrics.innerHorizontal - (slot - 44f) / 2
+
         fun current(glyphWidth: Float) = CallTrayBarLayout(
             muteGap = CallTrayTunables.muteGap,
             glyphWidth = glyphWidth,
-            trailingPadding = CallTrayComposerMetrics.innerHorizontal,
+            trailingPadding = trailingPadding,
             scopeFade = CallTrayTunables.scopeFade,
         )
 

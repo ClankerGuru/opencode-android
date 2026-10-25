@@ -1,7 +1,9 @@
 package ai.opencode.feature.drawer
 
 import ai.opencode.feature.session.*
+import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.sharing.SharedKey
+import ai.opencode.feature.composer.ComposerPersistence
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
 import ai.opencode.feature.media.BrowserFeature
@@ -325,6 +327,8 @@ fun HomeFeature.State.purgingSession(sessionID: String): HomeFeature.State {
     )
     val serverID = server.persistenceID
     ServerSharedKeys.cachedTranscriptSnapshots().update { it.removeEntry(serverID, sessionID) }
+    // iOS `purgePersistedComposer(sessionID:)`: the deleted session's saved draft goes too.
+    dependency(ComposerPersistence).removeSession(serverID, sessionID)
     val key = sessionKey(sessionID)
     s = s.updatingPinnedSessionKeys { keys -> keys.filterNot { it == key } }
         .updatingSessionReadDates { it - key }
