@@ -371,7 +371,7 @@ private object VoicePreviewAudioPlayer {
                     .build(),
             )
             audioPlayer.setDataSource(ByteArrayMediaSource(data))
-            audioPlayer.prepare()
+            withContext(Dispatchers.IO) { audioPlayer.prepare() }
         } catch (_: Exception) {
             audioPlayer.release()
             throw VoicePreviewError.Failed

@@ -1,5 +1,6 @@
 package ai.opencode.feature.voice
 
+import ai.opencode.core.log.AppLog
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import ai.opencode.core.motion.rememberReduceMotion
@@ -386,7 +387,9 @@ class DotScopeRenderer private constructor() {
             Thread { runCatching { RuntimeShader(DotScopeShaders.dotScopeFragment) } }.start()
         }
 
-        fun make(): DotScopeRenderer? = runCatching { DotScopeRenderer() }.getOrNull()
+        fun make(): DotScopeRenderer? = runCatching { DotScopeRenderer() }
+            .onFailure { AppLog.voice.error("dot_scope_shader_failed type=${it.javaClass.simpleName}") }
+            .getOrNull()
 
         /**
          * A 6.4 s exchange: you speak, a beat, the agent answers, a beat. Each voice is a

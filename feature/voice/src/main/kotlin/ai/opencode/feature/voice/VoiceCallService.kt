@@ -1,6 +1,7 @@
 package ai.opencode.feature.voice
 
 import ai.opencode.core.dependencies.*
+import ai.opencode.core.log.AppLog
 import android.app.*
 import android.content.Intent
 import android.content.pm.ServiceInfo
@@ -50,6 +51,12 @@ class VoiceCallServiceClient(
             val context = dependency(AppContext); val commands = dependency(VoiceCallCommands)
             VoiceCallServiceClient(
                 start = { state -> withContext(Dispatchers.Main.immediate) {
+                    // Without the microphone permission the call fails on its own
+                    // (microphoneDenied); a microphone service would throw instead.
+                    if (context.checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                        AppLog.voice.notice("voice_call_service_skipped reason=microphone_denied")
+                        return@withContext
+                    }
                     commands.activate(state.callID)
                     try { context.startForegroundService(VoiceCallService.intent(context, state)) }
                     catch (error: Exception) { commands.deactivate(state.callID); throw error }
@@ -101,6 +108,13 @@ class VoiceCallService : Service() {
                 val connected = intent.getLongExtra("connectedAt", -1).takeIf { it >= 0 }?.let(Instant::ofEpochMilli)
                 val updated = VoiceCallServiceState(id, phase, intent.getBooleanExtra("muted", false), connected)
                 if (updated != state) {
+                    // A microphone service may only start with RECORD_AUDIO granted (API 34+ throws
+                    // SecurityException otherwise); the call itself reports the denial.
+                    if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                        AppLog.voice.notice("voice_call_service_skipped reason=microphone_denied")
+                        if (state == null) stopSelf(startId)
+                        return START_NOT_STICKY
+                    }
                     state = updated
                     startForeground(NOTIFICATION, notification(updated), ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
                 }
@@ -109,7 +123,7 @@ class VoiceCallService : Service() {
         return START_NOT_STICKY // Never resurrect a microphone after process death.
     }
     private fun notification(state: VoiceCallServiceState): Notification {
-        val builder = Notification.Builder(this, CHANNEL).setSmallIcon(android.R.drawable.ic_btn_speak_now)
+        val builder = Notification.Builder(this, CHANNEL).setSmallIcon(R.drawable.ic_voice_call_notification)
             .setContentTitle("OpenCode").setCategory(Notification.CATEGORY_CALL).setOngoing(state.phase != VoiceCallServiceState.Phase.ended)
             .setOnlyAlertOnce(true).setVisibility(Notification.VISIBILITY_PUBLIC)
         val text = when (state.phase) {

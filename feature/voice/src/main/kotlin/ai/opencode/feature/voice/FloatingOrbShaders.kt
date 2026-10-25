@@ -188,11 +188,12 @@ FcoForces fcoForces(float2 uv, float spread) {
   float orbit = clock.y;
   float body = mood.w;
   int take = int(clock.z + 0.5);
-  FcoForces f = take == 1 ? fcoTides(uv, ly, la, th, t, orbit, body, spread)
-    : take == 2 ? fcoHelix(uv, ly, la, th, t, orbit, body, spread)
-    : take == 3 ? fcoRipples(uv, ly, la, th, t, orbit, body, spread)
-    : take == 4 ? fcoComets(uv, ly, la, th, t, orbit, body, spread)
-    : fcoTwinVortex(uv, ly, la, th, t, orbit, body, spread);
+  FcoForces f;
+  if (take == 1) { f = fcoTides(uv, ly, la, th, t, orbit, body, spread); }
+  else if (take == 2) { f = fcoHelix(uv, ly, la, th, t, orbit, body, spread); }
+  else if (take == 3) { f = fcoRipples(uv, ly, la, th, t, orbit, body, spread); }
+  else if (take == 4) { f = fcoComets(uv, ly, la, th, t, orbit, body, spread); }
+  else { f = fcoTwinVortex(uv, ly, la, th, t, orbit, body, spread); }
   // Quiet voices still show, dimmer; your muted force sinks further.
   float presenceY = (0.5 + 0.5 * fcoSat(ly * 1.4 + th * 0.7)) * (1.0 - 0.6 * mood.x);
   float presenceA = 0.5 + 0.5 * fcoSat(la * 1.4 + th * 0.7);
