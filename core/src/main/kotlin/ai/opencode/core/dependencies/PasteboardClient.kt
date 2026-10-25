@@ -3,6 +3,7 @@ package ai.opencode.core.dependencies
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import androidx.core.net.toUri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -24,7 +25,7 @@ class PasteboardClient(
             val context = dependency(AppContext)
             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             PasteboardClient(
-                setURL = { url -> withContext(Dispatchers.Main) { clipboard.setPrimaryClip(ClipData.newRawUri("URL", android.net.Uri.parse(url))) } },
+                setURL = { url -> withContext(Dispatchers.Main) { clipboard.setPrimaryClip(ClipData.newRawUri("URL", url.toUri())) } },
                 setString = { text -> withContext(Dispatchers.Main) { clipboard.setPrimaryClip(ClipData.newPlainText("Text", text)) } },
                 string = {
                     val item = clipboard.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)
