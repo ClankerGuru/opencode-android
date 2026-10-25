@@ -110,7 +110,6 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import androidx.core.util.Consumer
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -853,7 +852,7 @@ private class AttachmentCaptureSession(
     private var ratioBase = 1.0
     private var deviceFactor = 1.0
     private var rampJob: Job? = null
-    private val stateListener = Consumer<CameraState> { state -> cameraStateChanged(state) }
+    private val stateListener = androidx.lifecycle.Observer<CameraState> { state -> cameraStateChanged(state) }
     private val mainExecutor = ContextCompat.getMainExecutor(context)
 
     private fun selector(at: CameraDeviceDescription.Position): CameraSelector =
@@ -892,14 +891,14 @@ private class AttachmentCaptureSession(
     }
 
     private fun bind(cameras: ProcessCameraProvider, owner: LifecycleOwner, at: CameraDeviceDescription.Position): Boolean {
-        camera?.cameraInfo?.removeCameraStateListener(stateListener)
+        camera?.cameraInfo?.cameraState?.removeObserver(stateListener)
         return try {
             cameras.unbind(preview, output)
             val bound = cameras.bindToLifecycle(owner, selector(at), preview, output)
             camera = bound
             position = at
             interrupted = false
-            bound.cameraInfo.addCameraStateListener(mainExecutor, stateListener)
+            bound.cameraInfo.cameraState.observeForever(stateListener)
             prepare(bound)
             true
         } catch (error: Exception) {
@@ -914,7 +913,7 @@ private class AttachmentCaptureSession(
         pending = false
         rampJob?.cancel()
         rampJob = null
-        camera?.cameraInfo?.removeCameraStateListener(stateListener)
+        camera?.cameraInfo?.cameraState?.removeObserver(stateListener)
         camera = null
         provider?.unbind(preview, output)
         surfaceRequest = null

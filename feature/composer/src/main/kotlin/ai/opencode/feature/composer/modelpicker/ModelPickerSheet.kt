@@ -474,16 +474,17 @@ private fun PlainModelRow(model: OpenCodeModel, state: ModelPickerState, onEvent
             verticalAlignment = Alignment.CenterVertically,
         ) {
             ProviderIcon(model.providerID, model.canonicalProviderID, size = 20.dp, tint = OpenCodeTheme.colors.secondaryText)
-            Text(model.name, color = OpenCodeTheme.colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-            Text(
-                ModelProviderGroup.title(model.providerID),
-                style = OpenCodeTextStyles.subheadline,
-                color = OpenCodeTheme.colors.tertiaryText,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false),
-            )
-            Spacer(Modifier.weight(0.01f))
+            Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(model.name, color = OpenCodeTheme.colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                Text(
+                    ModelProviderGroup.title(model.providerID),
+                    style = OpenCodeTextStyles.subheadline,
+                    color = OpenCodeTheme.colors.tertiaryText,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+            }
             if (isFavorite) OpenCodeIcon(SFSymbol.StarFill, null, size = 14.dp, tint = FavoriteYellow)
             if (isCurrent) OpenCodeIcon(SFSymbol.Checkmark, null, size = OpenCodeIconSize.small, tint = OpenCodeTheme.colors.accent)
         }

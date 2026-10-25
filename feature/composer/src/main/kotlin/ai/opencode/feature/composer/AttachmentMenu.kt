@@ -870,7 +870,7 @@ private val RectConverter: TwoWayConverter<Rect, AnimationVector4D> = TwoWayConv
 /** Dismisses the menu on a tap or a downward drag (iOS `AttachmentMenuDismissArea`). */
 @Composable
 fun AttachmentMenuDismissArea(onDismiss: () -> Unit, modifier: Modifier = Modifier, extent: Dp? = null) {
-    BoxWithConstraints(
+    Box(
         modifier
             .then(if (extent != null) Modifier.size(extent) else Modifier.fillMaxSize())
             .clearAndSetSemantics {}

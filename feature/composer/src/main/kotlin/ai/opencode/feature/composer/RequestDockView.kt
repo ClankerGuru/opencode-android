@@ -65,6 +65,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -380,7 +381,9 @@ private class DockScope(
             }
             if (progress != null && progress.second > 1) {
                 val (page, count) = progress
+                // Clipped: the outgoing digits roll out of the row rather than over it.
                 Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.Center) {
+                    Box(Modifier.clipToBounds()) {
                     RollingNumber(
                         text = "${page + 1} of $count",
                         style = OpenCodeTextStyles.footnote,
@@ -388,6 +391,7 @@ private class DockScope(
                         alignment = RollingNumberAlignment.End,
                         accessibilityLabel = "Question ${page + 1} of $count",
                     )
+                    }
                 }
             }
             if (dock.reviewRequestIDs.size > 1) QueueMenu()
