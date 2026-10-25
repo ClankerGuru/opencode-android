@@ -225,6 +225,14 @@ data class OpenCodeMarkdownBlock(val id: Int, val kind: Kind) {
         }
 
         /**
+         * [text] with CRLF line endings as LF. Models sometimes stream `\r\n` (seen from
+         * opencode/big-pickle on a live server), and lines here split on `\n` never inside
+         * `\r\n` (Swift's Character rule), so a reply's lists and paragraphs collapsed into one
+         * paragraph showing literal `- ` markers. iOS has the same gap; this is a deliberate fix.
+         */
+        fun lineFeeds(text: String): String = if (text.indexOf('\r') < 0) text else text.replace("\r\n", "\n")
+
+        /**
          * The blocks of [text] (iOS `blocks(from:inlineCache:reusing:)`). [reusing] is the row's
          * previous blocks: their code highlights continue instead of starting over.
          */
@@ -233,6 +241,7 @@ data class OpenCodeMarkdownBlock(val id: Int, val kind: Kind) {
             inlineCache: InlineCache? = InlineCache.shared,
             reusing: List<OpenCodeMarkdownBlock> = emptyList(),
         ): List<OpenCodeMarkdownBlock> {
+            val text = lineFeeds(text)
             // The previous row already owns these values. No growing code cache or incremental
             // grammar state survives a stream or a navigation change.
             val previousCodes = reusing.mapNotNull { (it.kind as? Kind.Code)?.code }
