@@ -10,8 +10,8 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 
 | iOS concept | Kotlin file(s) | Status | Notes |
 | --- | --- | --- | --- |
-| `@Reducer`, `Reduce`, `Scope`, `CombineReducers`, `.onChange`, `.ifLet(\.$x)`, `.forEach`, `@Presents`/`PresentationAction` | `core/.../store/Reducer.kt` | done | `inout State` → returns `Reduced(state, effect)`; `ifLet`/`forEach` cancel child effects on dismissal/removal |
-| `Effect` (`.none/.run/.send/.merge/.concatenate/.cancellable/.cancel/.map/.debounce`) | `core/.../store/Effect.kt`, `EffectRunner.kt` | done | `.run` captures the creating `DependencyValues` (TCA escaping-dependency semantics) |
+| `@Reducer`, `Reduce`, `Scope`, `CombineReducers`, `.onChange`, `.ifLet(\.$x)`, `.forEach`, `@Presents`/`PresentationAction` | `core/.../store/Reducer.kt` | done | `inout State` → returns `Reduced(state, effect)`; both `ifLet` forms and `forEach` namespace nested cancellation IDs by the complete navigation path (slot + child identity) and cancel all child work on removal/replacement |
+| `Effect` (`.none/.run/.send/.merge/.concatenate/.cancellable/.cancel/.map/.debounce`) | `core/.../store/Effect.kt`, `EffectRunner.kt` | done | `.run` captures the creating `DependencyValues` (TCA escaping-dependency semantics); cancellation uses `(navigation path, id)`. Deliberate contract difference from TCA 1.26.2's prefix registration: an explicit parent cancel affects only its own level, not descendants; navigation teardown still cancels the whole child subtree |
 | `Store`, `store.scope`, view observation | `core/.../store/Store.kt` | done | main-thread `send`; `collectState()` / `observe {}` for Compose |
 | `TestStore` (exhaustive) | `core/.../store/TestStore.kt` | done | `send/receive/skipReceivedActions/finish`, `exhaustive = false` for non-exhaustive |
 | `@Dependency`, `DependencyKey`, `withDependencies`, `liveValue/testValue` | `core/.../dependencies/DependencyValues.kt` | done | thread/coroutine-local container; test values cached per test container |

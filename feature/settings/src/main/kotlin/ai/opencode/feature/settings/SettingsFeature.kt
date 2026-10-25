@@ -212,12 +212,14 @@ class SettingsFeature : Reducer<SettingsFeature.State, SettingsFeature.Action> {
                 action = { (it as? Action.ServerDetails)?.action },
                 embed = { Action.ServerDetails(it) },
                 child = ServerDetailsFeature(),
+                childID = { it.server.persistenceID },
             ),
             state = { it.modelVisibility },
             setState = { s, c -> s.copy(modelVisibility = c) },
             action = { (it as? Action.ModelVisibility)?.action },
             embed = { Action.ModelVisibility(it) },
             child = ModelVisibilityFeature(),
+            childID = { it.server.persistenceID },
         ),
     )
 
@@ -325,19 +327,16 @@ class SettingsFeature : Reducer<SettingsFeature.State, SettingsFeature.Action> {
             effect = Effect.send(Action.Voice(VoiceSettingsFeature.Action.VoicePickerDisappeared))
         }
         if (next.serverDetails == null) effect = Effect.merge(effect, leaveServerDetails(state.serverDetails))
-        if (next.modelVisibility == null && state.modelVisibility != null) {
-            effect = Effect.merge(effect, Effect.cancel(ModelVisibilityFeature.LoadID))
-        }
         return Reduced(next, effect)
     }
 
     /**
-     * Server Details' state is dropped as it leaves (the plain `ifLet` cancels nothing), so run its
-     * `Disappeared` here: it cancels the read, the polling and the sign-in attempt.
+     * `ifLet` cancels the removed child's reads and polling. Cancel its server-side sign-in
+     * from the parent so that cleanup survives the child's removal (iOS `disappeared`).
      */
     private fun leaveServerDetails(old: ServerDetailsFeature.State?): Effect<Action> {
         old ?: return Effect.none()
-        return ServerDetailsFeature().reduce(old, ServerDetailsFeature.Action.Disappeared).effect.map { Action.ServerDetails(it) }
+        return ServerDetailsFeature().cancelSignIn(old).map { Action.ServerDetails(it) }
     }
 
     private fun whatsNew(state: State, action: WhatsNewFeature.Action): Reduced<State, Action> = when (action) {
