@@ -3,11 +3,12 @@ package ai.opencode.feature.transcript.markdown.ui
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.feature.transcript.LocalTranscriptRowContext
-import ai.opencode.feature.transcript.TranscriptAction
 import ai.opencode.feature.transcript.SessionLinkTarget
-import ai.opencode.feature.transcript.markdown.SessionLink
-import ai.opencode.feature.transcript.markdown.label
+import ai.opencode.feature.transcript.TranscriptAction
 import ai.opencode.feature.transcript.markdown.InlineText
+import ai.opencode.feature.transcript.markdown.label
+import ai.opencode.feature.transcript.markdown.marked
+import ai.opencode.server.model.SessionLink
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue

@@ -20,7 +20,7 @@ import ai.opencode.feature.session.header.BreathingTitleHold
 import ai.opencode.feature.session.header.HeaderBlurTunables
 import ai.opencode.feature.session.header.SessionContextRing
 import ai.opencode.feature.session.header.SessionContextText
-import ai.opencode.feature.transcript.TranscriptMetrics
+import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.server.model.OpenCodeExportFormat
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState

@@ -6,6 +6,8 @@ import android.icu.number.Notation
 import android.icu.number.NumberFormatter
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
+import java.text.NumberFormat
+import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -14,7 +16,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
-import java.util.Locale
 
 /** A link as a card shows it right now (iOS `LinkPreview`). */
 data class LinkPreview(
@@ -38,9 +39,10 @@ data class LinkPreview(
     val id: String get() = target.key
     val url: String get() = target.url
     val domain: String get() = LinkPreviewPolicy.displayHost(url)
+    /** iOS `url.path`: decoded, empty for the root. */
     val path: String
         get() {
-            val path = url.toHttpUrlOrNull()?.encodedPath ?: return ""
+            val path = url.toHttpUrlOrNull()?.let { "/" + it.pathSegments.joinToString("/") } ?: return ""
             return if (path.length > 1) path else ""
         }
     val loadsMetadata: Boolean get() = target.loadsMetadata
@@ -124,6 +126,9 @@ data class LinkPreview(
             val parts = listOfNotNull(stars, details.language)
             return if (parts.isEmpty()) null else parts.joinToString(" · ")
         }
+
+        /** Swift's `Int.formatted()`: grouped digits in the reader's locale (a GitHub issue's comments). */
+        fun formatted(value: Int): String = NumberFormat.getIntegerInstance(Locale.getDefault()).format(value)
 
         /**
          * A link without metadata, named from its path: `/guides/background-transfers` reads

@@ -27,7 +27,7 @@ import ai.opencode.feature.composer.AttachmentMenuItem
 import ai.opencode.core.experiments.key
 import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.feature.composer.LocationClientError
-import ai.opencode.feature.transcript.TranscriptMetrics
+import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.system.notifications.SessionNotificationsClient
 import ai.opencode.server.model.OpenCodeShell
 import ai.opencode.server.model.OpenCodeSession

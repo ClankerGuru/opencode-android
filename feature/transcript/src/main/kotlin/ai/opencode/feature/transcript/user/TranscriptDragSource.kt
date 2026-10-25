@@ -1,10 +1,10 @@
 package ai.opencode.feature.transcript.user
 
-import ai.opencode.feature.transcript.TranscriptMetrics
+import ai.opencode.core.files.AttachmentFileType
+import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.AgentFileReference
-import ai.opencode.core.files.AttachmentFileType
 import android.content.ClipData
 import android.content.ClipDescription
 import android.net.Uri

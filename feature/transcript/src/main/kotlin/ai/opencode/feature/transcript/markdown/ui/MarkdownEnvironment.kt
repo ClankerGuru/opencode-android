@@ -2,31 +2,9 @@ package ai.opencode.feature.transcript.markdown.ui
 
 import ai.opencode.feature.transcript.SessionLinkTarget
 import ai.opencode.server.model.AgentFileReference
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.ui.graphics.ImageBitmap
-
-/**
- * What the renderer needs from `:feature:media` (iOS `Media/`), which isn't ported yet: the
- * Mermaid diagram card, the agent file cards and image gallery, and Link Icons' site icons.
- * Each slot is null until media provides it; the renderer then draws its fallback (a
- * highlighted code band for Mermaid, plain file rows, the globe glyph).
- */
-@Immutable
-class MarkdownMediaHandoff(
-    /** iOS `MermaidDiagramCard(source:onPreview:)`: only a closed ```mermaid fence reaches it. */
-    val mermaid: (@Composable (source: String) -> Unit)? = null,
-    /** iOS `AgentFileCards` / `AgentImageGallery` for a `.files` block. */
-    val files: (@Composable (files: List<AgentFileReference>) -> Unit)? = null,
-    /** iOS `LinkPreviewStore.inlineIcon(for:)`: a finished link's site icon, once fetched. */
-    val siteIcon: ((url: String) -> ImageBitmap?)? = null,
-    /** iOS `LinkPreviewStore.inlineLinksAppeared(_:row:)`: the row's fetchable links, once per set. */
-    val inlineLinksAppeared: ((urls: List<String>, row: String?) -> Unit)? = null,
-)
-
-val LocalMarkdownMediaHandoff = staticCompositionLocalOf { MarkdownMediaHandoff() }
 
 /**
  * iOS `SessionLinkContext`: the row's resolved session links. The row sets it from
@@ -49,6 +27,14 @@ enum class InlineLinkStyle {
     /** The icon; a bare URL drops `https://` and keeps the rest of its address (the default). */
     Address,
 }
+
+/**
+ * The row's stable list identity (iOS `EnvironmentValues.linkPreviewRow`): Link Icons report
+ * their links under it, and image links name their media with it. The list provides it around
+ * each row; null outside one. The store and the row's revision are media's
+ * (`LocalLinkPreviewStore`, `LocalLinkPreviewRevision`).
+ */
+val LocalLinkPreviewRow = staticCompositionLocalOf<String?> { null }
 
 /** iOS `transcriptLayoutTuning.linkStyle`: Clean Address in the transcript; surfaces outside it set Today. */
 val LocalInlineLinkStyle = staticCompositionLocalOf { InlineLinkStyle.Address }

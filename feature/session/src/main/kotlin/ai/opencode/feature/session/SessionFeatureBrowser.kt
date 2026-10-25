@@ -14,7 +14,7 @@ import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.feature.media.LinkMenuAction
 import ai.opencode.feature.media.LinkProbe
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
-import ai.opencode.feature.transcript.markdown.SessionLink
+import ai.opencode.server.model.SessionLink
 import ai.opencode.feature.transcript.markdown.sessionLinkIDs
 import ai.opencode.feature.transcript.markdown.sessionLinkTarget
 import ai.opencode.feature.transcript.SessionLinkTarget

@@ -1,11 +1,11 @@
 package ai.opencode.feature.transcript.user
 
+import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.LocalTranscriptRowContext
 import ai.opencode.feature.transcript.RowProps
 import ai.opencode.feature.transcript.TranscriptAction
 import ai.opencode.feature.transcript.TranscriptDisclosureState
 import ai.opencode.feature.transcript.TranscriptEntry
-import ai.opencode.feature.transcript.TranscriptMetrics
 import ai.opencode.feature.transcript.list.TranscriptQueuedInputView
 import ai.opencode.feature.transcript.rowInsets
 import ai.opencode.feature.transcript.rows.TranscriptEntryView

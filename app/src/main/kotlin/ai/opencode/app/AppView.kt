@@ -15,6 +15,8 @@ import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.ThisDevice
 import ai.opencode.feature.drawer.HomeFeature
 import ai.opencode.feature.drawer.HomeView
+import ai.opencode.feature.settings.servers.PairingScannerView
+import ai.opencode.feature.transcript.TranscriptMediaProviders
 import ai.opencode.server.OpenCodeServer
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -80,6 +82,8 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -107,6 +111,8 @@ fun AppView(store: StoreOf<AppFeature.State, AppFeature.Action>) {
     val isEditingServer by store.observe { it.isEditingServer }
     val isScanning by store.observe { it.isScanningPairingCode }
     OpenCodeAppTheme {
+        // Media's file viewer renders Markdown files with the transcript's renderer.
+        TranscriptMediaProviders {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             if (hasHome) {
                 val home = store.rememberScope<AppFeature.State, AppFeature.Action, HomeFeature.State, HomeFeature.Action>(
@@ -122,6 +128,7 @@ fun AppView(store: StoreOf<AppFeature.State, AppFeature.Action>) {
             if (isEditingServer) ServerFormSheet(store)
             if (isScanning) PairingScannerPresenter(store)
             AppAlerts(store)
+        }
         }
     }
 }
@@ -816,44 +823,20 @@ private fun HeaderFields(
 }
 
 /**
- * `.sheet(isPresented: $store.isScanningPairingCode) { PairingScannerView(…) }`: Google's code
- * scanner draws the camera, viewfinder and cancel itself. When it can't open (no camera, scanner
- * unavailable) the iOS fallback shows instead: “No Camera Available” with Paste Pairing Link.
+ * `.sheet(isPresented: $store.isScanningPairingCode) { PairingScannerView(…) }`: settings'
+ * CameraX + ZXing scanner, full screen, with its own no-camera / access-off / paste fallbacks.
+ * Back dismisses it like Cancel.
  */
 @Composable
 private fun PairingScannerPresenter(store: StoreOf<AppFeature.State, AppFeature.Action>) {
-    val isUnavailable by store.observe { it.isScannerUnavailable }
-    val pasteFailed by store.observe { it.scannerPasteFailed }
-    val context = androidx.compose.ui.platform.LocalContext.current
-    LaunchedEffect(Unit) {
-        when (val result = PairingScanner.scan(context)) {
-            is PairingScanner.Result.Scanned -> store.send(AppFeature.Action.PairingCodeScanned(result.text))
-            PairingScanner.Result.Cancelled -> store.send(AppFeature.Action.ScannerDismissed)
-            PairingScanner.Result.Unavailable -> store.send(AppFeature.Action.ScannerUnavailable)
-        }
-    }
-    if (isUnavailable) {
-        AlertDialog(
-            onDismissRequest = { store.send(AppFeature.Action.ScannerDismissed) },
-            icon = { OpenCodeIcon(SFSymbol.CameraMeteringUnknown, contentDescription = null) },
-            title = { Text("No Camera Available") },
-            text = { Text(formatted("Copy the link that `opencode pair --remote` prints on your computer, then paste it here.")) },
-            confirmButton = {
-                TextButton(onClick = { store.send(AppFeature.Action.ScannerPasteTapped) }) {
-                    OpenCodeIcon(SFSymbol.DocOnClipboard, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Paste Pairing Link")
-                }
-            },
-            dismissButton = { TextButton(onClick = { store.send(AppFeature.Action.ScannerDismissed) }) { Text("Cancel") } },
-        )
-    }
-    if (pasteFailed) {
-        AlertDialog(
-            onDismissRequest = { store.send(AppFeature.Action.ScannerPasteFailedDismissed) },
-            title = { Text("Nothing to Paste") },
-            text = { Text("Your clipboard doesn’t have a pairing link. Copy the link that opencode pair --remote prints, then try again.") },
-            confirmButton = { TextButton(onClick = { store.send(AppFeature.Action.ScannerPasteFailedDismissed) }) { Text("OK") } },
+    Dialog(
+        onDismissRequest = { store.send(AppFeature.Action.ScannerDismissed) },
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    ) {
+        PairingScannerView(
+            onScanned = { store.send(AppFeature.Action.PairingCodeScanned(it)) },
+            onCancel = { store.send(AppFeature.Action.ScannerDismissed) },
+            modifier = Modifier.fillMaxSize(),
         )
     }
 }

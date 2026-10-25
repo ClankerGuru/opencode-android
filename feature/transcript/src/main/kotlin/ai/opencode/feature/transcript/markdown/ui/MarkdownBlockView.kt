@@ -3,10 +3,15 @@ package ai.opencode.feature.transcript.markdown.ui
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.feature.media.AgentFileCards
+import ai.opencode.feature.media.AgentImageGallery
+import ai.opencode.feature.media.LocalLinkPreviewRevision
+import ai.opencode.feature.media.LocalLinkPreviewStore
+import ai.opencode.feature.media.MermaidDiagramCard
+import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.LocalTranscriptLayoutTuning
 import ai.opencode.feature.transcript.LocalTranscriptRowContext
 import ai.opencode.feature.transcript.TranscriptAction
-import ai.opencode.feature.transcript.TranscriptMetrics
 import ai.opencode.feature.transcript.markdown.InlineText
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock.Kind
@@ -35,9 +40,9 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -77,8 +82,8 @@ private fun BlockContent(kind: Kind, grown: List<TranscriptTextReveal.Arrival>, 
     val style = currentMarkdownStyle()
     val colors = style.colors
     val gutter = LocalTranscriptLayoutTuning.current.contentGutter.dp
-    val handoff = LocalMarkdownMediaHandoff.current
-    val send = LocalTranscriptRowContext.current.send
+    val context = LocalTranscriptRowContext.current
+    val send = context.send
     when (kind) {
         is Kind.NumberedItem -> ListItem(kind, kind.marker, 0, kind.text, grown, isGrowingTail)
         is Kind.ListItem -> ListItem(kind, kind.marker, kind.level, kind.text, grown, isGrowingTail)
@@ -100,7 +105,7 @@ private fun BlockContent(kind: Kind, grown: List<TranscriptTextReveal.Arrival>, 
             // Runs the screen's full width, like the code and table bands, with the block gap on each side.
             HairlineRule(Modifier.bleedHorizontal(gutter).clearAndSetSemantics {})
         is Kind.PullRequest -> PullRequestCard(kind.title) { send(TranscriptAction.LinkTapped(kind.url)) }
-        is Kind.Files -> handoff.files?.invoke(kind.files) ?: FileRows(kind.files) { send(TranscriptAction.OpenFile(it)) }
+        is Kind.Files -> FileCards(kind.files)
         // A Markdown image outside the session's folder loads through that folder's location once
         // it's on screen; a file that can't be shown inline falls back to its card.
         is Kind.Image -> MarkdownImage(kind.source, kind.alt, fallbackFile = AgentFileReference.fromLink(kind.source))
@@ -118,22 +123,7 @@ private fun BlockContent(kind: Kind, grown: List<TranscriptTextReveal.Arrival>, 
         }
         is Kind.Table -> MarkdownTable(kind.header, kind.rows)
         is Kind.Math -> MathDisplayView(kind.math)
-        is Kind.Mermaid -> {
-            val mermaid = handoff.mermaid
-            if (mermaid != null) {
-                mermaid(kind.source)
-            } else {
-                // Until media's diagram renderer lands, the fence shows as code.
-                val text = remember(kind.source, colors) {
-                    PresentedText.plain(MarkdownPresentation.code(OpenCodeMarkdownBlock.HighlightedCode(kind.source, "mermaid"), colors))
-                }
-                MarkdownBand {
-                    androidx.compose.foundation.text.selection.SelectionContainer {
-                        ArrivingText(text, emptyList(), MarkdownStyle.codeTextStyle(style.tuning.codeLeading), colors.text, softWrap = false)
-                    }
-                }
-            }
-        }
+        is Kind.Mermaid -> MermaidDiagramCard(kind.source) { send(TranscriptAction.PreviewImage(it)) }
     }
 }
 
@@ -158,7 +148,12 @@ private fun BlockText(
     val density = LocalDensity.current
     val sessionLinks = LocalSessionLinks.current
     val linkStyle = LocalInlineLinkStyle.current
-    val handoff = LocalMarkdownMediaHandoff.current
+    // iOS `linkPreviewStore` / `linkPreviewRevision` / `linkPreviewRow`: the list's store, read
+    // for Link Icons; the revision redraws the row when an icon arrives.
+    val linkStore = LocalLinkPreviewStore.current
+    val linkRevision = LocalLinkPreviewRevision.current
+    val linkRow = LocalLinkPreviewRow.current
+    val siteIcon = remember(linkStore) { linkStore?.let { store -> { url: String -> store.inlineIcon(url)?.image?.asImageBitmap() } } }
     val listener = rememberLinkListener()
     val options = PresentationOptions(
         foreground = color,
@@ -169,16 +164,16 @@ private fun BlockText(
         linkStyle = linkStyle,
         isGrowing = isGrowingTail,
     )
-    val presented = remember(inline, options, sessionLinks.targets, style.colors, density, handoff.siteIcon) {
-        MarkdownPresentation.present(inline, options, style, sessionLinks.targets, density, listener, handoff.siteIcon)
+    val presented = remember(inline, options, sessionLinks.targets, style.colors, density, siteIcon, linkRevision) {
+        MarkdownPresentation.present(inline, options, style, sessionLinks.targets, density, listener, siteIcon)
     }
     QuoteSelectionContainer(kind, modifier) {
         ArrivingText(presented, presented.mapArrivals(grown), textStyle, color)
     }
     ReportsSessionLinks(presented.sessionIDs)
     val fetchable = presented.fetchableLinks
-    if (fetchable.isNotEmpty() && handoff.inlineLinksAppeared != null) {
-        LaunchedEffect(fetchable) { handoff.inlineLinksAppeared.invoke(fetchable, sessionLinks.row) }
+    if (fetchable.isNotEmpty() && linkStore != null && linkRow != null) {
+        LaunchedEffect(linkStore, fetchable, linkRow) { linkStore.inlineLinksAppeared(fetchable, linkRow) }
     }
 }
 
@@ -250,31 +245,24 @@ private fun PullRequestCard(title: String, onOpen: () -> Unit) {
     }
 }
 
-/** Plain file rows until media's `AgentFileCards` arrive ([MarkdownMediaHandoff.files]). */
+/**
+ * A `.files` block (iOS `MarkdownBlockView.fileCards`): image previews in the transcript, file
+ * cards on other Markdown surfaces (and without a server to read the images from).
+ */
 @Composable
-private fun FileRows(files: List<AgentFileReference>, onOpen: (AgentFileReference) -> Unit) {
-    val colors = currentMarkdownStyle().colors
-    val shape = RoundedCornerShape(TranscriptMetrics.cardCornerRadius)
-    Column(verticalArrangement = Arrangement.spacedBy(TranscriptMetrics.clustered)) {
-        for (file in files) {
-            Row(
-                Modifier
-                    .widthIn(max = 320.dp)
-                    .heightIn(min = TranscriptMetrics.minimumHitSide)
-                    .clip(shape)
-                    .background(colors.userBubble, shape)
-                    .clickable { onOpen(file) }
-                    .semantics { contentDescription = file.name }
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                OpenCodeIcon(file.symbolName, contentDescription = null, size = 20.dp, tint = colors.secondaryText)
-                Column {
-                    Text(file.name, style = OpenCodeTextStyles.subheadline, color = colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(file.typeLabel, style = OpenCodeTextStyles.footnote, color = colors.secondaryText, maxLines = 1)
-                }
-            }
-        }
+private fun FileCards(files: List<AgentFileReference>) {
+    val context = LocalTranscriptRowContext.current
+    val server = context.server
+    val onOpenFile = { file: AgentFileReference -> context.send(TranscriptAction.OpenFile(file)) }
+    if (context.imagePreviews && server != null && files.any { it.kind == AgentFileReference.Kind.Image }) {
+        AgentImageGallery(
+            files = files,
+            server = server,
+            directory = context.directory,
+            onPreviewImage = { context.send(TranscriptAction.PreviewImage(it)) },
+            onOpenFile = onOpenFile,
+        )
+    } else {
+        AgentFileCards(files, onOpenFile)
     }
 }

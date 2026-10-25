@@ -6,7 +6,7 @@ import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
-import ai.opencode.feature.transcript.LinkMenuAction
+import ai.opencode.feature.media.LinkMenuAction
 import ai.opencode.feature.transcript.LocalTranscriptRowContext
 import ai.opencode.feature.transcript.TranscriptAction
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -52,8 +52,8 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.roundToInt
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * What a row does with a link: a file link opens the viewer, a session link opens its session,

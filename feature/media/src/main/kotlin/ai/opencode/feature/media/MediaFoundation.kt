@@ -1,33 +1,54 @@
 package ai.opencode.feature.media
 
-import android.content.ComponentCallbacks2
-import android.content.res.Configuration
-import android.graphics.Bitmap
 import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.dependencies.dependency
+import android.content.ComponentCallbacks2
+import android.content.res.Configuration
+import android.graphics.Bitmap
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import java.security.MessageDigest
 
 /**
- * The transcript spacing vocabulary media renderers use (iOS `TranscriptMetrics` in
- * `Transcript/TranscriptEntryView.swift` and the `TranscriptTunables` defaults it reads).
- * Lives here because `:feature:transcript` sits above media; the transcript reuses it.
+ * The transcript's complete spacing vocabulary (iOS `TranscriptMetrics` in
+ * `Transcript/TranscriptEntryView.swift`, at the `TranscriptTunables` defaults it reads: the
+ * Tuning Panel isn't ported). Rows own their outer rhythm; renderers only use values from this
+ * scale so padding never compounds. Lives here because media renderers use it and
+ * `:feature:transcript` sits above media; the transcript uses this one.
  */
 object TranscriptMetrics {
     val compact: Dp = 4.dp
     val clustered: Dp = 8.dp
+    /** `transcript.bubble.verticalPadding` default. */
+    val bubbleVertical: Dp = 10.dp
     val standard: Dp = 12.dp
     /** `transcript.row.contentGutter` default. */
     val contentGutter: Dp = 16.dp
     val turn: Dp = 20.dp
+
+    /** `transcript.bubble.cornerRadius` default. */
+    val bubbleCornerRadius: Dp = 18.dp
     /** Content surfaces: code, tables, cards, and images (`transcript.card.cornerRadius` default). */
     val cardCornerRadius: Dp = 14.dp
     /** Controls inside sheets and cards: choices and fields. */
     val controlCornerRadius: Dp = 10.dp
-    /** The widest the transcript and composer grow, gutters included. */
+
+    /** `transcript.bubble.maxFraction` default. */
+    const val maximumUserBubbleFraction: Float = 0.78f
+
+    /** The widest the transcript and composer grow, gutters included (tablets centre at it). */
     val readableColumnWidth: Dp = 720.dp
+
+    /** Within a reply, paragraphs, Used N, notices and Working are 16 apart (`transcript.row.flowHalf`). */
+    val flowHalf: Dp = 8.dp
+    /** A user message is 20 from the reply around it (`transcript.row.turnHalf`). */
+    val turnHalf: Dp = 12.dp
+    /** A compaction is a context boundary: 24 from its neighbours (`transcript.row.sectionHalf`). */
+    val sectionHalf: Dp = 16.dp
+
+    /** iOS `MinimumHitRect.side` (44 pt) → Android's 48 dp minimum target. */
+    val minimumHitSide: Dp = 48.dp
 }
 
 /**

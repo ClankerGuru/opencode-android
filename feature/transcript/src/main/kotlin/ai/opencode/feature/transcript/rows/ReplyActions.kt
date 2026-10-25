@@ -4,7 +4,7 @@ import ai.opencode.core.motion.Motion
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
-import ai.opencode.feature.transcript.TranscriptMetrics
+import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.clickable
@@ -34,9 +34,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
 import kotlin.math.max
 import kotlin.math.min
+import kotlinx.coroutines.delay
 
 /**
  * The reply's copy glyph in its slot (iOS `ReplyCopyGlyph`). The Working line draws the same one

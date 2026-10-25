@@ -1,5 +1,6 @@
 package ai.opencode.feature.transcript
 
+import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.rows.TranscriptTimeStamps
 import ai.opencode.server.model.OpenCodeImageAttachment
 import ai.opencode.server.model.OpenCodeModel

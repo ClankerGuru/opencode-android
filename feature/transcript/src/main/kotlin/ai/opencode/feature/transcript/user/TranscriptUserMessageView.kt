@@ -4,8 +4,8 @@ import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
-import ai.opencode.feature.transcript.TranscriptImagePreview
-import ai.opencode.feature.transcript.TranscriptMetrics
+import ai.opencode.feature.media.TranscriptImagePreview
+import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.server.model.AgentFileReference
 import ai.opencode.server.model.OpenCodeDelivery
 import androidx.compose.animation.AnimatedVisibility

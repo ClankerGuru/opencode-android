@@ -121,39 +121,7 @@ data class TranscriptLayoutTuning(
 /** iOS `EnvironmentValues.transcriptLayoutTuning`. */
 val LocalTranscriptLayoutTuning = staticCompositionLocalOf { TranscriptLayoutTuning() }
 
-/**
- * The transcript's complete spacing vocabulary (iOS `TranscriptMetrics`). Rows own their outer
- * rhythm; renderers only use values from this scale so padding never compounds.
- */
-object TranscriptMetrics {
-    val compact: Dp = 4.dp
-    val clustered: Dp = 8.dp
-    val bubbleVertical: Dp = TranscriptTunables.bubbleVertical.dp
-    val standard: Dp = 12.dp
-    val contentGutter: Dp = TranscriptTunables.contentGutter.dp
-    val turn: Dp = 20.dp
-
-    val bubbleCornerRadius: Dp = TranscriptTunables.bubbleCornerRadius.dp
-    /** Content surfaces: code, tables, cards, and images. */
-    val cardCornerRadius: Dp = TranscriptTunables.cardCornerRadius.dp
-    /** Controls inside sheets and cards: choices and fields. */
-    val controlCornerRadius: Dp = 10.dp
-
-    const val maximumUserBubbleFraction: Float = TranscriptTunables.bubbleMaxFraction
-
-    /** The widest the transcript and composer grow, gutters included (tablets centre at it). */
-    val readableColumnWidth: Dp = 720.dp
-
-    /** Within a reply, paragraphs, Used N, notices and Working are 16 apart. */
-    val flowHalf: Dp = TranscriptTunables.flowHalf.dp
-    /** A user message is 20 from the reply around it. */
-    val turnHalf: Dp = TranscriptTunables.turnHalf.dp
-    /** A compaction is a context boundary: 24 from its neighbours. */
-    val sectionHalf: Dp = TranscriptTunables.sectionHalf.dp
-
-    /** iOS `MinimumHitRect.side` (44 pt) → Android's 48 dp minimum target. */
-    val minimumHitSide: Dp = 48.dp
-}
+// iOS `TranscriptMetrics` is `:feature:media`'s [ai.opencode.feature.media.TranscriptMetrics] (media renderers use it).
 
 /** iOS `InlineRowMetrics`: Used N rows inside the band sit on a 28 pt pitch. */
 object InlineRowMetrics {

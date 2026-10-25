@@ -1,150 +1,81 @@
 package ai.opencode.feature.transcript.markdown
 
 import ai.opencode.feature.transcript.SessionLinkTarget
-import ai.opencode.server.model.AgentFileReference
 import ai.opencode.server.model.OpenCodeSession
+import ai.opencode.server.model.SessionLink
 
-/**
- * A session ID in a reply's Markdown (iOS `SessionLink`), as the desktop app links them
- * (`@opencode/util/session-mention`, `markdown-session-links.ts`): a complete generated ID
- * (`ses_` and 26 letters or digits), optionally written `@session:ses_…`, as a whole inline
- * code span or inside plain text. Never in a fenced block, a link, or a longer identifier or
- * path (`/` or `\`). Parsing marks it with a private `opencode-session://` link; the row shows
- * the session's title in its place and a tap opens the session.
- */
-object SessionLink {
-    const val scheme = "opencode-session"
+// The rich-text half of iOS `SessionLink` (`Transcript/SessionLinks.swift`): marking session IDs
+// in parsed inline Markdown. The URL/ID half is `:server`'s [SessionLink], which the link menu
+// (`:feature:media`) reads too; these extend it so call sites read as iOS's.
 
-    // ICU `\w` (NSRegularExpression), spelled out so it reads the same on the JVM and Android.
-    private const val WORD = "\\p{L}\\p{Nl}\\p{M}\\p{Nd}\\p{Pc}\\u200C\\u200D"
-    private val pattern = Regex("(?<![$WORD/\\\\:@-])(?:@session:)?(ses_[A-Za-z0-9]{26})(?![$WORD/\\\\-])")
+/** Marks the session IDs in inline Markdown freshly parsed from [markdown]. Text whose source can't render an ID returns as is. */
+fun SessionLink.mark(text: InlineText, markdown: String): InlineText {
+    if (!mayRenderID(markdown)) return text
+    return markRuns(text)
+}
 
-    /** [range] is the whole mention, `@session:` included. */
-    data class Mention(val id: String, val range: IntRange)
-
-    fun mentions(text: String): List<Mention> {
-        if (!text.contains("ses_")) return emptyList()
-        return pattern.findAll(text).map { Mention(it.groupValues[1], it.range) }.toList()
-    }
-
-    /** The ID when [text] is exactly one mention (an inline code span). */
-    fun exactID(text: String): String? {
-        val mention = mentions(text).firstOrNull() ?: return null
-        return if (mention.range.first == 0 && mention.range.last == text.length - 1) mention.id else null
-    }
-
-    /** The private link the rendered text carries. [title] rides along for the hold menu's preview. */
-    fun url(id: String, title: String? = null): String = buildString {
-        append(scheme).append("://open?id=").append(AgentFileReference.percentEncodeQueryValue(id))
-        if (title != null) append("&title=").append(AgentFileReference.percentEncodeQueryValue(title))
-    }
-
-    fun id(url: String): String? {
-        if (AgentFileReference.urlScheme(url) != scheme) return null
-        return query(url, "id")?.let(::exactID)
-    }
-
-    fun title(url: String): String? {
-        if (AgentFileReference.urlScheme(url) != scheme) return null
-        return query(url, "title")
-    }
-
-    private fun query(url: String, name: String): String? =
-        AgentFileReference.queryItems(url)?.firstOrNull { it.first == name }?.second
-
-    /** What a link shows until its title is known, or when it never is: `ses_ea0c…KB2l`. */
-    fun shortID(id: String): String {
-        if (id.length <= 16) return id
-        return "${id.take(8)}…${id.takeLast(4)}"
-    }
-
-    /** Marks the session IDs in inline Markdown freshly parsed from [markdown]. Text whose source can't render an ID returns as is. */
-    fun mark(text: InlineText, markdown: String): InlineText {
-        if (!mayRenderID(markdown)) return text
-        return markRuns(text)
-    }
-
-    /**
-     * Whether Markdown [source] could render an ID, which always shows `s_`. Only entities (`&`)
-     * and escapes (`\`) render a character the source doesn't hold, so otherwise that `s` and
-     * `_` are literal, with nothing shown between them: the source holds `s_`, or `s` then markup
-     * Markdown drops (emphasis, code span, link or image syntax), which starts with one of
-     * [joinsAfterS].
-     */
-    fun mayRenderID(source: String): Boolean {
-        var afterS = false
-        for (c in source) {
-            if (c == '&' || c == '\\' || (afterS && c in joinsAfterS)) return true
-            afterS = c == 's'
+/** The full scan: links every ID the rendered runs show. */
+fun SessionLink.markRuns(text: InlineText): InlineText {
+    var changed = false
+    val out = ArrayList<InlineRun>(text.runs.size)
+    for (run in text.runs) {
+        if (run.link != null) {
+            out.add(run)
+            continue
         }
-        return false
-    }
-
-    private val joinsAfterS = setOf('_', '*', '~', '`', '<', '[', ']', '!')
-
-    /** The full scan: links every ID the rendered runs show. */
-    fun markRuns(text: InlineText): InlineText {
-        var changed = false
-        val out = ArrayList<InlineRun>(text.runs.size)
-        for (run in text.runs) {
-            if (run.link != null) {
+        if (run.code) {
+            val id = if (run.languageIdentifier == null) exactID(run.text) else null
+            if (id != null) {
+                out.add(run.copy(link = url(id)))
+                changed = true
+            } else {
                 out.add(run)
-                continue
             }
-            if (run.code) {
-                val id = if (run.languageIdentifier == null) exactID(run.text) else null
-                if (id != null) {
-                    out.add(run.copy(link = url(id)))
-                    changed = true
-                } else {
-                    out.add(run)
-                }
-                continue
-            }
-            val found = mentions(run.text)
-            if (found.isEmpty()) {
-                out.add(run)
-                continue
-            }
-            changed = true
-            var cursor = 0
-            for (mention in found) {
-                if (mention.range.first > cursor) out.add(run.copy(text = run.text.substring(cursor, mention.range.first)))
-                out.add(run.copy(text = run.text.substring(mention.range.first, mention.range.last + 1), link = url(mention.id)))
-                cursor = mention.range.last + 1
-            }
-            if (cursor < run.text.length) out.add(run.copy(text = run.text.substring(cursor)))
+            continue
         }
-        return if (changed) InlineText(out) else text
-    }
-
-    /** A user message's plain text with its session IDs marked (desktop's `sessionReferenceText`), or null when it mentions none. */
-    fun marked(plain: String): InlineText? {
-        val found = mentions(plain)
-        if (found.isEmpty()) return null
-        val runs = ArrayList<InlineRun>()
+        val found = mentions(run.text)
+        if (found.isEmpty()) {
+            out.add(run)
+            continue
+        }
+        changed = true
         var cursor = 0
         for (mention in found) {
-            if (mention.range.first > cursor) runs.add(InlineRun(plain.substring(cursor, mention.range.first)))
-            runs.add(InlineRun(plain.substring(mention.range.first, mention.range.last + 1), link = url(mention.id)))
+            if (mention.range.first > cursor) out.add(run.copy(text = run.text.substring(cursor, mention.range.first)))
+            out.add(run.copy(text = run.text.substring(mention.range.first, mention.range.last + 1), link = url(mention.id)))
             cursor = mention.range.last + 1
         }
-        if (cursor < plain.length) runs.add(InlineRun(plain.substring(cursor)))
-        return InlineText(runs)
+        if (cursor < run.text.length) out.add(run.copy(text = run.text.substring(cursor)))
     }
+    return if (changed) InlineText(out) else text
+}
 
-    /** The session IDs linked in [text], once each, in order. */
-    fun ids(text: InlineText): List<String> {
-        val seen = LinkedHashSet<String>()
-        var previous: String? = null
-        for (run in text.runs) {
-            val link = run.link
-            // `runs[\.link]` coalesces equal neighbours; ids dedupe anyway.
-            if (link != null && link != previous) id(link)?.let(seen::add)
-            previous = link
-        }
-        return seen.toList()
+/** A user message's plain text with its session IDs marked (desktop's `sessionReferenceText`), or null when it mentions none. */
+fun SessionLink.marked(plain: String): InlineText? {
+    val found = mentions(plain)
+    if (found.isEmpty()) return null
+    val runs = ArrayList<InlineRun>()
+    var cursor = 0
+    for (mention in found) {
+        if (mention.range.first > cursor) runs.add(InlineRun(plain.substring(cursor, mention.range.first)))
+        runs.add(InlineRun(plain.substring(mention.range.first, mention.range.last + 1), link = url(mention.id)))
+        cursor = mention.range.last + 1
     }
+    if (cursor < plain.length) runs.add(InlineRun(plain.substring(cursor)))
+    return InlineText(runs)
+}
+
+/** The session IDs linked in [text], once each, in order. */
+fun SessionLink.ids(text: InlineText): List<String> {
+    val seen = LinkedHashSet<String>()
+    var previous: String? = null
+    for (run in text.runs) {
+        val link = run.link
+        // `runs[\.link]` coalesces equal neighbours; ids dedupe anyway.
+        if (link != null && link != previous) id(link)?.let(seen::add)
+        previous = link
+    }
+    return seen.toList()
 }
 
 /** iOS `SessionLinkTarget.maximumTitle`. */

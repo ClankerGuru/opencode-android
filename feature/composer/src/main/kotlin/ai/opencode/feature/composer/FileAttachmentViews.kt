@@ -2,35 +2,28 @@ package ai.opencode.feature.composer
 
 import ai.opencode.core.files.AttachmentFileType
 import ai.opencode.core.ui.OpenCodeIcon
-import ai.opencode.core.ui.OpenCodeIconSize
-import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.feature.media.FileAttachmentCard
+import ai.opencode.feature.media.FileAttachmentDetail
 import ai.opencode.server.model.OpenCodeTranscriptFile
 import ai.opencode.server.model.PastedTextSummary
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -39,84 +32,19 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.testTag
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import java.text.NumberFormat
 
 /**
- * The transcript metrics these cards share (iOS `TranscriptMetrics`, owned by
- * `:feature:transcript`, which this module can't see): the card corner radius and the
- * clustered / standard spacing.
+ * The transcript metrics these chips share (iOS `TranscriptMetrics`). `FileAttachmentCard`,
+ * `FileAttachmentDetail` and `AgentFileCards` live in `:feature:media`, which the transcript
+ * and its image gallery use too.
  */
 object FileAttachmentMetrics {
     val cardCornerRadius: Dp = 14.dp
     val clustered: Dp = 8.dp
     val standard: Dp = 12.dp
-}
-
-/**
- * The two-line file card desktop uses for attachments (session-ui `AttachmentCard`): the name
- * above a type label, here with a type glyph (iOS `FileAttachmentCard`). [symbolName] is an
- * SF Symbol name.
- */
-@Composable
-fun FileAttachmentCard(
-    name: String,
-    symbolName: String,
-    modifier: Modifier = Modifier,
-    width: Dp = 200.dp,
-    height: Dp? = null,
-    detailLines: Int = 1,
-    /** A quiet glyph after the text, such as play for media. */
-    trailingSymbolName: String? = null,
-    detail: @Composable () -> Unit,
-) {
-    Row(
-        modifier
-            .width(width)
-            .heightIn(min = height ?: 0.dp)
-            .padding(horizontal = FileAttachmentMetrics.standard, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Box(Modifier.width(28.dp), contentAlignment = Alignment.Center) {
-            OpenCodeIcon(symbolName, contentDescription = null, size = OpenCodeIconSize.medium, tint = OpenCodeTheme.colors.secondaryText)
-        }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(
-                name,
-                style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium),
-                color = OpenCodeTheme.colors.text,
-                maxLines = 1,
-                overflow = TextOverflow.MiddleEllipsis,
-            )
-            androidx.compose.runtime.CompositionLocalProvider(
-                androidx.compose.material3.LocalContentColor provides OpenCodeTheme.colors.secondaryText,
-                androidx.compose.material3.LocalTextStyle provides OpenCodeTextStyles.caption1.copy(color = OpenCodeTheme.colors.secondaryText),
-                FileAttachmentDetailLines provides detailLines,
-            ) { detail() }
-        }
-        if (trailingSymbolName != null) {
-            OpenCodeIcon(trailingSymbolName, contentDescription = null, size = 14.dp, tint = OpenCodeTheme.colors.tertiaryText)
-        }
-    }
-}
-
-/** How many lines a card's detail may take (iOS `.lineLimit(detailLines)`). */
-internal val FileAttachmentDetailLines = androidx.compose.runtime.compositionLocalOf { 1 }
-
-/** A card's detail text with the card's line limit. */
-@Composable
-fun FileAttachmentDetail(text: String, modifier: Modifier = Modifier, color: Color = Color.Unspecified) {
-    Text(
-        text,
-        modifier = modifier,
-        color = color,
-        maxLines = FileAttachmentDetailLines.current,
-        overflow = TextOverflow.Ellipsis,
-    )
 }
 
 /** iOS `OpenCodeTranscriptFile.typeLabel`. */
@@ -181,52 +109,6 @@ private fun TranscriptFileChip(file: OpenCodeTranscriptFile, shape: Shape, onOpe
                 }
             },
     ) { FileAttachmentDetail(file.typeLabel) }
-}
-
-/**
- * A file the agent pointed at, as its card shows it (the fields of `AgentFileReference`,
- * which lives in `:feature:media`).
- */
-@Immutable
-data class AgentFileCardItem(
-    /** The path; also the stable key. */
-    val id: String,
-    val name: String,
-    val symbolName: String,
-    val typeLabel: String,
-    /** Video or audio: the card trails play rather than a chevron. */
-    val isTimeBased: Boolean,
-)
-
-/**
- * Media and documents the agent pointed at, beneath the paragraph that names them (iOS
- * `AgentFileCards`). Each opens in the viewer.
- */
-@Composable
-fun AgentFileCards(files: List<AgentFileCardItem>, onOpen: (AgentFileCardItem) -> Unit, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(FileAttachmentMetrics.cardCornerRadius)
-    LazyRow(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(FileAttachmentMetrics.clustered)) {
-        items(files, key = { it.id }) { file ->
-            FileAttachmentCard(
-                name = file.name,
-                symbolName = file.symbolName,
-                width = if (files.size == 1) 260.dp else 220.dp,
-                trailingSymbolName = if (file.isTimeBased) "play.fill" else "chevron.right",
-                modifier = Modifier
-                    .heightIn(min = 48.dp)
-                    .clip(shape)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                    .clickable(role = Role.Button) { onOpen(file) }
-                    .clearAndSetSemantics {
-                        role = Role.Button
-                        contentDescription = "Open ${file.name}"
-                        stateDescription = file.typeLabel
-                        testTag = "agent-file-card"
-                        onClick { onOpen(file); true }
-                    },
-            ) { FileAttachmentDetail(file.typeLabel) }
-        }
-    }
 }
 
 /** A composer file: name, size, and upload progress, or a retry when the upload failed (iOS `ComposerFileChip`). */

@@ -1,20 +1,19 @@
 package ai.opencode.feature.transcript.user
 
-import ai.opencode.core.files.AttachmentFileType
 import android.net.Uri
 import androidx.compose.runtime.Immutable
+import java.time.Instant
+import java.util.Locale
+import kotlin.math.roundToInt
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
-import java.time.Instant
-import java.util.Locale
-import kotlin.math.roundToInt
 
 // Minimal value ports of iOS types this package draws from other areas (hand-offs: `:feature:voice`
-// owns `VoiceHandoff`, `:feature:composer` owns `SharedLocation` and `AttachmentFileType`'s labels).
+// owns `VoiceHandoff`, `:feature:composer` owns `SharedLocation`; file chip labels are `:core`'s `AttachmentFileType`).
 // Kept internal so the owning areas can replace them without touching callers outside `user/`.
 
 /** iOS `Voice/VoiceTranscript.swift` `VoiceHandoff`: only the parse the transcript needs. */
@@ -131,48 +130,5 @@ data class SharedLocation(
             val remainder = text.substring(close + closeTag.length).trim()
             return location to remainder
         }
-    }
-}
-
-/** iOS `AttachmentFileType.label` / `symbolName`: a file chip's subtitle and glyph. */
-internal object UserFileType {
-    private const val PDF_MIME = "application/pdf"
-
-    /** The common subset of the language names desktop takes from Shiki. */
-    private val languageNames = mapOf(
-        "c" to "C", "cjs" to "JavaScript", "cpp" to "C++", "cs" to "C#", "css" to "CSS", "dart" to "Dart",
-        "go" to "Go", "html" to "HTML", "java" to "Java", "js" to "JavaScript",
-        "json" to "JSON", "jsx" to "JSX", "kt" to "Kotlin", "lua" to "Lua", "md" to "Markdown", "mjs" to "JavaScript",
-        "php" to "PHP", "py" to "Python", "rb" to "Ruby", "rs" to "Rust", "sh" to "Shell", "sql" to "SQL",
-        "swift" to "Swift", "toml" to "TOML", "ts" to "TypeScript", "tsx" to "TSX",
-        "xml" to "XML", "yaml" to "YAML", "yml" to "YAML", "zsh" to "Zsh",
-    )
-
-    private val archiveMimes = setOf(
-        "application/zip", "application/x-zip-compressed", "application/gzip", "application/x-gzip", "application/x-tar",
-        "application/x-7z-compressed", "application/x-rar-compressed", "application/vnd.rar", "application/x-bzip2",
-    )
-
-    /** The chip subtitle: "PDF", a language name, or the extension in capitals. */
-    fun label(name: String, mime: String): String {
-        if (mime == PDF_MIME) return "PDF"
-        val suffix = AttachmentFileType.fileExtension(name)
-        if (suffix.isEmpty()) return "File"
-        return languageNames[suffix] ?: suffix.uppercase(Locale.ROOT)
-    }
-
-    fun symbolName(name: String, mime: String): String {
-        if (mime == PDF_MIME) return "doc.richtext"
-        if (mime.startsWith("image/")) return "photo"
-        if (mime.startsWith("video/")) return "film"
-        if (mime.startsWith("audio/")) return "waveform"
-        if (mime == "text/plain") {
-            return if (languageNames[AttachmentFileType.fileExtension(name)] == null) "doc.text" else "chevron.left.forwardslash.chevron.right"
-        }
-        // UTType conformance → MIME families.
-        if (mime in archiveMimes) return "doc.zipper"
-        if (mime.contains("spreadsheet") || mime == "text/csv" || mime == "application/vnd.ms-excel") return "tablecells"
-        if (mime.contains("presentation") || mime == "application/vnd.ms-powerpoint") return "rectangle.on.rectangle"
-        return "doc"
     }
 }
