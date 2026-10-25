@@ -27,6 +27,9 @@ class OpenCodeApplication : Application() {
         AppPhases.install(this)
         if (BuildConfig.DEBUG) AppLog.minimumPriority = Log.DEBUG
         DevTools.install()
+        // Voice's admitted sends, log uploads, diagnostics sinks and screen hold (installed
+        // before anything resolves their keys).
+        AppDependencies.install(this)
         AppLog.app.info { "app_launch version=${BuildConfig.VERSION_NAME} build=${BuildConfig.VERSION_CODE}" }
     }
 }

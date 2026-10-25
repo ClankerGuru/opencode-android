@@ -3,8 +3,18 @@ package ai.opencode.app
 import ai.opencode.core.store.Store
 import ai.opencode.feature.system.NotificationDestination
 import ai.opencode.feature.system.SystemAction
+import ai.opencode.feature.system.share.ShareConversation
 import ai.opencode.server.OpenCodePairingLink
+import ai.opencode.core.dependencies.dependency
+import ai.opencode.feature.composer.DictationPermissionClient
+import ai.opencode.feature.system.notifications.NotificationPermission
+import ai.opencode.feature.system.notifications.NotificationPermissionClient
+import ai.opencode.feature.voice.VoiceMicrophonePermission
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import androidx.activity.result.contract.ActivityResultContracts
+import kotlinx.coroutines.CompletableDeferred
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import ai.opencode.devtools.DevTools
@@ -29,6 +39,14 @@ class MainActivity : ComponentActivity() {
     private val root: RootStore by viewModels()
     private val store get() = root.store
 
+    /** The microphone prompt in flight (one at a time; a second ask joins it). */
+    private var microphoneRequest: CompletableDeferred<Boolean>? = null
+    private val microphoneLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        microphoneRequest?.complete(granted)
+        microphoneRequest = null
+    }
+    private var removeRequesters: List<() -> Unit> = emptyList()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         val splash = installSplashScreen()
         LaunchBloomController.start()
@@ -39,6 +57,15 @@ class MainActivity : ComponentActivity() {
             LifecycleEventObserver { _, event ->
                 when (event) {
                     Lifecycle.Event.ON_START -> store.send(AppFeature.Action.ForegroundChanged(true))
+                    // iOS `scenePhase == .active`: take what the share sheet left.
+                    Lifecycle.Event.ON_RESUME -> {
+                        store.send(AppFeature.Action.PendingSharesRequested)
+                        registerPermissionRequesters()
+                    }
+                    Lifecycle.Event.ON_PAUSE -> {
+                        removeRequesters.forEach { it() }
+                        removeRequesters = emptyList()
+                    }
                     Lifecycle.Event.ON_STOP -> store.send(AppFeature.Action.ForegroundChanged(false))
                     else -> Unit
                 }
@@ -49,6 +76,33 @@ class MainActivity : ComponentActivity() {
         setContent { DevToolsOverlay { AppView(store) } }
         // A recreated activity already handled its launch intent.
         if (savedInstanceState == null) handle(intent)
+    }
+
+    /**
+     * Calls and dictation ask for the microphone as they start, as iOS's
+     * `requestRecordPermission()` does. A call's first ask also asks for notifications (once), so
+     * its ongoing notification (iOS's Live Activity, which needs no permission) can show.
+     */
+    private fun registerPermissionRequesters() {
+        removeRequesters.forEach { it() }
+        removeRequesters = listOf(
+            dependency(VoiceMicrophonePermission).register {
+                val granted = requestMicrophone()
+                val notifications = dependency(NotificationPermissionClient)
+                if (granted && notifications.status() == NotificationPermission.NotDetermined) notifications.request()
+                granted
+            },
+            dependency(DictationPermissionClient).register { requestMicrophone() },
+        )
+    }
+
+    private suspend fun requestMicrophone(): Boolean {
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) return true
+        val pending = microphoneRequest ?: CompletableDeferred<Boolean>().also {
+            microphoneRequest = it
+            microphoneLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+        return pending.await()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -81,6 +135,8 @@ class MainActivity : ComponentActivity() {
             // ScrawlKit's setup links (iOS `.scrawl()`) aren't part of the Android app.
             val host = intent.data?.host?.lowercase()
             if (host == "scrawl" || host == "tether") return null
+            // Continue in OpenCode: the share waiting in Shares/ says where to go.
+            if (ShareConversation.isContinueURL(url)) return AppFeature.Action.PendingSharesRequested
             SystemAction.fromUrl(url)?.let { return AppFeature.Action.SystemActionReceived(it) }
             if (!OpenCodePairingLink.shouldHandleOpenURL(url)) return null
             return AppFeature.Action.PairingURLOpened(url)

@@ -1,6 +1,5 @@
 package ai.opencode.app
 
-import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.PasteboardClient
 import ai.opencode.core.dependencies.UuidClient
 import ai.opencode.core.dependencies.dependency
@@ -19,10 +18,14 @@ import ai.opencode.core.ui.ThisDevice
 import ai.opencode.feature.drawer.HomeConnectionFeature
 import ai.opencode.feature.drawer.HomeFeature
 import ai.opencode.feature.drawer.HomeSnapshotDate
+import ai.opencode.feature.drawer.keepingSettings
+import ai.opencode.feature.drawer.persistingSnapshot
 import ai.opencode.feature.system.NotificationDestination
 import ai.opencode.feature.system.SessionDirectory
 import ai.opencode.feature.system.SystemAction
 import ai.opencode.feature.system.SystemIntegrationClient
+import ai.opencode.feature.system.share.ReceivedShare
+import ai.opencode.feature.system.share.ShareInboxClient
 import ai.opencode.server.CachedHomeSnapshot
 import ai.opencode.server.ConnectionFailureDetail
 import ai.opencode.server.OpenCodeClient
@@ -44,10 +47,9 @@ import kotlinx.coroutines.launch
  * opened links with confirmation), saved-server edit and removal, the connect → health → Home
  * snapshot state machine, and routes notification taps and system actions to Home.
  *
- * Until `:feature:drawer` ports `HomeFeature`, Home is the phase 0 stub: [State.homeServer]
- * stands in for iOS `home.server`, and Home's iOS actions (`sessionTapped`,
- * `systemActionOpened`, `pairedComputerOpened`) map onto the stub's (see [openInHome]). See
- * `docs/parity/app.md` for what is still missing.
+ * Home is the drawer's [HomeFeature]; its delegates (server switch, rename, edit, removal,
+ * pairing, adding) are handled in [home]. Shares from the share sheet are `AppFeatureShares.kt`.
+ * See `docs/parity/app.md` for what is still missing (the session screen's parts, round 2b).
  */
 class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
     data class State(
@@ -68,8 +70,6 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         val connectionGeneration: Int = 0,
         val connectionAttempt: ConnectionAttempt? = null,
         val home: HomeFeature.State? = null,
-        /** iOS `home.server` until the drawer's `HomeFeature.State` carries it. */
-        val homeServer: OpenCodeServer? = null,
         val serverSwitchConfirmation: String? = null,
         /** A tapped notification's session, opened once its server's home loads. */
         val pendingNotification: NotificationDestination? = null,
@@ -77,6 +77,9 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         /** An intent, shortcut or link, waiting for its server's home to load. */
         val pendingSystemAction: SystemAction? = null,
         val systemActionError: String? = null,
+        /** Share-sheet items whose server is still connecting. */
+        val pendingShares: List<ReceivedShare> = emptyList(),
+        val shareError: String? = null,
         /** Not in the background. */
         val isInForeground: Boolean = true,
         /** Manual entry is opt-in; first launch presents the pairing actions. */
@@ -112,15 +115,19 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
 
         val knownServers: List<OpenCodeServer> get() = savedServers.value + listOfNotNull(savedServer.value)
 
+        /** iOS `home?.server`. */
+        val homeServer: OpenCodeServer? get() = home?.server
+
         /**
          * Cold launch keeps the splash until there's something to show: no Home, or Home with
-         * its list (iOS `isColdLaunchContentReady`; the stub Home has no open-session frame).
+         * its list (iOS `isColdLaunchContentReady`). TODO(merge): round 2b — an open session waits
+         * for its rows or first content frame (`sessionDetail.items` / `hasRenderedFirstContentFrame`).
          */
         val isColdLaunchContentReady: Boolean
-            get() = home == null || connection == Connection.Connected || connection is Connection.Failed || home.sessions.isNotEmpty()
+            get() = home == null || home.snapshotLoaded || connection is Connection.Failed
 
         /** iOS `home.snapshotLoaded`: Home has heard from its server once. */
-        val isHomeSnapshotLoaded: Boolean get() = home != null && connection == Connection.Connected
+        val isHomeSnapshotLoaded: Boolean get() = home?.snapshotLoaded == true
 
         /** A blank username field means the server's default user, like the web app. */
         val server: OpenCodeServer
@@ -174,12 +181,15 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
             }
 
         /**
-         * Anything shown over Home from the app: the server setup and scanner sheets, the pairing
-         * confirmation and the error alerts. (Home's own presentations join when the drawer ports.)
+         * Anything shown over Home, from the app or from Home: the server setup and scanner
+         * sheets, the pairing confirmation, the share, notification, system action and pairing
+         * error alerts, and `HomeFeature.State.presentsOverHome`. The server switch toast isn't
+         * one. TODO(merge): round 2b — also `sessionDetail.presentsOverSession`.
          */
         val isPresentingAnything: Boolean
             get() = isEditingServer || isScanningPairingCode || pendingPairing != null || pairingError != null ||
-                notificationError != null || systemActionError != null
+                shareError != null || notificationError != null || systemActionError != null ||
+                home?.presentsOverHome == true
 
         val errorMessage: String? get() = (connection as? Connection.Failed)?.message
         val errorContext: FailureContext? get() = (connection as? Connection.Failed)?.context
@@ -241,9 +251,8 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
             }
         }
 
-        /** iOS `HomeFeature.State(server:snapshot:)` on the stub Home: root sessions, newest first. */
+        /** iOS `HomeFeature.State(server:snapshot:loaded:)`. */
         internal fun withHome(server: OpenCodeServer, snapshot: OpenCodeHomeSnapshot?): State = copy(
-            homeServer = server,
             home = HomeFeature.State(
                 server = server,
                 snapshot = snapshot ?: OpenCodeHomeSnapshot(projects = emptyList(), sessions = emptyList(), activeSessionIDs = emptySet()),
@@ -251,19 +260,23 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
             ),
         )
 
-        internal fun withoutHome(): State = copy(home = null, homeServer = null)
+        internal fun withoutHome(): State = copy(home = null)
 
         /**
          * Whether Home can stay up while another server connects (iOS `keepsHome(switchingTo:)`):
-         * not for the server in use, nor an edit of it. (Calls and recordings, which also end
-         * Home first on iOS, arrive with the drawer's Home.)
+         * it shows the switch in the drawer ([HomeFeature.State.switchingTo], set by
+         * [showingSwitch]), and that server's Home replaces it when ready. Not for the server in
+         * use (a reconnect, or an edit of it). TODO(merge): round 2b — nor during a call or a
+         * recording (`voiceCallActivity`/`dictationActivity`), which end with this Home.
          */
         fun keepsHome(switchingTo: OpenCodeServer): Boolean {
-            val server = switchingTo
-            val current = homeServer ?: return false
-            if (home == null || current.persistenceID == server.persistenceID) return false
-            return editingSavedServer?.persistenceID != current.persistenceID
+            val home = home ?: return false
+            if (home.server.persistenceID == switchingTo.persistenceID) return false
+            return editingSavedServer?.persistenceID != home.server.persistenceID
         }
+
+        /** The kept Home shows the switch to [server] (the mutating half of iOS `keepsHome`). */
+        fun showingSwitch(server: OpenCodeServer): State = copy(home = home?.copy(switchingTo = server))
     }
 
     /**
@@ -391,6 +404,10 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         /** A session the action names that the list doesn't have. */
         data class SystemSessionLoaded(val action: SystemAction, val sessionID: String, val result: Result<OpenCodeSession>) : Action
         data object SystemActionErrorDismissed : Action
+        /** The app became active: take what the share sheet left (iOS `pendingSharesRequested`). */
+        data object PendingSharesRequested : Action
+        data class SharesReceived(val shares: List<ReceivedShare>) : Action
+        data object ShareErrorDismissed : Action
         data object ConnectButtonTapped : Action
         data object AddServerTapped : Action
         data class EditServerTapped(val server: OpenCodeServer) : Action
@@ -427,17 +444,26 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         child = HomeFeature(),
     )
 
-    override fun reduce(state: State, action: Action): Reduced<State, Action> = body.reduce(state, action)
+    // TODO(merge): round 2b (needs SessionFeature's call state on Home): `keepsScreenAwake`
+    // (`isInForeground && home.sessionDetail.voice.phase` not terminal) → `ScreenAwakeClient.set`
+    // on change, and ending the call's and the recording's Live Updates when Home closes
+    // (`home.voiceCallActivity`/`dictationActivity` → `VoiceCallServiceClient.stop` / the
+    // dictation activity's update(nil)).
+    override fun reduce(state: State, action: Action): Reduced<State, Action> {
+        val reduced = body.reduce(state, action)
+        // The pairing's drawer never opens under anything the app presents.
+        val home = reduced.state.home
+        if (home?.drawerOpenRequest == null || !reduced.state.isPresentingAnything) return reduced
+        AppLog.app.info { "paired computer drawer open dropped under an app presentation" }
+        return Reduced(reduced.state.copy(home = home.copy(drawerOpenRequest = null)), reduced.effect)
+    }
 
     private fun reduceCore(state: State, action: Action): Reduced<State, Action> = when (action) {
         Action.Task -> {
-            // Restored home owns revalidation on iOS; the stub Home can't, so the app reconnects
-            // its server behind it and keeps the cached list up meanwhile.
+            // Restored home owns revalidation; never replace its cached list with setup.
             val saved = state.savedServer.value
-            if (state.connection != State.Connection.Idle) Reduced(state)
-            // A notification or system action that arrived first waits for that Home's list, as
-            // iOS's restored Home does, so the reconnect keeps it.
-            else if (saved != null) connect(state.load(saved), preservingPending = state.home != null, keepingHome = state.home != null)
+            if (state.connection != State.Connection.Idle || state.home != null) Reduced(state)
+            else if (saved != null) connect(state.load(saved))
             // With no last-used server, wait for a scan or an explicit selection.
             else Reduced(state)
         }
@@ -465,6 +491,18 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         is Action.SystemActionReceived -> systemActionReceived(state, action.action)
         is Action.SystemSessionLoaded -> systemSessionLoaded(state, action)
         Action.SystemActionErrorDismissed -> Reduced(state.copy(systemActionError = null))
+        Action.PendingSharesRequested -> {
+            val inbox = dependency(ShareInboxClient)
+            Reduced(
+                state,
+                Effect.run { send ->
+                    val shares = inbox.consume()
+                    if (shares.isNotEmpty()) send(Action.SharesReceived(shares))
+                },
+            )
+        }
+        is Action.SharesReceived -> receiveShares(action.shares, state)
+        Action.ShareErrorDismissed -> Reduced(state.copy(shareError = null))
         Action.ConnectButtonTapped -> connectButtonTapped(state)
         Action.AddServerTapped -> cancelConnection(beginNewServer(state))
         is Action.EditServerTapped -> {
@@ -550,20 +588,60 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         next = next.copy(manualEntryDraft = next.server)
         // A server added from the drawer is switched to like a saved one; an edit of the server
         // in use reconnects it, which ends its Home first.
-        return connect(next, keepingHome = next.keepsHome(switchingTo = next.server))
+        val target = next.server
+        val keepsHome = next.keepsHome(switchingTo = target)
+        if (keepsHome) next = next.showingSwitch(target)
+        return connect(next, keepingHome = keepsHome)
     }
 
     private fun home(state: State, action: HomeFeature.Action): Reduced<State, Action> = when (action) {
-        is HomeFeature.Action.Delegate -> when (action.action) {
-            // Back to the picker (iOS `.home(.serverBadgeTapped)`): Home is rebuilt from scratch
-            // on reconnect since sessions, projects and the event stream are all server-scoped.
-            HomeFeature.DelegateAction.ServersRequested,
-            HomeFeature.DelegateAction.ServerBadgeTapped,
-            -> cancelConnection(state.copy(returnServer = state.homeServer).withoutHome())
-            // TODO(app): the drawer's server switcher, rename, edit, removal and pairing delegates.
-            else -> Reduced(state)
+        is HomeFeature.Action.Delegate -> homeDelegate(state, action.action)
+        // Home has taken its first snapshot (children run first): actions that waited for the
+        // list can resolve now.
+        is HomeFeature.Action.SnapshotRefreshed -> {
+            val pending = state.pendingSystemAction
+            val home = state.home
+            if (pending == null || home == null || pending.serverKey != SessionDirectory.serverKey(home.server.persistenceID)) Reduced(state)
+            else routeSystemAction(pending, state)
         }
+        // TODO(merge): round 2b — pairing links tapped in a session's transcript or its in-app
+        // browser (`.sessionDetail(.presented(.linkTapped/.browser(.pairingLinkTapped)))` and the
+        // subagent stack's) go to `requestPairing` when `OpenCodePairingLink.shouldHandleOpenURL`.
         else -> Reduced(state)
+    }
+
+    private fun homeDelegate(state: State, action: HomeFeature.DelegateAction): Reduced<State, Action> = when (action) {
+        // Back to the picker: Home is rebuilt from scratch on reconnect since sessions, projects
+        // and the event stream are all server-scoped. (`serversRequested` opens iOS's
+        // Experimental server-title sheet, which Android doesn't have; it leaves for the picker.)
+        HomeFeature.DelegateAction.ServersRequested,
+        HomeFeature.DelegateAction.ServerBadgeTapped,
+        -> cancelConnection(state.copy(returnServer = state.homeServer).withoutHome())
+        is HomeFeature.DelegateAction.ServerSwitchTapped -> {
+            val home = state.home
+            if (home == null || home.server.persistenceID == action.server.persistenceID) Reduced(state)
+            else {
+                // A switch that fails leaves the picker offering the way back.
+                var next = state.copy(returnServer = home.server)
+                val keepsHome = next.keepsHome(switchingTo = action.server)
+                if (keepsHome) next = next.showingSwitch(action.server)
+                selectServer(action.server, next, keepingHome = keepsHome)
+            }
+        }
+        is HomeFeature.DelegateAction.ServerRenamed -> Reduced(renameServer(action.server, action.name, state))
+        is HomeFeature.DelegateAction.EditServerRequested -> {
+            // The form opens over Home; Home stays until the edit connects.
+            val saved = state.knownServers.firstOrNull { it.persistenceID == action.server.persistenceID } ?: action.server
+            Reduced(state.copy(editingSavedServer = saved, manualEntryDraft = null, isEditingServer = true).load(saved))
+        }
+        is HomeFeature.DelegateAction.ServerRemovalConfirmed -> {
+            // The server in use isn't offered for removal; switch away first.
+            if (state.home?.server?.persistenceID == action.server.persistenceID) Reduced(state)
+            else Reduced(state, Effect.send(Action.ServerDeleted(action.server)))
+        }
+        HomeFeature.DelegateAction.PairServerRequested ->
+            Reduced(state.copy(editingSavedServer = null, isScanningPairingCode = true))
+        HomeFeature.DelegateAction.AddServerRequested -> Reduced(beginNewServer(state))
     }
 
     // MARK: Notifications and system actions
@@ -635,11 +713,11 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         val session = action.result.getOrNull()
         if (session != null && session.id == action.sessionID) {
             val inserted = state.insertingSession(session)
-            return Reduced(inserted, openInHome(inserted, SystemAction.Destination.Session(session.id)))
+            return Reduced(inserted, openInHome(action.action, SystemAction.Destination.Session(session.id)))
         }
         // A remembered session that's gone falls back to the newest one.
         if (action.action.destination == SystemAction.Destination.LastViewed) {
-            return Reduced(state, openInHome(state, SystemAction.Destination.LastViewed, skipping = action.sessionID))
+            return Reduced(state, openInHome(action.action, SystemAction.Destination.LastViewed))
         }
         return Reduced(state.copy(systemActionError = "It may have been deleted, or the server may be unavailable."))
     }
@@ -674,7 +752,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
                 }.cancellable(CancelID.SystemSession, cancelInFlight = true),
             )
         }
-        return Reduced(next, openInHome(next, action.destination))
+        return Reduced(next, openInHome(action, action.destination))
     }
 
     private fun loadNotificationSession(destination: NotificationDestination, server: OpenCodeServer): Effect<Action> {
@@ -695,29 +773,18 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         return copy(home = home.copy(sessions = listOf(session) + home.sessions))
     }
 
-    /** iOS `.home(.sessionTapped(id))` on the stub Home. */
+    /** iOS `.home(.sessionTapped(id))`. */
     private fun openSession(state: State, sessionID: String): Effect<Action> {
         return Effect.send(Action.Home(HomeFeature.Action.SessionTapped(sessionID)))
     }
 
-    /**
-     * iOS `.home(.systemActionOpened(destination, startsCall:, inBackground:))` on the stub Home:
-     * a session opens it, the last viewed falls back to the newest, and a draft opens New Session.
-     * (Projects for drafts and starting calls arrive with the drawer's and voice's ports.)
-     */
-    private fun openInHome(state: State, destination: SystemAction.Destination, skipping: String? = null): Effect<Action> {
-        val home = state.home ?: return Effect.none()
-        return when (destination) {
-            is SystemAction.Destination.Session -> openSession(state, destination.id)
-            SystemAction.Destination.LastViewed -> {
-                val remembered = state.homeServer?.let { state.lastViewedSessionIDs.value[it.persistenceID] }
-                    ?.takeIf { id -> id != skipping && home.sessions.any { it.id == id } }
-                val target = remembered ?: home.sessions.firstOrNull { it.id != skipping }?.id
-                if (target != null) openSession(state, target) else Effect.send(Action.Home(HomeFeature.Action.NewSessionTapped))
-            }
-            is SystemAction.Destination.Draft -> Effect.send(Action.Home(HomeFeature.Action.NewSessionTapped))
-        }
-    }
+    /** iOS `.home(.systemActionOpened(destination, startsCall:, inBackground:))`. */
+    private fun openInHome(action: SystemAction, destination: SystemAction.Destination): Effect<Action> =
+        Effect.send(
+            Action.Home(
+                HomeFeature.Action.SystemActionOpened(destination, startsCall = action.startsCall, inBackground = action.startsInBackground),
+            ),
+        )
 
     // MARK: Pairing
 
@@ -918,9 +985,16 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
             server.remember(original)
             next = next.copy(editingSavedServer = null)
         }
+        // A switch made from Settings stays in Settings: the connection card shows the new server arrive.
+        val previous = next.home
+        val keepsSettings = previous?.isSettingsShown == true && previous.switchingTo?.persistenceID == server.persistenceID
         val opensDrawer = next.connectionAttempt?.opensDrawer == true
         next = next.withHome(server, snapshot)
-        persistSnapshot(next, server, snapshot)
+        next = next.copy(
+            home = next.home
+                ?.let { if (keepsSettings) it.keepingSettings(previous) else it }
+                ?.persistingSnapshot(dependency(HomeSnapshotDate).now()),
+        )
         next = next.copy(
             isEditingServer = false,
             connection = State.Connection.Connected,
@@ -929,7 +1003,10 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
             returnServer = null,
         )
         // Anything the person asked for on the way in wins over the drawer.
-        val asked = next.pendingSystemAction != null || next.pendingNotification != null
+        val asked = next.pendingShares.isNotEmpty() || next.pendingSystemAction != null || next.pendingNotification != null
+        val delivered = deliverPendingShares(next)
+        next = delivered.state
+        val shares = delivered.effect
         var system: Effect<Action> = Effect.none()
         val pendingAction = next.pendingSystemAction
         if (pendingAction != null && pendingAction.serverKey == SessionDirectory.serverKey(server.persistenceID)) {
@@ -939,22 +1016,12 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         }
         val destination = next.pendingNotification
         if (destination != null && destination.serverKey == server.persistenceID) {
-            return Reduced(next, Effect.merge(forgotten, system, loadNotificationSession(destination, server)))
+            return Reduced(next, Effect.merge(forgotten, shares, system, loadNotificationSession(destination, server)))
         }
         if (opensDrawer && !asked) {
-            if (next.isPresentingAnything) {
-                AppLog.app.info { "paired computer drawer open dropped under an app presentation" }
-                return Reduced(next, Effect.merge(forgotten, system))
-            }
-            return Reduced(next, Effect.merge(forgotten, system, Effect.send(Action.Home(HomeFeature.Action.PairedComputerOpened))))
+            return Reduced(next, Effect.merge(forgotten, shares, Effect.send(Action.Home(HomeFeature.Action.PairedComputerOpened))))
         }
-        return Reduced(next, Effect.merge(forgotten, system))
-    }
-
-    /** iOS `home.persistSnapshot(at:)`, until the drawer's Home persists its own snapshots. */
-    private fun persistSnapshot(state: State, server: OpenCodeServer, snapshot: OpenCodeHomeSnapshot) {
-        val entry = CachedHomeSnapshot(serverID = server.persistenceID, snapshot = snapshot, capturedAt = dependency(DateClient).now())
-        state.cachedHomeSnapshots.update { it + (server.persistenceID to entry) }
+        return Reduced(next, Effect.merge(forgotten, shares, system))
     }
 
     /**

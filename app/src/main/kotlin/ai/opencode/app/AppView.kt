@@ -106,6 +106,7 @@ fun AppView(store: StoreOf<AppFeature.State, AppFeature.Action>) {
     LaunchedEffect(store) {
         store.send(AppFeature.Action.Task)
         store.send(AppFeature.Action.SystemActionsTask)
+        store.send(AppFeature.Action.PendingSharesRequested)
     }
     val hasHome by store.observe { it.home != null }
     val isEditingServer by store.observe { it.isEditingServer }
@@ -162,10 +163,12 @@ private fun ServerSwitchToast(store: StoreOf<AppFeature.State, AppFeature.Action
 
 @Composable
 private fun AppAlerts(store: StoreOf<AppFeature.State, AppFeature.Action>) {
+    val shareError by store.observe { it.shareError }
     val notificationError by store.observe { it.notificationError }
     val systemActionError by store.observe { it.systemActionError }
     val pairingError by store.observe { it.pairingError }
     val pendingPairing by store.observe { it.pendingPairing }
+    shareError?.let { ErrorAlert("Couldn’t Add Shared Items", it) { store.send(AppFeature.Action.ShareErrorDismissed) } }
     notificationError?.let { ErrorAlert("Couldn’t Open Session", it) { store.send(AppFeature.Action.NotificationErrorDismissed) } }
     systemActionError?.let { ErrorAlert("Couldn’t Open Session", it) { store.send(AppFeature.Action.SystemActionErrorDismissed) } }
     pairingError?.let { ErrorAlert("Couldn’t Pair with Server", it) { store.send(AppFeature.Action.PairingErrorDismissed) } }

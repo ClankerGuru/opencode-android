@@ -7,19 +7,38 @@ import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.feature.system.SessionDirectory
+import ai.opencode.feature.composer.ComposerPersistence
 import ai.opencode.feature.system.SystemIntegrationClient
+import ai.opencode.feature.system.notifications.AppIconBadgeClient
+import ai.opencode.feature.system.notifications.SessionNotificationsClient
+import ai.opencode.feature.system.share.ShareInboxClient
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodePairingLink
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.ServerSharedKeys
+import ai.opencode.server.rememberName
 
 /*
  * Port of iOS `AppFeature+Servers.swift` and the server-list cases of `AppFeature.swift`
  * (`serverDeleted`, `forgetIdentity`, `selectServer`). The server-title sheet helpers
- * (`renameServer`, `serverTitleDelegate`, `serverTitleFailed`, `cancelServerTitleConnection`,
- * `openServerTitle`, `keepsHomeBehindSheet`) wait for `ServerTitleFeature` (Experimental
- * Title-Is-the-Switch, off by default) in `:feature:settings`; with no sheet they are no-ops.
+ * (`serverTitleDelegate`, `serverTitleFailed`, `cancelServerTitleConnection`, `openServerTitle`,
+ * `keepsHomeBehindSheet`) belong to iOS's Experimental Title Is the Switch sheet, which Android
+ * doesn't have; with no sheet they are no-ops, so they aren't ported.
  */
+
+/** Renames a saved server in place, without reconnecting; Home takes the name too. */
+internal fun renameServer(server: OpenCodeServer, name: String, state: AppFeature.State): AppFeature.State {
+    val trimmed = name.trim()
+    val renamed = (state.knownServers.firstOrNull { it.persistenceID == server.persistenceID } ?: server)
+        .copy(name = trimmed.ifEmpty { null })
+    var next = state
+    val home = next.home
+    if (home != null && home.server.persistenceID == renamed.persistenceID) {
+        next = next.copy(home = home.copy(connection = home.connection.copy(server = home.server.copy(name = renamed.name))))
+    }
+    renamed.rememberName()
+    return next
+}
 
 internal fun AppFeature.selectServer(
     server: OpenCodeServer,
@@ -96,8 +115,9 @@ internal fun serverDeleted(state: AppFeature.State, server: OpenCodeServer): Red
     next.cachedHomeSnapshots.update { it - server.persistenceID }
     next.savedServers.update { servers -> servers.filterNot { it.persistenceID == server.persistenceID } }
     if (next.savedServer.value?.persistenceID == server.persistenceID) next.savedServer.set(null)
-    // Pending shares and the share inbox's targets are forgotten here once :feature:system
-    // ports `ShareInbox` (iOS `discardStagedFiles`, `shareInbox.removeTargets`).
+    discardStagedFiles(next.pendingShares.filter { it.handoff.serverID == server.persistenceID })
+    next = next.copy(pendingShares = next.pendingShares.filterNot { it.handoff.serverID == server.persistenceID })
+    dependency(ShareInboxClient).removeTargets(server.persistenceID)
     val forgotten = forgetIdentity(server.persistenceID, next)
     next = forgotten.state
     if (wasEditingServer || next.connectingServerID == server.id) {
@@ -108,14 +128,21 @@ internal fun serverDeleted(state: AppFeature.State, server: OpenCodeServer): Red
 }
 
 /**
- * Forgets what the app keeps for a server identity that is no longer saved: its cached
- * transcripts and its system integrations. (Composer drafts, session notifications and the
- * badge ledger are forgotten here once their areas port `ComposerPersistence.removeServer`,
- * `SessionNotifications.forget` and `AppIconBadge.forget`.)
+ * Forgets what the system, notifications, the icon's badge and the composer keep for a server
+ * identity that is no longer saved.
  */
 internal fun forgetIdentity(persistenceID: String, state: AppFeature.State): Reduced<AppFeature.State, AppFeature.Action> {
+    dependency(ComposerPersistence).removeServer(persistenceID)
     val transcripts = ServerSharedKeys.cachedTranscriptSnapshots()
     if (transcripts.value.entries.any { it.serverID == persistenceID }) transcripts.update { it.removeEntries(persistenceID) }
     dependency(SystemIntegrationClient).removeServer(SessionDirectory.serverKey(persistenceID))
-    return Reduced(state)
+    val sessionNotifications = dependency(SessionNotificationsClient)
+    val appIconBadge = dependency(AppIconBadgeClient)
+    return Reduced(
+        state,
+        Effect.run {
+            sessionNotifications.forget(persistenceID)
+            appIconBadge.forget(persistenceID)
+        },
+    )
 }
