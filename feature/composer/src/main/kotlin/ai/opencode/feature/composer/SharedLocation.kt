@@ -479,7 +479,7 @@ fun SharedLocationCard(
             .clickable { onOpen(location.mapsURL) }
             .clearAndSetSemantics {
                 contentDescription = label
-                onClick(label = "Opens in Maps") { onOpen(location.mapsURL); true }
+                onClick(label = "Open in Maps") { onOpen(location.mapsURL); true }
                 testTag = if (compact) "composer-location-card" else "shared-location-card"
             },
     ) {

@@ -962,10 +962,10 @@ fun PlusPhotoSheetFoot(
             symbol = SFSymbol.ChevronLeft,
             contentDescription = "Back",
             onClick = onBack,
-            // iOS `accessibilityHint("Returns to attachment options")`: TalkBack reads it as the action.
+            // iOS `accessibilityHint("Returns to attachment options")`: TalkBack reads “Double-tap to return…”.
             modifier = Modifier.semantics {
                 testTag = "plus-photo-back"
-                onClick(label = "Returns to attachment options") { onBack(); true }
+                onClick(label = "Return to attachment options") { onBack(); true }
             },
         )
         Spacer(Modifier.weight(1f).width(12.dp))

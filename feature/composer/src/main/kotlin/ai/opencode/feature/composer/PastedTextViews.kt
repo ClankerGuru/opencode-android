@@ -96,7 +96,7 @@ fun PastedTextCard(
             .width(width)
             .heightIn(min = height ?: 0.dp)
             .background(fill, shape)
-            .clickable(onClickLabel = "Opens the text", role = Role.Button, onClick = onOpen)
+            .clickable(onClickLabel = "Open the text", role = Role.Button, onClick = onOpen)
             .semantics {
                 contentDescription = PastedText.NAME
                 stateDescription = summary.summary

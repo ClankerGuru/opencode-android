@@ -428,7 +428,8 @@ private class DockScope(
                     Modifier
                         .outset(end = RequestDockMetrics.edge - (RequestDockMetrics.cornerRadius - 22.dp))
                         .size(48.dp)
-                        .clickable(enabled = enabled && idle && !busy, onClickLabel = "Dismiss", role = Role.Button) {
+                        // iOS hint “Tells the agent what’s in your answer instead”: TalkBack reads “Double-tap to tell…”.
+                        .clickable(enabled = enabled && idle && !busy, onClickLabel = "Tell the agent what’s in your answer instead", role = Role.Button) {
                             send(RequestDockFeature.Action.DismissTapped)
                         }
                         .semantics { contentDescription = "Dismiss" }

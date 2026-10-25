@@ -962,7 +962,7 @@ private fun CardControls(
                     .then(
                         if (interactive) {
                             Modifier
-                                .clickable(onClickLabel = "Returns to attachment options", role = Role.Button, onClick = onBack)
+                                .clickable(onClickLabel = "Return to attachment options", role = Role.Button, onClick = onBack)
                                 .openCodeTapTarget(header)
                         } else Modifier,
                     )

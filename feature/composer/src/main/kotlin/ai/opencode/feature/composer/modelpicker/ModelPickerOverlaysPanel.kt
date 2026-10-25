@@ -324,7 +324,7 @@ private fun Grabber(
                 contentDescription = "Sheet Grabber"
                 stateDescription = detent.accessibilityValue
                 role = Role.Button
-                onClick(if (detent == ModelListDetent.Large) "Makes the list half height" else "Makes the list full height") { toggle(); true }
+                onClick(if (detent == ModelListDetent.Large) "Make the list half height" else "Make the list full height") { toggle(); true }
                 progressBarRangeInfo = ProgressBarRangeInfo(if (detent == ModelListDetent.Large) 1f else 0f, 0f..1f, 0)
                 setProgress { target -> onDetent(detent.adjusted(if (target > 0.5f) 1 else -1)); true }
             }
