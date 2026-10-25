@@ -516,7 +516,7 @@ class DiagnosticsRecorder(
             val first = values.firstOrNull()
             if (first != null) {
                 lines += listOf("OpenCode diagnostics", "Events: ${values.size}")
-                if (wallClock) lines += "From ${DateTimeFormatter.ISO_INSTANT.format(first.wallDate)} to ${DateTimeFormatter.ISO_INSTANT.format(values.last().wallDate)}"
+                if (wallClock) lines += "From ${DateTimeFormatter.ISO_INSTANT.format(first.wallDate.truncatedTo(java.time.temporal.ChronoUnit.SECONDS))} to ${DateTimeFormatter.ISO_INSTANT.format(values.last().wallDate.truncatedTo(java.time.temporal.ChronoUnit.SECONDS))}"
                 lines += ""
                 val clock = DateTimeFormatter.ofPattern("HH:mm:ss.SSS'Z'").withZone(ZoneOffset.UTC)
                 var origin = first.monotonicSeconds
