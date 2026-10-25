@@ -57,7 +57,18 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.rememberReduceMotion
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.VisibilityThreshold
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import kotlinx.coroutines.launch
 
 /**
@@ -134,10 +145,41 @@ private fun MCPServersTray(
     // iOS pushes one server inside the tray's own NavigationStack.
     var detail by rememberSaveable { mutableStateOf<String?>(null) }
     BackHandler(enabled = detail != null) { detail = null }
-    detail?.let { name ->
-        MCPServerTray(state, name, send, close, onBack = { detail = null })
-        return
+    val reduceMotion = rememberReduceMotion()
+    // The push slides in from the right over the list, which moves a third of the way left; back
+    // reverses it (Settings' push spring); Reduce Motion cross-fades.
+    AnimatedContent(
+        targetState = detail,
+        transitionSpec = {
+            if (reduceMotion) {
+                fadeIn(Motion.reducedFadeSpec()) togetherWith fadeOut(Motion.reducedFadeSpec())
+            } else {
+                val pushing = targetState != null
+                val spring = MotionSpring(0.42).spec(IntOffset.VisibilityThreshold)
+                if (pushing) {
+                    slideInHorizontally(spring) { it } togetherWith slideOutHorizontally(spring) { -it * 3 / 10 }
+                } else {
+                    slideInHorizontally(spring) { -it * 3 / 10 } togetherWith slideOutHorizontally(spring) { it }
+                }.apply { targetContentZIndex = if (pushing) 1f else 0f }
+            }
+        },
+        label = "mcp-tray-push",
+    ) { name ->
+        if (name != null) {
+            MCPServerTray(state, name, send, close, onBack = { detail = null })
+        } else {
+            MCPServersList(state, send, close) { detail = it }
+        }
     }
+}
+
+@Composable
+private fun MCPServersList(
+    state: ServerDetailsFeature.State,
+    send: (ServerDetailsFeature.Action) -> Unit,
+    close: () -> Unit,
+    open: (String) -> Unit,
+) {
     val servers = state.mcpServers
     val connected = servers.count { it.status == OpenCodeMCPServer.Status.Connected }
     Column(Modifier.fillMaxWidth()) {
@@ -150,10 +192,11 @@ private fun MCPServersTray(
                     index == servers.lastIndex -> RoundedCornerShape(bottomStart = 26.dp, bottomEnd = 26.dp)
                     else -> RoundedCornerShape(0.dp)
                 }
-                Column(Modifier.animateItem().padding(horizontal = 16.dp).clip(shape).background(OpenCodeTheme.colors.groupedCard)) {
+                // iOS `.animation(.spring(duration: 0.3, bounce: 0), value: servers)`.
+                Column(Modifier.animateItem(MotionSpring(0.3).spec(), MotionSpring(0.3).spec(IntOffset.VisibilityThreshold), MotionSpring(0.3).spec()).padding(horizontal = 16.dp).clip(shape).background(OpenCodeTheme.colors.groupedCard)) {
                     MCPServerRow(
                         mcp = mcp,
-                        onOpen = { detail = mcp.name },
+                        onOpen = { open(mcp.name) },
                         action = { ServerDetailsFeature.Action.primaryAction(mcp)?.let(send) },
                     )
                     if (index != servers.lastIndex) SettingsDivider(inset = true)

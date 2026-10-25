@@ -1,11 +1,11 @@
 package ai.opencode.feature.settings
 
+import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -34,7 +34,6 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
-import kotlin.math.PI
 
 /**
  * Port of iOS `Settings/SettingsPresentation.swift`: Settings pushes full screen from the right
@@ -156,8 +155,11 @@ fun SettingsPresentation(
 private const val PARALLAX = 0.3f
 private const val DIM = 0.12
 
-/** iOS `.interpolatingSpring(duration: 0.42, bounce: 0)`: critically damped, stiffness (2π / 0.42)². */
-private val PushSpec = spring<Float>(dampingRatio = 1f, stiffness = ((2 * PI / 0.42) * (2 * PI / 0.42)).toFloat())
+/**
+ * iOS `.interpolatingSpring(duration: 0.42, bounce: 0)`: critically damped, stiffness (2π / 0.42)²
+ * (built per use so Developer Mode slow motion stretches it).
+ */
+private val PushSpec: AnimationSpec<Float> get() = MotionSpring(duration = 0.42, bounce = 0.0).spec()
 
 /** iOS `.easeInOut(duration: 0.3)` cross-fade under reduce motion. */
-private val FadeSpec = tween<Float>(durationMillis = 300, easing = FastOutSlowInEasing)
+private val FadeSpec: AnimationSpec<Float> get() = Motion.easeInOut(0.3)

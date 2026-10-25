@@ -82,7 +82,7 @@ fun SettingsIcon(symbol: String, tint: SettingsTint, modifier: Modifier = Modifi
     val color = tint.color()
     Box(
         modifier
-            .size(30.dp)
+            .size(29.dp)
             .clip(RoundedCornerShape(7.dp))
             .background(Brush.verticalGradient(listOf(color.copy(alpha = 0.85f).compositeOver(Color.White, 0.15f), color))),
         contentAlignment = Alignment.Center,
@@ -101,6 +101,13 @@ private fun Color.compositeOver(other: Color, amount: Float): Color = Color(
     blue = blue * (1 - amount) + other.blue * amount,
     alpha = alpha,
 )
+
+/**
+ * iOS `dynamicTypeSize.isAccessibilitySize`: the accessibility text sizes start at AX1, whose body
+ * is 28 pt against the default 17 pt.
+ */
+@Composable
+internal fun isAccessibilitySize(): Boolean = LocalDensity.current.fontScale >= 28f / 17f
 
 /** Minimum row height (iOS 44 pt list rows → the 48 dp target). */
 val SettingsRowMinHeight = 52.dp
@@ -170,7 +177,8 @@ fun SettingsSection(
 @Composable
 fun SettingsDivider(inset: Boolean = false) {
     HorizontalDivider(
-        modifier = Modifier.padding(start = if (inset) 58.dp else 16.dp),
+        // Inset: under the title, past the 16 dp side, the 29 dp tile and the 12 dp gap.
+        modifier = Modifier.padding(start = if (inset) 57.dp else 16.dp),
         color = OpenCodeTheme.colors.border,
         thickness = with(LocalDensity.current) { 1f.toDp() },
     )
@@ -324,28 +332,27 @@ fun <T> SettingsMenuRow(
     accessibilityLabel: String = title,
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val stacked = isAccessibilitySize()
     Box(modifier) {
-        SettingsRowFrame(
-            Modifier.semantics(mergeDescendants = true) {
-                contentDescription = accessibilityLabel
-                stateDescription = value
-            },
-            onClick = { expanded = true },
-        ) {
-            if (symbol != null) SettingsIcon(symbol, tint)
-            Column(Modifier.weight(1f)) {
-                Text(title, style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text)
-                if (caption != null) {
-                    Text(
-                        caption,
-                        style = OpenCodeTextStyles.footnote,
-                        color = OpenCodeTheme.colors.secondaryText,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+        val label: @Composable () -> Unit = {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (symbol != null) SettingsIcon(symbol, tint)
+                Column {
+                    Text(title, style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text)
+                    if (caption != null) {
+                        Text(
+                            caption,
+                            style = OpenCodeTextStyles.footnote,
+                            color = OpenCodeTheme.colors.secondaryText,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        }
+        val valueLabel: @Composable (Modifier) -> Unit = { valueModifier ->
+            Row(valueModifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                 Text(
                     value,
                     style = OpenCodeTextStyles.body,
@@ -355,6 +362,24 @@ fun <T> SettingsMenuRow(
                     modifier = Modifier.weight(1f, fill = false),
                 )
                 OpenCodeIcon(SFSymbol.ChevronUpChevronDown, contentDescription = null, size = 16.dp, tint = OpenCodeTheme.colors.tertiaryText)
+            }
+        }
+        SettingsRowFrame(
+            Modifier.semantics(mergeDescendants = true) {
+                contentDescription = accessibilityLabel
+                stateDescription = value
+            },
+            onClick = { expanded = true },
+        ) {
+            if (stacked) {
+                // iOS at accessibility sizes: the value goes under the title.
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    label()
+                    valueLabel(Modifier)
+                }
+            } else {
+                Box(Modifier.weight(1f)) { label() }
+                valueLabel(Modifier.weight(1f, fill = false))
             }
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, modifier = Modifier.align(Alignment.TopEnd)) {
@@ -412,4 +437,4 @@ fun <T> SettingsMenuRow(
 
 /** Leading spacer matching a row with an icon, for rows that line up under iconed rows. */
 @Composable
-fun RowScope.SettingsIconSpacer() = Spacer(Modifier.width(30.dp))
+fun RowScope.SettingsIconSpacer() = Spacer(Modifier.width(29.dp))
