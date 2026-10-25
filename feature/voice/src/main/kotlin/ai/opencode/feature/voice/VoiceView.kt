@@ -66,6 +66,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.CornerRadius
@@ -75,6 +76,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.TileMode
@@ -728,7 +730,13 @@ private class BottomRevealShape(private val height: Float, private val cornerRad
         val h = min(height * density.density, size.height)
         val top = size.height - h
         val r = min(cornerRadius * density.density, h / 2).coerceAtLeast(0f)
-        return Outline.Rounded(RoundRect(0f, top, size.width, size.height, topLeftCornerRadius = CornerRadius(r), topRightCornerRadius = CornerRadius(r)))
+        // Below the fold's rounded edge the sides stay open: a panel's control reaching past its
+        // sides onto the surface's corner arc (the request panel's ×) isn't cut in half.
+        val path = Path().apply {
+            addRoundRect(RoundRect(0f, top, size.width, size.height, topLeftCornerRadius = CornerRadius(r), topRightCornerRadius = CornerRadius(r)))
+            if (h > r) addRect(Rect(-size.width, top + r, size.width * 2, size.height))
+        }
+        return Outline.Generic(path)
     }
 }
 
