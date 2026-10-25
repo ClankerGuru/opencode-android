@@ -649,7 +649,6 @@ class CallTrayController {
         val barHeight = CallTrayComposerMetrics.barHeight
         val buttonDiameter = CallTrayComposerMetrics.buttonDiameter
         val buttonTrailingGap = CallTrayComposerMetrics.trailingGap
-        val innerHorizontal = CallTrayComposerMetrics.innerHorizontal
 
         val lVal = clamp(l.value.toFloat(), 0f, 1.5f)
         val aVal = clamp(a.value.toFloat(), 0f, 1.2f)
@@ -678,7 +677,8 @@ class CallTrayController {
         val trayY = trayBottom - trayH
         val trayRect = Rect(0f, trayY, wComposer, trayY + trayH)
         val trayR = trayRect.right
-        val endX = trayR - innerHorizontal - CallTrayBarLayout.slot / 2
+        // End's disc centre: iOS `innerHorizontal + 22`, the composer's call button's X.
+        val endX = trayR - CallTrayBarLayout.trailingPadding - CallTrayBarLayout.slot / 2
         val midY = trayRect.center.y
 
         val anchored = mode == CallTrayBelowMode.lift || mode == CallTrayBelowMode.slide
