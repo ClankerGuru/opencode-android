@@ -27,6 +27,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -186,7 +188,11 @@ fun SessionDrawerContainer(
                     .drawWithContent {
                         cardLayer.record { this@drawWithContent.drawContent() }
                         drawLayer(cardLayer)
-                    },
+                    }
+                    // iOS `excludesKeyboard`: a card the keyboard is leaving, or drawer search
+                    // owning it, lays out as if there were no keyboard (the session's
+                    // `imePadding` sees it consumed).
+                    .then(if (keyboardHold.excludesKeyboard) Modifier.consumeWindowInsets(WindowInsets.ime) else Modifier),
             ) {
                 CompositionLocalProvider(
                     LocalDrawerKeyboardSignals provides keyboardHold,
