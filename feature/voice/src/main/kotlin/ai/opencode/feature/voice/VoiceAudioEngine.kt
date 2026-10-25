@@ -37,7 +37,8 @@ object VoiceAudioRoute {
 }
 
 /** The platform seam for deterministic ownership/route/focus checks. Permission is
- * checked here; :app must request RECORD_AUDIO before invoking the start effect. */
+ * asked here (iOS `AVAudioApplication.requestRecordPermission()` at call start), through
+ * the requester :app registers on [VoiceMicrophonePermission]. */
 interface VoiceAudioSessionControlling {
     val mode: Int
     val outputPorts: List<Int>
@@ -45,7 +46,7 @@ interface VoiceAudioSessionControlling {
     val outputLatency: Double get() = 0.0
     val ioBufferDuration: Double get() = 0.01
     val routeDescription: String
-    fun requestRecordPermission(): Boolean
+    suspend fun requestRecordPermission(): Boolean
     fun activate(demo: Boolean)
     fun deactivate()
     fun route(atEar: Boolean, demo: Boolean)
@@ -90,7 +91,10 @@ class LiveVoiceAudioSession(private val context: Context) : VoiceAudioSessionCon
     override val outputPorts get() = listOfNotNull(manager.communicationDevice?.type)
     override val isInputAvailable get() = manager.getDevices(AudioManager.GET_DEVICES_INPUTS).isNotEmpty()
     override val routeDescription get() = VoiceAudioQuality.route(manager)
-    override fun requestRecordPermission() = context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+    override suspend fun requestRecordPermission(): Boolean {
+        if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) return true
+        return dependency(VoiceMicrophonePermission).request()
+    }
     @Synchronized override fun activate(demo: Boolean) {
         if (savedMode == null) savedMode = manager.mode
         val old = request
