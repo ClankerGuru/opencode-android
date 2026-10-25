@@ -155,12 +155,11 @@ class BrowserFeature : Reducer<BrowserFeature.State, BrowserFeature.Action> {
     }
 }
 
-/** The page the voice agent hears about (iOS `VoiceViewingPage`). */
-data class VoiceViewingPage(
-    val url: String,
-    val title: String,
-    val isOpen: Boolean,
-)
+/**
+ * The page the voice agent hears about (iOS `VoiceViewingPage`). Declared in `:server` so the call
+ * (`:feature:voice`) reads the same type the browser produces.
+ */
+typealias VoiceViewingPage = ai.opencode.server.model.VoiceViewingPage
 
 /** `url.host(percentEncoded: false)` for web URLs: the host, Unicode rather than punycode. */
 internal fun browserHost(url: String): String? {
