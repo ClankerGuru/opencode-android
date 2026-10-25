@@ -141,6 +141,8 @@ class TranscriptListController(
     private var revealGlide: JumpGlide? = null
     private var revealDeadline = 0.0
     private var revealsNewMessages = false
+    /** The reveal slides to the end (what's new fit, so no divider): iOS `revealsToEnd`. */
+    private var revealsToEnd = false
 
     /** Agent-sent messages glow once on arrival (iOS `TranscriptAgentMessageReveal`). */
     var agentReveal = ai.opencode.feature.transcript.user.TranscriptAgentMessageReveal()
@@ -230,6 +232,7 @@ class TranscriptListController(
             newMessagesDecision = null
             pendingNewMessagesLanding = null
             revealGlide = null
+            revealsToEnd = false
         }
         if (configuration.isLoading && emptyLoadingSince == null && configuration.entries.isEmpty()) emptyLoadingSince = transcriptNow()
         if (!configuration.isLoading) emptyLoadingSince = if (configuration.entries.isEmpty()) emptyLoadingSince else null
@@ -311,6 +314,7 @@ class TranscriptListController(
         passedNewMessages = null
         pendingNewMessagesLanding = null
         revealGlide = null
+        revealsToEnd = false
         trailingSpace = 0f
         heldSpaceDrain = HeldSpaceDrain()
         emptyLoadingSince = null
@@ -764,6 +768,7 @@ class TranscriptListController(
     private fun dragBegan() {
         stopBottomSpring()
         revealGlide = null
+        revealsToEnd = false
         readingAnchor = null
         finishGrowths()
         isUserGestureActive = true
@@ -786,6 +791,7 @@ class TranscriptListController(
     fun scrollToTop(): Boolean {
         stopBottomSpring()
         revealGlide = null
+        revealsToEnd = false
         finishGrowths()
         handleBehavior(TranscriptScrollBehavior.Event.UserLeftBottom)
         scope.launch { state.animateScrollToItem(0) }
@@ -832,6 +838,7 @@ class TranscriptListController(
     /** Jump to latest, tapped or by sending while browsing (iOS `jumpToLatest`). */
     fun jumpToLatest(event: TranscriptScrollBehavior.Event = TranscriptScrollBehavior.Event.JumpToLatestTapped, fromBrowsing: Boolean = false) {
         revealGlide = null
+        revealsToEnd = false
         isUserGestureActive = false
         readingAnchor = null
         val previousMode = if (fromBrowsing) TranscriptScrollBehavior.Mode.Browsing else behavior.mode
@@ -929,6 +936,7 @@ class TranscriptListController(
             if (remaining == null || share == null) {
                 if (remaining != null) state.dispatchRawDelta(remaining * density)
                 revealGlide = null
+                revealsToEnd = false
                 handleBehavior(TranscriptScrollBehavior.Event.RevealEnded(distanceFromBottom() <= 1f))
             } else {
                 state.dispatchRawDelta(remaining * share * density)
@@ -1216,8 +1224,32 @@ class TranscriptListController(
         if (dividerIndex < 0) return false
         val divider = info.visibleItemsInfo.firstOrNull { it.index == dividerIndex }
         val last = info.visibleItemsInfo.lastOrNull()
-        val fits = divider != null && last?.index == snapshot.items.lastIndex &&
+        val laidOut = divider != null && last?.index == snapshot.items.lastIndex
+        val fits = if (laidOut) {
             (last.offset + last.size - divider.offset) / density <= viewport(info).visibleHeight
+        } else {
+            // iOS measures every row to the end before deciding. Laid out away from the end, the
+            // divider fits when it sits no further down than the end can come up (estimated).
+            dividerDistance()?.let { it >= distanceFromBottom() - 0.5f } ?: false
+        }
+        if (fits && !laidOut && revealsNewMessages && distanceFromBottom() > 1f) {
+            // iOS `revealsToEnd`: it slides up to the end with no divider.
+            fittingNewMessages = generation
+            newMessagesDecision = mark.entryID to false
+            send(TranscriptAction.NewMessagesFit(generation))
+            snapshot = snapshot.copy(items = snapshot.items - TranscriptItemID.NewDivider)
+            stopBottomSpring()
+            finishGrowths()
+            handleBehavior(TranscriptScrollBehavior.Event.RevealBegan)
+            val distance = distanceFromBottom()
+            val duration = NewMessagesReveal.duration(distance, viewport(info).visibleHeight)
+            revealsToEnd = true
+            revealGlide = JumpGlide(distance, JumpGlide.Curve.FromRest, duration)
+            revealDeadline = transcriptNow() + duration + JumpGlide.MAXIMUM_EXTENSION + 0.5
+            revealsNewMessages = false
+            startMotion()
+            return true
+        }
         if (fits) {
             // What's new fits below it: no divider, as in a chat app.
             fittingNewMessages = generation
@@ -1260,11 +1292,17 @@ class TranscriptListController(
 
     /** Exact once the divider enters view; measured row heights carry the glide until then. */
     private fun newMessagesDistance(): Float? {
+        if (revealsToEnd) return distanceFromBottom()
+        return dividerDistance()?.let { min(it, distanceFromBottom()) }
+    }
+
+    /** How far below the viewport's top the divider sits (dp, estimated until it's laid out). */
+    private fun dividerDistance(): Float? {
         val index = snapshot.items.indexOf(TranscriptItemID.NewDivider)
         if (index < 0) return null
         val info = state.layoutInfo
         val visible = info.visibleItemsInfo.firstOrNull { it.key == TranscriptItemID.NewDivider.key }
-        if (visible != null) return min(visible.offset / density, distanceFromBottom())
+        if (visible != null) return visible.offset / density
         val first = info.visibleItemsInfo.firstOrNull() ?: return null
         val average = if (measuredHeights.isEmpty()) 80f else measuredHeights.values.average().toFloat()
         var distance = first.offset / density
@@ -1273,7 +1311,7 @@ class TranscriptListController(
         } else {
             for (i in index until first.index) distance -= measuredHeights[snapshot.items[i].key] ?: average
         }
-        return min(distance, distanceFromBottom())
+        return distance
     }
 
     // MARK: Session links
