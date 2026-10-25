@@ -1,5 +1,6 @@
 package ai.opencode.server.model
 
+import ai.opencode.core.files.AttachmentFileType
 import kotlinx.serialization.Serializable
 
 /**
@@ -484,54 +485,4 @@ data class AgentFileReference(
             return host to path
         }
     }
-}
-
-/** The common subset of the language names desktop takes from Shiki (iOS `AttachmentFileType.languageNames`). */
-private val attachmentLanguageNames: Map<String, String> = mapOf(
-    "c" to "C", "cjs" to "JavaScript", "cpp" to "C++", "cs" to "C#", "css" to "CSS", "dart" to "Dart",
-    "go" to "Go", "html" to "HTML", "java" to "Java", "js" to "JavaScript",
-    "json" to "JSON", "jsx" to "JSX", "kt" to "Kotlin", "lua" to "Lua", "md" to "Markdown", "mjs" to "JavaScript",
-    "php" to "PHP", "py" to "Python", "rb" to "Ruby", "rs" to "Rust", "sh" to "Shell", "sql" to "SQL",
-    "swift" to "Swift", "toml" to "TOML", "ts" to "TypeScript", "tsx" to "TSX",
-    "xml" to "XML", "yaml" to "YAML", "yml" to "YAML", "zsh" to "Zsh",
-)
-
-private val archiveMimes = setOf(
-    "application/zip", "application/gzip", "application/x-gzip", "application/x-tar", "application/x-bzip2",
-    "application/x-7z-compressed", "application/x-rar-compressed", "application/x-xz",
-)
-private val spreadsheetMimes = setOf(
-    "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    "application/x-iwork-numbers-sffnumbers", "application/vnd.oasis.opendocument.spreadsheet",
-)
-private val presentationMimes = setOf(
-    "application/vnd.ms-powerpoint", "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    "application/x-iwork-keynote-sffkey", "application/vnd.oasis.opendocument.presentation",
-)
-
-/**
- * iOS `AttachmentFileType.label(name:mime:)`: the chip subtitle, "PDF", a language name, or the
- * extension in capitals. An extension here (not a member) so `:feature:composer`'s port of
- * `AttachmentFileType` can take it over without a clash; a member of the same name wins.
- */
-fun AttachmentFileType.label(name: String, mime: String): String {
-    if (mime == "application/pdf") return "PDF"
-    val suffix = fileExtension(name)
-    if (suffix.isEmpty()) return "File"
-    return attachmentLanguageNames[suffix] ?: suffix.uppercase()
-}
-
-/** iOS `AttachmentFileType.symbolName(name:mime:)` (UTType conformance → the MIME sets above). */
-fun AttachmentFileType.symbolName(name: String, mime: String): String {
-    if (mime == "application/pdf") return "doc.richtext"
-    if (mime.startsWith("image/")) return "photo"
-    if (mime.startsWith("video/")) return "film"
-    if (mime.startsWith("audio/")) return "waveform"
-    if (mime == "text/plain") {
-        return if (attachmentLanguageNames[fileExtension(name)] == null) "doc.text" else "chevron.left.forwardslash.chevron.right"
-    }
-    if (mime in archiveMimes) return "doc.zipper"
-    if (mime in spreadsheetMimes) return "tablecells"
-    if (mime in presentationMimes) return "rectangle.on.rectangle"
-    return "doc"
 }
