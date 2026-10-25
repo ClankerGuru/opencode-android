@@ -1,0 +1,161 @@
+package ai.opencode.feature.transcript
+
+import ai.opencode.server.OpenCodeServer
+import ai.opencode.server.model.AgentFileReference
+import ai.opencode.server.model.OpenCodeQueuedInput
+import ai.opencode.server.model.OpenCodeRunError
+import androidx.compose.runtime.Immutable
+import androidx.compose.ui.graphics.ImageBitmap
+
+/**
+ * What a transcript row or the list asks the session to do. iOS rows call
+ * `send(SessionFeature.Action)` directly (one module); here `:feature:session` sits above, so
+ * the list sends these and `SessionFeature` maps each one to the iOS action of the same name.
+ */
+sealed interface TranscriptAction {
+    data object FirstContentFrameRendered : TranscriptAction
+    data class TranscriptBrowsingChanged(val isBrowsing: Boolean) : TranscriptAction
+    data class NewMessagesPassed(val generation: Int) : TranscriptAction
+    data class NewMessagesFit(val generation: Int) : TranscriptAction
+    data object SinceYouLeftTapped : TranscriptAction
+    data object ShowEarlierTapped : TranscriptAction
+    data class CopyTextTapped(val text: String) : TranscriptAction
+    data class QuoteTextTapped(val text: String) : TranscriptAction
+    data class LinkMenu(val action: LinkMenuAction, val url: String) : TranscriptAction
+    data class LinkTapped(val url: String) : TranscriptAction
+    data class SessionLinksAppeared(val ids: List<String>) : TranscriptAction
+    data class SubagentTapped(val sessionID: String) : TranscriptAction
+    data object MoveToBackgroundTapped : TranscriptAction
+    data class FailedSendRetryTapped(val messageID: String) : TranscriptAction
+    data class FailedSendEditTapped(val messageID: String) : TranscriptAction
+    data class FailedSendDeleteTapped(val messageID: String) : TranscriptAction
+    data class RunErrorActionTapped(val action: OpenCodeRunError.Action) : TranscriptAction
+    data class RevertToHereTapped(val messageID: String) : TranscriptAction
+    data object RedoTapped : TranscriptAction
+    data class PendingInputSendNowTapped(val inputID: String) : TranscriptAction
+    data class PendingInputMoveToQueueTapped(val inputID: String) : TranscriptAction
+    data class PendingInputCancelTapped(val inputID: String) : TranscriptAction
+    /** A file link or card was tapped (iOS `onOpenFile`): the session opens the media viewer. */
+    data class OpenFile(val file: AgentFileReference) : TranscriptAction
+    /** An image was tapped (iOS `onPreviewImage`): the session opens the zoom viewer. */
+    data class PreviewImage(val preview: TranscriptImagePreview) : TranscriptAction
+}
+
+/**
+ * The link long-press menu's actions (iOS `Browser/LinkMenu.swift` `LinkMenuAction`). Defined
+ * here until `:feature:media` ports the in-app browser's menu; the titles and icons match iOS.
+ */
+enum class LinkMenuAction(val title: String, val systemImage: String) {
+    OpenInAppBrowser("Open in App Browser", "globe"),
+    OpenInSafari("Open in Browser", "safari"),
+    OpenInApp("Open in App", "arrow.up.forward.app"),
+    Copy("Copy Link", "doc.on.doc"),
+    Share("Share…", "square.and.arrow.up"),
+    /** A session ID in a reply (`SessionLink`): TalkBack's open action. */
+    OpenSession("Open Session", "arrow.up.right.square"),
+    CopySessionID("Copy ID", "doc.on.doc"),
+}
+
+/** iOS `TranscriptImagePreview`: decoded pages the zoom viewer shows, in order. */
+@Immutable
+data class TranscriptImagePreview(val id: String, val pages: List<Page>) {
+    @Immutable
+    data class Page(val id: String, val image: ImageBitmap, val label: String)
+
+    constructor(id: String, image: ImageBitmap, label: String) : this(id, listOf(Page(id, image, label)))
+}
+
+/**
+ * Value projection of a subagent session for a transcript tool row (iOS `TranscriptSubagent`),
+ * so rows render from values without observing the session store.
+ */
+@Immutable
+data class TranscriptSubagent(
+    val title: String?,
+    val agent: String?,
+    val isKnown: Boolean,
+    val isRunning: Boolean,
+    val needsInput: Boolean,
+)
+
+/** What a linked session ID resolved to (iOS `SessionLinkTarget`). */
+@Immutable
+sealed interface SessionLinkTarget {
+    /** Asked for, not answered yet: shows the short ID. */
+    data object Resolving : SessionLinkTarget
+    data class Session(val title: String, val parentID: String?) : SessionLinkTarget
+    /** No such session on this server: stays the short ID. */
+    data object Missing : SessionLinkTarget
+}
+
+/** The New divider, above the first row that arrived while the reader was away (iOS `NewMessagesPlacement`). */
+@Immutable
+data class NewMessagesPlacement(val entryID: String, val generation: Int, val showsDivider: Boolean = true) {
+    companion object {
+        /** The reader has read past the divider once its bottom is above the top of what they can see. */
+        fun isPassed(dividerMaxY: Float, offsetY: Float, topInset: Float): Boolean = dividerMaxY <= offsetY + topInset
+    }
+}
+
+/**
+ * Quiet 1–2 line summary when returning to a session with unseen turns (iOS `Session/SinceYouLeft.swift`'s
+ * value type, moved down here because [TranscriptEntry] carries it; generation stays in `:feature:session`).
+ */
+@Immutable
+data class SinceYouLeft(
+    val sessionID: String,
+    val lastItemID: String,
+    val text: String,
+    val phase: Phase,
+    val isFallback: Boolean = false,
+) {
+    enum class Phase { Generating, Done }
+
+    companion object {
+        const val minimumTurnCount = 2
+        const val minimumAbsenceDuration = 60.0
+        /** ~1,200 tokens at ~4 characters per token. */
+        const val maxInputCharacters = 4_800
+        const val maxTokenEstimate = 1_200
+        const val maxCachedSessions = 16
+    }
+}
+
+/**
+ * Everything the list draws (iOS `TranscriptListViewController.Configuration`). The session
+ * builds it from its state; the list diffs it. Upward types iOS reads directly (the Working
+ * line's `WorkingActivity`, the Since You Left row) come in as [TranscriptSlots] instead.
+ */
+@Immutable
+data class TranscriptConfiguration(
+    val server: OpenCodeServer? = null,
+    val sessionID: String? = null,
+    val directory: String? = null,
+    val historyGeneration: Int = 0,
+    val entries: List<TranscriptEntry> = emptyList(),
+    val hasEarlierItems: Boolean = false,
+    val isLoadingEarlier: Boolean = false,
+    val earlierHistoryError: String? = null,
+    val isLoading: Boolean = false,
+    val showsEmptyState: Boolean = true,
+    val isRunning: Boolean = false,
+    val hasPendingRequests: Boolean = false,
+    val showsMoveToBackground: Boolean = false,
+    val actionableRunErrorID: String? = null,
+    val actionableRunErrorActions: List<OpenCodeRunError.Action> = emptyList(),
+    val subagents: Map<String, TranscriptSubagent> = emptyMap(),
+    /** What the session IDs linked in replies name (`SessionLink`). */
+    val sessionLinks: Map<String, SessionLinkTarget> = emptyMap(),
+    val isDraft: Boolean = false,
+    val queuedInputs: List<OpenCodeQueuedInput> = emptyList(),
+    /** Why each failed send failed, by message ID; its bubble offers Retry. */
+    val failedSends: Map<String, String> = emptyMap(),
+    /** A quiet line under a send that's taking a while, by message ID. */
+    val deliveryNotes: Map<String, String> = emptyMap(),
+    /** Messages waiting in the queued pill: a steering row that leaves for one flies into the pill. */
+    val queuedPillTexts: Map<String, String> = emptyMap(),
+    val sentItemID: String? = null,
+    val sendGeneration: Int = 0,
+    /** The New divider, above the first row that arrived while the reader was away. */
+    val newMessages: NewMessagesPlacement? = null,
+)

@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
@@ -76,7 +77,7 @@ fun RollingNumber(
     modifier: Modifier = Modifier,
     style: TextStyle = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
     color: Color = Color.Unspecified,
-    motion: RollingNumberStyle = RollingNumberStyle.Native,
+    motion: RollingNumberStyle = RollingNumberTunables.style(),
     alignment: RollingNumberAlignment = RollingNumberAlignment.Start,
     monospacedDigits: Boolean = true,
     accessibilityLabel: String? = null,
@@ -97,6 +98,7 @@ fun RollingNumber(
         RollingNumberModel.isRollable(text) &&
         motion.duration > 0
 
+    SideEffect { RollingNumberTunables.register() }
     val model = remember { RollingNumberModel() }
     model.sync(text, locale, animated = canRoll, style = motion, nowSeconds = System.nanoTime() / 1e9)
 
@@ -142,7 +144,7 @@ fun RollingNumber(
     modifier: Modifier = Modifier,
     style: TextStyle = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
     color: Color = Color.Unspecified,
-    motion: RollingNumberStyle = RollingNumberStyle.Native,
+    motion: RollingNumberStyle = RollingNumberTunables.style(),
     alignment: RollingNumberAlignment = RollingNumberAlignment.Start,
     accessibilityLabel: String? = null,
 ) {
