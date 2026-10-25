@@ -9,17 +9,16 @@ import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.openCodeTapTarget
-import ai.opencode.feature.session.seams.AttachmentMenuItem
-import ai.opencode.feature.session.seams.AttachmentPickerButton
-import ai.opencode.feature.session.seams.ComposerFileAttachment
-import ai.opencode.feature.session.seams.ComposerFileRouting
+import ai.opencode.feature.composer.AttachmentMenuItem
+import ai.opencode.feature.composer.AttachmentPickerButton
+import ai.opencode.feature.composer.ComposerFileAttachment
+import ai.opencode.feature.composer.ComposerFileRouting
 import ai.opencode.feature.session.seams.ComposerImageSource
 import ai.opencode.feature.session.seams.ComposerMediaLoader
 import ai.opencode.core.files.AttachmentFileType
 import ai.opencode.core.files.ComposerStagedFile
 import ai.opencode.feature.system.share.SharedImageEncoder
-import ai.opencode.feature.session.seams.SharedLocation
-import ai.opencode.feature.session.seams.SharedLocationText
+import ai.opencode.feature.composer.SharedLocation
 import ai.opencode.server.model.OpenCodeOutgoingAttachment
 import ai.opencode.server.model.PastedText
 import android.graphics.BitmapFactory
@@ -440,11 +439,11 @@ fun sessionAttachmentMenuItems(
     keepingLocationRowWhileMenuCloses: Boolean,
     clipboardHasImages: Boolean,
 ): List<AttachmentMenuItem> = buildList {
-    if (hasCamera) add(AttachmentMenuItem.camera)
-    add(AttachmentMenuItem.photos)
-    if (supportsFileUploads) add(AttachmentMenuItem.files)
-    if (!wantsLocationAttachment || keepingLocationRowWhileMenuCloses) add(AttachmentMenuItem.location)
-    if (clipboardHasImages) add(AttachmentMenuItem.paste)
+    if (hasCamera) add(AttachmentMenuItem.Camera)
+    add(AttachmentMenuItem.Photos)
+    if (supportsFileUploads) add(AttachmentMenuItem.Files)
+    if (!wantsLocationAttachment || keepingLocationRowWhileMenuCloses) add(AttachmentMenuItem.Location)
+    if (clipboardHasImages) add(AttachmentMenuItem.Paste)
 }
 
 // endregion
@@ -986,7 +985,7 @@ private fun MapPlaceholder(modifier: Modifier) {
 
 /** iOS `SharedLocation.coordinateText` / `mapsURL`, for the composer's card. */
 object SharedLocationLinks {
-    fun coordinateText(location: SharedLocation): String = SharedLocationText.coordinateText(location)
+    fun coordinateText(location: SharedLocation): String = location.coordinateText
 
     /** Android's maps link: a `geo:` URI at the spot, labelled as iOS's Apple Maps link is. */
     fun mapsURL(location: SharedLocation): String {

@@ -1,28 +1,12 @@
 package ai.opencode.feature.session.seams
 
 import ai.opencode.core.motion.rememberReduceMotion
+import ai.opencode.feature.composer.DictationLevels
 import ai.opencode.core.ui.OpenCodeIcon
-import ai.opencode.core.ui.OpenCodeIconButton
-import ai.opencode.core.ui.OpenCodeIconButtonStyle
-import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
-import ai.opencode.server.model.OpenCodeQueuedInput
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -31,11 +15,8 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlin.math.PI
 import kotlin.math.abs
@@ -43,8 +24,9 @@ import kotlin.math.max
 import kotlin.math.sin
 
 // Stand-ins the session composer (VIEW-COMPOSER: SessionViewComposer*.kt, ComposerViews.kt,
-// DictationViews.kt) needs from Composer/Voice files not ported yet. Each carries only what the
-// composer uses.
+// DictationViews.kt) still uses. The swipe rules and selection mark exist in :feature:composer
+// with a different API (Offset translations; no modifier); the view step adopts them and deletes
+// these. The dot scope is :feature:voice's.
 
 // region Swipe rules (Composer/ComposerTextInput.swift)
 
@@ -132,37 +114,6 @@ class ComposerSwipeOwnership {
 
 // endregion
 
-// region Dictation levels and latency (Composer/DictationClient.swift)
-
-/**
- * SEAM: real type belongs to :feature:composer (iOS `DictationLevels`); delete when that area
- * merges. The microphone's live level (0 silence … 1 loud speech), kept outside the store.
- */
-object DictationLevels {
-    @Volatile
-    var level: Float = 0f
-        private set
-
-    fun set(value: Float) {
-        level = value.coerceIn(0f, 1f)
-    }
-}
-
-/**
- * SEAM: real type belongs to :feature:composer (iOS `DictationLatency`); delete when that area
- * merges. Press-to-step timings for diagnostics; the steps marked from the composer are not
- * logged on iOS either (only `session_active` and `mic_live` are), so this is a no-op.
- */
-object DictationLatency {
-    @Suppress("UNUSED_PARAMETER")
-    fun touchDown(uptimeMillis: Long) = Unit
-
-    @Suppress("UNUSED_PARAMETER")
-    fun mark(step: String) = Unit
-}
-
-// endregion
-
 // region Dot scope (Voice/DotScopeView.swift)
 
 /**
@@ -207,69 +158,7 @@ fun DictationDotScope(leadingInset: Float, trailingInset: Float, modifier: Modif
 
 // endregion
 
-// region Queued messages and selection mark (Composer/QueuedMessagesSheet.swift, RequestDockView.swift)
-
-/**
- * SEAM: real view belongs to :feature:composer (iOS `Composer/QueuedMessagesSheet.swift`); delete
- * when that area merges. Stand-in: a fitted sheet of numbered two-line rows with Send Now and
- * Cancel Message, and Copy (iOS's long-press menu).
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun QueuedMessagesSheet(
-    messages: List<OpenCodeQueuedInput>,
-    onSendNow: (String) -> Unit,
-    onCopy: (String) -> Unit,
-    onCancel: (String) -> Unit,
-    onClose: () -> Unit,
-) {
-    ModalBottomSheet(onDismissRequest = onClose) {
-        Column(Modifier.fillMaxWidth().navigationBarsPadding()) {
-            Text(
-                "Queued Messages",
-                style = OpenCodeTextStyles.headline,
-                color = OpenCodeTheme.colors.text,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-            )
-            if (messages.isEmpty()) {
-                Column(Modifier.fillMaxWidth().padding(vertical = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    OpenCodeIcon(SFSymbol.Tray, contentDescription = null, tint = OpenCodeTheme.colors.secondaryText)
-                    Text("No Queued Messages", style = OpenCodeTextStyles.headline, color = OpenCodeTheme.colors.text)
-                }
-            }
-            LazyColumn(Modifier.padding(top = 4.dp, bottom = 12.dp)) {
-                itemsIndexed(messages, key = { _, it -> it.id }) { index, input ->
-                    if (index > 0) HorizontalDivider(Modifier.padding(start = 20.dp))
-                    Row(
-                        Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            "${index + 1}",
-                            style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium),
-                            color = OpenCodeTheme.colors.secondaryText,
-                            modifier = Modifier.width(20.dp),
-                        )
-                        Text(
-                            input.text,
-                            style = OpenCodeTextStyles.body,
-                            color = OpenCodeTheme.colors.text,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Box {
-                            OpenCodeIconButton(SFSymbol.DocOnDoc, "Copy", { onCopy(input.text) }, style = OpenCodeIconButtonStyle.Standard, iconSize = 18.dp)
-                        }
-                        OpenCodeIconButton(SFSymbol.Trash, "Cancel Message", { onCancel(input.id) }, style = OpenCodeIconButtonStyle.Standard, iconSize = 18.dp)
-                        OpenCodeIconButton(SFSymbol.ArrowUp, "Send Now", { onSendNow(input.id) }, style = OpenCodeIconButtonStyle.Standard, iconSize = 18.dp)
-                    }
-                }
-            }
-        }
-    }
-}
+// region Selection mark (Composer/RequestDockView.swift)
 
 /**
  * SEAM: real view belongs to :feature:composer (iOS `Composer/RequestDockView.swift`

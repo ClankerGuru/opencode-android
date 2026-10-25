@@ -17,7 +17,7 @@ import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.feature.session.header.HeaderBlurTunables
 import ai.opencode.feature.session.header.SessionHeaderStyle
 import ai.opencode.feature.session.header.titleBreathing
-import ai.opencode.feature.session.seams.TranscriptImageCache
+import ai.opencode.feature.media.DecodedImageCache
 import ai.opencode.feature.transcript.TranscriptAction
 import ai.opencode.feature.transcript.TranscriptConfiguration
 import ai.opencode.feature.transcript.TranscriptEntry
@@ -517,7 +517,7 @@ object SessionTranscriptView {
     fun handle(action: TranscriptAction, store: StoreOf<State, Action>, context: Context, host: SessionComposerHost?) {
         when (action) {
             is TranscriptAction.LinkMenu -> {
-                store.send(Action.LinkMenu(action.action, action.url))
+                store.send(Action.LinkMenu(action.action.mediaAction, action.url))
                 if (action.action == LinkMenuAction.Share) {
                     val url = OpenCodePairingLink.shareableURL(action.url) ?: return
                     val send = Intent(Intent.ACTION_SEND).apply {
@@ -543,7 +543,7 @@ object SessionTranscriptView {
         TranscriptAction.ShowEarlierTapped -> Action.ShowEarlierTapped
         is TranscriptAction.CopyTextTapped -> Action.CopyTextTapped(action.text)
         is TranscriptAction.QuoteTextTapped -> Action.QuoteTextTapped(action.text)
-        is TranscriptAction.LinkMenu -> Action.LinkMenu(action.action, action.url)
+        is TranscriptAction.LinkMenu -> Action.LinkMenu(action.action.mediaAction, action.url)
         is TranscriptAction.LinkTapped -> Action.LinkTapped(action.url)
         is TranscriptAction.SessionLinksAppeared -> Action.SessionLinksAppeared(action.ids)
         is TranscriptAction.SubagentTapped -> Action.SubagentTapped(action.sessionID)
@@ -688,13 +688,12 @@ fun CachedImage(id: String, data: ByteArray, modifier: Modifier = Modifier) {
 
 object CachedImage {
     fun decoded(id: String, data: ByteArray): ImageBitmap? {
-        val cache = dependency(TranscriptImageCache)
+        val cache = dependency(DecodedImageCache)
         val key = "attachment:$id"
-        cache.image(key)?.let { return it }
+        cache.image(key)?.let { return it.asImageBitmap() }
         val bitmap = BitmapFactory.decodeByteArray(data, 0, data.size) ?: return null
-        val image = bitmap.asImageBitmap()
-        cache.insert(image, key)
-        return image
+        cache.insert(bitmap, key)
+        return bitmap.asImageBitmap()
     }
 }
 
@@ -899,3 +898,7 @@ private fun MoveToBackgroundAction(activity: WorkingActivity, onMove: () -> Unit
         }
     }
 }
+
+/** The transcript's copy of the link menu's actions, as `:feature:media`'s (the reducer's) type: the same cases. */
+private val LinkMenuAction.mediaAction: ai.opencode.feature.media.LinkMenuAction
+    get() = ai.opencode.feature.media.LinkMenuAction.valueOf(name)

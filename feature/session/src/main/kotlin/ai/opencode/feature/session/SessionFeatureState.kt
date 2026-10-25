@@ -1,17 +1,20 @@
 package ai.opencode.feature.session
 
+import ai.opencode.feature.composer.RequestDockFeature
+import ai.opencode.feature.composer.UndoSnapshot
+import ai.opencode.feature.composer.DraftState
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.feature.session.SessionFeature.State
-import ai.opencode.feature.session.seams.ComposerAttachmentsFeature
-import ai.opencode.feature.session.seams.ComposerFileAttachment
-import ai.opencode.feature.session.seams.DictationFeature
+import ai.opencode.feature.composer.ComposerAttachmentsFeature
+import ai.opencode.feature.composer.ComposerFileAttachment
+import ai.opencode.feature.composer.DictationFeature
 import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.feature.session.seams.ModelSearch
+import ai.opencode.feature.composer.modelpicker.ModelSearch
 import ai.opencode.server.model.ModelVisibility
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
-import ai.opencode.feature.session.seams.SharedComposerDraft
-import ai.opencode.feature.session.seams.SharedLocation
+import ai.opencode.feature.composer.SharedComposerDraft
+import ai.opencode.feature.composer.SharedLocation
 import ai.opencode.feature.transcript.TranscriptEntry
 import ai.opencode.feature.transcript.TranscriptSubagent
 import ai.opencode.feature.session.seams.VoiceBroker
@@ -303,8 +306,8 @@ val State.effectiveDirectory: String? get() = session?.directory ?: draftProject
 
 fun State.updateDictation(transform: (DictationFeature.State) -> DictationFeature.State): State = copy(dictation = transform(dictation))
 
-val State.dictationPhase: DictationFeature.State.Phase get() = dictation.phase
-fun State.withDictationPhase(value: DictationFeature.State.Phase): State = updateDictation { it.copy(phase = value) }
+val State.dictationPhase: DictationFeature.Phase get() = dictation.phase
+fun State.withDictationPhase(value: DictationFeature.Phase): State = updateDictation { it.copy(phase = value) }
 val State.dictationError: String? get() = dictation.error
 fun State.withDictationError(value: String?): State = updateDictation { it.copy(error = value) }
 val State.dictationBase: String get() = dictation.base
@@ -313,18 +316,18 @@ val State.dictationRecording: Int get() = dictation.recording
 fun State.withDictationRecording(value: Int): State = updateDictation { it.copy(recording = value) }
 val State.dictationPress: Int get() = dictation.press
 fun State.withDictationPress(value: Int): State = updateDictation { it.copy(press = value) }
-val State.sendingDictation: DictationFeature.State.Sending? get() = dictation.sending
-fun State.withSendingDictation(value: DictationFeature.State.Sending?): State = updateDictation { it.copy(sending = value) }
+val State.sendingDictation: DictationFeature.Sending? get() = dictation.sending
+fun State.withSendingDictation(value: DictationFeature.Sending?): State = updateDictation { it.copy(sending = value) }
 val State.dictationEndedAt: Instant? get() = dictation.endedAt
 fun State.withDictationEndedAt(value: Instant?): State = updateDictation { it.copy(endedAt = value) }
-val State.dictationHold: DictationFeature.State.Hold? get() = dictation.hold
-fun State.withDictationHold(value: DictationFeature.State.Hold?): State = updateDictation { it.copy(hold = value) }
+val State.dictationHold: DictationFeature.Hold? get() = dictation.hold
+fun State.withDictationHold(value: DictationFeature.Hold?): State = updateDictation { it.copy(hold = value) }
 /** A dictated message on its way to Send: a request arriving meanwhile waits for it. */
 val State.dictationSendPending: Boolean get() = dictation.sendPending
 fun State.withDictationSendPending(value: Boolean): State = updateDictation { it.copy(sendPending = value) }
 /** An answer's recording carried here from the screen it answered on, to stop as this screen's task starts. */
-val State.discardedDictation: DictationFeature.State.Discarded? get() = dictation.discarded
-fun State.withDiscardedDictation(value: DictationFeature.State.Discarded?): State = updateDictation { it.copy(discarded = value) }
+val State.discardedDictation: DictationFeature.Discarded? get() = dictation.discarded
+fun State.withDiscardedDictation(value: DictationFeature.Discarded?): State = updateDictation { it.copy(discarded = value) }
 
 // endregion
 
@@ -359,7 +362,7 @@ fun State.withUnstartedUploadIDs(value: List<UUID>): State = updateComposerAttac
 
 // region Requests (forwarding to `requestDock`)
 
-fun State.updateRequestDock(transform: (RequestDockFeature.State) -> RequestDockFeature.State): State =
+fun State.updateRequestDock(transform: (RequestDockFeature.State<DraftState>) -> RequestDockFeature.State<DraftState>): State =
     copy(requestDock = transform(requestDock))
 
 val State.permissionRequests: List<OpenCodePermissionRequest> get() = requestDock.permissionRequests
@@ -384,8 +387,8 @@ fun State.withRequestsConnectionIsAvailable(value: Boolean): State = updateReque
 val State.requestErrors: Map<String, String> get() = requestDock.requestErrors
 fun State.withRequestErrors(value: Map<String, String>): State = updateRequestDock { it.copy(requestErrors = value) }
 /** While a pending request docks, the composer is its answer, and what was typed waits here. */
-val State.parkedComposer: State.DraftState? get() = requestDock.parkedComposer
-fun State.withParkedComposer(value: State.DraftState?): State = updateRequestDock { it.copy(parkedComposer = value) }
+val State.parkedComposer: DraftState? get() = requestDock.parkedComposer
+fun State.withParkedComposer(value: DraftState?): State = updateRequestDock { it.copy(parkedComposer = value) }
 /** The bar's text for each question page or request it has answered. */
 val State.answerDrafts: Map<String, String> get() = requestDock.answerDrafts
 fun State.withAnswerDrafts(value: Map<String, String>): State = updateRequestDock { it.copy(answerDrafts = value) }
@@ -406,10 +409,10 @@ val State.completedRequestIDs: Set<String> get() = requestDock.completedRequestI
 fun State.withCompletedRequestIDs(value: Set<String>): State = updateRequestDock { it.copy(completedRequestIDs = value) }
 
 /** The composer as an undo/revert left it (the parked composer's while a request holds the bar). */
-val State.undoSnapshot: State.UndoSnapshot?
+val State.undoSnapshot: UndoSnapshot?
     get() = if (parkedComposer != null) parkedComposer?.undoSnapshot else composerAttachments.undoSnapshot
 
-fun State.withUndoSnapshot(value: State.UndoSnapshot?): State {
+fun State.withUndoSnapshot(value: UndoSnapshot?): State {
     val parked = parkedComposer
     return if (parked != null) withParkedComposer(parked.copy(undoSnapshot = value))
     else updateComposerAttachments { it.copy(undoSnapshot = value) }
@@ -420,7 +423,7 @@ val State.dockRequestID: String? get() = requestDock.dockRequestID
 
 /** Drops requests matching [removing] and any answers, pages, errors, or selection for requests no longer pending. */
 fun State.pruneRequests(
-    removing: (PendingRequest) -> Boolean = { false },
+    removing: (id: String, sessionID: String) -> Boolean = { _, _ -> false },
     keepingSelection: Set<String> = emptySet(),
 ): State {
     val (dock, clearedSelection) = requestDock.prune(removing, keepingSelection)
@@ -741,6 +744,10 @@ fun State.updateObservedSession(observed: OpenCodeSession): State {
     return next.renameVoiceTarget(observed.id, observed.title)
 }
 
+/** Whether [id] (an attachment's `UUID` string) was among the attachments the undo restored. */
+private fun UndoSnapshot.hasAttachment(id: String): Boolean =
+    runCatching { UUID.fromString(id) }.getOrNull()?.let { it in attachmentIDs } == true
+
 fun State.clearUntouchedUndoDraft(): State {
     val currentDraft = parkedComposer?.text ?: draft
     val snapshot = undoSnapshot
@@ -750,12 +757,12 @@ fun State.clearUntouchedUndoDraft(): State {
             composer.copy(
                 text = snapshot.priorDraft,
                 location = if (composer.location == snapshot.restoredLocation) snapshot.priorLocation else composer.location,
-                attachments = composer.attachments.filterNot { it.id in snapshot.attachmentIDs },
+                attachments = composer.attachments.filterNot { snapshot.hasAttachment(it.id) },
                 files = composer.files.filterNot { it.id in snapshot.fileIDs },
             )
         }
         if (next.parkedComposer != null) {
-            next = next.withPendingAttachments(next.pendingAttachments.filterNot { it.id in snapshot.attachmentIDs })
+            next = next.withPendingAttachments(next.pendingAttachments.filterNot { snapshot.hasAttachment(it.id) })
                 .withPendingFiles(next.pendingFiles.filterNot { it.id in snapshot.fileIDs })
         }
     }
@@ -807,8 +814,8 @@ val State.isWaitingForUploads: Boolean get() = composerAttachments.isWaitingForU
 val State.hasPromptContent: Boolean get() = draft.isNotBlank() || composerAttachments.hasContent
 
 /** The composer's text, inline media, and files, saved while elsewhere. */
-val State.draftState: State.DraftState
-    get() = State.DraftState(
+val State.draftState: DraftState
+    get() = DraftState(
         text = draft,
         attachments = pendingAttachments,
         files = pendingFiles,
@@ -818,7 +825,7 @@ val State.draftState: State.DraftState
     )
 
 /** iOS `draftState`'s setter. */
-fun State.withDraftState(value: State.DraftState): State =
+fun State.withDraftState(value: DraftState): State =
     withDraft(value.text).copy(
         autocomplete = autocomplete.copy(chips = value.chips),
         composerAttachments = composerAttachments.copy(
@@ -830,7 +837,7 @@ fun State.withDraftState(value: State.DraftState): State =
     )
 
 /** Applies [change] to the session's composer (the parked one while a request holds the bar). */
-fun State.applySessionComposer(change: (State.DraftState) -> State.DraftState): State {
+fun State.applySessionComposer(change: (DraftState) -> DraftState): State {
     val composer = change(sessionComposer)
     if (parkedComposer != null) return withParkedComposer(composer)
     return setTyped(composer.text).copy(
@@ -845,7 +852,7 @@ fun State.applySessionComposer(change: (State.DraftState) -> State.DraftState): 
 }
 
 /** Restores a saved composer. An upload still in flight when it was saved comes back as failed and retryable. */
-fun State.restoreDraft(saved: State.DraftState): State {
+fun State.restoreDraft(saved: DraftState): State {
     var next = applySessionComposer {
         saved.copy(
             files = saved.files.map { file ->
@@ -881,8 +888,8 @@ fun State.typeBelow(text: String): State {
 }
 
 /** Words that won't be sent after all land in this composer, after what's there, with their attachments. */
-fun State.keepAsDraft(kept: State.DraftState): State {
-    val next = applySessionComposer { it.append(kept) }
+fun State.keepAsDraft(kept: DraftState): State {
+    val next = applySessionComposer { it.appending(kept) }
     return if (next.parkedComposer == null) next.clearEditedUndoDraft() else next
 }
 
@@ -908,7 +915,7 @@ fun State.showDictation(transcript: String): State {
 }
 
 /** The composer as typed, without the running recording's words. */
-val State.composerWithoutDictation: State.DraftState
+val State.composerWithoutDictation: DraftState
     get() {
         val composer = draftState
         if (hasLiveDictation && dictationHold == null) {
@@ -924,10 +931,10 @@ fun State.rebaseDictation(typed: String): State {
     return if (text != null) next.withDraft(text) else next
 }
 
-val State.carriedDictation: DictationFeature.State.Carried?
+val State.carriedDictation: DictationFeature.Carried?
     get() {
         if (!hasLiveDictation && sendingDictation == null) return null
-        return DictationFeature.State.Carried(
+        return DictationFeature.Carried(
             phase = dictationPhase,
             recording = dictationRecording,
             press = dictationPress,
@@ -939,19 +946,19 @@ val State.carriedDictation: DictationFeature.State.Carried?
     }
 
 /** Takes over a recording from the screen this one replaces. */
-fun State.adoptDictation(carried: DictationFeature.State.Carried): State {
+fun State.adoptDictation(carried: DictationFeature.Carried): State {
     var next = withDictationRecording(carried.recording).withDictationPress(carried.press).withSendingDictation(carried.sending)
-    if (carried.phase == DictationFeature.State.Phase.Idle) return next
+    if (carried.phase == DictationFeature.Phase.Idle) return next
     if (carried.isAnswer) {
         // An answer's words never land in another session: the mic stops when this screen's task starts.
-        return next.withDiscardedDictation(DictationFeature.State.Discarded(carried.recording, carried.press))
+        return next.withDiscardedDictation(DictationFeature.Discarded(carried.recording, carried.press))
             .withDictationRecording(next.dictationRecording + 1)
     }
     // A message's recording is never an answer: the request waits for it.
     if (next.isAnsweringRequest) next = next.endAnswering()
     val phase = carried.phase
-    next = if (phase is DictationFeature.State.Phase.Finishing && phase.send != null) {
-        next.withDictationPhase(DictationFeature.State.Phase.Finishing(send = null))
+    next = if (phase is DictationFeature.Phase.Finishing && phase.send != null) {
+        next.withDictationPhase(DictationFeature.Phase.Finishing(send = null))
     } else {
         next.withDictationPhase(phase)
     }

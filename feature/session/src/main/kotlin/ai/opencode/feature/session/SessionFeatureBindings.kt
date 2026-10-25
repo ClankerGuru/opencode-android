@@ -1,5 +1,11 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.sharing.ExperimentalFeature
+import ai.opencode.feature.composer.DraftState
+import ai.opencode.feature.composer.ComposerCommandOutcome
+import ai.opencode.feature.composer.ComposerAutocompleteOutcome
+import ai.opencode.feature.composer.ComposerAutocompleteEnvironment
+import ai.opencode.feature.composer.ComposerAutocompleteHost
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.PresentationAction
@@ -8,8 +14,8 @@ import ai.opencode.core.store.Reducer
 import ai.opencode.core.store.cancellable
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.State
-import ai.opencode.feature.session.seams.ComposerAutocompleteReducer
-import ai.opencode.feature.session.seams.DictationFeature
+import ai.opencode.feature.composer.ComposerAutocompleteReducer
+import ai.opencode.feature.composer.DictationFeature
 import ai.opencode.feature.session.seams.DotScopeSimulation
 import ai.opencode.feature.transcript.markdown.MarkdownQuote
 import ai.opencode.feature.session.seams.VoiceFeature
@@ -153,13 +159,19 @@ internal fun SessionFeature.reduceCallAndBindings(state: State, action: Action):
             if (!next.isOnlyReturn(next.draft)) next = next.applyBarEdit()
             next = next.clearEditedUndoDraft()
             val stop = stopDictation(next)
-            val autocomplete = ComposerAutocompleteReducer.draftChanged(stop.state)
+            val autocomplete = applyAutocomplete(
+                stop.state,
+                ComposerAutocompleteReducer.draftChanged(stop.state.autocomplete, stop.state.autocompleteHost, autocompleteEnvironment()),
+            )
             Reduced(autocomplete.state, Effect.merge(stop.effect, autocomplete.effect))
         }
         else -> Reduced(state)
     }
 
-    is Action.Autocomplete -> ComposerAutocompleteReducer.reduce(action.action, state)
+    is Action.Autocomplete -> applyAutocomplete(
+        state,
+        ComposerAutocompleteReducer.reduce(action.action, state.autocomplete, state.autocompleteHost, autocompleteEnvironment()),
+    )
 
     // Folders are browsed only while the Project sheet is open. Cleared once it has gone, so its
     // stack never changes while it slides away.
@@ -274,7 +286,7 @@ private fun SessionFeature.reduceVoice(state: State, action: PresentationAction<
  * otherwise at once (null).
  */
 private fun SessionFeature.callAfterDictation(state: State, atEar: Boolean): Reduced<State, Action>? {
-    if (state.dictationPhase == DictationFeature.State.Phase.Idle && !dictation.holdsAudio()) return null
+    if (state.dictationPhase == DictationFeature.Phase.Idle && !dictation.holdsAudio()) return null
     if (!(state.callsFromRoot || state.session != null || state.draftProject != null)) return null
     val yielded = yieldDictation(state)
     return Reduced(yielded.state, Effect.concatenate(yielded.effect, Effect.send(Action.CallAudioYielded(atEar))))
@@ -324,3 +336,57 @@ private fun SessionFeature.startCall(state: State): Reduced<State, Action> {
     }
     return Reduced(next, Effect.merge(yielded.effect, create))
 }
+
+// region Composer autocomplete (iOS `ComposerAutocompleteReducer`'s `in: &state` arguments)
+
+/** The slice of the session's state the autocomplete reducer reads. */
+internal val State.autocompleteHost: ComposerAutocompleteHost
+    get() = ComposerAutocompleteHost(
+        draft = draft,
+        server = server,
+        effectiveDirectory = effectiveDirectory,
+        isAnsweringRequest = isAnsweringRequest,
+        sessionID = session?.id,
+        projects = projects,
+    )
+
+/** The clients, cancel IDs and session actions iOS passes to every `ComposerAutocompleteReducer` call. */
+internal fun SessionFeature.autocompleteEnvironment(): ComposerAutocompleteEnvironment<Action> = ComposerAutocompleteEnvironment(
+    client = openCodeClient,
+    clock = clock,
+    uuid = uuid,
+    haptics = haptics,
+    isEnabled = experimentalFeatures(ExperimentalFeature.composerAutocomplete),
+    cancelCatalogID = SessionFeature.CancelID.AutocompleteCatalog,
+    cancelCommandsID = SessionFeature.CancelID.AutocompleteCommands,
+    cancelFilesID = SessionFeature.CancelID.AutocompleteFiles,
+    cancelSessionsID = SessionFeature.CancelID.AutocompleteSessions,
+    cancelAutoRunID = SessionFeature.CancelID.AutocompleteAutoRun,
+    cancelCommandWaitID = SessionFeature.CancelID.AutocompleteCommandWait,
+    embed = Action::Autocomplete,
+    sendTapped = { Action.SendTapped },
+    refreshRequestedOpen = { Action.RefreshRequested(RefreshReason.Open) },
+    replyCompleted = { Action.ReplyCompleted(it) },
+)
+
+/**
+ * Applies one autocomplete reduce to the session: its state, the draft it edited (a chosen row or
+ * a deleted chip, written as iOS's `state.draft = …`), and the session-field half of
+ * `commandFinished`.
+ */
+internal fun applyAutocomplete(state: State, outcome: ComposerAutocompleteOutcome<Action>): Reduced<State, Action> {
+    var next = state.copy(autocomplete = outcome.autocomplete)
+    if (outcome.draft != next.draft) next = next.withDraft(outcome.draft)
+    when (val command = outcome.command) {
+        ComposerCommandOutcome.Succeeded -> if (next.session != null) next = next.copy(pendingModel = null)
+        is ComposerCommandOutcome.Failed -> {
+            next = next.copy(isAwaitingReply = false)
+            (command.failure.draft as? DraftState)?.let { next = next.keepAsDraft(it) }
+            next = next.withDictationError(command.failure.error.message)
+        }
+        null -> Unit
+    }
+    return Reduced(next, outcome.effect)
+}
+
+// endregion

@@ -1,5 +1,12 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.store.map
+import ai.opencode.server.model.OpenCodePendingRequests
+import ai.opencode.feature.composer.DraftState
+import ai.opencode.feature.composer.RequestAnswering
+import ai.opencode.feature.composer.RequestReplies
+import ai.opencode.feature.composer.RequestBar
+import ai.opencode.feature.composer.RequestDockFeature
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
@@ -8,11 +15,8 @@ import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.feature.session.seams.isFront
 import ai.opencode.server.OpenCodeClientError
-import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeFormRequest
-import ai.opencode.server.model.OpenCodePermissionReply
 import ai.opencode.server.model.OpenCodePermissionRequest
-import ai.opencode.server.model.PromptContext
 import kotlin.time.Duration.Companion.seconds
 
 // Port of iOS `SessionFeature+Requests.swift`: pending requests (permissions, questions, forms).
@@ -51,7 +55,7 @@ internal fun SessionFeature.reduceRequests(state: State, action: Action): Reduce
             val result = action.result
             val requests = result.getOrNull()
             return if (requests != null) {
-                pendingRequestsLoaded(requests.permissions, requests.forms, state)
+                pendingRequestsLoaded(requests, state)
             } else {
                 val error = result.exceptionOrNull() as? OpenCodeClientError
                     ?: OpenCodeClientError(result.exceptionOrNull()?.message ?: OpenCodeClientError.UNREACHABLE_MESSAGE)
@@ -85,9 +89,9 @@ internal fun SessionFeature.reduceRequests(state: State, action: Action): Reduce
                 )
             }
             val attempt = if (next.requestFailureAwaitingReconnect) {
-                RequestDockFeature.State.LoadAttempt.reconnect
+                RequestDockFeature.State.LoadAttempt.Reconnect
             } else {
-                RequestDockFeature.State.LoadAttempt.initial
+                RequestDockFeature.State.LoadAttempt.Initial
             }
             // Whatever failed for lack of a server gets one quiet second chance now that Home has heard from it again.
             val recovery = ArrayList<Effect<Action>>()
@@ -109,47 +113,16 @@ internal fun SessionFeature.reduceRequests(state: State, action: Action): Reduce
     }
 }
 
-private fun SessionFeature.pendingRequestsLoaded(
-    permissions: List<OpenCodePermissionRequest>,
-    forms: List<OpenCodeFormRequest>,
-    state: State,
-): Reduced<State, Action> {
-    var next = state.withRequestLoadAttempt(null).withRequestFailureAwaitingReconnect(false)
-    val oldIDs = next.reviewRequestIDs.toSet()
-    val docked = next.dockRequestID
-    val completedIDs = next.completedRequestIDs
-    val protectedIDs = next.respondingRequestIDs + next.requestErrors.keys
-    val coveredOwners = next.familySessions.map { it.id }.toSet() + "global"
-    fun <R> reconcile(fetched: List<R>, requests: List<R>, id: (R) -> String, sessionID: (R) -> String): List<R> {
-        val live = fetched.filter { id(it) !in completedIDs }
-        val reconciled = live + requests.filter { previous ->
-            (id(previous) in protectedIDs || sessionID(previous) !in coveredOwners) && live.none { id(it) == id(previous) }
-        }
-        return if (requests != reconciled) reconciled else requests
-    }
-    next = next.updateRequestDock { dock ->
-        dock.copy(
-            permissionRequests = reconcile(permissions, dock.permissionRequests, { it.id }, { it.sessionID }),
-            formRequests = reconcile(forms, dock.formRequests, { it.id }, { it.sessionID }),
-            requestLoadError = null,
-        )
-    }
-    next = next.updateRequestDock { dock ->
-        var answers = dock.formAnswers
-        for (form in dock.formRequests) if (answers[form.id] == null) answers = answers + (form.id to form.defaultAnswers)
-        if (answers === dock.formAnswers) dock else dock.copy(formAnswers = answers)
-    }
-    // Answered elsewhere or interrupted: the dock moves on.
-    next = next.pruneRequests(keepingSelection = next.respondingRequestIDs)
-    val liveReviewIDs = next.reviewRequestIDs.toSet()
-    // What's docked stays until it's answered or the reader picks another; newer requests queue behind it.
-    if (docked != null && docked in liveReviewIDs && next.dockRequestID != docked) next = next.withSelectedRequestID(docked)
+private fun SessionFeature.pendingRequestsLoaded(requests: OpenCodePendingRequests, state: State): Reduced<State, Action> {
+    val reconciled = state.requestDock.reconciled(requests, state.familySessions.map { it.id }.toSet())
+    var next = state.copy(requestDock = reconciled.state)
+    if (reconciled.clearedSelection && next.activePicker == State.ActivePicker.requests) next = next.copy(activePicker = null)
     // Requests dock in the composer's place; nothing opens on its own. A catch-up card's waiting
     // requests were already there.
     val announcesArrivals = next.readsOnView || next.hasLoadedPendingRequests
     if (!next.readsOnView) next = next.copy(hasLoadedPendingRequests = true)
     // A call's bar takes the dock's place and has its own cues.
-    if (announcesArrivals && !next.callOwnsAudio && !next.isCovered && sceneWindow.isFront && (liveReviewIDs - oldIDs).isNotEmpty()) {
+    if (RequestAnswering.announcesArrival(reconciled.arrived, announcesArrivals, next.callOwnsAudio, next.isCovered, sceneWindow.isFront)) {
         haptics.play(Haptic.attention)
     }
     return Reduced(next)
@@ -160,7 +133,7 @@ private fun SessionFeature.pendingRequestsFailed(error: OpenCodeClientError, sta
     var next = state.withRequestLoadAttempt(null)
     if (!next.requestsConnectionIsAvailable) return Reduced(next)
     when (attempt) {
-        RequestDockFeature.State.LoadAttempt.initial -> {
+        RequestDockFeature.State.LoadAttempt.Initial -> {
             // A first failure while connected may be a warm-up hiccup. Retry once before treating it
             // as settled; a reconnect also retries (below).
             next = next.withRequestFailureAwaitingReconnect(true)
@@ -174,7 +147,7 @@ private fun SessionFeature.pendingRequestsFailed(error: OpenCodeClientError, sta
                 }.cancellable(SessionFeature.CancelID.RequestsRetry, cancelInFlight = true),
             )
         }
-        RequestDockFeature.State.LoadAttempt.reconnect, RequestDockFeature.State.LoadAttempt.manual -> {
+        RequestDockFeature.State.LoadAttempt.Reconnect, RequestDockFeature.State.LoadAttempt.Manual -> {
             next = next.withRequestFailureAwaitingReconnect(true).withRequestLoadError(error.message)
         }
         // Periodic projection failures stay quiet. Keep a previously settled failure visible until a
@@ -199,7 +172,7 @@ private fun SessionFeature.reduceRequestDock(action: RequestDockFeature.Action, 
     }
 
     RequestDockFeature.Action.RefreshTapped -> {
-        val next = state.withRequestLoadAttempt(RequestDockFeature.State.LoadAttempt.manual).withRequestLoadError(null)
+        val next = state.withRequestLoadAttempt(RequestDockFeature.State.LoadAttempt.Manual).withRequestLoadError(null)
         Reduced(next, refreshRequests(next))
     }
 
@@ -207,15 +180,18 @@ private fun SessionFeature.reduceRequestDock(action: RequestDockFeature.Action, 
         if (!state.requestsConnectionIsAvailable || state.requestLoadAttempt != null || !state.requestFailureAwaitingReconnect) {
             Reduced(state)
         } else {
-            startPendingWork(state, RequestDockFeature.State.LoadAttempt.reconnect)
+            startPendingWork(state, RequestDockFeature.State.LoadAttempt.Reconnect)
         }
     }
 
-    is RequestDockFeature.Action.PermissionReplyTapped -> replyPermission(action.id, action.reply, action.message, state)
+    is RequestDockFeature.Action.PermissionReplyTapped ->
+        dock(state, RequestReplies.replyPermission(state.requestDock, action.id, action.reply, action.message, state.server))
 
-    is RequestDockFeature.Action.FormSubmitTapped -> submitForm(action.id, state)
+    is RequestDockFeature.Action.FormSubmitTapped ->
+        dock(state, RequestReplies.submitForm(state.requestDock, action.id, state.server, state.effectiveDirectory))
 
-    is RequestDockFeature.Action.FormCancelTapped -> cancelForm(action.id, action.message, state)
+    is RequestDockFeature.Action.FormCancelTapped ->
+        dock(state, RequestReplies.cancelForm(state.requestDock, action.id, action.message, state.server, state.effectiveDirectory))
 
     RequestDockFeature.Action.DismissTapped -> dismissRequest(state)
 
@@ -223,90 +199,32 @@ private fun SessionFeature.reduceRequestDock(action: RequestDockFeature.Action, 
         if (!state.isAnsweringRequest || state.dockRequestID != action.requestID) Reduced(state) else sendRequestBar(state)
     }
 
-    RequestDockFeature.Action.CustomMarkTapped -> {
-        // A choice changed: your own words became the answer, or were set aside.
-        val (next, changed) = state.toggleCustomAnswer()
-        if (changed) haptics.play(Haptic.selection)
-        Reduced(next)
-    }
+    // A choice changed: your own words became the answer, or were set aside.
+    RequestDockFeature.Action.CustomMarkTapped -> Reduced(state.copy(requestDock = RequestReplies.customMarkTapped(state.requestDock, state.draft)))
 
     is RequestDockFeature.Action.ResponseFinished -> {
-        val id = action.requestID
-        val sessionID = action.sessionID
-        val wasResponding = id in state.respondingRequestIDs
-        var next = state.withRespondingRequestIDs(state.respondingRequestIDs - id)
-        val requestIsKnown = next.permissionRequests.any { it.id == id && it.sessionID == sessionID } ||
-            next.formRequests.any { it.id == id && it.sessionID == sessionID }
-        if (!(wasResponding || requestIsKnown || sessionID == "global" || next.familySessions.any { it.id == sessionID })) {
-            Reduced(next)
+        val settled = RequestReplies.responseFinished(
+            state.requestDock, action.sessionID, action.requestID, action.error, state.familySessions.map { it.id }.toSet(),
+        )
+        if (settled == null) {
+            Reduced(state)
         } else {
-            val error = action.error
-            if (error == null) haptics.play(Haptic.success) else haptics.play(Haptic.error)
-            next = if (error != null) {
-                next.withRequestErrors(next.requestErrors + (id to error.message)).withFailedReplyIDs(next.failedReplyIDs + id)
-            } else {
-                next.withCompletedRequestIDs(next.completedRequestIDs + id)
-                    .pruneRequests(removing = { it.id == id }, keepingSelection = next.respondingRequestIDs)
-            }
+            var next = state.copy(requestDock = settled.state)
+            if (settled.clearedSelection && next.activePicker == State.ActivePicker.requests) next = next.copy(activePicker = null)
             Reduced(next, refreshRequests(next))
         }
     }
 }
 
-private fun canRespond(id: String, state: State): Boolean =
-    id !in state.completedRequestIDs && id !in state.respondingRequestIDs
-
-private fun SessionFeature.replyPermission(
-    id: String,
-    reply: OpenCodePermissionReply,
-    message: String?,
+/** A dock reply flow's result, on the session. */
+private fun dock(
     state: State,
-): Reduced<State, Action> {
-    val request = state.permissionRequests.firstOrNull { it.id == id } ?: return Reduced(state)
-    if (!canRespond(id, state) || (reply == OpenCodePermissionReply.Always && request.save.isNullOrEmpty())) return Reduced(state)
-    // Only a denial carries a reason.
-    val reason = if (reply == OpenCodePermissionReply.Reject) message?.trim()?.ifEmpty { null } else null
-    val client = openCodeClient
-    return respond(id, request.sessionID, state) { server ->
-        client.replyPermission(server, request.sessionID, id, reply, reason)
-    }
-}
+    reduced: Reduced<RequestDockFeature.State<DraftState>, RequestDockFeature.Action>,
+): Reduced<State, Action> = Reduced(state.copy(requestDock = reduced.state), reduced.effect.map(Action::RequestDock))
 
-private fun SessionFeature.submitForm(id: String, state: State): Reduced<State, Action> {
-    val form = state.formRequests.firstOrNull { it.id == id } ?: return Reduced(state)
-    if (!canRespond(id, state)) return Reduced(state)
-    val validated = form.validatedAnswer(state.formAnswers[id] ?: emptyMap())
-    val answer = validated.getOrNull()
-    if (answer == null) {
-        val failure = validated.exceptionOrNull() as? OpenCodeFormRequest.ValidationFailure ?: return Reduced(state)
-        haptics.play(Haptic.error)
-        return Reduced(
-            state.withRequestErrors(state.requestErrors + (id to failure.error.message))
-                .withQuestionPageIndices(state.questionPageIndices + (id to failure.error.fieldIndex)),
-        )
-    }
-    val directory = state.effectiveDirectory
-    val client = openCodeClient
-    return respond(id, form.sessionID, state) { server ->
-        // A `"global"` (MCP elicitation) form is answered in the session's location.
-        PromptContext.formLocationDirectory.withValue(directory) { client.replyForm(server, form.sessionID, id, answer) }
-    }
-}
-
-private fun SessionFeature.cancelForm(id: String, message: String?, state: State): Reduced<State, Action> {
-    val form = state.formRequests.firstOrNull { it.id == id } ?: return Reduced(state)
-    if (!canRespond(id, state)) return Reduced(state)
-    val reason = message?.trim()?.ifEmpty { null }
-    val directory = state.effectiveDirectory
-    val client = openCodeClient
-    return respond(id, form.sessionID, state) { server ->
-        PromptContext.formLocationDirectory.withValue(directory) { client.cancelForm(server, form.sessionID, id, reason) }
-    }
-}
-
+/** × (or TalkBack escape): cancels the docked form or rejects the docked permission, with the bar's words; a recording into the bar stops. */
 private fun SessionFeature.dismissRequest(state: State): Reduced<State, Action> {
-    val id = state.dockRequestID ?: return Reduced(state)
-    if (state.respondingRequestIDs.isNotEmpty()) return Reduced(state)
+    if (state.dockRequestID == null || state.respondingRequestIDs.isNotEmpty()) return Reduced(state)
     // A held mic's words are in its bar until it stops.
     val reason = if (state.isAnsweringRequest) state.dictationHold?.text ?: state.draft else null
     var next = state
@@ -316,30 +234,16 @@ private fun SessionFeature.dismissRequest(state: State): Reduced<State, Action> 
         next = stopped.state
         stop = stopped.effect
     }
-    val responded = if (next.formRequests.any { it.id == id }) {
-        cancelForm(id, reason, next)
-    } else {
-        replyPermission(id, OpenCodePermissionReply.Reject, reason, next)
-    }
+    val responded = dock(next, RequestReplies.dismissRequest(next.requestDock, reason, next.server, next.effectiveDirectory))
     return Reduced(responded.state, Effect.merge(stop, responded.effect))
 }
 
 /** Sends the bar while it answers a request: the next page, the answer, or Deny/Dismiss with its words as what to do instead. */
 internal fun SessionFeature.sendRequestBar(state: State): Reduced<State, Action> {
-    val id = state.dockRequestID ?: return Reduced(state)
-    val bar = state.requestBar ?: return Reduced(state)
-    if (state.respondingRequestIDs.isNotEmpty()) return Reduced(state)
-    return when (bar) {
-        is RequestBar.Decline -> dismissRequest(state)
-        is RequestBar.Answer, is RequestBar.Choose -> {
-            if (!bar.isReady) return Reduced(state)
-            val page = state.dockedFormPage
-            if (!bar.isLast && page != null) {
-                return Reduced(state.copy(requestDock = state.requestDock.changeQuestionPage(id, page.page + 1)))
-            }
-            submitForm(id, state)
-        }
-    }
+    if (state.dockRequestID == null || state.respondingRequestIDs.isNotEmpty()) return Reduced(state)
+    // Deny/Dismiss carries the bar's words, and stops a recording into it, as × does.
+    if (state.requestBar is RequestBar.Decline) return dismissRequest(state)
+    return dock(state, RequestReplies.sendRequestBar(state.requestDock, state.draft, reason = null, state.server, state.effectiveDirectory))
 }
 
 /**
@@ -378,32 +282,4 @@ internal fun SessionFeature.reconcileAnswering(old: AnswerContext, state: State)
         stop = stopped.effect
     }
     return Reduced(next.moveAnswer(), stop)
-}
-
-/**
- * Marks a request as being answered, then reports how the reply settled. Callers own validation;
- * `requestResponseFinished` owns the outcome.
- */
-private fun respond(
-    requestID: String,
-    sessionID: String,
-    state: State,
-    reply: suspend (OpenCodeServer) -> Unit,
-): Reduced<State, Action> {
-    val next = state.withRequestErrors(state.requestErrors - requestID)
-        .withFailedReplyIDs(state.failedReplyIDs - requestID)
-        .withRespondingRequestIDs(state.respondingRequestIDs + requestID)
-    val server = next.server
-    return Reduced(
-        next,
-        Effect.run { send ->
-            val error = try {
-                reply(server)
-                null
-            } catch (error: OpenCodeClientError) {
-                error
-            }
-            send(Action.requestResponseFinished(sessionID, requestID, error))
-        },
-    )
 }

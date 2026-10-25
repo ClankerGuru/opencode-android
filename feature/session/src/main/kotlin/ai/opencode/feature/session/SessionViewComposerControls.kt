@@ -1,5 +1,7 @@
 package ai.opencode.feature.session
 
+import ai.opencode.feature.composer.MicPressCallbacks
+import ai.opencode.feature.composer.RequestBar
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.ui.OpenCodeIcon
@@ -302,9 +304,9 @@ internal fun SessionComposerEnv.AnswerTrailingControls(bar: RequestBar) {
                             store.send(Action.SendTapped)
                         }
                         .semantics(mergeDescendants = true) {
-                            contentDescription = bar.verb.rawValue
+                            contentDescription = bar.verb.title
                             if (s.draft.isNotEmpty()) stateDescription = "Tells the agent what to do instead"
-                            testTag = if (bar.verb == RequestBar.Verb.deny) "request-deny" else "request-decline"
+                            testTag = if (bar.verb == RequestBar.Verb.Deny) "request-deny" else "request-decline"
                         },
                     contentAlignment = Alignment.Center,
                 ) {
@@ -319,7 +321,7 @@ internal fun SessionComposerEnv.AnswerTrailingControls(bar: RequestBar) {
                         if (responding) {
                             CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                         } else {
-                            Text(bar.verb.rawValue, style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold), color = OpenCodeTheme.colors.text)
+                            Text(bar.verb.title, style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold), color = OpenCodeTheme.colors.text)
                         }
                     }
                 }

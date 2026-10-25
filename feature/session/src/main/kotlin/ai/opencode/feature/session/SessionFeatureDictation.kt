@@ -1,5 +1,6 @@
 package ai.opencode.feature.session
 
+import ai.opencode.feature.composer.DraftState
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
@@ -7,17 +8,12 @@ import ai.opencode.core.store.map
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.CancelID
 import ai.opencode.feature.session.SessionFeature.State
-import ai.opencode.feature.session.seams.DictationFeature
-import ai.opencode.feature.session.seams.DictationHoldRelease
-import ai.opencode.feature.session.seams.enterBackground
-import ai.opencode.feature.session.seams.finish
-import ai.opencode.feature.session.seams.start
-import ai.opencode.feature.session.seams.stop
-import ai.opencode.feature.session.seams.syncAndFlushPersistedComposer
+import ai.opencode.feature.composer.DictationFeature
+import ai.opencode.feature.composer.DictationHoldRelease
 import ai.opencode.server.model.OpenCodeDelivery
 
-// Port of iOS `SessionFeature+Dictation.swift`: the mic and dictation. `DictationFeature` (a composer
-// seam until :feature:composer merges) owns the recording's state; this file is the session's glue.
+// Port of iOS `SessionFeature+Dictation.swift`: the mic and dictation. `:feature:composer`'s
+// `DictationFeature` owns the recording's state; this file is the session's glue.
 
 /** The mic and dictation. Null: the action passes on. */
 internal fun SessionFeature.reduceDictation(state: State, action: Action): Reduced<State, Action>? {
@@ -89,7 +85,7 @@ private fun SessionFeature.micPressBegan(state: State): Reduced<State, Action> {
     if (state.isDictating || state.callOwnsAudio) return Reduced(state)
     var next = state
     val phase = next.dictationPhase
-    if (phase is DictationFeature.State.Phase.Finishing) {
+    if (phase is DictationFeature.Phase.Finishing) {
         // Let go to send and pressed again before its last words landed: that message finalizes
         // and goes out on its own, with its draft, and this press records the next one into an
         // empty composer.
@@ -102,7 +98,7 @@ private fun SessionFeature.micPressBegan(state: State): Reduced<State, Action> {
         }
         val draft = next.draftState.copy(text = hold.text)
         next = next.withSendingDictation(
-            DictationFeature.State.Sending(
+            DictationFeature.Sending(
                 recording = next.dictationRecording,
                 draft = draft,
                 delivery = send,
@@ -110,11 +106,11 @@ private fun SessionFeature.micPressBegan(state: State): Reduced<State, Action> {
                 sessionID = next.session?.id,
             ),
         )
-        next = next.withDictationRecording(next.dictationRecording + 1).withDraftState(State.DraftState())
+        next = next.withDictationRecording(next.dictationRecording + 1).withDraftState(DraftState())
     }
     haptics.play(Haptic.tap)
     val start = startDictation(next)
-    return Reduced(start.state.withDictationHold(DictationFeature.State.Hold(text = start.state.draft)), start.effect)
+    return Reduced(start.state.withDictationHold(DictationFeature.Hold(text = start.state.draft)), start.effect)
 }
 
 private fun SessionFeature.micPressReleased(state: State): Reduced<State, Action> {
@@ -127,12 +123,12 @@ private fun SessionFeature.micPressReleased(state: State): Reduced<State, Action
         return Reduced(state.withDictationHold(hold.copy(isLocked = true, armed = null)))
     }
     when (hold.armed) {
-        DictationFeature.State.Hold.Arm.lock -> {
+        DictationFeature.Hold.Arm.Lock -> {
             // Stays armed: the bar knows it was slid open, not tapped.
             haptics.play(Haptic.selection)
             return Reduced(state.withDictationHold(hold.copy(isLocked = true)))
         }
-        DictationFeature.State.Hold.Arm.cancel -> return Reduced(state, Effect.send(Action.micPressCancelled))
+        DictationFeature.Hold.Arm.Cancel -> return Reduced(state, Effect.send(Action.micPressCancelled))
         null -> Unit
     }
     if (state.isPreparingDictation) {
@@ -140,7 +136,7 @@ private fun SessionFeature.micPressReleased(state: State): Reduced<State, Action
         // Stopping now would abort setup, so recording goes on hands-free, as after a tap.
         return Reduced(state.withDictationHold(hold.copy(isLocked = true)))
     }
-    if (state.dictationPhase != DictationFeature.State.Phase.Recording) return Reduced(state)
+    if (state.dictationPhase != DictationFeature.Phase.Recording) return Reduced(state)
     haptics.play(Haptic.tap)
     return finishDictation(state, send = OpenCodeDelivery.Steer)
 }
@@ -192,7 +188,7 @@ private fun SessionFeature.sendingDictationStopped(errorMessage: String?, record
 private fun SessionFeature.dictationStopped(errorMessage: String?, state: State): Reduced<State, Action> {
     if (!(state.isDictating || state.isFinishingDictation)) return Reduced(state)
     val phase = state.dictationPhase
-    val delivery = (phase as? DictationFeature.State.Phase.Finishing)?.send
+    val delivery = (phase as? DictationFeature.Phase.Finishing)?.send
     var next = state.withDictationError(errorMessage)
     if (errorMessage != null) haptics.play(Haptic.error)
     // A held mic's words reach the draft only now: sent on success, kept for editing if the engine failed.
@@ -226,7 +222,7 @@ private fun SessionFeature.startDictation(state: State): Reduced<State, Action> 
  * call unconditionally: a no-op unless dictation is active.
  */
 internal fun SessionFeature.stopDictation(state: State): Reduced<State, Action> {
-    val endedAt = if (state.dictationPhase != DictationFeature.State.Phase.Idle && state.isVoiceAvailable) date.now() else null
+    val endedAt = if (state.dictationPhase != DictationFeature.Phase.Idle && state.isVoiceAvailable) date.now() else null
     val stopped = DictationFeature.stop(state.dictation, endedAt = endedAt, dictation = dictation)
     return Reduced(state.copy(dictation = stopped.state), stopped.effect.map(Action::Dictation))
 }
@@ -240,7 +236,7 @@ internal fun SessionFeature.yieldDictation(state: State): Reduced<State, Action>
     val hold = state.dictationHold
     val kept = if (hold != null) state.withDraft(hold.text) else state
     val stop = stopDictation(kept)
-    return Reduced(stop.state, Effect.concatenate(stop.effect, releaseDictationHold(DictationHoldRelease.call)))
+    return Reduced(stop.state, Effect.concatenate(stop.effect, releaseDictationHold(DictationHoldRelease.Call)))
 }
 
 /**

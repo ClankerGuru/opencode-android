@@ -1,5 +1,7 @@
 package ai.opencode.feature.session
 
+import ai.opencode.feature.composer.RequestDockFeature
+import ai.opencode.feature.composer.PromptOutbox
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
@@ -8,7 +10,6 @@ import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.CancelID
 import ai.opencode.feature.session.seams.VoiceDraftSessionCreated
 import ai.opencode.feature.session.seams.isOnDraft
-import ai.opencode.feature.session.seams.promoteDraftOutboxToSession
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeDelivery
@@ -140,7 +141,7 @@ private fun SessionFeature.sessionCreated(
     }
     // A call on the draft moves onto its session, as if it started there.
     val call: Effect<Action> = if (s.voice?.isOnDraft == true) Effect.send(Action.voicePresented(VoiceDraftSessionCreated(session))) else Effect.none()
-    val pending = startPendingWork(s, attempt = RequestDockFeature.State.LoadAttempt.initial)
+    val pending = startPendingWork(s, attempt = RequestDockFeature.State.LoadAttempt.Initial)
     return Reduced(pending.state, Effect.merge(pending.effect, call))
 }
 

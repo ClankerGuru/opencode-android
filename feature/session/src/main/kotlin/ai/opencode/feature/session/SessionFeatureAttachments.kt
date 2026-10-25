@@ -7,15 +7,12 @@ import ai.opencode.core.store.map
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.core.files.AttachmentFileType
-import ai.opencode.feature.session.seams.ComposerAttachmentsFeature
-import ai.opencode.feature.session.seams.ComposerFileAttachment
-import ai.opencode.feature.session.seams.cancelUpload
-import ai.opencode.feature.session.seams.readInlineFile
-import ai.opencode.server.OpenCodeClientError
+import ai.opencode.feature.composer.ComposerAttachmentsFeature
+import ai.opencode.feature.composer.ComposerFileAttachment
 
 // Port of iOS `SessionFeature+Attachments.swift`: attachments, uploads, and Location as the session
-// sees them. `ComposerAttachmentsFeature` (a composer seam until :feature:composer merges) reduces
-// the rest of each action first.
+// sees them. `:feature:composer`'s `ComposerAttachmentsFeature` reduces the rest of each action
+// first.
 
 /** Attachments, uploads, and Location. Null: the action passes on. */
 internal fun SessionFeature.reduceAttachments(state: State, action: Action): Reduced<State, Action>? {
@@ -88,11 +85,12 @@ internal fun SessionFeature.reduceAttachments(state: State, action: Action): Red
 
         is ComposerAttachmentsFeature.Action.FileUploadFinished -> {
             val id = attachments.id
-            val path = attachments.result.getOrNull()
-            if (path != null) {
+            val result = attachments.result
+            if (result is ComposerAttachmentsFeature.Outcome.Success) {
+                val path = result.value
                 sendIfUploadsFinished(updateFile(id, state) { it.copy(status = ComposerFileAttachment.Status.Uploaded(path)) })
             } else {
-                val isUnsupported = (attachments.result.exceptionOrNull() as? OpenCodeClientError)?.isUnsupported == true
+                val isUnsupported = (result as? ComposerAttachmentsFeature.Outcome.Failure)?.error?.isUnsupported == true
                 if (isUnsupported) {
                     val serverID = state.server.persistenceID
                     state.uploadUnsupportedServerIDs.update { it + serverID }
@@ -123,7 +121,7 @@ internal fun SessionFeature.reduceAttachments(state: State, action: Action): Red
             val found = state.pendingLocation
             val parked = state.parkedComposer
             // Asked for the message: it waits there while the bar answers.
-            if (attachments.result.isSuccess && parked != null && found != null) {
+            if (attachments.result is ComposerAttachmentsFeature.Outcome.Success && parked != null && found != null) {
                 Reduced(state.withParkedComposer(parked.copy(location = found)).withPendingLocation(null))
             } else {
                 Reduced(state)
@@ -141,7 +139,7 @@ internal fun SessionFeature.reduceAttachments(state: State, action: Action): Red
                 Reduced(
                     send.state,
                     Effect.merge(
-                        ComposerAttachmentsFeature.cancelUpload(file.id, discardURL = file.localURL).map(Action::ComposerAttachments),
+                        ComposerAttachmentsFeature.cancelUpload(file.id, discardPath = file.localPath).map(Action::ComposerAttachments),
                         send.effect,
                     ),
                 )

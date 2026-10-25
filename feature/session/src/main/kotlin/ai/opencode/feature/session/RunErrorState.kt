@@ -1,10 +1,11 @@
 package ai.opencode.feature.session
 
+import ai.opencode.feature.composer.PendingPrompt
 import ai.opencode.core.dependencies.UuidClient
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.store.Effect
 import ai.opencode.feature.session.SessionFeature.State
-import ai.opencode.feature.session.seams.ComposerFileAttachment
+import ai.opencode.feature.composer.ComposerFileAttachment
 import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.feature.transcript.TranscriptEntry
@@ -122,7 +123,7 @@ fun State.restoredPrompt(messageID: String, uuid: UuidClient = dependency(UuidCl
         when {
             pasted != null -> attachments += PastedText.attachment(pasted, id = uuid.next().toString())
             path != null -> composerFiles += ComposerFileAttachment(
-                id = uuid.next(), name = file.name, mime = file.mime, size = 0, localURL = path,
+                id = uuid.next(), name = file.name, mime = file.mime, size = 0, localPath = path,
                 status = ComposerFileAttachment.Status.Uploaded(path),
             )
             else -> return null

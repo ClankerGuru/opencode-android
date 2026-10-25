@@ -2,7 +2,7 @@ package ai.opencode.feature.session
 
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
-import ai.opencode.feature.session.seams.AttachmentPickerButton
+import ai.opencode.feature.composer.AttachmentPickerButton
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts

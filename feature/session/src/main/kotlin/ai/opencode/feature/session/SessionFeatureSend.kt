@@ -1,5 +1,15 @@
 package ai.opencode.feature.session
 
+import ai.opencode.feature.composer.SharedLocation
+import ai.opencode.feature.composer.AutocompleteItem
+import ai.opencode.feature.composer.ComposerCommandResult
+import ai.opencode.feature.composer.ComposerAutocompleteAction
+import ai.opencode.core.store.map
+import ai.opencode.feature.composer.PromptOutbox
+import ai.opencode.feature.composer.DeliveryOutcome
+import ai.opencode.feature.composer.PendingPrompt
+import ai.opencode.feature.composer.UndoSnapshot
+import ai.opencode.feature.composer.DraftState
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.log.AppLog
 import ai.opencode.core.store.Effect
@@ -7,25 +17,19 @@ import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.cancellable
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.State
-import ai.opencode.feature.session.seams.ComposerAttachmentsFeature
-import ai.opencode.feature.session.seams.ComposerAutocompleteChip
-import ai.opencode.feature.session.seams.ComposerAutocompleteCommandFinished
-import ai.opencode.feature.session.seams.ComposerAutocompleteDraftResolution
-import ai.opencode.feature.session.seams.ComposerCommandFailure
-import ai.opencode.feature.session.seams.ComposerFileAttachment
-import ai.opencode.feature.session.seams.ComposerUploadCancelID
-import ai.opencode.feature.session.seams.DictationFeature
-import ai.opencode.feature.session.seams.DictationHoldRelease
+import ai.opencode.feature.composer.ComposerAttachmentsFeature
+import ai.opencode.feature.composer.ComposerAutocompleteChip
+import ai.opencode.feature.composer.ComposerAutocompleteDraftResolution
+import ai.opencode.feature.composer.ComposerCommandFailure
+import ai.opencode.feature.composer.ComposerFileAttachment
+import ai.opencode.feature.composer.DictationFeature
+import ai.opencode.feature.composer.DictationHoldRelease
 import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.diagnostics.LabMarks
-import ai.opencode.feature.session.seams.PageShareRequest
+import ai.opencode.server.model.PageShareRequest
 import ai.opencode.feature.transcript.SessionLinkTarget
-import ai.opencode.feature.session.seams.SharedComposerDraft
-import ai.opencode.feature.session.seams.SharedDraftTarget
-import ai.opencode.feature.session.seams.SharedLocationText
-import ai.opencode.feature.session.seams.clearForSend
-import ai.opencode.feature.session.seams.prompt
-import ai.opencode.feature.session.seams.sessionPayload
+import ai.opencode.feature.composer.SharedComposerDraft
+import ai.opencode.feature.composer.SharedDraftTarget
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeAutocompleteMentions
@@ -40,44 +44,17 @@ import ai.opencode.server.model.OpenCodePromptSource
 import ai.opencode.server.model.OpenCodeRunError
 import ai.opencode.server.model.OpenCodeTranscriptFile
 import ai.opencode.server.model.OpenCodeTranscriptItem
-import ai.opencode.server.model.OpenCodeUploadEvent
 import ai.opencode.server.model.PastedText
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
-import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.UUID
 
 // Port of iOS `SessionFeature+Send.swift`: sends, failed sends, run errors, and undo.
-
-/** iOS `SessionFeature.PendingPrompt`: one send, as the outbox delivers it. */
-data class PendingPrompt(
-    val messageID: String,
-    val text: String,
-    val attachments: List<OpenCodeOutgoingAttachment>,
-    val files: List<ComposerFileAttachment> = emptyList(),
-    val wasRunning: Boolean = false,
-    /** Voice owns its run separately; remembering its row must not keep a composer's `isAwaitingReply` alive after the server reports idle. */
-    val ownsRun: Boolean = true,
-    val delivery: OpenCodeDelivery = OpenCodeDelivery.Steer,
-    val requestEpoch: Int,
-    /** Applied (`POST …/model`) just before the prompt, as the TUI does: a pick made since the last send, or a draft's model. */
-    val model: OpenCodeModelRef? = null,
-    /** Agent Selection: applied (`POST …/agent`) just before the prompt, like [model], when the session doesn't have it yet. */
-    val agent: String? = null,
-    /** Sent from the in-app browser's open page: read at delivery and folded into the body (`PromptPageContext`). */
-    val page: PageShareRequest? = null,
-    /** Structured autocomplete mentions folded into `PromptBody`. */
-    val mentions: OpenCodeAutocompleteMentions? = null,
-    /** Chosen autocomplete chips carried with the prompt for edit/restore. */
-    val chips: List<ComposerAutocompleteChip> = emptyList(),
-) {
-    /** A queued send posted mid-run: the run it waits behind keeps its model. */
-    val waitsBehindRun: Boolean get() = wasRunning && delivery == OpenCodeDelivery.Queue
-}
 
 /** Sends, failed sends, run errors, and undo. Null: the action passes on. */
 internal fun SessionFeature.reduceSending(state: State, action: Action): Reduced<State, Action>? {
@@ -96,7 +73,7 @@ internal fun SessionFeature.reduceSending(state: State, action: Action): Reduced
             val delivery = if (action == Action.QueueTapped) OpenCodeDelivery.Queue else OpenCodeDelivery.Steer
             // Dictated into the draft, then sent: the audio held for another press isn't needed.
             val sent = sendComposer(delivery, state)
-            return Reduced(sent.state, Effect.merge(releaseDictationHold(DictationHoldRelease.sent), sent.effect))
+            return Reduced(sent.state, Effect.merge(releaseDictationHold(DictationHoldRelease.Sent), sent.effect))
         }
 
         is Action.FailedSendRetryTapped -> {
@@ -333,7 +310,7 @@ internal fun SessionFeature.sendComposer(
     } else {
         null
     }
-    next = next.copy(autocomplete = next.autocomplete.clearForSend()).withDraftState(State.DraftState())
+    next = next.copy(autocomplete = next.autocomplete.clearForSend()).withDraftState(DraftState())
     if (autocompleteResolution is ComposerAutocompleteDraftResolution.Command) {
         val command = autocompleteResolution.execution
         next = next.copy(sharedMessageID = null)
@@ -365,9 +342,9 @@ internal fun SessionFeature.sendComposer(
                             return@run
                         }
                         client.sendCommand(server, sessionID, command.name, command.argumentsText, command.mentions, delivery)
-                        send(Action.Autocomplete(ComposerAutocompleteCommandFinished(Result.success(sessionID))))
+                        send(Action.Autocomplete(ComposerAutocompleteAction.CommandFinished(ComposerCommandResult.Success(sessionID))))
                     } catch (error: OpenCodeClientError) {
-                        send(Action.Autocomplete(ComposerAutocompleteCommandFinished(Result.failure(ComposerCommandFailure(error, savedDraft)))))
+                        send(Action.Autocomplete(ComposerAutocompleteAction.CommandFinished(ComposerCommandResult.Failure(ComposerCommandFailure(error, savedDraft)))))
                     }
                 }.cancellable(SessionFeature.CancelID.AutocompleteCommand, cancelInFlight = true),
             ),
@@ -385,7 +362,7 @@ internal fun SessionFeature.sendComposer(
     }
     // Their titles are known: the sent bubble's chips show them at once.
     for (chip in sentChips) {
-        val session = chip.sessionPayload ?: continue
+        val session = (chip.item.payload as? AutocompleteItem.Payload.Session)?.session ?: continue
         if (next.sessionLinks[session.id] == null) {
             next = next.copy(sessionLinks = next.sessionLinks + (session.id to SessionLinkTarget.Session(session.title, null)))
         }
@@ -411,19 +388,15 @@ internal fun SessionFeature.sendComposer(
  * A finished recording that won't be sent: its words go to the draft of the session it was meant
  * for, here, in a subagent of this family, or through Home for another session.
  */
-internal fun SessionFeature.keepUnsent(sending: DictationFeature.State.Sending, state: State): Reduced<State, Action> {
+internal fun SessionFeature.keepUnsent(sending: DictationFeature.Sending, state: State): Reduced<State, Action> {
     if (sending.sessionID == state.session?.id) return Reduced(state.keepAsDraft(sending.draft))
     val target = sending.sessionID
-    // A catch-up card keeps its family's drafts in state (iOS `familyDrafts`); a screen that reads
-    // on view keeps them in composer persistence, which Home owns until that port lands here.
-    if (target != null && !state.readsOnView && state.familySessions.any { it.id == target }) {
-        val drafts = state.catchUpFamilyDrafts
-        val merged = (drafts[target] ?: State.DraftState()).append(sending.draft)
-        val updated = if (merged.isEmptyDraft) drafts - target else drafts + (target to merged)
-        return Reduced(state.copy(catchUpFamilyDrafts = updated))
+    if (target != null && state.familySessions.any { it.id == target }) {
+        val merged = (state.familyDrafts[target] ?: DraftState()).appending(sending.draft)
+        return Reduced(state.settingFamilyDraft(target, merged))
     }
     val draftTarget = if (target == null) SharedDraftTarget.NewSession else SharedDraftTarget.Session(target)
-    return Reduced(state, Effect.send(Action.Delegate(SessionFeature.Delegate.KeepDraft(draftTarget, sharedDraft(sending.draft)))))
+    return Reduced(state, Effect.send(Action.Delegate(SessionFeature.Delegate.KeepDraft(draftTarget, SharedComposerDraft(composer = sending.draft)))))
 }
 
 /** Streams one composer file to the server. Progress and the result route back by ID, so a family switch that parks the draft keeps it moving. */
@@ -435,54 +408,9 @@ internal fun SessionFeature.upload(id: UUID, state: State): Reduced<State, Actio
     val file = target ?: return Reduced(next)
     return Reduced(
         next,
-        uploadEffect(file, next.server, next.effectiveDirectory, next.supportsFileUploads),
+        ComposerAttachmentsFeature.upload(file, next.server, next.effectiveDirectory, next.supportsFileUploads, openCodeClient)
+            .map(Action::ComposerAttachments),
     )
-}
-
-/** iOS `ComposerAttachmentsFeature.upload(_:server:directory:supportsFileUploads:openCodeClient:)`, mapped to the session's action. */
-private fun SessionFeature.uploadEffect(
-    file: ComposerFileAttachment,
-    server: OpenCodeServer,
-    directory: String?,
-    supportsFileUploads: Boolean,
-): Effect<Action> {
-    val id = file.id
-    if (!supportsFileUploads) {
-        return Effect.send(Action.fileUploadFinished(id, Result.failure(OpenCodeClientError.uploadsUnsupported)))
-    }
-    val uploadFile = openCodeClient.uploadFile
-    return Effect.run<Action> { send ->
-        val local = File(file.localURL.removePrefix("file://"))
-        try {
-            uploadFile(server, directory, local, file.name).collect { event ->
-                when (event) {
-                    is OpenCodeUploadEvent.Progress -> send(Action.fileUploadProgress(id, event.sent))
-                    is OpenCodeUploadEvent.Finished -> {
-                        // The server has its copy; drop ours even if the session changed.
-                        withContext(Dispatchers.IO) { runCatching { local.delete() } }
-                        send(Action.fileUploadFinished(id, Result.success(event.path)))
-                        throw UploadFinished
-                    }
-                }
-            }
-            if (!currentCoroutineContext().isActive) return@run
-            send(Action.fileUploadFinished(id, Result.failure(OpenCodeClientError("The upload ended early."))))
-        } catch (_: UploadFinished) {
-            // Done.
-        } catch (cancellation: CancellationException) {
-            throw cancellation
-        } catch (error: Exception) {
-            if (!currentCoroutineContext().isActive) return@run
-            val failure = error as? OpenCodeClientError ?: OpenCodeClientError(error.localizedMessage ?: "The upload failed.")
-            send(Action.fileUploadFinished(id, Result.failure(failure)))
-        }
-    }.cancellable(ComposerUploadCancelID(id), cancelInFlight = true)
-}
-
-/** Ends collecting an upload once the server has the file. */
-private object UploadFinished : Exception() {
-    private fun readResolve(): Any = UploadFinished
-    override fun fillInStackTrace(): Throwable = this
 }
 
 /** Applies [change] to the file wherever its draft currently lives. */
@@ -496,12 +424,12 @@ internal fun updateFile(id: UUID, state: State, change: (ComposerFileAttachment)
     if (parked != null && parkedIndex >= 0) {
         return state.withParkedComposer(parked.copy(files = parked.files.toMutableList().also { it[parkedIndex] = change(it[parkedIndex]) }))
     }
-    // A catch-up card's family drafts (iOS `familyDrafts`; persisted drafts wait for the composer persistence port).
-    for ((key, draft) in state.catchUpFamilyDrafts) {
+    val drafts = state.familyDrafts
+    for (key in drafts.keys) {
+        val draft = drafts[key] ?: continue
         val index = draft.files.indexOfFirst { it.id == id }
         if (index < 0) continue
-        val updated = draft.copy(files = draft.files.toMutableList().also { it[index] = change(it[index]) })
-        return state.copy(catchUpFamilyDrafts = state.catchUpFamilyDrafts + (key to updated))
+        return state.settingFamilyDraft(key, draft.copy(files = draft.files.toMutableList().also { it[index] = change(it[index]) }))
     }
     return state
 }
@@ -544,7 +472,7 @@ internal fun SessionFeature.submit(
     if (session != null) {
         target = SessionFeature.SendTarget.Existing(session.id)
     } else {
-        val directory = persistedDraftDirectory(messageID, isRetry) ?: next.draftProject?.directory ?: return Reduced(next)
+        val directory = persistedDraftDirectory(messageID, isRetry, next) ?: next.draftProject?.directory ?: return Reduced(next)
         next = next.copy(draftProject = OpenCodeProject.folder(directory, next.projects))
         target = SessionFeature.SendTarget.NewSession(directory)
     }
@@ -719,8 +647,8 @@ private fun returnToComposer(
         if (appendText) SharedComposerDraft.joined(existing, incoming) else SharedComposerDraft.joined(incoming, existing)
     val next = state.applySessionComposer { composer ->
         // Session chips went as `@session:<id>`: their titles come back.
-        val text = ComposerAutocompleteDraftResolution.draftText(fromSent = pending.text, chips = pending.chips)
-        val shared = SharedLocationText.parse(text)
+        val text = ComposerAutocompleteDraftResolution.draftText(sent = pending.text, chips = pending.chips)
+        val shared = SharedLocation.parse(text)
         var updated = if (shared != null) {
             val (location, remainder) = shared
             composer.copy(
@@ -779,12 +707,12 @@ internal fun fillComposerDraft(pending: PendingPrompt, state: State, focus: Bool
     val prior = next.sessionComposer
     next = returnToComposer(pending, next, appendText = true, preferReturnedLocation = true)
     next = next.withUndoSnapshot(
-        State.UndoSnapshot(
+        UndoSnapshot(
             restoredDraft = next.parkedComposer?.text ?: next.draft,
             priorDraft = prior.text,
             restoredLocation = next.sessionComposer.location,
             priorLocation = prior.location,
-            attachmentIDs = pending.attachments.map { it.id }.toSet(),
+            attachmentIDs = pending.attachments.mapNotNull { runCatching { UUID.fromString(it.id) }.getOrNull() }.toSet(),
             fileIDs = pending.files.map { it.id }.toSet(),
         ),
     )
@@ -1068,80 +996,56 @@ internal fun SessionFeature.deliver(
 }
 
 /** Reports a send's progress to this screen. Leaving the screen stops only the reporting: the outbox delivers it regardless. */
-internal fun SessionFeature.follow(statuses: ReceiveChannel<PromptOutbox.Status>, pending: PendingPrompt, server: OpenCodeServer): Effect<Action> {
+internal fun SessionFeature.follow(statuses: Flow<PromptOutbox.Status>, pending: PendingPrompt, server: OpenCodeServer): Effect<Action> {
     val client = openCodeClient
     val messageID = pending.messageID
     val requestEpoch = pending.requestEpoch
     return Effect.run { send ->
-        try {
-            var settled: PromptOutbox.Status.Settled? = null
-            for (status in statuses) {
-                when (status) {
-                    is PromptOutbox.Status.BackgroundMoved ->
-                        send(Action.MoveToBackgroundFinished(status.sessionID, status.key, status.error, isAutomatic = true))
-                    is PromptOutbox.Status.UpdateFailed ->
-                        send(Action.PendingInputUpdateFailed(status.sessionID, messageID, status.restoring, status.error))
-                    is PromptOutbox.Status.Settled -> settled = status
-                    is PromptOutbox.Status.BackgroundUnused -> send(Action.AutoBackgroundClaimLapsed(messageID, requestEpoch))
-                    PromptOutbox.Status.Withdrawn, PromptOutbox.Status.Stopped -> return@run
-                }
+        var settled: PromptOutbox.Status.Settled? = null
+        var ended = false
+        // Collecting ends when the send settles; leaving the screen cancels only this collection.
+        statuses.takeWhile { status ->
+            when (status) {
+                is PromptOutbox.Status.BackgroundMoved ->
+                    send(Action.MoveToBackgroundFinished(status.sessionID, status.key, status.error, isAutomatic = true))
+                is PromptOutbox.Status.UpdateFailed ->
+                    send(Action.PendingInputUpdateFailed(status.sessionID, messageID, status.restoring, status.error))
+                is PromptOutbox.Status.Settled -> settled = status
+                is PromptOutbox.Status.BackgroundUnused -> send(Action.AutoBackgroundClaimLapsed(messageID, requestEpoch))
+                PromptOutbox.Status.Withdrawn, PromptOutbox.Status.Stopped -> ended = true
             }
-            val outcome = settled ?: return@run
-            val latest = outcome.pending.copy(requestEpoch = requestEpoch)
-            val sessionID: String
-            when (val result = outcome.outcome) {
-                is DeliveryOutcome.Failed -> {
-                    result.created?.let { send(Action.SessionCreated(it)) }
-                    send(Action.PromptFailed(result.sessionID, result.error, latest))
-                    return@run
-                }
-                is DeliveryOutcome.Withdrawn -> return@run
-                is DeliveryOutcome.Sent -> {
-                    result.created?.let { send(Action.SessionCreated(it)) }
-                    result.appliedModel?.let { send(Action.ModelApplied(result.sessionID, it)) }
-                    result.appliedAgent?.let { send(Action.AgentApplied(result.sessionID, it)) }
-                    sessionID = result.sessionID
-                }
-            }
-            send(Action.PromptAdmitted(sessionID, messageID, requestEpoch))
-            if (latest.wasRunning) send(Action.PendingInputsRequested(sessionID))
-            // The optimistic local bubble covers the interim; wait for the run to finish, then load
-            // the reply. Token streaming arrives with the event stream.
-            try {
-                client.waitForIdle(server, sessionID)
-            } catch (cancellation: CancellationException) {
-                throw cancellation
-            } catch (_: Exception) {
+            !ended
+        }.collect()
+        if (ended) return@run
+        val outcome = settled ?: return@run
+        val latest = outcome.pending.copy(requestEpoch = requestEpoch)
+        val sessionID: String
+        when (val result = outcome.outcome) {
+            is DeliveryOutcome.Failed -> {
+                result.created?.let { send(Action.SessionCreated(it)) }
+                send(Action.PromptFailed(result.sessionID, result.error, latest))
                 return@run
             }
-            if (!currentCoroutineContext().isActive) return@run
-            send(Action.ReplyCompleted(sessionID))
-        } finally {
-            statuses.cancel()
+            is DeliveryOutcome.Withdrawn -> return@run
+            is DeliveryOutcome.Sent -> {
+                result.created?.let { send(Action.SessionCreated(it)) }
+                result.appliedModel?.let { send(Action.ModelApplied(result.sessionID, it)) }
+                result.appliedAgent?.let { send(Action.AgentApplied(result.sessionID, it)) }
+                sessionID = result.sessionID
+            }
         }
+        send(Action.PromptAdmitted(sessionID, messageID, requestEpoch))
+        if (latest.wasRunning) send(Action.PendingInputsRequested(sessionID))
+        // The optimistic local bubble covers the interim; wait for the run to finish, then load
+        // the reply. Token streaming arrives with the event stream.
+        try {
+            client.waitForIdle(server, sessionID)
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Exception) {
+            return@run
+        }
+        if (!currentCoroutineContext().isActive) return@run
+        send(Action.ReplyCompleted(sessionID))
     }
 }
-
-/**
- * The directory a retried draft send goes to: its lane's (iOS `ComposerPersistence.swift`
- * `persistedDraftDirectory(for:isRetry:in:)`). The persisted outbox's copy is read once the
- * composer persistence port lands.
- */
-private fun SessionFeature.persistedDraftDirectory(messageID: String, isRetry: Boolean): String? {
-    if (!isRetry) return null
-    return promptOutbox.directory(messageID)?.takeIf { it.isNotEmpty() }
-}
-
-/** iOS `DraftState.isEmpty`. */
-private val State.DraftState.isEmptyDraft: Boolean
-    get() = text.isEmpty() && attachments.isEmpty() && files.isEmpty() && location == null && undoSnapshot == null
-
-/** iOS `SharedComposerDraft(composer:)`. */
-private fun sharedDraft(composer: State.DraftState): SharedComposerDraft = SharedComposerDraft(
-    text = composer.text,
-    attachments = composer.attachments,
-    files = emptyList(),
-    parkedFiles = composer.files,
-    location = composer.location,
-    chips = composer.chips,
-)

@@ -1,5 +1,9 @@
 package ai.opencode.feature.session
 
+import ai.opencode.feature.composer.MicPress
+import ai.opencode.feature.composer.MicPressCallbacks
+import ai.opencode.feature.composer.DictationDrag
+import ai.opencode.feature.composer.DictationHoldTracker
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
@@ -9,9 +13,9 @@ import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.openCodeTapTarget
 import ai.opencode.feature.session.seams.DictationDotScope
-import ai.opencode.feature.session.seams.DictationFeature
-import ai.opencode.feature.session.seams.DictationLatency
-import ai.opencode.feature.session.seams.DictationLevels
+import ai.opencode.feature.composer.DictationFeature
+import ai.opencode.feature.composer.DictationLatency
+import ai.opencode.feature.composer.DictationLevels
 import ai.opencode.server.model.OpenCodeDelivery
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FiniteAnimationSpec
@@ -72,155 +76,16 @@ import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
-import kotlin.math.atan2
-import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
 // Port of iOS `Session/DictationViews.swift`: hold-to-dictate and the recording bar.
 
-typealias DictationHoldArm = DictationFeature.State.Hold.Arm
+typealias DictationHoldArm = DictationFeature.Hold.Arm
 
-/**
- * iOS `DictationHoldTracker`: where a held mic's finger has gone (dp). Sliding up arms lock and
- * sliding left arms cancel. Every move measures progress toward both from where the finger is
- * now; nothing latches onto an axis. A target arms once its progress reaches 1 and leads; it stays
- * armed until the finger is [hysteresis] short of its line or the other leads by
- * [dominanceMargin], so a finger resting on a boundary never flickers.
- */
-class DictationHoldTracker {
-    /** Progress toward each target, 1 at its line. */
-    data class Progress(val lock: Float = 0f, val cancel: Float = 0f) {
-        companion object {
-            fun of(dx: Float, dy: Float) = Progress(lock = max(0f, -dy) / lockDistance, cancel = max(0f, -dx) / cancelDistance)
-        }
-    }
-
-    var armed: DictationHoldArm? = null
-        private set
-    var progress = Progress()
-        private set
-    var maxDistance = 0f
-        private set
-
-    fun update(dx: Float, dy: Float) {
-        maxDistance = max(maxDistance, hypot(dx, dy))
-        progress = Progress.of(dx, dy)
-        val current = armed
-        if (current != null && holds(current)) return
-        armed = listOf(DictationHoldArm.lock, DictationHoldArm.cancel).filter { arms(it) }.maxByOrNull { progress(it) }
-    }
-
-    private fun progress(arm: DictationHoldArm) = if (arm == DictationHoldArm.lock) progress.lock else progress.cancel
-    private fun distance(arm: DictationHoldArm) = if (arm == DictationHoldArm.lock) lockDistance else cancelDistance
-    private fun other(arm: DictationHoldArm) = if (arm == DictationHoldArm.lock) DictationHoldArm.cancel else DictationHoldArm.lock
-
-    /** Reached its line and leads. */
-    private fun arms(arm: DictationHoldArm) = progress(arm) >= 1 && progress(arm) > progress(other(arm))
-
-    /** Still near enough its line and not overtaken. */
-    private fun holds(arm: DictationHoldArm) =
-        progress(arm) * distance(arm) >= distance(arm) - hysteresis && progress(arm) + dominanceMargin >= progress(other(arm))
-
-    fun isTap(afterSeconds: Double): Boolean = armed == null && afterSeconds < tapDuration && maxDistance < tapSlop
-
-    enum class Ending {
-        /** Short and still: locks hands-free. */
-        tap,
-        /** Let go: sends, or commits what's armed. */
-        release,
-        /** The system took the touch: never a send. */
-        interrupted,
-    }
-
-    fun ending(afterSeconds: Double, cancelled: Boolean): Ending = when {
-        cancelled -> Ending.interrupted
-        isTap(afterSeconds) -> Ending.tap
-        else -> Ending.release
-    }
-
-    companion object {
-        const val lockDistance = 56f
-        const val cancelDistance = 96f
-        const val hysteresis = 9f
-        /** How far an armed target's progress may trail the other's before it hands over. */
-        const val dominanceMargin = 0.15f
-        /** Shorter, stiller presses are taps. */
-        const val tapDuration = 0.3
-        const val tapSlop = 10f
-
-        /**
-         * How much each target's feedback shows for a finger at (dx, dy): all lock straight up, all
-         * cancel straight left, blended between 30° and 60°.
-         */
-        fun weights(dx: Float, dy: Float): Progress {
-            val up = max(0f, -dy)
-            val left = max(0f, -dx)
-            if (up + left <= 0f) return Progress(lock = 0.5f, cancel = 0.5f)
-            val angle = Math.toDegrees(atan2(up.toDouble(), left.toDouble())).toFloat()
-            val t = min(1f, max(0f, (angle - 30) / 30))
-            val lock = t * t * (3 - 2 * t)
-            return Progress(lock = lock, cancel = 1 - lock)
-        }
-    }
-}
-
-/** iOS `DictationDrag`: the finger's travel while holding the mic (dp), for the bar to follow. */
-data class DictationDrag(val dx: Float = 0f, val dy: Float = 0f)
-
-/** iOS `MicPressCallbacks`. */
-class MicPressCallbacks(
-    val onBegan: () -> Unit,
-    val onDrag: (DictationDrag) -> Unit,
-    val onArmed: (DictationHoldArm?) -> Unit,
-    val onReleased: () -> Unit,
-    val onLocked: () -> Unit,
-    /** The system took the touch, or the mic left the screen mid-press. */
-    val onInterrupted: () -> Unit,
-)
-
-/**
- * iOS `MicPress` (`Composer/MicPressGesture.swift`): one press at a time, from touch-down to its
- * end (tap, release, or interruption), reported exactly once. A press still down when the mic
- * goes away ends as an interruption.
- */
-class MicPress(var callbacks: MicPressCallbacks) {
-    private var tracker = DictationHoldTracker()
-    var isPressing = false
-        private set
-
-    fun began(uptimeMillis: Long) {
-        DictationLatency.touchDown(uptimeMillis)
-        isPressing = true
-        tracker = DictationHoldTracker()
-        callbacks.onBegan()
-    }
-
-    fun moved(dx: Float, dy: Float) {
-        if (!isPressing) return
-        val wasArmed = tracker.armed
-        tracker.update(dx, dy)
-        callbacks.onDrag(DictationDrag(dx, dy))
-        if (tracker.armed != wasArmed) callbacks.onArmed(tracker.armed)
-    }
-
-    fun ended(afterSeconds: Double, cancelled: Boolean) {
-        if (!isPressing) return
-        end(tracker.ending(afterSeconds, cancelled))
-    }
-
-    private fun end(ending: DictationHoldTracker.Ending) {
-        isPressing = false
-        tracker = DictationHoldTracker()
-        callbacks.onDrag(DictationDrag())
-        when (ending) {
-            DictationHoldTracker.Ending.tap -> callbacks.onLocked()
-            DictationHoldTracker.Ending.release -> callbacks.onReleased()
-            DictationHoldTracker.Ending.interrupted -> callbacks.onInterrupted()
-        }
-    }
-}
+// `DictationHoldTracker`, `DictationDrag`, `MicPressCallbacks` and `MicPress` are
+// `:feature:composer`'s (`MicPressGesture.kt`, moved down from iOS `DictationViews.swift`).
 
 /**
  * iOS `HoldToDictateButton` (+ `MicPressGesture`): touch and hold to record and let go to send;
@@ -252,16 +117,15 @@ fun HoldToDictateButton(
                     while (true) {
                         val event = awaitPointerEvent(PointerEventPass.Initial)
                         val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                        val dx = (change.position.x - down.position.x) / density
-                        val dy = (change.position.y - down.position.y) / density
+                        val translation = (change.position - down.position) / density
                         if (!change.pressed) {
-                            press.moved(dx, dy)
+                            press.moved(translation)
                             upTime = change.uptimeMillis
                             change.consume()
                             cancelled = false
                             break
                         }
-                        press.moved(dx, dy)
+                        press.moved(translation)
                         change.consume()
                     }
                 } catch (error: CancellationException) {
@@ -290,13 +154,13 @@ data class DictationHoldVisuals(
  */
 data class DictationHoldRetention(
     val identity: SessionFeature.State.TaskIdentity? = null,
-    val leavingHold: DictationFeature.State.Hold? = null,
+    val leavingHold: DictationFeature.Hold? = null,
     val settledRecording: Boolean? = false,
 ) {
-    fun leavingHold(currentIdentity: SessionFeature.State.TaskIdentity): DictationFeature.State.Hold? =
+    fun leavingHold(currentIdentity: SessionFeature.State.TaskIdentity): DictationFeature.Hold? =
         if (identity == currentIdentity) leavingHold else null
 
-    fun shownHold(active: DictationFeature.State.Hold?, currentIdentity: SessionFeature.State.TaskIdentity): DictationFeature.State.Hold? =
+    fun shownHold(active: DictationFeature.Hold?, currentIdentity: SessionFeature.State.TaskIdentity): DictationFeature.Hold? =
         active ?: leavingHold(currentIdentity)
 
     fun settledRecording(recording: Boolean, currentIdentity: SessionFeature.State.TaskIdentity): Boolean? {
@@ -306,7 +170,7 @@ data class DictationHoldRetention(
 
     fun syncIdentity(
         newIdentity: SessionFeature.State.TaskIdentity,
-        activeHold: DictationFeature.State.Hold?,
+        activeHold: DictationFeature.Hold?,
         recording: Boolean,
     ): DictationHoldRetention {
         if (identity == newIdentity) return this
@@ -314,7 +178,7 @@ data class DictationHoldRetention(
     }
 
     fun holdChanged(
-        hold: DictationFeature.State.Hold?,
+        hold: DictationFeature.Hold?,
         currentIdentity: SessionFeature.State.TaskIdentity,
         recording: Boolean,
     ): DictationHoldRetention {
@@ -334,8 +198,8 @@ data class DictationHoldRetention(
  * buttons and scope inside the composer, and the hold layer's circle and lock target above it).
  */
 data class DictationBarPose(
-    val hold: DictationFeature.State.Hold,
-    val phase: DictationFeature.State.Phase,
+    val hold: DictationFeature.Hold,
+    val phase: DictationFeature.Phase,
     val drag: DictationDrag,
     val reducedMotion: Boolean,
     val visuals: DictationHoldVisuals,
@@ -347,37 +211,37 @@ data class DictationBarPose(
 
     val isLocked: Boolean get() = hold.isLocked
     /** Slid up and let go, rather than tapped. */
-    val lockedBySliding: Boolean get() = isLocked && hold.armed == DictationHoldArm.lock
-    val isFinishing: Boolean get() = phase is DictationFeature.State.Phase.Finishing
-    val isSending: Boolean get() = (phase as? DictationFeature.State.Phase.Finishing)?.send != null
+    val lockedBySliding: Boolean get() = isLocked && hold.armed == DictationHoldArm.Lock
+    val isFinishing: Boolean get() = phase is DictationFeature.Phase.Finishing
+    val isSending: Boolean get() = (phase as? DictationFeature.Phase.Finishing)?.send != null
     val isHolding: Boolean get() = !isLocked && !isFinishing && !isLeaving
     /** Let go with nothing armed: the circle flies off with the message. */
     val isSentFromHold: Boolean get() = !isLocked && isSending
-    val cancelArmed: Boolean get() = isHolding && hold.armed == DictationHoldArm.cancel
-    val lockArmed: Boolean get() = isHolding && hold.armed == DictationHoldArm.lock
+    val cancelArmed: Boolean get() = isHolding && hold.armed == DictationHoldArm.Cancel
+    val lockArmed: Boolean get() = isHolding && hold.armed == DictationHoldArm.Lock
     val guidesShown: Boolean get() = isHolding && (showsHoldGuides || hold.armed != null)
 
     /** Each target's feedback: its progress, blended by direction. */
     val lockProgress: Float
         get() {
             if (!isHolding) return 0f
-            val progress = DictationHoldTracker.Progress.of(drag.dx, drag.dy)
-            return min(1f, progress.lock) * DictationHoldTracker.weights(drag.dx, drag.dy).lock
+            val progress = DictationHoldTracker.Progress.of(drag.translation)
+            return min(1f, progress.lock) * DictationHoldTracker.weights(drag.translation).lock
         }
     val cancelProgress: Float
         get() {
             if (!isHolding) return 0f
-            val progress = DictationHoldTracker.Progress.of(drag.dx, drag.dy)
-            return min(1f, progress.cancel) * DictationHoldTracker.weights(drag.dx, drag.dy).cancel
+            val progress = DictationHoldTracker.Progress.of(drag.translation)
+            return min(1f, progress.cancel) * DictationHoldTracker.weights(drag.translation).cancel
         }
 
     /** How far the circle leans after the finger (dp). Still under Reduce Motion. */
     val follow: Offset
         get() {
             if (!isHolding || reducedMotion) return Offset.Zero
-            val weights = DictationHoldTracker.weights(drag.dx, drag.dy)
-            val up = max(drag.dy * 0.3f, -(DictationHoldTracker.lockDistance * 0.3f + 4))
-            val left = max(drag.dx * 0.3f, -(DictationHoldTracker.cancelDistance * 0.42f + 6))
+            val weights = DictationHoldTracker.weights(drag.translation)
+            val up = max(drag.translation.y * 0.3f, -(DictationHoldTracker.lockDistance * 0.3f + 4))
+            val left = max(drag.translation.x * 0.3f, -(DictationHoldTracker.cancelDistance * 0.42f + 6))
             return Offset(
                 min(4f, if (left < 0) left * weights.cancel else left),
                 min(4f, if (up < 0) up * weights.lock else up),

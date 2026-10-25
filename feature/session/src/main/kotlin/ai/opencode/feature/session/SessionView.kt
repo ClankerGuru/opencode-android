@@ -23,10 +23,10 @@ import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.feature.session.header.HeaderBlurTunables
 import ai.opencode.feature.session.header.SessionHeaderBackdrop
 import ai.opencode.feature.session.header.SessionHeaderStyle
-import ai.opencode.feature.session.seams.AttachmentMenuItem
+import ai.opencode.feature.composer.AttachmentMenuItem
 import ai.opencode.core.experiments.key
 import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.feature.session.seams.LocationClientError
+import ai.opencode.feature.composer.LocationClientError
 import ai.opencode.feature.transcript.TranscriptMetrics
 import ai.opencode.feature.system.notifications.SessionNotificationsClient
 import ai.opencode.server.model.OpenCodeShell
@@ -379,23 +379,23 @@ private fun SessionAttachmentMenu(store: StoreOf<State, Action>, host: SessionCo
         if (phase != AttachmentMenuPhase.menu) return
         chosen += 1
         when (item) {
-            AttachmentMenuItem.photos -> {
+            AttachmentMenuItem.Photos -> {
                 // Choosing the photo picker gives it the room the keyboard had.
                 host.dismissComposerKeyboard()
                 phase = AttachmentMenuPhase.photos
             }
-            AttachmentMenuItem.files -> {
+            AttachmentMenuItem.Files -> {
                 restoresFocus = false
                 phase = AttachmentMenuPhase.closed
                 files.launch(arrayOf("*/*"))
             }
-            AttachmentMenuItem.location -> {
+            AttachmentMenuItem.Location -> {
                 restoresFocus = false
                 keepingLocationRow = true
                 store.send(Action.locationTapped)
                 phase = AttachmentMenuPhase.closed
             }
-            AttachmentMenuItem.camera, AttachmentMenuItem.paste -> phase = AttachmentMenuPhase.closed
+            AttachmentMenuItem.Camera, AttachmentMenuItem.Paste -> phase = AttachmentMenuPhase.closed
         }
     }
 
@@ -416,11 +416,11 @@ private fun SessionAttachmentMenu(store: StoreOf<State, Action>, host: SessionCo
         ) {
             for (item in items) {
                 val (title, symbol) = when (item) {
-                    AttachmentMenuItem.camera -> "Camera" to SFSymbol.Camera
-                    AttachmentMenuItem.photos -> "Photos" to SFSymbol.PhotoOnRectangle
-                    AttachmentMenuItem.files -> "Files" to SFSymbol.Folder
-                    AttachmentMenuItem.location -> "Location" to SFSymbol.Location
-                    AttachmentMenuItem.paste -> "Paste" to SFSymbol.DocOnClipboard
+                    AttachmentMenuItem.Camera -> "Camera" to SFSymbol.Camera
+                    AttachmentMenuItem.Photos -> "Photos" to SFSymbol.PhotoOnRectangle
+                    AttachmentMenuItem.Files -> "Files" to SFSymbol.Folder
+                    AttachmentMenuItem.Location -> "Location" to SFSymbol.Location
+                    AttachmentMenuItem.Paste -> "Paste" to SFSymbol.DocOnClipboard
                 }
                 DropdownMenuItem(
                     text = { Text(title) },
@@ -637,42 +637,6 @@ fun DrawerGlyph(modifier: Modifier = Modifier) {
             val radius = CornerRadius(stroke / 2, stroke / 2)
             drawRoundRect(color, Offset.Zero, Size(long, stroke), radius)
             drawRoundRect(color, Offset(0f, stroke + gap), Size(short, stroke), radius)
-        }
-    }
-}
-
-/** Readable display names for model provider IDs. */
-object ModelProviderGroup {
-    fun title(providerID: String): String = when (providerID) {
-        "opencode" -> "OpenCode Zen"
-        "openai" -> "OpenAI"
-        "anthropic" -> "Anthropic"
-        "google" -> "Google"
-        "openrouter" -> "OpenRouter"
-        "github-copilot" -> "GitHub Copilot"
-        "xai" -> "xAI"
-        "deepseek" -> "DeepSeek"
-        "mistral" -> "Mistral"
-        "groq" -> "Groq"
-        "amazon-bedrock" -> "Amazon Bedrock"
-        "google-vertex" -> "Google Vertex"
-        "azure" -> "Azure"
-        else -> providerID.split("-").joinToString(" ") { part -> part.take(1).uppercase() + part.drop(1) }
-    }
-
-    /**
-     * The vendor's name for the Fused + Stack picker (OC-397): drops a `console-` connection
-     * prefix and names a few more vendors (`"console-google"` → `"Google"`, `"fireworks-ai"` →
-     * `"Fireworks AI"`).
-     */
-    fun canonicalVendorTitle(providerID: String): String {
-        val cleaned = providerID.removePrefix("console-")
-        return when (cleaned) {
-            "meta" -> "Meta"
-            "fireworks-ai" -> "Fireworks AI"
-            "nvidia" -> "NVIDIA"
-            "novita", "novita-chat-completion" -> "Novita"
-            else -> title(cleaned)
         }
     }
 }

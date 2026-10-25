@@ -1,5 +1,8 @@
 package ai.opencode.feature.session
 
+import ai.opencode.feature.composer.DictationLatency
+import ai.opencode.feature.composer.DictationDrag
+import ai.opencode.feature.composer.RequestBar
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
@@ -13,11 +16,11 @@ import ai.opencode.core.ui.SFSymbol
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.seams.ComposerSwipeDown
 import ai.opencode.feature.session.seams.ComposerSwipeOwnership
-import ai.opencode.feature.session.seams.DictationFeature
+import ai.opencode.feature.composer.DictationFeature
 import ai.opencode.core.experiments.key
 import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.experiments.ModelPickerStyle
-import ai.opencode.feature.session.seams.QueuedMessagesSheet
+import ai.opencode.feature.composer.QueuedMessagesSheet
 import ai.opencode.server.model.OpenCodeProject
 import ai.opencode.server.model.OpenCodeQueuedInput
 import androidx.compose.animation.AnimatedVisibility
@@ -200,8 +203,8 @@ internal data class ComposerSnapshot(
     val hasFailedFiles: Boolean,
     val hasNonLocationAttachments: Boolean,
     val wantsLocationAttachment: Boolean,
-    val dictationHold: DictationFeature.State.Hold?,
-    val dictationPhase: DictationFeature.State.Phase,
+    val dictationHold: DictationFeature.Hold?,
+    val dictationPhase: DictationFeature.Phase,
     val isDictating: Boolean,
     val isFinishingDictation: Boolean,
     val isPreparingDictation: Boolean,
@@ -430,9 +433,9 @@ internal class SessionComposerEnv(
     val settledRecording: Boolean? get() = view.dictationRetention.settledRecording(s.dictationHold != null, s.taskIdentity)
 
     /** The recording's hold, or the last one while its bar fades out. */
-    val shownDictationHold: DictationFeature.State.Hold? get() = view.dictationRetention.shownHold(s.dictationHold, s.taskIdentity)
+    val shownDictationHold: DictationFeature.Hold? get() = view.dictationRetention.shownHold(s.dictationHold, s.taskIdentity)
 
-    fun dictationPose(hold: DictationFeature.State.Hold) = DictationBarPose(
+    fun dictationPose(hold: DictationFeature.Hold) = DictationBarPose(
         hold = hold,
         phase = s.dictationPhase,
         drag = view.dictationDrag,
@@ -527,7 +530,7 @@ internal class SessionComposerEnv(
 
     /** iOS `beginDictationHold()`: a new recording's hold starts from nothing, before its bar mounts. */
     fun beginDictationHold() {
-        ai.opencode.feature.session.seams.DictationLatency.mark("press_began")
+        DictationLatency.mark("press_began")
         val hold = store.state.dictationHold
         if (hold == null) view.heldComposerPresentation = composerPresentation
         if (hold == null || store.state.isFinishingDictation) view.dictationHoldVisuals = DictationHoldVisuals()
@@ -560,7 +563,7 @@ internal class SessionComposerEnv(
          * control's, never the keyboard's dismissal.
          */
         fun composerSwipeYields(
-            dictationHold: DictationFeature.State.Hold? = null,
+            dictationHold: DictationFeature.Hold? = null,
             attachmentMenuOpen: Boolean = false,
             panelsShown: Boolean = false,
         ): Boolean = dictationHold != null || attachmentMenuOpen || panelsShown

@@ -1,5 +1,9 @@
 package ai.opencode.feature.session
 
+import ai.opencode.feature.composer.modelpicker.ModelPickerSection
+import ai.opencode.feature.composer.modelpicker.ModelPickerState
+import ai.opencode.feature.composer.RequestDockFeature
+import ai.opencode.feature.composer.DraftState
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
@@ -7,18 +11,11 @@ import ai.opencode.core.store.cancellable
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.CancelID
 import ai.opencode.feature.session.SessionFeature.State
-import ai.opencode.feature.session.seams.ComposerAutocompleteState
-import ai.opencode.feature.session.seams.ModelLevelScale
-import ai.opencode.feature.session.seams.ModelSearch
-import ai.opencode.feature.session.seams.currentLevel
-import ai.opencode.feature.session.seams.parseLevelQuery
-import ai.opencode.feature.session.seams.resolveVariant
-import ai.opencode.feature.session.seams.familyDrafts
+import ai.opencode.feature.composer.ComposerAutocompleteState
+import ai.opencode.feature.composer.modelpicker.ModelLevelScale
+import ai.opencode.feature.composer.modelpicker.ModelSearch
 import ai.opencode.feature.session.seams.isTerminal
 import ai.opencode.feature.session.seams.moveDraft
-import ai.opencode.feature.session.seams.resolvePick
-import ai.opencode.feature.session.seams.restorePersistedComposer
-import ai.opencode.feature.session.seams.withFamilyDrafts
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.model.OpenCodeModel
 import ai.opencode.server.model.OpenCodeModelRef
@@ -286,7 +283,7 @@ private fun SessionFeature.familyPicked(id: String, state: State): Reduced<State
     // A recording follows the screen, as across Home's switches: what was typed beside it stays in
     // this session's composer.
     val carried = next.carriedDictation
-    next = next.withFamilyDrafts(next.familyDrafts.set(current.id, next.sessionComposer))
+    next = next.settingFamilyDraft(current.id, next.sessionComposer)
     next = next.withSendAfterUploads(null)
     next = forgetSharedSend(next)
     // The sheet acts on one session: its in-flight work must not land on the next one. The server
@@ -318,7 +315,7 @@ private fun SessionFeature.familyPicked(id: String, state: State): Reduced<State
     )
     next = next.supersedeRunWork()
     next = next.copy(autocomplete = ComposerAutocompleteState())
-    next = next.setSessionComposer(next.familyDrafts[selected.id] ?: State.DraftState())
+    next = next.setSessionComposer(next.familyDrafts[selected.id] ?: DraftState())
     // Answering, the bar and its recording stay as they are.
     if (carried != null && !next.isAnsweringRequest) next = next.adoptDictation(carried)
     next = next.copy(
@@ -363,7 +360,7 @@ private fun SessionFeature.familyPicked(id: String, state: State): Reduced<State
     )
     next = next.resetLiveProjection().copy(lastSentItemID = null)
     val abandon = abandonRefresh(next)
-    val requests = startPendingWork(abandon.state, RequestDockFeature.State.LoadAttempt.initial)
+    val requests = startPendingWork(abandon.state, RequestDockFeature.State.LoadAttempt.Initial)
     val shells = refreshShells(requests.state)
     val watchdog = watchdog(shells.state)
     return Reduced(
@@ -459,20 +456,36 @@ private fun SessionFeature.fetchModels(state: State): Effect<Action> {
 }
 
 /**
- * iOS `rememberedLevel(for:)` (`Composer/ModelPicker/ModelPickerSections.swift`, a
- * `SessionFeature.State` member): the level shown for [model] on its row in the list (and picked
- * when tapping its name): a level parsed from the search query when searching, else the active
- * level for the current model, else the remembered variant in `modelVariants`, else null
- * (`"Default"`).
+ * The model picker's inputs as `:feature:composer`'s pickers read them (iOS's
+ * `ModelPickerSections.swift` extends `SessionFeature.State` with these derived values).
  */
-fun State.rememberedLevel(model: OpenCodeModel): String? {
-    if (!ModelLevelScale(model.variants).isAdjustable) return null
-    if (isFilteringModels) {
-        val parsed = ModelSearch.parseLevelQuery(modelFilter).second
-        if (parsed != null) return ModelSearch.resolveVariant(parsed, model)
-    }
-    if (currentModelInfo?.id == model.id) return currentLevel?.takeIf { it in model.variants }
-    val saved = modelVariants.value[model.id]
-    if (saved != null && saved != "default" && saved in model.variants) return saved
-    return null
-}
+val State.modelPicker: ModelPickerState
+    get() = ModelPickerState(
+        models = models,
+        currentModel = currentModel,
+        favoriteModelIDs = favoriteModelIDs.value,
+        recentModelIDs = recentModelIDs.value,
+        modelVariants = modelVariants.value,
+        modelFilter = modelFilter,
+        isLoadingModels = isLoadingModels,
+        modelsLoadError = modelsLoadError,
+        modelVisibility = modelVisibility,
+        showsAllModels = showsAllModels,
+    )
+
+/** iOS `currentLevelScale`: the current model's levels, when it has any to choose between. */
+val State.currentLevelScale: ModelLevelScale? get() = modelPicker.currentLevelScale
+
+/** iOS `currentLevel`: the current level; null is the model's default. */
+val State.currentLevel: String? get() = modelPicker.currentLevel
+
+/** iOS `modelSheetSections(recents:recentLimit:)`. */
+fun State.modelSheetSections(recents: List<String>, recentLimit: Int): List<ModelPickerSection> =
+    modelPicker.modelSheetSections(recents, recentLimit)
+
+/**
+ * iOS `rememberedLevel(for:)`: the level shown for [model] on its row in the list (and picked when
+ * tapping its name): a level parsed from the search query when searching, else the active level
+ * for the current model, else the remembered variant in `modelVariants`, else null (`"Default"`).
+ */
+fun State.rememberedLevel(model: OpenCodeModel): String? = modelPicker.rememberedLevel(model)

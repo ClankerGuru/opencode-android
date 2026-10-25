@@ -1,130 +1,24 @@
 package ai.opencode.feature.session.seams
 
-import ai.opencode.core.files.ComposerStagedFile
 import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.dependencies.dependency
-import ai.opencode.feature.session.SessionFeature
-import ai.opencode.feature.session.pickerModels
-import ai.opencode.server.model.AttachmentFileType
-import ai.opencode.server.model.ModelProviderGroup
-import ai.opencode.server.model.OpenCodeModel
+import ai.opencode.core.files.AttachmentFileType
+import ai.opencode.core.files.ComposerStagedFile
 import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
 import android.net.Uri
-import androidx.core.net.toUri
 import android.provider.OpenableColumns
 import android.webkit.MimeTypeMap
+import androidx.core.net.toUri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.UUID
 
-// Stand-ins for Composer/Settings/System types the VIEW-PICKERS group (SessionViewModelPicker.kt,
-// SessionViewAttachments.kt, SessionViewPhotoSheet.kt) needs whose real ports belong to other
-// areas. Each carries only what those views use.
-
-// region Model picker (Composer/ModelPicker)
-
-/** SEAM: real tunables belong to :feature:composer (iOS `ModelPickerOverlays.swift`); shipped defaults. */
-object ModelPickerTunables {
-    /** Sheet: a flick down from full closes at this speed (pt/s → dp/s). */
-    const val FLICK_CLOSES = 800f
-    /** Large gap below the session header. */
-    const val HEADER_GAP = 6f
-}
-
-/** SEAM: real tunables belong to :feature:composer (iOS `FusedModelPickerTunables`); shipped defaults. */
-object FusedModelPickerTunables {
-    /** Recent rows. */
-    const val RECENTS = 3
-    /** All Models section on (1). */
-    const val ALL_MODELS = 1
-}
-
-/**
- * SEAM: real type belongs to :feature:composer (iOS `Composer/ModelPicker/ModelPickerSections.swift`);
- * delete when that area merges. Favorites, Recent, then one section per provider.
- */
-data class ModelPickerSection(val kind: Kind, val models: List<OpenCodeModel>) {
-    sealed interface Kind {
-        data object Favorites : Kind
-        data object Recent : Kind
-        data object AllModels : Kind
-        data object SearchResults : Kind
-        data class Provider(val id: String) : Kind
-    }
-
-    val id: String
-        get() = when (val k = kind) {
-            Kind.Favorites -> "favorites"
-            Kind.Recent -> "recent"
-            Kind.AllModels -> "all"
-            Kind.SearchResults -> "search"
-            is Kind.Provider -> "provider-${k.id}"
-        }
-
-    val title: String
-        get() = when (val k = kind) {
-            Kind.Favorites -> "Favorites"
-            Kind.Recent -> "Recent"
-            Kind.AllModels -> "All Models"
-            Kind.SearchResults -> ""
-            is Kind.Provider -> ModelProviderGroup.title(k.id)
-        }
-
-    companion object {
-        /**
-         * [recents] (most recent first) adds a Recent section of up to [recentLimit] models after
-         * Favorites, leaving out favorites. Searching drops both.
-         */
-        fun sections(
-            models: List<OpenCodeModel>,
-            favorites: Set<String>,
-            filter: String = "",
-            recents: List<String> = emptyList(),
-            recentLimit: Int = 0,
-        ): List<ModelPickerSection> {
-            val needle = filter.trim()
-            // Searching, providers come in the order of their best match.
-            val shown = ModelSearch.rank(models, needle, favorites)
-            val sections = mutableListOf<ModelPickerSection>()
-            if (needle.isEmpty()) {
-                val favored = shown.filter { it.id in favorites }
-                if (favored.isNotEmpty()) sections += ModelPickerSection(Kind.Favorites, favored)
-                val byID = LinkedHashMap<String, OpenCodeModel>()
-                for (model in models) byID.putIfAbsent(model.id, model)
-                val recent = recents.asSequence().filter { it !in favorites }.mapNotNull { byID[it] }.take(maxOf(recentLimit, 0)).toList()
-                if (recent.isNotEmpty()) sections += ModelPickerSection(Kind.Recent, recent)
-            }
-            // Providers in the order the server lists them.
-            val byProvider = LinkedHashMap<String, MutableList<OpenCodeModel>>()
-            for (model in shown) byProvider.getOrPut(model.providerID) { mutableListOf() } += model
-            sections += byProvider.map { (id, list) -> ModelPickerSection(Kind.Provider(id), list) }
-            return sections
-        }
-    }
-}
-
-/**
- * SEAM: real member belongs to the port of iOS `ModelPickerSections.swift`
- * (`modelSheetSections(recents:recentLimit:)`), which extends `SessionFeature.State`.
- */
-fun SessionFeature.State.modelSheetSections(recents: List<String>, recentLimit: Int): List<ModelPickerSection> =
-    ModelPickerSection.sections(pickerModels, favoriteModelIDs.value, modelFilter, recents, recentLimit)
-
-// endregion
-
-// region Attachments (Composer/AttachmentMenu, ComposerImageImport, System/Share)
-
-/** SEAM: real type belongs to :feature:composer (iOS `Composer/AttachmentMenu.swift` `AttachmentMenuItem`). */
-enum class AttachmentMenuItem { camera, photos, files, location, paste }
-
-/** SEAM: real constant belongs to :feature:composer (iOS `Composer/AttachmentPicker.swift`). */
-object AttachmentPickerButton {
-    const val MAX_PHOTO_SELECTION = 4
-}
+// The picked-content loader the VIEW-PICKERS group (SessionViewAttachments.kt,
+// SessionViewPhotoSheet.kt) uses until those views adopt :feature:composer's importers.
 
 /**
  * SEAM: real client belongs to :feature:composer / :feature:system (iOS `ComposerImageSource.load`,
@@ -227,7 +121,11 @@ class ComposerMediaLoader(
     }
 }
 
-/** SEAM: real type belongs to :feature:composer (iOS `Composer/ComposerImageImport.swift` `ComposerImageSource`). */
+/**
+ * SEAM: the session's attachment views still pass picked content URIs as strings with string
+ * attachment IDs; `:feature:composer`'s `ComposerImageSource` takes `Uri`s and `UUID`s. Delete once
+ * those views adopt the composer's importers (view step).
+ */
 sealed interface ComposerImageSource {
     /** `attachmentID`: chosen up front, so what it becomes is known before it loads. */
     val attachmentID: String? get() = null
@@ -238,15 +136,3 @@ sealed interface ComposerImageSource {
     class Data(val data: ByteArray) : ComposerImageSource
     class Loader(val load: suspend () -> ByteArray?, override val attachmentID: String? = null) : ComposerImageSource
 }
-
-/** SEAM: real type belongs to :feature:composer (iOS `Composer/ComposerFileImport.swift` `ComposerFileRouting`). */
-object ComposerFileRouting {
-    private val inlineImageExtensions = setOf("png", "jpg", "jpeg", "gif", "webp", "heic", "heif")
-
-    /** Image files from Files keep the inline image path (re-encoded like photos); everything else uploads. */
-    fun isInlineImage(name: String, mime: String?): Boolean =
-        AttachmentFileType.fileExtension(name) in inlineImageExtensions ||
-            (mime != null && mime.lowercase() in setOf("image/png", "image/jpeg", "image/gif", "image/webp", "image/heic", "image/heif"))
-}
-
-// endregion

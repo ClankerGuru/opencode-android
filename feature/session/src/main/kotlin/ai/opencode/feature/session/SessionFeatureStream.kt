@@ -1,18 +1,16 @@
 package ai.opencode.feature.session
 
+import ai.opencode.feature.composer.RequestDockFeature
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.cancellable
 import ai.opencode.core.store.map
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.CancelID
-import ai.opencode.feature.session.seams.DictationFeature
-import ai.opencode.feature.session.seams.DictationHoldRelease
-import ai.opencode.feature.session.seams.discardPending
-import ai.opencode.feature.session.seams.restorePersistedComposer
+import ai.opencode.feature.composer.DictationFeature
+import ai.opencode.feature.composer.DictationHoldRelease
 import ai.opencode.core.diagnostics.LabMarks
 import ai.opencode.feature.transcript.TranscriptEntry
-import ai.opencode.feature.session.seams.prepare
 import ai.opencode.feature.voice.ServerVoiceSupport
 import ai.opencode.server.OpenCodeLiveContentEvent
 import ai.opencode.server.model.OpenCodeContextReading
@@ -479,7 +477,7 @@ private fun SessionFeature.visibilityChanged(state: SessionFeature.State, visibl
         return Reduced(
             abandoned.state,
             Effect.merge(
-                releaseDictationHold(DictationHoldRelease.left),
+                releaseDictationHold(DictationHoldRelease.Left),
                 Effect.cancel(CancelID.ViewReceipt),
                 Effect.cancel(CancelID.SinceYouLeft),
                 Effect.cancel(CancelID.FamilyRefresh),
@@ -545,7 +543,7 @@ private fun SessionFeature.task(state: SessionFeature.State): Reduced<SessionFea
     s = s.copy(dictation = discarded.state)
     val discard: Effect<Action> = Effect.merge(
         discarded.effect.map { Action.Dictation(it) },
-        releaseDictationHold(DictationHoldRelease.left),
+        releaseDictationHold(DictationHoldRelease.Left),
     )
     // A live call or recording carried here keeps this screen's identity, so the previous
     // session's loops must stop before this one's start.
@@ -613,7 +611,7 @@ private fun SessionFeature.firstContentFrameRendered(state: SessionFeature.State
     s = loadModels.state
     // Pending work polls once the family is known (see familyResponse); record the attempt so a
     // failure there counts as the initial one.
-    s = s.withRequestLoadAttempt(RequestDockFeature.State.LoadAttempt.initial)
+    s = s.withRequestLoadAttempt(RequestDockFeature.State.LoadAttempt.Initial)
         .withRequestLoadError(null)
     val backgroundHint = scheduleBackgroundHint(s)
     s = backgroundHint.state

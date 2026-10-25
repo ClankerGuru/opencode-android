@@ -10,12 +10,11 @@ import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.openCodeTapTarget
-import ai.opencode.feature.session.seams.FusedModelPickerTunables
-import ai.opencode.feature.session.seams.ModelLevelScale
-import ai.opencode.feature.session.seams.ModelPickerSection
+import ai.opencode.feature.composer.modelpicker.FusedModelPickerTunables
+import ai.opencode.feature.composer.modelpicker.ModelLevelScale
+import ai.opencode.feature.composer.modelpicker.ModelPickerSection
 import ai.opencode.core.experiments.ModelPickerStyle
-import ai.opencode.feature.session.seams.ModelPickerTunables
-import ai.opencode.feature.session.seams.modelSheetSections
+import ai.opencode.feature.composer.modelpicker.ModelPickerTunables
 import ai.opencode.server.model.ModelProviderGroup
 import ai.opencode.server.model.ModelVariant
 import ai.opencode.server.model.OpenCodeModel
@@ -136,7 +135,7 @@ fun SessionModelPicker(store: StoreOf<SessionFeature.State, SessionFeature.Actio
     LaunchedEffect(sheetState, talkBack) {
         var previous = sheetState.currentValue
         snapshotFlow { sheetState.currentValue }.collect { value ->
-            val flickCloses = with(density) { ModelPickerTunables.FLICK_CLOSES.dp.toPx() }
+            val flickCloses = with(density) { ModelPickerTunables.flickCloses.toFloat().dp.toPx() }
             if (previous == SheetValue.Expanded && value == SheetValue.PartiallyExpanded && !talkBack &&
                 drag.downwardVelocity >= flickCloses
             ) {
@@ -388,7 +387,7 @@ private fun ModelPickerSheetContent(store: StoreOf<SessionFeature.State, Session
     val hideModels by remember(store) { store.state.hideModelsExperiment.flow }.collectAsState()
     val derived = remember(inputs, favoriteIDs, variants, visibility, hideModels) {
         val state = store.state
-        val sections = state.modelSheetSections(recentsAtOpen, FusedModelPickerTunables.RECENTS)
+        val sections = state.modelSheetSections(recentsAtOpen, FusedModelPickerTunables.recents.toInt())
         SheetDerived(
             sections = sections,
             levels = sections.flatMap { it.models }.associate { it.id to state.rememberedLevel(it) },

@@ -1,5 +1,10 @@
 package ai.opencode.feature.session
 
+import ai.opencode.feature.composer.RequestDockFeature
+import ai.opencode.feature.composer.UndeliveredPrompts
+import ai.opencode.feature.composer.PromptOutbox
+import ai.opencode.feature.composer.PendingPrompt
+import ai.opencode.feature.composer.DraftState
 import ai.opencode.core.dependencies.BackgroundTaskClient
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.DateClient
@@ -21,40 +26,36 @@ import ai.opencode.core.store.combine
 import ai.opencode.core.store.ifLet
 import ai.opencode.core.store.onChange
 import ai.opencode.core.store.scope
-import ai.opencode.feature.composer.ComposerFeature
-import ai.opencode.feature.session.seams.BrowserFeature
-import ai.opencode.feature.session.seams.ComposerAttachmentsFeature
-import ai.opencode.feature.session.seams.ComposerAutocompleteAction
-import ai.opencode.feature.session.seams.ComposerAutocompleteChip
-import ai.opencode.feature.session.seams.ComposerAutocompleteState
-import ai.opencode.feature.session.seams.ComposerFileAttachment
-import ai.opencode.feature.session.seams.ComposerPersistenceClient
+import ai.opencode.feature.media.BrowserFeature
+import ai.opencode.feature.composer.ComposerAttachmentsFeature
+import ai.opencode.feature.composer.ComposerAutocompleteAction
+import ai.opencode.feature.composer.ComposerAutocompleteState
+import ai.opencode.feature.composer.ComposerPersistence
 import ai.opencode.core.files.ComposerStagedFile
-import ai.opencode.feature.session.seams.DictationClient
-import ai.opencode.feature.session.seams.DictationFeature
+import ai.opencode.feature.composer.DictationClient
+import ai.opencode.feature.composer.DictationFeature
 import ai.opencode.core.experiments.key
 import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.core.diagnostics.LabMarks
-import ai.opencode.feature.transcript.LinkMenuAction
-import ai.opencode.feature.session.seams.LinkProbe
+import ai.opencode.feature.media.LinkMenuAction
+import ai.opencode.feature.media.LinkProbe
 import ai.opencode.feature.transcript.markdown.MarkdownStreamClient
 import ai.opencode.server.model.ModelVisibility
 import ai.opencode.feature.transcript.list.NewMessagesMark
-import ai.opencode.feature.session.seams.OpenURLClient
-import ai.opencode.feature.session.seams.PageReaderClient
+import ai.opencode.feature.media.OpenURLClient
+import ai.opencode.feature.media.PageReaderClient
 import ai.opencode.feature.session.seams.SceneWindowClient
 import ai.opencode.feature.transcript.SessionLinkTarget
 import ai.opencode.feature.system.notifications.SessionNotificationsClient
-import ai.opencode.feature.session.seams.SharedComposerDraft
-import ai.opencode.feature.session.seams.SharedDraftTarget
-import ai.opencode.feature.session.seams.SharedLocation
-import ai.opencode.feature.session.seams.UniversalLinkClient
+import ai.opencode.feature.composer.SharedComposerDraft
+import ai.opencode.feature.composer.SharedDraftTarget
+import ai.opencode.feature.composer.SharedLocation
+import ai.opencode.feature.composer.LocationClientError
+import ai.opencode.feature.media.UniversalLinkClient
 import ai.opencode.feature.session.seams.VoiceFeature
 import ai.opencode.feature.session.seams.VoiceServerChoice
-import ai.opencode.feature.session.seams.VoiceViewingPage
-import ai.opencode.feature.session.seams.persistedComposerWatch
-import ai.opencode.feature.session.seams.reconcilePersistedComposer
+import ai.opencode.feature.media.VoiceViewingPage
 import ai.opencode.feature.voice.ServerVoiceProvider
 import ai.opencode.feature.voice.ServerVoiceSupport
 import ai.opencode.feature.voice.VoiceEngine
@@ -268,7 +269,7 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         /** The IDs the shared send goes under. */
         val sharedMessageID: String? = null,
         val sharedSessionID: String? = null,
-        val requestDock: RequestDockFeature.State = RequestDockFeature.State(),
+        val requestDock: RequestDockFeature.State<DraftState> = RequestDockFeature.State(),
         val familySessions: List<OpenCodeSession> = emptyList(),
         val familyReadAt: Instant? = null,
         val familyRootID: String? = null,
@@ -340,8 +341,6 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         val movedWorkKeys: Set<String> = emptySet(),
         /** Work a steering send has claimed to move before it's posted, by the send's message ID. */
         val autoBackgroundClaims: Map<String, String> = emptyMap(),
-        /** Android: the composer area's entry point (`:feature:composer`). */
-        val composer: ComposerFeature.State = ComposerFeature.State(),
     ) {
         /** iOS `Identifiable.id`. */
         val id: Int get() = navigationID
@@ -361,31 +360,6 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         )
 
         // region Nested types of iOS `SessionFeature+State.swift`
-
-        /** The composer's text, inline media, and files, saved while elsewhere. */
-        data class DraftState(
-            val text: String = "",
-            val attachments: List<OpenCodeOutgoingAttachment> = emptyList(),
-            val files: List<ComposerFileAttachment> = emptyList(),
-            /** A shared location from the + menu, sent at the top of the prompt. */
-            val location: SharedLocation? = null,
-            val chips: List<ComposerAutocompleteChip> = emptyList(),
-            val undoSnapshot: UndoSnapshot? = null,
-        ) {
-            fun append(other: DraftState): DraftState {
-                val text = SharedComposerDraft.joined(text, other.text)
-                val chips = chips + other.chips.filter { chip -> chips.none { it.id == chip.id } }
-                val restored = undoSnapshot?.restoredDraft
-                return copy(
-                    text = text,
-                    attachments = attachments + other.attachments,
-                    files = files + other.files,
-                    location = location ?: other.location,
-                    chips = chips,
-                    undoSnapshot = if (restored != null && text != restored) null else undoSnapshot,
-                )
-            }
-        }
 
         /** The title's syncing cue while a page read runs. */
         data class ResyncState(
@@ -428,16 +402,6 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         ) {
             enum class Admission { sent, admitted }
         }
-
-        /** The composer as an undo/revert left it, plus the pre-undo snapshot that Undo/Redo restores. */
-        data class UndoSnapshot(
-            val restoredDraft: String,
-            val priorDraft: String = "",
-            val restoredLocation: SharedLocation? = null,
-            val priorLocation: SharedLocation? = null,
-            val attachmentIDs: Set<String> = emptySet(),
-            val fileIDs: Set<UUID> = emptySet(),
-        )
 
         /** The reply to what was last sent from the open page: its text, or null while the agent is still working on it. */
         data class BrowserPeek(val text: String?)
@@ -531,7 +495,7 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
             }
 
             /** Seconds of grace after dictation ends before Raise to Talk may start a call. */
-            const val raiseToTalkGrace: Double = DictationFeature.State.RAISE_TO_TALK_GRACE
+            val raiseToTalkGrace: Double = DictationFeature.State.RAISE_TO_TALK_GRACE.toMillis() / 1000.0
 
             const val recentProjectLimit = 5
         }
@@ -770,13 +734,11 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         data class FolderBrowser(val action: PresentationAction<FolderBrowserFeature.Action>) : Action
         data class Autocomplete(val action: ComposerAutocompleteAction) : Action
         data class Delegate(val delegate: SessionFeature.Delegate) : Action
-        /** Android: `:feature:composer`'s entry point. */
-        data class Composer(val action: ComposerFeature.Action) : Action
 
         companion object {
             val micTapped: Action get() = Dictation(DictationFeature.Action.MicTapped)
             val micPressBegan: Action get() = Dictation(DictationFeature.Action.MicPressBegan)
-            fun micPressArmed(arm: DictationFeature.State.Hold.Arm?): Action = Dictation(DictationFeature.Action.MicPressArmed(arm))
+            fun micPressArmed(arm: DictationFeature.Hold.Arm?): Action = Dictation(DictationFeature.Action.MicPressArmed(arm))
             val micPressReleased: Action get() = Dictation(DictationFeature.Action.MicPressReleased)
             val micPressLocked: Action get() = Dictation(DictationFeature.Action.MicPressLocked)
             val micPressInterrupted: Action get() = Dictation(DictationFeature.Action.MicPressInterrupted)
@@ -816,12 +778,12 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
             fun filesStaged(files: List<ComposerStagedFile>): Action = ComposerAttachments(ComposerAttachmentsFeature.Action.FilesStaged(files))
             fun fileUploadProgress(id: UUID, sent: Long): Action =
                 ComposerAttachments(ComposerAttachmentsFeature.Action.FileUploadProgress(id, sent))
-            fun fileUploadFinished(id: UUID, result: Result<String>): Action =
+            fun fileUploadFinished(id: UUID, result: ComposerAttachmentsFeature.Outcome<String, OpenCodeClientError>): Action =
                 ComposerAttachments(ComposerAttachmentsFeature.Action.FileUploadFinished(id, result))
             fun fileRetryTapped(id: UUID): Action = ComposerAttachments(ComposerAttachmentsFeature.Action.FileRetryTapped(id))
             fun fileRemoved(id: UUID): Action = ComposerAttachments(ComposerAttachmentsFeature.Action.FileRemoved(id))
             val locationTapped: Action get() = ComposerAttachments(ComposerAttachmentsFeature.Action.LocationTapped)
-            fun locationResponse(result: Result<SharedLocation>): Action =
+            fun locationResponse(result: ComposerAttachmentsFeature.Outcome<SharedLocation, LocationClientError>): Action =
                 ComposerAttachments(ComposerAttachmentsFeature.Action.LocationResponse(result))
             val locationRemoved: Action get() = ComposerAttachments(ComposerAttachmentsFeature.Action.LocationRemoved)
             val locationErrorDismissed: Action get() = ComposerAttachments(ComposerAttachmentsFeature.Action.LocationErrorDismissed)
@@ -988,7 +950,7 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
     internal val watchdogClock: Clock? = if (dependency(SessionTimers).watchdog) dependency(Clock) else null
     internal val uuid by Dependency(UuidClient)
     internal val serverID by Dependency(ServerIDClient)
-    internal val composerPersistence by Dependency(ComposerPersistenceClient)
+    internal val composerPersistence by Dependency(ComposerPersistence)
     internal val undeliveredPrompts by Dependency(UndeliveredPrompts)
     internal val promptOutbox by Dependency(PromptOutbox)
     internal val sessionNotifications by Dependency(SessionNotificationsClient)
@@ -1127,14 +1089,14 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
                 setState = { s, c -> s.copy(dictation = c) },
                 action = { (it as? Action.Dictation)?.action },
                 embed = Action::Dictation,
-                child = DictationFeature(),
+                child = DictationFeature,
             ),
             scope(
                 state = State::requestDock,
                 setState = { s, c -> s.copy(requestDock = c) },
                 action = { (it as? Action.RequestDock)?.action },
                 embed = Action::RequestDock,
-                child = RequestDockFeature(),
+                child = RequestDockFeature<DraftState>(),
             ),
             scope(
                 state = State::composerAttachments,
@@ -1143,20 +1105,12 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
                 embed = Action::ComposerAttachments,
                 child = ComposerAttachmentsFeature(),
             ),
-            scope(
-                state = State::composer,
-                setState = { s, c -> s.copy(composer = c) },
-                action = { (it as? Action.Composer)?.action },
-                embed = Action::Composer,
-                child = ComposerFeature(),
-            ),
             Reducer { state, action ->
                 when {
                     action is Action.ShellOutput && state.shellOutput == null -> Reduced(state)
                     action is Action.SessionSheet && state.sessionSheet == null -> Reduced(state)
                     action is Action.FolderBrowser && state.folderBrowser == null -> Reduced(state)
                     action is Action.Voice && state.voice == null -> Reduced(state)
-                    action is Action.Composer -> Reduced(state)
                     else -> core.reduce(state, action)
                 }
             },

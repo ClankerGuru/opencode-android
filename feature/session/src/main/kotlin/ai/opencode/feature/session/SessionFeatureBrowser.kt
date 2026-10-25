@@ -8,11 +8,11 @@ import ai.opencode.core.store.cancellable
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.CancelID
 import ai.opencode.feature.session.SessionFeature.State
-import ai.opencode.feature.session.seams.BrowserFeature
-import ai.opencode.feature.session.seams.BrowserLinkPolicy
+import ai.opencode.feature.media.BrowserFeature
+import ai.opencode.feature.media.BrowserLinkPolicy
 import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.feature.transcript.LinkMenuAction
-import ai.opencode.feature.session.seams.LinkProbe
+import ai.opencode.feature.media.LinkMenuAction
+import ai.opencode.feature.media.LinkProbe
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
 import ai.opencode.feature.transcript.markdown.SessionLink
 import ai.opencode.feature.transcript.markdown.sessionLinkIDs
@@ -165,6 +165,7 @@ internal fun SessionFeature.reduceBrowserAndBackgroundWork(state: State, action:
         is BrowserFeature.Action.LinkMenu -> linkMenu(browser.action, browser.url, state)
         // A page opening is a later navigation than any tap still waiting.
         is BrowserFeature.Action.Open -> dropLinkProbe(state)
+        else -> Reduced(state)
     }
 
     is Action.ShellOutput -> Reduced(state)
@@ -260,7 +261,7 @@ internal fun SessionFeature.reduceBrowserAndBackgroundWork(state: State, action:
         )
         // Its requests went with it. Left here, reconciliation would keep them for an owner it never
         // rediscovers, docked forever.
-        next = next.pruneRequests(removing = { it.sessionID == sessionID })
+        next = next.pruneRequests(removing = { _, owner -> owner == sessionID })
         val rootID = next.familyRootID
         if (next.session?.id == sessionID && rootID != null && next.familySessions.any { it.id == rootID }) {
             Reduced(next, Effect.send(Action.FamilyPicked(rootID)))

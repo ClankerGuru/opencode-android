@@ -1,5 +1,7 @@
 package ai.opencode.feature.session
 
+import ai.opencode.feature.composer.RequestDockFeature
+import ai.opencode.feature.composer.UndeliveredPrompts
 import ai.opencode.core.log.AppLog
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced

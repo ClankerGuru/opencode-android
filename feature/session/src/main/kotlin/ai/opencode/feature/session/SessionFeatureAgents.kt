@@ -9,7 +9,7 @@ import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.cancellable
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.State
-import ai.opencode.feature.session.seams.AgentPickerKeys
+import ai.opencode.feature.composer.AgentPickerSharedKeys
 import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
@@ -33,9 +33,9 @@ data class AgentSelectionState(
     /** The agent each queued send was sent with, applied when its message starts or Send Now makes it a steer (as `queuedPicks`). */
     val queuedPicks: Map<String, String> = emptyMap(),
     val queuedPickDue: String? = null,
-    val sessionAgents: Shared<Map<String, String>> = shared(AgentPickerKeys.sessionAgents),
-    val defaultAgentID: Shared<String> = shared(AgentPickerKeys.defaultAgentID),
-    val knownPrimaryAgents: Shared<List<OpenCodeAutocompleteAgent>> = shared(AgentPickerKeys.knownPrimaryAgents),
+    val sessionAgents: Shared<Map<String, String>> = shared(AgentPickerSharedKeys.sessionAgents),
+    val defaultAgentID: Shared<String> = shared(AgentPickerSharedKeys.defaultAgentID),
+    val knownPrimaryAgents: Shared<List<OpenCodeAutocompleteAgent>> = shared(AgentPickerSharedKeys.knownPrimaryAgents),
 )
 
 /** iOS `SessionFeature.agentsAttempts`: tries for the agents list, the first, then retries after 1 s and 2 s. */

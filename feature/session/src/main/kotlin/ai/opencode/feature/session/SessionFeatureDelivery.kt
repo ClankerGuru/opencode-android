@@ -1,11 +1,14 @@
 package ai.opencode.feature.session
 
+import ai.opencode.feature.composer.UndeliveredPrompts
+import ai.opencode.feature.composer.PromptOutbox
+import ai.opencode.feature.composer.DeliveryOutcome
+import ai.opencode.feature.composer.PendingPrompt
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.log.AppLog
 import ai.opencode.core.log.logSummary
-import ai.opencode.feature.session.seams.PageReaderClient
+import ai.opencode.feature.media.PageReaderClient
 import ai.opencode.feature.system.notifications.SessionNotificationsClient
-import ai.opencode.feature.session.seams.read
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
@@ -29,22 +32,6 @@ import kotlinx.coroutines.isActive
 import kotlin.time.TimeSource
 
 // Port of iOS `SessionFeature+Delivery.swift`.
-
-/** iOS `SessionFeature.DeliveryOutcome`. */
-sealed interface DeliveryOutcome {
-    /** [appliedModel] / [appliedAgent]: the model and agent this delivery applied before its prompt. */
-    data class Sent(
-        val sessionID: String,
-        val created: OpenCodeSession?,
-        val appliedModel: OpenCodeModelRef? = null,
-        val appliedAgent: String? = null,
-    ) : DeliveryOutcome
-
-    data class Failed(val sessionID: String?, val created: OpenCodeSession?, val error: OpenCodeClientError) : DeliveryOutcome
-
-    /** Stopped for what the reader asked: deleted (never posted, or taken back once admitted) or held by Stop before it was posted. */
-    data class Withdrawn(val sessionID: String?, val created: OpenCodeSession?) : DeliveryOutcome
-}
 
 /** iOS `SessionFeature.FailedSend`: a message whose send failed. Retry reuses its ID, which the server admits at most once. */
 data class FailedSend(
