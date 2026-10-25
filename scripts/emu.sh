@@ -34,6 +34,24 @@ case "$command" in
       >"${TMPDIR:-/tmp}/opencode-emulator-$port.log" 2>&1 &
     "$ADB" -s "emulator-$port" wait-for-device
     until [[ "$("$ADB" -s "emulator-$port" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == 1 ]]; do sleep 2; done
+    # SystemUI sizes its status bar before the emulator applies the display's final density
+    # (63–74 px instead of 132 on this AVD), which clips the clock and shrinks every app's top
+    # inset until the next configuration change. Once SystemUI has settled, a density round trip
+    # makes it re-read its dimensions.
+    status_bar() { "$ADB" -s "emulator-$port" shell dumpsys window | grep -m1 -oE 'type=statusBars frame=[^ ]*'; }
+    density=$("$ADB" -s "emulator-$port" shell wm density | sed -n 's/^Physical density: //p' | tr -d '\r')
+    for _ in 1 2 3; do
+      [[ -n "$density" ]] || break
+      sleep 6
+      "$ADB" -s "emulator-$port" shell wm density $((density + 1)) >/dev/null
+      sleep 2
+      "$ADB" -s "emulator-$port" shell wm density reset >/dev/null
+      sleep 3
+      # Done once the height holds: SystemUI didn't resize it again after the round trip.
+      after=$(status_bar)
+      sleep 3
+      [[ "$after" == "$(status_bar)" ]] && break
+    done
     echo "emulator-$port booted"
     ;;
   install)

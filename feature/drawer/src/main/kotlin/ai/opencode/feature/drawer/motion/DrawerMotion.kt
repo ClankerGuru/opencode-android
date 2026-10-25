@@ -747,6 +747,7 @@ class DrawerMotionState(
         if (progress > 0) setDrawerAvailable(true)
         offsetState.floatValue = newOffset
         callbacks.onProgress(progress)
+        keyboardHold?.follow(progress)
     }
 
     private companion object {

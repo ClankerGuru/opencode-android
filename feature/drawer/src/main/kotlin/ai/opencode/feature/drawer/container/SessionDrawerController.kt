@@ -13,6 +13,7 @@ import ai.opencode.feature.drawer.motion.DrawerDim
 import ai.opencode.feature.drawer.motion.DrawerKeyboardHold
 import ai.opencode.feature.drawer.motion.DrawerMotionState
 import ai.opencode.feature.drawer.motion.DrawerPanEvent
+import ai.opencode.feature.session.ComposerTunables
 import androidx.compose.animation.core.Animatable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -555,8 +556,27 @@ class SessionDrawerController internal constructor(
         )
     }
 
+    /**
+     * The stack card's composer strip while the opened session grows from it (iOS `composerSlice`):
+     * a picture of the stack card's bottom, sliding from the stack's bottom to where the session's
+     * composer rests, over [composerCoverTop]'s canvas, which hides the live composer meanwhile.
+     */
+    internal var composerSlice by mutableStateOf<ImageBitmap?>(null)
+        private set
+    /** The slice's clip, in the card's px, at the morph's start and end. */
+    internal var composerSliceStart = Rect.Zero
+        private set
+    internal var composerSliceEnd = Rect.Zero
+        private set
+    /** The picture's frame inside the slice (bottom-aligned), heights at the start and end. */
+    internal var composerSliceImageStartHeight = 0f
+        private set
+    internal var composerSliceImageEndHeight = 0f
+        private set
+
     /** Leaving onto the session (no drawer to return to): grows from the stack, or rises when finished. */
     private fun exitIntoSession(animated: Boolean, wasShowingCard: Boolean) {
+        val snapshot = pendingSnapshot.takeIf { animated && wasShowingCard }
         pendingSnapshot = null
         catchUpStack.live.alpha = 0f
         val previewFrom = catchUpStack.preview.alpha
@@ -583,6 +603,21 @@ class SessionDrawerController internal constructor(
             val scaledRadius = radius / scale
             cardMaskStart = startRect
             cardMaskEnd = Rect(0f, 0f, fullW, fullH)
+            if (snapshot != null) {
+                // iOS: a 68 pt strip of the stack card's bottom (its composer) slides to the
+                // session's composer, inset from the stack's 12 pt clearance to the composer's margin.
+                val sliceHeight = minOf(COMPOSER_STRIP_HEIGHT * density, stack.height)
+                val scaledSliceHeight = sliceHeight / scale
+                val startTop = startRect.bottom - scaledSliceHeight
+                val clearance = CatchUpMetrics.composerInset.value * density
+                val endTop = fullH - safeBottomPx + clearance - sliceHeight
+                val insetDelta = max(ComposerTunables.horizontalMargin * density - clearance, 0f)
+                composerSliceStart = Rect(0f, startTop, fullW, startTop + scaledSliceHeight)
+                composerSliceEnd = Rect(insetDelta, endTop, insetDelta + max(fullW - insetDelta * 2, 1f), endTop + sliceHeight)
+                composerSliceImageStartHeight = startRect.height
+                composerSliceImageEndHeight = stack.height
+                composerSlice = snapshot
+            }
             cardPosed = true
             runMorph(
                 kind = CatchUpModeMorph.OpenIntoSession,
@@ -738,6 +773,7 @@ class SessionDrawerController internal constructor(
 
     private fun clearCardPose() {
         cardPosed = false
+        composerSlice = null
         stageSnapshot = null
         cardMaskStart = null
         cardMaskEnd = null
@@ -823,6 +859,8 @@ class SessionDrawerController internal constructor(
         const val FINISH_DURATION = 0.48
         /** iOS 0.45 s, damping 1, returning to the drawer. */
         const val RETURN_DURATION = 0.45
+        /** iOS `composerStripHeight` (68 pt): the stack card's composer strip that slides into the session. */
+        const val COMPOSER_STRIP_HEIGHT = 68f
         /** The finished session rises from 18 pt below. */
         const val FINISH_RISE = 18f
         /** iOS `TranscriptMetrics.clustered` (8 pt): the stack card's top sits that far into the session. */

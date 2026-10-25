@@ -8,7 +8,9 @@ import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
+import ai.opencode.core.ui.LocalDrawerKeyboardSignals
 import ai.opencode.core.ui.LocalDrawerPanExclusion
+import ai.opencode.feature.drawer.motion.DrawerKeyboardHold
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
@@ -368,6 +370,8 @@ fun SessionSwitcherOverlay(
     val exclusion = remember(parentExclusion) { SessionSwitcherExclusion(parentExclusion) }
     controller.liveLayer = liveLayer
     controller.exclusion = exclusion
+    val keyboardHold = LocalDrawerKeyboardSignals.current as? DrawerKeyboardHold
+    controller.isOnTextField = { root, point -> keyboardHold?.isOnTextField(root, point) == true }
     val colors = OpenCodeTheme.colors
     val backdropColor = if (colors.isDark) Color(0xFF1A1A1A) else Color(0xFFDBDBDB)
 

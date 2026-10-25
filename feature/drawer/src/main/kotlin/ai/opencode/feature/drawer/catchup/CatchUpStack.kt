@@ -3,6 +3,8 @@ package ai.opencode.feature.drawer.catchup
 import ai.opencode.core.motion.rememberFrameDurationSeconds
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.feature.drawer.motion.DirectionalPan
+import ai.opencode.feature.drawer.motion.DrawerPanRegions
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -24,6 +26,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
@@ -35,14 +38,19 @@ import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
 import kotlin.math.abs
@@ -74,6 +82,8 @@ fun rememberCatchUpStackController(): CatchUpStackController {
  *   [CatchUpStackController.revealPreview] when its morph lands, as iOS does.
  * @param handlesPan the stack runs its own two-axis pan. Pass `false` when the drawer container's
  *   pan routes Catch Up swipes to [CatchUpStackController.handlePan].
+ * @param panRegions the drawer's pan regions: a horizontal scroller in the card that can still move
+ *   the way the finger goes keeps the drag (iOS `cardSwipeDecision`).
  * @param card the live card's body for the open session (`null` once the stack is empty).
  * @param preview an inert preview of the next session, with the host's preview revision so it can
  *   skip re-rendering for unrelated changes (iOS `CatchUpPreviewCard`'s equality).
@@ -87,6 +97,7 @@ fun CatchUpStack(
     previewRevision: Int = 0,
     revealsPreviewOnBegin: Boolean = true,
     handlesPan: Boolean = true,
+    panRegions: DrawerPanRegions? = null,
     card: @Composable (sessionID: String?) -> Unit,
     preview: @Composable (sessionID: String, revision: Int) -> Unit,
 ) {
@@ -158,7 +169,7 @@ fun CatchUpStack(
                         controller.refreshTuning()
                     }
                 }
-                .then(if (handlesPan) Modifier.catchUpPan(controller) else Modifier),
+                .then(if (handlesPan) Modifier.catchUpPan(controller, panRegions) else Modifier),
         ) {
             // The card behind: the next session, dimmed, inert and hidden from TalkBack.
             Box(
@@ -291,7 +302,18 @@ private fun CatchUpFlyingCardView(
  * wins it consumes the touch so a pending button in the card never fires. While the card is inert
  * (a flight or settle running) it reads touches before the card's content does.
  */
-private fun Modifier.catchUpPan(controller: CatchUpStackController): Modifier = pointerInput(controller) {
+private fun Modifier.catchUpPan(controller: CatchUpStackController, regions: DrawerPanRegions?): Modifier = composed {
+    val coordinates = remember { arrayOfNulls<LayoutCoordinates>(1) }
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    onGloballyPositioned { coordinates[0] = it }.pointerInput(controller, regions, rtl) { catchUpPanGestures(controller, regions, coordinates, rtl) }
+}
+
+private suspend fun PointerInputScope.catchUpPanGestures(
+    controller: CatchUpStackController,
+    regions: DrawerPanRegions?,
+    coordinates: Array<LayoutCoordinates?>,
+    rtl: Boolean,
+) {
     val slop = 8.dp.toPx()
     val scale = density
     fun dp(offset: Offset) = Offset(offset.x / scale, offset.y / scale)
@@ -299,18 +321,29 @@ private fun Modifier.catchUpPan(controller: CatchUpStackController): Modifier = 
         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
         if (!controller.canBeginDrag) return@awaitEachGesture
         val pointerID = down.id
+        // A horizontal scroller under the finger keeps the drags it can still scroll; the stack
+        // decides first (Initial pass) so the scroller never takes one that is the card's.
+        val pan = coordinates[0]
+        val scrollers = if (regions != null && pan != null && pan.isAttached) regions.scrollersAt(pan, down.position) else emptyList()
+        val origin = DirectionalPan.CardSwipeOrigin(
+            onCard = true,
+            scrollerOwnsRightwardDrag = scrollers.any { if (rtl) it.canScrollForward() else it.canScrollBackward() },
+            scrollerOwnsLeftwardDrag = scrollers.any { if (rtl) it.canScrollBackward() else it.canScrollForward() },
+        )
         var last: PointerInputChange = down
         var travelled: Offset
         while (true) {
-            val pass = if (controller.isContentEnabled) PointerEventPass.Main else PointerEventPass.Initial
+            val pass = if (controller.isContentEnabled && scrollers.isEmpty()) PointerEventPass.Main else PointerEventPass.Initial
             val event = awaitPointerEvent(pass)
             val change = event.changes.firstOrNull { it.id == pointerID } ?: return@awaitEachGesture
             if (!change.pressed) return@awaitEachGesture
             if (pass == PointerEventPass.Main && change.isConsumed) return@awaitEachGesture
             travelled = change.position - down.position
             last = change
-            if (travelled.getDistance() >= slop) {
-                if (abs(travelled.x) > abs(travelled.y)) break else return@awaitEachGesture
+            when (DirectionalPan.cardSwipeDecision(origin, travelled.x, travelled.y, slop)) {
+                DirectionalPan.Decision.Wait -> Unit
+                DirectionalPan.Decision.Begin -> break
+                else -> return@awaitEachGesture
             }
         }
         val tracker = VelocityTracker()
