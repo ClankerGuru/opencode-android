@@ -69,7 +69,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
@@ -507,8 +506,6 @@ private fun StatusLine(presentation: ConnectionStatusPresentation, style: Connec
                 color = color,
                 motion = millisecondsRoll,
                 alignment = RollingNumberAlignment.End,
-                // The roll stays inside its line, as iOS's masked digits do.
-                modifier = Modifier.clipToBounds(),
             )
         }
     }
