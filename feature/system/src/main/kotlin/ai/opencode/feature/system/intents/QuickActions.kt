@@ -1,0 +1,112 @@
+package ai.opencode.feature.system.intents
+
+import ai.opencode.feature.system.SystemAction
+import ai.opencode.feature.system.SessionDirectory
+import ai.opencode.core.ui.SFSymbol
+import android.content.Context
+import android.content.Intent
+import androidx.core.content.pm.ShortcutInfoCompat
+import androidx.core.content.pm.ShortcutManagerCompat
+import androidx.core.graphics.drawable.IconCompat
+
+/**
+ * Port of iOS `SystemQuickAction`: one launcher shortcut (Home Screen quick action). Shown at
+ * most four: the static New Session (`res/xml/shortcuts.xml`), then Start Call while Voice is
+ * set up, then the most recent sessions to fill the rest.
+ */
+data class SystemQuickAction(
+    val kind: Kind,
+    val title: String,
+    val subtitle: String? = null,
+    val symbol: SFSymbol,
+    val serverKey: String? = null,
+    val sessionID: String? = null,
+) {
+    enum class Kind(val rawValue: String) {
+        NewSession("ai.opencode.mobilecode.new-session"),
+        StartCall("ai.opencode.mobilecode.start-call"),
+        OpenSession("ai.opencode.mobilecode.open-session"),
+        ;
+
+        companion object {
+            fun of(rawValue: String) = entries.firstOrNull { it.rawValue == rawValue }
+        }
+    }
+
+    val action: SystemAction?
+        get() = when (kind) {
+            Kind.NewSession -> SystemAction(serverKey, SystemAction.Destination.Draft(null))
+            Kind.StartCall -> SystemAction(serverKey, SystemAction.Destination.LastViewed, startsCall = true)
+            Kind.OpenSession -> sessionID?.let { SystemAction(serverKey, SystemAction.Destination.Session(it)) }
+        }
+
+    val userInfo: Map<String, String?> get() = mapOf("server" to serverKey, "session" to sessionID)
+
+    /** A stable ID per slot, so updating the set replaces rather than piles up. */
+    val shortcutID: String
+        get() = SHORTCUT_PREFIX + when (kind) {
+            Kind.OpenSession -> "session:" + (serverKey ?: "") + ":" + (sessionID ?: "")
+            else -> kind.rawValue
+        }
+
+    fun shortcut(context: Context, rank: Int): ShortcutInfoCompat {
+        val intent = Intent(context, SystemActionActivity::class.java)
+            .setAction(SystemActionActivity.ACTION_SYSTEM)
+            .putExtra(SystemActionActivity.EXTRA_QUICK_ACTION, kind.rawValue)
+        serverKey?.let { intent.putExtra("server", it) }
+        sessionID?.let { intent.putExtra("session", it) }
+        val label = title.ifEmpty { "Session" }
+        return ShortcutInfoCompat.Builder(context, shortcutID)
+            .setShortLabel(label)
+            .setLongLabel(subtitle?.takeIf { it.isNotEmpty() }?.let { "$label · $it" } ?: label)
+            .setIcon(IconCompat.createWithResource(context, symbol.drawable))
+            .setIntent(intent)
+            .setRank(rank)
+            .build()
+    }
+
+    companion object {
+        const val LIMIT = 4
+        /** New Session is declared in `shortcuts.xml`, so it shows before first launch. */
+        const val STATIC_COUNT = 1
+        /** Quick actions' dynamic shortcut IDs; the share sheet's suggestions use another prefix. */
+        const val SHORTCUT_PREFIX = "qa:"
+
+        /** The dynamic items for the server on screen. */
+        fun items(server: SessionDirectory.Server?, voiceAvailable: Boolean): List<SystemQuickAction> {
+            server ?: return emptyList()
+            val items = mutableListOf<SystemQuickAction>()
+            if (voiceAvailable) {
+                items += SystemQuickAction(Kind.StartCall, "Start Call", server.lastViewed?.title, SFSymbol.Waveform, server.key)
+            }
+            for (session in server.sessions.take(LIMIT - STATIC_COUNT - items.size)) {
+                items += SystemQuickAction(
+                    Kind.OpenSession, session.title, session.projectName, SFSymbol.BubbleLeft, server.key, session.id,
+                )
+            }
+            return items
+        }
+
+        /** Reads a tapped item back, static or dynamic. */
+        fun action(type: String, userInfo: Map<String, String?>?): SystemAction? {
+            val kind = Kind.of(type) ?: return null
+            return SystemQuickAction(kind, "", null, SFSymbol.BubbleLeft, userInfo?.get("server"), userInfo?.get("session")).action
+        }
+
+        /**
+         * Replaces the launcher's dynamic quick actions with [items], leaving the share
+         * sheet's suggestions alone. Skips the work when nothing changed.
+         */
+        fun apply(context: Context, items: List<SystemQuickAction>) {
+            val existing = ShortcutManagerCompat.getDynamicShortcuts(context).filter { it.id.startsWith(SHORTCUT_PREFIX) }
+            val wanted = items.mapIndexed { index, item -> item.shortcut(context, index + STATIC_COUNT) }
+            val same = existing.size == wanted.size && existing.sortedBy { it.rank }.zip(wanted).all { (a, b) ->
+                a.id == b.id && a.shortLabel == b.shortLabel && a.longLabel == b.longLabel && a.rank == b.rank
+            }
+            if (same) return
+            val stale = existing.map { it.id }.filter { id -> wanted.none { it.id == id } }
+            if (stale.isNotEmpty()) ShortcutManagerCompat.removeDynamicShortcuts(context, stale)
+            if (wanted.isNotEmpty()) ShortcutManagerCompat.addDynamicShortcuts(context, wanted)
+        }
+    }
+}

@@ -4,28 +4,37 @@ import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
 
 /**
- * Phase 0 placeholder for this area's root reducer (iOS TCA feature).
- *
- * Will port `TranscriptListViewController*.swift` (list engine → LazyColumn + plain scroll-follow objects), `TranscriptEntry*.swift`, `OpenCodeMarkdownBlock*.swift`, `MarkdownStream*.swift`, `MathRendering.swift`, `RunError*.swift`
- * from `/Users/vogel/dev/opencode-ios/OpenCode/Transcript/` (all of: OpenCode/Transcript/).
- * Track every file in `docs/parity/transcript.md`.
- *
- * iOS has no TranscriptFeature reducer: row UI state (`TranscriptDisclosureState`) lives with the list. Keep this reducer for disclosure/row state only; durable transcript state stays in `SessionFeature`. Rows take immutable value props plus an action lambda, never a store.
- *
- * Keep the public names (`TranscriptFeature`, `TranscriptFeature.State`, `TranscriptFeature.Action`, `TranscriptView`) stable: `:app`
- * and parent features already wire them. Replace the placeholder state and actions freely.
+ * The transcript's store seam. iOS has no transcript reducer: the session builds the list's
+ * `Configuration` from its own state and rows call `send(SessionFeature.Action)`; row UI state
+ * (`TranscriptDisclosureState`) lives with the list. Here the session sets [State.configuration]
+ * (or calls [TranscriptList] directly) and maps [Action.Delegate] to its own actions.
  */
 class TranscriptFeature : Reducer<TranscriptFeature.State, TranscriptFeature.Action> {
     data class State(
-        val placeholder: Boolean = true,
+        val configuration: TranscriptConfiguration = TranscriptConfiguration(),
+        /** Incremented when the reader taps Jump to latest (iOS `SessionScrollEdgeBridge.jumpRequest`). */
+        val jumpRequest: Int = 0,
+        /** Whether the list's scroll behavior shows Jump to latest. */
+        val showsJumpButton: Boolean = false,
     )
 
     sealed interface Action {
         /** The view appeared (TCA `.task`). */
         data object Task : Action
+        /** The session replaced what the list draws. */
+        data class ConfigurationChanged(val configuration: TranscriptConfiguration) : Action
+        data object JumpToLatestTapped : Action
+        data class ShowsJumpButtonChanged(val shows: Boolean) : Action
+        /** Something a row or the list asks the session to do. */
+        data class Delegate(val action: TranscriptAction) : Action
     }
 
     override fun reduce(state: State, action: Action): Reduced<State, Action> = when (action) {
         Action.Task -> Reduced(state)
+        is Action.ConfigurationChanged -> Reduced(state.copy(configuration = action.configuration))
+        Action.JumpToLatestTapped -> Reduced(state.copy(jumpRequest = state.jumpRequest + 1))
+        is Action.ShowsJumpButtonChanged ->
+            Reduced(if (state.showsJumpButton == action.shows) state else state.copy(showsJumpButton = action.shows))
+        is Action.Delegate -> Reduced(state)
     }
 }

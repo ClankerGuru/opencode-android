@@ -6,67 +6,75 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 
 | iOS file | Lines | Kotlin file(s) | Status | Notes |
 | --- | ---: | --- | --- | --- |
-| `OpenCode/Transcript/AgentMessageReveal.swift` | 176 | | todo | |
-| `OpenCode/Transcript/DisclosureMotion.swift` | 20 | | todo | |
-| `OpenCode/Transcript/DisplayLinkTarget.swift` | 15 | | todo | |
-| `OpenCode/Transcript/HorizontalOverflowFade.swift` | 40 | | todo | |
-| `OpenCode/Transcript/ImageLinkPreviews.swift` | 180 | | todo | |
-| `OpenCode/Transcript/InlineLinkIcons.swift` | 367 | | todo | |
-| `OpenCode/Transcript/InlineRows.swift` | 228 | | todo | |
-| `OpenCode/Transcript/LinkPreviewMotion.swift` | 131 | | todo | |
-| `OpenCode/Transcript/LinkPreviewViews.swift` | 703 | | todo | |
-| `OpenCode/Transcript/MarkLoadingView.swift` | 106 | | todo | |
-| `OpenCode/Transcript/MarkdownBlockView.swift` | 1919 | | todo | |
-| `OpenCode/Transcript/MarkdownQuote.swift` | 58 | | todo | |
-| `OpenCode/Transcript/MarkdownStream.swift` | 325 | | todo | |
-| `OpenCode/Transcript/MarkdownStreamClient.swift` | 138 | | todo | |
-| `OpenCode/Transcript/MarkdownTailHeal.swift` | 408 | | todo | |
-| `OpenCode/Transcript/MathRendering.swift` | 128 | | todo | |
-| `OpenCode/Transcript/MathSyntax.swift` | 228 | | todo | |
-| `OpenCode/Transcript/ModelSwitchRule.swift` | 84 | | todo | |
-| `OpenCode/Transcript/MotionAudit.swift` | 611 | | todo | |
-| `OpenCode/Transcript/NewMessagesMark.swift` | 203 | | todo | |
-| `OpenCode/Transcript/OpenCodeMarkdownBlock+InlineCache.swift` | 116 | | todo | |
-| `OpenCode/Transcript/OpenCodeMarkdownBlock.swift` | 614 | | todo | |
-| `OpenCode/Transcript/RunError.swift` | 117 | | todo | |
-| `OpenCode/Transcript/RunErrorRow.swift` | 144 | | todo | |
-| `OpenCode/Transcript/RunErrorState.swift` | 169 | | todo | |
-| `OpenCode/Transcript/SessionLinkChips.swift` | 238 | | todo | |
-| `OpenCode/Transcript/SessionLinks.swift` | 345 | | todo | |
-| `OpenCode/Transcript/TranscriptCollectionView.swift` | 30 | | todo | |
-| `OpenCode/Transcript/TranscriptDragSource.swift` | 1060 | | todo | |
-| `OpenCode/Transcript/TranscriptEntry.swift` | 508 | | todo | |
-| `OpenCode/Transcript/TranscriptEntryView.swift` | 1845 | | todo | |
-| `OpenCode/Transcript/TranscriptKeyboardMotion.swift` | 240 | | todo | |
-| `OpenCode/Transcript/TranscriptLayoutProbe.swift` | 400 | | todo | |
-| `OpenCode/Transcript/TranscriptListRows.swift` | 525 | | todo | |
-| `OpenCode/Transcript/TranscriptListView.swift` | 243 | | todo | |
-| `OpenCode/Transcript/TranscriptListViewController+Configuration.swift` | 124 | | todo | |
-| `OpenCode/Transcript/TranscriptListViewController+DataSource.swift` | 538 | | todo | |
-| `OpenCode/Transcript/TranscriptListViewController+DisclosureMotion.swift` | 549 | | todo | |
-| `OpenCode/Transcript/TranscriptListViewController+ImagePreviews.swift` | 80 | | todo | |
-| `OpenCode/Transcript/TranscriptListViewController+KeyboardInsets.swift` | 603 | | todo | |
-| `OpenCode/Transcript/TranscriptListViewController+Layout.swift` | 187 | | todo | |
-| `OpenCode/Transcript/TranscriptListViewController+NewMessages.swift` | 372 | | todo | |
-| `OpenCode/Transcript/TranscriptListViewController+RowGrowth.swift` | 300 | | todo | |
-| `OpenCode/Transcript/TranscriptListViewController+RowPresentation.swift` | 200 | | todo | |
-| `OpenCode/Transcript/TranscriptListViewController+ScrollFollow.swift` | 685 | | todo | |
-| `OpenCode/Transcript/TranscriptListViewController+SendFlights.swift` | 212 | | todo | |
-| `OpenCode/Transcript/TranscriptListViewController+SnapshotAnchoring.swift` | 384 | | todo | |
-| `OpenCode/Transcript/TranscriptListViewController+Snapshots.swift` | 767 | | todo | |
-| `OpenCode/Transcript/TranscriptListViewController+Tracing.swift` | 250 | | todo | |
-| `OpenCode/Transcript/TranscriptListViewController.swift` | 843 | | todo | |
-| `OpenCode/Transcript/TranscriptMarkHandoff.swift` | 90 | | todo | |
-| `OpenCode/Transcript/TranscriptMotionClock.swift` | 19 | | todo | |
-| `OpenCode/Transcript/TranscriptMotionTrace.swift` | 642 | | todo | |
-| `OpenCode/Transcript/TranscriptNoticeKind.swift` | 71 | | todo | |
-| `OpenCode/Transcript/TranscriptPromotionTrace.swift` | 77 | | todo | |
-| `OpenCode/Transcript/TranscriptRowActions.swift` | 30 | | todo | |
-| `OpenCode/Transcript/TranscriptRowEntrance.swift` | 61 | | todo | |
-| `OpenCode/Transcript/TranscriptRowGrowth.swift` | 151 | | todo | |
-| `OpenCode/Transcript/TranscriptScrollBehavior.swift` | 321 | | todo | |
-| `OpenCode/Transcript/TranscriptScrollSprings.swift` | 251 | | todo | |
-| `OpenCode/Transcript/TranscriptScrollTrace.swift` | 640 | | todo | |
-| `OpenCode/Transcript/TranscriptTimeStamps.swift` | 304 | | todo | |
-| `OpenCode/Transcript/TranscriptUserMessage.swift` | 1611 | | todo | |
-| `OpenCode/Transcript/UserMessageRun.swift` | 84 | | todo | |
+| `OpenCode/Transcript/AgentMessageReveal.swift` | 176 | `user/AgentMessageReveal.kt` | done | Metal glow → AGSL `RuntimeShader`; Reduce Motion fade only; the list records arrivals once (`TranscriptAgentMessageReveal`) |
+| `OpenCode/Transcript/DisclosureMotion.swift` | 20 | `rows/DisclosureMotion.kt` | done |  |
+| `OpenCode/Transcript/DisplayLinkTarget.swift` | 15 | — | n/a: CADisplayLink trampoline → `motionFrameLoop` |  |
+| `OpenCode/Transcript/HorizontalOverflowFade.swift` | 40 | `markdown/ui/MarkdownBand.kt` | done |  |
+| `OpenCode/Transcript/ImageLinkPreviews.swift` | 180 | `links/ImageLinkPreviews.kt` | partial: space reserved on load (not on header); Coil defaults instead of iOS’s 10 s / 25 MB / failure memory | Experiment off by default (`TranscriptLayoutTuning.imageLinkPreviews`); 3-image cap, dedupe across the message; wired under prose blocks in `MarkdownBlocksView` |
+| `OpenCode/Transcript/InlineLinkIcons.swift` | 367 | `markdown/ui/MarkdownPresentation.kt`, `MarkdownEnvironment.kt`, `MarkdownLinks.kt` | partial: site icons come through `LocalMarkdownMediaHandoff.siteIcon` (glyph until media fills it); TalkBack has no hint for “Links to …” |  |
+| `OpenCode/Transcript/InlineRows.swift` | 228 | `rows/InlineRows.kt` | done |  |
+| `OpenCode/Transcript/LinkPreviewMotion.swift` | 131 | `links/LinkPreviewMotion.kt` | partial: `measure()` unused (fed image-row growth) | Arrival, materialisation, text transition |
+| `OpenCode/Transcript/LinkPreviewViews.swift` | 703 | `links/LinkPreviewViews.kt`, `links/LinkPreviewModel.kt`, `links/TranscriptLinkPreviews.kt` | partial: data comes through `LocalTranscriptLinkPreviews` (media implements it; null = no previews, as iOS without metadata); per-block growth lift not ported | Every view + `LinkPreviewSummary`, 3-link cap, hold menu; pure parts of media `LinkPreview`/`RichLinkPreview` value types ported for the seam |
+| `OpenCode/Transcript/MarkLoadingView.swift` | 106 | `list/TranscriptListRows.kt` | done | `MarkLoadingTunables`, `MarkLoadingTiming` (delay 0.3, min 0.4, fade 0.2/0.15, smoothstep), `LoadingGlyphPulse` (1.7 s cosine to 0.45 / 0.94, Reduce Motion 0.5 dim), `MarkLoadingView` paused when hidden/settled under Reduce Motion |
+| `OpenCode/Transcript/MarkdownBlockView.swift` | 1919 | `markdown/ui/MarkdownBlockView.kt`, `MarkdownStyle.kt`, `MarkdownPresentation.kt`, `MarkdownBlocksView.kt`, `ArrivingText.kt`, `TranscriptTextReveal.kt`, `MarkdownBand.kt`, `MarkdownTable.kt`, `TranscriptBand.kt`, `QuoteSelection.kt`, `MarkdownEnvironment.kt` | partial: drag sources on blocks; agent-image growth hold not wired (needs media `AgentImageRowGrowth`); only the Chunk reveal style (iOS default) is live; files blocks use a fallback card until media fills `LocalMarkdownMediaHandoff.files` | D-52 typography (17/4.5 at tone 0.92, H1–H3, 13 sp list numbers, code leading 3, gaps 16/20/24/8), bands bleeding to the edges with hairlines and overflow fade, tables (≤ 220 columns, fixed rules), streamed text fading only new characters over 0.2 s (opacity only), greedy line breaking for line hold, Quote in the selection menu + TalkBack action, `BandClock`/`TranscriptBand`/`BelowLayout` from TranscriptEntryView 562–806 |
+| `OpenCode/Transcript/MarkdownQuote.swift` | 58 | `markdown/MarkdownQuote.kt` | done |  |
+| `OpenCode/Transcript/MarkdownStream.swift` | 325 | `markdown/MarkdownStream.kt` | done | Incremental units, proofs, tail re-parse; UTF-16 offsets; matches `blocks()` on every prefix of the iOS corpus + 400 fuzzed docs |
+| `OpenCode/Transcript/MarkdownStreamClient.swift` | 138 | `markdown/MarkdownStreamClient.kt` | done | Dependency client (`Key`), `MarkdownStreamStore` (2 streams/part, 16 parts), `rememberMarkdownBlocks(partID, text, isStreaming)`, `EventBatcherHooks.withMarkdownStream()` for `:app` |
+| `OpenCode/Transcript/MarkdownTailHeal.swift` | 408 | `markdown/MarkdownTailHeal.kt` | done | remend heal of the live tail |
+| `OpenCode/Transcript/MathRendering.swift` | 128 | `markdown/ui/MathRendering.kt` | done | SwiftMath → jlatexmath alpha-mask bitmaps tinted with the text colour, cached (400); inline on the baseline, display on the band, unparseable TeX shows as code |
+| `OpenCode/Transcript/MathSyntax.swift` | 228 | `markdown/MathSyntax.kt` | done |  |
+| `OpenCode/Transcript/ModelSwitchRule.swift` | 84 | `rows/ModelSwitchRule.kt` | partial: provider marks through the `providerMark` slot (sparkles until filled) |  |
+| `OpenCode/Transcript/MotionAudit.swift` | 611 | — | n/a: motion audit detector shared with XCUITest (`MotionAuditTests`) |  |
+| `OpenCode/Transcript/NewMessagesMark.swift` | 203 | `list/NewMessagesMark.kt`, `TranscriptContract.kt` (`NewMessagesPlacement`) | partial: the `SessionFeature.State` extension (noteLeaving/noteOpening/noteOwnSend/absorbFittingNewMessages/updateNewMessagesMark) is session reducer logic → `:feature:session` | `NewMessagesMark`, `firstUnseen`, `NewMessagesPlacement.resolve`/`isPassed`, `newMessagesContext` 20 |
+| `OpenCode/Transcript/OpenCodeMarkdownBlock+InlineCache.swift` | 116 | `markdown/OpenCodeMarkdownBlock.kt` (`InlineCache`) | done | 512 entries / 128 KB, oldest evicted, lock-guarded |
+| `OpenCode/Transcript/OpenCodeMarkdownBlock.swift` | 614 | `markdown/OpenCodeMarkdownBlock.kt`, `markdown/InlineMarkdownParser.kt`, `markdown/HtmlEntities.kt`, `markdown/MarkdownModel.kt`, `markdown/SwiftText.kt` | done | Block parser line for line; Foundation `AttributedString(markdown:.inlineOnlyPreservingWhitespace)` replaced by a CommonMark inline parser (escapes, entities, code spans, delimiter-run emphasis incl. `_` intraword, `~~`, links, autolinks, raw HTML literal) producing `InlineText` runs. Unverifiable Foundation corners follow CommonMark (backslash-newline, newline in code spans). Android items keep raw Markdown; rows parse via `rememberMarkdownBlocks` |
+| `OpenCode/Transcript/RunError.swift` | 117 | `:server` `OpenCodeRunError`, `rows/RunErrorRow.kt` | done | `Action.symbol` added as an extension |
+| `OpenCode/Transcript/RunErrorRow.swift` | 144 | `rows/RunErrorRow.kt` | done | Hold menu = DropdownMenu; TalkBack actions incl. Copy Error |
+| `OpenCode/Transcript/RunErrorState.swift` | 169 | `rows/RunErrorState.kt` | partial: `restoredPrompt`, `settleRevertForNewPrompt`, `dropUndone` mutate session/composer state → `:feature:session` | `actionableRunErrorID`, `runErrorActions`, `editableLastMessage`, `hidingUndone`, `imageMIME` |
+| `OpenCode/Transcript/SessionLinkChips.swift` | 238 | `markdown/ui/SessionLinkChips.kt` | done | Chip drawn under the text layout, press darkens, muted short ID, reports shown IDs, tap opens, hold Copy ID, TalkBack “Open session <title>” |
+| `OpenCode/Transcript/SessionLinks.swift` | 345 | `markdown/SessionLinks.kt`, `TranscriptContract.kt` (`SessionLinkTarget`) | done | `SessionLink` (marking, `opencode-session://`, short IDs), `SessionLinkText.present` (chips as `InlineRun.sessionChip`), `label`/`resolvedTitle`; the SwiftUI environment is `markdown/ui/MarkdownEnvironment.kt` (`LocalSessionLinks`) |
+| `OpenCode/Transcript/TranscriptCollectionView.swift` | 30 | — | n/a: UIKit subclass for covered-top hit testing; Compose content under the header is not reachable by TalkBack touch either way |  |
+| `OpenCode/Transcript/TranscriptDragSource.swift` | 1060 | `user/TranscriptDragSource.kt` | partial: images and agent files carry no ClipData (need an `:app` FileProvider + media `AgentFileLoader`); no lift preview fill; no composer drop | Payload model (kinds, MIME/extension mapping, suggested names, image sniffing); text/code/URL/Markdown drags as global ClipData via `dragAndDropSource` |
+| `OpenCode/Transcript/TranscriptEntry.swift` | 508 | `TranscriptEntry.kt` | done | `build`, `entryStart`, `tail`, `entryID`, `sessionStartModelIDs`, `TranscriptRowIdentityPlan` line for line; `TranscriptSnapshotTrace` kept. Deviation: `ReplyEnd` carries the reply texts (items keep raw Markdown) and Copy parses + serializes on tap; `layoutKind` reads the Markdown source for code/table |
+| `OpenCode/Transcript/TranscriptEntryView.swift` | 1845 | root `TranscriptTunables.kt`, `TranscriptRowContext.kt`; `rows/TranscriptEntryView.kt`, `ToolRows.kt`, `ToolImages.kt`, `ReplyActions.kt`, `RowModifiers.kt`, `TranscriptRule.kt`, `InlineRows.kt`, `TranscriptRowSlots.kt`; `markdown/ui/TranscriptBand.kt`, `MarkdownImage.kt` | partial: no drag sources on tool images, files or Copy; Session-owned views (Since You Left row, activity orb, provider marks) come through `LocalTranscriptRowSlots` with fallbacks | Tunables/metrics/row insets, disclosure state, compaction states, tool rows and Used N groups (failed/denied/running pulse, console block, never raw JSON), answered questions, subagent rows, tool image justified rows, undone, model switch, reply Copy, time stamps, `MarkdownImage` (Coil + server file reader) |
+| `OpenCode/Transcript/TranscriptKeyboardMotion.swift` | 240 | — | n/a: keyboard curve copying for UIKit; Compose IME insets animate with the system |  |
+| `OpenCode/Transcript/TranscriptLayoutProbe.swift` | 400 | `TranscriptEntry.kt` (`layoutKind`) | n/a: layout-pressure journaling is iOS diagnostics; `layoutKind` kept |  |
+| `OpenCode/Transcript/TranscriptListRows.swift` | 525 | `list/TranscriptListRows.kt` | partial: `EmptyStateMotion`/`EmptyGlyphBreath` continuous-phase retargeting replaced by Compose `Animatable` springs (same spring, delay, blur/rise); settled-empty glyph does not breathe-settle from the mark | `TranscriptHistoryStatusView` (delayed 400 ms spinner, error + Retry), `DelayedProgressView`, `EmptyStateTunables` defaults, `TranscriptEmptyView` (“No messages yet” / “Start the conversation below.” with `motionBlurReveal`), `TranscriptQueuedInputView` (“Compaction queued”); `CenteredRow` → `fillParentMaxHeight` + centred box |
+| `OpenCode/Transcript/TranscriptListView.swift` | 243 | `list/TranscriptList.kt`, `TranscriptView.kt`, `TranscriptTunables.kt` | partial: `SessionScrollEdgeBridge` (scrolledUnderHeader, topSafeArea, workingRunTime, send transition hooks) belongs to the session screen; `ComposerTopEdge` probe n/a (Compose insets) | `TranscriptLayoutTuning` + `LocalTranscriptLayoutTuning`; `TranscriptList(configuration, send, contentPadding, jumpRequest, onShowsJumpButtonChanged, slots)` is the representable; lab `JumpButtonTrace` n/a |
+| `OpenCode/Transcript/TranscriptListViewController+Configuration.swift` | 124 | `TranscriptContract.kt` (`TranscriptConfiguration`) | done | Same fields (minus `working`, which comes in as the session's `TranscriptSlots.workingLine`, and `snapshotRevision`, perf only); data-class equality |
+| `OpenCode/Transcript/TranscriptListViewController+DataSource.swift` | 538 | `list/TranscriptListSnapshot.kt`, `list/TranscriptList.kt` | partial: `TranscriptUserMessage.isFromAgent` voice delegations and `SharedLocation` cards are not read when planning runs/edit props | `ItemID`, `MessageRow`, `RowProps`, `buildSnapshotItems` (dedupe, growing row, edit/send-now/run-error/subagent/session-link props, empty/history/new/working order), `userRuns`/`runMember`, separate content types per row family |
+| `OpenCode/Transcript/TranscriptListViewController+DisclosureMotion.swift` | 549 | `list/TranscriptListController.kt` (`toggleDisclosure`, `DisclosureHeight`) | partial: closing band drawn outside layout and per-cell masks are Compose-native (row height spring + clip) | Toggle runs as one motion: tapped row stays (LazyColumn top anchor), height on critically damped 0.3/0.24 s spring, follower stops, behavior `DisclosureToggled` after layout |
+| `OpenCode/Transcript/TranscriptListViewController+ImagePreviews.swift` | 80 | — | todo: image-preview row growth springs and viewport visibility (`AgentImageVisibility`) depend on `:feature:media` |  |
+| `OpenCode/Transcript/TranscriptListViewController+KeyboardInsets.swift` | 603 | — | n/a: Android lays the composer and IME out with `WindowInsets.ime`/`imePadding` in the session screen; the list takes the obstruction as `contentPadding` and a following reader re-lands on geometry change (`onLayout`) |  |
+| `OpenCode/Transcript/TranscriptListViewController+Layout.swift` | 187 | `list/TranscriptListController.kt` (`onLayout`) | partial: header geometry reporting (scrolled under header) is the session's | First layout lands on the end and sends `FirstContentFrameRendered` once; layout changes report to the behavior |
+| `OpenCode/Transcript/TranscriptListViewController+NewMessages.swift` | 372 | `list/TranscriptListController.kt` | partial: reveal glide (`NewMessagesReveal`) lands at once; background/foreground decision deferral (`decidesNewMessagesWhenShown`) reduced to `isShowingToReader` | Decide once in front of the reader: fits → `NewMessagesFit` and no divider; else land at the divider browsing; `NewMessagesPassed` once past |
+| `OpenCode/Transcript/TranscriptListViewController+RowGrowth.swift` | 300 | `list/TranscriptListController.kt` (`fittedHeight`, `stepMotion`), `list/TranscriptList.kt` (`GrowingRow`) | partial: removed-row height hand-off and image-preview spring growth not ported | Rows ease to new heights while following at rest (new rows from a pixel), ridden with `GrowthRide` in the same frame (`dispatchRawDelta` before layout), 28 dp soft edge, landing for catch-ups (> 4 rows), browsing, jumps, width changes, Reduce Motion |
+| `OpenCode/Transcript/TranscriptListViewController+RowPresentation.swift` | 200 | — | todo: promotion morphs (in-place change then move on one spring) not ported; promoted rows keep identity and reconfigure |  |
+| `OpenCode/Transcript/TranscriptListViewController+ScrollFollow.swift` | 685 | `list/TranscriptListController.kt` | partial: assistive (TalkBack) scroll detection, scroll-to-top, held space under the finger and keyboard spring kinds are not distinct on Android | Drag begin/settle via nested scroll (`onPreScroll` user input, `onPostFling`), behavior execution, follower spring retargeted per frame, JumpGlide (from rest within 2.5 screens, cut to 1.5 screens + fast start beyond), land on last item, opening settle 0.75 s, `TranscriptBrowsingChanged` |
+| `OpenCode/Transcript/TranscriptListViewController+SendFlights.swift` | 212 | — | todo: send flights from the composer into the bubble/pill need the composer's frame from `:feature:session`; sends currently arrive as normal rows (browsing sends jump to the end) |  |
+| `OpenCode/Transcript/TranscriptListViewController+SnapshotAnchoring.swift` | 384 | `list/TranscriptList.kt` | partial: reading anchor = LazyColumn's first visible item (iOS prefers the row under a header-peeking row) | Keyed LazyColumn keeps the anchor row through prepends, regroups and updates; browsing window retention via stable keys |
+| `OpenCode/Transcript/TranscriptListViewController+Snapshots.swift` | 767 | `list/TranscriptListController.kt` (`applySnapshot`) | partial: animated removals (fade out in place), idle repaint of recently changed rows and top-gap closing not ported | Identity plan → stable keys, entering rows and entrances, catch-up landing |
+| `OpenCode/Transcript/TranscriptListViewController+Tracing.swift` | 250 | — | n/a: DEBUG lab tracing (`-lab-*` launch arguments) for XCUITest; Android verifies with screenshots |  |
+| `OpenCode/Transcript/TranscriptListViewController.swift` | 843 | `list/TranscriptListController.kt`, `list/TranscriptList.kt` | partial: send flights, promotion morphs, keyboard moves, held trailing space, idle repaint and layout-pressure journaling not ported (see rows below) | Session change reset, draft→session continuity (`key(sessionID)` keeps draft list), earlier-history completion re-arm, browsing send → jump, jump requests, Reduce Motion; LazyColumn with stable keys + content types |
+| `OpenCode/Transcript/TranscriptMarkHandoff.swift` | 90 | `list/TranscriptList.kt` | partial: no leaving-mark picture crossfade | The empty row leaves the LazyColumn when content arrives; the 0.15 s opacity hand-off with minimum hold (`MarkLoadingTiming.handoffDelay`) is not yet drawn; lab trace n/a |
+| `OpenCode/Transcript/TranscriptMotionClock.swift` | 19 | `list/TranscriptListRows.kt` (`transcriptNow`) | done | Monotonic seconds; the frame loop supplies dt |
+| `OpenCode/Transcript/TranscriptMotionTrace.swift` | 642 | — | n/a: DEBUG lab motion trace for XCUITest |  |
+| `OpenCode/Transcript/TranscriptNoticeKind.swift` | 71 | `:server` `model/RunNotices.kt` | done | Already in `:server` (phase 0) |
+| `OpenCode/Transcript/TranscriptPromotionTrace.swift` | 77 | — | n/a: DEBUG lab trace |  |
+| `OpenCode/Transcript/TranscriptRowActions.swift` | 30 | `TranscriptContract.kt` (`TranscriptAction`), `markdown/ui/MarkdownLinks.kt` | done | File links → `TranscriptAction.OpenFile`, other links → `LinkTapped`, menus → `LinkMenu`; Share is the session’s |
+| `OpenCode/Transcript/TranscriptRowEntrance.swift` | 61 | `list/TranscriptRowEntrance.kt` | done | Styles, durations (0.25 / 0.4 / 0.45), rise 6, 4-row cap, 0.5 s window; CA layer animations → `graphicsLayer` pose on the list clock (`Modifier.rowEntrance`) |
+| `OpenCode/Transcript/TranscriptRowGrowth.swift` | 151 | `list/TranscriptRowGrowth.kt` | done | `RowGrowth` (cubic ease with lead, spring variant) and `GrowthRide` line for line |
+| `OpenCode/Transcript/TranscriptScrollBehavior.swift` | 321 | `list/TranscriptScrollBehavior.kt` | done | Pure state machine ported line for line (leave 120, rest 1, all events/commands) |
+| `OpenCode/Transcript/TranscriptScrollSprings.swift` | 251 | `list/TranscriptScrollSprings.kt` | done | `JumpGlide` (curves, extension), `NewMessagesReveal.duration`, `BottomSpring` (caps, no overshoot, pixel floor, deadlines), `HeldSpaceDrain`; `AnimationTimeScale` slow-mo → `motionFrameLoop` dt |
+| `OpenCode/Transcript/TranscriptScrollTrace.swift` | 640 | — | n/a: DEBUG lab scroll trace for XCUITest |  |
+| `OpenCode/Transcript/TranscriptTimeStamps.swift` | 304 | `rows/TranscriptTimeStamps.kt` | done | java.time + ICU; injectable now/zone/locale/24 h; `MinuteTimestampCache` |
+| `OpenCode/Transcript/TranscriptUserMessage.swift` | 1611 | `user/TranscriptUserMessage.kt`, `TranscriptUserMessageView.kt`, `TranscriptMessageRow.kt`, `TranscriptUserBubble.kt`, `TranscriptPendingActions.kt`, `TranscriptVoiceMessageView.kt`, `UserMessageLayout.kt`, `UserAttachmentViews.kt`, `UserMessageValues.kt` | partial: Select enters a read-only selected text field (system toolbar may not show on its own, no Back handling); voice long-press prompt preview; location map snapshot; Pasted Text viewer; zoom sources; `SessionMentionText` chips in bubbles | Value model, bubble (lift + menu Copy/Select/Send Now/Move to Queue/Delete/Revert to Here), 12→8 line fold with Show More, steering label, failed sends (Retry/Edit/Delete), delivery note, runs (4 dp, 6 dp tight corners), voice messages, TalkBack actions. Minimal copies of `VoiceHandoff.Delegation`, `SharedLocation`, file-type labels (hand-offs) |
+| `OpenCode/Transcript/UserMessageRun.swift` | 84 | `user/UserMessageRun.kt` | done |  |
+
+## Contracts and hand-offs
+
+- **Session → list:** `TranscriptList(configuration, send, contentPadding, jumpRequest, onShowsJumpButtonChanged, slots)` (or `TranscriptView(store)` with `TranscriptFeature.State.configuration`). Build entries with `TranscriptEntry.build(items, isRunning, models, sessionStartModels, sinceYouLeft)`; map every `TranscriptAction` to the iOS `SessionFeature.Action` of the same name (`OpenFile` → media viewer, `PreviewImage` → zoom viewer).
+- **Moved down into this module:** `SinceYouLeft` value type, `LinkMenuAction`, `TranscriptImagePreview`, `TranscriptSubagent`, `SessionLinkTarget`, `NewMessagesPlacement`/`NewMessagesMark`. `AgentFileReference` moved to `:server` (shared with media).
+- **Slots `:feature:session` fills:** `TranscriptSlots.workingLine` (WorkingLineRow + orb), `LocalTranscriptRowSlots` (`sinceYouLeft`, `agentGlyph`, `providerMark`; `replyEnd` is filled by the list with link previews).
+- **Seams `:feature:media` fills:** `LocalMarkdownMediaHandoff` (`mermaid`, `files`, `siteIcon`, `inlineLinksAppeared`), `LocalTranscriptLinkPreviews` (link preview store). `markdown/SyntaxHighlighter.kt` should be the one highlighter (media's file viewer reuses it).
+- **`:app`:** install `EventBatcherHooks.withMarkdownStream()` at the root (`DependencyValues.installRoot { this[EventBatcherHooks] = this[EventBatcherHooks].withMarkdownStream() }`).

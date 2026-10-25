@@ -48,6 +48,9 @@ object SharedKeys {
     /** Raise to Talk: raising the phone to your ear on a session starts an earpiece call. Off by default. */
     val raiseToTalk = SharedKey.appStorage("raise-to-talk", false)
 
+    /** Agent Selection: the agent new sessions start with (an agent ID); empty is the server's default. */
+    val defaultAgentID = SharedKey.appStorage("default-agent", "")
+
     /** Whether the one-time migration moving saved voice engines to GPT-Live has run on this install. */
     val voiceEngineMigratedToGPTLive = SharedKey.appStorage("voice-engine-migrated-to-gpt-live", false)
 

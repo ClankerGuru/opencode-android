@@ -355,6 +355,16 @@ object ServerSharedKeys {
     /** Every server you've connected to, most recent first. */
     val savedServers = SharedKey.keychain<List<OpenCodeServer>>("saved-servers", emptyList())
 
+    /** Agent Selection: the primary agents last listed, for Settings › Composer › Default Agent (iOS `knownPrimaryAgents`). */
+    val knownPrimaryAgents = SharedKey.fileStorage<List<ai.opencode.server.model.OpenCodeAutocompleteAgent>>(
+        FileDirectory.Documents,
+        "primary-agents.json",
+        emptyList(),
+    )
+
+    /** Agent Selection: the agent picked in each session (session ID → agent ID; iOS `sessionAgents`). */
+    val sessionAgents = SharedKey.fileStorage<Map<String, String>>(FileDirectory.Documents, "session-agents.json", emptyMap())
+
     /** Each saved server's last Home snapshot, keyed by its persistence ID. */
     val cachedHomeSnapshots = SharedKey.fileStorage<Map<String, CachedHomeSnapshot>>(FileDirectory.Caches, "home-snapshots.json", emptyMap())
 

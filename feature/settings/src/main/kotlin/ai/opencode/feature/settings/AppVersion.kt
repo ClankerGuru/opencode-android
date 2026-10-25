@@ -1,0 +1,26 @@
+package ai.opencode.feature.settings
+
+import ai.opencode.core.dependencies.AppContext
+import ai.opencode.core.dependencies.dependency
+import android.content.pm.PackageManager
+
+/**
+ * Port of iOS `AppVersion` (`Settings/SettingsView.swift`): what's running, “Version 0.2.3 (226) ·
+ * ec7d822”. Android reads the package's version name and code; the commit comes from the
+ * `opencode.commit` manifest meta-data when the app stamps one.
+ */
+data class AppVersion(val version: String, val build: String, val commit: String?) {
+    val label: String get() = "Version $version ($build)" + (commit?.let { " · $it" } ?: "")
+
+    companion object {
+        val current: AppVersion by lazy { read() }
+
+        private fun read(): AppVersion = runCatching {
+            val context = dependency(AppContext)
+            val pm = context.packageManager
+            val info = pm.getPackageInfo(context.packageName, PackageManager.PackageInfoFlags.of(PackageManager.GET_META_DATA.toLong()))
+            val commit = info.applicationInfo?.metaData?.getString("opencode.commit")?.takeIf { it.isNotEmpty() }
+            AppVersion(info.versionName ?: "?", info.longVersionCode.toString(), commit)
+        }.getOrElse { AppVersion("?", "?", null) }
+    }
+}
