@@ -18,6 +18,7 @@ import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl
 import okhttp3.Request
+import java.net.SocketException
 import java.net.UnknownServiceException
 import java.util.UUID
 import kotlin.coroutines.cancellation.CancellationException
@@ -80,6 +81,8 @@ enum class TransportFailure(val rawValue: String) {
          */
         fun of(error: Throwable): TransportFailure? {
             if (error is CancellationException) return null
+            // iOS reads only the listed POSIX codes; EACCES (no permission to open a socket) is none of them.
+            if (error is SocketException && error.message?.contains("EACCES") == true) return null
             return UrlErrorCode.fromThrowable(error)?.let(::ofUrlErrorCode)
         }
 
