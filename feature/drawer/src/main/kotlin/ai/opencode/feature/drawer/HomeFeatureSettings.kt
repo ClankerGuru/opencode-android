@@ -119,7 +119,8 @@ internal fun HomeFeature.reduceWhatsNew(state: State, action: WhatsNewFeature.Ac
 internal fun reducePreferences(state: State, action: HomeSettingsFeature.Action): HomeReduced = when (action) {
     HomeSettingsFeature.Action.SidebarToggled -> {
         val next = !state.isSidebarShown
-        shared(SharedKeys.sidebarShown).set(next)
+        // A further window's sidebar is its own (`HomeFeature.State.isWindowLocal`).
+        if (!state.isWindowLocal) shared(SharedKeys.sidebarShown).set(next)
         Reduced(state.copy(isSidebarShown = next))
     }
     else -> {

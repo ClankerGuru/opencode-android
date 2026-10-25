@@ -122,6 +122,12 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         val mutedSessionKeys: Set<String> = emptySet(),
         /** Mirror of `SharedKeys.sidebarShown`: beside a wide window's sidebar, whether it shows. */
         val isSidebarShown: Boolean = true,
+        /**
+         * A further window's Home (Multiple Windows, iOS `AppFeature.State(window:)`): its
+         * [lastViewedSessionIDs] and [isSidebarShown] live in memory, so switching sessions or
+         * hiding the sidebar here never changes the first window's.
+         */
+        val isWindowLocal: Boolean = false,
         /** Mirror of `SharedKeys.initializedInboxServerIDs`. */
         val initializedInboxServerIDs: Set<String> = emptySet(),
         /** Device-local read receipts not yet in an authoritative snapshot: a stale list must not resurrect unread. */

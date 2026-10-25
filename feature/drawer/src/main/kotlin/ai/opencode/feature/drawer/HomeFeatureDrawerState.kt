@@ -48,7 +48,8 @@ internal fun HomeFeature.State.updatingPinnedSessionKeys(transform: (List<String
 
 /** `$lastViewedSessionIDs.withLock { … }`. */
 internal fun HomeFeature.State.updatingLastViewedSessionIDs(transform: (Map<String, String>) -> Map<String, String>): HomeFeature.State =
-    writingThrough(SharedKeys.lastViewedSessionIDs, lastViewedSessionIDs, transform) { copy(lastViewedSessionIDs = it) }
+    if (isWindowLocal) copy(lastViewedSessionIDs = transform(lastViewedSessionIDs))
+    else writingThrough(SharedKeys.lastViewedSessionIDs, lastViewedSessionIDs, transform) { copy(lastViewedSessionIDs = it) }
 
 /** `$sessionReadDates.withLock { … }`. */
 internal fun HomeFeature.State.updatingSessionReadDates(transform: (Map<String, Instant>) -> Map<String, Instant>): HomeFeature.State =
@@ -68,7 +69,8 @@ internal fun HomeFeature.State.updatingInitializedInboxServerIDs(transform: (Set
 
 /** `$isSidebarShown.withLock { … }`. */
 internal fun HomeFeature.State.settingSidebarShown(shown: Boolean): HomeFeature.State =
-    writingThrough(SharedKeys.sidebarShown, isSidebarShown, { shown }) { copy(isSidebarShown = it) }
+    if (isWindowLocal) copy(isSidebarShown = shown)
+    else writingThrough(SharedKeys.sidebarShown, isSidebarShown, { shown }) { copy(isSidebarShown = it) }
 
 /** Replaces one listed session in place. */
 internal inline fun HomeFeature.State.updatingSession(sessionID: String, transform: (OpenCodeSession) -> OpenCodeSession): HomeFeature.State {
