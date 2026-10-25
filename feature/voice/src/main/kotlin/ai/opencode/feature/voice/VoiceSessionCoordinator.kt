@@ -110,6 +110,8 @@ abstract class VoiceSessionCoordinator<E, C, A>(
     private var audioUsesRTC = false
     private var captureTask: Job? = null
     private var audioEventTask: Job? = null
+    /** The audio session last told the call connected: each hears it once (iOS notes it on connect only). */
+    private var connectedAudio: VoiceAudioSession? = null
     abstract val defaultSessionLimit: Double
     abstract val defaultDiagnosticDomain: String
     abstract val expiredDiagnosticDomain: String
@@ -240,7 +242,7 @@ abstract class VoiceSessionCoordinator<E, C, A>(
         active?.expiresAt = expiresAt
         if (!lifecycle.hasConnected) {
             lifecycle.hasConnected = true
-            audio?.noteConnected?.invoke()
+            audio?.let { connectedAudio = it; it.noteConnected() }
             emit(VoiceCallEvent.Connected)
         }
     }
@@ -277,7 +279,13 @@ abstract class VoiceSessionCoordinator<E, C, A>(
             audioUsesRTC = false
             if (audio !== previous && streamMade) wireAudio(requireNotNull(audio))
         }
-        if (lifecycle.hasConnected) audio?.noteConnected?.invoke()
+        // Audio that joins after the connect (or replaces the engine) hears it once; a
+        // rotation or reconnect on the same audio never replays the connect chord.
+        val current = audio
+        if (lifecycle.hasConnected && current != null && current !== connectedAudio) {
+            connectedAudio = current
+            current.noteConnected()
+        }
         startSocketEvents(socket)
     }
 
