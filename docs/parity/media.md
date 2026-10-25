@@ -35,3 +35,14 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 | `OpenCode/Media/SyntaxHighlighter.swift` | 391 | | todo | |
 | `OpenCode/Media/TranscriptImageViewer.swift` | 352 | | todo | |
 | `OpenCode/Media/ZoomableImagePage.swift` | 338 | | todo | |
+
+## Moved here from other folders
+
+| iOS file / type | Kotlin file(s) | Status | Notes |
+| --- | --- | --- | --- |
+| `OpenCode/Core/DecodedImageCache.swift` | `feature/media/.../MediaFoundation.kt` (`DecodedImageCache`) | done | 48 MB `rowBytes × height` LRU, ≤ 64 entries, SHA-256 keys; `onTrimMemory`/`onLowMemory` purge = memory warning; Coil's own memory cache holds Coil-loaded images |
+| `TranscriptImagePreview` (`Transcript/TranscriptEntryView.swift`) | `feature/media/.../MediaFoundation.kt` | done | moved down: viewer, gallery and Mermaid build it; `Page.image` is an Android `Bitmap` |
+| `TranscriptMetrics` constants (`Transcript/TranscriptEntryView.swift`) | `feature/media/.../MediaFoundation.kt` | done | tunable defaults (gutter 16, card radius 14); transcript should reuse rather than redeclare |
+| `ExperimentalFeature(s)` (`Settings/ExperimentalFeatures.swift`) | `core/.../dependencies/ExperimentalFeatures.kt` | done | moved down (shared commit); Settings owns titles/summaries |
+| `SessionLink` URL helpers (`Transcript/SessionLinks.swift`) | `server/.../model/SessionLink.kt` | done | moved down (shared commit); Transcript owns the rich-text marking |
+

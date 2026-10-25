@@ -30,7 +30,7 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 | `OpenCode/Core/BackgroundTaskClient.swift` | 42 | `core/.../dependencies/BackgroundClients.kt` | partial | Android has no begin/endBackgroundTask; live value is a logged marker. Durable work (outbox sends) uses WorkManager in its feature |
 | `OpenCode/Core/BackgroundTimeClient.swift` | 34 | `core/.../dependencies/BackgroundClients.kt` | done | holds for the duration (process keeps running while cached) |
 | `OpenCode/Core/CancellableTaskGate.swift` | 47 | — | n/a | `URLSessionDataTask` ↔ continuation gate; OkHttp `Call` + `suspendCancellableCoroutine` in `:server` transport |
-| `OpenCode/Core/DecodedImageCache.swift` | 92 | — | todo | moves to `:feature:media` (Coil 3 memory cache with the same 48 MB byte bound) |
+| `OpenCode/Core/DecodedImageCache.swift` | 92 | `feature/media/.../MediaFoundation.kt` | done | moved to `:feature:media` (see media.md) |
 | `OpenCode/Core/Glass.swift` | 38 | see core-ui.md | — | |
 | `OpenCode/Core/HapticsClient.swift` | 496 | `core/.../haptics/HapticsClient.kt` | partial | `Haptic` vocabulary, `HapticsClient.play/prepare`, `HapticEffect` (= `.haptic(_:trigger:condition:)`), foreground + system-setting gating done. Voice call cues (`VoiceCallHaptic`, Core Haptics patterns, `voiceTick/HangUp/Glide`) and `AudioSessionHaptics` move to `:feature:voice`; `HapticLabCaption` is DEBUG lab tooling (n/a) |
 | `OpenCode/Core/Keychain.swift` | 79 | `core/.../sharing/Shared.kt` (`SharedKey.keychain`), `LiveSharedBytes.kt` | done | JSON-encoded value sealed with an AES-256-GCM Android Keystore key in `noBackupFilesDir/keychain/` |
