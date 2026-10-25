@@ -11,7 +11,11 @@ import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
 import ai.opencode.core.store.cancellable
 import ai.opencode.core.store.ifLet
+import ai.opencode.feature.drawer.HomeConnectionFeature
 import ai.opencode.feature.drawer.HomeFeature
+import ai.opencode.feature.drawer.HomeSnapshotDate
+import ai.opencode.feature.drawer.persistingSnapshot
+import ai.opencode.server.model.OpenCodeHomeSnapshot
 import ai.opencode.server.ConnectionFailureDetail
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeClientError
@@ -159,8 +163,20 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
                 val saved = shared(ServerSharedKeys.savedServer)
                 var state = State(savedServer = saved, savedServers = shared(ServerSharedKeys.savedServers))
                 val server = saved.value ?: return state
+                val cache = shared(ServerSharedKeys.cachedHomeSnapshots).value[server.persistenceID]
                 state = state.load(server)
-                return state.copy(home = HomeFeature.State(serverID = server.persistenceID, serverName = server.friendlyName))
+                var home = HomeFeature.State(
+                    server = server,
+                    snapshot = cache?.snapshot ?: OpenCodeHomeSnapshot(projects = emptyList(), sessions = emptyList(), activeSessionIDs = emptySet()),
+                    loaded = cache != null,
+                )
+                home = home.copy(
+                    connection = home.connection.copy(
+                        connectionStatus = HomeConnectionFeature.State.ConnectionStatus.reconnecting,
+                        lastKnownActivityDeadline = HomeFeature.lastKnownActivityDeadline(cache?.capturedAt, dependency(HomeSnapshotDate).now()),
+                    ),
+                )
+                return state.copy(home = home)
             }
         }
     }
@@ -273,7 +289,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         Action.ConnectButtonTapped -> {
             var next = state
             // Opened over Home from the drawer: a failure offers the way back.
-            state.home?.let { home -> next = next.copy(returnServer = state.knownServers.firstOrNull { it.persistenceID == home.serverID }) }
+            state.home?.let { home -> next = next.copy(returnServer = state.knownServers.firstOrNull { it.persistenceID == home.server.persistenceID }) }
             next = next.copy(serverURL = withDefaultScheme(state.serverURL.trim()))
             val original = state.editingSavedServer
             if (original != null && next.serverURL != original.url) next = next.copy(alternateURLs = emptyList())
@@ -309,12 +325,15 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         is Action.Home -> when (val home = action.action) {
             is HomeFeature.Action.Delegate -> when (home.action) {
                 HomeFeature.DelegateAction.ServersRequested -> {
-                    val current = state.knownServers.firstOrNull { it.persistenceID == state.home?.serverID }
+                    val current = state.knownServers.firstOrNull { it.persistenceID == state.home?.server?.persistenceID }
                     Reduced(
                         state.copy(home = null, connection = State.Connection.Picking, returnServer = current),
                         Effect.merge(Effect.cancel(CancelID.Health), Effect.cancel(CancelID.Home)),
                     )
                 }
+                // TODO(app): iOS AppFeature also handles serverBadgeTapped, serverSwitchTapped, serverRenamed,
+                // editServerRequested, serverRemovalConfirmed, pairServerRequested and addServerRequested.
+                else -> Reduced(state)
             }
             else -> Reduced(state)
         }
@@ -377,11 +396,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         return Reduced(
             state.copy(
                 editingSavedServer = null,
-                home = HomeFeature.State(
-                    serverID = server.persistenceID,
-                    serverName = server.friendlyName,
-                    sessions = snapshot.sessions.filter { it.parentID == null }.sortedByDescending { it.updatedAt },
-                ),
+                home = HomeFeature.State(server = server, snapshot = snapshot).persistingSnapshot(dependency(HomeSnapshotDate).now()),
                 isEditingServer = false,
                 connection = State.Connection.Connected,
                 connectionAttempt = null,

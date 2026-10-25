@@ -74,7 +74,7 @@ fun AppView(store: StoreOf<AppFeature.State, AppFeature.Action>) {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             if (hasHome) {
                 val home = store.rememberScope<AppFeature.State, AppFeature.Action, HomeFeature.State, HomeFeature.Action>(
-                    state = { it.home ?: HomeFeature.State(serverID = "", serverName = "") },
+                    state = { it.home ?: HomeFeature.State.placeholder(OpenCodeServer(url = "", username = "", password = "")) },
                     action = AppFeature.Action::Home,
                 )
                 HomeView(home)
