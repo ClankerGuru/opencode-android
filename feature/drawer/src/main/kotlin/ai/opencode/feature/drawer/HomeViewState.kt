@@ -176,9 +176,15 @@ class HomeViewState internal constructor(
     }
 }
 
-/** A [HomeViewState] for [store], kept across recompositions (iOS `HomeView`'s `@State`). */
+/**
+ * A [HomeViewState] for [store], kept across recompositions (iOS `HomeView`'s `@State`).
+ *
+ * A configuration change (light/dark, rotation) recreates the activity and this view with it,
+ * while Home's state lives on in the retained store: a drawer that last arrived open
+ * ([HomeFeature.State.isDrawerOpen]) opens again, at rest, rather than snapping shut.
+ */
 @Composable
 fun rememberHomeViewState(
     store: StoreOf<HomeFeature.State, HomeFeature.Action>,
     initiallyOpenDrawer: Boolean = false,
-): HomeViewState = remember(store) { HomeViewState(store, initiallyOpenDrawer) }
+): HomeViewState = remember(store) { HomeViewState(store, initiallyOpenDrawer || store.state.isDrawerOpen) }
