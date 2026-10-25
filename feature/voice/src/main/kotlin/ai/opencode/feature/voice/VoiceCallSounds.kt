@@ -113,7 +113,12 @@ object VoiceCallSynthesizer {
 }
 
 /** One call-scoped clock shared by the sound scheduler, haptics and scanner. */
-class VoiceCallSounds(private val clock: Clock = dependency(Clock), private val haptics: VoiceHapticPlaying = dependency(VoiceHapticEngine)) {
+class VoiceCallSounds(
+    private val clock: Clock = dependency(Clock),
+    private val haptics: VoiceHapticPlaying = dependency(VoiceHapticEngine),
+    /** Runs the connecting loop and delayed fallbacks; tests pass one on their virtual time. */
+    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+) {
     @Serializable data class ScheduledCue(val cue: DotScopeSimulation.Cue, val time: Double)
     @Serializable data class MeterSample(val time: Double, val rms: Float, val peak: Float)
     @Serializable data class RecordedHaptic(val haptic: VoiceCallHaptic, val time: Double)
@@ -123,7 +128,6 @@ class VoiceCallSounds(private val clock: Clock = dependency(Clock), private val 
         val logLine get() = "Call cue: first ${cue.name} heard $milliseconds ms after the tap (audio up at $audioReadyMilliseconds ms)"
     }
     data class EndingShape(val drawn: Boolean, val origin: Float, val overshoot: Float, val width: Float)
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val lock = Any()
     private var callID: UUID? = null
     private var startedAt = clock.now()
@@ -185,18 +189,20 @@ class VoiceCallSounds(private val clock: Clock = dependency(Clock), private val 
         haptics.cancel(VoiceHapticEngine.Kind.tick)
         fallbackTicks.forEach { it.cancel() }; fallbackTicks.clear()
     }
-    private fun voiceTick(cue: DotScopeSimulation.Cue, at: Duration, audioDelay: Double) {
-        if (!ticksAreDue) return
+    /** Whether the tick will play (iOS `LiveHaptics.voiceTick`): false once the call moved on. */
+    internal fun voiceTick(cue: DotScopeSimulation.Cue, at: Duration, audioDelay: Double): Boolean {
+        if (!ticksAreDue) return false
         val pattern = VoiceHapticDesign.tick(cue, audioDelay)
-        if (haptics.play(pattern, at, VoiceHapticEngine.Kind.tick)) return
+        if (haptics.play(pattern, at, VoiceHapticEngine.Kind.tick)) return true
         val due = at + (pattern.transients.firstOrNull() ?: 0.0).seconds
         fallbackTicks.removeAll { it.isCompleted }
         fallbackTicks.add(scope.launch {
             clock.sleep(maxOf(Duration.ZERO, due - clock.now()))
             if (ticksAreDue) fallback(VoiceCallHaptic.sweepPass)
         })
+        return true
     }
-    private fun voiceHangUp(drawn: Boolean, origin: Float, overshoot: Float, width: Float, at: Duration): Boolean {
+    internal fun voiceHangUp(drawn: Boolean, origin: Float, overshoot: Float, width: Float, at: Duration): Boolean {
         cancelVoiceTicks()
         val pattern = VoiceHapticDesign.hangUp(drawn, origin, overshoot, width)
         val due = at + (pattern.transients.firstOrNull() ?: 0.0).seconds
