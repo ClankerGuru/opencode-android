@@ -209,7 +209,7 @@ internal object DiagnosticsInstrumentation {
         private fun report() {
             if (callStart == 0L) return
             val (id, operation, attempt) = ids(request)
-            DiagnosticsRecorder.shared.networkMetrics(
+            LabMarks.networkTask(
                 requestID = id,
                 path = DiagnosticsRecorder.redactedPath(request.url.encodedPath),
                 metrics = DiagnosticsNetworkMetrics(

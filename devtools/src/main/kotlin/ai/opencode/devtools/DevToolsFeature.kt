@@ -6,6 +6,8 @@ import ai.opencode.core.dependencies.UuidClient
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.diagnostics.DiagnosticsEvent
 import ai.opencode.core.diagnostics.DiagnosticsRecorder
+import ai.opencode.core.diagnostics.MotionWatch
+import ai.opencode.core.diagnostics.MotionWatchEvent
 import ai.opencode.core.diagnostics.ProblemReportBuilder
 import ai.opencode.core.diagnostics.ProblemReportContext
 import ai.opencode.core.haptics.Haptic
@@ -25,6 +27,7 @@ import ai.opencode.core.tuning.TuningSharedKeys
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.ServerSharedKeys
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.merge
 
 /**
  * Settings › Advanced › Developer, Android-native (iOS `DiagnosticsView` + `DeveloperMode`): the
@@ -54,6 +57,11 @@ class DevToolsFeature : Reducer<DevToolsFeature.State, DevToolsFeature.Action> {
         val recordDiagnostics: Boolean = false,
         val includesTranscripts: Boolean = false,
         val demoCallAudio: Boolean = false,
+        /** iOS `@Shared(.motionWatch)`: the saved Motion Watch switch. */
+        val motionWatch: Boolean = false,
+        /** iOS `diagnostics.isMotionWatchActive()`: on and available. */
+        val motionWatchActive: Boolean = false,
+        val motionJumps: List<MotionWatchEvent> = emptyList(),
         val tuningEnabled: Boolean = false,
         /** Debug build, or Developer Mode on ([TuningAccess]). */
         val toolsAvailable: Boolean = false,
@@ -81,6 +89,7 @@ class DevToolsFeature : Reducer<DevToolsFeature.State, DevToolsFeature.Action> {
         data class RecordDiagnosticsChanged(val on: Boolean) : Action
         data class IncludeTranscriptsChanged(val on: Boolean) : Action
         data class DemoCallAudioChanged(val on: Boolean) : Action
+        data class MotionWatchChanged(val on: Boolean) : Action
         data class TuningEnabledChanged(val on: Boolean) : Action
         data object OpenTuningPanelTapped : Action
         data class TimeScaleChanged(val scale: Double) : Action
@@ -110,9 +119,12 @@ class DevToolsFeature : Reducer<DevToolsFeature.State, DevToolsFeature.Action> {
     override fun reduce(state: State, action: Action): Reduced<State, Action> = when (action) {
         Action.Task -> {
             val recorder = dependency(DiagnosticsRecorder)
+            val motionWatch = dependency(MotionWatch)
             Reduced(
                 load(state).copy(lab = state.lab.copy(address = shared(DevToolsKeys.labAddress).value)),
-                Effect.run<Action> { send -> recorder.changes.drop(1).collect { send(Action.Reload) } }.cancellable(CancelID.Observe, cancelInFlight = true),
+                Effect.run<Action> { send ->
+                    merge(recorder.changes.drop(1), motionWatch.changes.drop(1)).collect { send(Action.Reload) }
+                }.cancellable(CancelID.Observe, cancelInFlight = true),
             )
         }
         Action.Reload -> Reduced(load(state))
@@ -124,6 +136,7 @@ class DevToolsFeature : Reducer<DevToolsFeature.State, DevToolsFeature.Action> {
             val recorder = dependency(DiagnosticsRecorder)
             if (action.on && !recorder.isEnabled) recorder.setEnabled(true)
             DevTools.accessChanged()
+            if (action.on) dependency(SavedVoiceLogUploads).uploadAll()
             Reduced(load(state))
         }
         is Action.RecordDiagnosticsChanged -> {
@@ -132,6 +145,10 @@ class DevToolsFeature : Reducer<DevToolsFeature.State, DevToolsFeature.Action> {
         }
         is Action.IncludeTranscriptsChanged -> {
             dependency(DiagnosticsRecorder).setIncludesTranscripts(action.on)
+            Reduced(load(state))
+        }
+        is Action.MotionWatchChanged -> {
+            dependency(MotionWatch).setEnabled(action.on)
             Reduced(load(state))
         }
         is Action.DemoCallAudioChanged -> {
@@ -184,6 +201,7 @@ class DevToolsFeature : Reducer<DevToolsFeature.State, DevToolsFeature.Action> {
         }
         Action.ClearTapped -> {
             dependency(DiagnosticsRecorder).clear()
+            dependency(MotionWatch).clear()
             Reduced(load(state))
         }
         Action.ExportBundleTapped -> {
@@ -202,6 +220,8 @@ class DevToolsFeature : Reducer<DevToolsFeature.State, DevToolsFeature.Action> {
                     now = now,
                     events = recorder.snapshot(),
                     appLog = client.appLog(),
+                    previousRun = recorder.previousRunEvents(),
+                    motionJumps = dependency(MotionWatch).snapshot(),
                 )
                 Reduced(
                     state.copy(isExporting = true),
@@ -284,6 +304,9 @@ class DevToolsFeature : Reducer<DevToolsFeature.State, DevToolsFeature.Action> {
             recordDiagnostics = recorder.isEnabled,
             includesTranscripts = recorder.includesTranscripts,
             demoCallAudio = shared(SharedKeys.voiceDemoMode).value,
+            motionWatch = shared(MotionWatch.sharedKey).value,
+            motionWatchActive = dependency(MotionWatch).isActive,
+            motionJumps = if (state.route == Route.Troubleshooting) dependency(MotionWatch).snapshot() else state.motionJumps,
             tuningEnabled = shared(TuningSharedKeys.tuningEnabled).value && TuningAccess.isAvailable,
             toolsAvailable = TuningAccess.isAvailable,
             isInternalBuild = InternalBuild.isEnabled,

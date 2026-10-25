@@ -12,6 +12,8 @@ dependencies {
     api(project(":feature:session"))
     api(project(":feature:settings"))
     api(project(":feature:system"))
+    // Report a Problem (iOS `TraceUploadsFeature`, scoped on Home as `traces`).
+    implementation(project(":devtools"))
 }
 
 dependencies {

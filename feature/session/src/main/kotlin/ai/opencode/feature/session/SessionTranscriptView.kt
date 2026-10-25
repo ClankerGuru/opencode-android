@@ -512,6 +512,7 @@ object SessionTranscriptView {
             sentItemID = state.lastSentItemID,
             sendGeneration = state.sendGeneration,
             newMessages = newMessages,
+            snapshotRevision = state.perfSnapshotRevision,
         )
         return Projection(configuration, working)
     }

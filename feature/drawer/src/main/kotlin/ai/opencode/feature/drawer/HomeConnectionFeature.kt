@@ -3,6 +3,7 @@ package ai.opencode.feature.drawer
 import ai.opencode.core.dependencies.BackgroundTimeClient
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.diagnostics.PerfTimeline
 import ai.opencode.core.log.AppLog
 import ai.opencode.core.log.logSummary
 import ai.opencode.core.store.Effect
@@ -110,24 +111,28 @@ class HomeConnectionFeature : Reducer<HomeConnectionFeature.State, HomeConnectio
         }
 
         is Action.ServerConnected -> {
-            // The stream started before any rename since; the name on screen wins. (iOS also
-            // marks its PerfTimeline here; Android's diagnostics have no reconnect timeline.)
+            // The stream started before any rename since; the name on screen wins.
             val server = action.server.copy(name = state.server.name)
+            PerfTimeline.streamConnected()
             Reduced(
                 state.copy(server = server, hasConnected = true, isEventStreamLive = true, connectionErrorMessage = null),
             )
         }
 
-        is Action.EventStreamFailed -> Reduced(
-            state.copy(
-                connectionErrorMessage = action.error.message,
-                connectionStatus = State.ConnectionStatus.disconnected,
-                isEventStreamLive = false,
-            ),
-        )
+        is Action.EventStreamFailed -> {
+            if (state.isEventStreamLive) PerfTimeline.streamLost()
+            Reduced(
+                state.copy(
+                    connectionErrorMessage = action.error.message,
+                    connectionStatus = State.ConnectionStatus.disconnected,
+                    isEventStreamLive = false,
+                ),
+            )
+        }
 
         Action.ConnectionLost -> {
             val wasConnected = state.isConnected
+            if (state.isEventStreamLive) PerfTimeline.streamLost()
             var next = state.copy(
                 connectionStatus = if (wasConnected) State.ConnectionStatus.reconnecting else State.ConnectionStatus.disconnected,
                 isEventStreamLive = false,

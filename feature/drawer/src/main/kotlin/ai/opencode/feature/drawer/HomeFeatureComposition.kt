@@ -22,6 +22,7 @@ import ai.opencode.feature.drawer.catchup.CatchUpFeature
 import ai.opencode.feature.media.PageReaderClient
 import ai.opencode.feature.drawer.notices.DeliveredNotificationsClient
 import ai.opencode.feature.drawer.switcher.SessionSwitcherFeature
+import ai.opencode.devtools.traces.TraceUploadsFeature
 import ai.opencode.feature.session.SessionFeature
 import ai.opencode.feature.session.hasLiveDictation
 import ai.opencode.feature.session.dictationHold
@@ -120,6 +121,13 @@ private fun HomeFeature.homeReducers(): Reducer<State, Action> = combine(
         action = { (it as? Action.SessionSwitcher)?.action },
         embed = Action::SessionSwitcher,
         child = SessionSwitcherFeature(),
+    ),
+    scope(
+        state = { it.traces },
+        setState = { s: State, c: TraceUploadsFeature.State -> s.copy(traces = c) },
+        action = { (it as? Action.Traces)?.action },
+        embed = Action::Traces,
+        child = TraceUploadsFeature(),
     ),
     // Save the outgoing member before the presented reducer selects another one. Drawer navigation
     // instead saves in makeDetail/makeDraft.

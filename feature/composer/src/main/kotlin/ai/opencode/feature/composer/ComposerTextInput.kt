@@ -1,5 +1,6 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.diagnostics.PerfFrameLatency
 import ai.opencode.core.ui.BackSwipeRules
 import ai.opencode.core.ui.LocalDrawerKeyboardSignals
 import ai.opencode.core.ui.OpenCodeTextStyles
@@ -543,7 +544,8 @@ fun ComposerTextInput(
             }
         }
     }
-    val inputTransformation = autocompleteBridge?.let { holdTransformation.then(it.inputTransformation) } ?: holdTransformation
+    val inputTransformation = (autocompleteBridge?.let { holdTransformation.then(it.inputTransformation) } ?: holdTransformation)
+        .then(PerfKeystroke)
 
     fun insertNonSendNewline() {
         controller.nonSendEditFrom = state.text.toString()
@@ -753,6 +755,13 @@ fun ComposerTextInput(
                 }
             },
         )
+    }
+}
+
+/** iOS `PerfFrameLatency.begin("keystroke")` once the hold and autocomplete accept an edit. */
+private object PerfKeystroke : InputTransformation {
+    override fun TextFieldBuffer.transformInput() {
+        if (PerfFrameLatency.isEnabled && !asCharSequence().contentEquals(originalText)) PerfFrameLatency.begin("keystroke")
     }
 }
 
