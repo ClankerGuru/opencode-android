@@ -49,8 +49,10 @@ import kotlin.time.Duration.Companion.seconds
  */
 class DictationClient(
     /**
-     * Readies the speech model (and installs the on-device language if needed)
-     * so the first mic press doesn't stall behind it. Safe to call repeatedly.
+     * Readies the speech model so the first mic press doesn't stall behind it.
+     * Safe to call repeatedly. Never installs anything: on Android installing
+     * the on-device language raises a system download dialog, so that waits
+     * for the first press that needs it (iOS installs silently here).
      */
     val prepare: suspend () -> Unit = {},
     /**
@@ -211,6 +213,9 @@ sealed class DictationError(val errorDescription: String) : Exception(errorDescr
     class Recognizer(val code: Int) : DictationError("Couldn’t transcribe dictation (error $code)")
 }
 
+/** A warm-up load found the on-device language not installed: the first press installs it. */
+class DictationModelNotInstalled : Exception("The dictation language isn’t installed yet")
+
 /**
  * What [LiveDictation] drives: the shared audio, the microphone and the speech
  * model. Behind a seam so the ordering of presses, stops and cancels is
@@ -231,8 +236,12 @@ class DictationEngine(
      * owner token its press claimed.
      */
     val releaseSession: (end: DictationEnd, owner: Int) -> Unit,
-    /** A recognizer with its language installed and ready. */
-    val loadModel: suspend () -> DictationModel,
+    /**
+     * A recognizer with its language ready. With `install` false (warming up
+     * between presses) a language not yet on the device fails the load instead
+     * of downloading it; a press loads with `install` true.
+     */
+    val loadModel: suspend (install: Boolean) -> DictationModel,
 ) {
     companion object {
         fun live(context: Context, audio: DictationAudio, permission: DictationPermissionClient): DictationEngine {
@@ -251,7 +260,7 @@ class DictationEngine(
                 sessionOwner = { AudioSessionGeneration.value },
                 startCapture = { input, onEvent -> LiveCapture.start(context, audio, input, onEvent) },
                 releaseSession = { end, owner -> audio.release(end, owner) },
-                loadModel = { speech.loadedModel().model() },
+                loadModel = { install -> speech.loadedModel(install).model() },
             )
         }
     }
@@ -410,9 +419,13 @@ private class SpeechSetup(private val context: Context) {
     /** The resolved language and whether it's recognized on the device. */
     private var resolved: Pair<String, Boolean>? = null
 
-    /** A new recognizer with its language ready, for one recording. */
-    suspend fun loadedModel(): LoadedSpeech {
-        val (language, onDevice) = setup()
+    /**
+     * A new recognizer with its language ready, for one recording. Without
+     * [install], an on-device language that isn't installed fails the load
+     * with [DictationModelNotInstalled] and nothing is resolved yet.
+     */
+    suspend fun loadedModel(install: Boolean): LoadedSpeech {
+        val (language, onDevice) = setup(install)
         return withContext(Dispatchers.Main) {
             val recognizer = if (onDevice) {
                 SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
@@ -427,7 +440,7 @@ private class SpeechSetup(private val context: Context) {
      * One shared resolution and install: every load joins the one under way. A
      * failure isn't kept, so a later attempt retries.
      */
-    private suspend fun setup(): Pair<String, Boolean> = mutex.withLock {
+    private suspend fun setup(install: Boolean): Pair<String, Boolean> = mutex.withLock {
         resolved?.let { return it }
         val onDevice = withContext(Dispatchers.Main) { SpeechRecognizer.isOnDeviceRecognitionAvailable(context) }
         val available = withContext(Dispatchers.Main) { SpeechRecognizer.isRecognitionAvailable(context) }
@@ -440,7 +453,11 @@ private class SpeechSetup(private val context: Context) {
         }
         val language = bestLocale(supported)
         var result = language to onDevice
-        if (onDevice && support != null && language !in support.installedOnDeviceLanguages && !install(language)) {
+        val needsInstall = onDevice && support != null && language !in support.installedOnDeviceLanguages
+        // Warming up never downloads: `triggerModelDownload` shows a system
+        // dialog, which belongs to the press that needs the language.
+        if (needsInstall && !install) throw DictationModelNotInstalled()
+        if (needsInstall && !install(language)) {
             // The on-device language can't be installed now: the default
             // recognizer, offline where it can, still dictates.
             if (!available) throw DictationError.LocaleUnsupported()

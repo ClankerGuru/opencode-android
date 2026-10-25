@@ -110,7 +110,7 @@ class LiveDictation(private val engine: DictationEngine) {
         val locale = Locale.getDefault().toLanguageTag()
         if (prepareUnsupportedLocale == locale) return@withContext
         try {
-            warmModel().await()
+            warmModel(install = false).await()
             prepareUnsupportedLocale = null
         } catch (error: DictationError.LocaleUnsupported) {
             prepareUnsupportedLocale = locale
@@ -120,9 +120,31 @@ class LiveDictation(private val engine: DictationEngine) {
         }
     }
 
-    private fun warmModel(): Deferred<DictationModel> {
+    /**
+     * [install]: whether this load may download the on-device language (a
+     * system dialog on Android), which only a press asks for.
+     */
+    private fun warmModel(install: Boolean): Deferred<DictationModel> {
         warm?.let { return it }
-        val task = scope.async { engine.loadModel() }
+        val task = scope.async { engine.loadModel(install) }
+        keepWarm(task)
+        return task
+    }
+
+    /**
+     * The press's model: the warm one, or a new load that may install the
+     * language. A warm-up that found the language missing gives way to that
+     * install, so the first press that needs it downloads it.
+     */
+    private fun pressModel(): Deferred<DictationModel> {
+        val joined = warm ?: return warmModel(install = true)
+        val task = scope.async {
+            try {
+                joined.await()
+            } catch (_: DictationModelNotInstalled) {
+                engine.loadModel(true)
+            }
+        }
         keepWarm(task)
         return task
     }
@@ -236,7 +258,7 @@ class LiveDictation(private val engine: DictationEngine) {
     private suspend fun recognize(recording: Recording) {
         // Cancelled before it took a model: the next press takes it.
         if (recording.input.isDiscarded) return deliver(recording)
-        val load = warmModel()
+        val load = pressModel()
         warm = null
         recording.load = load
         try {
@@ -393,6 +415,6 @@ class LiveDictation(private val engine: DictationEngine) {
         engine.releaseSession(end, recording.sessionToken)
         // The next press starts warm. A load this press took and never used goes
         // back at once, so a press now joins it rather than preparing a second model.
-        if (recording.load != null) handBack(recording) else warmModel()
+        if (recording.load != null) handBack(recording) else warmModel(install = false)
     }
 }
