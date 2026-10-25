@@ -1,5 +1,13 @@
 package ai.opencode.app
 
+import ai.opencode.core.store.onChange
+import ai.opencode.core.store.PresentationAction
+import ai.opencode.feature.session.SessionFeature
+import ai.opencode.feature.media.BrowserFeature
+import ai.opencode.feature.voice.VoiceCallServiceClient
+import ai.opencode.feature.voice.ScreenAwakeClient
+import ai.opencode.feature.system.liveactivity.VoiceLiveActivityClient
+import ai.opencode.feature.system.liveactivity.DictationLiveActivityClient
 import ai.opencode.core.dependencies.PasteboardClient
 import ai.opencode.core.dependencies.UuidClient
 import ai.opencode.core.dependencies.dependency
@@ -119,12 +127,19 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         val homeServer: OpenCodeServer? get() = home?.server
 
         /**
-         * Cold launch keeps the splash until there's something to show: no Home, or Home with
-         * its list (iOS `isColdLaunchContentReady`). TODO(merge): round 2b — an open session waits
-         * for its rows or first content frame (`sessionDetail.items` / `hasRenderedFirstContentFrame`).
+         * Cold launch keeps the splash until there's something to show (iOS
+         * `isColdLaunchContentReady`): no Home; an open session's rows or its first content frame;
+         * a draft at once; else Home's list. A failed connection shows at once too; the splash
+         * gives up after `LaunchBloomController.TIMEOUT_MILLIS` (1.5 s) regardless.
          */
         val isColdLaunchContentReady: Boolean
-            get() = home == null || home.snapshotLoaded || connection is Connection.Failed
+            get() {
+                val home = home ?: return true
+                if (connection is Connection.Failed) return true
+                val detail = home.sessionDetail ?: return home.snapshotLoaded
+                if (detail.session == null) return true
+                return detail.items.isNotEmpty() || detail.hasRenderedFirstContentFrame
+            }
 
         /** iOS `home.snapshotLoaded`: Home has heard from its server once. */
         val isHomeSnapshotLoaded: Boolean get() = home?.snapshotLoaded == true
@@ -184,12 +199,15 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
          * Anything shown over Home, from the app or from Home: the server setup and scanner
          * sheets, the pairing confirmation, the share, notification, system action and pairing
          * error alerts, and `HomeFeature.State.presentsOverHome`. The server switch toast isn't
-         * one. TODO(merge): round 2b — also `sessionDetail.presentsOverSession`.
+         * one. Also the open session's own presentations (`sessionDetail.presentsOverSession`).
          */
         val isPresentingAnything: Boolean
             get() = isEditingServer || isScanningPairingCode || pendingPairing != null || pairingError != null ||
                 shareError != null || notificationError != null || systemActionError != null ||
-                home?.presentsOverHome == true
+                home?.presentsOverHome == true || home?.presentsOverSession == true
+
+        /** A call that is connecting or connected keeps the screen on, but only in the foreground. */
+        val keepsScreenAwake: Boolean get() = isInForeground && home?.hasLiveCall == true
 
         val errorMessage: String? get() = (connection as? Connection.Failed)?.message
         val errorContext: FailureContext? get() = (connection as? Connection.Failed)?.context
@@ -266,13 +284,15 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
          * Whether Home can stay up while another server connects (iOS `keepsHome(switchingTo:)`):
          * it shows the switch in the drawer ([HomeFeature.State.switchingTo], set by
          * [showingSwitch]), and that server's Home replaces it when ready. Not for the server in
-         * use (a reconnect, or an edit of it). TODO(merge): round 2b — nor during a call or a
-         * recording (`voiceCallActivity`/`dictationActivity`), which end with this Home.
+         * use (a reconnect, or an edit of it), nor during a call or a recording
+         * (`voiceCallActivity`/`dictationActivity`), which end with this Home.
          */
         fun keepsHome(switchingTo: OpenCodeServer): Boolean {
             val home = home ?: return false
             if (home.server.persistenceID == switchingTo.persistenceID) return false
-            return editingSavedServer?.persistenceID != home.server.persistenceID
+            if (editingSavedServer?.persistenceID == home.server.persistenceID) return false
+            // A call or a recording belongs to this Home and ends with it.
+            return !home.hasLiveCallOrRecording
         }
 
         /** The kept Home shows the switch to [server] (the mutating half of iOS `keepsHome`). */
@@ -444,13 +464,36 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         child = HomeFeature(),
     )
 
-    // TODO(merge): round 2b (needs SessionFeature's call state on Home): `keepsScreenAwake`
-    // (`isInForeground && home.sessionDetail.voice.phase` not terminal) → `ScreenAwakeClient.set`
-    // on change, and ending the call's and the recording's Live Updates when Home closes
-    // (`home.voiceCallActivity`/`dictationActivity` → `VoiceCallServiceClient.stop` / the
-    // dictation activity's update(nil)).
+    /** iOS `.keepingWhatsNewAcrossHomes()` (`AppFeatureWhatsNew.kt`). */
+    private val whatsNewBody: Reducer<State, Action> = body.keepingWhatsNewAcrossHomes()
+
+    /**
+     * Leaving Home cancels a call or a recording without Home seeing it end, so their ongoing
+     * notifications are ended here (iOS `.onChange` of `voiceCallActivity`/`dictationActivity`).
+     * Android's call notification is voice's foreground service, keyed by the call's presence ID.
+     * Then the screen stays on during a call, set at once rather than from an effect so a quick
+     * on-then-off can't land out of order (watched from here so leaving Home mid-call lets the
+     * screen sleep again too).
+     */
+    private val liveBody: Reducer<State, Action> = whatsNewBody
+        .onChange({ it.home?.sessionDetail?.voice?.callPresenceID }) { old, _, state ->
+            if (old == null || state.home != null) return@onChange Reduced(state)
+            val service = dependency(VoiceCallServiceClient)
+            val liveActivity = dependency(VoiceLiveActivityClient)
+            Reduced(state, Effect.run { service.stop(old); liveActivity.update(null, null) })
+        }
+        .onChange({ it.home?.dictationActivity != null }) { old, _, state ->
+            if (!old || state.home != null) return@onChange Reduced(state)
+            val dictationLiveActivity = dependency(DictationLiveActivityClient)
+            Reduced(state, Effect.run { dictationLiveActivity.update(null, null) })
+        }
+        .onChange({ it.keepsScreenAwake }) { _, keeps, state ->
+            dependency(ScreenAwakeClient).set(keeps)
+            Reduced(state)
+        }
+
     override fun reduce(state: State, action: Action): Reduced<State, Action> {
-        val reduced = body.reduce(state, action)
+        val reduced = liveBody.reduce(state, action)
         // The pairing's drawer never opens under anything the app presents.
         val home = reduced.state.home
         if (home?.drawerOpenRequest == null || !reduced.state.isPresentingAnything) return reduced
@@ -604,10 +647,27 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
             if (pending == null || home == null || pending.serverKey != SessionDirectory.serverKey(home.server.persistenceID)) Reduced(state)
             else routeSystemAction(pending, state)
         }
-        // TODO(merge): round 2b — pairing links tapped in a session's transcript or its in-app
-        // browser (`.sessionDetail(.presented(.linkTapped/.browser(.pairingLinkTapped)))` and the
-        // subagent stack's) go to `requestPairing` when `OpenCodePairingLink.shouldHandleOpenURL`.
+        // Pairing links tapped in a session's transcript or its in-app browser (the open screen's
+        // or a pushed subagent's) pair, as one opened from outside the app does.
+        is HomeFeature.Action.SessionDetail -> {
+            val url = (action.action as? PresentationAction.Presented)?.action?.let(::pairingLinkURL)
+            if (url != null) requestPairing(url, state) else Reduced(state)
+        }
+        is HomeFeature.Action.SubagentStack -> {
+            val url = pairingLinkURL(action.action)
+            if (url != null) requestPairing(url, state) else Reduced(state)
+        }
         else -> Reduced(state)
+    }
+
+    /** iOS `.linkTapped(url)` / `.browser(.pairingLinkTapped(url))` that `OpenCodePairingLink` handles. */
+    private fun pairingLinkURL(action: SessionFeature.Action): String? {
+        val url = when (action) {
+            is SessionFeature.Action.LinkTapped -> action.url
+            is SessionFeature.Action.Browser -> (action.action as? BrowserFeature.Action.PairingLinkTapped)?.url
+            else -> null
+        } ?: return null
+        return url.takeIf { OpenCodePairingLink.shouldHandleOpenURL(it) }
     }
 
     private fun homeDelegate(state: State, action: HomeFeature.DelegateAction): Reduced<State, Action> = when (action) {

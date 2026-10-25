@@ -1,6 +1,9 @@
 package ai.opencode.app
 
+import ai.opencode.core.store.Store
 import ai.opencode.core.store.StoreOf
+import ai.opencode.feature.media.MediaFeature
+import ai.opencode.feature.media.MediaView
 import ai.opencode.core.store.observe
 import ai.opencode.core.store.rememberScope
 import ai.opencode.core.ui.OpenCodeAppTheme
@@ -120,7 +123,10 @@ fun AppView(store: StoreOf<AppFeature.State, AppFeature.Action>) {
                     state = { it.home ?: HomeFeature.State.placeholder(OpenCodeServer(url = "", username = "", password = "")) },
                     action = AppFeature.Action::Home,
                 )
-                HomeView(home)
+                // The app's one media root (iOS `MediaPresenter` presents over the window): the
+                // transcript image viewer and file/diagram/pasted-text viewers cover the whole Home.
+                val media = remember { Store(MediaFeature.State(), MediaFeature()) }
+                MediaView(media) { HomeView(home) }
             } else {
                 ConnectionView(store)
             }
