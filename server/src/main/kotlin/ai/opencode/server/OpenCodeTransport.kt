@@ -18,16 +18,22 @@ class OpenCodeTransport(
     val eventStream: OkHttpClient,
 ) {
     companion object Key : DependencyKey<OpenCodeTransport> {
-        override val liveValue: OpenCodeTransport by lazy {
+        override val liveValue: OpenCodeTransport by lazy { pools(TransportSecurity.interceptor) }
+
+        /** The pools, each request first passing [guard] (iOS ATS: [TransportSecurity]). */
+        private fun pools(guard: okhttp3.Interceptor?): OpenCodeTransport {
             // OkHttp caps calls per host at 5 by default; the event stream and a `/wait` long poll
             // would hold two of them, and family/ancestry fan-out (six lookups plus active status)
             // needs more. iOS's URLSession has no such cap on in-flight requests.
             val dispatcher = Dispatcher().apply { maxRequestsPerHost = maxRequests }
-            val base = OkHttpClient.Builder().dispatcher(dispatcher).build()
+            val base = OkHttpClient.Builder().dispatcher(dispatcher).apply {
+                // Before connecting, and again for every redirect hop.
+                if (guard != null) addInterceptor(guard).addNetworkInterceptor(guard)
+            }.build()
             // Requests feed the diagnostics timeline (inert while recording is off); the event
             // stream records its own connect/disconnect marks instead.
             val recorded = base.newBuilder().recordingDiagnostics().build()
-            OpenCodeTransport(
+            return OpenCodeTransport(
                 request = recorded,
                 measuredRequest = recorded.newBuilder().build(),
                 longPoll = recorded.newBuilder().build(),
@@ -43,10 +49,11 @@ class OpenCodeTransport(
         /**
          * The same pools behind [TestNetworkBlock]: a test reaches only the hosts its fixtures
          * register (iOS `WireFixture`) and loopback (`MockWebServer`); anything else fails.
+         * Fixture hosts (`wire-<uuid>.invalid`) are plain HTTP, so the cleartext guard stays off.
          */
         override val testValue: OpenCodeTransport by lazy {
             fun OkHttpClient.blocked() = newBuilder().addInterceptor(TestNetworkBlock.interceptor).build()
-            val live = liveValue
+            val live = pools(guard = null)
             OpenCodeTransport(
                 request = live.request.blocked(),
                 measuredRequest = live.measuredRequest.blocked(),
