@@ -10,6 +10,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -45,7 +46,8 @@ fun OpenCodePrimaryButton(
 ) {
     val colors = if (role == OpenCodeButtonRole.Destructive) {
         val red = OpenCodeTheme.colors.destructive
-        ButtonDefaults.buttonColors(containerColor = red, contentColor = red.highContrastForeground())
+        // systemRed in every theme; iOS labels destructive prominent buttons white.
+        ButtonDefaults.buttonColors(containerColor = red, contentColor = Color.White)
     } else {
         ButtonDefaults.buttonColors()
     }
