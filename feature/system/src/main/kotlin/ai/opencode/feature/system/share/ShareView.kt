@@ -221,7 +221,17 @@ private fun Modifier.swipeDownToDismiss(enabled: Boolean, reduceMotion: Boolean,
     var dismissed by remember { mutableStateOf(false) }
     val currentEnabled by rememberUpdatedState(enabled)
     val currentDismiss by rememberUpdatedState(onDismiss)
+    val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
     val flingVelocity = with(density) { SWIPE_DISMISS_VELOCITY.toPx() }
+    // The dimming behind the sheet fades with how far it has been pulled down, as iOS's
+    // sheet's dimming view does, so nothing pops when it closes.
+    val window = androidx.activity.compose.LocalActivity.current?.window
+    androidx.compose.runtime.LaunchedEffect(window) {
+        if (window == null) return@LaunchedEffect
+        val dim = window.attributes.dimAmount
+        androidx.compose.runtime.snapshotFlow { if (height > 0) (offset / height).coerceIn(0f, 1f) else 0f }
+            .collect { pulled -> window.setDimAmount(dim * (1f - pulled)) }
+    }
 
     fun drag(delta: Float): Float {
         if (dismissed) return 0f
@@ -236,7 +246,11 @@ private fun Modifier.swipeDownToDismiss(enabled: Boolean, reduceMotion: Boolean,
         if (dismissed) return
         settling?.cancel()
         val goes = currentEnabled && offset > 0f && (offset > height / 2f || velocity > flingVelocity)
-        if (goes) dismissed = true
+        if (goes) {
+            dismissed = true
+            // As a committed sheet dismissal on iOS: the keyboard goes down alongside the sheet.
+            keyboard?.hide()
+        }
         settling = scope.launch {
             val target = if (goes) height.toFloat() else 0f
             val spec = if (goes) Motion.morphClose.animation<Float>(reduceMotion) else Motion.settle.animation(reduceMotion)
