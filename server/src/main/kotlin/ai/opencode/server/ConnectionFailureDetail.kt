@@ -1,7 +1,9 @@
 package ai.opencode.server
 
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.HttpUrl
 import java.io.EOFException
@@ -191,16 +193,63 @@ data class ConnectionFailureDetail(
          */
         suspend fun resolve(host: String): List<String> {
             if (host.isEmpty()) return emptyList()
+            // The lookup blocks and can't be interrupted, so it runs detached: a late answer is
+            // dropped instead of holding the connection flow past the second (iOS finishes the
+            // continuation on a 1 s timer and lets getaddrinfo complete on its own).
+            val lookup = LOOKUP_SCOPE.async {
+                runCatching {
+                    InetAddress.getAllByName(host).mapNotNull { it.hostAddress?.let(::numericHost) }.toSortedSet().toList()
+                }.getOrDefault(emptyList())
+            }
             return try {
-                withTimeoutOrNull(1.seconds) {
-                    withContext(Dispatchers.IO) {
-                        runCatching { InetAddress.getAllByName(host).mapNotNull { it.hostAddress }.toSortedSet().toList() }
-                            .getOrDefault(emptyList())
-                    }
-                } ?: emptyList()
+                withTimeoutOrNull(1.seconds) { lookup.await() } ?: emptyList()
             } catch (_: CancellationException) {
                 emptyList()
             }
+        }
+
+        private val LOOKUP_SCOPE = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+        /**
+         * An address as `getnameinfo(NI_NUMERICHOST)` writes it: Java spells IPv6 out in full
+         * (`fe80:0:0:0:0:0:0:1%wlan0`), `inet_ntop` compresses the longest run of two or more
+         * zero groups (`fe80::1%wlan0`).
+         */
+        internal fun numericHost(address: String): String {
+            if (!address.contains(':')) return address
+            val percent = address.indexOf('%')
+            val bare = if (percent >= 0) address.substring(0, percent) else address
+            val zone = if (percent >= 0) address.substring(percent) else ""
+            val bytes = HostAddress.parseIPv6(bare) ?: return address
+            val groups = (0 until 8).map { (bytes[it * 2] shl 8) or bytes[it * 2 + 1] }
+            var bestStart = -1
+            var bestLength = 0
+            var start = -1
+            for (index in 0..8) {
+                if (index < 8 && groups[index] == 0) {
+                    if (start < 0) start = index
+                } else if (start >= 0) {
+                    if (index - start > bestLength) {
+                        bestStart = start
+                        bestLength = index - start
+                    }
+                    start = -1
+                }
+            }
+            if (bestLength < 2) bestStart = -1
+            val text = StringBuilder()
+            var index = 0
+            while (index < 8) {
+                if (index == bestStart) {
+                    text.append("::")
+                    index += bestLength
+                    continue
+                }
+                if (text.isNotEmpty() && !text.endsWith(":")) text.append(':')
+                text.append(Integer.toHexString(groups[index]))
+                index++
+            }
+            return text.toString() + zone
         }
     }
 }

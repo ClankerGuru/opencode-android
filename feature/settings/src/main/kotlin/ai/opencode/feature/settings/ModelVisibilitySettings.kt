@@ -15,11 +15,13 @@ import ai.opencode.core.ui.OpenCodeIconSize
 import ai.opencode.core.ui.OpenCodePrimaryButton
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.core.ui.ProviderIcon
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.ModelProviderGroup
+import ai.opencode.server.model.ModelSearch
 import ai.opencode.server.model.ModelVisibility
 import ai.opencode.server.model.OpenCodeModel
 import ai.opencode.server.model.OpenCodeModelCatalog
@@ -29,6 +31,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
@@ -45,6 +48,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -197,7 +201,7 @@ fun ModelVisibilitySettingsView(store: SettingsStore) {
         SettingsPageScaffold(title = "Models", store = store) {
             item(key = "mode") {
                 Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().testTag("model-visibility-mode")) {
                         listOf(ModelVisibility.Mode.hide to "Hide", ModelVisibility.Mode.onlyShow to "Only Show")
                             .forEachIndexed { index, (mode, title) ->
                                 SegmentedButton(
@@ -223,10 +227,10 @@ fun ModelVisibilitySettingsView(store: SettingsStore) {
                 settingsSection(key = "providers", header = "Providers") {
                     providers.forEachIndexed { index, provider ->
                         if (index > 0) SettingsDivider(inset = true)
-                        SettingsRowFrame(onClick = {
+                        SettingsRowFrame(Modifier.testTag("model-visibility-provider-${provider.id}"), onClick = {
                             store.send(SettingsFeature.Action.PagePushed(SettingsPage.ModelProvider(provider.id)))
                         }) {
-                            OpenCodeIcon(SFSymbol.Cpu, contentDescription = null, size = 20.dp, tint = OpenCodeTheme.colors.secondaryText)
+                            ProviderIcon(provider.id, Modifier.size(20.dp), provider.canonicalID, tint = OpenCodeTheme.colors.secondaryText)
                             Text(provider.title, style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
                             Text(state.summary(provider, visibility), style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.secondaryText)
                             SettingsChevron()
@@ -247,12 +251,20 @@ fun ModelVisibilitySettingsView(store: SettingsStore) {
                         }
                         SettingsDivider()
                     }
-                    SettingsButtonRow("Forget Unavailable Models", onClick = { models.send(ModelVisibilityFeature.Action.ForgetUnavailableTapped) })
+                    SettingsButtonRow(
+                        "Forget Unavailable Models",
+                        onClick = { models.send(ModelVisibilityFeature.Action.ForgetUnavailableTapped) },
+                        modifier = Modifier.testTag("model-visibility-forget-unavailable"),
+                    )
                 }
             }
             if (state.server.persistenceID in byServer) {
                 settingsSection(key = "reset") {
-                    SettingsButtonRow("Show Every Model", onClick = { models.send(ModelVisibilityFeature.Action.ResetTapped) })
+                    SettingsButtonRow(
+                        "Show Every Model",
+                        onClick = { models.send(ModelVisibilityFeature.Action.ResetTapped) },
+                        modifier = Modifier.testTag("model-visibility-reset"),
+                    )
                 }
             }
         }
@@ -275,8 +287,7 @@ fun ModelVisibilitySettingsView(store: SettingsStore) {
 
 /**
  * One provider's page (iOS `ModelVisibilityProviderView`): hide the whole provider, or switch its
- * models. Search matches every query word against the model's name or ID (iOS ranks with the
- * composer's `ModelSearch`, which isn't in a module Settings can reach).
+ * models. Search ranks with `ModelSearch`, as both model pickers do.
  */
 @Composable
 fun ModelVisibilityProviderView(store: SettingsStore, providerID: String) {
@@ -288,10 +299,7 @@ fun ModelVisibilityProviderView(store: SettingsStore, providerID: String) {
     val providerTitle = provider?.title ?: ModelProviderGroup.title(providerID)
     val providerShown = providerID !in visibility.hiddenProviderIDs
     var filter by rememberSaveable { mutableStateOf("") }
-    val words = filter.lowercase().split(" ").filter { it.isNotBlank() }
-    val list = provider?.models.orEmpty().filter { model ->
-        words.all { word -> model.name.lowercase().contains(word) || model.id.lowercase().contains(word) }
-    }
+    val list = provider?.let { ModelSearch.rank(it.models, filter) }.orEmpty()
 
     SettingsPageScaffold(title = providerTitle, store = store) {
         item(key = "search") {
@@ -313,6 +321,7 @@ fun ModelVisibilityProviderView(store: SettingsStore, providerID: String) {
                     "Show $providerTitle",
                     checked = providerShown,
                     onCheckedChange = { models.send(ModelVisibilityFeature.Action.ProviderToggled(providerID, it)) },
+                    modifier = Modifier.testTag("model-visibility-provider-toggle"),
                 )
             }
         }
@@ -324,6 +333,7 @@ fun ModelVisibilityProviderView(store: SettingsStore, providerID: String) {
                         model.name,
                         checked = visibility.isModelOn(model),
                         onCheckedChange = { models.send(ModelVisibilityFeature.Action.ModelToggled(model, it)) },
+                        modifier = Modifier.testTag("model-visibility-model-${model.id}"),
                         enabled = providerShown,
                     )
                 }

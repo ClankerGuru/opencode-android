@@ -24,8 +24,17 @@ import ai.opencode.feature.voice.VoiceEngine
 import ai.opencode.feature.voice.VoiceRoute
 import ai.opencode.feature.voice.VoiceServerChoice
 import ai.opencode.feature.voice.VoiceSharedKeys
+import ai.opencode.core.motion.MotionSpring
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.snap
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -188,9 +197,16 @@ fun VoiceSettingsView(store: SettingsStore) {
                 }
                 if (divider()) SettingsDivider()
                 KeyRow(state, reduceMotion) { voice.send(VoiceSettingsFeature.Action.KeyRowTapped) }
-                if (state.isEditingKey && keySource.isPhoneKey) {
-                    SettingsDivider()
-                    KeyEditorRow(state, voice, settings)
+                // iOS inserts the editor with `.snappy(duration: 0.2)`, at once under Reduce Motion.
+                AnimatedVisibility(
+                    visible = state.isEditingKey && keySource.isPhoneKey,
+                    enter = if (reduceMotion) EnterTransition.None else expandVertically(KeySnappy.spec()) + fadeIn(KeySnappy.spec()),
+                    exit = if (reduceMotion) ExitTransition.None else shrinkVertically(KeySnappy.spec()) + fadeOut(KeySnappy.spec()),
+                ) {
+                    Column {
+                        SettingsDivider()
+                        KeyEditorRow(state, voice, settings)
+                    }
                 }
                 SettingsDivider()
                 SettingsRow(
@@ -232,7 +248,12 @@ private fun KeyRow(state: VoiceSettingsFeature.State, reduceMotion: Boolean, onT
         SettingsValueRow(state.keyRowTitle, state.keyBadgeTitle)
         return
     }
-    val rotation by animateFloatAsState(if (state.isEditingKey) 90f else 0f, tween(if (reduceMotion) 0 else 200), label = "key-chevron")
+    val rotation by animateFloatAsState(
+        if (state.isEditingKey) 90f else 0f,
+        if (reduceMotion) snap() else KeySnappy.spec(),
+        label = "key-chevron",
+    )
+    val stacked = isAccessibilitySize()
     SettingsRowFrame(
         Modifier.semantics(mergeDescendants = true) {
             contentDescription = state.keyRowTitle
@@ -241,34 +262,48 @@ private fun KeyRow(state: VoiceSettingsFeature.State, reduceMotion: Boolean, onT
         },
         onClick = onTap,
     ) {
-        Text(state.keyRowTitle, style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            val secondary = OpenCodeTheme.colors.secondaryText
-            when (val status = state.keyStatus) {
-                VoiceKeyStatus.Verified -> {
-                    OpenCodeIcon(SFSymbol.CheckmarkCircleFill, contentDescription = null, size = 18.dp, tint = SettingsTint.Green.color())
-                    Text("Verified", color = secondary)
-                }
-                VoiceKeyStatus.Checking -> {
-                    CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                    Text("Checking…", color = secondary)
-                }
-                VoiceKeyStatus.Saved -> Text("Saved", color = secondary)
-                is VoiceKeyStatus.Invalid -> {
-                    OpenCodeIcon(SFSymbol.ExclamationmarkCircleFill, contentDescription = null, size = 18.dp, tint = SettingsTint.Orange.color())
-                    Text("Saved", color = secondary)
-                }
-                VoiceKeyStatus.Missing -> Text("Missing", color = secondary)
-                is VoiceKeyStatus.OnServer -> Text(status.providerName, color = secondary)
+        val title = @Composable { Text(state.keyRowTitle, style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text) }
+        if (stacked) {
+            // iOS at accessibility sizes: the status goes under the title.
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                title()
+                KeyStatusAccessory(state, rotation)
             }
-            OpenCodeIcon(
-                SFSymbol.ChevronRight,
-                contentDescription = null,
-                size = 18.dp,
-                tint = OpenCodeTheme.colors.tertiaryText,
-                modifier = Modifier.rotate(rotation),
-            )
+        } else {
+            Box(Modifier.weight(1f)) { title() }
+            KeyStatusAccessory(state, rotation)
         }
+    }
+}
+
+@Composable
+private fun KeyStatusAccessory(state: VoiceSettingsFeature.State, rotation: Float) {
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        val secondary = OpenCodeTheme.colors.secondaryText
+        when (val status = state.keyStatus) {
+            VoiceKeyStatus.Verified -> {
+                OpenCodeIcon(SFSymbol.CheckmarkCircleFill, contentDescription = null, size = 18.dp, tint = SettingsTint.Green.color())
+                Text("Verified", style = OpenCodeTextStyles.body, color = secondary)
+            }
+            VoiceKeyStatus.Checking -> {
+                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                Text("Checking…", style = OpenCodeTextStyles.body, color = secondary)
+            }
+            VoiceKeyStatus.Saved -> Text("Saved", style = OpenCodeTextStyles.body, color = secondary)
+            is VoiceKeyStatus.Invalid -> {
+                OpenCodeIcon(SFSymbol.ExclamationmarkCircleFill, contentDescription = null, size = 18.dp, tint = SettingsTint.Orange.color())
+                Text("Saved", style = OpenCodeTextStyles.body, color = secondary)
+            }
+            VoiceKeyStatus.Missing -> Text("Missing", style = OpenCodeTextStyles.body, color = secondary)
+            is VoiceKeyStatus.OnServer -> Text(status.providerName, style = OpenCodeTextStyles.body, color = secondary)
+        }
+        OpenCodeIcon(
+            SFSymbol.ChevronRight,
+            contentDescription = null,
+            size = 18.dp,
+            tint = OpenCodeTheme.colors.tertiaryText,
+            modifier = Modifier.rotate(rotation),
+        )
     }
 }
 
@@ -276,8 +311,9 @@ private fun KeyRow(state: VoiceSettingsFeature.State, reduceMotion: Boolean, onT
 private fun KeyEditorRow(state: VoiceSettingsFeature.State, voice: VoiceStore, settings: (HomeSettingsFeature.Action) -> Unit) {
     val key = state.voiceEngine.apiKey(state.openAIAPIKey, state.xaiAPIKey).orEmpty()
     val provider = state.activeProvider
+    val stacked = isAccessibilitySize()
     Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        val keyInput = @Composable { fieldModifier: Modifier ->
             OutlinedTextField(
                 value = key,
                 onValueChange = { value ->
@@ -304,21 +340,39 @@ private fun KeyEditorRow(state: VoiceSettingsFeature.State, voice: VoiceStore, s
                         OpenCodeIcon(if (state.revealsKey) SFSymbol.EyeSlash else SFSymbol.Eye, contentDescription = null, tint = OpenCodeTheme.colors.secondaryText)
                     }
                 },
-                modifier = Modifier.weight(1f),
+                modifier = fieldModifier,
             )
+        }
+        val verifyButton = @Composable {
             FilledTonalButton(
                 onClick = { voice.send(VoiceSettingsFeature.Action.VerifyKeyTapped) },
                 enabled = state.activeAPIKey.isNotEmpty() && !state.isCheckingKey,
             ) { Text("Verify") }
         }
+        if (stacked) {
+            // iOS at accessibility sizes: Verify goes under the field.
+            keyInput(Modifier.fillMaxWidth())
+            verifyButton()
+        } else {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                keyInput(Modifier.weight(1f))
+                verifyButton()
+            }
+        }
         state.keyVerificationError?.let { error ->
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 OpenCodeIcon(SFSymbol.ExclamationmarkCircleFill, contentDescription = null, size = 16.dp, tint = OpenCodeTheme.colors.destructive)
-                Text(error, style = OpenCodeTextStyles.footnote, color = OpenCodeTheme.colors.destructive)
+                // iOS `.textSelection(.enabled)`.
+                SelectionContainer {
+                    Text(error, style = OpenCodeTextStyles.footnote, color = OpenCodeTheme.colors.destructive)
+                }
             }
         }
     }
 }
+
+/** SwiftUI `.snappy(duration: 0.2)`: the key row's chevron and editor. */
+private val KeySnappy = MotionSpring(duration = 0.2, bounce = 0.15)
 
 /** Settings → Voice → Voice: the voices the selected model offers, each with a cached TTS preview. */
 object CallVoicePicker {

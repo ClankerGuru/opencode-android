@@ -54,7 +54,7 @@ data class MotionTick(val dt: Double, val now: Double, val rawFrameDuration: Dou
 suspend fun motionFrameLoop(
     frameDurationSeconds: Double = 1.0 / 60.0,
     maxFrames: Double = 2.0,
-    timeScale: Double = AnimationTimeScale.shared.scale,
+    timeScale: Double? = null,
     onTick: (MotionTick) -> MotionFrameAction,
 ) {
     val rawFrame = max(1.0 / 240.0, frameDurationSeconds)
@@ -64,9 +64,11 @@ suspend fun motionFrameLoop(
         val action = withFrameNanos { frameNanos ->
             val rawDt = if (previousNanos == 0L) rawFrame else min(max((frameNanos - previousNanos) / 1e9, 0.0), maxFrames * rawFrame)
             previousNanos = frameNanos
-            val dt = rawDt * timeScale
+            // iOS samples `AnimationTimeScale.shared.scale` every frame, so slow motion engaged mid-flight applies at once.
+            val scale = timeScale ?: AnimationTimeScale.shared.scale
+            val dt = rawDt * scale
             virtualNow += dt
-            onTick(MotionTick(dt = dt, now = virtualNow, rawFrameDuration = rawFrame, scale = timeScale))
+            onTick(MotionTick(dt = dt, now = virtualNow, rawFrameDuration = rawFrame, scale = scale))
         }
         if (action == MotionFrameAction.Stop) return
     }

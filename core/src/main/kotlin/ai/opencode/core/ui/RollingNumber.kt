@@ -104,8 +104,10 @@ fun RollingNumber(
     model.sync(text, locale, animated = canRoll, style = motion, nowSeconds = System.nanoTime() / 1e9)
 
     if (!canRoll) {
+        // iOS `.fixedSize(horizontal: !dynamicTypeSize.isAccessibilitySize, ...)`: one line, wrapping only at accessibility sizes.
+        val maxLines = if (LocalDensity.current.fontScale >= ACCESSIBILITY_FONT_SCALE) Int.MAX_VALUE else 1
         Crossfade(text, modifier.then(semantics), animationSpec = Motion.easeInOut(Motion.fadeStandard), label = "RollingNumber") {
-            Text(it, style = resolvedStyle, maxLines = 1)
+            Text(it, style = resolvedStyle, maxLines = maxLines)
         }
         return
     }
@@ -188,12 +190,13 @@ private fun DrawScope.drawRollingFrame(frame: RollingNumberFrame, metrics: Rolli
     val masked = fade > 0f
     if (masked) drawIntoCanvas { it.saveLayer(bounds, Paint()) }
 
+    /** [smear]: vertical blur radius (px), already gated by [smearRadius]; 0 draws the glyph sharp. */
     fun glyph(glyph: String, centerX: Float, centerY: Float, alpha: Float, smear: Float, scale: Float = 1f) {
         if (alpha <= 0.001f) return
         val layout = textMetrics.layout(glyph)
         val topLeft = Offset(centerX - layout.size.width / 2f, centerY - layout.size.height / 2f)
         scale(scale, pivot = Offset(centerX, centerY)) {
-            if (smear < SMEAR_THRESHOLD) {
+            if (smear <= 0f) {
                 drawText(layout, color = color, topLeft = topLeft, alpha = alpha)
             } else {
                 // Vertical Gaussian (iOS rollingBlur: exp(-2.5 t²), t in -1..1), summed additively offscreen.
@@ -218,7 +221,7 @@ private fun DrawScope.drawRollingFrame(frame: RollingNumberFrame, metrics: Rolli
         val opacity = slot.opacity.toFloat()
         if (opacity <= 0.001f) continue
         val centerX = slot.x + slot.width / 2
-        val smear = max(slot.smear, slot.blur)
+        val smear = smearRadius(slot.smear, slot.blur)
         when (val content = slot.content) {
             is RollingNumberFrame.Content.Reel -> {
                 val base = floor(content.position).toInt()
@@ -231,11 +234,11 @@ private fun DrawScope.drawRollingFrame(frame: RollingNumberFrame, metrics: Rolli
             is RollingNumberFrame.Content.Symbol -> {
                 val p = content.progress.toFloat()
                 if (content.from != null && p < 1f) {
-                    glyph(content.from, centerX, height / 2, opacity * (1 - p), slot.blur, 1 + 0.04f * p)
+                    glyph(content.from, centerX, height / 2, opacity * (1 - p), smear, 1 + 0.04f * p)
                 }
                 if (content.to != null) {
                     val inScale = 0.96f + 0.04f * p + 0.03f * sin(p * Math.PI.toFloat())
-                    glyph(content.to, centerX, height / 2, opacity * p, slot.blur, inScale)
+                    glyph(content.to, centerX, height / 2, opacity * p, smear, inScale)
                 }
             }
         }
@@ -255,7 +258,18 @@ private fun DrawScope.drawRollingFrame(frame: RollingNumberFrame, metrics: Rolli
     }
 }
 
-private const val SMEAR_THRESHOLD = 0.45f
+/**
+ * The blur one slot draws with: iOS's band shader passes reels through below a 0.45 radius
+ * (`rollingBlur`), and its per-glyph arrival/exit blur starts above 0.3 (`slot.blur > 0.3`).
+ */
+private fun smearRadius(band: Float, arrival: Float): Float =
+    max(if (band >= BAND_BLUR_THRESHOLD) band else 0f, if (arrival > ARRIVAL_BLUR_THRESHOLD) arrival else 0f)
+
+private const val BAND_BLUR_THRESHOLD = 0.45f
+private const val ARRIVAL_BLUR_THRESHOLD = 0.3f
+
+/** iOS's first accessibility Dynamic Type size (AX1): body 28 pt over Large's 17 pt. */
+private const val ACCESSIBILITY_FONT_SCALE = 28f / 17f
 private const val SMEAR_TAPS = 4
 private val SMEAR_WEIGHT_TOTAL: Float = (-SMEAR_TAPS..SMEAR_TAPS).sumOf { k ->
     val t = k.toDouble() / SMEAR_TAPS

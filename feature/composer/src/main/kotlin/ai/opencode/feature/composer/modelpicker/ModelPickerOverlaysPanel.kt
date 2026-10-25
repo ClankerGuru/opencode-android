@@ -2,6 +2,7 @@
 
 package ai.opencode.feature.composer.modelpicker
 
+import ai.opencode.server.model.ModelSearch
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient

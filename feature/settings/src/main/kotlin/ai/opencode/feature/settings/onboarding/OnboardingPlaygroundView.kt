@@ -95,6 +95,18 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.zIndex
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.Placeable
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.unit.Constraints
+import kotlin.math.roundToInt
 
 private typealias PlaygroundStore = StoreOf<OnboardingPlaygroundFeature.State, Action>
 
@@ -120,6 +132,8 @@ fun OnboardingPlaygroundView(
     val controlsHidden by store.observe { it.controlsHidden }
     /** The shared centre slot (the camera aperture), in the field's dp. */
     val aperture = remember { mutableStateOf(Rect(0f, 0f, 240f, 240f)) }
+    /** The field waits for the aperture's first real bounds, so its first (snapped) frame is right. */
+    val aperturePlaced = remember { mutableStateOf(false) }
     /** Under the first session's header, where Quiet Relay's band lands. */
     val headerLine = remember { mutableFloatStateOf(0f) }
     /** The page the heartbeat wipe is carrying away. */
@@ -134,7 +148,7 @@ fun OnboardingPlaygroundView(
                 .background(colors.canvas)
                 .testTag("onboarding-playground"),
         ) {
-            SignalFieldView(
+            if (aperturePlaced.value) SignalFieldView(
                 SignalFieldScene(
                     phase = phase,
                     variant = variant,
@@ -147,7 +161,10 @@ fun OnboardingPlaygroundView(
                 OnboardingPages(
                     store = store,
                     wipedPage = wipedPage,
-                    onAperture = { aperture.value = it },
+                    onAperture = {
+                        aperture.value = it
+                        aperturePlaced.value = true
+                    },
                     onHeaderLine = { headerLine.floatValue = it },
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                 )
@@ -278,15 +295,28 @@ private fun OnboardingPages(
     fun isShown(page: Phase) = phase == page || (phase == Phase.session && wipes && wipedPage == page)
     val send: (Action) -> Unit = store::send
 
-    Box(modifier) {
-        ApertureLayer(phase, cameraFeed, reduceMotion, onAperture, onScanned = { send(Action.CodeScanned(it)) })
+    /** The active page's centre slot, its middle in this box's px: the aperture and trace follow it. */
+    val centreMid = remember { mutableStateOf<Float?>(null) }
+    val pagesCoordinates = remember { mutableStateOf<LayoutCoordinates?>(null) }
+    val reportCentre = remember {
+        CentreReporter { slot ->
+            val pages = pagesCoordinates.value ?: return@CentreReporter
+            if (!pages.isAttached || !slot.isAttached) return@CentreReporter
+            centreMid.value = pages.localPositionOf(slot, Offset.Zero).y + slot.size.height / 2f
+        }
+    }
+
+    Box(modifier.onPlaced { pagesCoordinates.value = it }) {
+        ApertureLayer(phase, cameraFeed, reduceMotion, { centreMid.value }, onAperture, onScanned = { send(Action.CodeScanned(it)) })
         Box(Modifier.fillMaxSize().wipeMask(wipe, revealing = false, active = wipes)) {
-            Welcome(isShown(Phase.welcome), send)
-            Story(isShown(Phase.story), send)
-            Camera(isShown(Phase.camera), send)
-            Waiting(isShown(Phase.waiting), send)
-            Connected(isShown(Phase.connected), send)
-            Failed(isShown(Phase.failed), failedWith, send)
+            CompositionLocalProvider(LocalCentreReporter provides reportCentre) {
+                Welcome(isShown(Phase.welcome), send)
+                Story(isShown(Phase.story), send)
+                Camera(isShown(Phase.camera), send)
+                Waiting(isShown(Phase.waiting), send)
+                Connected(isShown(Phase.connected), send)
+                Failed(isShown(Phase.failed), failedWith, send)
+            }
         }
         FirstSessionPage(
             isActive = phase == Phase.session,
@@ -301,7 +331,21 @@ private fun OnboardingPages(
     }
 }
 
-private val largeTitleBold: TextStyle get() = OpenCodeTextStyles.largeTitle.copy(fontWeight = FontWeight.Bold)
+/** Hands the active page's centre slot to [OnboardingPages]. */
+private fun interface CentreReporter {
+    fun report(slot: LayoutCoordinates)
+}
+
+private val LocalCentreReporter = staticCompositionLocalOf<CentreReporter?> { null }
+
+/** Page titles: iOS `.font(.largeTitle.bold())`, centred like every line above and below the centre. */
+private val largeTitleBold: TextStyle get() = OpenCodeTextStyles.largeTitle.copy(fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+
+/** Body copy in a page's top or below block, centred as iOS's `.multilineTextAlignment(.center)`. */
+private val centredBody: TextStyle get() = OpenCodeTextStyles.body.centred()
+
+/** An explicit `style` replaces [CenteredText]'s provided one, so top/below text centres itself. */
+private fun TextStyle.centred(): TextStyle = copy(textAlign = TextAlign.Center)
 
 @Composable
 private fun secondary(): Color = OpenCodeTheme.colors.secondaryText
@@ -327,7 +371,7 @@ private fun Welcome(on: Boolean, send: (Action) -> Unit) {
                 Entrance(on, 2) {
                     Text(
                         "Pick up a session. Talk through an idea. Keep things moving from your phone.",
-                        style = OpenCodeTextStyles.body,
+                        style = centredBody,
                         color = secondary(),
                     )
                 }
@@ -391,7 +435,7 @@ private fun Camera(on: Boolean, send: (Action) -> Unit) {
         },
         centre = { Spacer(Modifier.height(ApertureSide)) },
         below = {
-            Entrance(on, 3) { Text("Point your camera at the pairing code", style = OpenCodeTextStyles.subheadline, color = secondary()) }
+            Entrance(on, 3) { Text("Point your camera at the pairing code", style = OpenCodeTextStyles.subheadline.centred(), color = secondary()) }
         },
         footer = {
             Entrance(on, 4) { SecondaryButton("Use Sample Code", on) { send(Action.SampleCodeTapped) } }
@@ -414,7 +458,7 @@ private fun Waiting(on: Boolean, send: (Action) -> Unit) {
         },
         centre = { Spacer(Modifier.height(ApertureSide)) },
         below = {
-            Entrance(on, 2) { Text("The signal stays quiet until it replies", style = OpenCodeTextStyles.subheadline, color = secondary()) }
+            Entrance(on, 2) { Text("The signal stays quiet until it replies", style = OpenCodeTextStyles.subheadline.centred(), color = secondary()) }
         },
         footer = {
             Entrance(on, 3) { SecondaryButton("Cancel", on) { send(Action.CancelTapped) } }
@@ -445,7 +489,7 @@ private fun Connected(on: Boolean, send: (Action) -> Unit) {
         },
         centre = { Spacer(Modifier.height(120.dp)) },
         below = {
-            Entrance(on, 3) { Text("Your next session starts here", style = OpenCodeTextStyles.subheadline, color = secondary()) }
+            Entrance(on, 3) { Text("Your next session starts here", style = OpenCodeTextStyles.subheadline.centred(), color = secondary()) }
         },
         footer = {
             Entrance(on, 4) { PrimaryButton("Start a Session", on) { send(Action.StartSessionTapped) } }
@@ -513,7 +557,9 @@ private fun OnboardingPageLayout(
     below: @Composable () -> Unit,
     footer: @Composable ColumnScope.() -> Unit,
 ) {
+    val reporter = LocalCentreReporter.current
     OnboardingSkeleton(
+        onCentre = if (isActive && reporter != null) reporter::report else null,
         modifier = Modifier
             .zIndex(if (isActive) 1f else 0f)
             .then(if (isActive) Modifier.testTag("onboarding-page-$id") else Modifier.clearAndSetSemantics { }),
@@ -541,34 +587,77 @@ private fun CenteredText(content: @Composable () -> Unit) {
     ProvideTextStyle(LocalTextStyle.current.merge(OpenCodeTextStyles.body).copy(textAlign = TextAlign.Center), content)
 }
 
-/** The layout every page and the aperture share. */
+/**
+ * The layout every page shares: a 52 pt header, the block above the centre bottom-aligned, the
+ * centre, the block below top-aligned, and a footer at least 128 pt tall at the bottom. The two
+ * blocks split the free height evenly, so the centre lands at the same height on every page (iOS
+ * `OnboardingSkeleton`'s two `maxHeight: .infinity` frames). When a block needs more than its
+ * half (large text, a short window) it takes what it needs and the centre moves to fit; when the
+ * page can't fit at all it scrolls, so no text is cut off.
+ *
+ * [onCentre] reports the centre slot's coordinates, for the shared aperture to follow.
+ */
 @Composable
 private fun OnboardingSkeleton(
     modifier: Modifier = Modifier,
+    onCentre: ((LayoutCoordinates) -> Unit)? = null,
     header: @Composable () -> Unit,
     top: @Composable () -> Unit,
     centre: @Composable () -> Unit,
     below: @Composable () -> Unit,
     footer: @Composable ColumnScope.() -> Unit,
 ) {
-    Box(modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-        Column(
-            Modifier
+    BoxWithConstraints(modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        val viewport = constraints.maxHeight
+        val bottomPadding = with(LocalDensity.current) { 8.dp.roundToPx() }
+        Layout(
+            contents = listOf(
+                { Box(Modifier.fillMaxWidth().height(52.dp)) { header() } },
+                { Box(Modifier.fillMaxWidth().padding(bottom = 20.dp), contentAlignment = Alignment.BottomCenter) { top() } },
+                {
+                    Box(
+                        if (onCentre != null) Modifier.onGloballyPositioned(onCentre) else Modifier,
+                        contentAlignment = Alignment.Center,
+                    ) { centre() }
+                },
+                { Box(Modifier.fillMaxWidth().padding(top = 20.dp), contentAlignment = Alignment.TopCenter) { below() } },
+                {
+                    Column(
+                        Modifier.fillMaxWidth().heightIn(min = FooterHeight),
+                        verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.Bottom),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        content = footer,
+                    )
+                },
+            ),
+            modifier = Modifier
                 .widthIn(max = 520.dp)
-                .fillMaxSize()
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(start = 24.dp, end = 24.dp, bottom = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Box(Modifier.fillMaxWidth().height(52.dp)) { header() }
-            Box(Modifier.weight(1f).fillMaxWidth().padding(bottom = 20.dp), contentAlignment = Alignment.BottomCenter) { top() }
-            centre()
-            Box(Modifier.weight(1f).fillMaxWidth().padding(top = 20.dp), contentAlignment = Alignment.TopCenter) { below() }
-            Column(
-                Modifier.fillMaxWidth().heightIn(min = FooterHeight),
-                verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.Bottom),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                content = footer,
-            )
+        ) { slots, constraints ->
+            val loose = constraints.copy(minWidth = 0, minHeight = 0, maxHeight = Constraints.Infinity)
+            val (header, top, centre, below, footer) = slots.map { it.single().measure(loose) }
+            val fixed = header.height + centre.height + footer.height
+            val free = (viewport - bottomPadding - fixed).coerceAtLeast(0)
+            val half = free / 2
+            val (topSlot, belowSlot) = when {
+                top.height <= half && below.height <= half -> half to free - half
+                top.height + below.height <= free ->
+                    if (top.height > half) top.height to free - top.height else free - below.height to below.height
+                else -> top.height to below.height
+            }
+            val height = fixed + topSlot + belowSlot
+            val width = constraints.maxWidth
+            layout(width, height) {
+                fun Placeable.centred(y: Int) = place((width - this.width) / 2, y)
+                header.centred(0)
+                top.centred(header.height + topSlot - top.height)
+                val centreY = header.height + topSlot
+                centre.centred(centreY)
+                below.centred(centreY + centre.height)
+                footer.centred(height - footer.height)
+            }
         }
     }
 }
@@ -578,13 +667,16 @@ private val ApertureSide = 240.dp
 
 /**
  * The camera aperture: one view for the camera and waiting pages, so it stays put when the code
- * is found. A plain opening. Reports its bounds (in root dp) for the field's scan rings.
+ * is found. A plain opening, centred on the active page's centre slot ([centreMid], px in the
+ * pages' box; iOS lays it out in the same skeleton). Reports its bounds (in root dp) for the
+ * field's scan rings and trace.
  */
 @Composable
 private fun ApertureLayer(
     phase: Phase,
     cameraFeed: CameraFeed,
     reduceMotion: Boolean,
+    centreMid: () -> Float?,
     onAperture: (Rect) -> Unit,
     onScanned: (String) -> Unit,
 ) {
@@ -593,66 +685,65 @@ private fun ApertureLayer(
     val waiting = animateFloatAsState(if (phase == Phase.waiting) 1f else 0f, OnboardingMotion.layout(reduceMotion), label = "found")
     val shape = RoundedCornerShape(32.dp)
     val density = LocalDensity.current.density
-    OnboardingSkeleton(
-        header = {},
-        top = {},
-        centre = {
-            Box(
-                Modifier
-                    .size(ApertureSide)
-                    .onGloballyPositioned { coordinates ->
-                        val b = coordinates.boundsInRoot()
-                        onAperture(Rect(b.left / density, b.top / density, b.right / density, b.bottom / density))
-                    }
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        Box(
+            Modifier
+                .offset {
+                    val mid = centreMid() ?: return@offset IntOffset.Zero
+                    IntOffset(0, (mid - ApertureSide.toPx() / 2).roundToInt())
+                }
+                .size(ApertureSide)
+                .onGloballyPositioned { coordinates ->
+                    if (centreMid() == null) return@onGloballyPositioned
+                    val b = coordinates.boundsInRoot()
+                    onAperture(Rect(b.left / density, b.top / density, b.right / density, b.bottom / density))
+                }
+                .graphicsLayer {
+                    val s = shown.value
+                    alpha = s
+                    val scale = if (reduceMotion) 1f else 1f - 0.04f * (1f - s)
+                    scaleX = scale
+                    scaleY = scale
+                    val blur = if (reduceMotion) 0f else (4f * (1f - s)).dp.toPx()
+                    renderEffect = if (blur > 0.25f) BlurEffect(blur, blur, TileMode.Decal) else null
+                }
+                .clip(shape)
+                .background(Color.Black)
+                .border(1.dp, Color.White.copy(alpha = 0.18f), shape)
+                .then(
+                    if (shownTarget) {
+                        Modifier.semantics { contentDescription = if (cameraFeed == CameraFeed.live) "Camera" else "Simulated camera" }
+                    } else {
+                        Modifier.clearAndSetSemantics { }
+                    },
+                ),
+        ) {
+            if (cameraFeed == CameraFeed.live) {
+                QRCameraPreview(isRunning = phase == Phase.camera, modifier = Modifier.fillMaxSize(), onScanned = onScanned)
+            } else {
+                SimulatedCameraFeed(isRunning = phase == Phase.camera && !reduceMotion, modifier = Modifier.fillMaxSize())
+            }
+            // Code found: the feed dims under the mark while the server answers.
+            Box(Modifier.fillMaxSize().graphicsLayer { alpha = 0.55f * waiting.value }.background(Color.Black))
+            OpenCodeIcon(
+                SFSymbol.Checkmark,
+                contentDescription = null,
+                size = 40.dp,
+                tint = Color.White,
+                modifier = Modifier
+                    .align(Alignment.Center)
                     .graphicsLayer {
-                        val s = shown.value
-                        alpha = s
-                        val scale = if (reduceMotion) 1f else 1f - 0.04f * (1f - s)
+                        val w = waiting.value
+                        alpha = w
+                        val scale = if (reduceMotion) 1f else 0.9f + 0.1f * w
                         scaleX = scale
                         scaleY = scale
-                        val blur = if (reduceMotion) 0f else (4f * (1f - s)).dp.toPx()
+                        val blur = if (reduceMotion) 0f else (3f * (1f - w)).dp.toPx()
                         renderEffect = if (blur > 0.25f) BlurEffect(blur, blur, TileMode.Decal) else null
-                    }
-                    .clip(shape)
-                    .background(Color.Black)
-                    .border(1.dp, Color.White.copy(alpha = 0.18f), shape)
-                    .then(
-                        if (shownTarget) {
-                            Modifier.semantics { contentDescription = if (cameraFeed == CameraFeed.live) "Camera" else "Simulated camera" }
-                        } else {
-                            Modifier.clearAndSetSemantics { }
-                        },
-                    ),
-            ) {
-                if (cameraFeed == CameraFeed.live) {
-                    QRCameraPreview(isRunning = phase == Phase.camera, modifier = Modifier.fillMaxSize(), onScanned = onScanned)
-                } else {
-                    SimulatedCameraFeed(isRunning = phase == Phase.camera && !reduceMotion, modifier = Modifier.fillMaxSize())
-                }
-                // Code found: the feed dims under the mark while the server answers.
-                Box(Modifier.fillMaxSize().graphicsLayer { alpha = 0.55f * waiting.value }.background(Color.Black))
-                OpenCodeIcon(
-                    SFSymbol.Checkmark,
-                    contentDescription = null,
-                    size = 40.dp,
-                    tint = Color.White,
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .graphicsLayer {
-                            val w = waiting.value
-                            alpha = w
-                            val scale = if (reduceMotion) 1f else 0.9f + 0.1f * w
-                            scaleX = scale
-                            scaleY = scale
-                            val blur = if (reduceMotion) 0f else (3f * (1f - w)).dp.toPx()
-                            renderEffect = if (blur > 0.25f) BlurEffect(blur, blur, TileMode.Decal) else null
-                        },
-                )
-            }
-        },
-        below = {},
-        footer = {},
-    )
+                    },
+            )
+        }
+    }
 }
 
 /** The first session the pairing opens: a new draft on the paired Mac. */

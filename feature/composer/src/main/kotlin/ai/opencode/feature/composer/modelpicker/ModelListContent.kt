@@ -2,6 +2,7 @@
 
 package ai.opencode.feature.composer.modelpicker
 
+import ai.opencode.core.ui.ProviderIcon as CoreProviderIcon
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodePrimaryButton
 import ai.opencode.core.ui.OpenCodeTextStyles
@@ -563,40 +564,11 @@ internal fun FavoriteSwipeBox(
 }
 
 /**
- * Draws a provider's mark for the pickers: `(providerID, canonical, size, tint)`. iOS's
- * `ProviderIcon` (`Session/SessionView.swift`) and its artwork live with the session here, above
- * this module, so the session provides it; without one, [ProviderIcon] draws the provider's
- * initial in a ring.
- */
-val LocalModelPickerProviderIcon = staticCompositionLocalOf<(@Composable (providerID: String, canonical: String?, size: Dp, tint: Color) -> Unit)?> { null }
-
-/**
- * The provider's mark (iOS `ProviderIcon`: its own template image, else its canonical
- * provider's, else a Console connection's upstream, else a neutral placeholder), tinted like
- * text. Decorative (TalkBack hidden).
+ * The provider's mark: iOS `ProviderIcon` (`Session/SessionView.swift`), the `provider-<id>`
+ * template image (its own, else its canonical provider's, else a Console connection's upstream,
+ * else a neutral placeholder), drawn in [tint]. Decorative (TalkBack hidden).
  */
 @Composable
 internal fun ProviderIcon(providerID: String, canonical: String?, size: Dp, tint: Color, modifier: Modifier = Modifier) {
-    val provided = LocalModelPickerProviderIcon.current
-    if (provided != null) {
-        Box(modifier.size(size).clearAndSetSemantics {}, contentAlignment = Alignment.Center) { provided(providerID, canonical, size, tint) }
-        return
-    }
-    val id = canonical?.takeIf { providerID.startsWith("console-") } ?: providerID.removePrefix("console-")
-    val initial = ModelProviderGroup.canonicalVendorTitle(id).firstOrNull()?.uppercaseChar()?.toString() ?: "·"
-    Box(
-        modifier
-            .size(size)
-            .background(tint.copy(alpha = 0.16f), CircleShape)
-            .clearAndSetSemantics {},
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            initial,
-            color = tint,
-            style = OpenCodeTextStyles.caption2.copy(fontSize = OpenCodeTextStyles.caption2.fontSize * (size.value / 20f)),
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-        )
-    }
+    CoreProviderIcon(providerID, modifier.size(size), canonical, tint)
 }

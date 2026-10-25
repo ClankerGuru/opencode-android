@@ -55,10 +55,14 @@ internal fun locationQuery(directory: String?): List<Pair<String, String>> =
 /** A route as the log shows it: IDs stay, a pairing code doesn't. */
 internal fun loggablePath(path: String): String = if (path.startsWith("/auth/")) "/auth/…" else path
 
-/** An exception's type and its cause's: never its message, which can carry the URL. */
+/**
+ * An exception's `URLError` equivalent and type (iOS logs domain and code, then the
+ * underlying error's): never its message, which can carry the URL.
+ */
 internal fun logDescription(error: Throwable): String {
     if (error is kotlin.coroutines.cancellation.CancellationException) return "cancelled"
-    var description = error::class.java.simpleName
+    val type = error::class.java.simpleName
+    var description = UrlErrorCode.fromThrowable(error)?.let { "URLError $it ($type)" } ?: type
     error.cause?.let { description += " (${it::class.java.simpleName})" }
     return description
 }

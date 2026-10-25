@@ -19,6 +19,22 @@ import ai.opencode.core.ui.ThisDevice
 import ai.opencode.feature.drawer.HomeFeature
 import ai.opencode.feature.drawer.HomeView
 import ai.opencode.feature.settings.servers.PairingScannerView
+import ai.opencode.feature.settings.servers.ServerMarkTile
+import ai.opencode.feature.settings.servers.ServerTitleFeature
+import ai.opencode.feature.settings.servers.ServerTitleStore
+import ai.opencode.feature.settings.servers.ServerTitleView
+import ai.opencode.core.store.PresentationAction
+import ai.opencode.core.sharing.ExperimentalFeature
+import ai.opencode.core.sharing.experimental
+import ai.opencode.core.sharing.shared
+import ai.opencode.core.ui.OpenCodePrimaryButton
+import ai.opencode.server.friendlyName
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.material3.ModalBottomSheetProperties
+import androidx.compose.material3.SheetValue
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberUpdatedState
 import ai.opencode.feature.transcript.TranscriptMediaProviders
 import ai.opencode.server.OpenCodeServer
 import androidx.compose.animation.AnimatedVisibility
@@ -108,7 +124,7 @@ import kotlinx.coroutines.delay
 fun AppView(store: StoreOf<AppFeature.State, AppFeature.Action>) {
     LaunchedEffect(store) {
         store.send(AppFeature.Action.Task)
-        store.send(AppFeature.Action.SystemActionsTask)
+        // The system action inbox is started by `AppWideWork`, in the window that owns it.
         store.send(AppFeature.Action.PendingSharesRequested)
     }
     val hasHome by store.observe { it.home != null }
@@ -128,9 +144,10 @@ fun AppView(store: StoreOf<AppFeature.State, AppFeature.Action>) {
                 val media = remember { Store(MediaFeature.State(), MediaFeature()) }
                 MediaView(media) { HomeView(home) }
             } else {
-                ConnectionView(store)
+                ConnectionScreen(store)
             }
             ServerSwitchToast(store)
+            ServerTitleSheet(store)
             // Over Home too: the drawer adds and edits servers without leaving it.
             if (isEditingServer) ServerFormSheet(store)
             if (isScanning) PairingScannerPresenter(store)
@@ -206,6 +223,116 @@ private fun isAccessibilitySize(): Boolean = LocalDensity.current.fontScale > 1.
 /** iOS `.orange` (systemOrange) for the error card title and paste errors. */
 @Composable
 private fun systemOrange(): Color = if (OpenCodeTheme.colors.isDark) Color(0xFFFF9F0A) else Color(0xFFFF9500)
+
+/** The scoped server sheet store (iOS `$store.scope(state: \.serverTitle, action: \.serverTitle)`). */
+@Composable
+private fun rememberServerTitleStore(store: StoreOf<AppFeature.State, AppFeature.Action>): ServerTitleStore {
+    // The last state keeps drawing while the sheet animates away.
+    val last = remember { arrayOfNulls<ServerTitleFeature.State>(1) }
+    return store.rememberScope<AppFeature.State, AppFeature.Action, ServerTitleFeature.State, ServerTitleFeature.Action>(
+        state = { app -> (app.serverTitle ?: last[0] ?: ServerTitleFeature.State()).also { last[0] = it } },
+        action = { AppFeature.Action.ServerTitle(PresentationAction.Presented(it)) },
+    )
+}
+
+/**
+ * iOS `.sheet(item: serverSheet)`: the Experimental server sheet at full height (`.large`), which
+ * can't be swiped away while a connection is in progress (`interactiveDismissDisabled(busy)`).
+ * Not the first-run connect page, which is the screen itself.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ServerTitleSheet(store: StoreOf<AppFeature.State, AppFeature.Action>) {
+    val presented by store.observe { it.serverTitle != null && it.serverTitle?.connectOnly != true }
+    if (!presented) return
+    val titleStore = rememberServerTitleStore(store)
+    val busy by store.observe { it.serverTitle?.busy == true }
+    val currentBusy by rememberUpdatedState(busy)
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { it != SheetValue.Hidden || !currentBusy },
+    )
+    ModalBottomSheet(
+        onDismissRequest = { if (!currentBusy) store.send(AppFeature.Action.ServerTitle(PresentationAction.Dismiss)) },
+        sheetState = sheetState,
+        dragHandle = null,
+        containerColor = OpenCodeTheme.colors.groupedCanvas,
+        properties = ModalBottomSheetProperties(shouldDismissOnBackPress = !busy),
+    ) {
+        ServerTitleView(titleStore, Modifier.fillMaxHeight())
+    }
+}
+
+/**
+ * iOS `connectionView`: with Title Is the Switch on, the first-run connect page (no servers) or the
+ * “Connect Your Computer” screen whose Get Started opens the server sheet; otherwise the legacy screen.
+ */
+@Composable
+private fun ConnectionScreen(store: StoreOf<AppFeature.State, AppFeature.Action>) {
+    val titleSwitchStored by remember { shared(experimental(ExperimentalFeature.serverTitleSwitch)).flow }
+        .collectAsState(initial = shared(experimental(ExperimentalFeature.serverTitleSwitch)).value)
+    val titleSwitch = ExperimentalFeature.serverTitleSwitch.isActive(titleSwitchStored)
+    val connectOnly by store.observe { it.serverTitle?.connectOnly == true }
+    when {
+        titleSwitch && connectOnly -> ServerTitleView(rememberServerTitleStore(store), Modifier.fillMaxSize())
+        titleSwitch -> TitleSwitchConnectionView(store)
+        else -> ConnectionView(store)
+    }
+}
+
+/** iOS `connectionView` under Title Is the Switch: the mark, “Connect Your Computer”, Get Started. */
+@Composable
+private fun TitleSwitchConnectionView(store: StoreOf<AppFeature.State, AppFeature.Action>) {
+    val errorMessage by store.observe { it.errorMessage }
+    val returnServer by store.observe { it.returnServer }
+    Column(
+        Modifier.fillMaxSize().background(OpenCodeTheme.colors.groupedCanvas).safeDrawingPadding()
+            .padding(horizontal = 20.dp).padding(bottom = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Spacer(Modifier.weight(1f))
+        ServerMarkTile()
+        Text(
+            "Connect Your Computer",
+            style = OpenCodeTextStyles.title1.copy(fontWeight = FontWeight.Bold),
+            color = OpenCodeTheme.colors.text,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 20.dp).semantics { heading() },
+        )
+        Text(
+            "Pair this ${ThisDevice.name} with OpenCode on your computer.",
+            style = OpenCodeTextStyles.subheadline,
+            color = OpenCodeTheme.colors.secondaryText,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 6.dp),
+        )
+        errorMessage?.let {
+            Text(
+                it,
+                style = OpenCodeTextStyles.footnote,
+                color = OpenCodeTheme.colors.secondaryText,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 12.dp),
+            )
+        }
+        Spacer(Modifier.weight(1f))
+        Column(
+            Modifier.widthIn(max = 480.dp).fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            OpenCodePrimaryButton(onClick = { store.send(AppFeature.Action.ServerTitleOpened) }, modifier = Modifier.fillMaxWidth()) {
+                Text("Get Started")
+            }
+            returnServer?.let { server ->
+                TextButton(
+                    onClick = { store.send(AppFeature.Action.ReturnToServerTapped) },
+                    modifier = Modifier.heightIn(min = 48.dp),
+                ) { Text("Back to ${server.friendlyName}", style = OpenCodeTextStyles.body.copy(fontWeight = FontWeight.Medium)) }
+            }
+        }
+    }
+}
 
 /** iOS `legacyConnectionView` (the default while the Title-Is-the-Switch experiment is off). */
 @Composable

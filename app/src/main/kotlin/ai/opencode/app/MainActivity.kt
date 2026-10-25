@@ -1,6 +1,5 @@
 package ai.opencode.app
 
-import ai.opencode.core.store.Store
 import ai.opencode.feature.system.NotificationDestination
 import ai.opencode.feature.system.SystemAction
 import ai.opencode.feature.system.share.ShareConversation
@@ -27,15 +26,20 @@ import androidx.activity.viewModels
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.lifecycleScope
+import ai.opencode.feature.drawer.HomeFeature
+import ai.opencode.feature.system.SessionWindowTarget
+import kotlinx.coroutines.launch
 
 /**
- * The single activity (iOS's scene). The root [Store] lives in a retained [RootStore] so
- * configuration changes, split screen and freeform resizes keep state and in-flight effects;
- * [AppFeature] holds navigation (connection vs Home) as state, like iOS `AppView`.
+ * The app's window (iOS's scene). The window's [Store] lives in a retained [RootStore] (iOS
+ * `WindowStore`) so configuration changes, split screen and freeform resizes keep state and
+ * in-flight effects; [AppFeature] holds navigation (connection vs Home) as state, like iOS
+ * `AppView`. On a tablet each further window is a task of its own (`singleInstancePerTask`,
+ * [SceneWindows]); a phone has one.
  *
  * Intents are iOS's `onOpenURL` and notification taps: [route] turns each into an
- * [AppFeature.Action]. `singleTask` delivers later ones to [onNewIntent].
+ * [AppFeature.Action]. Later ones reach [onNewIntent].
  */
 class MainActivity : ComponentActivity() {
     private val root: RootStore by viewModels()
@@ -50,6 +54,10 @@ class MainActivity : ComponentActivity() {
     private var removeRequesters: List<() -> Unit> = emptyList()
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Debug lab hooks run before anything reads the store (iOS runs them before `OpenCodeApp.store`).
+        if (savedInstanceState == null) LabLaunch.apply(intent)
+        // The window's store: the first window's, or a further window's on its own session.
+        root.resolve(this, RootStore.target(intent, savedInstanceState))
         val splash = installSplashScreen()
         LaunchBloomController.start()
         splash.setKeepOnScreenCondition { LaunchBloomController.keepsCover(store.state.isColdLaunchContentReady) }
@@ -61,6 +69,7 @@ class MainActivity : ComponentActivity() {
                     Lifecycle.Event.ON_START -> store.send(AppFeature.Action.ForegroundChanged(true))
                     // iOS `scenePhase == .active`: take what the share sheet left.
                     Lifecycle.Event.ON_RESUME -> {
+                        SceneWindows.resumed(root)
                         store.send(AppFeature.Action.PendingSharesRequested)
                         registerPermissionRequesters()
                     }
@@ -81,6 +90,7 @@ class MainActivity : ComponentActivity() {
             PerfFrameSampler.startIfRequested()
         }
         setContent { DevToolsOverlay { AppView(store) } }
+        if (root.follows) followShownSession()
         // A recreated activity already handled its launch intent.
         if (savedInstanceState == null) handle(intent)
     }
@@ -112,15 +122,63 @@ class MainActivity : ComponentActivity() {
         return pending.await()
     }
 
+    /**
+     * iOS `SessionWindowFollow`: on a tablet the window's restorable value follows the session it
+     * shows (saved in [onSaveInstanceState]), and a session the cached list didn't have opens
+     * once Home is up.
+     */
+    private fun followShownSession() {
+        lifecycleScope.launch {
+            store.states.collect { state ->
+                val pending = root.pendingTarget ?: return@collect
+                val home = state.home ?: return@collect
+                if (root.shown?.sessionID == pending.sessionID) {
+                    root.pendingTarget = null
+                    return@collect
+                }
+                if (!home.snapshotLoaded || home.server.persistenceID != pending.serverID) return@collect
+                root.pendingTarget = null
+                store.send(AppFeature.Action.Home(HomeFeature.Action.SessionTapped(pending.sessionID)))
+            }
+        }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        if (!root.follows) return
+        val shown = root.shown ?: root.pendingTarget ?: return
+        outState.putString(SessionWindowTarget.EXTRA_SERVER_ID, shown.serverID)
+        outState.putString(SessionWindowTarget.EXTRA_SESSION_ID, shown.sessionID)
+    }
+
+    override fun onDestroy() {
+        if (isFinishing) root.activityFinished()
+        super.onDestroy()
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        // A window asked again for its own session shows it (iOS `onContinueUserActivity`).
+        if (intent.action == SessionWindowTarget.ACTION && root.follows) {
+            val next = RootStore.target(intent, null) ?: return
+            if (next != root.shown) store.send(AppFeature.Action.Home(HomeFeature.Action.SessionTapped(next.sessionID)))
+            return
+        }
         handle(intent)
     }
 
     private fun handle(intent: Intent?) {
         val action = route(intent) ?: return
         LaunchBloomController.completeColdLaunch()
+        if (action is AppFeature.Action.NotificationOpened) {
+            // iOS `SceneWindows.store(for:primary:)`: the window showing that session, else the
+            // one in use on its server, else the one doing the app-wide work.
+            val window = SceneWindows.window(action.destination, receiving = root)
+            if (window !== root) SceneWindows.bringToFront(window, this)
+            window.store.send(action)
+            return
+        }
         store.send(action)
     }
 
@@ -151,9 +209,3 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/** Holds the app's root store across configuration changes; cancels its effects when the task ends. */
-class RootStore : ViewModel() {
-    val store = Store(AppFeature.State.initial(), AppFeature())
-
-    override fun onCleared() = store.close()
-}
