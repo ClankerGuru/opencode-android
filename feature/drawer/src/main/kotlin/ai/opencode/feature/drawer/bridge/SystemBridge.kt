@@ -15,14 +15,6 @@ enum class VoiceCallCommand { Mute, Unmute, End }
 /** A command from the recording's Live Activity / ongoing notification. TODO(merge): `:feature:voice`'s `DictationCommand`. */
 enum class DictationCommand { Stop, Cancel }
 
-/** An item from the share sheet, for this server. TODO(merge): `:feature:system`'s `ReceivedShare`. */
-data class ReceivedShare(
-    val id: String,
-    val target: SharedDraftTarget,
-    val text: String = "",
-    val projectID: String? = null,
-)
-
 /** Where a system action (shortcut, launcher action, link) goes. TODO(merge): `SystemAction.Destination`. */
 sealed interface SystemActionDestination {
     data object NewSession : SystemActionDestination

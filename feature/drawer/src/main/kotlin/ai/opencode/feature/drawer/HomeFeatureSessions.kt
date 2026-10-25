@@ -6,9 +6,9 @@ import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.feature.drawer.HomeFeature.Action
 import ai.opencode.feature.drawer.HomeFeature.State
+import ai.opencode.feature.composer.SharedComposerDraft
 import ai.opencode.feature.drawer.bridge.SessionDelegate
 import ai.opencode.feature.drawer.bridge.SessionDetail
-import ai.opencode.feature.drawer.bridge.SessionDraftState
 import ai.opencode.feature.drawer.bridge.SessionScreenEvent
 import ai.opencode.feature.drawer.bridge.SessionScreenMessage
 import ai.opencode.server.OpenCodeLiveContentEvent
@@ -175,8 +175,9 @@ private fun HomeFeature.reduceSessionDelegate(state: State, delegate: SessionDel
         else Reduced(state.leavingCatchUp().openingDraft(delegate.directory, reason = "the voice agent opened a draft"))
     is SessionDelegate.ToggleMute -> Reduced(state, Effect.send(Action.ToggleMute(delegate.sessionID)))
     is SessionDelegate.KeepDraft -> {
-        val merged = (state.sharedDrafts[delegate.target] ?: SessionDraftState()).appending(delegate.draft)
-        Reduced(state.copy(sharedDrafts = state.sharedDrafts + (delegate.target to merged)))
+        val drafts = state.sharedDrafts
+        drafts[delegate.target] = drafts.getOrDefault(delegate.target) { SharedComposerDraft() }.appending(delegate.draft)
+        Reduced(state)
     }
     is SessionDelegate.ToggleRead -> {
         val session = state.sessions.firstOrNull { it.id == delegate.sessionID }

@@ -8,7 +8,7 @@ import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
 import ai.opencode.core.store.cancellable
-import ai.opencode.feature.drawer.bridge.SessionDraftState
+import ai.opencode.feature.composer.DraftState
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeSession
@@ -53,7 +53,7 @@ class CatchUpFeature : Reducer<CatchUpFeature.State, CatchUpFeature.Action> {
         val returnSessionID: String? = null,
         val returnComposerSessionID: String? = null,
         /** iOS `SessionFeature.State.DraftState` (the drawer-local stand-in until `:feature:session` ports it). */
-        val returnComposer: SessionDraftState? = null,
+        val returnComposer: DraftState? = null,
     ) {
         val composerTargetSessionID: String? get() = returnComposerSessionID ?: returnSessionID
 

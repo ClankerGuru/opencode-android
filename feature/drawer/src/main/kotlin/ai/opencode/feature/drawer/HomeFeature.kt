@@ -10,21 +10,27 @@ import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
 import ai.opencode.feature.drawer.bridge.NotificationPermission
 import ai.opencode.feature.drawer.bridge.DictationCommand
-import ai.opencode.feature.drawer.bridge.ReceivedShare
 import ai.opencode.feature.drawer.bridge.SessionDetail
-import ai.opencode.feature.drawer.bridge.SessionDraftState
 import ai.opencode.feature.drawer.bridge.SessionRefreshReason
 import ai.opencode.feature.drawer.bridge.SessionScreenEvent
 import ai.opencode.feature.drawer.bridge.SessionScreenMessage
 import ai.opencode.feature.drawer.bridge.SessionSwitchSnapshot
-import ai.opencode.feature.drawer.bridge.SharedDraftTarget
 import ai.opencode.feature.drawer.bridge.SystemActionDestination
 import ai.opencode.feature.drawer.bridge.VoiceCallCommand
 import ai.opencode.feature.drawer.catchup.CatchUpFeature
 import ai.opencode.feature.drawer.notices.InAppNotice
 import ai.opencode.feature.drawer.switcher.SessionSwitcherFeature
 import ai.opencode.feature.drawer.bridge.SessionFeatureLimits
+import ai.opencode.feature.composer.ComposerFileAttachment
+import ai.opencode.feature.composer.ComposerPersistence
+import ai.opencode.feature.composer.DraftState
+import ai.opencode.feature.composer.SharedComposerDraft
+import ai.opencode.feature.composer.SharedDraftTarget
+import ai.opencode.feature.composer.SharedDrafts
+import ai.opencode.feature.composer.parkPersistedDraft
+import ai.opencode.feature.composer.syncAbsorbedDraft
 import ai.opencode.feature.session.SessionFeature
+import ai.opencode.feature.system.share.ReceivedShare
 import ai.opencode.feature.settings.HomeSettingsFeature
 import ai.opencode.feature.settings.SettingsFeature
 import ai.opencode.feature.settings.whatsnew.WhatsNewFeature
@@ -158,15 +164,12 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         val drawerCloseRequests: Int = 0,
         /** A computer just paired: the drawer opens on its sessions. Holds the [detailGeneration] it was asked on. */
         val drawerOpenRequest: Int? = null,
-        /** Items from the share sheet waiting for their composer (iOS `sharedDrafts`). */
-        val sharedDrafts: Map<SharedDraftTarget, SessionDraftState> = emptyMap(),
-        /** Where arriving shares are taking the screen. */
-        val shareNavigationTarget: SharedDraftTarget? = null,
         /**
-         * Composers parked by session while their screen is away. Stand-in for iOS
-         * `composerPersistence` (persisted drafts). TODO(merge): `:feature:composer`'s persistence.
+         * Where arriving shares are taking the screen. The shares themselves wait for their
+         * composer in `:feature:composer`'s persistence ([sharedDrafts], iOS `sharedDrafts`), as
+         * do composers parked while their screen is away (iOS `composerPersistence`).
          */
-        val parkedDrafts: Map<String, SessionDraftState> = emptyMap(),
+        val shareNavigationTarget: SharedDraftTarget? = null,
         /** False while a cold launch without a cached list waits for its first snapshot. */
         val snapshotLoaded: Boolean = true,
         /** Whether Voice is set up, as last observed. */
@@ -783,32 +786,87 @@ internal val foregroundRefreshReasons = setOf(SessionRefreshReason.Open, Session
 // region State navigation (iOS `HomeFeature.State` methods in `HomeFeature.swift`)
 
 /**
+ * Shares waiting for their composer, by target, kept by `:feature:composer`'s persistence (iOS
+ * `HomeFeature.State.sharedDrafts`, `ComposerPersistence.swift`): a share outlives the app. Reads
+ * the [ComposerPersistence] dependency, so call it from a reducer.
+ */
+val HomeFeature.State.sharedDrafts: SharedDrafts
+    get() = SharedDrafts(server.persistenceID, projects, liveComposerTargets, dependency(ComposerPersistence))
+
+/** Composers on screen holding a draft, whose persisted draft isn't read back as a share (iOS `liveComposerTargets`). */
+private val HomeFeature.State.liveComposerTargets: Set<SharedDraftTarget>
+    get() {
+        val targets = HashSet<SharedDraftTarget>()
+        val detail = sessionDetail
+        if (catchUp == null && detail != null && detail.readsOnView && !detail.sessionComposer.isEmpty) {
+            targets += SharedDraftTarget(detail.session?.id)
+        }
+        for (child in subagentStack) {
+            if (child.readsOnView && !child.sessionComposer.isEmpty) targets += SharedDraftTarget(child.session?.id)
+        }
+        val stack = catchUp
+        if (stack != null && stack.returnComposer?.isEmpty == false) targets += SharedDraftTarget(stack.composerTargetSessionID)
+        return targets
+    }
+
+/**
  * Moves shared items into the open composer when it is their target. Catch Up cards are left
  * alone: their composers are not kept.
  */
 fun HomeFeature.State.absorbingSharedDrafts(): HomeFeature.State {
-    if (sharedDrafts.isEmpty() || catchUp != null) return this
+    if (sharedDrafts.isEmpty || catchUp != null) return this
     var s = this
     for (child in s.subagentStack) {
-        val key = SharedDraftTarget.of(child.session?.id ?: continue)
-        val shared = s.sharedDrafts[key] ?: continue
-        s = s.copy(sharedDrafts = s.sharedDrafts - key)
-            .updatingSubagent(child.navigationID) { it.copy(draft = it.draft.absorbing(shared)) }
+        val key = SharedDraftTarget(child.session?.id ?: continue)
+        val shared = s.sharedDrafts.removeValue(key) ?: continue
+        s = s.updatingSubagent(child.navigationID) { it.absorbing(shared) }
+        s.subagentStack.firstOrNull { it.navigationID == child.navigationID }?.let { s.syncAbsorbedDraft(it) }
     }
     val detail = s.sessionDetail ?: return s
-    val key = SharedDraftTarget.of(detail.session?.id)
+    val key = SharedDraftTarget(detail.session?.id)
     val target = s.shareNavigationTarget
     if (target != null) {
         if (key != target || detail.isDraft != (target == SharedDraftTarget.NewSession)) return s
         s = s.copy(shareNavigationTarget = null)
     }
-    val shared = s.sharedDrafts[key] ?: return s
-    return s.copy(sharedDrafts = s.sharedDrafts - key).updatingDetail { it.copy(draft = it.draft.absorbing(shared)) }
+    val shared = s.sharedDrafts.removeValue(key) ?: return s
+    val projectID = shared.projectID
+    if (detail.isDraft && projectID != null) {
+        val project = detail.projects.firstOrNull { it.id == projectID } ?: s.projects.firstOrNull { it.id == projectID }
+        if (project != null) s = s.updatingDetail { it.copy(draftProject = project) }
+    }
+    s = s.updatingDetail { it.absorbing(shared) }
+    s.sessionDetail?.let { s.syncAbsorbedDraft(it) }
+    return s
 }
 
-/** iOS `absorb(_:)`: shared text follows whatever is already typed. */
-private fun SessionDraftState.absorbing(shared: SessionDraftState): SessionDraftState =
-    SessionDraftState(SessionDraftState.joined(text, shared.text))
+/**
+ * iOS `SessionFeature.State.absorb(_:)` (`ShareInbox.swift`): shared text follows whatever is
+ * already typed, and its attachments, files, location and chips join the composer's. A parked file
+ * still uploading can't resume, so it comes back failed. TODO(merge) round 2b / `:feature:session`:
+ * the screen's own `absorb` (the request bar's parked composer, a live recording's rebase, the
+ * focus request, Send Later's `sharedSend`, `unstartedUploadIDs`).
+ */
+private fun SessionDetail.absorbing(shared: SharedComposerDraft): SessionDetail {
+    val newFiles = shared.parkedFiles.map { file ->
+        if (file.isUploading) file.copy(status = ComposerFileAttachment.Status.Failed("Couldn’t upload")) else file
+    } + shared.files.map { ComposerFileAttachment(it) }
+    return copy(
+        draft = draft.copy(
+            text = SharedComposerDraft.joined(draft.text, shared.text),
+            attachments = draft.attachments + shared.attachments,
+            files = draft.files + newFiles,
+            location = shared.location ?: draft.location,
+            chips = draft.chips + shared.chips.filter { chip -> draft.chips.none { it.id == chip.id } },
+        ),
+    )
+}
+
+/** iOS `syncAbsorbedDraft(for:)`: a composer that took a share is saved (or cleared) at once. */
+internal fun HomeFeature.State.syncAbsorbedDraft(detail: SessionDetail) {
+    if (catchUp != null || !detail.readsOnView) return
+    dependency(ComposerPersistence).syncAbsorbedDraft(server.persistenceID, detail.session, detail.draftProject, detail.sessionComposer)
+}
 
 /** Opens the remembered session for this server, else a draft (iOS `restoreInitialSession`). */
 fun HomeFeature.State.restoringInitialSession(): HomeFeature.State {
@@ -889,7 +947,7 @@ fun HomeFeature.State.makeDraft(directory: String? = null, reason: String = "you
         visit = transition.visit,
     )
     draft = s.finishingDetailTransition(draft)
-    val (restored, withDraft) = s.restoringPersistedDraft(draft)
+    val (restored, withDraft) = s.restoringPersistedDraft(draft, preservesExplicitProject = directory != null)
     s = restored
     return s to withDraft
 }
@@ -952,23 +1010,45 @@ private fun HomeFeature.State.finishingDetailTransition(detail: SessionDetail): 
  * Session over a draft starts empty: the old draft's words go.
  */
 private fun HomeFeature.State.syncingOutgoingDetailDraft(targetIsDraft: Boolean = false): HomeFeature.State {
-    val detail = sessionDetail ?: return this
-    if (catchUp != null || !detail.readsOnView) return this
-    // TODO(merge): also skip while the outgoing screen carries dictation (`carriedDictation != nil`).
-    if (targetIsDraft && detail.isDraft) return parkingDraft(null, null)
-    return parkingDraft(detail.sessionComposer, detail.session?.id)
+    val old = sessionDetail ?: return this
+    if (catchUp != null || !old.readsOnView) return this
+    // TODO(merge) round 2b / `:feature:session`: also skip while the outgoing screen carries dictation (`carriedDictation != nil`).
+    val persistence = dependency(ComposerPersistence)
+    if (targetIsDraft && old.isDraft) {
+        persistence.clearDraft(server.persistenceID, null, false)
+        return this
+    }
+    if (old.sessionComposer.isEmpty) return this
+    if (persistence.sharedDraft(server.persistenceID, old.session?.id) != null) {
+        parkingDraft(old.sessionComposer, old.session?.id)
+    } else {
+        syncAbsorbedDraft(old)
+    }
+    return this
 }
 
-/** A parked composer comes back with its session (iOS `restorePersistedDraft(into:)`). */
-private fun HomeFeature.State.restoringPersistedDraft(detail: SessionDetail): Pair<HomeFeature.State, SessionDetail> {
+/**
+ * A parked or persisted composer comes back with its session (iOS `restorePersistedDraft(into:)`).
+ * TODO(merge) round 2b / `:feature:session`: a draft whose send already created its session
+ * (`loadOutbox` → `draftBecameSessionID`, `promoteDraftOutboxToSession`) and the outbox's
+ * directory for a draft; `applyPersistedDraft` is the screen's.
+ */
+private fun HomeFeature.State.restoringPersistedDraft(
+    detail: SessionDetail,
+    preservesExplicitProject: Boolean = false,
+): Pair<HomeFeature.State, SessionDetail> {
     // Catch Up's cards keep no composer: the parked one waits for the session's own screen.
     if (catchUp != null || !detail.readsOnView) return this to detail
-    val key = detail.session?.id ?: DRAFT_KEY
-    val parked = parkedDrafts[key] ?: return this to detail
-    return copy(parkedDrafts = parkedDrafts - key) to detail.copy(draft = parked)
+    if (!detail.sessionComposer.isEmpty) return this to detail
+    val persistence = dependency(ComposerPersistence)
+    if (persistence.sharedDraft(server.persistenceID, detail.session?.id) != null) return this to detail
+    val restored = persistence.loadDraft(server.persistenceID, detail.session?.id) ?: return this to detail
+    var next = detail.copy(draft = restored.draft)
+    if (detail.isDraft && !(preservesExplicitProject && detail.draftProject != null)) {
+        restored.project?.let { project -> next = next.copy(draftProject = project) }
+    }
+    return this to next
 }
-
-private const val DRAFT_KEY = "\u0000draft"
 
 fun HomeFeature.State.rememberingSession(): HomeFeature.State = sessionDetail?.let(::remembering) ?: this
 
@@ -1106,13 +1186,14 @@ fun HomeFeature.State.seedingSessionSnapshot(detail: SessionDetail): SessionDeta
     return if (!isConnected) restored.copy(familyReadAt = null) else restored
 }
 
-/** Parks [composer] for [sessionID] (or the draft) until its screen comes back (iOS `parkDraft`). */
-fun HomeFeature.State.parkingDraft(composer: SessionDraftState?, sessionID: String?): HomeFeature.State {
-    val key = sessionID ?: DRAFT_KEY
-    if (composer == null || composer.isEmpty) {
-        return if (key in parkedDrafts) copy(parkedDrafts = parkedDrafts - key) else this
-    }
-    return copy(parkedDrafts = parkedDrafts + (key to composer))
+/**
+ * Parks [composer] for [sessionID] (or the draft) until its screen comes back (iOS `parkDraft` →
+ * `parkPersistedDraft`): `:feature:composer`'s persistence keeps it, a New Session draft with its project.
+ */
+fun HomeFeature.State.parkingDraft(composer: DraftState?, sessionID: String?): HomeFeature.State {
+    if (composer == null) return this
+    dependency(ComposerPersistence).parkPersistedDraft(server.persistenceID, composer, sessionID, sessionDetail?.draftProject)
+    return this
 }
 
 // endregion

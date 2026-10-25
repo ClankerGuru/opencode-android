@@ -11,7 +11,6 @@ import ai.opencode.feature.drawer.HomeFeature.DelegateAction
 import ai.opencode.feature.drawer.HomeFeature.State
 import ai.opencode.feature.drawer.bridge.NotificationPermission
 import ai.opencode.feature.drawer.bridge.SessionDetail
-import ai.opencode.feature.drawer.bridge.SessionDraftState
 import ai.opencode.feature.drawer.catchup.CatchUpFeature
 import ai.opencode.feature.settings.ConnectionStatus
 import ai.opencode.feature.settings.HomeSettingsFeature
@@ -225,8 +224,8 @@ private fun SessionDetail.typingBelow(text: String): SessionDetail {
     val added = text.trim()
     val current = draft.text
     return when {
-        current.isEmpty() -> copy(draft = SessionDraftState(text))
-        added.isNotEmpty() && !current.contains(added) -> copy(draft = SessionDraftState("$current\n\n$text"))
+        current.isEmpty() -> copy(draft = draft.copy(text = text))
+        added.isNotEmpty() && !current.contains(added) -> copy(draft = draft.copy(text = "$current\n\n$text"))
         else -> this
     }
 }

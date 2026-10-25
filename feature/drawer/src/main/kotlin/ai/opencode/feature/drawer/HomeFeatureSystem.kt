@@ -7,12 +7,15 @@ import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.feature.drawer.HomeFeature.Action
 import ai.opencode.feature.drawer.HomeFeature.State
-import ai.opencode.feature.drawer.bridge.ReceivedShare
-import ai.opencode.feature.drawer.bridge.SessionDraftState
 import ai.opencode.feature.drawer.bridge.SessionScreenMessage
-import ai.opencode.feature.drawer.bridge.SharedDraftTarget
 import ai.opencode.feature.drawer.bridge.SystemActionDestination
+import ai.opencode.feature.composer.SharedComposerDraft
+import ai.opencode.feature.composer.SharedDraftTarget
 import ai.opencode.feature.settings.whatsnew.whatsNewVoiceAvailable
+import ai.opencode.feature.system.share.ReceivedShare
+import ai.opencode.feature.system.share.ShareHandoff
+import ai.opencode.feature.system.share.resolvedShareTarget
+import ai.opencode.server.model.OpenCodeOutgoingAttachment
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeSession
 
@@ -66,21 +69,20 @@ private fun HomeFeature.sharesReceived(state: State, shares: List<ReceivedShare>
     var s = state
     var newestTarget: SharedDraftTarget = SharedDraftTarget.NewSession
     for (share in shares) {
-        val target = s.resolvedShareTarget(share)
-        val existing = s.sharedDrafts[target] ?: SessionDraftState()
-        // iOS `SharedComposerDraft.append` (text joined by a blank line; attachments, files and the
-        // project follow). TODO(merge): `:feature:system`'s `SharedComposerDraft`.
-        s = s.copy(sharedDrafts = s.sharedDrafts + (target to existing.appending(SessionDraftState(share.text))))
+        val resolved = resolvedShareTarget(share.handoff.target, s.sessions)
+        val target = SharedDraftTarget(resolved.sessionID)
+        val drafts = s.sharedDrafts
+        drafts[target] = drafts.getOrDefault(target) { SharedComposerDraft() }.appending(sharedComposerDraft(share, resolved.projectID))
         newestTarget = target
     }
     s = s.leavingCatchUp()
     dependency(HapticsClient).play(Haptic.success)
     // The composer on screen keeps only what's for it once the newest share's session is open;
     // until then it takes nothing it would lose.
-    val onScreen = s.sessionDetail?.let { SharedDraftTarget.of(it.session?.id) }
+    val onScreen = s.sessionDetail?.let { SharedDraftTarget(it.session?.id) }
     s = s.copy(shareNavigationTarget = if (onScreen == newestTarget) null else newestTarget)
-    return when (newestTarget) {
-        is SharedDraftTarget.Session -> Reduced(s, Effect.send(Action.SessionTapped(newestTarget.id)))
+    return when (val newest = newestTarget) {
+        is SharedDraftTarget.Session -> Reduced(s, Effect.send(Action.SessionTapped(newest.id)))
         SharedDraftTarget.NewSession -> {
             if (s.sessionDetail?.isDraft != true) s = s.openingDraft(reason = "something was shared to the app")
             Reduced(s)
@@ -89,12 +91,22 @@ private fun HomeFeature.sharesReceived(state: State, shares: List<ReceivedShare>
 }
 
 /**
- * iOS `resolvedShareTarget(_:)` (`ShareInbox.swift`): a share for a session the list doesn't hold
- * goes to a new session (in the session's project).
+ * iOS `SharedComposerDraft.init(_ share: ReceivedShare, projectID:)` (`ShareInbox.swift`): the
+ * composer half of a share. Built here because `:feature:composer` can't see `:feature:system`'s
+ * [ReceivedShare].
  */
-private fun State.resolvedShareTarget(share: ReceivedShare): SharedDraftTarget = when (val target = share.target) {
-    is SharedDraftTarget.Session -> if (sessions.any { it.id == target.id }) target else SharedDraftTarget.NewSession
-    SharedDraftTarget.NewSession -> SharedDraftTarget.NewSession
+private fun sharedComposerDraft(share: ReceivedShare, projectID: String?): SharedComposerDraft {
+    val base = SharedComposerDraft(
+        text = share.handoff.text.trim(),
+        attachments = share.images.map { OpenCodeOutgoingAttachment(id = it.id.toString(), data = it.data, mime = it.mime) },
+        files = share.files,
+        projectID = projectID,
+    )
+    return when (share.handoff.resolvedDelivery) {
+        ShareHandoff.Delivery.draft -> base
+        ShareHandoff.Delivery.openInComposer -> base.copy(focusesComposer = true)
+        ShareHandoff.Delivery.send -> base.copy(send = SharedComposerDraft.Send(share.handoff.messageID, share.handoff.newSessionID))
+    }
 }
 
 /**

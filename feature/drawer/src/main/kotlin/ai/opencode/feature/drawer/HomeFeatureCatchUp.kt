@@ -33,7 +33,7 @@ internal fun HomeFeature.reduceCatchUp(state: State, action: CatchUpFeature.Acti
                     queue = queue,
                     returnSessionID = returnSessionID,
                     returnComposerSessionID = returnComposerSessionID,
-                    returnComposer = detail?.sessionComposer ?: ai.opencode.feature.drawer.bridge.SessionDraftState(),
+                    returnComposer = detail?.sessionComposer ?: ai.opencode.feature.composer.DraftState(),
                 ),
             )
             val opened = openCatchUpCard(s)

@@ -9,7 +9,6 @@ import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.cancellable
 import ai.opencode.feature.drawer.HomeFeature.Action
 import ai.opencode.feature.drawer.HomeFeature.State
-import ai.opencode.feature.drawer.bridge.SessionDraftState
 import ai.opencode.feature.drawer.notices.AccessibilityAnnouncer
 import ai.opencode.feature.drawer.notices.InAppNotice
 import ai.opencode.core.experiments.InAppNoticeMode
@@ -46,7 +45,7 @@ internal fun HomeFeature.reduceNotifications(state: State, action: Action): Home
                 .openingDraft(reason = "notification setup")
                 // iOS `sessionDetail?.setTyped(notifyPluginSetUpPrompt)`.
                 // TODO(merge): `SessionFeature.State.setTyped` (it rebases a live recording).
-                .updatingDetail { it.copy(draft = SessionDraftState(HomeFeature.notifyPluginSetUpPrompt)) }
+                .updatingDetail { it.copy(draft = it.draft.copy(text = HomeFeature.notifyPluginSetUpPrompt)) }
             Reduced(s)
         }
     }

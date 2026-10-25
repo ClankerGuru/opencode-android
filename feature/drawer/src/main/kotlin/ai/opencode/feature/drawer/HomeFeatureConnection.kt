@@ -7,6 +7,7 @@ import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.cancellable
 import ai.opencode.feature.drawer.HomeFeature.Action
 import ai.opencode.feature.drawer.HomeFeature.State
+import ai.opencode.feature.composer.ComposerPersistence
 import ai.opencode.feature.drawer.bridge.SessionDetail
 import ai.opencode.feature.drawer.bridge.SessionScreenMessage
 import ai.opencode.server.OpenCodeClient
@@ -43,9 +44,8 @@ internal fun HomeFeature.reduceConnection(state: State, action: Action): HomeRed
         // sends with this server's credentials.
         // TODO(merge): `shareInbox.publishTargets(state.shareTargets)` and
         // `shareInbox.publishCredentials(ShareCredentials(server), true)` once `:feature:system` ports.
-        // TODO(merge): `flushPersistedComposer(state)` once `:feature:composer` ports its persistence.
         val persistence = dependency(TranscriptCachePersistence)
-        Reduced(state, Effect.run { persistence.flush() })
+        Reduced(state, Effect.merge(Effect.run { persistence.flush() }, flushPersistedComposer(state)))
     }
 
     Action.SceneEnteredBackground -> Reduced(state, publishAppBadge(state))
@@ -381,4 +381,22 @@ internal fun HomeFeature.refreshAttention(state: State): Effect<Action> {
         // `:feature:voice` ports its session board.
         if (sessionIDs != null) send(Action.AttentionRefreshed(sessionIDs))
     }.cancellable(HomeFeature.CancelID.Attention, cancelInFlight = true)
+}
+
+/**
+ * iOS `HomeFeature.flushPersistedComposer(_:)` (`ComposerPersistence.swift`): leaving the app
+ * saves every composer on screen that keeps its draft, then writes at once.
+ */
+internal fun HomeFeature.flushPersistedComposer(state: State): Effect<Action> {
+    val persistence = dependency(ComposerPersistence)
+    val serverID = state.server.persistenceID
+    fun schedule(detail: SessionDetail) {
+        val composer = detail.sessionComposer
+        if (composer.isEmpty) return
+        persistence.scheduleDraft(serverID, detail.session?.id, if (detail.session == null) detail.draftProject else null, composer)
+    }
+    val detail = state.sessionDetail
+    if (detail != null && state.catchUp == null && detail.readsOnView) schedule(detail)
+    for (child in state.subagentStack) if (child.readsOnView) schedule(child)
+    return Effect.run { persistence.flush() }
 }
