@@ -93,8 +93,12 @@ class VoiceAudioClient(
 }
 
 /** Prepared starts don't wait for an earlier engine's stop. Each has its own holder. */
-class VoiceAudioPrestart(private val begin: suspend (Boolean) -> VoiceAudioSession) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO + DependencyValues.current.asContextElement())
+class VoiceAudioPrestart(
+    /** Where prepared starts run; tests pass one they can hold. */
+    dispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val begin: suspend (Boolean) -> VoiceAudioSession,
+) {
+    private val scope = CoroutineScope(SupervisorJob() + dispatcher + DependencyValues.current.asContextElement())
     private class Pending(val token: Int) {
         lateinit var task: Deferred<VoiceAudioSession>
         var session: VoiceAudioSession? = null
