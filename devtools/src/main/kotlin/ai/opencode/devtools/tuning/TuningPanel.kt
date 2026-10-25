@@ -93,6 +93,11 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.background
+import ai.opencode.core.ui.OpenCodeTextStyles
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
@@ -289,33 +294,40 @@ fun TuningPanel(store: StoreOf<TuningFeature.State, TuningFeature.Action>, modif
                     )
                 fun measured(update: (Size) -> Unit, current: Size): Modifier = Modifier.onSizeChanged {
                     val next = Size(it.width / density.density, it.height / density.density)
-                    val first = pending.measured.add(shown)
+                    // Only the panel's very first size (as it appears) lands in place; a form measured later
+                    // (the pill on Collapse) moves on the settle spring, or it would jump in one frame.
+                    val first = pending.measured.isEmpty()
+                    pending.measured.add(shown)
                     if (next != current) {
-                        // The first real size lands in place rather than sliding from the guess.
                         if (first && !position.isRunning && !dragging) pending.snap = true
                         update(next)
                     }
                 }
-                when (shown) {
-                    TuningForm.Panel -> PanelForm(
-                        store = store,
-                        state = state,
-                        // iOS: `min(272, width − 2 × margin)` wide, `min(0.4 × height, 340)` tall in the safe area.
-                        width = minOf(272f, safeArea.width - 2 * TuningPlacementLayout.MARGIN).dp,
-                        maxHeight = minOf(safeArea.height * 0.4f, 340f).dp,
-                        drag = Modifier.throwGesture(4.dp, panelHandler),
-                        modifier = placed.then(measured({ panelSize = it }, panelSize)),
-                    )
-                    TuningForm.Pill -> TuningPill(
-                        state = state,
-                        expand = { store.send(TuningFeature.Action.ExpandTapped) },
-                        modifier = placed.then(measured({ pillSize = it }, pillSize)).throwGesture(0.dp, pillHandler),
-                    )
-                    TuningForm.Tab -> TuningTab(
-                        side = placement.side,
-                        pullOut = untuck,
-                        modifier = placed.throwGesture(0.dp, tabHandlerState),
-                    )
+                // Full-screen bounds: while Crossfade fades a form its layer draws offscreen, clipped to
+                // these bounds, and the form sits away from the origin (`offset`). Wrapping only the form
+                // clipped the panel to a corner fragment as it came out of the tab.
+                Box(Modifier.fillMaxSize()) {
+                    when (shown) {
+                        TuningForm.Panel -> PanelForm(
+                            store = store,
+                            state = state,
+                            // iOS: `min(272, width − 2 × margin)` wide, `min(0.4 × height, 340)` tall in the safe area.
+                            width = minOf(272f, safeArea.width - 2 * TuningPlacementLayout.MARGIN).dp,
+                            maxHeight = minOf(safeArea.height * 0.4f, 340f).dp,
+                            drag = Modifier.throwGesture(4.dp, panelHandler),
+                            modifier = placed.then(measured({ panelSize = it }, panelSize)),
+                        )
+                        TuningForm.Pill -> TuningPill(
+                            state = state,
+                            expand = { store.send(TuningFeature.Action.ExpandTapped) },
+                            modifier = placed.then(measured({ pillSize = it }, pillSize)).throwGesture(0.dp, pillHandler),
+                        )
+                        TuningForm.Tab -> TuningTab(
+                            side = placement.side,
+                            pullOut = untuck,
+                            modifier = placed.throwGesture(0.dp, tabHandlerState),
+                        )
+                    }
                 }
             }
         }
@@ -463,26 +475,36 @@ private fun TuningPill(state: TuningFeature.State, expand: () -> Unit, modifier:
     )
     val changed = tuning.observedOverrides.keys.count { key -> key.substringBefore('.') in groups }
     val title = if (state.showsAll) "All" else tuning.context.displayTitle
-    Surface(
-        modifier = modifier.semantics(mergeDescendants = true) {
-            contentDescription = "Tuning Panel"
-            stateDescription = if (changed > 0) "$changed changed" else ""
-            role = Role.Button
-            onClick(label = "Expand") { expand(); true }
-        },
-        shape = RoundedCornerShape(24.dp),
-        tonalElevation = 6.dp,
-        shadowElevation = 8.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    // iOS: a 34 tall capsule (caption semibold, 12 padding, 6 spacing) inside a 48 dp touch target.
+    Box(
+        modifier
+            .heightIn(min = 48.dp)
+            .semantics(mergeDescendants = true) {
+                contentDescription = "Tuning Panel"
+                stateDescription = if (changed > 0) "$changed changed" else ""
+                role = Role.Button
+                onClick(label = "Expand") { expand(); true }
+            },
+        contentAlignment = Alignment.Center,
     ) {
-        Row(
-            Modifier.openCodeTapTarget(accessibility = false).padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        Surface(
+            shape = CircleShape,
+            tonalElevation = 6.dp,
+            shadowElevation = 8.dp,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         ) {
-            OpenCodeIcon(SFSymbol.SliderHorizontal3, null, size = OpenCodeIconSize.small)
-            Text(title, style = MaterialTheme.typography.labelLarge, maxLines = 1)
-            if (changed > 0) Text("$changed", style = MaterialTheme.typography.labelLarge, color = ChangedColor)
+            Row(
+                Modifier.height(34.dp).padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                val caption = OpenCodeTextStyles.caption1.copy(fontWeight = FontWeight.SemiBold)
+                OpenCodeIcon(SFSymbol.SliderHorizontal3, null, size = OpenCodeIconSize.small)
+                Text(title, style = caption, maxLines = 1)
+                if (changed > 0) {
+                    Text("$changed", style = OpenCodeTextStyles.caption2.copy(fontWeight = FontWeight.SemiBold, fontFeatureSettings = "tnum"), color = ChangedColor)
+                }
+            }
         }
     }
 }
@@ -536,17 +558,35 @@ private fun PanelHeader(
     drag: Modifier,
 ) {
     var menu by remember { mutableStateOf(false) }
-    Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        Row(drag.weight(1f).padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (changed > 0) Text("$changed", style = MaterialTheme.typography.labelMedium, color = ChangedColor)
+    Row(Modifier.fillMaxWidth().padding(end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        // iOS: the handle is the title (slider glyph + footnote semibold); the changed count lives on groups.
+        Row(
+            drag.weight(1f).heightIn(min = 48.dp).padding(start = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            OpenCodeIcon(SFSymbol.SliderHorizontal3, null, size = OpenCodeIconSize.small, tint = OpenCodeTheme.colors.secondaryText)
+            Text(title, style = OpenCodeTextStyles.footnote.copy(fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        FilterChip(
-            selected = state.showsAll,
-            onClick = { store.send(TuningFeature.Action.ShowsAllToggled) },
-            label = { Text("All") },
-            modifier = Modifier.semantics { contentDescription = "Show All Groups" },
-        )
+        // iOS's "All": caption semibold in a 24 tall capsule, filled while on.
+        Box(
+            Modifier
+                .clickable(role = Role.Button) { store.send(TuningFeature.Action.ShowsAllToggled) }
+                .heightIn(min = 48.dp)
+                .semantics { contentDescription = "Show All Groups"; selected = state.showsAll },
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                "All",
+                Modifier
+                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = if (state.showsAll) 0.14f else 0f), CircleShape)
+                    .height(24.dp)
+                    .wrapContentHeight()
+                    .padding(horizontal = 8.dp),
+                style = OpenCodeTextStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
+                color = if (state.showsAll) MaterialTheme.colorScheme.onSurface else OpenCodeTheme.colors.secondaryText,
+            )
+        }
         Box {
             IconButton(onClick = { menu = true }) { OpenCodeIcon(SFSymbol.Ellipsis, "More") }
             DropdownMenu(menu, onDismissRequest = { menu = false }) {

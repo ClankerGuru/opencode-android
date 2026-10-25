@@ -58,6 +58,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import java.util.Locale
@@ -389,8 +390,15 @@ private fun SummaryCard(events: List<DiagnosticsEvent>, motionJumps: Int? = null
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         for ((label, value) in summary) {
             Row(Modifier.fillMaxWidth().semantics(mergeDescendants = true) {}) {
+                // Two columns that each wrap (iOS LabeledContent): a long value never squeezes its label.
                 Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                Text(value, style = MaterialTheme.typography.bodyMedium, color = OpenCodeTheme.colors.secondaryText)
+                Text(
+                    value,
+                    Modifier.weight(1f).padding(start = 12.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = OpenCodeTheme.colors.secondaryText,
+                    textAlign = TextAlign.End,
+                )
             }
         }
     }
