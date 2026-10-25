@@ -324,7 +324,9 @@ private fun HeaderTitle(
         }
         Surface(
             shape = OpenCodeShape.capsule,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            // The same tonal glass as the header's circles (`OpenCodeIconButton`): over the
+            // scroll-edge scrim (`surfaceContainer`) a `surfaceContainerHigh` capsule vanished.
+            color = MaterialTheme.colorScheme.surfaceContainerHighest,
             tonalElevation = 0.dp,
             modifier = Modifier
                 .clip(OpenCodeShape.capsule)
