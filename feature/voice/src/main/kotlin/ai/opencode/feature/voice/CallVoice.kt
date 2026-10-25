@@ -471,3 +471,5 @@ private object VoicePreviewAudioPlayer {
         return wav.toByteArray()
     }
 }
+/** iOS CallVoice.swift's DEBUG-only VoiceLabDemo extension. Only read in lab mode. */
+val VoiceLabDemo.previewDemoKey: String get() = "lab-voice-preview-key"

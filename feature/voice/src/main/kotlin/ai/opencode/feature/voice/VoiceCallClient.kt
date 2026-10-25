@@ -1,6 +1,8 @@
 package ai.opencode.feature.voice
 
 import ai.opencode.core.dependencies.DependencyKey
+import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.dependencies.withDependenciesSuspending
 import ai.opencode.core.log.AppLog
 import ai.opencode.server.OpenCodeClientError
 import kotlinx.coroutines.flow.Flow
@@ -75,10 +77,32 @@ class VoiceCallClient(
         get() = VoiceDelegatorRounds(next = delegatorRound, submit = submitDelegatorInput)
 
     companion object Key : DependencyKey<VoiceCallClient> {
-        // TODO(voice wave 3): VoiceCallHost. iOS builds the live client on `VoiceCallHost`
-        // (Realtime, GPT-Live, Gemini Live and the audio client), with `VoiceLabDemo.call`
-        // in DEBUG lab runs. Until the host exists the live value is the inert test value.
-        override val liveValue: VoiceCallClient by lazy { inert() }
+        override val liveValue: VoiceCallClient by lazy {
+            if (VoiceLabDemo.isEnabled) VoiceLabDemo.call else {
+                val host = VoiceCallHost()
+                VoiceCallClient(
+                    start = { apiKey, config ->
+                        withDependenciesSuspending({ this[VoiceAudioLabHooks] = VoiceLabDemo.audioHooks }) {
+                            host.start(apiKey, config, dependency(RealtimeClient), dependency(LiveClient), dependency(GeminiLiveClient), dependency(VoiceAudioClient))
+                        }
+                    },
+                    completeFunction = host::completeFunction,
+                    noteProgress = host::noteProgress,
+                    announce = { host.announce(it) },
+                    announceSession = { sessionID, promptIDs, text -> host.announce(text, sessionID, promptIDs) },
+                    cancelPendingAnnouncements = host::cancelPendingAnnouncements,
+                    abandonDelegation = host::abandonDelegation,
+                    retarget = host::retarget,
+                    setMuted = host::setMuted,
+                    setAtEar = host::setAtEar,
+                    updateInstructions = host::updateInstructions,
+                    end = host::end,
+                    delegatorRound = host::delegatorRound,
+                    submitDelegatorInput = host::submitDelegatorInput,
+                    updateDelegatorInstructions = host::updateDelegatorInstructions,
+                )
+            }
+        }
 
         override val testValue: VoiceCallClient get() = inert()
 

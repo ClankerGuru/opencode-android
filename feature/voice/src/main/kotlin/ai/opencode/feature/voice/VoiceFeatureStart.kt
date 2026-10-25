@@ -251,33 +251,6 @@ internal fun VoiceFeature.startCall(state: VoiceFeature.State): Reduced<VoiceFea
 }
 
 /**
- * The lab hooks the call reducer reads (a subset of iOS `VoiceLabDemo`, DEBUG only): the same
- * `OPENCODE_LAB_*` names through [VoiceLabEnvironment], which answers only in debuggable
- * builds. TODO(voice lab): fold into `VoiceLabDemo.kt` once that file is ported.
+ * Existing reducer/route callers share the full debug-only lab policy.
  */
-internal object VoiceLabFlags {
-    /** `OPENCODE_LAB_VOICE_DEMO`: the scripted call. */
-    val isEnabled: Boolean get() = VoiceLabEnvironment.string("OPENCODE_LAB_VOICE_DEMO") != null
-
-    private val realtimeURL: String? get() = VoiceLabEnvironment.string("OPENCODE_LAB_REALTIME_URL")?.takeIf { it.isNotEmpty() }
-    private val liveURL: String? get() = VoiceLabEnvironment.string("OPENCODE_LAB_LIVE_URL")?.takeIf { it.isNotEmpty() }
-
-    /** The lab's stand-in Realtime or GPT-Live server. */
-    val hasStandInServer: Boolean get() = realtimeURL != null || liveURL != null
-
-    /** `OPENCODE_LAB_OPENAI_KEY`: real calls without a stored key. */
-    val labAPIKey: String? get() = VoiceLabEnvironment.string("OPENCODE_LAB_OPENAI_KEY")?.takeIf { it.isNotEmpty() }
-
-    /** `OPENCODE_LAB_VOICE_ENGINE=gpt-live|realtime`, or inferred when only one engine's stand-in URL is set. */
-    val overrideEngine: VoiceEngine?
-        get() {
-            val raw = VoiceLabEnvironment.string("OPENCODE_LAB_VOICE_ENGINE")
-            VoiceEngine.entries.firstOrNull { it.rawValue == raw }?.let { return it }
-            if (liveURL != null && realtimeURL == null) return VoiceEngine.gptLive
-            if (realtimeURL != null && liveURL == null) return VoiceEngine.realtime
-            return null
-        }
-
-    /** iOS `VoiceLabDemo.preflight`: the lab needs no key check. */
-    val preflight = RealtimePreflightClient(verify = { _, _ -> })
-}
+internal typealias VoiceLabFlags = VoiceLabDemo
