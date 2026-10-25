@@ -28,6 +28,8 @@ import androidx.core.util.Consumer
 import androidx.lifecycle.Lifecycle
 import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.common.util.Util
 import kotlin.math.roundToInt
 
 /**
@@ -42,6 +44,7 @@ import kotlin.math.roundToInt
  * (aspect ratio, source rect, auto-enter, the play/pause action) in step with the player.
  */
 @Stable
+@androidx.annotation.OptIn(UnstableApi::class)
 internal class AgentFilePictureInPicture(private val activity: ComponentActivity, private val player: Player) {
     /** The activity is in Picture in Picture: the page shows only the video. */
     var isActive by mutableStateOf(activity.isInPictureInPictureMode)
@@ -63,12 +66,14 @@ internal class AgentFilePictureInPicture(private val activity: ComponentActivity
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (intent.action != action) return
-            if (player.isPlaying) player.pause() else player.play()
+            // As the viewer's own button: an ended video starts over (AVKit's play after the end).
+            Util.handlePlayPauseButtonAction(player)
         }
     }
 
     private val listener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) = update()
+        override fun onPlaybackStateChanged(playbackState: Int) = update()
         override fun onVideoSizeChanged(videoSize: VideoSize) = update()
     }
 
@@ -142,7 +147,7 @@ internal class AgentFilePictureInPicture(private val activity: ComponentActivity
     }
 
     private fun playPauseAction(): RemoteAction {
-        val playing = player.isPlaying
+        val playing = !Util.shouldShowPlayButton(player)
         val title = if (playing) "Pause" else "Play"
         val icon = Icon.createWithResource(activity, if (playing) ai.opencode.core.R.drawable.ms_pause_fill else ai.opencode.core.R.drawable.ms_play_arrow_fill)
         val intent = PendingIntent.getBroadcast(
