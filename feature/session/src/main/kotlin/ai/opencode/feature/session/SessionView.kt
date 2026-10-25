@@ -184,6 +184,7 @@ fun SessionView(
     val resolvedHeader = remember(headerEnvironment) { HeaderBlurTunables.resolved(headerEnvironment) }
 
     SessionLifecycle(store)
+    SessionVoiceLabTriggers(store, isEnabled = onCatchUpOpen == null)
     val callStore = store.rememberCallStore(hostedCall)
     val ownsCall by store.observe { it.voice != null }
     SessionCallTasks(store, callStore, hasCall = ownsCall || hostedCall != null)

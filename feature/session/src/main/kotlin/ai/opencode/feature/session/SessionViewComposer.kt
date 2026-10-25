@@ -990,17 +990,29 @@ private fun SessionComposerEnv.ComposerCapsule() {
                 .padding(top = room.dp)
                 .onSizeChanged { view.capsuleHeight = with(density) { it.height.toDp().value } },
         ) {
+            // iOS `composerSurfacePanel`: the request's panel, else the suggestions, on the surface.
+            val autocompleteExtent = if (showsAutocomplete) view.autocompleteController.glassExtent.toFloat() else 0f
+            val controller = view.autocompleteController
             ComposerSurface(
-                showsAutocomplete = showsAutocomplete,
-                panel = if (showsRequestPanel || docksRequest) {
-                    { RequestPanelContent(isShown = docksRequest, cap = cap) }
-                } else {
-                    null
+                panel = when {
+                    showsRequestPanel || docksRequest -> {
+                        { RequestPanelContent(isShown = docksRequest, cap = cap) }
+                    }
+                    showsAutocomplete -> {
+                        {
+                            ComposerAutocompletePanel(
+                                controller = controller,
+                                onSelectRow = { store.send(Action.Autocomplete(ComposerAutocompleteAction.RowChosen(it))) },
+                            )
+                        }
+                    }
+                    else -> null
                 },
                 // Laid out from its arrival until its surface has folded.
-                panelExtent = if (showsRequestPanel) activeHeight else 0f,
+                panelExtent = if (showsRequestPanel) activeHeight else autocompleteExtent,
                 // Under Reduce Motion the surface keeps its reach while the panel fades.
-                panelReveal = if (showsRequestPanel) activeHeight * view.requestPanelReveal.value else 0f,
+                panelReveal = if (showsRequestPanel) activeHeight * view.requestPanelReveal.value else autocompleteExtent,
+                panelShown = docksRequest || (showsAutocomplete && (if (reducedMotion) controller.isOpen else controller.isShown)),
             )
         }
     }
@@ -1136,10 +1148,10 @@ private fun SessionComposerEnv.resetRequestPanel() {
  */
 @Composable
 private fun SessionComposerEnv.ComposerSurface(
-    showsAutocomplete: Boolean,
     panel: (@Composable () -> Unit)?,
     panelExtent: Float,
     panelReveal: Float,
+    panelShown: Boolean,
 ) {
     val density = LocalDensity.current
     val current by rememberUpdatedState(this)
@@ -1162,7 +1174,7 @@ private fun SessionComposerEnv.ComposerSurface(
             panel = panel,
             panelExtent = panelExtent,
             panelReveal = panelReveal,
-            panelShown = docksRequest,
+            panelShown = panelShown,
             controlsTakeTouches = composerPresentation.expanded,
         ) {
             // The composer and the call trade places inside the one surface.
@@ -1178,22 +1190,14 @@ private fun SessionComposerEnv.ComposerSurface(
                 if (shown != null) {
                     VoiceCallComposer(shown)
                 } else {
-                    Column(Modifier.fillMaxWidth()) {
-                        if (showsAutocomplete) {
-                            ComposerAutocompletePanel(
-                                controller = view.autocompleteController,
-                                onSelectRow = { store.send(Action.Autocomplete(ComposerAutocompleteAction.RowChosen(it))) },
-                            )
-                        }
-                        Box(
-                            Modifier
-                                .fillMaxWidth()
-                                .autocompleteComposerAnchor(view.autocompleteBridge)
-                                .onSizeChanged { size ->
-                                    view.surfaceSize = with(density) { androidx.compose.ui.geometry.Size(size.width.toDp().value, size.height.toDp().value) }
-                                },
-                        ) { Composer() }
-                    }
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .autocompleteComposerAnchor(view.autocompleteBridge)
+                            .onSizeChanged { size ->
+                                view.surfaceSize = with(density) { androidx.compose.ui.geometry.Size(size.width.toDp().value, size.height.toDp().value) }
+                            },
+                    ) { Composer() }
                 }
             }
         }
