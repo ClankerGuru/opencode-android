@@ -10,4 +10,5 @@ android {
 // media, voice, system < transcript, composer, settings < session < drawer < app.
 dependencies {
     implementation(libs.webrtc)
+    implementation(libs.androidx.lifecycle.process)
 }
