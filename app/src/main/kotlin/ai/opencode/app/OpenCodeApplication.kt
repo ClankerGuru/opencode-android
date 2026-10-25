@@ -9,6 +9,15 @@ import ai.opencode.feature.transcript.markdown.withMarkdownStream
 import ai.opencode.server.EventBatcherHooks
 import ai.opencode.server.retry.AppPhases
 import android.app.Application
+import ai.opencode.core.dependencies.dependency
+import ai.opencode.devtools.DevToolsClient
+import ai.opencode.feature.settings.AppVersion
+import ai.opencode.feature.system.liveactivity.DictationLiveActivityClient
+import ai.opencode.feature.system.liveactivity.VoiceLiveActivityClient
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import android.util.Log
 
 /**
@@ -18,6 +27,8 @@ import android.util.Log
  * what the first frame needs (iOS cold-start rule).
  */
 class OpenCodeApplication : Application() {
+    private val launchScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
     override fun onCreate() {
         super.onCreate()
         DependencyValues.installRoot { this[AppContext] = applicationContext }
@@ -42,6 +53,14 @@ class OpenCodeApplication : Application() {
         // Voice's admitted sends, log uploads, diagnostics sinks and screen hold (installed
         // before anything resolves their keys).
         AppDependencies.install(this)
-        AppLog.app.info { "app_launch version=${BuildConfig.VERSION_NAME} build=${BuildConfig.VERSION_CODE}" }
+        // iOS `OpenCodeApp.init`'s launch line: version, distribution, model, system.
+        val device = dependency(DevToolsClient).device()
+        AppLog.app.notice { "Launch: ${AppVersion.current.label}, ${device.distribution}, ${device.model}, ${device.system}" }
+        // A call or a recording never outlives its process: end any ongoing notification a
+        // killed process left behind (iOS ends stale Live Activities at launch).
+        val voiceActivity = dependency(VoiceLiveActivityClient)
+        val dictationActivity = dependency(DictationLiveActivityClient)
+        launchScope.launch { voiceActivity.endAll() }
+        launchScope.launch { dictationActivity.endAll() }
     }
 }

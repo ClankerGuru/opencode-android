@@ -48,6 +48,8 @@ class MainActivity : ComponentActivity() {
     private var removeRequesters: List<() -> Unit> = emptyList()
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Debug lab hooks run before anything reads the store (iOS runs them before `OpenCodeApp.store`).
+        if (savedInstanceState == null) LabLaunch.apply(intent)
         val splash = installSplashScreen()
         LaunchBloomController.start()
         splash.setKeepOnScreenCondition { LaunchBloomController.keepsCover(store.state.isColdLaunchContentReady) }
