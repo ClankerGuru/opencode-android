@@ -565,25 +565,76 @@ private fun AutocompleteRowContent(item: AutocompleteItem, params: AutocompleteP
     ) {
         AutocompleteKindIcon(item.kind, params.iconSize, iconColor)
         Spacer(Modifier.width(10.dp))
-        Text(
-            item.title,
+        // iOS `HStack { title; Spacer(minLength: 8); label }`: SwiftUI offers the room to the
+        // least flexible text first, an equal share each, so a short command name stays whole
+        // and a long description truncates (a weighted title let the label take it all).
+        TitleAndLabel(
+            title = {
+                Text(
+                    item.title,
+                    style = OpenCodeTextStyles.body,
+                    color = titleColor,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            },
+            label = if (item.label.isEmpty()) null else ({
+                Text(
+                    item.label,
+                    style = OpenCodeTextStyles.subheadline.copy(fontFeatureSettings = "tnum"),
+                    color = kindColor,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }),
+            // HStack(spacing: 10) around Spacer(minLength: 8): at least 10 + 8 + 10.
+            gap = 28.dp,
             modifier = Modifier.weight(1f),
-            style = OpenCodeTextStyles.body,
-            color = titleColor,
-            maxLines = 1,
-            softWrap = false,
-            overflow = TextOverflow.Ellipsis,
         )
-        if (item.label.isNotEmpty()) {
-            // iOS `HStack(spacing: 10)` around a `Spacer(minLength: 8)`: at least 10 + 8 + 10.
-            Spacer(Modifier.width(28.dp))
-            Text(
-                item.label,
-                style = OpenCodeTextStyles.subheadline.copy(fontFeatureSettings = "tnum"),
-                color = kindColor,
-                maxLines = 1,
-                softWrap = false,
-            )
+    }
+}
+
+/**
+ * Lays out [title] leading and [label] trailing on one line, as SwiftUI's HStack sizes two
+ * one-line texts: the one with the narrower ideal width is offered half the room first and
+ * takes what it needs; the other gets the rest. Either truncates only past that.
+ */
+@Composable
+private fun TitleAndLabel(
+    title: @Composable () -> Unit,
+    label: (@Composable () -> Unit)?,
+    gap: androidx.compose.ui.unit.Dp,
+    modifier: Modifier = Modifier,
+) {
+    androidx.compose.ui.layout.Layout(
+        contents = listOf(title, label ?: {}),
+        modifier = modifier,
+    ) { (titles, labels), constraints ->
+        val width = constraints.maxWidth
+        val t = titles.first()
+        val l = labels.firstOrNull()
+        if (l == null) {
+            val placeable = t.measure(constraints.copy(minWidth = 0))
+            return@Layout layout(width, placeable.height) { placeable.place(0, 0) }
+        }
+        val room = (width - gap.roundToPx()).coerceAtLeast(0)
+        val titleIdeal = t.maxIntrinsicWidth(Int.MAX_VALUE)
+        val labelIdeal = l.maxIntrinsicWidth(Int.MAX_VALUE)
+        val (titleWidth, labelWidth) = if (titleIdeal <= labelIdeal) {
+            val first = minOf(titleIdeal, room / 2)
+            first to minOf(labelIdeal, room - first)
+        } else {
+            val first = minOf(labelIdeal, room / 2)
+            minOf(titleIdeal, room - first) to first
+        }
+        val tp = t.measure(androidx.compose.ui.unit.Constraints(maxWidth = titleWidth.coerceAtLeast(0)))
+        val lp = l.measure(androidx.compose.ui.unit.Constraints(maxWidth = labelWidth.coerceAtLeast(0)))
+        val height = maxOf(tp.height, lp.height)
+        layout(width, height) {
+            tp.place(0, (height - tp.height) / 2)
+            lp.place(width - lp.width, (height - lp.height) / 2)
         }
     }
 }
