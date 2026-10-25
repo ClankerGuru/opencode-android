@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings
 
+import ai.opencode.feature.system.notifications.NotificationPermission
 import ai.opencode.core.experiments.key
 import ai.opencode.core.experiments.ExperimentalFeature
 import ai.opencode.core.sharing.SharedKeys
@@ -220,7 +221,7 @@ private fun SettingsRootPage(store: SettingsStore) {
                     "Notifications",
                     "bell.badge.fill",
                     SettingsTint.Red,
-                    value = if (permission == NotificationPermissionStatus.enabled) "On" else "Off",
+                    value = if (permission == NotificationPermission.Enabled) "On" else "Off",
                 ) { push(SettingsPage.Notifications) }
             }
             SettingsDivider(inset = true)

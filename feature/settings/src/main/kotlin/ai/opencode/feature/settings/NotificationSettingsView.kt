@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings
 
+import ai.opencode.feature.system.notifications.NotificationPermission
 import ai.opencode.core.experiments.InAppNoticeMode
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.observe
@@ -28,14 +29,14 @@ fun NotificationSettingsView(store: SettingsStore) {
     LaunchedEffect(store) {
         store.send(SettingsFeature.Action.Delegate(SettingsFeature.SettingsDelegate.NotificationSettingsRequested))
     }
-    val enabled = permission == NotificationPermissionStatus.enabled
+    val enabled = permission == NotificationPermission.Enabled
 
     SettingsPageScaffold(title = "Notifications", store = store) {
         settingsSection(
             key = "permission",
             header = "This $ThisDeviceName",
             footer = footerText(
-                if (permission == NotificationPermissionStatus.disabled) {
+                if (permission == NotificationPermission.Disabled) {
                     "Notifications are off. Turn on Allow Notifications in Android Settings."
                 } else {
                     "Notifications pass through a relay that keeps nothing: no account, no history, no logs. Only sessions started on this $ThisDeviceName notify it."
@@ -49,7 +50,7 @@ fun NotificationSettingsView(store: SettingsStore) {
             if (!enabled) {
                 SettingsDivider()
                 SettingsButtonRow(
-                    if (permission == NotificationPermissionStatus.disabled) "Open Android Settings" else "Turn On Notifications",
+                    if (permission == NotificationPermission.Disabled) "Open Android Settings" else "Turn On Notifications",
                     onClick = {
                         store.send(SettingsFeature.Action.Delegate(SettingsFeature.SettingsDelegate.EnableNotificationsTapped))
                     },

@@ -15,6 +15,7 @@ import ai.opencode.feature.settings.whatsnew.WhatsNewFeature
 import ai.opencode.feature.settings.whatsnew.canTryWhatsNew
 import ai.opencode.feature.settings.whatsnew.whatsNewVoiceAvailable
 import ai.opencode.core.sharing.shared
+import ai.opencode.feature.system.notifications.NotificationPermission
 import ai.opencode.feature.voice.VoiceCallLog
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.ServerSharedKeys
@@ -25,12 +26,6 @@ import ai.opencode.server.friendlyName
  * Home owns the stream and passes the status in ([SettingsFeature.Action.HomeChanged]).
  */
 enum class ConnectionStatus { reconnecting, connected, disconnected }
-
-/**
- * This phone's notification permission (iOS `NotificationPermission`, `System/Notifications`).
- * Declared here until `:feature:system` ports `SessionNotifications`; Home loads it and passes it in.
- */
-enum class NotificationPermissionStatus { notDetermined, disabled, enabled }
 
 /**
  * One page on Settings' own stack (iOS `NavigationLink` destinations in `SettingsView` and the
@@ -87,8 +82,8 @@ class SettingsFeature : Reducer<SettingsFeature.State, SettingsFeature.Action> {
         val switchingTo: OpenCodeServer? = null,
         val connectionErrorMessage: String? = null,
         val credentialsRejected: Boolean = false,
-        /** Null when this build offers no notifications (the row is hidden). */
-        val notificationPermission: NotificationPermissionStatus? = null,
+        /** This phone's notification permission (`:feature:system`); null when this build offers no notifications (the row is hidden). */
+        val notificationPermission: NotificationPermission? = null,
         val isRequestingNotifications: Boolean = false,
         val notificationSetupError: String? = null,
         /** What the push shows, fixed as it opens: Settings, or What's New from the drawer's row. */
@@ -133,7 +128,7 @@ class SettingsFeature : Reducer<SettingsFeature.State, SettingsFeature.Action> {
 
         /** Home's notification state changed. */
         data class NotificationsChanged(
-            val permission: NotificationPermissionStatus?,
+            val permission: NotificationPermission?,
             val isRequesting: Boolean,
             val setupError: String?,
         ) : Action
