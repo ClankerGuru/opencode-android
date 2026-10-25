@@ -312,7 +312,13 @@ private fun SearchCapsule(
                     tint = if (isSearching) OpenCodeTheme.colors.secondaryText else OpenCodeTheme.colors.text,
                 )
             }
-            AnimatedVisibility(isSearching, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.weight(1f)) {
+            // iOS `.transition(.opacity)` inside the morph's `withAnimation`: the field fades on the morph spring.
+            AnimatedVisibility(
+                isSearching,
+                enter = fadeIn(DrawerSearchPillDefaults.morph.spec()),
+                exit = fadeOut(DrawerSearchPillDefaults.morph.spec()),
+                modifier = Modifier.weight(1f),
+            ) {
                 field(Modifier.fillMaxWidth())
             }
         }
