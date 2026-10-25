@@ -20,26 +20,31 @@
                 android:resource="@xml/shortcuts" />
         </activity>
 
-        <!-- Every system entry point: quick actions, shortcuts, tiles, widgets, links, notifications. -->
+        <!-- Every system entry point: quick actions, shortcuts, tiles, widgets, notifications.
+             Private: launchers, System UI and notifications start it as this app. -->
         <activity
             android:name=".intents.SystemActionActivity"
             android:excludeFromRecents="true"
-            android:exported="true"
+            android:exported="false"
             android:launchMode="singleInstance"
             android:noHistory="true"
             android:taskAffinity=""
-            android:theme="@android:style/Theme.Translucent.NoTitleBar">
-            <intent-filter>
-                <action android:name="ai.opencode.mobilecode.SYSTEM_ACTION" />
-                <category android:name="android.intent.category.DEFAULT" />
-            </intent-filter>
-        </activity>
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <!-- App Actions (OPEN_APP_FEATURE): Assistant starts it as itself; forwards the feature only. -->
+        <activity
+            android:name=".intents.AppActionActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
         <!-- Start Voice Call in Background (experimental): the call's Live Update first, no app UI. -->
         <activity
             android:name=".intents.BackgroundCallActivity"
             android:excludeFromRecents="true"
-            android:exported="true"
+            android:exported="false"
             android:noHistory="true"
             android:taskAffinity=""
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />

@@ -42,6 +42,12 @@ sealed interface Effect<out A> {
 
     data class Cancel(val ids: List<Any>) : Effect<Nothing>
 
+    /** A navigation boundary: all nested cancellation IDs belong to this child path. */
+    class NavigationScoped<A> internal constructor(
+        internal val id: Any,
+        internal val effect: Effect<A>,
+    ) : Effect<A>
+
     /** Transforms an effect's actions (`Scope` uses it to embed child actions). */
     class Mapped<A, B> internal constructor(
         internal val effect: Effect<A>,
@@ -107,6 +113,9 @@ sealed interface Effect<out A> {
 /** Tags this effect with [id] (TCA's `.cancellable(id:cancelInFlight:)`). */
 fun <A> Effect<A>.cancellable(id: Any, cancelInFlight: Boolean = false): Effect<A> =
     if (this is Effect.None) this else Effect.Cancellable(id, cancelInFlight, this)
+
+internal fun <A> Effect<A>.navigationScoped(id: Any): Effect<A> =
+    if (this is Effect.None) this else Effect.NavigationScoped(id, this)
 
 /** Transforms this effect's actions. */
 fun <A, B> Effect<A>.map(transform: (A) -> B): Effect<B> = when (this) {

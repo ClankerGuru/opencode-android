@@ -4,6 +4,8 @@ plugins {
 
 android {
     namespace = "ai.opencode.core"
+    // Shared test support (TestIsolationGuard, eventually) for every module's unit tests.
+    testFixtures { enable = true }
 }
 
 dependencies {
@@ -20,4 +22,6 @@ dependencies {
     api(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.process)
     implementation(libs.androidx.datastore.preferences)
+    testFixturesApi(libs.junit)
+    testFixturesApi(libs.kotlinx.coroutines.test)
 }

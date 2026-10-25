@@ -28,7 +28,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -109,6 +110,9 @@ private fun ChooseSessionView(directory: SessionDirectory, onChoose: (SessionEnt
             modifier = Modifier.padding(16.dp).widthIn(max = 560.dp).fillMaxWidth().heightIn(max = 640.dp),
             shape = MaterialTheme.shapes.extraLarge,
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            // Explicit: `contentColorFor` matches roles by value, and the container shares its
+            // colour with a role whose content colour is dim (as Ask OpenCode's dialog).
+            contentColor = MaterialTheme.colorScheme.onSurface,
             tonalElevation = 6.dp,
         ) {
             Column {
@@ -128,8 +132,8 @@ private fun ChooseSessionView(directory: SessionDirectory, onChoose: (SessionEnt
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                 )
-                LazyColumn(Modifier.fillMaxWidth()) {
-                    items(entities, key = { it.id }) { entity ->
+                LazyColumn(Modifier.fillMaxWidth(), contentPadding = PaddingValues(bottom = 8.dp)) {
+                    itemsIndexed(entities, key = { _, entity -> entity.id }) { index, entity ->
                         Row(
                             Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable { onChoose(entity) }
                                 .padding(horizontal = 24.dp, vertical = 10.dp),
@@ -144,7 +148,8 @@ private fun ChooseSessionView(directory: SessionDirectory, onChoose: (SessionEnt
                                 }
                             }
                         }
-                        HorizontalDivider(Modifier.padding(start = 64.dp))
+                        // Separators between rows only, none under the last.
+                        if (index < entities.lastIndex) HorizontalDivider(Modifier.padding(start = 64.dp))
                     }
                 }
             }

@@ -233,6 +233,14 @@ data class OpenCodeClient(
         fun markdownImageKey(server: OpenCodeServer, directory: String?, source: String): String =
             markdownImageCacheKey(server, directory, source).removePrefix("markdown:")
 
+        /** iOS `OpenCodeClient.assistantReply(messagesJSON:afterMessageID:acrossSteers:)`: a prompt's reply in a `/message` page. */
+        fun assistantReply(messagesJSON: ByteArray, afterMessageID: String, acrossSteers: Boolean = false): String? =
+            ai.opencode.server.live.assistantReply(messagesJSON, afterMessageID, acrossSteers)
+
+        /** iOS `OpenCodeClient.decodeTranscript(_:)`: a `/message` page's transcript items. */
+        fun decodeTranscript(data: ByteArray): List<ai.opencode.server.model.OpenCodeTranscriptItem> =
+            ai.opencode.server.live.decodeTranscript(data)
+
         override val liveValue: OpenCodeClient = OpenCodeClient(
             health = ::requestHealth,
             redeemPairing = ::requestRedeemPairing,
