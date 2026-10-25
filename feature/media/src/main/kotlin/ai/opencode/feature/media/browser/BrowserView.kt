@@ -309,8 +309,8 @@ private fun Bar(browser: BrowserFeature.State, onAction: (BrowserFeature.Action)
                 .testTag("browser-ask"),
         ) {
             // iOS `.contentTransition(.symbolEffect(.replace))`.
-            Crossfade(browser.isAsking, animationSpec = tween((Motion.fadeStandard * 1000).toInt()), label = "browser-ask") { asking ->
-                Box(contentAlignment = Alignment.Center) {
+            Crossfade(browser.isAsking, Modifier.fillMaxSize(), animationSpec = tween((Motion.fadeStandard * 1000).toInt()), label = "browser-ask") { asking ->
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     OpenCodeIcon(if (asking) "xmark" else "text.bubble", contentDescription = null, tint = OpenCodeTheme.colors.text)
                 }
             }
