@@ -15,6 +15,7 @@ import ai.opencode.feature.settings.whatsnew.WhatsNewFeature
 import ai.opencode.feature.settings.whatsnew.canTryWhatsNew
 import ai.opencode.feature.settings.whatsnew.whatsNewVoiceAvailable
 import ai.opencode.core.sharing.shared
+import ai.opencode.feature.voice.VoiceCallLog
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.ServerSharedKeys
 import ai.opencode.server.friendlyName
@@ -50,6 +51,8 @@ sealed interface SettingsPage {
     data object CallVoicePicker : SettingsPage
     /** Settings › Voice › Call History (`VoiceCallLogList`, `:feature:voice`). */
     data object CallHistory : SettingsPage
+    /** Settings › Voice › Call History › one call (`VoiceCallReplayView`, `:feature:voice`). */
+    data class CallReplay(val log: VoiceCallLog) : SettingsPage
     data object Notifications : SettingsPage
     data object WhatsNew : SettingsPage
     /** One entry's page in What's New. */
@@ -178,14 +181,11 @@ class SettingsFeature : Reducer<SettingsFeature.State, SettingsFeature.Action> {
 
     private val body: Reducer<State, Action> = combine(
         scope(
-            state = { Unit },
+            state = { HomeSettingsFeature.State(server = it.server) },
             setState = { s, _ -> s },
             action = { (it as? Action.Settings)?.action },
             embed = { Action.Settings(it) },
-            child = Reducer<Unit, HomeSettingsFeature.Action> { _, a ->
-                val reduced = HomeSettingsFeature().reduce(HomeSettingsFeature.State(), a)
-                Reduced(Unit, reduced.effect)
-            },
+            child = HomeSettingsFeature(),
         ),
         scope(
             state = { it.whatsNew },

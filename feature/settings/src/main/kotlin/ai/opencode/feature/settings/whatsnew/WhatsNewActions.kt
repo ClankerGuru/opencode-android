@@ -1,15 +1,9 @@
 package ai.opencode.feature.settings.whatsnew
 
 import ai.opencode.core.experiments.ExperimentalFeature
-import ai.opencode.core.experiments.key
-import ai.opencode.core.sharing.SharedKeys
-import ai.opencode.core.sharing.shared
 import ai.opencode.feature.settings.ConnectionStatus
 import ai.opencode.feature.settings.SettingsFeature
-import ai.opencode.feature.voice.ServerVoiceProvider
-import ai.opencode.feature.voice.ServerVoiceSupport
-import ai.opencode.feature.voice.VoiceEngine
-import ai.opencode.feature.voice.VoiceSharedKeys
+import ai.opencode.feature.voice.VoiceRoutePreferences
 import ai.opencode.server.OpenCodeServer
 
 /**
@@ -62,28 +56,8 @@ fun SettingsFeature.State.offersWhatsNew(destination: WhatsNewEntry.Destination)
 
 /**
  * Whether a call can start now (iOS `VoiceRoutePreferences.isAvailable(server:)`: Voice Mode on
- * and `VoiceRoute.resolve` not unavailable). Reads the same shared keys.
- *
- * Approximation until `:feature:voice` ports `VoiceRoutePreferences`/`VoiceRoute`/`VoiceBroker`:
- * Android has no Voice Server choice (`voiceServerChoice`) yet, so the broker is the connected
- * server whenever Server Voice is on (iOS's default choice), and iOS's DEBUG lab-demo override is
- * left out.
+ * and `VoiceRoute.resolve` not unavailable, the broker resolved from the Voice Server choice).
+ * False until Home hands Settings its server.
  */
-fun whatsNewVoiceAvailable(server: OpenCodeServer?): Boolean {
-    if (!shared(SharedKeys.voiceModeEnabled).value) return false
-    val engine = shared(VoiceSharedKeys.voiceEngine).value
-    val hasOpenAIKey = !shared(SharedKeys.openAIAPIKey).value.isNullOrBlank()
-    val hasXAIKey = !shared(SharedKeys.xaiAPIKey).value.isNullOrBlank()
-    // Server Voice never owns Grok, including when Gemini is selected on the server.
-    if (engine == VoiceEngine.grok) return hasXAIKey
-    val serverVoice = ExperimentalFeature.serverVoice.isActive(shared(ExperimentalFeature.serverVoice.key).value)
-    val broker = if (serverVoice) server else null
-    val support = broker?.let { shared(VoiceSharedKeys.serverVoiceSupportByServer).value[it.persistenceID] }
-        ?: ServerVoiceSupport.unknown
-    if (serverVoice && shared(VoiceSharedKeys.serverVoiceProvider).value == ServerVoiceProvider.geminiLive) {
-        return support != ServerVoiceSupport.unsupported
-    }
-    if (serverVoice && support != ServerVoiceSupport.unsupported) return true
-    // Preserve the documented fallback only after a confirmed unsupported route.
-    return hasOpenAIKey
-}
+fun whatsNewVoiceAvailable(server: OpenCodeServer?): Boolean =
+    server != null && VoiceRoutePreferences().isAvailable(server)

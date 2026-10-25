@@ -106,6 +106,7 @@ private fun SettingsPageContent(store: SettingsStore, page: SettingsPage) {
         SettingsPage.Voice -> VoiceSettingsView(store)
         SettingsPage.CallVoicePicker -> CallVoicePickerView(store)
         SettingsPage.CallHistory -> CallHistoryView(store)
+        is SettingsPage.CallReplay -> CallReplayView(store, page.log)
         SettingsPage.Notifications -> NotificationSettingsView(store)
         SettingsPage.WhatsNew -> WhatsNewListPage(store)
         is SettingsPage.WhatsNewDetail -> WhatsNewDetailPage(store, page.entryID)
