@@ -28,7 +28,35 @@ import ai.opencode.core.experiments.InAppNoticeMode
 import ai.opencode.feature.drawer.notices.InAppNotice
 import ai.opencode.feature.drawer.notices.InAppNoticeSettings
 import ai.opencode.feature.system.notifications.SessionNotificationsClient
+import ai.opencode.core.experiments.ExperimentalCallStyle
+import ai.opencode.core.experiments.ExperimentalFeature
+import ai.opencode.core.experiments.key
+import ai.opencode.core.motion.Motion
+import ai.opencode.core.sharing.shared
+import ai.opencode.feature.drawer.style.DrawerMetrics
+import ai.opencode.feature.voice.CallTrayController
+import ai.opencode.feature.voice.CallTrayDock
+import ai.opencode.feature.voice.CallTrayDockGeometry
+import ai.opencode.feature.voice.CallTrayDockOverlay
+import ai.opencode.feature.voice.CallTrayTunables
+import ai.opencode.feature.voice.FloatingCallCenter
+import ai.opencode.feature.voice.FloatingCallOverlay
 import ai.opencode.feature.voice.VoiceRoutePreferences
+import ai.opencode.feature.voice.VoiceStoreOf
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import kotlin.math.max
 import ai.opencode.server.OpenCodeServer
 import androidx.compose.runtime.collectAsState
 import ai.opencode.feature.drawer.switcher.SessionSwitcherOverlay
@@ -151,6 +179,22 @@ private fun HomeLayout(
     val isDrawerOpen by store.observe { it.isDrawerOpen }
     val catchUpProxy = remember { CatchUpStageProxy() }
     val currentReducedMotion by rememberUpdatedState(reducedMotion)
+    val callPresentation = rememberCallPresentation()
+    val usesTray = callPresentation == ExperimentalCallStyle.tray
+    SideEffect { view.usesCallTray = usesTray }
+    val callTray = view.callTray
+    // The open session's call (iOS `sessionStore.scope(\.voice, action: \.voice.presented)`).
+    // TODO(merge) round 2b / `:feature:session`: scope the session's `VoiceFeature` child here.
+    val call: VoiceStoreOf? = null
+    // How far the drawer is open, each frame it moves: only the travelling tray reads these.
+    val drawerProgress = remember { mutableFloatStateOf(0f) }
+    val drawerTravels = remember { mutableStateOf(true) }
+    val firstUsesTray = remember { mutableStateOf<Boolean?>(null) }
+    LaunchedEffect(usesTray) {
+        val previous = firstUsesTray.value
+        firstUsesTray.value = usesTray
+        if (previous != null && !usesTray) callTray.reset()
+    }
     // The last stack shown, so the stage keeps its last count while it fades out.
     val lastCatchUp = remember { arrayOfNulls<CatchUpFeature.Stack>(1) }
     catchUp?.let { lastCatchUp[0] = it }
@@ -216,8 +260,12 @@ private fun HomeLayout(
             // iOS `@ScaledMetric(relativeTo: .footnote) timeRevealReach = 76`.
             view.timeReveal.update(phase, reach = TIME_REVEAL_REACH * density.fontScale, reducedMotion = currentReducedMotion)
         },
-        // TODO(merge): the Call Tray (`dismissesKeyboardOnOpen`, `onDrawerProgress` → `callTray.dock`) once `:feature:voice` ports it.
-        dismissesKeyboardOnOpen = false,
+        // The Call Tray follows the drawer into its bottom slot (D-114).
+        onDrawerProgress = { progress, travels ->
+            drawerProgress.floatValue = progress
+            drawerTravels.value = travels
+        },
+        dismissesKeyboardOnOpen = usesTray && (callTray.showsSurface || call != null),
         contentSessionID = DrawerKeyboard.closingSession(chosen = view.chosenSessionID, shown = selectedSessionID),
         isContentPushed = pushed,
         isSheetPresented = settingsShown,
@@ -247,6 +295,95 @@ private fun HomeLayout(
         },
         preview = { sessionID, revision -> CatchUpPreviewCard(store, sessionID, revision) },
     )
+    // During a call the tray docks in the drawer beneath New Session (D-114).
+    if (usesTray && !usesSidebar) {
+        HomeCallTrayDock(
+            controller = callTray,
+            call = call,
+            reducedMotion = reducedMotion,
+            drawerWidth = drawerWidth,
+            isCatchingUp = catchUp != null,
+            drawerProgress = { drawerProgress.floatValue },
+            drawerTravels = { drawerTravels.value },
+        )
+    }
+    // A floating call stays put above both while the card slides and sessions change: the call
+    // belongs to the root session.
+    HomeFloatingCall(if (callPresentation == ExperimentalCallStyle.floating) call else null)
+}
+
+/** iOS `HomeView.callPresentation`: Settings' Call Style, from the call experiments. */
+@Composable
+private fun rememberCallPresentation(): ExperimentalCallStyle {
+    val callTraySetting by remember { shared(ExperimentalFeature.callTray.key).flow }.collectAsState()
+    val floatingCallSetting by remember { shared(ExperimentalFeature.floatingCall.key).flow }.collectAsState()
+    val livingOrbSetting by remember { shared(ExperimentalFeature.livingOrb.key).flow }.collectAsState()
+    val floatingCenter = remember { FloatingCallCenter.shared }
+    return ExperimentalCallStyle.of(
+        callTray = ExperimentalFeature.callTray.isActive(callTraySetting),
+        floatingCall = floatingCenter.isOn(floatingCallSetting),
+        livingOrb = ExperimentalFeature.livingOrb.isActive(livingOrbSetting),
+    )
+}
+
+/**
+ * The travelling Call Tray over Home (iOS `CallTrayDockOverlay` in `homeLayout`), fed the drawer's
+ * slot (iOS `drawerCallTrayGeometry`: where New Session and Settings stand without a call, as
+ * wide as their row, in window space) and whether it may dock ([CallTrayDock.mayDock]).
+ */
+@Composable
+private fun HomeCallTrayDock(
+    controller: CallTrayController,
+    call: VoiceStoreOf?,
+    reducedMotion: Boolean,
+    drawerWidth: Dp,
+    isCatchingUp: Boolean,
+    drawerProgress: () -> Float,
+    drawerTravels: () -> Boolean,
+) {
+    val density = LocalDensity.current
+    val insetBottom = with(density) { WindowInsets.systemBars.union(WindowInsets.displayCutout).getBottom(this).toDp() }.value
+    var origin by remember { mutableStateOf(Offset.Zero) }
+    BoxWithConstraints(Modifier.fillMaxSize().onGloballyPositioned { origin = it.positionInWindow() / density.density }) {
+        val screen = Rect(origin.x, origin.y, origin.x + maxWidth.value, origin.y + maxHeight.value)
+        val height = CallTrayTunables.height
+        val edge = DrawerMetrics.rowEdge.value
+        // The slot's bottom is the resting composer's (`ComposerTunables.bottomGap`, 0).
+        val slotTop = screen.bottom - insetBottom - height
+        val geometry = CallTrayDockGeometry(
+            slot = Rect(screen.left + edge, slotTop, screen.left + edge + max(1f, drawerWidth.value - 2 * edge), slotTop + height),
+            bounds = Rect(screen.left, screen.top, screen.left + drawerWidth.value, screen.bottom),
+            // The phone's drawer recedes behind the card as it closes (iOS: phones, not iPads).
+            recedes = !reducedMotion,
+            screen = screen,
+        )
+        CallTrayDockOverlay(
+            controller = controller,
+            store = call,
+            reducedMotion = reducedMotion,
+            drawerProgress = drawerProgress,
+            drawerTravels = drawerTravels,
+            mayDock = CallTrayDock.mayDock(usesTray = true, usesSidebar = false, isCatchingUp = isCatchingUp, isResting = controller.isResting),
+            drawer = geometry,
+        )
+    }
+}
+
+/**
+ * The floating call, full-window over Home (iOS `homeLayout`'s second overlay): shown while the
+ * call doesn't show its card. A call that fails or drops hands over to its card: the orb fades
+ * rather than vanishing (a hang-up already shrinks it away).
+ */
+@Composable
+private fun HomeFloatingCall(call: VoiceStoreOf?) {
+    val showsCard = if (call == null) null else call.observe { it.phase.showsCard }.value
+    AnimatedVisibility(
+        visible = call != null && showsCard == false,
+        enter = EnterTransition.None,
+        exit = fadeOut(Motion.easeOut(0.25)),
+    ) {
+        if (call != null) FloatingCallOverlay(call)
+    }
 }
 
 /**
@@ -424,6 +561,7 @@ private fun HomeLifecycle(store: StoreOf<HomeFeature.State, HomeFeature.Action>,
         if (previous == null || previous == serverID) return@LaunchedEffect
         view.cancelPinDrag()
         view.endSearch()
+        if (view.usesCallTray) view.callTray.reset()
     }
     // Search belongs to one visit to the drawer on one server.
     LaunchedEffect(view) {

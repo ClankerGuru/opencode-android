@@ -21,6 +21,7 @@ import ai.opencode.feature.drawer.switcher.SessionSwitcherFeature
 import ai.opencode.feature.session.SessionFeature
 import ai.opencode.feature.settings.SettingsFeature
 import ai.opencode.feature.system.share.ShareInboxClient
+import ai.opencode.feature.voice.VoiceSessionBoardClient
 import ai.opencode.server.OpenCodeLiveContentEvent
 import ai.opencode.server.OpenCodeServerEvent
 
@@ -360,5 +361,10 @@ private fun Reducer<State, Action>.homeChildrenObservers(feature: HomeFeature): 
         // Shortcuts, launcher actions and search offer what the drawer does.
         .onChange({ it.systemPublication }) { _, _, state ->
             feature.publishToSystem(state)
+            Reduced(state)
+        }
+        // The call's delegator reads what the drawer shows from here.
+        .onChange({ it.voiceSessionBoard }) { _, new, state ->
+            dependency(VoiceSessionBoardClient).publish(new)
             Reduced(state)
         }

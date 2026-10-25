@@ -12,6 +12,8 @@ import ai.opencode.feature.drawer.bridge.SessionDetail
 import ai.opencode.feature.system.share.ShareCredentials
 import ai.opencode.feature.system.share.ShareInboxClient
 import ai.opencode.feature.drawer.bridge.SessionScreenMessage
+import ai.opencode.feature.voice.VoiceSessionBoard
+import ai.opencode.feature.voice.VoiceSessionBoardClient
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeServerEvent
 import ai.opencode.server.TranscriptCachePersistence
@@ -371,6 +373,7 @@ internal fun HomeFeature.refreshAttention(state: State): Effect<Action> {
     val directories = HomeFeature.attentionDirectories(state)
     val client = dependency(OpenCodeClient)
     val clock = dependency(Clock)
+    val board = dependency(VoiceSessionBoardClient)
     return Effect.run<Action> { send ->
         clock.sleep(150.milliseconds)
         val sessionIDs = try {
@@ -380,10 +383,13 @@ internal fun HomeFeature.refreshAttention(state: State): Effect<Action> {
         } catch (_: Exception) {
             null
         }
-        // TODO(merge): `voiceSessionBoard.attentionRead(server.persistenceID, sessionIDs != null)` (kept
-        // rows stay on screen, but the call's delegator reports them as unknown) once
-        // `:feature:voice` ports its session board.
-        if (sessionIDs != null) send(Action.AttentionRefreshed(sessionIDs))
+        if (sessionIDs != null) {
+            send(Action.AttentionRefreshed(sessionIDs))
+            board.attentionRead(server.persistenceID, true)
+        } else if (currentCoroutineContext().isActive) {
+            // Kept rows stay on screen, but the delegator reports them as unknown.
+            board.attentionRead(server.persistenceID, false)
+        }
     }.cancellable(HomeFeature.CancelID.Attention, cancelInFlight = true)
 }
 
@@ -404,3 +410,26 @@ internal fun HomeFeature.flushPersistedComposer(state: State): Effect<Action> {
     for (child in state.subagentStack) if (child.readsOnView) schedule(child)
     return Effect.run { persistence.flush() }
 }
+
+/**
+ * The board the call's delegator reads while a call is up; null otherwise, so Home pays nothing
+ * for it between calls (iOS `HomeFeature.State.voiceSessionBoard`, `VoiceSessionBoard.swift`).
+ */
+internal val State.voiceSessionBoard: VoiceSessionBoard?
+    get() {
+        // TODO(merge) round 2b / `:feature:session`: `sessionDetail?.voice != null` (the screen's call).
+        val hasVoiceCall = false
+        if (!hasVoiceCall) return null
+        val status = statusSnapshot()
+        return VoiceSessionBoard.make(
+            hasVoiceCall = true,
+            serverID = server.persistenceID,
+            sessions = sessions,
+            busyIDs = status.busy,
+            attentionIDs = status.attention,
+            unreadIDs = sessions.filter { status.isUnread(it) && !status.isMuted(it.id) }.mapTo(HashSet()) { it.id },
+            pinnedSessionKeys = pinnedSessionKeys,
+            attentionDirectories = HomeFeature.attentionDirectories(this).toSet(),
+            isLive = status.showsActivity,
+        )
+    }
