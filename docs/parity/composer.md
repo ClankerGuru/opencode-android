@@ -9,7 +9,7 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 | `OpenCode/Composer/AgentPicker.swift` | 146 | | todo | |
 | `OpenCode/Composer/AttachmentCameraLenses.swift` | 234 | | todo | |
 | `OpenCode/Composer/AttachmentCameraView.swift` | 985 | | todo | |
-| `OpenCode/Composer/AttachmentFileType.swift` | 116 | | todo | |
+| `OpenCode/Composer/AttachmentFileType.swift` | 116 | `core/.../files/AttachmentFileType.kt` | done | moved to `:core` by the system area (the share target needs it); composer uses it from there |
 | `OpenCode/Composer/AttachmentMenu.swift` | 1086 | | todo | |
 | `OpenCode/Composer/AttachmentPicker.swift` | 426 | | todo | |
 | `OpenCode/Composer/AutocompleteFeature.swift` | 663 | | todo | |

@@ -1,0 +1,927 @@
+package ai.opencode.feature.system.share
+
+import ai.opencode.core.files.AttachmentFileType
+import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.rememberReduceMotion
+import ai.opencode.core.ui.OpenCodeIcon
+import ai.opencode.core.ui.OpenCodeIconButton
+import ai.opencode.core.ui.OpenCodeIconButtonStyle
+import ai.opencode.core.ui.OpenCodeIconSize
+import ai.opencode.core.ui.OpenCodeShape
+import ai.opencode.core.ui.OpenCodeTextStyles
+import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.core.ui.SFSymbol
+import ai.opencode.core.ui.openCodeTapTarget
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.hideFromAccessibility
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import java.net.URI
+import androidx.compose.material3.LocalContentColor
+
+/** What the share sheet's controls do ([ShareActivity] wires them). */
+class ShareActions(
+    val onMessageChange: (String) -> Unit,
+    val onChoose: (ShareComposition.Destination) -> Unit,
+    val onCancel: () -> Unit,
+    val onSend: () -> Unit,
+    val onSendLater: () -> Unit,
+    val onContinue: () -> Unit,
+    val onDone: () -> Unit,
+    val onDismissSaveError: () -> Unit,
+)
+
+/**
+ * Port of iOS `ShareView`: the share sheet as a composer: what was shared, large, at the top; the
+ * sessions as chips right above an app-style composer; Send in the composer and Continue in
+ * OpenCode beside the title. Wrap in `OpenCodeAppTheme {}`.
+ */
+@Composable
+fun ShareView(state: ShareModel.State, actions: ShareActions) {
+    val reduceMotion = rememberReduceMotion()
+    var showsSessionSearch by rememberSaveable { mutableStateOf(false) }
+    val colors = OpenCodeTheme.colors
+
+    Box(Modifier.fillMaxSize()) {
+        Surface(
+            modifier = Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .padding(top = 8.dp),
+            shape = OpenCodeShape.sheetTop,
+            color = colors.canvas,
+            contentColor = colors.text,
+        ) {
+            Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime))) {
+                TopBar(state, actions)
+                if (state.targets == null) {
+                    EmptyState(Modifier.weight(1f))
+                } else {
+                    Composer(state, actions, reduceMotion, Modifier.weight(1f)) {
+                        if (!state.isBusy) showsSessionSearch = true
+                    }
+                }
+            }
+        }
+    }
+
+    state.saveError?.let { error ->
+        AlertDialog(
+            onDismissRequest = actions.onDismissSaveError,
+            title = { Text("Couldn’t Save for OpenCode") },
+            text = { Text(error) },
+            confirmButton = { TextButton(onClick = actions.onDismissSaveError) { Text("OK") } },
+        )
+    }
+
+    if (showsSessionSearch) {
+        ShareSessionSearch(state, onChoose = actions.onChoose) { showsSessionSearch = false }
+    }
+}
+
+@Composable
+private fun TopBar(state: ShareModel.State, actions: ShareActions) {
+    Box(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp)) {
+        // Inert, not dimmed, from Send until the sheet closes.
+        OpenCodeIconButton(
+            symbol = SFSymbol.Xmark,
+            contentDescription = "Cancel",
+            onClick = { if (!state.isBusy) actions.onCancel() },
+            modifier = Modifier.align(Alignment.CenterStart),
+            style = OpenCodeIconButtonStyle.Standard,
+        )
+        Text(
+            "OpenCode",
+            style = OpenCodeTextStyles.headline,
+            modifier = Modifier.align(Alignment.Center).semantics { heading() },
+        )
+        if (state.targets != null) {
+            OpenCodeIconButton(
+                symbol = SFSymbol.ArrowUpForwardApp,
+                contentDescription = "Continue in OpenCode",
+                onClick = { if (!state.isBusy) actions.onContinue() },
+                modifier = Modifier.align(Alignment.CenterEnd),
+                style = OpenCodeIconButtonStyle.Standard,
+                enabled = state.canContinue || state.isBusy,
+            )
+        }
+    }
+}
+
+@Composable
+private fun EmptyState(modifier: Modifier) {
+    Column(
+        modifier.fillMaxWidth().padding(horizontal = 32.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        OpenCodeIcon(SFSymbol.Desktopcomputer, contentDescription = null, size = OpenCodeIconSize.hero, tint = OpenCodeTheme.colors.secondaryText)
+        Spacer(Modifier.height(16.dp))
+        Text("Connect to a Server First", style = OpenCodeTextStyles.title2.copy(fontWeight = FontWeight.Bold), textAlign = TextAlign.Center)
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Open OpenCode and connect to your computer, then share again.",
+            style = OpenCodeTextStyles.subheadline,
+            color = OpenCodeTheme.colors.secondaryText,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+@Composable
+private fun Composer(
+    state: ShareModel.State,
+    actions: ShareActions,
+    reduceMotion: Boolean,
+    modifier: Modifier,
+    onSearch: () -> Unit,
+) {
+    Column(modifier.fillMaxWidth()) {
+        ShareItemsPreview(
+            state,
+            Modifier.weight(1f).fillMaxWidth().sendingStage(state.phase, reduceMotion, rest = 0.85f),
+        )
+        Status(state, actions, reduceMotion)
+        ShareTargetChips(
+            state,
+            reduceMotion,
+            onChoose = actions.onChoose,
+            onSearch = onSearch,
+            modifier = Modifier.padding(bottom = 10.dp).sendingStage(state.phase, reduceMotion, rest = 0.5f),
+        )
+        MessageBar(state, actions, reduceMotion, Modifier.padding(horizontal = 12.dp).padding(bottom = 8.dp))
+    }
+}
+
+/** The failure row comes and goes without the card above jumping. */
+@Composable
+private fun Status(state: ShareModel.State, actions: ShareActions, reduceMotion: Boolean) {
+    val phase = state.phase
+    val visible = phase is ShareModel.Phase.Failed || phase == ShareModel.Phase.ContinueManually
+    // The last row shown, kept while it fades out.
+    val shown = remember { arrayOf(phase) }
+    if (visible) shown[0] = phase
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(phaseAnimation(reduceMotion)),
+        exit = fadeOut(phaseAnimation(reduceMotion)),
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            when (val current = shown[0]) {
+                is ShareModel.Phase.Failed -> {
+                    Text(current.problem.message, style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold), modifier = Modifier.weight(1f))
+                    FilledTonalButton(onClick = actions.onSendLater) { Text("Send Later") }
+                    if (current.problem.canRetry) Button(onClick = actions.onSend) { Text("Try Again") }
+                }
+                else -> {
+                    Text("Saved. Open OpenCode to continue", style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold), modifier = Modifier.weight(1f))
+                    Button(onClick = actions.onDone) { Text("Done") }
+                }
+            }
+        }
+    }
+}
+
+private fun <T> phaseAnimation(reduceMotion: Boolean) = MotionSpring(0.24, 0.15).animation<T>(reduceMotion)
+
+/**
+ * What sits above the bar while it sends: dimmed and locked in place, then lifted away (faded
+ * only, under reduce motion) once it's sent. Only alpha and offset change, so nothing around it
+ * moves.
+ */
+@Composable
+private fun Modifier.sendingStage(phase: ShareModel.Phase, reduceMotion: Boolean, rest: Float): Modifier {
+    val spec = MotionSpring(0.3, 0.0).animation<Float>(reduceMotion)
+    val alpha by animateFloatAsState(
+        when (phase) {
+            ShareModel.Phase.Sent -> 0f
+            ShareModel.Phase.Sending -> rest
+            else -> 1f
+        },
+        spec,
+        label = "stageAlpha",
+    )
+    val lift by animateDpAsState(
+        if (phase == ShareModel.Phase.Sent && !reduceMotion) (-14).dp else 0.dp,
+        MotionSpring(0.3, 0.0).animation(reduceMotion),
+        label = "stageLift",
+    )
+    val density = LocalDensity.current
+    val locked = phase == ShareModel.Phase.Sending || phase == ShareModel.Phase.Sent
+    return this
+        .graphicsLayer {
+            this.alpha = alpha
+            translationY = with(density) { lift.toPx() }
+        }
+        .blockInput(locked)
+        .then(if (phase == ShareModel.Phase.Sent) Modifier.semantics { hideFromAccessibility() } else Modifier)
+}
+
+/** Takes no touches while [blocked] (iOS `allowsHitTesting(false)`), without dimming. */
+private fun Modifier.blockInput(blocked: Boolean): Modifier = if (!blocked) this else pointerInput(Unit) {
+    awaitPointerEventScope {
+        while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
+    }
+}
+
+/** What was shared: images large, then files, then shared text and links. */
+@Composable
+private fun ShareItemsPreview(state: ShareModel.State, modifier: Modifier) {
+    val colors = OpenCodeTheme.colors
+    BoxWithConstraints(modifier) {
+        val extras = (state.files.size * 72 + state.sharedText.size * 80).dp
+        val imageHeight = maxOf(160.dp, maxHeight - 40.dp - extras)
+        Column(
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 12.dp)
+                .heightIn(min = maxHeight - 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            if (state.isLoading && !state.hasContent) {
+                CircularProgressIndicator(Modifier.semantics { contentDescription = "Loading shared items" })
+            }
+            Images(state.images, imageHeight)
+            for (file in state.files) {
+                Card(Modifier.semantics(mergeDescendants = true) {}) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OpenCodeIcon(
+                            AttachmentFileType.symbolName(file.name, file.mime),
+                            contentDescription = null,
+                            size = OpenCodeIconSize.large,
+                            tint = colors.secondaryText,
+                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(file.name, maxLines = 1, overflow = TextOverflow.MiddleEllipsis, style = OpenCodeTextStyles.body)
+                            Text(
+                                AttachmentFileType.subtitle(file.name, file.mime, file.size),
+                                style = OpenCodeTextStyles.footnote,
+                                color = colors.secondaryText,
+                            )
+                        }
+                    }
+                }
+            }
+            for (text in state.sharedText) {
+                Card {
+                    val link = remember(text) { SharedLink.parse(text) }
+                    if (link != null) {
+                        Row(
+                            Modifier.semantics(mergeDescendants = true) {},
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            OpenCodeIcon(SFSymbol.Link, contentDescription = null, size = OpenCodeIconSize.medium, tint = colors.secondaryText)
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(link.host, maxLines = 1, overflow = TextOverflow.Ellipsis, style = OpenCodeTextStyles.body)
+                                Text(
+                                    link.address,
+                                    style = OpenCodeTextStyles.footnote,
+                                    color = colors.secondaryText,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.MiddleEllipsis,
+                                )
+                            }
+                        }
+                    } else {
+                        Text(
+                            text,
+                            style = OpenCodeTextStyles.callout,
+                            color = colors.secondaryText,
+                            maxLines = 8,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
+            }
+            val skipped = skippedNote(state.skippedImageCount, state.skippedFileCount)
+            if (skipped.isNotEmpty()) {
+                Text(skipped, style = OpenCodeTextStyles.footnote, color = colors.secondaryText)
+            }
+        }
+    }
+}
+
+@Composable
+private fun Images(images: List<ShareModel.SharedImage>, height: Dp) {
+    if (images.size == 1) {
+        val image = images.first()
+        val bitmap = remember(image.id) { image.preview.asImageBitmap() }
+        Image(
+            bitmap = bitmap,
+            contentDescription = "Image",
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.heightIn(max = height).clip(RoundedCornerShape(18.dp)),
+        )
+    } else if (images.isNotEmpty()) {
+        LazyRow(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            itemsIndexed(images, key = { _, image -> image.id }) { index, image ->
+                val bitmap = remember(image.id) { image.preview.asImageBitmap() }
+                Image(
+                    bitmap = bitmap,
+                    contentDescription = "Image ${index + 1} of ${images.size}",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.heightIn(max = minOf(height, 300.dp)).clip(RoundedCornerShape(16.dp)),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun Card(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    Box(
+        modifier
+            .fillMaxWidth()
+            .background(OpenCodeTheme.colors.userBubble, RoundedCornerShape(14.dp))
+            .padding(14.dp),
+    ) {
+        content()
+    }
+}
+
+private fun skippedNote(images: Int, files: Int): String {
+    val parts = mutableListOf<String>()
+    if (images > 0) parts.add(if (images == 1) "1 image couldn’t be added" else "$images images couldn’t be added")
+    if (files > 0) parts.add(if (files == 1) "1 file couldn’t be added" else "$files files couldn’t be added")
+    return parts.joinToString(" · ")
+}
+
+/** A shared web link: its host over the full address. */
+private class SharedLink(val host: String, val address: String) {
+    companion object {
+        fun parse(text: String): SharedLink? {
+            if (text.any { it.isWhitespace() }) return null
+            val uri = runCatching { URI(text) }.getOrNull() ?: return null
+            if (uri.scheme?.lowercase() !in setOf("http", "https")) return null
+            val host = uri.host?.takeIf { it.isNotEmpty() } ?: return null
+            return SharedLink(if (host.startsWith("www.")) host.drop(4) else host, text)
+        }
+    }
+}
+
+/** New Session (in its project) first, then pinned and recent sessions, then search. The chosen one is filled. */
+@Composable
+private fun ShareTargetChips(
+    state: ShareModel.State,
+    reduceMotion: Boolean,
+    onChoose: (ShareComposition.Destination) -> Unit,
+    onSearch: () -> Unit,
+    modifier: Modifier,
+) {
+    val listState = rememberLazyListState()
+    val selectedKey = when (val destination = state.destination) {
+        is ShareComposition.Destination.Session -> destination.session.id
+        else -> NEW_KEY
+    }
+    val keys = remember(state.sessions) { listOf(NEW_KEY) + state.sessions.map { it.id } }
+    var appeared by remember { mutableStateOf(false) }
+    LaunchedEffect(selectedKey, keys) {
+        val index = keys.indexOf(selectedKey).coerceAtLeast(0)
+        centre(listState, index, animated = appeared && !reduceMotion)
+        appeared = true
+    }
+    LazyRow(
+        state = listState,
+        modifier = modifier.fillMaxWidth().blockInput(state.isBusy),
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        item(key = NEW_KEY) { NewSessionChip(state, onChoose) }
+        items(state.sessions, key = { it.id }) { session ->
+            val selected = (state.destination as? ShareComposition.Destination.Session)?.session?.id == session.id
+            Chip(
+                selected = selected,
+                label = "${session.title}, ${session.projectName}",
+                onClick = { onChoose(ShareComposition.Destination.Session(session)) },
+            ) {
+                Text(session.title, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 220.dp))
+            }
+        }
+        item(key = SEARCH_KEY) {
+            Box(
+                Modifier
+                    .clip(OpenCodeShape.circle)
+                    .clickable(onClickLabel = null, role = Role.Button, onClick = onSearch)
+                    .openCodeTapTarget()
+                    .semantics { contentDescription = "Search sessions" },
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    Modifier.size(36.dp).background(OpenCodeTheme.colors.inlineCodeFill, OpenCodeShape.circle),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    OpenCodeIcon(SFSymbol.Magnifyingglass, contentDescription = null, size = OpenCodeIconSize.small, tint = OpenCodeTheme.colors.secondaryText)
+                }
+            }
+        }
+    }
+}
+
+private const val NEW_KEY = "new"
+private const val SEARCH_KEY = "search"
+
+/** Scrolls item [index] to the row's centre. */
+private suspend fun centre(state: LazyListState, index: Int, animated: Boolean) {
+    var info = state.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
+    if (info == null) {
+        state.scrollToItem(index)
+        info = state.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index } ?: return
+    }
+    val viewport = state.layoutInfo.viewportEndOffset + state.layoutInfo.viewportStartOffset
+    val delta = (info.offset + info.size / 2f) - viewport / 2f
+    if (animated) state.animateScrollBy(delta, MotionSpring(0.5, 0.15).spec()) else state.scrollBy(delta)
+}
+
+@Composable
+private fun NewSessionChip(state: ShareModel.State, onChoose: (ShareComposition.Destination) -> Unit) {
+    val destination = state.destination
+    if (destination is ShareComposition.Destination.NewSession) {
+        // Chosen: it names its project, and a tap picks another.
+        var expanded by remember { mutableStateOf(false) }
+        Box {
+            Chip(
+                selected = true,
+                label = "New Session in ${destination.project.name}",
+                hint = "Chooses its project",
+                onClick = { expanded = true },
+            ) {
+                OpenCodeIcon(SFSymbol.Plus, contentDescription = null, size = 14.dp)
+                Text("New Session")
+                Text(destination.project.name, modifier = Modifier.alpha(0.65f), maxLines = 1)
+                OpenCodeIcon(SFSymbol.ChevronDown, contentDescription = null, size = 12.dp)
+            }
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                for (candidate in state.projects) {
+                    DropdownMenuItem(
+                        text = { Text(candidate.name) },
+                        onClick = {
+                            expanded = false
+                            onChoose(ShareComposition.Destination.NewSession(candidate))
+                        },
+                        trailingIcon = if (candidate.id == destination.project.id) {
+                            { OpenCodeIcon(SFSymbol.Checkmark, contentDescription = "Selected", size = OpenCodeIconSize.small) }
+                        } else {
+                            null
+                        },
+                    )
+                }
+            }
+        }
+    } else {
+        val project = state.projects.firstOrNull() ?: return
+        Chip(selected = false, label = "New Session", onClick = { onChoose(ShareComposition.Destination.NewSession(project)) }) {
+            OpenCodeIcon(SFSymbol.Plus, contentDescription = null, size = 14.dp)
+            Text("New Session")
+        }
+    }
+}
+
+@Composable
+private fun Chip(
+    selected: Boolean,
+    label: String,
+    onClick: () -> Unit,
+    hint: String? = null,
+    content: @Composable () -> Unit,
+) {
+    val colors = OpenCodeTheme.colors
+    val container = if (selected) colors.text else colors.inlineCodeFill
+    val foreground = if (selected) colors.canvas else colors.text
+    Box(
+        Modifier
+            .clip(OpenCodeShape.capsule)
+            .clickable(onClickLabel = hint, role = Role.Button, onClick = onClick)
+            .openCodeTapTarget(accessibility = false)
+            .semantics {
+                contentDescription = label
+                this.selected = selected
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(
+            Modifier
+                .clearAndSetSemantics {}
+                .height(36.dp)
+                .background(container, OpenCodeShape.capsule)
+                .padding(horizontal = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
+            CompositionLocalProvider(LocalContentColor provides foreground) {
+                androidx.compose.material3.ProvideTextStyle(
+                    OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium, color = foreground),
+                ) { content() }
+            }
+        }
+    }
+}
+
+/**
+ * The bar keeps its size and the keyboard through Send → Sent → close: the field locks in place
+ * and dims, the arrow turns into the spinner in the same circle, then into a checkmark that
+ * pops, while the words give way to where they went.
+ */
+@Composable
+private fun MessageBar(state: ShareModel.State, actions: ShareActions, reduceMotion: Boolean, modifier: Modifier) {
+    val colors = OpenCodeTheme.colors
+    val phase = state.phase
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    val fieldAlpha by animateFloatAsState(
+        when (phase) {
+            ShareModel.Phase.Sent -> 0f
+            ShareModel.Phase.Sending -> 0.55f
+            else -> 1f
+        },
+        phaseAnimation(reduceMotion),
+        label = "fieldAlpha",
+    )
+    val fieldBlur by animateDpAsState(if (phase == ShareModel.Phase.Sent && !reduceMotion) 6.dp else 0.dp, phaseAnimation(reduceMotion), label = "fieldBlur")
+    val fieldLift by animateDpAsState(if (phase == ShareModel.Phase.Sent && !reduceMotion) (-6).dp else 0.dp, phaseAnimation(reduceMotion), label = "fieldLift")
+    val density = LocalDensity.current
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(26.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = colors.text,
+    ) {
+        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Box(
+                Modifier.weight(1f).padding(start = 16.dp, top = 12.dp, bottom = 14.dp),
+                contentAlignment = Alignment.BottomStart,
+            ) {
+                BasicTextField(
+                    value = state.message,
+                    // Edits are ignored while it sends, without taking the keyboard (never disabled:
+                    // that would drop it).
+                    onValueChange = actions.onMessageChange,
+                    textStyle = OpenCodeTextStyles.body.copy(color = colors.text),
+                    cursorBrush = SolidColor(if (state.isBusy) androidx.compose.ui.graphics.Color.Transparent else colors.accent),
+                    minLines = 1,
+                    maxLines = 6,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(focus)
+                        .graphicsLayer {
+                            alpha = fieldAlpha
+                            translationY = with(density) { fieldLift.toPx() }
+                        }
+                        .blur(fieldBlur)
+                        .then(if (phase == ShareModel.Phase.Sent) Modifier.semantics { hideFromAccessibility() } else Modifier),
+                    decorationBox = { inner ->
+                        Box {
+                            if (state.message.isEmpty()) {
+                                Text("Message", style = OpenCodeTextStyles.body, color = colors.tertiaryText)
+                            }
+                            inner()
+                        }
+                    },
+                )
+                val destination = state.destination
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = phase == ShareModel.Phase.Sent && destination != null,
+                    enter = if (reduceMotion) fadeIn(Motion.reducedFadeSpec()) else fadeIn(phaseAnimation(reduceMotion)) +
+                        slideInVertically(phaseAnimation(reduceMotion)) { -it / 3 },
+                    exit = fadeOut(phaseAnimation(reduceMotion)),
+                ) {
+                    Text(
+                        "Sent to ${destination?.title ?: ""}",
+                        style = OpenCodeTextStyles.body,
+                        color = colors.secondaryText,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            SendButton(state, actions.onSend, reduceMotion, Modifier.padding(2.dp))
+        }
+    }
+}
+
+private enum class Glyph { Arrow, Spinner, Check }
+
+@Composable
+private fun SendButton(state: ShareModel.State, onSend: () -> Unit, reduceMotion: Boolean, modifier: Modifier) {
+    val colors = OpenCodeTheme.colors
+    val phase = state.phase
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(
+        if (pressed && !reduceMotion) 0.92f else 1f,
+        MotionSpring(0.16, 0.15).spec(),
+        label = "sendPress",
+    )
+    val pop = remember { Animatable(1f) }
+    val sent = phase == ShareModel.Phase.Sent
+    LaunchedEffect(sent) {
+        // Plays as the checkmark arrives: 0.11 + 0.17 s, settled as the sheet starts to go.
+        if (sent && !reduceMotion) {
+            pop.animateTo(ShareComposition.SendMotion.POP_SCALE, tween(110, easing = Motion.EaseInOut))
+            pop.animateTo(1f, MotionSpring(0.17, 0.15).spec())
+        } else {
+            pop.snapTo(1f)
+        }
+    }
+    val lit = state.canSend || phase == ShareModel.Phase.Sending || sent
+    val glyph = when (phase) {
+        ShareModel.Phase.Sending -> Glyph.Spinner
+        ShareModel.Phase.Sent -> Glyph.Check
+        else -> Glyph.Arrow
+    }
+    val label = when (phase) {
+        ShareModel.Phase.Sending -> "Sending"
+        ShareModel.Phase.Sent -> "Sent"
+        else -> "Send"
+    }
+    val face = modifier.size(48.dp)
+    Box(
+        // Sending and sent keep their look but take no taps, and stop being a button.
+        (if (state.isBusy) face else face.clickable(
+            interactionSource = interaction,
+            indication = null,
+            enabled = state.canSend,
+            role = Role.Button,
+            onClick = onSend,
+        )).semantics { contentDescription = label },
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier
+                .size(34.dp)
+                .scale(pressScale * pop.value)
+                .background(if (lit) colors.text else colors.inlineCodeFill, OpenCodeShape.circle),
+            contentAlignment = Alignment.Center,
+        ) {
+            AnimatedContent(
+                targetState = glyph,
+                transitionSpec = {
+                    if (reduceMotion) {
+                        fadeIn(Motion.reducedFadeSpec()) togetherWith fadeOut(Motion.reducedFadeSpec())
+                    } else {
+                        (scaleIn(phaseAnimation(false), initialScale = 0.55f) + fadeIn(phaseAnimation(false))) togetherWith
+                            (scaleOut(phaseAnimation(false), targetScale = 0.55f) + fadeOut(phaseAnimation(false)))
+                    }
+                },
+                label = "sendGlyph",
+            ) { current ->
+                when (current) {
+                    Glyph.Spinner -> SendingSpinner(colors.canvas)
+                    Glyph.Check -> OpenCodeIcon(SFSymbol.Checkmark, contentDescription = null, size = 18.dp, tint = colors.canvas)
+                    Glyph.Arrow -> OpenCodeIcon(
+                        SFSymbol.ArrowUp,
+                        contentDescription = null,
+                        size = 18.dp,
+                        tint = if (state.canSend) colors.canvas else colors.tertiaryText,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** The sending arc, drawn in the background colour on the label-coloured circle. */
+@Composable
+private fun SendingSpinner(color: androidx.compose.ui.graphics.Color) {
+    val transition = rememberInfiniteTransition(label = "spinner")
+    val angle by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(800, easing = LinearEasing), RepeatMode.Restart),
+        label = "spinnerAngle",
+    )
+    Canvas(Modifier.size(15.dp).semantics { hideFromAccessibility() }) {
+        val stroke = 2.2.dp.toPx()
+        rotate(angle) {
+            drawArc(
+                color = color,
+                startAngle = 0f,
+                sweepAngle = 0.72f * 360f,
+                useCenter = false,
+                topLeft = Offset(stroke / 2, stroke / 2),
+                size = Size(size.width - stroke, size.height - stroke),
+                style = Stroke(width = stroke, cap = StrokeCap.Round),
+            )
+        }
+    }
+}
+
+/** Every session the sheet offers, searchable, for when the chips run long. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ShareSessionSearch(
+    state: ShareModel.State,
+    onChoose: (ShareComposition.Destination) -> Unit,
+    onClose: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var query by rememberSaveable { mutableStateOf("") }
+    val colors = OpenCodeTheme.colors
+    ModalBottomSheet(onDismissRequest = onClose, sheetState = sheetState, containerColor = colors.groupedCanvas) {
+        Box(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
+            OpenCodeIconButton(
+                symbol = SFSymbol.Xmark,
+                contentDescription = "Close",
+                onClick = onClose,
+                modifier = Modifier.align(Alignment.CenterStart),
+                style = OpenCodeIconButtonStyle.Standard,
+            )
+            Text("Sessions", style = OpenCodeTextStyles.headline, modifier = Modifier.align(Alignment.Center))
+        }
+        Surface(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            shape = OpenCodeShape.fill,
+            color = colors.inlineCodeFill,
+        ) {
+            Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                OpenCodeIcon(SFSymbol.Magnifyingglass, contentDescription = null, size = OpenCodeIconSize.small, tint = colors.secondaryText)
+                Spacer(Modifier.width(8.dp))
+                BasicTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    singleLine = true,
+                    textStyle = OpenCodeTextStyles.body.copy(color = colors.text),
+                    cursorBrush = SolidColor(colors.accent),
+                    modifier = Modifier.weight(1f),
+                    decorationBox = { inner ->
+                        Box {
+                            if (query.isEmpty()) Text("Search", style = OpenCodeTextStyles.body, color = colors.tertiaryText)
+                            inner()
+                        }
+                    },
+                )
+            }
+        }
+        val pinned = matches(state.targets?.pinned ?: emptyList(), query)
+        val recents = matches(state.targets?.recents ?: emptyList(), query)
+        LazyColumn(Modifier.fillMaxWidth(), contentPadding = PaddingValues(bottom = 24.dp)) {
+            section("Pinned", pinned, state.destination, onChoose, onClose)
+            section("Recents", recents, state.destination, onChoose, onClose)
+        }
+    }
+}
+
+private fun matches(sessions: List<ShareTargets.Session>, query: String): List<ShareTargets.Session> =
+    sessions.filter {
+        query.isEmpty() || it.title.contains(query, ignoreCase = true) || it.projectName.contains(query, ignoreCase = true)
+    }
+
+private fun androidx.compose.foundation.lazy.LazyListScope.section(
+    title: String,
+    sessions: List<ShareTargets.Session>,
+    destination: ShareComposition.Destination?,
+    onChoose: (ShareComposition.Destination) -> Unit,
+    onClose: () -> Unit,
+) {
+    if (sessions.isEmpty()) return
+    item(key = "header-$title") {
+        Text(
+            title,
+            style = OpenCodeTextStyles.footnote.copy(fontWeight = FontWeight.SemiBold),
+            color = OpenCodeTheme.colors.secondaryText,
+            modifier = Modifier.padding(start = 20.dp, top = 16.dp, bottom = 6.dp).semantics { heading() },
+        )
+    }
+    items(sessions, key = { "$title-${it.id}" }) { session ->
+        val selected = (destination as? ShareComposition.Destination.Session)?.session == session
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .clickable(role = Role.Button) {
+                    onChoose(ShareComposition.Destination.Session(session))
+                    onClose()
+                }
+                .heightIn(min = 48.dp)
+                .padding(horizontal = 20.dp, vertical = 8.dp)
+                .semantics(mergeDescendants = true) { this.selected = selected },
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text(session.title, style = OpenCodeTextStyles.body, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                session.projectName,
+                style = OpenCodeTextStyles.subheadline,
+                color = OpenCodeTheme.colors.secondaryText,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}

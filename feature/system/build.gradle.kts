@@ -12,4 +12,8 @@ dependencies {
     implementation(libs.glance.appwidget)
     implementation(libs.glance.material3)
     implementation(libs.androidx.work.runtime)
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.lifecycle.process)
+    implementation(libs.firebase.messaging)
+    implementation(libs.androidx.datastore.preferences)
 }
