@@ -1,6 +1,10 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.store.TestStore
+import ai.opencode.feature.composer.DictationFeature
+import ai.opencode.feature.system.liveactivity.DictationActivityAttributes
+import ai.opencode.feature.voice.VoiceFeature
 import ai.opencode.core.testing.TestIsolationRule
 import ai.opencode.feature.session.DraftProjectOrder
 import ai.opencode.feature.session.SessionFeature
@@ -175,5 +179,117 @@ class NewSessionDraftTests {
         assertEquals(SessionFeature.State.TaskIdentity(server.persistenceID, 5, null), store.state.sessionDetail?.taskIdentity)
         runTaskAndLoadModels()
         store.finish()
+    }
+
+    /**
+     * When a live call or carried dictation keeps `navigationID` unchanged (`keepsIdentity`),
+     * `visit` still advances on draft → draft and draft-created session → draft, so `taskIdentity`
+     * changes, the task runs `stopSessionWork`, and `models` loads for the new draft.
+     */
+    @Test
+    fun keepsIdentityMovesAdvanceVisitAndRunTask() = runTest {
+        val model = OpenCodeModel(modelID = "cirrus-4", providerID = "opencode", name = "Cirrus 4", variants = listOf("low", "high"))
+        val prior = OpenCodeSession(
+            id = "ses_prior", title = "Prior session", projectID = projects[0].id, directory = projects[0].directory,
+            updatedAt = Instant.EPOCH, model = model.ref("high"),
+        )
+        val created = OpenCodeSession(
+            id = "ses_created", title = "Created session", projectID = projects[0].id, directory = projects[0].directory,
+            updatedAt = Instant.EPOCH, model = model.ref("high"),
+        )
+        val catalog = OpenCodeModelCatalog(models = listOf(model), defaultModel = model)
+        val listed = listOf(projects[0], projects[1])
+        val recording = DictationFeature.State(phase = DictationFeature.Phase.Recording)
+        fun HomeFeature.State.detail(update: (SessionFeature.State) -> SessionFeature.State) = copy(sessionDetail = update(sessionDetail!!))
+
+        // 1. Carried dictation: draft -> draft keeps navigationID == 1, advances visit to 2, and runs the task.
+        val home = HomeFeature.State(server, OpenCodeHomeSnapshot(projects = listed, sessions = listOf(prior), activeSessionIDs = emptySet()))
+            .detail { it.copy(dictation = recording) }
+        assertEquals(1, home.sessionDetail?.navigationID)
+        assertEquals(1, home.sessionDetail?.visit)
+        assertEquals(SessionFeature.State.TaskIdentity(server.persistenceID, 1, null), home.sessionDetail?.taskIdentity)
+        val store = TestStore(home, HomeFeature(), backgroundScope) {
+            this[OpenCodeClient] = noSends(OpenCodeClient.testValue).copy(modelCatalog = { _, _ -> catalog })
+        }
+        store.exhaustive = false
+        store.send(HomeFeature.Action.NewSessionTapped)
+        assertEquals(2, store.state.detailGeneration)
+        assertEquals("The ifLet identity stays 1 so the recording's effect lives on", 1, store.state.sessionDetail?.navigationID)
+        assertEquals(SessionFeature.State.TaskIdentity(server.persistenceID, 2, null), store.state.sessionDetail?.taskIdentity)
+        assertEquals(true, store.state.sessionDetail?.inheritsLiveWork)
+        assertEquals(DictationFeature.Phase.Recording, store.state.sessionDetail?.dictation?.phase)
+        assertEquals(projects[0], store.state.sessionDetail?.draftProject)
+        store.send(HomeFeature.Action.detail(SessionFeature.Action.Task))
+        assertEquals(false, store.state.sessionDetail?.inheritsLiveWork)
+        assertEquals(1, store.state.sessionDetail?.runWorkGeneration)
+        store.receive({ it == HomeFeature.Action.detail(SessionFeature.Action.ModelsResponse(Result.success(catalog))) }, "modelsResponse")
+        assertEquals(listOf(model), store.state.sessionDetail?.models)
+        assertEquals("Cirrus 4", store.state.sessionDetail?.currentModelName)
+        assertNotNull(store.state.sessionDetail?.currentLevelScale)
+
+        // 2. Carried dictation on a draft-created session -> draft: navigationID 1, visit 3, the old
+        // session's work stopped, models loaded for the new draft.
+        val createdHome = HomeFeature.State(server, OpenCodeHomeSnapshot(projects = listed, sessions = listOf(prior), activeSessionIDs = emptySet()))
+            .copy(detailGeneration = 2)
+            .detail {
+                it.copy(
+                    navigationID = 1, visit = 2, draftBecameSessionID = created.id, session = created,
+                    familySessions = listOf(created), familyRootID = created.id, dictation = recording,
+                )
+            }
+        val createdSessionIdentity = createdHome.sessionDetail?.taskIdentity
+        assertEquals(SessionFeature.State.TaskIdentity(server.persistenceID, 2, null), createdSessionIdentity)
+        val createdStore = TestStore(createdHome, HomeFeature(), backgroundScope) {
+            this[OpenCodeClient] = noSends(OpenCodeClient.testValue).copy(modelCatalog = { _, _ -> catalog })
+            this[DateClient] = DateClient.constant(Instant.EPOCH)
+        }
+        createdStore.exhaustive = false
+        createdStore.send(HomeFeature.Action.NewSessionTapped)
+        assertEquals(3, createdStore.state.detailGeneration)
+        assertEquals(DictationActivityAttributes.ContentState(title = "New session", startedAt = Instant.EPOCH), createdStore.state.dictationActivity)
+        assertEquals(1, createdStore.state.sessionDetail?.navigationID)
+        assertNull(createdStore.state.sessionDetail?.session)
+        assertEquals(SessionFeature.State.TaskIdentity(server.persistenceID, 3, null), createdStore.state.sessionDetail?.taskIdentity)
+        assertNotEquals(createdSessionIdentity, createdStore.state.sessionDetail?.taskIdentity)
+        assertEquals(true, createdStore.state.sessionDetail?.inheritsLiveWork)
+        createdStore.send(HomeFeature.Action.detail(SessionFeature.Action.Task))
+        assertEquals(false, createdStore.state.sessionDetail?.inheritsLiveWork)
+        assertEquals(1, createdStore.state.sessionDetail?.runWorkGeneration)
+        createdStore.receive({ it == HomeFeature.Action.detail(SessionFeature.Action.ModelsResponse(Result.success(catalog))) }, "modelsResponse")
+        assertEquals("Cirrus 4", createdStore.state.sessionDetail?.currentModelName)
+        assertNotNull(createdStore.state.sessionDetail?.currentLevelScale)
+
+        // 3. Live call on a draft-created session -> draft: navigationID 1, visit 3, the previous
+        // session's work stopped (runWorkGeneration superseded), models loaded.
+        val callHome = HomeFeature.State(server, OpenCodeHomeSnapshot(projects = listed, sessions = listOf(created), activeSessionIDs = emptySet()))
+            .copy(detailGeneration = 2)
+            .detail {
+                it.copy(
+                    navigationID = 1, visit = 2, draftBecameSessionID = created.id, session = created,
+                    familySessions = listOf(created), familyRootID = created.id, runWorkGeneration = 4,
+                    voice = VoiceFeature.State(server, created).withPhase(VoiceFeature.State.Phase.Live),
+                )
+            }
+        val callStore = TestStore(callHome, HomeFeature(), backgroundScope) {
+            this[OpenCodeClient] = noSends(OpenCodeClient.testValue).copy(modelCatalog = { _, _ -> catalog })
+            this[DateClient] = DateClient.constant(Instant.EPOCH)
+        }
+        callStore.exhaustive = false
+        callStore.send(HomeFeature.Action.NewSessionTapped)
+        assertEquals("The ifLet identity stays 1 so the live call's effects survive", 1, callStore.state.sessionDetail?.navigationID)
+        assertEquals(3, callStore.state.sessionDetail?.visit)
+        assertEquals(true, callStore.state.sessionDetail?.inheritsLiveWork)
+        assertEquals(SessionFeature.State.TaskIdentity(server.persistenceID, 3, null), callStore.state.sessionDetail?.taskIdentity)
+        assertNotEquals(
+            "Moving from a draft-created session to a new draft under keepsIdentity still changes taskIdentity",
+            createdSessionIdentity, callStore.state.sessionDetail?.taskIdentity,
+        )
+        callStore.send(HomeFeature.Action.detail(SessionFeature.Action.Task))
+        assertEquals("stopSessionWork ran for the previous session", false, callStore.state.sessionDetail?.inheritsLiveWork)
+        assertEquals("supersedeRunWork advanced the new detail's runWorkGeneration", 1, callStore.state.sessionDetail?.runWorkGeneration)
+        callStore.receive({ it == HomeFeature.Action.detail(SessionFeature.Action.ModelsResponse(Result.success(catalog))) }, "modelsResponse")
+        assertEquals(listOf(model), callStore.state.sessionDetail?.models)
+        assertEquals("Cirrus 4", callStore.state.sessionDetail?.currentModelName)
+        assertNotNull(callStore.state.sessionDetail?.currentLevelScale)
     }
 }
