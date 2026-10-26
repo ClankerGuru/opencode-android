@@ -254,6 +254,10 @@ object LoadingGlyphPulse {
 /** The list's monotonic clock in seconds (iOS `AnimationTimeScale.referenceNow`). */
 fun transcriptNow(): Double = ai.opencode.core.tuning.AnimationTimeScale.shared.now()
 
+/** The pulse runs only while a load shows on screen; under Reduce Motion it stops once in (iOS `MarkLoadingView.isPaused`). */
+internal fun markLoadingIsPaused(loadingSince: Double?, isHidden: Boolean, settled: Boolean, reducedMotion: Boolean): Boolean =
+    isHidden || loadingSince == null || (settled && reducedMotion)
+
 /**
  * The chat-bubbles glyph, pulsing while waiting inside the delayed fade (iOS `MarkLoadingView`).
  * [isHidden] pauses it (a background scene, a hidden list, an off-screen row).
@@ -264,7 +268,7 @@ fun MarkLoadingView(loadingSince: Double?, isHidden: Boolean = false, modifier: 
     val timing = remember(loadingSince) { MarkLoadingTiming(loadingSince) }
     var now by remember { mutableDoubleStateOf(transcriptNow()) }
     var settled by remember(loadingSince) { mutableStateOf(false) }
-    val paused = isHidden || loadingSince == null || (settled && reduceMotion)
+    val paused = markLoadingIsPaused(loadingSince, isHidden, settled, reduceMotion)
     LaunchedEffect(paused, loadingSince) {
         if (paused) return@LaunchedEffect
         motionFrameLoop {

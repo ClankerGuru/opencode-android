@@ -44,4 +44,6 @@ dependencies {
     implementation(libs.androidx.navigation3.ui)
     implementation(libs.androidx.lifecycle.process)
     debugImplementation(libs.compose.ui.tooling)
+    // TestIsolationGuard, WireFixture and the network block (see AGENTS.md "Tests").
+    testImplementation(testFixtures(project(":server")))
 }

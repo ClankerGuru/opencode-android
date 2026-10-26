@@ -79,3 +79,44 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 - **Media:** rows render media directly (Mermaid card, image gallery, file cards, link previews, site icons). The list owns one `LinkPreviewStore` per session (remembered, closed on dispose) and provides it as `LocalLinkPreviewStore`, with `LocalLinkPreviewRevision`/`LocalLinkPreviewRow` per row. The highlighter is media's `SyntaxHighlighter`.
 - **`:app` root:** wrap the app in `TranscriptMediaProviders { … }` so the file viewer renders Markdown files with the transcript's renderer (media's `LocalAgentFileMarkdown`).
 - **`:app`:** install `EventBatcherHooks.withMarkdownStream()` at the root (`DependencyValues.installRoot { this[EventBatcherHooks] = this[EventBatcherHooks].withMarkdownStream() }`).
+
+## Tests
+
+iOS `OpenCodeTests` files that test `:feature:transcript` code, ported into `feature/transcript/src/test`
+(`./gradlew :feature:transcript:testDebugUnitTest`). Class and method names match iOS; parameterized
+iOS tests loop over their arguments inside one test. Pure JVM except `TranscriptTimeStampsTests`,
+`TranscriptDragTests` and `InlineLinkIconsTests`, which run under Robolectric (`android.icu`,
+`MimeTypeMap`/`Uri`/`ClipData`). Where an iOS test mixes pure checks with framework checks, the
+framework half is a sibling (`…Stamps`, `…Framework`). "Skipped" tests belong to another module's
+port; "dropped" ones can't exist on Android, and each Kotlin file's header lists them with reasons.
+
+| iOS file | Kotlin file | Ported | Skipped (owner) | Dropped (reason) |
+| --- | --- | ---: | --- | --- |
+| `MarkdownBlockTests.swift` | `markdown/MarkdownBlockTests.kt` | 40 | `markdownImageClientDecodes…` (`:server`); 3 highlighting tests (`:feature:media`); `increaseContrastUsesSecondaryOnHeaderProjectLine`, `titleLoadingPresets…` (`:feature:session`) | 2 `UIHostingController` measurements; 2 SwiftUI split-overlay tests (Android fades one laid-out text); `whatIsSelectedCopiedAndRead…` + 2 `StreamLineHoldTests` (`LineBreak.Simple` never moves a word); 2 `TranscriptTextRevealWaitTests` (no `wait(until:)`) |
+| `MarkdownStreamTests.swift` | `markdown/MarkdownStreamTests.kt` | 10 (+ env-gated cost metric) | – | – |
+| `MathAndMermaidTests.swift` | `markdown/MathAndMermaidTests.kt` | 13 | 4 Mermaid card/cache tests (`:feature:media`) | `mathSurvivesTheTranscriptCache` (Android caches raw Markdown, never parsed blocks) |
+| `InlineLinkIconsTests.swift` | `markdown/ui/InlineLinkIconsTests.kt` | 8 | – | `cleanAddressIsTheDefault` (Clean Address baked, no presets); 5 TextKit hit-layout / `ImageRenderer` pixel probes |
+| `TranscriptEntryTests.swift` | `TranscriptEntryTests.kt` | 24 | 5 window/projection tests (`:feature:session`); `executeRowsNameTheToolsTheirScriptCalls` (`:server`) | – |
+| `TranscriptTimeStampsTests.swift` | `rows/TranscriptTimeStampsTests.kt` | 16 | – | – |
+| `TranscriptDragTests.swift` | `user/TranscriptDragTests.kt` | 8 | `composerDropCategorizes…` (`:feature:session`) | 6 `UIImage`/`NSItemProvider`/temp-folder/UIKit hosting tests (Android serves bytes through media's `AgentFileProvider`) |
+| `NewMessagesTests.swift` | `list/NewMessagesTests.kt` | 7 | 15 `SessionFeature` tests (`:feature:session`); 3 `HomeFeature` tests (`:feature:drawer`) | – |
+| `NewMessagesListTests.swift` | `NewMessagesListTests.kt` | 1 | – | 14 hosted-list fit/landing probes (real row heights in the UIKit harness) |
+| `TranscriptScrollBehaviorTests.swift` | `list/TranscriptScrollBehaviorTests.kt` | 57 | 2 projection-cache tests (`:feature:session`) | 14 UIKit collection-view harness tests; `listOwnMotionIsNotAnAssistiveScroll` (VoiceOver scroll split); `statusBarScrollToTopLeavesTheBottom` (no status-bar tap) |
+| `TranscriptLayoutTests.swift` (+ `JustifiedImageRowsTests`) | `rows/TranscriptLayoutTests.kt` | 6 | – | `layoutDuringScrollCommandDoesNotRecursivelyScroll`, `reconfiguredTableSettlesAtFractionalOffsets`, `hairlineSnapsWithoutMovingItsMeasurement` (UIKit layout internals) |
+| `MarkLoadingTests.swift` | `list/MarkLoadingTests.kt` | 6 | – | 4 scene/window/cell lifecycle tests; `cancellingHandoffRestoresInteraction…` (view snapshot; Android crossfades `emptyHandoff`) |
+| `PromotionMorphTests.swift` | – | 0 | – | 3 UIKit cell transform/mask/reuse tests |
+| `UserMessageRunTests.swift` | `user/UserMessageRunTests.kt` | 4 | – | – |
+| `PastedTextTests.swift` | `user/PastedTextTests.kt` | 4 | 5 threshold tests (`:server`, `:feature:media`); 5 composer/outbox tests and Copy's half (`:feature:session`); `promptCarriesThePaste…` (`:server`) | `theSummaryIsComputedOnce…`, `aLongBubbleFoldsAndOpensInPlace` (hosting sizing; the fold is `foldsPastTwelveLines`) |
+| `ModelSwitchRuleTests.swift` | `rows/ModelSwitchRuleTests.kt` | 6 | – | – |
+| `InlineRowsTests.swift` | `rows/InlineRowsTests.kt` | 11 | – | `aLostEdgeCountsFromTheRequest` (CALayer edge band; Android's disclosure is the row's own spring and clip) |
+| `LinkPreviewMotionTests.swift` | `links/LinkPreviewMotionTests.kt` | 3 | – | `catchUpBeforeFirstLayout…` (UIKit list harness; `landArrivals` computes from now) |
+| `RunErrorTests.swift` | `rows/RunErrorTests.kt` | 3 | 17 `SessionFeature` reducer tests (`:feature:session`) | – |
+| `AgentRevealAndOrbModelTests.swift` | `user/AgentRevealAndOrbModelTests.kt` | 4 | 26 status orb tests (`ActivityGyro`, `WorkingRun`…: `:feature:session`) | `analyticalInnerGlowShader…` (AGSL runs only on a GPU) |
+| `TranscriptCachePersistenceTests.swift` | `:server` `TranscriptCachePersistenceTests.kt` | 1 | 7 `HomeFeature`/`AppFeature` tests (`:feature:drawer`, `:app`) | 2 protected-data write tests (no locked-device file protection on Android) |
+| `TranscriptBenchmarkTests.swift` | – | 0 | 8 `HomeFeature`/`AppFeature`/`SessionTranscriptView.ProjectionCache` tests (`:feature:drawer`, `:app`, `:feature:session`; `differsOnlyInTailAssistantMarkdown` is a UIKit reconfigure fast path with no Android counterpart) | 5 env-gated CPU/scroll benchmarks |
+
+Bugs the ported tests found, fixed: inline code drawn at body size instead of `.subheadline`
+(`inlineCodeInHeadingsUses…`); bare URLs not linked like Foundation's Markdown (InlineLinkIcons);
+German stamps writing “08:24” for iOS's “8:24” (`followsTheLocale`); the growth soft edge
+dimming what a row already showed, widening at once and vanishing in one frame (the two
+`growthSoftEdge…` tests, ported against `GrowthSoftEdge`).

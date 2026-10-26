@@ -48,3 +48,41 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 | `FileAttachmentCard`, `AgentFileCards` (`Composer/FileAttachmentViews.swift`) | `feature/media/.../agentfiles/FileAttachmentViews.kt` | done | moved down from composer: the gallery and the transcript show them; composer keeps `ComposerFileChip`/`TranscriptFileChips` and imports the card. Cards drag with `mediaDragSource(.AgentFile(file))` using `LocalMediaDragContext` (path as text without one); background `userBubble` (iOS `secondarySystemBackground`) |
 | `TranscriptDragPayload.url` / `.agentFile` and type helpers (`Transcript/TranscriptDragSource.swift`) | `feature/media/.../agentfiles/MediaDragSource.kt`, `AgentFileDragProvider.kt` | done | moved down for media’s own surfaces; the content URI (`${applicationId}.agentfiles.drag`) downloads lazily through `AgentFileLoader` (cache shared with the viewer) when the drop target opens it, falls back to the cached image as PNG, reports the suggested name via `OpenableColumns.DISPLAY_NAME`. The transcript can hand its `.agentFile`/`.image` payloads to it |
 | `LinkMenuAction` (`Browser/LinkMenu.swift`) | `feature/media/.../browser/LinkMenu.kt` | done | the one copy; the transcript's `TranscriptAction.LinkMenu` carries it |
+
+## Tests
+
+iOS `OpenCodeTests` files that test `:feature:media` code, ported into `feature/media/src/test`
+(JVM, `./gradlew :feature:media:testDebugUnitTest`). Test class and method names match iOS. Tests
+whose subject belongs to another module are left to that module's port ("skipped"); "dropped"
+tests can't exist as JVM unit tests here.
+
+Test-only support: `MediaTestSupport.kt` (`stubBitmap()` for code that only carries an image by
+identity, `stubSiteIcon`, `Locked`, `onMain`), and two AOSP sources copied into
+`src/test/java/android/util/` to shadow `android.jar`'s no-op stubs: `Patterns` (its `WEB_URL` is
+null under the stubs; bare-URL link detection runs the real framework regex) and `LruCache`
+(`AgentImagePreviews`' pixel cache; `LinkedHashMap.eldest()` spelled for the JDK). There is no
+Robolectric, so nothing decodes or encodes real pixels; the replies iOS writes as Markdown are
+given as the `LinkTextBlock`s the transcript hands media.
+
+| iOS file | Kotlin file | Ported | Skipped (owner) | Dropped (reason) |
+| --- | --- | ---: | --- | --- |
+| `AgentFileTests.swift` | `AgentFileTests.kt` | 10 | 8 `AgentFileReferenceTests` and `toolRowsOfferViewableFiles` (`:server`); 5 `AgentFileMarkdownTests`, 9 `ToolSummaryTests` (`:feature:transcript`) | 2 `AgentFileAudioOwnershipTests` (need an ExoPlayer and `AudioManager`); the paint, wrap-toggle and memory probes of `largeFiles…` (UIKit); IPv6 zone-ID origins of `foreignOrigin…` (OkHttp's `HttpUrl` rejects zone IDs) |
+| `AgentImagePreviewTests.swift` | `AgentImagePreviewTests.kt` | 59 | `aLoneNamedImageStopsAt360Points`, `aStrangeShapeIsShownWholeInItsTile` (`JustifiedImageRows`, `:feature:transcript`) | EXIF quarter-turn assert of `aJPEGsShapeTurns…` (platform decoder); `aDownloadCancelledBeforeItStartsNeverStarts` (URLSession task state); `theFadesTimelineEndsWithTheFade` (SwiftUI `TimelineView` schedule, none on Android); `aReportAfterAGrowthEndedNeverJoinsIt`, `anUnmeasuredChangeExpiresOnItsOwn` (expiry runs on the main `Looper`, absent in JVM tests); 6 UIKit viewport/marker harness tests (`hiddenAndImagelessViewports…`, `deallocatedEntranceHolders…`, `removingTheLastMarker…`, `previewsInViewReadBefore…`, `aPreviewScrolledBack…`, `anOpeningViewport…`). `evict(key)` → `trimMemory()`; `isPinned` asserts read pixel survival instead |
+| `BrowserTests.swift` | `BrowserTests.kt` | 15 | 5 `PagePromptBodyTests` (`:server`); 3 `BrowserSendTests`, 16 `OpenLinksInAppsTests` probe tests, `BrowserPeekEndTests` and the `SessionFeature` half of `holdingALink…` (`:feature:session`); 3 `BrowserLifetimeTests` (drawer/session); 4 `BrowserVoiceTests` (`:feature:voice`/session) | `theWebViewAcceptsTheClampedInsets` (`WKWebView`); WebKit context-menu configuration asserts (Android's hold menu is ours) |
+| `DecodedImageCacheTests.swift` | – | 0 | – | 4 (cost is real `Bitmap.rowBytes × height`; the Markdown image half is `:server`'s client) |
+| `ImageLinkPreviewTests.swift` | `ImageLinkPreviewTests.kt` | 6 | `MarkdownStream` half of `completedLink…`, `imageLinkBlocksParticipate…`, `imageLinkSettingsArePart…` (`:feature:transcript`) | 6 `ImageLinkLoader` tests (`cachesCoalesces…`, `offscreenCancellation…`, `cancellingOneCoalescedWaiter…`, `constrainedRefusal…`, `deferralWhileQueued…`, `downsamples…`): the loader decodes through `ImageDecoder` and caches by real pixel cost |
+| `LinkPreviewTests.swift` | `LinkPreviewTests.kt` | 25 | `LinkPreviewSummary` asserts of `editorialSummary…`/`pendingLinks…` (their accessibility labels are ported); `LinkPreviewCellReuseTests` (`:feature:transcript`) | cookie flags read as "no Cookie header" (the transport has no jar) |
+| `LinkPreviewMotionTests.swift` | – | 0 | 4 (`LinkPreviewRowPresentation`, transcript list: `:feature:transcript`) | – |
+| `RichLinkPreviewTests.swift` | `RichLinkPreviewTests.kt` | 6 | – | – |
+| `SiteIconTests.swift` | `SiteIconTests.kt` | 15 | – | 5 `SiteIconImageTests` (decode/encode pixels); `diskOutlivesTheLoaderAndExpires` (needs a usable icon), `linkPreviewSessionReusesNoRedirectTransport` (URLSession delegate identity); `aSuppliedIconWins` (data-URL icon decoding). `oneRequestPerDomainThenMemory` coalesces an unusable answer instead of an icon |
+| `MediaDismissDragTests.swift` | `MediaDismissDragTests.kt` | 6 | – | `MediaViewerController.overrideUserInterfaceStyle` asserts (UIKit; the rule `MediaPresenter.isDarkRoom` is ported) |
+| `MediaZoomGeometryTests.swift` (+`TranscriptImageViewerFeatureTests`) | `MediaZoomGeometryTests.kt` | 9 | – | `scrollViewReportsFullScreenFittedFrame…` (UIScrollView layout probe) |
+| `LowDataModeTests.swift` | `LowDataModeTests.kt` | 3 | `networkPathSnapshot…`, `constrainedNetworkRefusal…` (`:server`) | per-request `allowsConstrainedNetworkAccess` asserts (Android's transport refuses on a constrained path instead) |
+| `MathAndMermaidTests.swift` | `MathAndMermaidTests.kt` | 4 | 14 math/Mermaid Markdown parsing tests (`:feature:transcript`) | – |
+
+Production bugs the ported tests found: none.
+
+`AgentFileReferenceTests`, `PagePromptBodyTests` and the first two `LowDataModeTests` (owner `:server`) are in
+server.md's table.
+
+Total: 158 media tests, all passing.
