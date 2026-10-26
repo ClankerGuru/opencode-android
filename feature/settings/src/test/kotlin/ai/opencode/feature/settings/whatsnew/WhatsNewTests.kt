@@ -5,6 +5,7 @@ import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.SharedStore
 import ai.opencode.core.store.TestStore
 import ai.opencode.core.testing.TestIsolationRule
+import ai.opencode.core.ui.sfSymbol
 import ai.opencode.feature.settings.ConnectionStatus
 import ai.opencode.feature.settings.SettingsFeature
 import ai.opencode.feature.settings.SettingsFeature.SettingsDelegate
@@ -17,8 +18,14 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertNotNull
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /**
  * Port of iOS `WhatsNewTests.swift` (`WhatsNewTests`, `WhatsNewDotSymbolTests`,
@@ -37,9 +44,9 @@ import org.junit.Test
  *   drops Settings' state, and with it the page), the five `tryIt…Draft…`/`…OnThisServer…` tests,
  *   and `WhatsNewTryItTests`' four `modelList…` tests.
  * - `WhatsNewTryItTests.whatsNewSurvivesAHomeReplacement`: `WhatsNewAcrossHomes` (`:app`).
- * - `WhatsNewDotSymbolTests.aSymbolLightsItsShapeOnTheGrid`: dropped. `DotField` is the page's
- *   private renderer, rasterizing the symbol's Android vector drawable on a `Canvas`; no JVM
- *   counterpart to iOS's SF Symbol rasterization.
+ *
+ * `WhatsNewDotSymbolTests` rasterizes the symbol's vector drawable on a `Canvas` ([DotField]), so it
+ * runs under Robolectric (native graphics, the app's resources).
  */
 class WhatsNewTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -417,5 +424,32 @@ class WhatsNewTryItTests {
             it.copy(root = SettingsFeature.State.Root.settings, whatsNew = it.whatsNew.copy(isPresented = false))
         }
         store.finish()
+    }
+}
+
+/** iOS `WhatsNewDotSymbolTests`: the page's [DotField] over the symbol's Material Symbol drawable. */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35])
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+class WhatsNewDotSymbolTests {
+    @get:Rule val isolation = TestIsolationRule()
+
+    /** A feature's symbol lights its own shape on the grid, not its bounds. */
+    @Test
+    fun aSymbolLightsItsShapeOnTheGrid() {
+        val drawable = RuntimeEnvironment.getApplication().getDrawable(sfSymbol("plus"))
+        assertNotNull(drawable)
+        val field = DotField.make(drawable!!, width = 350f, height = 220f, pitch = 3.5f)
+        assertTrue(field.columns == 100 && field.rows == 62)
+        val lit = field.lit.map { it.row * field.columns + it.column }.toSet()
+        assertTrue("The plus's centre is lit", 31 * 100 + 50 in lit)
+        val rows = field.lit.map { it.row }
+        val columns = field.lit.map { it.column }
+        val top = rows.min()
+        val bottom = rows.max()
+        val left = columns.min()
+        val right = columns.max()
+        assertTrue("Its bounding box's corners stay dark", top * 100 + left !in lit && bottom * 100 + right !in lit)
+        assertTrue(field.lit.size.toDouble() < (bottom - top + 1) * (right - left + 1) * 0.6)
     }
 }

@@ -65,7 +65,7 @@ left to that module's port ("skipped"); "dropped" tests can't exist on Android.
 | `ServerDetailsTests.swift` | `serverdetails/ServerDetailsTests.kt` | 11 | `decodesEveryMCPStatus`, `decodesCredentialAndEnvironmentAccounts`, `onlyMCPConnectIsRetriedWhenUnsent` (`:server` internal payloads / `mcpConnectionIdempotency`) | – |
 | `WhatsNewTests.swift` (`WhatsNewTests`) | `whatsnew/WhatsNewTests.kt` | 14 (3 are the Settings halves of Home tests: `homePushes…`, `readingItInSettings…`, `openPushes…`, against `SettingsFeature`, where Android keeps the page) | `tryItTypesAPrompt…`, `closingSettingsWithoutWhatsNew…`, `closingWhatsNewDropsItsSettingsPage`, `tryItTypesThePrompt…OnThisServer…`, `tryItKeepsTheOpenDrafts…`, `tryItAgain…`, `tryItTwice…`, `tryItKeepsASavedDrafts…` (`:feature:drawer`) | – |
 | `WhatsNewTests.swift` (`WhatsNewTryItTests`) | `whatsnew/WhatsNewTests.kt` (`WhatsNewTryItTests`) | 3 (Settings halves of `aNewSessionWhileOffline…`, `aCallBeforeVoiceIsSetUp…`; `settingsAskedForOverWhatsNew…`) | 4 `modelList…` (`:feature:drawer`), `whatsNewSurvivesAHomeReplacement` (`:app`) | – |
-| `WhatsNewTests.swift` (`WhatsNewDotSymbolTests`) | – | 0 | – | `aSymbolLightsItsShapeOnTheGrid`: `DotField` is the page's private `Canvas` renderer of an Android vector drawable (iOS rasterizes an SF Symbol) |
+| `WhatsNewTests.swift` (`WhatsNewDotSymbolTests`) | `whatsnew/WhatsNewTests.kt` (`WhatsNewDotSymbolTests`, Robolectric) | 1 (`DotField` over the `plus` Material Symbol drawable, native graphics with the module's resources; `DotField` is `internal`, was `private`) | – | – |
 | `WhatsNewAddedIDs.swift` | `whatsnew/WhatsNewAddedIDs.kt` | data | – | `uikit-drawer-experiment` left out (its entry isn't on Android's list) |
 | `ModelVisibilityTests.swift` | `ModelVisibilityTests.kt` | 4 (Settings › Models, against `ModelVisibilityFeature`) | 6 Rules (`:server`), 5 Pickers (`:feature:session`) | – |
 | `ServerQuietStyleTests.swift` | `servers/ServerQuietStyleTests.kt` | 2 | – | `markIntroWindsBack…`, `markFrontOnIs…`: `ServerMarkGeometry` (the wireframe mark, unused on iOS) isn't ported |
@@ -83,4 +83,4 @@ left to that module's port ("skipped"); "dropped" tests can't exist on Android.
 
 Production bugs the ported tests found: none (every ported test passed against the existing port).
 
-Total: 97 settings tests, all passing.
+Total: 98 settings tests, all passing. Robolectric (test-only, `isIncludeAndroidResources`) runs only `WhatsNewDotSymbolTests`.

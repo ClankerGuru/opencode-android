@@ -557,7 +557,7 @@ private const val DOT_PITCH = 3.5f
 private const val SWEEP_PERIOD = 4.2f
 
 /** Which dots a symbol lights on a grid: each dot's share of the symbol's ink, from a 4× supersampled rendering. */
-private class DotField(
+internal class DotField(
     val width: Float,
     val height: Float,
     val columns: Int,
