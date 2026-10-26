@@ -454,8 +454,11 @@ class PromptOutbox(
             storage.delivered += messageID
             if (storage.delivered.size > 64) repeat(storage.delivered.size - 64) { storage.delivered.removeAt(0) }
             for (lane in storage.lanes.values) {
-                lane.admitted = lane.admitted.map {
-                    if (it.pending.messageID == messageID) it.copy(pending = it.pending.copy(wasRunning = false)) else it
+                // iOS updates the lane's first match only.
+                val index = lane.admitted.indexOfFirst { it.pending.messageID == messageID }
+                if (index < 0) continue
+                lane.admitted = lane.admitted.toMutableList().also {
+                    it[index] = it[index].copy(pending = it[index].pending.copy(wasRunning = false))
                 }
             }
         }

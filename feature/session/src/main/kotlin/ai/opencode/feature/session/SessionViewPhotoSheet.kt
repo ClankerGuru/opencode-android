@@ -596,7 +596,7 @@ fun SessionPlusPhotoSheet(state: SessionPhotoSheetState, modifier: Modifier = Mo
         }
     }
     if (shown) PhotoLibraryAccessHost()
-    PlusCameraSurface(presentation = state.camera, sheetIsOpen = morph.isOpen) { data -> state.captureCameraPhoto(data) }
+    PlusCameraSurface(presentation = state.camera, sheetIsOpen = morph.isOpen, onCapture = { data -> state.captureCameraPhoto(data) }, sheetContent = { morph.content.value })
 }
 
 /** The grabber, the grid and the foot, laid out where the sheet rests. */

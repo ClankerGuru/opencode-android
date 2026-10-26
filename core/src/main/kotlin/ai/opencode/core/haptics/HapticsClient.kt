@@ -3,7 +3,10 @@ package ai.opencode.core.haptics
 import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.diagnostics.DiagnosticsRecorder
+import ai.opencode.core.diagnostics.LabMarks
 import ai.opencode.core.log.AppLog
+import android.media.AudioManager
 import android.content.Context
 import android.os.VibrationEffect
 import android.os.VibrationEffect.Composition
@@ -110,9 +113,21 @@ private class LiveHaptics(context: Context) {
     )
 
     fun play(haptic: Haptic) {
+        trace(haptic.name)
         if (!isActive() || !systemHapticsEnabled() || !vibrator.hasVibrator()) return
         runCatching { vibrator.vibrate(effect(haptic.feedback)) }
             .onFailure { AppLog.app.error { "Haptic ${haptic.name} failed: ${it::class.java.simpleName}" } }
+    }
+
+    /**
+     * Records what a haptic request met, for Developer Mode traces (iOS `LiveHaptics.trace`):
+     * one content-free `haptic_<kind>` mark while the diagnostics timeline or lab marks run.
+     */
+    private fun trace(kind: String) {
+        if (!DiagnosticsRecorder.shared.isEnabled && !LabMarks.isEnabled) return
+        val active = isActive()
+        val audio = runCatching { AudioSessionHaptics.current(context) }.getOrNull() ?: return
+        LabMarks.mark(AudioSessionHaptics.traceLine(kind, appActive = active, callActive = AudioSessionHaptics.isCallActive(), audio = audio))
     }
 
     private fun isActive(): Boolean =
@@ -160,4 +175,40 @@ private class LiveHaptics(context: Context) {
             is HapticFeedback.Notification -> if (feedback.kind == HapticFeedback.Kind.Success) VibrationEffect.EFFECT_DOUBLE_CLICK else VibrationEffect.EFFECT_HEAVY_CLICK
         },
     )
+}
+
+/**
+ * The audio half of a haptic's trace line (iOS `AudioSessionHaptics`). iOS mutes haptics while
+ * its audio session records unless the session allows them; Android never does (`allow=1`).
+ * `audio=` is the `AudioManager` mode (iOS: category/mode). Dictation and calls report through
+ * [isDictating] and [isCallActive] where they own the audio.
+ */
+object AudioSessionHaptics {
+    data class AudioState(val category: String, val mode: String, val allowsHaptics: Boolean, val dictating: Boolean, val otherAudio: Boolean)
+
+    /** Whether dictation is recording; set by the feature that records. */
+    @Volatile var isDictating: () -> Boolean = { false }
+
+    /** Whether a voice call holds the audio; set by the voice feature. */
+    @Volatile var isCallActive: () -> Boolean = { false }
+
+    fun current(context: Context): AudioState {
+        val audio = context.getSystemService(AudioManager::class.java)
+        val mode = when (audio?.mode) {
+            AudioManager.MODE_NORMAL -> "Normal"
+            AudioManager.MODE_RINGTONE -> "Ringtone"
+            AudioManager.MODE_IN_CALL -> "InCall"
+            AudioManager.MODE_IN_COMMUNICATION -> "InCommunication"
+            AudioManager.MODE_CALL_SCREENING -> "CallScreening"
+            null -> "-"
+            else -> audio.mode.toString()
+        }
+        return AudioState(category = "-", mode = mode, allowsHaptics = true, dictating = isDictating(), otherAudio = audio?.isMusicActive == true)
+    }
+
+    /** One content-free line: what was asked for, whether the app was active, and what the audio was doing. */
+    fun traceLine(kind: String, appActive: Boolean, callActive: Boolean, audio: AudioState): String =
+        "haptic_$kind app=${if (appActive) "active" else "inactive"} audio=${audio.category}/${audio.mode}" +
+            " allow=${if (audio.allowsHaptics) 1 else 0} dictating=${if (audio.dictating) 1 else 0}" +
+            " call=${if (callActive) 1 else 0} other=${if (audio.otherAudio) 1 else 0}"
 }

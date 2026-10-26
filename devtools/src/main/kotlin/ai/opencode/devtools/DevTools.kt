@@ -2,6 +2,9 @@ package ai.opencode.devtools
 
 import ai.opencode.core.diagnostics.DiagnosticsRecorder
 import ai.opencode.core.diagnostics.LabMarks
+import ai.opencode.core.diagnostics.MotionWatch
+import ai.opencode.core.diagnostics.PerfFrameSampler
+import ai.opencode.core.diagnostics.PerfTimeline
 import ai.opencode.core.log.AppLog
 import ai.opencode.core.motion.MotionTunables
 import ai.opencode.core.sharing.SharedKey
@@ -13,6 +16,11 @@ import ai.opencode.core.tuning.TuningPerf
 import ai.opencode.core.tuning.TuningSharedKeys
 import ai.opencode.core.tuning.TuningStore
 import ai.opencode.devtools.tuning.TuningFeature
+import ai.opencode.core.dependencies.AppContext
+import ai.opencode.core.dependencies.dependency
+import ai.opencode.devtools.traces.TraceUploadsFeature
+import ai.opencode.devtools.traces.WindowSnapshot
+import android.app.Application
 import android.content.Intent
 import java.net.URL
 
@@ -37,12 +45,20 @@ object DevTools {
 
     /** At launch: applies the saved Tuning switch where tuning is available (iOS `TuningOverlay.start`). */
     fun install() {
+        // iOS makes `DiagnosticsRecorder.shared` at launch: its journal sets the previous run aside
+        // and starts following the foreground marker before anything records.
+        DiagnosticsRecorder.shared
+        runCatching { dependency(AppContext).applicationContext as Application }.getOrNull()?.let(WindowSnapshot::install)
         applyTuning(shared(TuningSharedKeys.tuningEnabled).value && TuningAccess.isAvailable)
     }
 
     /**
      * Debug lab extras (iOS launch arguments): `tuning-enabled`, `tuning-as-release`,
-     * `lab-time-scale`, `lab-marks-url`, `diagnostics-enabled`, `lab-tuning-perf`, `tuning-panel`.
+     * `lab-time-scale`, `lab-marks-url`, `diagnostics-enabled`, `lab-tuning-perf`, `tuning-panel`,
+     * `perf-signposts` (iOS `OPENCODE_PERF_SIGNPOSTS=1`: `PerfTimeline` sections without a lab),
+     * `perf-frames` (iOS `OPENCODE_PERF_FRAMES=1`: frame windows and latencies on a lab run) and
+     * `lab-crash-report` (iOS `-lab-crash-report`: debug builds report an unclean exit only when asked) and
+     * `lab-motion-watch` (iOS `-lab-motion-watch`: Motion Watch on for the run).
      */
     fun handleLaunchIntent(intent: Intent?) {
         intent ?: return
@@ -50,6 +66,10 @@ object DevTools {
         intent.getStringExtra("lab-marks-url")?.let { raw -> LabMarks.endpoint = runCatching { URL(raw) }.getOrNull() }
         if (intent.getBooleanExtra("diagnostics-enabled", false)) DiagnosticsRecorder.shared.setEnabled(true)
         if (intent.getBooleanExtra("lab-tuning-perf", false)) TuningPerf.enabled = true
+        if (intent.getBooleanExtra("lab-crash-report", false)) TraceUploadsFeature.labCrashReport = true
+        if (intent.getBooleanExtra("perf-signposts", false)) PerfTimeline.signpostsRequested = true
+        if (intent.getBooleanExtra("perf-frames", false)) PerfFrameSampler.framesRequested = true
+        if (intent.getBooleanExtra("lab-motion-watch", false)) MotionWatch.enableForLab()
         AnimationTimeScale.requestedLabScale(intent.getStringExtra("lab-time-scale"))?.let {
             AnimationTimeScale.shared.setScale(it, bypassAccessCheck = true)
         }
@@ -82,6 +102,7 @@ object DevTools {
 
     /** Developer Mode changed: outside debug builds, tuning and slow motion leave with it (iOS `TuningOverlay.accessChanged`). */
     fun accessChanged() {
+        MotionWatch.shared.accessChanged()
         if (!TuningAccess.isAvailable) {
             if (TuningStore.shared.isEnabled) setTuningEnabled(false)
             AnimationTimeScale.shared.reset()

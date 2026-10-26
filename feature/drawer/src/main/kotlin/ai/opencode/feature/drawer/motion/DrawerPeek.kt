@@ -30,6 +30,8 @@ import kotlin.math.min
  * A session's last activity as the drawer's time reveal shows it (iOS `DrawerTimestamp`): the
  * time today, then Yesterday, the weekday within the week, and a short numeric date. Formats
  * are java.time's localized short styles (iOS `Date.FormatStyle` `.shortened` / `.numeric`).
+ * Pass [hour24] (`DateFormat.is24HourFormat`) so the time follows the device's 24-hour setting,
+ * as iOS's `.shortened` follows the user's.
  */
 object DrawerTimestamp {
     private val cache = ConcurrentHashMap<String, String>()
@@ -39,21 +41,26 @@ object DrawerTimestamp {
         now: Instant = Instant.now(),
         zone: ZoneId = ZoneId.systemDefault(),
         locale: Locale = Locale.getDefault(),
+        hour24: Boolean? = null,
     ): String {
         val today = now.atZone(zone).truncatedTo(ChronoUnit.DAYS)
         val dayOfDate = date.atZone(zone).truncatedTo(ChronoUnit.DAYS)
         val days = ChronoUnit.DAYS.between(dayOfDate.toLocalDate(), today.toLocalDate()).toInt()
         // iOS `MinuteTimestampCache`: one entry per minute, day bucket, locale and zone.
-        val key = "${date.epochSecond / 60}|$days|${locale.toLanguageTag()}|${zone.id}"
+        val key = "${date.epochSecond / 60}|$days|${locale.toLanguageTag()}|${zone.id}|$hour24"
         cache[key]?.let { return it }
-        val formatted = uncachedText(date.atZone(zone), today, days, locale)
+        val formatted = uncachedText(date.atZone(zone), today, days, locale, hour24)
         if (cache.size > 2_000) cache.clear()
         cache[key] = formatted
         return formatted
     }
 
-    private fun uncachedText(date: ZonedDateTime, today: ZonedDateTime, days: Int, locale: Locale): String {
-        val time = DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(locale)
+    private fun uncachedText(date: ZonedDateTime, today: ZonedDateTime, days: Int, locale: Locale, hour24: Boolean?): String {
+        val time = if (hour24 == null) {
+            DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(locale)
+        } else {
+            DateTimeFormatter.ofPattern(android.text.format.DateFormat.getBestDateTimePattern(locale, if (hour24) "Hm" else "hm"), locale)
+        }
         val numeric = DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT).withLocale(locale)
         if (days == 0 && !date.isBefore(today)) return date.format(time)
         if (!date.isBefore(today)) return date.format(numeric)

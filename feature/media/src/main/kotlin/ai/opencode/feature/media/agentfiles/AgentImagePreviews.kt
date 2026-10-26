@@ -824,9 +824,13 @@ class AgentImagePreviews(
         val RETRY_DELAYS: List<Duration> = listOf(2.seconds, 8.seconds, 30.seconds)
         /**
          * How long an image whose shape isn't known stays out of the layout before a placeholder
-         * stands in. This bounds the blank wait even when the server sends no header.
+         * stands in. This bounds the blank wait even when the server sends no header. Lab runs
+         * that watch a held image for longer stretch it (iOS `-lab-image-shape-deadline-ms`):
+         * `debug.opencode.lab_image_shape_deadline_ms`, debuggable builds only.
          */
-        val SHAPE_DEADLINE: Duration = 700.milliseconds
+        val SHAPE_DEADLINE: Duration by lazy {
+            LabLaunch.property("debug.opencode.lab_image_shape_deadline_ms")?.toIntOrNull()?.milliseconds ?: 700.milliseconds
+        }
         /** How long a gallery whose block is still streaming gathers images named after its first before deciding their arrangement. */
         val bentoGather: Duration get() = SHAPE_DEADLINE
         const val MAXIMUM_DEFERRED_KEYS = 64
@@ -1004,9 +1008,17 @@ class AgentImageSizeCache(private val file: File?) {
         private val json = Json { ignoreUnknownKeys = true }
         private val saveScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-        /** `cacheDir/AgentImageSizes.json`; in memory where no context is installed. */
+        /**
+         * `cacheDir/AgentImageSizes.json`; in memory where no context is installed. Lab runs that
+         * keep no transcript on disk keep no shapes either, so one run never opens with another's
+         * (iOS `LabTranscriptDiskCache.isDisabled`, `OPENCODE_LAB_DISABLE_TRANSCRIPT_DISK_CACHE=1`):
+         * `debug.opencode.lab_disable_transcript_disk_cache` = 1, debuggable builds only.
+         */
         val live: AgentImageSizeCache by lazy {
-            AgentImageSizeCache(runCatching { File(dependency(AppContext).cacheDir, "AgentImageSizes.json") }.getOrNull())
+            val disabled = LabLaunch.property("debug.opencode.lab_disable_transcript_disk_cache") == "1"
+            AgentImageSizeCache(
+                if (disabled) null else runCatching { File(dependency(AppContext).cacheDir, "AgentImageSizes.json") }.getOrNull(),
+            )
         }
 
         val inMemory: AgentImageSizeCache get() = AgentImageSizeCache(null)

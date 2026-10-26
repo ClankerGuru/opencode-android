@@ -1,11 +1,11 @@
 package ai.opencode.feature.composer
 
-import ai.opencode.core.sharing.InstantSerializer
 import ai.opencode.core.files.ComposerStagedFile
 import ai.opencode.server.model.OpenCodeOutgoingAttachment
 import ai.opencode.server.model.OpenCodeProject
 import ai.opencode.server.model.OpenCodeSession
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Required
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
@@ -54,11 +54,12 @@ data class DraftState(
 @Serializable
 data class UndoSnapshot(
     val restoredDraft: String,
-    val priorDraft: String = "",
+    // Swift's synthesized `Decodable` ignores property defaults: these keys are required, as on iOS.
+    @Required val priorDraft: String = "",
     @Serializable(with = SharedLocationSerializer::class) val restoredLocation: SharedLocation? = null,
     @Serializable(with = SharedLocationSerializer::class) val priorLocation: SharedLocation? = null,
-    val attachmentIDs: Set<@Serializable(with = UUIDSerializer::class) UUID> = emptySet(),
-    val fileIDs: Set<@Serializable(with = UUIDSerializer::class) UUID> = emptySet(),
+    @Required val attachmentIDs: Set<@Serializable(with = UUIDSerializer::class) UUID> = emptySet(),
+    @Required val fileIDs: Set<@Serializable(with = UUIDSerializer::class) UUID> = emptySet(),
 )
 
 /**
@@ -173,7 +174,7 @@ data class RestoredOutboxEntry(
     val updatedAt: Instant,
 )
 
-/** iOS `SharedLocation: Codable` (`ComposerPersistence.swift`): the same keys, `capturedAt` as an instant. */
+/** iOS `SharedLocation: Codable` (`ComposerPersistence.swift`): the same keys, `capturedAt` in `JSONEncoder`'s date shape. */
 internal object SharedLocationSerializer : KSerializer<SharedLocation> {
     @Serializable
     private class Surrogate(
@@ -182,7 +183,7 @@ internal object SharedLocationSerializer : KSerializer<SharedLocation> {
         val accuracy: Double? = null,
         val place: String? = null,
         val address: String? = null,
-        @Serializable(with = InstantSerializer::class) val capturedAt: Instant,
+        @Serializable(with = ComposerDateSerializer::class) val capturedAt: Instant,
     )
 
     override val descriptor: SerialDescriptor = Surrogate.serializer().descriptor

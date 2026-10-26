@@ -41,7 +41,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.foundation.focusable
@@ -145,9 +144,10 @@ fun DrawerListSessionCell(
     val key = remember(row.session.id) { DrawerPinDrag.ItemKey.Row(row.session.id) }
     val rowCoordinates = remember(row.session.id) { arrayOfNulls<LayoutCoordinates>(1) }
 
-    // A row leaving the list mid-hold or mid-drag ends it.
+    // A row leaving the list mid-drag or mid-landing ends it (iOS `Coordinator.dismantle`: the
+    // drag under way, or the pin drag's row; `dismantled` checks the latter).
     DisposableEffect(row.session.id) {
-        onDispose { if (hold.isDragActive) currentActions.dismantled() }
+        onDispose { currentActions.dismantled() }
     }
 
     val emphasis = DrawerRowEmphasis.of(selected = row.selected, muted = row.muted, hasIndicator = row.indicator != Indicator.none)
@@ -234,8 +234,14 @@ fun DrawerListSessionCell(
             Modifier
                 .fillMaxWidth()
                 .heightIn(min = DrawerMetrics.rowHeight)
+                // The raised row's shadow, always in the chain (only its elevation changes), so the
+                // hold that raises it mid-gesture never changes the modifiers around the touch handler.
+                .graphicsLayer {
+                    shadowElevation = if (held) 8.dp.toPx() else 0f
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(cornerRadius)
+                    clip = false
+                }
                 .onGloballyPositioned { rowCoordinates[0] = it }
-                .then(if (held) Modifier.shadow(8.dp, androidx.compose.foundation.shape.RoundedCornerShape(cornerRadius), clip = false) else Modifier)
                 .drawBehind {
                     if (held) drawRoundRect(raisedSurface, cornerRadius = CornerRadius(cornerRadius.toPx()))
                 }

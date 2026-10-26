@@ -151,3 +151,18 @@ class DevToolsClient(
         }
     }
 }
+
+/**
+ * iOS `DiagnosticsClient.developerModeChanged(true)`: turning Developer Mode on uploads every voice
+ * call log saved on this phone (`DeveloperMode.upload(log)`, detached at utility priority). Voice
+ * sits beside `:devtools`, so `:app` installs the live value; the default does nothing.
+ */
+class SavedVoiceLogUploads(
+    /** Starts the uploads and returns at once; they outlive the screen that asked. */
+    val uploadAll: () -> Unit = {},
+) {
+    companion object Key : DependencyKey<SavedVoiceLogUploads> {
+        override val liveValue: SavedVoiceLogUploads = SavedVoiceLogUploads()
+        override val testValue: SavedVoiceLogUploads = SavedVoiceLogUploads()
+    }
+}

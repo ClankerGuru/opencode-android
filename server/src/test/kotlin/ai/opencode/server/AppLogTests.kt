@@ -36,13 +36,14 @@ class AppLogTests {
     fun aPairingCodeNeverReachesTheLog() {
         assertEquals("/auth/…", loggablePath("/auth/connect/abc-123"))
         assertEquals("/api/session/ses_1/prompt", loggablePath("/api/session/ses_1/prompt"))
-        // Android: the exception's type and its cause's (iOS: the URLError code and its
-        // underlying POSIX error), never the message that carries the URL.
+        // iOS: "URLError -1005 (NSPOSIXErrorDomain 53)". Android: the URLError code the
+        // exception maps to (`UrlErrorCode`), its type, then its cause's type; never the
+        // message that carries the URL.
         val error = SocketException("https://user:secret@example.ts.net/api").apply {
             initCause(java.io.IOException("connection reset by https://user:secret@example.ts.net"))
         }
         val description = logDescription(error)
-        assertEquals("SocketException (IOException)", description)
+        assertEquals("URLError -1005 (SocketException) (IOException)", description)
         assertFalse(description.contains("secret"))
         assertFalse(description.contains("example.ts.net"))
     }

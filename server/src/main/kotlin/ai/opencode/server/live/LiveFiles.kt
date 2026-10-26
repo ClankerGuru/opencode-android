@@ -31,6 +31,7 @@ import okio.BufferedSink
 import okio.source
 import java.io.File
 import java.io.IOException
+import java.text.Collator
 import java.util.UUID
 import kotlin.time.Duration.Companion.seconds
 
@@ -237,17 +238,17 @@ internal fun directoryListing(location: String, path: String?, entries: List<Pai
     val directory = resolve(path ?: location)
     val folders = entries.filter { it.second == "directory" }.map { resolve(it.first) }.filter { it != directory }
     fun name(path: String) = path.trimEnd('/').substringAfterLast('/')
+    val collator = standardCollator()
     val sorted = folders.toSet().sortedWith { x, y ->
         val a = name(x)
         val b = name(y)
-        if (a.startsWith(".") != b.startsWith(".")) (if (!a.startsWith(".")) -1 else 1) else naturalCompare(a, b)
+        if (a.startsWith(".") != b.startsWith(".")) (if (!a.startsWith(".")) -1 else 1) else naturalCompare(a, b, collator)
     }
     return OpenCodeDirectoryListing(directory, sorted)
 }
 
 /** `localizedStandardCompare`: case-insensitive, digit runs compared by value. */
-internal fun naturalCompare(a: String, b: String): Int {
-    val collator = standardCollator()
+internal fun naturalCompare(a: String, b: String, collator: Collator = standardCollator()): Int {
     var i = 0
     var j = 0
     while (i < a.length && j < b.length) {

@@ -181,12 +181,14 @@ fun AttachmentPickerButton(
     val circleAlpha by animateFloatAsState(if (isDictating) 1f else 0f, dictationSpec, label = "dictation-circle")
     val circleColor by animateColorAsState(
         if (cancelArmed) SystemRed else MaterialTheme.colorScheme.surfaceContainerHighest,
+        if (reduceMotion) Motion.easeInOut(0.15) else MotionSpring(0.22, 0.25).spec(),
         label = "dictation-circle-color",
     )
     val glyphX by animateFloatAsState(if (isDictating) 0f else glyphOffset, dictationSpec, label = "plus-glyph-x")
     val touchAlpha by animateFloatAsState(
         if (isTouching && !showsX) 0.55f else 1f,
-        Motion.easeInOut(0.15),
+        // SwiftUI `.smooth(duration: 0.15)`: a critically damped spring.
+        MotionSpring(0.15).spec(),
         label = "plus-touch",
     )
     val glyphColor = if (cancelArmed) Color.White else OpenCodeTheme.colors.text

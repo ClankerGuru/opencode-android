@@ -340,7 +340,10 @@ private class TranscriptCacheWriter(private val storage: TranscriptCachePersiste
     private fun write(snapshot: CachedTranscriptSnapshots?) {
         snapshot ?: return
         val data = snapshot.encodedForPersistence() ?: return storage.remove()
-        storage.set(data)
+        if (storage.set(data)) return
+        // Refused (iOS: a locked phone): keep it pending unless a newer one replaced it, so
+        // the next schedule or flush writes it instead of losing it.
+        synchronized(lock) { if (pending == null) pending = snapshot }
     }
 }
 

@@ -5,13 +5,16 @@ import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.core.dependencies.dependency
-import ai.opencode.core.log.AppLog
 import ai.opencode.server.OpenCodePairingLink
 import ai.opencode.server.model.OpenCodePageContext
 import android.annotation.SuppressLint
 import android.content.Context
+import android.app.Activity
+import android.content.ContextWrapper
 import android.content.MutableContextWrapper
 import android.content.pm.ApplicationInfo
+import android.content.res.Resources
+import android.graphics.Color
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.os.Handler
@@ -19,15 +22,21 @@ import android.os.Looper
 import android.os.Message
 import android.view.ContextThemeWrapper
 import android.view.MotionEvent
+import android.view.View
 import android.view.ViewGroup
+import android.view.WindowInsets
+import android.view.WindowInsetsController
 import android.view.animation.DecelerateInterpolator
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.webkit.ProfileStore
+import androidx.webkit.ScriptHandler
+import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import kotlinx.coroutines.CoroutineScope
@@ -37,7 +46,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.util.Locale
 import java.util.UUID
 import kotlin.coroutines.resume
 import kotlin.math.roundToInt
@@ -95,8 +106,11 @@ class PageReaderClient(
  * so cookies and logins last until the app quits and never mix with other web content: pages
  * open signed out and what the agent can read is public by default. (iOS's store never reaches
  * disk; Android WebView has no in-memory profile, so clearing at first use stands in for it.)
- * Only public `http(s)` pages load ([BrowserLinkPolicy]); other links go to the system. Media
- * waits for a tap. Port of iOS `BrowserWebViews`.
+ * Only public `http(s)` pages load ([BrowserLinkPolicy]), in the page and in its frames; other
+ * links go to the system. Media waits for a tap. Port of iOS `BrowserWebViews`.
+ *
+ * iOS runs the page reader in its own `WKContentWorld`; Android's WebView has no content worlds,
+ * so the reader runs in the page's world, wrapped in a function that leaves no globals behind.
  */
 class BrowserWebViews private constructor() {
     class Entry(var url: String, val id: UUID) {
@@ -110,8 +124,17 @@ class BrowserWebViews private constructor() {
         var lastTouchY = 0f
         /** The context a page needs for its dialogs and pickers: the host's while shown. */
         val context = MutableContextWrapper(dependency(AppContext))
-        /** The app's appearance when the page opened: the page's `prefers-color-scheme`. */
-        var isDark = false
+        /** The app's appearance, which the page reads as `prefers-color-scheme` (see [BrowserThemeContext]). */
+        val themed = BrowserThemeContext(context)
+        /** The back button above and the bar below, in dp (iOS `obscuredContentInsets`). */
+        var insets = BrowserInsets()
+        /** The insets' document-start script, replaced when they change. */
+        var insetsScript: ScriptHandler? = null
+        /** The width the insets were last given for, in dp (desktop pages scale them by it). */
+        var insetsWidth = 0f
+        /** A video playing full screen (iOS's media presentation), and how to end it. */
+        var fullscreen: View? = null
+        var fullscreenCallback: WebChromeClient.CustomViewCallback? = null
     }
 
     private val entries = HashMap<UUID, Entry>()
@@ -120,13 +143,12 @@ class BrowserWebViews private constructor() {
 
     /**
      * The page's web view, made on first use. [isDark] is the app's appearance (iOS: a web view
-     * follows its window's interface style); Android hands it to the page as `prefers-color-scheme`
-     * through the creating context's `isLightTheme`, so it is fixed when the web view is made.
+     * follows its window's interface style); later changes come through [setAppearance].
      */
     fun webView(id: UUID, url: String, isDark: Boolean = false): WebView {
         val entry = entries.getOrPut(id) { Entry(url, id) }
         entry.webView?.let { return it }
-        entry.isDark = isDark
+        entry.themed.isDark = isDark
         val webView = makeWebView(entry)
         entry.webView = webView
         webView.loadUrl(entry.url)
@@ -140,6 +162,31 @@ class BrowserWebViews private constructor() {
 
     fun setLinkHeldHandler(id: UUID, handler: ((String, Float, Float) -> Unit)?) {
         entries[id]?.onLinkHeld = handler
+    }
+
+    /**
+     * The app's appearance changed: the open page's `prefers-color-scheme` follows without a
+     * reload, as a `WKWebView` follows its trait collection. Android's WebView reads the scheme
+     * from its context theme's `isLightTheme` whenever it refreshes its preferences, which a
+     * configuration change triggers.
+     */
+    fun setAppearance(id: UUID, isDark: Boolean) {
+        val entry = entries[id] ?: return
+        if (entry.themed.isDark == isDark) return
+        entry.themed.isDark = isDark
+        entry.webView?.let { it.dispatchConfigurationChanged(it.resources.configuration) }
+    }
+
+    /**
+     * The back button above and the bar below (iOS `obscuredContentInsets`): the page draws edge
+     * to edge and scrolls under them, and its first and last pixels still scroll clear of them.
+     */
+    fun setObscuredInsets(id: UUID, insets: BrowserInsets) {
+        val entry = entries[id] ?: return
+        val clamped = BrowserInsets.obscured(insets)
+        if (entry.insets == clamped) return
+        entry.insets = clamped
+        entry.webView?.let { installInsets(it, entry) }
     }
 
     /** Pages held now: zero once every session has let go. */
@@ -178,6 +225,7 @@ class BrowserWebViews private constructor() {
 
     fun discard(id: UUID) {
         val entry = entries.remove(id) ?: return
+        exitFullscreen(entry)
         entry.webView?.let { tearDown(it, entry) }
     }
 
@@ -293,11 +341,7 @@ class BrowserWebViews private constructor() {
     private fun makeWebView(entry: Entry): WebView {
         val profile = prepareProfile()
         // Android's WebView reads the page's colour scheme from its context theme's `isLightTheme`.
-        val themed = ContextThemeWrapper(
-            entry.context,
-            if (entry.isDark) android.R.style.Theme_Material_NoActionBar else android.R.style.Theme_Material_Light_NoActionBar,
-        )
-        val webView = WebView(themed)
+        val webView = WebView(entry.themed)
         if (profile != null) WebViewCompat.setProfile(webView, profile)
         if (!clearedThisRun) {
             clearedThisRun = true
@@ -310,7 +354,8 @@ class BrowserWebViews private constructor() {
             mediaPlaybackRequiresUserGesture = true
             allowFileAccess = false
             allowContentAccess = false
-            setSupportMultipleWindows(false)
+            // Links that ask for a new window open in this one ([Chrome.onCreateWindow]).
+            setSupportMultipleWindows(true)
             javaScriptCanOpenWindowsAutomatically = false
             builtInZoomControls = true
             displayZoomControls = false
@@ -318,18 +363,19 @@ class BrowserWebViews private constructor() {
             loadWithOverviewMode = true
             cacheMode = WebSettings.LOAD_DEFAULT
         }
+        // iOS shows a page in dark only when the page itself supports it (no algorithmic darkening).
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
+            WebSettingsCompat.setAlgorithmicDarkeningAllowed(webView.settings, false)
+        }
         webView.isVerticalScrollBarEnabled = true
         webView.contentDescription = null
         if (isDebuggable) WebView.setWebContentsDebuggingEnabled(true)
         webView.webViewClient = Client(entry)
-        webView.webChromeClient = object : WebChromeClient() {
-            override fun onReceivedTitle(view: WebView, title: String?) {
-                entry.onEvent?.invoke(BrowserFeature.Action.TitleChanged(title ?: ""))
-            }
-
-            override fun onProgressChanged(view: WebView, newProgress: Int) {
-                if (newProgress >= 100) entry.onEvent?.invoke(BrowserFeature.Action.LoadingChanged(false))
-            }
+        webView.webChromeClient = Chrome(entry, profile)
+        installInsets(webView, entry)
+        // Desktop pages scale the insets by the web view's width: a new width gives them again.
+        webView.addOnLayoutChangeListener { view, left, _, right, _, oldLeft, _, oldRight, _ ->
+            if (right - left != oldRight - oldLeft && entry.webView === view) installInsets(view as WebView, entry)
         }
         // Downloads and anything the page can't show go to the system.
         webView.setDownloadListener { url, _, contentDisposition, _, _ ->
@@ -389,6 +435,8 @@ class BrowserWebViews private constructor() {
     private fun tearDown(webView: WebView, entry: Entry) {
         entry.onEvent = null
         entry.onLinkHeld = null
+        entry.insetsScript?.remove()
+        entry.insetsScript = null
         webView.evaluateJavascript(PAUSE_MEDIA_SCRIPT, null)
         webView.stopLoading()
         webView.setDownloadListener(null)
@@ -467,9 +515,26 @@ class BrowserWebViews private constructor() {
             emitHistory(entry, view)
         }
 
+        /**
+         * Embedded frames' first loads (iOS judges every frame's navigations; Android's
+         * `shouldOverrideUrlLoading` skips a frame's initial load). A frame's document request is
+         * a navigation, the only kind that carries `Upgrade-Insecure-Requests` (Chromium adds it
+         * to every frame navigation), so images, scripts and fetches load as on iOS. What iOS
+         * cancels answers 204 No Content, which leaves the frame as it was. Runs off the main thread.
+         */
+        override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
+            if (request.isForMainFrame || !isFrameNavigation(request)) return null
+            val decision = BrowserNavigationPolicy.decide(request.url?.toString(), isMainFrame = false, isUserTap = false)
+            return if (decision == BrowserNavigationPolicy.Decision.Allow) null else cancelledFrame()
+        }
+
+        override fun onPageCommitVisible(view: WebView, url: String?) {
+            // Without document-start scripts, the insets arrive once the page commits.
+            if (!documentStartScripts) view.evaluateJavascript(insetsScript(entry), null)
+        }
+
         /** The renderer went away (memory pressure): the page loads again in a fresh web view. */
         override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
-            AppLog.app.notice("Browser page renderer ended crashed=${detail.didCrash()}")
             if (entries[entry.id] !== entry || entry.webView !== view) {
                 (view.parent as? ViewGroup)?.removeView(view)
                 view.destroy()
@@ -479,6 +544,8 @@ class BrowserWebViews private constructor() {
             val index = parent?.indexOfChild(view) ?: -1
             val layoutParams = view.layoutParams
             parent?.removeView(view)
+            exitFullscreen(entry)
+            entry.insetsScript = null
             view.destroy()
             val fresh = makeWebView(entry)
             entry.webView = fresh
@@ -487,6 +554,124 @@ class BrowserWebViews private constructor() {
             return true
         }
     }
+
+    private inner class Chrome(private val entry: Entry, private val profile: String?) : WebChromeClient() {
+        override fun onReceivedTitle(view: WebView, title: String?) {
+            entry.onEvent?.invoke(BrowserFeature.Action.TitleChanged(title ?: ""))
+        }
+
+        override fun onProgressChanged(view: WebView, newProgress: Int) {
+            if (newProgress >= 100) entry.onEvent?.invoke(BrowserFeature.Action.LoadingChanged(false))
+        }
+
+        /**
+         * Links that ask for a new window open in this one, if they may load at all (iOS
+         * `createWebViewWith`). WebView names the new window's address only to the web view that
+         * takes it, so a throwaway one hears it and is let go.
+         */
+        override fun onCreateWindow(view: WebView, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message): Boolean {
+            val transport = resultMsg.obj as? WebView.WebViewTransport ?: return false
+            val probe = WebView(view.context)
+            if (profile != null) WebViewCompat.setProfile(probe, profile)
+            probe.webViewClient = object : WebViewClient() {
+                private var heard = false
+
+                private fun heard(window: WebView, url: String?) {
+                    if (heard) return
+                    heard = true
+                    window.stopLoading()
+                    if (url != null && BrowserLinkPolicy.isPublicWebPage(url) && entry.webView === view) view.loadUrl(url)
+                    window.post { window.destroy() }
+                }
+
+                override fun shouldOverrideUrlLoading(window: WebView, request: WebResourceRequest): Boolean {
+                    heard(window, request.url?.toString())
+                    return true
+                }
+
+                override fun onPageStarted(window: WebView, url: String?, favicon: Bitmap?) = heard(window, url)
+            }
+            transport.webView = probe
+            resultMsg.sendToTarget()
+            return true
+        }
+
+        /** A video going full screen (WebKit presents its own player): over the whole window. */
+        override fun onShowCustomView(view: View, callback: CustomViewCallback) {
+            val activity = activityOf(entry.context.baseContext)
+            if (activity == null || entry.fullscreen != null) {
+                callback.onCustomViewHidden()
+                return
+            }
+            view.setBackgroundColor(Color.BLACK)
+            (activity.window.decorView as ViewGroup).addView(
+                view,
+                ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT),
+            )
+            activity.window.insetsController?.apply {
+                systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                hide(WindowInsets.Type.systemBars())
+            }
+            entry.fullscreen = view
+            entry.fullscreenCallback = callback
+        }
+
+        override fun onHideCustomView() = exitFullscreen(entry)
+    }
+
+    /** Ends a full-screen video (iOS `closeAllMediaPresentations`). */
+    private fun exitFullscreen(entry: Entry) {
+        val view = entry.fullscreen ?: return
+        val callback = entry.fullscreenCallback
+        entry.fullscreen = null
+        entry.fullscreenCallback = null
+        (view.parent as? ViewGroup)?.removeView(view)
+        activityOf(entry.context.baseContext)?.window?.insetsController?.show(WindowInsets.Type.systemBars())
+        callback?.onCustomViewHidden()
+    }
+
+    private fun activityOf(context: Context): Activity? {
+        var current: Context? = context
+        while (current != null) {
+            if (current is Activity) return current
+            current = (current as? ContextWrapper)?.baseContext
+        }
+        return null
+    }
+
+    /**
+     * Gives the page its obscured insets: a document-start script for every page it goes to, and
+     * the open page now. iOS hands WebKit `obscuredContentInsets`; Android's WebView has no
+     * content insets (it ignores padding, and its `env(safe-area-inset-*)` comes only from the
+     * window's system bars, for `viewport-fit=cover` pages alone). So the page's root gets the
+     * insets as padding (border-box, so full-height layouts fit between the bars) and scroll
+     * padding: the page draws under the bars, and scrolled to either end its first and last
+     * pixels sit clear of them.
+     */
+    private fun installInsets(webView: WebView, entry: Entry) {
+        val metrics = webView.resources.displayMetrics
+        entry.insetsWidth = (if (webView.width > 0) webView.width else metrics.widthPixels) / metrics.density
+        val script = insetsScript(entry)
+        if (documentStartScripts) {
+            entry.insetsScript?.remove()
+            entry.insetsScript = WebViewCompat.addDocumentStartJavaScript(webView, script, setOf("*"))
+        }
+        webView.evaluateJavascript(script, null)
+    }
+
+    private fun insetsScript(entry: Entry): String {
+        val insets = entry.insets
+        fun number(value: Float) = String.format(Locale.ROOT, "%.2f", value)
+        return "($INSETS_SCRIPT)(${number(insets.top)},${number(insets.left)},${number(insets.bottom)},${number(insets.right)},${number(entry.insetsWidth)});"
+    }
+
+    private val documentStartScripts: Boolean by lazy { WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT) }
+
+    private fun isFrameNavigation(request: WebResourceRequest): Boolean =
+        request.requestHeaders.entries.any { (name, value) -> name.equals("Upgrade-Insecure-Requests", ignoreCase = true) && value.trim() == "1" }
+
+    private fun cancelledFrame(): WebResourceResponse =
+        WebResourceResponse("text/plain", "utf-8", 204, "No Content", emptyMap(), ByteArrayInputStream(ByteArray(0)))
 
     private suspend fun evaluate(webView: WebView, script: String): String? = suspendCancellableCoroutine { continuation ->
         webView.evaluateJavascript(script) { value ->
@@ -524,6 +709,47 @@ class BrowserWebViews private constructor() {
 
         private val isDebuggable: Boolean
             get() = dependency(AppContext).applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
+
+        /**
+         * The obscured insets on the page's root (main frame only), in dp scaled to the page's
+         * layout width (a desktop page laid out wider than the screen gets proportionally more),
+         * applied as soon as the root exists and again as the page loads and resizes. State lives
+         * on a registry symbol so a later call updates it without stacking listeners.
+         */
+        private val INSETS_SCRIPT = """
+            function(t, l, b, r, w) {
+              if (window.top !== window) return;
+              var key = Symbol.for('opencode.browser.insets');
+              var s = window[key];
+              if (!s) {
+                s = { t: 0, l: 0, b: 0, r: 0, w: 0 };
+                Object.defineProperty(window, key, { value: s });
+                s.apply = function() {
+                  var root = document.documentElement;
+                  if (!root) return;
+                  var k = s.w > 0 ? Math.max(1, root.clientWidth / s.w) : 1;
+                  var style = root.style;
+                  style.setProperty('box-sizing', 'border-box', 'important');
+                  style.setProperty('padding-top', (s.t * k) + 'px', 'important');
+                  style.setProperty('padding-left', (s.l * k) + 'px', 'important');
+                  style.setProperty('padding-bottom', (s.b * k) + 'px', 'important');
+                  style.setProperty('padding-right', (s.r * k) + 'px', 'important');
+                  style.setProperty('scroll-padding-top', (s.t * k) + 'px', 'important');
+                  style.setProperty('scroll-padding-bottom', (s.b * k) + 'px', 'important');
+                };
+                if (!document.documentElement) {
+                  new MutationObserver(function(_, observer) {
+                    if (document.documentElement) { observer.disconnect(); s.apply(); }
+                  }).observe(document, { childList: true });
+                }
+                document.addEventListener('DOMContentLoaded', s.apply);
+                window.addEventListener('load', s.apply);
+                window.addEventListener('resize', s.apply);
+              }
+              s.t = t; s.l = l; s.b = b; s.r = r; s.w = w;
+              s.apply();
+            }
+        """.trimIndent()
 
         private const val PAUSE_MEDIA_SCRIPT =
             "document.querySelectorAll('video,audio').forEach(function(m){try{m.pause()}catch(e){}});"
@@ -571,5 +797,45 @@ class BrowserWebViews private constructor() {
             const scrollable = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
             return { url: location.href, title: document.title, visible: parts.join(''), selection, scroll: Math.min(1, Math.max(0, window.scrollY / scrollable)) };
         """.trimIndent()
+    }
+}
+
+/**
+ * The page's obscured insets in dp: the back button's row above, the bar (and Ask, and the
+ * keyboard) below, and the side safe areas (iOS `UIEdgeInsets` for `obscuredContentInsets`).
+ */
+data class BrowserInsets(val top: Float = 0f, val left: Float = 0f, val bottom: Float = 0f, val right: Float = 0f) {
+    companion object {
+        /**
+         * iOS `BrowserWebViewHost.obscuredInsets`: never negative (mid-rotation or mid-drawer-slide
+         * the safe area can briefly report one).
+         */
+        fun obscured(insets: BrowserInsets) = BrowserInsets(
+            top = maxOf(0f, insets.top),
+            left = maxOf(0f, insets.left),
+            bottom = maxOf(0f, insets.bottom),
+            right = maxOf(0f, insets.right),
+        )
+    }
+}
+
+/**
+ * The browser's context theme, light or dark as the app is (a `WKWebView` follows its window's
+ * interface style). Chromium reads `isLightTheme` from the web view's context theme each time it
+ * refreshes the page's preferences, so switching [isDark] and sending the web view a configuration
+ * change updates the page's `prefers-color-scheme` in place. The base stays the page's
+ * [MutableContextWrapper], so dialogs and pickers still use the host's window.
+ */
+class BrowserThemeContext(base: Context) : ContextThemeWrapper(base, 0) {
+    var isDark = false
+    private var themes: Pair<Resources, Array<Resources.Theme?>>? = null
+
+    override fun getTheme(): Resources.Theme {
+        val resources = resources
+        val cached = themes?.takeIf { it.first === resources }?.second ?: arrayOfNulls<Resources.Theme>(2).also { themes = resources to it }
+        val index = if (isDark) 1 else 0
+        return cached[index] ?: resources.newTheme().apply {
+            applyStyle(if (isDark) android.R.style.Theme_Material_NoActionBar else android.R.style.Theme_Material_Light_NoActionBar, true)
+        }.also { cached[index] = it }
     }
 }

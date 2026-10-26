@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package ai.opencode.feature.session
 
 import androidx.compose.ui.semantics.semantics
@@ -16,6 +18,7 @@ import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeIconSize
 import ai.opencode.core.ui.OpenCodeSecondaryButton
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.core.ui.ProviderIcon
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.State
@@ -76,8 +79,8 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -105,7 +108,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -116,9 +118,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.currentStateAsState
-import coil3.compose.AsyncImage
-import coil3.request.ImageRequest
-import coil3.svg.SvgDecoder
 import kotlinx.coroutines.flow.drop
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -253,7 +252,7 @@ fun SessionView(
                 SessionHeaderBackdrop(
                     backdrop = resolvedHeader.backdrop,
                     appBlur = resolvedHeader.appBlur,
-                    safeTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
+                    safeTop = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding(),
                     scrolledUnderHeader = { scrollEdgeBridge.scrolledUnderHeader },
                     modifier = Modifier.align(Alignment.TopCenter),
                 )
@@ -267,7 +266,7 @@ fun SessionView(
                     onBack = onBack,
                     onCatchUpOpen = onCatchUpOpen,
                     onHeaderHeight = { headerHeight = it.roundToInt().toFloat() },
-                    modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding(),
+                    modifier = Modifier.align(Alignment.TopCenter).windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility),
                 )
                 Column(
                     Modifier
@@ -627,7 +626,7 @@ private fun SessionComposerDismissArea(store: StoreOf<State, Action>, host: Sess
 private fun RequestPanelRoomProbe(host: SessionComposerHost, modifier: Modifier) {
     val density = LocalDensity.current
     var height by remember { mutableIntStateOf(0) }
-    val top = WindowInsets.statusBars.getTop(density)
+    val top = WindowInsets.statusBarsIgnoringVisibility.getTop(density)
     val bottom = maxOf(WindowInsets.ime.getBottom(density), WindowInsets.navigationBars.getBottom(density))
     Box(modifier.onSizeChanged { height = it.height })
     SideEffect {
@@ -915,56 +914,6 @@ fun DrawerGlyph(modifier: Modifier = Modifier) {
             drawRoundRect(color, Offset(0f, stroke + gap), Size(short, stroke), radius)
         }
     }
-}
-
-/**
- * A provider's logo from OpenCode's provider icon set, tinted like text (iOS template images; the
- * iOS SVGs ship in `assets/provider-icons`). Decorative: the row it sits in names the provider.
- *
- * @param canonical the provider this one stands for, when its own ID has no icon.
- */
-@Composable
-fun ProviderIcon(providerID: String, modifier: Modifier = Modifier, canonical: String? = null) {
-    val context = LocalContext.current
-    val name = remember(providerID, canonical) { ProviderIcon.assetName(providerID, canonical) }
-    val request = remember(name) {
-        ImageRequest.Builder(context)
-            .data("file:///android_asset/provider-icons/$name.svg")
-            .decoderFactory(SvgDecoder.Factory())
-            .build()
-    }
-    AsyncImage(
-        model = request,
-        contentDescription = null,
-        modifier = modifier,
-        colorFilter = ColorFilter.tint(LocalContentColor.current),
-    )
-}
-
-object ProviderIcon {
-    /**
-     * Like desktop: the provider's own icon, else its canonical provider's, else a Console
-     * connection's upstream, else the neutral placeholder.
-     */
-    fun assetName(providerID: String, canonical: String?): String {
-        val candidates = listOfNotNull(providerID, canonical, if (providerID.startsWith("console-")) providerID.drop(8) else null)
-        return candidates.firstOrNull { it in available } ?: "synthetic"
-    }
-
-    /** The icons in `assets/provider-icons` (iOS `ProviderIcons.xcassets`, `provider-<id>`). */
-    val available: Set<String> = setOf(
-        "302ai", "abacus", "aihubmix", "alibaba-cn", "alibaba", "amazon-bedrock", "anthropic", "azure-cognitive-services", "azure",
-        "bailing", "baseten", "berget", "cerebras", "chutes", "cloudferro-sherlock", "cloudflare-ai-gateway", "cloudflare-workers-ai",
-        "cohere", "cortecs", "deepinfra", "deepseek", "digitalocean", "evroc", "fastrouter", "fireworks-ai", "firmware", "friendli",
-        "github-copilot", "github-models", "gitlab", "google-vertex-anthropic", "google-vertex", "google", "groq", "helicone",
-        "huggingface", "iflowcn", "inception", "inference", "io-net", "jiekou", "kilo", "kimi-for-coding", "kuae-cloud-coding-plan",
-        "llama", "lmstudio", "lucidquery", "meganova", "minimax-cn-coding-plan", "minimax-cn", "minimax-coding-plan", "minimax",
-        "mistral", "moark", "modelscope", "moonshotai-cn", "moonshotai", "morph", "nano-gpt", "nebius", "nova", "novita-ai", "nvidia",
-        "ollama-cloud", "openai", "opencode-go", "opencode", "openrouter", "ovhcloud", "perplexity", "poe", "privatemode-ai",
-        "qihang-ai", "qiniu-ai", "requesty", "sap-ai-core", "scaleway", "siliconflow-cn", "siliconflow", "stackit", "stepfun",
-        "submodel", "synthetic", "togetherai", "upstage", "v0", "venice", "vercel", "vivgrid", "vultr", "wandb", "xai", "xiaomi",
-        "zai-coding-plan", "zai", "zenmux", "zhipuai-coding-plan", "zhipuai",
-    )
 }
 
 /**

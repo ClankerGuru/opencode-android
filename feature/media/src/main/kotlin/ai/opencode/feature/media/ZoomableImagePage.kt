@@ -4,6 +4,7 @@ import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.rememberReduceMotion
 import android.graphics.Bitmap
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationEndReason
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween
@@ -52,6 +53,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.max
@@ -311,10 +313,15 @@ class MediaZoomState internal constructor(image: Bitmap) {
         else -> raw
     }
 
-    /** Pans by [delta] (finger movement), rubber-banding past the content's edges. */
+    /**
+     * Pans to [rawOffset] (the finger's unbounded offset), rubber-banding past the content's
+     * edges. An axis the content doesn't overflow stays put, as a scroll view without
+     * `alwaysBounce…` locks it.
+     */
     internal fun pan(rawOffset: Offset) {
         val (low, high) = offsetRange(zoomScale)
         fun band(value: Float, low: Float, high: Float, dimension: Float): Float = when {
+            high <= low -> low
             value < low -> low - rubber(low - value, dimension)
             value > high -> high + rubber(value - high, dimension)
             else -> value
@@ -337,7 +344,11 @@ class MediaZoomState internal constructor(image: Bitmap) {
         animateTo(scope, target, clamped(Offset(-newOrigin.x, -newOrigin.y), target), crossFade = false)
     }
 
-    /** Release after a pan: decelerates with momentum, or bounces back flush with the edges. */
+    /**
+     * Release after a pan: decelerates with momentum and, like a scroll view, bounces when the
+     * momentum meets an edge (out past it with the speed it had, then back flush); a release
+     * already past an edge springs back. Each axis the content overflows moves on its own.
+     */
     internal fun fling(scope: CoroutineScope, velocity: Offset, density: androidx.compose.ui.unit.Density) {
         val inside = clamped(contentOffset, zoomScale)
         if (inside != contentOffset) {
@@ -347,10 +358,23 @@ class MediaZoomState internal constructor(image: Bitmap) {
         val (low, high) = offsetRange(zoomScale)
         animation?.cancel()
         animation = scope.launch {
-            val animatable = Animatable(contentOffset, Offset.VectorConverter)
-            animatable.updateBounds(low, high)
-            animatable.animateDecay(Offset(-velocity.x, -velocity.y), splineBasedDecay<Offset>(density)) {
-                set(zoomScale, value)
+            val decay = splineBasedDecay<Float>(density)
+            var x = contentOffset.x
+            var y = contentOffset.y
+            suspend fun axis(start: Float, speed: Float, low: Float, high: Float, apply: (Float) -> Unit) {
+                if (high <= low || speed == 0f) return
+                val animatable = Animatable(start)
+                animatable.updateBounds(low, high)
+                val result = animatable.animateDecay(speed, decay) { apply(value) }
+                if (result.endReason != AnimationEndReason.BoundReached) return
+                // The bounce: out past the edge with the momentum left, then back flush.
+                val edge = animatable.value
+                animatable.updateBounds(Float.NEGATIVE_INFINITY, Float.POSITIVE_INFINITY)
+                animatable.animateTo(edge, Motion.settle.spec(), initialVelocity = result.endState.velocity) { apply(value) }
+            }
+            coroutineScope {
+                launch { axis(x, -velocity.x, low.x, high.x) { x = it; set(zoomScale, Offset(x, y)) } }
+                launch { axis(y, -velocity.y, low.y, high.y) { y = it; set(zoomScale, Offset(x, y)) } }
             }
         }
     }
@@ -398,7 +422,7 @@ class MediaZoomState internal constructor(image: Bitmap) {
             set(scale, offset)
             animation = scope.launch {
                 try {
-                    animate(0f, 1f, animationSpec = tween(200)) { value, _ -> fade = value }
+                    animate(0f, 1f, animationSpec = tween(200, easing = Motion.EaseInOut)) { value, _ -> fade = value }
                 } finally {
                     fade = 1f
                     fadingFrom = null
@@ -422,7 +446,7 @@ class MediaZoomState internal constructor(image: Bitmap) {
 /**
  * One image fitted to its page, reporting where so the viewer's flight lands on it (iOS
  * `ZoomableImagePage`). Pinching (about the fingers, past either limit with resistance),
- * panning (with momentum, flush with the edges), and double tapping behave like Photos. At
+ * panning (with momentum, bouncing back flush with the edges), and double tapping behave like Photos. At
  * fit, drags belong to the pager and the dismissal; zoomed, a drag from a side edge heading
  * out turns the page ([MediaZoomGeometry.handsOffToPager]).
  *

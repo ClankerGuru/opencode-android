@@ -78,7 +78,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.ui.unit.sp
 
 /** The page's store: Settings scoped to its Server Details child (null while the page leaves). */
@@ -132,7 +134,7 @@ fun ServerDetailsPage(store: SettingsStore) {
                     state.mcpError?.let { error ->
                         item(key = "mcp-error") {
                             Row(
-                                Modifier.animateItem().fillMaxWidth().padding(horizontal = 20.dp).padding(top = 8.dp, bottom = 4.dp),
+                                Modifier.animateItem(ErrorFade, ErrorPlacement, ErrorFade).fillMaxWidth().padding(horizontal = 20.dp).padding(vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                             ) {
@@ -147,15 +149,15 @@ fun ServerDetailsPage(store: SettingsStore) {
                                 mcp = mcp,
                                 onTap = { send(ServerDetailsFeature.Action.TrayChanged(ServerDetailsFeature.Tray.Server(mcp.name))) },
                                 action = { ServerDetailsFeature.Action.primaryAction(mcp)?.let(send) },
-                                modifier = Modifier.animateItem().tileRow(),
+                                modifier = Modifier.animateItem(ListFade, ListPlacement, ListFade).tileRow(),
                             )
                         }
                     }
                     item(key = "mcp-tile") {
-                        McpTile(state.mcpServers, { send(ServerDetailsFeature.Action.TrayChanged(ServerDetailsFeature.Tray.Mcp)) }, Modifier.animateItem().tileRow())
+                        McpTile(state.mcpServers, { send(ServerDetailsFeature.Action.TrayChanged(ServerDetailsFeature.Tray.Mcp)) }, Modifier.animateItem(ListFade, ListPlacement, ListFade).tileRow())
                     }
                     item(key = "accounts-skills") {
-                        Row(Modifier.animateItem().tileRow(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
+                        Row(Modifier.animateItem(ListFade, ListPlacement, ListFade).tileRow(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
                             AccountsTile(capabilities.accounts, { send(ServerDetailsFeature.Action.TrayChanged(ServerDetailsFeature.Tray.Accounts)) }, Modifier.weight(1f))
                             SkillsTile(capabilities.skills, { send(ServerDetailsFeature.Action.TrayChanged(ServerDetailsFeature.Tray.Skills)) }, Modifier.weight(1f))
                         }
@@ -220,6 +222,14 @@ private fun CodeAlert(instructions: String, send: (ServerDetailsFeature.Action) 
         },
     )
 }
+
+/** iOS `.animation(.spring(duration: 0.4, bounce: 0), value: mcpServers)` over the banners and tiles. */
+private val ListPlacement get() = MotionSpring(0.4).spec(IntOffset.VisibilityThreshold)
+private val ListFade get() = MotionSpring(0.4).spec<Float>()
+
+/** iOS `.animation(.spring(duration: 0.3, bounce: 0), value: mcpError)`. */
+private val ErrorPlacement get() = MotionSpring(0.3).spec(IntOffset.VisibilityThreshold)
+private val ErrorFade get() = MotionSpring(0.3).spec<Float>()
 
 private fun Modifier.tileRow(): Modifier = fillMaxWidth().padding(horizontal = 16.dp).padding(top = 6.dp, bottom = 6.dp)
 

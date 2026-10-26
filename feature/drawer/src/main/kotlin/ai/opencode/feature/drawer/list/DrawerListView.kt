@@ -152,6 +152,9 @@ fun DrawerListView(
     LaunchedEffect(store) { store.states.collect { homeState.value = it } }
     val liftedID = remember { mutableStateOf<String?>(null) }
     val holder = remember { DrawerListModelHolder() }
+    // The rows' times follow the device's 24-hour setting (iOS `.shortened` follows the user's).
+    val timeContext = LocalContext.current
+    val hour24 = remember(timeContext) { android.text.format.DateFormat.is24HourFormat(timeContext) }
 
     // Catch Up and What’s New stay in the list while they fold away.
     val catchUpMounted = shortcutMotion.isCatchUpMounted(fallback = holder.model.shortcuts.showsCatchUp)
@@ -167,7 +170,7 @@ fun DrawerListView(
                 catchUpMounted = mounted.value.first,
                 whatsNewMounted = mounted.value.second,
                 now = Instant.now(),
-                timestamp = { date, now -> DrawerTimestamp.text(date, now) },
+                timestamp = { date, now -> DrawerTimestamp.text(date, now, hour24 = hour24) },
                 project = { session, projects -> OpenCodeProject.resolved(session, projects) },
             )
             stabilized(holder.model, next).also { holder.model = it }
@@ -339,6 +342,9 @@ fun DrawerListView(
     }
 
     Box(modifier) {
+        // Beneath the rows: they move out of its way, and the lifted row (drawn in the list)
+        // stays above it, as iOS's system platter floats above the zone.
+        DrawerPinDropZoneOverlay(pinDrag)
         LazyColumn(
             state = listState,
             contentPadding = contentPadding,
@@ -383,7 +389,6 @@ fun DrawerListView(
                 }
             }
         }
-        DrawerPinDropZoneOverlay(pinDrag)
     }
 }
 
@@ -427,6 +432,9 @@ private fun rowActions(
             } else {
                 pinDrag.endDrag(x, y)
             }
+            // A drag that never began (no list to move) leaves no lift behind (iOS
+            // `dragInteraction(_:session:didEndWith:)` clears it whatever happened).
+            if (pinDrag.draggingID == null) liftedID.value = null
         },
         dismantled = { if (pinDrag.activeSessionID == id) pinDrag.cancelDrag() },
         lifted = { liftedID.value = it },

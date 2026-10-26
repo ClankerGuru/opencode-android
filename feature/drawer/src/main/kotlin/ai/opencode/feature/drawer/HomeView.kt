@@ -1,5 +1,7 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.devtools.traces.TraceUploadsHost
+import ai.opencode.core.store.rememberScope
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
@@ -75,9 +77,11 @@ import ai.opencode.server.model.OpenCodeTranscriptItem
 import androidx.compose.runtime.DisposableEffect
 import ai.opencode.feature.session.SessionView
 import ai.opencode.feature.settings.HomeSettingsFeature
+import ai.opencode.feature.settings.LocalAppearanceTranscriptPreview
 import ai.opencode.feature.settings.SettingsFeature
 import ai.opencode.feature.settings.SettingsPresentation
 import ai.opencode.feature.settings.SettingsView
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -158,6 +162,8 @@ fun HomeView(
     HomeLifecycle(store, view)
     // iOS hosts it on Home, so deletes from the session's own menu confirm too.
     HomeDeleteConfirmation(store)
+    // iOS `.traceUploads(store.scope(\.traces, action: \.traces))`: Report a Problem and its toast.
+    TraceUploadsHost(store.rememberScope({ it.traces }, HomeFeature.Action::Traces))
 }
 
 /** iOS `homeLayout`: the container with the session, the drawer, and Catch Up. */
@@ -808,7 +814,7 @@ private fun HomeSettings(store: StoreOf<HomeFeature.State, HomeFeature.Action>) 
             action = { HomeFeature.Action.SettingsScreen(PresentationAction.Presented(it)) },
         )
     }
-    SettingsView(settings)
+    CompositionLocalProvider(LocalAppearanceTranscriptPreview provides AppearanceTranscriptPreviewRows) { SettingsView(settings) }
 }
 
 /**

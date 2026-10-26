@@ -1,5 +1,6 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.diagnostics.PerfTimeline
 import ai.opencode.core.log.AppLog
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
@@ -159,7 +160,8 @@ private fun SessionFeature.earlierHistoryResponse(
     }
     // The first cursor page mostly overlaps the newest REST window. Keep filling the visible limit
     // the user already requested instead of relying on another top-edge callback during the
-    // prepend transition. (iOS `PerfTimeline.olderPageApplied` is perf-build only.)
+    // prepend transition.
+    PerfTimeline.olderPageApplied(sessionID, exhausted = s.earlierHistory == EarlierHistory.Exhausted, failed = page == null)
     if (page == null) return Reduced(s)
     return Reduced(
         s,
@@ -369,7 +371,7 @@ private fun SessionFeature.loadEarlierHistory(state: SessionFeature.State): Redu
         earlierHistory = EarlierHistory.Loading(cursor = cursor, reachedLoadedItems = reachedLoadedItems),
         earlierHistoryError = null,
     )
-    // iOS `PerfTimeline.olderPageRequested` is perf-build only.
+    PerfTimeline.olderPageRequested(sessionID)
     val server = s.server
     val generation = s.earlierHistoryGeneration
     val client = openCodeClient

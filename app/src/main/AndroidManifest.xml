@@ -18,9 +18,15 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:launchMode="singleTask"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation"
+            android:launchMode="singleInstancePerTask"
+            android:supportsPictureInPicture="true"
             android:theme="@style/Theme.OpenCode.Starting"
             android:windowSoftInputMode="adjustResize">
+            <!-- Multiple Windows on a tablet (iOS iPad, OC-512): each window is a task (`SceneWindows`). -->
+            <property
+                android:name="android.window.PROPERTY_SUPPORTS_MULTI_INSTANCE_SYSTEM_UI"
+                android:value="true" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

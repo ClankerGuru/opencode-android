@@ -15,6 +15,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.doubleOrNull
 import java.math.BigDecimal
+import java.text.BreakIterator
 import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
 import java.util.Locale
@@ -47,7 +48,7 @@ sealed interface OpenCodeJSONValue {
 
     fun needsBounding(stringLimit: Int, collectionLimit: Int): Boolean = when (this) {
         Null, is Bool, is Number -> false
-        is Str -> value.codePointCount(0, value.length) > stringLimit && utf8Length(value) > stringLimit
+        is Str -> utf8Length(value) > stringLimit && value.characterPrefixEnd(stringLimit) != null
         is Array -> values.size > collectionLimit || values.any { it.needsBounding(stringLimit, collectionLimit) }
         is Object -> values.size > collectionLimit || values.values.any { it.needsBounding(stringLimit, collectionLimit) }
     }
@@ -140,13 +141,16 @@ private fun jsonString(text: String): String = buildString {
     append('"')
 }
 
-/** Swift's `Double.formatted()`: grouped, up to a few fraction digits, POSIX-like. */
+/**
+ * Swift's `Double.formatted()`: the current locale, grouped, and ICU's default of at most six
+ * fraction digits, rounded half to even (`0.26575467567788` → "0.265755").
+ */
 internal fun formatGroupedNumber(value: Double): String =
-    DecimalFormat("#,##0.###", DecimalFormatSymbols(Locale.US)).format(value)
+    DecimalFormat("#,##0.######", DecimalFormatSymbols(Locale.getDefault())).format(value)
 
-/** Swift's `Double.formatted(.number.grouping(.never))`. */
+/** Swift's `Double.formatted(.number.grouping(.never))`: as [formatGroupedNumber], ungrouped. */
 internal fun formatPlainNumber(value: Double): String =
-    DecimalFormat("0.###", DecimalFormatSymbols(Locale.US)).format(value)
+    DecimalFormat("0.######", DecimalFormatSymbols(Locale.getDefault())).format(value)
 
 internal fun utf8Length(text: String): Int {
     var count = 0
@@ -170,20 +174,30 @@ val String.nonEmpty: String? get() = ifEmpty { null }
 /** iOS `String.firstLine`: up to the first line break, else the whole string. */
 val String.firstLine: String
     get() {
-        val parts = split('\n', '\r', '\u2028', '\u2029', '\u0085').filter { it.isNotEmpty() }
+        // Swift's `Character.isNewline`: LF, VT, FF, CR, NEL, LS, PS.
+        val parts = split('\n', '\u000B', '\u000C', '\r', '\u2028', '\u2029', '\u0085').filter { it.isNotEmpty() }
         return parts.firstOrNull() ?: this
     }
 
-/**
- * iOS `String.bounded(to:)`: at most [limit] characters (grapheme-approximated by
- * code points), then a truncation marker.
- */
+/** iOS `String.bounded(to:)`: at most [limit] characters (grapheme clusters, as Swift counts), then a truncation marker. */
 fun String.bounded(limit: Int): String {
+    // UTF-8 length is never below the character count: a cheap first check.
     if (utf8Length(this) <= limit) return this
-    val codePoints = codePointCount(0, length)
-    if (codePoints <= limit) return this
-    val end = offsetByCodePoints(0, limit)
+    val end = characterPrefixEnd(limit) ?: return this
     return substring(0, end) + "\n… output truncated"
+}
+
+/**
+ * Where the first [limit] characters (Swift `Character`s: extended grapheme clusters) end,
+ * or null when the text has no more than [limit] of them.
+ */
+internal fun String.characterPrefixEnd(limit: Int): Int? {
+    if (limit < 0 || codePointCount(0, length) <= limit) return null
+    val characters = BreakIterator.getCharacterInstance()
+    characters.setText(this)
+    characters.first()
+    val end = if (limit == 0) 0 else characters.next(limit)
+    return if (end == BreakIterator.DONE || end >= length) null else end
 }
 
 /** Swift's `trimmingCharacters(in: .whitespacesAndNewlines)`. */
