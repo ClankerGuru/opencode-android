@@ -271,6 +271,7 @@ fun ComposerMorphPhotoSheet(
         outgoingReturns = menuOpen && !foldsToComposer,
         continuousGlass = true,
         dismissesDown = foldsToComposer,
+        retainsContent = true,
     ) {
         PlusPhotoSheetContent(
             library = library,

@@ -55,8 +55,11 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layout
-import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.unit.Constraints
+import kotlin.math.abs
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.platform.LocalWindowInfo
@@ -121,36 +124,60 @@ fun ShellOutputView(
         // The column's top below the sheet's (the drag handle), so the visible part is the window
         // below the sheet's top less that.
         var headerInSheet by remember { mutableFloatStateOf(0f) }
-        Column(
-            Modifier
+        // A drag moves the sheet every frame: only the output box takes the new height. The
+        // toolbar, earlier-output bar and status bar keep constant constraints, so they're
+        // measured once, and the header's place is written only when it really moves.
+        Layout(
+            content = {
+                Toolbar(state, onClose, send = store::send)
+                Box { EarlierOutputBar(state) { store.send(ShellOutputFeature.Action.LoadEarlierTapped) } }
+                Box(Modifier.fillMaxSize()) {
+                    Content(state, isFollowing, jumpRequest, onFollowingChanged = { isFollowing = it })
+                    JumpToLatest(visible = !isFollowing && state.output.isNotEmpty(), modifier = Modifier.align(Alignment.BottomEnd)) {
+                        jumpRequest += 1
+                    }
+                }
+                StatusBar(state, runningGlyph, send = store::send)
+            },
+            modifier = Modifier
                 .fillMaxSize()
-                .onGloballyPositioned { coordinates ->
-                    val offset = runCatching { sheetState.requireOffset() }.getOrNull() ?: return@onGloballyPositioned
-                    headerInSheet = (coordinates.positionInWindow().y - offset).coerceAtLeast(0f)
-                }
-                .layout { measurable, constraints ->
-                    val offset = runCatching { sheetState.requireOffset() }.getOrNull()
-                    val full = constraints.maxHeight
-                    // Above the navigation bar, wherever the sheet rests (its own inset spacer sits
-                    // off screen at the medium rest).
-                    val visible = if (offset == null || windowHeight <= 0) {
-                        full - navigationBottom
-                    } else {
-                        (windowHeight - navigationBottom - offset - headerInSheet).roundToInt()
-                    }.coerceIn(0, full)
-                    val placeable = measurable.measure(constraints.copy(minHeight = visible, maxHeight = visible))
-                    layout(placeable.width, full) { placeable.place(0, 0) }
+                .onPlaced { coordinates ->
+                    val offset = runCatching { sheetState.requireOffset() }.getOrNull() ?: return@onPlaced
+                    val header = (coordinates.positionInWindow().y - offset).coerceAtLeast(0f)
+                    if (abs(header - headerInSheet) > 0.5f) headerInSheet = header
                 },
-        ) {
-            Toolbar(state, onClose, send = store::send)
-            EarlierOutputBar(state) { store.send(ShellOutputFeature.Action.LoadEarlierTapped) }
-            Box(Modifier.weight(1f).fillMaxWidth()) {
-                Content(state, isFollowing, jumpRequest, onFollowingChanged = { isFollowing = it })
-                JumpToLatest(visible = !isFollowing && state.output.isNotEmpty(), modifier = Modifier.align(Alignment.BottomEnd)) {
-                    jumpRequest += 1
+        ) { measurables, constraints ->
+            val width = constraints.maxWidth
+            val full = constraints.maxHeight
+            val offset = runCatching { sheetState.requireOffset() }.getOrNull()
+            // Above the navigation bar, wherever the sheet rests (its own inset spacer sits
+            // off screen at the medium rest).
+            val visible = if (offset == null || windowHeight <= 0) {
+                full - navigationBottom
+            } else {
+                (windowHeight - navigationBottom - offset - headerInSheet).roundToInt()
+            }.coerceIn(0, full)
+            val bars = Constraints(minWidth = width, maxWidth = width, maxHeight = full)
+            val toolbar = measurables[0].measure(bars)
+            val earlier = measurables[1].measure(bars)
+            val status = measurables[3].measure(bars)
+            val outputHeight = (visible - toolbar.height - earlier.height - status.height).coerceAtLeast(0)
+            val output = measurables[2].measure(Constraints.fixed(width, outputHeight))
+            layout(width, full) {
+                // M3 changes the top inset as the sheet crosses the status bar. Read the
+                // placed top, not last frame's measured header, to pin the footer this frame.
+                val top = coordinates?.positionInWindow()?.y
+                val statusTop = if (top == null || offset == null || windowHeight <= 0) {
+                    toolbar.height + earlier.height + outputHeight
+                } else {
+                    ((windowHeight - navigationBottom - top).roundToInt() - status.height)
+                        .coerceIn(toolbar.height + earlier.height, (full - status.height).coerceAtLeast(toolbar.height + earlier.height))
                 }
+                toolbar.place(0, 0)
+                earlier.place(0, toolbar.height)
+                output.place(0, toolbar.height + earlier.height)
+                status.place(0, statusTop)
             }
-            StatusBar(state, runningGlyph, send = store::send)
         }
     }
     if (state.isConfirmingStop) {
@@ -279,21 +306,55 @@ private fun EmptyState(title: String, description: String?) {
 /** One output line and its absolute byte offset, its stable key: trimming or loading earlier keeps the reader's place. */
 private data class OutputLine(val offset: Long, val text: String)
 
-private fun outputLines(text: String, startCursor: Int): List<OutputLine> {
-    val lines = ArrayList<OutputLine>()
-    var offset = startCursor.toLong()
-    var lineStart = 0
-    while (lineStart <= text.length) {
-        val newline = text.indexOf('\n', lineStart)
-        val end = if (newline < 0) text.length else newline
-        val line = text.substring(lineStart, end)
-        if (newline < 0 && line.isEmpty() && lines.isNotEmpty()) break
-        lines += OutputLine(offset, line)
-        offset += ShellOutputFeature.utf8Count(line) + 1
-        if (newline < 0) break
-        lineStart = newline + 1
+/**
+ * The output's lines, kept across polls: output that only grew re-reads from its last line on,
+ * so a long capture isn't split again on every append. Anything else (trimmed, loaded earlier)
+ * is read whole.
+ */
+private class OutputLines {
+    private var text = ""
+    private var startCursor = -1
+    private var lines: List<OutputLine> = emptyList()
+    /** Where the last line starts in [text]. */
+    private var lastLineStart = 0
+
+    fun update(text: String, startCursor: Int): List<OutputLine> {
+        if (text == this.text && startCursor == this.startCursor) return lines
+        val appends = startCursor == this.startCursor && lines.isNotEmpty() &&
+            text.length >= this.text.length && text.startsWith(this.text)
+        val next = ArrayList<OutputLine>(if (appends) lines.size + 16 else 64)
+        var from = 0
+        var offset = startCursor.toLong()
+        if (appends) {
+            next.addAll(lines.subList(0, lines.size - 1))
+            from = lastLineStart
+            offset = lines.last().offset
+        }
+        lastLineStart = parse(text, from, offset, next)
+        this.text = text
+        this.startCursor = startCursor
+        lines = next
+        return next
     }
-    return lines
+
+    /** Appends [text]'s lines from [from] on; returns where the last one starts. */
+    private fun parse(text: String, from: Int, startOffset: Long, into: ArrayList<OutputLine>): Int {
+        var offset = startOffset
+        var lineStart = from
+        var lastStart = from
+        while (lineStart <= text.length) {
+            val newline = text.indexOf('\n', lineStart)
+            val end = if (newline < 0) text.length else newline
+            val line = text.substring(lineStart, end)
+            if (newline < 0 && line.isEmpty() && into.isNotEmpty()) break
+            into += OutputLine(offset, line)
+            lastStart = lineStart
+            offset += ShellOutputFeature.utf8Count(line) + 1
+            if (newline < 0) break
+            lineStart = newline + 1
+        }
+        return lastStart
+    }
 }
 
 /**
@@ -303,7 +364,8 @@ private fun outputLines(text: String, startCursor: Int): List<OutputLine> {
  */
 @Composable
 private fun ShellOutputTextView(text: String, startCursor: Int, isFollowing: Boolean, jumpRequest: Int, onFollowingChanged: (Boolean) -> Unit) {
-    val lines = remember(text, startCursor) { outputLines(text, startCursor) }
+    val cache = remember { OutputLines() }
+    val lines = remember(text, startCursor) { cache.update(text, startCursor) }
     val listState = rememberLazyListState()
     val reduceMotion = rememberReduceMotion()
     val followThreshold = with(LocalDensity.current) { 32.dp.toPx() }
@@ -335,13 +397,11 @@ private fun ShellOutputTextView(text: String, startCursor: Int, isFollowing: Boo
     LaunchedEffect(lines, isFollowing) {
         if (isFollowing && lines.isNotEmpty()) listState.scrollToItem(lines.size - 1, Int.MAX_VALUE / 2)
     }
-    // A resize (the sheet's detent changing) keeps a following reader at the bottom (iOS `onResize`).
-    LaunchedEffect(listState) {
-        snapshotFlow { listState.layoutInfo.viewportSize }.distinctUntilChanged().collect {
-            val count = listState.layoutInfo.totalItemsCount
-            if (following && count > 0) listState.scrollToItem(count - 1, Int.MAX_VALUE / 2)
-        }
-    }
+    // A resize (the sheet dragged or settling on a detent) keeps a following reader at the bottom
+    // in the same layout pass (iOS `onResize`): the bottom is asked for before the list measures
+    // at its new height, so its last lines never lag a frame behind the status bar.
+    val lineCount by rememberUpdatedState(lines.size)
+    val measuredHeight = remember { intArrayOf(-1) }
     LaunchedEffect(jumpRequest) {
         if (jumpRequest == lastJump) return@LaunchedEffect
         lastJump = jumpRequest
@@ -356,7 +416,22 @@ private fun ShellOutputTextView(text: String, startCursor: Int, isFollowing: Boo
         LazyColumn(
             state = listState,
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 24.dp),
-            modifier = Modifier.fillMaxSize().testTag("shell-output-text").semantics { contentDescription = "Shell output" },
+            modifier = Modifier
+                .fillMaxSize()
+                .layout { measurable, constraints ->
+                    val height = constraints.maxHeight
+                    if (height != measuredHeight[0]) {
+                        // Never while the reader's own drag runs: asking would stop it (and a swipe
+                        // that pulls the sheet down goes through it).
+                        if (measuredHeight[0] >= 0 && following && !userScrolling && !listState.isScrollInProgress && lineCount > 0) {
+                            listState.requestScrollToItem(lineCount - 1, Int.MAX_VALUE / 2)
+                        }
+                        measuredHeight[0] = height
+                    }
+                    val placeable = measurable.measure(constraints)
+                    layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+                }
+                .testTag("shell-output-text").semantics { contentDescription = "Shell output" },
         ) {
             itemsIndexed(lines, key = { _, line -> line.offset }, contentType = { _, _ -> 0 }) { _, line ->
                 Text(line.text, style = style, softWrap = true)

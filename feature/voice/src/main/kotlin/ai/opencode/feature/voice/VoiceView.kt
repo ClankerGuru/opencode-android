@@ -65,6 +65,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
@@ -184,6 +186,15 @@ fun Modifier.callSurface(shape: Shape, color: Color): Modifier = graphicsLayer {
     shadowElevation = 3.dp.toPx()
     clip = false
 }.background(color, shape)
+
+/** Animated geometry is observed by the layer/draw scopes, never by composition. */
+private fun Modifier.callSurface(shape: () -> Shape, color: Color): Modifier = graphicsLayer {
+    this.shape = shape()
+    shadowElevation = 3.dp.toPx()
+    clip = false
+}.drawBehind {
+    drawOutline(shape().createOutline(size, layoutDirection, this), color)
+}
 
 /** Touches on this element and its children are dropped (iOS `.allowsHitTesting(false)` over content that shouldn't act). */
 internal fun Modifier.blocksTouches(): Modifier = pointerInput(Unit) {
@@ -444,15 +455,15 @@ fun VoiceCallSurface(
     store: VoiceStoreOf?,
     modifier: Modifier = Modifier,
     panel: (@Composable () -> Unit)? = null,
-    panelExtent: Float = 0f,
-    panelReveal: Float = 0f,
+    panelExtent: () -> Float = { 0f },
+    panelReveal: () -> Float = { 0f },
     panelShown: Boolean = false,
     expansion: ComposerExpansion? = null,
     @Suppress("UNUSED_PARAMETER") controlsTakeTouches: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    val panelExtentValue = if (store == null) panelExtent else 0f
-    val panelRevealValue = if (store == null) panelReveal else 0f
+    val panelExtentValue = { if (store == null) panelExtent() else 0f }
+    val panelRevealValue = { if (store == null) panelReveal() else 0f }
     val panelIsShown = store == null && panelShown
     val activeExpansion = if (store == null) expansion else null
     val reduceMotion = rememberReduceMotion()
@@ -537,10 +548,10 @@ fun VoiceCallSurface(
     }
     val expansionReach = reachBox.value
     val expanding = expansionReach > 0 || expansionOpen
-    val extent = if (store == null) max(panelExtentValue, expansionReach) else callExtent
+    val extent = { if (store == null) max(panelExtentValue(), expansionReach) else callExtent }
     val surfaceExpanded = if (store == null) panelIsShown || expansionOpen else isExpanded
     // The room above the bar the surface doesn't reach yet (or any more).
-    val unrevealed = if (store == null && !expanding) max(0f, extent - panelRevealValue) else 0f
+    val unrevealed = { if (store == null && !expanding) max(0f, extent() - panelRevealValue()) else 0f }
     val reducedReach by animateFloatAsState(if (expansionOpen) 1_000f else 0f, Motion.reducedFadeSpec(), label = "reducedReach")
     val dim by animateFloatAsState(
         if (expansionOpen) (if (isDark) ComposerExpansion.dimDark else ComposerExpansion.dimLight) else 0f,
@@ -581,11 +592,11 @@ fun VoiceCallSurface(
                             Modifier
                                 .fillMaxSize()
                                 .graphicsLayer { alpha = 1f - glassFullAlpha }
-                                .callSurface(TopInsetRect(extent, cornerRadius), surfaceColor),
+                                .callSurface({ TopInsetRect(extent(), cornerRadius) }, surfaceColor),
                         )
                         Box(Modifier.fillMaxSize().graphicsLayer { alpha = glassFullAlpha }.callSurface(RoundedCornerShape(cornerRadius.dp), surfaceColor))
                     } else {
-                        Box(Modifier.fillMaxSize().callSurface(TopInsetRect(unrevealed, cornerRadius), surfaceColor))
+                        Box(Modifier.fillMaxSize().callSurface({ TopInsetRect(unrevealed(), cornerRadius) }, surfaceColor))
                     }
                 }
             }
@@ -617,11 +628,13 @@ fun VoiceCallSurface(
                 // A request's panel sits on the bar, its position fixed there; only the clip (the
                 // surface's reach) grows and folds, so the panel never moves under it. Laid out
                 // even before the surface reveals any of it, so its height is known to grow to.
-                val reveal = min(panelRevealValue, extent)
                 Box(
                     Modifier
                         .layoutId(SurfaceSlot.panel)
-                        .clip(BottomRevealShape(reveal, 28f))
+                        .graphicsLayer {
+                            shape = BottomRevealShape(min(panelRevealValue(), extent()), 28f)
+                            clip = true
+                        }
                         .then(if (panelIsShown) Modifier else Modifier.blocksTouches()),
                 ) { panel() }
             }
@@ -671,10 +684,14 @@ private class ExpansionMotion {
 }
 
 /** Laid out as the bar alone: what grows above it never moves the session's insets. */
-private fun surfaceMeasurePolicy(extent: Float, fullExtent: Float, panelExtent: Float, transcriptHeight: Float) = MeasurePolicy { measurables, constraints ->
+private fun surfaceMeasurePolicy(extent: () -> Float, fullExtent: Float, panelExtent: () -> Float, transcriptHeight: Float) = MeasurePolicy { measurables, constraints ->
     val bar = measurables.first { it.layoutId == SurfaceSlot.content }.measure(constraints.copy(minHeight = 0))
     val width = bar.width
-    val extentPx = extent.dp.roundToPx()
+    // A self-animating panel reports its current height during measurement. Read the
+    // surface extent afterwards so its outline does not trail that panel by one frame.
+    val panel = measurables.firstOrNull { it.layoutId == SurfaceSlot.panel }
+        ?.measure(Constraints(minWidth = width, maxWidth = width))
+    val extentPx = extent().dp.roundToPx()
     val placeables = measurables.filter { it.layoutId != SurfaceSlot.content }.map { measurable ->
         val c = when (measurable.layoutId) {
             SurfaceSlot.glass -> Constraints.fixed(width, bar.height + extentPx)
@@ -684,7 +701,7 @@ private fun surfaceMeasurePolicy(extent: Float, fullExtent: Float, panelExtent: 
             SurfaceSlot.expansion -> Constraints.fixed(width, bar.height + extentPx)
             else -> Constraints()
         }
-        measurable.layoutId to measurable.measure(c)
+        measurable.layoutId to (if (measurable.layoutId == SurfaceSlot.panel) panel!! else measurable.measure(c))
     }
     val expansionHeight = fullExtent.dp.roundToPx() + bar.height
     layout(width, bar.height) {
@@ -741,6 +758,9 @@ private class BottomRevealShape(private val height: Float, private val cornerRad
         }
         return Outline.Generic(path)
     }
+
+    override fun equals(other: Any?) = other is BottomRevealShape && other.height == height && other.cornerRadius == cornerRadius
+    override fun hashCode() = height.hashCode() * 31 + cornerRadius.hashCode()
 }
 
 /**

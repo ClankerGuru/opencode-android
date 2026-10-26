@@ -90,6 +90,11 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.unit.Constraints
+import kotlinx.coroutines.delay
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 
@@ -572,3 +577,48 @@ internal fun FavoriteSwipeBox(
 internal fun ProviderIcon(providerID: String, canonical: String?, size: Dp, tint: Color, modifier: Modifier = Modifier) {
     CoreProviderIcon(providerID, modifier.size(size), canonical, tint)
 }
+
+/**
+ * Decodes the picker's provider marks into the image cache before the picker first opens, so
+ * its rows draw them on their first frame instead of popping in as each SVG decodes (and the
+ * decoder's classes load off the opening). Starts a beat after it appears; each distinct mark
+ * (current, favourites, then the rest, at most [PROVIDER_PREWARM_LIMIT]) is composed once at the
+ * largest size the picker draws, transparent, taking no room and outside semantics.
+ */
+@Composable
+internal fun ProviderIconPrewarm(state: ModelPickerState) {
+    var started by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(PROVIDER_PREWARM_DELAY_MILLIS)
+        started = true
+    }
+    if (!started) return
+    val marks = remember(state.models, state.modelVisibility, state.currentModel, state.favoriteModelIDs) {
+        val current = state.currentModelInfo
+        val visible = state.pickerModels
+        (listOfNotNull(current) + visible.filter { it.id in state.favoriteModelIDs } + visible)
+            .distinctBy { CoreProviderIcon.assetName(it.providerID, it.canonicalProviderID) }
+            .take(PROVIDER_PREWARM_LIMIT)
+    }
+    Layout(
+        content = {
+            for (model in marks) {
+                key(model.providerID, model.canonicalProviderID) {
+                    CoreProviderIcon(model.providerID, Modifier, model.canonicalProviderID)
+                }
+            }
+        },
+        modifier = Modifier
+            .graphicsLayer { alpha = 0f }
+            .clearAndSetSemantics {},
+    ) { measurables, _ ->
+        val side = PROVIDER_PREWARM_SIDE.roundToPx()
+        val placeables = measurables.map { it.measure(Constraints.fixed(side, side)) }
+        layout(0, 0) { placeables.forEach { it.place(0, 0) } }
+    }
+}
+
+/** The largest provider mark the pickers draw (the sheets' rows). */
+private val PROVIDER_PREWARM_SIDE = 20.dp
+private const val PROVIDER_PREWARM_LIMIT = 24
+private const val PROVIDER_PREWARM_DELAY_MILLIS = 900L

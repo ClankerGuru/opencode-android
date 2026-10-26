@@ -72,6 +72,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.foundation.text.modifiers.TextAutoSizeLayoutScope
+import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.currentStateAsState
+import ai.opencode.server.OpenCodeServer
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -259,6 +272,100 @@ private fun SessionSheetContent(
         }
     }
 }
+
+/** Once per process: the sheet's content has been composed and measured ahead of its first open. */
+private var sessionSheetPrewarmed = false
+private var sessionSheetPrewarming = false
+
+/** The prewarm's sections, one per frame, so no single frame carries all of it. */
+private const val PREWARM_SECTIONS = 4
+
+/** After the session has opened and settled, so the warm-up never shares a frame with that. */
+private const val PREWARM_DELAY_MS = 1_500L
+
+/**
+ * Composes and measures the Session sheet's content once per process, off screen, before it's
+ * first opened: its classes load and verify and its composition, text and measuring code warm
+ * up then, not inside the frame the sheet opens in. One section per frame (title, tiles,
+ * details, the rest), measured but never placed, so nothing is drawn, hit or read by TalkBack,
+ * and it sends nothing (a neutral session, no store). It can't warm what only the open sheet
+ * builds: `ModalBottomSheet`'s dialog window and its first traversal.
+ *
+ * @param enabled false while a sheet is up: the warm-up waits for the next quiet moment.
+ * @param details the session's sheet details at warm-up time (only its model is read).
+ * @param providerIcon the sheet's provider mark, as [SessionSheetView] draws it.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SessionSheetPrewarm(
+    enabled: Boolean,
+    details: () -> SessionSheetDetails,
+    providerIcon: (@Composable (providerID: String, canonicalProviderID: String?, size: Dp) -> Unit)? = null,
+) {
+    if (sessionSheetPrewarmed) return
+    var section by remember { mutableIntStateOf(0) }
+    val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
+    val active = enabled && lifecycle.isAtLeast(Lifecycle.State.RESUMED)
+    LaunchedEffect(active) {
+        if (!active) {
+            section = 0
+            return@LaunchedEffect
+        }
+        delay(PREWARM_DELAY_MS)
+        // One warm-up at a time: session pages composed side by side take turns.
+        if (sessionSheetPrewarming || sessionSheetPrewarmed) return@LaunchedEffect
+        sessionSheetPrewarming = true
+        try {
+            for (next in 1..PREWARM_SECTIONS) {
+                section = next
+                // Composed in this frame, measured in its layout pass.
+                withFrameNanos { }
+                withFrameNanos { }
+            }
+            sessionSheetPrewarmed = true
+        } finally {
+            sessionSheetPrewarming = false
+            section = 0
+        }
+    }
+    if (section == 0) return
+    val warm = remember { prewarmModel(details()) }
+    Box(
+        Modifier
+            .clearAndSetSemantics { }
+            .layout { measurable, constraints ->
+                val width = if (constraints.hasBoundedWidth) constraints.maxWidth else 1080
+                measurable.measure(Constraints(maxWidth = width))
+                // Measured, never placed: nothing draws or takes touches.
+                layout(0, 0) { }
+            },
+    ) {
+        Column(Modifier.padding(horizontal = 18.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            when (section) {
+                1 -> Hero(warm.state, warm.details, warm.context, statusOrb = { _, size ->
+                    AgentActivityGlyph(AgentActivitySource.Subagent(SubagentActivity(sessionID = null, phase = SubagentActivity.Phase.idle)), size = size)
+                }, onRename = { })
+                2 -> Tiles(warm.state, isListRow = true, warm.context, title = null, send = { })
+                3 -> DetailsCard(warm.details, onModelTapped = { }, providerIcon)
+                else -> {
+                    AlwaysNotifyCard(isOn = false, isPending = false) { }
+                    DeleteRow(enabled = true) { }
+                    rememberModalBottomSheetState(skipPartiallyExpanded = true)
+                    BottomSheetDefaults.DragHandle()
+                }
+            }
+        }
+    }
+}
+
+private class SessionSheetPrewarmModel(val state: SessionSheetFeature.State, val details: SessionSheetDetails, val context: SessionListContext)
+
+/** A neutral session with the real model, so the warm-up lays out what the sheet will. */
+private fun prewarmModel(real: SessionSheetDetails) = SessionSheetPrewarmModel(
+    state = SessionSheetFeature.State(server = OpenCodeServer(url = "", username = "", password = ""), sessionID = ""),
+    details = real.copy(session = null, hasPendingRequests = false, isBusy = false),
+    context = SessionListContext(isPinned = false),
+)
 
 // MARK: Hero: status orb, title, where it runs
 
@@ -464,7 +571,7 @@ private fun ActionTile(title: String, symbol: SFSymbol, inFlight: Boolean, isBus
                 role = Role.Button
             },
     ) {
-        SessionSheetTile(title = title, symbol = symbol, inFlight = inFlight, dimmed = isBusy && !inFlight)
+        SessionSheetTile(title = title, symbol = symbol, inFlight = inFlight, dimmed = isBusy && !inFlight, symbolChanges = false)
     }
 }
 
@@ -481,7 +588,7 @@ private fun ExportTile(inFlight: Boolean, isBusy: Boolean, onExport: (OpenCodeEx
                     role = Role.Button
                 },
         ) {
-            SessionSheetTile(title = "Export", symbol = SFSymbol.SquareAndArrowUp, inFlight = inFlight, dimmed = isBusy && !inFlight)
+            SessionSheetTile(title = "Export", symbol = SFSymbol.SquareAndArrowUp, inFlight = inFlight, dimmed = isBusy && !inFlight, symbolChanges = false)
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             for (format in OpenCodeExportFormat.entries) {
@@ -500,9 +607,12 @@ private fun ExportTile(inFlight: Boolean, isBusy: Boolean, onExport: (OpenCodeEx
 /**
  * One of the sheet's quiet tiles: a monochrome glyph over its caption, no fill. A toggle that's
  * on shows its filled glyph and a semibold caption.
+ *
+ * @param symbolChanges a toggle's glyph cross-fades between its states; an action's never changes,
+ *   so it skips the transition's machinery.
  */
 @Composable
-private fun SessionSheetTile(title: String, symbol: SFSymbol, isOn: Boolean = false, inFlight: Boolean = false, dimmed: Boolean = false) {
+private fun SessionSheetTile(title: String, symbol: SFSymbol, isOn: Boolean = false, inFlight: Boolean = false, dimmed: Boolean = false, symbolChanges: Boolean = true) {
     val iconSize = with(LocalDensity.current) { (22 * fontScale).dp }
     val reduceMotion = rememberReduceMotion()
     Column(
@@ -517,6 +627,8 @@ private fun SessionSheetTile(title: String, symbol: SFSymbol, isOn: Boolean = fa
         Box(Modifier.height(iconSize + 4.dp), contentAlignment = Alignment.Center) {
             if (inFlight) {
                 CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+            } else if (!symbolChanges) {
+                OpenCodeIcon(symbol, contentDescription = null, size = iconSize, tint = OpenCodeTheme.colors.text)
             } else {
                 AnimatedContent(
                     symbol,
@@ -535,9 +647,30 @@ private fun SessionSheetTile(title: String, symbol: SFSymbol, isOn: Boolean = fa
             maxLines = 1,
             softWrap = false,
             overflow = TextOverflow.Ellipsis,
-            autoSize = TextAutoSize.StepBased(minFontSize = style.fontSize * 0.75f, maxFontSize = style.fontSize),
+            autoSize = remember(style.fontSize) { CaptionAutoSize(min = style.fontSize * 0.75f, max = style.fontSize) },
         )
     }
+}
+
+/**
+ * iOS `.minimumScaleFactor`: the caption at full size when it fits, which takes one layout (a
+ * step-based search lays each caption out five or six times); only a caption that doesn't fit
+ * searches down, in 0.25 sp steps, for the largest size that does.
+ */
+private data class CaptionAutoSize(val min: TextUnit, val max: TextUnit) : TextAutoSize {
+    override fun TextAutoSizeLayoutScope.getFontSize(constraints: Constraints, text: AnnotatedString): TextUnit {
+        if (!performLayout(constraints, text, max).overflows()) return max
+        var fits = min.value
+        var tooBig = max.value
+        while (tooBig - fits > 0.25f) {
+            val size = (fits + tooBig) / 2
+            if (performLayout(constraints, text, size.sp).overflows()) tooBig = size else fits = size
+        }
+        return fits.sp
+    }
+
+    private fun TextLayoutResult.overflows(): Boolean =
+        didOverflowWidth || didOverflowHeight || (lineCount > 0 && isLineEllipsized(lineCount - 1))
 }
 
 // MARK: Model, context, cost

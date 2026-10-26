@@ -163,11 +163,12 @@ fun Modifier.requestPanelCap(cap: Dp?): Modifier = layout { measurable, constrai
 @Composable
 internal fun RequestPanelFallback(
     modifier: Modifier = Modifier,
+    columnModifier: Modifier = Modifier,
     footer: @Composable () -> Unit = {},
     column: @Composable () -> Unit,
 ) {
     Layout(
-        contents = listOf({ RequestPanelStack(content = column) }, footer),
+        contents = listOf({ RequestPanelStack(modifier = columnModifier, content = column) }, footer),
         modifier = modifier,
     ) { (stackMeasurables, footerMeasurables), constraints ->
         val width = constraints.maxWidth
@@ -192,7 +193,7 @@ internal fun RequestPanelFallback(
  * (iOS's scrolling fallback, where `requestPanelScrolls` shows the parts whole).
  */
 @Composable
-private fun RequestPanelStack(content: @Composable () -> Unit) {
+private fun RequestPanelStack(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     val holder = remember { RequestPanelScroll() }
     val scrollState = rememberScrollableState { delta ->
         val old = holder.offset
@@ -202,7 +203,7 @@ private fun RequestPanelStack(content: @Composable () -> Unit) {
     }
     Layout(
         content = content,
-        modifier = Modifier
+        modifier = modifier
             // Clipped top and bottom only, and only while the column scrolls: the header's × sits
             // out past the panel's side padding, on the surface's corner arc (`outset`), which a
             // full `clipToBounds` cut in half; and a page sliding out over a shorter new one
