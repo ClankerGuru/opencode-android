@@ -92,13 +92,13 @@ port; "dropped" ones can't exist on Android, and each Kotlin file's header lists
 
 | iOS file | Kotlin file | Ported | Skipped (owner) | Dropped (reason) |
 | --- | --- | ---: | --- | --- |
-| `MarkdownBlockTests.swift` | `markdown/MarkdownBlockTests.kt` | 40 | `markdownImageClientDecodes…` (`:server`); 3 highlighting tests (`:feature:media`); `increaseContrastUsesSecondaryOnHeaderProjectLine`, `titleLoadingPresets…` (`:feature:session`) | 2 `UIHostingController` measurements; 2 SwiftUI split-overlay tests (Android fades one laid-out text); `whatIsSelectedCopiedAndRead…` + 2 `StreamLineHoldTests` (`LineBreak.Simple` never moves a word); 2 `TranscriptTextRevealWaitTests` (no `wait(until:)`) |
+| `MarkdownBlockTests.swift` | `markdown/MarkdownBlockTests.kt` | 40 | `markdownImageClientDecodes…` (`:server`); 3 highlighting tests (`:feature:media`); `increaseContrastUsesSecondaryOnHeaderProjectLine` (`:feature:session`); `titleLoadingPresets…` (dropped in `:feature:session`: Tuning presets) | 2 `UIHostingController` measurements; 2 SwiftUI split-overlay tests (Android fades one laid-out text); `whatIsSelectedCopiedAndRead…` + 2 `StreamLineHoldTests` (`LineBreak.Simple` never moves a word); 2 `TranscriptTextRevealWaitTests` (no `wait(until:)`) |
 | `MarkdownStreamTests.swift` | `markdown/MarkdownStreamTests.kt` | 10 (+ env-gated cost metric) | – | – |
 | `MathAndMermaidTests.swift` | `markdown/MathAndMermaidTests.kt` | 13 | 4 Mermaid card/cache tests (`:feature:media`) | `mathSurvivesTheTranscriptCache` (Android caches raw Markdown, never parsed blocks) |
 | `InlineLinkIconsTests.swift` | `markdown/ui/InlineLinkIconsTests.kt` | 8 | – | `cleanAddressIsTheDefault` (Clean Address baked, no presets); 5 TextKit hit-layout / `ImageRenderer` pixel probes |
-| `TranscriptEntryTests.swift` | `TranscriptEntryTests.kt` | 24 | 5 window/projection tests (`:feature:session`); `executeRowsNameTheToolsTheirScriptCalls` (`:server`) | – |
+| `TranscriptEntryTests.swift` | `TranscriptEntryTests.kt` | 24 | 5 window/projection tests (`:feature:session`, ported there); `executeRowsNameTheToolsTheirScriptCalls` (`:server`) | – |
 | `TranscriptTimeStampsTests.swift` | `rows/TranscriptTimeStampsTests.kt` | 16 | – | – |
-| `TranscriptDragTests.swift` | `user/TranscriptDragTests.kt` | 8 | `composerDropCategorizes…` (`:feature:session`) | 6 `UIImage`/`NSItemProvider`/temp-folder/UIKit hosting tests (Android serves bytes through media's `AgentFileProvider`) |
+| `TranscriptDragTests.swift` | `user/TranscriptDragTests.kt` | 8 | `composerDropCategorizes…` (`:feature:session`, ported there) | 6 `UIImage`/`NSItemProvider`/temp-folder/UIKit hosting tests (Android serves bytes through media's `AgentFileProvider`) |
 | `NewMessagesTests.swift` | `list/NewMessagesTests.kt` | 7 | 15 `SessionFeature` tests (`:feature:session`); 3 `HomeFeature` tests (`:feature:drawer`) | – |
 | `NewMessagesListTests.swift` | `NewMessagesListTests.kt` | 1 | – | 14 hosted-list fit/landing probes (real row heights in the UIKit harness) |
 | `TranscriptScrollBehaviorTests.swift` | `list/TranscriptScrollBehaviorTests.kt` | 57 | 2 projection-cache tests (`:feature:session`) | 14 UIKit collection-view harness tests; `listOwnMotionIsNotAnAssistiveScroll` (VoiceOver scroll split); `statusBarScrollToTopLeavesTheBottom` (no status-bar tap) |
@@ -114,6 +114,12 @@ port; "dropped" ones can't exist on Android, and each Kotlin file's header lists
 | `AgentRevealAndOrbModelTests.swift` | `user/AgentRevealAndOrbModelTests.kt` | 4 | 26 status orb tests (`ActivityGyro`, `WorkingRun`…: `:feature:session`) | `analyticalInnerGlowShader…` (AGSL runs only on a GPU) |
 | `TranscriptCachePersistenceTests.swift` | `:server` `TranscriptCachePersistenceTests.kt` | 1 | 7 `HomeFeature`/`AppFeature` tests (`:feature:drawer`, `:app`) | 2 protected-data write tests (no locked-device file protection on Android) |
 | `TranscriptBenchmarkTests.swift` | – | 0 | 8 `HomeFeature`/`AppFeature`/`SessionTranscriptView.ProjectionCache` tests (`:feature:drawer`, `:app`, `:feature:session`; `differsOnlyInTailAssistantMarkdown` is a UIKit reconfigure fast path with no Android counterpart) | 5 env-gated CPU/scroll benchmarks |
+| `SessionLinkTests.swift` | `markdown/SessionLinkTests.kt` | 11 | `linkURLRoundTrips…` (`:server`); 4 `SessionFeature` tests (`:feature:session`); 7 `HomeFeature` tests (`:feature:drawer`) | `reinjectingAnEqualContextDoesNotRedrawItsReaders` (`UIHostingController` redraw count; `SessionLinkContext` holds no closure, so equal contexts are equal values: `aStreamedDelta…`); `testSessionLinkCPU` (env-gated benchmark) |
+| `AgentFileTests.swift` | `AgentFileTests.kt` (`AgentFileMarkdownTests`, `ToolSummaryTests`) | 13 (5 + 8) | `toolRowsOfferViewableFiles`, `AgentFileReferenceTests` (`:server`); `AgentFileLoadingTests`, `AgentFileAudioOwnershipTests` (`:feature:media`) | – (`cardsSurviveTheTranscriptSnapshot` round-trips the `AssistantMarkdown` item, which is Android's snapshot of a reply) |
+| `VoiceHandoffParseTests.swift` | `user/VoiceHandoffParseTests.kt` | 1 (`theLabelRowFallback…`) | the parsing tests (`:feature:voice`) | – |
+| `FileAttachmentTests.swift` | `user/FileAttachmentTests.kt` | 1 (`fileOnlyMessagesHaveNoBubble`'s `TranscriptEntry` check) | decoding (`userMessagesRenderChips…`, the first half of `fileOnly…`) (`:server`); the rest (`:core`, `:feature:composer`, `:feature:session`) | – |
+
+Total (`./gradlew :feature:transcript:testDebugUnitTest`): 261 tests, 1 skipped (the env-gated stream cost metric), 0 failures.
 
 Bugs the ported tests found, fixed: inline code drawn at body size instead of `.subheadline`
 (`inlineCodeInHeadingsUses…`); bare URLs not linked like Foundation's Markdown (InlineLinkIcons);

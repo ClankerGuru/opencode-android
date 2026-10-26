@@ -81,7 +81,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.first
@@ -236,12 +240,19 @@ class LocationClient(
     /**
      * Pre-renders the composer's compact map snapshot before the location response lands so
      * the card reveals with its map already in cache, bounded by [timeout] (1.2 s default) so
-     * slow tiles never hold the card on “Finding Location…”.
+     * slow tiles never hold the card on “Finding Location…”. As iOS's `MapSnapshotGate`, the
+     * snapshot runs in its own job, so the wait ends at [timeout] even when the snapshot ignores
+     * cancellation; it is cancelled then.
      */
     suspend fun prefetchCompactSnapshot(location: SharedLocation, timeout: Duration? = null) {
         val limit = timeout ?: prefetchTimeout
         val (size, dark) = compactSnapshotTraits()
-        withTimeoutOrNull(limit) { snapshot(location, size, dark) }
+        val render = CoroutineScope(currentCoroutineContext() + Job()).async { snapshot(location, size, dark) }
+        try {
+            withTimeoutOrNull(limit) { render.await() }
+        } finally {
+            render.cancel()
+        }
     }
 
     companion object Key : DependencyKey<LocationClient> {
