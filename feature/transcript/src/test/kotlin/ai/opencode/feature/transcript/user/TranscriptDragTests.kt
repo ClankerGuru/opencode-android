@@ -14,8 +14,8 @@ import org.junit.Test
  * [TranscriptDragPayload] model, its file names and MIME types (iOS `UTType`s).
  *
  * The drag's data itself is a `ClipData` and `content://` URIs, and names from MIME types use
- * `MimeTypeMap`; both are stubs on the JVM. Those halves are the `…Framework` tests beside the
- * iOS names, `@Ignore`d until the module runs them under Robolectric. iOS's off-main-thread
+ * `MimeTypeMap`; both are stubs in plain JVM tests, so the class runs under Robolectric. Those
+ * halves are the `…Framework` tests beside the iOS names. iOS's off-main-thread
  * loading has no Android counterpart: the `ClipData` is built when the drag starts and media's
  * `AgentFileDragProvider` serves bytes on the reader's thread.
  */
@@ -23,7 +23,6 @@ import org.junit.Test
 @Config(sdk = [35])
 class TranscriptDragTests {
     private companion object {
-        const val NEEDS_FRAMEWORK = "Uses MimeTypeMap/Uri/ClipData, stubs in JVM unit tests: needs Robolectric"
         const val PLAIN = "text/plain"
     }
 

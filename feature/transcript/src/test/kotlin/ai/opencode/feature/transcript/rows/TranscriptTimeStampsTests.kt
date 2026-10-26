@@ -24,17 +24,13 @@ import kotlin.math.abs
  * messages that open a day or resume after a pause (D-45).
  *
  * The stamp text comes from `android.icu` (`DateFormat` skeletons, `RelativeDateTimeFormatter`),
- * which is a stub on the JVM, so every test that formats a stamp is `@Ignore`d until the module
- * runs those under Robolectric. Where an iOS test also checks [TranscriptTimeStamps.date] (pure),
- * that half runs under the iOS name and the formatting half is the `…Stamps` test beside it.
+ * which is a stub in plain JVM tests, so the class runs under Robolectric. Where an iOS test
+ * also checks [TranscriptTimeStamps.date], that half runs under the iOS name and the formatting
+ * half is the `…Stamps` test beside it.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class TranscriptTimeStampsTests {
-    private companion object {
-        const val NEEDS_ICU = "Formats with android.icu, a stub in JVM unit tests: needs Robolectric"
-    }
-
     private val zone = ZoneId.of("America/Los_Angeles")
     private val locale = Locale.US
 
