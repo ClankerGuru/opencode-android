@@ -43,6 +43,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 import java.time.Instant
 import java.util.UUID
 import kotlin.math.abs
@@ -65,10 +69,16 @@ import kotlin.time.Duration.Companion.milliseconds
  * - `photoRequestGateResumesExactlyOnceAcrossCancelAndLateCompletion`: iOS's `PhotoRequestGate`
  *   guards a `PHImageRequestID` and a continuation (`arm`/`registered`/`finish`); Android's gate is
  *   an `android.os.CancellationSignal` plus structured cancellation, with no such states.
- * - In `plusPhotoLibraryExposesVideoAssetsAndLabFixtureIncludesVideosAndCameraCapture`, the decoded
- *   image data and `renderLabCameraCapture` checks: they draw real Bitmaps (no JVM stand-in).
+ * - In `plusPhotoLibraryExposesVideoAssetsAndLabFixtureIncludesVideosAndCameraCapture`, the
+ *   `renderLabCameraCapture` check: Android's lab fixture has no camera-capture render.
+ *
+ * Runs under Robolectric (native graphics, xxhdpi = iOS's 3× screen) so the lab fixture's image
+ * data draws and decodes real Bitmaps.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35], qualifiers = "xxhdpi")
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class PhotoFlightTests {
     /** iOS's main actor runs a callback made on it inline (`MainActor.assumeIsolated`): Main.immediate here. */
     private lateinit var main: kotlinx.coroutines.test.TestDispatcher
@@ -756,7 +766,6 @@ class PhotoFlightTests {
         assertEquals("0:14", video.formattedDuration)
     }
 
-    /** The fixture's thumbnails and image data draw real Bitmaps: the library reads it without them. */
     @Test fun plusPhotoLibraryExposesVideoAssetsAndLabFixtureIncludesVideosAndCameraCapture() = runTest(main) {
         val fixture = PhotoLibraryClient.labFixture(limited = false)
         val recent = fixture.recent(10)
@@ -769,6 +778,10 @@ class PhotoFlightTests {
         assertEquals("0:08", recent[4].formattedDuration)
         assertTrue(recent[7].isVideo)
         assertEquals("0:31", recent[7].formattedDuration)
+
+        val videoData = fixture.imageData("lab-photo-1")
+        assertNotNull(videoData)
+        assertNotNull(android.graphics.BitmapFactory.decodeByteArray(videoData, 0, videoData!!.size))
 
         val listing = PhotoLibraryClient(
             access = fixture.access,

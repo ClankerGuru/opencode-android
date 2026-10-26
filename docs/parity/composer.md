@@ -73,7 +73,7 @@ iOS `OpenCodeTests` files that test `:feature:composer` code, ported into `featu
 (JVM, `./gradlew :feature:composer:testDebugUnitTest`; class and method names match iOS, parameterized
 tests loop inside one test). Tests driving `SessionFeature`, `HomeFeature` or `AppFeature` are left to
 `:feature:session` (branch `tests/session`), drawer and `:app` ("skipped"); each Kotlin file's header
-lists them by name. "Dropped" tests can't exist as JVM unit tests.
+lists them by name. "Dropped" tests can't exist as JVM unit tests. Tests needing Android framework classes (`ContentResolver`, Bitmap encode/decode, `KeyEvent`, drawing) run under Robolectric (test-only, native graphics).
 
 | iOS file | Kotlin file | Ported | Skipped (owner) | Dropped (reason) |
 | --- | --- | ---: | --- | --- |
@@ -87,18 +87,18 @@ lists them by name. "Dropped" tests can't exist as JVM unit tests.
 | `DictationLiveActivityTests.swift` | `DictationLiveActivityTests.kt` | 1 (`DictationFeature` store) | 4 `HomeFeature` tests → drawer; `theStopIntentSendsItsCommand` → system (Live Update owner) | – |
 | `SendOutboxTests.swift` | `SendOutboxTests.kt` | 1 (`retryAfterIsReadAsSecondsOrADate`, a `:server` helper no other port covered) | 35 → `:feature:session` | – |
 | `ComposerPersistenceTests.swift` | `ComposerPersistenceTests.kt` | 1 (cleanup through the persistence client) | 7 → `:feature:session`, 3 → drawer | – |
-| `ComposerAutocompleteTests.swift` | `ComposerAutocompleteTests.kt` (+`ComposerAutocompleteTestSupport.kt`) | 12 (3 partly) | 5 → `:feature:session`; `experimentalFlagOffProducesByteIdenticalPromptBody` → `:server` | caret auto-run step (Android's auto-run is fixed to Fill), UIKit `keyCommands`/text-view checks |
+| `ComposerAutocompleteTests.swift` | `ComposerAutocompleteTests.kt` (Robolectric, +`ComposerAutocompleteTestSupport.kt`) | 12 (2 partly) | 5 → `:feature:session`; `experimentalFlagOffProducesByteIdenticalPromptBody` → `:server` | caret auto-run step (Android's auto-run is fixed to Fill), UIKit text-view checks; `keyCommands` counts are checked through `handleKeyEvent` |
 | `ComposerAutocompleteMotionTests.swift` | `ComposerAutocompleteMotionTests.kt` | 9 | – | – |
 | `ComposerSessionMentionTests.swift` | `ComposerSessionMentionTests.kt` | 4 | 3 → `:feature:session`; `sentSessionTokensRenderAsSessionLinks` → `:feature:transcript` | – |
-| `ComposerItemProviderLoaderTests.swift` | `ComposerItemProviderLoaderTests.kt` | 7 | `composerOffersACallWhenVoiceIsSetUp`, `composerControlPresentation` → `:feature:session` | `textViewRoutesImagePaste…` (UIKit paste), `loadsFileBackedAndUIImageProviders` (real content resolver/image decode) |
+| `ComposerItemProviderLoaderTests.swift` | `ComposerItemProviderLoaderTests.kt` (Robolectric) | 8 | `composerOffersACallWhenVoiceIsSetUp`, `composerControlPresentation` → `:feature:session` | `textViewRoutesImagePaste…` (UIKit paste) |
 | `FileAttachmentTests.swift` | `FileAttachmentTests.kt` (+ `:core` `files/AttachmentFileTypeTests.kt`) | 1 (`ComposerAttachmentsFeature`) + 3 (`:core`) | 7 → `:feature:session`; `PromptPresentationTests`/`FileAttachmentWireTests` (7) → `:server`; `ShareHandoffFileTests` → `:feature:system` | – |
 | `InlinePhotoSelectionTests.swift` | `InlinePhotoSelectionTests.kt` | 7 | – | – |
 | `AttachmentCameraActivityTests.swift` | `AttachmentCameraActivityTests.kt` | 6 | – | – |
 | `AttachmentCameraControlsRenderTests.swift` | – | 0 | – | `renderControls` (opt-in UIKit screenshot) |
 | `AttachmentCameraLensTests.swift` | `AttachmentCameraLensTests.kt` | 20 | – | – |
 | `AttachmentMenuPressTests.swift` | `AttachmentMenuPressTests.kt` | 11 | `taskIdentity` half of the linger test → drawer | – |
-| `PhotoFlightTests.swift` | `plusmenu/PhotoFlightTests.kt` | 38 | – | 10 `PhotoFlightAudit` tests (telemetry not ported), `photoRequestGateResumesExactlyOnce…` (Android gate is a `CancellationSignal`); Bitmap image-data checks of one test |
-| `ModelPickerTests.swift` | `modelpicker/ModelPickerTests.kt` | 29 | 13 + reducer half of `searchParsesTrailingLevel…` → `:feature:session` | `turningOffCustomModelPickerUnregistersLevelTunables` (no Tuning Panel), `searchableSheetsAvoidForcedNavigationBarDrawerOnMac` (Mac-only); preset/registry and Canvas path sub-asserts |
+| `PhotoFlightTests.swift` | `plusmenu/PhotoFlightTests.kt` (Robolectric, xxhdpi) | 38 | – | 10 `PhotoFlightAudit` tests (telemetry not ported), `photoRequestGateResumesExactlyOnce…` (Android gate is a `CancellationSignal`); `renderLabCameraCapture` check (no Android counterpart) |
+| `ModelPickerTests.swift` | `modelpicker/ModelPickerTests.kt` (Robolectric) | 29 | 13 + reducer half of `searchParsesTrailingLevel…` → `:feature:session` | `turningOffCustomModelPickerUnregistersLevelTunables` (no Tuning Panel), `searchableSheetsAvoidForcedNavigationBarDrawerOnMac` (Mac-only); preset/registry sub-asserts. The arc's path check reads the drawn pixels' bounds |
 
 Composer-named files owned elsewhere: `SessionFeatureTests+Composer/+Dictation/+ModelPicks` (`:feature:session`),
 `ShareComposerTests` (system/drawer), `PairingPasteTests` (`:app`), `AgentFileTests` (media/transcript),

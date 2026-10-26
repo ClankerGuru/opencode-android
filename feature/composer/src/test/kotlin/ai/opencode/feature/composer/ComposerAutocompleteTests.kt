@@ -27,6 +27,9 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import java.util.UUID
 import kotlin.math.abs
 import kotlin.math.max
@@ -53,13 +56,12 @@ import kotlin.time.Duration.Companion.milliseconds
  * - `caretAwareTriggerDetectionAndAutoRunCancellationWorkCleanly`: step 2 (auto-run) sets the
  *   `composer.autocomplete.commandAction` tunable to Run through the Tuning Panel; Android bakes
  *   the tunables (Fill), so a chosen command never runs by itself. Step 1 is ported.
- * - `keyboardBridgeOnlyInterceptsReturnWhenSelectableAndSingleBackspaceInChip`: the
- *   `keyCommands` counts are UIKit's; Android's hardware keys go through `handleKeyEvent`, which
- *   needs framework `KeyEvent`s. The `shouldChangeText` half is ported.
  * - `midDraftChipInsertAndChipDeletePreserveCaretOffset`: the `UITextView` probes
  *   (`selectedRange`, `pinsToEnd`, `syncMeasuredState`) are UIKit; the reducer half (caret
  *   after inserting and deleting a mid-draft chip) is ported.
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35])
 class ComposerAutocompleteTests {
     private val directory = session.directory
 
@@ -465,6 +467,18 @@ class ComposerAutocompleteTests {
     }
 
     /** The `shouldChangeText` half (see the class note). */
+    /** Hardware keys the bridge takes (iOS's `keyCommands`): ↑, ↓, Escape, Tab, Return pressed down. */
+    private fun interceptedKeys(bridge: ComposerAutocompleteTextBridge): Int =
+        listOf(
+            android.view.KeyEvent.KEYCODE_DPAD_UP,
+            android.view.KeyEvent.KEYCODE_DPAD_DOWN,
+            android.view.KeyEvent.KEYCODE_ESCAPE,
+            android.view.KeyEvent.KEYCODE_TAB,
+            android.view.KeyEvent.KEYCODE_ENTER,
+        ).count { code ->
+            bridge.handleKeyEvent(androidx.compose.ui.input.key.KeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, code)))
+        }
+
     @Test fun keyboardBridgeOnlyInterceptsReturnWhenSelectableAndSingleBackspaceInChip() {
         val bridge = ComposerAutocompleteTextBridge()
         bridge.isEnabled = true
@@ -480,11 +494,17 @@ class ComposerAutocompleteTests {
         assertTrue(bridge.shouldChangeText("", start = 0, length = 0, replacement = "\n"))
         assertTrue(bridge.shouldChangeText("", start = 0, length = 0, replacement = "\t"))
         assertEquals(0, confirmCount)
+        // iOS `keyCommands.count == 3`: hardware ↑, ↓ and Escape only.
+        assertEquals(3, interceptedKeys(bridge))
 
         // With a selectable row (`hasSelectableRow == true`): Return and Tab confirm selection.
         bridge.hasSelectableRow = true
         assertFalse(bridge.shouldChangeText("", start = 0, length = 0, replacement = "\n"))
         assertEquals(1, confirmCount)
+        // iOS `keyCommands.count == 5`: plus Tab and Return.
+        confirmCount = 0
+        assertEquals(5, interceptedKeys(bridge))
+        assertEquals(2, confirmCount)
 
         // Single backspace inside a chip removes the chip; multi-character selection across a chip deletes normally.
         val targetChip = chip(901, AutocompleteItem.skill(sampleSkills[0]))

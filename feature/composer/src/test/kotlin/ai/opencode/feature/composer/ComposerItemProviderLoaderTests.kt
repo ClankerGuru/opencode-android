@@ -17,22 +17,39 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+import org.robolectric.Shadows.shadowOf
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Color
+import android.net.Uri
+import java.io.ByteArrayInputStream
+import java.io.File
 import java.util.UUID
 import kotlin.time.Duration.Companion.seconds
 
 /**
  * Port of iOS `ComposerItemProviderLoaderTests.swift` ([ComposerImageImporter]).
  *
+ * Runs under Robolectric (native graphics) so `loadsFileBackedAndUIImageProviders` reads real
+ * `ContentResolver` streams and encodes/decodes real JPEGs: a `file:` Uri stands in for the
+ * file-backed provider and a `content:` Uri for the file-URL one; iOS's in-memory `UIImage`
+ * provider is `ComposerImageSource.Data` on Android, which never goes through the loader.
  * Dropped: `textViewRoutesImagePasteWithoutChangingText` (UIKit `ImagePasteTextView.paste`;
- * Android routes pastes through the field's `contentReceiver`) and
- * `loadsFileBackedAndUIImageProviders` (decodes `NSItemProvider`s with UIKit; Android's
- * [ComposerItemProviderLoader] reads a `ContentResolver`, which JVM tests don't have).
+ * Android routes pastes through the field's `contentReceiver`).
  * `imageImportPreservesMixedSourceOrder` keeps its mixed order with a loader in place of the
- * item provider for the same reason.
+ * item provider (the importer resolves item providers through the `AppContext` dependency).
  * Skipped → `:feature:session`: `composerOffersACallWhenVoiceIsSetUp`,
  * `composerControlPresentation` (`ComposerControls` lives in `SessionViewComposerControls.kt`).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35])
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ComposerItemProviderLoaderTests {
     @After fun tearDown() {
         Dispatchers.resetMain()
@@ -50,6 +67,27 @@ class ComposerItemProviderLoaderTests {
 
     private suspend fun waitForImport(importer: ComposerImageImporter) {
         while (importer.isLoading) yield()
+    }
+
+    @Test fun loadsFileBackedAndUIImageProviders() = runTest {
+        val bitmap = Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.rgb(255, 165, 0)) }
+        val jpeg = java.io.ByteArrayOutputStream().use { out ->
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 100, out)
+            out.toByteArray()
+        }
+        val file = File.createTempFile("loader", ".jpg").apply { writeBytes(jpeg) }
+        try {
+            val context = RuntimeEnvironment.getApplication()
+            val contentUri = Uri.parse("content://ai.opencode.test/photo.jpg")
+            shadowOf(context.contentResolver).registerInputStream(contentUri, ByteArrayInputStream(jpeg))
+
+            val loaded = listOf(Uri.fromFile(file), contentUri).mapNotNull { ComposerItemProviderLoader.load(it, context) }
+
+            assertEquals(2, loaded.size)
+            assertTrue(loaded.all { BitmapFactory.decodeByteArray(it, 0, it.size) != null })
+        } finally {
+            file.delete()
+        }
     }
 
     @Test fun imageImportPreservesMixedSourceOrder() = runTest {

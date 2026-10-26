@@ -24,6 +24,11 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.math.abs
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
@@ -49,6 +54,9 @@ import kotlin.time.Duration.Companion.milliseconds
  * Android: the tunables are baked constants), `searchableSheetsAvoidForcedNavigationBarDrawerOnMac`
  * (SwiftUI `SearchFieldPlacement` on Mac and an iOS source scan).
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35])
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ModelPickerTests {
     private fun model(modelID: String, providerID: String, name: String, variants: List<String> = emptyList()) =
         OpenCodeModel(modelID = modelID, providerID = providerID, name = name, variants = variants)
@@ -293,10 +301,28 @@ class ModelPickerTests {
 
     /**
      * D-65 option 3: level j of n fills j/n of the arc, so the lowest is never empty and the
-     * highest always full, at any count; Default fills to the middle, dimmed. iOS also checks the
-     * `Shape`'s path (empty at fill 0, centred in its box): n/a, Android draws the arc straight
-     * into a `DrawScope` ([LevelArc.draw]), which needs a real Canvas.
+     * highest always full, at any count; Default fills to the middle, dimmed. iOS checks the
+     * `Shape`'s path (empty at fill 0, centred in its box); Android draws the arc straight into a
+     * `DrawScope` ([LevelArc.draw]), so the check reads the drawn pixels' bounds instead.
      */
+    /** The pixel bounds [LevelArc.draw] covers in a 20×20 box (a 1 px stroke, close to the iOS path), or null when nothing is drawn. */
+    private fun drawnBounds(fill: Double): androidx.compose.ui.geometry.Rect? {
+        val image = androidx.compose.ui.graphics.ImageBitmap(20, 20)
+        androidx.compose.ui.graphics.drawscope.CanvasDrawScope().draw(
+            androidx.compose.ui.unit.Density(1f),
+            androidx.compose.ui.unit.LayoutDirection.Ltr,
+            androidx.compose.ui.graphics.Canvas(image),
+            androidx.compose.ui.geometry.Size(20f, 20f),
+        ) { LevelArc.draw(this, fill = fill, span = 240.0, color = androidx.compose.ui.graphics.Color.Black, stroke = 1f) }
+        val pixels = IntArray(400)
+        image.readPixels(pixels)
+        val lit = pixels.indices.filter { (pixels[it] ushr 24) != 0 }
+        if (lit.isEmpty()) return null
+        val xs = lit.map { it % 20 }
+        val ys = lit.map { it / 20 }
+        return androidx.compose.ui.geometry.Rect(xs.min().toFloat(), ys.min().toFloat(), xs.max() + 1f, ys.max() + 1f)
+    }
+
     @Test fun theArcFillsToTheLevelAtAnyCount() {
         for (levels in 1..6) {
             val count = levels + 1
@@ -309,6 +335,9 @@ class ModelPickerTests {
         }
         assertEquals(LevelArc.Pose(0.625, 0.45), LevelArc.pose(index = 0, count = 5))
         assertEquals("From bottom left, over the top, to bottom right", 150.0, LevelArc.start(span = 240.0), 0.0)
+        assertNull("Nothing drawn at fill 0", drawnBounds(fill = 0.0))
+        val full = drawnBounds(fill = 1.0)!!
+        assertTrue("Centred in its box: $full", abs((full.left + full.right) / 2f - 10f) < 0.6f && full.top > 1f && full.bottom < 19f)
         assertEquals(2.45, LevelScrubberTunables.arcStroke, 0.0)
         assertEquals(240.0, LevelScrubberTunables.arcSpan, 0.0)
     }
