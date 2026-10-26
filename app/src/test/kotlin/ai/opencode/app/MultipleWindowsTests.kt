@@ -9,21 +9,26 @@ import ai.opencode.feature.session.SessionFeature
 import ai.opencode.feature.system.NotificationDestination
 import ai.opencode.feature.system.SystemAction
 import ai.opencode.feature.system.SystemActionInbox
+import ai.opencode.feature.system.SessionWindowTarget
 import ai.opencode.feature.system.SystemIntegrationClient
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeHomeSnapshot
 import ai.opencode.server.model.OpenCodeSession
 import android.app.Application
+import android.content.Intent
+import android.os.Bundle
 import android.os.Looper
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.time.Instant
@@ -32,7 +37,7 @@ import java.time.Instant
  * Port of the `:app` half of iOS `MultipleWindowsTests.swift` (window roster, app-wide work,
  * call ownership). `SharedEventStreams`/`SharedReads` tests are `:server`'s
  * `live/MultipleWindowsTests`; `aFurtherWindowKeepsItsOwnSidebar` is `HomeSettingsFeature`
- * (`:feature:drawer`); `windowTargetRoundTripsThroughItsActivity` is `:feature:system`'s.
+ * (`:feature:drawer`). `windowTargetRoundTripsThroughItsActivity` is `MultipleWindowsFrameworkTests`.
  * `AppWideWorkTests` is below (Robolectric). Dropped: `oneWindowIsAlwaysTheFrontWindow` (UIKit
  * `ActiveScene` touch tracking), `activityTypeIsDeclaredInInfoPlist` (Info.plist).
  */
@@ -190,6 +195,28 @@ class WindowRosterTests {
         roster.left(first)
         assertEquals(WindowRoster.Role.Secondary, second.role)
         assertTrue(second.ownsAppWide)
+    }
+}
+
+/** iOS `MultipleWindowsTests.windowTargetRoundTripsThroughItsActivity`: the target rides an `Intent` (Robolectric). */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35], application = Application::class)
+class MultipleWindowsFrameworkTests {
+    @get:Rule val isolation = TestIsolationRule()
+
+    @Test
+    fun windowTargetRoundTripsThroughItsActivity() {
+        val target = SessionWindowTarget(serverID = "server", sessionID = "ses_1")
+        val intent = SceneWindows.intent(RuntimeEnvironment.getApplication(), target)
+        assertEquals(SessionWindowTarget.ACTION, intent.action)
+        assertEquals(target, RootStore.target(intent, saved = null))
+        assertNull(RootStore.target(Intent("other"), saved = null))
+        // Restored after a relaunch: the window's saved value.
+        val saved = Bundle().apply {
+            putString(SessionWindowTarget.EXTRA_SERVER_ID, target.serverID)
+            putString(SessionWindowTarget.EXTRA_SESSION_ID, target.sessionID)
+        }
+        assertEquals(target, RootStore.target(null, saved))
     }
 }
 

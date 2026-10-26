@@ -191,14 +191,18 @@ object SceneWindows {
     fun open(target: SessionWindowTarget) {
         if (!isSupported) return
         val context = dependency(AppContext)
-        val intent = Intent(context, MainActivity::class.java)
+        val intent = intent(context, target)
+        runCatching { context.startActivity(intent) }
+            .onFailure { AppLog.app.error { "Couldn’t open a window: ${it::class.java.simpleName}" } }
+    }
+
+    /** iOS `SessionWindowTarget.userActivity`: the intent that opens [target] in a window of its own ([RootStore.target] reads it back). */
+    internal fun intent(context: Context, target: SessionWindowTarget): Intent =
+        Intent(context, MainActivity::class.java)
             .setAction(SessionWindowTarget.ACTION)
             .putExtra(SessionWindowTarget.EXTRA_SERVER_ID, target.serverID)
             .putExtra(SessionWindowTarget.EXTRA_SESSION_ID, target.sessionID)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK or Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT)
-        runCatching { context.startActivity(intent) }
-            .onFailure { AppLog.app.error { "Couldn’t open a window: ${it::class.java.simpleName}" } }
-    }
 
     /** Brings [window]'s task to the front, when a tap in another window is meant for it. */
     internal fun bringToFront(window: RootStore, from: Context) {
