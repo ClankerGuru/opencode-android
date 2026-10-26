@@ -26,8 +26,8 @@ import kotlin.time.Duration.Companion.seconds
  * action an effect sends must be [receive]d, and [finish] fails while effects still run
  * (cancellation included), as TCA's default. Set [exhaustive] = false for TCA's
  * `exhaustivity = .off`: `update` then applies to the actual new state (partial asserts),
- * unasserted effect actions are reduced before the next send, and [receive] skips
- * non-matching actions.
+ * unasserted effect actions are reduced before the next send, [receive] skips
+ * non-matching actions, and [finish] waits out its timeout for running effects without failing.
  *
  * Dependencies resolve to `testValue` unless overridden; keys without one fail loudly. An
  * effect that throws fails the test at the next call. Effects should take dispatchers from a
@@ -124,6 +124,12 @@ class TestStore<S, A>(
         try {
             withTimeout(timeout) { while (runner.hasRunningEffects) delay(5) }
         } catch (_: kotlinx.coroutines.TimeoutCancellationException) {
+            // TCA reports effects still in flight only when exhaustive; with exhaustivity off
+            // they're a skipped assertion and keep running (the test's scope ends them).
+            if (!exhaustive) {
+                drain()
+                return
+            }
             val count = runner.runningCount
             runner.cancelAll()
             throw AssertionError("$count effect(s) still running at finish. Cancel them or await their actions.")
