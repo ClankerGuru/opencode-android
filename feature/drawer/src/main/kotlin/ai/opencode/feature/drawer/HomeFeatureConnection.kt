@@ -23,6 +23,7 @@ import ai.opencode.server.OpenCodeServerEvent
 import ai.opencode.server.TranscriptCachePersistence
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.SessionActivity
+import ai.opencode.server.model.keepingFirstPrompts
 import ai.opencode.server.remember
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
@@ -196,7 +197,8 @@ private fun HomeFeature.snapshotRefreshed(state: State, action: Action.SnapshotR
     val carried = s.sessions.filter { session ->
         session.id !in incomingSessionIDs && session.id !in recentlyDeleted && (session.id == openRootID || s.isPinned(session.id))
     }
-    s = s.copy(sessions = snapshotSessions + carried, activeSessionIDs = snapshotActive)
+    // Server copies don't carry the first prompt an unnamed session is shown by; keep what's known.
+    s = s.copy(sessions = snapshotSessions.keepingFirstPrompts(s.sessions) + carried, activeSessionIDs = snapshotActive)
     var parents = s.activeSessionParents + (incoming.activeSessionParents ?: emptyMap())
     if (parents.size > HomeFeature.parentLinkLimit) parents = SessionActivity.ancestry(s.activeSessionIDs, parents)
     s = s.copy(activeSessionParents = parents)

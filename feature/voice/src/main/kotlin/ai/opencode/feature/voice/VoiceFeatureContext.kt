@@ -22,7 +22,7 @@ val VoiceFeature.State.scopeStage: DotScopeSimulation.Stage
     }
 
 fun VoiceFeature.State.viewingSession(at: Instant): OpenCodeSession? =
-    target.sessionID?.let { OpenCodeSession(id = it, title = sessionTitle, projectID = "", directory = target.directory, updatedAt = at) }
+    target.sessionID?.let { OpenCodeSession(id = it, serverTitle = sessionTitle, projectID = "", directory = target.directory, updatedAt = at) }
 
 /** Adopts the session created for the current draft without treating it as a move. */
 fun VoiceFeature.State.adoptDraftSession(session: OpenCodeSession): VoiceFeature.State {

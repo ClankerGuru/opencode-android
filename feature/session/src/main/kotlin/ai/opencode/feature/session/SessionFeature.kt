@@ -838,7 +838,8 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         /** The server's `cursor.next` when decoded from a `/message` response (`null` when exhausted). */
         val pageCursor: PageCursor? = null,
     ) {
-        data class PageCursor(val next: String?)
+        /** [reachesStart]: the window holds the session's first message (`OpenCodeTranscriptWindow.PageCursor`). */
+        data class PageCursor(val next: String?, val reachesStart: Boolean = next == null)
 
         sealed interface Scope {
             data object Page : Scope

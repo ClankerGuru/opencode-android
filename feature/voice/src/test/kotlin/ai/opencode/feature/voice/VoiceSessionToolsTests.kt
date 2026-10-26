@@ -46,10 +46,10 @@ private val distantPast: Instant = Instant.parse("0001-01-01T00:00:00Z")
  */
 class VoiceSessionToolsTests {
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
-    private val earpiece = OpenCodeSession(id = "ses_ear", title = "Fix the earpiece routing", projectID = "ios", directory = "/Users/kit/opencode-ios", updatedAt = Instant.ofEpochSecond(400))
-    private val upload = OpenCodeSession(id = "ses_upload", title = "Upload retries", projectID = "ios", directory = "/Users/kit/opencode-ios", updatedAt = Instant.ofEpochSecond(300))
-    private val docs = OpenCodeSession(id = "ses_docs", title = "Docs refresh", projectID = "web", directory = "/Users/kit/website", updatedAt = Instant.ofEpochSecond(200))
-    private val math = OpenCodeSession(id = "ses_math", title = "Math bug", projectID = "math", directory = "/Users/kit/math", updatedAt = Instant.ofEpochSecond(100))
+    private val earpiece = OpenCodeSession(id = "ses_ear", serverTitle = "Fix the earpiece routing", projectID = "ios", directory = "/Users/kit/opencode-ios", updatedAt = Instant.ofEpochSecond(400))
+    private val upload = OpenCodeSession(id = "ses_upload", serverTitle = "Upload retries", projectID = "ios", directory = "/Users/kit/opencode-ios", updatedAt = Instant.ofEpochSecond(300))
+    private val docs = OpenCodeSession(id = "ses_docs", serverTitle = "Docs refresh", projectID = "web", directory = "/Users/kit/website", updatedAt = Instant.ofEpochSecond(200))
+    private val math = OpenCodeSession(id = "ses_math", serverTitle = "Math bug", projectID = "math", directory = "/Users/kit/math", updatedAt = Instant.ofEpochSecond(100))
 
     private val sessions: List<OpenCodeSession> get() = listOf(earpiece, upload, docs, math)
 
@@ -302,7 +302,7 @@ class VoiceSessionToolsTests {
 
     @Test fun searchSessionsMergesServerAndDrawerMatchesWithStatus() = runBlocking {
         val reads = Reads()
-        val older = OpenCodeSession(id = "ses_old", title = "Earpiece audio route (old)", projectID = "ios", directory = "/Users/kit/opencode-ios", updatedAt = Instant.ofEpochSecond(1))
+        val older = OpenCodeSession(id = "ses_old", serverTitle = "Earpiece audio route (old)", projectID = "ios", directory = "/Users/kit/opencode-ios", updatedAt = Instant.ofEpochSecond(1))
         val tools = workspace(client(reads) { query -> if (query == "earpiece") listOf(older) else emptyList() }, board = board())
         val rows = rows(tools, "search_sessions", """{"query":"the earpiece session"}""")
         assertEquals(listOf(earpiece.id, older.id), rows.map { it["id"].string() })
@@ -342,7 +342,7 @@ class VoiceSessionToolsTests {
 
     /** A second saved server with its own credentials, whose only session is running. */
     private val studio = OpenCodeServer(url = "https://studio.tailnet.ts.net:4096", username = "opencode", password = "studio-secret", name = "Studio")
-    private val render = OpenCodeSession(id = "ses_render", title = "Render farm", projectID = "farm", directory = "/srv/farm", updatedAt = Instant.ofEpochSecond(500))
+    private val render = OpenCodeSession(id = "ses_render", serverTitle = "Render farm", projectID = "farm", directory = "/srv/farm", updatedAt = Instant.ofEpochSecond(500))
 
     /** Every server a read went to (by URL) and the password it carried. */
     private fun multiServerClient(seen: Locked<List<String>>): OpenCodeClient {
@@ -463,10 +463,10 @@ class VoiceSessionToolsTests {
 class VoiceModelToolsTests {
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
     private val fable = OpenCodeSession(
-        id = "ses_fable", title = "Fable refactor", projectID = "ios", directory = "/Users/kit/opencode-ios", updatedAt = distantPast,
+        id = "ses_fable", serverTitle = "Fable refactor", projectID = "ios", directory = "/Users/kit/opencode-ios", updatedAt = distantPast,
         model = OpenCodeModelRef(id = "gpt-5.4", providerID = "openai", variant = "high"),
     )
-    private val docs = OpenCodeSession(id = "ses_docs", title = "Docs refresh", projectID = "web", directory = "/Users/kit/website", updatedAt = distantPast)
+    private val docs = OpenCodeSession(id = "ses_docs", serverTitle = "Docs refresh", projectID = "web", directory = "/Users/kit/website", updatedAt = distantPast)
 
     private val catalog = OpenCodeModelCatalog(
         models = listOf(
@@ -501,7 +501,7 @@ class VoiceModelToolsTests {
             modelCatalog = { _, _ -> catalog },
             getSession = { _, id -> sessions.firstOrNull { it.id == id } ?: throw OpenCodeClientError("No session $id") },
             switchModel = { _, id, ref -> calls.switched.update { it + "$id ${ref.providerID}/${ref.id} ${ref.variant ?: "-"}" } },
-            createSession = { _, directory, _ -> OpenCodeSession(id = "ses_new", title = "New", projectID = "p", directory = directory, updatedAt = distantPast) },
+            createSession = { _, directory, _ -> OpenCodeSession(id = "ses_new", serverTitle = "New", projectID = "p", directory = directory, updatedAt = distantPast) },
             moveToBackground = { _, _ -> },
             setPendingInputDelivery = { _, _, _, _ -> },
             sendDeliveredPrompt = { _, id, _, _ ->
@@ -516,7 +516,7 @@ class VoiceModelToolsTests {
             start = VoiceDelegatorWorkspace.Start(
                 server = server,
                 // The call names the session on screen without its model.
-                viewing = viewing?.let { OpenCodeSession(id = it.id, title = it.title, projectID = "", directory = it.directory, updatedAt = distantPast) },
+                viewing = viewing?.let { OpenCodeSession(id = it.id, serverTitle = it.title, projectID = "", directory = it.directory, updatedAt = distantPast) },
                 draftDirectory = "/Users/kit/opencode-ios",
                 draftModel = draftModel,
                 viewingModel = viewingModel,

@@ -3,6 +3,8 @@ package ai.opencode.feature.composer
 import ai.opencode.server.model.OpenCodeOutgoingAttachment
 import ai.opencode.server.model.OpenCodeProject
 import ai.opencode.server.model.OpenCodeSession
+import ai.opencode.server.model.SessionTitle
+import ai.opencode.server.model.learningFirstPrompt
 import java.util.UUID
 
 // The "Feature Integration" half of iOS `ComposerPersistence.swift` (`extension SessionFeature`,
@@ -183,13 +185,16 @@ fun restorePersistedComposer(
         }
         val alreadyInOutbox = outbox.contains(id)
         if (currentSession == null) {
-            val created = if (alreadyInOutbox) null else entry.createdSession ?: entry.sessionID?.let { sessionID ->
+            // The prompt it was created with names it until the server does.
+            val firstPrompt = SessionTitle.preview(entry.pending.text)
+            val created = if (alreadyInOutbox) null else entry.createdSession?.learningFirstPrompt(firstPrompt) ?: entry.sessionID?.let { sessionID ->
                 OpenCodeSession(
                     id = sessionID,
-                    title = "New Session",
+                    serverTitle = SessionTitle.placeholder,
                     projectID = currentProject?.id ?: "",
                     directory = entry.directory ?: currentProject?.directory ?: "",
                     updatedAt = entry.updatedAt,
+                    firstPrompt = firstPrompt,
                 )
             }
             if (created != null) {

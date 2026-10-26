@@ -22,6 +22,7 @@ import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodePairingLink
 import ai.opencode.server.model.OpenCodeDelivery
 import ai.opencode.server.model.OpenCodeTranscriptItem
+import ai.opencode.server.model.keepingFirstPrompts
 import java.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -245,9 +246,9 @@ internal fun SessionFeature.reduceBrowserAndBackgroundWork(state: State, action:
         var next = state.renameVoiceTarget(sessionID, action.title)
         val index = next.familySessions.indexOfFirst { it.id == sessionID }
         if (index >= 0) {
-            next = next.copy(familySessions = next.familySessions.toMutableList().also { it[index] = it[index].copy(title = action.title) })
+            next = next.copy(familySessions = next.familySessions.toMutableList().also { it[index] = it[index].copy(serverTitle = action.title) })
             val session = next.session
-            if (session?.id == sessionID) next = next.copy(session = session.copy(title = action.title))
+            if (session?.id == sessionID) next = next.copy(session = session.copy(serverTitle = action.title))
         }
         Reduced(next)
     }
@@ -380,7 +381,7 @@ private fun SessionFeature.familyResponse(family: ai.opencode.server.model.OpenC
     // an already-discovered child: that would disable its task card and reject the child request
     // response already being submitted. Explicit deletion events retire family members.
     val familyIDs = family.sessions.map { it.id }.toSet()
-    var members = family.sessions + state.familySessions.filter { it.id !in familyIDs }
+    var members = family.sessions.keepingFirstPrompts(state.familySessions) + state.familySessions.filter { it.id !in familyIDs }
     val current = state.session
     if (current != null) {
         val index = members.indexOfFirst { it.id == current.id }
