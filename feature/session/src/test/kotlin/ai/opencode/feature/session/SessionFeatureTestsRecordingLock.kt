@@ -27,6 +27,7 @@ import ai.opencode.server.model.OpenCodePendingRequests
 import ai.opencode.server.model.OpenCodeToolCall
 import ai.opencode.server.model.OpenCodeTranscriptItem
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.yield
 import ai.opencode.server.model.OpenCodeJSONValue
 import org.junit.Test
@@ -88,10 +89,11 @@ class SessionFeatureTestsRecordingLock {
         store.receive(Action.dictationUpdated("first message, all of it", recording = 0))
         first.close()
         store.receive(Action.dictationStopped(errorMessage = null, recording = 0))
-        for (i in 0 until 100) {
+        // The dictation actor finalizes on a real thread: wait in real time (bounded), not a yield count.
+        for (i in 0 until 300) {
             if (sent.value.isNotEmpty()) break
             store.skipReceivedActions()
-            yield()
+            delay(10)
         }
         assertEquals(listOf("Hey first message, all of it"), sent.value)
         assertNull(store.state.sendingDictation)
