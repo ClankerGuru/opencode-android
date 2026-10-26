@@ -5,6 +5,7 @@ import ai.opencode.feature.system.intents.ControlIntents
 import ai.opencode.feature.system.intents.OpenCodeControlKind
 import ai.opencode.feature.system.intents.SessionControlValue
 import ai.opencode.feature.system.intents.SessionEntity
+import ai.opencode.feature.system.intents.SystemSearchIndex
 import ai.opencode.feature.system.intents.SystemPromptSender
 import ai.opencode.feature.system.intents.SystemQuickAction
 import ai.opencode.feature.system.intents.controlTarget
@@ -30,6 +31,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import java.io.File
 import java.time.Instant
 
@@ -102,7 +106,7 @@ class SessionDirectoryTests {
     }
 }
 
-/** `spotlightIndexesOnlyTitlesAndProjects`: Android's index document is an AppSearch `GenericDocument` (an Android runtime class). */
+/** `spotlightIndexesOnlyTitlesAndProjects` (an AppSearch `GenericDocument`) runs under Robolectric in [SystemEntityQueryFrameworkTests]. */
 class SystemEntityQueryTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -163,6 +167,25 @@ class SystemEntityQueryTests {
         val session = SessionEntity.of(directoryServer().sessions[0], serverKey)
         assertEquals(SystemAction(serverKey, SystemAction.Destination.Session("ses_newer")), session.action())
         assertNull(SessionEntity(id = "garbage", title = "", detail = null).action())
+    }
+}
+
+/**
+ * [SystemEntityQueryTests]' index check: Android's Spotlight item is an AppSearch `GenericDocument`
+ * (iOS `CSSearchableItemAttributeSet`), built by [SystemSearchIndex.document] (Robolectric).
+ */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35])
+class SystemEntityQueryFrameworkTests {
+    @get:Rule val isolation = TestIsolationRule()
+
+    @Test
+    fun spotlightIndexesOnlyTitlesAndProjects() {
+        val document = SystemSearchIndex.document(directoryServer().sessions[0], serverKey)
+        assertEquals("Fix login", document.getPropertyString("name"))
+        assertEquals("app", document.getPropertyString("description"))
+        // No message text: only the title, the project, the link and its Open action.
+        assertEquals(setOf("name", "description", "url", "potentialActions"), document.propertyNames)
     }
 }
 

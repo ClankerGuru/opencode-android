@@ -88,7 +88,7 @@ internal object SystemSearchIndex {
         "${SystemAction.URL_SCHEME}://session/${encode(sessionID)}?server=${encode(serverKey)}"
 
     /** Titles and project names only (iOS `SessionEntity.attributeSet`). */
-    private fun document(session: SessionDirectory.Session, serverKey: String): GenericDocument {
+    internal fun document(session: SessionDirectory.Session, serverKey: String): GenericDocument {
         val url = url(serverKey, session.id)
         val open = GenericDocument.Builder<GenericDocument.Builder<*>>(serverKey, "${identifier(serverKey, session.id)}#open", POTENTIAL_ACTION)
             .setPropertyString("name", "Open Session")
