@@ -164,9 +164,6 @@ class SessionVoiceTests {
         delegate(key, store)
         harness.admissions.resolve(key, "msg_$key")
         store.receive(voice<VoiceFeature.Action.WorkAdmitted>(), "voice.presented.workAdmitted")
-        // TCA runs the host's synchronous `.send(.voicePromptAdmitted)` before the effect's next
-        // action; Android's TestStore queues it after `workAdmitted`, so take it explicitly.
-        store.receive(Action.VoicePromptAdmitted::class)
         store.receive(Action.RefreshResponse::class)
     }
 
@@ -283,7 +280,8 @@ class SessionVoiceTests {
         )
         store.receive(Action.RefreshResponse::class)
 
-        // TCA has already reduced the synchronous sends that read queued; Android queues them.
+        // TCA has already reduced the synchronous sends of the actions received so far (here the
+        // read's follow-up); Android's TestStore reduces them on the next receive.
         applyReactions(store)
         val refreshes = store.state.nextRefreshID
         harness.typedIdle.resolve("typed", Unit)
@@ -306,15 +304,11 @@ class SessionVoiceTests {
         store.receive(voice<VoiceFeature.Action.EndTapped>(), "endTapped") {
             it.withVoice { voice -> voice.withPhase(VoiceFeature.State.Phase.Ended).copy(pendingWork = emptyList()) }
         }
-        // Android delivers the host's run-state read ahead of the call's `delegate.ended`: the
-        // voice child's ending effect (a send merged with `voiceCall.end()`) runs as one launched
-        // effect, so its send lands after the host's synchronous onChange send (TCA sends both at
-        // once, `ended` first).
-        store.receive(Action.RefreshRequested(RefreshReason.RunState))
-        store.receive(Action.RefreshResponse::class)
         store.receive(voiceEnded, "delegate.ended")
         assertTrue("The server still owns the run the call handed off", store.state.isRunning)
         assertFalse(store.state.isAwaitingReply)
+        store.receive(Action.RefreshRequested(RefreshReason.RunState))
+        store.receive(Action.RefreshResponse::class)
         // The bar stays while the scope sweeps out, then the composer returns.
         store.receive(Action.VoiceExitFinished) { it.copy(voice = null) }
 
