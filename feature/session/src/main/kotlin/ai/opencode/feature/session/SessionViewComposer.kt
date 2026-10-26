@@ -1186,13 +1186,22 @@ private fun SessionComposerEnv.ComposerSurface(
                 contentKey = { it != null },
                 transitionSpec = {
                     val spec: androidx.compose.animation.core.FiniteAnimationSpec<Float> = if (reducedMotion) Motion.easeInOut(0.2) else MotionSpring(0.32).spec()
-                    fadeIn(spec) togetherWith fadeOut(spec) using SizeTransform(clip = false)
+                    // Clipped to the surface as it resizes: the taller composer fading out never
+                    // shows past the bar's edge.
+                    fadeIn(spec) togetherWith fadeOut(spec) using SizeTransform(clip = true)
                 },
                 label = "composerCallSwap",
             ) { shown ->
                 if (shown != null) {
                     VoiceCallComposer(shown)
                 } else {
+                    // Leaving for a call, the composer fades out as it was (SwiftUI's removed view
+                    // keeps its last state): the draft becoming the call's session mid-swap mustn't
+                    // collapse it to one line under the arriving bar.
+                    val leaving = transition.targetState != null
+                    val live = this@ComposerSurface
+                    val frozen = remember(leaving) { if (leaving) live else null }
+                    val env = frozen ?: live
                     Box(
                         Modifier
                             .fillMaxWidth()
@@ -1200,7 +1209,7 @@ private fun SessionComposerEnv.ComposerSurface(
                             .onSizeChanged { size ->
                                 view.surfaceSize = with(density) { androidx.compose.ui.geometry.Size(size.width.toDp().value, size.height.toDp().value) }
                             },
-                    ) { Composer() }
+                    ) { env.Composer() }
                 }
             }
         }
