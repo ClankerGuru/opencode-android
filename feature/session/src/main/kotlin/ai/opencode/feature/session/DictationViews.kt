@@ -96,7 +96,13 @@ typealias DictationHoldArm = DictationFeature.Hold.Arm
 data class DictationHoldVisuals(
     /** A sustained hold, not a tap: the circle has grown and the targets show. */
     val showsGuides: Boolean = false,
-)
+) {
+    /** A new press: nothing from the last recording's hold carries over. */
+    fun begin(): DictationHoldVisuals = DictationHoldVisuals()
+
+    /** The recording ended. */
+    fun end(): DictationHoldVisuals = DictationHoldVisuals()
+}
 
 /**
  * iOS `DictationHoldRetention`: identity-scoped retention for the bar's leaving hold and settled

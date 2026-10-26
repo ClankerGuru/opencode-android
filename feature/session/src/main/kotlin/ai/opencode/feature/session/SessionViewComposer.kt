@@ -492,7 +492,7 @@ fun SessionComposer(
     LaunchedEffect(snapshot.taskIdentity) {
         view.dictationRetention = view.dictationRetention.syncIdentity(snapshot.taskIdentity, snapshot.dictationHold, recordingNow)
         if (snapshot.dictationHold == null) {
-            view.dictationHoldVisuals = DictationHoldVisuals()
+            view.dictationHoldVisuals = view.dictationHoldVisuals.end()
             view.heldComposerPresentation = null
         }
     }
@@ -500,7 +500,7 @@ fun SessionComposer(
         val hold = snapshot.dictationHold
         view.dictationRetention = view.dictationRetention.holdChanged(hold, snapshot.taskIdentity, recordingNow)
         if (hold == null) {
-            view.dictationHoldVisuals = DictationHoldVisuals()
+            view.dictationHoldVisuals = view.dictationHoldVisuals.end()
             view.heldComposerPresentation = null
         }
     }
@@ -739,7 +739,7 @@ internal class SessionComposerEnv(
         DictationLatency.mark("press_began")
         val hold = store.state.dictationHold
         if (hold == null) view.heldComposerPresentation = composerPresentation
-        if (hold == null || store.state.isFinishingDictation) view.dictationHoldVisuals = DictationHoldVisuals()
+        if (hold == null || store.state.isFinishingDictation) view.dictationHoldVisuals = view.dictationHoldVisuals.begin()
         store.send(Action.micPressBegan)
         // Counted from the touch: a hold grows the circle and offers the lock target about 0.1 s
         // in, and a quick tap usually locks before then and never shows them.

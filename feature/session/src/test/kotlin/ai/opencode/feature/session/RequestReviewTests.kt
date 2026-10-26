@@ -36,7 +36,7 @@ import kotlin.time.Duration.Companion.seconds
  *
  * Not ported here (:server, `OpenCodeFormValue.typedNumber`): `typedNumbersReadMidEntryTextAndLocaleSeparators`.
  * Not ported here (:feature:composer, `RequestDockAnswer` alone): `dockAnswersReadOtherAndReadiness`.
- * Not ported here (:feature:transcript, `QuestionRowSummary` / `TranscriptEntry`): `settledQuestionsReadAsOneQuietRow`.
+ * Not ported here (:feature:transcript, `QuestionRowSummary` / `TranscriptEntry`, ported there): `settledQuestionsReadAsOneQuietRow`.
  */
 class RequestReviewTests {
     private val session = OpenCodeSession(id = "ses_review", serverTitle = "Review", projectID = "proj", directory = "/tmp/review", updatedAt = Instant.EPOCH)
