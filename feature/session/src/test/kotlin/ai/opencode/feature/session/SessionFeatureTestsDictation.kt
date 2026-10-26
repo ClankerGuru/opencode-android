@@ -334,15 +334,12 @@ class SessionFeatureTestsDictation {
 
             store.send(Action.micPressBegan) { it.withDictationPhase(DictationFeature.Phase.Preparing) }
             store.send(end)
+            // iOS starts the end's effect (its stop reaching the dictation actor) before the next
+            // line; here it runs on the test's loop, so let it get there before the grant.
+            SessionTestSupport.settle()
             mic.permitted.open()
             delay(80)
             store.skipReceivedActions()
-            // The mic's release runs on the audio thread; under load it can land after 80 ms.
-            repeat(200) {
-                if (mic.claims.value == 0) return@repeat
-                delay(10)
-                store.skipReceivedActions()
-            }
             assertEquals("$end left the session claimed", 0, mic.claims.value)
             assertEquals("$end turned the mic on afterwards", 0, mic.captures.value)
             assertEquals("$end left the bar waiting", DictationFeature.Phase.Idle, store.state.dictationPhase)
