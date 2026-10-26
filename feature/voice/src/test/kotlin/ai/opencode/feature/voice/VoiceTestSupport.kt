@@ -45,6 +45,8 @@ class FakeVoiceAudioSession(outputPorts: List<Int>) : VoiceAudioSessionControlli
         data object Deactivated : Event
         data class Route(val atEar: Boolean) : Event
         data object PlaybackStarted : Event
+        /** iOS `volumeChanged`: the call's playback gain (recorded by [RecordingAudioControl]). */
+        data class VolumeChanged(val volume: Float) : Event
     }
 
     private val lock = Any()
@@ -57,6 +59,7 @@ class FakeVoiceAudioSession(outputPorts: List<Int>) : VoiceAudioSessionControlli
     val events: List<Event> get() = synchronized(lock) { recorded.toList() }
     fun clearEvents() = synchronized(lock) { recorded.clear() }
     fun record(event: Event) = synchronized(lock) { recorded += event; Unit }
+    fun setOutputPorts(ports: List<Int>) = synchronized(lock) { this.ports = ports }
 
     override val mode: Int = android.media.AudioManager.MODE_IN_COMMUNICATION
     override val outputPorts: List<Int> get() = synchronized(lock) { ports }

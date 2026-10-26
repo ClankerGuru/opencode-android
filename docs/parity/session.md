@@ -105,7 +105,7 @@ Parameterized iOS tests loop over their arguments. Each file's KDoc lists what i
 | `ModelVisibilityTests.swift` | `ModelVisibilityTests.kt` | 5 | Rules → `:server`, Settings → `:feature:settings` |
 | `VoiceFeatureTests+Screen.swift` (deferred by voice) | `VoiceFeatureTestsScreenSession.kt` | 11 | rest in `:feature:voice` |
 | `VoiceFeatureTests.swift`, `VoiceSessionToolsTests.swift`, `FloatingCallModelTests.swift`, `VoiceRouteTests.swift`, `VoiceLiveTests.swift` (deferred by voice) | `VoiceFeatureTestsSession.kt`, `VoiceSessionToolsTestsSession.kt`, `FloatingCallModelTestsSession.kt`, `VoiceRouteTestsSession.kt`, `VoiceLiveTestsSession.kt` | 8 | Settings halves → settings, Home halves → drawer |
-| `RaiseToTalkTests.swift` (+`Routing`) | `RaiseToTalkTests.kt` | 11 | 24 raise-detector/audio-routing tests → `:feature:voice` |
+| `RaiseToTalkTests.swift` (+`Routing`) | `RaiseToTalkTests.kt` | 11 | 24 raise-detector/audio-routing tests → `:feature:voice`, ported there |
 | `NewMessagesTests.swift` | `NewMessagesTests.kt` | 14 | 7 mark/placement → transcript; 3 Home → drawer |
 | `BrowserTests.swift` | `BrowserTests.kt` | 17 | policy/page-prompt/`BrowserFeature` → `:feature:media`; 9 Home → drawer; 3 → voice; WebKit/UIKit probes deleted |
 | `FileAttachmentTests.swift` | `FileAttachmentTests.kt` | 7 | types/presentation/wire/staging → core, composer, server, transcript, system |
