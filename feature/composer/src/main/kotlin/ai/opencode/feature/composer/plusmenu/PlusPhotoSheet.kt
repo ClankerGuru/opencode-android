@@ -155,7 +155,7 @@ class PlusPhotoLibrary(private val client: PhotoLibraryClient = dependency(Photo
     var savedScrollPhotoID: String? = null
 
     /** Pixels per dp of the display (iOS `defaultDisplayScale`); views keep it current. */
-    var displayScale: Float = Resources.getSystem().displayMetrics.density.takeIf { it > 0 } ?: 3f
+    var displayScale: Float = Resources.getSystem()?.displayMetrics?.density?.takeIf { it > 0 } ?: 3f
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var watch: Job? = null

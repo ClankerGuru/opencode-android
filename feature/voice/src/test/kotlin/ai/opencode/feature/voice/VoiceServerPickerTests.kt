@@ -54,7 +54,7 @@ class VoiceServerPickerTests {
     private val studio = OpenCodeServer(url = "http://studio.local:4096", username = "opencode", password = "studio", name = "Studio")
     private val session = OpenCodeSession(
         id = "ses_voice",
-        title = "Voice Server",
+        serverTitle = "Voice Server",
         projectID = "proj_1",
         directory = "/Users/kit/code/open-source/opencode-ios",
         updatedAt = Instant.ofEpochSecond(1_700_000_000),

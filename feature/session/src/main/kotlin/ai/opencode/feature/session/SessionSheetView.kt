@@ -18,6 +18,7 @@ import ai.opencode.feature.session.header.SessionContextText
 import ai.opencode.feature.session.header.titleBreathing
 import ai.opencode.feature.system.notifications.SessionNotificationsClient
 import ai.opencode.server.model.ModelVariant
+import ai.opencode.server.model.isUntitled
 import ai.opencode.server.model.OpenCodeContextUsage
 import ai.opencode.server.model.OpenCodeExportFormat
 import ai.opencode.server.model.OpenCodeModel
@@ -259,7 +260,7 @@ private fun SessionSheetContent(
             .testTag("session-sheet"),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Hero(state, details, context, statusOrb, onRename = { sheet.send(SessionSheetFeature.Action.RenameTapped(details.session?.title ?: "")) })
+        Hero(state, details, context, statusOrb, onRename = { sheet.send(SessionSheetFeature.Action.RenameTapped(details.session?.let { if (it.isUntitled) "" else it.title }.orEmpty())) })
         Tiles(state, isListRow, context, details.session?.title, sheet::send)
         DetailsCard(details, onModelTapped, providerIcon)
         if (isListRow && notificationsAvailable) {

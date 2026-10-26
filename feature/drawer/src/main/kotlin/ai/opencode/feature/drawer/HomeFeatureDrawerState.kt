@@ -14,6 +14,7 @@ import ai.opencode.feature.drawer.catchup.CatchUpFeature
 import ai.opencode.server.ServerSharedKeys
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.SessionActivity
+import ai.opencode.server.model.learningFirstPrompt
 import ai.opencode.feature.drawer.HomeFeature.State.Indicator
 import ai.opencode.feature.drawer.HomeFeature.State.StatusSnapshot
 import ai.opencode.feature.drawer.HomeFeature.State.Viewing
@@ -81,6 +82,16 @@ internal inline fun HomeFeature.State.updatingSession(sessionID: String, transfo
     val next = transform(sessions[index])
     if (next == sessions[index]) return this
     return copy(sessions = sessions.toMutableList().also { it[index] = next })
+}
+
+/**
+ * Home's list and remembered snapshot learn the first prompt a session's screen just learned
+ * ([learningFirstPrompt]), so its row, Catch Up card, notices and system surfaces read the same.
+ */
+internal fun HomeFeature.State.learningFirstPrompt(session: OpenCodeSession?): HomeFeature.State {
+    val preview = session?.firstPrompt ?: return this
+    return updatingSession(session.id) { it.learningFirstPrompt(preview) }
+        .updatingSnapshot(session.id) { it.copy(session = it.session.learningFirstPrompt(preview)) }
 }
 
 /** Replaces one remembered snapshot in place (`sessionSnapshots[id]?.… = …`). */

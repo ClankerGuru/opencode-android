@@ -20,6 +20,7 @@ val WhatsNewEntry.Companion.all: List<WhatsNewEntry> get() = whatsNewEntries
 
 @Suppress("MaxLineLength")
 private val whatsNewEntries: List<WhatsNewEntry> = listOf(
+    smaller(id = "session-title-first-prompt", day = "2026-10-25", title = "Titles from First Prompts", symbol = "text.quote", summary = "Sessions without a title now show their first prompt, on one line, until the server names them."),
     smaller(id = "voice-server-picker", day = "2026-10-23", title = "Choose a Voice Server", symbol = "server.rack", summary = "With Server Voice on, Settings › Voice › Voice Server picks which saved server your calls go through, or This Phone to use your own keys."),
     smaller(id = "pair-opens-drawer", day = "2026-10-23", title = "Pick Up Where You Left Off", symbol = "desktopcomputer", summary = "After you pair a new computer, the sidebar opens on its recent sessions so you can choose one, instead of leaving you on an empty session."),
     smaller(id = "gpt-live-own-key", day = "2026-10-23", title = "GPT-Live Uses Your Key", symbol = "key", summary = "GPT-Live calls use your own OpenAI key, or your server’s with Server Voice on, instead of a saved server’s OpenCode Console workspace."),

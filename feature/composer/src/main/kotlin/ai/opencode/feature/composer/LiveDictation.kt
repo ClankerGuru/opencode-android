@@ -47,6 +47,17 @@ class LiveDictation(private val engine: DictationEngine) {
         var load: Deferred<DictationModel>? = null
         var results: Job? = null
         var isReleased = false
+        private var micStopped = false
+
+        /**
+         * Stops its mic once: a stop's finish and a later cancel's discard (a call
+         * starting while it finalizes) can both reach it.
+         */
+        fun stopCapture() {
+            if (micStopped) return
+            micStopped = true
+            capture?.stop()
+        }
 
         /** Interrupted, or the recognizer failed: never held after. */
         var failed = false
@@ -376,7 +387,7 @@ class LiveDictation(private val engine: DictationEngine) {
     private suspend fun finish(recording: Recording) {
         finishing[recording.press] = recording
         try {
-            recording.capture?.stop()
+            recording.stopCapture()
             // No more audio. A model still loading gets everything heard so far:
             // letting go right after speaking doesn't lose the words.
             recording.input.end()
@@ -393,7 +404,7 @@ class LiveDictation(private val engine: DictationEngine) {
 
     private suspend fun discard(recording: Recording) {
         if (current === recording) current = null
-        recording.capture?.stop()
+        recording.stopCapture()
         recording.input.discard()
         recording.recognition?.cancel()
         recording.results?.cancel()
