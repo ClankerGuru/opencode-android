@@ -108,5 +108,5 @@ Composer-named files owned elsewhere: `SessionFeatureTests+Composer/+Dictation/+
 Bugs the ports found (fixed): dictation kept private copies of `AudioSessionOwner`/`AudioSessionGeneration`,
 so it never saw a call take the audio (a hold could outlive a call starting, and dictation could release
 audio a call held); `PlusPhotoLibrary.displayScale` crashed without system `Resources` (now falls back to 3×,
-iOS's last resort). Refactors for testability, behaviour unchanged: `RequestPanelFit.stack` (pure squeeze),
+iOS's last resort); a stopped recording's mic was stopped twice when a newer press finalized it and its late cancel discarded it (`LiveDictation` `Recording.stopCapture` now stops it once). Refactors for testability, behaviour unchanged: `RequestPanelFit.stack` (pure squeeze),
 `InlinePhotoSelection` generic over its picked item.
