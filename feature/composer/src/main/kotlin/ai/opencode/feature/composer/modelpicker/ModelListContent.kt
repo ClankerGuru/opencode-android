@@ -425,22 +425,42 @@ fun ModelSearchCapsuleField(
     placeholder: String = "Search Models",
     onSubmit: () -> Unit = {},
 ) {
+    // Feed edits back to BasicTextField immediately, before the store's Flow collector redraws
+    // its parent. An old value in between resets the caret and reorders the next characters.
+    // A delayed echo of an earlier edit must not roll back newer keystrokes. External changes
+    // still replace the buffer; an echo acknowledges all edits up to that value.
+    var input by remember { mutableStateOf(text) }
+    val pendingEdits = remember { mutableListOf<String>() }
+    LaunchedEffect(text) {
+        val acknowledged = pendingEdits.indexOf(text)
+        if (acknowledged >= 0) {
+            pendingEdits.subList(0, acknowledged + 1).clear()
+        } else if (input != text) {
+            pendingEdits.clear()
+            input = text
+        }
+    }
+    val changeText: (String) -> Unit = {
+        input = it
+        pendingEdits.add(it)
+        onTextChange(it)
+    }
     val textColor = OpenCodeTheme.colors.text
     Row(
         modifier
             .fillMaxWidth()
             .heightIn(min = minHeight.dp)
             .background(OpenCodeTheme.colors.inlineCodeFill, CircleShape)
-            .padding(start = leadingPadding, end = if (text.isEmpty()) emptyTrailingPadding else clearTrailingPadding),
+            .padding(start = leadingPadding, end = if (input.isEmpty()) emptyTrailingPadding else clearTrailingPadding),
         horizontalArrangement = Arrangement.spacedBy(spacing),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         OpenCodeIcon(SFSymbol.Magnifyingglass, null, size = 20.dp, tint = OpenCodeTheme.colors.secondaryText)
         Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-            if (text.isEmpty()) Text(placeholder, style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.secondaryText, maxLines = 1)
+            if (input.isEmpty()) Text(placeholder, style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.secondaryText, maxLines = 1)
             BasicTextField(
-                value = text,
-                onValueChange = onTextChange,
+                value = input,
+                onValueChange = changeText,
                 singleLine = true,
                 textStyle = OpenCodeTextStyles.body.copy(color = textColor),
                 cursorBrush = SolidColor(OpenCodeTheme.colors.accent),
@@ -454,10 +474,10 @@ fun ModelSearchCapsuleField(
                     .testTag("model-search"),
             )
         }
-        if (text.isNotEmpty()) {
+        if (input.isNotEmpty()) {
             Box(
                 Modifier
-                    .clickable(role = Role.Button) { onTextChange("") }
+                    .clickable(role = Role.Button) { changeText("") }
                     .openCodeTapTarget()
                     .semantics { contentDescription = "Clear" },
                 contentAlignment = Alignment.Center,
