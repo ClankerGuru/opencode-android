@@ -43,7 +43,7 @@ import kotlin.math.abs
  * - TranscriptScrollBehaviorTests.shortTranscriptHoldingTailAnchorAcrossPreTailInsertDoesNotOverscrollBottom
  * - TranscriptScrollBehaviorTests.shortTranscriptHistoryRowLeavingGlidesTopGapClosedOverSeveralFrames
  *
- * Skipped (owner :feature:session):
+ * Skipped (owner :feature:session, ported there):
  * - TranscriptAssistiveScrollTests.projectionCacheIsolatesEntryBuildingAndRowPropsReconfigureOnlyAffectedCells
  *   (`SessionTranscriptView.ProjectionCache`)
  * - TranscriptScrollBehaviorTests.browsingWindowKeepsItsLeadingBoundaryAcrossTailAppends
