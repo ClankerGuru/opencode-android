@@ -94,7 +94,10 @@ another module are left to that module's port ("skipped"); "dropped" tests can't
 | `LivingOrbTests.swift` | `LivingOrbTests.kt` | 3 | `flagRestoresEveryExistingCallStyleWhenOff` (`:core`), `settingsPersistStyle…` (`:feature:settings`, ported there) | `colourAndShapePresets…` (tuning store not ported; tunables are baked) |
 | `VoiceHapticTests.swift` (+teardown, tick race, startup, hang-up engine suites) | `VoiceHapticTests.kt` | 27 (`endingACallReleasesItsHapticEngine…` on the real `VoiceHapticEngine` under Robolectric, `VoiceCallTeardownFrameworkTests`) | – | `patternsBecomeCorePatterns` (Core Haptics players; Android mixes one waveform) |
 | `DotScopeSimulationTests.swift` | `DotScopeSimulationTests.kt` | 20 | – | 5 `MTKView`/`UIHostingController` draw/pause probes |
-| `VoiceAudioAndTranscriptTests.swift` | `VoiceAudioAndTranscriptTests.kt` | 48 | – | `LiveRTCSetupTests` (no `LiveRTCLocked` counterpart) |
+| `VoiceAudioAndTranscriptTests.swift` | `VoiceAudioAndTranscriptTests.kt` | 48 | – | `LiveRTCSetupTests.aSessionShutDownMidSetupStoresNothingMore` (no `LiveRTCLocked` counterpart: `VoiceRTCSession` confines its state to one serial dispatcher, so there is no lock-and-store step to race a shutdown) |
+| `RaiseToTalkTests.swift` | `RaiseToTalkTests.kt` | 16 (the `RaiseToEarDetector` and at-ear engine start) | 8 `SessionFeature` tests (`:feature:session`, ported there) | – |
+| `RaiseToTalkTests+Routing.swift` | `RaiseToTalkRoutingTests.kt` | 8 + the `VoiceAudioEngine` half of `setAtEarBeforeRunningIsNotLost` (`VoiceAudioEngine` routing/ramp, `VoiceCallHost` ear hand-off) | 3 `SessionFeature` tests (`:feature:session`, ported there) | – |
+| `HapticsAuditTests.swift` | `HapticsAuditTests.kt` | 1 (`theCallsFallbacksComeFromTheVocabulary`) | rest (`:core`, `:feature:session`, drawer, ported there) | – |
 | `VoiceLiveTests.swift` | `VoiceLiveTests.kt` | 83 | 8 `VoiceEnginePersistenceTests` migrations (`:app`), 3 compaction/retarget tests (`:feature:session`, drawer) | – |
 | `VoiceReconnectReplyTests.swift` | `VoiceReconnectReplyTests.kt` | 7 | – | – |
 | `VoiceRouteTests.swift` | `VoiceRouteTests.kt` | 6 | `inactiveGeminiNeverDisablesThePhoneKey…`, `grokSuppressesUnrelatedServerErrors` (their Settings and session halves, ported in `:feature:settings`/`:feature:session`) | – |
@@ -114,7 +117,7 @@ another module are left to that module's port ("skipped"); "dropped" tests can't
 
 Voice-named iOS files whose subject lives elsewhere (left to those modules' ports): `LabVoiceKeysTests` (ported in `:app`),
 `ScreenAwakeTests`, `VoiceLiveActivityTests` (`:app`/drawer stores), `VoiceRoutingBaselineTests`,
-`ServerQuietStyleTests` (`:feature:settings`, ported there), `SessionVoiceTests`, `RaiseToTalkTests(+Routing)`,
+`ServerQuietStyleTests` (`:feature:settings`, ported there), `SessionVoiceTests`,
 `AgentRevealAndOrbModelTests` (`:feature:session`), `LiveDelegationFeatureTests+Session`,
 `DictationLiveActivityTests` (drawer), `AudioSessionHapticsTests` (`:core` `HapticsClient`, ported there; its live
 dictation suite is opt-in device-only), `DictationAudioTests`, `LiveDictationTests` (`:feature:composer`).
@@ -123,6 +126,6 @@ Production bugs the ported tests found (each fixed in its own `fix(voice)` commi
 rounded its pitch half-to-even (10 px dots instead of 11 at 3×); AudioEngineGuard reported the
 exception class instead of its reason and turned cancellation into an engine error; a reactivation
 that failed when an interruption ended was never retried by the next route/configuration change;
-a just-finished call log was missing from `list()` while its save was still writing; End landed 2 dp left of the call button (48 dp slot kept the 6 dp padding); a reconnect or rotation replayed the connect chord; `RetryBudget.bounded` (`:server`) timed its limit on the scripted clock, so a lost send's answer was never read back.
+a just-finished call log was missing from `list()` while its save was still writing; End landed 2 dp left of the call button (48 dp slot kept the 6 dp padding); a reconnect or rotation replayed the connect chord; `RetryBudget.bounded` (`:server`) timed its limit on the scripted clock, so a lost send's answer was never read back; a cancelled speaker ramp re-sent an unchanged 1.0 gain (iOS only sets a changed volume) and a fallback to the built-in output was noted as “Route changed” instead of the ear's route; every call start re-sent its initial ear to the audio (iOS only re-applies one that changed while the audio started).
 
-Total: 481 voice tests (Gradle), all passing. Robolectric (test-only) runs only `VoiceCallTeardownFrameworkTests`.
+Total: 507 voice tests (Gradle), all passing. Robolectric (test-only) runs only `VoiceCallTeardownFrameworkTests`.

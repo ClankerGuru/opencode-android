@@ -524,6 +524,7 @@ class VoiceAudioEngine(
     }
     fun cancelSpeakerRamp() { rampGeneration++; rampTask?.cancel(); rampTask = null; setPlaybackVolume(1f) }
     private fun setPlaybackVolume(volume: Float) {
+        if (playbackVolume == volume) return
         playbackVolume = volume; externalControl?.setPlaybackVolume(volume)
         synchronized(lock) { cueTracks.forEach { it.setVolume(if (muteOutput) 0f else volume) } }
     }
@@ -537,7 +538,12 @@ class VoiceAudioEngine(
         if (!demo && session.mode != AudioManager.MODE_IN_COMMUNICATION) {
             holder.activate { session.activate(demo); session.route(atEar, demo) }
             note(VoiceCallLog.Note.Kind.audio, "⚠︎ Call audio session restored · ${session.routeDescription}")
-        } else note(VoiceCallLog.Note.Kind.audio, "Route changed · ${session.routeDescription}")
+        } else {
+            // iOS notes a fallback to the built-in output (`oldDeviceUnavailable`) as the ear's
+            // route, and following an external device as a route change.
+            val route = when { demo || external -> "Route changed · "; atEar -> "At the ear: earpiece · "; else -> "Away from the ear: speaker · " }
+            note(VoiceCallLog.Note.Kind.audio, route + session.routeDescription)
+        }
         events.trySend(VoiceAudioEvent.routeChanged)
     }
     suspend fun handleInterruption(began: Boolean) = control.withLock {

@@ -23,7 +23,9 @@ import ai.opencode.feature.session.SessionFeature
 import ai.opencode.feature.session.updateObservedSession
 import ai.opencode.feature.system.liveactivity.VoiceCallActivityAttributes
 import ai.opencode.feature.system.liveactivity.VoiceCallCommand
+import ai.opencode.feature.system.liveactivity.VoiceLiveActivity
 import ai.opencode.feature.system.liveactivity.VoiceLiveActivityClient
+import ai.opencode.feature.system.liveactivity.VoiceCallActivityAttributes.ContentState.Phase
 import ai.opencode.feature.voice.DotScopeSimulation
 import ai.opencode.feature.voice.RealtimePreflightClient
 import ai.opencode.feature.voice.VoiceCallEvent
@@ -45,7 +47,9 @@ import kotlin.time.Duration.Companion.seconds
 
 /**
  * Port of iOS `VoiceLiveActivityTests.swift`'s Home tests (the call's ongoing notification as
- * Home drives it). The mapping, commands and `LiveVoiceActivity` tests are `:feature:system`'s;
+ * Home drives it) and its mapping tests (here because Home's `liveActivityCall` builds the
+ * `VoiceLiveActivity.Call` from `VoiceFeature.State`, which `:feature:system` can't see). The
+ * commands and `LiveVoiceActivity` tests are `:feature:system`'s;
  * `leavingHomeMidCallEndsTheActivity` and `leavingHomeWithoutACallLeavesActivitiesAlone` are
  * `:app`'s.
  *
@@ -269,5 +273,91 @@ class VoiceLiveActivityTests {
             detail = detail.updateObservedSession(session.copy(id = "ses_other", serverTitle = "Other"))
             assertEquals("Upload retries", detail.voice?.sessionTitle)
         }
+    }
+
+    // MARK: Mapping (iOS `VoiceLiveActivity.content(for:previous:now:)` over Home's `liveActivityCall`)
+
+    private val t1: Instant = Instant.ofEpochSecond(1_060)
+
+    private fun HomeFeatureTestSupport.Harness.voice(phase: VoiceFeature.State.Phase, configure: (VoiceFeature.State) -> VoiceFeature.State = { it }): VoiceFeature.State =
+        configure(state { VoiceFeature.State(server, session) }.withPhase(phase))
+
+    private fun map(call: VoiceFeature.State?, previous: VoiceCallActivityAttributes.ContentState?, now: Instant) =
+        VoiceLiveActivity.content(call?.let(::liveActivityCall), previous, now)
+
+    @Test fun noCallAndHangUpShowNothing() = homeTest { h ->
+        assertNull(map(null, null, t0))
+        val live = content(Phase.Live, startedAt = t0)
+        assertNull(map(h.voice(VoiceFeature.State.Phase.Ended), live, t1))
+    }
+
+    @Test fun phasesMapToTheActivityPhase() = homeTest { h ->
+        val live = content(Phase.Live, startedAt = t0)
+        val cases = listOf(
+            VoiceFeature.State.Phase.Connecting to Phase.Connecting,
+            VoiceFeature.State.Phase.Live to Phase.Live,
+            VoiceFeature.State.Phase.EndingAfterGoodbye(spoken = false) to Phase.Live,
+            VoiceFeature.State.Phase.EndingAfterGoodbye(spoken = true) to Phase.Live,
+            VoiceFeature.State.Phase.Dropped to Phase.Ended,
+            VoiceFeature.State.Phase.Failed("Couldn’t connect") to Phase.Ended,
+        )
+        for ((phase, expected) in cases) assertEquals("$phase", expected, map(h.voice(phase), live, t1)?.phase)
+    }
+
+    @Test fun onlyAVisibleReconnectReadsAsReconnecting() = homeTest { h ->
+        val live = content(Phase.Live, startedAt = t0)
+        assertEquals(content(Phase.Reconnecting, startedAt = t0), map(h.voice(VoiceFeature.State.Phase.Live) { it.copy(isReconnecting = true) }, live, t1))
+        assertEquals(Phase.Reconnecting, map(h.voice(VoiceFeature.State.Phase.EndingAfterGoodbye(spoken = false)) { it.copy(isReconnecting = true) }, live, t1)?.phase)
+        // A drop that couldn't be restored ends the call.
+        assertEquals(Phase.Ended, map(h.voice(VoiceFeature.State.Phase.Dropped) { it.copy(isReconnecting = true) }, live, t1)?.phase)
+    }
+
+    @Test fun whatTheCallIsDoingDoesNotShow() = homeTest { h ->
+        val live = content(Phase.Live, startedAt = t0)
+        val busy = h.voice(VoiceFeature.State.Phase.Live) {
+            val captured = it.tail.capture()
+            it.copy(
+                isAssistantSpeaking = true,
+                pendingWork = listOf(VoiceFeature.State.PendingWork(callID = "c", capture = captured.capture)),
+                targetNeedsInput = true,
+                isAudioInterrupted = true,
+            )
+        }
+        assertEquals(live, map(busy, live, t1))
+    }
+
+    @Test fun muteIsCarried() = homeTest { h ->
+        val live = content(Phase.Live, startedAt = t0)
+        assertEquals(content(Phase.Live, isMuted = true, startedAt = t0), map(h.voice(VoiceFeature.State.Phase.Live) { it.copy(isMuted = true) }, live, t1))
+        assertEquals(
+            content(Phase.Reconnecting, isMuted = true, startedAt = t0),
+            map(h.voice(VoiceFeature.State.Phase.Live) { it.copy(isReconnecting = true, isMuted = true) }, live, t1),
+        )
+    }
+
+    @Test fun theTimerStartsWhenTheCallConnectsAndSurvivesReconnects() = homeTest { h ->
+        val connecting = map(h.voice(VoiceFeature.State.Phase.Connecting), null, t0)
+        assertNull(connecting?.startedAt)
+        val live = map(h.voice(VoiceFeature.State.Phase.Live), connecting, t0)
+        assertEquals(t0, live?.startedAt)
+        val reconnecting = map(h.voice(VoiceFeature.State.Phase.Live) { it.copy(isReconnecting = true) }, live, t1)
+        assertEquals(t0, reconnecting?.startedAt)
+        val ended = map(h.voice(VoiceFeature.State.Phase.Dropped), reconnecting, t1)
+        assertEquals(content(Phase.Ended, startedAt = t0), ended)
+        // Rejoin starts a new call and a new timer.
+        val rejoining = map(h.voice(VoiceFeature.State.Phase.Connecting), ended, t1)
+        assertNull(rejoining?.startedAt)
+        assertEquals(t1, map(h.voice(VoiceFeature.State.Phase.Live), rejoining, t1)?.startedAt)
+        // A call that never connected has no timer to show.
+        assertNull(map(h.voice(VoiceFeature.State.Phase.Failed("No key")), connecting, t1)?.startedAt)
+    }
+
+    @Test fun theAttributesNameTheCallsSession() = homeTest { h ->
+        val state = h.voice(VoiceFeature.State.Phase.Live)
+        assertEquals(session.id, VoiceLiveActivity.attributes(liveActivityCall(state)).sessionID)
+        assertEquals(server.id, VoiceLiveActivity.attributes(liveActivityCall(state)).serverID)
+
+        val draft = h.state { VoiceFeature.State(server, draftDirectory = "/x", model = null) }
+        assertEquals("", VoiceLiveActivity.attributes(liveActivityCall(draft)).sessionID)
     }
 }

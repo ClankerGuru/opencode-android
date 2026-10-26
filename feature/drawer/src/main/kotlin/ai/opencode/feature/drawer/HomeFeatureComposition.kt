@@ -482,7 +482,7 @@ private fun Reducer<State, Action>.homeChildrenObservers(feature: HomeFeature): 
         }
 
 /** The part of a call its ongoing notification shows (iOS `VoiceLiveActivity.Call.init(_:)`). */
-private fun liveActivityCall(voice: VoiceFeature.State): VoiceLiveActivity.Call = VoiceLiveActivity.Call(
+internal fun liveActivityCall(voice: VoiceFeature.State): VoiceLiveActivity.Call = VoiceLiveActivity.Call(
     phase = when (voice.phase) {
         VoiceFeature.State.Phase.Connecting -> VoiceLiveActivity.CallPhase.Connecting
         VoiceFeature.State.Phase.Live -> VoiceLiveActivity.CallPhase.Live
@@ -499,7 +499,7 @@ private fun liveActivityCall(voice: VoiceFeature.State): VoiceLiveActivity.Call 
 )
 
 /** iOS `DictationLiveActivity.recording(in:)`: only a hands-free recording, outside a call. */
-private fun liveActivityRecording(detail: SessionFeature.State?): DictationLiveActivity.Recording? =
+internal fun liveActivityRecording(detail: SessionFeature.State?): DictationLiveActivity.Recording? =
     DictationLiveActivity.recording(
         hasDetail = detail != null,
         callIsTerminal = detail?.voice?.phase?.isTerminal ?: true,

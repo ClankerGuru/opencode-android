@@ -73,7 +73,7 @@ Shared support: `HomeFeatureTestSupport.kt`, `SystemIntegrationTestSupport.kt`,
 | `CatchUpTests.swift` | `catchup/CatchUpTests.kt`, `catchup/CatchUpPreviewStoresTests.kt` | 31 of 32 | deleted `hostedTwelveCardCatchUpOpenSwipeAndExitProfile` (UIWindow/Mach memory profile); the two preview-store tests run under Robolectric (`CatchUpPreviewStoresTests`) |
 | `CatchUpFinishTests.swift` | `catchup/CatchUpFinishTests.kt` | 12 | – |
 | `SessionSwitcherTests.swift` | `switcher/SessionSwitcherTests.kt` | 7 | – |
-| `InAppNoticeTests.swift` | `notices/InAppNoticeTests.kt` | 18 of 20 | 2 → `:feature:system` (notification presentation/content) |
+| `InAppNoticeTests.swift` | `notices/InAppNoticeTests.kt` | 18 of 20 | 2 → `:feature:system` (notification presentation/content), ported there |
 | `PairedComputerOpensDrawerTests.swift` | `PairedComputerOpensDrawerTests.kt` | 8 | – |
 | `SelectedTranscriptCancellationTests.swift` | `SelectedTranscriptCancellationTests.kt` | 13 | – |
 | `DirectionalPanGestureRecognizerTests.swift` | `motion/DirectionalPanGestureRecognizerTests.kt` | 33 of 36 | deleted 3 UIKit layout probes (`revealedTimeStaysLeftOfTheRow`, `cardRotationDoesNotChange…`, `realSessionCardLocks…`); `displayCornersByDevice` keeps the rule, not the iPhone table; `ComposerSendTransitionTests` → `:feature:composer`/`:feature:transcript` |
@@ -101,8 +101,9 @@ Shared support: `HomeFeatureTestSupport.kt`, `SystemIntegrationTestSupport.kt`,
 | `SubagentStackTests.swift` | `SubagentStackTests.kt` | 17 of 19 | `BackSwipeRules` → `:core`; `SessionActivity` → `:server` |
 | `BrowserTests.swift` | `BrowserTests.kt` | 9 (Home) | WKWebView registry checks deleted (WebKit); rest `:feature:media`/`:feature:session` |
 | `WhatsNewTests.swift` | `WhatsNewTests.kt` | 18 | `WhatsNewFeature`/entries → `:feature:settings`; `whatsNewSurvivesAHomeReplacement` → `:app` |
-| Voice suites (`VoiceFeatureTests`, `+CallLog`, `VoiceLiveTests`, `ServerVoiceTests`, `VoiceServerPickerTests`, `VoiceSessionToolsTests`, `VoiceLiveActivityTests`, `DictationLiveActivityTests`, `LiveDelegationFeatureTests+Session`) | same names | 3, 4, 2, 1 (Home half), 1, 1, 6, 3, 1 | rest `:feature:voice`/`:feature:system`/`:app`; live activity pushes asserted as Home's `voiceCallActivity` (Android's call notification is the call's own foreground service) |
+| Voice suites (`VoiceFeatureTests`, `+CallLog`, `VoiceLiveTests`, `ServerVoiceTests`, `VoiceServerPickerTests`, `VoiceSessionToolsTests`, `VoiceLiveActivityTests`, `DictationLiveActivityTests`, `LiveDelegationFeatureTests+Session`) | same names | 3, 4, 2, 1 (Home half), 1, 1, 13 (6 Home + 7 mapping over Home's `liveActivityCall`), 4 (3 Home + `onlyALiveHandsFreeRecordingOutsideACallShows` over `liveActivityRecording`), 1 | rest `:feature:voice`/`:feature:system` (ported there); `leavingHomeMidCallEndsTheActivity`, `leavingHomeWithoutACallLeavesActivitiesAlone` (`AppFeature`, `:app`); live activity pushes asserted as Home's `voiceCallActivity` (Android's call notification is the call's own foreground service) |
 | `TranscriptCachePersistenceTests.swift` | `TranscriptCachePersistenceTests.kt` | 7 (Home) | `splicedEnvelope…` in `:server`; lock-time write refusal tests deleted (Android storage has none); backup exclusion iOS-only |
+| `AppIconBadgeTests.swift` | `AppIconBadgeTests.kt` | 8 (Home publishing) | ledger/storage/refs (`:feature:system`), identity forgetting (`:app`); `callsWhileOneRunsShareIt` and the other `BadgeAuthorization` tests have no Android counterpart (system.md) |
 | `ComposerPersistenceTests.swift`, `RequestAnswerTests.swift`, `SessionFeatureTests+Sending.swift` | same names | 4, 1, 1 | rest `:feature:composer`/`:feature:session`; `AppFeature.serverDeleted` steps → `:app` |
 
 Fixes the ported tests found: older drawer timestamps' four-digit year (`DrawerPeek`); a Catch Up
@@ -111,3 +112,5 @@ card drag ends when Catch Up closes, and `dismissCard`/`undoCard` finish its ent
 `friendlyName` (`:feature:system`); `:core`'s `EffectRunner` registers nested cancellables at once,
 and `TestStore` follows TCA (drops cancelled effects' sends, `skipInFlightEffects`, non-exhaustive
 `finish`, effects inherit the sender's context).
+
+Total: 418 drawer tests (Gradle), all passing.
