@@ -252,10 +252,8 @@ class VoiceServerPickerTests {
             it.copy(serverVoiceSupport = ServerVoiceSupport.supported)
         }
         assertEquals(ServerVoiceSupport.supported, shared.run { shared(VoiceSharedKeys.serverVoiceSupportByServer).value[studio.persistenceID] })
-        // This TestStore queues the probe's actions before reducing them, so the reducer's
-        // delegate arrives after the route (TCA and the live Store reduce it first).
-        store.receive(VoiceFeature.Action.CallRouteResolved(VoiceRoute.Server(VoiceRoute.ServerRoute.OpenAI(VoiceRoute.OpenAI.gptLive)), usesDelegator = false))
         store.receive(VoiceFeature.Action.Delegate(VoiceFeature.DelegateAction.ServerVoiceSupportChanged(ServerVoiceSupport.supported)))
+        store.receive(VoiceFeature.Action.CallRouteResolved(VoiceRoute.Server(VoiceRoute.ServerRoute.OpenAI(VoiceRoute.OpenAI.gptLive)), usesDelegator = false))
         connectGate.complete(Unit)
         store.receive(VoiceFeature.Action.CallEvent(VoiceCallEvent.Connected)) {
             it.withPhase(VoiceFeature.State.Phase.Live).copy(connectedAt = Instant.ofEpochSecond(1_000))
@@ -315,9 +313,8 @@ class VoiceServerPickerTests {
             it.copy(serverVoiceSupport = ServerVoiceSupport.supported)
         }
         assertEquals(ServerVoiceSupport.supported, shared.run { shared(VoiceSharedKeys.serverVoiceSupportByServer).value[server.persistenceID] })
-        // See aChosenServerBrokersTheCall…: the delegate is queued after the route here.
-        store.receive(VoiceFeature.Action.CallRouteResolved(VoiceRoute.Server(VoiceRoute.ServerRoute.OpenAI(VoiceRoute.OpenAI.gptLive)), usesDelegator = false))
         store.receive(VoiceFeature.Action.Delegate(VoiceFeature.DelegateAction.ServerVoiceSupportChanged(ServerVoiceSupport.supported)))
+        store.receive(VoiceFeature.Action.CallRouteResolved(VoiceRoute.Server(VoiceRoute.ServerRoute.OpenAI(VoiceRoute.OpenAI.gptLive)), usesDelegator = false))
         connectGate.complete(Unit)
         store.receive(VoiceFeature.Action.CallEvent(VoiceCallEvent.Connected)) {
             it.withPhase(VoiceFeature.State.Phase.Live).copy(connectedAt = Instant.ofEpochSecond(2_000))

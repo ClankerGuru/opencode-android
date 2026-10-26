@@ -64,11 +64,29 @@ internal class EffectRunner<A>(
                 val key = CancelKey(path, effect.id)
                 if (effect.cancelInFlight) cancel(listOf(key))
                 // A body with nothing to suspend (send/cancel only) stays synchronous, so a
-                // child's `.send` or `.cancel` under `ifLet`/`forEach` keeps TCA's ordering.
-                if (isSynchronous(effect.effect)) execute(effect.effect, now, later, path)
-                else launchTracked(key) { runToCompletion(effect.effect, later, path) }
+                // child's `.send` or `.cancel` under `ifLet`/`forEach` keeps TCA's ordering. A
+                // merge's synchronous parts run now too; only its suspending parts are launched.
+                executeCancellable(effect.effect, key, now, later, path)
             }
             is Effect.Run, is Effect.Concatenate -> launchTracked(null) { runToCompletion(effect, later, path) }
+        }
+    }
+
+    /**
+     * The body of a cancellable: synchronous parts (TCA delivers a `.send` at once, cancellable or
+     * not) run now; the rest launch tracked under [key].
+     */
+    @Suppress("UNCHECKED_CAST")
+    private fun <B> executeCancellable(effect: Effect<B>, key: CancelKey, now: (B) -> Unit, later: suspend (B) -> Unit, path: List<Any>) {
+        when {
+            isSynchronous(effect) -> execute(effect, now, later, path)
+            effect is Effect.Merge -> effect.effects.forEach { executeCancellable(it, key, now, later, path) }
+            effect is Effect.NavigationScoped -> executeCancellable(effect.effect, key, now, later, path + effect.id)
+            effect is Effect.Mapped<*, *> -> {
+                val mapped = effect as Effect.Mapped<Any?, B>
+                executeCancellable(mapped.effect, key, { now(mapped.transform(it)) }, { later(mapped.transform(it)) }, path)
+            }
+            else -> launchTracked(key) { runToCompletion(effect, later, path) }
         }
     }
 
