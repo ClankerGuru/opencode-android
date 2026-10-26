@@ -91,177 +91,181 @@ fun FusedModelChip(
     DisposableEffect(Unit) { onDispose { anchors.clearChipFrames() } }
 
     val nameStyle = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Medium)
-    Row(
-        modifier
-            .widthIn(max = FusedModelPickerTunables.chipMax.dp)
-            .heightIn(min = 48.dp)
-            .animateContentSize(FusedModelPickerTunables.animation(FusedModelPickerTunables.chipWidth, reduceMotion))
-            .onGloballyPositioned { if (it.size.width > 0) anchors.chipFrame = it.boundsInRoot() }
-            .excludedFromDrawerPan(isEnabled)
-            .pointerInput(Unit) {
-                val threshold = FusedModelPickerTunables.scrubThreshold.dp.toPx()
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = false)
-                    if (!enabled) return@awaitEachGesture
-                    var axis: Int? = null // 0 horizontal, 1 vertical
-                    var scrubStartIdx = 0
-                    var total = androidx.compose.ui.geometry.Offset.Zero
-                    var lifted = false
-                    while (!lifted) {
-                        val event = awaitPointerEvent()
-                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                        total += change.positionChange()
-                        val s = currentState
-                        val model = s.currentModelInfo
-                        val sc = s.currentLevelScale
-                        if (axis == null && hypot(total.x, total.y) > threshold) {
-                            if (abs(total.y) >= abs(total.x) * 0.9f && model != null && sc != null && sc.isAdjustable) {
-                                axis = 1
-                                val rightEdge = if (anchors.chipLevelFrame != androidx.compose.ui.geometry.Rect.Zero) anchors.chipLevelFrame.right else anchors.chipFrame.right
-                                val anchorY = currentComposerTop - 24.dp.toPx()
-                                anchors.openLevelStack(
-                                    kind = FusedLevelStackState.SourceKind.Chip,
-                                    model = model,
-                                    level = s.currentLevel,
-                                    anchorX = anchors.chipFrame.left + down.position.x,
-                                    anchorY = anchorY,
-                                    rightEdgeX = rightEdge,
-                                    tapMode = false,
-                                    reduceMotion = reduceMotion,
-                                )
-                            } else if (abs(total.x) > abs(total.y) && sc != null && sc.isAdjustable) {
-                                axis = 0
-                                scrubStartIdx = sc.index(s.currentLevel)
-                            }
-                        }
-                        if (axis == 1 && model != null && sc != null) {
-                            change.consume()
-                            val next = anchors.updateLevelStackDrag(-(total.y / density.density).toDouble())
-                            if (next != null) currentOnEvent(ModelPickerEvent.ModelRowLevelChanged(model, sc.level(next)))
-                        } else if (axis == 0 && model != null && sc != null) {
-                            change.consume()
-                            val nextIdx = sc.scrubIndex(scrubStartIdx, (total.x / density.density).toDouble(), step = 28.0)
-                            val nextLevel = sc.level(nextIdx)
-                            if (nextLevel != s.currentLevel) currentOnEvent(ModelPickerEvent.ModelRowLevelChanged(model, nextLevel))
-                        }
-                        if (!change.pressed) {
-                            lifted = true
-                            // A tap is the chip's: the composer behind it mustn't also take it (and raise the keyboard).
-                            if (axis == null && hypot(total.x, total.y) <= threshold) change.consume()
-                        }
-                    }
-                    if (anchors.levelStack?.kind == FusedLevelStackState.SourceKind.Chip) {
-                        anchors.closeLevelStack(commit = true, reduceMotion = reduceMotion)
-                    } else if (lifted && axis == null && hypot(total.x, total.y) <= threshold) {
-                        currentOnOpenList()
-                    }
-                }
-            },
-        horizontalArrangement = Arrangement.spacedBy(5.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        // Name: “Choose model”, its value the short name; a tap opens the list.
+    Box(modifier) {
+        // Ahead of the picker's first opening, its provider marks decode while the composer stands.
+        ProviderIconPrewarm(state)
         Row(
             Modifier
+                .widthIn(max = FusedModelPickerTunables.chipMax.dp)
                 .heightIn(min = 48.dp)
-                .weight(1f, fill = false)
-                .clearAndSetSemantics {
-                    contentDescription = "Choose model"
-                    stateDescription = shortName
-                    role = Role.Button
-                    onClick { if (enabled) currentOnOpenList(); true }
-                }
-                .testTag("composer-model"),
+                .animateContentSize(FusedModelPickerTunables.animation(FusedModelPickerTunables.chipWidth, reduceMotion))
+                .onGloballyPositioned { if (it.size.width > 0) anchors.chipFrame = it.boundsInRoot() }
+                .excludedFromDrawerPan(isEnabled)
+                .pointerInput(Unit) {
+                    val threshold = FusedModelPickerTunables.scrubThreshold.dp.toPx()
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        if (!enabled) return@awaitEachGesture
+                        var axis: Int? = null // 0 horizontal, 1 vertical
+                        var scrubStartIdx = 0
+                        var total = androidx.compose.ui.geometry.Offset.Zero
+                        var lifted = false
+                        while (!lifted) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                            total += change.positionChange()
+                            val s = currentState
+                            val model = s.currentModelInfo
+                            val sc = s.currentLevelScale
+                            if (axis == null && hypot(total.x, total.y) > threshold) {
+                                if (abs(total.y) >= abs(total.x) * 0.9f && model != null && sc != null && sc.isAdjustable) {
+                                    axis = 1
+                                    val rightEdge = if (anchors.chipLevelFrame != androidx.compose.ui.geometry.Rect.Zero) anchors.chipLevelFrame.right else anchors.chipFrame.right
+                                    val anchorY = currentComposerTop - 24.dp.toPx()
+                                    anchors.openLevelStack(
+                                        kind = FusedLevelStackState.SourceKind.Chip,
+                                        model = model,
+                                        level = s.currentLevel,
+                                        anchorX = anchors.chipFrame.left + down.position.x,
+                                        anchorY = anchorY,
+                                        rightEdgeX = rightEdge,
+                                        tapMode = false,
+                                        reduceMotion = reduceMotion,
+                                    )
+                                } else if (abs(total.x) > abs(total.y) && sc != null && sc.isAdjustable) {
+                                    axis = 0
+                                    scrubStartIdx = sc.index(s.currentLevel)
+                                }
+                            }
+                            if (axis == 1 && model != null && sc != null) {
+                                change.consume()
+                                val next = anchors.updateLevelStackDrag(-(total.y / density.density).toDouble())
+                                if (next != null) currentOnEvent(ModelPickerEvent.ModelRowLevelChanged(model, sc.level(next)))
+                            } else if (axis == 0 && model != null && sc != null) {
+                                change.consume()
+                                val nextIdx = sc.scrubIndex(scrubStartIdx, (total.x / density.density).toDouble(), step = 28.0)
+                                val nextLevel = sc.level(nextIdx)
+                                if (nextLevel != s.currentLevel) currentOnEvent(ModelPickerEvent.ModelRowLevelChanged(model, nextLevel))
+                            }
+                            if (!change.pressed) {
+                                lifted = true
+                                // A tap is the chip's: the composer behind it mustn't also take it (and raise the keyboard).
+                                if (axis == null && hypot(total.x, total.y) <= threshold) change.consume()
+                            }
+                        }
+                        if (anchors.levelStack?.kind == FusedLevelStackState.SourceKind.Chip) {
+                            anchors.closeLevelStack(commit = true, reduceMotion = reduceMotion)
+                        } else if (lifted && axis == null && hypot(total.x, total.y) <= threshold) {
+                            currentOnOpenList()
+                        }
+                    }
+                },
             horizontalArrangement = Arrangement.spacedBy(5.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            val model = state.currentModelInfo
-            if (FusedModelPickerTunables.chipProviderLogo && model != null) {
-                ProviderIcon(model.providerID, model.canonicalProviderID, size = 15.dp, tint = OpenCodeTheme.colors.secondaryText)
-            }
-            // The name rolls to the new one; the chip's width follows on `chipWidth`.
-            ChipRoll(
-                shortName,
-                ascending = { _, _ -> true },
-                spring = FusedModelPickerTunables.chipWidth,
-                reduceMotion = reduceMotion,
-                label = "chip-name",
-                // The label's frame as it lays out (and widens), as iOS's `onGeometryChange` reads it.
-                modifier = Modifier.onGloballyPositioned { if (it.size.width > 0) anchors.chipNameFrame = it.boundsInRoot() },
-            ) { name ->
-                Text(
-                    name,
-                    style = nameStyle,
-                    color = OpenCodeTheme.colors.text,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.alpha(if (flightActive) 0f else 1f),
-                )
-            }
-        }
-
-        if (FusedModelPickerTunables.chipGlyph && scale != null) {
-            ModelLevelGlyph(scale, state.currentLevel, size = 15.dp, color = OpenCodeTheme.colors.text)
-        }
-
-        if (levelLabel != null) {
+            // Name: “Choose model”, its value the short name; a tap opens the list.
             Row(
                 Modifier
-                    .widthIn(min = 48.dp)
                     .heightIn(min = 48.dp)
+                    .weight(1f, fill = false)
                     .clearAndSetSemantics {
-                        contentDescription = "Thinking level"
-                        stateDescription = levelLabel
+                        contentDescription = "Choose model"
+                        stateDescription = shortName
                         role = Role.Button
                         onClick { if (enabled) currentOnOpenList(); true }
-                        // TalkBack's adjust: one stop up or down (iOS `accessibilityAdjustableAction`).
-                        if (scale != null) {
-                            progressBarRangeInfo = ProgressBarRangeInfo(scale.index(state.currentLevel).toFloat(), 0f..(scale.count - 1).toFloat(), scale.count - 2)
-                            setProgress { target ->
-                                val model = currentState.currentModelInfo ?: return@setProgress false
-                                val delta = target.roundToInt() - scale.index(currentState.currentLevel)
-                                if (delta == 0) return@setProgress false
-                                currentOnEvent(ModelPickerEvent.ModelRowLevelChanged(model, scale.stepped(currentState.currentLevel, if (delta > 0) 1 else -1)))
-                                true
-                            }
-                        }
                     }
-                    .testTag("composer-level"),
+                    .testTag("composer-model"),
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                // A higher level rolls up into place, a lower one down.
-                val levelScale = scale
+                val model = state.currentModelInfo
+                if (FusedModelPickerTunables.chipProviderLogo && model != null) {
+                    ProviderIcon(model.providerID, model.canonicalProviderID, size = 15.dp, tint = OpenCodeTheme.colors.secondaryText)
+                }
+                // The name rolls to the new one; the chip's width follows on `chipWidth`.
                 ChipRoll(
-                    levelLabel,
-                    ascending = { from, to ->
-                        val levels = levelScale?.levels.orEmpty().map(ModelLevelScale::label)
-                        levels.indexOf(to) >= levels.indexOf(from)
-                    },
-                    spring = FusedModelPickerTunables.chipRoll,
+                    shortName,
+                    ascending = { _, _ -> true },
+                    spring = FusedModelPickerTunables.chipWidth,
                     reduceMotion = reduceMotion,
-                    label = "chip-level",
-                    modifier = Modifier.onGloballyPositioned {
-                        if (it.size.width > 0) {
-                            val frame = it.boundsInRoot()
-                            anchors.chipLevelFrame = frame
-                            anchors.levelControl = frame
-                        }
-                    },
-                ) { label ->
+                    label = "chip-name",
+                    // The label's frame as it lays out (and widens), as iOS's `onGeometryChange` reads it.
+                    modifier = Modifier.onGloballyPositioned { if (it.size.width > 0) anchors.chipNameFrame = it.boundsInRoot() },
+                ) { name ->
                     Text(
-                        label,
+                        name,
                         style = nameStyle,
-                        color = OpenCodeTheme.colors.text.copy(alpha = FusedModelPickerTunables.levelAlpha.toFloat()),
+                        color = OpenCodeTheme.colors.text,
                         maxLines = 1,
-                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.alpha(if (flightActive) 0f else 1f),
                     )
                 }
             }
-        }
 
-        if (FusedModelPickerTunables.chipChevron) {
-            OpenCodeIcon(SFSymbol.ChevronDown, null, size = 12.dp, tint = OpenCodeTheme.colors.secondaryText)
+            if (FusedModelPickerTunables.chipGlyph && scale != null) {
+                ModelLevelGlyph(scale, state.currentLevel, size = 15.dp, color = OpenCodeTheme.colors.text)
+            }
+
+            if (levelLabel != null) {
+                Row(
+                    Modifier
+                        .widthIn(min = 48.dp)
+                        .heightIn(min = 48.dp)
+                        .clearAndSetSemantics {
+                            contentDescription = "Thinking level"
+                            stateDescription = levelLabel
+                            role = Role.Button
+                            onClick { if (enabled) currentOnOpenList(); true }
+                            // TalkBack's adjust: one stop up or down (iOS `accessibilityAdjustableAction`).
+                            if (scale != null) {
+                                progressBarRangeInfo = ProgressBarRangeInfo(scale.index(state.currentLevel).toFloat(), 0f..(scale.count - 1).toFloat(), scale.count - 2)
+                                setProgress { target ->
+                                    val model = currentState.currentModelInfo ?: return@setProgress false
+                                    val delta = target.roundToInt() - scale.index(currentState.currentLevel)
+                                    if (delta == 0) return@setProgress false
+                                    currentOnEvent(ModelPickerEvent.ModelRowLevelChanged(model, scale.stepped(currentState.currentLevel, if (delta > 0) 1 else -1)))
+                                    true
+                                }
+                            }
+                        }
+                        .testTag("composer-level"),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    // A higher level rolls up into place, a lower one down.
+                    val levelScale = scale
+                    ChipRoll(
+                        levelLabel,
+                        ascending = { from, to ->
+                            val levels = levelScale?.levels.orEmpty().map(ModelLevelScale::label)
+                            levels.indexOf(to) >= levels.indexOf(from)
+                        },
+                        spring = FusedModelPickerTunables.chipRoll,
+                        reduceMotion = reduceMotion,
+                        label = "chip-level",
+                        modifier = Modifier.onGloballyPositioned {
+                            if (it.size.width > 0) {
+                                val frame = it.boundsInRoot()
+                                anchors.chipLevelFrame = frame
+                                anchors.levelControl = frame
+                            }
+                        },
+                    ) { label ->
+                        Text(
+                            label,
+                            style = nameStyle,
+                            color = OpenCodeTheme.colors.text.copy(alpha = FusedModelPickerTunables.levelAlpha.toFloat()),
+                            maxLines = 1,
+                            softWrap = false,
+                            modifier = Modifier.alpha(if (flightActive) 0f else 1f),
+                        )
+                    }
+                }
+            }
+
+            if (FusedModelPickerTunables.chipChevron) {
+                OpenCodeIcon(SFSymbol.ChevronDown, null, size = 12.dp, tint = OpenCodeTheme.colors.secondaryText)
+            }
         }
     }
 }

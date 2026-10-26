@@ -539,27 +539,31 @@ fun ModelPickerChip(
     modifier: Modifier = Modifier,
 ) {
     val secondary = OpenCodeTheme.colors.secondaryText
-    Row(
-        modifier
-            .clickable(role = Role.Button, onClick = onClick)
-            .heightIn(min = 48.dp)
-            .clearAndSetSemantics {
-                contentDescription = "Choose model"
-                stateDescription = if (usesModelPickerSheet) state.sheetChipAccessibilityValue else state.currentModelLabel
-                role = Role.Button
+    Box(modifier) {
+        // Ahead of the picker's first opening, its provider marks decode while the composer stands.
+        ProviderIconPrewarm(state)
+        Row(
+            Modifier
+                .clickable(role = Role.Button, onClick = onClick)
+                .heightIn(min = 48.dp)
+                .clearAndSetSemantics {
+                    contentDescription = "Choose model"
+                    stateDescription = if (usesModelPickerSheet) state.sheetChipAccessibilityValue else state.currentModelLabel
+                    role = Role.Button
+                }
+                .testTag("composer-model"),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            val style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium)
+            if (usesModelPickerSheet) {
+                // New Model Picker: the short name, then its level.
+                Text(state.currentModelShortName, style = style, color = OpenCodeTheme.colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                state.currentChipLevelLabel?.let { Text(it, style = style, color = secondary, maxLines = 1, softWrap = false) }
+            } else {
+                Text(state.currentModelLabel, style = style, color = secondary, maxLines = 1, overflow = TextOverflow.MiddleEllipsis, modifier = Modifier.weight(1f, fill = false))
             }
-            .testTag("composer-model"),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        val style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium)
-        if (usesModelPickerSheet) {
-            // New Model Picker: the short name, then its level.
-            Text(state.currentModelShortName, style = style, color = OpenCodeTheme.colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-            state.currentChipLevelLabel?.let { Text(it, style = style, color = secondary, maxLines = 1, softWrap = false) }
-        } else {
-            Text(state.currentModelLabel, style = style, color = secondary, maxLines = 1, overflow = TextOverflow.MiddleEllipsis, modifier = Modifier.weight(1f, fill = false))
+            OpenCodeIcon(SFSymbol.ChevronDown, null, size = 12.dp, tint = secondary)
         }
-        OpenCodeIcon(SFSymbol.ChevronDown, null, size = 12.dp, tint = secondary)
     }
 }
