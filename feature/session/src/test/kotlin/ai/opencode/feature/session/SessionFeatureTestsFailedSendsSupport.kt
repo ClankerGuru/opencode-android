@@ -1,7 +1,10 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.store.TestStore
 import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.server.model.OpenCodeTranscriptItem
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Helpers iOS keeps on `SessionFeatureTests` for its send tests: `sentID`
@@ -30,5 +33,20 @@ internal object FailedSendsSupport {
         ).withDraft("")
             // The Working line sees the run start.
             .updateWorkingRun(signal)
+    }
+
+    /**
+     * TCA's `finish()` on a non-exhaustive store: effects still in flight after the timeout are
+     * not a failure (TCA reports them only with `exhaustivity = .on`). Android's `TestStore.finish`
+     * fails either way, so non-exhaustive ports whose iOS test ends with a long-lived poll still
+     * running finish through this.
+     */
+    suspend fun <S, A> TestStore<S, A>.finishLikeTCA(timeout: Duration = 1.seconds) {
+        if (exhaustive) return finish(timeout)
+        try {
+            finish(timeout)
+        } catch (error: AssertionError) {
+            if (error.message?.contains("still running at finish") != true) throw error
+        }
     }
 }
