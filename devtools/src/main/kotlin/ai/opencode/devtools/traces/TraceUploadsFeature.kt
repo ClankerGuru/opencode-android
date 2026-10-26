@@ -1,6 +1,5 @@
 package ai.opencode.devtools.traces
 
-import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.DependencyKey
@@ -277,12 +276,16 @@ class TraceUploadsFeature : Reducer<TraceUploadsFeature.State, TraceUploadsFeatu
         data object Failed : Attachment
     }
 
-    /** Writes the report to a temporary file and uploads it to the session's directory the way the composer uploads a file from the + menu. */
+    /**
+     * Writes the report to a temporary file (iOS `FileManager.default.temporaryDirectory`; Android's
+     * `java.io.tmpdir` is the app's cache directory) and uploads it to the session's directory the
+     * way the composer uploads a file from the + menu.
+     */
     private suspend fun uploadAttachment(bundle: ProblemReportBundle, destination: ProblemReportDestination, client: OpenCodeClient): Attachment {
         val name = ProblemReportBuilder.attachmentName(bundle.report)
         val file = withContext(Dispatchers.IO) {
             runCatching {
-                File(dependency(AppContext).cacheDir, "${UUID.randomUUID().toString().uppercase()}-$name").apply { writeText(ProblemReportBuilder.attachment(bundle)) }
+                File(System.getProperty("java.io.tmpdir"), "${UUID.randomUUID().toString().uppercase()}-$name").apply { writeText(ProblemReportBuilder.attachment(bundle)) }
             }.getOrNull()
         } ?: return Attachment.Failed
         try {

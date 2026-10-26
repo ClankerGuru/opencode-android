@@ -196,7 +196,7 @@ internal suspend fun requestCancelIntegrationOAuth(server: OpenCodeServer, integ
     )
 }
 
-private fun MCPServerPayload.server(): OpenCodeMCPServer {
+internal fun MCPServerPayload.server(): OpenCodeMCPServer {
     val error = status.error ?: ""
     val mapped = when (status.status) {
         "connected" -> OpenCodeMCPServer.Status.Connected
@@ -209,7 +209,7 @@ private fun MCPServerPayload.server(): OpenCodeMCPServer {
     return OpenCodeMCPServer(name, mapped, integrationID)
 }
 
-private fun IntegrationPayload.accounts(): List<OpenCodeAccount> = connections.mapNotNull { connection ->
+internal fun IntegrationPayload.accounts(): List<OpenCodeAccount> = connections.mapNotNull { connection ->
     when (connection.type) {
         "credential" -> {
             val method = connection.method?.let(OpenCodeAccount.Method::of) ?: return@mapNotNull null
