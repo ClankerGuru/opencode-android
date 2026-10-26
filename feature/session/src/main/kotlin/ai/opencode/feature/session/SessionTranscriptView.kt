@@ -517,6 +517,7 @@ object SessionTranscriptView {
             isLoading = state.isTranscriptLoading,
             showsEmptyState = state.showsEmptyState,
             isRunning = showsWorking,
+            workingHandsOffToCopy = working?.handsOffToCopy == true,
             hasPendingRequests = state.hasPendingRequests,
             showsMoveToBackground = state.showsMoveToBackground,
             actionableRunErrorID = actionableErrorID,

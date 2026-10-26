@@ -73,12 +73,14 @@ class MarkdownStream(
 
     /** How much of the last text [text] shares, and how many committed chars an update to it would keep. */
     fun reuse(text: String): Pair<Int, Int> {
+        val text = OpenCodeMarkdownBlock.lineFeeds(text)
         val shared = SwiftText.commonPrefix(source, text)
         return shared to (units.lastOrNull { it.proofEnd <= shared }?.end ?: 0)
     }
 
     /** The blocks of [text]. [streaming] heals the live tail's last block. */
     fun update(text: String, streaming: Boolean): List<OpenCodeMarkdownBlock> {
+        val text = OpenCodeMarkdownBlock.lineFeeds(text)
         costCommitted = ArrayList()
         costParsed = 0
         val shared = SwiftText.commonPrefix(source, text)

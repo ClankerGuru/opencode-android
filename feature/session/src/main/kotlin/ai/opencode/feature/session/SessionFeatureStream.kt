@@ -214,6 +214,7 @@ private fun SessionFeature.eventStreamConnected(
     s = retune.state.copy(
         streamSupportsProjection = false,
         liveText = emptyMap(),
+        gappedLiveText = retune.state.gappedLiveText + retune.state.liveText.keys,
         lastProjectedMessageID = null,
         shells = retune.state.shells.map { if (it.isListed) it else it.copy(isListed = true) },
     )
@@ -653,6 +654,7 @@ internal fun Throwable.asClientError(): ai.opencode.server.OpenCodeClientError =
 internal class LiveProjection(state: SessionFeature.State) {
     val items: MutableList<OpenCodeTranscriptItem> = ArrayList(state.items)
     val liveText: MutableMap<String, String> = LinkedHashMap(state.liveText)
+    val gappedLiveText: MutableSet<String> = HashSet(state.gappedLiveText)
     private val shellToolStatuses = HashMap(state.shellToolStatuses)
     private val subagentToolSessionIDs = HashSet(state.subagentToolSessionIDs)
     private var shellsChanged = false
@@ -675,6 +677,7 @@ internal class LiveProjection(state: SessionFeature.State) {
         var next = state
         if (itemsChanged) next = next.copy(items = items.toList())
         if (liveText != state.liveText) next = next.copy(liveText = liveText.toMap())
+        if (gappedLiveText != state.gappedLiveText) next = next.copy(gappedLiveText = gappedLiveText.toSet())
         if (shellsChanged) next = next.copy(shellToolStatuses = shellToolStatuses.toMap())
         if (subagentsChanged) next = next.copy(subagentToolSessionIDs = subagentToolSessionIDs.toSet())
         return next
@@ -689,16 +692,20 @@ private fun SessionFeature.applyLiveEvent(event: OpenCodeLiveContentEvent, proje
     when (event) {
         is OpenCodeLiveContentEvent.TextStarted -> {
             val id = "${event.messageID}-text-${event.ordinal}"
+            if (id in projection.gappedLiveText) return
             projection.liveText[id] = projection.liveText[id] ?: ""
         }
         is OpenCodeLiveContentEvent.TextDelta -> {
             val id = "${event.messageID}-text-${event.ordinal}"
+            // Missed deltas aren't replayed: the text shown stays until the part's end has it all.
+            if (id in projection.gappedLiveText) return
             val text = (projection.liveText[id] ?: "") + event.delta
             projection.liveText[id] = text
             if (upsertLiveText(id, text, streaming = true, items = projection.items)) projection.itemsChanged = true
         }
         is OpenCodeLiveContentEvent.TextEnded -> {
             val id = "${event.messageID}-text-${event.ordinal}"
+            projection.gappedLiveText.remove(id)
             if (upsertLiveText(id, event.text, items = projection.items)) projection.itemsChanged = true
             projection.liveText.remove(id)
         }

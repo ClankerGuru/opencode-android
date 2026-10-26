@@ -171,6 +171,14 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         val streamSupportsProjection: Boolean = false,
         /** Raw live text, retained separately from rendered markdown so batches append exactly once. */
         val liveText: Map<String, String> = emptyMap(),
+        /**
+         * Text parts that were streaming when the stream had a gap (a reconnect, or the requests
+         * connection dropping): their deltas from before the gap are gone and the server doesn't
+         * replay them, so later deltas would rebuild only the tail. These keep the text already
+         * shown and wait for the part's end, which carries the whole text. Android-only: iOS
+         * restarts the accumulator and shows only the tail until the part ends.
+         */
+        val gappedLiveText: Set<String> = emptySet(),
         val projectedMessageIDs: Set<String> = emptySet(),
         val lastProjectedMessageID: String? = null,
         val resync: ResyncState? = null,

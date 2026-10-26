@@ -122,6 +122,11 @@ data class TranscriptConfiguration(
     val isLoading: Boolean = false,
     val showsEmptyState: Boolean = true,
     val isRunning: Boolean = false,
+    /**
+     * iOS `configuration.working?.handsOffToCopy`: the Working line is ending in the reply's copy
+     * button, so the reply end that replaces it is already drawn and doesn't fade in.
+     */
+    val workingHandsOffToCopy: Boolean = false,
     val hasPendingRequests: Boolean = false,
     val showsMoveToBackground: Boolean = false,
     val actionableRunErrorID: String? = null,

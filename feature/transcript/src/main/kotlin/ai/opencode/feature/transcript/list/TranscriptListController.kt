@@ -410,6 +410,14 @@ class TranscriptListController(
                 it.key in oldKeys && it is TranscriptItemID.Message && old.rows[it.stableID] is MessageRow.Entry
             }
             val tailInserted = next.items.drop(lastKept + 1).filter { it.key !in oldKeys }
+            // Working handed off to the reply's copy button in its own row: the reply end that
+            // replaces it is already drawn there, so it doesn't fade in (iOS `handoff`). Without
+            // this the copy button blinked out and faded back in as Working left.
+            val handoff = if (previous.workingHandsOffToCopy && !configuration.isRunning) {
+                tailInserted.filter { (next.rows[(it as? TranscriptItemID.Message)?.stableID] as? MessageRow.Entry)?.entry is TranscriptEntry.ReplyEnd }.toSet()
+            } else {
+                emptySet()
+            }
             val fades = old.items.count { it.key !in nextKeys } <= RowEntrance.MAXIMUM_ROWS &&
                 next.items.count { it.key !in oldKeys } <= RowEntrance.MAXIMUM_ROWS
             if (fades != fadesRemovals) fadesRemovals = fades
@@ -428,7 +436,7 @@ class TranscriptListController(
                     // at full height, not clipped to a pixel while the follower looks for it.
                     if (!sent && !promoted && !reduceMotion) {
                         enteringItems += item.key
-                        pendingEntrances[item.key] = t to RowEntranceStyle.Arrival
+                        if (item !in handoff) pendingEntrances[item.key] = t to RowEntranceStyle.Arrival
                     }
                 }
                 if (tailInserted.isNotEmpty()) pendingEffects += { startMotion() }
