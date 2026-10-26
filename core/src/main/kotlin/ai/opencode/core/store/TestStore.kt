@@ -26,8 +26,8 @@ import kotlin.time.Duration.Companion.seconds
  * action an effect sends must be [receive]d, and [finish] fails while effects still run
  * (cancellation included), as TCA's default. Set [exhaustive] = false for TCA's
  * `exhaustivity = .off`: `update` then applies to the actual new state (partial asserts),
- * unasserted effect actions are reduced before the next send, and [receive] skips
- * non-matching actions.
+ * unasserted effect actions are reduced before the next send, [receive] skips
+ * non-matching actions, and [finish] waits out its timeout for running effects without failing.
  *
  * Dependencies resolve to `testValue` unless overridden; keys without one fail loudly. An
  * effect that throws fails the test at the next call. Effects should take dispatchers from a
@@ -54,6 +54,14 @@ class TestStore<S, A>(
 
     /** Every action effects send, in the order production would reduce them. */
     private val received = Channel<A>(Channel.UNLIMITED)
+
+    /**
+     * Actions sent synchronously (`Effect.send`): `Store` reduces them right after the action
+     * that sent them, ahead of anything a running effect sent meanwhile, so they come first.
+     */
+    private val immediate = ArrayDeque<A>()
+
+    private fun nextReceived(): A? = synchronized(immediate) { immediate.removeFirstOrNull() } ?: received.tryReceive().getOrNull()
     private var unhandledError: Throwable? = null
 
     var exhaustive: Boolean = true
@@ -63,7 +71,7 @@ class TestStore<S, A>(
 
     private val runner = EffectRunner<A>(
         scope = scope,
-        sendNow = { received.trySend(it) },
+        sendNow = { synchronized(immediate) { immediate.addLast(it) } },
         sendFromEffect = { received.send(it) },
         onUnhandledError = { if (unhandledError == null) unhandledError = it },
     )
@@ -90,7 +98,7 @@ class TestStore<S, A>(
     ) {
         throwUnhandled()
         while (true) {
-            val action = withTimeout(timeout) { received.receive() }
+            val action = nextReceived() ?: withTimeout(timeout) { received.receive() }
             if (matches(action)) {
                 apply(action, update, "receive($action)")
                 break
@@ -116,6 +124,12 @@ class TestStore<S, A>(
         try {
             withTimeout(timeout) { while (runner.hasRunningEffects) delay(5) }
         } catch (_: kotlinx.coroutines.TimeoutCancellationException) {
+            // TCA reports effects still in flight only when exhaustive; with exhaustivity off
+            // they're a skipped assertion and keep running (the test's scope ends them).
+            if (!exhaustive) {
+                drain()
+                return
+            }
             val count = runner.runningCount
             runner.cancelAll()
             throw AssertionError("$count effect(s) still running at finish. Cancel them or await their actions.")
@@ -126,7 +140,7 @@ class TestStore<S, A>(
 
     private fun drain() {
         while (true) {
-            val action = received.tryReceive().getOrNull() ?: return
+            val action = nextReceived() ?: return
             apply(action, null, "skipped($action)", assert = false)
         }
     }
@@ -151,7 +165,7 @@ class TestStore<S, A>(
     }
 
     private fun assertNoUnreceived(where: String) {
-        val next = received.tryReceive().getOrNull() ?: return
+        val next = nextReceived() ?: return
         throw AssertionError("Unreceived action $where: $next")
     }
 }
