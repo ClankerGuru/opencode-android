@@ -1,0 +1,57 @@
+package ai.opencode.feature.session
+
+import ai.opencode.feature.composer.DictationFeature
+import ai.opencode.feature.session.SessionFeature.State.TaskIdentity
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Test
+
+/**
+ * The `:feature:session` test of iOS `OpenCodeTests/DictationHoldTrackerTests.swift`
+ * ([DictationHoldRetention], `DictationViews.kt`); the tracker and mic press tests are
+ * `:feature:composer`'s. iOS mutates the retention in place; Android's is a value, reassigned.
+ */
+class DictationHoldTrackerTests {
+    /**
+     * Switching sessions or drafts (or a dictation dropped on switch) immediately hides the
+     * previous session's leaving hold and folded-composer state on the new `taskIdentity`,
+     * whereas a carried dictation keeps its hold.
+     */
+    @Test fun dictationHoldRetentionDropsLeavingHoldAcrossSessionAndDraftSwitches() {
+        val firstIdentity = TaskIdentity(serverID = "srv", visit = 1, sessionID = "ses_1")
+        val secondIdentity = TaskIdentity(serverID = "srv", visit = 2, sessionID = "ses_2")
+        val hold = DictationFeature.Hold(text = "Dictated on session 1", isLocked = true)
+
+        var retention = DictationHoldRetention()
+        assertNull(retention.identity)
+        assertEquals(false, retention.settledRecording(recording = false, currentIdentity = firstIdentity))
+
+        // First press on a freshly mounted screen (identity == null) adopts firstIdentity while
+        // keeping settledRecording false, so the composer controls' fade runs instead of jumping
+        // to true on frame 0.
+        retention = retention.holdChanged(hold, firstIdentity, recording = true)
+        assertEquals(firstIdentity, retention.identity)
+        assertEquals(false, retention.settledRecording(recording = true, currentIdentity = firstIdentity))
+        retention = retention.copy(settledRecording = true)
+        // Dictation ends on session 1: leavingHold stays while its bar fades out.
+        retention = retention.holdChanged(null, firstIdentity, recording = false)
+        assertEquals(hold, retention.shownHold(active = null, currentIdentity = firstIdentity))
+        assertEquals(true, retention.settledRecording(recording = false, currentIdentity = firstIdentity))
+
+        // Switching to session 2 before the fade finishes never shows session 1's bar.
+        assertNull(retention.shownHold(active = null, currentIdentity = secondIdentity))
+        assertNull(retention.leavingHold(secondIdentity))
+        assertEquals(false, retention.settledRecording(recording = false, currentIdentity = secondIdentity))
+
+        retention = retention.syncIdentity(secondIdentity, activeHold = null, recording = false)
+        assertNull(retention.leavingHold)
+        assertEquals(false, retention.settledRecording)
+
+        // When a recording is carried onto session 2, its adopted hold is shown and retained.
+        val carriedHold = DictationFeature.Hold(text = "Carried to session 2", isLocked = true)
+        val thirdIdentity = TaskIdentity(serverID = "srv", visit = 3, sessionID = "ses_3")
+        retention = retention.syncIdentity(thirdIdentity, activeHold = carriedHold, recording = true)
+        assertEquals(carriedHold, retention.shownHold(active = carriedHold, currentIdentity = thirdIdentity))
+        assertEquals(true, retention.settledRecording(recording = true, currentIdentity = thirdIdentity))
+    }
+}
