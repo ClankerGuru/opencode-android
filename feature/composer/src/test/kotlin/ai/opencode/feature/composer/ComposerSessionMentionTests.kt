@@ -130,18 +130,18 @@ class ComposerSessionMentionTests {
         val project = OpenCodeProject(id = "proj_1", name = "opencode-ios", directory = session.directory)
         val current = OpenCodeSession(
             id = mentionID("Current"),
-            title = "Drawer Current",
+            serverTitle = "Drawer Current",
             projectID = "proj_1",
             directory = session.directory,
             updatedAt = Instant.ofEpochSecond(1_950),
         )
         fun payload(seed: String, title: String, projectID: String, directory: String, updated: Long) =
-            OpenCodeSession(id = mentionID(seed), title = title, projectID = projectID, directory = directory, updatedAt = Instant.ofEpochSecond(updated))
+            OpenCodeSession(id = mentionID(seed), serverTitle = title, projectID = projectID, directory = directory, updatedAt = Instant.ofEpochSecond(updated))
         val polish = payload("DrawerPolish", "Drawer Polish", "proj_1", session.directory, 1_900)
         val voice = payload("Voice", "Voice Call Retries", "proj_2", "/Users/kit/code/opencode", 1_800)
         val gestures = payload("Gestures", "Drawer Gestures", "proj_1", session.directory, 1_700)
         val malformed = OpenCodeSession(
-            id = "ses_short", title = "Drawer Broken", projectID = "proj_1", directory = session.directory,
+            id = "ses_short", serverTitle = "Drawer Broken", projectID = "proj_1", directory = session.directory,
             updatedAt = Instant.ofEpochSecond(1_990),
         )
         val all = listOf(current, malformed, polish, voice, gestures)

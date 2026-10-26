@@ -351,7 +351,7 @@ class SystemPromptSenderTests {
         createSession = { requested, directory, _ ->
             assertEquals(server, requested)
             sent.created += directory
-            OpenCodeSession(id = "ses_created", title = "New session", projectID = "prj_app", directory = directory, updatedAt = Instant.now())
+            OpenCodeSession(id = "ses_created", serverTitle = "New session", projectID = "prj_app", directory = directory, updatedAt = Instant.now())
         },
     )
 

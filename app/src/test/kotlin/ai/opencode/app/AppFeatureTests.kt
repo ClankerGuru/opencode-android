@@ -131,7 +131,7 @@ class AppFeatureTests {
     @Test
     fun notificationOpensCachedSessionWithoutRebuildingAReconnectingHome() = runTest {
         val server = OpenCodeServer(url = "https://saved.example", username = "opencode", password = "test")
-        val target = OpenCodeSession(id = "ses_cached", title = "Cached", projectID = "project", directory = "/work", updatedAt = Instant.now())
+        val target = OpenCodeSession(id = "ses_cached", serverTitle = "Cached", projectID = "project", directory = "/work", updatedAt = Instant.now())
         saveAll(listOf(server))
         val base = home(server, OpenCodeHomeSnapshot(projects = emptyList(), sessions = listOf(target), activeSessionIDs = emptySet()))
         val state = shared.appState().copy(
@@ -156,7 +156,7 @@ class AppFeatureTests {
     @Test
     fun notificationLoadsSessionOutsideTheRecentList() = runTest {
         val server = OpenCodeServer(url = "https://saved.example", username = "opencode", password = "test")
-        val target = OpenCodeSession(id = "ses_old", title = "Older session", projectID = "project", directory = "/work", updatedAt = Instant.ofEpochSecond(100))
+        val target = OpenCodeSession(id = "ses_old", serverTitle = "Older session", projectID = "project", directory = "/work", updatedAt = Instant.ofEpochSecond(100))
         saveAll(listOf(server))
         val state = shared.appState().copy(home = home(server, emptySnapshot))
         val store = store(
@@ -183,7 +183,7 @@ class AppFeatureTests {
 
     @Test
     fun abandonedOrMalformedNotificationsOpenNothing() = runTest {
-        val target = OpenCodeSession(id = "ses_old", title = "Old", projectID = "project", directory = "/work", updatedAt = distantPast)
+        val target = OpenCodeSession(id = "ses_old", serverTitle = "Old", projectID = "project", directory = "/work", updatedAt = distantPast)
         val store = store(shared.appState())
         store.send(AppFeature.Action.NotificationSessionLoaded(NotificationDestination(serverKey = "old-server", sessionID = target.id), Result.success(target)))
         store.send(AppFeature.Action.NotificationOpened(NotificationDestination(serverKey = "old-server", sessionID = "ses_/../../config")))
@@ -280,7 +280,7 @@ class AppFeatureTests {
             url = "https://saved.example", username = "kit", password = "secret",
             alternateURLs = listOf("http://192.168.1.20:4096"),
         )
-        val session = OpenCodeSession(id = "ses_cached", title = "Cached work", projectID = "proj_cached", directory = "/work", updatedAt = Instant.ofEpochSecond(1_000))
+        val session = OpenCodeSession(id = "ses_cached", serverTitle = "Cached work", projectID = "proj_cached", directory = "/work", updatedAt = Instant.ofEpochSecond(1_000))
         val snapshot = OpenCodeHomeSnapshot(
             projects = listOf(OpenCodeProject(id = "proj_cached", name = "Work", directory = "/work")),
             sessions = listOf(session), activeSessionIDs = setOf(session.id),
@@ -318,7 +318,7 @@ class AppFeatureTests {
                 snapshot = OpenCodeHomeSnapshot(
                     projects = listOf(OpenCodeProject(id = "other-project", name = "Private work", directory = "/other")),
                     sessions = listOf(
-                        OpenCodeSession(id = "other-session", title = "Other account", projectID = "other-project", directory = "/other", updatedAt = Instant.ofEpochSecond(1_000)),
+                        OpenCodeSession(id = "other-session", serverTitle = "Other account", projectID = "other-project", directory = "/other", updatedAt = Instant.ofEpochSecond(1_000)),
                     ),
                     activeSessionIDs = setOf("other-session"),
                 ),
@@ -344,7 +344,7 @@ class AppFeatureTests {
     @Test
     fun encodedHomeCacheDoesNotPersistServerPassword() {
         val server = OpenCodeServer(url = "https://saved.example", username = "kit", password = "unique-keychain-secret")
-        val session = OpenCodeSession(id = "ses_cached", title = "Cached work", projectID = "proj_cached", directory = "/work", updatedAt = Instant.ofEpochSecond(1_000))
+        val session = OpenCodeSession(id = "ses_cached", serverTitle = "Cached work", projectID = "proj_cached", directory = "/work", updatedAt = Instant.ofEpochSecond(1_000))
         val cache = shared.run {
             val home = HomeFeature.State(server, OpenCodeHomeSnapshot(projects = emptyList(), sessions = listOf(session), activeSessionIDs = emptySet()))
             home.persistingSnapshot(Instant0).cachedHomeSnapshot
@@ -655,7 +655,7 @@ class AppFeatureTests {
         var savedMini = OpenCodeServer(url = "https://mini-trial.taila8e7c7.ts.net:4196", username = "opencode", password = "1780000000.old_sig", name = "Mini Trial")
         val savedTailnet = OpenCodeServer(url = "http://100.64.0.3:4096", username = "opencode", password = "pw1", name = "Box Tailnet")
         val savedLAN = OpenCodeServer(url = "http://192.168.1.10:4096", username = "opencode", password = "pw2", name = "Box LAN")
-        val session = OpenCodeSession(id = "ses_1", title = "Pair mini-trial", projectID = "p", directory = "/project", updatedAt = Instant.ofEpochSecond(1))
+        val session = OpenCodeSession(id = "ses_1", serverTitle = "Pair mini-trial", projectID = "p", directory = "/project", updatedAt = Instant.ofEpochSecond(1))
         val snapshot = OpenCodeHomeSnapshot(projects = emptyList(), sessions = listOf(session), activeSessionIDs = emptySet())
         save(studio)
         saveAll(listOf(studio, savedMini, savedTailnet, savedLAN))
@@ -783,7 +783,7 @@ class AppFeatureTests {
         val studio = OpenCodeServer(url = "https://studio.taila8e7c7.ts.net:4096", username = "opencode", password = "pw", name = "Studio")
         val targetServer = OpenCodeServer(url = "https://mini-trial.taila8e7c7.ts.net:4196", username = "opencode", password = "pw2", name = "Mini Trial")
         val draftServer = OpenCodeServer(url = "https://draft.example.com:4096", username = "opencode", password = "draft-pw", name = "Draft")
-        val session = OpenCodeSession(id = "ses_1", title = "Live call", projectID = "p", directory = "/project", updatedAt = Instant.ofEpochSecond(1))
+        val session = OpenCodeSession(id = "ses_1", serverTitle = "Live call", projectID = "p", directory = "/project", updatedAt = Instant.ofEpochSecond(1))
         val snapshot = OpenCodeHomeSnapshot(projects = emptyList(), sessions = listOf(session), activeSessionIDs = emptySet())
         save(studio)
         saveAll(listOf(studio, targetServer))

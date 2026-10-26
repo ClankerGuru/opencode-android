@@ -107,7 +107,7 @@ class PairingOpensDrawerAppTests {
     }
 
     private fun session(id: String, project: String, updated: Long) = OpenCodeSession(
-        id = id, title = id, projectID = project, directory = "/$project",
+        id = id, serverTitle = id, projectID = project, directory = "/$project",
         updatedAt = Instant.ofEpochSecond(updated), idleMilliseconds = 1_000, viewedMilliseconds = 1_000,
     )
 
