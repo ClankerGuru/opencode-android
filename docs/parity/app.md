@@ -50,7 +50,7 @@ a lower module were ported there under the same suite name.
 | `ConnectionErrorReportTests.swift` | `ConnectionErrorReportTests.kt` | 6 | 9 `ConnectionFailureDetail` tests → `:server` `ConnectionErrorReportTests` | – |
 | `ScreenAwakeTests.swift` | `ScreenAwakeTests.kt` | 5 | – | – |
 | `LaunchBloomTests.swift` | `LaunchBloomTests.kt` | 4 | – | `onlyForegroundColdLaunchCanMount`, `backgroundingAndSceneDetachmentReleaseCover` (UIScene states, window cover views; the system splash shows only on an activity's cold start), `touchRevealsContentAtOnce` (the splash takes no touches), `handoffIsAHardCut…` (no `launch.fade` tunable: always a hard cut), `systemLaunchUsesTheSameBlankBackground` (Info.plist), `rootStopsObservingSessionRowsOnceLaunchIsDecided` (SwiftUI observation tracking); colour half of `coverIsTheBlankLaunchBackground…` |
-| `MultipleWindowsTests.swift` (+`WindowRosterTests`, `AppWideWorkTests`) | `MultipleWindowsTests.kt` (`MultipleWindowsTests`, `WindowRosterTests`) | 2 + 7 | 7 `SharedEventStreams`/`SharedReads` → `:server` `live/MultipleWindowsTests` (+ the batcher test in `EventBatcherTests`); `aFurtherWindowKeepsItsOwnSidebar` → `:feature:drawer` (`HomeSettingsFeature`) | `oneWindowIsAlwaysTheFrontWindow` (UIKit `ActiveScene`), `activityTypeIsDeclaredInInfoPlist`, `windowTargetRoundTripsThroughItsActivity` (the target rides an `Intent`, a framework class); **todo**: the 5 `AppWideWorkTests` — `RootStore` resolves through the process-wide `SceneWindows` roster and needs an `Activity`, so a test can't hand it a roster and work (iOS `WindowStore(roster:appWideWork:)` takes them) |
+| `MultipleWindowsTests.swift` (+`WindowRosterTests`, `AppWideWorkTests`) | `MultipleWindowsTests.kt` (`MultipleWindowsTests`, `WindowRosterTests`, `AppWideWorkTests` under Robolectric) | 2 + 7 + 5 | 7 `SharedEventStreams`/`SharedReads` → `:server` `live/MultipleWindowsTests` (+ the batcher test in `EventBatcherTests`); `aFurtherWindowKeepsItsOwnSidebar` → `:feature:drawer` (`HomeSettingsFeature`) | `oneWindowIsAlwaysTheFrontWindow` (UIKit `ActiveScene`), `activityTypeIsDeclaredInInfoPlist`, `windowTargetRoundTripsThroughItsActivity` (the target rides an `Intent`, a framework class). `AppWideWorkTests` drive `RootStore(roster, appWideWork, makeStore)` and `resolve(target, primary)` (iOS `WindowStore(roster:appWideWork:makeStore:)`, `resolve(target:primary:)`); its reload test is a configuration change (the retained `RootStore` resolves again) |
 | `PairingOpensDrawerAppTests.swift` | `PairingOpensDrawerAppTests.kt` | 9 | `aComputerSharingAnAddressWithASavedOneIsNotNew` → `:server` | – (the session-tap step of `pickingASession…` is non-exhaustive past the tap: Home's read/transcript bookkeeping is the drawer's) |
 | `AppIconBadgeTests.swift` | `AppIconBadgeTests.kt` | 4 (forgetting an identity) | 9 Home publishing tests → `:feature:drawer`; ledger/storage/refs (5) → `:feature:system` `notifications/AppIconBadgeTests` | `BadgeAuthorization` (3) and App Group tests (no Android counterpart) |
 
@@ -58,6 +58,9 @@ Production changes the ports needed: `ThisDevice.isTablet` read `Resources.getSy
 check, so every “this phone” copy threw under JVM tests (`shared:` fix, no device change);
 `LaunchBloomController` timed its cover with `SystemClock.uptimeMillis` instead of the `Clock`
 dependency (iOS `continuousClock`), so its 1.5 s give-up couldn't run on a `TestClock` (refactor, same
-live behaviour). No behaviour bugs found.
+live behaviour); `RootStore` takes its roster, app-wide work and secondary-store maker (defaults: the
+process-wide ones) and resolves without an `Activity`, `SceneWindows.window(destination, roster, work, active)`
+routes for a given roster, and `AppWideWork` follows the store, not the window, as iOS's does (each live window
+has its own store, so live behaviour is unchanged). No behaviour bugs found.
 
 Total: 80 `:app` tests, all passing.
