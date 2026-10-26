@@ -10,7 +10,6 @@ package ai.opencode.feature.settings.whatsnew
  */
 object WhatsNewAddedIDs {
     val addedSinceSplit: List<String> = listOf(
-        "session-title-first-prompt",
         "voice-server-picker",
         "pair-opens-drawer",
         "gpt-live-own-key",
