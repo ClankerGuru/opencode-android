@@ -8,6 +8,7 @@ import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.openCodeTapTarget
+import ai.opencode.feature.composer.OpenCodeBottomSheet
 import ai.opencode.server.model.ModelProviderGroup
 import ai.opencode.server.model.ModelVariant
 import ai.opencode.server.model.OpenCodeModel
@@ -33,7 +34,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -373,7 +373,7 @@ fun ModelPickerDetentsSheet(
             scope.launch { sheetState.hide() }.invokeOnCompletion { action() }
         }
     }
-    ModalBottomSheet(
+    OpenCodeBottomSheet(
         onDismissRequest = { currentOnClose() },
         sheetState = sheetState,
         dragHandle = { Box(probe) { BottomSheetDefaults.DragHandle() } },

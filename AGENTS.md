@@ -103,6 +103,7 @@ jlatexmath), Firebase Messaging (push; keep it behind an interface until credent
 Add a new library only with a one-line justification here.
 - `com.google.zxing:core` (settings): decodes the pairing QR from CameraX frames, as iOS's
   AVFoundation QR metadata output does; pure Java, no Play services (ML Kit would need them).
+- `androidx.profileinstaller:profileinstaller` (app): installs the packaged app and library Baseline Profiles for ART compilation, including sideloaded builds.
 
 ## Check and run
 
