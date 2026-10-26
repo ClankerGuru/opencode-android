@@ -2,6 +2,17 @@ package ai.opencode.feature.transcript.user
 
 import ai.opencode.core.files.AttachmentFileType
 import ai.opencode.core.ui.OpenCodeIcon
+import ai.opencode.core.ui.OpenCodeIconSize
+import ai.opencode.core.ui.SFSymbol
+import ai.opencode.feature.media.MediaZoomSources
+import ai.opencode.feature.media.mediaZoomSource
+import ai.opencode.feature.transcript.LocalTranscriptRowContext
+import ai.opencode.feature.transcript.TranscriptAction
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.role
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.feature.media.FileAttachmentCard
@@ -130,7 +141,7 @@ internal fun TranscriptFileChips(
                 val text = file.text
                 val summary = file.pasted
                 if (text != null && summary != null) {
-                    PastedTextCard(text, summary, corners)
+                    PastedTextCard(file.id, text, summary, corners)
                 } else {
                     FileChip(file, onOpen, corners)
                 }
@@ -159,7 +170,7 @@ private fun FileChip(file: OpenCodeTranscriptFile, onOpen: ((AgentFileReference)
             )
             .clip(shape)
             .background(cardFill(), shape)
-            .then(if (open != null) Modifier.clickable(onClickLabel = "Opens the file", onClick = open) else Modifier)
+            .then(if (open != null) Modifier.clickable(onClickLabel = "Open the file", onClick = open) else Modifier)
             .semantics(mergeDescendants = true) {
                 contentDescription = "Attached file ${file.name}"
                 stateDescription = typeLabel
@@ -168,22 +179,29 @@ private fun FileChip(file: OpenCodeTranscriptFile, onOpen: ((AgentFileReference)
 }
 
 /**
- * A long paste's card: its name, length and first lines fading out (iOS `PastedTextCard`;
- * minimal port, hand-off to `:feature:composer`). Opening its viewer waits for the composer's
- * `PastedTextViewer` (no transcript action for it yet).
+ * A long paste's card: its name, length and first lines fading out (iOS `PastedTextCard`). A tap
+ * opens the whole text in the Pasted Text viewer, zooming out of the card (its zoom source is
+ * `pasted-<file id>`); the session presents it for [TranscriptAction.OpenPastedText].
  */
 @Composable
-private fun PastedTextCard(text: String, summary: PastedTextSummary, corners: UserSurfaceCorners) {
+private fun PastedTextCard(id: String, text: String, summary: PastedTextSummary, corners: UserSurfaceCorners) {
     val shape = corners.shape(TranscriptMetrics.cardCornerRadius)
+    val send = LocalTranscriptRowContext.current.send
+    val sourceID = "pasted-$id"
+    val open = { send(TranscriptAction.OpenPastedText(text, summary, sourceID)) }
     Column(
         Modifier
             .transcriptDragSource(TranscriptDragPayload.PastedText(text, PastedText.NAME), cornerRadius = TranscriptMetrics.cardCornerRadius)
             .width(240.dp)
+            .clip(shape)
             .background(cardFill(), shape)
+            .mediaZoomSource(sourceID, TranscriptMetrics.cardCornerRadius)
+            .clickable(onClickLabel = "Open the text", onClick = open)
             .padding(horizontal = TranscriptMetrics.standard, vertical = 10.dp)
             .semantics(mergeDescendants = true) {
                 contentDescription = PastedText.NAME
                 stateDescription = summary.summary
+                role = Role.Button
             },
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -232,8 +250,7 @@ private fun PastedTextCard(text: String, summary: PastedTextSummary, corners: Us
 
 /**
  * A shared location's card: a map, its place and address, and its coordinates (iOS
- * `SharedLocationCard`, the sent card only). The map is a placeholder until `:feature:composer`
- * ports `SharedLocationMap`'s snapshots (hand-off). Tapping opens the maps link.
+ * `SharedLocationCard`, the sent card only). Tapping opens the maps link.
  */
 @Composable
 internal fun SharedLocationCard(
@@ -253,20 +270,24 @@ internal fun SharedLocationCard(
             .graphicsLayer { alpha = if (isPending) 0.6f else 1f }
             .clip(shape)
             .background(cardFill())
-            .clickable(onClickLabel = "Opens in Maps") { onOpen(location.mapsURL) }
-            .semantics(mergeDescendants = true) {
+            .clickable(onClickLabel = "Open in Maps") { onOpen(location.mapsURL) }
+            .clearAndSetSemantics {
                 contentDescription = "Location: $title${subtitle?.let { ", $it" } ?: ""}"
-                onClick("Opens in Maps") { onOpen(location.mapsURL); true }
+                role = Role.Button
+                onClick("Open in Maps") { onOpen(location.mapsURL); true }
             },
     ) {
+        // iOS `SharedLocationMap`: a still map under the pin. Android has no MapKit snapshot (the
+        // composer's `LocationClient.snapshot` seam is empty too), so the tile and pin alone.
         Box(
             Modifier
                 .fillMaxWidth()
                 .height(120.dp)
-                .background(OpenCodeTheme.colors.inlineCodeFill),
+                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
             contentAlignment = Alignment.Center,
         ) {
-            OpenCodeIcon("mappin", contentDescription = null, size = 28.dp, tint = Color(0xFFFF3B30))
+            Box(Modifier.size(16.dp).background(Color.White, CircleShape))
+            OpenCodeIcon(SFSymbol.MappinCircleFill, contentDescription = null, size = OpenCodeIconSize.large, tint = Color(0xFFFF3B30))
         }
         Column(
             Modifier
@@ -329,14 +350,26 @@ internal fun UserMessageImages(
                         )
                         .size(side)
                         .clip(shape)
+                        .mediaZoomSource(attachment.id, TranscriptMetrics.cardCornerRadius)
                         .clickable(enabled = !isPending) {
                             transcriptImagePreview(images, attachment.id, "Attached image")?.let(onPreview)
                         }
-                        .semantics { contentDescription = label },
+                        .semantics {
+                            contentDescription = label
+                            role = Role.Button
+                        },
                 ) {
-                    // TODO(hand-off): `mediaZoomSource` / `MediaZoomSources.isHidden` from `:feature:media`.
+                    // The anchor full-screen media zooms out of and back into; it's hidden while
+                    // its image is up full screen.
                     if (image != null) {
-                        Image(image, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                        Image(
+                            image,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer { alpha = if (MediaZoomSources.shared.isHidden(listOf(attachment.id))) 0f else 1f },
+                        )
                     }
                 }
             }

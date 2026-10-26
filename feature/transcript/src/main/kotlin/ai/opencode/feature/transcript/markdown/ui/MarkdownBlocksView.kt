@@ -45,10 +45,19 @@ fun MarkdownBlocksView(
     if (revealItem != null && !isGrowing) reveal.settle(revealItem)
     // Image Link Previews (experimental): thumbnails under prose blocks with direct-image links.
     val imageLinks = ai.opencode.feature.transcript.links.rememberImageLinkPlan(blocks, isGrowing)
+    val imageGrowth = ai.opencode.feature.media.LocalAgentImageRowGrowth.current
+    val imageDensity = androidx.compose.ui.platform.LocalDensity.current.density
     androidx.compose.runtime.CompositionLocalProvider(LocalTranscriptTextReveal provides reveal) {
         Column(modifier) {
             for ((index, block) in blocks.withIndex()) {
                 key(block.id) {
+                    androidx.compose.runtime.CompositionLocalProvider(ai.opencode.feature.media.LocalAgentImageBlock provides block.id) {
+                    Column(Modifier.agentImageGrowthHold(
+                        lift = { (imageGrowth?.lift(block.id) ?: 0f) * imageDensity },
+                        cut = { (imageGrowth?.cut(listOf(block.id)) ?: 0f) * imageDensity },
+                        clips = imageGrowth != null && (block.kind is OpenCodeMarkdownBlock.Kind.Files || block.kind is OpenCodeMarkdownBlock.Kind.Image || imageLinks[block.id] != null),
+                        softEdge = index < blocks.lastIndex,
+                    )) {
                     MarkdownBlockView(
                         block,
                         Modifier.padding(top = style.gap(if (index == 0) null else blocks[index - 1].kind, block.kind)),
@@ -56,6 +65,8 @@ fun MarkdownBlocksView(
                         isGrowingTail = isGrowing && index == blocks.size - 1,
                     )
                     imageLinks[block.id]?.let { ai.opencode.feature.transcript.links.BlockImageLinks(block, it) }
+                    }
+                    }
                 }
             }
         }
@@ -85,7 +96,7 @@ fun agentImageGrowthDepth(height: Float, cut: Float, fade: Float): Float {
  * is drawn up by what the images above it still have to grow ([lift]) and an image's block is
  * cut off by its own ([cut]) through the transcript's soft edge (`growthSoftEdge` deep), so
  * everything below an image holds still while the row's edge eases. Drawing only. The growth
- * values come from media's `AgentImageRowGrowth` (not ported yet).
+ * values come from media's `AgentImageRowGrowth`, converted to pixels by the caller.
  */
 fun Modifier.agentImageGrowthHold(lift: () -> Float, cut: () -> Float, clips: Boolean, softEdge: Boolean = true): Modifier =
     graphicsLayer {
@@ -100,7 +111,7 @@ fun Modifier.agentImageGrowthHold(lift: () -> Float, cut: () -> Float, clips: Bo
                 val c = cut()
                 if (c <= 0.5f) return@drawWithContent
                 val bottom = maxOf(0f, size.height - c)
-                val depth = agentImageGrowthDepth(size.height, c, if (softEdge) TranscriptTunables.growthSoftEdge else 0f)
+                val depth = agentImageGrowthDepth(size.height, c, if (softEdge) TranscriptTunables.growthSoftEdge * density else 0f)
                 if (depth > 0f) {
                     drawRect(
                         Brush.verticalGradient(0f to Color.Transparent, 1f to Color.Black, startY = bottom - depth, endY = bottom),

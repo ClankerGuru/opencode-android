@@ -22,7 +22,6 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import org.scilab.forge.jlatexmath.TeXConstants
 import org.scilab.forge.jlatexmath.TeXFormula
 import ru.noties.jlatexmath.awt.AndroidGraphics2D
@@ -77,9 +76,14 @@ object InlineMath {
     /** Latin Modern sits smaller than SF at the same size; this evens it out (`(pointSize * 1.1).rounded()`). */
     fun fontSize(pointSize: Float): Float = Math.round(pointSize * 1.1f).toFloat()
 
-    /** [fontSize] for a text size, in px for [density] (font scale included, like Dynamic Type). */
-    fun fontSizePx(textSize: TextUnit, density: Density): Float =
-        with(density) { fontSize(textSize.value).sp.toPx() }
+    /**
+     * [fontSize] for a text size, in px for [density]. Rounded at the scaled size, as iOS rounds
+     * the Dynamic Type point size (font scale included, nonlinear scaling too).
+     */
+    fun fontSizePx(textSize: TextUnit, density: Density): Float {
+        val scaledPoints = with(density) { textSize.toPx() } / density.density
+        return fontSize(scaledPoints) * density.density
+    }
 }
 
 /**
@@ -108,7 +112,7 @@ fun MathDisplayView(math: OpenCodeMarkdownBlock.MathBlock, modifier: Modifier = 
             )
         } else {
             SelectionContainer {
-                Text(math.raw, style = MarkdownStyle.codeTextStyle(), color = colors.text, softWrap = false)
+                Text(math.raw, style = MarkdownStyle.codeTextStyle(codeLeading = 0f), color = colors.text, softWrap = false)
             }
         }
     }

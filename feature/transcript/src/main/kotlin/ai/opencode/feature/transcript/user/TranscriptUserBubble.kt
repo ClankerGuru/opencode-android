@@ -1,5 +1,8 @@
 package ai.opencode.feature.transcript.user
 
+import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.haptics.Haptic
+import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeIcon
@@ -7,6 +10,32 @@ import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.LocalTranscriptRowContext
+import ai.opencode.feature.transcript.markdown.marked
+import ai.opencode.feature.transcript.markdown.ui.ArrivingText
+import ai.opencode.feature.transcript.markdown.ui.LocalSessionLinks
+import ai.opencode.feature.transcript.markdown.ui.MarkdownPresentation
+import ai.opencode.feature.transcript.markdown.ui.PresentationOptions
+import ai.opencode.feature.transcript.markdown.ui.ReportsSessionLinks
+import ai.opencode.feature.transcript.markdown.ui.SessionMentions
+import ai.opencode.feature.transcript.markdown.ui.currentMarkdownStyle
+import ai.opencode.feature.transcript.markdown.ui.rememberLinkListener
+import ai.opencode.server.model.SessionLink
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.window.OnBackInvokedCallback
+import android.window.OnBackInvokedDispatcher
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalTextToolbar
+import androidx.compose.ui.platform.TextToolbar
+import androidx.compose.ui.platform.TextToolbarStatus
+import kotlinx.coroutines.delay
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
@@ -42,6 +71,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.addOutline
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -118,6 +150,7 @@ internal fun TranscriptUserBubble(
                     fold = fold,
                     folds = folds,
                     reduceMotion = reduceMotion,
+                    onCopy = onCopy,
                     onEndSelection = { isSelecting = false },
                     modifier = faceModifier.sendLandingProbe(landingProbe).graphicsLayer {
                         scaleX = lift
@@ -172,6 +205,7 @@ private fun UserBubbleFace(
     fold: UserBubbleFold.State,
     folds: BooleanArray,
     reduceMotion: Boolean,
+    onCopy: (String) -> Unit,
     onEndSelection: () -> Unit,
     modifier: Modifier,
 ) {
@@ -185,19 +219,18 @@ private fun UserBubbleFace(
         folds = folds,
         content = {
             Box {
-                // TODO(hand-off): `SessionMentionText` (session link chips) once rows/ ports it.
-                Text(
+                // Its selectable copy stands in while selecting; hidden from TalkBack then.
+                UserBubbleText(
                     text,
-                    style = UserBubbleTextStyle,
-                    color = OpenCodeTheme.colors.text,
-                    modifier = Modifier
+                    Modifier
                         .graphicsLayer { alpha = (if (isSelecting) 0f else pendingAlpha) * reveal.text.toFloat() }
                         .then(if (isSelecting) Modifier.clearAndSetSemantics { } else Modifier),
                 )
                 if (isSelecting) {
                     UserBubbleSelectableText(
-                        text = text,
+                        text = SessionMentions.shown(text, LocalSessionLinks.current),
                         isPending = isPending,
+                        onCopy = onCopy,
                         onEndSelection = onEndSelection,
                         modifier = Modifier.matchParentSize().graphicsLayer { alpha = reveal.text.toFloat() },
                     )
@@ -342,45 +375,183 @@ private fun UserBubbleFoldView(
 }
 
 /**
- * Native range selection over a user bubble after choosing Select from its menu: the whole
- * message selected with the platform handles and text toolbar, until the selection collapses or
- * the field loses focus (iOS `UserBubbleSelectableText`). A read-only text field, so the
- * keyboard stays down.
+ * A sent message's text with its `@session:<id>` mentions drawn as session chips showing their
+ * titles (iOS `SessionMentionText` in the bubble), at the bubble's line spacing; plain text when
+ * it mentions none.
  */
 @Composable
-private fun UserBubbleSelectableText(text: String, isPending: Boolean, onEndSelection: () -> Unit, modifier: Modifier) {
+private fun UserBubbleText(text: String, modifier: Modifier) {
+    val colors = OpenCodeTheme.colors
+    val marked = remember(text) { SessionLink.marked(text) }
+    if (marked == null) {
+        Text(text, style = UserBubbleTextStyle, color = colors.text, modifier = modifier)
+        return
+    }
+    val style = currentMarkdownStyle()
+    val density = LocalDensity.current
+    val targets = LocalSessionLinks.current.targets
+    val listener = rememberLinkListener()
+    val presented = remember(marked, targets, colors, density) {
+        MarkdownPresentation.present(
+            marked,
+            PresentationOptions(foreground = colors.text, textSize = OpenCodeTextStyles.body.fontSize, tonesBody = false),
+            style, targets, density, listener, siteIcon = null,
+        )
+    }
+    ArrivingText(presented, emptyList(), UserBubbleTextStyle, colors.text, modifier)
+    ReportsSessionLinks(presented.sessionIDs)
+}
+
+/** iOS's selection settles for this long after Select: a collapse within it is the system's, and is undone. */
+private const val SELECTION_SETTLE_SECONDS = 0.45
+
+/** iOS presents the edit menu over the whole selection this long after Select (`presentMenu: true`). */
+private const val SELECTION_MENU_DELAY_MILLIS = 480L
+
+/**
+ * Native range selection over a user bubble after choosing Select from its menu (iOS
+ * `UserBubbleSelectableText`): the whole message selected in a read-only field (so the keyboard
+ * stays down), with the system's floating text toolbar over it (Copy, Select All), until the
+ * selection collapses, the field loses focus, Back is pressed, or the bubble scrolls off screen.
+ * The reader can adjust the range with the platform handles; a Copy plays `tap` (through
+ * [onCopy], `CopyTextTapped`).
+ */
+@Composable
+private fun UserBubbleSelectableText(text: String, isPending: Boolean, onCopy: (String) -> Unit, onEndSelection: () -> Unit, modifier: Modifier) {
     val state: TextFieldState = rememberTextFieldState(text)
     val focus = remember { FocusRequester() }
     val end by rememberUpdatedState(onEndSelection)
+    val copy by rememberUpdatedState(onCopy)
+    val platformToolbar = LocalTextToolbar.current
+    val haptics = remember { dependency(HapticsClient) }
+    val toolbar = remember(platformToolbar) { UserBubbleSelectionToolbar(platformToolbar) { haptics.play(Haptic.tap) } }
     var hadFocus by remember { mutableStateOf(false) }
+    var adjusted by remember { mutableStateOf(false) }
+    var coordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+
+    fun selectedText(): String {
+        val selection = state.selection
+        return state.text.substring(selection.min, selection.max)
+    }
+
+    fun presentMenu() {
+        val bounds = coordinates?.takeIf { it.isAttached }?.boundsInRoot() ?: return
+        toolbar.present(
+            bounds,
+            copy = {
+                selectedText().takeIf { it.isNotEmpty() }?.let(copy)
+                toolbar.dismiss()
+            },
+            selectAll = {
+                state.edit { selectAll() }
+                presentMenu()
+            },
+        )
+    }
+
     LaunchedEffect(text) {
         if (state.text.toString() != text) state.edit { replace(0, length, text) }
         state.edit { selectAll() }
         focus.requestFocus()
+        delay(SELECTION_MENU_DELAY_MILLIS)
+        if (!adjusted) {
+            state.edit { selectAll() }
+            presentMenu()
+        }
     }
     LaunchedEffect(Unit) {
         val activatedAt = System.nanoTime()
-        var adjusted = false
         snapshotFlow { state.selection }.collect { selection ->
             val full = state.text.length
             if (selection.collapsed) {
-                // Within 0.45 s of opening, a collapse is the system settling: select it all again.
-                if ((System.nanoTime() - activatedAt) / 1e9 < 0.45 && !adjusted) state.edit { selectAll() } else end()
+                // A collapse while it settles is the system's: select it all again.
+                if ((System.nanoTime() - activatedAt) / 1e9 < SELECTION_SETTLE_SECONDS && !adjusted) state.edit { selectAll() } else end()
             } else if (selection.min != 0 || selection.max != full) {
+                // The reader moved a handle: the field's own toolbar follows the new range.
+                if (!adjusted) toolbar.dismiss()
                 adjusted = true
             }
         }
     }
-    BasicTextField(
-        state = state,
-        readOnly = true,
-        textStyle = UserBubbleTextStyle.copy(color = OpenCodeTheme.colors.text.copy(alpha = if (isPending) 0.6f else 1f)),
-        modifier = modifier
-            .focusRequester(focus)
-            .onFocusChanged {
-                if (it.isFocused) hadFocus = true else if (hadFocus) end()
-            },
-    )
+    DisposableEffect(toolbar) { onDispose { toolbar.dismiss() } }
+    SelectionBackHandler { end() }
+
+    CompositionLocalProvider(LocalTextToolbar provides toolbar) {
+        BasicTextField(
+            state = state,
+            readOnly = true,
+            textStyle = UserBubbleTextStyle.copy(color = OpenCodeTheme.colors.text.copy(alpha = if (isPending) 0.6f else 1f)),
+            modifier = modifier
+                .focusRequester(focus)
+                .onFocusChanged {
+                    if (it.isFocused) hadFocus = true else if (hadFocus) end()
+                }
+                .onGloballyPositioned {
+                    coordinates = it
+                    // Scrolled off screen: selection ends (iOS observes the list's offset).
+                    val visible = it.boundsInWindow()
+                    if (hadFocus && (visible.width <= 0f || visible.height <= 0f)) end()
+                },
+        )
+    }
+}
+
+/**
+ * The platform text toolbar, shown over the whole selection when Select opens it. The field's
+ * own requests pass through, except a hide while this menu is up and the reader hasn't touched
+ * the selection yet (the field doesn't know it put the menu there). The field's Copy plays `tap`.
+ */
+private class UserBubbleSelectionToolbar(private val platform: TextToolbar, private val onCopied: () -> Unit) : TextToolbar {
+    private var holdsMenu = false
+
+    override val status: TextToolbarStatus get() = platform.status
+
+    override fun showMenu(
+        rect: Rect,
+        onCopyRequested: (() -> Unit)?,
+        onPasteRequested: (() -> Unit)?,
+        onCutRequested: (() -> Unit)?,
+        onSelectAllRequested: (() -> Unit)?,
+    ) {
+        holdsMenu = false
+        // iOS's selection view plays `tap` on Copy.
+        val copy = onCopyRequested?.let { request -> { request(); onCopied() } }
+        platform.showMenu(rect, copy, onPasteRequested, onCutRequested, onSelectAllRequested)
+    }
+
+    override fun hide() {
+        if (!holdsMenu) platform.hide()
+    }
+
+    fun present(rect: Rect, copy: () -> Unit, selectAll: () -> Unit) {
+        holdsMenu = true
+        platform.showMenu(rect, onCopyRequested = copy, onPasteRequested = null, onCutRequested = null, onSelectAllRequested = selectAll)
+    }
+
+    fun dismiss() {
+        if (!holdsMenu) return
+        holdsMenu = false
+        platform.hide()
+    }
+}
+
+/** Back ends the selection (iOS: tapping elsewhere), ahead of the screen's own Back while it's up. */
+@Composable
+private fun SelectionBackHandler(onBack: () -> Unit) {
+    val activity = LocalContext.current.findActivity() ?: return
+    val current by rememberUpdatedState(onBack)
+    DisposableEffect(activity) {
+        val callback = OnBackInvokedCallback { current() }
+        // Above the app's own handlers (default priority), below a full-screen viewer (overlay).
+        activity.onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT + 1, callback)
+        onDispose { activity.onBackInvokedDispatcher.unregisterOnBackInvokedCallback(callback) }
+    }
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
 
 /**
@@ -409,7 +580,8 @@ internal fun Modifier.voiceMessageBackground(
 ): Modifier {
     val reduceMotion = rememberReduceMotion()
     val colors = OpenCodeTheme.colors
-    val glow = remember { AgentRevealGlow() }
+    // The shader compiles only for a bubble that reveals, not for every row.
+    val glow = remember { lazy(LazyThreadSafetyMode.NONE) { AgentRevealGlow() } }
     // Only the shape: a run's corners tighten or round on their own.
     val full = TranscriptMetrics.bubbleCornerRadius
     val spec = PromotionMotion.animation<Dp>(reduceMotion)
@@ -430,7 +602,8 @@ internal fun Modifier.voiceMessageBackground(
                 drawIntoCanvas { canvas ->
                     canvas.saveLayer(Rect(0f, 0f, size.width, size.height), Paint().apply { alpha = body })
                     drawOutline(outline, colors.userBubble.copy(alpha = colors.userBubble.alpha * fillAlpha))
-                    with(glow) { draw(reveal.light, corners, colors.isDark) }
+                    // Clipped to the bubble's shape, as iOS clips the light (`clipShape`).
+                    clipPath(Path().apply { addOutline(outline) }) { with(glow.value) { draw(reveal.light, corners, colors.isDark) } }
                     canvas.restore()
                 }
             }
@@ -438,7 +611,7 @@ internal fun Modifier.voiceMessageBackground(
                 if (!resting) {
                     drawIntoCanvas { canvas ->
                         canvas.saveLayer(Rect(0f, 0f, size.width, size.height), Paint().apply { alpha = body })
-                        with(glow) { draw(reveal.light, corners, colors.isDark) }
+                        clipPath(Path().apply { addOutline(outline) }) { with(glow.value) { draw(reveal.light, corners, colors.isDark) } }
                         canvas.restore()
                     }
                 }

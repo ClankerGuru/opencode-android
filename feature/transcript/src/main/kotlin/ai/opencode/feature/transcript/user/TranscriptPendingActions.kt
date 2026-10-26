@@ -117,7 +117,7 @@ internal fun action(label: String, block: () -> Unit) = CustomAccessibilityActio
 /** The long-press menu every user surface opens: the platform menu, anchored on the surface. */
 @Composable
 internal fun UserMessageMenu(expanded: Boolean, onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
-    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss, content = content)
+    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss, properties = ai.opencode.feature.media.liftMenuProperties(), content = content)
 }
 
 @Composable

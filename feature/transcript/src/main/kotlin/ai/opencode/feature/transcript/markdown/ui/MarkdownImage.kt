@@ -9,6 +9,8 @@ import ai.opencode.feature.media.TranscriptImagePreview
 import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.LocalTranscriptRowContext
 import ai.opencode.feature.transcript.TranscriptAction
+import ai.opencode.feature.transcript.user.TranscriptDragPayload
+import ai.opencode.feature.transcript.user.transcriptDragSource
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.AgentFileReference
@@ -108,6 +110,16 @@ fun MarkdownImage(
                 modifier
                     .fillMaxWidth()
                     .heightIn(max = 360.dp)
+                    .transcriptDragSource(
+                        TranscriptDragPayload.Image(
+                            load.image,
+                            name = fallbackFile?.name ?: alt.ifEmpty { "image" },
+                            file = fallbackFile,
+                            server = server,
+                            directory = directory,
+                        ),
+                        cornerRadius = TranscriptMetrics.cardCornerRadius,
+                    )
                     .clip(shape)
                     .background(colors.userBubble, shape)
                     .clickable { send(TranscriptAction.PreviewImage(TranscriptImagePreview(cacheKey, load.image.asAndroidBitmap(), label))) }
@@ -155,7 +167,8 @@ private fun FailedImageCard(name: String, fallbackFile: AgentFileReference?, onR
                 .heightIn(min = 48.dp)
                 .clip(shape)
                 .background(colors.userBubble, shape)
-                .combinedClickable(onClick = onRetry, onLongClick = { menu = true })
+                // iOS `accessibilityHint("Tries again")`: TalkBack reads “Double-tap to try again”.
+                .combinedClickable(onClickLabel = "Try again", onClick = onRetry, onLongClick = { menu = true })
                 .semantics {
                     contentDescription = name
                     stateDescription = "Couldn’t load image"

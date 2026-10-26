@@ -1,5 +1,8 @@
 package ai.opencode.feature.transcript.rows
 
+import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.haptics.Haptic
+import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeIconSize
 import ai.opencode.core.ui.OpenCodeTextStyles
@@ -36,6 +39,7 @@ import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ai.opencode.server.model.OpenCodeRunError
@@ -78,6 +82,7 @@ fun RunErrorRow(
     val orbSize = scaledDp(18f)
     val spacing = scaledDp(8f)
     val colors = OpenCodeTheme.colors
+    val haptics = remember { dependency(HapticsClient) }
 
     val line: @Composable (Modifier) -> Unit = { lineModifier ->
         Row(
@@ -104,7 +109,13 @@ fun RunErrorRow(
     Box(
         modifier
             .fillMaxWidth()
-            .pointerInput(Unit) { detectTapGestures(onLongPress = { menuOpen = true }) },
+            // iOS `contextMenu`: the hold answers with the menu's tap.
+            .pointerInput(Unit) {
+                detectTapGestures(onLongPress = {
+                    haptics.play(Haptic.tap)
+                    menuOpen = true
+                })
+            },
     ) {
         if (isAccessibilityTextSize()) {
             Column {
@@ -173,7 +184,8 @@ fun UndoneRow(redo: () -> Unit, modifier: Modifier = Modifier) {
         Row(
             Modifier
                 .alignByBaseline()
-                .semantics(mergeDescendants = true) {},
+                // iOS `accessibilityHint`: read after the line.
+                .semantics(mergeDescendants = true) { stateDescription = "Undo is available until you send a new message" },
             horizontalArrangement = Arrangement.spacedBy(spacing),
             verticalAlignment = Alignment.CenterVertically,
         ) {
