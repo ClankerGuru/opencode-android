@@ -129,3 +129,10 @@ ThreadContextElement); `:core` `TestStore` queued `Effect.send` behind effect ou
 non-exhaustive `finish` on running effects (TCA does neither); `:core` `EffectRunner` launched a
 whole cancellable merge when any part suspended, delaying its synchronous sends; `:core`
 `ImmediateClock.sleep` never yielded (swift-clocks does), hanging the call coordinator's uplink loop.
+
+`TestStore` after the drawer port's merge: main's runner (nested cancellables register at once,
+their synchronous parts run immediately), caller context, dropped sends from cancelled effects,
+`skipInFlightEffects` and non-exhaustive `finish`, plus this port's front queue that takes an
+action's synchronous `Effect.send`s before other effect output (TCA's order). It still reduces
+received actions when asked rather than as they arrive (TCA reduces them on arrival); a few tests
+call `skipReceivedActions()`/`settle()` before moving a clock or opening a gate for that reason.
