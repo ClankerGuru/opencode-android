@@ -21,4 +21,6 @@ dependencies {
     implementation(libs.coil.svg)
     // SinceYouLeftClient.liveValue: Gemini Nano via AICore, as iOS uses FoundationModels' on-device model.
     implementation(libs.mlkit.genai.prompt)
+    // android.icu (SessionContextText's compact window) in the ported SessionSheetTests line.
+    testImplementation(libs.robolectric)
 }

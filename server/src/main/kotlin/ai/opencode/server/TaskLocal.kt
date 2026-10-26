@@ -1,5 +1,6 @@
 package ai.opencode.server
 
+import kotlinx.coroutines.ThreadContextElement
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
@@ -15,12 +16,28 @@ import kotlin.coroutines.CoroutineContext
  */
 class TaskLocal<T>(private val defaultValue: () -> T) {
     private class Key<T> : CoroutineContext.Key<Element<T>>
-    private class Element<T>(val value: T, override val key: CoroutineContext.Key<*>) : CoroutineContext.Element
+
+    /** Also mirrors the value into [local] while its coroutine runs, so plain functions can read it as Swift's can. */
+    private class Element<T>(
+        val value: T,
+        override val key: CoroutineContext.Key<*>,
+        private val local: ThreadLocal<Element<T>?>,
+    ) : ThreadContextElement<Element<T>?> {
+        override fun updateThreadContext(context: CoroutineContext): Element<T>? = local.get().also { local.set(this) }
+        override fun restoreThreadContext(context: CoroutineContext, oldState: Element<T>?) = local.set(oldState)
+    }
 
     private val key = Key<T>()
+    private val local = ThreadLocal<Element<T>?>()
 
     /** The bound value in this coroutine, else the default. */
     suspend fun current(): T = get(currentCoroutineContext())
+
+    /**
+     * The bound value from a non-suspending function running inside a coroutine that bound it
+     * (Swift reads `@TaskLocal`s from synchronous code too), else the default.
+     */
+    fun currentBlocking(): T = local.get()?.value ?: defaultValue()
 
     fun get(context: CoroutineContext): T {
         val element = context[key] ?: return defaultValue()
@@ -28,7 +45,7 @@ class TaskLocal<T>(private val defaultValue: () -> T) {
     }
 
     /** The context element binding [value], for `withContext` / `launch`. */
-    fun asContextElement(value: T): CoroutineContext = Element(value, key)
+    fun asContextElement(value: T): CoroutineContext = Element(value, key, local)
 
-    suspend fun <R> withValue(value: T, block: suspend () -> R): R = withContext(Element(value, key)) { block() }
+    suspend fun <R> withValue(value: T, block: suspend () -> R): R = withContext(Element(value, key, local)) { block() }
 }

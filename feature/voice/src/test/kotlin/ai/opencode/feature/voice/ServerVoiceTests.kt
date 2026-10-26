@@ -370,12 +370,10 @@ class ServerVoiceTests {
             it.copy(serverVoiceSupport = ServerVoiceSupport.unsupported)
         }
         assertEquals(ServerVoiceSupport.unsupported, shared.run { shared(VoiceSharedKeys.serverVoiceSupportByServer).value[server.persistenceID] })
-        // The probe's two actions are queued before the first is reduced, so this TestStore
-        // receives the reducer's delegate after them (TCA and the live Store reduce it first).
+        store.receive(VoiceFeature.Action.Delegate(VoiceFeature.DelegateAction.ServerVoiceSupportChanged(ServerVoiceSupport.unsupported)))
         store.receive(VoiceFeature.Action.CallRouteResolved(VoiceRoute.PhoneKey(VoiceEngine.gptLive), usesDelegator = false)) {
             it.copy(activeRoute = VoiceRoute.PhoneKey(VoiceEngine.gptLive))
         }
-        store.receive(VoiceFeature.Action.Delegate(VoiceFeature.DelegateAction.ServerVoiceSupportChanged(ServerVoiceSupport.unsupported)))
         connectGate.complete(Unit)
         store.receive(VoiceFeature.Action.CallEvent(VoiceCallEvent.Connected)) {
             it.withPhase(VoiceFeature.State.Phase.Live).copy(connectedAt = Instant.ofEpochSecond(3_000))
@@ -446,12 +444,10 @@ class ServerVoiceTests {
             it.copy(serverVoiceSupport = ServerVoiceSupport.supported)
         }
         assertEquals(ServerVoiceSupport.supported, shared.run { shared(VoiceSharedKeys.serverVoiceSupportByServer).value[server.persistenceID] })
-        // The probe's two actions are queued before the first is reduced, so this TestStore
-        // receives the reducer's delegate after them (TCA and the live Store reduce it first).
+        store.receive(VoiceFeature.Action.Delegate(VoiceFeature.DelegateAction.ServerVoiceSupportChanged(ServerVoiceSupport.supported)))
         store.receive(VoiceFeature.Action.CallRouteResolved(VoiceRoute.Server(VoiceRoute.ServerRoute.GeminiLive), usesDelegator = false)) {
             it.copy(activeRoute = VoiceRoute.Server(VoiceRoute.ServerRoute.GeminiLive), activeProvider = ServerVoiceProvider.geminiLive)
         }
-        store.receive(VoiceFeature.Action.Delegate(VoiceFeature.DelegateAction.ServerVoiceSupportChanged(ServerVoiceSupport.supported)))
         connectGate.complete(Unit)
         store.receive(VoiceFeature.Action.CallEvent(VoiceCallEvent.Connected)) {
             it.withPhase(VoiceFeature.State.Phase.Live).copy(connectedAt = Instant.ofEpochSecond(3_500))
