@@ -86,3 +86,26 @@ gated on `SharedKeys.developerMode` exactly as iOS.
 | Session Lab switcher | `DevToolsFeature.kt` (Lab), `DevToolsClient.kt` | `GET /lab/state` (checks `session-rendering-v1`), checkpoint select (`POST /lab/select`), Use as Server (saves `http://<address>` with empty password, flushes, relaunches) |
 | Export Diagnostics | `DevToolsFeature.kt`, `DevToolsClient.kt` | zip of `report-<id>.md`, `timeline.txt/json`, `app-log.txt` via FileProvider (`<appId>.devtools.files`); no addresses, credentials or message text |
 | Lab launch extras | `DevTools.kt` | `tuning-enabled`, `tuning-as-release`, `tuning-panel`, `lab-time-scale`, `lab-marks-url`, `diagnostics-enabled`, `lab-tuning-perf` |
+
+## Tests
+
+iOS `OpenCodeTests` files that test `:devtools` code, ported into `devtools/src/test` (JVM,
+`./gradlew :devtools:testDebugUnitTest`). Diagnostics that moved to `:core` (journal, recorder,
+problem report, Motion Watch, perf windows) are tested there (core.md).
+
+| iOS file | Kotlin file | Ported | Skipped (owner) | Dropped (reason) |
+| --- | --- | ---: | --- | --- |
+| `TraceTests.swift` (`TraceUploadsTests`, half of `DiagnosticsPrivacyTests`) | `traces/TraceTests.kt` | 13 | `theReportGoesToItsSessionElseTheMostRecentOne` and the `HomeFeature.problemReportContext` half of `noReportOutputCarriesTheServerAddressOrUsername` (`:feature:drawer`); `:core` suites (core.md); `VoiceTimelineTests` (`:feature:voice`) | `TeamFeedbackTests` (8: Team Feedback enrollment and Scrawl lanes, n/a on Android); retry half of `traceUploadRidesSendRetryPolicy` (todo: `DeveloperModeUploads.upload` in `:server` has no transport seam; the policy assert is ported) |
+| `GlassShapeTests.swift` | `tuning/GlassShapeTests.kt` | 1 | `GlassShape.clamped` tests (`:core`) | – |
+| `TouchProbeTests.swift` | – | 0 | – | all 4: Touch Probe is n/a on Android (UIKit hit chains and gesture-recognizer states; `DiagnosticsRecorder` has no `recordTouch`) |
+| `MetricKitTests.swift` | – | 0 | – | all 6: MetricKit payload store and summaries (iOS-only; Android has no MetricKit counterpart wired) |
+| `ScrawlMicrophoneTests.swift` | – | 0 | – | all 5: ScrawlKit's `AVAudioEngine` tap (Scrawl is an iOS team tool) |
+
+Notes: `nothingOpensOrUploadsWithDeveloperModeOff` keeps the recorder's own `takeUnexpectedEnd` (iOS stubs it true and its Debug
+build ignores it; JVM tests can't read the app's debuggable flag). Copy reads “OpenCode Android” where iOS's reads “OpenCode iOS”.
+
+Production bugs the ported tests found: the problem report attachment was written to `AppContext.cacheDir` from inside the
+effect, so without an installed context every report fell back to inline; it now goes to `java.io.tmpdir` (iOS
+`temporaryDirectory`; the app's cache directory on Android) (`fix(devtools)`).
+
+Total: 14 `:devtools` tests, all passing.

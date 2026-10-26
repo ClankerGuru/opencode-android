@@ -23,9 +23,14 @@ object InternalBuild {
     val isEnabled: Boolean by lazy {
         isDebug || runCatching {
             val context = dependency(AppContext)
-            context.packageManager.getInstallSourceInfo(context.packageName).installingPackageName != "com.android.vending"
+            detect(isDebug = false, installingPackageName = context.packageManager.getInstallSourceInfo(context.packageName).installingPackageName)
         }.getOrDefault(false)
     }
+
+    /** iOS `detect(isDebug:receiptURL:)`: Google Play's installer stands in for the App Store receipt. */
+    fun detect(isDebug: Boolean, installingPackageName: String?): Boolean = isDebug || installingPackageName != PLAY_STORE
+
+    private const val PLAY_STORE = "com.android.vending"
 }
 
 /**
