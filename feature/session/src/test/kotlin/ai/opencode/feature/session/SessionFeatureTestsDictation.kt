@@ -159,6 +159,9 @@ class SessionFeatureTestsDictation {
         val micsStopped = LockIsolated(0)
         val modelsStarted = LockIsolated(0)
 
+        /** Stops and cancels that have reached the dictation actor. */
+        val ended = LockIsolated(0)
+
         /** What reached the model, one value per buffer. */
         val heard = LockIsolated(listOf<Short>())
         val modelLoaded = Gate()
@@ -224,8 +227,14 @@ class SessionFeatureTestsDictation {
                 prepare = { live.prepare() },
                 begin = { live.begin() },
                 start = { live.start(it) },
-                stop = { live.stop(it) },
-                cancel = { live.cancel(it) },
+                stop = {
+                    live.stop(it)
+                    ended.increment()
+                },
+                cancel = {
+                    live.cancel(it)
+                    ended.increment()
+                },
             )
         }
 
@@ -335,8 +344,10 @@ class SessionFeatureTestsDictation {
             store.send(Action.micPressBegan) { it.withDictationPhase(DictationFeature.Phase.Preparing) }
             store.send(end)
             // iOS starts the end's effect (its stop reaching the dictation actor) before the next
-            // line; here it runs on the test's loop, so let it get there before the grant.
-            SessionTestSupport.settle()
+            // line; here it runs on the test's loop and the actor's thread, so wait until it has
+            // reached the actor before the grant (a fixed number of yields lost the race under load).
+            mic.until { mic.ended.value > 0 }
+            assertEquals("$end never reached the dictation actor", 1, mic.ended.value)
             mic.permitted.open()
             delay(80)
             store.skipReceivedActions()

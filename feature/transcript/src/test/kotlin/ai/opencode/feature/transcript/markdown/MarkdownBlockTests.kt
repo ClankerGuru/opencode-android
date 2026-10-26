@@ -54,7 +54,7 @@ import org.junit.Test
  * - `markdownImageClientDecodesDataURIAndCachesInIsolatedTestScope` → `:server` (`OpenCodeClient.markdownImage`).
  * - `highlightingPreservesTextAndColorsKeywords`, `highlightingHandlesStringsAndUnknownLanguage`,
  *   `highlightingKeepsUnicodeAndPartialTokenBoundaries` → `:feature:media` (`SyntaxHighlighter`).
- * - `increaseContrastUsesSecondaryOnHeaderProjectLine` → `:feature:session` (`SessionView.headerProjectColor`).
+ * - `increaseContrastUsesSecondaryOnHeaderProjectLine` → `:feature:session` (`SessionView.headerProjectColor`, ported there).
  * - `TextRevealTuningTests.titleLoadingPresetsPickEachVariantAndDefaultsMatchToday` → `:feature:session` (`TitleLoadingTunables`).
  *
  * Dropped (can't exist on Android):

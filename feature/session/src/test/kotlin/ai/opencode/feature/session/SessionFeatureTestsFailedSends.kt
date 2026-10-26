@@ -40,7 +40,7 @@ import org.junit.Test
  * arguments.
  *
  * Not ported here (`:feature:transcript`): `aFailedMessageRetriedMidRunKeepsItsRowIdentity`
- * (its subject is `TranscriptRowIdentityPlan` alone).
+ * (its subject is `TranscriptRowIdentityPlan` alone; ported there).
  */
 class SessionFeatureTestsFailedSends {
     /**

@@ -37,7 +37,7 @@ import kotlin.time.Duration.Companion.milliseconds
  * `ComposerPersistenceTests.sessionMentionRidesTheOutboxAcrossRelaunchAsItsToken` extension
  * (they send, retry and persist through `SessionFeature`).
  * Skipped → `:server`/`:feature:transcript`: `sentSessionTokensRenderAsSessionLinks`
- * (`SessionLink`, `SessionLinkText`).
+ * (`SessionLink`, `SessionLinkText`; ported in `:feature:transcript`).
  */
 class ComposerSessionMentionTests {
     @Test fun sessionTitleMatchingAndServerSearchFollowDesktop() {

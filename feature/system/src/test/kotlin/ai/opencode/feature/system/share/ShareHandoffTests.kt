@@ -1,19 +1,74 @@
 package ai.opencode.feature.system.share
 
+import ai.opencode.core.files.ComposerFileStaging
+import ai.opencode.core.files.AttachmentFileType
 import ai.opencode.core.testing.TestIsolationRule
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Color
+import android.media.ExifInterface
 import org.junit.After
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+import java.io.ByteArrayInputStream
 import java.io.File
 import java.nio.file.Files
 import java.time.Instant
 import java.util.UUID
 
 // Ports of iOS `ShareHandoffTests.swift`. `ShareInboxFeatureTests` drives `HomeFeature`
-// (`:feature:drawer`). `SharedImageEncoderTests` needs Android's `ImageDecoder`/`Bitmap`, which
-// JVM tests don't have (no Robolectric).
+// (`:feature:drawer`). `SharedImageEncoderTests` and the `MimeTypeMap` half of
+// `SharedItemLoaderAndActivationTests` (`SharedItemLoaderAndActivationFrameworkTests`) run under
+// Robolectric (real `ImageDecoder`/`Bitmap`/`ExifInterface` and `MimeTypeMap`).
+
+/**
+ * Port of iOS `FileAttachmentTests.swift`'s `ShareHandoffFileTests`: a shared file moves out of its
+ * share into the composer's staging directory under its own name. The `SharedComposerDraft` half
+ * (the draft's file names) is `:feature:composer`'s.
+ */
+class ShareHandoffFileTests {
+    @get:Rule val isolation = TestIsolationRule()
+
+    @Test
+    fun sharedFilesMoveIntoTheAppStagingDirectory() {
+        val root = Files.createTempDirectory("share-root-").toFile()
+        val staging = Files.createTempDirectory("share-staging-").toFile().also { it.delete() }
+        try {
+            val source = File(root, "source.pdf").apply { writeBytes("%PDF".toByteArray()) }
+            val store = ShareHandoffStore(File(root, "Shares"))
+            val id = UUID.randomUUID()
+            val handoff = ShareHandoff(
+                id = UUID.randomUUID(),
+                createdAt = Instant.now(),
+                serverID = "server",
+                target = ShareHandoff.Target.NewSession(projectID = null),
+                text = "",
+                files = listOf(ShareHandoff.FileEntry(id = id, fileName = "file-0", name = "Q3 Report.pdf", mime = "application/pdf")),
+            )
+            store.save(handoff, images = emptyList(), files = listOf(source))
+
+            val shares = store.consumeAll(now = Instant.now(), filesDirectory = staging)
+
+            val file = requireNotNull(shares.firstOrNull()?.files?.firstOrNull())
+            assertEquals("Q3 Report.pdf", file.name)
+            assertEquals(4L, file.size)
+            assertEquals(File(File(staging, id.toString().uppercase()), "Q3 Report.pdf"), file.url)
+            assertArrayEquals("%PDF".toByteArray(), file.url.readBytes())
+        } finally {
+            root.deleteRecursively()
+            staging.deleteRecursively()
+        }
+    }
+}
 
 class ShareHandoffStoreTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -91,8 +146,8 @@ class ShareHandoffStoreTests {
  * `OpenableColumns.DISPLAY_NAME` or the URI's last segment, and filters shares with the
  * manifest's intent filters. What carries over is the name each JSON share is staged under
  * ([SharedItemLoader.resolvedFileName]); the representation-order, sparse/FIFO-file,
- * cancellation and precedence probes are provider mechanics. The non-JSON `clip.mov` case reads
- * Android's `MimeTypeMap`, which JVM tests don't have.
+ * cancellation and precedence probes are provider mechanics. The non-JSON `clip.mov` case and the
+ * staged copy's type read Android's `MimeTypeMap`: [SharedItemLoaderAndActivationFrameworkTests].
  */
 class SharedItemLoaderAndActivationTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -110,5 +165,112 @@ class SharedItemLoaderAndActivationTests {
         assertEquals("synthetic-events.json", SharedItemLoader.resolvedFileName(suggested = "synthetic-events.json", fallbackName = null, type = json))
         // 5. Unnamed JSON data.
         assertEquals("file.json", SharedItemLoader.resolvedFileName(suggested = null, fallbackName = null, type = json))
+    }
+}
+
+/**
+ * The `MimeTypeMap` half of [SharedItemLoaderAndActivationTests]: the JSON file staged untouched
+ * (case 1a's name, type and bytes) and a non-JSON share keeping its suggested name (Robolectric's
+ * real `MimeTypeMap` on API 35).
+ */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35])
+class SharedItemLoaderAndActivationFrameworkTests {
+    @get:Rule val isolation = TestIsolationRule()
+
+    @Test
+    fun stagesJSONAcrossFileURLTransferableAndInMemoryRepresentationsWithoutRewritingBytes() {
+        // Exact whitespace and key ordering must survive byte-for-byte without decoding/re-encoding.
+        val rawJSON = "[\n  { \"seq\": 1, \"event\": \"synthetic_probe\" },\n  { \"seq\": 2, \"event\": \"done\" }\n]\n".toByteArray()
+        val directory = Files.createTempDirectory("shared-items-").toFile()
+        try {
+            val source = File(directory, "opencode-diagnostics.txt.json").apply { writeBytes(rawJSON) }
+            val name = SharedItemLoader.resolvedFileName(suggested = null, fallbackName = source.name, type = "application/json")
+            val staged = ComposerFileStaging.stage(source, name = name, directory = File(directory, "ComposerFiles"))
+            assertEquals("opencode-diagnostics.txt.json", staged.name)
+            assertEquals("text/plain", staged.mime)
+            assertEquals("JSON", AttachmentFileType.label(name = staged.name, mime = staged.mime))
+            assertArrayEquals(rawJSON, staged.url.readBytes())
+            // Non-JSON types keep their existing suggested name without extension reconciliation.
+            assertEquals("clip.mov", SharedItemLoader.resolvedFileName(suggested = "clip.mov", fallbackName = "temp.mp4", type = "video/quicktime"))
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+}
+
+/**
+ * Port of iOS `SharedImageEncoderTests` under Robolectric (native graphics: real `ImageDecoder`,
+ * `Bitmap` and JPEG codecs; `ExifInterface` writes and reads the metadata as `CGImageSource`
+ * does). The `ImageAttachmentImporter` comparison of `shareReencodingMatchesTheComposer…` is in
+ * `:feature:session` (`SharedImageEncoderFrameworkTests`), the lowest module that sees both the
+ * share sheet's and the composer's encoder. API 34: Robolectric 4.16's native `ImageDecoder`
+ * shadows its file-descriptor source (`jpeg(file)`) only through API 34.
+ */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+class SharedImageEncoderTests {
+    @get:Rule val isolation = TestIsolationRule()
+
+    /** A 3000×2000 JPEG tagged as rotated, with camera and GPS metadata. */
+    private fun cameraPhoto(): ByteArray {
+        val bitmap = Bitmap.createBitmap(3000, 2000, Bitmap.Config.ARGB_8888)
+        bitmap.eraseColor(Color.rgb(51, 102, 204))
+        val file = File.createTempFile("camera-", ".jpg")
+        try {
+            file.outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.JPEG, 90, it)) }
+            bitmap.recycle()
+            ExifInterface(file.absolutePath).apply {
+                setAttribute(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_ROTATE_90.toString())
+                setAttribute(ExifInterface.TAG_MAKE, "TestCam")
+                setAttribute(ExifInterface.TAG_MODEL, "Lens 1")
+                setAttribute(ExifInterface.TAG_GPS_LATITUDE, "37/1,19/1,48/1")
+                setAttribute(ExifInterface.TAG_GPS_LATITUDE_REF, "N")
+                saveAttributes()
+            }
+            return file.readBytes()
+        } finally {
+            file.delete()
+        }
+    }
+
+    private fun exif(data: ByteArray) = ExifInterface(ByteArrayInputStream(data))
+
+    private fun pixelSize(data: ByteArray): Pair<Int, Int> {
+        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(data, 0, data.size, options)
+        return options.outWidth to options.outHeight
+    }
+
+    @Test
+    fun shareReencodingMatchesTheComposerAndStripsMetadata() {
+        val original = cameraPhoto()
+        assertNotNull(exif(original).getAttribute(ExifInterface.TAG_GPS_LATITUDE))
+
+        val shared = SharedImageEncoder.jpeg(original)
+        assertNotNull(shared)
+        shared!!
+
+        val file = File.createTempFile("share-", ".jpg")
+        try {
+            file.writeBytes(original)
+            assertArrayEquals(shared, SharedImageEncoder.jpeg(file))
+        } finally {
+            file.delete()
+        }
+
+        val encoded = exif(shared)
+        assertNull(encoded.getAttribute(ExifInterface.TAG_GPS_LATITUDE))
+        assertNull(encoded.getAttribute(ExifInterface.TAG_MAKE))
+        assertEquals(1, encoded.getAttributeInt(ExifInterface.TAG_ORIENTATION, 1).let { if (it == ExifInterface.ORIENTATION_UNDEFINED) 1 else it })
+        // The rotation is applied to the pixels, and the long edge is capped.
+        assertEquals(1045 to SharedImageEncoder.MAX_PIXEL_SIZE, pixelSize(shared))
+    }
+
+    @Test
+    fun oversizedSourcesAreRejected() {
+        assertNull(SharedImageEncoder.jpeg(ByteArray(SharedImageEncoder.MAX_SOURCE_BYTES + 1)))
+        assertNull(SharedImageEncoder.jpeg("not an image".toByteArray()))
     }
 }

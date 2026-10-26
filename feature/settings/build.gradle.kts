@@ -4,6 +4,8 @@ plugins {
 
 android {
     namespace = "ai.opencode.feature.settings"
+    // Robolectric resolves the Material Symbol drawables (WhatsNewDotSymbolTests).
+    testOptions.unitTests.isIncludeAndroidResources = true
 }
 
 // Feature dependencies mirror iOS type references; the graph is acyclic:
@@ -28,4 +30,9 @@ dependencies {
     implementation(libs.camerax.lifecycle)
     implementation(libs.camerax.compose)
     implementation(libs.zxing.core)
+}
+
+// What's New's dot symbol (vector drawable on a Canvas) in the ported WhatsNewDotSymbolTests.
+dependencies {
+    testImplementation(libs.robolectric)
 }

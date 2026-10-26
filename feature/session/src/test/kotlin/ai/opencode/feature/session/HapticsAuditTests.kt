@@ -52,7 +52,7 @@ import java.time.Instant
  * (its expected log here leaves that one tap out).
  * UIKit-only: the `SessionView.composerSwipeYields` / `performSwipeUpFocus` window and text-view checks of
  * `swipingUpOnTheComposerTapsAndRequestsFocusUnlessDictating` (its reducer half is here).
- * Not ported here (:core / :feature:voice / runtime): the `LiveHapticsTests` suite (see docs/parity/core.md).
+ * Not ported here (:core, :feature:voice): the `LiveHapticsTests` suite (see docs/parity/core.md).
  */
 class HapticsAuditTests {
     private val server = OpenCodeServer(url = "http://127.0.0.1:9", username = "opencode", password = "pw")

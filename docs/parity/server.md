@@ -98,15 +98,24 @@ fixtures: `server/src/testFixtures` (`WireFixture`, `ServerTestIsolation`); the 
 | `ModelVisibilityTests.swift` | `model/ModelVisibilityTests.kt` | 6 (Rules) | Pickers/Settings tests → `:feature:session`/`:feature:settings` |
 | `SessionLinkTests.swift` | `model/SessionLinkTests.kt` | 1 (`linkURLRoundTripsItsIDAndTitle`) | parsing/presentation → `:feature:transcript`; session/Home/menu → features |
 | `TestIsolationGuardTests.swift` | `testing/ServerTestIsolationTests.kt` | 1 (network block) | rest in `:core` (see core.md) |
-| `AgentFileTests.swift` | `model/AgentFileReferenceTests.kt` | 8 (`AgentFileReferenceTests`) | `toolRowsOfferViewableFiles` not ported yet (`:server`); rest → `:feature:media`/`:feature:transcript` (see media.md) |
+| `AgentFileTests.swift` | `model/AgentFileReferenceTests.kt` | 9 (`AgentFileReferenceTests`; `toolRowsOfferViewableFiles` of `AgentFileMarkdownTests`) | rest → `:feature:media`/`:feature:transcript` (see media.md) |
+| `PastedTextTests.swift` | `model/PastedTextTests.kt` | 5 (4 `PastedTextThresholdTests`, `promptCarriesThePasteAsAnInlineTextFile`) | `plainDocumentSplitsLinesWithoutHighlighting` → `:feature:media`; composer/outbox/`SessionFeature` → `:feature:session`; read-back/fold → `:feature:transcript` |
 | `BrowserTests.swift` | `live/PagePromptBodyTests.kt` | 5 (`PagePromptBodyTests`) | rest → `:feature:media`/session/voice (see media.md) |
 | `ServerDetailsTests.swift` | `live/ServerDetailsTests.kt` | 3 (`decodesEveryMCPStatus`, `decodesCredentialAndEnvironmentAccounts`, `onlyMCPConnectIsRetriedWhenUnsent`) | `OpenCodeAccount.subtitle` (`ServerDetailsTrays`) and the reducer tests → `:feature:settings`; here the accounts test checks provider/method/label |
 | `ConnectionHealthTests.swift` | `ConnectionHealthTests.kt` | 2 (`routes`, `routesClassifyParsedAddressesNotSpellings`) | health machine, trace, card names → `:feature:settings` |
 | `LowDataModeTests.swift` | `retry/LowDataModeTests.kt` | 1 (`networkPathSnapshotPreservesConstrainedAndExpensiveFlags`) | loaders → `:feature:media`. Dropped `constrainedNetworkRefusalIsNeverRetryableTransportFailure`: iOS's `URLError.networkUnavailableReason == .constrained` (per-request `allowsConstrainedNetworkAccess`) has no Android counterpart, so `TransportFailure` has no constrained refusal to classify |
+| `ServerSwitchingTests.swift` | `ServerSwitchingTests.kt` | 6 (names: `friendlyName`/`defaultName`/`displayName`, pre-name decoding, `at`, headers on every request; iOS `friendlyName(host:)` is `friendlyServerName`) | Home → `:feature:drawer`; `ServerTitleFeature` → `:feature:settings`; `AppFeature` (14) → `:app` |
+| `ProjectIconTests.swift` | `model/ProjectIconTests.kt` | 3 (`ProjectMark`, `OpenCodeProjectIcon`, `project.updated` frame) | rendering/loader → `:feature:drawer`; flag → `:core` |
+| `FileAttachmentTests.swift` | `model/FileAttachmentTests.kt` (`PromptPresentationTests`, `FileAttachmentWireTests`) | 4 + 3 | the `TranscriptEntry.build` check of `fileOnlyMessagesHaveNoBubble` → `:feature:transcript`; rest → core/session/composer/system |
+| `NewSessionDraftTests.swift` | `model/NewSessionDraftTests.kt` | 2 (`OpenCodeProject.folder`, `directoryListing`) | rest → `:feature:session`/drawer/`:app` |
+| `ComposerAutocompleteTests.swift` | `live/ComposerAutocompleteTests.kt` | 1 (`experimentalFlagOffProducesByteIdenticalPromptBodyToMain`; `promptBody` is internal here) | rest → `:feature:composer`/`:feature:session` |
+| `SubagentStackTests.swift` | `model/SubagentStackTests.kt` | 1 (`descendantsFollowTheFamilyTree`, `SessionActivity.descendants`) | stack → `:feature:drawer`; back rules → `:core` |
+| `TranscriptEntryTests.swift` (`TaskListAndExecuteTests`) | `model/TranscriptEntryTests.kt` (`TaskListAndExecuteTests`) | 1 (`executeRowsNameTheToolsTheirScriptCalls`, `OpenCodeToolCall.calledTools`/`subtitle`) | rest → `:feature:transcript`/`:feature:session` |
+| `MarkdownBlockTests.swift` | `MarkdownBlockTests.kt` | 1 (`markdownImage` cache; key is `OpenCodeClient.markdownImageKey`) | rest → `:feature:transcript`/`:feature:media`/`:feature:session` |
 
 Bugs the ports found (fixed): EACCES socket errors were retried; a refused cleartext redirect to
 another host read as interrupted; OkHttp's 5-per-host cap queued family fan-out; endpoint
 queries encoded `/` as `%2F`; transport failures recorded no failure phase
 (`DiagnosticsNetworkPhases`, found by the core `DiagnosticsRecorderTests`).
 
-Total: 195 `:server` tests (`./gradlew :server:testDebugUnitTest`).
+Total: 244 `:server` tests (`./gradlew :server:testDebugUnitTest`; 2 skipped: opt-in live checks), all passing.

@@ -19,4 +19,6 @@ dependencies {
     implementation(libs.androidx.webkit)
     // ComponentActivity is also used by the main-source picture-in-picture host.
     implementation(libs.androidx.activity.compose)
+    // Real Bitmaps, `Patterns`, `LruCache` and the main Looper in the framework-bound JVM tests.
+    testImplementation(libs.robolectric)
 }

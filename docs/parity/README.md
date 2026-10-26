@@ -40,3 +40,41 @@ Each area has one file listing **every** iOS source file it owns:
    it); note the move in both areas' files. Never add an upward or cyclic module dependency.
 3. Re-run the inventory if iOS adds files: the `find OpenCode/<Area> -name '*.swift' -o -name
    '*.metal'` list must match the table.
+
+## Tests
+
+Every iOS unit test (`OpenCodeTests/`, 185 files, 3,126 `@Test`s, of which 173 files hold tests and
+the rest are support) is either ported into the module that owns its code or deleted with a reason
+in that module's `## Tests` section. A test ported in halves (say a reducer half and a wire half)
+counts in each module. In a `## Tests` row, "→ `<module>`" means the test is ported in that module
+under the same name; anything not ported anywhere is listed as deleted with its reason. Checked on
+2026-10-26 by matching every iOS test name against the Kotlin test functions: 2,858 iOS tests ported,
+268 deleted, none unaccounted for.
+
+| Module | iOS test files covered | iOS tests ported | Deleted with reason | JVM tests (Gradle) |
+| --- | ---: | ---: | ---: | ---: |
+| `:app` | 21 | 125 | 27 | 125 |
+| `:core` | 18 | 109 | 72 | 113 |
+| `:server` | 35 | 225 | 3 | 244 (2 opt-in live checks skipped) |
+| `:devtools` | 4 | 14 | 10 | 14 |
+| `:feature:media` | 15 | 175 | 14 | 180 |
+| `:feature:voice` | 30 | 444 | 16 | 511 |
+| `:feature:system` | 9 | 88 | 2 | 89 |
+| `:feature:transcript` | 31 | 268 | 43 | 276 (1 env-gated metric skipped) |
+| `:feature:composer` | 26 | 229 | 18 | 230 |
+| `:feature:settings` | 17 | 98 | 10 | 98 |
+| `:feature:session` | 58 | 706 | 41 | 719 |
+| `:feature:drawer` | 49 | 422 | 12 | 424 |
+| **Total** | 173 distinct | 2,858 distinct | 268 | 3,023 |
+
+"Deleted" counts whole iOS tests, each charged to the module whose section records it: UIKit and
+SwiftUI layout probes, Tuning Panel and Mac playgrounds, MetricKit, Touch Probe, Team Feedback and
+Scrawl, Metal shaders, ActivityKit authorization, App Group, Info.plist checks, env-gated benchmarks,
+and migrations from iOS builds Android never had. Sub-asserts dropped inside a ported test aren't
+counted. A JVM count can exceed the iOS count because parameterized iOS tests and framework halves
+(`…FrameworkTests` under Robolectric) are separate Kotlin tests.
+
+Robolectric 4.16 (test-only) runs the tests that need Android framework classes (Bitmap/ImageDecoder
+pixels, `Intent`, `android.icu`, `Patterns`, `LruCache`, `MimeTypeMap`, AppSearch, the main looper,
+`Vibrator`) in `:app`, `:core`, `:feature:media`, `:feature:voice`, `:feature:system`,
+`:feature:transcript`, `:feature:composer`, `:feature:settings`, `:feature:session` and `:feature:drawer`.

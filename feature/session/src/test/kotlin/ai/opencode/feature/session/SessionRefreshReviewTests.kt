@@ -50,10 +50,11 @@ import kotlin.math.max
  * Not ported here (their subject is another module): `theBlockReadsPlainlyAndParsesBack`,
  * `locationSnapshotIsInertInTestsAndInjectable`, `locationTappedPrefetchesCompactSnapshotBeforeDeliveringLocationResponse`,
  * `locationEntranceTraceHasOneContinuousEntranceWithNoHeightJumpAbove1_5pt`,
- * `locationTappedDeliversLocationAfterPrefetchTimeoutAndLoadsMapAsyncWithoutHeightChange`,
+ * `locationTappedDeliversLocationAfterPrefetchTimeoutAndLoadsMapAsyncWithoutHeightChange`
+ * (SharedLocation / ComposerAttachmentsFeature, :feature:composer). Ported here:
  * `composerFoldLayoutMatchesMainWhenNoLocationIsMountedIncludingPreparingDictationRow`
- * (SharedLocation / ComposerAttachmentsFeature / ComposerFoldLayout, :feature:composer);
- * `theTranscriptShowsTheCardAndOnlyTheTypedText` (TranscriptUserMessage, :feature:transcript).
+ * (`ComposerFoldFrames` lives in this module's `ComposerViews.kt`);
+ * `theTranscriptShowsTheCardAndOnlyTheTypedText` (TranscriptUserMessage, :feature:transcript, ported there).
  */
 class SessionRefreshReviewTests {
     private val server = OpenCodeServer(url = "http://localhost:9", username = "", password = "")
@@ -744,6 +745,59 @@ class SessionRefreshReviewTests {
         assertEquals(State.EarlierHistory.UnknownEdge, store.state.earlierHistory)
         assertNull(store.state.earlierHistoryInsertionID)
         assertEquals(1, store.state.earlierHistoryGeneration)
+    }
+
+    /**
+     * iOS checks `ComposerFoldLayout`'s static frames, then measures it in a `UIHostingController`
+     * (that last step is dropped: Android's `ComposerFoldLayout` measures through the same
+     * [ComposerFoldFrames]). Frames are the children's tops; widths are the column's.
+     */
+    @Test fun composerFoldLayoutMatchesMainWhenNoLocationIsMountedIncludingPreparingDictationRow() {
+        // 1. With no location mounted, progress is always 1 whether or not other attachments
+        // (paste, photo, file) are present, so adding them never animates 0 -> 1.
+        assertEquals(1f, ComposerFoldFrames.attachmentRevealProgress(locationMounted = false, locationPresented = false, hasNonLocationAttachments = false, reduceMotion = false))
+        assertEquals(1f, ComposerFoldFrames.attachmentRevealProgress(locationMounted = false, locationPresented = false, hasNonLocationAttachments = true, reduceMotion = false))
+        assertEquals(0f, ComposerFoldFrames.attachmentRevealProgress(locationMounted = true, locationPresented = false, hasNonLocationAttachments = false, reduceMotion = false))
+        assertEquals(1f, ComposerFoldFrames.attachmentRevealProgress(locationMounted = true, locationPresented = true, hasNonLocationAttachments = false, reduceMotion = false))
+
+        // 2. Composer + bottom "Preparing dictation…" (`composerFolds()`) row without location:
+        // unfolded visible range is 0...y (92 total), never clipped at the last frame's bottom (64).
+        val composer = 64f
+        val preparingRow = 20f
+        val unfoldedWithPreparing = ComposerFoldFrames.frames(
+            sizes = listOf(composer, preparingRow),
+            folds = listOf(false, true),
+            firstStayingFoldTop = 22f,
+            isFolded = false,
+            attachmentRevealProgress = ComposerFoldFrames.attachmentRevealProgress(locationMounted = false, locationPresented = false, hasNonLocationAttachments = false, reduceMotion = false),
+            spacing = 8f,
+        )
+        assertEquals(0f..92f, unfoldedWithPreparing.visible)
+        assertEquals(listOf(0f, 72f), unfoldedWithPreparing.frames)
+
+        // When folded for active dictation, it clips to the first staying top + foldTop ... its bottom (22...64).
+        val foldedWithPreparing = ComposerFoldFrames.frames(
+            sizes = listOf(composer, preparingRow),
+            folds = listOf(false, true),
+            firstStayingFoldTop = 22f,
+            isFolded = true,
+            attachmentRevealProgress = 1f,
+            spacing = 8f,
+        )
+        assertEquals(22f..64f, foldedWithPreparing.visible)
+
+        // 3. Even while a location card is unfolding at the top (progress < 1), the upper bound
+        // stays at `y` so a bottom `composerFolds` subview is never clipped.
+        val midLocationUnfold = ComposerFoldFrames.frames(
+            sizes = listOf(136f, composer, preparingRow),
+            folds = listOf(true, false, true),
+            firstStayingFoldTop = 22f,
+            isFolded = false,
+            attachmentRevealProgress = 0.5f,
+            spacing = 8f,
+        )
+        // Total y = 136 + 8 + 64 + 8 + 20 = 236; first staying top = 144, lower = 144 * 0.5 = 72.
+        assertEquals(72f..236f, midLocationUnfold.visible)
     }
 
     // endregion

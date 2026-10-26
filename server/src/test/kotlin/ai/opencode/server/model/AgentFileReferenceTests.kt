@@ -153,3 +153,24 @@ class AgentFileReferenceTests {
         assertEquals(server.basicAuthorization, request.header("Authorization"))
     }
 }
+
+/**
+ * The `:server` test of iOS `AgentFileTests.swift` › `AgentFileMarkdownTests`
+ * (`OpenCodeToolCall.fileReference`); its Markdown tests are `:feature:transcript`'s.
+ */
+class AgentFileMarkdownTests {
+    @get:Rule val isolation = TestIsolationRule()
+
+    @Test
+    fun toolRowsOfferViewableFiles() {
+        fun call(name: String, input: Map<String, OpenCodeJSONValue>) = OpenCodeToolCall(
+            callID = "c", name = name, status = OpenCodeToolCall.Status.Completed,
+            input = OpenCodeJSONValue.Object(input), output = emptyList(), metadata = emptyMap(),
+        )
+        assertEquals("/repo/a.swift", call("write", mapOf("path" to OpenCodeJSONValue.Str("/repo/a.swift"))).fileReference?.path)
+        assertEquals(AgentFileReference.Kind.Pdf, call("read", mapOf("filePath" to OpenCodeJSONValue.Str("docs/spec.pdf"))).fileReference?.kind)
+        assertNull(call("list", mapOf("path" to OpenCodeJSONValue.Str("/repo/src"))).fileReference)
+        assertNull(call("glob", mapOf("path" to OpenCodeJSONValue.Str("src/*.ts"))).fileReference)
+        assertNull(call("shell", mapOf("path" to OpenCodeJSONValue.Str("a.swift"), "command" to OpenCodeJSONValue.Str("ls"))).fileReference)
+    }
+}

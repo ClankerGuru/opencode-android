@@ -3,12 +3,21 @@ package ai.opencode.feature.session
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionTestSupport.sessionTest
 import ai.opencode.server.OpenCodeServer
+import ai.opencode.server.model.OpenCodeJSONValue
 import ai.opencode.server.model.OpenCodeSession
+import ai.opencode.server.model.OpenCodeToolCall
 import ai.opencode.server.model.OpenCodeTranscriptItem
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import java.time.Instant
+import java.time.ZoneOffset
+import java.util.Locale
 
 /**
  * Port of the `SessionFeature` parts of iOS `TranscriptScrollBehaviorTests.swift` (in its `TranscriptRowGrowthTests`
@@ -22,6 +31,11 @@ import org.junit.Test
  * `visiblePreTailRowResizingAfterOpeningSettleDoesNotGrowOrMoveHeldTailRow` and
  * `shortTranscriptHistoryRowLeavingGlidesTopGapClosedOverSeveralFrames`, which only use an inert `SessionFeature` store
  * to drive the UIKit list. Every other test in the file is :feature:transcript's (`TranscriptScrollBehavior` and the list).
+ *
+ * Also here: the [SessionTranscriptView.ProjectionCache] half of
+ * `TranscriptAssistiveScrollTests.projectionCacheIsolatesEntryBuildingAndRowPropsReconfigureOnlyAffectedCells`; its
+ * `configurationsForTesting` half counts UIKit cell reconfigurations (Compose recomposes rows by key). It runs under
+ * Robolectric: the time stamps format with `android.icu`.
  */
 class TranscriptRowGrowthTests {
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
@@ -73,5 +87,53 @@ class TranscriptRowGrowthTests {
         state = state.copy(browsingWindowStartID = null)
         assertEquals("message-15", state.visibleItems.firstOrNull()?.id)
         assertEquals(20, state.visibleItems.size)
+    }
+}
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35])
+class TranscriptAssistiveScrollTests {
+    private fun subagent(id: String, description: String) = OpenCodeTranscriptItem.Tool(
+        id = id,
+        call = OpenCodeToolCall(
+            callID = "call_${id.removePrefix("t")}",
+            messageID = "a0",
+            name = "subagent",
+            status = OpenCodeToolCall.Status.Completed,
+            input = OpenCodeJSONValue.Object(mapOf("description" to OpenCodeJSONValue.Str(description))),
+            output = emptyList(),
+            metadata = mapOf("sessionID" to OpenCodeJSONValue.Str("ses_child")),
+        ),
+    )
+
+    @Test fun projectionCacheIsolatesEntryBuildingAndRowPropsReconfigureOnlyAffectedCells() {
+        val cache = SessionTranscriptView.ProjectionCache()
+        val items = listOf(
+            OpenCodeTranscriptItem.UserText(id = "m0", text = "Hello"),
+            subagent("t0", "Explore repo"),
+            subagent("t1", "Continue exploration"),
+        )
+        var computeCount = 0
+        val firstVisible = cache.resolveVisibleItems(items = items, visibleLimit = 20, browsingWindowStartID = null, revertMessageID = null) {
+            computeCount += 1
+            items
+        }
+        val secondVisible = cache.resolveVisibleItems(items = items, visibleLimit = 20, browsingWindowStartID = null, revertMessageID = null) {
+            computeCount += 1
+            items
+        }
+        assertEquals(1, computeCount)
+        assertEquals(firstVisible, secondVisible)
+
+        val day1 = Instant.ofEpochSecond(1_700_049_600)
+        val day2 = day1.plusSeconds(24 * 60 * 60)
+        val idValue = (day1.toEpochMilli() * 0x1000 + 1) and 0xFFFF_FFFF_FFFFL
+        val timedID = "msg_" + String.format("%012x", idValue) + "StampsFixture1"
+        val timedItems = listOf(OpenCodeTranscriptItem.UserText(id = timedID, text = "Dated"))
+        fun entries(now: Instant) = cache.resolveEntries(
+            visibleItems = timedItems, allItems = timedItems, showsWorking = false, failedFinale = false, models = emptyList(),
+            sentNow = false, mark = null, now = now.plusSeconds(60), zone = ZoneOffset.UTC, locale = Locale.US,
+        ).first
+        assertNotEquals(entries(day1), entries(day2))
     }
 }

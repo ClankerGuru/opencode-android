@@ -64,46 +64,48 @@ store or Home state lives here, whichever iOS file it came from (no other module
 Shared support: `HomeFeatureTestSupport.kt`, `SystemIntegrationTestSupport.kt`,
 `VoiceHomeTestSupport.kt`. Robolectric (test-only, native graphics) runs only
 `icons/ProjectIconRenderTests` (decoded pixels, loader's decoding steps) and `catchup/CatchUpPreviewStoresTests` (the preview's real `Store` on the main looper). `./gradlew
-:feature:drawer:testDebugUnitTest`: 400+ tests, offline, virtual time.
+:feature:drawer:testDebugUnitTest`: 424 tests, offline, virtual time.
 
 | iOS file | Kotlin | Ported | Left elsewhere / deleted (reason) |
 | --- | --- | --- | --- |
-| `HomeFeatureTests.swift` | `HomeFeatureTests.kt`, `HomeFeatureTestsDrawer.kt`, `HomeFeatureTestsNavigation.kt`, `HomeFeatureTestsSessionSwitch.kt`, `HomeFeatureTestsFirstSend.kt` | 78 | 3 transcript-cache tests → `:server` `TranscriptCachePersistenceTests.kt` (`:server` types only); deleted `homeCPUPerformance`, `switchingCPUPerformance` (opt-in timing benchmarks, no assertions) |
-| `HomeChildFeatureTests.swift` | `HomeChildFeatureTests.kt` | 7 of 9 | 2 → `:feature:settings` (`HomeSettingsFeature`) |
+| `HomeFeatureTests.swift` | `HomeFeatureTests.kt`, `HomeFeatureTestsDrawer.kt`, `HomeFeatureTestsNavigation.kt`, `HomeFeatureTestsSessionSwitch.kt`, `HomeFeatureTestsFirstSend.kt` | 78 | 3 transcript-cache tests → `:server` `TranscriptCachePersistenceTests.kt` (`:server` types only; ported there); deleted `homeCPUPerformance`, `switchingCPUPerformance` (opt-in timing benchmarks, no assertions) |
+| `HomeChildFeatureTests.swift` | `HomeChildFeatureTests.kt` | 7 of 9 | 2 → `:feature:settings` (`HomeSettingsFeature`), ported there |
 | `CatchUpTests.swift` | `catchup/CatchUpTests.kt`, `catchup/CatchUpPreviewStoresTests.kt` | 31 of 32 | deleted `hostedTwelveCardCatchUpOpenSwipeAndExitProfile` (UIWindow/Mach memory profile); the two preview-store tests run under Robolectric (`CatchUpPreviewStoresTests`) |
 | `CatchUpFinishTests.swift` | `catchup/CatchUpFinishTests.kt` | 12 | – |
 | `SessionSwitcherTests.swift` | `switcher/SessionSwitcherTests.kt` | 7 | – |
-| `InAppNoticeTests.swift` | `notices/InAppNoticeTests.kt` | 18 of 20 | 2 → `:feature:system` (notification presentation/content) |
+| `InAppNoticeTests.swift` | `notices/InAppNoticeTests.kt` | 18 of 20 | 2 → `:feature:system` (notification presentation/content), ported there |
 | `PairedComputerOpensDrawerTests.swift` | `PairedComputerOpensDrawerTests.kt` | 8 | – |
 | `SelectedTranscriptCancellationTests.swift` | `SelectedTranscriptCancellationTests.kt` | 13 | – |
-| `DirectionalPanGestureRecognizerTests.swift` | `motion/DirectionalPanGestureRecognizerTests.kt` | 33 of 36 | deleted 3 UIKit layout probes (`revealedTimeStaysLeftOfTheRow`, `cardRotationDoesNotChange…`, `realSessionCardLocks…`); `displayCornersByDevice` keeps the rule, not the iPhone table; `ComposerSendTransitionTests` → `:feature:composer`/`:feature:transcript` |
-| `DrawerKeyboardTests.swift` | `motion/DrawerKeyboardTests.kt` | 13 of 16 | deleted 2 (keys following the card need a real window and IME); 1 → `:feature:transcript` |
+| `DirectionalPanGestureRecognizerTests.swift` | `motion/DirectionalPanGestureRecognizerTests.kt` | 33 of 36 | deleted 3 UIKit layout probes (`revealedTimeStaysLeftOfTheRow`, `cardRotationDoesNotChange…`, `realSessionCardLocks…`); `displayCornersByDevice` keeps the rule, not the iPhone table; `ComposerSendTransitionTests` → `:feature:composer`/`:feature:transcript` (not ported there: a hosted `UIWindow` snapshot test) |
+| `DrawerKeyboardTests.swift` | `motion/DrawerKeyboardTests.kt` | 13 of 16 | deleted 2 (keys following the card need a real window and IME); 1 → `:feature:transcript` (`suspendedSessionCardTranscriptIgnoresDrawerKeyboardFrameChanges`; not ported there: `TranscriptListViewController`'s UIKit content inset) |
 | `DrawerTitleFadeTests.swift` | `list/DrawerTitleFadeTests.kt` | 7 of 9 | deleted `aRelayoutMidRevealKeepsTheFadeAtTheEdge` (Compose recomputes the mask each frame), `catchUpFocusFindsItsElement` (UIKit view walk) |
-| `DrawerActivityTests.swift` | `DrawerActivityTests.kt` | 17 of 19 | 2 `AppFeature` tests → `:app`; tunables test checks defaults only (no Tuning Panel) |
-| `ProjectIconTests.swift` | `icons/ProjectIconTests.kt`, `icons/ProjectIconRenderTests.kt` (Robolectric: everything that decodes an image, loader included) | 6 of 10 | `experimentalFlagIsOffByDefault` → `:core`; 3 decoding tests → `:server` (`ProjectMark`, `OpenCodeProjectIcon`, stream frame) |
-| `ServerSwitchingTests.swift` | `ServerSwitchingTests.kt` | 3 (Home) | names/headers → `:server`; `ServerTitleFeature` → `:feature:settings`; `AppFeature` → `:app` |
+| `DrawerActivityTests.swift` | `DrawerActivityTests.kt` | 17 of 19 | 2 `AppFeature` tests → `:app` (`aRelaunchShowsCachedRunningState…` ported there, `theSingleCacheOfEarlierBuilds…` deleted there); tunables test checks defaults only (no Tuning Panel) |
+| `ProjectIconTests.swift` | `icons/ProjectIconTests.kt`, `icons/ProjectIconRenderTests.kt` (Robolectric: everything that decodes an image, loader included) | 7 of 10 | `experimentalFlagIsOffByDefault` ported here (no `:core` port covered it); 3 decoding tests → `:server` (`ProjectMark`, `OpenCodeProjectIcon`, stream frame), ported there |
+| `ServerSwitchingTests.swift` | `ServerSwitchingTests.kt` | 3 (Home) | names/headers → `:server`; `ServerTitleFeature` → `:feature:settings`; `AppFeature` → `:app`; all ported there |
 | `ServerTitleRecoveryTests.swift`, `ServerQuietStyleTests.swift`, `ConnectionHealthTests.swift` | – | 0 | `:feature:settings`/`:app` types only (ported there) |
 | `FamilyDiscoveryBenchmarkTests.swift` | – | 0 | deleted: opt-in real-HTTP timing benchmark of `:server`'s family discovery, no behaviour asserted |
 | `DrawerPerfProbe+Settling.swift` | – | 0 | deleted: DEBUG UIKit run-loop pumping helper (no tests; `DrawerPerfProbe` n/a) |
 | `MotionSystemTests.swift` | `motion/MotionSystemTests.kt` | 4 (drawer) | `returnToDrawerDoesNotMoveLongReturnSession` deleted (hosted `UIScrollView` offsets); rest `:core`/`:feature:transcript` |
 | `TuningTests.swift` | `style/TuningTests.kt` (`TuningStoreTests`, `DrawerSpacingTests`) | 4 | 7 preset/registration tests deleted (no Tuning Panel; drawer tunables are shipped defaults) |
-| `HapticsAuditTests.swift` | `HapticsAuditTests.kt` | 1 (`homeHaptics`) | rest `:feature:session`/`:core` |
-| `ThemePaletteTests.swift` | `ThemePaletteTests.kt` | 1 (Home half) | transcript layout half → `:feature:transcript` |
+| `HapticsAuditTests.swift` | `HapticsAuditTests.kt` | 1 (`homeHaptics`) | rest `:feature:session`/`:core`/`:feature:voice`, ported there |
+| `ThemePaletteTests.swift` | `ThemePaletteTests.kt` | 1 (Home half) | transcript layout half (`TranscriptTunables`/`MarkdownStyle`) → `:feature:transcript`, not ported there |
 | `SessionLinkTests.swift` | `SessionLinkTests.kt` | 7 (Home) | `aRowWhoseLookupFailed…` drives `sessionLinksAppeared` instead of UIKit rows |
-| `NewSessionDraftTests.swift` | `NewSessionDraftTests.kt` | 4 | `switchingServersFromADraft…` → `:app`; rest `:feature:session`; Try It via Settings' `TryWhatsNew` delegate |
-| `WorkingOrderTests.swift` | `WorkingOrderTests.kt` | 2 | rest `:feature:session` |
+| `NewSessionDraftTests.swift` | `NewSessionDraftTests.kt` | 4 | `switchingServersFromADraft…` → `:app` (ported there); rest `:feature:session`; Try It via Settings' `TryWhatsNew` delegate |
+| `WorkingOrderTests.swift` | `WorkingOrderTests.kt` | 2 | rest `:feature:session`, ported there |
 | `MultipleWindowsTests.swift` | `MultipleWindowsTests.kt` | 1 (`aFurtherWindowKeepsItsOwnSidebar`) | `:server`/`:app` |
-| `NetworkRetryTests.swift` (`EventStreamReconnectTests`) | `EventStreamReconnectTests.kt` | 6 | rest `:server` |
+| `NetworkRetryTests.swift` (`EventStreamReconnectTests`) | `EventStreamReconnectTests.kt` | 6 | rest `:server`; `actionsALoopThatOwnsItsRetries…` `:feature:voice`; ported there |
 | `NewMessagesTests.swift`, `SessionSheetTests.swift`, `TraceTests.swift` | `NewMessagesTests.kt`, `SessionSheetTests.kt`, `TraceTests.kt` (`TraceUploadsTests`) | 3, 1, 2 | rest `:feature:transcript`/`:feature:session`/`:core`/`:devtools` |
 | `AppFeatureTests.swift`, `AttachmentMenuPressTests.swift`, `FloatingCallModelTests.swift` | `AppFeatureTests.kt`, `AttachmentMenuPressTests.kt`, `FloatingCallModelTests.kt` | 1, 1, 1 | Call Tray frame half of the floating-call test deleted (UIWindow hosting) |
-| `SystemIntegrationTests.swift` | `SystemIntegrationTests.kt` | 18 | rest `:feature:system`/`:app` |
+| `SystemIntegrationTests.swift` | `SystemIntegrationTests.kt` | 18 | rest `:feature:system`/`:app`, ported there |
 | `ShareHandoffTests.swift`, `ShareComposerTests.swift` | `ShareHandoffTests.kt` (`ShareInboxFeatureTests`), `ShareComposerTests.kt` (`ShareComposerAppTests`) | 6, 7 | rest `:feature:system`/`:feature:composer`/`:app` |
-| `SubagentStackTests.swift` | `SubagentStackTests.kt` | 17 of 19 | `BackSwipeRules` → `:core`; `SessionActivity` → `:server` |
-| `BrowserTests.swift` | `BrowserTests.kt` | 9 (Home) | WKWebView registry checks deleted (WebKit); rest `:feature:media`/`:feature:session` |
-| `WhatsNewTests.swift` | `WhatsNewTests.kt` | 18 | `WhatsNewFeature`/entries → `:feature:settings`; `whatsNewSurvivesAHomeReplacement` → `:app` |
-| Voice suites (`VoiceFeatureTests`, `+CallLog`, `VoiceLiveTests`, `ServerVoiceTests`, `VoiceServerPickerTests`, `VoiceSessionToolsTests`, `VoiceLiveActivityTests`, `DictationLiveActivityTests`, `LiveDelegationFeatureTests+Session`) | same names | 3, 4, 2, 1 (Home half), 1, 1, 6, 3, 1 | rest `:feature:voice`/`:feature:system`/`:app`; live activity pushes asserted as Home's `voiceCallActivity` (Android's call notification is the call's own foreground service) |
+| `SubagentStackTests.swift` | `SubagentStackTests.kt` | 17 of 19 | `BackSwipeRules` → `:core`; `SessionActivity` → `:server`; both ported there |
+| `BrowserTests.swift` | `BrowserTests.kt` | 9 (Home) | WKWebView registry checks deleted (WebKit); rest `:feature:media`/`:feature:session`/`:feature:voice` (`BrowserVoiceTests`), ported there |
+| `WhatsNewTests.swift` | `WhatsNewTests.kt` | 18 | `WhatsNewFeature`/entries → `:feature:settings`; `whatsNewSurvivesAHomeReplacement` → `:app`; both ported there |
+| Voice suites (`VoiceFeatureTests`, `+CallLog`, `VoiceLiveTests`, `ServerVoiceTests`, `VoiceServerPickerTests`, `VoiceSessionToolsTests`, `VoiceLiveActivityTests`, `DictationLiveActivityTests`, `LiveDelegationFeatureTests+Session`) | same names | 3, 4, 2, 1 (Home half), 1, 1, 13 (6 Home + 7 mapping over Home's `liveActivityCall`), 4 (3 Home + `onlyALiveHandsFreeRecordingOutsideACallShows` over `liveActivityRecording`), 1 | rest `:feature:voice`/`:feature:system` (ported there); `leavingHomeMidCallEndsTheActivity`, `leavingHomeWithoutACallLeavesActivitiesAlone` (`AppFeature`, `:app`); live activity pushes asserted as Home's `voiceCallActivity` (Android's call notification is the call's own foreground service) |
 | `TranscriptCachePersistenceTests.swift` | `TranscriptCachePersistenceTests.kt` | 7 (Home) | `splicedEnvelope…` in `:server`; lock-time write refusal tests deleted (Android storage has none); backup exclusion iOS-only |
-| `ComposerPersistenceTests.swift`, `RequestAnswerTests.swift`, `SessionFeatureTests+Sending.swift` | same names | 4, 1, 1 | rest `:feature:composer`/`:feature:session`; `AppFeature.serverDeleted` steps → `:app` |
+| `AppIconBadgeTests.swift` | `AppIconBadgeTests.kt` | 8 (Home publishing) | ledger/storage/refs (`:feature:system`), identity forgetting (`:app`, ported there); `callsWhileOneRunsShareIt` and the other `BadgeAuthorization` tests have no Android counterpart (system.md) |
+| `TranscriptBenchmarkTests.swift` | `TranscriptBenchmarkTests.kt` | 5 (`backgroundStreamingIsolation…` with step 4 checking the chrome values stay put instead of `withObservationTracking`; `contentBatchStepStarted…`, `sameCountWindow…`, `networkRerouted…`, `shouldForwardFamilyRunState…`) | 2 `ProjectionCache` tests → `:feature:session`, ported there; deleted `appFeatureStoreBuildsReducerBodiesOncePerInstance` (counts TCA `body` builds via iOS `bodyCache`; Kotlin reducers are built once per instance) and the 5 env-gated CPU/scroll benchmarks |
+| `ComposerPersistenceTests.swift`, `RequestAnswerTests.swift`, `SessionFeatureTests+Sending.swift` | same names | 4, 1, 1 | rest `:feature:composer`/`:feature:session`; `AppFeature.serverDeleted` steps → `:app` (not ported there yet) |
 
 Fixes the ported tests found: older drawer timestamps' four-digit year (`DrawerPeek`); a Catch Up
 card drag ends when Catch Up closes, and `dismissCard`/`undoCard` finish its entrance first
@@ -111,3 +113,5 @@ card drag ends when Catch Up closes, and `dismissCard`/`undoCard` finish its ent
 `friendlyName` (`:feature:system`); `:core`'s `EffectRunner` registers nested cancellables at once,
 and `TestStore` follows TCA (drops cancelled effects' sends, `skipInFlightEffects`, non-exhaustive
 `finish`, effects inherit the sender's context).
+
+Total: 424 drawer tests (Gradle), all passing.

@@ -20,7 +20,7 @@ private typealias Arm = DictationFeature.Hold.Arm
  * Skipped → `:feature:session` (`DictationViews.kt` owns `DictationHoldVisuals`,
  * `DictationBarPose` and `DictationHoldRetention`):
  * `aSecondDictationStartsWithNoCircleOrGuides`,
- * `dictationHoldRetentionDropsLeavingHoldAcrossSessionAndDraftSwitches`.
+ * `dictationHoldRetentionDropsLeavingHoldAcrossSessionAndDraftSwitches` (both ported there).
  */
 class DictationHoldTrackerTests {
     private fun track(points: List<Pair<Float, Float>>): DictationHoldTracker {

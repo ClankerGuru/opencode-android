@@ -169,7 +169,8 @@ abstract class VoiceSessionCoordinator<E, C, A>(
             val socket = requireNotNull(active)
             activateAudio(socket)
             if (!running()) throw CancellationException()
-            audio?.setAtEar?.invoke(lifecycle.atEar)
+            // Only an ear change made while the audio started (iOS `if atEar != initialAtEar`).
+            if (lifecycle.atEar != atEar) audio?.setAtEar?.invoke(lifecycle.atEar)
             startSocketEvents(socket)
             return makeEventStream(requireNotNull(audio))
         } catch (error: Throwable) {

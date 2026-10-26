@@ -86,7 +86,7 @@ data class SystemAction(
  * Process-wide delivery plumbing, reached only through [SystemIntegrationClient.actions] by
  * reducers; the system entry points post to it directly, as iOS intents do.
  */
-class SystemActionInbox internal constructor() {
+class SystemActionInbox {
     private class Listener(val id: UUID, val channel: SendChannel<SystemAction>)
 
     private val lock = Any()

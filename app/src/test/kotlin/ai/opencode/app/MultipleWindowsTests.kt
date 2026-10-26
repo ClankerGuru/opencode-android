@@ -1,21 +1,45 @@
 package ai.opencode.app
 
+import ai.opencode.core.store.Reduced
+import ai.opencode.core.store.Reducer
+import ai.opencode.core.store.Store
 import ai.opencode.core.testing.TestIsolationRule
 import ai.opencode.feature.drawer.HomeFeature
+import ai.opencode.feature.session.SessionFeature
+import ai.opencode.feature.system.NotificationDestination
+import ai.opencode.feature.system.SystemAction
+import ai.opencode.feature.system.SystemActionInbox
+import ai.opencode.feature.system.SessionWindowTarget
+import ai.opencode.feature.system.SystemIntegrationClient
+import ai.opencode.server.OpenCodeServer
+import ai.opencode.server.model.OpenCodeHomeSnapshot
+import ai.opencode.server.model.OpenCodeSession
+import android.app.Application
+import android.content.Intent
+import android.os.Bundle
+import android.os.Looper
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
+import org.robolectric.annotation.Config
+import java.time.Instant
 
 /**
  * Port of the `:app` half of iOS `MultipleWindowsTests.swift` (window roster, app-wide work,
  * call ownership). `SharedEventStreams`/`SharedReads` tests are `:server`'s
  * `live/MultipleWindowsTests`; `aFurtherWindowKeepsItsOwnSidebar` is `HomeSettingsFeature`
- * (`:feature:drawer`); `windowTargetRoundTripsThroughItsActivity` is `:feature:system`'s.
- * Dropped: `oneWindowIsAlwaysTheFrontWindow` (UIKit `ActiveScene` touch tracking),
- * `activityTypeIsDeclaredInInfoPlist` (Info.plist).
+ * (`:feature:drawer`). `windowTargetRoundTripsThroughItsActivity` is `MultipleWindowsFrameworkTests`.
+ * `AppWideWorkTests` is below (Robolectric). Dropped: `oneWindowIsAlwaysTheFrontWindow` (UIKit
+ * `ActiveScene` touch tracking), `activityTypeIsDeclaredInInfoPlist` (Info.plist).
  */
 class MultipleWindowsTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -171,5 +195,201 @@ class WindowRosterTests {
         roster.left(first)
         assertEquals(WindowRoster.Role.Secondary, second.role)
         assertTrue(second.ownsAppWide)
+    }
+}
+
+/** iOS `MultipleWindowsTests.windowTargetRoundTripsThroughItsActivity`: the target rides an `Intent` (Robolectric). */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35], application = Application::class)
+class MultipleWindowsFrameworkTests {
+    @get:Rule val isolation = TestIsolationRule()
+
+    @Test
+    fun windowTargetRoundTripsThroughItsActivity() {
+        val target = SessionWindowTarget(serverID = "server", sessionID = "ses_1")
+        val intent = SceneWindows.intent(RuntimeEnvironment.getApplication(), target)
+        assertEquals(SessionWindowTarget.ACTION, intent.action)
+        assertEquals(target, RootStore.target(intent, saved = null))
+        assertNull(RootStore.target(Intent("other"), saved = null))
+        // Restored after a relaunch: the window's saved value.
+        val saved = Bundle().apply {
+            putString(SessionWindowTarget.EXTRA_SERVER_ID, target.serverID)
+            putString(SessionWindowTarget.EXTRA_SESSION_ID, target.sessionID)
+        }
+        assertEquals(target, RootStore.target(null, saved))
+    }
+}
+
+/**
+ * iOS `AppWideWorkTests`: [AppWideWork] with real window stores ([RootStore] on a test roster): the
+ * system action inbox is drained in the store doing the app-wide work, wherever that goes. Under
+ * Robolectric because a [Store] sends on Android's main looper.
+ *
+ * Android differences: a window's store is its own (`RootStore` makes it on the first `onCreate`);
+ * the test hands every primary the same `primary` store as iOS's `OpenCodeApp.store`. A reload is
+ * a configuration change, which keeps the window's retained `RootStore` and resolves it again
+ * (iOS builds new window state for the same scene).
+ */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35], application = Application::class)
+class AppWideWorkTests {
+    @get:Rule val isolation = TestIsolationRule()
+
+    private val shared = AppTestShared()
+    private val inbox = SystemActionInbox()
+    private val handled = Locked<List<String>>(emptyList())
+    private val listens = Locked(0)
+    private val made = Locked(0)
+    private val stores = ArrayList<Store<AppFeature.State, AppFeature.Action>>()
+
+    @After fun closeStores() {
+        stores.forEach { it.close() }
+        idle()
+    }
+
+    /** iOS `Recording`: `AppFeature`, noting which store each intent reached. */
+    private fun recording(name: String) = object : Reducer<AppFeature.State, AppFeature.Action> {
+        val base = AppFeature()
+        override fun reduce(state: AppFeature.State, action: AppFeature.Action): Reduced<AppFeature.State, AppFeature.Action> {
+            if (action is AppFeature.Action.SystemActionReceived) handled.update { it + name }
+            return base.reduce(state, action)
+        }
+    }
+
+    private fun store(name: String, state: AppFeature.State = shared.appState()): Store<AppFeature.State, AppFeature.Action> =
+        Store(
+            state,
+            recording(name),
+            dependencies = shared.values.update {
+                this[SystemIntegrationClient] = SystemIntegrationClient(
+                    actions = {
+                        listens.update { it + 1 }
+                        inbox.actions()
+                    },
+                    publish = { _, _ -> },
+                    removeServer = {},
+                )
+            },
+        ).also { stores += it }
+
+    private fun window(roster: WindowRoster, work: AppWideWork, secondary: String = "secondary") =
+        RootStore(roster, work) { _, _ ->
+            made.update { it + 1 }
+            store(secondary)
+        }
+
+    private fun idle() = shadowOf(Looper.getMainLooper()).idle()
+
+    /** Posts an intent once the app-wide work has moved, and waits until a store handles it. */
+    private fun intent() {
+        idle()
+        val before = handled.value.size
+        inbox.post(SystemAction(serverKey = null, destination = SystemAction.Destination.LastViewed))
+        repeat(100) {
+            if (handled.value.size != before) return
+            idle()
+        }
+    }
+
+    @Test
+    fun closingAndReopeningTheFirstIPadWindowMovesTheInboxBothWays() {
+        val roster = WindowRoster(multipleWindows = true)
+        val work = AppWideWork(roster)
+        val primary = store("primary")
+        val first = window(roster, work)
+        val second = window(roster, work)
+        first.resolve(null) { primary }
+        second.resolve(null) { primary }
+        assertEquals(WindowRoster.Role.Secondary, second.role)
+        intent()
+
+        // The first window closes: an App Action still lands, in the survivor.
+        roster.detached(first)
+        intent()
+
+        // Reopened from the launcher: the new window shows the app's store, and the inbox goes with it.
+        val reopened = window(roster, work)
+        reopened.resolve(null) { primary }
+        assertEquals(WindowRoster.Role.Primary, reopened.role)
+        intent()
+
+        assertEquals(listOf("primary", "secondary", "primary"), handled.value)
+    }
+
+    @Test
+    fun aReloadKeepsTheInboxInThePrimaryStoreWithoutRestartingIt() {
+        val roster = WindowRoster(multipleWindows = true)
+        val work = AppWideWork(roster)
+        val primary = store("primary")
+        val window = window(roster, work)
+        window.resolve(null) { primary }
+        intent()
+
+        // A configuration change: the retained window resolves again for its new activity.
+        assertSame(primary, window.resolve(null) { store("reloaded") })
+        assertEquals(WindowRoster.Role.Primary, window.role)
+        intent()
+
+        assertEquals(listOf("primary", "primary"), handled.value)
+        assertEquals("The work carried on; no view going away stranded or restarted it", 1, listens.value)
+    }
+
+    @Test
+    fun theInboxListensFromTheFirstWindowAndThroughADisconnect() {
+        val roster = WindowRoster(multipleWindows = false)
+        val work = AppWideWork(roster)
+        val primary = store("primary")
+        val window = window(roster, work)
+        window.resolve(null) { primary }
+        assertSame("Listening as soon as the window joins, not on a later turn", primary, work.store)
+        // Disconnected before anything else ran: no owner now, but the work stays.
+        roster.detached(window)
+        intent()
+        assertEquals("An intent running in the background is handled with no window connected", listOf("primary"), handled.value)
+        assertEquals(1, listens.value)
+    }
+
+    @Test
+    fun aNotificationNeverGoesToAClosedWindow() {
+        val server = OpenCodeServer(url = "https://saved.example", username = "kit", password = "test")
+        val session = OpenCodeSession(id = "ses_shown", serverTitle = "Shown", projectID = "prj_app", directory = "/work/app", updatedAt = Instant.ofEpochSecond(300))
+        val home = shared.run {
+            HomeFeature.State(server, OpenCodeHomeSnapshot(projects = emptyList(), sessions = listOf(session), activeSessionIDs = emptySet()))
+                .copy(sessionDetail = SessionFeature.State.session(server, session))
+        }
+        val showing = Store(shared.appState().copy(home = home), AppFeature(), dependencies = shared.values).also { stores += it }
+
+        val roster = WindowRoster(multipleWindows = true)
+        val work = AppWideWork(roster)
+        val primary = store("primary")
+        val first = window(roster, work)
+        val second = RootStore(roster, work) { _, _ -> showing }
+        first.resolve(null) { primary }
+        second.resolve(null) { primary }
+        val destination = NotificationDestination(serverKey = server.persistenceID, sessionID = session.id)
+        assertSame(showing, SceneWindows.window(destination, roster, work, active = null)?.store)
+
+        // Closed, its state kept. The tap goes to the window doing the app-wide work.
+        roster.detached(second)
+        assertSame(primary, SceneWindows.window(destination, roster, work, active = null)?.store)
+    }
+
+    @Test
+    fun anIPhoneKeepsOneStoreThroughADisconnectAndReturn() {
+        val roster = WindowRoster(multipleWindows = false)
+        val work = AppWideWork(roster)
+        val primary = store("primary")
+        val old = window(roster, work)
+        old.resolve(null) { primary }
+        roster.detached(old)
+        intent()
+
+        val new = window(roster, work)
+        assertSame(primary, new.resolve(null) { primary })
+        intent()
+
+        assertEquals(listOf("primary", "primary"), handled.value)
+        assertEquals("A phone never makes a second store", 0, made.value)
+        assertEquals(1, listens.value)
     }
 }

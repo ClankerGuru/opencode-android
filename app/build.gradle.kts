@@ -57,4 +57,6 @@ dependencies {
     debugImplementation(libs.compose.ui.tooling)
     // TestIsolationGuard, WireFixture and the network block (see AGENTS.md "Tests").
     testImplementation(testFixtures(project(":server")))
+    // AppWideWorkTests: real window stores, whose sends need Android's main looper.
+    testImplementation(libs.robolectric)
 }

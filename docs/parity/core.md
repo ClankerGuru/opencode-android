@@ -62,17 +62,21 @@ Ported from iOS `OpenCodeTests/` into `core/src/test` (JVM, same names). Shared 
 | `DiagnosticsRecorderTests.swift` | `diagnostics/DiagnosticsRecorderTests.kt` | 12 of 13 | `headerResolutionNotifiesObserversWhenChanged` → `:feature:session` (`SessionHeaderStyle`); `RealtimeTransportDiagnostic` half → `:feature:voice` |
 | `PrivacyManifestTests.swift` | `diagnostics/DiagnosticsRecorderTests.kt` | 1 of 2 | manifest plist test deleted (iOS `PrivacyInfo.xcprivacy`) |
 | `ExperimentalFeatureTests.swift` | `experiments/ExperimentalFeatureTests.kt` | 8 | `VoiceAudioDemoMode` half → `:feature:voice` |
-| `HapticsAuditTests.swift` | `haptics/HapticsAuditTests.kt` | 1 (`LiveHapticsTests` source scan) | `HapticsAuditTests` suite → `:feature:session`/`:feature:drawer`; `VoiceCallHaptic` fallbacks → `:feature:voice`; background gate needs an Android runtime (no Robolectric) |
+| `HapticsAuditTests.swift` | `haptics/HapticsAuditTests.kt` | 2 (`LiveHapticsTests` source scan; `aRequestArrivingInTheBackgroundPlaysNothing` under Robolectric in `LiveHapticsFrameworkTests`: `LiveHaptics` gated by `ProcessLifecycleOwner`, shadow `Vibrator`) | `HapticsAuditTests` suite → `:feature:session`/`:feature:drawer`; `VoiceCallHaptic` fallbacks → `:feature:voice`, ported there |
+| `AudioSessionHapticsTests.swift` | `haptics/AudioSessionHapticsTests.kt` | 1 (`traceLineIsContentFreeAndNamesWhatMutesHaptics`) | deleted: `LiveDictationAudioSessionTests` (6, opt-in suite on the simulator's real microphone and `AVAudioSession`) |
 | `TuningTests.swift` | `tuning/TuningTests.kt` | 27 | TuningFeature/Wire/Placement/summon gesture → `:devtools`; drawer/composer/transcript tunables → features; MotionXRay not ported; CALayer checks deleted |
 | `MotionSystemTests.swift` | `motion/MotionSystemTests.kt` | 5 | empty-state → `:feature:transcript`; drawer shortcuts (4) → `:feature:drawer`; window probe deleted |
 | `RollingNumberTests.swift` | `ui/RollingNumberTests.kt` | 8 of 9 | `rollingTitleSurvivesPixelSnapping` deleted (UIWindow pixel snapping) |
-| `ThemePaletteTests.swift` | `ui/ThemePaletteTests.kt` | 5 of 8 | appearance settings → `:feature:settings`/`:feature:drawer`; `legacyTranscriptRhythmStorageIsCleanedUp` deleted (Android never wrote the key) |
+| `ThemePaletteTests.swift` | `ui/ThemePaletteTests.kt` | 5 of 8 | appearance settings → `:feature:settings`/`:feature:drawer` (ported there: `appearanceSettingsActions…`, Home half); `legacyTranscriptRhythmStorageIsCleanedUp` deleted (Android never wrote the key) |
 | `PerfFrameWindowTests.swift` | `diagnostics/PerfFrameWindowTests.kt` | 6 of 9 | deleted: `infoPlistEnablesProMotion120HzOnPhone` (Info.plist), `proMotion120HzFrameRateRangeAndClockIntervals` (live `CADisplayLink`; its `DrawerSpring` half → `:feature:drawer`), `transcriptFollowerDisplayLinkDoesNotRequestAbove60Hz` (`CADisplayLink` rate range) |
 | `PerfFreshTrackerTests.swift` | `diagnostics/PerfFreshTrackerTests.kt` | 4 | – |
 | `MotionWatchTests.swift` (+`MotionAuditDetectorTests`) | `diagnostics/MotionWatchTests.kt` | 9 | `recordsReplayContext…` keeps everything but its `replayContext` asserts (`PlaygroundReplayContext` is the Mac playgrounds', n/a) |
 | `TraceTests.swift` (`DiagnosticsJournalTests`, `InternalBuildTests`, `ProblemReportBundleTests`, `DiagnosticsPrivacyTests`, `CrashReportTests`) | `diagnostics/TraceTests.kt` | 14 | `TraceUploadsTests`, `screenshotsOnly…`, `diagnosticsIndexesMetricsByRequest` → `:devtools`; `VoiceTimelineTests` → `:feature:voice`; `TeamFeedbackTests` deleted (devtools.md) |
+| `LivingOrbTests.swift` | `experiments/LivingOrbTests.kt` | 1 (`flagRestoresEveryExistingCallStyleWhenOff`, `ExperimentalCallStyle.of`) | orb → `:feature:voice`; style setting → `:feature:settings` |
+| `SubagentStackTests.swift` | `ui/SubagentStackTests.kt` | 1 (`backRulesLetTheEdgeWinAndContentKeepItsClaims`; iOS `BackSwipeSpring.goesBack` is `BackSwipeRules.goesBack`, decision distance passed as iOS's 8) | stack → `:feature:drawer`; `descendantsFollowTheFamilyTree` → `:server` |
 | `GlassShapeTests.swift` | `ui/GlassShapeTests.kt` | 2 of 3 | `GlassShape.clamped` → `OpenCodeShapeGeometry.clamped`; `tuningTabsKeepTheirWholeHitTargetOnScreen` → `:devtools` |
 
 Round 2 (ui helper): no `:core` production bugs found. `InternalBuild.detect(isDebug, installingPackageName)` was pulled out of
-`isEnabled` (unchanged behaviour) so `InternalBuildTests` can check it. 106 `:core` tests in total, all passing
-(`./gradlew :core:testDebugUnitTest`).
+`isEnabled` (unchanged behaviour) so `InternalBuildTests` can check it. 113 `:core` tests in total, all passing
+(`./gradlew :core:testDebugUnitTest`). Robolectric (test-only) runs only `LiveHapticsFrameworkTests`; `LiveHaptics` is `internal` (was
+`private`) so it can.

@@ -79,34 +79,41 @@ lists them by name. "Dropped" tests can't exist as JVM unit tests. Tests needing
 | --- | --- | ---: | --- | --- |
 | `RequestPanelFitTests.swift` | `RequestPanelFitTests.kt` | 9 | – | `atTheLargestTextOnTheSmallestPhoneAllowStaysOnScreen`, `asTheKeyboardMovesThePanelNeverReachesTheHeader` (SwiftUI window layout probes). The layout tests run through `RequestPanelFit.stack`, the squeeze `RequestPanelStack` now calls |
 | `RequestAnswerTests.swift` | `RequestAnswerTests.kt` | 1 (`RequestDockFeature` store) | 28 → `:feature:session`; `switchingIntoASnapshotDuringACallEndsTheRestoredAnswer` → drawer | `inlineRequestBarMultiline…`, `disabledQuestionBarTrailingControl…`, `requestBarDictationFoldAndUnfold…` (UIKit text view/colour probes) |
-| `RequestReviewTests.swift` | `RequestReviewTests.kt` (+ `:server` `model/RequestReviewTests.kt`) | 1 + 1 (`typedNumbers…` in `:server`) | 26 → `:feature:session`; `settledQuestionsReadAsOneQuietRow` → `:feature:transcript` | – |
-| `DictationHoldTrackerTests.swift` | `DictationHoldTrackerTests.kt` (+`MicPressTests`) | 14 | `aSecondDictationStartsWithNoCircleOrGuides`, `dictationHoldRetentionDrops…` → `:feature:session` | – |
+| `RequestReviewTests.swift` | `RequestReviewTests.kt` (+ `:server` `model/RequestReviewTests.kt`) | 1 + 1 (`typedNumbers…` in `:server`) | 26 → `:feature:session`; `settledQuestionsReadAsOneQuietRow` → `:feature:transcript` (ported there) | – |
+| `DictationHoldTrackerTests.swift` | `DictationHoldTrackerTests.kt` (+`MicPressTests`) | 14 | `aSecondDictationStartsWithNoCircleOrGuides`, `dictationHoldRetentionDrops…` → `:feature:session` (ported there) | – |
 | `DictationInputTests.swift` | `DictationInputTests.kt` | 4 | – | – |
 | `DictationAudioTests.swift` | `DictationAudioTests.kt` (+`DictationHoldReportingTests`) | 28 | `theComposerLetsAHeldSessionGo`, `aCallStartsOnlyOnceDictationHasLetGo`, `raiseToTalkWaitsForDictationToo` → `:feature:session` | `aStoppedMicUnderACallLeavesItsSettings`, `anOlderRecordingsStopNeverTouchesTheNewerOne` (only assert `prefersNoInterruptionsFromSystemAlerts`, no Android equivalent); AVAudioSession category/mode/notify sub-asserts dropped in ported tests |
 | `LiveDictationTests.swift` | `LiveDictationTests.kt` | 15 | – | – |
-| `DictationLiveActivityTests.swift` | `DictationLiveActivityTests.kt` | 1 (`DictationFeature` store) | 4 `HomeFeature` tests → drawer; `theStopIntentSendsItsCommand` → system (Live Update owner) | – |
+| `DictationLiveActivityTests.swift` | `DictationLiveActivityTests.kt` | 1 (`DictationFeature` store) | 4 `HomeFeature` tests → drawer (`onlyALive…` ported there too); `theStopIntentSendsItsCommand` → system (Live Update owner) | – |
 | `SendOutboxTests.swift` | `SendOutboxTests.kt` | 1 (`retryAfterIsReadAsSecondsOrADate`, a `:server` helper no other port covered) | 35 → `:feature:session` | – |
 | `ComposerPersistenceTests.swift` | `ComposerPersistenceTests.kt` | 1 (cleanup through the persistence client) | 7 → `:feature:session`, 3 → drawer | – |
 | `ComposerAutocompleteTests.swift` | `ComposerAutocompleteTests.kt` (Robolectric, +`ComposerAutocompleteTestSupport.kt`) | 12 (2 partly) | 5 → `:feature:session`; `experimentalFlagOffProducesByteIdenticalPromptBody` → `:server` | caret auto-run step (Android's auto-run is fixed to Fill), UIKit text-view checks; `keyCommands` counts are checked through `handleKeyEvent` |
 | `ComposerAutocompleteMotionTests.swift` | `ComposerAutocompleteMotionTests.kt` | 9 | – | – |
-| `ComposerSessionMentionTests.swift` | `ComposerSessionMentionTests.kt` | 4 | 3 → `:feature:session`; `sentSessionTokensRenderAsSessionLinks` → `:feature:transcript` | – |
+| `ComposerSessionMentionTests.swift` | `ComposerSessionMentionTests.kt` | 4 | 3 → `:feature:session`; `sentSessionTokensRenderAsSessionLinks` → `:feature:transcript` (both ported there) | – |
 | `ComposerItemProviderLoaderTests.swift` | `ComposerItemProviderLoaderTests.kt` (Robolectric) | 8 | `composerOffersACallWhenVoiceIsSetUp`, `composerControlPresentation` → `:feature:session` | `textViewRoutesImagePaste…` (UIKit paste) |
-| `FileAttachmentTests.swift` | `FileAttachmentTests.kt` (+ `:core` `files/AttachmentFileTypeTests.kt`) | 1 (`ComposerAttachmentsFeature`) + 3 (`:core`) | 7 → `:feature:session`; `PromptPresentationTests`/`FileAttachmentWireTests` (7) → `:server`; `ShareHandoffFileTests` → `:feature:system` | – |
+| `FileAttachmentTests.swift` | `FileAttachmentTests.kt` (+ `:core` `files/AttachmentFileTypeTests.kt`) | 1 (`ComposerAttachmentsFeature`) + 3 (`:core`) | 7 → `:feature:session`; `PromptPresentationTests`/`FileAttachmentWireTests` (7) → `:server`; `ShareHandoffFileTests` → `:feature:system`, ported there | – |
 | `InlinePhotoSelectionTests.swift` | `InlinePhotoSelectionTests.kt` | 7 | – | – |
+| `WorkingOrderTests.swift` | `WorkingOrderTests.kt` | 1 (`deliveryMarksARecordedSendAsSent`, `PromptOutbox` alone) | `SessionFeature` tests → `:feature:session`; 2 `HomeFeature` tests → drawer | – |
+| `SessionRefreshReviewTests.swift` (`SharedLocationTests`) | `SessionRefreshReviewTests.kt` (`SharedLocationTests`, Robolectric native graphics, virtual time) | 5 (`theBlockReads…`, `locationSnapshotIsInert…`, `locationTappedPrefetches…`, `locationEntranceTrace…` (metrics), `locationTappedDeliversAfterPrefetchTimeout…`) | `SessionRefreshReviewTests` and the `SessionFeature` location tests, `composerFoldLayoutMatches…` (`ComposerFoldFrames`) → `:feature:session`; `theTranscriptShowsTheCard…` → `:feature:transcript` (ported there) | `LocationAttachmentTrace` lab recorder/parser (the metrics it records are checked directly); `MapSnapshotGate` half (MapKit's never-calling-back `cancel()`; tiles here are cancellable OkHttp calls) |
+| `SessionFeatureTests.swift` | `SessionFeatureTests.kt` (Robolectric native graphics) | 1 (`imageImportDecodes…`, `ImageAttachmentImporter`) | rest → `:feature:session` | – |
 | `AttachmentCameraActivityTests.swift` | `AttachmentCameraActivityTests.kt` | 6 | – | – |
 | `AttachmentCameraControlsRenderTests.swift` | – | 0 | – | `renderControls` (opt-in UIKit screenshot) |
 | `AttachmentCameraLensTests.swift` | `AttachmentCameraLensTests.kt` | 20 | – | – |
 | `AttachmentMenuPressTests.swift` | `AttachmentMenuPressTests.kt` | 11 | `taskIdentity` half of the linger test → drawer | – |
 | `PhotoFlightTests.swift` | `plusmenu/PhotoFlightTests.kt` (Robolectric, xxhdpi) | 38 | – | 10 `PhotoFlightAudit` tests (telemetry not ported), `photoRequestGateResumesExactlyOnce…` (Android gate is a `CancellationSignal`); `renderLabCameraCapture` check (no Android counterpart) |
+| `ShareComposerTests.swift` | `ShareComposerTests.kt` (`ShareComposerTests`, `ShareCompositionTests`) | 2 (`sharesJoiningOneComposerSendOnlyWhenAllAskTo`, `SharedComposerDraft`; the `PromptOutbox.newSessionID` half of `newIDsHaveTheServersShape`, against the literal `ShareSendRequest`'s port checks) | the rest → `:feature:system`, `ShareComposerAppTests` → `:feature:drawer` (ported there) | – |
+| `SessionHeaderStyleTests.swift` | `SessionHeaderStyleTests.kt` | 1 (`composerGlassIsInteractiveAndSwipeDownDismissesKeyboard`'s `ComposerSwipeDown` rules) | the rest → `:feature:session` (ported there) | its `VoiceCallSurface.usesInteractiveGlass` asserts (Liquid Glass interactivity; the composer is an M3 surface) |
 | `ModelPickerTests.swift` | `modelpicker/ModelPickerTests.kt` (Robolectric) | 29 | 13 + reducer half of `searchParsesTrailingLevel…` → `:feature:session` | `turningOffCustomModelPickerUnregistersLevelTunables` (no Tuning Panel), `searchableSheetsAvoidForcedNavigationBarDrawerOnMac` (Mac-only); preset/registry sub-asserts. The arc's path check reads the drawn pixels' bounds |
 
+Total (`./gradlew :feature:composer:testDebugUnitTest`): 230 tests, 0 failures.
+
 Composer-named files owned elsewhere: `SessionFeatureTests+Composer/+Dictation/+ModelPicks` (`:feature:session`),
-`ShareComposerTests` (system/drawer), `PairingPasteTests` (`:app`), `AgentFileTests` (media/transcript),
+`ShareComposerTests` (system/drawer; its `SharedComposerDraft`/`PromptOutbox` tests are here), `PairingPasteTests` (`:app`, ported there), `AgentFileTests` (media/transcript),
 `ModelSwitchRuleTests` (`:feature:transcript`), `WireRequestTests`/`PairingDeviceNameTests`/`ModelVisibilityTests`
 (already in `:server`), `FloatingCallModelTests(+Dock)` (`:feature:voice`).
 
 Bugs the ports found (fixed): dictation kept private copies of `AudioSessionOwner`/`AudioSessionGeneration`,
 so it never saw a call take the audio (a hold could outlive a call starting, and dictation could release
 audio a call held); `PlusPhotoLibrary.displayScale` crashed without system `Resources` (now falls back to 3×,
-iOS's last resort); a stopped recording's mic was stopped twice when a newer press finalized it and its late cancel discarded it (`LiveDictation` `Recording.stopCapture` now stops it once). Refactors for testability, behaviour unchanged: `RequestPanelFit.stack` (pure squeeze),
+iOS's last resort); a stopped recording's mic was stopped twice when a newer press finalized it and its late cancel discarded it (`LiveDictation` `Recording.stopCapture` now stops it once). `LocationClient.prefetchCompactSnapshot` waited for a snapshot that ignored cancellation, so a hung map held the card on “Finding Location…” past the 1.2 s limit (iOS runs it in its own task behind `MapSnapshotGate`; it now runs in its own job and is cancelled at the limit). Refactors for testability, behaviour unchanged: `RequestPanelFit.stack` (pure squeeze),
 `InlinePhotoSelection` generic over its picked item.
