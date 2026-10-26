@@ -1,0 +1,405 @@
+package ai.opencode.feature.media
+
+import ai.opencode.core.testing.TestIsolationRule
+import ai.opencode.server.OpenCodeServer
+import ai.opencode.server.retry.ServerContact
+import kotlinx.coroutines.test.runTest
+import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.Request
+import okhttp3.Response
+import okhttp3.ResponseBody.Companion.asResponseBody
+import okhttp3.ResponseBody.Companion.toResponseBody
+import okio.Buffer
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+import java.io.File
+
+/**
+ * Port of iOS `AgentFileLoadingTests` (`AgentFileTests.swift`): probing, streaming ranges,
+ * errors, text documents, JSON formatting and folding, highlight budgets, cache keys and the
+ * loader's credentials. Requests are answered by an OkHttp interceptor (iOS passes the transport
+ * as a closure), so nothing reaches the network.
+ */
+class AgentFileLoadingTests {
+    @get:Rule val isolation = TestIsolationRule()
+
+    private fun response(status: Int, headers: Map<String, String>, body: Long = 0): Response {
+        val builder = Response.Builder()
+            .request(Request.Builder().url("https://box/api/fs/read/a.mp4").build())
+            .protocol(Protocol.HTTP_1_1)
+            .code(status)
+            .message("")
+        headers.forEach { (name, value) -> builder.header(name, value) }
+        // A network body reports the Content-Length it was sent with.
+        val contentLength = headers["Content-Length"]?.toLong() ?: body
+        return builder.body(Buffer().asResponseBody(headers["Content-Type"]?.toMediaType(), contentLength)).build()
+    }
+
+    /** A client whose every call is answered by [answer] without a connection. */
+    private fun client(answer: (Request) -> Response): OkHttpClient =
+        OkHttpClient.Builder().addInterceptor { chain -> answer(chain.request()) }.build()
+
+    private fun answered(request: Request, status: Int, headers: Map<String, String>, body: String = ""): Response {
+        val builder = Response.Builder().request(request).protocol(Protocol.HTTP_1_1).code(status).message("")
+        headers.forEach { (name, value) -> builder.header(name, value) }
+        return builder.body(body.toResponseBody(headers["Content-Type"]?.toMediaType())).build()
+    }
+
+    @Test
+    fun probeReadsRangeSupportAndSize() {
+        val ranged = AgentFileProbe.of(response(206, mapOf("Content-Range" to "bytes 0-1/48213", "Content-Type" to "video/mp4", "ETag" to "W/\"1\"")))
+        assertEquals(AgentFileProbe(size = 48213, mime = "video/mp4", supportsRanges = true, entityTag = "W/\"1\""), ranged)
+        val whole = AgentFileProbe.of(response(200, mapOf("Content-Length" to "900", "Content-Type" to "application/pdf")))
+        assertTrue(whole.size == 900L && !whole.supportsRanges)
+        assertEquals(0L, AgentFileProbe.of(response(416, mapOf("Content-Range" to "bytes */0"))).size)
+        assertNull(AgentFileProbe.totalLength("bytes 0-1/*"))
+    }
+
+    @Test
+    fun streamingAsksForExactlyTheBytesAVFoundationWants() {
+        assertEquals("bytes=0-1", StreamingFileLoader.rangeHeader(offset = 0, length = 2, toEnd = false))
+        assertEquals("bytes=1000-1499", StreamingFileLoader.rangeHeader(offset = 1000, length = 500, toEnd = false))
+        assertEquals("bytes=1000-", StreamingFileLoader.rangeHeader(offset = 1000, length = 500, toEnd = true))
+    }
+
+    @Test
+    fun errorsReadAsUserFacingCopy() {
+        assertEquals(AgentFileError.NotFound, AgentFileError.from(404))
+        assertNull(AgentFileError.from(206))
+        assertEquals("File Not Found", AgentFileError.NotFound.title)
+        assertEquals("Couldn’t Open File", AgentFileError.Server(500).title)
+    }
+
+    @Test
+    fun textDocumentsSplitLinesAndClampTheFocus() {
+        val document = AgentTextDocument.of("let a = 1\nlet b = 2\n", fileName = "a.swift", focusLine = 2)
+        val lines = (0 until document.displayLineCount).map { index -> document.lineRange(index).let { document.text.substring(it.first, it.last + 1) } }
+        assertEquals(listOf("let a = 1", "let b = 2"), lines)
+        assertEquals(2, document.focusLine)
+        assertNull(AgentTextDocument.of("x", fileName = "a.txt", focusLine = 9).focusLine)
+    }
+
+    @Test
+    fun jsonFormattingAndLineFoldingKeepParagraphsBoundedAndUTF8Safe() {
+        val raw = """{"items":[{"id":"a:1,b:2","empty":{},"list":[],"escaped":"quote \" { } [ ] , : end"}],"ok":true}"""
+        val formatted = AgentTextDocument.formatJSON(raw)
+        assertTrue(formatted.contains("\"id\": \"a:1,b:2\""))
+        assertTrue(formatted.contains("\"empty\": {}"))
+        assertTrue(formatted.contains("\"list\": []"))
+        assertTrue(formatted.contains(""""escaped": "quote \" { } [ ] , : end""""))
+
+        // Multi-byte UTF-8 scalars (4-byte emoji) never split mid-scalar when folded.
+        val emojiLine = "🦊".repeat(1_500) // 6,000 UTF-8 bytes on one line
+        val folded = AgentTextDocument.foldLongLines(emojiLine, maxLineBytes = 4_096)
+        val scan = AgentTextDocument.scan(folded.encodeToByteArray())
+        assertEquals(2, scan.lineCount)
+        assertTrue(scan.longestLineBytes <= 4_096)
+        assertEquals(emojiLine, folded.replace("\n", ""))
+
+        // Escapes at `maxLineBytes - 1` or right after a multi-byte scalar at the boundary
+        // still fold subsequent runs and finish within budget.
+        val limit = 100
+        val boundaryPrefix = "a".repeat(91) + """\"""" + "b".repeat(95) + "🦊" + """\""""
+        val boundaryChunk = "c".repeat(99) + """\n"""
+        val escapedJSON = """{"k":"""" + boundaryPrefix + boundaryChunk.repeat(5_000) + """"}"""
+        val started = System.nanoTime()
+        val formattedEscaped = AgentTextDocument.formatJSON(escapedJSON, maxLineBytes = limit)
+        val elapsedMs = (System.nanoTime() - started) / 1e6
+        val escapedScan = AgentTextDocument.scan(formattedEscaped.encodeToByteArray())
+        assertTrue("Longest line was ${escapedScan.longestLineBytes} bytes", escapedScan.longestLineBytes <= limit + 2)
+        assertTrue(escapedScan.lineCount > 5_000)
+        assertTrue("Boundary-escape JSON format took $elapsedMs ms", elapsedMs < 50)
+    }
+
+    @Test
+    fun singleLine200KBJSONAndLongLinesStayWithinHighlightBudget() {
+        val entries = (0 until 2_000).joinToString(",") { i ->
+            """{"id":"item_$i","index":$i,"active":true,"score":$i.5,"message":"Payload entry number $i with realistic text content"}"""
+        }
+        val singleLine200KB = "[$entries]"
+        assertTrue(singleLine200KB.encodeToByteArray().size > 200_000)
+
+        var started = System.nanoTime()
+        val tokens = SyntaxHighlighter.tokens(singleLine200KB, language = "json")
+        var elapsedMs = (System.nanoTime() - started) / 1e6
+        assertTrue("200 KB single-line JSON highlight took $elapsedMs ms", elapsedMs < 50)
+        assertTrue("Lines over 1,000 bytes render plain without token runs", tokens.isEmpty())
+
+        started = System.nanoTime()
+        val incremental = SyntaxHighlighter.highlightIncremental(singleLine200KB, language = "json", previous = null)
+        elapsedMs = (System.nanoTime() - started) / 1e6
+        assertTrue("200 KB single-line JSON incremental highlight took $elapsedMs ms", elapsedMs < 50)
+        assertTrue(incremental.tokens.isEmpty())
+
+        // A long line between short lines renders plain while short neighbors still highlight
+        // and incremental highlighting advances safePrefixUTF8Count past the long line.
+        val longLine = "let blob = \"" + "abcdefghij".repeat(150) + "\""
+        val mixed = "let before = 1\n$longLine\nlet after = 2\n"
+        val firstSource = "let before = 1\n$longLine\n"
+        val firstPass = SyntaxHighlighter.highlightIncremental(firstSource, language = "swift", previous = null)
+        assertEquals(firstSource.encodeToByteArray().size, firstPass.safePrefixUTF8Count)
+        val secondPass = SyntaxHighlighter.highlightIncremental(
+            mixed,
+            language = "swift",
+            previous = SyntaxHighlighter.Previous(firstSource, firstPass.safePrefixUTF8Count, firstPass.safePrefixTokens),
+        )
+        val colored = secondPass.tokens.map { mixed.substring(it.start, it.end) }
+        assertEquals("Short lines highlight while the >1,000-byte line between them stays plain", listOf("let", "1", "let", "2"), colored)
+
+        // A streaming code block crossing the 128 KB budget still advances safePrefixUTF8Count
+        // to the last complete line before the cap.
+        val line = "let counter = 12345\n" // 20 UTF-8 bytes
+        val beforeCap = line.repeat(6_500) // 130,000 bytes (< 131,072)
+        val afterCap = beforeCap + line.repeat(100) // 132,000 bytes (> 131,072)
+        val preCapResult = SyntaxHighlighter.highlightIncremental(beforeCap, language = "swift", previous = null)
+        assertEquals(beforeCap.encodeToByteArray().size, preCapResult.safePrefixUTF8Count)
+        val postCapResult = SyntaxHighlighter.highlightIncremental(
+            afterCap,
+            language = "swift",
+            previous = SyntaxHighlighter.Previous(beforeCap, preCapResult.safePrefixUTF8Count, preCapResult.safePrefixTokens),
+        )
+        assertTrue(
+            "Crossing 128 KB still advances safePrefixUTF8Count to the boundary line",
+            postCapResult.safePrefixUTF8Count > preCapResult.safePrefixUTF8Count,
+        )
+        assertTrue(postCapResult.safePrefixUTF8Count <= SyntaxHighlighter.maxHighlightedUTF8Bytes)
+    }
+
+    /**
+     * The build half of iOS's test (format, fold and highlight off the main thread within
+     * budget). Its paint, wrap-toggle and memory-footprint probes drive `UIHostingController`
+     * and `drawHierarchy` (UIKit-only).
+     */
+    @Test
+    fun largeFilesFormatAndHighlightOffMainActorAndRenderWithinBudget() = runTest {
+        val directory = temporaryDirectory("large-file-test").apply { mkdirs() }
+        try {
+            suspend fun verifyCase(
+                minBytes: Int,
+                name: String,
+                focusLine: Int? = null,
+                buildBudgetMs: Double,
+                makeText: () -> String,
+                check: (AgentTextDocument) -> Unit = {},
+            ) {
+                val file = File(directory, name)
+                val text = makeText()
+                assertTrue(text.encodeToByteArray().size > minBytes)
+                file.writeText(text)
+                val started = System.nanoTime()
+                val loaded = AgentFileViewerModel.loadTextContent(file, fileName = name, focusLine = focusLine, isMarkdown = false)
+                val elapsedMs = (System.nanoTime() - started) / 1e6
+                val document = (loaded as? AgentFileViewerModel.Content.Text)?.document
+                assertNotNull("Expected a text document for $name", document)
+                assertTrue(document!!.usesLazyTextView)
+                assertTrue("$name build took $elapsedMs ms", elapsedMs < buildBudgetMs)
+                check(document)
+                file.delete()
+            }
+
+            verifyCase(
+                minBytes = 5_000_000,
+                name = "pretty-5mb.json",
+                focusLine = 100_000,
+                buildBudgetMs = 500.0,
+                makeText = {
+                    val prettyEntries = (0 until 4_000).joinToString(",\n") { i ->
+                        """
+                          {
+                            "id": "item_$i",
+                            "index": $i,
+                            "active": ${if (i % 2 == 0) "true" else "false"},
+                            "score": ${i * 17}.42,
+                            "message": "Payload entry number $i with realistic text content for the viewer"
+                          }
+                        """.trimIndent().prependIndent("  ")
+                    }
+                    "[\n" + "$prettyEntries,\n".repeat(6) + prettyEntries + "\n]\n"
+                },
+                check = { doc ->
+                    assertEquals(100_000, doc.focusLine)
+                    assertNotNull(doc.focusRange)
+                },
+            )
+            verifyCase(
+                minBytes = 4_800_000,
+                name = "minified-5mb.json",
+                buildBudgetMs = 500.0,
+                makeText = {
+                    val minifiedEntries = (0 until 6_500).joinToString(",") { i ->
+                        """{"id":"item_$i","index":$i,"active":true,"score":$i.5,"message":"Payload entry number $i with realistic text content"}"""
+                    }
+                    "[" + "$minifiedEntries,".repeat(5) + minifiedEntries + "]"
+                },
+                check = { doc -> assertTrue("Minified 5 MB JSON is formatted into indented lines", doc.lineCount > 200_000) },
+            )
+            verifyCase(
+                minBytes = 5_000_000,
+                name = "server-5mb.log",
+                buildBudgetMs = 500.0,
+                makeText = {
+                    val logChunk = (0 until 50).joinToString("\n") { i ->
+                        "2026-10-18T12:00:${"%02d".format(i)}Z INFO worker[$i] " + "frame=$i ".repeat(600)
+                    }
+                    "$logChunk\n".repeat(22)
+                },
+                check = { doc ->
+                    assertTrue(AgentTextDocument.scan(doc.text.encodeToByteArray()).longestLineBytes <= AgentTextDocument.maxParagraphBytes)
+                },
+            )
+            verifyCase(
+                minBytes = 5_000_000,
+                name = "changes-5mb.diff",
+                buildBudgetMs = 500.0,
+                makeText = {
+                    val diffHunk = """
+                        diff --git a/OpenCode/SessionView.swift b/OpenCode/SessionView.swift
+                        index 1234567..89abcdef 100644
+                        --- a/OpenCode/SessionView.swift
+                        +++ b/OpenCode/SessionView.swift
+                        @@ -10,6 +10,8 @@ struct SessionView: View {
+                           let title: String
+                        +  let subtitle: String = "Added line in diff hunk"
+                        +  let count: Int = 42
+                           var body: some View { Text(title) }
+                        }
+                    """.trimIndent()
+                    "$diffHunk\n".repeat(16_000)
+                },
+            )
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun cacheKeysSeparateServersAndPaths() {
+        val cache = temporaryDirectory("agent-file-cache")
+        val a = OpenCodeServer(url = "https://a:4096", username = "opencode", password = "")
+        val b = OpenCodeServer(url = "https://b:4096", username = "opencode", password = "")
+        val first = AgentFileLoader.cacheURL(a, absolutePath = "/tmp/x.mp4", name = "x.mp4", cacheDirectory = cache)
+        assertEquals("x.mp4", first.name)
+        assertNotEquals(AgentFileLoader.cacheURL(b, absolutePath = "/tmp/x.mp4", name = "x.mp4", cacheDirectory = cache), first)
+        assertNotEquals(AgentFileLoader.cacheURL(a, absolutePath = "/var/x.mp4", name = "x.mp4", cacheDirectory = cache), first)
+    }
+
+    /** iOS also asserts `NetworkRetry.policy == .once`; the loader's client sends once by construction ([AgentFileLoader.client]). */
+    @Test
+    fun probeAndDownloadAttachCustomServerHeadersAndRecordContact() = runTest {
+        val server = OpenCodeServer(
+            url = "http://100.101.102.103:4096",
+            username = "opencode",
+            password = "pw",
+            headers = listOf(
+                OpenCodeServer.Header(name = "CF-Access-Client-Id", value = "id-123"),
+                OpenCodeServer.Header(name = "CF-Access-Client-Secret", value = "sec-456"),
+            ),
+        )
+        val rawRequest = Request.Builder().url("http://100.101.102.103:4096/api/fs/read/demo.txt?location%5Bdirectory%5D=/tmp").build()
+        val contact = ServerContact()
+        val probed = Locked<Request?>(null)
+        val probe = AgentFileLoader.probe(
+            rawRequest,
+            server = server,
+            contact = contact,
+            client = client { request ->
+                probed.set(request)
+                answered(request, 206, mapOf("Content-Range" to "bytes 0-1/12", "Content-Type" to "text/plain"))
+            },
+        )
+        val sent = probed.current!!
+        assertEquals("bytes=0-1", sent.header("Range"))
+        assertEquals("id-123", sent.header("CF-Access-Client-Id"))
+        assertEquals("sec-456", sent.header("CF-Access-Client-Secret"))
+        assertEquals(server.basicAuthorization, sent.header("Authorization"))
+        assertEquals(AgentFileProbe(size = 12, mime = "text/plain", supportsRanges = true), probe)
+        assertTrue(contact.hasAnsweredHTTPOrigin(rawRequest.url))
+
+        val directory = temporaryDirectory("agent-file-test")
+        val destination = File(directory, "demo.txt")
+        try {
+            val downloadContact = ServerContact()
+            val downloadedRequest = Locked<Request?>(null)
+            val progress = Locked(listOf<Pair<Long, Long?>>())
+            val downloaded = AgentFileLoader.download(
+                rawRequest,
+                destination = destination,
+                server = server,
+                contact = downloadContact,
+                client = client { request ->
+                    downloadedRequest.set(request)
+                    answered(request, 200, emptyMap(), body = "hello world\n")
+                },
+                progress = { received, expected -> progress.update { it + (received to expected) } },
+            )
+            val request = downloadedRequest.current!!
+            assertEquals("id-123", request.header("CF-Access-Client-Id"))
+            assertEquals("sec-456", request.header("CF-Access-Client-Secret"))
+            assertEquals(server.basicAuthorization, request.header("Authorization"))
+            assertEquals(listOf(12L to 12L), progress.current)
+            assertEquals(destination, downloaded)
+            assertEquals("hello world\n", AgentFileLoader.readText(downloaded))
+            assertTrue(downloadContact.hasAnsweredHTTPOrigin(rawRequest.url))
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    /**
+     * iOS also covers IPv6 zone-scoped origins (`http://[fe80::1%25en0]:4096`); OkHttp's `HttpUrl`
+     * rejects zone IDs, so such a request can't be built on Android.
+     */
+    @Test
+    fun foreignOriginRequestsExcludeServerAuthAndCustomHeaders() = runTest {
+        val server = OpenCodeServer(
+            url = "http://100.101.102.103:4096",
+            username = "opencode",
+            password = "pw",
+            alternateURLs = listOf("https://box.tail1234.ts.net", "http://[fe80::1%25en0]:4096"),
+            headers = listOf(
+                OpenCodeServer.Header(name = "CF-Access-Client-Id", value = "id-123"),
+                OpenCodeServer.Header(name = "CF-Access-Client-Secret", value = "sec-456"),
+            ),
+        )
+        val alternateRequest = AgentFileLoader.authorizedRequest(
+            Request.Builder().url("https://box.tail1234.ts.net:443/api/fs/read/demo.txt").build(),
+            server,
+        )
+        assertEquals(server.basicAuthorization, alternateRequest.header("Authorization"))
+        assertEquals("id-123", alternateRequest.header("CF-Access-Client-Id"))
+
+        for (foreign in listOf(
+            "https://cdn.example.com/demo.txt",
+            "http://100.101.102.103:8080/api/fs/read/demo.txt",
+            "https://100.101.102.103:4096/api/fs/read/demo.txt",
+            "http://[fe80::1]:4096/api/fs/read/demo.txt",
+        )) {
+            val url = foreign.toHttpUrl()
+            val contact = ServerContact()
+            val sent = Locked<Request?>(null)
+            AgentFileLoader.probe(
+                Request.Builder().url(url).build(),
+                server = server,
+                contact = contact,
+                client = client { request ->
+                    sent.set(request)
+                    answered(request, 206, mapOf("Content-Range" to "bytes 0-1/12", "Content-Type" to "text/plain"))
+                },
+            )
+            val request = sent.current!!
+            assertNull("leaked Authorization to $foreign", request.header("Authorization"))
+            assertNull("leaked custom header to $foreign", request.header("CF-Access-Client-Id"))
+            assertNull("leaked custom header to $foreign", request.header("CF-Access-Client-Secret"))
+            assertFalse(contact.hasAnsweredHTTPOrigin(url))
+        }
+    }
+}

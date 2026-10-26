@@ -4,7 +4,11 @@ import ai.opencode.core.testing.TestIsolationRule
 import ai.opencode.server.retry.NetworkPathMonitor
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
+import ai.opencode.server.model.AgentFileReference
+import org.junit.Assert.assertFalse
 import okhttp3.Request
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -17,7 +21,8 @@ import org.junit.Test
  * store). `NetworkPathMonitor` and `TransportFailure` are `:server`'s. Android has no
  * per-request `allowsConstrainedNetworkAccess`: the preview transport refuses every request on a
  * constrained path (`LinkPreviewTransport.ConstrainedRefusal`), so those request asserts have
- * no counterpart; the loaders' deferral is checked as on iOS.
+ * no counterpart; the loaders' deferral is checked as on iOS. `AgentImagePreviews` (media) is
+ * ported in full.
  */
 class LowDataModeTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -127,5 +132,111 @@ class LowDataModeTests {
             assertTrue(arrivedRows.flatten().contains("row-post"))
             store.close()
         }
+    }
+    @Test
+    fun agentImagePreviewsDeferInLowDataModeRecoverWhenUnconstrainedAndKeepRefusedRechecksUnconfirmed() = runTest {
+        val constrained = Locked(true)
+        val loadRequests = Locked(listOf<AgentImageRequest>())
+        val probeRequests = Locked(listOf<AgentImageRequest>())
+        val path = MutableSharedFlow<NetworkPathMonitor.Snapshot>(replay = 1)
+        val dispatcher = StandardTestDispatcher(testScheduler)
+
+        val previews = AgentImagePreviews(
+            sizes = AgentImageSizeCache.inMemory,
+            loader = { request, _, _ ->
+                loadRequests.update { it + request }
+                if (!request.allowsConstrainedNetworkAccess && constrained.current) {
+                    throw AgentImageDownload.FailureException(AgentImageDownload.Failure.Constrained)
+                }
+                AgentImageResponse.File(AgentImageFixtures.red, AgentImageValidators(entityTag = "\"v1\""))
+            },
+            decoder = AgentImageFixtures.decoder,
+            sleep = {},
+            prober = { request, _ ->
+                probeRequests.update { it + request }
+                AgentImageProbeResult.Size(AgentImageSize(40.0, 30.0), entityTag = "\"v1\"")
+            },
+            shouldDeferPrefetch = { constrained.current },
+            pathUpdates = { path },
+            dispatcher = dispatcher,
+        )
+
+        val key = AgentImageKey(server = "s", path = "/game/hero.png")
+        val sighting = AgentImageSighting(key, "reply-1")
+        val request = AgentImageRequest(Request.Builder().url("http://lab/api/fs/read/hero.png").build())
+
+        // 1. The accessibility value distinguishes Data Saver deferral inside the project from outside-the-project files.
+        assertEquals("Deferred for Low Data Mode", AgentImagePlan.outsideAccessibilityValue(AgentFileReference(path = "hero.png"), "/game"))
+        assertEquals("Outside the project", AgentImagePlan.outsideAccessibilityValue(AgentFileReference(path = "/etc/hosts.png"), "/game"))
+
+        // 2. Under Data Saver, un-allowed images in the session folder are deferred to Tap to load (outside).
+        assertTrue(previews.isDeferredByNetwork(key))
+        val deferredPlan = AgentImagePlan.make(
+            files = listOf(AgentFileReference(path = "hero.png")),
+            directory = "/game",
+            phase = { _, _ -> previews.entry(key).phase },
+            allowed = { previews.isAllowed(key) && it.absolutePath == key.path },
+            deferred = { previews.isDeferredByNetwork(key) },
+        )
+        assertEquals(listOf("hero.png"), deferredPlan.outside.map { it.path })
+        assertTrue(deferredPlan.previews.isEmpty())
+
+        // Probe and show both defer without hitting the network.
+        previews.probe(key, request)
+        previews.show(sighting, request)
+        delay(20)
+        assertTrue(probeRequests.current.isEmpty())
+        assertTrue(loadRequests.current.isEmpty())
+
+        // 3. When the path becomes unconstrained while visible, the deferred image probes and loads.
+        constrained.set(false)
+        path.emit(NetworkPathMonitor.Snapshot(isSatisfied = true, primaryInterface = "wifi wlan0", isExpensive = false, isConstrained = false))
+        for (i in 0 until 100) {
+            if (previews.entry(key).phase == AgentImagePreviews.Phase.Loaded) break
+            delay(5)
+        }
+        assertEquals(AgentImagePreviews.Phase.Loaded, previews.entry(key).phase)
+        assertFalse(previews.isDeferredByNetwork(key))
+        assertTrue(previews.isFresh(sighting))
+        previews.close()
+
+        // 4. A revalidation (a second reply naming the same file) refused under Data Saver must NOT mark the new sighting fresh.
+        val recheckPreviews = AgentImagePreviews(
+            sizes = AgentImageSizeCache.inMemory,
+            loader = { request, validators, _ ->
+                loadRequests.update { it + request }
+                if (validators != null && !request.allowsConstrainedNetworkAccess) {
+                    throw AgentImageDownload.FailureException(AgentImageDownload.Failure.Constrained)
+                }
+                AgentImageResponse.File(AgentImageFixtures.blue, AgentImageValidators(entityTag = "\"v1\""))
+            },
+            decoder = AgentImageFixtures.decoder,
+            sleep = {},
+            shouldDeferPrefetch = { false },
+            pathUpdates = { emptyFlow() },
+            dispatcher = dispatcher,
+        )
+        loadRequests.set(emptyList())
+        val firstSighting = AgentImageSighting(key, "reply-a")
+        val secondSighting = AgentImageSighting(key, "reply-b")
+        recheckPreviews.show(firstSighting, request)
+        for (i in 0 until 100) {
+            if (recheckPreviews.entry(key).phase == AgentImagePreviews.Phase.Loaded) break
+            delay(5)
+        }
+        assertTrue(recheckPreviews.isFresh(firstSighting))
+
+        recheckPreviews.show(secondSighting, request)
+        for (i in 0 until 100) {
+            if (loadRequests.current.size >= 2 && recheckPreviews.activeReads == 0) break
+            delay(5)
+        }
+        assertEquals(AgentImagePreviews.Phase.Loaded, recheckPreviews.entry(key).phase)
+        assertFalse(recheckPreviews.entry(key).rechecking)
+        assertFalse(
+            "Refused revalidation must remain unconfirmed so tapping fetches the current file",
+            recheckPreviews.isFresh(secondSighting),
+        )
+        recheckPreviews.close()
     }
 }
