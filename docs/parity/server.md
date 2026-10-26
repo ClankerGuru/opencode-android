@@ -98,7 +98,8 @@ fixtures: `server/src/testFixtures` (`WireFixture`, `ServerTestIsolation`); the 
 | `ModelVisibilityTests.swift` | `model/ModelVisibilityTests.kt` | 6 (Rules) | Pickers/Settings tests → `:feature:session`/`:feature:settings` |
 | `SessionLinkTests.swift` | `model/SessionLinkTests.kt` | 1 (`linkURLRoundTripsItsIDAndTitle`) | parsing/presentation → `:feature:transcript`; session/Home/menu → features |
 | `TestIsolationGuardTests.swift` | `testing/ServerTestIsolationTests.kt` | 1 (network block) | rest in `:core` (see core.md) |
-| `AgentFileTests.swift` | `model/AgentFileReferenceTests.kt` | 8 (`AgentFileReferenceTests`) | `toolRowsOfferViewableFiles` not ported yet (`:server`); rest → `:feature:media`/`:feature:transcript` (see media.md) |
+| `AgentFileTests.swift` | `model/AgentFileReferenceTests.kt` | 9 (`AgentFileReferenceTests`; `toolRowsOfferViewableFiles` of `AgentFileMarkdownTests`) | rest → `:feature:media`/`:feature:transcript` (see media.md) |
+| `PastedTextTests.swift` | `model/PastedTextTests.kt` | 5 (4 `PastedTextThresholdTests`, `promptCarriesThePasteAsAnInlineTextFile`) | `plainDocumentSplitsLinesWithoutHighlighting` → `:feature:media`; composer/outbox/`SessionFeature` → `:feature:session`; read-back/fold → `:feature:transcript` |
 | `BrowserTests.swift` | `live/PagePromptBodyTests.kt` | 5 (`PagePromptBodyTests`) | rest → `:feature:media`/session/voice (see media.md) |
 | `ServerDetailsTests.swift` | `live/ServerDetailsTests.kt` | 3 (`decodesEveryMCPStatus`, `decodesCredentialAndEnvironmentAccounts`, `onlyMCPConnectIsRetriedWhenUnsent`) | `OpenCodeAccount.subtitle` (`ServerDetailsTrays`) and the reducer tests → `:feature:settings`; here the accounts test checks provider/method/label |
 | `ConnectionHealthTests.swift` | `ConnectionHealthTests.kt` | 2 (`routes`, `routesClassifyParsedAddressesNotSpellings`) | health machine, trace, card names → `:feature:settings` |

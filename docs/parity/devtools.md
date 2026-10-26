@@ -95,7 +95,7 @@ problem report, Motion Watch, perf windows) are tested there (core.md).
 
 | iOS file | Kotlin file | Ported | Skipped (owner) | Dropped (reason) |
 | --- | --- | ---: | --- | --- |
-| `TraceTests.swift` (`TraceUploadsTests`, half of `DiagnosticsPrivacyTests`) | `traces/TraceTests.kt` | 13 | `theReportGoesToItsSessionElseTheMostRecentOne` and the `HomeFeature.problemReportContext` half of `noReportOutputCarriesTheServerAddressOrUsername` (`:feature:drawer`); `:core` suites (core.md); `VoiceTimelineTests` (`:feature:voice`) | `TeamFeedbackTests` (8: Team Feedback enrollment and Scrawl lanes, n/a on Android); retry half of `traceUploadRidesSendRetryPolicy` (todo: `DeveloperModeUploads.upload` in `:server` has no transport seam; the policy assert is ported) |
+| `TraceTests.swift` (`TraceUploadsTests`, half of `DiagnosticsPrivacyTests`) | `traces/TraceTests.kt` | 13 | `theReportGoesToItsSessionElseTheMostRecentOne` and the `HomeFeature.problemReportContext` half of `noReportOutputCarriesTheServerAddressOrUsername` (`:feature:drawer`); `:core` suites (core.md); `VoiceTimelineTests` (`:feature:voice`) | `TeamFeedbackTests` (8: Team Feedback enrollment and Scrawl lanes, n/a on Android) (`traceUploadRidesSendRetryPolicy` asserts the actual retries through `DeveloperModeUploads.upload(bundle, perform)`, iOS's `perform:` seam) |
 | `GlassShapeTests.swift` | `tuning/GlassShapeTests.kt` | 1 | `GlassShape.clamped` tests (`:core`) | – |
 | `TouchProbeTests.swift` | – | 0 | – | all 4: Touch Probe is n/a on Android (UIKit hit chains and gesture-recognizer states; `DiagnosticsRecorder` has no `recordTouch`) |
 | `MetricKitTests.swift` | – | 0 | – | all 6: MetricKit payload store and summaries (iOS-only; Android has no MetricKit counterpart wired) |

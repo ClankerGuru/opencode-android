@@ -106,7 +106,7 @@ port; "dropped" ones can't exist on Android, and each Kotlin file's header lists
 | `MarkLoadingTests.swift` | `list/MarkLoadingTests.kt` | 6 | – | 4 scene/window/cell lifecycle tests; `cancellingHandoffRestoresInteraction…` (view snapshot; Android crossfades `emptyHandoff`) |
 | `PromotionMorphTests.swift` | – | 0 | – | 3 UIKit cell transform/mask/reuse tests |
 | `UserMessageRunTests.swift` | `user/UserMessageRunTests.kt` | 4 | – | – |
-| `PastedTextTests.swift` | `user/PastedTextTests.kt` | 4 | 5 threshold tests (`:server`, `:feature:media`); 5 composer/outbox tests and Copy's half (`:feature:session`); `promptCarriesThePaste…` (`:server`) | `theSummaryIsComputedOnce…`, `aLongBubbleFoldsAndOpensInPlace` (hosting sizing; the fold is `foldsPastTwelveLines`) |
+| `PastedTextTests.swift` | `user/PastedTextTests.kt` | 4 | 5 threshold tests (4 `:server`, 1 `:feature:media`); 5 composer/outbox tests and Copy's half (`:feature:session`); `promptCarriesThePaste…` (`:server`) | `theSummaryIsComputedOnce…`, `aLongBubbleFoldsAndOpensInPlace` (hosting sizing; the fold is `foldsPastTwelveLines`) |
 | `ModelSwitchRuleTests.swift` | `rows/ModelSwitchRuleTests.kt` | 6 | – | – |
 | `InlineRowsTests.swift` | `rows/InlineRowsTests.kt` | 11 | – | `aLostEdgeCountsFromTheRequest` (CALayer edge band; Android's disclosure is the row's own spring and clip) |
 | `LinkPreviewMotionTests.swift` | `links/LinkPreviewMotionTests.kt` | 3 | – | `catchUpBeforeFirstLayout…` (UIKit list harness; `landArrivals` computes from now) |

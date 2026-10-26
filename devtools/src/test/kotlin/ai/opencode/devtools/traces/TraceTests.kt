@@ -29,7 +29,16 @@ import ai.opencode.server.model.OpenCodeDelivery
 import ai.opencode.server.model.OpenCodeFileReference
 import ai.opencode.server.model.OpenCodeUploadEvent
 import ai.opencode.server.model.PromptContext
+import ai.opencode.core.dependencies.withDependenciesSuspending
+import ai.opencode.server.retry.NetworkRetry
+import ai.opencode.server.retry.RetryEnvironment
 import ai.opencode.server.retry.RetryPolicy
+import okhttp3.Protocol
+import okhttp3.Response
+import okhttp3.ResponseBody.Companion.toResponseBody
+import java.net.SocketException
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.time.Duration
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -95,8 +104,6 @@ private class Gate {
  *   debuggable flag, so the recorder's own (false) answer stands in.
  * - `theReportGoesToItsSessionElseTheMostRecentOne` and the `HomeFeature.problemReportContext`
  *   half of `noReportOutputCarriesTheServerAddressOrUsername` belong to `:feature:drawer`.
- * - `traceUploadRidesSendRetryPolicy` keeps the policy assert; `DeveloperModeUploads.upload`
- *   (`:server`) has no transport seam for its retry half.
  * - Copy reads “OpenCode Android” where iOS's reads “OpenCode iOS”.
  */
 class TraceUploadsTests {
@@ -497,8 +504,44 @@ class TraceUploadsTests {
     }
 
     @Test
-    fun traceUploadRidesSendRetryPolicy() {
+    fun traceUploadRidesSendRetryPolicy() = runBlocking {
         assertEquals(RetryPolicy.send, TraceUploadsFeature.RETRY_POLICY)
+        val device = ProblemReportDevice(appVersion = "0.1.0", build = "37", distribution = "TestFlight", system = "iOS 26.0", model = "iPhone18,2")
+        val bundle = ProblemReportBuilder.make(
+            id = UUID.fromString("4DB11E09-4794-431A-897C-F9571032F194"),
+            context = context, device = device, now = Instant.ofEpochSecond(1_000),
+            events = emptyList(), screenshot = null,
+        )
+        val attempts = AtomicInteger(0)
+        val clock = SleepRecordingClock()
+        val ok = withDependenciesSuspending({ this[SharedStore] = SharedStore.inMemory() }) {
+            NetworkRetry.policy.withValue(TraceUploadsFeature.RETRY_POLICY) {
+                NetworkRetry.clock.withValue(clock) {
+                    NetworkRetry.environment.withValue(RetryEnvironment.online(unit = 0.0)) {
+                        DeveloperModeUploads.upload(bundle) { request ->
+                            // iOS `URLError(.networkConnectionLost)`.
+                            if (attempts.incrementAndGet() < 3) throw SocketException("Connection reset")
+                            Response.Builder().request(request).protocol(Protocol.HTTP_1_1).code(201).message("Created")
+                                .body(ByteArray(0).toResponseBody()).build()
+                        }
+                    }
+                }
+            }
+        }
+        assertTrue(ok)
+        assertEquals(3, attempts.get())
+        assertEquals(2, clock.sleeps.size)
+    }
+
+    /** iOS `ScriptedClock`: sleeps return at once, each recorded. */
+    private class SleepRecordingClock : Clock {
+        private var time = Duration.ZERO
+        val sleeps = mutableListOf<Duration>()
+        override fun now(): Duration = synchronized(this) { time }
+        override suspend fun sleep(duration: Duration) = synchronized(this) {
+            sleeps += duration
+            time += duration
+        }
     }
 
     @Test
