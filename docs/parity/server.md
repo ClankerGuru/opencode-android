@@ -108,6 +108,9 @@ fixtures: `server/src/testFixtures` (`WireFixture`, `ServerTestIsolation`); the 
 | `ProjectIconTests.swift` | `model/ProjectIconTests.kt` | 3 (`ProjectMark`, `OpenCodeProjectIcon`, `project.updated` frame) | rendering/loader → `:feature:drawer`; flag → `:core` |
 | `FileAttachmentTests.swift` | `model/FileAttachmentTests.kt` (`PromptPresentationTests`, `FileAttachmentWireTests`) | 4 + 3 | the `TranscriptEntry.build` check of `fileOnlyMessagesHaveNoBubble` → `:feature:transcript`; rest → core/session/composer/system |
 | `NewSessionDraftTests.swift` | `model/NewSessionDraftTests.kt` | 2 (`OpenCodeProject.folder`, `directoryListing`) | rest → `:feature:session`/drawer/`:app` |
+| `ComposerAutocompleteTests.swift` | `live/ComposerAutocompleteTests.kt` | 1 (`experimentalFlagOffProducesByteIdenticalPromptBodyToMain`; `promptBody` is internal here) | rest → `:feature:composer`/`:feature:session` |
+| `SubagentStackTests.swift` | `model/SubagentStackTests.kt` | 1 (`descendantsFollowTheFamilyTree`, `SessionActivity.descendants`) | stack → `:feature:drawer`; back rules → `:core` |
+| `TranscriptEntryTests.swift` (`TaskListAndExecuteTests`) | `model/TranscriptEntryTests.kt` (`TaskListAndExecuteTests`) | 1 (`executeRowsNameTheToolsTheirScriptCalls`, `OpenCodeToolCall.calledTools`/`subtitle`) | rest → `:feature:transcript`/`:feature:session` |
 | `MarkdownBlockTests.swift` | `MarkdownBlockTests.kt` | 1 (`markdownImage` cache; key is `OpenCodeClient.markdownImageKey`) | rest → `:feature:transcript`/`:feature:media`/`:feature:session` |
 
 Bugs the ports found (fixed): EACCES socket errors were retried; a refused cleartext redirect to
@@ -115,4 +118,4 @@ another host read as interrupted; OkHttp's 5-per-host cap queued family fan-out;
 queries encoded `/` as `%2F`; transport failures recorded no failure phase
 (`DiagnosticsNetworkPhases`, found by the core `DiagnosticsRecorderTests`).
 
-Total: 241 `:server` tests (`./gradlew :server:testDebugUnitTest`; 2 skipped: opt-in live checks), all passing.
+Total: 244 `:server` tests (`./gradlew :server:testDebugUnitTest`; 2 skipped: opt-in live checks), all passing.
