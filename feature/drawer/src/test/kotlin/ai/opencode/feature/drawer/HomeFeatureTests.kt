@@ -30,19 +30,16 @@ import ai.opencode.feature.system.notifications.SessionNotificationsClient
 import ai.opencode.feature.voice.CallVoice
 import ai.opencode.feature.voice.VoiceEngine
 import ai.opencode.feature.voice.VoiceSharedKeys
-import ai.opencode.server.CachedTranscriptSnapshots
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.OpenCodeServerEvent
 import ai.opencode.server.ServerSharedKeys
-import ai.opencode.server.TranscriptCachePersistence
 import ai.opencode.server.model.OpenCodeNotifyPluginStatus
 import ai.opencode.server.model.OpenCodePendingRequests
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.OpenCodeTranscriptItem
 import ai.opencode.server.model.SessionActivity
-import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -59,6 +56,11 @@ import java.time.Instant
  * Settings, busy state and priority, the transcript caches, snapshots, prefetch and attention.
  * The drawer's pins, mutes, deletion and read state are in `HomeFeatureTestsDrawer.kt`;
  * navigation and the connection in `HomeFeatureTestsNavigation.kt`.
+ *
+ * `transcriptSnapshotRoundTripsAndInvalidatesWhenSessionChanges`,
+ * `transcriptPersistenceCoalescesAndKeepsProtectedFormat` and
+ * `transcriptPersistenceBoundsLargeSnapshotsBeforeItsSingleFinalEncode` use only `:server` types:
+ * they are in `server/src/test/.../TranscriptCachePersistenceTests.kt`.
  */
 class HomeFeatureTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -73,8 +75,6 @@ class HomeFeatureTests {
         directory: String = "/tmp/demo",
         updatedAt: Instant = date(1_000),
     ) = OpenCodeSession(id = id, title = title, projectID = projectID, directory = directory, updatedAt = updatedAt)
-
-    private val decoder = Json { ignoreUnknownKeys = true; explicitNulls = false }
 
     /** Notifications need a server plugin most people won't have yet, so a send never interrupts with an offer. */
     @Test
@@ -321,31 +321,6 @@ class HomeFeatureTests {
     }
 
     @Test
-    fun transcriptSnapshotRoundTripsAndInvalidatesWhenSessionChanges() {
-        val server = OpenCodeServer(url = "https://saved.example", username = "", password = "")
-        val updatedAt = date(1_000)
-        val session = OpenCodeSession(id = "ses_cached", title = "Cached", projectID = "p", directory = "/p", updatedAt = updatedAt)
-        val items = listOf(
-            OpenCodeTranscriptItem.UserText(id = "m1", text = "hello"),
-            OpenCodeTranscriptItem.AssistantMarkdown(id = "m2", text = "**Hi**\n\n```swift\nlet n = 1\n```"),
-            OpenCodeTranscriptItem.Compaction(id = "m3"),
-        )
-        val cache = CachedTranscriptSnapshots().replaceEntries(
-            server.persistenceID,
-            listOf(CachedTranscriptSnapshots.Entry(serverID = server.persistenceID, sessionID = session.id, updatedAt = updatedAt, items = items)),
-        )
-        val restored = decoder.decodeFromString(CachedTranscriptSnapshots.serializer(), requireNotNull(cache.encodedForPersistence()).decodeToString())
-        val restoredItems = requireNotNull(restored.validItems(server.persistenceID, listOf(session))[session.id])
-        assertEquals(items.map { it.id }, restoredItems.map { it.id })
-        assertEquals(listOf("hello"), restoredItems.mapNotNull { (it as? OpenCodeTranscriptItem.UserText)?.text })
-
-        val changed = session.copy(updatedAt = updatedAt.plusSeconds(1))
-        assertEquals(items.map { it.id }, restored.validItems(server.persistenceID, listOf(changed))[session.id]?.map { it.id })
-        assertTrue(restored.validItems(server.persistenceID, emptyList()).isEmpty())
-        assertTrue(restored.validItems("another-server", listOf(session)).isEmpty())
-    }
-
-    @Test
     fun viewOnlyRefreshPublishesBoundedTranscriptForNextRestore() = homeTest { h ->
         val server = OpenCodeServer(url = "https://saved.example", username = "", password = "")
         val session = OpenCodeSession(id = "ses_cached", title = "Cached", projectID = "p", directory = "/p", updatedAt = date(1_000))
@@ -380,42 +355,6 @@ class HomeFeatureTests {
         val restored = h.state { HomeFeature.State(server, snapshot(listOf(session))).copy(transcriptCache = emptyMap()).restoringTranscriptCache() }
         assertEquals(cached, restored.transcriptCache[session.id])
         h.skipInFlightEffects()
-    }
-
-    @Test
-    fun transcriptPersistenceCoalescesAndKeepsProtectedFormat() {
-        val memory = TranscriptCachePersistence.Storage.Memory()
-        val storage = TranscriptCachePersistence.Storage.inMemory(memory)
-        val persistence = TranscriptCachePersistence.make(storage)
-        val first = CachedTranscriptSnapshots(entries = listOf(CachedTranscriptSnapshots.Entry(serverID = "server", sessionID = "first", updatedAt = distantPast, items = emptyList())))
-        val second = CachedTranscriptSnapshots(entries = listOf(CachedTranscriptSnapshots.Entry(serverID = "server", sessionID = "second", updatedAt = date(1_000), items = emptyList())))
-
-        persistence.schedule(first)
-        persistence.schedule(second)
-        persistence.flush()
-
-        assertEquals(second, persistence.load())
-        assertEquals(second, decoder.decodeFromString(CachedTranscriptSnapshots.serializer(), requireNotNull(storage.data()).decodeToString()))
-    }
-
-    @Test
-    fun transcriptPersistenceBoundsLargeSnapshotsBeforeItsSingleFinalEncode() {
-        val payload = "x".repeat(600_000)
-        val entries = (0 until CachedTranscriptSnapshots.MAXIMUM_ENTRIES).map { index ->
-            CachedTranscriptSnapshots.Entry(
-                serverID = "server",
-                sessionID = "ses_$index",
-                updatedAt = date(index),
-                items = listOf(OpenCodeTranscriptItem.UserText(id = "m_$index", text = payload)),
-            )
-        }
-        val snapshot = CachedTranscriptSnapshots(entries = entries)
-        val data = requireNotNull(snapshot.encodedForPersistence())
-        val decoded = decoder.decodeFromString(CachedTranscriptSnapshots.serializer(), data.decodeToString())
-
-        assertTrue(data.size <= CachedTranscriptSnapshots.MAXIMUM_BYTES)
-        assertTrue(decoded.entries.size < entries.size)
-        assertEquals(entries.first().sessionID, decoded.entries.firstOrNull()?.sessionID)
     }
 
     @Test
