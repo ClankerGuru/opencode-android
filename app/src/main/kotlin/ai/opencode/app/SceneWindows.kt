@@ -124,16 +124,16 @@ object SceneWindows {
     }
 
     internal fun join(window: RootStore): WindowRoster.Role {
-        val role = roster.join(window)
-        AppLog.app.notice("Window joined role=${role.name.lowercase()} windows=${roster.members.size}")
+        val role = window.roster.join(window)
+        AppLog.app.notice("Window joined role=${role.name.lowercase()} windows=${window.roster.members.size}")
         return role
     }
 
-    internal fun attached(window: RootStore) = roster.attached(window)
+    internal fun attached(window: RootStore) = window.roster.attached(window)
 
     internal fun detached(window: RootStore) {
         AppLog.app.notice("Window scene disconnected role=${window.role?.name?.lowercase() ?: "nil"}")
-        roster.detached(window)
+        window.roster.detached(window)
     }
 
     internal fun resumed(window: RootStore) {
@@ -151,15 +151,19 @@ object SceneWindows {
      * connected window in use if it is on that server, else the window doing the app-wide work
      * (with one window, always the first). A closed window's kept state never gets it.
      */
-    fun window(destination: NotificationDestination, receiving: RootStore): RootStore {
-        val owner = appWideWork.window ?: roster.appWideOwner as? RootStore
-        if (!roster.multipleWindows) return owner ?: receiving
+    fun window(destination: NotificationDestination, receiving: RootStore): RootStore =
+        window(destination, roster, appWideWork, active?.get()) ?: receiving
+
+    /** iOS `store(for:roster:work:active:)`: [window] for a given roster, work and window in use. */
+    fun window(destination: NotificationDestination, roster: WindowRoster, work: AppWideWork, active: RootStore?): RootStore? {
+        val owner = work.window ?: roster.appWideOwner as? RootStore
+        if (!roster.multipleWindows) return owner
         val onServer = roster.connectedMembers.filterIsInstance<RootStore>().filter {
             it.store.state.home?.server?.persistenceID == destination.serverKey
         }
         onServer.firstOrNull { it.store.state.home?.sessionDetail?.session?.id == destination.sessionID }?.let { return it }
-        active?.get()?.takeIf { it in onServer }?.let { return it }
-        return owner ?: receiving
+        active?.takeIf { it in onServer }?.let { return it }
+        return owner
     }
 
     fun callIsElsewhere(window: RootStore): Boolean {
@@ -210,8 +214,14 @@ object SceneWindows {
  * One window's part (iOS `WindowStore`), retained across configuration changes: its role
  * ([WindowRoster]) and its store. The primary restores as the app always has; a secondary
  * (tablet) starts from [AppFeature.State.window]. Resolved once, on the first `onCreate`.
+ * [roster], [appWideWork] and [makeStore] are the process-wide ones and a secondary's store
+ * unless a test hands in its own (iOS `WindowStore(roster:appWideWork:makeStore:)`).
  */
-class RootStore : ViewModel(), WindowRosterMember {
+class RootStore(
+    internal val roster: WindowRoster = SceneWindows.roster,
+    private val appWideWork: AppWideWork = SceneWindows.appWideWork,
+    private val makeStore: (SessionWindowTarget?, RootStore) -> Store<AppFeature.State, AppFeature.Action> = { target, window -> secondaryStore(target, window) },
+) : ViewModel(), WindowRosterMember {
     var role: WindowRoster.Role? = null
         private set
     lateinit var store: Store<AppFeature.State, AppFeature.Action>
@@ -231,7 +241,7 @@ class RootStore : ViewModel(), WindowRosterMember {
     val isResolved: Boolean get() = ::store.isInitialized && !isClosed
 
     /** iOS: a tablet's window follows the session it shows. A phone's one window is the app exactly as it was. */
-    val follows: Boolean get() = SceneWindows.roster.multipleWindows
+    val follows: Boolean get() = roster.multipleWindows
 
     /** The session shown, as the window's restorable value (iOS `SessionWindowFollow.shown`). */
     val shown: SessionWindowTarget?
@@ -244,28 +254,38 @@ class RootStore : ViewModel(), WindowRosterMember {
     fun resolve(activity: Activity, target: SessionWindowTarget?) {
         this.activity = WeakReference(activity)
         taskID = activity.taskId
+        resolve(target) {
+            Store(AppFeature.State.initial(), WindowAppFeature(AppFeature(), this), dependencies = windowDependencies())
+        }
+    }
+
+    /**
+     * iOS `resolve(target:primary:)`: the first time, joins [roster] and makes the window's store,
+     * [primary] for the primary role, else [makeStore]; then the window is attached.
+     */
+    fun resolve(
+        target: SessionWindowTarget?,
+        primary: () -> Store<AppFeature.State, AppFeature.Action>,
+    ): Store<AppFeature.State, AppFeature.Action> {
         if (role == null) {
             // Restored with a session, or opened by Open in New Window.
-            val restoredTarget = if (SceneWindows.roster.multipleWindows) target ?: SceneWindows.takePendingTarget() else null
+            val restoredTarget = if (roster.multipleWindows) target ?: SceneWindows.takePendingTarget() else null
             val role = SceneWindows.join(this)
+            store = if (role == WindowRoster.Role.Primary) primary() else makeStore(restoredTarget, this)
             this.role = role
-            store = Store(
-                if (role == WindowRoster.Role.Primary) AppFeature.State.initial() else AppFeature.State.window(restoredTarget),
-                WindowAppFeature(AppFeature(), this),
-                dependencies = windowDependencies(),
-            )
             pendingTarget = restoredTarget
             // The owner may show another store now.
-            SceneWindows.appWideWork.sync()
+            appWideWork.sync()
         }
         SceneWindows.attached(this)
+        return store
     }
 
     /**
      * On a tablet, haptics and announcements play only in the window in use (iOS's per-window
      * `SceneWindow`); a phone's one window keeps the app's tracker.
      */
-    private fun windowDependencies(): DependencyValues {
+    internal fun windowDependencies(): DependencyValues {
         if (!SceneWindows.isSupported) return DependencyValues.root
         return DependencyValues.root.with(
             SceneWindowClient,
@@ -292,11 +312,15 @@ class RootStore : ViewModel(), WindowRosterMember {
             SceneWindows.noteCall(this, active = false)
             isClosed = true
             store.close()
-            SceneWindows.roster.left(this)
+            roster.left(this)
         }
     }
 
     companion object {
+        /** iOS `WindowStore.secondaryStore`: a further window's own store. */
+        fun secondaryStore(target: SessionWindowTarget?, window: RootStore): Store<AppFeature.State, AppFeature.Action> =
+            Store(AppFeature.State.window(target), WindowAppFeature(AppFeature(), window), dependencies = window.windowDependencies())
+
         fun target(intent: Intent?, saved: Bundle?): SessionWindowTarget? {
             fun read(server: String?, session: String?) =
                 if (server != null && session != null) SessionWindowTarget(server, session) else null
@@ -319,6 +343,9 @@ class AppWideWork(private val roster: WindowRoster) {
     var window: RootStore? = null
         private set
 
+    /** iOS `store`: the store listening to the inbox. */
+    val store: Store<AppFeature.State, AppFeature.Action>? get() = window?.takeUnless { it.isClosed }?.store
+
     init {
         roster.onSettle = { sync() }
     }
@@ -327,6 +354,11 @@ class AppWideWork(private val roster: WindowRoster) {
         val owner = roster.appWideOwner as? RootStore ?: return
         if (owner.role == null || owner === window) return
         val before = window
+        // It follows the store, not the window (iOS): an owner showing the same store carries on.
+        if (before != null && !before.isClosed && before.store === owner.store) {
+            window = owner
+            return
+        }
         // The inbox has one listener; this takes it from the store before.
         if (before != null && !before.isClosed) before.store.send(AppFeature.Action.SystemActionsTaskEnded)
         window = owner
