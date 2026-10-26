@@ -16,6 +16,8 @@ import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.openCodeTapTarget
 import ai.opencode.server.model.OpenCodeFormField
 import ai.opencode.server.model.OpenCodeFormFieldType
+import ai.opencode.server.model.OpenCodeFormOption
+import ai.opencode.server.model.OpenCodeJSONValue
 import ai.opencode.server.model.OpenCodeFormRequest
 import ai.opencode.server.model.OpenCodeFormValue
 import ai.opencode.server.model.OpenCodePermissionReply
@@ -25,7 +27,7 @@ import ai.opencode.server.model.OpenCodeToolCall
 import ai.opencode.server.model.OpenCodeTranscriptItem
 import android.content.Context
 import android.view.accessibility.AccessibilityManager
-import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.animateFloatAsState
@@ -70,11 +72,13 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
@@ -282,6 +286,90 @@ fun RequestDockView(
             scope.Content(shown)
         }
     }
+}
+
+/**
+ * Warms the request panel's first build once per process: a beat after it appears, a sample
+ * two-page question is composed through [RequestDockView] for a moment, one screen below the
+ * window, transparent and outside semantics (no touches, no focus, no haptics, nothing sent),
+ * then dropped. The first real request then composes code that has already run (class loading,
+ * verification, JIT) instead of paying for it in the frame its panel grows. Call it from the
+ * session screen alongside the dock; it draws nothing.
+ */
+@Composable
+fun RequestDockPrewarm() {
+    var phase by remember { mutableStateOf(if (requestDockPrewarmed) 2 else 0) }
+    LaunchedEffect(Unit) {
+        if (phase == 2) return@LaunchedEffect
+        delay(REQUEST_PREWARM_DELAY_MILLIS)
+        if (requestDockPrewarmed) {
+            phase = 2
+            return@LaunchedEffect
+        }
+        requestDockPrewarmed = true
+        phase = 1
+        // Long enough for its arrival effects and first animation frames to run once.
+        delay(REQUEST_PREWARM_HOLD_MILLIS)
+        phase = 2
+    }
+    if (phase != 1) return
+    val focusManager = LocalFocusManager.current
+    Layout(
+        content = {
+            // Both first arrivals: a question's panel and a permission's (folded, with Always Allow).
+            RequestDockView(dock = RequestDockSample.questionDock, context = RequestDockSample.context, isKeyboardUp = false, send = {})
+            RequestDockView(dock = RequestDockSample.permissionDock, context = RequestDockSample.context, isKeyboardUp = false, send = {})
+        },
+        modifier = Modifier
+            .graphicsLayer { alpha = 0f }
+            .clearAndSetSemantics {}
+            .inertToFocus(focusManager),
+    ) { measurables, constraints ->
+        val width = if (constraints.hasBoundedWidth) constraints.maxWidth else 400.dp.roundToPx()
+        val placeables = measurables.map { it.measure(Constraints(maxWidth = width)) }
+        layout(0, 0) { placeables.forEach { it.place(0, REQUEST_PREWARM_OFFSET) } }
+    }
+}
+
+private var requestDockPrewarmed = false
+private const val REQUEST_PREWARM_DELAY_MILLIS = 1_200L
+private const val REQUEST_PREWARM_HOLD_MILLIS = 400L
+
+/** Far below any window, so no pointer reaches the sample. */
+private const val REQUEST_PREWARM_OFFSET = 100_000
+
+/** The prewarm's inert samples, in their own session: a two-page single-choice question, and a command's permission. */
+private object RequestDockSample {
+    private const val SESSION = "request-dock-prewarm"
+    private val question = OpenCodeFormRequest(
+        id = "request-dock-prewarm",
+        sessionID = SESSION,
+        title = "Question",
+        fields = listOf("first", "second").map { key ->
+            OpenCodeFormField(
+                key = key,
+                type = OpenCodeFormFieldType.String,
+                title = "Question",
+                description = "Which one?",
+                options = listOf(
+                    OpenCodeFormOption("a", "First choice", "A short description"),
+                    OpenCodeFormOption("b", "Second choice"),
+                    OpenCodeFormOption("c", "Third choice"),
+                ),
+            )
+        },
+        metadata = mapOf("kind" to OpenCodeJSONValue.Str("question")),
+    )
+    private val permission = OpenCodePermissionRequest(
+        id = "request-dock-prewarm-permission",
+        sessionID = SESSION,
+        action = "bash",
+        resources = listOf("ls -la"),
+        save = listOf("ls *"),
+    )
+    val questionDock = RequestDockFeature.State<Unit>(formRequests = listOf(question), parkedComposer = Unit)
+    val permissionDock = RequestDockFeature.State<Unit>(permissionRequests = listOf(permission), parkedComposer = Unit)
+    val context = RequestDockContext(currentSessionID = SESSION, isVisible = false)
 }
 
 /** What the panel shows: the docked request, its answers and page. */
@@ -708,6 +796,9 @@ private class DockScope(
         val expanded = state.expandedPermissionID == permission.id
         val fontScale = LocalDensity.current.fontScale
         RequestPanelFallback(
+            // iOS animates expandedPermissionID with the 0.3 s panel spring. Animate the
+            // column, not the footer: the caption rides its top and Allow stays on the bar.
+            columnModifier = if (reducedMotion) Modifier else Modifier.animateContentSize(MotionSpring(0.3).spec()),
             footer = {
                 // Allow stays in reach: past the floors the rest scrolls above it. The actions stop growing at the first accessibility size.
                 val density = LocalDensity.current
@@ -949,9 +1040,26 @@ fun SelectionMark(selected: Boolean, multiple: Boolean) {
         if (reducedMotion) {
             OpenCodeIcon(symbol, contentDescription = null, size = SelectionMarkWidth, tint = if (selected) colors.text else colors.tertiaryText)
         } else {
-            Crossfade(symbol, animationSpec = Motion.easeOut(Motion.fadeFast), label = "selectionMark") {
-                OpenCodeIcon(it, contentDescription = null, size = SelectionMarkWidth, tint = if (selected) colors.text else colors.tertiaryText)
+            // Crossfade's fade without its transition machinery per row: a panel of choices builds in one cheap pass.
+            var leaving by remember { mutableStateOf<Pair<SFSymbol, Color>?>(null) }
+            var current by remember { mutableStateOf(symbol to (if (selected) colors.text else colors.tertiaryText)) }
+            val fade = remember { Animatable(1f) }
+            val tint = if (selected) colors.text else colors.tertiaryText
+            LaunchedEffect(symbol, tint) {
+                if (current.first == symbol) {
+                    current = symbol to tint
+                    return@LaunchedEffect
+                }
+                leaving = current
+                current = symbol to tint
+                fade.snapTo(0f)
+                fade.animateTo(1f, Motion.easeOut(Motion.fadeFast))
+                leaving = null
             }
+            leaving?.let { (old, oldTint) ->
+                OpenCodeIcon(old, contentDescription = null, size = SelectionMarkWidth, tint = oldTint, modifier = Modifier.graphicsLayer { alpha = 1f - fade.value })
+            }
+            OpenCodeIcon(current.first, contentDescription = null, size = SelectionMarkWidth, tint = current.second, modifier = Modifier.graphicsLayer { alpha = fade.value })
         }
     }
 }

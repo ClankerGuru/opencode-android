@@ -117,6 +117,9 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.constrainHeight
+import androidx.compose.ui.unit.offset
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.semantics.contentDescription
@@ -258,8 +261,10 @@ internal class SessionComposerViewState {
     val autocompleteBridge = ComposerAutocompleteTextBridge()
     /** The composer surface's size (dp), for the autocomplete simulation. */
     var surfaceSize by mutableStateOf(androidx.compose.ui.geometry.Size.Zero)
-    /** The composer area's height (dp), for the request panel's cap. */
-    var areaHeight by mutableFloatStateOf(0f)
+    /** The composer area outside the panel's reserved room (dp), measured in one pass. */
+    var requestChromeHeight by mutableFloatStateOf(0f)
+    /** Actual room reserved by the capsule this pass; read by its parent after measurement. */
+    var requestPanelRoomPx = 0
     /** iOS `requestPanelHeight`'s model value: the panel's measured height (dp). */
     var requestPanelHeight by mutableFloatStateOf(0f)
     /** iOS `requestPanelHeight` as drawn: animated as iOS's `withAnimation` changes it (dp). */
@@ -272,9 +277,6 @@ internal class SessionComposerViewState {
     var requestPanelLingers by mutableStateOf(false)
     var requestPanelIdentity by mutableStateOf<SessionFeature.State.TaskIdentity?>(null)
     var requestPanelLeaveJob: Job? = null
-    /** The bar's and the capsule's (bar plus the panel's room) heights, dp (iOS `requestPanelMeasures`). */
-    var barHeight by mutableFloatStateOf(0f)
-    var capsuleHeight by mutableFloatStateOf(0f)
     /** iOS `isImageDropTargeted`. */
     var isImageDropTargeted by mutableStateOf(false)
 }
@@ -786,14 +788,21 @@ private fun SessionComposerEnv.ComposerArea(modifier: Modifier) {
         if (reducedMotion) tween(0) else MotionSpring(0.25).spec(),
         label = "composerBottomGap",
     )
-    val density = LocalDensity.current
     Box(
         modifier
             .fillMaxWidth()
-            .onSizeChanged { view.areaHeight = with(density) { it.height.toDp().value } }
+            .layout { measurable, constraints ->
+                val area = measurable.measure(constraints)
+                // iOS chrome = area - (capsule - bar). Read the room actually reserved by
+                // the child in this pass, never a mix of old/new onSizeChanged callbacks.
+                val chrome = Math.round((area.height - view.requestPanelRoomPx).toDp().value).toFloat()
+                if (view.requestChromeHeight != chrome) view.requestChromeHeight = chrome
+                layout(area.width, area.height) { area.placeRelative(0, 0) }
+            }
             .padding(horizontal = horizontalMargin.dp)
             .padding(top = 6.dp, bottom = bottom),
     ) {
+        ai.opencode.feature.composer.RequestDockPrewarm()
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(pillGap.dp)) {
             HiddenUnderComposerPanel(host.composerPanelCovers, Modifier.hiddenUnderVoiceTranscript(showsCallTranscript)) { ComposerPills() }
             val error = s.settledRequestLoadError
@@ -955,7 +964,7 @@ private fun SessionComposerEnv.QueuedActivity(hasQueued: Boolean) {
  * iOS `composerCapsule`: the composer and a call share one surface ([VoiceCallSurface]): starting
  * or ending a call swaps what's inside it, + becoming Mute and the call button End, and the call's
  * transcript grows out of the same surface. A pending request's panel grows up out of it too,
- * drawn above the bar in the room the capsule makes for it (`padding(top = requestPanelRoom)`),
+ * drawn above the bar in the room the capsule makes for it (layout-phase top padding),
  * which stays until the surface has folded, so nothing under the panel moves while it shows.
  */
 @Composable
@@ -965,10 +974,9 @@ private fun SessionComposerEnv.ComposerCapsule() {
     // With Composer Autocomplete on (and no panel or call), the suggestions grow there instead.
     val showsAutocomplete = usesAutocomplete && !showsRequestPanel && voiceStore == null
     val photoSheet = LocalSessionPhotoSheet.current?.takeIf { it.usesPlusMenuSheet }
-    val density = LocalDensity.current
     val cap = requestPanelCap()
-    val activeHeight = activeRequestPanelHeight(cap)
-    val room = if (voiceStore == null && showsRequestPanel) activeHeight else 0f
+    val activeHeight = { activeRequestPanelHeight(cap) }
+    val room = { if (voiceStore == null && showsRequestPanel) activeHeight() else 0f }
     // iOS `.callTrayHost(…)`: in the Call Tray style the composer stays and the tray splits out
     // beneath it, merging the composer's surface into its own while nothing else grows out of it.
     CallTrayHost(
@@ -992,8 +1000,17 @@ private fun SessionComposerEnv.ComposerCapsule() {
         Box(
             Modifier
                 .fillMaxWidth()
-                .padding(top = room.dp)
-                .onSizeChanged { view.capsuleHeight = with(density) { it.height.toDp().value } },
+                .layout { measurable, constraints ->
+                    val bar = measurable.measure(constraints.offset(vertical = -room().dp.roundToPx()))
+                    // Measuring a self-animating permission updates its height. Reserve that
+                    // same frame's room so the pills cannot lag over the panel's caption.
+                    val top = room().dp.roundToPx()
+                    val height = constraints.constrainHeight(bar.height + top)
+                    view.requestPanelRoomPx = height - bar.height
+                    layout(bar.width, height) {
+                        bar.placeRelative(0, top)
+                    }
+                },
         ) {
             // iOS `composerSurfacePanel`: the request's panel, else the suggestions, on the surface.
             val autocompleteExtent = if (showsAutocomplete) view.autocompleteController.glassExtent.toFloat() else 0f
@@ -1014,9 +1031,9 @@ private fun SessionComposerEnv.ComposerCapsule() {
                     else -> null
                 },
                 // Laid out from its arrival until its surface has folded.
-                panelExtent = if (showsRequestPanel) activeHeight else autocompleteExtent,
+                panelExtent = { if (showsRequestPanel) activeHeight() else autocompleteExtent },
                 // Under Reduce Motion the surface keeps its reach while the panel fades.
-                panelReveal = if (showsRequestPanel) activeHeight * view.requestPanelReveal.value else autocompleteExtent,
+                panelReveal = { if (showsRequestPanel) activeHeight() * view.requestPanelReveal.value else autocompleteExtent },
                 panelShown = docksRequest || (showsAutocomplete && (if (reducedMotion) controller.isOpen else controller.isShown)),
             )
         }
@@ -1038,8 +1055,7 @@ private val SessionComposerEnv.lingersRequestPanel: Boolean
  */
 @Composable
 private fun SessionComposerEnv.requestPanelCap(): Float? {
-    val chrome = RequestPanelFit.chrome(composer = view.areaHeight, capsule = view.capsuleHeight, bar = view.barHeight)
-    return RequestPanelFit.panelCap(room = host.availableHeight, header = host.headerHeight, chrome = chrome)
+    return RequestPanelFit.panelCap(room = host.availableHeight, header = host.headerHeight, chrome = view.requestChromeHeight)
 }
 
 /**
@@ -1154,8 +1170,8 @@ private fun SessionComposerEnv.resetRequestPanel() {
 @Composable
 private fun SessionComposerEnv.ComposerSurface(
     panel: (@Composable () -> Unit)?,
-    panelExtent: Float,
-    panelReveal: Float,
+    panelExtent: () -> Float,
+    panelReveal: () -> Float,
     panelShown: Boolean,
 ) {
     val density = LocalDensity.current
@@ -1173,7 +1189,6 @@ private fun SessionComposerEnv.ComposerSurface(
                     view.surfaceBounds = it.boundsInRoot()
                     host.attachmentAnchors.composer = view.surfaceBounds
                 }
-                .onSizeChanged { view.barHeight = with(density) { it.height.toDp().value } }
                 .composerSwipes({ current }, density.density)
                 .semantics { testTag = "session-composer" },
             panel = panel,
@@ -1313,6 +1328,7 @@ private fun SessionComposerEnv.RequestPanelContent(isShown: Boolean, cap: Float?
     val density = LocalDensity.current
     val current by rememberUpdatedState(this)
     val currentCap by rememberUpdatedState(cap)
+    var measuredRequestID by remember { mutableStateOf<String?>(null) }
     Box(
         Modifier
             .fillMaxWidth()
@@ -1326,12 +1342,25 @@ private fun SessionComposerEnv.RequestPanelContent(isShown: Boolean, cap: Float?
                 if (height == env.view.requestPanelHeight) return@onSizeChanged
                 val eases = env.view.requestPanelEasing.eases(height, currentCap, keyboardUp = env.messageFieldFocused)
                 val wasZero = env.view.requestPanelHeight == 0f
+                val requestID = env.store.state.dockRequestID
+                // Permission columns already animate their own height. Applying a second
+                // spring here makes the surface trail the caption and clip it mid-expansion.
+                val followsColumn = requestID == measuredRequestID &&
+                    env.store.state.requestDock.permissionRequests.any { it.id == requestID }
+                measuredRequestID = requestID
                 env.view.requestPanelHeight = height
-                env.scope.launch {
+                env.scope.launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
                     when {
                         env.reducedMotion || !eases -> env.view.requestPanelShown.snapTo(height)
                         wasZero -> env.view.requestPanelShown.animateTo(height, RequestPanelReveal.glass(opening = true))
+                        followsColumn -> env.view.requestPanelShown.snapTo(height)
                         else -> env.view.requestPanelShown.animateTo(height, MotionSpring(0.3).spec())
+                    }
+                    if (followsColumn && !env.reducedMotion) {
+                        // The surface reports only the bar's size, so child remeasurement
+                        // cannot propagate to the capsule's reserved room. Queue its state
+                        // observers (and the reveal layer) before this layout pass draws.
+                        androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications()
                     }
                 }
             },
