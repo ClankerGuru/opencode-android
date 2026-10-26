@@ -39,10 +39,15 @@ internal object SessionFeatureTestsSendingSupport {
     class Gate {
         private val channel = Channel<Unit>(Channel.UNLIMITED)
         suspend fun await() {
-            channel.receive()
+            channel.receiveCatching()
         }
+        /** `continuation.yield()`: lets one waiter through. */
         fun open() {
             channel.trySend(Unit)
+        }
+        /** `continuation.finish()`: every later wait passes at once. */
+        fun finish() {
+            channel.close()
         }
     }
 
