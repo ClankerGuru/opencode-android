@@ -55,7 +55,7 @@ class AppFeatureTests {
         val session = json.decodeFromString(CachedHomeSnapshot.serializer(), beforeAlwaysNotify).snapshot.sessions.first()
         assertEquals(
             OpenCodeSession(
-                id = "ses_1", title = "Release", projectID = "global", directory = "/tmp",
+                id = "ses_1", serverTitle = "Release", projectID = "global", directory = "/tmp",
                 updatedAt = Instant.parse("2026-05-09T01:46:40Z"), cost = 0.5,
             ),
             session,
