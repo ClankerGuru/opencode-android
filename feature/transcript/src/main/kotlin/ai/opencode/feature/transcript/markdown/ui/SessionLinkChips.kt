@@ -1,5 +1,9 @@
 package ai.opencode.feature.transcript.markdown.ui
 
+import ai.opencode.core.tuning.Tunable
+import ai.opencode.core.tuning.TuningPreset
+import ai.opencode.core.tuning.TuningPresets
+import ai.opencode.core.tuning.TuningStore
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.feature.transcript.LocalTranscriptRowContext
@@ -16,6 +20,34 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+
+/** Developer Mode → Tuning → Transcript → Session Links (iOS `SessionLinkTunables`). */
+object SessionLinkTunables {
+    /** The chip's corner radius at body size (17 pt); it scales with the text. */
+    val radius = Tunable("transcript.sessionLink.radius", "Chip corner radius (pt at body size)", default = 4.5f, range = 0.0..10.0, step = 0.25)
+    /** The chip's height and how far its centre sits above the baseline, in ems. */
+    val height = Tunable("transcript.sessionLink.height", "Chip height (em)", default = 1.16f, range = 0.9..1.3, step = 0.01)
+    val rise = Tunable("transcript.sessionLink.rise", "Chip centre above baseline (em)", default = 0.31f, range = 0.2..0.45, step = 0.005)
+    val fill = Tunable("transcript.sessionLink.fill", "Chip fill opacity", default = 0.08, range = 0.02..0.25, step = 0.005)
+
+    /** The radius options on the decision after D-131, at body size. */
+    val options: TuningPresets by lazy {
+        TuningPresets(
+            "transcript.sessionLink", "Session Links",
+            listOf(
+                TuningPreset("3 pt", radius.preset(3f)),
+                TuningPreset("4.5 pt", radius.preset(4.5f)),
+                TuningPreset("6 pt", radius.preset(6f)),
+            ),
+        )
+    }
+
+    fun register(store: TuningStore = TuningStore.shared) {
+        store.register(options)
+        store.register(radius, height, rise)
+        store.register(fill)
+    }
+}
 
 /**
  * Reports the session IDs a block shows, once per set (iOS `reportsSessionLinks(_:to:)`): the

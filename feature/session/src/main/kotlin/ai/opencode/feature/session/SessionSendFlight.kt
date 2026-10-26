@@ -109,6 +109,9 @@ internal class SessionSendFlights(
 
     val isFlying: Boolean get() = flights.isNotEmpty()
 
+    /** px per dp, from the last [land]. */
+    private var flightDensity = 0f
+
     /** The overlay's place in the window (px), to draw window rects in its own space. */
     var coordinates: LayoutCoordinates? = null
 
@@ -125,6 +128,7 @@ internal class SessionSendFlights(
         density: Float,
         layOut: (String, Float) -> androidx.compose.ui.text.TextLayoutResult,
     ): Boolean {
+        flightDensity = density
         val text = send.text
         if ((send.flies || send.isQueued) && !transition.isPrepared && !reduceMotion && composerFrame != null &&
             composerFrame != Rect.Zero && text != null
@@ -187,6 +191,7 @@ internal class SessionSendFlights(
             val marker = landing.marker(flight.itemID)
             if (marker != null && marker.bounds.width > 0f) flight.destination = marker.bounds
             if (!flight.started) {
+                if (flight.destination == null) predictedDestination(flight)?.let { flight.destination = it }
                 if (flight.destination == null) {
                     // The bubble hasn't been laid out yet: a few frames for the follower to bring it.
                     flight.waitingFrames += 1
@@ -201,6 +206,22 @@ internal class SessionSendFlights(
         }
         landed.forEach(::finish)
         frame += 1
+    }
+
+    /**
+     * Where a bubble still below the screen will land (iOS lays it out at the end and starts the
+     * flight there): the words' size in a bubble at the list's end, trailing its gutter. The
+     * flight retargets onto the real bubble as soon as it is laid out.
+     */
+    private fun predictedDestination(flight: SendFlight): Rect? {
+        val end = landing.listEnd ?: return null
+        val density = flightDensity.takeIf { it > 0f } ?: return null
+        val gutter = TranscriptMetrics.contentGutter.value * density
+        val vertical = TranscriptMetrics.bubbleVertical.value * density
+        val words = flight.source.bounds
+        val right = end.right - TranscriptTunables.contentGutter * density
+        val bottom = end.bottom - TranscriptMetrics.turnHalf.value * density
+        return Rect(right - words.width - 2 * gutter, bottom - words.height - 2 * vertical, right, bottom)
     }
 
     /** Lands [flight] now: its row shows again where it is (iOS `finishLanding`). */

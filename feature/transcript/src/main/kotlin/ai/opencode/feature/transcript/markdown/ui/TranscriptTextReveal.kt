@@ -1,5 +1,10 @@
 package ai.opencode.feature.transcript.markdown.ui
 
+import ai.opencode.core.tuning.Tunable
+import ai.opencode.core.tuning.TunableChoice
+import ai.opencode.core.tuning.TuningPreset
+import ai.opencode.core.tuning.TuningPresets
+import ai.opencode.core.tuning.TuningStore
 import ai.opencode.feature.transcript.TranscriptTunables
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
 import androidx.compose.runtime.Composable
@@ -12,27 +17,31 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 
 /**
- * How streamed assistant text reveals as chunks arrive (iOS `StreamTextRevealStyle`, D-53).
- * The Tuning Panel isn't ported, so the style is iOS's default, [Chunk]; the sweeps' alpha
- * curve is kept for when it is.
+ * How streamed assistant text reveals as chunks arrive (iOS `StreamTextRevealStyle`, D-53),
+ * picked live in the Tuning Panel (`transcript.textReveal.style`; [TextRevealTunables]).
  */
-enum class StreamTextRevealStyle {
+enum class StreamTextRevealStyle(override val rawValue: String) : TunableChoice {
     /** Today's look: each chunk fades its opacity over 0.2 s on its own clock. */
-    Chunk,
+    Chunk("chunk"),
     /** Soft reading-order frontier sweeping left-to-right across each arriving chunk. */
-    Frontier,
+    Frontier("frontier"),
     /** Soft frontier sweep condensing out of a 2.5 pt focus blur with a slight phosphor lift. */
-    Focus;
+    Focus("focus");
 
-    /** One arriving chunk's reveal, captured when it arrives (`transcript.textReveal.duration`). */
+    /**
+     * One arriving chunk's reveal, captured when it arrives (`transcript.textReveal.duration`;
+     * the presets set 0.22 s and 0.24 s for 2 and 3).
+     */
     val duration: Double get() = TranscriptTextReveal.duration
 
     companion object {
-        val current: StreamTextRevealStyle get() = TextRevealTunables.style
+        val current: StreamTextRevealStyle get() = TextRevealTunables.style.value
 
         /**
          * iOS `StreamSweepRenderer.alpha`: a feathered frontier crossing the chunk (positions
-         * 0…1) as `progress` runs 0…1, reaching full opacity everywhere by the end.
+         * 0…1) as `progress` runs 0…1, reaching full opacity everywhere by the end, so handing
+         * the chunk to the base text never changes a pixel. The head moves evenly and the
+         * feather spans most of a chunk, so each glyph fades over about half the reveal.
          */
         fun sweepAlpha(progress: Double, position: Double, feather: Double): Double {
             if (progress >= 1) return 1.0
@@ -49,13 +58,34 @@ enum class StreamTextRevealStyle {
     }
 }
 
-/** D-53 (iOS `TextRevealTunables`): the defaults, baked (Tuning Panel not ported). */
+/**
+ * D-53 (Developer Mode → Tuning → Transcript → Text Reveal; iOS `TextRevealTunables`). Each
+ * chunk reads them as it arrives, so a change shows on the next chunk without a relaunch.
+ */
 object TextRevealTunables {
-    val style = StreamTextRevealStyle.Chunk
-    const val feather = 1.0
-    const val blurRadius = 2.5
-    const val phosphorLift = 0.09
-    const val stagger = 0.0
+    val style = Tunable("transcript.textReveal.style", "Stream reveal style", default = StreamTextRevealStyle.Chunk)
+    val feather = Tunable("transcript.textReveal.feather", "Frontier feather (×)", default = 1.0, range = 0.25..3.0, step = 0.05)
+    val blurRadius = Tunable("transcript.textReveal.blurRadius", "Focus blur radius (pt)", default = 2.5, range = 0.0..8.0, step = 0.25)
+    val phosphorLift = Tunable("transcript.textReveal.phosphorLift", "Phosphor lift", default = 0.09, range = 0.0..0.4, step = 0.01)
+    val stagger = Tunable("transcript.textReveal.stagger", "Per-chunk stagger (s)", default = 0.0, range = 0.0..0.2, step = 0.005)
+
+    /** 1 Today · 2 Soft Frontier Sweep · 3 Focus Frontier, as recorded for D-53. */
+    val options: TuningPresets by lazy {
+        TuningPresets(
+            "transcript.textReveal", "Text Reveal",
+            listOf(
+                TuningPreset("Today"),
+                TuningPreset("Soft Frontier Sweep", style.preset(StreamTextRevealStyle.Frontier), TranscriptTunables.Knobs.textFadeDuration.preset(0.22)),
+                TuningPreset("Focus Frontier", style.preset(StreamTextRevealStyle.Focus), TranscriptTunables.Knobs.textFadeDuration.preset(0.24)),
+            ),
+        )
+    }
+
+    fun register(store: TuningStore = TuningStore.shared) {
+        store.register(options)
+        store.register(style)
+        store.register(TranscriptTunables.Knobs.textFadeDuration, feather, blurRadius, phosphorLift, stagger)
+    }
 }
 
 /**
@@ -69,7 +99,7 @@ class TranscriptTextReveal {
     /** Seconds on the frame clock's timebase (`System.nanoTime`), injectable for deterministic checks. */
     var now: () -> Double = { System.nanoTime() / 1e9 }
     var chunkDuration: () -> Double = { StreamTextRevealStyle.current.duration }
-    var chunkStagger: () -> Double = { TextRevealTunables.stagger }
+    var chunkStagger: () -> Double = { TextRevealTunables.stagger.value }
 
     data class Arrival(
         /** Where in the block's characters the new text starts. */

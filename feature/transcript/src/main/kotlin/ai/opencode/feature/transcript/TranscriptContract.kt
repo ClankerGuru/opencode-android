@@ -1,5 +1,6 @@
 package ai.opencode.feature.transcript
 
+import ai.opencode.server.model.PastedTextSummary
 import ai.opencode.feature.media.LinkMenuAction
 import ai.opencode.feature.media.TranscriptImagePreview
 import ai.opencode.server.OpenCodeServer
@@ -40,6 +41,11 @@ sealed interface TranscriptAction {
     data class OpenFile(val file: AgentFileReference) : TranscriptAction
     /** An image was tapped (iOS `onPreviewImage`): the session opens the zoom viewer. */
     data class PreviewImage(val preview: TranscriptImagePreview) : TranscriptAction
+    /**
+     * A sent message's Pasted Text card was tapped (iOS `PastedTextCard.open`): the session
+     * presents the Pasted Text viewer, zooming out of the card ([sourceID]).
+     */
+    data class OpenPastedText(val text: String, val summary: PastedTextSummary, val sourceID: String) : TranscriptAction
 }
 
 /**

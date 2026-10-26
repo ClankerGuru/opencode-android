@@ -1,7 +1,12 @@
 package ai.opencode.feature.transcript.links
 
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.feature.media.AgentImageMarkerView
+import ai.opencode.feature.media.AgentImageRowGrowth
 import ai.opencode.feature.media.AgentImageSize
+import ai.opencode.feature.media.AgentImageVisibilityMarker
+import ai.opencode.feature.media.LocalAgentImageBlock
+import ai.opencode.feature.media.LocalAgentImageRowGrowth
 import ai.opencode.feature.media.ImageLinkPolicy
 import ai.opencode.feature.media.ImageLinkPreviewClient
 import ai.opencode.feature.media.MediaThumbnail
@@ -13,10 +18,13 @@ import ai.opencode.feature.transcript.TranscriptAction
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
 import ai.opencode.feature.transcript.markdown.ui.LocalLinkPreviewRow
 import android.graphics.Bitmap
+import android.os.Handler
+import android.os.Looper
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -29,6 +37,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -37,8 +47,11 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
+import kotlin.math.abs
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 // The transcript's half of iOS Image Link Previews (`Transcript/ImageLinkPreviews.swift`): the
@@ -91,7 +104,8 @@ fun BlockImageLinks(
 /**
  * The prose keeps its original links, including while a read fails or waits (iOS
  * `ImageLinkPreviews`). A visible image reserves its aspect-fit space as soon as its header
- * arrives; the list's `RowGrowth` eases the row to it.
+ * arrives, and reports its height change to the row's [AgentImageRowGrowth] under its block
+ * ([LocalAgentImageBlock]), so the text below holds still while the list eases the row.
  */
 @Composable
 fun ImageLinkPreviews(
@@ -101,7 +115,21 @@ fun ImageLinkPreviews(
     onPreview: (TranscriptImagePreview) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier) {
+    val block = LocalAgentImageBlock.current
+    val rowGrowth = LocalAgentImageRowGrowth.current
+    val density = LocalDensity.current
+    val laidOut = remember { ImageLinksLaidOut() }
+    Column(
+        modifier.onSizeChanged { size ->
+            val height = with(density) { size.height.toDp().value }
+            val place = laidOut.place
+            if (place != null && place == occurrence && abs(height - laidOut.height) > 0.5f && block != null) {
+                rowGrowth?.add(block, height - laidOut.height)
+            }
+            laidOut.place = occurrence
+            laidOut.height = height
+        },
+    ) {
         for (url in urls) {
             key(url) {
                 ImageLinkThumbnail(url, mediaID = "image-link:$occurrence|$url", maxHeight = maxHeight, onPreview = onPreview)
@@ -110,56 +138,93 @@ fun ImageLinkPreviews(
     }
 }
 
-/** iOS `ImageLinkThumbnailModel`: the cached image, else a bounded read once the thumbnail is composed (on screen). */
+/** iOS `ImageLinkPreviews.laidOut`: where and how tall the previews last laid out (dp). */
+private class ImageLinksLaidOut {
+    var place: String? = null
+    var height = 0f
+}
+
+/** iOS `ImageLinkThumbnailModel`: the cached image, else a bounded read while the thumbnail is on screen. */
 private class ImageLinkThumbnailModel(url: String, private val client: ImageLinkPreviewClient) {
     var image by mutableStateOf<Bitmap?>(client.cached(url))
     var size by mutableStateOf(image?.let { AgentImageSize(it.width.toDouble(), it.height.toDouble()) })
+    private var generation = Any()
+    private val main = Handler(Looper.getMainLooper())
 
-    suspend fun load(url: String) {
+    /** Main thread. [revised] runs just before the reserved size changes (the row is about to grow). */
+    suspend fun load(url: String, revised: () -> Unit) {
         if (image != null) return
-        val loaded = client.cached(url) ?: client.load(url) { size = it }
-        // Header dimensions keep their exact aspect through downsampling rounding.
-        size = if (loaded == null) null else size ?: AgentImageSize(loaded.width.toDouble(), loaded.height.toDouble())
-        image = loaded
+        val generation = Any()
+        this.generation = generation
+        try {
+            val loaded = client.cached(url) ?: client.load(url) { size ->
+                main.post { if (this.generation === generation) resize(size, revised) }
+            }
+            if (!currentCoroutineContext().isActive || this.generation !== generation) return
+            // Header dimensions keep their exact aspect through downsampling rounding.
+            resize(if (loaded == null) null else size ?: AgentImageSize(loaded.width.toDouble(), loaded.height.toDouble()), revised)
+            image = loaded
+        } finally {
+            if (this.generation === generation) this.generation = Any()
+        }
+    }
+
+    private fun resize(size: AgentImageSize?, revised: () -> Unit) {
+        if (this.size == size) return
+        revised()
+        this.size = size
     }
 }
 
 @Composable
 private fun ImageLinkThumbnail(url: String, mediaID: String, maxHeight: Float, onPreview: (TranscriptImagePreview) -> Unit) {
     val model = remember(url) { ImageLinkThumbnailModel(url, dependency(ImageLinkPreviewClient)) }
-    // Composed rows are the visible ones (plus the list's prefetch): load while shown.
-    LaunchedEffect(model) { model.load(url) }
-    val size = model.size ?: return
+    // Composed rows can be far off screen (a reply lays out all its blocks): read only while the
+    // transcript's viewport says this one is on screen (iOS `ImageLinkVisibilityMarker`).
+    var visible by remember { mutableStateOf(false) }
+    val marker = remember { arrayOfNulls<AgentImageMarkerView>(1) }
+    LaunchedEffect(model, visible) {
+        if (visible) model.load(url) { marker[0]?.contentRevised() }
+    }
     // iOS `url.lastPathComponent`, decoded.
     val label = remember(url) { url.toHttpUrlOrNull()?.pathSegments?.lastOrNull { it.isNotEmpty() } ?: url }
-    ImageLinkThumbnailLayout(
-        width = size.width,
-        height = size.height,
-        maxHeight = maxHeight,
-        modifier = Modifier.padding(top = TranscriptMetrics.standard),
-    ) {
-        val image = model.image
-        if (image != null) {
-            val open = { onPreview(TranscriptImagePreview(id = mediaID, image = image, label = label)) }
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .clip(RoundedCornerShape(TranscriptMetrics.cardCornerRadius))
-                    .clickable(onClick = open)
-                    .clearAndSetSemantics {
-                        contentDescription = "Open $label"
-                        role = Role.Button
-                        testTag = "image-link-preview"
-                        onClick { open(); true }
-                    },
+    Box(Modifier.fillMaxWidth()) {
+        val size = model.size
+        if (size != null) {
+            ImageLinkThumbnailLayout(
+                width = size.width,
+                height = size.height,
+                maxHeight = maxHeight,
+                modifier = Modifier.padding(top = TranscriptMetrics.standard),
             ) {
-                MediaThumbnail(
-                    image, listOf(mediaID), Modifier.fillMaxSize(), fits = true, maxHeight = maxHeight.dp,
-                    cornerRadius = TranscriptMetrics.cardCornerRadius,
-                )
+                val image = model.image
+                if (image != null) {
+                    val open = { onPreview(TranscriptImagePreview(id = mediaID, image = image, label = label)) }
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(TranscriptMetrics.cardCornerRadius))
+                            .clickable(onClick = open)
+                            .clearAndSetSemantics {
+                                contentDescription = "Open $label"
+                                role = Role.Button
+                                testTag = "image-link-preview"
+                                onClick { open(); true }
+                            },
+                    ) {
+                        MediaThumbnail(
+                            image, listOf(mediaID), Modifier.fillMaxSize(), fits = true, maxHeight = maxHeight.dp,
+                            cornerRadius = TranscriptMetrics.cardCornerRadius,
+                        )
+                    }
+                } else {
+                    Box(Modifier.fillMaxSize().clearAndSetSemantics {})
+                }
             }
-        } else {
-            Box(Modifier.fillMaxSize().clearAndSetSemantics {})
+        }
+        AgentImageVisibilityMarker(Modifier.matchParentSize()) { shown, view ->
+            marker[0] = view
+            visible = shown
         }
     }
 }

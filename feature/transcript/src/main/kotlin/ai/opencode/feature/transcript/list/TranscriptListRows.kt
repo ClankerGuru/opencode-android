@@ -10,8 +10,6 @@ import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.server.model.OpenCodeQueuedInput
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -46,11 +44,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlin.math.PI
+import kotlin.math.abs
+import kotlin.math.acos
 import kotlin.math.cos
+import kotlin.math.sin
 import kotlin.math.max
 import kotlin.math.min
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 /** Earlier history: a delayed spinner while paging, the error with Retry, else a 1 dp spacer (iOS `TranscriptHistoryStatusView`). */
 @Composable
@@ -101,6 +101,97 @@ object EmptyStateTunables {
     const val glyphSpacing = 14f
     const val subtitleSpacing = 6f
     const val verticalOffset = 0f
+}
+
+/** iOS `EmptyGlyphBreath`: phase, position and velocity survive a loading/reduced-motion change. */
+data class EmptyGlyphBreath(
+    val isActive: Boolean = false,
+    val reduceMotion: Boolean = false,
+    val start: Double = 0.0,
+    val phase: Double = 0.0,
+    val offset: Double = 0.0,
+    val offsetVelocity: Double = 0.0,
+) {
+    private fun target(time: Double): Pair<Double, Double> {
+        if (!isActive) return 0.0 to 0.0
+        if (reduceMotion) return 1.0 to 0.0
+        val omega = 2 * PI / max(0.2, EmptyStateTunables.breathPeriod)
+        val x = omega * (phase + max(0.0, time - start))
+        return (0.5 - 0.5 * cos(x)) to (0.5 * omega * sin(x))
+    }
+
+    private fun error(time: Double): Pair<Double, Double> = ai.opencode.core.motion.SpringSolver.evaluate(
+        from = offset, to = 0.0, initialVelocity = offsetVelocity,
+        spring = MotionSpring(if (reduceMotion) ai.opencode.core.motion.Motion.reducedFade else EmptyStateTunables.breathSettle, 0.0),
+        elapsed = max(0.0, time - start),
+    )
+
+    fun excursion(time: Double): Pair<Double, Double> {
+        val target = target(time)
+        val error = error(time)
+        return (target.first + error.first).coerceIn(0.0, 1.0) to (target.second + error.second)
+    }
+
+    fun opacity(time: Double): Float = (1 - excursion(time).first *
+        (1 - if (reduceMotion) EmptyStateTunables.reducedLoadingOpacity else EmptyStateTunables.breathMinOpacity)).toFloat()
+
+    fun scale(time: Double): Float = if (reduceMotion) 1f else 1 - excursion(time).first.toFloat() * (1 - EmptyStateTunables.breathMinScale)
+
+    fun isSettled(time: Double): Boolean {
+        if (isActive && !reduceMotion) return false
+        val error = error(time)
+        return abs(error.first) < 0.002 && abs(error.second) < 0.01
+    }
+
+    fun retarget(active: Boolean, reduced: Boolean, time: Double): EmptyGlyphBreath {
+        val current = excursion(time)
+        var next = EmptyGlyphBreath(active, reduced, time)
+        if (active && !reduced) next = next.copy(phase = acos(1 - 2 * current.first) / (2 * PI) * max(0.2, EmptyStateTunables.breathPeriod))
+        val target = next.target(time)
+        return next.copy(offset = current.first - target.first, offsetVelocity = current.second - target.second)
+    }
+}
+
+/** The empty copy's spring retargets from both its value and its velocity, including during its delay. */
+data class EmptyStateMotion(
+    val isLoading: Boolean,
+    val showsEmptyState: Boolean,
+    val reduceMotion: Boolean,
+    val usesMarkLoading: Boolean = true,
+    val start: Double = transcriptNow(),
+    val titleFrom: Double = if (!isLoading && showsEmptyState) 1.0 else 0.0,
+    val titleVelocity: Double = 0.0,
+    val subtitleFrom: Double = titleFrom,
+    val subtitleVelocity: Double = 0.0,
+    val breath: EmptyGlyphBreath = EmptyGlyphBreath(isLoading && !usesMarkLoading, reduceMotion, start),
+) {
+    private val target: Double get() = if (!isLoading && showsEmptyState) 1.0 else 0.0
+    fun text(time: Double, subtitle: Boolean = false): Pair<Double, Double> {
+        val from = if (subtitle) subtitleFrom else titleFrom
+        val velocity = if (subtitle) subtitleVelocity else titleVelocity
+        val delay = if (subtitle && !reduceMotion && target > 0.5) EmptyStateTunables.subtitleDelay else 0.0
+        val elapsed = max(0.0, time - start) - delay
+        if (elapsed <= 0) return from.coerceIn(0.0, 1.0) to velocity
+        val result = ai.opencode.core.motion.SpringSolver.evaluate(
+            from = from, to = target, initialVelocity = velocity,
+            spring = if (reduceMotion) MotionSpring(ai.opencode.core.motion.Motion.reducedFade, 0.0) else EmptyStateTunables.revealSpring,
+            elapsed = elapsed,
+        )
+        return result.first.coerceIn(0.0, 1.0) to result.second
+    }
+
+    fun isSettled(time: Double): Boolean = breath.isSettled(time) && listOf(text(time), text(time, true)).all {
+        abs(it.first - target) < 0.002 && abs(it.second) < 0.01
+    }
+
+    fun retarget(loading: Boolean, empty: Boolean, reduced: Boolean, time: Double): EmptyStateMotion {
+        if (isLoading == loading && showsEmptyState == empty && reduceMotion == reduced) return this
+        val title = text(time)
+        val subtitle = text(time, true)
+        return copy(isLoading = loading, showsEmptyState = empty, reduceMotion = reduced, start = time,
+            titleFrom = title.first, titleVelocity = title.second, subtitleFrom = subtitle.first, subtitleVelocity = subtitle.second,
+            breath = breath.retarget(loading && !usesMarkLoading, reduced, time))
+    }
 }
 
 /** iOS `MarkLoadingTunables` (`mark.loading.*`). */
@@ -161,7 +252,7 @@ object LoadingGlyphPulse {
 }
 
 /** The list's monotonic clock in seconds (iOS `AnimationTimeScale.referenceNow`). */
-fun transcriptNow(): Double = System.nanoTime() / 1e9
+fun transcriptNow(): Double = ai.opencode.core.tuning.AnimationTimeScale.shared.now()
 
 /**
  * The chat-bubbles glyph, pulsing while waiting inside the delayed fade (iOS `MarkLoadingView`).
@@ -182,12 +273,12 @@ fun MarkLoadingView(loadingSince: Double?, isHidden: Boolean = false, modifier: 
             MotionFrameAction.Continue
         }
     }
-    val elapsed = loadingSince?.let { now - it - timing.delay }
     val glyph = with(LocalDensity.current) { (EmptyStateTunables.glyphSize * fontScale).dp }
     OpenCodeIcon(
         "bubble.left.and.bubble.right",
         contentDescription = null,
         modifier = modifier.size(glyph).graphicsLayer {
+            val elapsed = loadingSince?.let { now - it - timing.delay }
             val scale = LoadingGlyphPulse.scale(elapsed, reduceMotion)
             scaleX = scale
             scaleY = scale
@@ -213,21 +304,15 @@ fun TranscriptEmptyView(
 ) {
     val reduceMotion = rememberReduceMotion()
     val showsText = !isLoading && showsEmptyState
-    val title = remember { Animatable(if (showsText) 1f else 0f) }
-    val subtitle = remember { Animatable(if (showsText) 1f else 0f) }
-    LaunchedEffect(showsText, reduceMotion) {
-        val target = if (showsText) 1f else 0f
-        val spec = if (reduceMotion) {
-            androidx.compose.animation.core.tween<Float>(200)
-        } else {
-            spring(dampingRatio = 1f, stiffness = EmptyStateTunables.revealSpring.stiffness())
-        }
-        kotlinx.coroutines.coroutineScope {
-            launch { title.animateTo(target, spec) }
-            launch {
-                if (!reduceMotion && target > 0.5f) delay((EmptyStateTunables.subtitleDelay * 1000).toLong())
-                subtitle.animateTo(target, spec)
-            }
+    var motion by remember { mutableStateOf(EmptyStateMotion(isLoading, showsEmptyState, reduceMotion)) }
+    var now by remember { mutableDoubleStateOf(transcriptNow()) }
+    LaunchedEffect(isLoading, showsEmptyState, reduceMotion, pulsePaused) {
+        now = transcriptNow()
+        motion = motion.retarget(isLoading, showsEmptyState, reduceMotion, now)
+        if (pulsePaused || motion.isSettled(now)) return@LaunchedEffect
+        motionFrameLoop {
+            now = transcriptNow()
+            if (motion.isSettled(now)) MotionFrameAction.Stop else MotionFrameAction.Continue
         }
     }
     Box(modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -246,14 +331,19 @@ fun TranscriptEmptyView(
                 OpenCodeIcon(
                     "bubble.left.and.bubble.right",
                     contentDescription = null,
-                    modifier = Modifier.size(glyph),
+                    modifier = Modifier.size(glyph).graphicsLayer {
+                        alpha = motion.breath.opacity(now)
+                        scaleX = motion.breath.scale(now)
+                        scaleY = scaleX
+                    },
                     tint = OpenCodeTheme.colors.secondaryText,
                 )
             }
             Spacer(Modifier.height(EmptyStateTunables.glyphSpacing.dp))
             Text(
                 "No messages yet",
-                modifier = Modifier.motionBlurReveal(title.value, EmptyStateTunables.revealBlur.dp, EmptyStateTunables.revealRise.dp, reduceMotion),
+                modifier = Modifier.motionBlurReveal(motion.text(now).first.toFloat(), EmptyStateTunables.revealBlur.dp, EmptyStateTunables.revealRise.dp, reduceMotion)
+                    .then(if (!showsText) Modifier.clearAndSetSemantics { } else Modifier),
                 style = OpenCodeTextStyles.title2.copy(fontWeight = FontWeight.Bold),
                 color = OpenCodeTheme.colors.text,
                 textAlign = TextAlign.Center,
@@ -261,19 +351,14 @@ fun TranscriptEmptyView(
             Spacer(Modifier.height(EmptyStateTunables.subtitleSpacing.dp))
             Text(
                 "Start the conversation below.",
-                modifier = Modifier.motionBlurReveal(subtitle.value, EmptyStateTunables.revealBlur.dp, EmptyStateTunables.revealRise.dp, reduceMotion),
+                modifier = Modifier.motionBlurReveal(motion.text(now, true).first.toFloat(), EmptyStateTunables.revealBlur.dp, EmptyStateTunables.revealRise.dp, reduceMotion)
+                    .then(if (!showsText) Modifier.clearAndSetSemantics { } else Modifier),
                 style = OpenCodeTextStyles.subheadline,
                 color = OpenCodeTheme.colors.secondaryText,
                 textAlign = TextAlign.Center,
             )
         }
     }
-}
-
-/** Stiffness of a critically damped `(duration, bounce = 0)` spring: ω² with ω = 2π / duration. */
-private fun MotionSpring.stiffness(): Float {
-    val omega = 2 * PI / max(0.01, duration)
-    return (omega * omega).toFloat()
 }
 
 /**
