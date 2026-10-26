@@ -71,7 +71,7 @@ internal fun SessionFeature.reduceRequests(state: State, action: Action): Reduce
                 next = next.withRequestLoadAttempt(null).withRequestFailureAwaitingReconnect(true).copy(pendingWorkPollSeconds = null)
                 // This read may predate the gap (including a local buffer overflow). Do not let
                 // reconnect join it or replay its pre-gap deltas over REST.
-                next = next.copy(liveText = emptyMap())
+                next = next.copy(liveText = emptyMap(), gappedLiveText = next.gappedLiveText + next.liveText.keys)
                 val abandon = abandonRefresh(next)
                 // Without the stream, reconciliation is the only content path: restart the watchdog at its unhealthy cadence.
                 val watched = watchdog(abandon.state)

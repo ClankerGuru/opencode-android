@@ -772,7 +772,7 @@ fun State.clearUntouchedUndoDraft(): State {
 /** The session moved on: Stop and every run-state read in flight are stale. */
 fun State.supersedeRunWork(): State = copy(runWorkGeneration = runWorkGeneration + 1, isInterrupting = false, stopAttempt = null)
 
-fun State.resetLiveProjection(): State = copy(liveText = emptyMap(), projectedMessageIDs = emptySet(), lastProjectedMessageID = null)
+fun State.resetLiveProjection(): State = copy(liveText = emptyMap(), gappedLiveText = emptySet(), projectedMessageIDs = emptySet(), lastProjectedMessageID = null)
 
 val State.showsMoveToBackground: Boolean
     get() {
