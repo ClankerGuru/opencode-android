@@ -19,4 +19,6 @@ dependencies {
 dependencies {
     implementation(libs.androidx.navigation3.runtime)
     implementation(libs.androidx.navigation3.ui)
+    // Real Bitmap/Canvas/ImageDecoder pixels for the ported ProjectIcon rendering tests.
+    testImplementation(libs.robolectric)
 }
