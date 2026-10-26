@@ -2,6 +2,8 @@ package ai.opencode.feature.transcript.rows
 
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.feature.media.TranscriptImagePreview
+import ai.opencode.feature.transcript.user.TranscriptDragPayload
+import ai.opencode.feature.transcript.user.transcriptDragSource
 import ai.opencode.server.model.OpenCodeImageAttachment
 import android.graphics.BitmapFactory
 import android.util.LruCache
@@ -84,6 +86,10 @@ fun ToolImageMosaic(images: List<OpenCodeImageAttachment>, modifier: Modifier = 
             val image = decoded.getOrNull(index)
             Box(
                 Modifier
+                    .transcriptDragSource(
+                        TranscriptDragPayload.ImageAttachment(attachment.id, attachment.data, "tool-image-${index + 1}"),
+                        cornerRadius = JustifiedImageRows.cornerRadius.dp,
+                    )
                     .clip(shape)
                     // Behind transparent images, and while one decodes.
                     .background(OpenCodeTheme.colors.userBubble)

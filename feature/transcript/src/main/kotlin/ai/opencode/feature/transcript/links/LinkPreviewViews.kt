@@ -1,5 +1,8 @@
 package ai.opencode.feature.transcript.links
 
+import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.haptics.Haptic
+import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
@@ -8,6 +11,7 @@ import ai.opencode.feature.media.GitHubLink
 import ai.opencode.feature.media.GitHubPreview
 import ai.opencode.feature.media.LinkPreview
 import ai.opencode.feature.media.LinkPreviewBitmap
+import ai.opencode.feature.media.LocalAgentImageRowGrowth
 import ai.opencode.feature.media.LocalLinkPreviewRevision
 import ai.opencode.feature.media.LocalLinkPreviewStore
 import ai.opencode.feature.media.RichLinkSource
@@ -133,6 +137,8 @@ fun LinkPreviewReplyEnd(
     }
     val previews = targets.map(store::preview)
     val disclosure = LocalTranscriptRowContext.current.disclosure
+    val growth = LocalAgentImageRowGrowth.current
+    val reduceMotion = rememberReduceMotion()
     LaunchedEffect(store, key, targets) {
         for (target in targets) store.appeared(target, key)
     }
@@ -144,7 +150,13 @@ fun LinkPreviewReplyEnd(
         verticalArrangement = Arrangement.spacedBy(TranscriptMetrics.clustered),
     ) {
         LinkPreviewEntries(previews, isOpen = disclosure.isOpen(TranscriptDisclosureState.Kind.LinkLists, key), presentation = store.presentation(key) { LinkPreviewRowPresentation() })
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                // Holds still while the links above it grow, as the rows below do.
+                .graphicsLayer { translationY = if (reduceMotion || growth == null) 0f else -growth.lift(previews.size) * density },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             actions()
             Spacer(Modifier.weight(1f))
             if (previews.size > LinkPreviewEntries.shown) {
@@ -167,9 +179,16 @@ object LinkPreviewEntries {
 fun LinkPreviewEntries(previews: List<LinkPreview>, isOpen: Boolean, presentation: LinkPreviewRowPresentation? = null) {
     val scaledIcon = LinkPreviewEntry.iconSide * LocalDensity.current.fontScale
     val inset = min(scaledIcon, LinkPreviewEntry.maximumIconSide.value).dp + LinkPreviewEntry.iconSpacing
+    val growth = LocalAgentImageRowGrowth.current
+    val reduceMotion = rememberReduceMotion()
 
+    /** A hairline from the text column to the trailing edge, drawn up by what the links above it still have to grow. */
     @Composable
-    fun separator() = HairlineRule(Modifier.padding(start = inset))
+    fun separator(before: Int) = HairlineRule(
+        Modifier
+            .padding(start = inset)
+            .graphicsLayer { translationY = if (reduceMotion || growth == null) 0f else -growth.lift(before) * density },
+    )
 
     @Composable
     fun entry(preview: LinkPreview, index: Int) {
@@ -183,7 +202,7 @@ fun LinkPreviewEntries(previews: List<LinkPreview>, isOpen: Boolean, presentatio
     Column(Modifier.fillMaxWidth()) {
         previews.take(LinkPreviewEntries.shown).forEachIndexed { index, preview ->
             key(preview.id) {
-                if (index > 0) separator()
+                if (index > 0) separator(index)
                 entry(preview, index)
             }
         }
@@ -191,7 +210,7 @@ fun LinkPreviewEntries(previews: List<LinkPreview>, isOpen: Boolean, presentatio
             Column(Modifier.fillMaxWidth()) {
                 previews.drop(LinkPreviewEntries.shown).forEachIndexed { offset, preview ->
                     key(preview.id) {
-                        separator()
+                        separator(LinkPreviewEntries.shown + offset)
                         entry(preview, LinkPreviewEntries.shown + offset)
                     }
                 }
@@ -266,6 +285,7 @@ fun LinkPreviewMoreButton(count: Int, key: String, entryID: String) {
 @Composable
 fun LinkPreviewButton(preview: LinkPreview, label: @Composable () -> Unit) {
     val send = LocalTranscriptRowContext.current.send
+    val haptics = remember { dependency(HapticsClient) }
     var menu by remember { mutableStateOf(false) }
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -274,7 +294,11 @@ fun LinkPreviewButton(preview: LinkPreview, label: @Composable () -> Unit) {
     val open = { send(TranscriptAction.LinkTapped(url)) }
     Box(
         Modifier
-            .transcriptDragSource(TranscriptDragPayload.Url(url), cornerRadius = 8.dp, onLift = { menu = true })
+            .transcriptDragSource(TranscriptDragPayload.Url(url), cornerRadius = 8.dp, onLift = {
+                // The hold answers the finger, as the inline links' menu does (iOS: the context menu's own).
+                haptics.play(Haptic.tap)
+                menu = true
+            })
             .clickable(interactionSource = interaction, indication = null, onClick = open)
             .graphicsLayer { alpha = if (pressed) 0.6f else 1f }
             .clearAndSetSemantics {
@@ -287,7 +311,7 @@ fun LinkPreviewButton(preview: LinkPreview, label: @Composable () -> Unit) {
             },
     ) {
         label()
-        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, properties = ai.opencode.feature.media.liftMenuProperties()) {
             Box(Modifier.width(340.dp).padding(horizontal = 8.dp, vertical = 4.dp)) { LinkPreviewCard(preview) }
             for (action in actions) {
                 DropdownMenuItem(

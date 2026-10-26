@@ -8,7 +8,11 @@ import ai.opencode.server.model.OpenCodeModelRef
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
+import android.content.res.AssetManager
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
@@ -52,6 +56,20 @@ data class ModelSwitchLabel(val title: String, val variant: String?) {
 }
 
 /**
+ * Which providers have a mark of their own (iOS `UIImage(named: "provider-<id>") != nil`): the
+ * session's `assets/provider-icons/<id>.svg`, merged into the app. Listed once per process.
+ */
+internal object ProviderMarks {
+    @Volatile private var names: Set<String>? = null
+
+    fun has(providerID: String, assets: AssetManager): Boolean {
+        val known = names ?: (runCatching { assets.list("provider-icons")?.toSet() }.getOrNull().orEmpty())
+            .map { it.removeSuffix(".svg") }.toSet().also { names = it }
+        return providerID in known
+    }
+}
+
+/**
  * A quiet centred rule where the session's model or thinking level changed (iOS
  * `ModelSwitchRule`), like compaction's, with the provider's mark as on desktop. A long name
  * truncates at its end, before the level, which stays in view; accessibility sizes wrap.
@@ -63,10 +81,15 @@ fun ModelSwitchRule(label: ModelSwitchLabel, providerID: String, modifier: Modif
     val style = OpenCodeTextStyles.caption1.copy(color = colors.secondaryText)
     RuleRow(quaternaryLine(), modifier.clearAndSetSemantics { contentDescription = label.accessibilityLabel }, minLine = 16.dp) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            // The provider's mark, or filled sparkles for one without a mark (the outline reads faint at this size).
+            // The provider's mark, or filled sparkles for one without a mark of its own (iOS
+            // checks `provider-<id>` exists: no canonical or placeholder fallback here).
             val mark = LocalTranscriptRowSlots.current.providerMark
-            if (mark != null) {
-                mark(providerID, Modifier.size(iconSize))
+            val assets = LocalContext.current.assets
+            if (mark != null && ProviderMarks.has(providerID, assets)) {
+                // A template image takes the row's secondary ink.
+                CompositionLocalProvider(LocalContentColor provides colors.secondaryText) {
+                    mark(providerID, Modifier.size(iconSize))
+                }
             } else {
                 OpenCodeIcon("sparkles", contentDescription = null, size = iconSize, tint = colors.secondaryText)
             }

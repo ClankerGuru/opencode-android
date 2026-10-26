@@ -167,13 +167,23 @@ fun MermaidDiagramCard(
             val key = MermaidCacheKey(source, theme, display.width)
             val shown = image?.takeIf { it.first == key }?.second ?: renderer.cachedImage(key)
             val shape = RoundedCornerShape(TranscriptMetrics.cardCornerRadius)
+            val dragSource = LocalTranscriptImageDragSource.current
             Box(
                 Modifier
                     .fillMaxWidth()
                     .height(height)
                     .clip(shape)
                     .background(MermaidRenderer.background(theme), shape)
-                    .combinedClickable(onClick = { if (shown != null) open() }, onLongClick = { menuOpen = true })
+                    .then(
+                        // The transcript's drag source owns the hold: it opens the menu, and a
+                        // move after it drags the diagram out (closing the menu).
+                        if (dragSource != null && shown != null) {
+                            dragSource(shown, "diagram.png", TranscriptMetrics.cardCornerRadius, { menuOpen = true }, { menuOpen = false })
+                                .clickable(onClick = ::open)
+                        } else {
+                            Modifier.combinedClickable(onClick = { if (shown != null) open() }, onLongClick = { menuOpen = true })
+                        },
+                    )
                     .clearAndSetSemantics {
                         contentDescription = "Diagram"
                         stateDescription = if (naturalSize == null) "$diagramType, loading" else diagramType
@@ -196,7 +206,7 @@ fun MermaidDiagramCard(
                 } else {
                     CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
                 }
-                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }, properties = ai.opencode.feature.media.liftMenuProperties()) {
                     DropdownMenuItem(
                         text = { Text("View Source") },
                         leadingIcon = { OpenCodeIcon("chevron.left.forwardslash.chevron.right", contentDescription = null) },

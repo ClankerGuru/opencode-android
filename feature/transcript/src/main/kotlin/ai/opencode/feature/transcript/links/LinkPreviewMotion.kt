@@ -2,7 +2,17 @@ package ai.opencode.feature.transcript.links
 
 import ai.opencode.core.motion.motionBlurReveal
 import ai.opencode.core.motion.rememberReduceMotion
+import ai.opencode.feature.media.AgentImageRowGrowth
 import ai.opencode.feature.media.LinkPreview
+import ai.opencode.feature.media.LinkPreviewStore
+import ai.opencode.feature.media.LocalAgentImageRowGrowth
+import ai.opencode.feature.transcript.TranscriptEntry
+import ai.opencode.feature.transcript.list.MessageRow
+import ai.opencode.feature.transcript.list.TranscriptItemID
+import ai.opencode.feature.transcript.list.TranscriptListSnapshot
+import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
+import ai.opencode.feature.transcript.markdown.ui.agentImageGrowthHold
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -10,17 +20,21 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
@@ -94,13 +108,60 @@ class LinkPreviewRowPresentation {
 
 /**
  * One clock for the pixels only (iOS `ArrivingLinkPreview`). Layout takes its final size at once;
- * the list's `RowGrowth` eases the row's height (iOS `AgentImageRowGrowth` owns that per block).
+ * the row's [AgentImageRowGrowth] owns every point of travel, including the Copy row: each link
+ * reports its height change under its [block] (its index), and is drawn up by what the links
+ * above it still have to grow and cut by its own, so nothing below moves ahead of the row's edge.
  */
 @Composable
 internal fun ArrivingLinkPreview(preview: LinkPreview, block: Int, presentation: LinkPreviewRowPresentation) {
     val change = presentation.change(preview, duration = LinkPreviewMotion.fade)
-    LinkPreviewButton(preview) {
-        LinkPreviewMaterialisation(change)
+    val growth = LocalAgentImageRowGrowth.current
+    val reduceMotion = rememberReduceMotion()
+    val density = LocalDensity.current
+    val currentPreview by rememberUpdatedState(preview)
+    Box(
+        Modifier
+            .onSizeChanged { size ->
+                val delta = presentation.measure(with(density) { size.height.toDp().value }, currentPreview)
+                if (!reduceMotion && abs(delta) > 0.5f) growth?.add(block, delta)
+            }
+            .agentImageGrowthHold(
+                lift = { if (reduceMotion || growth == null) 0f else growth.lift(block) * density.density },
+                cut = { if (reduceMotion || growth == null) 0f else growth.cut(listOf(block)) * density.density },
+                clips = true,
+            ),
+    ) {
+        LinkPreviewButton(preview) {
+            LinkPreviewMaterialisation(change)
+        }
+    }
+}
+
+/**
+ * iOS `TranscriptListViewController+Snapshots`: the reply end the Copy handoff brings as a run
+ * finishes is already drawn, but its links are genuinely new. Marks its presentation `arrives`,
+ * so they fade in and grow like an image that loaded. Fed every list update from composition,
+ * after the controller applied it; a plain object kept by the list.
+ */
+class LinkPreviewArrivals(private val store: LinkPreviewStore) {
+    private var lastSnapshot: TranscriptListSnapshot? = null
+    private var wasRunning = false
+
+    fun update(snapshot: TranscriptListSnapshot, isRunning: Boolean, hasLaidOutContent: Boolean) {
+        val previous = lastSnapshot
+        if (previous === snapshot) return
+        lastSnapshot = snapshot
+        val previouslyRunning = wasRunning
+        wasRunning = isRunning
+        if (previous == null || !hasLaidOutContent || !previouslyRunning) return
+        val old = previous.items.mapTo(HashSet()) { it.key }
+        for (item in snapshot.items) {
+            if (item.key in old || item !is TranscriptItemID.Message) continue
+            val entry = (snapshot.rows[item.stableID] as? MessageRow.Entry)?.entry as? TranscriptEntry.ReplyEnd ?: continue
+            val blocks = entry.texts.flatMap { OpenCodeMarkdownBlock.blocks(it) }.linkTextBlocks()
+            if (store.targets(blocks, entry.id).isEmpty()) continue
+            store.presentation(item.stableID) { LinkPreviewRowPresentation() }.arrives = true
+        }
     }
 }
 

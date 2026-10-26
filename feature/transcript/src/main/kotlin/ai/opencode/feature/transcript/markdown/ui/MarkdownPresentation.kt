@@ -4,6 +4,7 @@ import ai.opencode.core.ui.OpenCodeColors
 import ai.opencode.core.ui.OpenCodeFonts
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.feature.media.SiteIcon
 import ai.opencode.feature.transcript.SessionLinkTarget
 import ai.opencode.feature.transcript.markdown.InlineRun
 import ai.opencode.feature.transcript.markdown.MathSyntax
@@ -19,16 +20,23 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.LinkInteractionListener
@@ -138,12 +146,14 @@ object MarkdownPresentation {
         targets: Map<String, SessionLinkTarget>,
         density: Density,
         links: LinkInteractionListener?,
-        siteIcon: ((String) -> ImageBitmap?)?,
+        siteIcon: ((String) -> SiteIcon?)?,
     ): PresentedText {
         val colors = style.colors
         val groups = group(inline.runs)
         val hasMathRun = inline.runs.any { MathSyntax.Delimiter.from(it.languageIdentifier) != null }
-        val decoratesLinks = options.linkStyle != InlineLinkStyle.Today && !hasMathRun
+        // In the transcript only (its rows redraw when an icon arrives): [siteIcon] is the list's
+        // store (iOS `linkIcons`: `linkStyle != .today, let linkStore, !InlineMath.contains`).
+        val decoratesLinks = options.linkStyle != InlineLinkStyle.Today && siteIcon != null && !hasMathRun
         val inlineContent = mutableMapOf<String, InlineTextContent>()
         val edits = mutableListOf<TextEdit>()
         val chips = mutableListOf<SessionChip>()
@@ -180,18 +190,20 @@ object MarkdownPresentation {
                         if (chipURL !in menuLinks) menuLinks += chipURL
                     }
                     url != null -> {
-                        val web = MarkdownLinks.isWeb(url)
+                        // iOS `InlineLinkText.decorate`: every link the hold menu offers (web, and a
+                        // shareable pairing link); session links are chips above.
+                        val slotted = MarkdownLinks.offersMenu(url)
                         val linkStyles = TextLinkStyles(SpanStyle(color = colors.link))
                         withLink(clickable(url, linkStyles, links)) {
-                            if (decoratesLinks && web) {
+                            if (decoratesLinks && slotted) {
                                 val isOpen = options.isGrowing && originalOffset + groupLength >= totalLength
                                 val domain = MarkdownLinks.iconDomain(url)
                                 val id = "icon:$groupIndex"
                                 appendInlineContent(id, wordJoiner)
-                                inlineContent[id] = linkIcon(url, domain, isOpen, options.textSize, colors, siteIcon)
+                                inlineContent[id] = linkIcon(url, domain, isOpen, options.textSize, colors, siteIcon!!)
                                 edits += TextEdit(originalOffset, 0, 1)
                                 if (!isOpen && domain != null) fetchable += url
-                                val host = MarkdownLinks.displayHost(url)
+                                val host = slotHost(url)
                                 if (host !in hosts) hosts += host
                                 val written = group.runs.joinToString("") { it.text }
                                 val shown = if (written == url && !isOpen) displayed(url, options.linkStyle) else null
@@ -280,7 +292,7 @@ object MarkdownPresentation {
             if (parsed?.host == null) {
                 null
             } else {
-                var shown = MarkdownLinks.displayHost(url) + (if (parsed.port >= 0) ":${parsed.port}" else "")
+                var shown = slotHost(url) + (if (parsed.port >= 0) ":${parsed.port}" else "")
                 var folded = parsed.query != null || parsed.fragment != null
                 for ((index, segment) in parsed.pathSegments.withIndex()) {
                     if (index >= 2 || shown.length + segment.length + 1 > chipLength) {
@@ -294,6 +306,15 @@ object MarkdownPresentation {
                 shown.toList().joinToString(wordJoiner)
             }
         }
+    }
+
+    /**
+     * iOS `LinkPreviewPolicy.displayHost`: the URL's host, lowercased, without `www.`; the whole
+     * URL when it has none. TalkBack's “Links to …” hint and a chip's domain.
+     */
+    fun slotHost(url: String): String {
+        val host = runCatching { android.net.Uri.parse(url).host }.getOrNull()?.takeIf { it.isNotEmpty() }?.lowercase() ?: url
+        return if (host.startsWith("www.")) host.drop(4) else host
     }
 
     private class Group(val link: String?, val runs: List<InlineRun>)
@@ -378,9 +399,12 @@ object MarkdownPresentation {
     }
 
     /**
-     * The icon's slot in a line of text (iOS `InlineLinkIconMetrics`): a little taller than the
-     * capitals (`capHeight × 1.25`, Roboto's cap height ≈ 0.711 em), centred on the line, and a
-     * small gap before the link's text.
+     * The icon's slot in a line of text (iOS `InlineLinkIconMetrics` + `InlineLinkIconImages`): a
+     * little taller than the capitals (`capHeight × 1.25`, Roboto's cap height ≈ 0.711 em), centred
+     * on the line, and a small gap before the link's text. The site's icon is rounded like the
+     * cards (`side × 0.225`); a mark that would vanish gets a plate (a dark one a light plate in
+     * dark mode, a light one a dark plate in light mode). Until it arrives, or for a link still
+     * streaming in, the globe; a link the icon service is never asked about, a neutral link glyph.
      */
     private fun linkIcon(
         url: String,
@@ -388,18 +412,30 @@ object MarkdownPresentation {
         isOpen: Boolean,
         textSize: TextUnit,
         colors: OpenCodeColors,
-        siteIcon: ((String) -> ImageBitmap?)?,
+        siteIcon: (String) -> SiteIcon?,
     ): InlineTextContent {
         val size = textSize.value
         val side = (size * 0.711f * 1.25f).roundToInt().toFloat()
         val gap = max(3f, (side * 0.27f).roundToInt().toFloat())
         val placeholder = Placeholder((side + gap).sp, side.sp, PlaceholderVerticalAlign.TextCenter)
+        val dark = colors.isDark
         return InlineTextContent(placeholder) {
-            val icon = if (!isOpen && domain != null) siteIcon?.invoke(url) else null
+            val icon = if (!isOpen && domain != null) siteIcon(url) else null
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
-                Box(Modifier.fillMaxHeight().aspectRatio(1f).clip(RoundedCornerShape(percent = 22)), contentAlignment = Alignment.Center) {
+                Box(Modifier.fillMaxHeight().aspectRatio(1f), contentAlignment = Alignment.Center) {
                     if (icon != null) {
-                        Image(icon, contentDescription = null, modifier = Modifier.fillMaxSize())
+                        val plate = when {
+                            icon.tone == SiteIcon.Tone.Dark && dark -> Color(0.92f, 0.92f, 0.92f)
+                            icon.tone == SiteIcon.Tone.Light && !dark -> Color(0.2f, 0.2f, 0.2f)
+                            else -> Color.Transparent
+                        }
+                        val bitmap = remember(icon) { icon.image.asImageBitmap() }
+                        Image(
+                            bitmap,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize().clip(SiteIconShape).background(plate),
+                            filterQuality = FilterQuality.High,
+                        )
                     } else {
                         // Decorative: TalkBack reads the link's text, not its icon.
                         OpenCodeIcon(
@@ -412,6 +448,11 @@ object MarkdownPresentation {
                 }
             }
         }
+    }
+
+    /** iOS `UIBezierPath(roundedRect:cornerRadius: side * 0.225)`. */
+    private val SiteIconShape = GenericShape { size, _ ->
+        addRoundRect(RoundRect(Rect(Offset.Zero, size), CornerRadius(size.minDimension * 0.225f)))
     }
 
     /** Inline math on the baseline: the placeholder holds the ascent; the descent hangs below it. */
