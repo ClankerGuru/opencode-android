@@ -44,6 +44,25 @@ internal object SessionFeatureTestsSendingSupport {
         }
     }
 
+    /** iOS `expectOptimisticSend(_:text:)`: the state a send from an idle session's composer leaves at once. */
+    fun expectOptimisticSend(state: SessionFeature.State, text: String = "hello"): SessionFeature.State {
+        val messageID = sentID
+        val signal = state.workingRunSignal
+        return state.copy(
+            // A send supersedes any run-state work.
+            runWorkGeneration = state.runWorkGeneration + 1,
+            optimisticPromptIDs = setOf(messageID),
+            nextPromptRequestEpoch = 1,
+            promptStates = state.promptStates + (messageID to SessionFeature.State.PromptState(requestEpoch = 1)),
+            isAwaitingReply = true,
+            items = listOf(OpenCodeTranscriptItem.UserText(id = messageID, text = text)),
+            lastSentItemID = messageID,
+            sendGeneration = 1,
+        ).withDraft("")
+            // The Working line sees the run start.
+            .updateWorkingRun(signal)
+    }
+
     /** iOS `Task.sleep(for: .seconds(3600))` in a stub: a wait the test never sees end. */
     suspend fun hang() = delay(1.hours)
 
