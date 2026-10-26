@@ -5,11 +5,13 @@ import ai.opencode.core.dependencies.TestClock
 import ai.opencode.core.dependencies.asContextElement
 import ai.opencode.feature.voice.DotScopeSimulation.Cue
 import ai.opencode.feature.voice.DotScopeSimulation.Scan
+import android.os.VibratorManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -19,6 +21,11 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
+import org.robolectric.annotation.Config
 import java.util.UUID
 import kotlin.math.abs
 import kotlin.math.sqrt
@@ -283,8 +290,9 @@ class VoiceHapticTests {
 
 /**
  * A call's audio teardown never cuts off whatever claimed the session after it.
- * `endingACallReleasesItsHapticEngineAndANewCallKeepsIt` is dropped: Android's `VoiceHapticEngine`
- * needs a real `Vibrator` and `ProcessLifecycleOwner` (no Robolectric in this suite).
+ * `endingACallReleasesItsHapticEngineAndANewCallKeepsIt` drives the real `VoiceHapticEngine`
+ * (`Vibrator`, `ProcessLifecycleOwner`), so it runs under Robolectric in
+ * [VoiceCallTeardownFrameworkTests].
  */
 class VoiceCallTeardownTests {
     @Test fun dictationStartedAfterACallKeepsTheSession() {
@@ -308,6 +316,34 @@ class VoiceCallTeardownTests {
         order += "haptics"
         call.release()
         assertEquals(listOf("haptics", "deactivate"), order)
+    }
+}
+
+/**
+ * [VoiceCallTeardownTests]' engine test on Android's real `VoiceHapticEngine` (Robolectric's
+ * shadow `Vibrator`). Releasing the engine is cancelling the vibrator and unpreparing it, so the
+ * port also checks the new call's vibrator isn't cancelled and the last call's end is.
+ */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35])
+class VoiceCallTeardownFrameworkTests {
+    @Test fun endingACallReleasesItsHapticEngineAndANewCallKeepsIt() = runBlocking {
+        val app = RuntimeEnvironment.getApplication()
+        val vibrator = shadowOf(app.getSystemService(VibratorManager::class.java).defaultVibrator)
+        val engine = VoiceHapticEngine(app, clock = TestClock())
+        engine.prepare()
+        assertTrue(engine.isCallActive)
+        engine.endCall()
+        assertFalse(engine.isCallActive)
+        // The next call starts before the last one's teardown finishes.
+        engine.prepare()
+        engine.finish()
+        assertTrue(engine.isCallActive)
+        assertFalse(vibrator.isCancelled)
+        // That call's own end does release it.
+        engine.endCall()
+        engine.finish()
+        assertTrue(vibrator.isCancelled)
     }
 }
 

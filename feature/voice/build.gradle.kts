@@ -11,4 +11,6 @@ android {
 dependencies {
     implementation(libs.webrtc)
     implementation(libs.androidx.lifecycle.process)
+    // The real VoiceHapticEngine (Vibrator, ProcessLifecycleOwner) in the ported teardown test.
+    testImplementation(libs.robolectric)
 }

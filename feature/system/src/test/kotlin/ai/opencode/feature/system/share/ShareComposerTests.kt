@@ -1,5 +1,8 @@
 package ai.opencode.feature.system.share
 
+import ai.opencode.core.dependencies.AppContext
+import ai.opencode.core.dependencies.withDependencies
+import ai.opencode.core.files.ComposerFileStaging
 import ai.opencode.core.files.ComposerStagedFile
 import ai.opencode.core.testing.TestIsolationRule
 import ai.opencode.feature.system.SessionDirectory
@@ -21,6 +24,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
 import java.io.File
 import java.net.ConnectException
 import java.nio.file.Files
@@ -41,12 +48,12 @@ private val server = OpenCodeServer(
 // MARK: Credentials
 
 /**
- * Not ported: `removingAServerForgetsItsCredentialsOnly` (`ShareInboxClient.live` needs an
- * Android `Context` for its files and sharing shortcuts; no Robolectric here),
- * `keychainItemRoundTripsUpdatesAndRemoves` (the item is a Keystore-encrypted
- * `SharedKey.keychain`; no Keystore under JVM tests), `extensionTransportSecurityMatchesTheApp`
- * (iOS ATS / `NSExtension` plist: Android's share target runs in the app's process under its
- * network security config).
+ * `removingAServerForgetsItsCredentialsOnly` (`ShareInboxClient.live` needs an Android `Context`
+ * for its files and sharing shortcuts) runs under Robolectric in [ShareCredentialsFrameworkTests].
+ * Not ported: `keychainItemRoundTripsUpdatesAndRemoves` (the item is an `AndroidKeyStore`-encrypted
+ * `SharedKey.keychain`; Robolectric has no `AndroidKeyStore` provider),
+ * `extensionTransportSecurityMatchesTheApp` (iOS ATS / `NSExtension` plist: Android's share target
+ * runs in the app's process under its network security config).
  */
 class ShareCredentialsTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -88,6 +95,26 @@ class ShareCredentialsTests {
         ShareCredentials.publish(ShareCredentials(other), store)
         assertEquals(other.persistenceID, store.load()?.serverID)
         assertNull(store.load()?.callbackURL)
+    }
+}
+
+/** [ShareCredentialsTests]' test of the live inbox client, which needs an Android `Context` (Robolectric). */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35])
+class ShareCredentialsFrameworkTests {
+    @get:Rule val isolation = TestIsolationRule()
+
+    @Test
+    fun removingAServerForgetsItsCredentialsOnly() {
+        val store = ShareCredentialStore.inMemory()
+        val inbox = withDependencies({ this[AppContext] = RuntimeEnvironment.getApplication() }) {
+            ShareInboxClient.live(credentials = store)
+        }
+        inbox.publishCredentials(ShareCredentials(server), true)
+        inbox.removeTargets("someone-else")
+        assertNotNull(store.load())
+        inbox.removeTargets(server.persistenceID)
+        assertNull(store.load())
     }
 }
 
@@ -167,6 +194,8 @@ private val encoder = Json { encodeDefaults = true; explicitNulls = false }
  * `promptBodyMatchesTheApps` compares with the app's body as `:server`'s (internal)
  * `promptBody` writes it for the same message (see `LivePrompts.kt`).
  * `newIDsHaveTheServersShape` drops its `PromptOutbox.newSessionID` comparison (`:feature:composer`).
+ * The two file tests stage through `ComposerFileStaging`, whose type sniffing reads Android's
+ * `MimeTypeMap`: they're in [ShareSenderFrameworkTests].
  */
 class ShareSenderTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -215,32 +244,6 @@ class ShareSenderTests {
     }
 
     @Test
-    fun filesUploadIntoTheSessionsFolderThenAreReferenced() = runBlocking {
-        val staging = Files.createTempDirectory("composer-files-").toFile()
-        try {
-            val staged = stagedFile("notes.md", "# Notes", staging)
-            val fake = FakeServer(
-                listOf(
-                    ok("""{"paths":{"tmp":"/srv/tmp"}}"""),
-                    { seen -> 200 to """{"data":{"path":"${seen.query["path"] ?: ""}"}}""".toByteArray() },
-                    ok(),
-                ),
-            )
-            sender(fake).send(ShareSendRequest(ShareSendRequest.Target.Session("ses_f", "/work"), messageID = "msg_f", text = "Summarize", files = listOf(staged)))
-            assertEquals(listOf("/api/info", "/api/experimental/fs/write", "/api/session/ses_f/prompt"), fake.requests.map { it.path })
-            val write = fake.requests[1]
-            val path = "/srv/tmp/uploads/${staged.id.toString().lowercase()}/notes.md"
-            assertEquals(mapOf("location[directory]" to "/work", "path" to path), write.query)
-            assertEquals("# Notes", write.body?.let(::String))
-            val prompt = json(fake.requests[2].body)
-            assertEquals("Summarize\nAttached file: `$path`", prompt["text"]?.jsonPrimitive?.content)
-            assertEquals(path, prompt["metadata"]?.jsonObject?.get("attachments")?.jsonArray?.first()?.jsonObject?.get("path")?.jsonPrimitive?.content)
-        } finally {
-            staging.deleteRecursively()
-        }
-    }
-
-    @Test
     fun busyAnswersAreRetriedUnderTheSameID() = runBlocking {
         val fake = FakeServer(listOf(status(503), status(502), ok()))
         sender(fake).send(ShareSendRequest(ShareSendRequest.Target.Session("ses_r", null), messageID = "msg_r", text = "Again"))
@@ -283,6 +286,48 @@ class ShareSenderTests {
     }
 
     @Test
+    fun newIDsHaveTheServersShape() {
+        assertTrue(Regex("msg_[0-9a-f]{12}[0-9A-Za-z]{14}").matches(ShareSendRequest.newMessageID()))
+        assertEquals("ses_ce7a3afffffeabc00000000000", ShareSendRequest.newSessionID(atEpochMillis = 1_800_000_000_000, entropy = "abc"))
+    }
+}
+
+/**
+ * [ShareSenderTests]' file sends, staged as iOS does through `ComposerFileStaging.stage` (its
+ * type sniffing reads Android's `MimeTypeMap`; Robolectric's real one on API 35).
+ */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35])
+class ShareSenderFrameworkTests {
+    @get:Rule val isolation = TestIsolationRule()
+
+    @Test
+    fun filesUploadIntoTheSessionsFolderThenAreReferenced() = runBlocking {
+        val staging = Files.createTempDirectory("composer-files-").toFile()
+        try {
+            val staged = stagedFile("notes.md", "# Notes", staging)
+            val fake = FakeServer(
+                listOf(
+                    ok("""{"paths":{"tmp":"/srv/tmp"}}"""),
+                    { seen -> 200 to """{"data":{"path":"${seen.query["path"] ?: ""}"}}""".toByteArray() },
+                    ok(),
+                ),
+            )
+            sender(fake).send(ShareSendRequest(ShareSendRequest.Target.Session("ses_f", "/work"), messageID = "msg_f", text = "Summarize", files = listOf(staged)))
+            assertEquals(listOf("/api/info", "/api/experimental/fs/write", "/api/session/ses_f/prompt"), fake.requests.map { it.path })
+            val write = fake.requests[1]
+            val path = "/srv/tmp/uploads/${staged.id.toString().lowercase()}/notes.md"
+            assertEquals(mapOf("location[directory]" to "/work", "path" to path), write.query)
+            assertEquals("# Notes", write.body?.let(::String))
+            val prompt = json(fake.requests[2].body)
+            assertEquals("Summarize\nAttached file: `$path`", prompt["text"]?.jsonPrimitive?.content)
+            assertEquals(path, prompt["metadata"]?.jsonObject?.get("attachments")?.jsonArray?.first()?.jsonObject?.get("path")?.jsonPrimitive?.content)
+        } finally {
+            staging.deleteRecursively()
+        }
+    }
+
+    @Test
     fun filesPastTheLimitAreLeftForTheApp() = runBlocking {
         val staging = Files.createTempDirectory("composer-files-").toFile()
         try {
@@ -300,21 +345,14 @@ class ShareSenderTests {
         }
     }
 
-    @Test
-    fun newIDsHaveTheServersShape() {
-        assertTrue(Regex("msg_[0-9a-f]{12}[0-9A-Za-z]{14}").matches(ShareSendRequest.newMessageID()))
-        assertEquals("ses_ce7a3afffffeabc00000000000", ShareSendRequest.newSessionID(atEpochMillis = 1_800_000_000_000, entropy = "abc"))
-    }
-
-    /**
-     * iOS stages through `ComposerFileStaging.stage`; its MIME sniffing reads Android's
-     * `MimeTypeMap`, which JVM tests don't have, so the staged copy is laid out the same way here.
-     */
     private fun stagedFile(name: String, contents: String, directory: File): ComposerStagedFile {
-        val id = UUID.randomUUID()
-        val file = File(File(directory, id.toString().uppercase()).apply { mkdirs() }, name)
-        file.writeText(contents)
-        return ComposerStagedFile(id, name, "text/plain", file.length(), file)
+        val source = File.createTempFile("${UUID.randomUUID()}-", "-$name")
+        try {
+            source.writeText(contents)
+            return ComposerFileStaging.stage(source, name = name, directory = directory)
+        } finally {
+            source.delete()
+        }
     }
 }
 
