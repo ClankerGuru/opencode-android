@@ -7,6 +7,7 @@ import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
+import ai.opencode.core.ui.OpenCodeColors
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeIconButton
 import ai.opencode.core.ui.OpenCodeIconSize
@@ -283,11 +284,8 @@ internal fun FloatingControl(symbol: SFSymbol, label: String, onClick: () -> Uni
 }
 
 /** iOS `headerProjectColor(for:)`: secondary under high contrast, else primary at 75 %. */
-@Composable
-private fun headerProjectColor(): Color {
-    val colors = OpenCodeTheme.colors
-    return if (colors.highContrast) colors.secondaryText else colors.text.copy(alpha = 0.75f)
-}
+internal fun headerProjectColor(colors: OpenCodeColors): Color =
+    if (colors.highContrast) colors.secondaryText else colors.text.copy(alpha = 0.75f)
 
 /**
  * The header's one title capsule. A draft and the session it becomes share it, so creating the
@@ -305,7 +303,7 @@ private fun HeaderTitle(
     val latestTitle = model.titleText ?: return
     // The capsule's second line: the project, which a draft knows before the session list does.
     val project = listContext.project?.name ?: model.draftProjectName
-    val projectColor = headerProjectColor()
+    val projectColor = headerProjectColor(OpenCodeTheme.colors)
     val fontScale = LocalDensity.current.fontScale
     // Auto Rename's new title waits for the breath to ease back to full; another session switched
     // in place shows its own title at once.
