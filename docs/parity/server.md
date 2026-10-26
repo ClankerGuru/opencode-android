@@ -104,10 +104,15 @@ fixtures: `server/src/testFixtures` (`WireFixture`, `ServerTestIsolation`); the 
 | `ServerDetailsTests.swift` | `live/ServerDetailsTests.kt` | 3 (`decodesEveryMCPStatus`, `decodesCredentialAndEnvironmentAccounts`, `onlyMCPConnectIsRetriedWhenUnsent`) | `OpenCodeAccount.subtitle` (`ServerDetailsTrays`) and the reducer tests → `:feature:settings`; here the accounts test checks provider/method/label |
 | `ConnectionHealthTests.swift` | `ConnectionHealthTests.kt` | 2 (`routes`, `routesClassifyParsedAddressesNotSpellings`) | health machine, trace, card names → `:feature:settings` |
 | `LowDataModeTests.swift` | `retry/LowDataModeTests.kt` | 1 (`networkPathSnapshotPreservesConstrainedAndExpensiveFlags`) | loaders → `:feature:media`. Dropped `constrainedNetworkRefusalIsNeverRetryableTransportFailure`: iOS's `URLError.networkUnavailableReason == .constrained` (per-request `allowsConstrainedNetworkAccess`) has no Android counterpart, so `TransportFailure` has no constrained refusal to classify |
+| `ServerSwitchingTests.swift` | `ServerSwitchingTests.kt` | 6 (names: `friendlyName`/`defaultName`/`displayName`, pre-name decoding, `at`, headers on every request; iOS `friendlyName(host:)` is `friendlyServerName`) | Home → `:feature:drawer`; `ServerTitleFeature` → `:feature:settings`; `AppFeature` (14) → `:app` |
+| `ProjectIconTests.swift` | `model/ProjectIconTests.kt` | 3 (`ProjectMark`, `OpenCodeProjectIcon`, `project.updated` frame) | rendering/loader → `:feature:drawer`; flag → `:core` |
+| `FileAttachmentTests.swift` | `model/FileAttachmentTests.kt` (`PromptPresentationTests`, `FileAttachmentWireTests`) | 4 + 3 | the `TranscriptEntry.build` check of `fileOnlyMessagesHaveNoBubble` → `:feature:transcript`; rest → core/session/composer/system |
+| `NewSessionDraftTests.swift` | `model/NewSessionDraftTests.kt` | 2 (`OpenCodeProject.folder`, `directoryListing`) | rest → `:feature:session`/drawer/`:app` |
+| `MarkdownBlockTests.swift` | `MarkdownBlockTests.kt` | 1 (`markdownImage` cache; key is `OpenCodeClient.markdownImageKey`) | rest → `:feature:transcript`/`:feature:media`/`:feature:session` |
 
 Bugs the ports found (fixed): EACCES socket errors were retried; a refused cleartext redirect to
 another host read as interrupted; OkHttp's 5-per-host cap queued family fan-out; endpoint
 queries encoded `/` as `%2F`; transport failures recorded no failure phase
 (`DiagnosticsNetworkPhases`, found by the core `DiagnosticsRecorderTests`).
 
-Total: 195 `:server` tests (`./gradlew :server:testDebugUnitTest`).
+Total: 241 `:server` tests (`./gradlew :server:testDebugUnitTest`; 2 skipped: opt-in live checks), all passing.
