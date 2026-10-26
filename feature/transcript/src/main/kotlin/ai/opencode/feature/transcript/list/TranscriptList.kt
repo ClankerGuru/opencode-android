@@ -268,8 +268,10 @@ private fun TranscriptListContent(
                     .then(if (controller.emptyHandoff != null) Modifier.clearAndSetSemantics { } else Modifier)
                     .onGloballyPositioned {
                         motionCoordinates[0] = it
-                        imageViewport.bounds = it.boundsInWindow()
+                        val bounds = it.boundsInWindow()
+                        imageViewport.bounds = bounds
                         imageVisibility.setNeedsUpdate()
+                        controller.sendLanding?.listEnd = bounds.copy(bottom = bounds.bottom - with(density) { listPadding.calculateBottomPadding().toPx() })
                     },
                 contentPadding = listPadding,
             ) {
@@ -279,7 +281,7 @@ private fun TranscriptListContent(
                         .animateItem(
                             fadeInSpec = null,
                             placementSpec = controller.placementSpring?.spec(),
-                            fadeOutSpec = if (item == TranscriptItemID.Empty) null else androidx.compose.animation.core.tween((RowEntrance.EXIT_DURATION * 1000).toInt(), easing = androidx.compose.animation.core.CubicBezierEasing(0f, 0f, 0.58f, 1f)) /* iOS .curveEaseOut */,
+                            fadeOutSpec = if (item == TranscriptItemID.Empty || !controller.fadesRemovals) null else androidx.compose.animation.core.tween((RowEntrance.EXIT_DURATION * 1000).toInt(), easing = androidx.compose.animation.core.CubicBezierEasing(0f, 0f, 0.58f, 1f)) /* iOS .curveEaseOut */,
                         )
                         .fillMaxWidth()
                         .wrapContentWidth()
@@ -369,27 +371,27 @@ private fun TranscriptListContent(
  */
 @Composable
 private fun GrowingRow(controller: TranscriptListController, key: String, modifier: Modifier, content: @Composable () -> Unit) {
+    val canvas = OpenCodeTheme.colors.canvas
     Box(
         modifier
             .rowEntrance { controller.entrance(key) }
             // Outside the layout below, so the clip and soft edge sit at the reported (growing) height.
-            .graphicsLayer {
-                clip = controller.isClipping(key)
-                compositingStrategy = if (controller.softEdge(key) > 0f) CompositingStrategy.Offscreen else CompositingStrategy.Auto
-            }
+            .graphicsLayer { clip = controller.isClipping(key) }
             .drawWithContent {
                 drawContent()
                 val edge = controller.softEdge(key) * density
                 if (edge > 0.5f) {
-                    // The soft edge only ever brightens what it covers (iOS growth mask).
+                    // The soft edge only ever brightens what it covers (iOS growth mask): the row
+                    // fades into the transcript's canvas behind it. Drawn over, not punched out
+                    // (DstOut), which needs an offscreen layer chosen in the same frame; a layer
+                    // still on Auto the frame growth starts showed the cut as a black band.
                     drawRect(
                         brush = Brush.verticalGradient(
-                            colors = listOf(Color.Transparent, Color.Black),
+                            colors = listOf(canvas.copy(alpha = 0f), canvas),
                             startY = size.height - edge,
                             endY = size.height,
                         ),
                         topLeft = Offset(0f, size.height - edge),
-                        blendMode = BlendMode.DstOut,
                     )
                 }
             }

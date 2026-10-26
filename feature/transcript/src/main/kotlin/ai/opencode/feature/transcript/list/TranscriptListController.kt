@@ -28,6 +28,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.math.roundToInt
 import kotlin.math.max
 import kotlin.math.min
 
@@ -136,6 +137,15 @@ class TranscriptListController(
      * glide up into its place instead of jumping in one frame).
      */
     var placementSpring by mutableStateOf<ai.opencode.core.motion.MotionSpring?>(null)
+        private set
+
+    /**
+     * Whether rows this update removes fade out where they were (iOS `fadeOut`: the few rows an
+     * update takes off the screen, like the copy button as Working takes its place). A refresh,
+     * catch-up or window swap replaces many at once; iOS reloads those, and here a bulk fade
+     * left disappearing rows stuck half-drawn over the new ones. They go at once.
+     */
+    var fadesRemovals by mutableStateOf(true)
         private set
     private var placementUntil = 0.0
 
@@ -400,6 +410,9 @@ class TranscriptListController(
                 it.key in oldKeys && it is TranscriptItemID.Message && old.rows[it.stableID] is MessageRow.Entry
             }
             val tailInserted = next.items.drop(lastKept + 1).filter { it.key !in oldKeys }
+            val fades = old.items.count { it.key !in nextKeys } <= RowEntrance.MAXIMUM_ROWS &&
+                next.items.count { it.key !in oldKeys } <= RowEntrance.MAXIMUM_ROWS
+            if (fades != fadesRemovals) fadesRemovals = fades
             if (tailInserted.size > RowEntrance.MAXIMUM_ROWS) {
                 landArrivals()
             } else {
@@ -972,13 +985,16 @@ class TranscriptListController(
         if (growths.isNotEmpty() || disclosureSprings.isNotEmpty()) {
             val atEnd = distanceFromBottom() <= 1f || ride.deficit > 0.5f
             val finished = mutableListOf<String>()
+            var grown = 0f
             for ((key, growth) in growths) {
                 if (lastLayout?.visibleItemsInfo?.none { it.key == key } == true) {
                     finished += key
                     imageGrowths[key.removePrefix("m:")]?.settle()
                     continue
                 }
+                val before = growth.height
                 growth.advance(dt, now)
+                grown += growth.height - before
                 if (growth.isFinished) finished += key
             }
             for (key in finished) {
@@ -988,7 +1004,20 @@ class TranscriptListController(
             for ((key, growth) in growths) imageGrowths[key.removePrefix("m:")]?.update(growth.target - growth.height)
             val doneDisclosures = disclosureSprings.filterValues { it.step(dt) }.keys
             for (key in doneDisclosures) disclosureSprings.remove(key)?.let { settledHeights[key] = it.target }
-            if (following && bottomSpring?.kind != SpringKind.Jump) {
+            if (following && bottomSpring == null) {
+                // Ridden in the same frame as the growth (iOS `GrowthRide`): the position is
+                // requested for this frame's measure, which lays the row out at its new height
+                // and clamps to the new end. A plain scroll here would be refused at the old end
+                // (nothing to scroll into yet), and one after the layout is a frame late: the end
+                // would bob down and back on every chunk.
+                val step = (BottomSpring.ARRIVAL_SPEED * dt).toFloat()
+                val viewport = viewport()
+                val end = viewport.offsetY + distanceFromBottom(viewport)
+                val before = if (atEnd) viewport.offsetY else end
+                val next = ride.offset(viewport.offsetY, before, end + max(0f, grown), step)
+                val delta = ((next - viewport.offsetY) * density).roundToInt()
+                if (delta > 0) state.requestScrollToItem(state.firstVisibleItemIndex, state.firstVisibleItemScrollOffset + delta)
+            } else if (following && bottomSpring?.kind != SpringKind.Jump) {
                 val step = (BottomSpring.ARRIVAL_SPEED * dt).toFloat()
                 pendingGrowthRide = atEnd to step
             }
