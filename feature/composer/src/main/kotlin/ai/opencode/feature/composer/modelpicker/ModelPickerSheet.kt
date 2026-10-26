@@ -18,6 +18,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -40,6 +43,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -56,6 +60,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
@@ -315,7 +320,7 @@ internal fun ModelSheetTitleBar(
  * [onClose] asks the owner to close it (`activePicker = nil`); [onClosed] runs once it leaves
  * however it closed (iOS `onDisappear`: `.modelListClosed`).
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ModelPickerDetentsSheet(
     onClose: () -> Unit,
@@ -378,6 +383,25 @@ fun ModelPickerDetentsSheet(
         sheetState = sheetState,
         dragHandle = { Box(probe) { BottomSheetDefaults.DragHandle() } },
     ) {
+        // UIKit lifts a medium sheet when Search brings up the keyboard. Keep that expanded
+        // rest after the keyboard goes, but don't fight a subsequent drag back down.
+        val imeVisible = WindowInsets.isImeVisible
+        val focusManager = LocalFocusManager.current
+        var liftedForIme by remember { mutableStateOf(false) }
+        LaunchedEffect(imeVisible, sheetState.currentValue) {
+            if (!imeVisible) {
+                liftedForIme = false
+            } else if (sheetState.currentValue == SheetValue.PartiallyExpanded && sheetState.targetValue != SheetValue.Hidden) {
+                if (liftedForIme) {
+                    // A slow drag back down is the reader's choice, not another keyboard rise.
+                    // UIKit dismisses input when panning the sheet; don't bounce back to full.
+                    focusManager.clearFocus()
+                } else {
+                    liftedForIme = true
+                    sheetState.expand()
+                }
+            }
+        }
         CompositionLocalProvider(LocalModelSheetHideThen provides hideThen) {
             Box(probe.fillMaxWidth()) { content() }
         }
