@@ -65,6 +65,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
@@ -630,7 +631,7 @@ private fun FusedModelRow(
             .alpha(alpha)
             .onGloballyPositioned {
                 if (it.size.width > 0) {
-                    rowFrame = it.boundsInRoot()
+                    rowFrame = it.unclippedBoundsInRoot()
                     if (isPrimaryFlightRow) anchors.rowFrames[model.id] = rowFrame
                 }
             }
@@ -701,7 +702,7 @@ private fun FusedModelRow(
                             .alpha(if (isFlying) 0f else 1f)
                             .onGloballyPositioned {
                                 if (it.size.width > 0) {
-                                    nameFrame = it.boundsInRoot()
+                                    nameFrame = it.unclippedBoundsInRoot()
                                     if (isPrimaryFlightRow) anchors.rowNameFrames[model.id] = nameFrame
                                 }
                             },
@@ -799,7 +800,7 @@ private fun LevelZone(
     Row(
         Modifier
             .heightIn(min = FusedModelPickerTunables.rowHeight.dp)
-            .onGloballyPositioned { zoneFrame = it.boundsInRoot() }
+            .onGloballyPositioned { zoneFrame = it.unclippedBoundsInRoot() }
             .pointerInput(model.id) {
                 val slop = HOLD_SLOP.dp.toPx()
                 val scrubSlop = viewConfiguration.touchSlop
@@ -924,7 +925,7 @@ private fun LevelZone(
             softWrap = false,
             modifier = Modifier
                 .alpha(if (hidden) 0f else 1f)
-                .onGloballyPositioned { if (it.size.width > 0) onLevelFrame(it.boundsInRoot()) },
+                .onGloballyPositioned { if (it.size.width > 0) onLevelFrame(it.unclippedBoundsInRoot()) },
         )
         OpenCodeIcon(
             SFSymbol.ChevronUpChevronDown, null, size = 12.dp,
@@ -934,3 +935,10 @@ private fun LevelZone(
     }
 }
 
+/**
+ * The element's bounds in root px, not clipped by its ancestors: the morph's glass clips the
+ * list while it grows, and `boundsInRoot` would collapse a row it hasn't reached yet to its
+ * edge, so a label flight aimed at it would jump there.
+ */
+private fun androidx.compose.ui.layout.LayoutCoordinates.unclippedBoundsInRoot(): Rect =
+    Rect(positionInRoot(), androidx.compose.ui.geometry.Size(size.width.toFloat(), size.height.toFloat()))

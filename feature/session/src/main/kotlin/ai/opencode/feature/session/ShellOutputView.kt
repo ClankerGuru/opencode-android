@@ -25,7 +25,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -37,7 +38,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -54,9 +55,17 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.platform.LocalWindowInfo
+import kotlin.math.roundToInt
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -97,14 +106,42 @@ fun ShellOutputView(
         if (isActive) store.send(ShellOutputFeature.Action.Task)
         onDispose { if (isActive) store.send(ShellOutputFeature.Action.TaskEnded) }
     }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    val windowHeight = LocalWindowInfo.current.containerSize.height
+    val navigationBottom = WindowInsets.navigationBars.getBottom(LocalDensity.current)
     ModalBottomSheet(
         onDismissRequest = onClose,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false),
-        modifier = Modifier.semantics { contentDescription = "Shell output" },
+        sheetState = sheetState,
+        modifier = Modifier.testTag("shell-output"),
     ) {
         var isFollowing by remember { mutableStateOf(true) }
         var jumpRequest by remember { mutableIntStateOf(0) }
-        Column(Modifier.fillMaxSize().navigationBarsPadding()) {
+        // iOS `.medium` keeps the status bar (`safeAreaBar(edge: .bottom)`) at the sheet's visible
+        // foot: the column is as tall as the part of the sheet on screen, not the whole sheet.
+        // The column's top below the sheet's (the drag handle), so the visible part is the window
+        // below the sheet's top less that.
+        var headerInSheet by remember { mutableFloatStateOf(0f) }
+        Column(
+            Modifier
+                .fillMaxSize()
+                .onGloballyPositioned { coordinates ->
+                    val offset = runCatching { sheetState.requireOffset() }.getOrNull() ?: return@onGloballyPositioned
+                    headerInSheet = (coordinates.positionInWindow().y - offset).coerceAtLeast(0f)
+                }
+                .layout { measurable, constraints ->
+                    val offset = runCatching { sheetState.requireOffset() }.getOrNull()
+                    val full = constraints.maxHeight
+                    // Above the navigation bar, wherever the sheet rests (its own inset spacer sits
+                    // off screen at the medium rest).
+                    val visible = if (offset == null || windowHeight <= 0) {
+                        full - navigationBottom
+                    } else {
+                        (windowHeight - navigationBottom - offset - headerInSheet).roundToInt()
+                    }.coerceIn(0, full)
+                    val placeable = measurable.measure(constraints.copy(minHeight = visible, maxHeight = visible))
+                    layout(placeable.width, full) { placeable.place(0, 0) }
+                },
+        ) {
             Toolbar(state, onClose, send = store::send)
             EarlierOutputBar(state) { store.send(ShellOutputFeature.Action.LoadEarlierTapped) }
             Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -122,7 +159,7 @@ fun ShellOutputView(
             title = { Text("Stop This Shell?") },
             text = { Text("The command ends now. The output shown here stays until you close it.") },
             confirmButton = {
-                TextButton(onClick = { store.send(ShellOutputFeature.Action.StopConfirmed) }) {
+                TextButton(onClick = { store.send(ShellOutputFeature.Action.StopConfirmed) }, modifier = Modifier.testTag("shell-output-stop-confirm")) {
                     Text("Stop Shell", color = OpenCodeTheme.colors.destructive)
                 }
             },
@@ -142,7 +179,16 @@ private fun Toolbar(state: ShellOutputFeature.State, onClose: () -> Unit, send: 
         didCopy = false
     }
     Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        OpenCodeIconButton(SFSymbol.Xmark, contentDescription = "Close", onClick = onClose, style = OpenCodeIconButtonStyle.Standard)
+        OpenCodeIconButton(
+            SFSymbol.Xmark,
+            contentDescription = "Close",
+            onClick = onClose,
+            style = OpenCodeIconButtonStyle.Standard,
+            modifier = Modifier.testTag("shell-output-close"),
+        )
+        // The title is centred on the sheet (iOS `.principal`): the leading side holds one
+        // control and the trailing two, so it gives the difference back.
+        Spacer(Modifier.width(48.dp))
         Text(
             state.shell.title,
             style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Monospace),
@@ -187,7 +233,11 @@ private fun EarlierOutputBar(state: ShellOutputFeature.State, onLoadEarlier: () 
             modifier = Modifier.weight(1f),
         )
         if (state.canLoadEarlier && !state.isUnavailable) {
-            TextButton(onClick = onLoadEarlier, enabled = !state.isLoadingEarlier, modifier = Modifier.heightIn(min = 48.dp)) {
+            TextButton(
+                onClick = onLoadEarlier,
+                enabled = !state.isLoadingEarlier,
+                modifier = Modifier.heightIn(min = 48.dp).testTag("shell-output-load-earlier"),
+            ) {
                 if (state.isLoadingEarlier) {
                     CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                 } else {
@@ -280,8 +330,17 @@ private fun ShellOutputTextView(text: String, startCursor: Int, isFollowing: Boo
             if (userScrolling && it != following) reportFollowing(it)
         }
     }
-    LaunchedEffect(lines.size, isFollowing) {
+    // Every render while following ends at the bottom: new lines, or more of the last one
+    // (iOS `render(text:startCursor:in:)` scrolls after every append).
+    LaunchedEffect(lines, isFollowing) {
         if (isFollowing && lines.isNotEmpty()) listState.scrollToItem(lines.size - 1, Int.MAX_VALUE / 2)
+    }
+    // A resize (the sheet's detent changing) keeps a following reader at the bottom (iOS `onResize`).
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.layoutInfo.viewportSize }.distinctUntilChanged().collect {
+            val count = listState.layoutInfo.totalItemsCount
+            if (following && count > 0) listState.scrollToItem(count - 1, Int.MAX_VALUE / 2)
+        }
     }
     LaunchedEffect(jumpRequest) {
         if (jumpRequest == lastJump) return@LaunchedEffect
@@ -297,7 +356,7 @@ private fun ShellOutputTextView(text: String, startCursor: Int, isFollowing: Boo
         LazyColumn(
             state = listState,
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 24.dp),
-            modifier = Modifier.fillMaxSize().semantics { contentDescription = "Shell output" },
+            modifier = Modifier.fillMaxSize().testTag("shell-output-text").semantics { contentDescription = "Shell output" },
         ) {
             itemsIndexed(lines, key = { _, line -> line.offset }, contentType = { _, _ -> 0 }) { _, line ->
                 Text(line.text, style = style, softWrap = true)
@@ -315,7 +374,13 @@ private fun JumpToLatest(visible: Boolean, modifier: Modifier, onClick: () -> Un
         enter = if (reduceMotion) fadeIn(Motion.reducedFadeSpec()) else fadeIn() + scaleIn(initialScale = 0.8f),
         exit = if (reduceMotion) fadeOut(Motion.reducedFadeSpec()) else fadeOut() + scaleOut(targetScale = 0.8f),
     ) {
-        OpenCodeIconButton(SFSymbol.ArrowDown, contentDescription = "Scroll to latest", onClick = onClick, iconSize = 20.dp)
+        OpenCodeIconButton(
+            SFSymbol.ArrowDown,
+            contentDescription = "Scroll to latest",
+            onClick = onClick,
+            iconSize = 20.dp,
+            modifier = Modifier.testTag("shell-output-scroll-to-latest"),
+        )
     }
 }
 
@@ -328,11 +393,18 @@ private fun StatusBar(state: ShellOutputFeature.State, runningGlyph: @Composable
     ) {
         ShellStatusLabel(state, runningGlyph, Modifier.weight(1f))
         if (state.isRunning || state.isStopping) {
-            OutlinedButton(
+            // iOS `.bordered` capsule tinted red: a tonal red fill.
+            val red = OpenCodeTheme.colors.destructive
+            FilledTonalButton(
                 onClick = { send(ShellOutputFeature.Action.StopTapped) },
                 enabled = !state.isStopping,
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = OpenCodeTheme.colors.destructive),
-                modifier = Modifier.heightIn(min = 48.dp),
+                colors = ButtonDefaults.filledTonalButtonColors(
+                    containerColor = red.copy(alpha = 0.15f),
+                    contentColor = red,
+                    disabledContainerColor = red.copy(alpha = 0.08f),
+                    disabledContentColor = red.copy(alpha = 0.5f),
+                ),
+                modifier = Modifier.heightIn(min = 48.dp).testTag("shell-output-stop"),
             ) {
                 if (state.isStopping) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                 else Text("Stop Shell")
@@ -356,7 +428,7 @@ private fun ShellStatusLabel(state: ShellOutputFeature.State, runningGlyph: @Com
         shell.status == OpenCodeShell.Status.Timeout -> "Timed out"
         else -> shell.exitCode?.takeIf { it != 0 }?.let { "Exited with code $it" } ?: "Exited"
     }
-    Row(modifier.semantics(mergeDescendants = true) {}, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(modifier.semantics(mergeDescendants = true) {}.testTag("shell-output-status"), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Box(Modifier.width(18.dp), contentAlignment = Alignment.Center) {
             when {
                 shell.status == OpenCodeShell.Status.Running && !state.isUnavailable -> runningGlyph(shell.id)

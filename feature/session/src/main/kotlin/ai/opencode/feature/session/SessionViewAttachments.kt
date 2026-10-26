@@ -71,6 +71,10 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionOnScreen
+import ai.opencode.feature.composer.plusmenu.PhotoFlights
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
@@ -244,6 +248,28 @@ class SessionAttachmentImporter internal constructor(
             if (inline.isNotEmpty()) startImageImport(inline.map(ComposerImageSource::ItemProvider), onAdded = onFocus)
             if (files.isNotEmpty()) startFileImport(files.map(ComposerFileSource::Url), onStaged = onFocus)
         }
+    }
+
+    /**
+     * iOS `handleComposerDrop(_:)`: something dropped anywhere on the composer. Images attach as
+     * photos and other files stage as uploads (only while the composer takes attachments, not
+     * answering a request); text joins the draft ([insertDroppedText]). False when nothing in
+     * [clip] was usable. The caller holds the drop's URI permissions while the imports read.
+     */
+    fun handleComposerDrop(clip: android.content.ClipData, mimeTypes: List<String>): Boolean {
+        val canAttach = store.state.takesPasteAttachments
+        val items = (0 until clip.itemCount).map { clip.getItemAt(it) }
+        val resolver = dependency(ai.opencode.core.dependencies.AppContext).contentResolver
+        val uris = items.mapNotNull { it.uri }
+        fun isImage(uri: Uri) = (resolver.getType(uri) ?: mimeTypes.firstOrNull { it.startsWith("image/") })?.startsWith("image/") == true
+        val images = if (canAttach) uris.filter(::isImage) else emptyList()
+        val files = if (canAttach) uris.filterNot(::isImage) else emptyList()
+        val texts = items.filter { it.uri == null }.mapNotNull { it.text?.toString()?.takeIf(String::isNotEmpty) }
+        if (images.isEmpty() && files.isEmpty() && texts.isEmpty()) return false
+        if (images.isNotEmpty()) startImageImport(images.map(ComposerImageSource::ItemProvider))
+        if (files.isNotEmpty()) startFileImport(files.map(ComposerFileSource::Url))
+        texts.forEach(::insertDroppedText)
+        return true
     }
 
     /**
@@ -444,6 +470,12 @@ fun PendingAttachmentsRow(
     onOpenPastedText: (OpenCodeOutgoingAttachment) -> Unit,
     onOpenLocation: (String) -> Unit,
     modifier: Modifier = Modifier,
+    /**
+     * The New Plus Menu's flights (iOS `usesPlusMenuSheet ? photoFlights`): thumbnails report their
+     * slots and hide while their photo is in the air, and reserved slots stand in for photos the
+     * importer is still decoding.
+     */
+    flights: PhotoFlights? = null,
 ) {
     val reduceMotion = rememberReduceMotion()
     LazyRow(
@@ -457,14 +489,27 @@ fun PendingAttachmentsRow(
             val text = attachment.pastedText
             val summary = attachment.pasted
             when {
-                attachment.isImage -> RemovableAttachment(
-                    label = "Remove image attachment ${index + 1}",
-                    identifier = "remove-pending-attachment-$index",
-                    reduceMotion = reduceMotion,
-                    onRemove = { onRemoveAttachment(index) },
-                    modifier = item,
-                ) {
-                    AttachmentThumbnail(attachment, index)
+                attachment.isImage -> {
+                    // A photo flying in draws itself here until it lands (`PhotoFlights`).
+                    val id = remember(attachment.id) { runCatching { UUID.fromString(attachment.id) }.getOrNull() }
+                    val arriving = flights != null && id != null && flights.hidesAttachment(id)
+                    RemovableAttachment(
+                        label = "Remove image attachment ${index + 1}",
+                        identifier = "remove-pending-attachment-$index",
+                        reduceMotion = reduceMotion,
+                        onRemove = { onRemoveAttachment(index) },
+                        arriving = arriving,
+                        modifier = item,
+                    ) {
+                        AttachmentThumbnail(
+                            attachment,
+                            index,
+                            Modifier
+                                .then(if (flights != null && id != null) Modifier.onGloballyPositioned { flights.slot(id, it.boundsOnScreen()) } else Modifier)
+                                // The image waits for its flight to land (~0.3 s).
+                                .alpha(if (arriving) 0f else 1f),
+                        )
+                    }
                 }
                 text != null && summary != null -> RemovableAttachment(
                     label = "Remove ${PastedText.NAME}",
@@ -508,6 +553,17 @@ fun PendingAttachmentsRow(
                         }
                     }
                 }
+            }
+        }
+        if (flights != null) {
+            val present = attachments.map { it.id }.toSet()
+            items(flights.reservedAttachments.filter { it.toString() !in present }, key = { "reserved-$it" }) { id ->
+                Box(
+                    Modifier
+                        .size(PendingAttachmentMetrics.slotSide)
+                        .onGloballyPositioned { flights.slot(id, it.boundsOnScreen()) }
+                        .clearAndSetSemantics { },
+                )
             }
         }
         items(files, key = { "file-${it.id}" }) { file ->
@@ -592,14 +648,14 @@ fun RemovableAttachment(
 
 /** iOS `attachmentThumbnail`: the image, 76 × 76 with 22 dp corners, decoded off the main thread. */
 @Composable
-private fun AttachmentThumbnail(attachment: OpenCodeOutgoingAttachment, index: Int) {
+private fun AttachmentThumbnail(attachment: OpenCodeOutgoingAttachment, index: Int, modifier: Modifier = Modifier) {
     val density = LocalDensity.current
     val target = with(density) { PendingAttachmentMetrics.slotSide.roundToPx() }
     val image by produceState<ImageBitmap?>(null, attachment.id) {
         value = withContext(Dispatchers.Default) { decodeThumbnail(attachment.data, target) }
     }
     Box(
-        Modifier
+        modifier
             .size(PendingAttachmentMetrics.slotSide)
             .clip(RoundedCornerShape(PendingAttachmentMetrics.slotRadius))
             .background(MaterialTheme.colorScheme.surfaceContainerHighest)
@@ -624,3 +680,7 @@ private fun decodeThumbnail(data: ByteArray, target: Int): ImageBitmap? = try {
 }
 
 // endregion
+
+/** The element's bounds in screen px, where [PhotoFlights] works. */
+private fun androidx.compose.ui.layout.LayoutCoordinates.boundsOnScreen(): androidx.compose.ui.geometry.Rect =
+    androidx.compose.ui.geometry.Rect(positionOnScreen(), androidx.compose.ui.geometry.Size(size.width.toFloat(), size.height.toFloat()))

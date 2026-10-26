@@ -53,6 +53,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.indication
+import androidx.compose.material3.ripple
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
@@ -67,6 +71,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.traversalIndex
@@ -297,7 +302,8 @@ fun DictationScopeBar(
     ) {
         DotScopeView(
             mode = DotScopeMode.Dictation(leadingInset, trailingInset, DictationLevelSource),
-            modifier = Modifier.matchParentSize().alpha(scopeAlpha),
+            // 6 dp past the bar on every side, as its insets count (iOS `.padding(-6)`).
+            modifier = Modifier.matchParentSize().outset(6.dp).alpha(scopeAlpha),
         )
         Row(Modifier.matchParentSize(), verticalAlignment = Alignment.CenterVertically) {
             // The composer's × beneath takes these touches.
@@ -324,13 +330,14 @@ fun DictationScopeBar(
                     label = if (finishing) "Finishing dictation" else "Stop recording",
                     hidden = !p.isLocked || p.isLeaving,
                     order = 0f,
+                    hint = "Puts the words in your message",
                     onClick = { guarded(onStop) },
                 )
             }
             Spacer(Modifier.width(DictationBarPose.spacing.dp))
             DictationLockedReveal(isLocked = p.isLocked, reducedMotion = p.reducedMotion) {
                 val sendLabel = if (p.isSending) "Sending message" else "Send"
-                val button: @Composable (Modifier) -> Unit = { extra ->
+                val button: @Composable (Modifier, Boolean) -> Unit = { extra, tappable ->
                     RoundBarButton(
                         symbol = SFSymbol.ArrowUp,
                         foreground = OpenCodeTheme.colors.sendButtonForeground,
@@ -343,16 +350,22 @@ fun DictationScopeBar(
                         hidden = !p.isLocked || p.isLeaving,
                         order = 1f,
                         modifier = extra,
+                        tappable = tappable,
                         onClick = { guarded { onSend(OpenCodeDelivery.Steer) } },
                     )
                 }
                 if (isRunning || offersDelivery) {
                     // Like the composer's Send mid-run: a fresh touch on ↑ opens the menu.
-                    DeliveryMenu(onSend = { delivery -> guarded { onSend(delivery) } }, enabled = p.isLocked && !p.isSending) { menuModifier ->
-                        button(menuModifier)
+                    DeliveryMenu(
+                        onSend = { delivery -> guarded { onSend(delivery) } },
+                        enabled = p.isLocked && !p.isSending,
+                        clickLabel = if (isRunning) "Steers at the next step" else null,
+                        longClickLabel = if (isRunning) "Queue after this response" else null,
+                    ) { menuModifier ->
+                        button(menuModifier, false)
                     }
                 } else {
-                    button(Modifier)
+                    button(Modifier, true)
                 }
             }
         }
@@ -388,12 +401,17 @@ private fun RoundBarButton(
     order: Float,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    /** iOS `accessibilityHint`: TalkBack's click label. */
+    hint: String? = null,
+    /** False inside a [DeliveryMenu], whose own gesture takes the tap and the hold. */
+    tappable: Boolean = true,
 ) {
+    val interactions = remember { MutableInteractionSource() }
     Box(
         modifier
             .then(
-                if (enabled) {
-                    Modifier.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClick = onClick)
+                if (enabled && tappable) {
+                    Modifier.clickable(interactionSource = interactions, indication = null, role = Role.Button, onClickLabel = hint, onClick = onClick)
                 } else {
                     Modifier
                 },
@@ -412,7 +430,10 @@ private fun RoundBarButton(
             ),
         contentAlignment = Alignment.Center,
     ) {
-        Box(Modifier.size(diameter.dp).background(background, OpenCodeShape.circle), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier.size(diameter.dp).clip(OpenCodeShape.circle).background(background).indication(interactions, ripple()),
+            contentAlignment = Alignment.Center,
+        ) {
             if (showsProgress) {
                 CircularProgressIndicator(Modifier.size(16.dp), color = foreground, strokeWidth = 2.dp)
             } else {
@@ -433,6 +454,9 @@ fun DeliveryMenu(
     onSend: (OpenCodeDelivery) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    /** iOS `accessibilityHint` halves: TalkBack's tap (Steer) and hold (the menu) labels. */
+    clickLabel: String? = null,
+    longClickLabel: String? = null,
     content: @Composable (Modifier) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -446,7 +470,10 @@ fun DeliveryMenu(
                 }
                 .semantics {
                     role = Role.Button
-                    onClick(label = null) { sendNow(OpenCodeDelivery.Steer); true }
+                    if (enabled) {
+                        onClick(label = clickLabel) { sendNow(OpenCodeDelivery.Steer); true }
+                        onLongClick(label = longClickLabel) { expanded = true; true }
+                    }
                 },
         )
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
@@ -509,6 +536,7 @@ fun DictationHoldLayer(
         while (true) withFrameNanos { now -> swell = follower.step(DictationLevels.level, now) }
     }
     LaunchedEffect(Unit) { DictationLatency.mark("hold_circle") }
+    LaunchedEffect(p.guidesShown) { if (p.guidesShown) DictationLatency.mark("lock_target") }
     val springs = { d: Double, b: Double -> if (p.reducedMotion) Motion.easeInOut<Float>(0.2) else MotionSpring(d, b).spec() }
     val guides by animateFloatAsState(if (p.guidesShown) 1f else 0f, springs(0.3, 0.15), label = "holdGuides")
     val shown = !p.isLocked && !p.isSentFromHold && !p.isLeaving
@@ -553,7 +581,7 @@ fun DictationHoldLayer(
                 Modifier
                     .size(DictationBarPose.targetDiameter.dp)
                     .alpha(guides)
-                    .scale(if (p.lockArmed && !p.reducedMotion) 1.1f else 1f)
+                    .scale(if (p.reducedMotion) 1f else 1f + 0.1f * armedFill)
                     .background(OpenCodeTheme.colors.variant.surfaceStrong.color, OpenCodeShape.circle),
                 contentAlignment = Alignment.Center,
             ) {
@@ -612,3 +640,15 @@ class DictationLevelFollower {
 
 /** iOS `DictationLevels.shared.level`, read by the dictation bar's scope once per frame. */
 private val DictationLevelSource = DotScopeLevelSource { DictationLevels.level }
+
+/** Lays the element out [by] past its incoming bounds on every side, without changing its own size. */
+private fun Modifier.outset(by: androidx.compose.ui.unit.Dp): Modifier = layout { measurable, constraints ->
+    val extra = (by * 2).roundToPx()
+    val placeable = measurable.measure(
+        Constraints.fixed(
+            (constraints.maxWidth + extra).coerceAtLeast(0),
+            (constraints.maxHeight + extra).coerceAtLeast(0),
+        ),
+    )
+    layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(-by.roundToPx(), -by.roundToPx()) }
+}

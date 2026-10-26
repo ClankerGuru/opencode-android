@@ -95,7 +95,8 @@ object SessionExport {
             val rawInput = state["input"]
             val input = when {
                 rawInput is JsonPrimitive && rawInput.isString -> rawInput.content
-                rawInput is JsonObject || rawInput is JsonArray -> prettyJSON(rawInput)
+                // iOS writes tool input without `.withoutEscapingSlashes`: `/` reads `\/`.
+                rawInput is JsonObject || rawInput is JsonArray -> prettyJSON(rawInput, escapesSlashes = true)
                 else -> "{}"
             }
             val output = when (state.string("status")) {
@@ -114,20 +115,25 @@ object SessionExport {
 
     private fun JsonObject.string(key: String): String? = (this[key] as? JsonPrimitive)?.takeIf { it.isString }?.content
 
-    /** Foundation's `.prettyPrinted, .sortedKeys, .withoutEscapingSlashes`: two-space indent, `"key" : value`. */
-    internal fun prettyJSON(element: JsonElement, indent: String = ""): String = when (element) {
+    /**
+     * Foundation's `.prettyPrinted, .sortedKeys, .withoutEscapingSlashes`: two-space indent,
+     * `"key" : value`. [escapesSlashes]: without `.withoutEscapingSlashes`, strings write `/` as `\/`.
+     */
+    internal fun prettyJSON(element: JsonElement, indent: String = "", escapesSlashes: Boolean = false): String = when (element) {
         is JsonObject -> if (element.isEmpty()) "{\n\n$indent}" else element.entries.sortedBy { it.key }.joinToString(
             separator = ",\n",
             prefix = "{\n",
             postfix = "\n$indent}",
-        ) { (key, value) -> "$indent  ${JsonPrimitive(key)} : ${prettyJSON(value, "$indent  ")}" }
+        ) { (key, value) ->
+            "$indent  ${prettyJSON(JsonPrimitive(key), escapesSlashes = escapesSlashes)} : ${prettyJSON(value, "$indent  ", escapesSlashes)}"
+        }
         is JsonArray -> if (element.isEmpty()) "[\n\n$indent]" else element.joinToString(
             separator = ",\n",
             prefix = "[\n",
             postfix = "\n$indent]",
-        ) { "$indent  ${prettyJSON(it, "$indent  ")}" }
+        ) { "$indent  ${prettyJSON(it, "$indent  ", escapesSlashes)}" }
         JsonNull -> "null"
-        is JsonPrimitive -> element.toString()
+        is JsonPrimitive -> if (escapesSlashes && element.isString) element.toString().replace("/", "\\/") else element.toString()
     }
 }
 

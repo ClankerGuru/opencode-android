@@ -19,4 +19,6 @@ dependencies {
     // ProviderIcon: OpenCode's provider logos ship as the iOS SVGs (assets/provider-icons), drawn by Coil.
     implementation(libs.coil.compose)
     implementation(libs.coil.svg)
+    // SinceYouLeftClient.liveValue: Gemini Nano via AICore, as iOS uses FoundationModels' on-device model.
+    implementation(libs.mlkit.genai.prompt)
 }

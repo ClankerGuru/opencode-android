@@ -110,9 +110,15 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.currentStateAsState
@@ -211,6 +217,26 @@ fun SessionTranscriptView(
             providerMark = { providerID, markModifier -> ProviderIcon(providerID, markModifier) },
         )
     }
+    // The reader's drag takes the list: the keyboard goes (iOS `scrollViewWillBeginDragging`
+    // calls `dismissKeyboard`), once per gesture. Programmatic scrolls and flings don't count.
+    val dismissOnDrag = remember(host) {
+        object : NestedScrollConnection {
+            var dismissed = false
+
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (source == NestedScrollSource.UserInput && available.y != 0f && !dismissed) {
+                    dismissed = true
+                    host?.dismissComposerKeyboard()
+                }
+                return Offset.Zero
+            }
+
+            override suspend fun onPreFling(available: Velocity): Velocity {
+                dismissed = false
+                return Velocity.Zero
+            }
+        }
+    }
     // A new screen starts without the jump button (iOS `resetShowsJumpButton`).
     DisposableEffect(host) { onDispose { host?.showsJumpButton = false } }
 
@@ -224,7 +250,7 @@ fun SessionTranscriptView(
         TranscriptList(
             configuration = projection.configuration,
             send = send,
-            modifier = modifier.fillMaxSize(),
+            modifier = modifier.fillMaxSize().nestedScroll(dismissOnDrag),
             contentPadding = PaddingValues(
                 top = safeTop + top.contentTop.dp,
                 bottom = bottomObstruction + scrollEdgeBridge.composerHeight.dp,
@@ -928,24 +954,44 @@ private fun WorkingLine(activity: WorkingActivity, pose: WorkingHandoffPose, off
 @Composable
 private fun MoveToBackgroundAction(activity: WorkingActivity, onMove: () -> Unit) {
     val fontScale = LocalDensity.current.fontScale
+    val measurer = rememberTextMeasurer()
+    val workingStyle = TranscriptFonts.metaFont(FontWeight.Medium)
+    val labelStyle = TranscriptFonts.metaFont()
+    val iconSize = 16.dp
     BoxWithConstraints {
-        // Working's footprint (orb slot + text), without a second animating orb.
-        val reserved = (26 * fontScale).dp + (if (activity.needsInput) 140 else 70).dp * fontScale + 12.dp
-        val showsTitle = maxWidth - reserved > 200.dp * fontScale
+        val density = LocalDensity.current
+        // Working's footprint (orb slot + its text) and the 12 dp before the action, without a
+        // second animating orb; the title shows only where the whole label fits beside it
+        // (iOS `ViewThatFits`).
+        val working = remember(activity.needsInput, workingStyle, density) {
+            measurer.measure(if (activity.needsInput) "Needs your input" else "Working", workingStyle).size.width
+        }
+        val title = remember(labelStyle, density) { measurer.measure("Move to Background", labelStyle, maxLines = 1).size.width }
+        val showsTitle = with(density) {
+            val reserved = (26 * fontScale).dp + working.toDp() + 12.dp
+            val label = iconSize + 6.dp + title.toDp()
+            maxWidth - reserved >= label
+        }
         Row(
             Modifier
                 .widthIn(min = 48.dp)
                 .heightIn(min = 48.dp)
-                .clickable(role = Role.Button, onClick = onMove)
-                .semantics { contentDescription = "Move to Background" },
+                .clickable(
+                    role = Role.Button,
+                    // iOS `accessibilityHint`: TalkBack's click label.
+                    onClickLabel = "Keeps the running work going in the background so the agent reads your next message",
+                    onClick = onMove,
+                )
+                .semantics { contentDescription = "Move to Background" }
+                .testTag("move-to-background"),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.End),
         ) {
-            OpenCodeIcon(SFSymbol.TrayAndArrowDown, contentDescription = null, size = 16.dp, tint = OpenCodeTheme.colors.secondaryText)
+            OpenCodeIcon(SFSymbol.TrayAndArrowDown, contentDescription = null, size = iconSize, tint = OpenCodeTheme.colors.secondaryText)
             if (showsTitle) {
                 Text(
                     "Move to Background",
-                    style = TranscriptFonts.metaFont().copy(fontSize = 17.sp),
+                    style = labelStyle,
                     color = OpenCodeTheme.colors.secondaryText,
                     maxLines = 1,
                 )
