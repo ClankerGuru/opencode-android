@@ -710,7 +710,7 @@ class TranscriptListController(
         if (abs(width - lastContentWidth) > 0.5f) finishGrowths()
         lastVisibleHeight = visibleHeight
         lastContentWidth = width
-        val viewport = viewport(info)
+        var viewport = viewport(info)
         readingAnchor?.let { (key, offset) ->
             readingAnchor = null
             val row = info.visibleItemsInfo.firstOrNull { it.key == key }
@@ -725,7 +725,10 @@ class TranscriptListController(
                 val end = viewport.offsetY + distanceFromBottom(viewport)
                 val before = if (wasAtEnd) viewport.offsetY else end
                 val next = ride.offset(viewport.offsetY, before, end, step)
-                if (next > viewport.offsetY) state.dispatchRawDelta((next - viewport.offsetY) * density)
+                if (next > viewport.offsetY) {
+                    state.dispatchRawDelta((next - viewport.offsetY) * density)
+                    viewport = viewport()
+                }
                 if (growths.isEmpty()) {
                     if (distanceFromBottom() > 0.5f) springToBottom(SpringKind.Arrival)
                     ride.reset()
@@ -753,8 +756,10 @@ class TranscriptListController(
             followsSentRow = false
             followEnd(viewport, viewportChanged = geometryChanged)
         }
-        // Rows growing at the end are ridden by the frame loop.
-        if (growths.isNotEmpty() || bottomSpring != null) return
+        // Growth owns the pinned end, not a gap opened by a resized viewport or new rows.
+        val growthSliver = RowEntrance.MAXIMUM_ROWS / density + 0.5f
+        if (bottomSpring != null || (growths.isNotEmpty() &&
+                (ride.deficit > 0.5f || distanceFromBottom(viewport) <= growthSliver))) return
         if (behavior.mode == TranscriptScrollBehavior.Mode.Following && distanceFromBottom(viewport) > 0.5f) {
             followEnd(viewport, viewportChanged = geometryChanged)
         } else if (behavior.mode == TranscriptScrollBehavior.Mode.Browsing) {
@@ -774,6 +779,7 @@ class TranscriptListController(
             springToBottom(if (viewportChanged) {
                 if (keyboardMoved) SpringKind.Keyboard else SpringKind.Viewport
             } else SpringKind.Arrival)
+            if (!viewportChanged && growths.isNotEmpty()) bottomSpring?.velocity = BottomSpring.ARRIVAL_SPEED
         } else {
             landOnLastItem()
         }
@@ -957,7 +963,14 @@ class TranscriptListController(
         motionJob = scope.launch {
             motionFrameLoop(frameDurationSeconds = frameDuration) { tick ->
                 now = transcriptNow()
-                if (stepMotion(tick.dt, min(tick.dt, tick.rawFrameDuration * tick.scale))) MotionFrameAction.Continue else MotionFrameAction.Stop
+                if (stepMotion(tick.dt, min(tick.dt, tick.rawFrameDuration * tick.scale))) {
+                    MotionFrameAction.Continue
+                } else {
+                    // Measurement can start new growth before this coroutine resumes from
+                    // the frame callback. Release ownership now so its wake is not lost.
+                    motionJob = null
+                    MotionFrameAction.Stop
+                }
             }
         }
     }
