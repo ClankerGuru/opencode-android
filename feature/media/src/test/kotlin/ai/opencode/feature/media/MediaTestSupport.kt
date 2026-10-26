@@ -10,10 +10,12 @@ import kotlinx.coroutines.test.setMain
 /**
  * Shared helpers for the `:feature:media` ports of iOS tests.
  *
- * JVM unit tests run against the `android.jar` stubs, where `Bitmap` can't be made or decoded.
- * Reducers and stores that only carry an image (by identity) get a [stubBitmap]: a distinct
- * instance whose methods all return stub defaults. Tests that need real pixels (decoding,
- * `rowBytes`, PNG output) aren't ported here; see the `## Tests` notes in docs/parity/media.md.
+ * Plain JVM unit tests run against the `android.jar` stubs, where `Bitmap` can't be made or
+ * decoded. Reducers and stores that only carry an image (by identity) get a [stubBitmap]: a
+ * distinct instance whose methods all return stub defaults. Tests that need the framework (real
+ * pixels, `rowBytes`, PNG output, `Patterns`, `LruCache`, the main `Looper`) run under
+ * Robolectric with native graphics in their own classes; see the `## Tests` notes in
+ * docs/parity/media.md.
  */
 internal fun stubBitmap(): Bitmap = unsafe.allocateInstance(Bitmap::class.java) as Bitmap
 
