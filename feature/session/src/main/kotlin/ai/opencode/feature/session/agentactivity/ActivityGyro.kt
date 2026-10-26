@@ -988,7 +988,9 @@ class GyroPhosphor {
     private class PatternState(val amount: Double, val age: Double)
 
     private var light = DoubleArray(0)
-    private var heat = DoubleArray(0)
+    /** Each dot's flash heat (iOS `heat`, read by tests). */
+    internal var heat = DoubleArray(0)
+        private set
 
     /** The accent weights as drawn. */
     private val weights = HashMap<ActivityAccent, Double>()
