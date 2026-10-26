@@ -27,7 +27,7 @@ import kotlin.time.Duration.Companion.seconds
 /** Port of iOS `VoiceRouteTests.swift`. */
 class VoiceRouteTests {
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
-    private val session = OpenCodeSession(id = "route", title = "Routing", projectID = "p", directory = "/project", updatedAt = Instant.EPOCH)
+    private val session = OpenCodeSession(id = "route", serverTitle = "Routing", projectID = "p", directory = "/project", updatedAt = Instant.EPOCH)
 
     /**
      * 192 combinations. Expected precedence is tabulated independently of the resolver:

@@ -26,7 +26,12 @@ internal fun HomeFeature.core(state: State, action: Action): Reduced<State, Acti
         is Action.ServerEvent -> action.event is OpenCodeServerEvent.SessionRenamed ||
             action.event is OpenCodeServerEvent.SessionDeleted ||
             action.event is OpenCodeServerEvent.ProjectUpdated
-        is Action.SessionDetail -> (action.action as? PresentationAction.Presented)?.action is SessionFeature.Action.SessionCreated
+        is Action.SessionDetail -> when ((action.action as? PresentationAction.Presented)?.action) {
+            is SessionFeature.Action.SessionCreated -> true
+            // A session that just learned its first prompt keeps it across launches.
+            is SessionFeature.Action.AcceptedTranscriptUpdated -> reduced.state.sessions != state.sessions
+            else -> false
+        }
         else -> false
     }
     if (persists) s = s.persistingSnapshot(dependency(HomeSnapshotDate).now())

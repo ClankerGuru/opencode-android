@@ -6,6 +6,7 @@ import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeHomeSnapshot
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.OpenCodeSessionFamily
+import ai.opencode.server.model.SessionTitle
 import ai.opencode.server.model.instantFromMillis
 import ai.opencode.server.model.nonEmpty
 import ai.opencode.server.model.trimmedWhitespace
@@ -297,7 +298,7 @@ private suspend fun activeDescendants(server: OpenCodeServer, family: List<OpenC
 
 internal fun session(payload: SessionPayload) = OpenCodeSession(
     id = payload.id,
-    title = payload.title?.trimmedWhitespace()?.nonEmpty ?: "Untitled session",
+    serverTitle = payload.title?.trimmedWhitespace()?.nonEmpty ?: SessionTitle.placeholder,
     projectID = payload.projectID,
     directory = payload.location.directory,
     updatedAt = instantFromMillis(payload.time.updated),

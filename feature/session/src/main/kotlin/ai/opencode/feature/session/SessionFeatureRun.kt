@@ -12,6 +12,8 @@ import ai.opencode.feature.voice.VoiceFeature
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeDelivery
+import ai.opencode.server.model.SessionTitle
+import ai.opencode.server.model.learningFirstPrompt
 import ai.opencode.server.retry.RequestIdempotency
 import ai.opencode.server.retry.RetryPolicy
 import ai.opencode.server.retry.RetrySchedule
@@ -119,9 +121,12 @@ private fun SessionFeature.sessionCreated(
     state: SessionFeature.State,
     action: Action.SessionCreated,
 ): Reduced<SessionFeature.State, Action> {
-    val session = action.session
     // Heard once; a draft's Stop may already have moved here.
-    if (state.session?.id == session.id) return Reduced(state)
+    if (state.session?.id == action.session.id) return Reduced(state)
+    // A draft's first prompt names its session until the server does.
+    val session = action.session.learningFirstPrompt(
+        if (state.session == null) SessionTitle.firstPrompt(state.items, reachesStart = state.earlierHistory == SessionFeature.State.EarlierHistory.Exhausted) else null,
+    )
     val draftID = state.outboxDraftID
     var s = state
     if (s.session == null) s = s.copy(draftBecameSessionID = session.id, initialTranscriptIsFresh = true)

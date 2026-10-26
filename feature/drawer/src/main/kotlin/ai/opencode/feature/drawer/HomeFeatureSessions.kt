@@ -176,7 +176,8 @@ internal fun HomeFeature.reduceSessionDetail(state: State, action: SessionFeatur
         }
 
         is SessionFeature.Action.AcceptedTranscriptUpdated -> {
-            val s = state.publishingTranscript(action.sessionID, action.items).persistingTranscriptCache(action.sessionID)
+            val s = state.learningFirstPrompt(state.sessionDetail?.session?.takeIf { it.id == action.sessionID })
+                .publishingTranscript(action.sessionID, action.items).persistingTranscriptCache(action.sessionID)
             return Reduced(s, prefetchTranscripts(s))
         }
 
@@ -190,7 +191,8 @@ internal fun HomeFeature.reduceSessionDetail(state: State, action: SessionFeatur
         }
 
         is SessionFeature.Action.SessionCreated -> {
-            val session = action.session
+            // The screen's copy knows the first prompt it was created with.
+            val session = state.sessionDetail?.session?.takeIf { it.id == action.session.id } ?: action.session
             // The event stream may have listed it already.
             val s = state.copy(sessions = listOf(session) + state.sessions.filterNot { it.id == session.id })
                 .updatingSessionReadDates { it + (state.sessionKey(session.id) to session.updatedAt) }

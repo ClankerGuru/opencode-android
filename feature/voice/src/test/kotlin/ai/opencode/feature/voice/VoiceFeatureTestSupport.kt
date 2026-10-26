@@ -39,10 +39,10 @@ internal object VoiceFeatureTestSupport {
 
     /** Swift's `Date.distantPast`. */
     val distantPast: Instant = Instant.parse("0001-01-01T00:00:00Z")
-    val session = OpenCodeSession(id = "ses_voice", title = "Voice lab", projectID = "p", directory = "/Users/kit/project", updatedAt = distantPast)
+    val session = OpenCodeSession(id = "ses_voice", serverTitle = "Voice lab", projectID = "p", directory = "/Users/kit/project", updatedAt = distantPast)
 
     fun session(id: String, title: String, directory: String) =
-        OpenCodeSession(id = id, title = title, projectID = "p", directory = directory, updatedAt = distantPast)
+        OpenCodeSession(id = id, serverTitle = title, projectID = "p", directory = directory, updatedAt = distantPast)
 
     fun date(seconds: Long): Instant = Instant.ofEpochSecond(seconds)
 

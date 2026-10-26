@@ -20,6 +20,7 @@ import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeExportFormat
 import ai.opencode.server.model.OpenCodeModelRef
 import ai.opencode.server.model.OpenCodeSession
+import ai.opencode.server.model.SessionTitle
 import kotlinx.coroutines.CancellationException
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -153,7 +154,7 @@ class SessionSheetFeature : Reducer<SessionSheetFeature.State, SessionSheetFeatu
                         // An empty title asks the server to generate one; it answers once the new title is saved.
                         val error = clientError {
                             client.renameSession(server, sessionID, "")
-                            title = client.getSession(server, sessionID).title
+                            title = client.getSession(server, sessionID).serverTitle
                         }
                         send(Action.RenameFinished(if (error == null) title else "", error, sessionID))
                     },
@@ -167,8 +168,9 @@ class SessionSheetFeature : Reducer<SessionSheetFeature.State, SessionSheetFeatu
                 var next = state.copy(operation = null)
                 // The server answers Auto Rename the same way whether or not it wrote a title: when
                 // its title model fails, it keeps the old one and still succeeds. A title that comes
-                // back unchanged failed too.
-                val autoRenameChangedNothing = wasAuto && action.error == null && action.title == state.renameOriginalTitle
+                // back unchanged, or still unnamed (shown as its first prompt), failed too.
+                val autoRenameChangedNothing = wasAuto && action.error == null &&
+                    (action.title == state.renameOriginalTitle || SessionTitle.isPlaceholder(action.title))
                 if (wasAuto && (action.error != null || autoRenameChangedNothing)) {
                     // The old title stays; the line under it says so for a moment.
                     next = next.copy(autoRenameFailed = true)

@@ -42,7 +42,7 @@ import kotlin.time.Duration.Companion.seconds
 /** Port of iOS `CallVoiceTests.swift`. */
 class CallVoiceTests {
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
-    private val session = OpenCodeSession(id = "ses_voice", title = "Voice lab", projectID = "p", directory = "/Users/kit/project", updatedAt = Instant.parse("0001-01-01T00:00:00Z"))
+    private val session = OpenCodeSession(id = "ses_voice", serverTitle = "Voice lab", projectID = "p", directory = "/Users/kit/project", updatedAt = Instant.parse("0001-01-01T00:00:00Z"))
 
     @Test fun defaultsToMarinAndPersists() {
         SpeechTestShared().run {

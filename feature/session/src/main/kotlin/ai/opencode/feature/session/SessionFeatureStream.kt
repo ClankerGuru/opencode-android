@@ -180,7 +180,7 @@ internal fun SessionFeature.reduceStream(
             else -> Reduced(state.copy(resync = resync.copy(minimumElapsed = true)))
         }
     }
-    is Action.AcceptedTranscriptUpdated -> Reduced(state)
+    is Action.AcceptedTranscriptUpdated -> Reduced(if (action.sessionID == state.session?.id) state.learningFirstPrompt() else state)
     is Action.ViewAcknowledged -> {
         val viewed = maxOf(state.viewedIdle[action.sessionID] ?: 0L, action.idle)
         var s = state.copy(viewedIdle = state.viewedIdle + (action.sessionID to viewed))

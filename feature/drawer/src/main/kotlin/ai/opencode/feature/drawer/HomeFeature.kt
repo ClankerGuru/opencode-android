@@ -42,6 +42,8 @@ import ai.opencode.server.model.OpenCodeProject
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.OpenCodeTranscriptItem
 import ai.opencode.server.model.SessionActivity
+import ai.opencode.server.model.SessionTitle
+import ai.opencode.server.model.learningFirstPrompt
 import java.time.Instant
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -1088,7 +1090,8 @@ private fun HomeFeature.State.restoringPersistedDraft(
         val entry = persistence.loadOutbox(server.persistenceID, null).firstOrNull()
         if (entry != null) {
             val alreadyInOutbox = dependency(PromptOutbox).contains(entry.pending.messageID)
-            val created = entry.createdSession
+            // The prompt it was created with names it until the server does.
+            val created = entry.createdSession?.learningFirstPrompt(SessionTitle.preview(entry.pending.text))
             val entryDirectory = entry.directory
             if (!alreadyInOutbox && created != null) {
                 if (s.sessions.none { it.id == created.id }) s = s.copy(sessions = listOf(created) + s.sessions)

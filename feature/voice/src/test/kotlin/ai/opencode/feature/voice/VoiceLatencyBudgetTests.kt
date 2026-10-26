@@ -63,8 +63,8 @@ import kotlin.time.TimeSource
  */
 class VoiceLatencyBudgetTests {
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
-    private val ear = OpenCodeSession(id = "ses_ear", title = "Fix the earpiece routing", projectID = "ios", directory = "/Users/kit/opencode-ios", updatedAt = date(400))
-    private val docs = OpenCodeSession(id = "ses_docs", title = "Docs refresh", projectID = "web", directory = "/Users/kit/website", updatedAt = date(200))
+    private val ear = OpenCodeSession(id = "ses_ear", serverTitle = "Fix the earpiece routing", projectID = "ios", directory = "/Users/kit/opencode-ios", updatedAt = date(400))
+    private val docs = OpenCodeSession(id = "ses_docs", serverTitle = "Docs refresh", projectID = "web", directory = "/Users/kit/website", updatedAt = date(200))
 
     /** Short slices so a test that hits one finishes quickly. */
     private val quick = VoiceDelegatorWorkspace.Latency(total = 30.seconds, optional = 200.milliseconds, upload = 200.milliseconds)
@@ -178,7 +178,7 @@ class VoiceLatencyBudgetTests {
 
     @Test fun aChosenModelThatCouldntBeSetIsReportedNotSkipped() = voiceTest {
         val client = OpenCodeClient.testValue.copy(
-            createSession = { _, directory, _ -> OpenCodeSession(id = "ses_new", title = "New", projectID = "p", directory = directory, updatedAt = VoiceFeatureTestSupport.distantPast) },
+            createSession = { _, directory, _ -> OpenCodeSession(id = "ses_new", serverTitle = "New", projectID = "p", directory = directory, updatedAt = VoiceFeatureTestSupport.distantPast) },
             switchModel = { _, _, _ -> throw OpenCodeClientError(message = "The server returned HTTP 500.", statusCode = 500) },
             getSession = { _, _ -> throw OpenCodeClientError(message = "unused") },
         )
@@ -194,7 +194,7 @@ class VoiceLatencyBudgetTests {
         val switched = LockIsolated(0)
         val client = OpenCodeClient.testValue.copy(
             homeSnapshot = { hang() },
-            createSession = { _, directory, _ -> OpenCodeSession(id = "ses_new", title = "New", projectID = "p", directory = directory, updatedAt = VoiceFeatureTestSupport.distantPast) },
+            createSession = { _, directory, _ -> OpenCodeSession(id = "ses_new", serverTitle = "New", projectID = "p", directory = directory, updatedAt = VoiceFeatureTestSupport.distantPast) },
             switchModel = { _, _, _ -> switched.increment() },
             getSession = { _, _ -> hang() },
         )
@@ -257,7 +257,7 @@ class VoiceLatencyBudgetTests {
         val calls = LockIsolated(listOf<String>())
         val opened = LockIsolated(listOf<OpenCodeSession>())
         val client = OpenCodeClient.testValue.copy(
-            createSession = { _, directory, _ -> OpenCodeSession(id = "ses_new", title = "New", projectID = "p", directory = directory, updatedAt = VoiceFeatureTestSupport.distantPast) },
+            createSession = { _, directory, _ -> OpenCodeSession(id = "ses_new", serverTitle = "New", projectID = "p", directory = directory, updatedAt = VoiceFeatureTestSupport.distantPast) },
             switchModel = { _, _, _ -> throw OpenCodeClientError(message = "Unknown model", statusCode = 400) },
             getSession = { _, _ -> throw OpenCodeClientError(message = "unused") },
             sendDeliveredPrompt = { _, id, _, _ ->
@@ -283,7 +283,7 @@ class VoiceLatencyBudgetTests {
     @Test fun aSetModelShowsOnTheOpenedSessionWithoutAFreshRead() = voiceTest {
         val opened = LockIsolated(listOf<OpenCodeSession>())
         val client = OpenCodeClient.testValue.copy(
-            createSession = { _, directory, _ -> OpenCodeSession(id = "ses_new", title = "New", projectID = "p", directory = directory, updatedAt = VoiceFeatureTestSupport.distantPast) },
+            createSession = { _, directory, _ -> OpenCodeSession(id = "ses_new", serverTitle = "New", projectID = "p", directory = directory, updatedAt = VoiceFeatureTestSupport.distantPast) },
             switchModel = { _, _, _ -> },
             getSession = { _, _ -> throw OpenCodeClientError(message = "Offline") },
         )
@@ -502,7 +502,7 @@ class VoiceLatencyBudgetTests {
 
     @Test fun aSessionCreatedBeforeItsMessageFailedIsStillReported() = voiceTest {
         val client = OpenCodeClient.testValue.copy(
-            createSession = { _, directory, _ -> OpenCodeSession(id = "ses_new", title = "New", projectID = "p", directory = directory, updatedAt = VoiceFeatureTestSupport.distantPast) },
+            createSession = { _, directory, _ -> OpenCodeSession(id = "ses_new", serverTitle = "New", projectID = "p", directory = directory, updatedAt = VoiceFeatureTestSupport.distantPast) },
             homeSnapshot = { OpenCodeHomeSnapshot(projects = emptyList(), sessions = emptyList(), activeSessionIDs = emptySet()) },
             getSession = { _, _ -> throw OpenCodeClientError(message = "Offline") },
             sendDeliveredPrompt = { _, _, _, _ -> throw OpenCodeClientError(message = "The server returned HTTP 500.", statusCode = 500) },
