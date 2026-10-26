@@ -317,6 +317,28 @@ object DrawerListTitle {
         }
         return null
     }
+
+    /** Whether the title reads right to left: by its own first strong character, else the layout's direction. */
+    fun isRightToLeft(title: String, layoutRTL: Boolean): Boolean = when (writingDirection(title)) {
+        LayoutDirection.Rtl -> true
+        LayoutDirection.Ltr -> false
+        null -> layoutRTL
+    }
+
+    /** The end of the row an overflowing title fades out at. */
+    enum class ClearEnd { Left, Right }
+
+    /**
+     * Where a [naturalWidth]-wide title line sits in a [width]-wide row (its left x), and the end it
+     * fades out at (`null` when it fits): an overflowing title keeps its own start in view whatever
+     * the layout direction; a title that fits sits on the layout's leading edge.
+     */
+    fun placement(naturalWidth: Int, width: Int, overflows: Boolean, titleRTL: Boolean, layoutRTL: Boolean): Pair<Int, ClearEnd?> =
+        if (overflows) {
+            if (titleRTL) (width - naturalWidth) to ClearEnd.Left else 0 to ClearEnd.Right
+        } else {
+            (if (layoutRTL) width - naturalWidth else 0) to null
+        }
 }
 
 /**
@@ -340,13 +362,7 @@ fun DrawerListTitleView(
     revealProgress: () -> Float = { 0f },
 ) {
     val layoutRTL = LocalLayoutDirection.current == LayoutDirection.Rtl
-    val titleRTL = remember(text, layoutRTL) {
-        when (DrawerListTitle.writingDirection(text)) {
-            LayoutDirection.Rtl -> true
-            LayoutDirection.Ltr -> false
-            null -> layoutRTL
-        }
-    }
+    val titleRTL = remember(text, layoutRTL) { DrawerListTitle.isRightToLeft(text, layoutRTL) }
     val timeStyle = remember { DrawerListFonts.monospacedDigits(DrawerListFonts.font(OpenCodeTextStyles.footnote, FontWeight.Normal)) }
     Box(modifier) {
         FadingTitle(
@@ -409,13 +425,7 @@ private fun FadingTitle(
         val overflow = placeable.width > width + 0.5.dp.toPx()
         if (overflows.value != overflow) overflows.value = overflow
         layout(width, height) {
-            val x = if (overflow) {
-                // Keeps its own start in view, whatever the layout direction.
-                if (titleRTL) width - placeable.width else 0
-            } else {
-                // Fits: plain text on the layout's leading edge.
-                if (layoutRTL) width - placeable.width else 0
-            }
+            val (x, _) = DrawerListTitle.placement(placeable.width, width, overflow, titleRTL, layoutRTL)
             placeable.place(x, (height - placeable.height) / 2)
         }
     }

@@ -181,7 +181,7 @@ fun DrawerListSessionCell(
     )
 
     // The card-edge fade: on with the first dp of slide, eased in over `revealFadeIn`.
-    val masking by remember(row.reducedMotion) { derivedStateOf { !row.reducedMotion && reveal.offset != 0f } }
+    val masking by remember(row.reducedMotion) { derivedStateOf { DrawerRevealFade.masks(row.reducedMotion, reveal.offset) } }
     val veil = remember { Animatable(1f) }
     LaunchedEffect(masking) {
         if (masking && DrawerTunables.revealFadeIn > 0) {
@@ -209,12 +209,12 @@ fun DrawerListSessionCell(
             .drawWithContent {
                 drawContent()
                 if (!masking) return@drawWithContent
-                val fade = max(DrawerTunables.titleFade.toPx(), 0.5.dp.toPx())
-                val rowMaxX = size.width - rowEdge.toPx()
-                val offset = reveal.offset * density.density
-                val shift = fade * min(max(offset, 0f) / max(DrawerTunables.revealFadeRamp.toPx(), 1f), 1f)
-                val solidEnd = rowMaxX - shift
-                val rampEnd = max(rowMaxX + fade - shift, 1f)
+                val (solidEnd, rampEnd) = DrawerRevealFade.stops(
+                    rowMaxX = size.width - rowEdge.toPx(),
+                    offset = reveal.offset * density.density,
+                    fade = max(DrawerTunables.titleFade.toPx(), 0.5.dp.toPx()),
+                    ramp = DrawerTunables.revealFadeRamp.toPx(),
+                )
                 val strength = veil.value.coerceIn(0f, 1f)
                 drawRect(
                     brush = Brush.horizontalGradient(
@@ -436,4 +436,21 @@ private fun RevealedTime(time: String, reducedMotion: Boolean, progress: () -> F
             }
             .graphicsLayer { alpha = progress().coerceIn(0f, 1f) },
     )
+}
+
+/**
+ * The card-edge fade while the time reveal slides a row under the card (iOS
+ * `DrawerListSessionCell.applyReveal`'s mask): the whole row fades out over the last `titleFade`
+ * before its resting trailing edge (the card's edge), the ramp moving onto that edge over the
+ * first `revealFadeRamp` of slide so no point of slide steps the row's alpha.
+ */
+internal object DrawerRevealFade {
+    /** A row at rest, or under Reduce Motion (the time cross-fades in place), is unmasked. */
+    fun masks(reducedMotion: Boolean, offset: Float): Boolean = !reducedMotion && offset != 0f
+
+    /** Where the mask is solid until and where its ramp to clear ends, in the row's coordinates (one unit throughout). */
+    fun stops(rowMaxX: Float, offset: Float, fade: Float, ramp: Float): Pair<Float, Float> {
+        val shift = fade * min(max(offset, 0f) / max(ramp, 1f), 1f)
+        return (rowMaxX - shift) to max(rowMaxX + fade - shift, 1f)
+    }
 }
