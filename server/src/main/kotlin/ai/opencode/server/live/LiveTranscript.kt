@@ -78,7 +78,9 @@ internal suspend fun requestHistoryPage(server: OpenCodeServer, sessionID: Strin
     return decodeTranscriptPage(data.data, TranscriptContextCapture.current.current())
 }
 
-fun decodeTranscript(data: ByteArray): List<OpenCodeTranscriptItem> = decodeTranscriptPage(data, null).items
+/** Records the page's context and cursor for an enclosing [TranscriptContextCapture], as iOS does. */
+fun decodeTranscript(data: ByteArray): List<OpenCodeTranscriptItem> =
+    decodeTranscriptPage(data, TranscriptContextCapture.current.currentBlocking()).items
 
 internal fun decodeTranscriptPage(data: ByteArray, capture: TranscriptContextCapture?): OpenCodeTranscriptPage {
     val payload = decoded(data, "transcript", MessagesPayload::decode)

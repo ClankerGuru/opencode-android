@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -276,6 +277,11 @@ class EventStreamReconnectTests {
         clock.advance(600.milliseconds)
         store.receive(serverConnected)
         assertEquals(2, subscriptions.get())
+        // TCA reduces the reconnect's own `.serverEvent(.connected)` as it arrives, before the clock
+        // moves; this TestStore reduces received actions when asked, so take it (and its refresh
+        // timer, which starts sleeping before the clock moves) first.
+        store.skipReceivedActions()
+        runCurrent()
         clock.advance(1.seconds)
         store.receive(snapshotRefreshed)
         assertTrue(snapshots.get() >= 1)
