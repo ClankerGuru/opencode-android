@@ -627,7 +627,7 @@ private fun CatchUpPreviewCard(store: StoreOf<HomeFeature.State, HomeFeature.Act
  * reducer honours the renderer's first-frame event, as the live screen does, and nothing else: a
  * preview performs no loading, request handling or read receipts.
  */
-private class CatchUpPreviewStores {
+internal class CatchUpPreviewStores {
     private data class Inputs(
         val session: OpenCodeSession,
         val items: List<OpenCodeTranscriptItem>?,
