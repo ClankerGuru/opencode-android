@@ -112,6 +112,8 @@ class TranscriptListController(
     private var motionJob: Job? = null
     private var now = transcriptNow()
     private val growths = HashMap<String, RowGrowth>()
+    /** Each growing (or just grown) row's soft edge (iOS `TranscriptHostingCell` growth mask). */
+    private val softEdges = HashMap<String, GrowthSoftEdge>()
     private val disclosureSprings = HashMap<String, DisclosureHeight>()
     private val settledHeights = HashMap<String, Float>()
     private val enteringItems = HashSet<String>()
@@ -300,6 +302,7 @@ class TranscriptListController(
     private fun resetForSessionChange() {
         stopBottomSpring()
         growths.clear()
+        softEdges.clear()
         removedHeights.clear()
         runResizedItems.clear()
         revisedRows.clear()
@@ -1010,6 +1013,9 @@ class TranscriptListController(
                 imageGrowths[key.removePrefix("m:")]?.growthFinished()
             }
             for ((key, growth) in growths) imageGrowths[key.removePrefix("m:")]?.update(growth.target - growth.height)
+            for ((key, growth) in growths) {
+                softEdges.getOrPut(key, ::GrowthSoftEdge).update(growth.height, growth.target, now, TranscriptTunables.growthSoftEdge)
+            }
             val doneDisclosures = disclosureSprings.filterValues { it.step(dt) }.keys
             for (key in doneDisclosures) disclosureSprings.remove(key)?.let { settledHeights[key] = it.target }
             if (following && bottomSpring == null) {
@@ -1038,6 +1044,20 @@ class TranscriptListController(
                 springToBottom(SpringKind.Arrival)
                 if (carriesVelocity) bottomSpring?.velocity = BottomSpring.ARRIVAL_SPEED
                 ride.reset()
+            }
+        }
+        // A growth that ended with its edge still soft eases it away (iOS `leaveGrowthMask`).
+        if (softEdges.isNotEmpty()) {
+            for ((key, edge) in softEdges) {
+                if (key in growths) continue
+                val height = settledHeights[key] ?: 0f
+                val onScreen = lastLayout?.visibleItemsInfo?.any { it.key == key } == true
+                edge.update(height, height, now, TranscriptTunables.growthSoftEdge, onScreen)
+            }
+            softEdges.entries.removeAll { (key, edge) -> key !in growths && edge.isIdle(now) }
+            if (softEdges.values.any { it.isLeaving }) {
+                frameTick++
+                moved = true
             }
         }
         // Entrances fade on the same clock.
@@ -1102,6 +1122,8 @@ class TranscriptListController(
         enteringItems.clear()
         ride.reset()
         frameTick++
+        // Their soft edges ease away on the frame loop.
+        if (softEdges.isNotEmpty()) startMotion()
     }
 
     // MARK: Row growth (called from a row's measure pass)
@@ -1121,6 +1143,7 @@ class TranscriptListController(
         val runResized = runResizedItems.remove(key)
         val row = lastLayout?.visibleItemsInfo?.firstOrNull { it.key == key }
         val aboveAnchor = row != null && row.offset + row.size <= 44 * density
+        if (softEdges.containsKey(key)) startMotion()
         if (runResized && removed <= 0.5f || revised && aboveAnchor) {
             growths.remove(key)
             revisedRows.remove(key)
@@ -1208,8 +1231,7 @@ class TranscriptListController(
     fun softEdge(key: String): Float {
         // Always subscribes: a growth starting in the measure pass must redraw this row's edge.
         @Suppress("UNUSED_VARIABLE") val tick = frameTick
-        val growth = growths[key] ?: return 0f
-        return min(TranscriptTunables.growthSoftEdge, max(0f, growth.target - growth.height))
+        return softEdges[key]?.drawn(now) ?: 0f
     }
 
     /** Entrance progress for [key]: null once settled (iOS `RowEntrance.add`). */

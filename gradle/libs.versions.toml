@@ -33,6 +33,7 @@ highlights = "1.1.0"
 jlatexmath = "0.2.0"
 junit = "4.13.2"
 turbine = "1.2.1"
+robolectric = "4.16"
 androidxJunit = "1.3.0"
 
 [libraries]
@@ -107,6 +108,7 @@ jlatexmath-android = { module = "ru.noties:jlatexmath-android", version.ref = "j
 
 junit = { module = "junit:junit", version.ref = "junit" }
 turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 androidx-test-junit = { module = "androidx.test.ext:junit", version.ref = "androidxJunit" }
 
 # build-logic

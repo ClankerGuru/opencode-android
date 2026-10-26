@@ -141,3 +141,91 @@ class GrowthRide {
         deficit = 0f
     }
 }
+
+/**
+ * A growing row's soft edge (iOS `TranscriptHostingCell`'s growth mask), in dp: a fade at the
+ * row's growing edge that only ever brings in what the growth shows. It never reaches above the
+ * height the row stood at when the growth began (a streamed line wrapping onto a new one never
+ * dims the line above), widens no faster than the row grows (a new line arriving mid-growth
+ * can't darken the line still easing in), and a growth that ends with its edge still soft eases
+ * it away over [LEAVE_DURATION] instead of brightening in one frame. Plain object, stepped by
+ * the list's frame loop.
+ */
+class GrowthSoftEdge {
+    private var start: Float? = null
+    private var width = 0f
+    private var fadeHeight = 0f
+    private var fade = 0f
+    private var leaveFrom = 0f
+    private var leaveStart: Double? = null
+
+    val isLeaving: Boolean get() = leaveStart != null
+
+    /** The fade as drawn at [now], leaving included (iOS `drawnGrowthFade`). */
+    fun drawn(now: Double): Float {
+        val started = leaveStart ?: return fade
+        val t = ((now - started) / LEAVE_DURATION).coerceIn(0.0, 1.0).toFloat()
+        return leaveFrom * (1 - LEAVE_EASING.transform(t))
+    }
+
+    /** Nothing drawn and nothing to ease: the list may forget it. */
+    fun isIdle(now: Double): Boolean = leaveStart?.let { now - it >= LEAVE_DURATION } ?: (fade == 0f)
+
+    /**
+     * The row lays out at [height] of its [measured] content this frame (iOS `updateGrowthMask`).
+     * [onScreen] false drops a leaving edge at once: nothing would see it ease.
+     */
+    fun update(height: Float, measured: Float, now: Double, maxFade: Float, onScreen: Boolean = true) {
+        if (measured - height <= 0.5f) {
+            start = null
+            width = 0f
+            leave(height, now, onScreen)
+            return
+        }
+        if (leaveStart != null) {
+            // Growing again while the last edge clears: carry on from it.
+            val shown = drawn(now)
+            leaveStart = null
+            start = max(0f, height - shown)
+            width = shown
+            fadeHeight = height
+        }
+        val begins = start == null
+        val from = min(start ?: height, height)
+        if (begins) fadeHeight = height
+        start = from
+        val room = max(0f, height - fadeHeight)
+        val next = minOf(maxFade, measured - height, height - from, width + room)
+        width = max(0f, next)
+        fadeHeight = height
+        // Nothing new on show yet: a hard edge at what was already there.
+        fade = if (next > 0.5f) next else 0f
+    }
+
+    private fun leave(height: Float, now: Double, onScreen: Boolean) {
+        if (leaveStart != null) {
+            if (!onScreen || height <= 0.5f) remove()
+            return
+        }
+        if (fade == 0f) return
+        if (!onScreen || height <= 0.5f || fade <= 1f) {
+            remove()
+            return
+        }
+        leaveFrom = fade
+        leaveStart = now
+        fade = 0f
+    }
+
+    private fun remove() {
+        leaveStart = null
+        fade = 0f
+    }
+
+    companion object {
+        /** iOS `growthMaskLeaveDuration`. */
+        const val LEAVE_DURATION = 0.2
+        /** `CAMediaTimingFunction(name: .easeOut)`. */
+        private val LEAVE_EASING = androidx.compose.animation.core.CubicBezierEasing(0f, 0f, 0.58f, 1f)
+    }
+}
