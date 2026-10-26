@@ -66,7 +66,7 @@ Ported from iOS `OpenCodeTests/` into `core/src/test` (JVM, same names). Shared 
 | `TuningTests.swift` | `tuning/TuningTests.kt` | 27 | TuningFeature/Wire/Placement/summon gesture → `:devtools`; drawer/composer/transcript tunables → features; MotionXRay not ported; CALayer checks deleted |
 | `MotionSystemTests.swift` | `motion/MotionSystemTests.kt` | 5 | empty-state → `:feature:transcript`; drawer shortcuts (4) → `:feature:drawer`; window probe deleted |
 | `RollingNumberTests.swift` | `ui/RollingNumberTests.kt` | 8 of 9 | `rollingTitleSurvivesPixelSnapping` deleted (UIWindow pixel snapping) |
-| `ThemePaletteTests.swift` | `ui/ThemePaletteTests.kt` | 5 of 8 | appearance settings → `:feature:settings`/`:feature:drawer`; `legacyTranscriptRhythmStorageIsCleanedUp` deleted (Android never wrote the key) |
+| `ThemePaletteTests.swift` | `ui/ThemePaletteTests.kt` | 5 of 8 | appearance settings → `:feature:settings`/`:feature:drawer` (ported there: `appearanceSettingsActions…`, Home half); `legacyTranscriptRhythmStorageIsCleanedUp` deleted (Android never wrote the key) |
 | `PerfFrameWindowTests.swift` | `diagnostics/PerfFrameWindowTests.kt` | 6 of 9 | deleted: `infoPlistEnablesProMotion120HzOnPhone` (Info.plist), `proMotion120HzFrameRateRangeAndClockIntervals` (live `CADisplayLink`; its `DrawerSpring` half → `:feature:drawer`), `transcriptFollowerDisplayLinkDoesNotRequestAbove60Hz` (`CADisplayLink` rate range) |
 | `PerfFreshTrackerTests.swift` | `diagnostics/PerfFreshTrackerTests.kt` | 4 | – |
 | `MotionWatchTests.swift` (+`MotionAuditDetectorTests`) | `diagnostics/MotionWatchTests.kt` | 9 | `recordsReplayContext…` keeps everything but its `replayContext` asserts (`PlaygroundReplayContext` is the Mac playgrounds', n/a) |

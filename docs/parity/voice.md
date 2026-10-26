@@ -91,17 +91,17 @@ another module are left to that module's port ("skipped"); "dropped" tests can't
 | `VoiceHandoffParseTests.swift` (+`VoiceFramingTests`, `VoiceSteeringInstructionsTests`) | `VoiceHandoffParseTests.kt` | 23 | `promptsFromBeforeTheFramingStillRender`, `aDelegationProjectsToAVoiceMessage…`, `aVoiceMessageWearsTheBadge…`, `theLabelRowFallback…` and the `TranscriptUserMessage` asserts of two more (`:feature:transcript`) | – |
 | `RealtimeProtocolTests.swift` | `RealtimeProtocolTests.kt` | 24 | – | – |
 | `VoiceCaptionAndQualityTests.swift` | `VoiceCaptionAndQualityTests.kt` | 8 | – | `appendingWordsNeverMovesEarlierWords`, `wordsFadeInWhereTheyLie` (SwiftUI `ImageRenderer` pixel probes) |
-| `LivingOrbTests.swift` | `LivingOrbTests.kt` | 3 | `flagRestoresEveryExistingCallStyleWhenOff` (`:core`), `settingsPersistStyle…` (`:feature:settings`) | `colourAndShapePresets…` (tuning store not ported; tunables are baked) |
+| `LivingOrbTests.swift` | `LivingOrbTests.kt` | 3 | `flagRestoresEveryExistingCallStyleWhenOff` (`:core`), `settingsPersistStyle…` (`:feature:settings`, ported there) | `colourAndShapePresets…` (tuning store not ported; tunables are baked) |
 | `VoiceHapticTests.swift` (+teardown, tick race, startup, hang-up engine suites) | `VoiceHapticTests.kt` | 26 | – | `patternsBecomeCorePatterns` (Core Haptics players; Android mixes one waveform), `endingACallReleasesItsHapticEngine…` (needs a real `Vibrator`) |
 | `DotScopeSimulationTests.swift` | `DotScopeSimulationTests.kt` | 20 | – | 5 `MTKView`/`UIHostingController` draw/pause probes |
 | `VoiceAudioAndTranscriptTests.swift` | `VoiceAudioAndTranscriptTests.kt` | 48 | – | `LiveRTCSetupTests` (no `LiveRTCLocked` counterpart) |
 | `VoiceLiveTests.swift` | `VoiceLiveTests.kt` | 83 | 8 `VoiceEnginePersistenceTests` migrations (`:app`), 3 compaction/retarget tests (`:feature:session`, drawer) | – |
 | `VoiceReconnectReplyTests.swift` | `VoiceReconnectReplyTests.kt` | 7 | – | – |
-| `VoiceRouteTests.swift` | `VoiceRouteTests.kt` | 6 | `inactiveGeminiNeverDisablesThePhoneKey…`, `grokSuppressesUnrelatedServerErrors` (session/settings) | – |
+| `VoiceRouteTests.swift` | `VoiceRouteTests.kt` | 6 | `inactiveGeminiNeverDisablesThePhoneKey…`, `grokSuppressesUnrelatedServerErrors` (their Settings and session halves, ported in `:feature:settings`/`:feature:session`) | – |
 | `VoiceResultSpeechTests.swift` | `VoiceResultSpeechTests.kt` | 41 | – | – |
-| `CallVoiceTests.swift` | `CallVoiceTests.kt` | 7 | 2 `VoiceSettingsFeature` tests (`:feature:settings`) | – |
+| `CallVoiceTests.swift` | `CallVoiceTests.kt` | 7 | 2 `VoiceSettingsFeature` tests and the `CallVoicePicker.rowValue` half of `anUnsupportedChoice…` (`:feature:settings`, ported there) | – |
 | `ServerVoiceTests.swift` | `ServerVoiceTests.kt` | 16 | HomeFeature half of `serverVoiceReprobesOnce…` (drawer) | – |
-| `VoiceServerPickerTests.swift` | `VoiceServerPickerTests.kt` | 7 | 4 `VoiceSettingsFeature` (`:feature:settings`), `homeSavesTheChoice…` (drawer) | – |
+| `VoiceServerPickerTests.swift` | `VoiceServerPickerTests.kt` | 7 | 4 `VoiceSettingsFeature`, `homeSavesTheChoice…` and the Settings halves of `everyEntryPointRoutes…`, `thisIPhoneUsesThePhonesOwnKey` (`:feature:settings`, ported there) | – |
 | `VoiceSessionToolsTests.swift` (+`VoiceModelToolsTests`) | `VoiceSessionToolsTests.kt` | 24 | `homePublishesTheDrawerState…` (drawer), `theScreenFollowsOnlyItsOwnSessionsSwitch` (`:feature:session`) | – |
 | `FloatingCallModelTests.swift` | `FloatingCallModelTests.kt` | 21 | `canStartCallFromTap` half of `tapIntoProjectPicker…`, `ComposerTunables.bottomGap` (`:feature:session`) | Preset/registry parts of 3 tunables tests (tuning store not ported); 8 `TestWindowHost`/SessionView hosting tests (`onlyTopSessionViewDrivesCallTrayController`, `callTrayReserveGlides…`, `callTrayOverlayResetsReserve…`, `pushingAndPoppingSubagent…`, two `subagentStartedCall…`, `subagentPopDuringEnding…`, `growModelListCloseAndReset…`) |
 | `FloatingCallModelTests+Dock.swift` | `FloatingCallModelTestsDock.kt` | 3 | – | – |
@@ -114,7 +114,7 @@ another module are left to that module's port ("skipped"); "dropped" tests can't
 
 Voice-named iOS files whose subject lives elsewhere (left to those modules' ports): `LabVoiceKeysTests`,
 `ScreenAwakeTests`, `VoiceLiveActivityTests` (`:app`/drawer stores), `VoiceRoutingBaselineTests`,
-`ServerQuietStyleTests` (`:feature:settings`), `SessionVoiceTests`, `RaiseToTalkTests(+Routing)`,
+`ServerQuietStyleTests` (`:feature:settings`, ported there), `SessionVoiceTests`, `RaiseToTalkTests(+Routing)`,
 `AgentRevealAndOrbModelTests` (`:feature:session`), `LiveDelegationFeatureTests+Session`,
 `DictationLiveActivityTests` (drawer), `AudioSessionHapticsTests` (`:core` `HapticsClient`; its live
 dictation suite is opt-in device-only), `DictationAudioTests`, `LiveDictationTests` (`:feature:composer`).
