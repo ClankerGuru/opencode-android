@@ -27,4 +27,6 @@ dependencies {
     implementation(libs.coil.svg)
     testFixturesApi(libs.junit)
     testFixturesApi(libs.kotlinx.coroutines.test)
+    // ProcessLifecycleOwner + Vibrator (LiveHaptics' foreground gate) in the ported LiveHapticsTests.
+    testImplementation(libs.robolectric)
 }

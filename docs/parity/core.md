@@ -62,7 +62,7 @@ Ported from iOS `OpenCodeTests/` into `core/src/test` (JVM, same names). Shared 
 | `DiagnosticsRecorderTests.swift` | `diagnostics/DiagnosticsRecorderTests.kt` | 12 of 13 | `headerResolutionNotifiesObserversWhenChanged` → `:feature:session` (`SessionHeaderStyle`); `RealtimeTransportDiagnostic` half → `:feature:voice` |
 | `PrivacyManifestTests.swift` | `diagnostics/DiagnosticsRecorderTests.kt` | 1 of 2 | manifest plist test deleted (iOS `PrivacyInfo.xcprivacy`) |
 | `ExperimentalFeatureTests.swift` | `experiments/ExperimentalFeatureTests.kt` | 8 | `VoiceAudioDemoMode` half → `:feature:voice` |
-| `HapticsAuditTests.swift` | `haptics/HapticsAuditTests.kt` | 1 (`LiveHapticsTests` source scan) | `HapticsAuditTests` suite → `:feature:session`/`:feature:drawer`; `VoiceCallHaptic` fallbacks → `:feature:voice`; background gate needs an Android runtime (no Robolectric) |
+| `HapticsAuditTests.swift` | `haptics/HapticsAuditTests.kt` | 2 (`LiveHapticsTests` source scan; `aRequestArrivingInTheBackgroundPlaysNothing` under Robolectric in `LiveHapticsFrameworkTests`: `LiveHaptics` gated by `ProcessLifecycleOwner`, shadow `Vibrator`) | `HapticsAuditTests` suite → `:feature:session`/`:feature:drawer`; `VoiceCallHaptic` fallbacks → `:feature:voice` |
 | `TuningTests.swift` | `tuning/TuningTests.kt` | 27 | TuningFeature/Wire/Placement/summon gesture → `:devtools`; drawer/composer/transcript tunables → features; MotionXRay not ported; CALayer checks deleted |
 | `MotionSystemTests.swift` | `motion/MotionSystemTests.kt` | 5 | empty-state → `:feature:transcript`; drawer shortcuts (4) → `:feature:drawer`; window probe deleted |
 | `RollingNumberTests.swift` | `ui/RollingNumberTests.kt` | 8 of 9 | `rollingTitleSurvivesPixelSnapping` deleted (UIWindow pixel snapping) |
@@ -74,5 +74,6 @@ Ported from iOS `OpenCodeTests/` into `core/src/test` (JVM, same names). Shared 
 | `GlassShapeTests.swift` | `ui/GlassShapeTests.kt` | 2 of 3 | `GlassShape.clamped` → `OpenCodeShapeGeometry.clamped`; `tuningTabsKeepTheirWholeHitTargetOnScreen` → `:devtools` |
 
 Round 2 (ui helper): no `:core` production bugs found. `InternalBuild.detect(isDebug, installingPackageName)` was pulled out of
-`isEnabled` (unchanged behaviour) so `InternalBuildTests` can check it. 106 `:core` tests in total, all passing
-(`./gradlew :core:testDebugUnitTest`).
+`isEnabled` (unchanged behaviour) so `InternalBuildTests` can check it. 110 `:core` tests in total, all passing
+(`./gradlew :core:testDebugUnitTest`). Robolectric (test-only) runs only `LiveHapticsFrameworkTests`; `LiveHaptics` is `internal` (was
+`private`) so it can.

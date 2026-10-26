@@ -102,7 +102,7 @@ fun <T> HapticEffect(haptic: Haptic, trigger: T, condition: (old: T, new: T) -> 
  * (requests and notices also arrive in the background) or when the system's touch
  * feedback setting is off (iOS's System Haptics switch).
  */
-private class LiveHaptics(context: Context) {
+internal class LiveHaptics(context: Context) {
     private val context = context.applicationContext
     private val vibrator: Vibrator =
         (context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager).defaultVibrator

@@ -1,9 +1,23 @@
 package ai.opencode.core.haptics
 
 import ai.opencode.core.testing.TestIsolationRule
+import android.os.VibrationEffect
+import android.os.VibratorManager
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.ProcessLifecycleOwner
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
+import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowVibrator
 import java.io.File
 
 /**
@@ -11,8 +25,8 @@ import java.io.File
  * (`HapticsAuditTests`: which Session/Home actions play which `Haptic`) drives `SessionFeature`
  * and `HomeFeature`, so it belongs to `:feature:session` / `:feature:drawer`;
  * `theCallsFallbacksComeFromTheVocabulary` (`VoiceCallHaptic`) belongs to `:feature:voice`.
- * `aRequestArrivingInTheBackgroundPlaysNothing` isn't ported: Android's foreground gate is
- * `ProcessLifecycleOwner` + `Vibrator`, which need an Android runtime (no Robolectric here).
+ * `aRequestArrivingInTheBackgroundPlaysNothing` reads Android's foreground gate
+ * (`ProcessLifecycleOwner` + `Vibrator`), so it runs under Robolectric in [LiveHapticsFrameworkTests].
  */
 class LiveHapticsTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -50,6 +64,47 @@ class LiveHapticsTests {
         assertTrue(
             "Use dependency(HapticsClient) or HapticEffect (core/haptics/HapticsClient.kt) instead of raw Vibrator or haptic feedback: $violations",
             violations.isEmpty(),
+        )
+    }
+}
+
+/**
+ * [LiveHapticsTests]' foreground gate under Robolectric: iOS's `LiveHaptics(isActive:)` is
+ * Android's [LiveHaptics] reading `ProcessLifecycleOwner` (resumed = the app is in front), and a
+ * haptic that plays reaches the (shadow) `Vibrator`.
+ */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35])
+class LiveHapticsFrameworkTests {
+    @get:Rule val isolation = TestIsolationRule()
+
+    private val app = RuntimeEnvironment.getApplication()
+    private val vibrator = app.getSystemService(VibratorManager::class.java).defaultVibrator
+
+    /** The process lifecycle as the system drives it (in tests nothing attaches it to activities). */
+    private fun process(state: Lifecycle.State) {
+        (ProcessLifecycleOwner.get().lifecycle as LifecycleRegistry).currentState = state
+    }
+
+    @After fun backgroundAgain() = process(Lifecycle.State.CREATED)
+
+    @Test
+    fun aRequestArrivingInTheBackgroundPlaysNothing() {
+        shadowOf(vibrator).setSupportedPrimitives(
+            listOf(VibrationEffect.Composition.PRIMITIVE_CLICK, VibrationEffect.Composition.PRIMITIVE_TICK, VibrationEffect.Composition.PRIMITIVE_LOW_TICK),
+        )
+        val haptics = LiveHaptics(app)
+        process(Lifecycle.State.CREATED)
+        haptics.play(Haptic.attention)
+        assertTrue(shadowOf(vibrator).primitiveSegmentsInPrimitiveEffects.isEmpty())
+        assertFalse(shadowOf(vibrator).isVibrating)
+
+        process(Lifecycle.State.RESUMED)
+        haptics.play(Haptic.attention)
+        // `attention` is a rigid impact at 0.7: one tick.
+        assertEquals(
+            listOf(ShadowVibrator.PrimitiveEffect(VibrationEffect.Composition.PRIMITIVE_TICK, 0.7f, 0)),
+            shadowOf(vibrator).primitiveSegmentsInPrimitiveEffects,
         )
     }
 }
