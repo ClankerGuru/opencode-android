@@ -55,6 +55,13 @@ a lower module were ported there under the same suite name.
 | `AppIconBadgeTests.swift` | `AppIconBadgeTests.kt` | 4 (forgetting an identity) | 9 Home publishing tests → `:feature:drawer`; ledger/storage/refs (5) → `:feature:system` `notifications/AppIconBadgeTests` | `BadgeAuthorization` (3) and App Group tests (no Android counterpart) |
 | `PairingPasteTests.swift` | `PairingPasteTests.kt` | 1 | – | – |
 | `LabVoiceKeysTests.swift` | `LabVoiceKeysTests.kt` (Robolectric: the lab extras ride an `Intent`; through `LabLaunch.apply`) | 1 | – | – |
+| `SystemIntegrationTests.swift` | `SystemIntegrationTests.kt` (`SystemRoutingTests`, `SystemColdLaunchTests`) | 7 + 3 (the AppFeature sections) | Home routing/cold-launch tests → `:feature:drawer`; directory, entities, controls, quick actions, prompt sender, publisher → `:feature:system` | – |
+| `ServerSwitchingTests.swift` | `ServerSwitchingTests.kt` | 14 (renaming, re-pairing, switching from Home/Settings, failed switch, form and scanner over Home, removal, closing the sheet mid-switch, where the sheet opens, the form's headers) | names/decoding/headers on requests (6) → `:server`; Home (3) → `:feature:drawer`; `ServerTitleFeature` (5) → `:feature:settings` | – (shared values iOS asserts inside state closures are checked after the step: `Shared` is a reference here) |
+| `ServerTitleRecoveryTests.swift` | `ServerTitleRecoveryTests.kt` | 5 | 2 `ServerTitleFeature` tests → `:feature:settings` | – |
+| `DrawerActivityTests.swift` | `DrawerActivityTests.kt` | 1 (`aRelaunchShowsCachedRunningStateOnlyWhileItIsFresh`, both ages) | rest → `:feature:drawer` | `theSingleCacheOfEarlierBuildsMovesIntoPerServerCaches` (migrates earlier iOS builds' single Home cache; no earlier Android builds, legacy migration n/a) |
+| `NewSessionDraftTests.swift` | `NewSessionDraftTests.kt` | 1 (`switchingServersFromADraft…`) | rest → `:feature:session`/drawer; folder/listing → `:server` | – |
+| `ShareHandoffTests.swift` | `ShareHandoffTests.kt` | 1 (`appConsumesSharesOnActivation…`) | rest → `:feature:drawer`/`:feature:system`/`:feature:session` | – |
+| `VoiceLiveTests.swift` (`VoiceEnginePersistenceTests`) | – | 0 | rest → `:feature:voice` | all 8 (`realtimeMigratesToGPTLive` … `laterManualChoiceSticks`): they test `AppFeature+Migrations`' engine migration (Realtime/Grok → GPT-Live on launch), which Android doesn't have (no earlier builds; see the `AppFeature+Migrations.swift` row). The manual-choice marker Settings writes is kept for parity |
 
 Production changes the ports needed: `ThisDevice.isTablet` read `Resources.getSystem()` without a null
 check, so every “this phone” copy threw under JVM tests (`shared:` fix, no device change);
@@ -65,4 +72,4 @@ process-wide ones) and resolves without an `Activity`, `SceneWindows.window(dest
 routes for a given roster, and `AppWideWork` follows the store, not the window, as iOS's does (each live window
 has its own store, so live behaviour is unchanged). No behaviour bugs found.
 
-Total: 80 `:app` tests, all passing.
+Total: 120 `:app` tests (`./gradlew :app:testDebugUnitTest`), all passing.
