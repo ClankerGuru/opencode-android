@@ -313,7 +313,6 @@ class VoiceServerPickerTests {
             it.copy(serverVoiceSupport = ServerVoiceSupport.supported)
         }
         assertEquals(ServerVoiceSupport.supported, shared.run { shared(VoiceSharedKeys.serverVoiceSupportByServer).value[server.persistenceID] })
-        // See aChosenServerBrokersTheCall…: the delegate is queued after the route here.
         store.receive(VoiceFeature.Action.Delegate(VoiceFeature.DelegateAction.ServerVoiceSupportChanged(ServerVoiceSupport.supported)))
         store.receive(VoiceFeature.Action.CallRouteResolved(VoiceRoute.Server(VoiceRoute.ServerRoute.OpenAI(VoiceRoute.OpenAI.gptLive)), usesDelegator = false))
         connectGate.complete(Unit)
