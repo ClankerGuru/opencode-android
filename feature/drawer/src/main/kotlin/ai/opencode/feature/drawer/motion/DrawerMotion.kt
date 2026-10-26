@@ -103,8 +103,9 @@ class DrawerShortcutSlot(isOpen: Boolean = false) {
         private set
     var solver: SpringSolver = makeSolver(if (isOpen) 1.0 else 0.0)
         private set
+    /** Internal setter: tests clear it as iOS's do (`slot.generation = nil`). */
     var generation: Int? = null
-        private set
+        internal set
     var delayRemaining: Double = 0.0
         private set
 
@@ -184,8 +185,8 @@ class DrawerShortcutSlot(isOpen: Boolean = false) {
  */
 @Stable
 class DrawerShortcutMotion(private val scope: CoroutineScope, var frameDurationSeconds: Double = 1.0 / 60.0) {
-    private val catchUp = DrawerShortcutSlot()
-    private val whatsNew = DrawerShortcutSlot()
+    internal val catchUp = DrawerShortcutSlot()
+    internal val whatsNew = DrawerShortcutSlot()
 
     private var catchUpMountedState by mutableStateOf(false)
     private var catchUpWantsOpenState by mutableStateOf(false)
