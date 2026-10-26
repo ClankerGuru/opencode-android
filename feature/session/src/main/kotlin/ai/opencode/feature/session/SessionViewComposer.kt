@@ -1215,7 +1215,9 @@ private fun SessionComposerEnv.ComposerSurface(
                     // Leaving for a call, the composer fades out as it was (SwiftUI's removed view
                     // keeps its last state): the draft becoming the call's session mid-swap mustn't
                     // collapse it to one line under the arriving bar.
-                    val leaving = transition.targetState != null
+                    // This scope's transition targets EnterExitState, never the nullable call.
+                    // Freeze only when the outer AnimatedContent is actually targeting a call.
+                    val leaving = call != null
                     val live = this@ComposerSurface
                     val frozen = remember(leaving) { if (leaving) live else null }
                     val env = frozen ?: live

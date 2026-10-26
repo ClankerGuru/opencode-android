@@ -17,6 +17,6 @@ dependencies {
     implementation(libs.media3.ui.compose)
     implementation(libs.androidx.browser)
     implementation(libs.androidx.webkit)
-    // The debug-only media lab harness (src/debug, MediaLabActivity).
-    debugImplementation(libs.androidx.activity.compose)
+    // ComponentActivity is also used by the main-source picture-in-picture host.
+    implementation(libs.androidx.activity.compose)
 }

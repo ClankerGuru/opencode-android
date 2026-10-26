@@ -139,7 +139,7 @@ class VoiceLateResultTests {
     @Test fun theCallAnnouncesAResultAfterAStatusCheck() = runTest {
         val shared = SpeechTestShared()
         val voice = shared.run {
-            VoiceFeature.State(server, OpenCodeSession(id = "ses_ios", title = "OpenCode iOS", projectID = "p", directory = "/Users/kit/ios", updatedAt = distantPast))
+            VoiceFeature.State(server, OpenCodeSession(id = "ses_ios", serverTitle = "OpenCode iOS", projectID = "p", directory = "/Users/kit/ios", updatedAt = distantPast))
                 .withPhase(VoiceFeature.State.Phase.Live)
                 .stepping(ReplyWatch.Event.Sent(listOf(prompt)))
         }
@@ -318,7 +318,7 @@ class VoiceSuppressionTests {
      */
     @Test fun aReadCancelsHeldResultsForEveryPromptInTheSession() = runBlocking {
         val shared = SpeechTestShared()
-        val session = OpenCodeSession(id = home, title = "HOME", projectID = "p", directory = "/Users/kit/home", updatedAt = distantPast)
+        val session = OpenCodeSession(id = home, serverTitle = "HOME", projectID = "p", directory = "/Users/kit/home", updatedAt = distantPast)
         val voice = shared.run {
             shared(SharedKeys.openAIAPIKey).set("sk-test")
             VoiceFeature.State(server, session)
@@ -372,7 +372,7 @@ class VoiceSuppressionTests {
     // MARK: Through the call
 
     private val homeSession: OpenCodeSession
-        get() = OpenCodeSession(id = home, title = "HOME", projectID = "p", directory = "/Users/kit/home", updatedAt = distantPast)
+        get() = OpenCodeSession(id = home, serverTitle = "HOME", projectID = "p", directory = "/Users/kit/home", updatedAt = distantPast)
 
     private fun delegatorCall(shared: SpeechTestShared): VoiceFeature.State = shared.run {
         shared(SharedKeys.openAIAPIKey).set("sk-test")
@@ -756,7 +756,7 @@ class VoiceSuppressionTests {
      * whole reply.
      */
     @Test fun readSessionReportsItsOwnPromptAndTheWholeReply() = runBlocking {
-        val session = OpenCodeSession(id = home, title = "HOME", projectID = "p", directory = "/Users/kit/home", updatedAt = distantPast)
+        val session = OpenCodeSession(id = home, serverTitle = "HOME", projectID = "p", directory = "/Users/kit/home", updatedAt = distantPast)
         val short = (1..40).joinToString("\n") { "- Item $it: Olive at 4:23 asked about dinner plans" }
         val client = OpenCodeClient.testValue.copy(
             getSession = { _, _ -> session },
@@ -785,7 +785,7 @@ class VoiceSuppressionTests {
     // design cut at 400 characters ("| The 1…") and told him the reply it
     // could see was cut off, so it didn't want to invent the rules.
 
-    private val gameEngine = OpenCodeSession(id = "ses_game", title = "GAME ENGINE", projectID = "p", directory = "/Users/kit/game", updatedAt = distantPast)
+    private val gameEngine = OpenCodeSession(id = "ses_game", serverTitle = "GAME ENGINE", projectID = "p", directory = "/Users/kit/game", updatedAt = distantPast)
 
     private fun gameWorkspace(client: OpenCodeClient): VoiceDelegatorWorkspace = VoiceDelegatorWorkspace(
         client = client,

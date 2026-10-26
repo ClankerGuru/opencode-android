@@ -3,6 +3,7 @@ package ai.opencode.feature.transcript.markdown.ui
 import ai.opencode.core.ui.OpenCodeColors
 import ai.opencode.core.ui.OpenCodeFonts
 import ai.opencode.core.ui.OpenCodeIcon
+import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.feature.media.SiteIcon
 import ai.opencode.feature.transcript.SessionLinkTarget
@@ -132,6 +133,7 @@ data class PresentationOptions(
 
 /** Builds [PresentedText] (iOS `PresentedMarkdownText.make`, `SessionLinkText.present`, `InlineLinkText.decorate`, `InlineMath.text`). */
 object MarkdownPresentation {
+    private val plainRun = InlineRun("")
     private const val wordJoiner = "\u2060"
     /** No-break padding in the surrounding font: the glyph sits in a figure space (iOS `SessionChipLayout`). */
     const val chipLeadingPad = SessionLinkText.leadingPad
@@ -148,6 +150,11 @@ object MarkdownPresentation {
         links: LinkInteractionListener?,
         siteIcon: ((String) -> SiteIcon?)?,
     ): PresentedText {
+        // Plain prose has no links, chips or math to present. Keep it span-free rather than
+        // building groups and an empty SpanStyle over every run; Text supplies its base style.
+        if (inline.runs.all { it.sameAttributes(plainRun) }) {
+            return PresentedText.plain(AnnotatedString(inline.text))
+        }
         val colors = style.colors
         val groups = group(inline.runs)
         val hasMathRun = inline.runs.any { MathSyntax.Delimiter.from(it.languageIdentifier) != null }
@@ -363,6 +370,8 @@ object MarkdownPresentation {
             },
             fontStyle = if (run.emphasized) FontStyle.Italic else null,
             fontFamily = if (run.code) OpenCodeFonts.monospace else null,
+            // iOS parses inline code as `.subheadline` monospaced; in a heading it takes the heading's size.
+            fontSize = if (run.code && heading == null) OpenCodeTextStyles.subheadline.fontSize else TextUnit.Unspecified,
             background = if (run.code) colors.inlineCodeFill else Color.Unspecified,
             textDecoration = if (run.strikethrough) TextDecoration.LineThrough else null,
         )

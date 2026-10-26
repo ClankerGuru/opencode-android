@@ -200,7 +200,7 @@ class VoiceReconnectReplyTests {
     }
 
     private fun voiceOnCall(shared: VoiceTestShared): VoiceFeature.State {
-        val session = OpenCodeSession(id = ios, title = "OPENCODE IOS", projectID = "p", directory = "/Users/kit/ios", updatedAt = Instant.EPOCH)
+        val session = OpenCodeSession(id = ios, serverTitle = "OPENCODE IOS", projectID = "p", directory = "/Users/kit/ios", updatedAt = Instant.EPOCH)
         return shared.read {
             var voice = VoiceFeature.State(server, session).withPhase(VoiceFeature.State.Phase.Live).copy(usesDelegator = true)
             voice = voice.copy(replyWatch = voice.replyWatch.transition(ReplyWatch.Event.CallPhaseChanged(ReplyWatch.CallPhase.live)).first)

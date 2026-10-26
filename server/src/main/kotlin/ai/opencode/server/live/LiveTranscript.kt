@@ -33,12 +33,13 @@ import kotlinx.serialization.json.JsonElement
 
 /** The context reading and next cursor of the transcript window just decoded, for `transcriptWithContextUsageAndCursor`. */
 internal class TranscriptContextCapture {
-    data class Captured(val reading: OpenCodeContextReading, val nextCursor: String?)
+    /** [messageCount]: messages in the page, so a short page reads as reaching the session's start. */
+    data class Captured(val reading: OpenCodeContextReading, val nextCursor: String?, val messageCount: Int = 0)
 
     @Volatile private var captured: Captured? = null
 
-    fun record(value: OpenCodeContextReading, nextCursor: String?) {
-        captured = Captured(value, nextCursor)
+    fun record(value: OpenCodeContextReading, nextCursor: String?, messageCount: Int = 0) {
+        captured = Captured(value, nextCursor, messageCount)
     }
 
     fun take(): Captured? = captured
@@ -84,7 +85,7 @@ fun decodeTranscript(data: ByteArray): List<OpenCodeTranscriptItem> =
 internal fun decodeTranscriptPage(data: ByteArray, capture: TranscriptContextCapture?): OpenCodeTranscriptPage {
     val payload = decoded(data, "transcript", MessagesPayload::decode)
     val next = payload.cursor?.next
-    capture?.record(contextUsage(payload), next)
+    capture?.record(contextUsage(payload), next, payload.data.size)
     return OpenCodeTranscriptPage(payload.data.asReversed().flatMap(::transcriptItems), next)
 }
 

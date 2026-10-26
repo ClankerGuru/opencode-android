@@ -31,6 +31,7 @@ import ai.opencode.feature.transcript.markdown.ui.TranscriptTextReveal
 import ai.opencode.feature.transcript.rows.NewMessagesDivider
 import ai.opencode.feature.transcript.user.TranscriptMessageRow
 import ai.opencode.feature.transcript.user.UserMessageRun
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
@@ -45,6 +46,7 @@ import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.layout.LazyLayoutCacheWindow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -120,6 +122,7 @@ fun TranscriptList(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun TranscriptListContent(
     configuration: TranscriptConfiguration,
@@ -134,7 +137,14 @@ private fun TranscriptListContent(
 ) {
     val scope = rememberCoroutineScope()
     val initialIndex = remember { (configuration.entries.size + configuration.queuedInputs.size + 2).coerceAtLeast(0) }
-    val listState = remember { LazyListState(firstVisibleItemIndex = initialIndex) }
+    val listState = remember {
+        LazyListState(
+            // Prepare a viewport in the scroll direction rather than only the next row;
+            // retain half a viewport behind so a short reversal can reuse measured Markdown.
+            cacheWindow = LazyLayoutCacheWindow(aheadFraction = 1f, behindFraction = 0.5f),
+            firstVisibleItemIndex = initialIndex,
+        )
+    }
     val controller = remember { TranscriptListController(listState, scope) }
     val density = LocalDensity.current
     val reduceMotion = rememberReduceMotion()

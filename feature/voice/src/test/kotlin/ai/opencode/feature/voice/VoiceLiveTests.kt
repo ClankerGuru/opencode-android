@@ -2233,7 +2233,7 @@ class VoiceDelegatorRoundTests {
  */
 class VoiceEnginePersistenceTests {
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
-    private val session = OpenCodeSession(id = "ses_voice", title = "Voice lab", projectID = "p", directory = "/Users/kit/project", updatedAt = Instant.EPOCH)
+    private val session = OpenCodeSession(id = "ses_voice", serverTitle = "Voice lab", projectID = "p", directory = "/Users/kit/project", updatedAt = Instant.EPOCH)
 
     @Test fun defaultsToGPTLiveAndPersistsSelectionAcrossCalls() = runTest {
         val shared = VoiceTestShared()
@@ -2310,7 +2310,7 @@ class VoiceEnginePersistenceTests {
 /** Port of iOS `LiveDelegationFeatureTests` (the `VoiceFeature` ones; see the report for the rest). */
 class LiveDelegationFeatureTests {
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
-    private val session = OpenCodeSession(id = "ses_voice", title = "Voice lab", projectID = "p", directory = "/Users/kit/project", updatedAt = Instant.EPOCH)
+    private val session = OpenCodeSession(id = "ses_voice", serverTitle = "Voice lab", projectID = "p", directory = "/Users/kit/project", updatedAt = Instant.EPOCH)
     private val emptyArgs = RealtimeJSONs.obj()
 
     private fun callEvent(event: VoiceCallEvent) = VoiceFeature.Action.CallEvent(event)
@@ -2674,7 +2674,7 @@ class LiveDelegationFeatureTests {
             this[DateClient] = DateClient.constant(Instant.EPOCH)
         }
         DependencyValues.withValues(values) {
-            val other = OpenCodeSession(id = "ses_other", title = "Other", projectID = "p", directory = "/Users/kit/project", updatedAt = Instant.EPOCH)
+            val other = OpenCodeSession(id = "ses_other", serverTitle = "Other", projectID = "p", directory = "/Users/kit/project", updatedAt = Instant.EPOCH)
             val tail = VoiceTranscriptTail()
             val capture = tail.capture().capture
             var voice = VoiceFeature.State(server, session)

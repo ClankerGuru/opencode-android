@@ -5,6 +5,7 @@ import ai.opencode.core.motion.MotionFrameAction
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.SpringSolver
 import ai.opencode.core.motion.motionFrameLoop
+import ai.opencode.feature.drawer.catchup.CatchUpDisposition
 import ai.opencode.feature.drawer.catchup.CatchUpMetrics
 import ai.opencode.feature.drawer.catchup.CatchUpStackController
 import ai.opencode.feature.drawer.catchup.CatchUpStage
@@ -488,6 +489,9 @@ class SessionDrawerController internal constructor(
         }
         catchUp = stage
         if (stage != null) lastStage = stage
+        // iOS `stack.end(...)` on leaving: a card drag under way is nobody's now. (The stack keeps
+        // its stage until the exit morph unmounts it, so its preview fades with the stage.)
+        if (previous != null && stage == null) catchUpStack.dropDrag()
         // Catching up takes the whole screen; afterwards the sidebar returns.
         if (sidebarShown != null) {
             sidebarJob?.cancel()
@@ -500,6 +504,18 @@ class SessionDrawerController internal constructor(
             previous != null && stage == null -> exitIntoSession(animated, previous.cardID != null)
             else -> Unit
         }
+    }
+
+    /** The chrome's Keep Unread / Mark as Read: a morph still landing lands first (iOS `dismissCard`). */
+    fun dismissCard(disposition: CatchUpDisposition) {
+        finishModeTransition()
+        catchUpStack.fling(disposition)
+    }
+
+    /** The chrome's Undo (iOS `undoCard`). */
+    fun undoCard() {
+        finishModeTransition()
+        catchUpStack.undo()
     }
 
     private val stackFrame: Rect

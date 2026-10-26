@@ -150,9 +150,9 @@ data class OpenCodeMarkdownBlock(val id: Int, val kind: Kind) {
         }
 
         fun parse(text: String): Entry {
+            synchronized(lock) { inlines.values[text] }?.let { return it }
             val bytes = SwiftText.utf8Length(text)
             if (maximumEntries <= 0 || bytes > maximumSourceBytes) return uncachedInlineEntry(text)
-            synchronized(lock) { inlines.values[text] }?.let { return it }
             // Live projection and a row's lookup can miss simultaneously. Neither holds the lock
             // while parsing; a duplicate miss is harmless.
             val parsed = uncachedInlineEntry(text)
@@ -161,18 +161,18 @@ data class OpenCodeMarkdownBlock(val id: Int, val kind: Kind) {
         }
 
         fun parseCompletedSegment(segment: String): List<SegmentItem> {
+            synchronized(lock) { segments.values[segment] }?.let { return it }
             val bytes = SwiftText.utf8Length(segment)
             if (maximumEntries <= 0 || bytes > maximumSourceBytes) return parseTextSegment(segment, this)
-            synchronized(lock) { segments.values[segment] }?.let { return it }
             val parsed = parseTextSegment(segment, this)
             synchronized(lock) { segments.insert(parsed, segment, bytes, maximumEntries, maximumSourceBytes) }
             return parsed
         }
 
         fun parseTableRow(line: String): TableRowEntry {
+            synchronized(lock) { tableRows.values[line] }?.let { return it }
             val bytes = SwiftText.utf8Length(line)
             if (maximumEntries <= 0 || bytes > maximumSourceBytes) return uncachedTableRow(line, this)
-            synchronized(lock) { tableRows.values[line] }?.let { return it }
             val parsed = uncachedTableRow(line, this)
             synchronized(lock) { tableRows.insert(parsed, line, bytes, maximumEntries, maximumSourceBytes) }
             return parsed

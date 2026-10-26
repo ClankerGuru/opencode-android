@@ -1,6 +1,7 @@
 package ai.opencode.server.model
 
 import ai.opencode.core.sharing.InstantSerializer
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.time.Instant
 
@@ -174,7 +175,11 @@ data class OpenCodeModelCatalog(val models: List<OpenCodeModel>, val defaultMode
 @Serializable
 data class OpenCodeSession(
     val id: String,
-    val title: String,
+    /**
+     * `Session.Info.title`, or [SessionTitle.placeholder] while the server hasn't named the session.
+     * Surfaces show [title]; this is for renames and the "is it named yet" checks.
+     */
+    @SerialName("title") val serverTitle: String,
     val projectID: String,
     val directory: String,
     @Serializable(with = InstantSerializer::class) val updatedAt: Instant,
@@ -189,7 +194,16 @@ data class OpenCodeSession(
     val alwaysNotify: Boolean = false,
     /** A staged undo (V2's `Session.Revert`): this message and everything after it are hidden. */
     val revertMessageID: String? = null,
-)
+    /**
+     * The session's first prompt as a one-line [SessionTitle.preview], once known: from the prompt
+     * this phone created it with, or a loaded transcript that reaches its start. Only an unnamed
+     * session learns one; it rides cached Home snapshots so a cold launch shows it too.
+     */
+    val firstPrompt: String? = null,
+) {
+    /** What every surface calls this session: the server's title, else its first prompt ([SessionTitle.display]). */
+    val title: String get() = SessionTitle.display(serverTitle, firstPrompt)
+}
 
 /** The context window the session's latest reply filled, as the TUI measures it. */
 data class OpenCodeContextUsage(val tokens: Int, val model: OpenCodeModelRef)

@@ -51,7 +51,7 @@ class ServerVoiceTests {
     private val server = OpenCodeServer(url = "http://127.0.0.1:4096", username = "opencode", password = "secret")
     private val session = OpenCodeSession(
         id = "ses_voice",
-        title = "Server Voice",
+        serverTitle = "Server Voice",
         projectID = "proj_1",
         directory = "/Users/kit/code/open-source/opencode-ios",
         updatedAt = Instant.ofEpochSecond(1_700_000_000),

@@ -99,5 +99,6 @@ object WhatsNewAddedIDs {
         "optical-insets",
         "server-voice-experiment",
         "call-tray-colour-blend",
+        "session-title-first-prompt",
     )
 }

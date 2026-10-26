@@ -48,67 +48,50 @@ internal class EffectRunner<A>(
         jobs.forEach { it.cancel() }
     }
 
+    /**
+     * [keys] are the enclosing cancellable identities: every coroutine launched under them is
+     * registered with each at once, so a cancel sent right after (before the coroutine first runs)
+     * reaches nested `cancellable`s too, as TCA registers them when the effect is subscribed.
+     */
     @Suppress("UNCHECKED_CAST")
-    private fun <B> execute(effect: Effect<B>, now: (B) -> Unit, later: suspend (B) -> Unit, path: List<Any> = emptyList()) {
+    private fun <B> execute(
+        effect: Effect<B>,
+        now: (B) -> Unit,
+        later: suspend (B) -> Unit,
+        path: List<Any> = emptyList(),
+        keys: List<CancelKey> = emptyList(),
+    ) {
         when (effect) {
             is Effect.None -> Unit
             is Effect.SendAction -> now(effect.action)
             is Effect.Cancel -> cancel(effect.ids.map { CancelKey(path, it) })
-            is Effect.Merge -> effect.effects.forEach { execute(it, now, later, path) }
-            is Effect.NavigationScoped -> execute(effect.effect, now, later, path + effect.id)
+            is Effect.Merge -> effect.effects.forEach { execute(it, now, later, path, keys) }
+            is Effect.NavigationScoped -> execute(effect.effect, now, later, path + effect.id, keys)
             is Effect.Mapped<*, *> -> {
                 val mapped = effect as Effect.Mapped<Any?, B>
-                execute(mapped.effect, { now(mapped.transform(it)) }, { later(mapped.transform(it)) }, path)
+                execute(mapped.effect, { now(mapped.transform(it)) }, { later(mapped.transform(it)) }, path, keys)
             }
             is Effect.Cancellable -> {
                 val key = CancelKey(path, effect.id)
                 if (effect.cancelInFlight) cancel(listOf(key))
-                // A body with nothing to suspend (send/cancel only) stays synchronous, so a
-                // child's `.send` or `.cancel` under `ifLet`/`forEach` keeps TCA's ordering. A
-                // merge's synchronous parts run now too; only its suspending parts are launched.
-                executeCancellable(effect.effect, key, now, later, path)
+                // Sends and cancels inside stay synchronous, so a child's `.send` or `.cancel`
+                // under `ifLet`/`forEach` keeps TCA's ordering.
+                execute(effect.effect, now, later, path, keys + key)
             }
-            is Effect.Run, is Effect.Concatenate -> launchTracked(null) { runToCompletion(effect, later, path) }
+            is Effect.Run, is Effect.Concatenate -> launchTracked(keys) { runToCompletion(effect, later, path) }
         }
     }
 
-    /**
-     * The body of a cancellable: synchronous parts (TCA delivers a `.send` at once, cancellable or
-     * not) run now; the rest launch tracked under [key].
-     */
-    @Suppress("UNCHECKED_CAST")
-    private fun <B> executeCancellable(effect: Effect<B>, key: CancelKey, now: (B) -> Unit, later: suspend (B) -> Unit, path: List<Any>) {
-        when {
-            isSynchronous(effect) -> execute(effect, now, later, path)
-            effect is Effect.Merge -> effect.effects.forEach { executeCancellable(it, key, now, later, path) }
-            effect is Effect.NavigationScoped -> executeCancellable(effect.effect, key, now, later, path + effect.id)
-            effect is Effect.Mapped<*, *> -> {
-                val mapped = effect as Effect.Mapped<Any?, B>
-                executeCancellable(mapped.effect, key, { now(mapped.transform(it)) }, { later(mapped.transform(it)) }, path)
-            }
-            else -> launchTracked(key) { runToCompletion(effect, later, path) }
-        }
-    }
-
-    private fun isSynchronous(effect: Effect<*>): Boolean = when (effect) {
-        is Effect.None, is Effect.SendAction, is Effect.Cancel -> true
-        is Effect.Merge -> effect.effects.all(::isSynchronous)
-        is Effect.Mapped<*, *> -> isSynchronous(effect.effect)
-        is Effect.Cancellable -> isSynchronous(effect.effect)
-        is Effect.NavigationScoped -> isSynchronous(effect.effect)
-        is Effect.Run, is Effect.Concatenate -> false
-    }
-
-    private fun launchTracked(id: CancelKey?, block: suspend () -> Unit) {
+    private fun launchTracked(ids: List<CancelKey>, block: suspend () -> Unit) {
         val job = scope.launch(start = CoroutineStart.LAZY) { block() }
         synchronized(lock) {
             running += job
-            if (id != null) inFlight.getOrPut(id) { HashSet() } += job
+            for (id in ids) inFlight.getOrPut(id) { HashSet() } += job
         }
         job.invokeOnCompletion {
             synchronized(lock) {
                 running -= job
-                if (id != null) inFlight[id]?.let { set -> set -= job; if (set.isEmpty()) inFlight.remove(id) }
+                for (id in ids) inFlight[id]?.let { set -> set -= job; if (set.isEmpty()) inFlight.remove(id) }
             }
         }
         job.start()

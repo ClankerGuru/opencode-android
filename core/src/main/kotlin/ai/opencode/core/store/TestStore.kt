@@ -2,10 +2,16 @@ package ai.opencode.core.store
 
 import ai.opencode.core.dependencies.DependencyValues
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
+import kotlin.coroutines.ContinuationInterceptor
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -26,8 +32,8 @@ import kotlin.time.Duration.Companion.seconds
  * action an effect sends must be [receive]d, and [finish] fails while effects still run
  * (cancellation included), as TCA's default. Set [exhaustive] = false for TCA's
  * `exhaustivity = .off`: `update` then applies to the actual new state (partial asserts),
- * unasserted effect actions are reduced before the next send, [receive] skips
- * non-matching actions, and [finish] waits out its timeout for running effects without failing.
+ * unasserted effect actions are reduced before the next send, and [receive] skips
+ * non-matching actions.
  *
  * Dependencies resolve to `testValue` unless overridden; keys without one fail loudly. An
  * effect that throws fails the test at the next call. Effects should take dispatchers from a
@@ -56,8 +62,8 @@ class TestStore<S, A>(
     private val received = Channel<A>(Channel.UNLIMITED)
 
     /**
-     * Actions sent synchronously (`Effect.send`): `Store` reduces them right after the action
-     * that sent them, ahead of anything a running effect sent meanwhile, so they come first.
+     * Actions sent synchronously (`Effect.send`): `Store` (and TCA) reduces them right after the
+     * action that sent them, ahead of anything a running effect sent meanwhile, so they come first.
      */
     private val immediate = ArrayDeque<A>()
 
@@ -69,15 +75,30 @@ class TestStore<S, A>(
     var state: S = initialState
         private set
 
+    /**
+     * The sending coroutine's context, less its job and dispatcher: effects see the task locals it
+     * bound (`withRetryPolicy { store.send(…) }`), as Swift effects inherit the sending task's.
+     */
+    private var callerContext: CoroutineContext = EmptyCoroutineContext
+    private val effectScope = object : CoroutineScope {
+        override val coroutineContext: CoroutineContext get() = scope.coroutineContext + callerContext
+    }
+
+    private suspend fun captureCaller() {
+        callerContext = currentCoroutineContext().minusKey(Job).minusKey(ContinuationInterceptor)
+    }
+
     private val runner = EffectRunner<A>(
-        scope = scope,
+        scope = effectScope,
         sendNow = { synchronized(immediate) { immediate.addLast(it) } },
-        sendFromEffect = { received.send(it) },
+        // As `Store`'s hop to the main thread (and TCA's `Send`): a cancelled effect's sends are dropped.
+        sendFromEffect = { currentCoroutineContext().ensureActive(); received.send(it) },
         onUnhandledError = { if (unhandledError == null) unhandledError = it },
     )
 
     /** Sends [action] and asserts the resulting state equals `update(previous)`. */
     suspend fun send(action: A, update: ((S) -> S)? = null) {
+        captureCaller()
         throwUnhandled()
         if (exhaustive) assertNoUnreceived("before sending $action") else drain()
         apply(action, update, "send($action)")
@@ -96,6 +117,7 @@ class TestStore<S, A>(
         timeout: Duration = 1.seconds,
         update: ((S) -> S)? = null,
     ) {
+        captureCaller()
         throwUnhandled()
         while (true) {
             val action = nextReceived() ?: withTimeout(timeout) { received.receive() }
@@ -110,28 +132,43 @@ class TestStore<S, A>(
         throwUnhandled()
     }
 
+    /** Cancels every effect still running (TCA's `skipInFlightEffects`), for long-living ones a test leaves. */
+    suspend fun skipInFlightEffects() {
+        yield()
+        throwUnhandled()
+        runner.cancelAll()
+        yield()
+    }
+
     /** Reduces actions effects sent without asserting them (TCA's `skipReceivedActions`). */
     suspend fun skipReceivedActions() {
+        captureCaller()
         yield()
         drain()
     }
 
-    /** Asserts every action was received and no effect is still running. */
+    /**
+     * Asserts every action was received and no effect is still running. Non-exhaustive, as TCA's
+     * `exhaustivity = .off` (which reduces effect actions as they arrive), actions keep being
+     * reduced while waiting, and effects still running after [timeout] are cancelled without failing.
+     */
     suspend fun finish(timeout: Duration = 1.seconds) {
+        captureCaller()
         yield()
         throwUnhandled()
         if (exhaustive) assertNoUnreceived("at finish") else drain()
         try {
-            withTimeout(timeout) { while (runner.hasRunningEffects) delay(5) }
-        } catch (_: kotlinx.coroutines.TimeoutCancellationException) {
-            // TCA reports effects still in flight only when exhaustive; with exhaustivity off
-            // they're a skipped assertion and keep running (the test's scope ends them).
-            if (!exhaustive) {
-                drain()
-                return
+            withTimeout(timeout) {
+                while (true) {
+                    if (!exhaustive) drain()
+                    if (!runner.hasRunningEffects) break
+                    delay(5)
+                }
             }
+        } catch (_: kotlinx.coroutines.TimeoutCancellationException) {
             val count = runner.runningCount
             runner.cancelAll()
+            if (!exhaustive) return
             throw AssertionError("$count effect(s) still running at finish. Cancel them or await their actions.")
         }
         throwUnhandled()

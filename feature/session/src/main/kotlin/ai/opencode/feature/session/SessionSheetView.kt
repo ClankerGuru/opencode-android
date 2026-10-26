@@ -11,12 +11,14 @@ import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.RollingNumber
 import ai.opencode.core.ui.RollingNumberAlignment
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.feature.composer.OpenCodeBottomSheet
 import ai.opencode.feature.session.header.BreathingTitleHold
 import ai.opencode.feature.session.header.SessionContextRing
 import ai.opencode.feature.session.header.SessionContextText
 import ai.opencode.feature.session.header.titleBreathing
 import ai.opencode.feature.system.notifications.SessionNotificationsClient
 import ai.opencode.server.model.ModelVariant
+import ai.opencode.server.model.isUntitled
 import ai.opencode.server.model.OpenCodeContextUsage
 import ai.opencode.server.model.OpenCodeExportFormat
 import ai.opencode.server.model.OpenCodeModel
@@ -56,7 +58,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -232,7 +233,7 @@ fun SessionSheetView(
     providerIcon: (@Composable (providerID: String, canonicalProviderID: String?, size: Dp) -> Unit)? = null,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(onDismissRequest = onDismissRequest, sheetState = sheetState) {
+    OpenCodeBottomSheet(onDismissRequest = onDismissRequest, sheetState = sheetState) {
         SessionSheetContent(sheet, context, details, onModelTapped, statusOrb, providerIcon)
         SessionActionPresentations(sheet, title = details.session?.title)
     }
@@ -259,7 +260,7 @@ private fun SessionSheetContent(
             .testTag("session-sheet"),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Hero(state, details, context, statusOrb, onRename = { sheet.send(SessionSheetFeature.Action.RenameTapped(details.session?.title ?: "")) })
+        Hero(state, details, context, statusOrb, onRename = { sheet.send(SessionSheetFeature.Action.RenameTapped(details.session?.let { if (it.isUntitled) "" else it.title }.orEmpty())) })
         Tiles(state, isListRow, context, details.session?.title, sheet::send)
         DetailsCard(details, onModelTapped, providerIcon)
         if (isListRow && notificationsAvailable) {
@@ -288,8 +289,8 @@ private const val PREWARM_DELAY_MS = 1_500L
  * first opened: its classes load and verify and its composition, text and measuring code warm
  * up then, not inside the frame the sheet opens in. One section per frame (title, tiles,
  * details, the rest), measured but never placed, so nothing is drawn, hit or read by TalkBack,
- * and it sends nothing (a neutral session, no store). It can't warm what only the open sheet
- * builds: `ModalBottomSheet`'s dialog window and its first traversal.
+ * and it sends nothing (a neutral session, no store). The session's in-window sheet reuses
+ * the existing ViewRoot rather than paying for a new dialog window on every open.
  *
  * @param enabled false while a sheet is up: the warm-up waits for the next quiet moment.
  * @param details the session's sheet details at warm-up time (only its model is read).
