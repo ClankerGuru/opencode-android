@@ -1,6 +1,7 @@
 package ai.opencode.feature.voice
 
 import ai.opencode.core.log.AppLog
+import ai.opencode.core.diagnostics.PerfTrace
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import ai.opencode.core.motion.rememberReduceMotion
@@ -31,6 +32,10 @@ import androidx.compose.ui.unit.IntSize
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.currentStateAsState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.abs
@@ -127,8 +132,8 @@ fun DotScopeView(
     val isPaused = isHidden || isCovered || !lifecycle.isAtLeast(Lifecycle.State.RESUMED)
     LaunchedEffect(scope, isPaused, reduceMotion, size, density, if (reduceMotion) mode else Unit, isDark) {
         if (size.width <= 0 || size.height <= 0) return@LaunchedEffect
-        scope.resetClock()
         if (isPaused) return@LaunchedEffect
+        scope.resetClock()
         if (reduceMotion) {
             // Still: draw only when something changes.
             configure()
@@ -136,10 +141,9 @@ fun DotScopeView(
             return@LaunchedEffect
         }
         while (true) {
-            withFrameNanos { nanos ->
-                configure()
-                if (scope.render(nowSeconds = nanos / 1e9, pixelWidth = size.width, pixelHeight = size.height, scale = density)) frame++
-            }
+            val nanos = withFrameNanos { it }
+            configure()
+            if (scope.render(nowSeconds = nanos / 1e9, pixelWidth = size.width, pixelHeight = size.height, scale = density)) frame++
         }
     }
 
@@ -183,11 +187,16 @@ object DotScopePalette {
 /**
  * Steps the scope's simulation at a fixed rate and draws the lit grid (iOS `DotScopeRenderer`).
  * A plain object: one per mounted scope, or one per call shared by the tray in the session and
- * in the drawer ([CallTrayController.scopeRenderer]). Main thread only.
+ * in the drawer ([CallTrayController.scopeRenderer]). Configuration and publication are main
+ * thread only; simulation and half-float packing run on Default. The mutex covers both, so
+ * shared surfaces never advance the same simulation or reuse its buffer concurrently.
  */
 class DotScopeRenderer private constructor() {
     private var simulation = DotScopeSimulation()
     private var lastFrame: Double? = null
+    private val frameMutex = Mutex()
+    private var clockGeneration = 0L // Main thread; snapshotted with each request.
+    private var simulatedGeneration = -1L // Worker, under frameMutex.
 
     /** Dictation's window eases to new insets as the bar's buttons come and go. */
     private var insets: ScopeVector2? = null
@@ -204,6 +213,7 @@ class DotScopeRenderer private constructor() {
     private var grid: DotScopeGrid? = null
     private var field = FloatArray(0)
     private var bitmap: Bitmap? = null
+    private var publishedBitmap: Bitmap? = null
     private var pixels: ByteBuffer? = null
 
     /** The shader brush once a frame has been drawn into it. */
@@ -212,10 +222,10 @@ class DotScopeRenderer private constructor() {
 
     /** After a pause the scope resumes where it was instead of fast-forwarding. */
     fun resetClock() {
-        lastFrame = null
+        clockGeneration++
     }
 
-    private fun prepareGrid(pixelWidth: Int, pixelHeight: Int, scale: Float): DotScopeGrid? {
+    private fun prepareGrid(pixelWidth: Int, pixelHeight: Int, scale: Float, mode: DotScopeMode): DotScopeGrid? {
         if (pixelWidth < 1 || pixelHeight < 1 || scale <= 0f) return null
         val next = DotScopeGrid(pixelWidth = pixelWidth, pixelHeight = pixelHeight, scale = scale, requestedPitch = 3.5f)
         if (next != grid) {
@@ -224,19 +234,73 @@ class DotScopeRenderer private constructor() {
             val texture = createBitmap(next.columns, next.rows, Bitmap.Config.RGBA_F16, hasAlpha = true, colorSpace = ColorSpace.get(ColorSpace.Named.EXTENDED_SRGB))
             bitmap = texture
             pixels = ByteBuffer.allocateDirect(next.columns * next.rows * 8).order(ByteOrder.nativeOrder())
-            val input = BitmapShader(texture, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP).apply { filterMode = BitmapShader.FILTER_MODE_NEAREST }
-            shader.setInputBuffer("field", input)
-            brush = null
             // The floating call's panel is not the bar the call's sounds are timed to.
             if (mode !is DotScopeMode.Panel) sounds.noteScopeWidth(next.width)
         }
         return grid
     }
 
-    /** Advances (or stills) the simulation for the frame at [nowSeconds] and uploads it. */
-    fun render(nowSeconds: Double, pixelWidth: Int, pixelHeight: Int, scale: Float): Boolean {
-        val grid = prepareGrid(pixelWidth, pixelHeight, scale) ?: return false
+    private data class FrameState(
+        val live: Float, val glow: ScopeVector2, val breath: Float,
+        val grid: Float, val presence: Float, val insets: ScopeVector2?,
+    )
+
+    /** One awaited request per display frame, not a queue of work that can outlive its view. */
+    suspend fun render(nowSeconds: Double, pixelWidth: Int, pixelHeight: Int, scale: Float): Boolean {
+        // Snapshot this surface before waiting for a shared renderer. No worker reads Compose
+        // state, a level source, the sound clock, or mutable main-thread configuration.
         val mode = mode
+        val isStill = isStill
+        val isDark = isDark
+        val generation = clockGeneration
+        val snapshot = if (isStill) VoiceAudioLevels.Snapshot(0f, 0f) else when (mode) {
+            is DotScopeMode.Dictation -> mode.level.level().let { VoiceAudioLevels.Snapshot(it, it * 0.85f) }
+            is DotScopeMode.Preview -> (if (mode.active) previewLevels(nowSeconds) else 0f to 0f)
+                .let { VoiceAudioLevels.Snapshot(it.first, it.second) }
+            else -> levels.snapshot()
+        }
+        val stageElapsed = if (isStill) null else when (mode) {
+            is DotScopeMode.Call -> sounds.stageElapsed(mode.stage)
+            is DotScopeMode.Panel -> sounds.stageElapsed(mode.stage)
+            else -> null
+        }
+        return frameMutex.withLock {
+            if (generation != clockGeneration) return@withLock false
+            val grid = prepareGrid(pixelWidth, pixelHeight, scale, mode) ?: return@withLock false
+            val state = withContext(Dispatchers.Default) {
+                PerfTrace.section("dot_scope_compute") {
+                    if (simulatedGeneration != generation) {
+                        lastFrame = null
+                        simulatedGeneration = generation
+                    }
+                    simulate(grid, nowSeconds, mode, isStill, snapshot, stageElapsed)
+                    pack(grid)
+                    val scan = simulation.scan(grid.width)
+                    FrameState(simulation.live, simulation.glow, simulation.breath, scan.grid, scan.presence, insets)
+                }
+            }
+            // Cancellation of the owning LaunchedEffect prevents publication on return from
+            // withContext. A handoff/reset also rejects an old surface's completed frame.
+            if (generation != clockGeneration) return@withLock false
+            PerfTrace.section("dot_scope_publish") {
+                pixels?.let { bitmap?.copyPixelsFromBuffer(it) }
+                if (bitmap !== publishedBitmap) {
+                    val input = BitmapShader(checkNotNull(bitmap), Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
+                        .apply { filterMode = BitmapShader.FILTER_MODE_NEAREST }
+                    shader.setInputBuffer("field", input)
+                    publishedBitmap = bitmap
+                }
+                setUniforms(grid, mode, isDark, state)
+                if (brush == null) brush = ShaderBrush(shader)
+            }
+            true
+        }
+    }
+
+    private fun simulate(
+        grid: DotScopeGrid, nowSeconds: Double, mode: DotScopeMode, isStill: Boolean,
+        snapshot: VoiceAudioLevels.Snapshot, stageElapsed: Double?,
+    ) {
         val target = when (mode) {
             is DotScopeMode.Call, is DotScopeMode.Preview -> ScopeVector2(DotScopeSimulation.windowInset, DotScopeSimulation.windowInset)
             is DotScopeMode.Panel -> ScopeVector2(0f, 0f)
@@ -254,9 +318,9 @@ class DotScopeRenderer private constructor() {
             simulation = DotScopeSimulation.still(connected)
             insets = target
             simulation.windowInsets = target
-            applyTrayMetrics(grid)
+            applyTrayMetrics(grid, mode)
         } else {
-            val rawElapsed = min(0.1, nowSeconds - (lastFrame ?: nowSeconds))
+            val rawElapsed = (nowSeconds - (lastFrame ?: nowSeconds)).coerceIn(0.0, 0.1)
             // iOS `AnimationTimeScale` is a lab hook; real time here.
             val elapsed = rawElapsed
             lastFrame = nowSeconds
@@ -266,40 +330,30 @@ class DotScopeRenderer private constructor() {
             } ?: target
             insets = eased
             simulation.windowInsets = eased
-            applyTrayMetrics(grid)
+            applyTrayMetrics(grid, mode)
             when (mode) {
                 is DotScopeMode.Call, is DotScopeMode.Panel -> {
                     val stage = if (mode is DotScopeMode.Call) mode.stage else (mode as DotScopeMode.Panel).stage
                     // Where the shared clock was when this frame's step begins.
-                    val stageElapsed = sounds.stageElapsed(stage)?.let { max(0.0, it - elapsed) }
-                    simulation.setStage(stage, stageElapsed)
-                    val snapshot = levels.snapshot()
+                    simulation.setStage(stage, stageElapsed?.let { max(0.0, it - elapsed) })
                     simulation.advance(elapsed, you = snapshot.user, agent = snapshot.assistant, connected = stage == DotScopeSimulation.Stage.live)
                 }
                 is DotScopeMode.Tray -> {
                     simulation.setStage(mode.stage)
-                    val snapshot = levels.snapshot()
                     simulation.advance(elapsed, you = snapshot.user, agent = snapshot.assistant, connected = mode.stage == DotScopeSimulation.Stage.live)
                 }
                 is DotScopeMode.Dictation -> {
-                    val level = mode.level.level()
-                    simulation.advance(elapsed, you = level, agent = level * 0.85f, connected = true)
+                    simulation.advance(elapsed, you = snapshot.user, agent = snapshot.assistant, connected = true)
                 }
                 is DotScopeMode.Preview -> {
-                    val preview = if (mode.active) previewLevels(nowSeconds) else 0f to 0f
-                    simulation.advance(elapsed, you = preview.first, agent = preview.second, connected = mode.active)
+                    simulation.advance(elapsed, you = snapshot.user, agent = snapshot.assistant, connected = mode.active)
                 }
             }
         }
         simulation.render(grid, field)
-        upload(grid)
-        setUniforms(grid)
-        if (brush == null) brush = ShaderBrush(shader)
-        return true
     }
 
-    private fun applyTrayMetrics(grid: DotScopeGrid) {
-        val mode = mode
+    private fun applyTrayMetrics(grid: DotScopeGrid, mode: DotScopeMode) {
         if (mode is DotScopeMode.Tray) {
             val w = if (mode.visibleWidth > 0) min(grid.width, mode.visibleWidth) else grid.width
             simulation.reachesLeadingEdge = true
@@ -314,9 +368,8 @@ class DotScopeRenderer private constructor() {
 
     // The texture holds raw half-float bits (`Half.toHalf` → `putShort`), read by the shader as data.
     @SuppressLint("HalfFloat")
-    private fun upload(grid: DotScopeGrid) {
+    private fun pack(grid: DotScopeGrid) {
         val buffer = pixels ?: return
-        val texture = bitmap ?: return
         buffer.clear()
         val one = Half.toHalf(1f)
         for (n in 0 until grid.count) {
@@ -327,17 +380,15 @@ class DotScopeRenderer private constructor() {
             buffer.putShort(one)
         }
         buffer.rewind()
-        texture.copyPixelsFromBuffer(buffer)
     }
 
-    private fun setUniforms(grid: DotScopeGrid) {
-        val scan = simulation.scan(grid.width)
+    private fun setUniforms(grid: DotScopeGrid, mode: DotScopeMode, isDark: Boolean, state: FrameState) {
         val palette = DotScopePalette.pearlPalette(isDark)
         val isDictation: Boolean
         val window: FloatArray
         val bar = floatArrayOf(0f, grid.width, 0f, 0f)
         val shape = floatArrayOf(grid.height / 2, 0f, 0f, 0f)
-        when (val mode = mode) {
+        when (mode) {
             is DotScopeMode.Call, is DotScopeMode.Preview -> {
                 isDictation = false
                 window = floatArrayOf(DotScopeSimulation.windowInset, DotScopeSimulation.windowFade, 0f, 0f)
@@ -348,7 +399,7 @@ class DotScopeRenderer private constructor() {
             }
             is DotScopeMode.Tray -> {
                 isDictation = false
-                val eased = insets ?: ScopeVector2(mode.leadingInset, mode.trailingInset)
+                val eased = state.insets ?: ScopeVector2(mode.leadingInset, mode.trailingInset)
                 val w = if (mode.visibleWidth > 0) min(grid.width, mode.visibleWidth) else grid.width
                 val leftFade = max(6f, mode.fade)
                 window = floatArrayOf(eased.x, mode.fade, eased.y, 0f)
@@ -359,16 +410,16 @@ class DotScopeRenderer private constructor() {
             }
             is DotScopeMode.Dictation -> {
                 isDictation = true
-                val eased = insets ?: ScopeVector2(mode.leadingInset, mode.trailingInset)
+                val eased = state.insets ?: ScopeVector2(mode.leadingInset, mode.trailingInset)
                 window = floatArrayOf(eased.x, 24f, eased.y, 0f)
             }
         }
-        val glow = simulation.glow
+        val glow = state.glow
         shader.setFloatUniform("grid", grid.pitch, grid.columns.toFloat(), grid.rows.toFloat(), grid.scale)
         shader.setFloatUniform("origin", grid.originX, grid.originY, grid.width, grid.height)
-        shader.setFloatUniform("state", simulation.live, if (isDark) 1f else 0f, scan.grid, scan.presence)
+        shader.setFloatUniform("state", state.live, if (isDark) 1f else 0f, state.grid, state.presence)
         shader.setFloatUniform("window", window)
-        shader.setFloatUniform("glow", glow.x, glow.y, simulation.breath, simulation.live)
+        shader.setFloatUniform("glow", glow.x, glow.y, state.breath, state.live)
         shader.setFloatUniform("you", palette.you)
         shader.setFloatUniform("youCore", palette.youCore)
         shader.setFloatUniform("agent", if (isDictation) palette.you else palette.agent)

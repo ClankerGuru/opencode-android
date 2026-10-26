@@ -110,6 +110,7 @@ class DotScopeSimulation {
     private val beamSpeeds = arrayOf(FloatArray(0), FloatArray(0))
     private var instant = FloatArray(0); private var core = FloatArray(0)
     private var head = FloatArray(0); private var tail = FloatArray(0); private var lit = FloatArray(0)
+    private var rasterDistances = FloatArray(0); private var rasterNearest = IntArray(0)
     private var beamGrid: DotScopeGrid? = null
     private var primed = false
     private var steps = 0
@@ -288,6 +289,7 @@ class DotScopeSimulation {
         if (!primed || ys[0].size != samples) {
             for (k in 0..1) { ys[k] = FloatArray(samples); brightness[k] = FloatArray(samples); previousYs[k] = FloatArray(samples); beamSpeeds[k] = FloatArray(samples) }
             instant = FloatArray(grid.count * 2); core = FloatArray(grid.count * 2); head = FloatArray(grid.count * 2); tail = FloatArray(grid.count * 2); lit = FloatArray(grid.count * 4)
+            rasterDistances = FloatArray(grid.rows); rasterNearest = IntArray(grid.rows)
         }
         val scan = scan(grid.width); buildTraces(grid, scan, samples)
         val hb = beamEvery * stepDuration.toFloat()
@@ -319,20 +321,31 @@ class DotScopeSimulation {
     }
     private fun raster(grid: DotScopeGrid, samples: Int, coreLimit: Float) {
         val dx = 1f / subsamples
-        for (k in 0..1) for (i in 0 until grid.columns) {
-            val s0 = max(0, (i - 3) * subsamples); val s1 = min(samples - 1, (i + 3) * subsamples)
-            for (j in 0 until grid.rows) {
-                var best = 1e9f; var nearest = i * subsamples
+        val distances = rasterDistances; val nearest = rasterNearest
+        for (k in 0..1) {
+            val ys = ys[k]; val brightness = brightness[k]
+            for (i in 0 until grid.columns) {
+                val s0 = max(0, (i - 3) * subsamples); val s1 = min(samples - 1, (i + 3) * subsamples)
+                distances.fill(1e9f); nearest.fill(i * subsamples)
+                // A segment's geometry is identical for every row in this column. Visit
+                // segments in the same order (including ties), but compute it just once.
                 for (s in s0 until s1) {
-                    val ay = ys[k][s]; val dy = ys[k][s + 1] - ay
-                    val px = i - s * dx; val py = j - ay
-                    val t = ((px * dx + py * dy) / (dx * dx + dy * dy)).coerceIn(0f, 1f)
-                    val ex = px - t * dx; val ey = py - t * dy; val d2 = ex * ex + ey * ey
-                    if (d2 < best) { best = d2; nearest = s }
+                    val ay = ys[s]; val dy = ys[s + 1] - ay
+                    val px = i - s * dx; val projectionX = px * dx
+                    val lengthSquared = dx * dx + dy * dy
+                    for (j in 0 until grid.rows) {
+                        val py = j - ay
+                        val t = ((projectionX + py * dy) / lengthSquared).coerceIn(0f, 1f)
+                        val ex = px - t * dx; val ey = py - t * dy; val d2 = ex * ex + ey * ey
+                        if (d2 < distances[j]) { distances[j] = d2; nearest[j] = s }
+                    }
                 }
-                val m = (j * grid.columns + i) * 2 + k; val onBeam = exp(-best / 0.25f)
-                instant[m] = min(1.2f, onBeam + 0.5f * exp(-sqrt(best) / 0.8f)) * brightness[k][nearest]
-                core[m] = min(coreLimit, onBeam * brightness[k][nearest])
+                for (j in 0 until grid.rows) {
+                    val best = distances[j]; val bright = brightness[nearest[j]]
+                    val m = (j * grid.columns + i) * 2 + k; val onBeam = exp(-best / 0.25f)
+                    instant[m] = min(1.2f, onBeam + 0.5f * exp(-sqrt(best) / 0.8f)) * bright
+                    core[m] = min(coreLimit, onBeam * bright)
+                }
             }
         }
     }
