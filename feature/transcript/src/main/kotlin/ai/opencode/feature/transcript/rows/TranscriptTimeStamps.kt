@@ -5,6 +5,7 @@ import ai.opencode.server.model.OpenCodeTranscriptItem
 import android.icu.text.DateFormat
 import android.icu.text.DisplayContext
 import android.icu.text.RelativeDateTimeFormatter
+import android.icu.text.SimpleDateFormat
 import android.icu.util.TimeZone
 import android.icu.util.ULocale
 import java.time.Instant
@@ -234,7 +235,11 @@ object TranscriptTimeStamps {
             false -> "hm"
             null -> "jm"
         }
-        val clock = format(skeleton, zone, locale, DisplayContext.CAPITALIZATION_FOR_STANDALONE).format(Date.from(time))
+        val clockFormat = format(skeleton, zone, locale, DisplayContext.CAPITALIZATION_FOR_STANDALONE)
+        // iOS `.shortened` writes the hour at its default digits (“8:24”, never “08:24”), where
+        // ICU's best pattern for some locales pads it (de: “HH:mm”).
+        (clockFormat as? SimpleDateFormat)?.let { it.applyPattern(it.toPattern().replace("HH", "H").replace("hh", "h")) }
+        val clock = clockFormat.format(Date.from(time))
         if (!showsDay) return clock
         return "${day(time, now, zone, locale)}\t$clock"
     }

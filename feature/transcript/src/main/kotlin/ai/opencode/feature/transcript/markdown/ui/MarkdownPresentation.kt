@@ -3,6 +3,7 @@ package ai.opencode.feature.transcript.markdown.ui
 import ai.opencode.core.ui.OpenCodeColors
 import ai.opencode.core.ui.OpenCodeFonts
 import ai.opencode.core.ui.OpenCodeIcon
+import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.feature.media.SiteIcon
 import ai.opencode.feature.transcript.SessionLinkTarget
@@ -369,6 +370,8 @@ object MarkdownPresentation {
             },
             fontStyle = if (run.emphasized) FontStyle.Italic else null,
             fontFamily = if (run.code) OpenCodeFonts.monospace else null,
+            // iOS parses inline code as `.subheadline` monospaced; in a heading it takes the heading's size.
+            fontSize = if (run.code && heading == null) OpenCodeTextStyles.subheadline.fontSize else TextUnit.Unspecified,
             background = if (run.code) colors.inlineCodeFill else Color.Unspecified,
             textDecoration = if (run.strikethrough) TextDecoration.LineThrough else null,
         )

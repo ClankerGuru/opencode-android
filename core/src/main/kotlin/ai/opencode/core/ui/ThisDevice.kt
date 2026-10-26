@@ -8,7 +8,8 @@ import android.content.res.Resources
  * phone/tablet; a tablet is a smallest width of at least 600 dp, Android's tablet breakpoint.
  */
 object ThisDevice {
-    val isTablet: Boolean get() = Resources.getSystem().configuration.smallestScreenWidthDp >= 600
+    // `getSystem()` is null only off-device (JVM unit tests stub the framework); that reads as a phone.
+    val isTablet: Boolean get() = (Resources.getSystem()?.configuration?.smallestScreenWidthDp ?: 0) >= 600
 
     /** “this phone”, “this tablet” (iOS “this iPhone”, “this iPad”). */
     val name: String get() = if (isTablet) "tablet" else "phone"

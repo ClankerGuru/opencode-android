@@ -13,6 +13,9 @@ package ai.opencode.feature.transcript.markdown
  * - inline links and images `[text](dest "title")` with balanced parentheses and `<dest>`;
  *   images keep only their alt text (no block, so nothing to draw);
  * - autolinks `<https://…>` and `<name@host>`;
+ * - GFM extended autolinks (cmark-gfm's autolink extension, which Foundation enables): bare
+ *   `http://`, `https://` and `ftp://` URLs and `www.` addresses, outside link text, with the
+ *   extension's domain check and trailing-punctuation trim (bare email addresses aren't linked);
  * - nothing else: no block syntax, no reference links, raw HTML stays text (as Foundation
  *   keeps it), whitespace and newlines are preserved as written.
  *
@@ -28,7 +31,7 @@ object InlineMarkdownParser {
     /** Plain prose (no character that can start inline syntax) parses to itself. */
     private fun mayHaveMarkup(text: String): Boolean {
         for (c in text) if (isSpecial(c)) return true
-        return false
+        return text.contains("://") || text.contains("www.")
     }
 
     private fun isSpecial(c: Char): Boolean = when (c) {
@@ -133,9 +136,17 @@ object InlineMarkdownParser {
                         pos++
                     }
                     '&' -> entity()
+                    ':' -> if (!urlAutolink()) {
+                        buffer.append(':')
+                        pos++
+                    }
+                    'w' -> if (!wwwAutolink()) {
+                        buffer.append('w')
+                        pos++
+                    }
                     else -> {
                         var end = pos + 1
-                        while (end < n && !isSpecial(s[end])) end++
+                        while (end < n && !isSpecial(s[end]) && s[end] != ':' && s[end] != 'w') end++
                         buffer.append(s, pos, end)
                         pos = end
                     }
@@ -496,6 +507,122 @@ object InlineMarkdownParser {
             return true
         }
 
+        // MARK: Extended autolinks (cmark-gfm extensions/autolink.c)
+
+        /** `url_match` at the `:` of `scheme://`: the scheme's letters are the buffer's tail. */
+        fun urlAutolink(): Boolean {
+            if (brackets != null || n - pos < 4 || s[pos + 1] != '/' || s[pos + 2] != '/') return false
+            var rewind = 0
+            while (rewind < pos && isAsciiLetter(s[pos - rewind - 1])) rewind++
+            val start = pos - rewind
+            val scheme = s.substring(start, pos)
+            if (!buffer.endsWith(scheme)) return false
+            // `sd_autolink_issafe`: a known scheme, then an alphanumeric.
+            if (scheme.lowercase() !in safeSchemes || pos + 3 >= n || !isAsciiAlnum(s[pos + 3])) return false
+            val domain = checkDomain(pos + 3, allowShort = true)
+            if (domain == 0) return false
+            val end = autolinkDelimiter(pos, linkEnd(pos + 3 + domain))
+            if (end <= pos) return false
+            buffer.setLength(buffer.length - rewind)
+            appendAutolink(s.substring(start, end), s.substring(start, end))
+            pos = end
+            return true
+        }
+
+        /** `www_match`: `www.` at the start, after whitespace, or after `*`, `_`, `~` or `(`. */
+        fun wwwAutolink(): Boolean {
+            if (brackets != null || !s.startsWith("www.", pos)) return false
+            if (pos > 0 && s[pos - 1] !in "*_~(" && !isAsciiSpace(s[pos - 1])) return false
+            val domain = checkDomain(pos, allowShort = false)
+            if (domain == 0) return false
+            val end = autolinkDelimiter(pos, linkEnd(pos + domain))
+            if (end <= pos) return false
+            val text = s.substring(pos, end)
+            appendAutolink(text, "http://$text")
+            pos = end
+            return true
+        }
+
+        fun appendAutolink(text: String, url: String) {
+            flush()
+            val link = Node(LINK)
+            link.url = urlString(url)
+            link.append(Node(TEXT, text))
+            root.append(link)
+        }
+
+        /** `check_domain`: the domain's length, or 0 when an underscore sits in its last two labels (or, unless [allowShort], it has no dot). */
+        fun checkDomain(start: Int, allowShort: Boolean): Int {
+            val size = n - start
+            var np = 0
+            var underscore1 = 0
+            var underscore2 = 0
+            var i = 1
+            while (i < size - 1) {
+                if (s[start + i] == '\\' && i < size - 2) i++
+                val c = s[start + i]
+                if (c == '_') {
+                    underscore2++
+                } else if (c == '.') {
+                    underscore1 = underscore2
+                    underscore2 = 0
+                    np++
+                } else if (!isHostChar(start + i) && c != '-') {
+                    break
+                }
+                i++
+            }
+            if (underscore1 > 0 || underscore2 > 0) return 0
+            return if (allowShort || np > 0) i else 0
+        }
+
+        /** Up to the next whitespace or `<`. */
+        fun linkEnd(from: Int): Int {
+            var end = from
+            while (end < n && !isAsciiSpace(s[end]) && s[end] != '<') end++
+            return end
+        }
+
+        /** `autolink_delim`: trims trailing punctuation, unbalanced `)` and a trailing entity from `[base, end)`; returns the new end. */
+        fun autolinkDelimiter(base: Int, end: Int): Int {
+            var linkEnd = end
+            var opening = 0
+            var closing = 0
+            for (i in base until linkEnd) {
+                when (s[i]) {
+                    '<' -> {
+                        linkEnd = i
+                        break
+                    }
+                    '(' -> opening++
+                    ')' -> closing++
+                }
+            }
+            while (linkEnd > base) {
+                when (s[linkEnd - 1]) {
+                    ')' -> {
+                        if (closing <= opening) return linkEnd
+                        closing--
+                        linkEnd--
+                    }
+                    '?', '!', '.', ',', ':', '*', '_', '~', '\'', '"' -> linkEnd--
+                    ';' -> {
+                        var newEnd = linkEnd - 2
+                        while (newEnd > base && isAsciiLetter(s[newEnd])) newEnd--
+                        linkEnd = if (newEnd < linkEnd - 2 && s[newEnd] == '&') newEnd else linkEnd - 1
+                    }
+                    else -> return linkEnd
+                }
+            }
+            return linkEnd
+        }
+
+        /** `is_valid_hostchar`: neither whitespace nor punctuation. */
+        fun isHostChar(index: Int): Boolean {
+            val cp = s.codePointAt(index)
+            return !isUnicodeWhitespace(cp) && !isUnicodePunctuation(cp)
+        }
+
         // MARK: Flattening
 
         data class Style(
@@ -523,6 +650,15 @@ object InlineMarkdownParser {
     }
 
     // MARK: Character classes
+
+    private val safeSchemes = setOf("http", "https", "ftp")
+
+    private fun isAsciiLetter(c: Char): Boolean = c in 'a'..'z' || c in 'A'..'Z'
+
+    private fun isAsciiAlnum(c: Char): Boolean = isAsciiLetter(c) || c in '0'..'9'
+
+    /** `cmark_isspace`. */
+    private fun isAsciiSpace(c: Char): Boolean = c == ' ' || c in '\t'..'\r'
 
     private fun isAsciiPunctuation(c: Char): Boolean =
         c in '!'..'/' || c in ':'..'@' || c in '['..'`' || c in '{'..'~'
