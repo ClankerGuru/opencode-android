@@ -79,7 +79,8 @@ left to that module's port ("skipped"); "dropped" tests can't exist on Android.
 | `HomeChildFeatureTests.swift` | `HomeChildFeatureTests.kt` | 2 (`HomeSettingsFeature`) | `HomeNotificationsFeature` and other Home children (`:feature:drawer`) | – |
 | `ServerSwitchingTests.swift` | `servers/ServerSwitchingTests.kt` | 5 (`ServerTitleFeature` alone) | `AppFeature` tests (`:app`), header tests (`:server`) | – |
 | `ServerTitleRecoveryTests.swift` | `servers/ServerTitleRecoveryTests.kt` | 2 (`ServerTitleFeature` alone) | `AppFeature` tests (`:app`) | – |
+| `AppFeatureTests.swift` | `AppFeatureTests.kt` | 1 (`appVersionPrefersOpenCodeVersion`: the label; Android reads the package version, no Info.plist key) | the rest (`:app`, `:server`) | – |
 
 Production bugs the ported tests found: none (every ported test passed against the existing port).
 
-Total: 96 settings tests, all passing.
+Total: 97 settings tests, all passing.

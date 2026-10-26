@@ -71,12 +71,13 @@ iOS `OpenCodeTests` files that test `:feature:system` code, ported into `feature
 | `ShareComposerTests.swift` | `share/ShareComposerTests.kt` | 23 | `ShareComposerAppTests` (7, `:feature:drawer`); `sharesJoiningOneComposerSendOnlyWhenAllAskTo` (`SharedComposerDraft`, `:feature:composer`); `PromptOutbox.newSessionID` half of `newIDsHaveTheServersShape` (`:feature:composer`) | `removingAServerForgetsItsCredentialsOnly` (`ShareInboxClient.live` needs an Android `Context`), `keychainItemRoundTripsUpdatesAndRemoves` (Keystore-backed `SharedKey.keychain`), `extensionTransportSecurityMatchesTheApp` (ATS / `NSExtension` plist; the share target runs in-process) |
 | `ShareHandoffTests.swift` | `share/ShareHandoffTests.kt` | 4 | `ShareInboxFeatureTests` (7, `:feature:drawer`) | `SharedImageEncoderTests` (2: Android `ImageDecoder`/`Bitmap`, no Robolectric); 4 of 5 `SharedItemLoaderAndActivationTests` (`NSExtensionActivationRule`, `NSItemProvider` representation order, sparse/FIFO files, cancellation, precedence); the JSON share names of the fifth are ported via `resolvedFileName` |
 | `SystemIntegrationTests.swift` | `SystemIntegrationTests.kt` | 31 | `SystemRoutingTests` (16, Home/`AppFeature`), `SystemColdLaunchTests` (6), `SystemVoiceAvailabilityTests` (2), `SystemCallTests` (2) (`:feature:drawer`/`:app`); Home's `systemDirectoryEntry` tests (2) | `spotlightIndexesOnlyTitlesAndProjects` (AppSearch `GenericDocument` is an Android runtime class) |
+| `AppIconBadgeTests.swift` | `notifications/AppIconBadgeTests.kt` | 5 (ledger pushes and storage, refs) | Home publishing (9, `:feature:drawer`); identity forgetting (4, `:app`) | `BadgeAuthorization` (3: Android has no separate badge authorization), `withoutAnAppGroup…` (no App Group) |
+| `MultipleWindowsTests.swift` | – | 0 | rest (`:app`, `:server`) | `windowTargetRoundTripsThroughItsActivity` (the target rides an `Intent`/`Bundle`, framework classes) |
 
 Notes: the handoff JSON test decodes this port's own format (Android writes and reads its own handoff files); `promptBodyMatchesTheApps`
 compares with the JSON `:server`'s internal `promptBody` writes; the app's `controlIntentsPostTheirChoice` reads `ControlIntents.perform`
-(what `SystemActionActivity` posts); the publisher runs on virtual time. `AppIconBadgeTests.swift` (the lead's) has pure
-`:feature:system` suites (`AppBadgeLedger` pushes and storage, `SessionNotifications.Saved` refs) besides its Home/App tests.
+(what `SystemActionActivity` posts); the publisher runs on virtual time. `AppIconBadgeTests.swift`'s `:feature:system` suites were ported by the lead.
 
 Production bugs the ported tests found: none.
 
-Total: 58 `:feature:system` tests, all passing.
+Total: 63 `:feature:system` tests, all passing.
