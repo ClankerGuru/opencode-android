@@ -60,9 +60,8 @@ import kotlin.time.Duration.Companion.milliseconds
  * :feature:drawer); `contextDecodingMatchesTheTUI`, `sheetRoutesMatchTheV2Contract`,
  * `alwaysNotifyMergesIntoTheSessionsMetadataAndDecodes`, `modelCatalogCarriesTheContextWindow`
  * (`OpenCodeClient` wire decoding, ported in :server's `SessionSheetWireTests`).
- * `contextFractionUsesTheReplyModelsWindow` skips the compact `"32% of 400K"` line:
- * `SessionContextText` formats with `android.icu.text.CompactDecimalFormat`, which needs the
- * Android runtime (no Robolectric here); the token-count line is checked.
+ * `contextFractionUsesTheReplyModelsWindow`'s compact `"32% of 400K"` line runs under Robolectric in
+ * [SessionSheetFrameworkTests] (`SessionContextText` formats with `android.icu`).
  */
 class SessionSheetTests {
     private val server = OpenCodeServer(url = "http://localhost:9", username = "", password = "")
@@ -836,3 +835,16 @@ class SessionSheetTests {
 private inline fun <reified T : SessionSheetFeature.Action> SessionSheetActionMatcher(
     crossinline where: (T) -> Boolean = { true },
 ): (Action) -> Boolean = { action -> ((action as? Action.SessionSheet)?.action as? T)?.let(where) == true }
+
+/**
+ * The `android.icu` line of iOS `contextFractionUsesTheReplyModelsWindow`: `SessionContextText`
+ * compacts the window with `CompactDecimalFormat`, which needs Android's ICU (Robolectric).
+ */
+@org.junit.runner.RunWith(org.robolectric.RobolectricTestRunner::class)
+@org.robolectric.annotation.Config(sdk = [35])
+class SessionSheetFrameworkTests {
+    @Test fun contextFractionUsesTheReplyModelsWindow() {
+        assertEquals("32% of 400K", SessionContextText.summary(tokens = 128_000, limit = 400_000, locale = java.util.Locale.US))
+        assertEquals("53,200 tokens", SessionContextText.summary(tokens = 53_200, limit = null, locale = java.util.Locale.US))
+    }
+}
