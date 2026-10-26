@@ -353,13 +353,15 @@ object SessionTranscriptView {
                 visibleItems.isNotEmpty()
             ) {
                 val lastIdx = items.size - 1
-                if (prev.items[lastIdx] != items[lastIdx] &&
+                if (prev.items[lastIdx] is OpenCodeTranscriptItem.AssistantMarkdown &&
+                    items[lastIdx] is OpenCodeTranscriptItem.AssistantMarkdown &&
+                    prev.items[lastIdx] != items[lastIdx] &&
                     prev.items[lastIdx].id == items[lastIdx].id &&
                     visibleItems.last().id == items[lastIdx].id &&
-                    prev.items.subList(0, lastIdx) == items.subList(0, lastIdx)
+                    prev.items.hasSamePrefixBeforeLast(items)
                 ) {
                     windowInputs = inputs
-                    visibleItems = visibleItems.dropLast(1) + items[lastIdx]
+                    visibleItems = visibleItems.replacingLast(items[lastIdx])
                     return visibleItems
                 }
             }
@@ -394,6 +396,7 @@ object SessionTranscriptView {
                 prevStructural.showsWorking == showsWorking &&
                 prevStructural.failedFinale == failedFinale &&
                 prevStructural.models == models &&
+                prevStructural.sinceYouLeft == sinceYouLeft &&
                 prevStamp.sentNow == sentNow &&
                 prevStamp.nowSecond == nowSecond &&
                 prevStamp.zoneID == zone.id &&
@@ -418,17 +421,17 @@ object SessionTranscriptView {
                     TranscriptEntry.promptID(allItems[aLast]) == null &&
                     structuralLast?.id == newItem.id &&
                     entryLast?.id == newItem.id &&
-                    visibleItems.subList(0, vLast) == prevStructural.visibleItems.subList(0, vLast) &&
-                    (visibleItems.size == allItems.size || allItems.subList(0, aLast) == prevStructural.allItems.subList(0, aLast))
+                    visibleItems.hasSamePrefixBeforeLast(prevStructural.visibleItems) &&
+                    (visibleItems.size == allItems.size || allItems.hasSamePrefixBeforeLast(prevStructural.allItems))
                 ) {
                     if (visibleItems[vLast] != prevStructural.visibleItems[vLast]) {
                         val updatedEntry = TranscriptEntry.Single(visibleItems[vLast])
                         structuralInputs = prevStructural.copy(visibleItems = visibleItems, allItems = allItems)
-                        structuralEntries = structuralEntries.dropLast(1) + updatedEntry
+                        structuralEntries = structuralEntries.replacingLast(updatedEntry)
                         structuralGeneration += 1
                         stampInputs = prevStamp.copy(allItems = allItems)
                         finalInputs = prevFinal.copy(structuralGeneration = structuralGeneration)
-                        entries = entries.dropLast(1) + updatedEntry
+                        entries = entries.replacingLast(updatedEntry)
                     }
                     return entries to newMessages
                 }

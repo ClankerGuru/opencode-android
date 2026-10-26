@@ -648,11 +648,49 @@ internal fun Throwable.asClientError(): ai.opencode.server.OpenCodeClientError =
 // region Live projection
 
 /**
- * The rows a run of live events writes, copied out of [SessionFeature.State] once and written back
- * once ([applied]), so a batch of deltas doesn't copy the whole state per event.
+ * A same-size tail edit over an immutable snapshot. Flatten replacements so a long stream
+ * retains neither intermediate tails nor a chain of wrappers. Never wrap a list still being edited.
+ */
+private class LastReplacedList<T>(source: List<T>, private val last: T) : AbstractList<T>(), java.util.RandomAccess {
+    val prefix: List<T> = if (source is LastReplacedList<T>) source.prefix else source
+    override val size: Int = source.size
+
+    override fun get(index: Int): T {
+        if (index < 0 || index >= size) throw IndexOutOfBoundsException("index: $index, size: $size")
+        return if (index == size - 1) last else prefix[index]
+    }
+
+    override fun equals(other: Any?): Boolean = when {
+        this === other -> true
+        other is LastReplacedList<*> && size == other.size && prefix === other.prefix -> last == other.last
+        prefix === other -> last == prefix.last()
+        else -> super.equals(other)
+    }
+
+    override fun hashCode(): Int = super.hashCode()
+}
+
+internal fun <T> List<T>.replacingLast(item: T): List<T> {
+    require(isNotEmpty())
+    return LastReplacedList(this, item)
+}
+
+/** Shared prefixes prove the streaming fast path without scanning historical rows. */
+internal fun List<*>.hasSamePrefixBeforeLast(other: List<*>): Boolean {
+    if (size != other.size || isEmpty()) return false
+    val prefix = if (this is LastReplacedList<*>) this.prefix else this
+    val otherPrefix = if (other is LastReplacedList<*>) other.prefix else other
+    return prefix === otherPrefix || subList(0, lastIndex) == other.subList(0, other.lastIndex)
+}
+
+/**
+ * Last-text edits share the immutable history; structural edits lazily copy it once per batch.
+ * [applied] snapshots that mutable fallback before handing it back to state.
  */
 internal class LiveProjection(state: SessionFeature.State) {
-    val items: MutableList<OpenCodeTranscriptItem> = ArrayList(state.items)
+    private var sharedItems = state.items
+    private var editedItems: MutableList<OpenCodeTranscriptItem>? = null
+    val items: List<OpenCodeTranscriptItem> get() = editedItems ?: sharedItems
     val liveText: MutableMap<String, String> = LinkedHashMap(state.liveText)
     val gappedLiveText: MutableSet<String> = HashSet(state.gappedLiveText)
     private val shellToolStatuses = HashMap(state.shellToolStatuses)
@@ -661,6 +699,16 @@ internal class LiveProjection(state: SessionFeature.State) {
     private var subagentsChanged = false
     /** A live event replaced or inserted a row. */
     var itemsChanged = false
+
+    fun mutableItems(): MutableList<OpenCodeTranscriptItem> =
+        editedItems ?: ArrayList(sharedItems).also { editedItems = it }
+
+    fun replaceLastText(item: OpenCodeTranscriptItem.AssistantMarkdown) {
+        val edited = editedItems
+        if (edited != null) edited[edited.lastIndex] = item
+        else sharedItems = sharedItems.replacingLast(item)
+        itemsChanged = true
+    }
 
     fun noteShell(shellID: String, status: OpenCodeToolCall.Status) {
         if (shellToolStatuses[shellID] != status) {
@@ -675,7 +723,7 @@ internal class LiveProjection(state: SessionFeature.State) {
 
     fun applied(state: SessionFeature.State): SessionFeature.State {
         var next = state
-        if (itemsChanged) next = next.copy(items = items.toList())
+        if (itemsChanged) next = next.copy(items = editedItems?.toList() ?: sharedItems)
         if (liveText != state.liveText) next = next.copy(liveText = liveText.toMap())
         if (gappedLiveText != state.gappedLiveText) next = next.copy(gappedLiveText = gappedLiveText.toSet())
         if (shellsChanged) next = next.copy(shellToolStatuses = shellToolStatuses.toMap())
@@ -701,12 +749,12 @@ private fun SessionFeature.applyLiveEvent(event: OpenCodeLiveContentEvent, proje
             if (id in projection.gappedLiveText) return
             val text = (projection.liveText[id] ?: "") + event.delta
             projection.liveText[id] = text
-            if (upsertLiveText(id, text, streaming = true, items = projection.items)) projection.itemsChanged = true
+            upsertLiveText(id, text, streaming = true, projection = projection)
         }
         is OpenCodeLiveContentEvent.TextEnded -> {
             val id = "${event.messageID}-text-${event.ordinal}"
             projection.gappedLiveText.remove(id)
-            if (upsertLiveText(id, event.text, items = projection.items)) projection.itemsChanged = true
+            upsertLiveText(id, event.text, projection = projection)
             projection.liveText.remove(id)
         }
         is OpenCodeLiveContentEvent.ToolInputStarted ->
@@ -750,6 +798,22 @@ private fun SessionFeature.applyLiveEvent(event: OpenCodeLiveContentEvent, proje
         is OpenCodeLiveContentEvent.StepStarted, is OpenCodeLiveContentEvent.StepStreamed, is OpenCodeLiveContentEvent.StepEnded,
         is OpenCodeLiveContentEvent.ReasoningStarted, is OpenCodeLiveContentEvent.ReasoningDelta, is OpenCodeLiveContentEvent.ReasoningEnded,
         -> Unit
+    }
+}
+
+private fun SessionFeature.upsertLiveText(
+    id: String,
+    text: String,
+    streaming: Boolean = false,
+    projection: LiveProjection,
+) {
+    val shown = if (streaming) OpenCodeMarkdownBlock.holdingPendingMarker(text) else text
+    if (shown.isBlank()) return
+    val last = projection.items.lastOrNull() as? OpenCodeTranscriptItem.AssistantMarkdown
+    if (last?.id == id) {
+        if (last.text != shown) projection.replaceLastText(last.copy(text = shown))
+    } else if (upsertLiveText(id, shown, items = projection.mutableItems())) {
+        projection.itemsChanged = true
     }
 }
 
@@ -825,11 +889,11 @@ private fun upsertLiveTool(
     val item = OpenCodeTranscriptItem.Tool(id = id, call = call)
     if (index >= 0) {
         if (items[index] != item) {
-            items[index] = item
+            projection.mutableItems()[index] = item
             projection.itemsChanged = true
         }
     } else {
-        items.add(liveInsertionIndex(messageID, items), item)
+        projection.mutableItems().add(liveInsertionIndex(messageID, items), item)
         projection.itemsChanged = true
     }
     call.metadata["shellID"]?.string?.let { projection.noteShell(it, call.status) }
