@@ -32,6 +32,18 @@ internal object SessionFeatureTestsSendingSupport {
     fun assertNull(value: Any?, message: String? = null) = org.junit.Assert.assertNull(message, value)
     fun assertNotNull(value: Any?, message: String? = null) = org.junit.Assert.assertNotNull(message, value)
 
+    /**
+     * iOS's TestStore reduces every action as it arrives, even with exhaustivity off; this one
+     * reduces them when asked. Reduces what's waiting and lets the effects it starts run up to
+     * their first suspension (e.g. a `TestClock` sleep), as iOS has by the next line.
+     */
+    suspend fun <S, A> TestStore<S, A>.flush() {
+        repeat(3) {
+            skipReceivedActions()
+            SessionTestSupport.settle()
+        }
+    }
+
     /** iOS `Task.sleep(for: .seconds(3600))` in a stub: a wait the test never sees end. */
     suspend fun hang() = delay(1.hours)
 
