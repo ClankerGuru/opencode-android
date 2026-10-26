@@ -327,6 +327,8 @@ fun BackgroundWorkGlyph(
     waiting: Set<String>,
     probe: ShellGlyphProbe?,
     modifier: Modifier = Modifier,
+    /** Held still (the panel covers the capsule). */
+    isPaused: Boolean = false,
 ) {
     val reduceMotion = rememberReduceMotion()
     // Swapped in place as subagents come and go, like the words beside it. The disc's dot field
@@ -336,6 +338,7 @@ fun BackgroundWorkGlyph(
             AgentActivityGlyph(
                 source = AgentActivitySource.summary(agents, emptyList(), waiting),
                 modifier = if (reduceMotion) Modifier else Modifier.blurringWith(this),
+                isPaused = isPaused,
             )
         }
         AnimatedVisibility(shells.isNotEmpty(), enter = fadeIn(Motion.reducedFadeSpec()), exit = fadeOut(Motion.reducedFadeSpec())) {
@@ -345,6 +348,7 @@ fun BackgroundWorkGlyph(
                 modifier = if (reduceMotion) Modifier else Modifier.blurringWith(this),
                 key = "capsule|" + ids.joinToString(","),
                 probe = probe,
+                isPaused = isPaused,
             )
         }
     }
@@ -791,8 +795,10 @@ fun BackgroundWorkPresentation(
                 .background(surfaceColor)
                 .then(if (hidden) Modifier.clearAndSetSemantics { } else Modifier),
         ) {
-            // The capsule's label, a button while the surface is at rest.
-            if (stage != BackgroundWorkStage.panel || progress.value < 1f) {
+            // The capsule's label, a button while the surface is at rest. Kept composed under the open
+            // panel (held still), so closing never composes it in the fold's first frame.
+            val labelShown = stage != BackgroundWorkStage.panel || progress.value < 1f
+            run {
                 Box(
                     Modifier
                         .fillMaxSize()
@@ -818,20 +824,27 @@ fun BackgroundWorkPresentation(
                 ) {
                     BackgroundWorkCapsuleLabel(rowAgents.size, rowShells.size, Modifier.clearAndSetSemantics { }) {
                         CompositionLocalProvider(LocalGlyphStepTrace provides if (GlassMorphTrace.isEnabled) "capsule" else null) {
-                            BackgroundWorkGlyph(rowAgents, rowShells, waitingSessionIDs, probe)
+                            BackgroundWorkGlyph(rowAgents, rowShells, waitingSessionIDs, probe, isPaused = !labelShown)
                         }
                     }
                 }
             }
             // The rows run from the morph's first frame, both ways: only accessibility waits for the panel to land.
-            if (stage != BackgroundWorkStage.closed || progress.value > 0f) {
+            // Kept composed (held still, out of sight and touch) while the capsule rests, so opening
+            // never composes the rows in the morph's first frame: that cost 30–40 ms on the main
+            // thread and the panel's first frames jumped.
+            val rowsOpen = stage != BackgroundWorkStage.closed || progress.value > 0f
+            run {
                 Box(
                     Modifier
                         .layout { measurable, constraints ->
                             val w = (panel.width * density.density).roundToInt()
                             val h = (panel.height * density.density).roundToInt()
                             val placeable = measurable.measure(Constraints.fixed(w, h))
-                            layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(0, 0) }
+                            layout(constraints.maxWidth, constraints.maxHeight) {
+                                // Closed, far outside the screen: it takes no touch and draws nothing.
+                                if (rowsOpen) placeable.place(0, 0) else placeable.place(-100_000, 0)
+                            }
                         }
                         .graphicsLayer {
                             alpha = progress.value
@@ -851,7 +864,7 @@ fun BackgroundWorkPresentation(
                         shells = rowShells,
                         probe = probe,
                         scrollState = scrollState,
-                        isLive = true,
+                        isLive = rowsOpen,
                         onContentHeight = ::measured,
                         onOpenSubagent = { id ->
                             if (!dragController.drag.isDragging) {
@@ -871,21 +884,8 @@ fun BackgroundWorkPresentation(
             }
         }
 
-        if (!isPanel && live != null) {
-            // Measured while the capsule shows, out of sight and touch, so opening lays the panel out at its real height at once.
-            Box(
-                Modifier
-                    .layout { measurable, _ ->
-                        val w = (panel.width * density.density).roundToInt()
-                        val placeable = measurable.measure(Constraints(minWidth = w, maxWidth = w))
-                        measured(placeable.height / density.density)
-                        layout(0, 0) { }
-                    }
-                    .clearAndSetSemantics { },
-            ) {
-                BackgroundWorkRows(rowAgents, waitingSessionIDs, rowShells, probe, isLive = false, onOpenSubagent = {}, onOpenShell = {})
-            }
-        }
+        // The rows above stay composed while the capsule rests and report their natural height
+        // (`onContentHeight`), so opening lays the panel out at its real height at once.
     }
 }
 
