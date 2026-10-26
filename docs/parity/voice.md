@@ -92,7 +92,7 @@ another module are left to that module's port ("skipped"); "dropped" tests can't
 | `RealtimeProtocolTests.swift` | `RealtimeProtocolTests.kt` | 24 | – | – |
 | `VoiceCaptionAndQualityTests.swift` | `VoiceCaptionAndQualityTests.kt` | 8 | – | `appendingWordsNeverMovesEarlierWords`, `wordsFadeInWhereTheyLie` (SwiftUI `ImageRenderer` pixel probes) |
 | `LivingOrbTests.swift` | `LivingOrbTests.kt` | 3 | `flagRestoresEveryExistingCallStyleWhenOff` (`:core`), `settingsPersistStyle…` (`:feature:settings`) | `colourAndShapePresets…` (tuning store not ported; tunables are baked) |
-| `VoiceHapticTests.swift` (+teardown, tick race, startup, hang-up engine suites) | `VoiceHapticTests.kt` | 26 | – | `patternsBecomeCorePatterns` (Core Haptics players; Android mixes one waveform), `endingACallReleasesItsHapticEngine…` (needs a real `Vibrator`) |
+| `VoiceHapticTests.swift` (+teardown, tick race, startup, hang-up engine suites) | `VoiceHapticTests.kt` | 27 (`endingACallReleasesItsHapticEngine…` on the real `VoiceHapticEngine` under Robolectric, `VoiceCallTeardownFrameworkTests`) | – | `patternsBecomeCorePatterns` (Core Haptics players; Android mixes one waveform) |
 | `DotScopeSimulationTests.swift` | `DotScopeSimulationTests.kt` | 20 | – | 5 `MTKView`/`UIHostingController` draw/pause probes |
 | `VoiceAudioAndTranscriptTests.swift` | `VoiceAudioAndTranscriptTests.kt` | 48 | – | `LiveRTCSetupTests` (no `LiveRTCLocked` counterpart) |
 | `VoiceLiveTests.swift` | `VoiceLiveTests.kt` | 83 | 8 `VoiceEnginePersistenceTests` migrations (`:app`), 3 compaction/retarget tests (`:feature:session`, drawer) | – |
@@ -125,4 +125,4 @@ exception class instead of its reason and turned cancellation into an engine err
 that failed when an interruption ended was never retried by the next route/configuration change;
 a just-finished call log was missing from `list()` while its save was still writing; End landed 2 dp left of the call button (48 dp slot kept the 6 dp padding); a reconnect or rotation replayed the connect chord; `RetryBudget.bounded` (`:server`) timed its limit on the scripted clock, so a lost send's answer was never read back.
 
-Total: 480 voice tests, all passing (`--rerun` ×3).
+Total: 481 voice tests (Gradle), all passing. Robolectric (test-only) runs only `VoiceCallTeardownFrameworkTests`.
