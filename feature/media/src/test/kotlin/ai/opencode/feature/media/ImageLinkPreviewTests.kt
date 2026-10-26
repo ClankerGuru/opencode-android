@@ -1,9 +1,13 @@
 package ai.opencode.feature.media
 
 import ai.opencode.core.testing.TestIsolationRule
+import android.graphics.Bitmap
+import android.graphics.Color
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
 import okhttp3.Protocol
@@ -12,16 +16,27 @@ import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+import java.io.ByteArrayOutputStream
 
 /**
- * Port of iOS `ImageLinkPreviewTests.swift`: the link policy and the read queue. iOS's replies
- * are Markdown (`:feature:transcript`); here they're the [LinkTextBlock]s the transcript hands
- * media. The loader tests that decode pixels aren't ported (see docs/parity/media.md).
+ * Port of iOS `ImageLinkPreviewTests.swift`: the link policy, the read queue and [ImageLinkLoader].
+ * iOS's replies are Markdown (`:feature:transcript`); here they're the [LinkTextBlock]s the
+ * transcript hands media. Runs under Robolectric: bare-URL detection reads the framework's
+ * `Patterns.WEB_URL`, and the loader decodes real PNGs (native graphics) into the pixel cache.
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35])
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ImageLinkPreviewTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -98,6 +113,98 @@ class ImageLinkPreviewTests {
         }
     }
 
+    private fun file(data: ByteArray) = AgentImageResponse.File(data, AgentImageValidators())
+
+    @Test
+    fun cachesCoalescesAndKeepsFailuresFromRefetchingOnDeltas() = runTest {
+        val image = Bitmap.createBitmap(12, 12, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.RED) }
+        val data = ByteArrayOutputStream().also { image.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
+        val reads = Locked(0)
+        val loader = ImageLinkLoader(DecodedImageCache(), fetch = { request, _ ->
+            reads.update { it + 1 }
+            assertFalse(request.allowsConstrainedNetworkAccess)
+            assertNull(request.request.header("Authorization"))
+            if (request.request.url.pathSegments.last() == "bad.png") throw AgentImageDownload.FailureException(AgentImageDownload.Failure.NotImage)
+            file(data)
+        })
+        val url = "https://example.com/shot.png"
+        val one = async { loader.load(url) }
+        val two = async { loader.load(url) }
+        assertTrue(one.await() != null && two.await() != null)
+        assertNotNull(loader.load(url))
+        assertEquals(1, reads.current)
+        val bad = "https://example.com/bad.png"
+        repeat(10) { assertNull(loader.load(bad)) }
+        assertEquals(2, reads.current)
+    }
+
+    private val imageData: ByteArray get() = LinkPreviewFixtures.iconPNG(side = 16, letter = "I")
+
+    @Test
+    fun offscreenCancellationStopsTransportAndUnblocksNextURL() = runTest {
+        val started = Channel<Unit>(Channel.UNLIMITED)
+        val cancelled = Locked(false)
+        val reads = Locked(0)
+        val image = imageData
+        val loader = ImageLinkLoader(DecodedImageCache(), fetch = { request, _ ->
+            val attempt = reads.withValue { (it + 1) to (it + 1) }
+            if (request.request.url.pathSegments.last() == "slow.png" && attempt == 1) {
+                try {
+                    started.send(Unit)
+                    delay(30_000)
+                    fail("Off-screen image transport was not cancelled")
+                } catch (error: CancellationException) {
+                    cancelled.set(true)
+                    throw error
+                }
+            }
+            file(image)
+        })
+        val slow = "https://example.com/slow.png"
+        val first = async { loader.load(slow) }
+        started.receive()
+        val next = async { loader.load("https://other.example.com/next.png") }
+        first.cancel() // Same cancellation the visibility-keyed effect receives.
+        assertNull(runCatching { first.await() }.getOrNull())
+        assertNotNull(next.await())
+        assertTrue(cancelled.current)
+        assertNotNull("Cancellation must not enter the failure cache", loader.load(slow))
+        assertEquals(3, reads.current)
+    }
+
+    @Test
+    fun cancellingOneCoalescedWaiterKeepsTheOtherAndReplaysHeader() = runTest {
+        val header = AgentImageSize(640.0, 480.0)
+        val firstHeader = Channel<AgentImageSize>(Channel.UNLIMITED)
+        val secondHeader = Channel<AgentImageSize>(Channel.UNLIMITED)
+        val release = CompletableDeferred<Unit>()
+        val cancelled = Locked(false)
+        val reads = Locked(0)
+        val image = imageData
+        val loader = ImageLinkLoader(DecodedImageCache(), fetch = { _, report ->
+            reads.update { it + 1 }
+            try {
+                report(header)
+                release.await()
+                file(image)
+            } catch (error: CancellationException) {
+                cancelled.set(true)
+                throw error
+            }
+        })
+        val url = "https://example.com/shared.png"
+        val first = async { loader.load(url, onSize = { firstHeader.trySend(it) }) }
+        assertEquals(header, firstHeader.receive())
+        val second = async { loader.load(url, onSize = { secondHeader.trySend(it) }) }
+        assertEquals(header, secondHeader.receive())
+        first.cancel()
+        assertNull(runCatching { first.await() }.getOrNull())
+        assertFalse(cancelled.current)
+        release.complete(Unit)
+        assertNotNull(second.await())
+        assertEquals(1, reads.current)
+    }
+
     @Test
     fun cancellingAQueuedReadReturnsBeforeTheActiveReadFinishes() = runTest {
         val queue = CoalescedReadQueue<Int, Int>()
@@ -127,5 +234,77 @@ class ImageLinkPreviewTests {
         }
         release.complete(Unit)
         assertEquals(1, first.await())
+    }
+
+    @Test
+    fun constrainedRefusalRetriesOnTheNextAppearance() = runTest {
+        val reads = Locked(0)
+        val image = imageData
+        val loader = ImageLinkLoader(DecodedImageCache(), fetch = { _, _ ->
+            if (reads.withValue { (it + 1) to (it + 1) } == 1) throw AgentImageDownload.FailureException(AgentImageDownload.Failure.Constrained)
+            file(image)
+        })
+        val url = "https://example.com/retry.png"
+        assertNull(loader.load(url))
+        assertNotNull(loader.load(url))
+        assertEquals(2, reads.current)
+    }
+
+    @Test
+    fun deferralWhileQueuedDoesNotCacheAFailure() = runTest {
+        val checks = Locked(0)
+        val shouldDefer = Locked(false)
+        val started = Channel<Unit>(Channel.UNLIMITED)
+        val queued = Channel<Unit>(Channel.UNLIMITED)
+        val release = CompletableDeferred<Unit>()
+        val image = imageData
+        val reads = Locked(0)
+        val loader = ImageLinkLoader(
+            DecodedImageCache(),
+            deferred = {
+                val count = checks.withValue { (it + 1) to (it + 1) }
+                // First load checks before enqueuing and before transport. Second load
+                // enters normally, but the path becomes constrained while it queues.
+                if (count == 3) {
+                    shouldDefer.set(true)
+                    queued.trySend(Unit)
+                    false
+                } else {
+                    shouldDefer.current
+                }
+            },
+            fetch = { request, _ ->
+                reads.update { it + 1 }
+                if (request.request.url.pathSegments.last() == "first.png") {
+                    started.send(Unit)
+                    release.await()
+                }
+                file(image)
+            },
+        )
+        val first = async { loader.load("https://example.com/first.png") }
+        started.receive()
+        val url = "https://example.com/queued.png"
+        val second = async { loader.load(url) }
+        queued.receive()
+        release.complete(Unit)
+        assertNotNull(first.await())
+        assertNull(second.await())
+        shouldDefer.set(false)
+        assertNotNull(loader.load(url))
+        assertEquals(2, reads.current)
+    }
+
+    @Test
+    fun downsamplesBeforePuttingLargeImagesInTheCache() = runTest {
+        val data = LinkPreviewFixtures.iconPNG(side = 3000, letter = "I")
+        val cache = DecodedImageCache()
+        val loader = ImageLinkLoader(cache, fetch = { _, _ -> file(data) })
+        val url = "https://example.com/large.png"
+        val image = loader.load(url)
+        assertNotNull(image)
+        assertTrue(image!!.width <= ImageLinkLoader.MAX_PIXEL_SIZE)
+        assertTrue(image.height <= ImageLinkLoader.MAX_PIXEL_SIZE)
+        assertTrue(cache.image(ImageLinkLoader.key(url)) === image)
     }
 }

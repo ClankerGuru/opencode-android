@@ -3,6 +3,7 @@ package ai.opencode.feature.media
 import ai.opencode.core.testing.TestIsolationRule
 import ai.opencode.server.model.AgentFileReference
 import android.graphics.Bitmap
+import android.os.Build
 import androidx.compose.ui.geometry.Rect
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -23,6 +24,10 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -34,7 +39,8 @@ import kotlin.math.min
 /**
  * Test images for the previews: real PNG headers (signature and `IHDR`, so the shape reads from
  * the first bytes as on a device) standing for files whose pixels decode to [AgentImageFixtures.bitmap]
- * (one stub `Bitmap` per file: JVM tests can't decode, and the previews compare images by identity).
+ * (one `Bitmap` per file, as the previews compare images by identity): a real one of the header's
+ * size under Robolectric, where the pixel cache weighs it, else a stub.
  */
 internal object AgentImageFixtures {
     fun png(width: Int, height: Int, tag: Int = 0): ByteArray {
@@ -49,7 +55,16 @@ internal object AgentImageFixtures {
     private val bitmaps = HashMap<String, Bitmap>()
 
     /** The decoded image of [data]: the same instance for the same bytes. */
-    fun bitmap(data: ByteArray): Bitmap = synchronized(bitmaps) { bitmaps.getOrPut(data.contentToString()) { stubBitmap() } }
+    fun bitmap(data: ByteArray): Bitmap = synchronized(bitmaps) {
+        bitmaps.getOrPut(data.contentToString()) {
+            val size = AgentImageHeader.pngSize(data)
+            if (Build.FINGERPRINT == "robolectric" && size != null) {
+                Bitmap.createBitmap(size.width.toInt(), size.height.toInt(), Bitmap.Config.ARGB_8888)
+            } else {
+                stubBitmap()
+            }
+        }
+    }
 
     val decoder: AgentImageDecoder = { bitmap(it) }
 }
@@ -65,20 +80,9 @@ private suspend fun settle(condition: () -> Boolean = { false }) {
 
 private fun request(path: String) = AgentImageRequest(Request.Builder().url("http://lab/api/fs/read/$path").build())
 
-/** Port of iOS `AgentImagePreviewTests` (`AgentImagePreviewTests.swift`). */
+/** Port of iOS `AgentImagePreviewTests` (`AgentImagePreviewTests.swift`); `aJPEGsShapeTurnsWithItsOrientation` decodes a real JPEG in [AgentImagePreviewFrameworkTests]. */
 class AgentImagePreviewTests {
     @get:Rule val isolation = TestIsolationRule()
-
-    private fun jpeg(width: Int, height: Int): ByteArray {
-        // SOI, an APP0 of 16 bytes, then SOF0.
-        val app0 = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE0.toByte(), 0x00, 0x10) + ByteArray(14)
-        val sof = byteArrayOf(
-            0xFF.toByte(), 0xC0.toByte(), 0x00, 0x11, 0x08,
-            (height ushr 8).toByte(), height.toByte(), (width ushr 8).toByte(), width.toByte(),
-            0x03, 0x01, 0x22, 0x00,
-        )
-        return app0 + sof
-    }
 
     @Test
     fun aPNGsShapeIsKnownFromItsFirstBytes() {
@@ -86,17 +90,6 @@ class AgentImagePreviewTests {
         assertEquals(AgentImageSize(640.0, 360.0), AgentImageHeader.size(data.copyOf(minOf(64, data.size))))
         assertNull("the header isn't there yet", AgentImageHeader.size(data.copyOf(12)))
         assertEquals(AgentImageSize(640.0, 360.0), AgentImageHeader.pngSize(data))
-    }
-
-    /**
-     * iOS also reads an EXIF-rotated JPEG as a quarter turn; Android applies EXIF through the
-     * platform decoder's bounds pass (`ExifInterface`), which JVM tests don't have.
-     */
-    @Test
-    fun aJPEGsShapeTurnsWithItsOrientation() {
-        val upright = jpeg(400, 300)
-        assertEquals(AgentImageSize(400.0, 300.0), AgentImageHeader.size(upright))
-        assertEquals(AgentImageSize(400.0, 300.0), AgentImageHeader.jpegSize(upright))
     }
 
     @Test
@@ -259,8 +252,12 @@ internal fun TestScope.makePreviews(
  * Port of iOS `AgentImagePreviewReadTests`: rechecks per place, retries, cancellation, limits.
  * iOS's `evict(key)` (the `NSCache` letting one image go) is [AgentImagePreviews.trimMemory]
  * here, which lets every unpinned image go; `isPinned` has no Android counterpart, so its
- * asserts read whether the pixels survive instead.
+ * asserts read whether the pixels survive instead. Runs under Robolectric so the previews' pixel
+ * cache is the framework's `LruCache`, weighing real bitmaps.
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35])
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class AgentImagePreviewReadTests {
     @get:Rule val isolation = TestIsolationRule()
 

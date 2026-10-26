@@ -11,6 +11,10 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 import java.io.IOException
 
 /** Port of iOS `SiteIconDomainTests` (`SiteIconTests.swift`). */
@@ -87,15 +91,18 @@ class SiteIconDomainTests {
 
 /**
  * Port of iOS `SiteIconLoaderTests` (`SiteIconTests.swift`): the loader's caching and coalescing.
- * Decoding an icon needs real Bitmaps, so tests whose service answers a usable icon aren't ported
- * (see docs/parity/media.md); an unusable answer here is bytes that aren't an image.
+ * Runs under Robolectric's native graphics so the service answers real icons ([IconFixture]).
+ * `linkPreviewSessionReusesNoRedirectTransport` (URLSession delegate identity) isn't ported.
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35])
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class SiteIconLoaderTests {
     @get:Rule val isolation = TestIsolationRule()
 
     private class Service(
         val status: Int = 200,
-        val body: ByteArray = "<html>not an icon</html>".toByteArray(),
+        val body: ByteArray = IconFixture.png(side = 64),
         val delayMillis: Long = 0,
         val fails: Boolean = false,
     ) {
@@ -131,11 +138,11 @@ class SiteIconLoaderTests {
             assertEquals(SiteIconResult.Missing, restarted.load("example.com"))
             assertEquals("The disk remembers it too", 1, missing.count)
 
-            val unusable = Service()
-            val other = SiteIconLoader(fetch = unusable.fetch, directory = null)
+            val tiny = Service(body = IconFixture.png(side = 16))
+            val other = SiteIconLoader(fetch = tiny.fetch, directory = null)
             assertEquals(SiteIconResult.Missing, other.load("example.org"))
             assertEquals(SiteIconResult.Missing, other.load("example.org"))
-            assertEquals("An unusable icon isn't fetched again either", 1, unusable.count)
+            assertEquals("A 16 px icon isn't fetched again either", 1, tiny.count)
         } finally {
             directory.deleteRecursively()
         }
@@ -154,22 +161,45 @@ class SiteIconLoaderTests {
 
     @Test
     fun oneRequestPerDomainThenMemory() = runTest {
-        // iOS answers a usable icon; here the unusable answer is remembered the same way.
         val service = Service(delayMillis = 50)
         val loader = SiteIconLoader(fetch = service.fetch, directory = null)
         val first = async { loader.load("exe.dev") }
         val second = async { loader.load("exe.dev") }
-        assertEquals(SiteIconResult.Missing, first.await())
-        assertEquals(first.await(), second.await())
+        val results = listOf(first.await(), second.await())
+        assertTrue("Expected an icon", results[0] is SiteIconResult.Icon)
+        assertEquals(results[0], results[1])
         assertEquals(1, service.count)
-        assertEquals(SiteIconResult.Missing, loader.cached("exe.dev"))
-        assertEquals(SiteIconResult.Missing, loader.load("exe.dev"))
+        assertEquals(results[0], loader.cached("exe.dev"))
+        assertEquals(results[0], loader.load("exe.dev"))
         assertEquals(1, service.count)
         assertEquals(listOf("https://icons.duckduckgo.com/ip3/exe.dev.ico"), service.requests.current.map { it.url.toString() })
     }
+
+    @Test
+    fun diskOutlivesTheLoaderAndExpires() = runTest {
+        val directory = temporaryDirectory("site-icon-tests")
+        try {
+            val clock = Locked(0L)
+            val service = Service()
+            val result = SiteIconLoader(fetch = service.fetch, directory = directory, now = { clock.current }).load("exe.dev")
+            val offline = Service(fails = true)
+            val next = SiteIconLoader(fetch = offline.fetch, directory = directory, now = { clock.current })
+            assertNull("Memory starts empty", next.cached("exe.dev"))
+            assertEquals(result, next.load("exe.dev"))
+            assertEquals(0, offline.count)
+            clock.update { it + SiteIconLoader.ICON_LIFETIME + 1000 }
+            assertNull(next.cached("exe.dev"))
+            assertEquals(SiteIconResult.Deferred, next.load("exe.dev"))
+            assertEquals(1, offline.count)
+            next.sweep()
+            assertEquals(0, directory.listFiles()?.size)
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
 }
 
-/** Port of iOS `SiteIconStoreTests` (`SiteIconTests.swift`). Icons are [stubSiteIcon]s. */
+/** Port of iOS `SiteIconStoreTests` (`SiteIconTests.swift`). Icons are [stubSiteIcon]s; `aSuppliedIconWins` decodes a real one in [SiteIconStoreFrameworkTests]. */
 class SiteIconStoreTests {
     @get:Rule val isolation = TestIsolationRule()
 
