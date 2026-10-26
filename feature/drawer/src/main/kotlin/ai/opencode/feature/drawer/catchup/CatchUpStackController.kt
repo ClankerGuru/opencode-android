@@ -542,6 +542,22 @@ class CatchUpStackController internal constructor() {
 
     fun cancelPendingAnimations() = finishTransition(syncingPreview = false)
 
+    /**
+     * Catch Up ended under the finger (iOS `end`'s mid-drag part): the rest of the drag, or the
+     * snap-back it started, moves nothing and can't dismiss a card.
+     */
+    internal fun dropDrag() {
+        if (!isDragging && settleJob == null) return
+        if (settleJob != null) {
+            stopSettleSpring()
+            isTransitioning = false
+        }
+        isDragging = false
+        dragStartOffset = Offset.Zero
+        armedDisposition = null
+        endDragSurface()
+    }
+
     private fun stopSettleSpring() {
         settleJob?.cancel()
         settleJob = null
