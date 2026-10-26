@@ -20,6 +20,7 @@ import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Response
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
 import java.security.SecureRandom
@@ -58,10 +59,14 @@ object DeveloperModeUploads {
 
     private val client by lazy { OkHttpClient.Builder().callTimeout(30, TimeUnit.SECONDS).build() }
 
-    /** Uploads a problem report (`PUT v1/traces/<owner>/<id>`, 201 expected) under the send retry policy. */
-    suspend fun upload(bundle: ProblemReportBundle): Boolean {
+    /**
+     * Uploads a problem report (`PUT v1/traces/<owner>/<id>`, 201 expected) under the send retry
+     * policy. [perform] stands in for the HTTP call (iOS's `perform:`), throwing an [IOException]
+     * for a transport failure; null sends it.
+     */
+    suspend fun upload(bundle: ProblemReportBundle, perform: (suspend (Request) -> Response)? = null): Boolean {
         val body = traceBody(bundle).toString().toByteArray()
-        return put("v1/traces", bundle.report.id, body, RetryPolicy.send)
+        return put("v1/traces", bundle.report.id, body, RetryPolicy.send, perform)
     }
 
     /** Uploads a voice call log (already JSON-encoded by its owner) under the request retry policy. */
@@ -89,14 +94,21 @@ object DeveloperModeUploads {
         }
     }
 
-    private suspend fun put(path: String, id: UUID, body: ByteArray, policy: RetryPolicy): Boolean {
+    private suspend fun put(
+        path: String,
+        id: UUID,
+        body: ByteArray,
+        policy: RetryPolicy,
+        perform: (suspend (Request) -> Response)? = null,
+    ): Boolean {
         val owner = owner()
         val url = "$BASE/$path/$owner/${id.toString().uppercase(Locale.ROOT)}"
         return try {
             NetworkRetry.run(NetworkRetry.currentPolicy(policy), idempotency = RequestIdempotency.Idempotent, label = "PUT /$path") {
                 val request = Request.Builder().url(url).put(body.toRequestBody("application/json".toMediaType())).build()
                 val (status, retryAfter) = try {
-                    withContext(Dispatchers.IO) { client.newCall(request).execute().use { it.code to it.header("Retry-After") } }
+                    val response = perform?.invoke(request) ?: withContext(Dispatchers.IO) { client.newCall(request).execute() }
+                    response.use { it.code to it.header("Retry-After") }
                 } catch (error: IOException) {
                     val transport = TransportFailure.of(error)
                     throw transport?.let(OpenCodeClientError::unreachable) ?: OpenCodeClientError(OpenCodeClientError.UNREACHABLE_MESSAGE)
