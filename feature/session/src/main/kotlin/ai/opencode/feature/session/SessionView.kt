@@ -775,6 +775,12 @@ private fun SessionSheets(store: StoreOf<State, Action>, listContext: SessionLis
     }
 
     val sheet = store.rememberOptionalScope({ it.sessionSheet }, Action::SessionSheet)
+    // The Session sheet's content, composed and measured ahead of its first open.
+    SessionSheetPrewarm(
+        enabled = activePicker == null,
+        details = { sessionSheetDetails(store.state) },
+        providerIcon = { providerID, canonical, size -> ProviderIcon(providerID, Modifier.size(size), canonical) },
+    )
     when (activePicker) {
         State.ActivePicker.session -> if (sheet != null) {
             val details by store.observe(::sessionSheetDetails)
