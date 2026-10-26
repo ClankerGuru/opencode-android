@@ -18,4 +18,6 @@ dependencies {
     implementation(libs.camerax.camera2)
     implementation(libs.camerax.lifecycle)
     implementation(libs.camerax.compose)
+    // ContentResolver/Bitmap encode-decode in the ported loader and photo-fixture JVM tests.
+    testImplementation(libs.robolectric)
 }
