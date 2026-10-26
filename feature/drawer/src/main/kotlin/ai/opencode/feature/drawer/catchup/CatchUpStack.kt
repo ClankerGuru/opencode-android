@@ -98,6 +98,9 @@ fun CatchUpStack(
     revealsPreviewOnBegin: Boolean = true,
     handlesPan: Boolean = true,
     panRegions: DrawerPanRegions? = null,
+    /** What [proxy]'s buttons do (the drawer container lands its morph first, iOS `dismissCard`/`undoCard`). */
+    dismissCard: (CatchUpDisposition) -> Unit = controller::fling,
+    undoCard: () -> Unit = controller::undo,
     card: @Composable (sessionID: String?) -> Unit,
     preview: @Composable (sessionID: String, revision: Int) -> Unit,
 ) {
@@ -122,8 +125,8 @@ fun CatchUpStack(
         controller.frameDuration = frameDuration
         controller.endEditing = { focusManager.clearFocus() }
         controller.liveLayer = liveLayer
-        proxy?.dismiss = { controller.fling(it) }
-        proxy?.undo = { controller.undo() }
+        proxy?.dismiss = dismissCard
+        proxy?.undo = undoCard
         val current = controller.currentStage
         when {
             current == null -> {

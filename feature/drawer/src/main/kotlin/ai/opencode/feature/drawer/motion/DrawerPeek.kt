@@ -18,7 +18,9 @@ import androidx.compose.ui.unit.dp
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
+import java.time.chrono.IsoChronology
 import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeFormatterBuilder
 import java.time.format.FormatStyle
 import java.time.temporal.ChronoUnit
 import java.util.Locale
@@ -61,7 +63,9 @@ object DrawerTimestamp {
         } else {
             DateTimeFormatter.ofPattern(android.text.format.DateFormat.getBestDateTimePattern(locale, if (hour24) "Hm" else "hm"), locale)
         }
-        val numeric = DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT).withLocale(locale)
+        // iOS `.numeric` writes the full year ("9/30/2026"); java.time's short style has two digits.
+        val numericPattern = DateTimeFormatterBuilder.getLocalizedDateTimePattern(FormatStyle.SHORT, null, IsoChronology.INSTANCE, locale)
+        val numeric = DateTimeFormatter.ofPattern(numericPattern.replace(Regex("y+"), "y"), locale)
         if (days == 0 && !date.isBefore(today)) return date.format(time)
         if (!date.isBefore(today)) return date.format(numeric)
         if (!date.isBefore(today.minusDays(1))) return "Yesterday"

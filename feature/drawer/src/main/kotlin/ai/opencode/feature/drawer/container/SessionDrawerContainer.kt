@@ -349,6 +349,8 @@ fun SessionDrawerContainer(
                 stage = stackStage,
                 controller = controller.catchUpStack,
                 proxy = catchUpProxy,
+                dismissCard = controller::dismissCard,
+                undoCard = controller::undoCard,
                 previewRevision = previewRevision,
                 revealsPreviewOnBegin = false,
                 panRegions = panRegions,

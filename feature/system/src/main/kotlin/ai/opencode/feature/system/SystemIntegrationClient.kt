@@ -8,6 +8,7 @@ import ai.opencode.feature.system.intents.SystemQuickAction
 import ai.opencode.feature.system.intents.SystemSearchIndex
 import ai.opencode.feature.system.widgets.OpenCodeControls
 import ai.opencode.server.OpenCodeServer
+import ai.opencode.server.friendlyName
 import ai.opencode.server.model.OpenCodeProject
 import ai.opencode.server.model.OpenCodeSession
 import android.content.Context
@@ -118,7 +119,7 @@ class SystemPublication(
             val listed = kept.map { it.id }.toSet()
             return SessionDirectory.Server(
                 key = SessionDirectory.serverKey(server.persistenceID),
-                name = server.displayName,
+                name = server.friendlyName,
                 lastViewedSessionID = lastViewedSessionIDs[server.persistenceID]?.takeIf { it in listed },
                 pinnedIDs = pinnedIDs.filter { it in listed },
                 sessions = kept.map(::entry),
