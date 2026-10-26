@@ -60,7 +60,7 @@ import java.util.UUID
  * `requestBarDictationFoldAndUnfoldTraceHasNoStepOrOpaqueControlCollision`.
  */
 class RequestAnswerTests {
-    private val session = OpenCodeSession(id = "ses_answer", title = "Answer", projectID = "proj", directory = "/tmp/answer", updatedAt = Instant.EPOCH)
+    private val session = OpenCodeSession(id = "ses_answer", serverTitle = "Answer", projectID = "proj", directory = "/tmp/answer", updatedAt = Instant.EPOCH)
     private val server = OpenCodeServer(url = "http://127.0.0.1:4105", username = "", password = "")
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -545,7 +545,7 @@ class RequestAnswerTests {
         val next = h.state {
             SessionFeature.State.session(
                 server = answering.server,
-                session = OpenCodeSession(id = "ses_other", title = "Other", projectID = "proj", directory = "/tmp/other", updatedAt = Instant.EPOCH),
+                session = OpenCodeSession(id = "ses_other", serverTitle = "Other", projectID = "proj", directory = "/tmp/other", updatedAt = Instant.EPOCH),
                 cachedItems = emptyList(),
             ).withDraft("Typed there").adoptDictation(carried!!)
         }

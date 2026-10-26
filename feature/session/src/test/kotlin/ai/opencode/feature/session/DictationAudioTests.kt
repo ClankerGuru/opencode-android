@@ -31,7 +31,7 @@ import java.time.Instant
  */
 class DictationHoldReportingTests {
     private val server = OpenCodeServer(url = "http://127.0.0.1:9", username = "opencode", password = "pw")
-    private val session = OpenCodeSession(id = "ses_1", title = "Chat", projectID = "proj_1", directory = "/tmp/demo", updatedAt = Instant.EPOCH)
+    private val session = OpenCodeSession(id = "ses_1", serverTitle = "Chat", projectID = "proj_1", directory = "/tmp/demo", updatedAt = Instant.EPOCH)
 
     private fun Harness.screen(): SessionFeature.State =
         state { SessionFeature.State.session(server = server, session = session, cachedItems = emptyList()).copy(isVisible = true) }

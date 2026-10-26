@@ -76,7 +76,7 @@ class ComposerPersistenceTests {
     private val project = OpenCodeProject(id = "proj_1", name = "OpenCode", directory = "/Users/kit/code/opencode")
     private val session = OpenCodeSession(
         id = "ses_1",
-        title = "Durable drafts",
+        serverTitle = "Durable drafts",
         projectID = "proj_1",
         directory = "/Users/kit/code/opencode",
         updatedAt = Instant.ofEpochSecond(1_000),
@@ -519,7 +519,7 @@ class ComposerPersistenceTests {
     @Test fun newSessionDraftSendPreservesDirectoryRestoresInProcessLaneAndReconcilesAfterCreateSession() = persistenceTest { h ->
         val secondProject = OpenCodeProject(id = "proj_2", name = "Second", directory = "/Users/kit/code/second")
         val createdSession = OpenCodeSession(
-            id = "ses_new_2", title = "New Session", projectID = secondProject.id,
+            id = "ses_new_2", serverTitle = "New Session", projectID = secondProject.id,
             directory = secondProject.directory, updatedAt = Instant.ofEpochSecond(2_000),
         )
         val firstGate = Gate()
@@ -539,7 +539,7 @@ class ComposerPersistenceTests {
                 createSession = { _, directory, _ ->
                     firstGate.wait()
                     OpenCodeSession(
-                        id = createdSession.id, title = createdSession.title, projectID = secondProject.id,
+                        id = createdSession.id, serverTitle = createdSession.title, projectID = secondProject.id,
                         directory = directory, updatedAt = createdSession.updatedAt,
                     )
                 },
@@ -682,7 +682,7 @@ class ComposerPersistenceTests {
     @Test fun newSessionDraftKilledBetweenCreateSessionAndSettlementResumesCreatedSessionOnRelaunch() = persistenceTest { h ->
         val secondProject = OpenCodeProject(id = "proj_2", name = "Second", directory = "/Users/kit/code/second")
         val createdSession = OpenCodeSession(
-            id = "ses_created_after_post", title = "New Session", projectID = secondProject.id,
+            id = "ses_created_after_post", serverTitle = "New Session", projectID = secondProject.id,
             directory = secondProject.directory, updatedAt = Instant.ofEpochSecond(2_500),
         )
         val sendGate = Gate()

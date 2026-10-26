@@ -39,7 +39,7 @@ import kotlin.time.Duration.Companion.seconds
  * Not ported here (:feature:transcript, `QuestionRowSummary` / `TranscriptEntry`): `settledQuestionsReadAsOneQuietRow`.
  */
 class RequestReviewTests {
-    private val session = OpenCodeSession(id = "ses_review", title = "Review", projectID = "proj", directory = "/tmp/review", updatedAt = Instant.EPOCH)
+    private val session = OpenCodeSession(id = "ses_review", serverTitle = "Review", projectID = "proj", directory = "/tmp/review", updatedAt = Instant.EPOCH)
     private val json = Json { ignoreUnknownKeys = true }
 
     private fun decodeForm(text: String): OpenCodeFormRequest = json.decodeFromString(OpenCodeFormRequest.serializer(), text)
@@ -248,7 +248,7 @@ class RequestReviewTests {
             """{"id":"frm_mcp","sessionID":"global","title":"context7 is requesting input","metadata":{"kind":"mcp-elicitation","server":"context7","message":"How would you like to continue?"},"fields":[{"key":"mode","type":"string","title":"How would you like to continue?","options":[{"value":"anon","label":"Continue anonymously with smaller limits"}]}]}""",
         )
         val plainGlobal = decodeForm("""{"id":"frm_signin","sessionID":"global","title":"Sign in","fields":[{"key":"token","type":"string","title":"Token"}]}""")
-        val child = OpenCodeSession(id = "ses_child", title = "UI checks", projectID = "proj", directory = "/tmp/review", updatedAt = Instant.EPOCH, parentID = session.id)
+        val child = OpenCodeSession(id = "ses_child", serverTitle = "UI checks", projectID = "proj", directory = "/tmp/review", updatedAt = Instant.EPOCH, parentID = session.id)
         val family = listOf(session, child)
 
         assertEquals(
@@ -552,7 +552,7 @@ class RequestReviewTests {
     }
 
     @Test fun aSubagentsQuestionDocksAndAnswersItsOwner() = sessionTest { h ->
-        val child = OpenCodeSession(id = "ses_child", title = "UI checks", projectID = "proj", directory = "/tmp/review", updatedAt = Instant.EPOCH, parentID = session.id)
+        val child = OpenCodeSession(id = "ses_child", serverTitle = "UI checks", projectID = "proj", directory = "/tmp/review", updatedAt = Instant.EPOCH, parentID = session.id)
         val form = question("frm_child", sessionID = "ses_child")
         val initial = h.dockState().withFormRequests(emptyList()).withFormAnswers(emptyMap()).copy(familySessions = listOf(child))
         val store = h.store(
@@ -618,7 +618,7 @@ class RequestReviewTests {
     }
 
     @Test fun aDeletedSubagentsRequestsLeaveTheDock() = sessionTest { h ->
-        val child = OpenCodeSession(id = "ses_child", title = "UI checks", projectID = "proj", directory = "/tmp/review", updatedAt = Instant.EPOCH, parentID = session.id)
+        val child = OpenCodeSession(id = "ses_child", serverTitle = "UI checks", projectID = "proj", directory = "/tmp/review", updatedAt = Instant.EPOCH, parentID = session.id)
         val childPermission = OpenCodePermissionRequest(id = "per_child", sessionID = child.id, action = "shell", resources = listOf("ls"), save = null)
         val childForm = question("frm_child", sessionID = "ses_child")
         val initial = h.dockState().copy(familySessions = listOf(session, child)).updateRequestDock {

@@ -31,7 +31,7 @@ internal object ComposerAutocompleteTestSupport {
     val server = OpenCodeServer(url = "http://localhost:9", username = "opencode", password = "pw")
     val session = OpenCodeSession(
         id = "ses_autocomplete",
-        title = "Composer Autocomplete",
+        serverTitle = "Composer Autocomplete",
         projectID = "proj_1",
         directory = "/Users/kit/code/opencode-ios",
         updatedAt = Instant.ofEpochSecond(1_000),

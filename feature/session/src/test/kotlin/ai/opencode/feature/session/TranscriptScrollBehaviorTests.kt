@@ -28,7 +28,7 @@ class TranscriptRowGrowthTests {
 
     /** The `SessionFeature` half: Jump to Latest leaving browsing trims the window back to the live tail. */
     @Test fun jumpToLatestWhenWindowTrimsGlidesToBottomWithoutTopGapOrLossOfPosition() = sessionTest { h ->
-        val session = OpenCodeSession(id = "ses_g2a", title = "G2A", projectID = "p", directory = "/p", updatedAt = SessionTestSupport.distantPast)
+        val session = OpenCodeSession(id = "ses_g2a", serverTitle = "G2A", projectID = "p", directory = "/p", updatedAt = SessionTestSupport.distantPast)
         val allItems = (0 until 80).map { OpenCodeTranscriptItem.UserText(id = "m$it", text = "Message $it: line 1\nline 2") }
         val sessionState = h.state { SessionFeature.State.session(server = server, session = session, cachedItems = allItems) }
             .copy(hasRenderedFirstContentFrame = true, browsingWindowStartID = "m0")
@@ -43,7 +43,7 @@ class TranscriptRowGrowthTests {
 
     /** The `SessionFeature` half: a short cached session claims no earlier items, before or during its open read. */
     @Test fun openingShortCachedSessionAndFinishingPrewarmedLoadingRefreshStayAlignedWithinOnePointFivePt() = sessionTest { h ->
-        val shortSession = OpenCodeSession(id = "ses_c1", title = "Short", projectID = "p", directory = "/p", updatedAt = SessionTestSupport.distantPast)
+        val shortSession = OpenCodeSession(id = "ses_c1", serverTitle = "Short", projectID = "p", directory = "/p", updatedAt = SessionTestSupport.distantPast)
         val shortCached = listOf(
             OpenCodeTranscriptItem.UserText(id = "u0", text = "Upload this file"),
             OpenCodeTranscriptItem.AssistantMarkdown(id = "a0", text = "Uploaded cleanly."),
@@ -55,7 +55,7 @@ class TranscriptRowGrowthTests {
     }
 
     @Test fun browsingWindowKeepsItsLeadingBoundaryAcrossTailAppends() = sessionTest { h ->
-        val session = OpenCodeSession(id = "ses_window", title = "Window", projectID = "project", directory = "/project", updatedAt = SessionTestSupport.distantPast)
+        val session = OpenCodeSession(id = "ses_window", serverTitle = "Window", projectID = "project", directory = "/project", updatedAt = SessionTestSupport.distantPast)
         var state = h.state {
             SessionFeature.State.session(
                 server = server,

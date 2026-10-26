@@ -74,7 +74,7 @@ import kotlin.time.Duration.Companion.seconds
  */
 
 private val browserServer = OpenCodeServer(url = "http://localhost:9", username = "", password = "")
-private val chat = OpenCodeSession(id = "ses_1", title = "Chat", projectID = "p", directory = "/project", updatedAt = Instant.EPOCH)
+private val chat = OpenCodeSession(id = "ses_1", serverTitle = "Chat", projectID = "p", directory = "/project", updatedAt = Instant.EPOCH)
 
 private fun browser(action: BrowserFeature.Action): Action = Action.Browser(action)
 
@@ -453,7 +453,7 @@ class BrowserLifetimeTests {
     private val server = OpenCodeServer(url = "https://switch.example", username = "", password = "")
     private val link = "https://example.com/article"
     private fun session(id: String, parent: String? = null) =
-        OpenCodeSession(id = id, title = id, projectID = "project", directory = "/project", updatedAt = Instant.ofEpochSecond(10), parentID = parent)
+        OpenCodeSession(id = id, serverTitle = id, projectID = "project", directory = "/project", updatedAt = Instant.ofEpochSecond(10), parentID = parent)
 
     @Test fun aSubagentNeverOpensUnderItsParentsPage() = sessionTest { h ->
         val discarded = LockIsolated(listOf<UUID>())
@@ -487,7 +487,7 @@ class BrowserLifetimeTests {
 
 class BrowserVoiceTests {
     private val server = OpenCodeServer(url = "https://voice.example", username = "", password = "")
-    private val a = OpenCodeSession(id = "ses_a", title = "A", projectID = "p", directory = "/project", updatedAt = SessionTestSupport.distantPast)
+    private val a = OpenCodeSession(id = "ses_a", serverTitle = "A", projectID = "p", directory = "/project", updatedAt = SessionTestSupport.distantPast)
     private val pageURL = "https://example.com/doc"
 
     @Test fun aCallStartedOverAPageKnowsIt() = sessionTest { h ->

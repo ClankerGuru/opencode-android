@@ -185,7 +185,7 @@ class SyncReconciliationTests {
             server = testServer,
             session = OpenCodeSession(
                 id = "ses_sync",
-                title = "Sync",
+                serverTitle = "Sync",
                 projectID = "p",
                 directory = "/project",
                 updatedAt = SessionTestSupport.distantPast,

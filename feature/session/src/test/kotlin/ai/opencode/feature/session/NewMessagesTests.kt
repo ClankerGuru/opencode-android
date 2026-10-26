@@ -52,7 +52,7 @@ import kotlin.time.Duration.Companion.seconds
 class NewMessagesTests {
     private val server = OpenCodeServer(url = "http://127.0.0.1:9", username = "", password = "")
 
-    private fun session(id: String) = OpenCodeSession(id = id, title = id, projectID = "project", directory = "/project", updatedAt = Instant.ofEpochSecond(10))
+    private fun session(id: String) = OpenCodeSession(id = id, serverTitle = id, projectID = "project", directory = "/project", updatedAt = Instant.ofEpochSecond(10))
     private fun user(id: String): OpenCodeTranscriptItem = OpenCodeTranscriptItem.UserText(id = id, text = id)
     private fun reply(id: String): OpenCodeTranscriptItem = OpenCodeTranscriptItem.AssistantMarkdown(id = id, text = "Reply $id")
 

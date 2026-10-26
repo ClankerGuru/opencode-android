@@ -87,7 +87,7 @@ class ModelPickerTests {
     // MARK: Reducer
 
     private fun Harness.state(model: OpenCodeModelRef?): State {
-        val session = OpenCodeSession(id = "ses_1", title = "Chat", projectID = "p", directory = "/project", updatedAt = Instant.EPOCH, model = model)
+        val session = OpenCodeSession(id = "ses_1", serverTitle = "Chat", projectID = "p", directory = "/project", updatedAt = Instant.EPOCH, model = model)
         return state { State.session(server = testServer, session = session) }.copy(models = listOf(cirrusZen, cirrusRouter, mini, basalt))
     }
 

@@ -184,7 +184,7 @@ class NewSessionDraftTests {
     @Test fun theSessionArrivingClosesTheProjectSheet() = draftTest { h ->
         val state = h.draft(projects[0]).openProjectPicker()
         val initialIdentity = state.taskIdentity
-        val created = OpenCodeSession(id = "ses_new", title = "New session", projectID = "p1", directory = projects[0].directory, updatedAt = SessionTestSupport.distantPast)
+        val created = OpenCodeSession(id = "ses_new", serverTitle = "New session", projectID = "p1", directory = projects[0].directory, updatedAt = SessionTestSupport.distantPast)
         val store = h.store(state) {
             this[OpenCodeClient] = this[OpenCodeClient].copy(
                 getSession = { _, _ -> created },
@@ -410,10 +410,10 @@ class NewSessionDraftTests {
             sendWorld(
                 createSession = { directory, id ->
                     created.append(directory)
-                    OpenCodeSession(id = id ?: "ses_new", title = "New session", projectID = "global", directory = directory, updatedAt = SessionTestSupport.distantPast)
+                    OpenCodeSession(id = id ?: "ses_new", serverTitle = "New session", projectID = "global", directory = directory, updatedAt = SessionTestSupport.distantPast)
                 },
                 getSession = { id ->
-                    OpenCodeSession(id = id, title = "New session", projectID = "global", directory = "/srv/code/lantern", updatedAt = SessionTestSupport.distantPast)
+                    OpenCodeSession(id = id, serverTitle = "New session", projectID = "global", directory = "/srv/code/lantern", updatedAt = SessionTestSupport.distantPast)
                 },
             )
         }
@@ -437,10 +437,10 @@ class NewSessionDraftTests {
             sendWorld(
                 createSession = { directory, id ->
                     ids.append(id)
-                    OpenCodeSession(id = id ?: "ses_new", title = "New session", projectID = "p1", directory = directory, updatedAt = SessionTestSupport.distantPast)
+                    OpenCodeSession(id = id ?: "ses_new", serverTitle = "New session", projectID = "p1", directory = directory, updatedAt = SessionTestSupport.distantPast)
                 },
                 getSession = { id ->
-                    OpenCodeSession(id = id, title = "New session", projectID = "p1", directory = "/srv/code/project-1", updatedAt = SessionTestSupport.distantPast)
+                    OpenCodeSession(id = id, serverTitle = "New session", projectID = "p1", directory = "/srv/code/project-1", updatedAt = SessionTestSupport.distantPast)
                 },
             )
         }

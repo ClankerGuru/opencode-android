@@ -30,7 +30,7 @@ class SessionFeatureStackBudgetTests {
         val state = h.state {
             State.session(
                 server = OpenCodeServer(url = "http://localhost:9", username = "", password = ""),
-                session = OpenCodeSession(id = "ses_stack", title = "Stack", projectID = "p", directory = "/project", updatedAt = distantPast),
+                session = OpenCodeSession(id = "ses_stack", serverTitle = "Stack", projectID = "p", directory = "/project", updatedAt = distantPast),
                 cachedItems = listOf(OpenCodeTranscriptItem.UserText(id = "u1", text = "Hi")),
             )
         }.copy(earlierHistory = State.EarlierHistory.Loading(cursor = "older", reachedLoadedItems = true))

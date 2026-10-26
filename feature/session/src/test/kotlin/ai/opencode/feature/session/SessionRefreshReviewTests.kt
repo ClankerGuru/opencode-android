@@ -57,7 +57,7 @@ import kotlin.math.max
  */
 class SessionRefreshReviewTests {
     private val server = OpenCodeServer(url = "http://localhost:9", username = "", password = "")
-    private val session = OpenCodeSession(id = "ses_review", title = "Review", projectID = "p", directory = "/project", updatedAt = distantPast)
+    private val session = OpenCodeSession(id = "ses_review", serverTitle = "Review", projectID = "p", directory = "/project", updatedAt = distantPast)
     private val user = OpenCodeTranscriptItem.UserText(id = "msg_user", text = "Check")
     private val text = OpenCodeTranscriptItem.AssistantMarkdown(id = "msg_reply-text-0", text = "Unpersisted")
 
@@ -543,7 +543,7 @@ class SessionRefreshReviewTests {
 
     @Test fun locationAttachesThenSendsAtTheTopOfThePrompt() = sessionTest { h ->
         val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
-        val session = OpenCodeSession(id = "ses_loc", title = "Loc", projectID = "p", directory = "/tmp", updatedAt = distantPast)
+        val session = OpenCodeSession(id = "ses_loc", serverTitle = "Loc", projectID = "p", directory = "/tmp", updatedAt = distantPast)
         val state = h.state(session = session, cachedItems = emptyList(), server = server).copy(draft = "Where am I?")
         val sent = LockIsolated(listOf<String>())
         val spot = spot
@@ -572,7 +572,7 @@ class SessionRefreshReviewTests {
 
     @Test fun deniedLocationExplainsItself() = sessionTest { h ->
         val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
-        val session = OpenCodeSession(id = "ses_denied", title = "Denied", projectID = "p", directory = "/tmp", updatedAt = distantPast)
+        val session = OpenCodeSession(id = "ses_denied", serverTitle = "Denied", projectID = "p", directory = "/tmp", updatedAt = distantPast)
         val store = h.store(h.state(session = session, cachedItems = emptyList(), server = server)) {
             this[LocationClient] = LocationClient(current = { throw LocationClientError.Denied })
         }
@@ -585,7 +585,7 @@ class SessionRefreshReviewTests {
 
     @Test fun authoritativeRefreshStartsTranscriptBeforeGetSessionFinishes() = sessionTest { h ->
         val server = OpenCodeServer(url = "http://localhost:9", username = "", password = "")
-        val session = OpenCodeSession(id = "ses_parallel", title = "Parallel", projectID = "p", directory = "/project", updatedAt = distantPast)
+        val session = OpenCodeSession(id = "ses_parallel", serverTitle = "Parallel", projectID = "p", directory = "/project", updatedAt = distantPast)
         val sessionGate = Gate()
         val transcriptStarted = CompletableDeferred<Unit>()
         val items = listOf<OpenCodeTranscriptItem>(OpenCodeTranscriptItem.UserText(id = "m1", text = "Hello"))
@@ -614,7 +614,7 @@ class SessionRefreshReviewTests {
 
     @Test fun wireDecodedShortSessionMarksEarlierHistoryExhaustedImmediately() = sessionTest { h ->
         val server = OpenCodeServer(url = "http://localhost:9", username = "", password = "")
-        val session = OpenCodeSession(id = "ses_short", title = "Short", projectID = "p", directory = "/project", updatedAt = distantPast)
+        val session = OpenCodeSession(id = "ses_short", serverTitle = "Short", projectID = "p", directory = "/project", updatedAt = distantPast)
         val payload = """{"data":[{"id":"m1","type":"user","text":"Hello"}]}""".toByteArray()
         val historyCalls = LockIsolated(0)
         val store = h.store(h.state(session = session, cachedItems = emptyList(), server = server)) {
@@ -641,7 +641,7 @@ class SessionRefreshReviewTests {
 
     @Test fun wireDecodedLongSessionTransitionsDirectlyToPagingCursor() = sessionTest { h ->
         val server = OpenCodeServer(url = "http://localhost:9", username = "", password = "")
-        val session = OpenCodeSession(id = "ses_long_cursor", title = "Long", projectID = "p", directory = "/project", updatedAt = distantPast)
+        val session = OpenCodeSession(id = "ses_long_cursor", serverTitle = "Long", projectID = "p", directory = "/project", updatedAt = distantPast)
         val payload = """{"data":[{"id":"m2","type":"user","text":"Newest"},{"id":"m1","type":"user","text":"Older"}],"cursor":{"next":"cur_before_m1"}}""".toByteArray()
         val requestedCursors = LockIsolated(listOf<String?>())
         val oldest = OpenCodeTranscriptItem.UserText(id = "m0", text = "Oldest")
@@ -674,7 +674,7 @@ class SessionRefreshReviewTests {
 
     @Test fun inFlightInitialRefreshHoldsEarlierHistoryNetworkRequestBeforeFirstFrame() = sessionTest { h ->
         val server = OpenCodeServer(url = "http://localhost:9", username = "", password = "")
-        val session = OpenCodeSession(id = "ses_cached_race", title = "Cached Race", projectID = "p", directory = "/project", updatedAt = distantPast)
+        val session = OpenCodeSession(id = "ses_cached_race", serverTitle = "Cached Race", projectID = "p", directory = "/project", updatedAt = distantPast)
         val cached = (0 until 30).map { OpenCodeTranscriptItem.UserText(id = "m$it", text = "Message $it") }
         val state = h.state(session = session, cachedItems = cached, server = server).copy(refresh = State.Refresh(id = 1, reason = RefreshReason.Open))
         val historyCalls = LockIsolated(0)
@@ -697,7 +697,7 @@ class SessionRefreshReviewTests {
 
     @Test fun selectedTranscriptCarriesPageCursorThroughActionWithoutStaticSideChannel() = sessionTest { h ->
         val server = OpenCodeServer(url = "http://localhost:9", username = "", password = "")
-        val session = OpenCodeSession(id = "ses_selected_cursor", title = "Selected", projectID = "p", directory = "/project", updatedAt = distantPast)
+        val session = OpenCodeSession(id = "ses_selected_cursor", serverTitle = "Selected", projectID = "p", directory = "/project", updatedAt = distantPast)
         // Decode a stale wire payload with identical item IDs and no cursor outside the reducer;
         // because pageCursor travels explicitly on selectedTranscriptResponse/transcriptResponse,
         // that stray decode cannot mark a later cursorless transcriptResponse exhausted.
@@ -718,7 +718,7 @@ class SessionRefreshReviewTests {
 
     @Test fun restPageOverlappingOnlyProjectedTailResetsEarlierHistoryToUnknownEdge() = sessionTest { h ->
         val server = OpenCodeServer(url = "http://localhost:9", username = "", password = "")
-        val session = OpenCodeSession(id = "ses_sse_gap", title = "SSE Gap", projectID = "p", directory = "/project", updatedAt = distantPast)
+        val session = OpenCodeSession(id = "ses_sse_gap", serverTitle = "SSE Gap", projectID = "p", directory = "/project", updatedAt = distantPast)
         val m1 = OpenCodeTranscriptItem.UserText(id = "m1", text = "First durable")
         val state = h.state(session = session, cachedItems = listOf(m1), server = server).copy(
             earlierHistory = State.EarlierHistory.Exhausted,

@@ -395,7 +395,7 @@ class ComposerAutocompleteTests {
                 this[OpenCodeClient] = this[OpenCodeClient].copy(
                     createSession = { _, directory, id ->
                         createdSessionID.setValue(id)
-                        OpenCodeSession(id = id ?: "ses_fallback", title = "New Session", projectID = "proj_1", directory = directory, updatedAt = Instant.ofEpochSecond(2_000))
+                        OpenCodeSession(id = id ?: "ses_fallback", serverTitle = "New Session", projectID = "proj_1", directory = directory, updatedAt = Instant.ofEpochSecond(2_000))
                     },
                     sendCommand = { _, _, _, _, _, _ -> throw OpenCodeClientError(message = "Couldn’t run command", statusCode = 400) },
                 )
@@ -491,7 +491,7 @@ class ComposerAutocompleteTests {
     @Test fun sessionSwitchRoundTripsChipsAndFailedSendRetryKeepsMentions() = sessionTest { h ->
         val persistence = ComposerPersistence.inMemory()
         val childSession = OpenCodeSession(
-            id = "ses_child", title = "Child Subagent", projectID = session.projectID,
+            id = "ses_child", serverTitle = "Child Subagent", projectID = session.projectID,
             directory = session.directory, updatedAt = Instant.ofEpochSecond(1_100), parentID = session.id,
         )
         val skillChip = chip(701, AutocompleteItem.skill(sampleSkills[0]))

@@ -65,7 +65,7 @@ import kotlin.time.Duration.Companion.seconds
  */
 class SendOutboxTests {
     private val server = OpenCodeServer(url = "http://localhost:9", username = "", password = "")
-    private val session = OpenCodeSession(id = "ses_1", title = "Chat", projectID = "p", directory = "/project", updatedAt = SessionTestSupport.distantPast)
+    private val session = OpenCodeSession(id = "ses_1", serverTitle = "Chat", projectID = "p", directory = "/project", updatedAt = SessionTestSupport.distantPast)
     private val first = "msg_00000000000100000000000000"
     private val second = "msg_00000000000200000000000000"
     private val third = "msg_00000000000300000000000000"
@@ -131,7 +131,7 @@ class SendOutboxTests {
                     post(id, attempt)
                 },
                 getSession = { _, id ->
-                    OpenCodeSession(id = id, title = "Chat", projectID = "p", directory = "/project", updatedAt = SessionTestSupport.distantPast)
+                    OpenCodeSession(id = id, serverTitle = "Chat", projectID = "p", directory = "/project", updatedAt = SessionTestSupport.distantPast)
                 },
                 transcript = { _, _, _ -> emptyList() },
                 sessionFamily = { _, root -> OpenCodeSessionFamily(sessions = listOf(root), activeSessionIDs = emptySet()) },
@@ -393,7 +393,7 @@ class SendOutboxTests {
     }
 
     @Test fun aDraftsSecondSendGoesToTheSessionItsFirstCreates() = outboxTest { h ->
-        val created = OpenCodeSession(id = "ses_new", title = "New session", projectID = "p", directory = "/project", updatedAt = SessionTestSupport.distantPast)
+        val created = OpenCodeSession(id = "ses_new", serverTitle = "New session", projectID = "p", directory = "/project", updatedAt = SessionTestSupport.distantPast)
         val posts = Posts()
         val sessions = LockIsolated(listOf<String>())
         val creations = LockIsolated(0)
@@ -509,7 +509,7 @@ class SendOutboxTests {
 
     @Test fun aSendDeletedWhileBeingPostedStaysDeletedAcrossASwitchAndIsTakenBackOnAdmission() = outboxTest { h ->
         val root = session
-        val child = OpenCodeSession(id = "ses_child", title = "Inspect", projectID = "p", directory = "/project", updatedAt = SessionTestSupport.distantPast, parentID = root.id)
+        val child = OpenCodeSession(id = "ses_child", serverTitle = "Inspect", projectID = "p", directory = "/project", updatedAt = SessionTestSupport.distantPast, parentID = root.id)
         val state = h.running(draft = "Use the staging bucket").copy(familySessions = listOf(root, child))
         val posts = Posts()
         val cancels = LockIsolated(listOf<String>())
@@ -540,7 +540,7 @@ class SendOutboxTests {
 
     @Test fun aFamilySwitchRoundTripKeepsSendsStillOnTheirWay() = outboxTest { h ->
         val root = session
-        val child = OpenCodeSession(id = "ses_child", title = "Inspect", projectID = "p", directory = "/project", updatedAt = SessionTestSupport.distantPast, parentID = root.id)
+        val child = OpenCodeSession(id = "ses_child", serverTitle = "Inspect", projectID = "p", directory = "/project", updatedAt = SessionTestSupport.distantPast, parentID = root.id)
         val state = h.running(draft = "Use the staging bucket").copy(familySessions = listOf(root, child))
         val posts = Posts()
         val slow = Gate()
@@ -567,7 +567,7 @@ class SendOutboxTests {
 
     @Test fun aSendAdmittedWhileAwayIsThereOnTheFirstFrameBack() = outboxTest { h ->
         val root = session
-        val child = OpenCodeSession(id = "ses_child", title = "Inspect", projectID = "p", directory = "/project", updatedAt = SessionTestSupport.distantPast, parentID = root.id)
+        val child = OpenCodeSession(id = "ses_child", serverTitle = "Inspect", projectID = "p", directory = "/project", updatedAt = SessionTestSupport.distantPast, parentID = root.id)
         val state = h.running(draft = "Use the staging bucket").copy(familySessions = listOf(root, child))
         val outbox = newOutbox()
         val posts = Posts()
@@ -672,7 +672,7 @@ class SendOutboxTests {
     }
 
     @Test fun stopOnADraftCallsOffItsCreationAndReturnsTheWords() = outboxTest { h ->
-        val created = OpenCodeSession(id = "ses_new", title = "New session", projectID = "p", directory = "/project", updatedAt = SessionTestSupport.distantPast)
+        val created = OpenCodeSession(id = "ses_new", serverTitle = "New session", projectID = "p", directory = "/project", updatedAt = SessionTestSupport.distantPast)
         val posts = Posts()
         val slowCreate = Gate()
         val store = h.store(h.draftState("Find the flaky test"), posts, dependencies = {
@@ -712,10 +712,10 @@ class SendOutboxTests {
                 createSession = { _, directory, id ->
                     val count = ids.withValue { val next = it + id; next to next.size }
                     if (count == 1) throw OpenCodeClientError.unreachable(TransportFailure.Interrupted)
-                    OpenCodeSession(id = id ?: "ses_server", title = "New session", projectID = "p", directory = directory, updatedAt = SessionTestSupport.distantPast)
+                    OpenCodeSession(id = id ?: "ses_server", serverTitle = "New session", projectID = "p", directory = directory, updatedAt = SessionTestSupport.distantPast)
                 },
                 getSession = { _, id ->
-                    OpenCodeSession(id = id, title = "New session", projectID = "p", directory = "/project", updatedAt = SessionTestSupport.distantPast)
+                    OpenCodeSession(id = id, serverTitle = "New session", projectID = "p", directory = "/project", updatedAt = SessionTestSupport.distantPast)
                 },
             )
         })
@@ -829,7 +829,7 @@ class SendOutboxTests {
     }
 
     @Test fun stopOnADraftWhoseSessionExistsIsThatSessionsStop() = outboxTest { h ->
-        val created = OpenCodeSession(id = "ses_new", title = "New session", projectID = "p", directory = "/project", updatedAt = SessionTestSupport.distantPast)
+        val created = OpenCodeSession(id = "ses_new", serverTitle = "New session", projectID = "p", directory = "/project", updatedAt = SessionTestSupport.distantPast)
         val posts = Posts()
         val creations = LockIsolated(0)
         val interrupted = LockIsolated(listOf<String>())
@@ -870,7 +870,7 @@ class SendOutboxTests {
 
     @Test fun aRefusedMoveToQueueWhileAwayComesBackAsPosted() = outboxTest { h ->
         val root = session
-        val child = OpenCodeSession(id = "ses_child", title = "Inspect", projectID = "p", directory = "/project", updatedAt = SessionTestSupport.distantPast, parentID = root.id)
+        val child = OpenCodeSession(id = "ses_child", serverTitle = "Inspect", projectID = "p", directory = "/project", updatedAt = SessionTestSupport.distantPast, parentID = root.id)
         val state = h.running(draft = "Use the staging bucket").copy(familySessions = listOf(root, child))
         val outbox = newOutbox()
         val posts = Posts()

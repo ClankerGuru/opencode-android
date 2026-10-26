@@ -50,7 +50,7 @@ internal object SessionTestSupport {
         viewedMilliseconds: Long? = null,
     ) = OpenCodeSession(
         id = id,
-        title = title,
+        serverTitle = title,
         projectID = "p",
         directory = directory,
         updatedAt = updatedAt,

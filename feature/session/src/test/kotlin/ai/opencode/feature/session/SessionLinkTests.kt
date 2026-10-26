@@ -46,7 +46,7 @@ class SessionLinkTests {
     private val server = OpenCodeServer(url = "https://links.example", username = "", password = "")
 
     private fun session(id: String, title: String = "Home", parent: String? = null) =
-        OpenCodeSession(id = id, title = title, projectID = "project", directory = "/project", updatedAt = Instant.ofEpochSecond(10), parentID = parent)
+        OpenCodeSession(id = id, serverTitle = title, projectID = "project", directory = "/project", updatedAt = Instant.ofEpochSecond(10), parentID = parent)
 
     private fun Harness.sessionState(): State = state {
         val root = session(ROOT, title = "Root")

@@ -70,7 +70,7 @@ import kotlin.time.Duration.Companion.seconds
  */
 class VoiceFeatureTestsScreenSession {
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
-    private val session = OpenCodeSession(id = "ses_voice", title = "Voice lab", projectID = "p", directory = "/Users/kit/project", updatedAt = distantPast)
+    private val session = OpenCodeSession(id = "ses_voice", serverTitle = "Voice lab", projectID = "p", directory = "/Users/kit/project", updatedAt = distantPast)
 
     private fun DependencyValues.Builder.recordInto(outbox: PromptOutbox) {
         this[PromptOutbox] = outbox
@@ -286,7 +286,7 @@ class VoiceFeatureTestsScreenSession {
      * the screen's model button keeps it.
      */
     @Test fun theCallCarriesTheScreensPickUntilItIsApplied() = sessionTest { h ->
-        val session = OpenCodeSession(id = "ses_1", title = "Fix", projectID = "p", directory = "/project", updatedAt = distantPast)
+        val session = OpenCodeSession(id = "ses_1", serverTitle = "Fix", projectID = "p", directory = "/project", updatedAt = distantPast)
         val fast = OpenCodeModel(modelID = "fast", providerID = "fixture", name = "Fast")
         val state = h.state { State.session(server = server, session = session, cachedItems = emptyList()).copy(voice = live(VoiceFeature.State(server, session))) }
         val store = h.store(state)
@@ -312,9 +312,9 @@ class VoiceFeatureTestsScreenSession {
                 createSession = { _, directory, id ->
                     creates.append(directory to id)
                     created.await()
-                    OpenCodeSession(id = id ?: "", title = "", projectID = "p", directory = directory, updatedAt = distantPast)
+                    OpenCodeSession(id = id ?: "", serverTitle = "", projectID = "p", directory = directory, updatedAt = distantPast)
                 },
-                getSession = { _, id -> OpenCodeSession(id = id, title = "", projectID = "p", directory = "/project", updatedAt = distantPast) },
+                getSession = { _, id -> OpenCodeSession(id = id, serverTitle = "", projectID = "p", directory = "/project", updatedAt = distantPast) },
                 transcript = { _, _, _ -> emptyList() },
                 sessionFamily = { _, root -> OpenCodeSessionFamily(sessions = listOf(root), activeSessionIDs = emptySet()) },
                 runningShells = { _, _ -> emptyList() },
@@ -416,7 +416,7 @@ class VoiceFeatureTestsScreenSession {
     }
 
     @Test fun firstRequestOnADraftCreatesTheSessionAndTheScreenAdoptsIt() = sessionTest { h ->
-        val created = OpenCodeSession(id = "ses_new", title = "Upload test", projectID = "p", directory = "/project", updatedAt = distantPast)
+        val created = OpenCodeSession(id = "ses_new", serverTitle = "Upload test", projectID = "p", directory = "/project", updatedAt = distantPast)
         val state = h.state {
             State.draft(server = server, draftProject = OpenCodeProject(id = "p", name = "project", directory = "/project"), projects = emptyList())
                 .copy(voice = live(VoiceFeature.State(server, draftDirectory = "/project", model = OpenCodeModelRef(id = "fixture-model", providerID = "fixture"))))
@@ -467,7 +467,7 @@ class VoiceFeatureTestsScreenSession {
      * creates once: applied, it doesn't wait for another send.
      */
     @Test fun aDraftCallsModelIsAppliedOnceToTheSessionItCreates() = sessionTest { h ->
-        val created = OpenCodeSession(id = "ses_new", title = "Upload test", projectID = "p", directory = "/project", updatedAt = distantPast)
+        val created = OpenCodeSession(id = "ses_new", serverTitle = "Upload test", projectID = "p", directory = "/project", updatedAt = distantPast)
         val model = OpenCodeModelRef(id = "fixture-model", providerID = "fixture")
         val project = OpenCodeProject(id = "p", name = "project", directory = "/project")
         val state = h.state {
@@ -501,7 +501,7 @@ class VoiceFeatureTestsScreenSession {
      * the session half, with that admission.)
      */
     @Test fun aDraftCallsRefusedModelSendsNothing() = sessionTest { h ->
-        val created = OpenCodeSession(id = "ses_new", title = "Upload test", projectID = "p", directory = "/project", updatedAt = distantPast)
+        val created = OpenCodeSession(id = "ses_new", serverTitle = "Upload test", projectID = "p", directory = "/project", updatedAt = distantPast)
         val model = OpenCodeModelRef(id = "fixture-model", providerID = "fixture")
         val calls = LockIsolated(listOf<String>())
         val admission = withTestDependencies({
@@ -546,7 +546,7 @@ class VoiceFeatureTestsScreenSession {
      * shows the pick, waiting for the next send.
      */
     @Test fun aKeptPickWaitsOnTheSessionsScreen() = sessionTest { h ->
-        val session = OpenCodeSession(id = "ses_new", title = "New", projectID = "p", directory = "/project", updatedAt = distantPast)
+        val session = OpenCodeSession(id = "ses_new", serverTitle = "New", projectID = "p", directory = "/project", updatedAt = distantPast)
         val model = OpenCodeModelRef(id = "fixture-model", providerID = "fixture")
         val state = h.state { State.session(server = server, session = session, cachedItems = emptyList()).copy(voice = live(VoiceFeature.State(server, session))) }
         val store = h.store(state)
@@ -559,7 +559,7 @@ class VoiceFeatureTestsScreenSession {
     }
 
     @Test fun aDraftsSessionIsNotAdoptedOnceItsRequestWasLetGo() = sessionTest { h ->
-        val created = OpenCodeSession(id = "ses_new", title = "Upload test", projectID = "p", directory = "/project", updatedAt = distantPast)
+        val created = OpenCodeSession(id = "ses_new", serverTitle = "Upload test", projectID = "p", directory = "/project", updatedAt = distantPast)
         val project = OpenCodeProject(id = "p", name = "project", directory = "/project")
         val other = OpenCodeProject(id = "o", name = "other", directory = "/other")
         val state = h.state {

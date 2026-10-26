@@ -42,7 +42,7 @@ import java.time.Instant
  */
 class WorkingOrderTests {
     private val server = testServer
-    private val session = OpenCodeSession(id = "ses_blog", title = "Blog game", projectID = "p", directory = "/notes", updatedAt = Instant.EPOCH)
+    private val session = OpenCodeSession(id = "ses_blog", serverTitle = "Blog game", projectID = "p", directory = "/notes", updatedAt = Instant.EPOCH)
     private val earlier: List<OpenCodeTranscriptItem> = listOf(
         OpenCodeTranscriptItem.UserText(id = "msg_1", text = "Add a lockbox to the desk"),
         OpenCodeTranscriptItem.AssistantMarkdown(id = "msg_2-text-0", text = ""),

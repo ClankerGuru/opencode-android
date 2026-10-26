@@ -27,7 +27,7 @@ import org.junit.Test
  */
 class VoiceRouteTestsSession {
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
-    private val session = OpenCodeSession(id = "route", title = "Routing", projectID = "p", directory = "/project", updatedAt = distantPast)
+    private val session = OpenCodeSession(id = "route", serverTitle = "Routing", projectID = "p", directory = "/project", updatedAt = distantPast)
 
     /** iOS `preserveSettings()`'s starting point: voice on, GPT-Live, no keys, Server Voice off. */
     private fun Harness.preserveSettings() = state {

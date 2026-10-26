@@ -45,7 +45,7 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 private val server = testServer
-private val session = OpenCodeSession(id = "ses_bg", title = "Background", projectID = "p", directory = "/project", updatedAt = Instant.EPOCH)
+private val session = OpenCodeSession(id = "ses_bg", serverTitle = "Background", projectID = "p", directory = "/project", updatedAt = Instant.EPOCH)
 
 private fun runningTool(
     key: String = "msg_a-tool-call_1",

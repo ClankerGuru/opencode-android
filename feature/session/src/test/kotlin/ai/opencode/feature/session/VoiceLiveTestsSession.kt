@@ -23,7 +23,7 @@ import org.junit.Test
  */
 class VoiceLiveTestsSession {
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
-    private val session = OpenCodeSession(id = "ses_voice", title = "Voice lab", projectID = "p", directory = "/Users/kit/project", updatedAt = distantPast)
+    private val session = OpenCodeSession(id = "ses_voice", serverTitle = "Voice lab", projectID = "p", directory = "/Users/kit/project", updatedAt = distantPast)
 
     @Test fun theSessionScreenReportsTheNewestFinishedCompactionOnlyDuringACall() = sessionTest { h ->
         var state = h.state {
@@ -54,7 +54,7 @@ class VoiceLiveTestsSession {
      * the call arrives, not only when a later one lands.
      */
     @Test fun aCallArrivingInASessionKnowsItsLatestCompaction() = sessionTest { h ->
-        val other = OpenCodeSession(id = "ses_other", title = "Other", projectID = "p", directory = "/Users/kit/project", updatedAt = distantPast)
+        val other = OpenCodeSession(id = "ses_other", serverTitle = "Other", projectID = "p", directory = "/Users/kit/project", updatedAt = distantPast)
         val compacted = listOf(
             OpenCodeTranscriptItem.UserText(id = "msg_1", text = "Hello"),
             OpenCodeTranscriptItem.Compaction(id = "cmp_1", info = OpenCodeCompaction(status = OpenCodeCompaction.Status.Completed)),

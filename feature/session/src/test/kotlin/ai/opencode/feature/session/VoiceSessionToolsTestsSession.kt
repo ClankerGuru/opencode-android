@@ -27,7 +27,7 @@ class VoiceSessionToolsTestsSession {
     }
 
     @Test fun theScreenFollowsOnlyItsOwnSessionsSwitch() = sessionTest { h ->
-        val session = OpenCodeSession(id = "ses_fable", title = "Fable refactor", projectID = "ios", directory = "/Users/kit/opencode-ios", updatedAt = distantPast)
+        val session = OpenCodeSession(id = "ses_fable", serverTitle = "Fable refactor", projectID = "ios", directory = "/Users/kit/opencode-ios", updatedAt = distantPast)
         val state = h.state {
             State.session(server = server, session = session, cachedItems = emptyList())
                 .copy(voice = VoiceFeature.State(server, session).withPhase(VoiceFeature.State.Phase.Live))

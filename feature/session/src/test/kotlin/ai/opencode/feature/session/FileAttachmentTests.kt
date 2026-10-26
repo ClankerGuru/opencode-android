@@ -61,7 +61,7 @@ import java.util.UUID
  */
 class FileAttachmentFeatureTests {
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
-    private val session = OpenCodeSession(id = "ses_1", title = "Files", projectID = "p", directory = "/project", updatedAt = Instant.EPOCH)
+    private val session = OpenCodeSession(id = "ses_1", serverTitle = "Files", projectID = "p", directory = "/project", updatedAt = Instant.EPOCH)
 
     private fun staged(name: String, mime: String = "application/pdf", size: Long = 100, id: Long = 1) = ComposerStagedFile(
         id = UUID(0, id),

@@ -69,7 +69,7 @@ import kotlin.time.Duration.Companion.seconds
 class RunErrorTests {
     private val server = OpenCodeServer(url = "http://127.0.0.1:9", username = "opencode", password = "pw")
     private val filter = OpenCodeRunError(type = "provider.content-filter", message = "Provider blocked the response")
-    private val chatSession = OpenCodeSession(id = "ses_1", title = "Chat", projectID = "p", directory = "/project", updatedAt = Instant.EPOCH)
+    private val chatSession = OpenCodeSession(id = "ses_1", serverTitle = "Chat", projectID = "p", directory = "/project", updatedAt = Instant.EPOCH)
 
     private fun Harness.state(items: List<OpenCodeTranscriptItem>, draft: String = ""): SessionFeature.State = state {
         SessionFeature.State.session(server = server, session = chatSession, cachedItems = items).withDraft(draft)
@@ -478,7 +478,7 @@ class RunErrorTests {
         revert("Earlier\n\nTighten the drawer", "Earlier", 4)
 
         val clearedSnapshot = OpenCodeSession(
-            id = "ses_1", title = "Chat", projectID = "p", directory = "/project",
+            id = "ses_1", serverTitle = "Chat", projectID = "p", directory = "/project",
             updatedAt = store.state.session!!.updatedAt, revertMessageID = null,
         )
         store.send(Action.SessionSnapshotUpdated(clearedSnapshot)) { it.updateObservedSession(clearedSnapshot) }
@@ -675,7 +675,7 @@ class RunErrorTests {
             )
 
             val sibling = OpenCodeSession(
-                id = "ses_2", title = "Subagent", projectID = "p", directory = "/project",
+                id = "ses_2", serverTitle = "Subagent", projectID = "p", directory = "/project",
                 updatedAt = Instant.ofEpochSecond(1_000), parentID = "ses_1",
             )
             val base = h.state(items, draft = "Earlier")

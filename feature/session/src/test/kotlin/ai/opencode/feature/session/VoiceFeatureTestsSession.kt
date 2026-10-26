@@ -16,7 +16,7 @@ import org.junit.Test
  */
 class VoiceFeatureTestsSession {
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
-    private val session = OpenCodeSession(id = "ses_voice", title = "Voice lab", projectID = "p", directory = "/Users/kit/project", updatedAt = distantPast)
+    private val session = OpenCodeSession(id = "ses_voice", serverTitle = "Voice lab", projectID = "p", directory = "/Users/kit/project", updatedAt = distantPast)
 
     @Test fun voiceAvailabilityRequiresBothAdvancedToggleAndAPIKey() = sessionTest { h ->
         val state = h.state { State.session(server = server, session = session, cachedItems = emptyList()) }

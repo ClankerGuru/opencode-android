@@ -62,7 +62,7 @@ import ai.opencode.feature.transcript.SinceYouLeft as TranscriptSinceYouLeft
 class SinceYouLeftTests {
     private val server = OpenCodeServer(url = "http://127.0.0.1:9", username = "", password = "")
 
-    private fun session(id: String) = OpenCodeSession(id = id, title = id, projectID = "project", directory = "/project", updatedAt = Instant.ofEpochSecond(10))
+    private fun session(id: String) = OpenCodeSession(id = id, serverTitle = id, projectID = "project", directory = "/project", updatedAt = Instant.ofEpochSecond(10))
 
     private fun user(id: String, text: String = "Update the spring"): OpenCodeTranscriptItem = OpenCodeTranscriptItem.UserText(id = id, text = text)
 
@@ -114,7 +114,7 @@ class SinceYouLeftTests {
             this[DateClient] = DateClient.constant(now)
             this[SinceYouLeftClient] = sinceYouLeft
             this[OpenCodeClient] = this[OpenCodeClient].copy(
-                getSession = { _, id -> OpenCodeSession(id = id, title = id, projectID = "project", directory = "/project", updatedAt = Instant.ofEpochSecond(10)) },
+                getSession = { _, id -> OpenCodeSession(id = id, serverTitle = id, projectID = "project", directory = "/project", updatedAt = Instant.ofEpochSecond(10)) },
                 contextUsage = { _, _ -> OpenCodeContextReading.Inconclusive },
                 viewSession = { _, _, _ -> },
                 sessionFamily = { _, root -> OpenCodeSessionFamily(sessions = listOf(root), activeSessionIDs = emptySet()) },

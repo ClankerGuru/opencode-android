@@ -56,7 +56,7 @@ import java.time.Instant
  */
 class HapticsAuditTests {
     private val server = OpenCodeServer(url = "http://127.0.0.1:9", username = "opencode", password = "pw")
-    private val session = OpenCodeSession(id = "ses_1", title = "Chat", projectID = "proj_1", directory = "/tmp/demo", updatedAt = Instant.EPOCH)
+    private val session = OpenCodeSession(id = "ses_1", serverTitle = "Chat", projectID = "proj_1", directory = "/tmp/demo", updatedAt = Instant.EPOCH)
     private val json = Json { ignoreUnknownKeys = true }
 
     private fun Harness.sessionState(isRunning: Boolean = false): SessionFeature.State =

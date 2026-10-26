@@ -34,7 +34,7 @@ class ModelVisibilityTests {
     // MARK: Pickers
 
     private fun Harness.sessionState(visibility: ModelVisibility?, experiment: Boolean = true): State {
-        val session = OpenCodeSession(id = "ses_1", title = "Chat", projectID = "p", directory = "/project", updatedAt = Instant.EPOCH, model = cirrus.ref)
+        val session = OpenCodeSession(id = "ses_1", serverTitle = "Chat", projectID = "p", directory = "/project", updatedAt = Instant.EPOCH, model = cirrus.ref)
         val state = state { State.session(server = server, session = session) }.copy(models = catalog)
         state.hideModelsExperiment.set(experiment)
         if (visibility != null) state.modelVisibilityByServer.set(mapOf(server.persistenceID to visibility))

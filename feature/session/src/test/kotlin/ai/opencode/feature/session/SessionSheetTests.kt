@@ -69,7 +69,7 @@ class SessionSheetTests {
     private val model = OpenCodeModelRef(id = "fixture-model", providerID = "fixture")
 
     private fun session(id: String = "ses_sheet", title: String = "Sheet", parentID: String? = null, cost: Double? = null) = OpenCodeSession(
-        id = id, title = title, projectID = "prj", directory = "/work/app",
+        id = id, serverTitle = title, projectID = "prj", directory = "/work/app",
         updatedAt = Instant.ofEpochSecond(100), parentID = parentID, cost = cost,
     )
 
@@ -105,8 +105,8 @@ class SessionSheetTests {
     private fun sheetDelegate(delegate: SessionSheetFeature.Delegate): Action = sheet(SessionSheetFeature.Action.Delegate(delegate))
     private fun State.updatingSheet(update: SessionSheetFeature.State.() -> SessionSheetFeature.State) = copy(sessionSheet = sessionSheet?.update())
     private fun State.renamed(title: String) = copy(
-        session = session?.copy(title = title),
-        familySessions = familySessions.mapIndexed { index, s -> if (index == 0) s.copy(title = title) else s },
+        session = session?.copy(serverTitle = title),
+        familySessions = familySessions.mapIndexed { index, s -> if (index == 0) s.copy(serverTitle = title) else s },
     )
     private fun State.alwaysNotify(isOn: Boolean) = copy(
         session = session?.copy(alwaysNotify = isOn),
@@ -473,7 +473,7 @@ class SessionSheetTests {
             client {
                 copy(
                     renameSession = { _, _, title -> patched.append(title) },
-                    getSession = { _, _ -> session.copy(title = "Plan the boys’ dinner") },
+                    getSession = { _, _ -> session.copy(serverTitle = "Plan the boys’ dinner") },
                 )
             }
         }

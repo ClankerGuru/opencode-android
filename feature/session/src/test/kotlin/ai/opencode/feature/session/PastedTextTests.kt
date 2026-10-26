@@ -46,7 +46,7 @@ import kotlin.time.Duration.Companion.seconds
  */
 
 private val pasteServer = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
-private val pasteSession = OpenCodeSession(id = "ses_1", title = "Paste", projectID = "p", directory = "/project", updatedAt = Instant.EPOCH)
+private val pasteSession = OpenCodeSession(id = "ses_1", serverTitle = "Paste", projectID = "p", directory = "/project", updatedAt = Instant.EPOCH)
 
 /** A big paste's summary is computed once, when it's pasted. */
 class PastedTextOnceTests {
@@ -161,7 +161,7 @@ class UserBubbleFoldTests {
 
         val copied = LockIsolated(listOf<String>())
         val haptics = HapticsRecorder()
-        val store = h.store(h.state { SessionFeature.State.session(server = pasteServer, session = pasteSession.copy(title = "Copy"), cachedItems = emptyList()) }) {
+        val store = h.store(h.state { SessionFeature.State.session(server = pasteServer, session = pasteSession.copy(serverTitle = "Copy"), cachedItems = emptyList()) }) {
             this[PasteboardClient] = PasteboardClient(setURL = {}, setString = { copied.append(it) })
             this[HapticsClient] = haptics.client
         }

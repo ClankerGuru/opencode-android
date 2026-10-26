@@ -78,17 +78,17 @@ class ComposerSessionMentionTests {
         val issues = LockIsolated(listOf<String>())
         val project = OpenCodeProject(id = "proj_1", name = "opencode-ios", directory = session.directory)
         val current = OpenCodeSession(
-            id = mentionID("Current"), title = "Drawer Current", projectID = "proj_1",
+            id = mentionID("Current"), serverTitle = "Drawer Current", projectID = "proj_1",
             directory = session.directory, updatedAt = Instant.ofEpochSecond(1_950),
         )
         fun payload(seed: String, title: String, projectID: String, directory: String, updated: Long) = OpenCodeSession(
-            id = mentionID(seed), title = title, projectID = projectID, directory = directory, updatedAt = Instant.ofEpochSecond(updated),
+            id = mentionID(seed), serverTitle = title, projectID = projectID, directory = directory, updatedAt = Instant.ofEpochSecond(updated),
         )
         val polish = payload("DrawerPolish", "Drawer Polish", "proj_1", session.directory, 1_900)
         val voice = payload("Voice", "Voice Call Retries", "proj_2", "/Users/kit/code/opencode", 1_800)
         val gestures = payload("Gestures", "Drawer Gestures", "proj_1", session.directory, 1_700)
         val malformed = OpenCodeSession(
-            id = "ses_short", title = "Drawer Broken", projectID = "proj_1", directory = session.directory,
+            id = "ses_short", serverTitle = "Drawer Broken", projectID = "proj_1", directory = session.directory,
             updatedAt = Instant.ofEpochSecond(1_990),
         )
         val all = listOf(current, malformed, polish, voice, gestures)
@@ -280,7 +280,7 @@ class ComposerSessionMentionTests {
         try {
             val persistenceServer = OpenCodeServer(url = "http://localhost:9", username = "opencode", password = "pw")
             val persistenceSession = OpenCodeSession(
-                id = "ses_1", title = "Durable drafts", projectID = "proj_1",
+                id = "ses_1", serverTitle = "Durable drafts", projectID = "proj_1",
                 directory = "/Users/kit/code/opencode", updatedAt = Instant.ofEpochSecond(1_000),
             )
             val firstID = "msg_00000000000100000000000000"

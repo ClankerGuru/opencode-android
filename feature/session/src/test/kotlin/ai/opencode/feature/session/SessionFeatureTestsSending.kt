@@ -57,7 +57,7 @@ class SessionFeatureTestsSending {
     @Test
     fun sendingWhileRunningQueuesOptimisticallyAndSurvivesStalePolls() = sessionTest { h ->
         val server = OpenCodeServer(url = "http://127.0.0.1:9", username = "opencode", password = "pw")
-        val session = OpenCodeSession(id = "ses_1", title = "Chat", projectID = "proj_1", directory = "/tmp/demo", updatedAt = Instant.EPOCH)
+        val session = OpenCodeSession(id = "ses_1", serverTitle = "Chat", projectID = "proj_1", directory = "/tmp/demo", updatedAt = Instant.EPOCH)
         val localID = "msg_00000000000100000000000000"
         val posts = LockIsolated<List<Pair<String, OpenCodeDelivery>>>(emptyList())
         val state = h.state { State.session(server = server, session = session, cachedItems = listOf(user("m1", "first"))) }
@@ -115,7 +115,7 @@ class SessionFeatureTestsSending {
     @Test
     fun queuedSendWithImagesKeepsImagesThroughEchoAndPromotion() = sessionTest { h ->
         val server = OpenCodeServer(url = "http://127.0.0.1:9", username = "opencode", password = "pw")
-        val session = OpenCodeSession(id = "ses_1", title = "Chat", projectID = "proj_1", directory = "/tmp/demo", updatedAt = Instant.EPOCH)
+        val session = OpenCodeSession(id = "ses_1", serverTitle = "Chat", projectID = "proj_1", directory = "/tmp/demo", updatedAt = Instant.EPOCH)
         val data = byteArrayOf(1, 2, 3)
         val state = h.state { State.session(server = server, session = session, cachedItems = emptyList(), isRunning = true) }
             .withDraft("Look")
@@ -316,7 +316,8 @@ class SessionFeatureTestsSending {
                 sendGeneration = 1,
             ).withDraft("")
         }
-        store.receive(Action.SessionCreated::class) { it.copy(session = created) }
+        // Android: an unnamed session learns its first prompt (the title fallback, `SessionTitle`).
+        store.receive(Action.SessionCreated::class) { it.copy(session = created.copy(firstPrompt = "hello")) }
         store.receive(Action.ReplyCompleted(sessionID = "ses_new"))
         store.receive(Action.ExternalRunStateChanged(isRunning = false)) { it.copy(isAwaitingReply = false) }
         store.receive(Action.RefreshResponse::class) { it.copy(items = replied) }

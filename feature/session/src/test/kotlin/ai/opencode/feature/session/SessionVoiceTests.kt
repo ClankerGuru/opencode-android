@@ -51,8 +51,8 @@ import kotlin.time.Duration.Companion.milliseconds
  */
 class SessionVoiceTests {
     private val server = OpenCodeServer(url = "http://voice.invalid", username = "", password = "")
-    private val root = OpenCodeSession(id = "ses_root", title = "Root", projectID = "p", directory = "/project", updatedAt = distantPast)
-    private val child = OpenCodeSession(id = "ses_child", title = "Child", projectID = "p", directory = "/project", updatedAt = distantPast, parentID = "ses_root")
+    private val root = OpenCodeSession(id = "ses_root", serverTitle = "Root", projectID = "p", directory = "/project", updatedAt = distantPast)
+    private val child = OpenCodeSession(id = "ses_child", serverTitle = "Child", projectID = "p", directory = "/project", updatedAt = distantPast, parentID = "ses_root")
 
     /** iOS `Cue`: answers that resolve (or fail) only when the test says so, by key. */
     private class Cue<Value>(keys: List<String>) {

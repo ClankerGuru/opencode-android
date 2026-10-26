@@ -68,7 +68,7 @@ import java.time.Instant
  */
 class RaiseToTalkTests {
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
-    private val session = OpenCodeSession(id = "ses_ear", title = "Ear", projectID = "p", directory = "/Users/kit/project", updatedAt = SessionTestSupport.distantPast)
+    private val session = OpenCodeSession(id = "ses_ear", serverTitle = "Ear", projectID = "p", directory = "/Users/kit/project", updatedAt = SessionTestSupport.distantPast)
 
     private fun Harness.earState(voice: Boolean = true, apiKey: String? = "sk-test"): SessionFeature.State {
         sharedStore.reference(SharedKeys.voiceModeEnabled).set(voice)
