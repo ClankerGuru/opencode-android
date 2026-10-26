@@ -108,6 +108,46 @@ object RequestPanelFit {
         }
     }
 
+    /** A part that gives up height ([requestPanelPart]): its natural height (already at most its cap), its floor and priority. */
+    data class Part(val natural: Int, val floor: Int, val priority: Double)
+
+    /** The parts' heights (in [stack]'s part order), whether the column scrolls, and its height. */
+    data class Stack(val heights: List<Int>, val scrolls: Boolean, val height: Int)
+
+    /**
+     * The column under [room] (null: unbounded): [fixed] children at their own heights, [parts]
+     * at their natural heights where they fit, else squeezed in priority order down to their
+     * floors; past the floors the parts stay whole and the column scrolls, at most [room] tall.
+     */
+    fun stack(room: Int?, fixed: Int, parts: List<Part>): Stack {
+        val natural = parts.map { it.natural }
+        val least = parts.map { min(it.natural, it.floor) }
+        val needed = fixed + least.sum()
+        val scrolls = room != null && needed > room
+        val heights = IntArray(parts.size)
+        if (scrolls || room == null) {
+            for (index in parts.indices) heights[index] = natural[index]
+        } else {
+            for (index in parts.indices) heights[index] = least[index]
+            var extra = room - needed
+            // Higher priorities take room first; within one, the least flexible first, evenly.
+            val groups = parts.indices.groupBy { parts[it].priority }
+            for (priority in groups.keys.sortedDescending()) {
+                val members = groups.getValue(priority).sortedBy { natural[it] - least[it] }
+                var left = members.size
+                for (index in members) {
+                    val share = if (left > 0) extra / left else 0
+                    val grant = min(share, natural[index] - least[index]).coerceAtLeast(0)
+                    heights[index] += grant
+                    extra -= grant
+                    left -= 1
+                }
+            }
+        }
+        val total = fixed + heights.sum()
+        return Stack(heights.toList(), scrolls, if (room == null) total else min(total, room))
+    }
+
     /** The panel stands at its cap: the cap, not its content, set its height. */
     fun isCapped(height: Float, cap: Float?): Boolean = cap?.let { height >= it - 0.5f } ?: false
 
@@ -230,35 +270,22 @@ private fun RequestPanelStack(modifier: Modifier = Modifier, content: @Composabl
                 fixed[index] = measurable.measure(loose).also { fixedHeight += it.height }
             }
         }
-        val natural = IntArray(measurables.size)
-        val least = IntArray(measurables.size)
-        for ((index, measurable) in measurables.withIndex()) {
-            val part = parts[index] ?: continue
-            natural[index] = min(naturalHeight(measurable, width), part.cap.roundToPx())
-            least[index] = min(natural[index], part.floor.roundToPx())
-        }
-        val needed = fixedHeight + least.sum()
-        val scrolls = room != Constraints.Infinity && needed > room
+        val partIndices = measurables.indices.filter { parts[it] != null }
+        val fit = RequestPanelFit.stack(
+            room = room.takeIf { it != Constraints.Infinity },
+            fixed = fixedHeight,
+            parts = partIndices.map { index ->
+                val part = parts[index]!!
+                RequestPanelFit.Part(
+                    natural = min(naturalHeight(measurables[index], width), part.cap.roundToPx()),
+                    floor = part.floor.roundToPx(),
+                    priority = part.priority,
+                )
+            },
+        )
+        val scrolls = fit.scrolls
         val heights = IntArray(measurables.size)
-        if (scrolls || room == Constraints.Infinity) {
-            for (index in measurables.indices) if (parts[index] != null) heights[index] = natural[index]
-        } else {
-            for (index in measurables.indices) if (parts[index] != null) heights[index] = least[index]
-            var extra = room - needed
-            // Higher priorities take room first; within one, the least flexible first, evenly.
-            val groups = measurables.indices.filter { parts[it] != null }.groupBy { parts[it]!!.priority }
-            for (priority in groups.keys.sortedDescending()) {
-                val members = groups.getValue(priority).sortedBy { natural[it] - least[it] }
-                var left = members.size
-                for (index in members) {
-                    val share = if (left > 0) extra / left else 0
-                    val grant = min(share, natural[index] - least[index]).coerceAtLeast(0)
-                    heights[index] += grant
-                    extra -= grant
-                    left -= 1
-                }
-            }
-        }
+        partIndices.forEachIndexed { at, index -> heights[index] = fit.heights[at] }
         val placeables = measurables.mapIndexed { index, measurable ->
             fixed[index] ?: measurable.measure(Constraints(minWidth = 0, maxWidth = width, minHeight = heights[index], maxHeight = heights[index]))
         }
