@@ -73,6 +73,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.alpha
@@ -148,13 +150,25 @@ import kotlin.math.roundToInt
 class BackgroundWorkAnchor {
     /** Root coordinates in px; null while the capsule's place isn't laid out. */
     internal var bounds by mutableStateOf<Rect?>(null)
+
+    /** The capsule's place as laid out now (read at draw time, after this frame's layout). */
+    internal var coordinates: androidx.compose.ui.layout.LayoutCoordinates? = null
+
+    /**
+     * What moves the capsule's place frame by frame (the request panel's room growing above the
+     * composer), read while the surface draws so it redraws in the frame its place moves.
+     */
+    var motion: () -> Float = { 0f }
 }
 
 @Composable
 fun rememberBackgroundWorkAnchor(): BackgroundWorkAnchor = remember { BackgroundWorkAnchor() }
 
 /** Marks the capsule the background-work panel anchors to. */
-fun Modifier.backgroundActivityAnchor(anchor: BackgroundWorkAnchor): Modifier = onGloballyPositioned { anchor.bounds = it.boundsInRoot() }
+fun Modifier.backgroundActivityAnchor(anchor: BackgroundWorkAnchor): Modifier = onGloballyPositioned {
+    anchor.coordinates = it
+    anchor.bounds = it.boundsInRoot()
+}
 
 /** The open panel covers the composer pills beside and above the capsule. */
 val LocalBackgroundWorkCoversPills = compositionLocalOf { false }
@@ -659,6 +673,8 @@ fun BackgroundWorkPresentation(
         CompositionLocalProvider(LocalBackgroundWorkCoversPills provides isPanel) { content() }
 
         // The capsule's frame (dp, overlay-local), or while the panel is up or closing, where it last was.
+        // The place's top (root px) this composition laid the surface out from.
+        val composedTop = anchor.bounds?.top
         val live = anchor.bounds?.let { b ->
             Rect((b.left - origin.x) / density.density, (b.top - origin.y) / density.density, (b.right - origin.x) / density.density, (b.bottom - origin.y) / density.density)
         }
@@ -760,6 +776,15 @@ fun BackgroundWorkPresentation(
                         traced.surface = Rect(left, top, right, bottom).translate(o) to hiddenAlpha * max(capsuleAlpha.value, progress.value)
                     }
                     layout(0, 0) { placeable.place((left * density.density).roundToInt(), (top * density.density).roundToInt()) }
+                }
+                // At rest, the capsule rides its place in the frame the place moves (iOS draws it in
+                // the pill row): the bounds above are last frame's, so the drawing makes up the
+                // difference from where the place is laid out now. The next composition catches up.
+                .drawWithContent {
+                    anchor.motion()
+                    val now = anchor.coordinates?.takeIf { it.isAttached }?.positionInRoot()
+                    val dy = if (stage == BackgroundWorkStage.closed && progress.value == 0f && composedTop != null && now != null) now.y - composedTop else 0f
+                    if (dy == 0f) drawContent() else translate(top = dy) { this@drawWithContent.drawContent() }
                 }
                 .shadow(if (isPanel) 6.dp else 2.dp, shape, clip = false)
                 .clip(shape)

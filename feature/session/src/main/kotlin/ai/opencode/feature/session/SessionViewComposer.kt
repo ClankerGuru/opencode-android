@@ -464,6 +464,8 @@ fun SessionComposer(
         send = { store.send(Action.Autocomplete(it)) },
     )
     host.focusAction = env.focus
+    // The background-work capsule above rides the request panel's room as it animates.
+    host.backgroundWorkAnchor?.motion = { view.requestPanelShown.value * 1000f + view.requestPanelReveal.value }
     host.dismissAction = env.dismissKeyboard
     SideEffect {
         host.autocompleteCovers = usesAutocomplete && view.autocompleteController.isOpen
