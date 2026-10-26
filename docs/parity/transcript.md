@@ -92,7 +92,7 @@ port; "dropped" ones can't exist on Android, and each Kotlin file's header lists
 
 | iOS file | Kotlin file | Ported | Skipped (owner) | Dropped (reason) |
 | --- | --- | ---: | --- | --- |
-| `MarkdownBlockTests.swift` | `markdown/MarkdownBlockTests.kt` | 40 | `markdownImageClientDecodes…` (`:server`); 3 highlighting tests (`:feature:media`); `increaseContrastUsesSecondaryOnHeaderProjectLine`, `titleLoadingPresets…` (`:feature:session`) | 2 `UIHostingController` measurements; 2 SwiftUI split-overlay tests (Android fades one laid-out text); `whatIsSelectedCopiedAndRead…` + 2 `StreamLineHoldTests` (`LineBreak.Simple` never moves a word); 2 `TranscriptTextRevealWaitTests` (no `wait(until:)`) |
+| `MarkdownBlockTests.swift` | `markdown/MarkdownBlockTests.kt` | 40 | `markdownImageClientDecodes…` (`:server`); 3 highlighting tests (`:feature:media`, ported there); `increaseContrastUsesSecondaryOnHeaderProjectLine`, `titleLoadingPresets…` (`:feature:session`) | 2 `UIHostingController` measurements; 2 SwiftUI split-overlay tests (Android fades one laid-out text); `whatIsSelectedCopiedAndRead…` + 2 `StreamLineHoldTests` (`LineBreak.Simple` never moves a word); 2 `TranscriptTextRevealWaitTests` (no `wait(until:)`) |
 | `MarkdownStreamTests.swift` | `markdown/MarkdownStreamTests.kt` | 10 (+ env-gated cost metric) | – | – |
 | `MathAndMermaidTests.swift` | `markdown/MathAndMermaidTests.kt` | 13 | 4 Mermaid card/cache tests (`:feature:media`) | `mathSurvivesTheTranscriptCache` (Android caches raw Markdown, never parsed blocks) |
 | `InlineLinkIconsTests.swift` | `markdown/ui/InlineLinkIconsTests.kt` | 8 | – | `cleanAddressIsTheDefault` (Clean Address baked, no presets); 5 TextKit hit-layout / `ImageRenderer` pixel probes |
