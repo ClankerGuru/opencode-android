@@ -6,6 +6,7 @@ import ai.opencode.core.tuning.TunableChoice
 import ai.opencode.core.tuning.TuningPreset
 import ai.opencode.core.tuning.TuningPresets
 import ai.opencode.core.tuning.TuningStore
+import ai.opencode.feature.media.AgentImageTunables
 import ai.opencode.feature.transcript.markdown.ui.SessionLinkTunables
 import ai.opencode.feature.transcript.markdown.ui.TextRevealTunables
 import androidx.compose.runtime.Immutable
@@ -329,6 +330,7 @@ object TranscriptTunables {
             codeLeading = codeLeading,
             paragraphGap = resolvedParagraphGap(paragraphGap, flow),
             imageLinkPreviews = imageLinkPreviews,
+            linkMaxHeight = AgentImageTunables.linkMaxHeight.value,
         )
     }
 }
