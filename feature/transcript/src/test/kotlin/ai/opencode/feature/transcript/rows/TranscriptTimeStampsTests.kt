@@ -8,7 +8,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
-import org.junit.Ignore
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import org.junit.Test
 import java.time.Duration
 import java.time.Instant
@@ -26,6 +28,8 @@ import kotlin.math.abs
  * runs those under Robolectric. Where an iOS test also checks [TranscriptTimeStamps.date] (pure),
  * that half runs under the iOS name and the formatting half is the `…Stamps` test beside it.
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35])
 class TranscriptTimeStampsTests {
     private companion object {
         const val NEEDS_ICU = "Formats with android.icu, a stub in JVM unit tests: needs Robolectric"
@@ -67,7 +71,6 @@ class TranscriptTimeStampsTests {
     }
 
     @Test
-    @Ignore(NEEDS_ICU)
     fun datesTheFirstMessageOfEachDayAndTimesLongPauses() {
         val now = at(10, 12, 9, 41)
         val times = listOf(
@@ -91,7 +94,6 @@ class TranscriptTimeStampsTests {
 
     /** A pause is time without activity, not time since the last message: a long run leaves no gap before the next message. */
     @Test
-    @Ignore(NEEDS_ICU)
     fun pausesAreMeasuredFromTheLastActivity() {
         val now = at(10, 12, 18, 0)
         val first = at(10, 12, 8, 0)
@@ -106,7 +108,6 @@ class TranscriptTimeStampsTests {
     }
 
     @Test
-    @Ignore(NEEDS_ICU)
     fun aNewDayIsDatedEvenRightAfterTheLastReply() {
         val now = at(10, 12, 9, 0)
         val late = at(10, 11, 23, 50)
@@ -129,7 +130,6 @@ class TranscriptTimeStampsTests {
     }
 
     @Test
-    @Ignore(NEEDS_ICU)
     fun idsWithoutTimesStamps() {
         val now = at(10, 12, 9, 41)
         // A message sent from this phone takes its reply's time.
@@ -161,7 +161,6 @@ class TranscriptTimeStampsTests {
     }
 
     @Test
-    @Ignore(NEEDS_ICU)
     fun aServerClockAheadOrBehindReadsAsNowStamps() {
         val now = at(10, 12, 9, 41)
         // A message from this phone whose reply the server dated 50 ms (or 40 s) ahead is
@@ -195,7 +194,6 @@ class TranscriptTimeStampsTests {
 
     /** A message from this phone that never got a reply (stopped, or failed) has no time: it gets no stamp, and never takes a later turn's time. */
     @Test
-    @Ignore(NEEDS_ICU)
     fun anUnansweredMessageNeverTakesALaterTurnsTime() {
         val now = at(10, 12, 9, 41)
         val stopped = "msg_0A1B2C3D4E5F60718293A4B5C6D7E8F9"
@@ -221,7 +219,6 @@ class TranscriptTimeStampsTests {
 
     /** A prompt's images and text are one message, dated once, over its first row. */
     @Test
-    @Ignore(NEEDS_ICU)
     fun imagesAndTextAreOneMessage() {
         val now = at(10, 12, 9, 41)
         val sent = id(at(10, 12, 8, 0))
@@ -236,7 +233,6 @@ class TranscriptTimeStampsTests {
 
     /** Voice delegations and messages another agent sent are messages in the session like any other. */
     @Test
-    @Ignore(NEEDS_ICU)
     fun voiceAndAgentMessagesAreDatedToo() {
         val now = at(10, 12, 9, 41)
         val voice = at(10, 9, 8, 40)
@@ -247,7 +243,6 @@ class TranscriptTimeStampsTests {
     }
 
     @Test
-    @Ignore(NEEDS_ICU)
     fun daylightSavingTime() {
         val newYorkZone = ZoneId.of("America/New_York")
         fun newYork(items: List<OpenCodeTranscriptItem>, now: Instant): Map<String, String> =
@@ -273,7 +268,6 @@ class TranscriptTimeStampsTests {
 
     /** A week ago today is a date, never the weekday that also names today. */
     @Test
-    @Ignore(NEEDS_ICU)
     fun aWeekAgoIsADate() {
         val now = at(10, 12, 9, 41)
         val lastMonday = at(10, 5, 10, 0)
@@ -281,7 +275,6 @@ class TranscriptTimeStampsTests {
     }
 
     @Test
-    @Ignore(NEEDS_ICU)
     fun insertsEachStampAboveItsMessage() {
         val now = at(10, 12, 9, 41)
         val items = turn(at(10, 11, 9, 0)) + turn(at(10, 12, 9, 0))
@@ -307,7 +300,6 @@ class TranscriptTimeStampsTests {
     }
 
     @Test
-    @Ignore(NEEDS_ICU)
     fun followsTheLocale() {
         val german = Locale.GERMANY
         val now = at(10, 12, 9, 41)
