@@ -42,6 +42,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -743,11 +744,18 @@ fun ComposerTextInput(
             lineLimits = TextFieldLineLimits.MultiLine(),
             onTextLayout = { getResult ->
                 val result = getResult()
-                controller.layout = result
-                sendTransition?.textLayout = result
-                autocompleteBridge?.textLayout = result
-                if (result != null) autocompleteBridge?.updateLineBreaks(result)
-                controller.layoutTick += 1
+                // The field calls this from its own measure, which observes every state read here:
+                // `layoutTick += 1` reads before it writes, so the write invalidated the field's
+                // measure, which called this again — a relayout and redraw every frame for as long
+                // as the screen stayed up (60 fps idle, found against a live server). Only the
+                // layout result is the field's input; the rest is bookkeeping for other readers.
+                Snapshot.withoutReadObservation {
+                    controller.layout = result
+                    sendTransition?.textLayout = result
+                    autocompleteBridge?.textLayout = result
+                    if (result != null) autocompleteBridge?.updateLineBreaks(result)
+                    controller.layoutTick += 1
+                }
             },
             decorator = { innerTextField ->
                 Box {

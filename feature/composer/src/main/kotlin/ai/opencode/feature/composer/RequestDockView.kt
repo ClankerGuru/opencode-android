@@ -818,7 +818,7 @@ private class DockScope(
                     ) { ButtonLabel("Always Allow", sending = busy && state.sentAction == DockAction.Always) }
                     if (state.scopeShownForID == permission.id) {
                         Popup(
-                            popupPositionProvider = AbovePositionProvider,
+                            popupPositionProvider = with(LocalDensity.current) { remember(density) { AbovePositionProvider(16.dp.roundToPx()) } },
                             onDismissRequest = { state.scopeShownForID = null },
                             properties = PopupProperties(focusable = true),
                         ) {
@@ -1033,9 +1033,9 @@ private fun Modifier.outset(start: Dp = 0.dp, end: Dp = 0.dp): Modifier = layout
 }
 
 /** Places the Always Allow scope popover above its button (below when there's no room), inside the window. */
-private object AbovePositionProvider : PopupPositionProvider {
+/** Above the anchor, centred on it, kept [margin] px inside the window (like a popover inside the safe area). */
+private class AbovePositionProvider(private val margin: Int) : PopupPositionProvider {
     override fun calculatePosition(anchorBounds: IntRect, windowSize: IntSize, layoutDirection: LayoutDirection, popupContentSize: IntSize): IntOffset {
-        val margin = 8
         val x = (anchorBounds.center.x - popupContentSize.width / 2).coerceIn(margin, max(margin, windowSize.width - popupContentSize.width - margin))
         val above = anchorBounds.top - popupContentSize.height - margin
         val y = if (above >= margin) above else min(anchorBounds.bottom + margin, max(margin, windowSize.height - popupContentSize.height - margin))

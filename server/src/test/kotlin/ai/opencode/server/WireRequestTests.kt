@@ -28,6 +28,7 @@ import java.time.Instant
 import java.util.Base64
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.seconds
+import okhttp3.ResponseBody.Companion.toResponseBody
 
 /** Exact request bodies and failure handling for the live HTTP transport, captured below OkHttp. */
 class WireRequestTests {
@@ -404,5 +405,45 @@ class WireRequestTests {
             assertTrue(fixture.requests.all { it.queryValue("location[directory]") == "/work/cold-boot" })
             assertTrue(fixture.requests.all { it.timeoutInterval == LOCATION_BOOT_TIMEOUT.inWholeMilliseconds / 1000.0 })
         }
+    }
+
+    /**
+     * iOS `AppFeatureTests.transportSecurityAllowsPrivateOverlays` (same addresses): plain HTTP
+     * reaches private networks and overlays only; the live guard refuses the rest as the
+     * platform's cleartext refusal, before anything is sent.
+     */
+    @Test
+    fun transportSecurityAllowsPrivateOverlays() {
+        val allowed = listOf(
+            "http://100.64.0.1:9", "http://100.96.0.1:9", "http://100.127.255.254:9",
+            "http://[fc00::1]:9", "http://[fd7a:115c:a1e0::1]:9", "http://[fdff:ffff::1]:9",
+            "http://peer.tailnet-0000.ts.net:9", "http://peer.netbird.cloud:9", "http://peer.netbird.selfhosted:9",
+            "http://nas.home.arpa:9", "http://build.internal:9",
+            // NSAllowsLocalNetworking itself: RFC 1918, loopback, unqualified and .local names.
+            "http://10.0.2.2:4096", "http://192.168.1.20:4096", "http://172.31.7.134:4096", "http://127.0.0.1:4096",
+            "http://my-mac:4096", "http://my-mac.local:4096",
+        )
+        val blocked = listOf(
+            "http://100.63.255.254:9", "http://100.128.0.1:9", "http://8.8.8.8:9",
+            "http://[fbff::1]:9", "http://[fe00::1]:9", "http://[2606:4700:4700::1111]:9",
+            "http://opencode-ats-probe.example.com:9", "http://ts.net.example.com:9",
+        )
+        fun refused(address: String): Boolean {
+            val client = okhttp3.OkHttpClient.Builder().addInterceptor(TransportSecurity.interceptor)
+                .addInterceptor { chain ->
+                    okhttp3.Response.Builder().request(chain.request()).protocol(okhttp3.Protocol.HTTP_1_1)
+                        .code(204).message("").body(ByteArray(0).toResponseBody()).build()
+                }
+                .build()
+            return try {
+                client.newCall(okhttp3.Request.Builder().url(address).build()).execute().close()
+                false
+            } catch (error: java.net.UnknownServiceException) {
+                error.message.orEmpty().startsWith("CLEARTEXT communication to ")
+            }
+        }
+        for (address in allowed) assertTrue("should allow $address", !refused(address))
+        for (address in blocked) assertTrue("should block $address", refused(address))
+        assertTrue("HTTPS is never refused", !refused("https://8.8.8.8:9"))
     }
 }

@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Release: cleartext follows the platform default (off). OpenCode servers on a LAN or
-     tailnet are often plain http, so the server agent decides the release policy with
-     the iOS ATS settings (NSAllowsArbitraryLoads / local networking) as the reference. -->
+<!-- Plain HTTP is allowed here because this config can't name address ranges: OpenCode servers on
+     a LAN or tailnet are usually http://<private IP>:4096. The live transport enforces iOS's ATS
+     policy (local networking plus overlay ranges and names) in code: see
+     ai.opencode.server.TransportSecurity, which refuses plain HTTP to public hosts. -->
 <network-security-config>
-    <base-config cleartextTrafficPermitted="false" />
+    <base-config cleartextTrafficPermitted="true" />
 </network-security-config>

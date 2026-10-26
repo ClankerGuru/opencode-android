@@ -148,14 +148,20 @@ private fun InlineToolGroupHeaderLabel(header: InlineToolGroupHeader, modifier: 
         }
         Text(text, modifier, style = style)
     } else {
+        // Top-aligned, not by baseline: the pieces share one style, so their baselines already
+        // agree (RollingNumber's canvas rounds its ascender up, under a pixel). Baseline alignment
+        // queried RollingNumber's alignment lines during measure while it swapped its subtree
+        // (canvas ↔ crossfaded text on lifecycle and fit changes), which crashes compose-ui
+        // 1.12.1 with "LayoutNode N not found in RectList" (b/549552303, fixed in 1.13.0-beta01;
+        // found against a live server). Restore alignByBaseline once Compose is on 1.13.
         Row(modifier) {
             // RollingNumber falls back to plain text when it doesn't fit (iOS `ViewThatFits`).
-            RollingNumber(header.title, Modifier.alignByBaseline(), style = style, color = colors.secondaryText)
+            RollingNumber(header.title, style = style, color = colors.secondaryText)
             if (header.failed > 0) {
-                RollingNumber(" · ${header.failed} failed", Modifier.alignByBaseline(), style = style, color = colors.destructive)
+                RollingNumber(" · ${header.failed} failed", style = style, color = colors.destructive)
             }
             header.cue?.let {
-                Text(" · $it", Modifier.alignByBaseline(), style = style, color = colors.secondaryText, maxLines = 1, softWrap = false)
+                Text(" · $it", style = style, color = colors.secondaryText, maxLines = 1, softWrap = false)
             }
         }
     }
@@ -427,10 +433,13 @@ private fun InlineQuestionView(entry: TranscriptEntry, id: String, call: OpenCod
                 style = style,
             )
         } else {
+            // Top-aligned (one style, so the baselines agree): baseline alignment while
+            // AnimatedVisibility adds or drops its text crashes compose-ui 1.12.1 (b/549552303;
+            // see InlineToolGroupHeaderLabel).
             Row(headerModifier) {
-                Text(lead, Modifier.alignByBaseline(), style = style, color = colors.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(lead, style = style, color = colors.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (value != null) {
-                    AnimatedVisibility(!expanded, Modifier.alignByBaseline().weight(1f, fill = false), enter = DisclosedTransition.enter, exit = DisclosedTransition.exit) {
+                    AnimatedVisibility(!expanded, Modifier.weight(1f, fill = false), enter = DisclosedTransition.enter, exit = DisclosedTransition.exit) {
                         Text(" · $value", style = style, color = colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
