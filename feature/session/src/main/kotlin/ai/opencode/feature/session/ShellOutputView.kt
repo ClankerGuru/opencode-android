@@ -10,6 +10,7 @@ import ai.opencode.core.ui.OpenCodeIconButtonStyle
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.feature.composer.OpenCodeBottomSheet
 import ai.opencode.server.model.OpenCodeShell
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -37,7 +38,6 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
@@ -112,7 +112,7 @@ fun ShellOutputView(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val windowHeight = LocalWindowInfo.current.containerSize.height
     val navigationBottom = WindowInsets.navigationBars.getBottom(LocalDensity.current)
-    ModalBottomSheet(
+    OpenCodeBottomSheet(
         onDismissRequest = onClose,
         sheetState = sheetState,
         modifier = Modifier.testTag("shell-output"),

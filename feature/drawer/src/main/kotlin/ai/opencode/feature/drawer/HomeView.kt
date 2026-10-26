@@ -146,16 +146,18 @@ fun HomeView(
         settings = { HomeSettings(store) },
         modifier = modifier,
     ) {
-        BoxWithConstraints(Modifier.fillMaxSize()) {
-            // An iPad-wide window lists the sessions in a sidebar beside the session; anything
-            // narrower slides the phone's drawer under it.
-            val usesSidebar = maxWidth >= SidebarMetrics.minimumWindowWidth
-            // Three quarters of a phone; on a wider window, no wider than a sidebar.
-            val drawerWidth = if (usesSidebar) SidebarMetrics.width else min(maxWidth * 0.75f, 400.dp)
-            val containerWidth = maxWidth
-            SideEffect { view.usesSidebar = usesSidebar }
-            if (hasDetail) HomeLayout(store, view, usesSidebar, drawerWidth, containerWidth, reducedMotion)
-            HomeSidebarEffects(store, view, usesSidebar)
+        ai.opencode.feature.composer.OpenCodeSheetHost {
+            BoxWithConstraints(Modifier.fillMaxSize()) {
+                // An iPad-wide window lists the sessions in a sidebar beside the session; anything
+                // narrower slides the phone's drawer under it.
+                val usesSidebar = maxWidth >= SidebarMetrics.minimumWindowWidth
+                // Three quarters of a phone; on a wider window, no wider than a sidebar.
+                val drawerWidth = if (usesSidebar) SidebarMetrics.width else min(maxWidth * 0.75f, 400.dp)
+                val containerWidth = maxWidth
+                SideEffect { view.usesSidebar = usesSidebar }
+                if (hasDetail) HomeLayout(store, view, usesSidebar, drawerWidth, containerWidth, reducedMotion)
+                HomeSidebarEffects(store, view, usesSidebar)
+            }
         }
     }
     HomeSettingsBack(store)
@@ -186,6 +188,7 @@ private fun HomeLayout(
     // A subagent or a web page pushed over the session: its back gesture has the drag.
     val pushed by store.observe { it.subagentStack.isNotEmpty() || it.sessionDetail?.browser?.pageID != null }
     val settingsShown by store.observe { it.isSettingsShown }
+    val sheetPresented by store.observe { it.topDetail?.activePicker != null || it.topDetail?.shellOutput != null }
     val isDrawerOpen by store.observe { it.isDrawerOpen }
     val catchUpProxy = remember { CatchUpStageProxy() }
     val currentReducedMotion by rememberUpdatedState(reducedMotion)
@@ -277,7 +280,7 @@ private fun HomeLayout(
         dismissesKeyboardOnOpen = usesTray && (callTray.showsSurface || call != null),
         contentSessionID = DrawerKeyboard.closingSession(chosen = view.chosenSessionID, shown = selectedSessionID),
         isContentPushed = pushed,
-        isSheetPresented = settingsShown,
+        isSheetPresented = settingsShown || sheetPresented,
         content = {
             SessionSwitcherOverlay(
                 store = store,
@@ -487,6 +490,10 @@ private fun HomeSessionStack(
     val entries by store.observe(::stackEntries)
     val catchingUp by store.observe { it.catchUp != null }
     val drawerOpen by store.observe { it.isDrawerOpen }
+    val sheetPresented by store.observe {
+        val top = it.topDetail
+        top?.activePicker != null || top?.shellOutput != null
+    }
     val listContext by store.observe { it.sessionListContext(it.sessionDetail?.session) }
     // Pages drawn while they animate out, by their identity.
     val known = remember { HashMap<Int, StackEntry>() }
@@ -508,7 +515,7 @@ private fun HomeSessionStack(
             }
         },
         modifier = Modifier.fillMaxSize(),
-        enabled = !catchingUp && !drawerOpen && !view.isSessionDrawerPresented,
+        enabled = !catchingUp && !drawerOpen && !view.isSessionDrawerPresented && !sheetPresented,
         root = {
             SessionView(
                 root,
