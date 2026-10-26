@@ -1,9 +1,13 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.diagnostics.LabMarks
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticEffect
 import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.log.AppLog
+import ai.opencode.core.tuning.InternalBuild
+import ai.opencode.feature.voice.VoiceLabEnvironment
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionFrameAction
 import ai.opencode.core.motion.motionFrameLoop
@@ -51,7 +55,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -67,8 +70,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.alpha
@@ -144,13 +150,25 @@ import kotlin.math.roundToInt
 class BackgroundWorkAnchor {
     /** Root coordinates in px; null while the capsule's place isn't laid out. */
     internal var bounds by mutableStateOf<Rect?>(null)
+
+    /** The capsule's place as laid out now (read at draw time, after this frame's layout). */
+    internal var coordinates: androidx.compose.ui.layout.LayoutCoordinates? = null
+
+    /**
+     * What moves the capsule's place frame by frame (the request panel's room growing above the
+     * composer), read while the surface draws so it redraws in the frame its place moves.
+     */
+    var motion: () -> Float = { 0f }
 }
 
 @Composable
 fun rememberBackgroundWorkAnchor(): BackgroundWorkAnchor = remember { BackgroundWorkAnchor() }
 
 /** Marks the capsule the background-work panel anchors to. */
-fun Modifier.backgroundActivityAnchor(anchor: BackgroundWorkAnchor): Modifier = onGloballyPositioned { anchor.bounds = it.boundsInRoot() }
+fun Modifier.backgroundActivityAnchor(anchor: BackgroundWorkAnchor): Modifier = onGloballyPositioned {
+    anchor.coordinates = it
+    anchor.bounds = it.boundsInRoot()
+}
 
 /** The open panel covers the composer pills beside and above the capsule. */
 val LocalBackgroundWorkCoversPills = compositionLocalOf { false }
@@ -309,6 +327,8 @@ fun BackgroundWorkGlyph(
     waiting: Set<String>,
     probe: ShellGlyphProbe?,
     modifier: Modifier = Modifier,
+    /** Held still (the panel covers the capsule). */
+    isPaused: Boolean = false,
 ) {
     val reduceMotion = rememberReduceMotion()
     // Swapped in place as subagents come and go, like the words beside it. The disc's dot field
@@ -318,6 +338,7 @@ fun BackgroundWorkGlyph(
             AgentActivityGlyph(
                 source = AgentActivitySource.summary(agents, emptyList(), waiting),
                 modifier = if (reduceMotion) Modifier else Modifier.blurringWith(this),
+                isPaused = isPaused,
             )
         }
         AnimatedVisibility(shells.isNotEmpty(), enter = fadeIn(Motion.reducedFadeSpec()), exit = fadeOut(Motion.reducedFadeSpec())) {
@@ -327,6 +348,7 @@ fun BackgroundWorkGlyph(
                 modifier = if (reduceMotion) Modifier else Modifier.blurringWith(this),
                 key = "capsule|" + ids.joinToString(","),
                 probe = probe,
+                isPaused = isPaused,
             )
         }
     }
@@ -419,6 +441,32 @@ fun BackgroundWorkPresentation(
     var origin by remember { mutableStateOf(Offset.Zero) }
     var overlayWidth by remember { mutableFloatStateOf(0f) }
 
+    // iOS DEBUG `-lab-glass-trace`: the surface's path through each morph, and each stage it
+    // passed through and why it closed without landing (`fade`, `reset`).
+    val trace = remember { GlassMorphTrace() }
+    val dragTrace = remember { GlassMorphTrace() }
+    val stageLog = remember { ArrayList<String>() }
+    var countChanges by remember { mutableIntStateOf(0) }
+    val traced = remember { TracedFrames() }
+
+    fun follow(glass: GlassMorphTrace, generation: Int) {
+        if (!GlassMorphTrace.isEnabled) return
+        scope.launch {
+            while (withFrameNanos { glass.tick(generation, it, traced.surface) }) Unit
+        }
+    }
+
+    fun logStage(entry: String) {
+        if (!GlassMorphTrace.isEnabled) return
+        stageLog += entry
+        AppLog.app.debug { "background-work-stages " + stageLog.joinToString(" ") }
+    }
+
+    fun traceClose() {
+        val start = if (traced.placed != Rect.Zero) traced.placed else traced.panel
+        follow(trace, trace.begin("close", region = traced.pill.union(traced.panel).union(start), followingGlyphs = true))
+    }
+
     val latestPresented by rememberUpdatedState(isPresented)
     val latestHasWork by rememberUpdatedState(hasWork)
     val latestSession by rememberUpdatedState(sessionID)
@@ -456,6 +504,7 @@ fun BackgroundWorkPresentation(
 
     // The drawer swaps sessions in place: nothing of the last session's surface, mid-morph or measured, carries over to the next.
     fun reset() {
+        if (stage != BackgroundWorkStage.closed) logStage("reset")
         motion += 1
         dragController.reset()
         scope.launch { scrollState.scrollTo(0) }
@@ -510,6 +559,7 @@ fun BackgroundWorkPresentation(
         motion += 1
         val current = motion
         if (!latestHasWork) {
+            logStage("fade")
             // The panel's frame and rows are kept (stage `capsule`) until it has left.
             stage = BackgroundWorkStage.capsule
             capsuleShown = false
@@ -527,6 +577,7 @@ fun BackgroundWorkPresentation(
             }
             return
         }
+        if (InternalBuild.isDebug) LabMarks.mark("background_work_close")
         val (spec, velocity) = BackgroundWorkMotion.closeAnimation(releaseVelocity, remainingDistance, reduceMotion)
         stage = BackgroundWorkStage.capsule
         if (latestCallTranscript || latestCovered) setCapsuleShown(false, animated = !reduceMotion)
@@ -546,6 +597,7 @@ fun BackgroundWorkPresentation(
     fun finishDrag(velocity: Float, remainingDistance: Float? = null) {
         dragController.end(velocity) { releaseVelocity ->
             val remaining = remainingDistance ?: max(40f, (contentHeight ?: 180f) - dragController.drag.offset)
+            traceClose()
             close(releaseVelocity, remaining)
             onPresentedChange(false)
         }
@@ -553,9 +605,21 @@ fun BackgroundWorkPresentation(
 
     OnChange(isPresented) { _, presented ->
         if (presented) {
-            if (stage != BackgroundWorkStage.panel) open()
+            if (stage != BackgroundWorkStage.panel) {
+                follow(trace, trace.begin("open", region = traced.pill.union(traced.panel), followingGlyphs = true))
+                open()
+            }
         } else if (stage == BackgroundWorkStage.panel) {
+            traceClose()
             close()
+        }
+    }
+    OnChange(stage) { _, new -> logStage(new.name) }
+    // `-lab-count-trace`: each change of counts with the capsule at rest, as `count-<n>`, follows its surface resizing.
+    OnChange(agents.size to shells.size) { _, _ ->
+        if (GlassMorphTrace.tracesCounts && stage == BackgroundWorkStage.closed && traced.pill != Rect.Zero && abs(traced.pill.left - 20f) < 2f) {
+            countChanges += 1
+            follow(trace, trace.begin("count-$countChanges", region = traced.pill, matchingCorner = true))
         }
     }
     OnChange(hasWork) { _, work ->
@@ -613,6 +677,8 @@ fun BackgroundWorkPresentation(
         CompositionLocalProvider(LocalBackgroundWorkCoversPills provides isPanel) { content() }
 
         // The capsule's frame (dp, overlay-local), or while the panel is up or closing, where it last was.
+        // The place's top (root px) this composition laid the surface out from.
+        val composedTop = anchor.bounds?.top
         val live = anchor.bounds?.let { b ->
             Rect((b.left - origin.x) / density.density, (b.top - origin.y) / density.density, (b.right - origin.x) / density.density, (b.bottom - origin.y) / density.density)
         }
@@ -654,6 +720,11 @@ fun BackgroundWorkPresentation(
         val widthDp = overlayWidth / density.density
         val panel = Rect(pill.left, pill.bottom - height, pill.left + max(pill.width, widthDp - 2 * pill.left), pill.bottom)
         val isScrollable = (contentHeight ?: 0f) > maxHeight + 0.5f
+        if (GlassMorphTrace.isEnabled) {
+            val o = Offset(origin.x / density.density, origin.y / density.density)
+            traced.pill = pill.translate(o)
+            traced.panel = panel.translate(o)
+        }
         // Like the pills it grows from, it hides under the call's transcript and under a panel grown out of the composer.
         val hidden = showsCallTranscript || isCovered
         val hiddenAlpha by androidx.compose.animation.core.animateFloatAsState(if (hidden) 0f else 1f, Motion.reducedFadeSpec(), label = "hidden")
@@ -668,7 +739,12 @@ fun BackgroundWorkPresentation(
                 override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
                     if (source != NestedScrollSource.UserInput || stage != BackgroundWorkStage.panel) return Offset.Zero
                     translation += available.y / density.density
+                    val wasDragging = dragController.drag.isDragging
                     dragController.update(translation, 0f, scrollState.value / density.density, isScrollable)
+                    if (!wasDragging && dragController.drag.isDragging && GlassMorphTrace.isEnabled) {
+                        val area = traced.pill.union(traced.panel)
+                        follow(dragTrace, dragTrace.begin("drag", region = Rect(area.left - 40f, area.top - 80f, area.right + 40f, area.bottom + 80f)))
+                    }
                     return if (dragController.drag.isDragging) available else Offset.Zero
                 }
 
@@ -698,15 +774,31 @@ fun BackgroundWorkPresentation(
                     val w = max(0, ((right - left) * density.density).roundToInt())
                     val h = max(0, ((bottom - top) * density.density).roundToInt())
                     val placeable = measurable.measure(Constraints.fixed(w, h))
+                    if (GlassMorphTrace.isEnabled) {
+                        val o = Offset(origin.x / density.density, origin.y / density.density)
+                        if (stage != BackgroundWorkStage.closed) traced.placed = placed.translate(o)
+                        traced.surface = Rect(left, top, right, bottom).translate(o) to hiddenAlpha * max(capsuleAlpha.value, progress.value)
+                    }
                     layout(0, 0) { placeable.place((left * density.density).roundToInt(), (top * density.density).roundToInt()) }
+                }
+                // At rest, the capsule rides its place in the frame the place moves (iOS draws it in
+                // the pill row): the bounds above are last frame's, so the drawing makes up the
+                // difference from where the place is laid out now. The next composition catches up.
+                .drawWithContent {
+                    anchor.motion()
+                    val now = anchor.coordinates?.takeIf { it.isAttached }?.positionInRoot()
+                    val dy = if (stage == BackgroundWorkStage.closed && progress.value == 0f && composedTop != null && now != null) now.y - composedTop else 0f
+                    if (dy == 0f) drawContent() else translate(top = dy) { this@drawWithContent.drawContent() }
                 }
                 .shadow(if (isPanel) 6.dp else 2.dp, shape, clip = false)
                 .clip(shape)
                 .background(surfaceColor)
                 .then(if (hidden) Modifier.clearAndSetSemantics { } else Modifier),
         ) {
-            // The capsule's label, a button while the surface is at rest.
-            if (stage != BackgroundWorkStage.panel || progress.value < 1f) {
+            // The capsule's label, a button while the surface is at rest. Kept composed under the open
+            // panel (held still), so closing never composes it in the fold's first frame.
+            val labelShown = stage != BackgroundWorkStage.panel || progress.value < 1f
+            run {
                 Box(
                     Modifier
                         .fillMaxSize()
@@ -731,19 +823,28 @@ fun BackgroundWorkPresentation(
                     contentAlignment = Alignment.CenterStart,
                 ) {
                     BackgroundWorkCapsuleLabel(rowAgents.size, rowShells.size, Modifier.clearAndSetSemantics { }) {
-                        BackgroundWorkGlyph(rowAgents, rowShells, waitingSessionIDs, probe)
+                        CompositionLocalProvider(LocalGlyphStepTrace provides if (GlassMorphTrace.isEnabled) "capsule" else null) {
+                            BackgroundWorkGlyph(rowAgents, rowShells, waitingSessionIDs, probe, isPaused = !labelShown)
+                        }
                     }
                 }
             }
             // The rows run from the morph's first frame, both ways: only accessibility waits for the panel to land.
-            if (stage != BackgroundWorkStage.closed || progress.value > 0f) {
+            // Kept composed (held still, out of sight and touch) while the capsule rests, so opening
+            // never composes the rows in the morph's first frame: that cost 30–40 ms on the main
+            // thread and the panel's first frames jumped.
+            val rowsOpen = stage != BackgroundWorkStage.closed || progress.value > 0f
+            run {
                 Box(
                     Modifier
                         .layout { measurable, constraints ->
                             val w = (panel.width * density.density).roundToInt()
                             val h = (panel.height * density.density).roundToInt()
                             val placeable = measurable.measure(Constraints.fixed(w, h))
-                            layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(0, 0) }
+                            layout(constraints.maxWidth, constraints.maxHeight) {
+                                // Closed, far outside the screen: it takes no touch and draws nothing.
+                                if (rowsOpen) placeable.place(0, 0) else placeable.place(-100_000, 0)
+                            }
                         }
                         .graphicsLayer {
                             alpha = progress.value
@@ -756,13 +857,14 @@ fun BackgroundWorkPresentation(
                         .then(if (settled && !hidden) Modifier.testTag("background-work-panel") else Modifier.clearAndSetSemantics { }),
                     contentAlignment = Alignment.BottomStart,
                 ) {
+                    CompositionLocalProvider(LocalGlyphStepTrace provides if (GlassMorphTrace.isEnabled) "rows" else null) {
                     BackgroundWorkPanel(
                         agents = rowAgents,
                         waitingSessionIDs = waitingSessionIDs,
                         shells = rowShells,
                         probe = probe,
                         scrollState = scrollState,
-                        isLive = true,
+                        isLive = rowsOpen,
                         onContentHeight = ::measured,
                         onOpenSubagent = { id ->
                             if (!dragController.drag.isDragging) {
@@ -777,25 +879,13 @@ fun BackgroundWorkPresentation(
                             }
                         },
                     )
+                    }
                 }
             }
         }
 
-        if (!isPanel && live != null) {
-            // Measured while the capsule shows, out of sight and touch, so opening lays the panel out at its real height at once.
-            Box(
-                Modifier
-                    .layout { measurable, _ ->
-                        val w = (panel.width * density.density).roundToInt()
-                        val placeable = measurable.measure(Constraints(minWidth = w, maxWidth = w))
-                        measured(placeable.height / density.density)
-                        layout(0, 0) { }
-                    }
-                    .clearAndSetSemantics { },
-            ) {
-                BackgroundWorkRows(rowAgents, waitingSessionIDs, rowShells, probe, isLive = false, onOpenSubagent = {}, onOpenShell = {})
-            }
-        }
+        // The rows above stay composed while the capsule rests and report their natural height
+        // (`onContentHeight`), so opening lays the panel out at its real height at once.
     }
 }
 
@@ -929,7 +1019,8 @@ private fun BackgroundWorkRow(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val highlight = LocalContentColor.current.copy(alpha = 0.08f)
+    // iOS `Color.primary.opacity(0.08)`.
+    val highlight = OpenCodeTheme.colors.text.copy(alpha = 0.08f)
     Row(
         modifier
             .fillMaxWidth()
@@ -1030,4 +1121,162 @@ object ShellElapsedTimeFormat {
         )
         return if (parts.isEmpty()) "0 seconds" else parts.joinToString(", ")
     }
+}
+
+// MARK: Debug traces
+
+/**
+ * iOS DEBUG `glyphStepTrace`: the orbs and shell glyphs inside count their steps under this name
+ * ([GlyphAdvanceProbe]) while [GlassMorphTrace] is enabled.
+ */
+val LocalGlyphStepTrace = compositionLocalOf<String?> { null }
+
+/**
+ * iOS DEBUG `GlyphAdvanceProbe`: counts the steps the background-work surface's orbs and shell
+ * glyphs take on a running frame loop, so a trace can tell whether they moved while the surface
+ * morphed. Main thread only.
+ */
+internal object GlyphAdvanceProbe {
+    val steps = HashMap<String, Int>()
+
+    fun stepped(name: String) {
+        steps[name] = (steps[name] ?: 0) + 1
+    }
+}
+
+/**
+ * Port of iOS DEBUG `GlassMorphTrace` (`-lab-glass-trace`): follows the background-work surface
+ * through a morph, frame by frame, and writes what it saw as iOS's accessibility value reads
+ * (`open: x,y,w,h@ms …|open-coverage: …|open-glyphs: …`) to [AppLog] under
+ * `background-work-glass-trace`. Android draws the surface itself, so the shape followed is the
+ * surface's own placed bounds (root dp, opacity-weighted) instead of a walk of the layer tree.
+ * Debug builds only. The `-ink` probe (a window readback of the words' reach) is not taken.
+ */
+internal class GlassMorphTrace(private val identifier: String = "background-work-glass-trace") {
+    companion object {
+        /** iOS `-lab-glass-trace`: the lab's `debug.opencode.glass_trace=1` (debug builds only). */
+        val isEnabled: Boolean by lazy { VoiceLabEnvironment.flag("OPENCODE_LAB_GLASS_TRACE") }
+
+        /** iOS `-lab-count-trace` (`debug.opencode.count_trace=1`): also follows the capsule resizing as its counts change. */
+        val tracesCounts: Boolean by lazy { isEnabled && VoiceLabEnvironment.flag("OPENCODE_LAB_COUNT_TRACE") }
+    }
+
+    var summary = ""
+        private set
+    private var phase = ""
+    private var started = 0L
+    private var path = ArrayList<Pair<Rect, Double>>()
+    private val phases = ArrayList<String>()
+    private var region: Rect? = null
+    private var coverage = ArrayList<Float>()
+    private var ticks = 0
+    private var lockedAt: Int? = null
+    private var shortLived = false
+    private var followsGlyphs = false
+    private var glyphSteps: Map<String, Int> = emptyMap()
+    private var glyphMoves = HashMap<String, ArrayList<Double>>()
+    private var glyphCallbacks = ArrayList<Double>()
+    private var generation = 0
+
+    /**
+     * Starts following the surface and measuring it inside [region] (`<phase>-coverage: min
+     * area,frames,the frame it was first found on`); [followingGlyphs] adds `<phase>-glyphs:
+     * frames the orbs moved on, frames, the longest stretch in ms they held still`.
+     * [matchingCorner] (the counts trace) follows for 0.8 s instead of 2 s, as on iOS.
+     */
+    fun begin(phase: String, region: Rect? = null, matchingCorner: Boolean = false, followingGlyphs: Boolean = false): Int {
+        if (!isEnabled) return generation
+        finish()
+        this.phase = phase
+        this.region = region?.inflate(4f)
+        shortLived = matchingCorner
+        followsGlyphs = followingGlyphs
+        glyphSteps = HashMap(GlyphAdvanceProbe.steps)
+        glyphMoves = HashMap()
+        glyphCallbacks = ArrayList()
+        coverage = ArrayList()
+        ticks = 0
+        lockedAt = null
+        path = ArrayList()
+        started = System.nanoTime()
+        return ++generation
+    }
+
+    /** One frame: the surface's bounds (root dp) and opacity, or null where it isn't drawn. Returns false once the phase is over. */
+    fun tick(generation: Int, frameNanos: Long, surface: Pair<Rect, Float>?): Boolean {
+        if (generation != this.generation || phase.isEmpty()) return false
+        if ((System.nanoTime() - started) / 1e9 >= if (shortLived) 0.8 else 2.0) {
+            finish()
+            return false
+        }
+        val time = (frameNanos - started) / 1e9
+        val next = surface?.takeIf { it.second > 0.01f && it.first.width > 1f && it.first.height > 1f }
+        region?.let { region ->
+            if (lockedAt == null && next != null) lockedAt = ticks
+            if (lockedAt != null) {
+                val inside = next?.first?.takeIf { it.overlaps(region) }?.intersect(region)
+                coverage += if (inside == null) 0f else inside.width * inside.height * next.second
+            }
+        }
+        ticks += 1
+        if (followsGlyphs) {
+            glyphCallbacks += time
+            for ((name, steps) in GlyphAdvanceProbe.steps) {
+                if (steps != glyphSteps[name]) glyphMoves.getOrPut(name) { ArrayList() } += time
+            }
+            glyphSteps = HashMap(GlyphAdvanceProbe.steps)
+        }
+        if (next != null) path += next.first to time
+        return true
+    }
+
+    private fun finish() {
+        if (phase.isEmpty()) return
+        fun f1(value: Float) = String.format(java.util.Locale.ROOT, "%.1f", value)
+        val frames = path.joinToString(" ") { (rect, time) ->
+            listOf(rect.left, rect.top, rect.width, rect.height).joinToString(",") { f1(it) } + "@" + String.format(java.util.Locale.ROOT, "%.1f", time * 1000)
+        }
+        phases.removeAll { it.startsWith("$phase:") || it.startsWith("$phase-coverage:") }
+        phases += "$phase: $frames"
+        if (region != null) {
+            phases += "$phase-coverage: " + String.format(java.util.Locale.ROOT, "%.0f,%d,%d", coverage.minOrNull() ?: 0f, coverage.size, lockedAt ?: -1)
+        }
+        if (followsGlyphs) {
+            // Per group, the longest stretch with no step: from the phase's start to its first
+            // step, then between steps. A group that leaves stops stepping, so nothing after its
+            // last step counts; one that never stepped held still throughout.
+            val end = glyphCallbacks.lastOrNull() ?: 0.0
+            var worst = Triple("none", 0, 0.0)
+            for (name in listOf("capsule", "rows")) {
+                val moves = glyphMoves[name].orEmpty()
+                var still = if (moves.isEmpty()) end else 0.0
+                var from = 0.0
+                for (time in moves) {
+                    still = max(still, time - from)
+                    from = time
+                }
+                if (still >= worst.third) worst = Triple(name, moves.size, still)
+            }
+            phases.removeAll { it.startsWith("$phase-glyphs:") }
+            phases += "$phase-glyphs: " + String.format(java.util.Locale.ROOT, "%d,%d,%.0f,", worst.second, glyphCallbacks.size, worst.third * 1000) + worst.first
+        }
+        summary = phases.joinToString("|")
+        phase = ""
+        AppLog.app.debug { "$identifier $summary" }
+    }
+}
+
+/** iOS DEBUG `TracedFrames`: root-dp frames of the capsule's surface, the panel and where the panel is placed, for the trace. */
+private class TracedFrames {
+    var pill: Rect = Rect.Zero
+    var panel: Rect = Rect.Zero
+    var placed: Rect = Rect.Zero
+    /** The surface as last laid out (root dp) and drawn (opacity). */
+    var surface: Pair<Rect, Float>? = null
+}
+
+private fun Rect.union(other: Rect): Rect = when {
+    this == Rect.Zero -> other
+    other == Rect.Zero -> this
+    else -> Rect(min(left, other.left), min(top, other.top), max(right, other.right), max(bottom, other.bottom))
 }

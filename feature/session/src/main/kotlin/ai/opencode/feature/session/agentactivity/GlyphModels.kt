@@ -1,5 +1,6 @@
 package ai.opencode.feature.session.agentactivity
 
+import ai.opencode.core.tuning.AnimationTimeScale
 import ai.opencode.feature.session.AgentActivity
 import ai.opencode.feature.session.AgentActivityCounts
 import ai.opencode.feature.session.AgentActivityOverride
@@ -98,7 +99,8 @@ class AgentActivityGlyphModel {
         repeat(min(new.tool, 3)) { gyro.event(ActivityGyro.Event.tool) }
         repeat(min(new.output, 3)) { gyro.event(ActivityGyro.Event.output) }
         // The Working line's finale plays faster, in steps no longer than usual.
-        val dt = min(1.0 / 30, max(0.0, now - (last ?: now))) * source.rate
+        val rawDt = min(1.0 / 30, max(0.0, now - (last ?: now))) * source.rate
+        val dt = AnimationTimeScale.shared.scaledDelta(rawDt)
         last = now
         var remaining = dt
         while (remaining > 1e-6) {
@@ -143,7 +145,7 @@ class ShellGlyphModel(internal var meter: ShellOutputMeter = ShellOutputMeter.sh
         if (glyph.state != state) glyph.set(state)
         // Resuming from a pause steps on from the held pose, at most 1/30 s.
         val rawStep = min(1.0 / 30, max(0.0, now - (last ?: now)))
-        pending += rawStep
+        pending += AnimationTimeScale.shared.scaledDelta(rawStep)
         stepped = rawStep > 0
         last = now
         val rate = ShellOutputFeed.chunkRate(reading.bytesPerSecond)

@@ -1,8 +1,39 @@
 package ai.opencode.feature.session
 
 import ai.opencode.core.dependencies.DependencyKey
-import ai.opencode.core.motion.Motion
-import ai.opencode.core.motion.rememberReduceMotion
+import ai.opencode.core.tuning.AnimationTimeScale
+import ai.opencode.feature.transcript.markdown.InlineText
+import ai.opencode.feature.transcript.markdown.ui.LocalTranscriptTextReveal
+import ai.opencode.feature.transcript.markdown.ui.TranscriptTextReveal
+import ai.opencode.feature.voice.VoiceLabEnvironment
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.sp
+import com.google.mlkit.genai.common.FeatureStatus
+import com.google.mlkit.genai.prompt.Generation
+import com.google.mlkit.genai.prompt.GenerativeModel
+import com.google.mlkit.genai.prompt.SystemInstruction
+import com.google.mlkit.genai.prompt.TextPart
+import com.google.mlkit.genai.prompt.generateContentRequest
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
@@ -15,21 +46,17 @@ import ai.opencode.server.model.OpenCodePromptSource
 import ai.opencode.server.model.OpenCodeToolCall
 import ai.opencode.server.model.OpenCodeTranscriptItem
 import ai.opencode.server.model.TranscriptNoticeKind
-import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -455,12 +482,45 @@ data class SinceYouLeftInput(
 }
 
 /**
+ * Port of iOS DEBUG/PERF `SinceYouLeftLab`: lab runs stand a canned summary in for the
+ * on-device model, streamed word by word. iOS reads `OPENCODE_LAB_SINCE_YOU_LEFT` (a custom
+ * summary, or `1`/`true`/`default`) and `OPENCODE_LAB_EXPERIMENTS` (`since-you-left` among
+ * them); Android reads them as the lab's debug system properties ([VoiceLabEnvironment]:
+ * `debug.opencode.since_you_left`, `debug.opencode.experiments`), never in release builds.
+ */
+object SinceYouLeftLab {
+    val overrideValue: String?
+        get() = VoiceLabEnvironment.string("OPENCODE_LAB_SINCE_YOU_LEFT")?.trim()?.ifEmpty { null }
+
+    val isEnabled: Boolean
+        get() {
+            if (overrideValue != null) return true
+            val experiments = VoiceLabEnvironment.string("OPENCODE_LAB_EXPERIMENTS") ?: ""
+            return experiments.split(',').contains("since-you-left")
+        }
+
+    const val defaultSummary =
+        "Fixed the drawer spring, ran the tests (2 failed, then passed), waiting on you to pick a preset"
+
+    val cannedChunks: List<String>
+        get() {
+            val custom = overrideValue
+            if (custom != null && custom != "1" && custom.lowercase() != "true" && custom != "default") return chunk(custom)
+            return chunk(defaultSummary)
+        }
+
+    fun chunk(text: String): List<String> = SinceYouLeft.wordPrefixes(text)
+}
+
+/**
  * Port of iOS `SinceYouLeftClient` (`@Dependency(\.sinceYouLeft)`).
  *
- * Android: there is no system on-device language model equivalent to Apple's Foundation Models
- * in this app's dependency set, so the live client is [unavailable] and callers show
- * [SinceYouLeftInput.structuralFallback], as iOS does on devices without Apple Intelligence.
- * [systemInstructions] is kept so a future on-device model uses the same tuned prompt.
+ * The live client is Gemini Nano through AICore (ML Kit GenAI Prompt API), Android's public
+ * on-device model, as iOS uses Foundation Models' `SystemLanguageModel`: available only where
+ * the model is downloaded and ready (iOS `availability == .available`; a device that could
+ * still download it counts as unavailable, as iOS never downloads), else callers show
+ * [SinceYouLeftInput.structuralFallback]. Same instructions, greedy sampling, first line only,
+ * word-by-word steps 28 ms apart.
  */
 class SinceYouLeftClient(
     val isAvailable: () -> Boolean = { false },
@@ -484,7 +544,10 @@ class SinceYouLeftClient(
             summarize = {
                 flow {
                     for ((index, chunk) in chunks.withIndex()) {
-                        if (delayMilliseconds > 0) delay(if (index == 0) minOf(delayMilliseconds, 16) else delayMilliseconds)
+                        if (delayMilliseconds > 0) {
+                            val waitMs = if (index == 0) minOf(delayMilliseconds, 16) else delayMilliseconds
+                            delay((AnimationTimeScale.shared.wallSeconds(waitMs / 1000.0) * 1000).toLong())
+                        }
                         emit(sanitize(chunk))
                     }
                 }
@@ -495,7 +558,18 @@ class SinceYouLeftClient(
 
         val unavailable = SinceYouLeftClient(isAvailable = { false }, summarize = { emptyFlow() })
 
-        override val liveValue: SinceYouLeftClient get() = unavailable
+        override val liveValue: SinceYouLeftClient by lazy {
+            OnDeviceSummaryModel.refresh()
+            SinceYouLeftClient(
+                isAvailable = {
+                    if (SinceYouLeftLab.isEnabled) true else OnDeviceSummaryModel.isAvailable()
+                },
+                summarize = { input ->
+                    if (SinceYouLeftLab.isEnabled) canned(SinceYouLeftLab.cannedChunks, delayMilliseconds = 42).summarize(input)
+                    else OnDeviceSummaryModel.summarize(input)
+                },
+            )
+        }
         override val testValue: SinceYouLeftClient get() = unavailable
 
         private fun sanitize(chunk: String) = SinceYouLeft.sanitize(chunk, trimTrailingPeriod = false)
@@ -503,21 +577,75 @@ class SinceYouLeftClient(
 }
 
 /**
+ * Gemini Nano through AICore. iOS reads `SystemLanguageModel.default.availability` synchronously;
+ * AICore answers asynchronously, so the last answer is kept and each read asks again in the
+ * background (the reducer reads it long after the session first loads).
+ */
+private object OnDeviceSummaryModel {
+    private val model: GenerativeModel by lazy { Generation.getClient() }
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    @Volatile private var status: Int = FeatureStatus.UNAVAILABLE
+
+    fun isAvailable(): Boolean {
+        val available = status == FeatureStatus.AVAILABLE
+        refresh()
+        return available
+    }
+
+    fun refresh() {
+        scope.launch { status = currentStatus() }
+    }
+
+    private suspend fun currentStatus(): Int = try {
+        model.checkStatus()
+    } catch (cancellation: CancellationException) {
+        throw cancellation
+    } catch (_: Throwable) {
+        // No AICore, an unlocked bootloader, or AICore still setting up.
+        FeatureStatus.UNAVAILABLE
+    }
+
+    fun summarize(input: SinceYouLeftInput): Flow<String> = flow {
+        if (currentStatus() != FeatureStatus.AVAILABLE) return@flow
+        val request = generateContentRequest(SystemInstruction(SinceYouLeftClient.systemInstructions), TextPart(input.prompt)) {
+            // iOS `GenerationOptions(sampling: .greedy)`.
+            temperature = 0f
+            topK = 1
+        }
+        var snapshot = ""
+        var lastYielded = ""
+        model.generateContentStream(request).collect { chunk ->
+            // Chunks are deltas; iOS's snapshots are the response so far.
+            snapshot += chunk.candidates.firstOrNull()?.text.orEmpty()
+            val partial = SinceYouLeft.sanitize(SinceYouLeft.firstLine(snapshot), trimTrailingPeriod = false)
+            if (partial.isEmpty() || partial == lastYielded) return@collect
+            val steps = SinceYouLeft.wordSteps(lastYielded, partial)
+            for ((index, step) in steps.withIndex()) {
+                if (index > 0) delay(28)
+                lastYielded = step
+                emit(step)
+            }
+        }
+    }
+}
+
+/**
  * Port of iOS `SinceYouLeftRow`: the quiet 1–2 line summary row at the end of the transcript
- * (`OC-420`, `D-94`). Matches the transcript's type and spacing, grows as words stream in, and
- * dismisses on send or ✕.
- *
- * Deviation: iOS reveals streamed words with the transcript's `ArrivingText`; until
- * :feature:transcript exposes it, the text grows in with an animated size change.
- *
- * @param entryID the transcript entry's ID (iOS keys the text reveal by it).
+ * (`OC-420`, `D-94`). Matches the transcript's type and spacing, grows in with the list's row
+ * growth, and dismisses on send or ✕. Streamed words fade in where they land, on the
+ * transcript's text reveal (iOS `ArrivingText` over `transcriptTextReveal`), keyed by [entryID].
  */
 @Composable
 fun SinceYouLeftRow(entryID: String, summary: SinceYouLeft, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
-    val reduceMotion = rememberReduceMotion()
-    val isAccessibilitySize = LocalConfiguration.current.fontScale >= 1.8f
+    val density = LocalDensity.current
+    val fontScale = density.fontScale
+    val isAccessibilitySize = fontScale >= 1.8f
     val lineCap = if (isAccessibilitySize) Int.MAX_VALUE else if (summary.isFallback) 1 else 2
-    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    // iOS `TranscriptMetrics.compact` (4) and line spacing 2, scaled with the text.
+    val headerGap = (4 * fontScale).dp
+    val subheadline = OpenCodeTextStyles.subheadline
+    val textStyle = subheadline.copy(lineHeight = (subheadline.lineHeight.value + 2).sp)
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(headerGap)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
                 "Since you left",
@@ -525,34 +653,84 @@ fun SinceYouLeftRow(entryID: String, summary: SinceYouLeft, onDismiss: () -> Uni
                 color = OpenCodeTheme.colors.secondaryText,
                 maxLines = 1,
             )
-            HorizontalDivider(Modifier.weight(1f).clearAndSetSemantics {}, thickness = 0.5.dp, color = OpenCodeTheme.colors.border)
+            // iOS `HairlineRule`: one device pixel.
+            HorizontalDivider(Modifier.weight(1f).clearAndSetSemantics {}, thickness = (1f / density.density).dp, color = OpenCodeTheme.colors.border)
+            // The ✕ keeps its glyph's size in the row; its touch area reaches past it (Compose's
+            // minimum touch target, iOS's padded content shape).
             Box(
                 Modifier
-                    .size(48.dp)
-                    .padding(start = 0.dp)
                     .clickable(role = Role.Button, onClick = onDismiss)
-                    .semantics {
-                        contentDescription = "Dismiss summary"
-                        role = Role.Button
-                    },
+                    .testTag("since-you-left-dismiss")
+                    .semantics { contentDescription = "Dismiss summary" },
                 contentAlignment = Alignment.Center,
             ) {
-                OpenCodeIcon(SFSymbol.Xmark, contentDescription = null, size = 14.dp, tint = OpenCodeTheme.colors.secondaryText)
+                OpenCodeIcon(SFSymbol.Xmark, contentDescription = null, size = (12 * fontScale).dp, tint = OpenCodeTheme.colors.secondaryText)
             }
         }
-        Text(
-            summary.text,
-            style = OpenCodeTextStyles.subheadline.copy(lineHeight = OpenCodeTextStyles.subheadline.lineHeight),
-            color = OpenCodeTheme.colors.secondaryText,
+        SinceYouLeftText(
+            entryID = entryID,
+            text = summary.text,
+            isGrowing = summary.phase == SinceYouLeft.Phase.Generating,
+            style = textStyle,
             maxLines = lineCap,
-            overflow = TextOverflow.Ellipsis,
             modifier = Modifier
                 .fillMaxWidth()
-                .then(if (reduceMotion) Modifier else Modifier.animateContentSize(Motion.settle.spec()))
+                .testTag("since-you-left-bar")
                 .semantics {
                     stateDescription = summary.text
                     customActions = listOf(CustomAccessibilityAction("Dismiss") { onDismiss(); true })
                 },
         )
     }
+}
+
+/**
+ * iOS `ArrivingText` for the summary's one paragraph: the text is laid out once as it is, and
+ * each arrival's own characters are erased by `1 - opacity` over it, so no glyph moves. Arrivals
+ * come from the transcript's [TranscriptTextReveal] under [entryID] (the list provides it); the
+ * reveal settles the entry once it stops growing.
+ */
+@Composable
+private fun SinceYouLeftText(entryID: String, text: String, isGrowing: Boolean, style: TextStyle, maxLines: Int, modifier: Modifier = Modifier) {
+    val reveal = LocalTranscriptTextReveal.current ?: remember { TranscriptTextReveal() }
+    val block = OpenCodeMarkdownBlock(id = 0, kind = OpenCodeMarkdownBlock.Kind.Paragraph(InlineText.plain(text)))
+    val now = reveal.now()
+    val arrivals = reveal.arrivals(entryID, listOf(block), now)[0].orEmpty()
+    if (!isGrowing) reveal.settle(entryID)
+    val active = arrivals.filter { now - it.time < it.duration }
+    val ends = active.maxOfOrNull { it.time + it.duration }
+    val frame = remember { mutableLongStateOf(0L) }
+    LaunchedEffect(ends) {
+        if (ends == null) return@LaunchedEffect
+        while (reveal.now() < ends) withFrameNanos { frame.longValue = it }
+        frame.longValue += 1
+    }
+    var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
+    Text(
+        text,
+        style = style,
+        color = OpenCodeTheme.colors.secondaryText,
+        maxLines = maxLines,
+        overflow = TextOverflow.Ellipsis,
+        onTextLayout = { layout = it },
+        modifier = modifier
+            .graphicsLayer { compositingStrategy = if (ends != null) CompositingStrategy.Offscreen else CompositingStrategy.Auto }
+            .drawWithContent {
+                drawContent()
+                val result = layout ?: return@drawWithContent
+                if (active.isEmpty()) return@drawWithContent
+                frame.longValue
+                val at = reveal.now()
+                val length = result.layoutInput.text.length
+                val sorted = active.sortedBy { it.offset }
+                for ((index, arrival) in sorted.withIndex()) {
+                    val start = arrival.offset.coerceIn(0, length)
+                    val end = (if (index + 1 < sorted.size) sorted[index + 1].offset else length).coerceIn(start, length)
+                    if (end <= start) continue
+                    val hidden = 1f - TranscriptTextReveal.opacity(arrival, at)
+                    if (hidden <= 0.004f) continue
+                    drawPath(result.getPathForRange(start, end), Color.Black, alpha = hidden, blendMode = BlendMode.DstOut)
+                }
+            },
+    )
 }

@@ -12,7 +12,9 @@ import ai.opencode.core.ui.SFSymbol
 import ai.opencode.server.model.OpenCodeProject
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -63,6 +65,8 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -200,13 +204,41 @@ fun DraftProjectList(
         animationSpec = if (reducedMotion) tween(0) else ProjectPickerTunables.selection.spec(),
         label = "draftProjectFold",
     )
+    // iOS `matchedGeometryEffect(id: "chosen")`: one highlight that slides between rows. Its
+    // position is a fractional row index the stack resolves against the rows' live placement,
+    // so it rides the fold with the chosen row. Folded, a pick swaps in place (iOS animation nil).
+    val highlightIndex = remember { Animatable(chosenIndex?.toFloat() ?: 0f) }
+    var highlightShown by remember { mutableStateOf(chosenIndex != null) }
+    LaunchedEffect(chosenIndex, isComposing, reducedMotion) {
+        val target = chosenIndex ?: return@LaunchedEffect
+        if (isComposing || reducedMotion || !highlightShown) highlightIndex.snapTo(target.toFloat())
+        else highlightIndex.animateTo(target.toFloat(), ProjectPickerTunables.selection.spec())
+    }
+    LaunchedEffect(chosenIndex != null) { highlightShown = chosenIndex != null }
+    val highlightAlpha by animateFloatAsState(
+        targetValue = if (chosenIndex != null) 1f else 0f,
+        animationSpec = if (isComposing) snap() else ProjectPickerTunables.selection.spec(),
+        label = "draftProjectHighlightAlpha",
+    )
     AnimatedContent(
         targetState = reducedMotion && isComposing,
         transitionSpec = { fadeIn(Motion.easeInOut(ProjectPickerTunables.reducedFade)) togetherWith fadeOut(Motion.easeInOut(ProjectPickerTunables.reducedFade)) },
         label = "draftProjectsReduced",
-        modifier = modifier.semantics { contentDescription = "Projects" },
+        modifier = modifier.testTag("draft-projects"),
     ) { onlyKept ->
-        DraftProjectStack(folded = if (isComposing) kept else null, fold = if (onlyKept) 1f else fold) {
+        DraftProjectStack(
+            folded = if (isComposing) kept else null,
+            fold = if (onlyKept) 1f else fold,
+            // Under Reduce Motion the highlight cross-fades in place on its row instead.
+            highlightIndex = if (reducedMotion) null else { { highlightIndex.value } },
+            highlight = {
+                Box(
+                    Modifier
+                        .alpha(highlightAlpha)
+                        .background(OpenCodeTheme.colors.text.copy(alpha = 0.06f), RoundedCornerShape(50)),
+                )
+            },
+        ) {
             shown.forEachIndexed { index, project ->
                 val rowIsChosen = index == chosenIndex
                 if (!onlyKept || index == kept) {
@@ -215,9 +247,11 @@ fun DraftProjectList(
                             title = project.name,
                             symbol = if (rowIsChosen) SFSymbol.FolderFill else SFSymbol.Folder,
                             chosen = rowIsChosen,
+                            ownHighlight = reducedMotion,
                             iconWidth = iconWidth,
                             hint = if (isComposing) "Chooses where the session starts" else null,
                             onClick = { if (isComposing) onAll() else onPick(project) },
+                            tag = "draft-project-row",
                         )
                     }
                 } else {
@@ -230,9 +264,11 @@ fun DraftProjectList(
                         title = if (shown.isEmpty()) "Choose Folder…" else "All Projects",
                         symbol = if (shown.isEmpty()) SFSymbol.FolderBadgePlus else SFSymbol.Magnifyingglass,
                         chosen = false,
+                        ownHighlight = reducedMotion,
                         iconWidth = iconWidth,
                         hint = null,
                         onClick = onAll,
+                        tag = "draft-projects-all",
                     )
                 }
             } else {
@@ -246,8 +282,9 @@ private fun isChosen(project: OpenCodeProject, chosen: OpenCodeProject?): Boolea
     chosen != null && (project.id == chosen.id || project.directory == chosen.directory)
 
 @Composable
-private fun DraftProjectRow(title: String, symbol: SFSymbol, chosen: Boolean, iconWidth: androidx.compose.ui.unit.Dp, hint: String?, onClick: () -> Unit) {
-    val highlight by animateFloatAsState(if (chosen) 1f else 0f, ProjectPickerTunables.selection.spec(), label = "draftProjectHighlight")
+private fun DraftProjectRow(title: String, symbol: SFSymbol, chosen: Boolean, ownHighlight: Boolean, iconWidth: androidx.compose.ui.unit.Dp, hint: String?, onClick: () -> Unit, tag: String) {
+    // Reduce Motion: the row's own highlight cross-fades in place (iOS easeInOut reducedFade).
+    val highlight by animateFloatAsState(if (chosen && ownHighlight) 1f else 0f, Motion.easeInOut(ProjectPickerTunables.reducedFade), label = "draftProjectHighlight")
     Row(
         Modifier
             .fillMaxWidth()
@@ -255,6 +292,7 @@ private fun DraftProjectRow(title: String, symbol: SFSymbol, chosen: Boolean, ic
             .background(OpenCodeTheme.colors.text.copy(alpha = 0.06f * highlight), RoundedCornerShape(50))
             .clickable(role = Role.Button, onClickLabel = hint, onClick = onClick)
             .padding(start = 17.dp, end = 16.dp)
+            .testTag(tag)
             .semantics(mergeDescendants = true) {
                 selected = chosen
                 contentDescription = title
@@ -307,24 +345,47 @@ private fun DraftProjectFade(isHidden: Boolean, reducedMotion: Boolean, content:
  * edge). Folded to one row, it's that row's height and that row sits at the bottom; the rest
  * keep the places they had, measured from the bottom, so while they fade they ride with the
  * composer instead of being left behind or dropping. [fold] (0…1) animates between the two.
+ *
+ * [highlight] is drawn behind the rows at the fractional row index [highlightIndex] reads
+ * (iOS's matched-geometry highlight): between two rows it interpolates their live frames.
+ * A null [highlightIndex] leaves it out.
  */
 @Composable
-fun DraftProjectStack(folded: Int?, fold: Float, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    Layout(content = content, modifier = modifier) { measurables, constraints ->
+fun DraftProjectStack(
+    folded: Int?,
+    fold: Float,
+    modifier: Modifier = Modifier,
+    highlightIndex: (() -> Float)? = null,
+    highlight: @Composable () -> Unit = {},
+    content: @Composable () -> Unit,
+) {
+    Layout(contents = listOf(highlight, content), modifier = modifier) { (highlightMeasurables, measurables), constraints ->
         val placeables = measurables.map { it.measure(constraints.copy(minHeight = 0)) }
         val width = if (constraints.hasBoundedWidth) constraints.maxWidth else placeables.maxOfOrNull { it.width } ?: 0
         val full = placeables.sumOf { it.height }
         val keptIndex = folded?.takeIf { it in placeables.indices }
         val progress = if (keptIndex == null) 0f else fold
         val height = if (keptIndex == null) full else lerpFloat(full.toFloat(), placeables[keptIndex].height.toFloat(), progress).roundToInt()
+        val tops = IntArray(placeables.size)
+        var below = 0
+        for (index in placeables.indices.reversed()) {
+            val placeable = placeables[index]
+            val fromBottom = if (index == keptIndex) lerpFloat(below.toFloat(), 0f, progress).roundToInt() else below
+            tops[index] = height - fromBottom - placeable.height
+            below += placeable.height
+        }
+        val at = highlightIndex?.invoke()?.takeIf { placeables.isNotEmpty() }?.coerceIn(0f, placeables.lastIndex.toFloat())
+        val highlightPlaceable = at?.let {
+            val lower = it.toInt()
+            val upper = minOf(lower + 1, placeables.lastIndex)
+            val fraction = it - lower
+            val top = lerpFloat(tops[lower].toFloat(), tops[upper].toFloat(), fraction).roundToInt()
+            val rowHeight = lerpFloat(placeables[lower].height.toFloat(), placeables[upper].height.toFloat(), fraction).roundToInt()
+            highlightMeasurables.firstOrNull()?.measure(Constraints.fixed(width, rowHeight))?.let { placeable -> placeable to top }
+        }
         layout(width, height) {
-            var below = 0
-            for (index in placeables.indices.reversed()) {
-                val placeable = placeables[index]
-                val fromBottom = if (index == keptIndex) lerpFloat(below.toFloat(), 0f, progress).roundToInt() else below
-                placeable.place(0, height - fromBottom - placeable.height)
-                below += placeable.height
-            }
+            highlightPlaceable?.let { (placeable, top) -> placeable.place(0, top) }
+            placeables.forEachIndexed { index, placeable -> placeable.place(0, tops[index]) }
         }
     }
 }
@@ -392,7 +453,8 @@ private fun ProjectList(
     onCancel: () -> Unit,
     folderBrowser: StoreOf<FolderBrowserFeature.State, FolderBrowserFeature.Action>?,
 ) {
-    Column(Modifier.fillMaxWidth().semantics { contentDescription = "Project Picker" }) {
+    // iOS `.screenName("Project Picker")` names the screen for Scrawl recordings, not for TalkBack.
+    Column(Modifier.fillMaxWidth()) {
         SheetTitleBar(
             title = "Project",
             leading = { TextButton(onClick = onCancel) { Text("Cancel") } },
@@ -470,7 +532,7 @@ fun FolderBrowserView(store: StoreOf<FolderBrowserFeature.State, FolderBrowserFe
     val directory = state.directory(route)
     val listing = state.listings[route]
     LaunchedEffect(route) { store.send(FolderBrowserFeature.Action.FolderAppeared(route)) }
-    Column(Modifier.fillMaxWidth().semantics { contentDescription = "Project Picker › Choose Folder" }) {
+    Column(Modifier.fillMaxWidth()) {
         var menuOpen by remember { mutableStateOf(false) }
         SheetTitleBar(
             title = directory?.let(FolderBrowserFeature::name) ?: "Folder",

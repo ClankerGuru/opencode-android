@@ -155,11 +155,16 @@ private fun SessionComposerEnv.ModelButton(enabled: Boolean) {
                 anchors = anchors,
                 composerTop = host.attachmentAnchors.composer.top,
                 onEvent = { store.send(modelPickerAction(it)) },
+                // iOS `openModelList`: the list grows out of the composer as the sheet it morphs into.
                 onOpenList = {
-                    dismissKeyboard()
-                    store.send(Action.ModelButtonTapped)
+                    if (host.modelPanels != null) {
+                        host.openModelList()
+                    } else {
+                        dismissKeyboard()
+                        store.send(Action.ModelButtonTapped)
+                    }
                 },
-                isEnabled = enabled,
+                isEnabled = enabled && host.modelPanels?.modelList?.isOpen != true,
             )
         } else {
             val usesSheet = modelPickerStyle == ModelPickerStyle.sheet
@@ -188,6 +193,8 @@ private fun SessionComposerEnv.AttachmentButton() {
     val press = host.attachmentPress ?: return
     val hold = s.dictationHold
     val pose = hold?.let { dictationPose(it) }
+    // New Plus Menu: a hold on + peeks at the newest photos (iOS `peek`, `showRecentPhotos`, `addLibraryPhotos`).
+    val photoSheet = LocalSessionPhotoSheet.current?.takeIf { it.usesPlusMenuSheet }
     AttachmentPickerButton(
         isLoading = host.isImportingAttachments,
         isOpen = host.isAttachmentMenuOpen,
@@ -200,6 +207,9 @@ private fun SessionComposerEnv.AttachmentButton() {
         onCancelDictation = { store.send(Action.micPressCancelled) },
         // Its ink as far from the surface's leading edge as from its top; the expanded text inset starts on the same line.
         glyphOffset = ComposerTunables.plusInkOffset,
+        peek = photoSheet?.recentPeek,
+        onHoldPeek = { photoSheet?.showRecentPhotos() == true },
+        onPeekChoose = { id -> photoSheet?.addLibraryPhotos(listOf(id)) },
         // Sliding from + to the rows must not open the drawer; loading, or as the recording's ×, it takes no slide.
         modifier = Modifier.excludedFromDrawerPan(!host.isImportingAttachments && hold == null),
     )
@@ -234,17 +244,20 @@ internal fun SessionComposerEnv.AnswerLeadingControls(bar: RequestBar, recording
                                 Modifier.clearAndSetSemantics { }.blockTouches()
                             } else {
                                 Modifier
-                                    .clickable(role = Role.Button, onClickLabel = null) {
+                                    .clickable(
+                                        role = Role.Button,
+                                        // iOS `accessibilityHint`: TalkBack's click label.
+                                        onClickLabel = when {
+                                            draftEmpty -> "Type or dictate your own answer"
+                                            bar.isCustom -> "Sets your words aside"
+                                            else -> "Answers with your words"
+                                        },
+                                    ) {
                                         if (s.draft.isBlank()) focus() else store.send(Action.requestCustomMarkTapped)
                                     }
                                     .semantics(mergeDescendants = true) {
                                         contentDescription = "Your own answer"
                                         selected = bar.isCustom
-                                        stateDescription = when {
-                                            draftEmpty -> "Type or dictate your own answer"
-                                            bar.isCustom -> "Sets your words aside"
-                                            else -> "Answers with your words"
-                                        }
                                         testTag = "request-custom"
                                     }
                             },
@@ -276,13 +289,12 @@ internal fun SessionComposerEnv.AnswerTrailingControls(bar: RequestBar) {
                     Modifier
                         .padding(end = 5.dp)
                         .heightIn(min = 48.dp)
-                        .clickable(role = Role.Button) {
+                        .clickable(role = Role.Button, onClickLabel = if (s.draft.isNotEmpty()) "Tells the agent what to do instead" else null) {
                             dismissKeyboard()
                             store.send(Action.SendTapped)
                         }
                         .semantics(mergeDescendants = true) {
                             contentDescription = bar.verb.title
-                            if (s.draft.isNotEmpty()) stateDescription = "Tells the agent what to do instead"
                             testTag = if (bar.verb == RequestBar.Verb.Deny) "request-deny" else "request-decline"
                         },
                     contentAlignment = Alignment.Center,
@@ -322,6 +334,8 @@ internal fun SessionComposerEnv.AnswerTrailingControls(bar: RequestBar) {
                             .openCodeTapTarget(accessibility = false)
                             .semantics(mergeDescendants = true) {
                                 contentDescription = if (bar.isLast) "Send" else "Next"
+                                // iOS `accessibilityHint` on a disabled control: TalkBack reads no click
+                                // label there, so the reason is its state.
                                 if (!ready) stateDescription = "Choose an answer or type your own"
                                 testTag = if (bar.isLast) "request-send" else "request-next"
                             },
@@ -389,8 +403,9 @@ private fun SessionComposerEnv.HoldToDictate(label: String, isCallTrayActive: Bo
             .semantics(mergeDescendants = true) {
                 role = Role.Button
                 contentDescription = label
-                stateDescription = "Tap to dictate into your message, or touch and hold to record and send"
-                onClick(label = null) {
+                // iOS `accessibilityHint` “Tap to dictate into your message, or touch and hold to
+                // record and send”: TalkBack voices its own gesture before the click label.
+                onClick(label = "Dictate into your message, or touch and hold to record and send") {
                     if (store.state.isDictating) {
                         store.send(Action.dictationInsertTapped)
                     } else {
@@ -439,7 +454,6 @@ internal fun SessionComposerEnv.TrailingButton(control: ComposerTrailingControl)
     val semantics = Modifier.semantics(mergeDescendants = true) {
         contentDescription = accessibilityLabel
         testTag = control.accessibilityLabel
-        if (steers) stateDescription = "Steers at the next step. Touch and hold to queue after this response."
         if (control == ComposerTrailingControl.Stop && s.isInterrupting) stateDescription = "Stopping"
         if (disabled) disabled()
         if (control == ComposerTrailingControl.Stop && holdingStopStartsCall) {
@@ -455,6 +469,9 @@ internal fun SessionComposerEnv.TrailingButton(control: ComposerTrailingControl)
                 steers -> DeliveryMenu(
                     onSend = { sendMessage(if (it == ai.opencode.server.model.OpenCodeDelivery.Queue) Action.QueueTapped else Action.SendTapped) },
                     enabled = !disabled,
+                    // iOS `accessibilityHint` “Steers at the next step. Touch and hold to queue after this response.”
+                    clickLabel = "Steers at the next step",
+                    longClickLabel = "Queue after this response",
                 ) { menuModifier ->
                     Box(menuModifier.openCodeTapTarget(accessibility = false).then(semantics), contentAlignment = Alignment.Center) { label() }
                 }
@@ -469,7 +486,9 @@ internal fun SessionComposerEnv.TrailingButton(control: ComposerTrailingControl)
                     Modifier
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
-                            indication = ripple(bounded = false, radius = 22.dp),
+                            // iOS `UndimmedWhilePressed(isOn: usesCallTray)`: the tray's disc lifts out of
+                            // this circle, so the press shows nothing over it.
+                            indication = if (usesCallTray) null else ripple(bounded = false, radius = 22.dp),
                             role = Role.Button,
                         ) {
                             // Only ever starts a call; End is the call bar's.

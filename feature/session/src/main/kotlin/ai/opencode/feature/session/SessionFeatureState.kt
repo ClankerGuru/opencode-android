@@ -19,6 +19,7 @@ import ai.opencode.feature.transcript.TranscriptEntry
 import ai.opencode.feature.transcript.TranscriptSubagent
 import ai.opencode.feature.voice.VoiceBroker
 import ai.opencode.feature.voice.VoiceFeature
+import ai.opencode.feature.voice.VoiceLabDemo
 import ai.opencode.feature.voice.VoiceRoute
 import ai.opencode.server.model.OpenCodeDelivery
 import ai.opencode.server.model.OpenCodeFormRequest
@@ -507,9 +508,17 @@ val State.voiceRoute: VoiceRoute
         )
     }
 
-val State.isVoiceAvailable: Boolean get() = voiceModeEnabled.value && voiceRoute.isAvailable
+val State.isVoiceAvailable: Boolean get() = voiceLabOverride || (voiceModeEnabled.value && voiceRoute.isAvailable)
 
-fun State.Companion.isVoiceAvailable(enabled: Boolean, apiKey: String?): Boolean = enabled && !apiKey.isNullOrBlank()
+fun State.Companion.isVoiceAvailable(enabled: Boolean, apiKey: String?): Boolean =
+    voiceLabOverride || (enabled && !apiKey.isNullOrBlank())
+
+/**
+ * iOS's `#if DEBUG` voice lab switches: a scripted call, a stand-in server, or the lab's key make
+ * the call button available. [VoiceLabDemo] answers nothing in release builds.
+ */
+private val voiceLabOverride: Boolean
+    get() = VoiceLabDemo.isEnabled || VoiceLabDemo.hasStandInServer || VoiceLabDemo.labAPIKey != null
 
 /** The model the next send applies: a draft's model for the session it creates, or a pick still waiting in a session. */
 val State.sendModel: OpenCodeModelRef? get() = if (session == null) currentModel else pendingModel

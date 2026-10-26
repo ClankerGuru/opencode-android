@@ -144,7 +144,11 @@ fun FusedModelChip(
                             val nextLevel = sc.level(nextIdx)
                             if (nextLevel != s.currentLevel) currentOnEvent(ModelPickerEvent.ModelRowLevelChanged(model, nextLevel))
                         }
-                        if (!change.pressed) lifted = true
+                        if (!change.pressed) {
+                            lifted = true
+                            // A tap is the chip's: the composer behind it mustn't also take it (and raise the keyboard).
+                            if (axis == null && hypot(total.x, total.y) <= threshold) change.consume()
+                        }
                     }
                     if (anchors.levelStack?.kind == FusedLevelStackState.SourceKind.Chip) {
                         anchors.closeLevelStack(commit = true, reduceMotion = reduceMotion)

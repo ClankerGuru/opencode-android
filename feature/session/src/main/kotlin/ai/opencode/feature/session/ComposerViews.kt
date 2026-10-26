@@ -22,6 +22,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
+import androidx.compose.foundation.indication
+import androidx.compose.material3.ripple
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -579,11 +585,19 @@ fun ComposerStopButton(
             override val longPressTimeoutMillis: Long get() = 500
         }
     }
+    val interactions = remember { MutableInteractionSource() }
     CompositionLocalProvider(LocalViewConfiguration provides config) {
         Box(
             modifier
+                .indication(interactions, ripple(bounded = false, radius = 22.dp))
                 .pointerInput(holdStartsCall) {
                     detectTapGestures(
+                        onPress = { offset ->
+                            val press = PressInteraction.Press(offset)
+                            interactions.emit(press)
+                            val released = tryAwaitRelease()
+                            interactions.emit(if (released) PressInteraction.Release(press) else PressInteraction.Cancel(press))
+                        },
                         onLongPress = if (holdStartsCall) {
                             { onHold() }
                         } else {
@@ -592,7 +606,11 @@ fun ComposerStopButton(
                         onTap = { onStop() },
                     )
                 }
-                .semantics { role = Role.Button }
+                // Assistive activation always stops; the call is its own action.
+                .semantics {
+                    role = Role.Button
+                    onClick { onStop(); true }
+                }
                 .openCodeTapTarget(accessibility = false),
             contentAlignment = Alignment.Center,
         ) { label() }
@@ -610,17 +628,23 @@ fun ComposerPillLabel(
     modifier: Modifier = Modifier,
     rolls: Boolean = false,
     onClick: (() -> Unit)? = null,
+    /** iOS `accessibilityHint`: TalkBack's click label (“Double tap to …”). */
+    onClickLabel: String? = null,
     leading: @Composable () -> Unit,
 ) {
-    // Slim surface, full 48 dp target.
+    // Slim surface, full 48 dp target; the press shows on the capsule.
+    val interactions = remember { MutableInteractionSource() }
     Box(
         modifier
-            .then(if (onClick != null) Modifier.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick) else Modifier)
+            .then(if (onClick != null) Modifier.clickable(interactionSource = interactions, indication = null, role = Role.Button, onClickLabel = onClickLabel, onClick = onClick) else Modifier)
             .openCodeTapTarget(accessibility = false),
         contentAlignment = Alignment.Center,
     ) {
         Surface(
-            modifier = Modifier.padding(vertical = 5.dp),
+            modifier = Modifier
+                .padding(vertical = 5.dp)
+                .clip(OpenCodeShape.capsule)
+                .indication(interactions, ripple()),
             shape = OpenCodeShape.capsule,
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             tonalElevation = 2.dp,
@@ -679,6 +703,7 @@ fun JumpToLatestPill(
         if (!isShown) mounted = false
     }
     val slotOpen = if (reduceMotion) (if (isShown) 1f else 0f) else presence.value.coerceIn(0f, 1f)
+    val interactions = remember { MutableInteractionSource() }
     val slotWidth = if (collapsesSlot) (48f + JumpToLatestPillMotion.gap) * slotOpen else 48f
     Box(modifier.width(slotWidth.dp).heightIn(min = 48.dp), contentAlignment = Alignment.CenterEnd) {
         if (mounted) {
@@ -691,8 +716,9 @@ fun JumpToLatestPill(
                     .then(
                         if (isShown) {
                             Modifier
-                                .clickable(onClickLabel = null, role = Role.Button, onClick = onClick)
+                                .clickable(interactionSource = interactions, indication = null, role = Role.Button, onClick = onClick)
                                 .semantics { contentDescription = "Scroll to latest" }
+                                .testTag("scroll-to-latest")
                         } else {
                             Modifier.clearAndSetSemantics { }.blockTouches()
                         },
@@ -705,7 +731,7 @@ fun JumpToLatestPill(
                     color = MaterialTheme.colorScheme.surfaceContainerHigh,
                     tonalElevation = 2.dp,
                     shadowElevation = 2.dp,
-                    modifier = Modifier.size(34.dp),
+                    modifier = Modifier.size(34.dp).clip(OpenCodeShape.circle).indication(interactions, ripple()),
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         OpenCodeIcon(SFSymbol.ArrowDown, contentDescription = null, size = 18.dp, tint = OpenCodeTheme.colors.text)
