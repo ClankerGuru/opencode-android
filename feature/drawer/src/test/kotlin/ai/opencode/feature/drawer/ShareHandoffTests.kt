@@ -1,5 +1,6 @@
 package ai.opencode.feature.drawer
 
+import kotlin.time.Duration.Companion.seconds
 import ai.opencode.core.files.ComposerStagedFile
 import ai.opencode.core.store.TestStore
 import ai.opencode.core.testing.TestIsolationRule
@@ -225,6 +226,8 @@ class ShareInboxFeatureTests {
         assertEquals(1, detail?.composerFocusRequest)
         assertNull(detail?.sharedSend)
         assertNull(detail?.sendAfterUploads)
-        store.finish()
+        // Composer reads the shared file on `Dispatchers.IO` (real time): wait for it in real time,
+        // not on the test's virtual clock, so a loaded box can't outlast `finish`'s timeout.
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { store.finish(timeout = 10.seconds) }
     }
 }
