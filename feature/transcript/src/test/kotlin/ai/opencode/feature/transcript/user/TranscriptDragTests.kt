@@ -4,7 +4,9 @@ import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
-import org.junit.Ignore
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import org.junit.Test
 
 /**
@@ -17,6 +19,8 @@ import org.junit.Test
  * loading has no Android counterpart: the `ClipData` is built when the drag starts and media's
  * `AgentFileDragProvider` serves bytes on the reader's thread.
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35])
 class TranscriptDragTests {
     private companion object {
         const val NEEDS_FRAMEWORK = "Uses MimeTypeMap/Uri/ClipData, stubs in JVM unit tests: needs Robolectric"
@@ -33,7 +37,6 @@ class TranscriptDragTests {
     }
 
     @Test
-    @Ignore(NEEDS_FRAMEWORK)
     fun codePayloadRegistersLanguageUTTypeAndPlainTextOffMainThreadFramework() {
         val source = "struct Greeting {\n  let message = \"Hello\"\n}"
         val clip = TranscriptDragPayload.Code(source = source, language = "swift").clipData()!!
@@ -64,7 +67,6 @@ class TranscriptDragTests {
 
     /** iOS: `ts` and `tsx` conform to `.sourceCode`; Android has no source-code supertype, so a text type. */
     @Test
-    @Ignore(NEEDS_FRAMEWORK)
     fun codeLanguageMappingCoversCommonFenceTagsFramework() {
         for (tag in listOf("ts", "tsx")) {
             val mime = TranscriptDragPayload.codeMimeType(tag)
@@ -89,7 +91,6 @@ class TranscriptDragTests {
     }
 
     @Test
-    @Ignore(NEEDS_FRAMEWORK)
     fun imageAttachmentSniffsMagicBytesAndLoadsOffMainThreadFramework() {
         val jpegHeader = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE0.toByte(), 0x00, 0x10, 0x4A, 0x46)
         val name = TranscriptDragPayload.ImageAttachment(id = "img-1", data = jpegHeader, name = "camera-roll").suggestedName
@@ -112,7 +113,6 @@ class TranscriptDragTests {
     }
 
     @Test
-    @Ignore(NEEDS_FRAMEWORK)
     fun pastedTextURLAndMessagePayloadsProvideExpectedRepresentationsFramework() {
         val paste = TranscriptDragPayload.PastedText(text = "line 1\nline 2", name = "Pasted Text")
         assertEquals("Pasted Text.txt", paste.suggestedName)

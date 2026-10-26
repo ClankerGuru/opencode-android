@@ -11,6 +11,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 /*
  * Port of iOS `OpenCodeTests/InlineLinkIconsTests.swift` (Link Icons, OC-348 / D-68). iOS
@@ -22,8 +25,6 @@ import org.junit.Test
  * Not ported:
  * - `cleanAddressIsTheDefault`: Android bakes D-68's Clean Address (`LocalInlineLinkStyle`
  *   defaults to [InlineLinkStyle.Address]) and has no `InlineLinkTunables` presets to compare.
- * - `aChipFoldsABareURLToItsDomainAndAShortPath`: the Chip fold and the slot's host parse with
- *   `android.net.Uri`, which plain JVM unit tests stub out (needs Robolectric).
  * - Dropped (UIKit/SwiftUI): `holdingTheIconFindsItsLink`,
  *   `headingWithLinkCoversBothIconAndLinkTextInHitLayout`,
  *   `linkLayoutMeasuresTunedBodySizeInlineCodeAndScaledLeading` (`LinkHitLayout`/`LinkMenuView`
@@ -32,6 +33,9 @@ import org.junit.Test
  *   `centredIconsKeepLineHeightAndAlignOpticallyAcrossStylesAndDynamicType` (`UIFont`
  *   metrics, `ImageRenderer` pixel probes; Android centres a `Placeholder` on the text).
  */
+// Robolectric: the Chip fold and the icon slot's host parse with `android.net.Uri`.
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35])
 class InlineLinkIconsTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -81,6 +85,23 @@ class InlineLinkIconsTests {
         assertEquals(listOf(device, "https://vercel.com/docs/cli/login"), decorated.fetchableLinks)
         // Taps and Copy Link still use the link's own URL.
         assertEquals(listOf(device, "https://vercel.com/docs/cli/login"), links(decorated))
+    }
+
+    @Test fun aChipFoldsABareURLToItsDomainAndAShortPath() {
+        val decorated = decorate("Open $device and check.", InlineLinkStyle.Chip, isGrowing = false)
+        assertEquals("Open vercel.com/oauth/device… and check.", shown(decorated))
+        // One unbreakable run: word joiners between its characters.
+        val text = decorated.text
+        val chip = text.getLinkAnnotations(0, text.length).first { (it.item as? LinkAnnotation.Clickable)?.tag == device }
+        assertTrue(text.text.substring(chip.start, chip.end).contains("vercel.com".toList().joinToString("\u2060")))
+        assertEquals(
+            "example.com/search…",
+            MarkdownPresentation.displayed("https://example.com/search?q=oauth&page=2", InlineLinkStyle.Chip)?.replace("\u2060", ""),
+        )
+        assertEquals(
+            "example.com/a/b…",
+            MarkdownPresentation.displayed("https://www.example.com/a/b/c/d", InlineLinkStyle.Chip)?.replace("\u2060", ""),
+        )
     }
 
     @Test fun linksWithTheirOwnTextKeepIt() {
