@@ -4,6 +4,8 @@ import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.log.AppLog
+import ai.opencode.feature.voice.AudioSessionGeneration
+import ai.opencode.feature.voice.AudioSessionOwner
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.Application
@@ -37,7 +39,6 @@ import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
 
 /**
  * How a recording ended, which decides how long its audio session stays
@@ -138,119 +139,6 @@ object DictationHoldPolicy {
                 else -> t.sendMediaHold
             }
         }
-    }
-}
-
-/**
- * Port of iOS `AudioSessionGeneration`: press/cue identity, separate from
- * activation. A call or a press claiming the shared audio bumps it.
- *
- * Minimal internal holder: iOS keeps this in `Core/AudioSessionOwner.swift`,
- * which belongs to `:feature:voice` here. Until that area exports it, dictation
- * keeps its own; voice calls must bump this one when they start.
- */
-object AudioSessionGeneration {
-    private val lock = Any()
-    private var current = 0
-    private var onNextCancel: (() -> Unit)? = null
-
-    val value: Int get() = synchronized(lock) { current }
-
-    fun bump(): Int {
-        val (value, cancel) = synchronized(lock) {
-            current += 1
-            val cancel = onNextCancel
-            onNextCancel = null
-            current to cancel
-        }
-        cancel?.invoke()
-        return value
-    }
-
-    fun onNext(after: Int, cancel: () -> Unit) {
-        val now = synchronized(lock) {
-            if (current != after) return@synchronized true
-            onNextCancel = cancel
-            false
-        }
-        if (now) cancel()
-    }
-}
-
-/**
- * Port of iOS `AudioSessionOwner`: shared activation, not exclusive
- * ownership. Only the last holder releases. A refused deactivation retries.
- *
- * Minimal internal copy (see [AudioSessionGeneration]); the voice area owns
- * the shared one.
- */
-class AudioSessionOwner(
-    private val schedule: (Duration, () -> Unit) -> Unit = { delay, work ->
-        Handler(Looper.getMainLooper()).postDelayed(work, delay.inWholeMilliseconds)
-    },
-) {
-    private val lock = Any()
-    private var nextID = 0
-    private val live = HashSet<Int>()
-    private val active = HashSet<Int>()
-    private val ready = HashSet<Int>()
-    private var epoch = 0
-
-    val activeCount: Int get() = synchronized(lock) { active.size }
-
-    fun holder(deactivate: () -> Unit): Holder = synchronized(lock) {
-        nextID += 1
-        live += nextID
-        Holder(nextID, deactivate)
-    }
-
-    private fun deactivate(body: () -> Unit, attempt: Int = 0): Boolean {
-        return try {
-            body()
-            if (attempt > 0) AppLog.voice.notice("Released audio session on retry $attempt")
-            true
-        } catch (error: Exception) {
-            if (attempt >= retryDelays.size) {
-                AppLog.voice.error("Couldn’t release audio session after $attempt retries")
-                return false
-            }
-            AppLog.voice.error("Couldn’t release audio session, retry ${attempt + 1}")
-            val epoch = epoch
-            schedule(retryDelays[attempt]) {
-                synchronized(lock) {
-                    if (this.epoch == epoch && active.isEmpty()) deactivate(body, attempt + 1)
-                }
-            }
-            false
-        }
-    }
-
-    inner class Holder internal constructor(private val id: Int, private val deactivate: () -> Unit) {
-        /** Failure keeps teardown responsibility and permits another attempt. */
-        fun activate(body: () -> Unit) {
-            synchronized(lock) {
-                if (id !in live) throw kotlinx.coroutines.CancellationException("Audio holder released")
-                active += id
-                ready -= id
-                epoch += 1
-                body()
-                if (id !in live) throw kotlinx.coroutines.CancellationException("Audio holder released")
-                ready += id
-            }
-        }
-
-        /** Whether this was the last holder and the session deactivated. */
-        fun release(): Boolean = synchronized(lock) {
-            if (!live.remove(id)) return@synchronized false
-            ready -= id
-            if (!active.remove(id) || active.isNotEmpty()) return@synchronized false
-            deactivate(deactivate)
-        }
-    }
-
-    companion object {
-        val retryDelays: List<Duration> = listOf(500.milliseconds, 1500.milliseconds, 4.seconds)
-        val shared: AudioSessionOwner by lazy { AudioSessionOwner() }
     }
 }
 
@@ -445,7 +333,7 @@ class DictationAudio(private val environment: Environment) {
                 observe = { handler -> LiveDictationAudioEvents.observe(context, handler) },
                 queue = Executors.newSingleThreadExecutor { Thread(it, "ai.opencode.dictation-audio") },
                 log = { line -> AppLog.voice.info(line) },
-                owner = AudioSessionOwner.shared,
+                owner = dependency(AudioSessionOwner),
             )
 
             /** Acts on nothing: for previews and tests. */
