@@ -112,11 +112,11 @@ another module are left to that module's port ("skipped"); "dropped" tests can't
 | `VoiceResumeTests.swift` | `VoiceResumeTests.kt` | 21 | – | – |
 | `VoiceLatencyBudgetTests.swift` | `VoiceLatencyBudgetTests.kt` | 22 | – | – |
 
-Voice-named iOS files whose subject lives elsewhere (left to those modules' ports): `LabVoiceKeysTests`,
+Voice-named iOS files whose subject lives elsewhere (left to those modules' ports): `LabVoiceKeysTests` (ported in `:app`),
 `ScreenAwakeTests`, `VoiceLiveActivityTests` (`:app`/drawer stores), `VoiceRoutingBaselineTests`,
 `ServerQuietStyleTests` (`:feature:settings`, ported there), `SessionVoiceTests`, `RaiseToTalkTests(+Routing)`,
 `AgentRevealAndOrbModelTests` (`:feature:session`), `LiveDelegationFeatureTests+Session`,
-`DictationLiveActivityTests` (drawer), `AudioSessionHapticsTests` (`:core` `HapticsClient`; its live
+`DictationLiveActivityTests` (drawer), `AudioSessionHapticsTests` (`:core` `HapticsClient`, ported there; its live
 dictation suite is opt-in device-only), `DictationAudioTests`, `LiveDictationTests` (`:feature:composer`).
 
 Production bugs the ported tests found (each fixed in its own `fix(voice)` commit): DotScopeGrid

@@ -63,6 +63,7 @@ Ported from iOS `OpenCodeTests/` into `core/src/test` (JVM, same names). Shared 
 | `PrivacyManifestTests.swift` | `diagnostics/DiagnosticsRecorderTests.kt` | 1 of 2 | manifest plist test deleted (iOS `PrivacyInfo.xcprivacy`) |
 | `ExperimentalFeatureTests.swift` | `experiments/ExperimentalFeatureTests.kt` | 8 | `VoiceAudioDemoMode` half → `:feature:voice` |
 | `HapticsAuditTests.swift` | `haptics/HapticsAuditTests.kt` | 2 (`LiveHapticsTests` source scan; `aRequestArrivingInTheBackgroundPlaysNothing` under Robolectric in `LiveHapticsFrameworkTests`: `LiveHaptics` gated by `ProcessLifecycleOwner`, shadow `Vibrator`) | `HapticsAuditTests` suite → `:feature:session`/`:feature:drawer`; `VoiceCallHaptic` fallbacks → `:feature:voice` |
+| `AudioSessionHapticsTests.swift` | `haptics/AudioSessionHapticsTests.kt` | 1 (`traceLineIsContentFreeAndNamesWhatMutesHaptics`) | deleted: `LiveDictationAudioSessionTests` (6, opt-in suite on the simulator's real microphone and `AVAudioSession`) |
 | `TuningTests.swift` | `tuning/TuningTests.kt` | 27 | TuningFeature/Wire/Placement/summon gesture → `:devtools`; drawer/composer/transcript tunables → features; MotionXRay not ported; CALayer checks deleted |
 | `MotionSystemTests.swift` | `motion/MotionSystemTests.kt` | 5 | empty-state → `:feature:transcript`; drawer shortcuts (4) → `:feature:drawer`; window probe deleted |
 | `RollingNumberTests.swift` | `ui/RollingNumberTests.kt` | 8 of 9 | `rollingTitleSurvivesPixelSnapping` deleted (UIWindow pixel snapping) |

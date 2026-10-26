@@ -101,7 +101,7 @@ lists them by name. "Dropped" tests can't exist as JVM unit tests. Tests needing
 | `ModelPickerTests.swift` | `modelpicker/ModelPickerTests.kt` (Robolectric) | 29 | 13 + reducer half of `searchParsesTrailingLevel…` → `:feature:session` | `turningOffCustomModelPickerUnregistersLevelTunables` (no Tuning Panel), `searchableSheetsAvoidForcedNavigationBarDrawerOnMac` (Mac-only); preset/registry sub-asserts. The arc's path check reads the drawn pixels' bounds |
 
 Composer-named files owned elsewhere: `SessionFeatureTests+Composer/+Dictation/+ModelPicks` (`:feature:session`),
-`ShareComposerTests` (system/drawer), `PairingPasteTests` (`:app`), `AgentFileTests` (media/transcript),
+`ShareComposerTests` (system/drawer), `PairingPasteTests` (`:app`, ported there), `AgentFileTests` (media/transcript),
 `ModelSwitchRuleTests` (`:feature:transcript`), `WireRequestTests`/`PairingDeviceNameTests`/`ModelVisibilityTests`
 (already in `:server`), `FloatingCallModelTests(+Dock)` (`:feature:voice`).
 

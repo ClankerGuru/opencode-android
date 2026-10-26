@@ -85,6 +85,7 @@ real bitmaps), `SiteIconLoaderTests` and `DecodedImageCacheTests` whole; `SiteIc
 | `MediaZoomGeometryTests.swift` (+`TranscriptImageViewerFeatureTests`) | `MediaZoomGeometryTests.kt` | 9 | – | `scrollViewReportsFullScreenFittedFrame…` (UIScrollView layout probe) |
 | `LowDataModeTests.swift` | `LowDataModeTests.kt` | 3 | `networkPathSnapshot…`, `constrainedNetworkRefusal…` (`:server`) | per-request `allowsConstrainedNetworkAccess` asserts (Android's transport refuses on a constrained path instead) |
 | `MathAndMermaidTests.swift` | `MathAndMermaidTests.kt` | 4 | 14 math/Mermaid Markdown parsing tests (`:feature:transcript`) | – |
+| `PastedTextTests.swift` | `PastedTextTests.kt` | 1 (`plainDocumentSplitsLinesWithoutHighlighting`, `AgentTextDocument.plainText`) | 4 thresholds and the prompt wire test (`:server`); composer/outbox/`SessionFeature` (`:feature:session`); read-back/fold (`:feature:transcript`) | – |
 
 Production bugs the ported tests found: none.
 
