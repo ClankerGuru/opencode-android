@@ -33,3 +33,31 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 | `app/.../MainActivity.kt` (`route`) | intents are iOS's `onOpenURL` and notification taps: `opencode://` (system actions, pairing), `opencode-ios://pair|connect`, `https://opencode.ai/pair` (App Link, `autoVerify`; needs `assetlinks.json` on opencode.ai), notification content intents |
 | `app/src/main/res/xml/data_extraction_rules.xml` | backup and device transfer exclude `support/` (incl. `composer-state.json`, `ComposerAttachments/`) and `documents/`, as iOS sets `isExcludedFromBackup` on file-stored shared values and the composer's state; preferences back up like UserDefaults |
 | `app/src/main/res/xml/network_security_config.xml` | cleartext permitted (the config can't name address ranges); iOS's ATS policy (`Info.plist` local networking + overlay `NSExceptionDomains`) is enforced in code by `server/.../TransportSecurity.kt` on the live transport |
+
+## Tests
+
+iOS `OpenCodeTests` files that test `:app` code, ported into `app/src/test` (JVM,
+`./gradlew :app:testDebugUnitTest`; `:app` takes `:server`'s test fixtures). Class and method names
+match iOS; parameterized iOS tests loop over their arguments in one test. `AppTestSupport.kt`: one
+in-memory `SharedStore` shared by the states a test builds (iOS `AppFeature.State()`) and the store,
+`GatedHome` (iOS `gatedHomeStore`), `receiveCase` (iOS `receive(\.case)`). Tests whose subject lives in
+a lower module were ported there under the same suite name.
+
+| iOS file | Kotlin file | Ported | Elsewhere (owner) | Dropped (reason) |
+| --- | --- | ---: | --- | --- |
+| `AppFeatureTests.swift` | `AppFeatureTests.kt` | 43 | 11 pairing-link/redemption/ranking/Home-cache wire tests → `:server` `AppFeatureTests`; `appVersionPrefersOpenCodeVersion` → `:feature:settings` `AppFeatureTests` | `transportSecurityAllowsPrivateOverlays` (opt-in ATS probe); `CredentialField` half of `credentialFieldFocusOrder…` (focus order is Compose's `ImeAction.Next` chain; the name prompt half is ported) |
+| `AppFeatureTests+Migrations.swift` | – | 0 | – | `theOldConsoleSignInLeavesTheKeychainOnce` (no earlier Android builds to migrate) |
+| `ConnectionErrorReportTests.swift` | `ConnectionErrorReportTests.kt` | 6 | 9 `ConnectionFailureDetail` tests → `:server` `ConnectionErrorReportTests` | – |
+| `ScreenAwakeTests.swift` | `ScreenAwakeTests.kt` | 5 | – | – |
+| `LaunchBloomTests.swift` | `LaunchBloomTests.kt` | 4 | – | `onlyForegroundColdLaunchCanMount`, `backgroundingAndSceneDetachmentReleaseCover` (UIScene states, window cover views; the system splash shows only on an activity's cold start), `touchRevealsContentAtOnce` (the splash takes no touches), `handoffIsAHardCut…` (no `launch.fade` tunable: always a hard cut), `systemLaunchUsesTheSameBlankBackground` (Info.plist), `rootStopsObservingSessionRowsOnceLaunchIsDecided` (SwiftUI observation tracking); colour half of `coverIsTheBlankLaunchBackground…` |
+| `MultipleWindowsTests.swift` (+`WindowRosterTests`, `AppWideWorkTests`) | `MultipleWindowsTests.kt` (`MultipleWindowsTests`, `WindowRosterTests`) | 2 + 7 | 7 `SharedEventStreams`/`SharedReads` → `:server` `live/MultipleWindowsTests` (+ the batcher test in `EventBatcherTests`); `aFurtherWindowKeepsItsOwnSidebar` → `:feature:drawer` (`HomeSettingsFeature`) | `oneWindowIsAlwaysTheFrontWindow` (UIKit `ActiveScene`), `activityTypeIsDeclaredInInfoPlist`, `windowTargetRoundTripsThroughItsActivity` (the target rides an `Intent`, a framework class); **todo**: the 5 `AppWideWorkTests` — `RootStore` resolves through the process-wide `SceneWindows` roster and needs an `Activity`, so a test can't hand it a roster and work (iOS `WindowStore(roster:appWideWork:)` takes them) |
+| `PairingOpensDrawerAppTests.swift` | `PairingOpensDrawerAppTests.kt` | 9 | `aComputerSharingAnAddressWithASavedOneIsNotNew` → `:server` | – (the session-tap step of `pickingASession…` is non-exhaustive past the tap: Home's read/transcript bookkeeping is the drawer's) |
+| `AppIconBadgeTests.swift` | `AppIconBadgeTests.kt` | 4 (forgetting an identity) | 9 Home publishing tests → `:feature:drawer`; ledger/storage/refs (5) → `:feature:system` `notifications/AppIconBadgeTests` | `BadgeAuthorization` (3) and App Group tests (no Android counterpart) |
+
+Production changes the ports needed: `ThisDevice.isTablet` read `Resources.getSystem()` without a null
+check, so every “this phone” copy threw under JVM tests (`shared:` fix, no device change);
+`LaunchBloomController` timed its cover with `SystemClock.uptimeMillis` instead of the `Clock`
+dependency (iOS `continuousClock`), so its 1.5 s give-up couldn't run on a `TestClock` (refactor, same
+live behaviour). No behaviour bugs found.
+
+Total: 80 `:app` tests, all passing.
