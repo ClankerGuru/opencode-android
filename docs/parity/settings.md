@@ -46,3 +46,40 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 | `OpenCode/Settings/WhatsNew/WhatsNewView.swift` | 553 | `feature/settings/.../whatsnew/WhatsNewView.kt` | done | the entry page's bar title fades in over 0.15 s ease-out once its own title scrolls under the bar (`SettingsPageScaffold(titleVisible)`); button hint is TalkBack's click label |
 
 Also here: `HomeSettingsFeature.kt` (iOS `Drawer/HomeSettingsFeature.swift`, moved down; see drawer.md): every action but `developerModeChanged`/`motionWatchChanged`/`touchProbeChanged`/`voiceDemoModeChanged` (iOS sends them from `DiagnosticsView`; Android's `:devtools` `DevToolsFeature` owns Developer Mode and Demo Call Audio, Motion Watch and Touch Probe are iOS-only) and the Tuning mirrors of `plusMenuSheet`/`composerAutocomplete` (the composer reads the keys). Settings-owned Android extras: `SettingsPresentation.kt` is the overlay Home wraps itself in.
+
+## Tests
+
+iOS `OpenCodeTests` files that test `:feature:settings` code, ported into `feature/settings/src/test`
+(JVM, `./gradlew :feature:settings:testDebugUnitTest`). Test class and method names match iOS;
+parameterized iOS tests loop over their arguments inside one test. Shared support is
+`SettingsTestSupport.kt` (a per-test in-memory `SharedStore` in place of iOS's process-wide
+`@Shared` values, `LockIsolated`, a haptics recorder). Shared values aren't in Android's reducer
+state (states read the keys live), so where iOS asserts `$shared.withLock` inside a step, the
+port checks the key after the send. Tests whose store or subject belongs to another module are
+left to that module's port ("skipped"); "dropped" tests can't exist on Android.
+
+| iOS file | Kotlin file | Ported | Skipped (owner) | Dropped (reason) |
+| --- | --- | ---: | --- | --- |
+| `OnboardingPlaygroundFeatureTests.swift` | `onboarding/OnboardingPlaygroundFeatureTests.kt` | 10 | – | – (Close: Android's view dismisses, so the test checks no effect keeps running instead of counting `dismiss`) |
+| `PlaygroundFixtureTests.swift` | – | 0 | – | all 7: `PlaygroundFixtureEngine` presets/replays/session host and `TuningFeature`'s playground selection are n/a on Android (devtools.md: Session Lab and `session-lab.py` checkpoints replace the in-app fixture playgrounds) |
+| `ServerDetailsTests.swift` | `serverdetails/ServerDetailsTests.kt` | 11 | `decodesEveryMCPStatus`, `decodesCredentialAndEnvironmentAccounts`, `onlyMCPConnectIsRetriedWhenUnsent` (`:server` internal payloads / `mcpConnectionIdempotency`) | – |
+| `WhatsNewTests.swift` (`WhatsNewTests`) | `whatsnew/WhatsNewTests.kt` | 14 (3 are the Settings halves of Home tests: `homePushes…`, `readingItInSettings…`, `openPushes…`, against `SettingsFeature`, where Android keeps the page) | `tryItTypesAPrompt…`, `closingSettingsWithoutWhatsNew…`, `closingWhatsNewDropsItsSettingsPage`, `tryItTypesThePrompt…OnThisServer…`, `tryItKeepsTheOpenDrafts…`, `tryItAgain…`, `tryItTwice…`, `tryItKeepsASavedDrafts…` (`:feature:drawer`) | – |
+| `WhatsNewTests.swift` (`WhatsNewTryItTests`) | `whatsnew/WhatsNewTests.kt` (`WhatsNewTryItTests`) | 3 (Settings halves of `aNewSessionWhileOffline…`, `aCallBeforeVoiceIsSetUp…`; `settingsAskedForOverWhatsNew…`) | 4 `modelList…` (`:feature:drawer`), `whatsNewSurvivesAHomeReplacement` (`:app`) | – |
+| `WhatsNewTests.swift` (`WhatsNewDotSymbolTests`) | – | 0 | – | `aSymbolLightsItsShapeOnTheGrid`: `DotField` is the page's private `Canvas` renderer of an Android vector drawable (iOS rasterizes an SF Symbol) |
+| `WhatsNewAddedIDs.swift` | `whatsnew/WhatsNewAddedIDs.kt` | data | – | `uikit-drawer-experiment` left out (its entry isn't on Android's list) |
+| `ModelVisibilityTests.swift` | `ModelVisibilityTests.kt` | 4 (Settings › Models, against `ModelVisibilityFeature`) | 6 Rules (`:server`), 5 Pickers (`:feature:session`) | – |
+| `ServerQuietStyleTests.swift` | `servers/ServerQuietStyleTests.kt` | 2 | – | `markIntroWindsBack…`, `markFrontOnIs…`: `ServerMarkGeometry` (the wireframe mark, unused on iOS) isn't ported |
+| `ConnectionHealthTests.swift` | `connection/ConnectionHealthTests.kt` | 28 | `routes`, `routesClassifyParsedAddressesNotSpellings` (`ConnectionRoute`, `reachabilityRank`, `isLoopback` live in `:server`) | – (the probe test answers through an OkHttp interceptor; its `NetworkRetry.policy == .once` check can't be observed on OkHttp's dispatcher thread) |
+| `ThemePaletteTests.swift` | `ThemePaletteTests.kt` | 1 (`appearanceSettingsActions…` through `HomeSettingsFeature`, minus its `TranscriptTunables`/`MarkdownStyle` half, `:feature:transcript`) | 5 + legacy (`:core`, see core.md) | `appearanceTunablesRegisterSoftEdgeControls` (tuning store not ported; the soft edge's 22/12 are baked) |
+| `LivingOrbTests.swift` | `LivingOrbTests.kt` | 1 (`settingsPersistStyle…`; checks the key name and stored encoding instead of raw `UserDefaults`) | rest (`:feature:voice`, `:core`) | – |
+| `CallVoiceTests.swift` | `CallVoiceTests.kt` | 3 (`CallVoicePicker.rowValue` half of `anUnsupportedChoice…`, `keyRowSwitches…`, `previewRequiresAKey…`) | rest (`:feature:voice`) | – |
+| `VoiceServerPickerTests.swift` | `VoiceServerPickerTests.kt` | 7 (4 `VoiceSettingsFeature`, `homeSavesTheChoice…`, Settings halves of `everyEntryPointRoutes…`, `thisIPhoneUsesThePhonesOwnKey`) | rest (`:feature:voice`); `SessionFeature.State` checks (`:feature:session`) | – |
+| `VoiceRouteTests.swift` | `VoiceRouteTests.kt` | 2 (Settings/`VoiceRoutePreferences` halves of `inactiveGemini…`, `grokSuppresses…`) | rest (`:feature:voice`); `SessionFeature.State` checks (`:feature:session`) | – |
+| `VoiceRoutingBaselineTests.swift` | `VoiceRoutingBaselineTests.kt` | 1 | – | – |
+| `HomeChildFeatureTests.swift` | `HomeChildFeatureTests.kt` | 2 (`HomeSettingsFeature`) | `HomeNotificationsFeature` and other Home children (`:feature:drawer`) | – |
+| `ServerSwitchingTests.swift` | `servers/ServerSwitchingTests.kt` | 5 (`ServerTitleFeature` alone) | `AppFeature` tests (`:app`), header tests (`:server`) | – |
+| `ServerTitleRecoveryTests.swift` | `servers/ServerTitleRecoveryTests.kt` | 2 (`ServerTitleFeature` alone) | `AppFeature` tests (`:app`) | – |
+
+Production bugs the ported tests found: none (every ported test passed against the existing port).
+
+Total: 96 settings tests, all passing.
