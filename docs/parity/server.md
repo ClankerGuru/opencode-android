@@ -94,8 +94,15 @@ fixtures: `server/src/testFixtures` (`WireFixture`, `ServerTestIsolation`); the 
 | `ModelVisibilityTests.swift` | `model/ModelVisibilityTests.kt` | 6 (Rules) | Pickers/Settings tests → `:feature:session`/`:feature:settings` |
 | `SessionLinkTests.swift` | `model/SessionLinkTests.kt` | 1 (`linkURLRoundTripsItsIDAndTitle`) | parsing/presentation → `:feature:transcript`; session/Home/menu → features |
 | `TestIsolationGuardTests.swift` | `testing/ServerTestIsolationTests.kt` | 1 (network block) | rest in `:core` (see core.md) |
+| `AgentFileTests.swift` | `model/AgentFileReferenceTests.kt` | 8 (`AgentFileReferenceTests`) | `toolRowsOfferViewableFiles` not ported yet (`:server`); rest → `:feature:media`/`:feature:transcript` (see media.md) |
+| `BrowserTests.swift` | `live/PagePromptBodyTests.kt` | 5 (`PagePromptBodyTests`) | rest → `:feature:media`/session/voice (see media.md) |
+| `ServerDetailsTests.swift` | `live/ServerDetailsTests.kt` | 3 (`decodesEveryMCPStatus`, `decodesCredentialAndEnvironmentAccounts`, `onlyMCPConnectIsRetriedWhenUnsent`) | `OpenCodeAccount.subtitle` (`ServerDetailsTrays`) and the reducer tests → `:feature:settings`; here the accounts test checks provider/method/label |
+| `ConnectionHealthTests.swift` | `ConnectionHealthTests.kt` | 2 (`routes`, `routesClassifyParsedAddressesNotSpellings`) | health machine, trace, card names → `:feature:settings` |
+| `LowDataModeTests.swift` | `retry/LowDataModeTests.kt` | 1 (`networkPathSnapshotPreservesConstrainedAndExpensiveFlags`) | loaders → `:feature:media`. Dropped `constrainedNetworkRefusalIsNeverRetryableTransportFailure`: iOS's `URLError.networkUnavailableReason == .constrained` (per-request `allowsConstrainedNetworkAccess`) has no Android counterpart, so `TransportFailure` has no constrained refusal to classify |
 
 Bugs the ports found (fixed): EACCES socket errors were retried; a refused cleartext redirect to
 another host read as interrupted; OkHttp's 5-per-host cap queued family fan-out; endpoint
 queries encoded `/` as `%2F`; transport failures recorded no failure phase
 (`DiagnosticsNetworkPhases`, found by the core `DiagnosticsRecorderTests`).
+
+Total: 195 `:server` tests (`./gradlew :server:testDebugUnitTest`).
