@@ -84,14 +84,14 @@ lists them by name. "Dropped" tests can't exist as JVM unit tests. Tests needing
 | `DictationInputTests.swift` | `DictationInputTests.kt` | 4 | – | – |
 | `DictationAudioTests.swift` | `DictationAudioTests.kt` (+`DictationHoldReportingTests`) | 28 | `theComposerLetsAHeldSessionGo`, `aCallStartsOnlyOnceDictationHasLetGo`, `raiseToTalkWaitsForDictationToo` → `:feature:session` | `aStoppedMicUnderACallLeavesItsSettings`, `anOlderRecordingsStopNeverTouchesTheNewerOne` (only assert `prefersNoInterruptionsFromSystemAlerts`, no Android equivalent); AVAudioSession category/mode/notify sub-asserts dropped in ported tests |
 | `LiveDictationTests.swift` | `LiveDictationTests.kt` | 15 | – | – |
-| `DictationLiveActivityTests.swift` | `DictationLiveActivityTests.kt` | 1 (`DictationFeature` store) | 4 `HomeFeature` tests → drawer; `theStopIntentSendsItsCommand` → system (Live Update owner) | – |
+| `DictationLiveActivityTests.swift` | `DictationLiveActivityTests.kt` | 1 (`DictationFeature` store) | 4 `HomeFeature` tests → drawer (`onlyALive…` ported there too); `theStopIntentSendsItsCommand` → system (Live Update owner) | – |
 | `SendOutboxTests.swift` | `SendOutboxTests.kt` | 1 (`retryAfterIsReadAsSecondsOrADate`, a `:server` helper no other port covered) | 35 → `:feature:session` | – |
 | `ComposerPersistenceTests.swift` | `ComposerPersistenceTests.kt` | 1 (cleanup through the persistence client) | 7 → `:feature:session`, 3 → drawer | – |
 | `ComposerAutocompleteTests.swift` | `ComposerAutocompleteTests.kt` (Robolectric, +`ComposerAutocompleteTestSupport.kt`) | 12 (2 partly) | 5 → `:feature:session`; `experimentalFlagOffProducesByteIdenticalPromptBody` → `:server` | caret auto-run step (Android's auto-run is fixed to Fill), UIKit text-view checks; `keyCommands` counts are checked through `handleKeyEvent` |
 | `ComposerAutocompleteMotionTests.swift` | `ComposerAutocompleteMotionTests.kt` | 9 | – | – |
 | `ComposerSessionMentionTests.swift` | `ComposerSessionMentionTests.kt` | 4 | 3 → `:feature:session`; `sentSessionTokensRenderAsSessionLinks` → `:feature:transcript` | – |
 | `ComposerItemProviderLoaderTests.swift` | `ComposerItemProviderLoaderTests.kt` (Robolectric) | 8 | `composerOffersACallWhenVoiceIsSetUp`, `composerControlPresentation` → `:feature:session` | `textViewRoutesImagePaste…` (UIKit paste) |
-| `FileAttachmentTests.swift` | `FileAttachmentTests.kt` (+ `:core` `files/AttachmentFileTypeTests.kt`) | 1 (`ComposerAttachmentsFeature`) + 3 (`:core`) | 7 → `:feature:session`; `PromptPresentationTests`/`FileAttachmentWireTests` (7) → `:server`; `ShareHandoffFileTests` → `:feature:system` | – |
+| `FileAttachmentTests.swift` | `FileAttachmentTests.kt` (+ `:core` `files/AttachmentFileTypeTests.kt`) | 1 (`ComposerAttachmentsFeature`) + 3 (`:core`) | 7 → `:feature:session`; `PromptPresentationTests`/`FileAttachmentWireTests` (7) → `:server`; `ShareHandoffFileTests` → `:feature:system`, ported there | – |
 | `InlinePhotoSelectionTests.swift` | `InlinePhotoSelectionTests.kt` | 7 | – | – |
 | `AttachmentCameraActivityTests.swift` | `AttachmentCameraActivityTests.kt` | 6 | – | – |
 | `AttachmentCameraControlsRenderTests.swift` | – | 0 | – | `renderControls` (opt-in UIKit screenshot) |

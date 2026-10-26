@@ -30,6 +30,46 @@ import java.util.UUID
 // `SharedItemLoaderAndActivationTests` (`SharedItemLoaderAndActivationFrameworkTests`) run under
 // Robolectric (real `ImageDecoder`/`Bitmap`/`ExifInterface` and `MimeTypeMap`).
 
+/**
+ * Port of iOS `FileAttachmentTests.swift`'s `ShareHandoffFileTests`: a shared file moves out of its
+ * share into the composer's staging directory under its own name. The `SharedComposerDraft` half
+ * (the draft's file names) is `:feature:composer`'s.
+ */
+class ShareHandoffFileTests {
+    @get:Rule val isolation = TestIsolationRule()
+
+    @Test
+    fun sharedFilesMoveIntoTheAppStagingDirectory() {
+        val root = Files.createTempDirectory("share-root-").toFile()
+        val staging = Files.createTempDirectory("share-staging-").toFile().also { it.delete() }
+        try {
+            val source = File(root, "source.pdf").apply { writeBytes("%PDF".toByteArray()) }
+            val store = ShareHandoffStore(File(root, "Shares"))
+            val id = UUID.randomUUID()
+            val handoff = ShareHandoff(
+                id = UUID.randomUUID(),
+                createdAt = Instant.now(),
+                serverID = "server",
+                target = ShareHandoff.Target.NewSession(projectID = null),
+                text = "",
+                files = listOf(ShareHandoff.FileEntry(id = id, fileName = "file-0", name = "Q3 Report.pdf", mime = "application/pdf")),
+            )
+            store.save(handoff, images = emptyList(), files = listOf(source))
+
+            val shares = store.consumeAll(now = Instant.now(), filesDirectory = staging)
+
+            val file = requireNotNull(shares.firstOrNull()?.files?.firstOrNull())
+            assertEquals("Q3 Report.pdf", file.name)
+            assertEquals(4L, file.size)
+            assertEquals(File(File(staging, id.toString().uppercase()), "Q3 Report.pdf"), file.url)
+            assertArrayEquals("%PDF".toByteArray(), file.url.readBytes())
+        } finally {
+            root.deleteRecursively()
+            staging.deleteRecursively()
+        }
+    }
+}
+
 class ShareHandoffStoreTests {
     @get:Rule val isolation = TestIsolationRule()
 
