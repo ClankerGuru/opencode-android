@@ -17,6 +17,7 @@ import ai.opencode.feature.composer.plusmenu.VideoDurationBadge
 import android.content.ContentResolver
 import android.content.ContentUris
 import android.content.Context
+import android.net.Uri
 import androidx.core.net.toUri
 import android.os.Bundle
 import android.provider.MediaStore
@@ -239,7 +240,7 @@ private const val GRID_SPACING = 2
 @Composable
 internal fun InlinePhotoPicker(
     library: InlinePhotoLibrary,
-    selection: InlinePhotoSelection,
+    selection: InlinePhotoSelection<Uri>,
     filter: InlinePhotoFilter,
     includesVideos: Boolean,
     isActive: Boolean,
