@@ -31,7 +31,7 @@ class SessionFeatureTestsSending {
     private val testServer = OpenCodeServer(url = "http://localhost:9", username = "", password = "")
 
     private fun testSession(id: String, title: String) =
-        OpenCodeSession(id = id, title = title, projectID = "p", directory = "/project", updatedAt = Instant.now())
+        OpenCodeSession(id = id, serverTitle = title, projectID = "p", directory = "/project", updatedAt = Instant.now())
 
     /**
      * Each session screen counts its runs from 1, so a token from the number alone collided: the

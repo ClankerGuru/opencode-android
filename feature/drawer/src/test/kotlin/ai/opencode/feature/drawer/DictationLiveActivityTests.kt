@@ -42,8 +42,8 @@ class DictationLiveActivityTests {
     @get:Rule val isolation = TestIsolationRule()
 
     private val server = OpenCodeServer(url = "http://127.0.0.1:9", username = "opencode", password = "pw")
-    private val first = OpenCodeSession(id = "ses_first", title = "First", projectID = "p", directory = "/work", updatedAt = Instant.ofEpochSecond(2_000))
-    private val second = OpenCodeSession(id = "ses_second", title = "Second", projectID = "p", directory = "/work", updatedAt = Instant.ofEpochSecond(1_000))
+    private val first = OpenCodeSession(id = "ses_first", serverTitle = "First", projectID = "p", directory = "/work", updatedAt = Instant.ofEpochSecond(2_000))
+    private val second = OpenCodeSession(id = "ses_second", serverTitle = "Second", projectID = "p", directory = "/work", updatedAt = Instant.ofEpochSecond(1_000))
     private val t0: Instant = Instant.ofEpochSecond(3_000)
 
     private fun home(): HomeFeature.State =

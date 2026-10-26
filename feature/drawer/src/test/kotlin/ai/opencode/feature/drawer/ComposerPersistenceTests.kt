@@ -84,7 +84,7 @@ class ComposerPersistenceTests {
     private val project = OpenCodeProject(id = "proj_1", name = "OpenCode", directory = "/Users/kit/code/opencode")
     private val session = OpenCodeSession(
         id = "ses_1",
-        title = "Durable drafts",
+        serverTitle = "Durable drafts",
         projectID = "proj_1",
         directory = "/Users/kit/code/opencode",
         updatedAt = Instant.ofEpochSecond(1_000),
@@ -199,7 +199,7 @@ class ComposerPersistenceTests {
     @Test
     fun incomingShareAndKeepDraftMergeIntoPersistedDraftAndDisarmSendLater() = runTest {
         val persistence = ComposerPersistence.inMemory(debounce = 60.seconds)
-        val targetSession = OpenCodeSession(id = "ses_target", title = "Target", projectID = project.id, directory = project.directory, updatedAt = Instant.ofEpochSecond(500))
+        val targetSession = OpenCodeSession(id = "ses_target", serverTitle = "Target", projectID = project.id, directory = project.directory, updatedAt = Instant.ofEpochSecond(500))
         persistence.scheduleDraft(server.persistenceID, targetSession.id, null, DraftState(text = "Persisted draft before launch"))
 
         val world = World(persistence)
@@ -251,8 +251,8 @@ class ComposerPersistenceTests {
     @Test
     fun parkDraftFamilyDraftsAndCatchUpPreserveAttachmentsAndNeverDuplicateOrResurrectDrafts() = runTest {
         val persistence = ComposerPersistence.inMemory(debounce = 60.seconds)
-        val childSession = OpenCodeSession(id = "ses_child", title = "Subagent", projectID = project.id, directory = project.directory, updatedAt = Instant.ofEpochSecond(1_200), parentID = session.id)
-        val unreadSession = OpenCodeSession(id = "ses_unread", title = "Unread", projectID = project.id, directory = project.directory, updatedAt = Instant.ofEpochSecond(1_800), idleMilliseconds = 5_000)
+        val childSession = OpenCodeSession(id = "ses_child", serverTitle = "Subagent", projectID = project.id, directory = project.directory, updatedAt = Instant.ofEpochSecond(1_200), parentID = session.id)
+        val unreadSession = OpenCodeSession(id = "ses_unread", serverTitle = "Unread", projectID = project.id, directory = project.directory, updatedAt = Instant.ofEpochSecond(1_800), idleMilliseconds = 5_000)
 
         val stagedFile = ComposerStagedFile(
             id = UUID.fromString("00000000-0000-0000-0000-000000000095"),
@@ -384,9 +384,9 @@ class ComposerPersistenceTests {
         outbox.bind(persistence)
         undelivered.bind(persistence)
 
-        val childSession = OpenCodeSession(id = "ses_child", title = "Subagent", projectID = project.id, directory = project.directory, updatedAt = Instant.ofEpochSecond(1_100), parentID = session.id)
-        val unreadSession = OpenCodeSession(id = "ses_unread", title = "Unread root", projectID = project.id, directory = project.directory, updatedAt = Instant.ofEpochSecond(1_200), idleMilliseconds = 2_000)
-        val unreadChild = OpenCodeSession(id = "ses_unread_child", title = "Unread child", projectID = project.id, directory = project.directory, updatedAt = Instant.ofEpochSecond(1_250), idleMilliseconds = 2_500, parentID = unreadSession.id)
+        val childSession = OpenCodeSession(id = "ses_child", serverTitle = "Subagent", projectID = project.id, directory = project.directory, updatedAt = Instant.ofEpochSecond(1_100), parentID = session.id)
+        val unreadSession = OpenCodeSession(id = "ses_unread", serverTitle = "Unread root", projectID = project.id, directory = project.directory, updatedAt = Instant.ofEpochSecond(1_200), idleMilliseconds = 2_000)
+        val unreadChild = OpenCodeSession(id = "ses_unread_child", serverTitle = "Unread child", projectID = project.id, directory = project.directory, updatedAt = Instant.ofEpochSecond(1_250), idleMilliseconds = 2_500, parentID = unreadSession.id)
 
         // 1. Duplicate draft on .familyPicked: neither parkDraft nor setSharedDraft duplicates into the composer.
         val world = World(persistence, outbox, undelivered)
@@ -427,7 +427,7 @@ class ComposerPersistenceTests {
         )
 
         // 2. .sessionCreated promotes the draft outbox and clears outboxDraftID, and restorePersistedDraft migrates nil-session drafts.
-        val createdSession = OpenCodeSession(id = "ses_created_from_draft", title = "Created session", projectID = project.id, directory = project.directory, updatedAt = Instant.ofEpochSecond(1_300))
+        val createdSession = OpenCodeSession(id = "ses_created_from_draft", serverTitle = "Created session", projectID = project.id, directory = project.directory, updatedAt = Instant.ofEpochSecond(1_300))
         val draftHomeState = world.state {
             HomeFeature.State(server, OpenCodeHomeSnapshot(projects = listOf(project), sessions = listOf(session), activeSessionIDs = emptySet())).openingDraft()
         }

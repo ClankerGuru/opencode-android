@@ -24,7 +24,7 @@ class AppFeatureTests {
     @Test
     fun encodedHomeCacheDoesNotPersistServerPassword() {
         val server = OpenCodeServer(url = "https://saved.example", username = "kit", password = "unique-keychain-secret")
-        val session = OpenCodeSession(id = "ses_cached", title = "Cached work", projectID = "proj_cached", directory = "/work", updatedAt = Instant.ofEpochSecond(1_000))
+        val session = OpenCodeSession(id = "ses_cached", serverTitle = "Cached work", projectID = "proj_cached", directory = "/work", updatedAt = Instant.ofEpochSecond(1_000))
         val cache = DependencyValues.withValues(DependencyValues.testing()) {
             val home = HomeFeature.State(server, OpenCodeHomeSnapshot(projects = emptyList(), sessions = listOf(session), activeSessionIDs = emptySet()))
             home.persistingSnapshot(Instant.EPOCH)

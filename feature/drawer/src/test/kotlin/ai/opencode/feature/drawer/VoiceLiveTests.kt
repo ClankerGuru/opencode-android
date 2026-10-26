@@ -46,14 +46,14 @@ class VoiceLiveTests {
     @get:Rule val isolation = TestIsolationRule()
 
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
-    private val session = OpenCodeSession(id = "ses_voice", title = "Voice lab", projectID = "p", directory = "/Users/kit/project", updatedAt = HomeFeatureTestSupport.distantPast)
+    private val session = OpenCodeSession(id = "ses_voice", serverTitle = "Voice lab", projectID = "p", directory = "/Users/kit/project", updatedAt = HomeFeatureTestSupport.distantPast)
 
     /**
      * A compaction that happened while the call was elsewhere is seen when
      * the call arrives, not only when a later one lands.
      */
     @Test fun aCallArrivingInASessionKnowsItsLatestCompaction() = homeTest { h ->
-        val other = OpenCodeSession(id = "ses_other", title = "Other", projectID = "p", directory = "/Users/kit/project", updatedAt = HomeFeatureTestSupport.distantPast)
+        val other = OpenCodeSession(id = "ses_other", serverTitle = "Other", projectID = "p", directory = "/Users/kit/project", updatedAt = HomeFeatureTestSupport.distantPast)
         val project = OpenCodeProject(id = "p", name = "project", directory = "/Users/kit/project")
         val compacted = listOf(
             OpenCodeTranscriptItem.UserText(id = "msg_1", text = "Hello"),
@@ -75,8 +75,8 @@ class VoiceLiveTests {
     }
 
     @Test fun draftAdoptingCreatedSessionDoesNotRetargetAndRealRetargetSendsConciseDeltaAndSilentAbandon() = voiceHomeTest { h ->
-        val created = OpenCodeSession(id = "ses_created", title = "Untitled session", projectID = "p", directory = "/Users/kit/project", updatedAt = HomeFeatureTestSupport.distantPast)
-        val other = OpenCodeSession(id = "ses_other", title = "Other session", projectID = "p", directory = "/Users/kit/project", updatedAt = HomeFeatureTestSupport.distantPast)
+        val created = OpenCodeSession(id = "ses_created", serverTitle = "Untitled session", projectID = "p", directory = "/Users/kit/project", updatedAt = HomeFeatureTestSupport.distantPast)
+        val other = OpenCodeSession(id = "ses_other", serverTitle = "Other session", projectID = "p", directory = "/Users/kit/project", updatedAt = HomeFeatureTestSupport.distantPast)
         val project = OpenCodeProject(id = "p", name = "project", directory = "/Users/kit/project")
         val home = h.state {
             var home = HomeFeature.State(server, OpenCodeHomeSnapshot(projects = listOf(project), sessions = listOf(other), activeSessionIDs = emptySet()))

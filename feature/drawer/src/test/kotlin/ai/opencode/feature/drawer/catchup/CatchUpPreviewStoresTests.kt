@@ -28,7 +28,7 @@ import org.robolectric.annotation.Config
 class CatchUpPreviewStoresTests {
     private val server = OpenCodeServer(url = "http://localhost:9", username = "", password = "")
     private fun session(id: String, updated: Long) = OpenCodeSession(
-        id = id, title = id, projectID = "p", directory = "/project",
+        id = id, serverTitle = id, projectID = "p", directory = "/project",
         updatedAt = Instant.ofEpochSecond(updated), idleMilliseconds = 2_000, viewedMilliseconds = 1_000,
     )
 

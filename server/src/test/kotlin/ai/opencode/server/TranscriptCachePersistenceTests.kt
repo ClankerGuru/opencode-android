@@ -68,7 +68,7 @@ class TranscriptCachePersistenceTests {
     fun transcriptSnapshotRoundTripsAndInvalidatesWhenSessionChanges() {
         val server = OpenCodeServer(url = "https://saved.example", username = "", password = "")
         val updatedAt = date(1_000)
-        val session = OpenCodeSession(id = "ses_cached", title = "Cached", projectID = "p", directory = "/p", updatedAt = updatedAt)
+        val session = OpenCodeSession(id = "ses_cached", serverTitle = "Cached", projectID = "p", directory = "/p", updatedAt = updatedAt)
         val items = listOf(
             OpenCodeTranscriptItem.UserText(id = "m1", text = "hello"),
             OpenCodeTranscriptItem.AssistantMarkdown(id = "m2", text = "**Hi**\n\n```swift\nlet n = 1\n```"),

@@ -60,7 +60,7 @@ class SelectedTranscriptCancellationTests {
     private val server = OpenCodeServer(url = "http://localhost:9", username = "", password = "")
 
     private fun session(id: String, updated: Long, idle: Long = 1_000, viewed: Long = 1_000) = OpenCodeSession(
-        id = id, title = id, projectID = "p", directory = "/project",
+        id = id, serverTitle = id, projectID = "p", directory = "/project",
         updatedAt = Instant.ofEpochSecond(updated), idleMilliseconds = idle, viewedMilliseconds = viewed,
     )
 
@@ -277,7 +277,7 @@ class SelectedTranscriptCancellationTests {
         val otherSession = session("other", 30, idle = 2_000, viewed = 1_000)
         val uncachedSession = session("uncached", 20, idle = 2_000, viewed = 1_000)
         val childSession = OpenCodeSession(
-            id = "child", title = "Child", projectID = "p", directory = "/project",
+            id = "child", serverTitle = "Child", projectID = "p", directory = "/project",
             updatedAt = Instant.ofEpochSecond(25), parentID = "home",
         )
         val snapshot = OpenCodeHomeSnapshot(emptyList(), listOf(homeSession, otherSession, uncachedSession), setOf("ses_subagent"))

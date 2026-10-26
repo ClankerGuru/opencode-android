@@ -53,10 +53,10 @@ class ShareInboxFeatureTests {
     private val project = OpenCodeProject(id = "proj", name = "Work", directory = "/work")
     private val other = OpenCodeProject(id = "proj_other", name = "Other", directory = "/other")
     private val current = OpenCodeSession(
-        id = "ses_current", title = "Current", projectID = "proj", directory = "/work", updatedAt = Instant.ofEpochSecond(30),
+        id = "ses_current", serverTitle = "Current", projectID = "proj", directory = "/work", updatedAt = Instant.ofEpochSecond(30),
     )
     private val target = OpenCodeSession(
-        id = "ses_target", title = "Target", projectID = "proj_other", directory = "/other", updatedAt = Instant.ofEpochSecond(20),
+        id = "ses_target", serverTitle = "Target", projectID = "proj_other", directory = "/other", updatedAt = Instant.ofEpochSecond(20),
     )
     private val screenshot = ReceivedShare.Image(id = UUID(0, 1), data = byteArrayOf(0xFF.toByte(), 0xD8.toByte()), mime = "image/jpeg")
 

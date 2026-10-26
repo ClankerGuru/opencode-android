@@ -50,7 +50,7 @@ class InAppNoticeTests {
     private val server = OpenCodeServer(url = "http://localhost:9", username = "", password = "")
 
     private fun session(id: String, title: String, idle: Long = 1_000, viewed: Long = 1_000, parent: String? = null) = OpenCodeSession(
-        id = id, title = title, projectID = "p", directory = "/project",
+        id = id, serverTitle = title, projectID = "p", directory = "/project",
         updatedAt = Instant.ofEpochSecond(10), idleMilliseconds = idle, viewedMilliseconds = viewed, parentID = parent,
     )
 

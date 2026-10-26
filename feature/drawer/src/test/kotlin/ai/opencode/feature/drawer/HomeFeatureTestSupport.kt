@@ -51,7 +51,7 @@ internal object HomeFeatureTestSupport {
         model: OpenCodeModelRef? = null,
     ) = OpenCodeSession(
         id = id,
-        title = title,
+        serverTitle = title,
         projectID = projectID,
         directory = directory,
         updatedAt = updatedAt,

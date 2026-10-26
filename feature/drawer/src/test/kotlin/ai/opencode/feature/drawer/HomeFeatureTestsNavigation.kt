@@ -67,7 +67,7 @@ class HomeFeatureTestsNavigation {
         projectID: String = "proj_1",
         directory: String = "/tmp/demo",
         updatedAt: Instant = date(1_000),
-    ) = OpenCodeSession(id = id, title = title, projectID = projectID, directory = directory, updatedAt = updatedAt)
+    ) = OpenCodeSession(id = id, serverTitle = title, projectID = projectID, directory = directory, updatedAt = updatedAt)
 
     private fun HomeFeature.State.key(id: String) = "${server.persistenceID}|$id"
 
@@ -135,7 +135,7 @@ class HomeFeatureTestsNavigation {
     fun draftOpenedBeforeTheFirstSnapshotLearnsItsProjects() = homeTest { h ->
         val recent = OpenCodeProject(id = "proj_recent", name = "recent", directory = "/tmp/recent")
         val other = OpenCodeProject(id = "proj_other", name = "other", directory = "/tmp/other")
-        val session = OpenCodeSession(id = "ses_1", title = "Latest work", projectID = "proj_recent", directory = "/tmp/recent", updatedAt = date(1_000))
+        val session = OpenCodeSession(id = "ses_1", serverTitle = "Latest work", projectID = "proj_recent", directory = "/tmp/recent", updatedAt = date(1_000))
         // Cold launch with nothing cached: Home starts empty and opens a draft.
         val state = h.state {
             val base = HomeFeature.State(testServer, snapshot(emptyList()))
@@ -174,8 +174,8 @@ class HomeFeatureTestsNavigation {
      */
     @Test
     fun switchingSessionsCarriesTheRecordingAndSendsItThere() = homeTest { h ->
-        val first = OpenCodeSession(id = "ses_first", title = "First", projectID = "p", directory = "/work", updatedAt = date(2_000))
-        val second = OpenCodeSession(id = "ses_second", title = "Second", projectID = "p", directory = "/work", updatedAt = date(1_000))
+        val first = OpenCodeSession(id = "ses_first", serverTitle = "First", projectID = "p", directory = "/work", updatedAt = date(2_000))
+        val second = OpenCodeSession(id = "ses_second", serverTitle = "Second", projectID = "p", directory = "/work", updatedAt = date(1_000))
         val state = h.state {
             HomeFeature.State(testServer, snapshot(listOf(first, second)))
                 .copy(transcriptCache = mapOf(first.id to emptyList(), second.id to emptyList()))
@@ -255,8 +255,8 @@ class HomeFeatureTestsNavigation {
         val server = testServer
         val recent = OpenCodeProject(id = "proj_recent", name = "recent", directory = "/tmp/recent")
         val other = OpenCodeProject(id = "proj_other", name = "other", directory = "/tmp/other")
-        val session = OpenCodeSession(id = "ses_1", title = "Latest work", projectID = "proj_recent", directory = "/tmp/recent", updatedAt = date(1_000))
-        val created = OpenCodeSession(id = "ses_new", title = "Untitled session", projectID = "proj_recent", directory = "/tmp/recent", updatedAt = date(2_000))
+        val session = OpenCodeSession(id = "ses_1", serverTitle = "Latest work", projectID = "proj_recent", directory = "/tmp/recent", updatedAt = date(1_000))
+        val created = OpenCodeSession(id = "ses_new", serverTitle = "Untitled session", projectID = "proj_recent", directory = "/tmp/recent", updatedAt = date(2_000))
         val store = h.store(h.state { HomeFeature.State(server, snapshot(listOf(session), projects = listOf(other, recent))) }) {
             this[OpenCodeClient] = OpenCodeClient.testValue.copy(
                 familyPendingRequests = { _, _, _ -> OpenCodePendingRequests(permissions = emptyList()) },
@@ -341,7 +341,7 @@ class HomeFeatureTestsNavigation {
             it.copy(activeSessionIDs = setOf("ses_1"), runChangesDuringRefresh = mapOf("ses_1" to true))
         }
         assertEquals(CachedHomeSnapshot(server.persistenceID, snapshot(listOf(session), active = setOf("ses_1")), capturedAt), cached())
-        val renamed = session.copy(title = "Login fixed")
+        val renamed = session.copy(serverTitle = "Login fixed")
         val renamedCache = CachedHomeSnapshot(server.persistenceID, snapshot(listOf(renamed), active = setOf(session.id)), capturedAt)
         store.send(Action.ServerEvent(OpenCodeServerEvent.SessionRenamed(sessionID = "ses_1", title = "Login fixed"))) {
             it.copy(sessions = listOf(renamed))
@@ -382,7 +382,7 @@ class HomeFeatureTestsNavigation {
     fun alternateAddressPropagatesIntoSelectedSession() = homeTest { h ->
         val primary = OpenCodeServer(url = "http://primary.test", username = "opencode", password = "pw", alternateURLs = listOf("http://alternate.test"))
         val alternate = primary.at("http://alternate.test")
-        val session = OpenCodeSession(id = "ses_1", title = "Selected", projectID = "p", directory = "/project", updatedAt = Instant.now())
+        val session = OpenCodeSession(id = "ses_1", serverTitle = "Selected", projectID = "p", directory = "/project", updatedAt = Instant.now())
         val state = h.state {
             HomeFeature.State(primary, snapshot(listOf(session))).copy(sessionDetail = SessionFeature.State.session(primary, session, cachedItems = emptyList()))
         }
@@ -441,8 +441,8 @@ class HomeFeatureTestsNavigation {
     @Test
     fun retryReplacesCachedHomeWithAuthoritativeSnapshotAndReconnects() = homeTest { h ->
         val server = OpenCodeServer(url = "https://saved.example", username = "kit", password = "secret")
-        val oldSession = OpenCodeSession(id = "ses_old", title = "Old work", projectID = "proj_old", directory = "/old", updatedAt = date(1_000))
-        val latest = OpenCodeSession(id = "ses_latest", title = "Latest work", projectID = "proj_latest", directory = "/latest", updatedAt = date(2_000))
+        val oldSession = OpenCodeSession(id = "ses_old", serverTitle = "Old work", projectID = "proj_old", directory = "/old", updatedAt = date(1_000))
+        val latest = OpenCodeSession(id = "ses_latest", serverTitle = "Latest work", projectID = "proj_latest", directory = "/latest", updatedAt = date(2_000))
         val refreshed = snapshot(listOf(latest), active = setOf(latest.id), projects = listOf(OpenCodeProject(id = "proj_latest", name = "Latest", directory = "/latest")))
         val state = h.state {
             val base = HomeFeature.State(server, snapshot(listOf(oldSession), projects = listOf(OpenCodeProject(id = "proj_old", name = "Old", directory = "/old"))))
@@ -487,7 +487,7 @@ class HomeFeatureTestsNavigation {
     @Test
     fun lostConnectionAndFailedRetryRetainCachedSessions() = homeTest { h ->
         val server = OpenCodeServer(url = "https://saved.example", username = "kit", password = "secret")
-        val session = OpenCodeSession(id = "ses_cached", title = "Cached work", projectID = "proj_cached", directory = "/work", updatedAt = date(1_000))
+        val session = OpenCodeSession(id = "ses_cached", serverTitle = "Cached work", projectID = "proj_cached", directory = "/work", updatedAt = date(1_000))
         val snapshot = snapshot(listOf(session), active = setOf(session.id), projects = listOf(OpenCodeProject(id = "proj_cached", name = "Work", directory = "/work")))
         val lostAt = date(5_000)
         val items = listOf<OpenCodeTranscriptItem>(OpenCodeTranscriptItem.UserText(id = "m_cached", text = "Cached message"))
@@ -548,7 +548,7 @@ class HomeFeatureTestsNavigation {
     fun offlineHomeOpensCachedSessionsAndOnlyAnOutageBlocksNewSessions() {
         for (isReconnecting in listOf(false, true)) homeTest { h ->
             val server = OpenCodeServer(url = "https://saved.example", username = "kit", password = "secret")
-            val session = OpenCodeSession(id = "ses_cached", title = "Cached work", projectID = "proj_cached", directory = "/work", updatedAt = date(1_000))
+            val session = OpenCodeSession(id = "ses_cached", serverTitle = "Cached work", projectID = "proj_cached", directory = "/work", updatedAt = date(1_000))
             val items = listOf<OpenCodeTranscriptItem>(OpenCodeTranscriptItem.UserText(id = "m_cached", text = "Cached message"))
             val state = h.state {
                 val base = HomeFeature.State(server, snapshot(listOf(session), active = setOf(session.id)))
@@ -595,7 +595,7 @@ class HomeFeatureTestsNavigation {
     @Test
     fun attentionEventsReconcileFromAuthoritativePendingRequests() = homeTest { h ->
         val server = OpenCodeServer(url = "http://127.0.0.1:9", username = "opencode", password = "pw")
-        val session = OpenCodeSession(id = "ses_1", title = "Work", projectID = "proj_1", directory = "/tmp/demo", updatedAt = Instant.now())
+        val session = OpenCodeSession(id = "ses_1", serverTitle = "Work", projectID = "proj_1", directory = "/tmp/demo", updatedAt = Instant.now())
         val state = h.state {
             HomeFeature.State(server, snapshot(listOf(session), projects = listOf(OpenCodeProject(id = "proj_1", name = "demo", directory = "/tmp/demo"))))
         }
@@ -618,7 +618,7 @@ class HomeFeatureTestsNavigation {
     @Test
     fun requestSettledElsewhereRefreshesTheOpenSessionWithoutWaitingForItsPoll() = homeTest { h ->
         val server = OpenCodeServer(url = "http://127.0.0.1:9", username = "opencode", password = "pw")
-        val session = OpenCodeSession(id = "ses_1", title = "Work", projectID = "proj_1", directory = "/tmp/demo", updatedAt = Instant.now())
+        val session = OpenCodeSession(id = "ses_1", serverTitle = "Work", projectID = "proj_1", directory = "/tmp/demo", updatedAt = Instant.now())
         val state = h.state {
             HomeFeature.State(server, snapshot(listOf(session))).copy(sessionDetail = SessionFeature.State.session(server, session, cachedItems = emptyList()))
         }

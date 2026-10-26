@@ -73,7 +73,7 @@ class SessionSwitchTests {
     private val server = OpenCodeServer(url = "https://switch.example", username = "", password = "")
 
     private fun session(id: String, parent: String? = null) =
-        OpenCodeSession(id = id, title = id, projectID = "project", directory = "/project", updatedAt = date(10), parentID = parent)
+        OpenCodeSession(id = id, serverTitle = id, projectID = "project", directory = "/project", updatedAt = date(10), parentID = parent)
 
     private fun Harness.homeState(listed: Boolean = true): HomeFeature.State = state {
         val root = session("root")

@@ -60,9 +60,9 @@ class SystemIntegrationTests {
         val serverKey = SessionDirectory.serverKey(server.persistenceID)
         val project = OpenCodeProject(id = "prj_app", name = "app", directory = "/work/app")
         val docs = OpenCodeProject(id = "prj_docs", name = "docs", directory = "/work/docs")
-        val older = OpenCodeSession(id = "ses_older", title = "Older work", projectID = "prj_docs", directory = "/work/docs", updatedAt = Instant.ofEpochSecond(100))
-        val newer = OpenCodeSession(id = "ses_newer", title = "Fix login", projectID = "prj_app", directory = "/work/app", updatedAt = Instant.ofEpochSecond(300))
-        val loose = OpenCodeSession(id = "ses_loose", title = "Scratch", projectID = "global", directory = "/", updatedAt = Instant.ofEpochSecond(200))
+        val older = OpenCodeSession(id = "ses_older", serverTitle = "Older work", projectID = "prj_docs", directory = "/work/docs", updatedAt = Instant.ofEpochSecond(100))
+        val newer = OpenCodeSession(id = "ses_newer", serverTitle = "Fix login", projectID = "prj_app", directory = "/work/app", updatedAt = Instant.ofEpochSecond(300))
+        val loose = OpenCodeSession(id = "ses_loose", serverTitle = "Scratch", projectID = "global", directory = "/", updatedAt = Instant.ofEpochSecond(200))
 
         fun snapshot(projects: List<OpenCodeProject>, sessions: List<OpenCodeSession>) =
             OpenCodeHomeSnapshot(projects = projects, sessions = sessions, activeSessionIDs = emptySet())
@@ -80,7 +80,7 @@ class SystemIntegrationTests {
     @Test
     fun homeBuildsItsEntryFromTheListPinsAndLastViewed() {
         val child = OpenCodeSession(
-            id = "ses_child", title = "Subagent", projectID = "prj_app", directory = "/work/app",
+            id = "ses_child", serverTitle = "Subagent", projectID = "prj_app", directory = "/work/app",
             updatedAt = Instant.ofEpochSecond(400), parentID = "ses_newer",
         )
         var state = HomeFeature.State(server, snapshot(listOf(project, docs), listOf(older, newer, loose, child)))
@@ -229,7 +229,7 @@ class SystemIntegrationTests {
             this[UuidClient] = UuidClient.incrementing()
             this[OpenCodeClient] = OpenCodeClient.testValue.copy(
                 createSession = { _, directory, id ->
-                    OpenCodeSession(id = id ?: "", title = "", projectID = "p", directory = directory, updatedAt = Instant.EPOCH)
+                    OpenCodeSession(id = id ?: "", serverTitle = "", projectID = "p", directory = directory, updatedAt = Instant.EPOCH)
                 },
                 familyPendingRequests = { _, _, _ -> OpenCodePendingRequests(permissions = emptyList(), forms = emptyList()) },
                 pendingInputs = { _, _ -> emptyList() },
@@ -397,7 +397,7 @@ class SystemIntegrationTests {
     @Test
     fun aSubagentOnScreenGivesWayToItsSession() = runTest {
         val child = OpenCodeSession(
-            id = "ses_child", title = "Subagent", projectID = "prj_app", directory = "/work/app",
+            id = "ses_child", serverTitle = "Subagent", projectID = "prj_app", directory = "/work/app",
             updatedAt = Instant.now(), parentID = "ses_newer",
         )
         val store = callStore(backgroundScope) {

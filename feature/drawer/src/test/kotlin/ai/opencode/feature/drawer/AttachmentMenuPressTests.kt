@@ -42,7 +42,7 @@ class AttachmentMenuPressTests {
         assertTrue(linger.keepsPickerDrawn(firstDraftIdentity))
 
         // A draft becoming its own created session keeps the same taskIdentity.
-        val created = OpenCodeSession(id = "ses_created", title = "Created", projectID = "p1", directory = "/project", updatedAt = Instant.EPOCH)
+        val created = OpenCodeSession(id = "ses_created", serverTitle = "Created", projectID = "p1", directory = "/project", updatedAt = Instant.EPOCH)
         val becameSession = home.sessionDetail!!.copy(draftBecameSessionID = created.id, session = created)
         assertEquals(firstDraftIdentity, becameSession.taskIdentity)
         assertTrue(linger.glassLingers(becameSession.taskIdentity))

@@ -61,7 +61,7 @@ class HomeFeatureTestsDrawer {
     private val otherServer = OpenCodeServer(url = "http://localhost:4097", username = "", password = "")
 
     private fun session(id: String, title: String, updatedAt: Instant, projectID: String = "p", directory: String = "/project", idle: Long? = null, viewed: Long? = null) =
-        OpenCodeSession(id = id, title = title, projectID = projectID, directory = directory, updatedAt = updatedAt, idleMilliseconds = idle, viewedMilliseconds = viewed)
+        OpenCodeSession(id = id, serverTitle = title, projectID = projectID, directory = directory, updatedAt = updatedAt, idleMilliseconds = idle, viewedMilliseconds = viewed)
 
     private fun key(id: String) = "${server.persistenceID}|$id"
 
@@ -838,8 +838,8 @@ class HomeFeatureTestsDrawer {
     fun pinningAndReadStateAreLocalReversibleChoices() = homeTest { h ->
         val server = OpenCodeServer(url = "http://127.0.0.1:9", username = "opencode", password = "pw")
         val now = Instant.now()
-        val first = OpenCodeSession(id = "ses_1", title = "First", projectID = "proj_1", directory = "/tmp/demo", updatedAt = now)
-        val second = OpenCodeSession(id = "ses_2", title = "Second", projectID = "proj_1", directory = "/tmp/demo", updatedAt = now)
+        val first = OpenCodeSession(id = "ses_1", serverTitle = "First", projectID = "proj_1", directory = "/tmp/demo", updatedAt = now)
+        val second = OpenCodeSession(id = "ses_2", serverTitle = "Second", projectID = "proj_1", directory = "/tmp/demo", updatedAt = now)
         val keyFirst = "${server.persistenceID}|${first.id}"
         val keySecond = "${server.persistenceID}|${second.id}"
         val state = h.state {
@@ -861,7 +861,7 @@ class HomeFeatureTestsDrawer {
     fun indicatorsPrioritizeAttentionThenRunningThenUnread() = homeTest { h ->
         h.state {
             val server = OpenCodeServer(url = "http://127.0.0.1:9", username = "opencode", password = "pw")
-            val session = OpenCodeSession(id = "ses_1", title = "Work", projectID = "proj_1", directory = "/tmp/demo", updatedAt = date(2_000))
+            val session = OpenCodeSession(id = "ses_1", serverTitle = "Work", projectID = "proj_1", directory = "/tmp/demo", updatedAt = date(2_000))
             var state = HomeFeature.State(server, snapshot(listOf(session)))
                 .updatingSessionReadDates { it + ("${server.persistenceID}|${session.id}" to date(1_000)) }
             assertEquals(HomeFeature.State.Indicator.unread, state.indicator(session))
@@ -877,8 +877,8 @@ class HomeFeatureTestsDrawer {
         h.state {
             val server = OpenCodeServer(url = "http://127.0.0.1:9", username = "opencode", password = "pw")
             val now = Instant.now()
-            val running = OpenCodeSession(id = "ses_running", title = "Running", projectID = "proj", directory = "/tmp/demo", updatedAt = now)
-            val recent = OpenCodeSession(id = "ses_recent", title = "Recent", projectID = "proj", directory = "/tmp/demo", updatedAt = now)
+            val running = OpenCodeSession(id = "ses_running", serverTitle = "Running", projectID = "proj", directory = "/tmp/demo", updatedAt = now)
+            val recent = OpenCodeSession(id = "ses_recent", serverTitle = "Recent", projectID = "proj", directory = "/tmp/demo", updatedAt = now)
             var state = HomeFeature.State(server, snapshot(listOf(running, recent), active = setOf(running.id)))
                 .updatingSessionReadDates { it + ("${server.persistenceID}|${running.id}" to running.updatedAt) + ("${server.persistenceID}|${recent.id}" to recent.updatedAt) }
 
@@ -891,7 +891,7 @@ class HomeFeatureTestsDrawer {
     @Test
     fun pinnedChatStaysPinnedWhileItNeedsInput() = homeTest { h ->
         val server = OpenCodeServer(url = "http://127.0.0.1:9", username = "opencode", password = "pw")
-        val session = OpenCodeSession(id = "chat", title = "Chat", projectID = "p", directory = "/project", updatedAt = Instant.now())
+        val session = OpenCodeSession(id = "chat", serverTitle = "Chat", projectID = "p", directory = "/project", updatedAt = Instant.now())
         val store = h.store(h.state { HomeFeature.State(server, snapshot(listOf(session))) })
         store.send(Action.TogglePin(session.id)) { it.copy(pinnedSessionKeys = listOf("${server.persistenceID}|${session.id}")) }
         store.send(Action.AttentionRefreshed(setOf(session.id))) { it.copy(attentionSessionIDs = setOf(session.id)) }

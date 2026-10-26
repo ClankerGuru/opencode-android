@@ -66,7 +66,7 @@ class NewSessionDraftTests {
         home = home.copy(
             sessions = listOf(
                 OpenCodeSession(
-                    id = "ses_recent", title = "Recent", projectID = projects[6].id,
+                    id = "ses_recent", serverTitle = "Recent", projectID = projects[6].id,
                     directory = projects[6].directory, updatedAt = Instant.ofEpochSecond(100),
                 ),
             ),
@@ -104,7 +104,7 @@ class NewSessionDraftTests {
     fun everyDraftFromADraftGetsAFreshTaskIdentityAndLoadsModels() = runTest {
         val model = OpenCodeModel(modelID = "cirrus-4", providerID = "opencode", name = "Cirrus 4", variants = listOf("low", "high"))
         val prior = OpenCodeSession(
-            id = "ses_prior", title = "Prior session", projectID = projects[0].id, directory = projects[0].directory,
+            id = "ses_prior", serverTitle = "Prior session", projectID = projects[0].id, directory = projects[0].directory,
             updatedAt = Instant.EPOCH, model = model.ref("high"),
         )
         val catalog = OpenCodeModelCatalog(models = listOf(model), defaultModel = model)
@@ -190,11 +190,11 @@ class NewSessionDraftTests {
     fun keepsIdentityMovesAdvanceVisitAndRunTask() = runTest {
         val model = OpenCodeModel(modelID = "cirrus-4", providerID = "opencode", name = "Cirrus 4", variants = listOf("low", "high"))
         val prior = OpenCodeSession(
-            id = "ses_prior", title = "Prior session", projectID = projects[0].id, directory = projects[0].directory,
+            id = "ses_prior", serverTitle = "Prior session", projectID = projects[0].id, directory = projects[0].directory,
             updatedAt = Instant.EPOCH, model = model.ref("high"),
         )
         val created = OpenCodeSession(
-            id = "ses_created", title = "Created session", projectID = projects[0].id, directory = projects[0].directory,
+            id = "ses_created", serverTitle = "Created session", projectID = projects[0].id, directory = projects[0].directory,
             updatedAt = Instant.EPOCH, model = model.ref("high"),
         )
         val catalog = OpenCodeModelCatalog(models = listOf(model), defaultModel = model)

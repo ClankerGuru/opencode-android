@@ -67,7 +67,7 @@ class LiveDelegationFeatureTestsSession {
     @get:Rule val isolation = TestIsolationRule()
 
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
-    private val session = OpenCodeSession(id = "ses_voice", title = "Voice lab", projectID = "p", directory = "/Users/kit/project", updatedAt = HomeFeatureTestSupport.distantPast)
+    private val session = OpenCodeSession(id = "ses_voice", serverTitle = "Voice lab", projectID = "p", directory = "/Users/kit/project", updatedAt = HomeFeatureTestSupport.distantPast)
 
     /** iOS `URLError(.networkConnectionLost)`. */
     private class NetworkConnectionLost : IOException("The network connection was lost.")
@@ -148,7 +148,7 @@ class LiveDelegationFeatureTestsSession {
 
     @Test
     fun aDelegationKeepsRunningAcrossASessionSwitchAndAReconnect() = homeTest { h ->
-        val other = OpenCodeSession(id = "ses_other", title = "Other session", projectID = "p", directory = "/Users/kit/project", updatedAt = HomeFeatureTestSupport.distantPast)
+        val other = OpenCodeSession(id = "ses_other", serverTitle = "Other session", projectID = "p", directory = "/Users/kit/project", updatedAt = HomeFeatureTestSupport.distantPast)
         val project = OpenCodeProject(id = "p", name = "project", directory = "/Users/kit/project")
         h.setShared(SharedKeys.openAIAPIKey, "sk-test")
         h.setShared(VoiceSharedKeys.voiceEngine, VoiceEngine.gptLive)

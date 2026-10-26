@@ -27,9 +27,9 @@ class TraceUploadsTests {
 
     @Test
     fun theReportGoesToItsSessionElseTheMostRecentOne() {
-        val older = OpenCodeSession(id = "ses_old", title = "Old", projectID = "p", directory = "/w", updatedAt = Instant.ofEpochSecond(100))
-        val newer = OpenCodeSession(id = "ses_new", title = "New", projectID = "p", directory = "/w", updatedAt = Instant.ofEpochSecond(200))
-        val child = OpenCodeSession(id = "ses_child", title = "Child", projectID = "p", directory = "/w", updatedAt = Instant.ofEpochSecond(300), parentID = "ses_new")
+        val older = OpenCodeSession(id = "ses_old", serverTitle = "Old", projectID = "p", directory = "/w", updatedAt = Instant.ofEpochSecond(100))
+        val newer = OpenCodeSession(id = "ses_new", serverTitle = "New", projectID = "p", directory = "/w", updatedAt = Instant.ofEpochSecond(200))
+        val child = OpenCodeSession(id = "ses_child", serverTitle = "Child", projectID = "p", directory = "/w", updatedAt = Instant.ofEpochSecond(300), parentID = "ses_new")
         val state = HomeFeature.State(server, OpenCodeHomeSnapshot(projects = emptyList(), sessions = listOf(older, child, newer), activeSessionIDs = emptySet()))
         assertEquals(ProblemReportDestination(server = server, sessionID = "ses_1", directory = null), state.problemReportDestination(context))
         assertEquals(

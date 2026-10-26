@@ -315,7 +315,7 @@ class WhatsNewTryItTests {
     private val server = OpenCodeServer(url = "http://localhost:9", username = "", password = "")
 
     private fun session(id: String, updated: Long, parent: String? = null, idle: Long = 2_000, viewed: Long = 1_000) = OpenCodeSession(
-        id = id, title = id, projectID = "p", directory = "/project",
+        id = id, serverTitle = id, projectID = "p", directory = "/project",
         updatedAt = date(updated), idleMilliseconds = idle, viewedMilliseconds = viewed, parentID = parent,
     )
 

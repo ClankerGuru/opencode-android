@@ -28,7 +28,7 @@ class SessionSheetTests {
 
     private val server = OpenCodeServer(url = "http://localhost:9", username = "", password = "")
     private fun session(id: String = "ses_sheet", title: String = "Sheet") =
-        OpenCodeSession(id = id, title = title, projectID = "prj", directory = "/work/app", updatedAt = Instant.ofEpochSecond(100))
+        OpenCodeSession(id = id, serverTitle = title, projectID = "prj", directory = "/work/app", updatedAt = Instant.ofEpochSecond(100))
 
     private fun delegate(d: SessionFeature.Delegate) = HomeFeature.Action.detail(SessionFeature.Action.Delegate(d))
 

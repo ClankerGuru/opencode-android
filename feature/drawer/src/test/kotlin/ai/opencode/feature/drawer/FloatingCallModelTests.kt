@@ -22,8 +22,8 @@ class FloatingCallModelTests {
     @Test
     fun onlyTopSessionViewDrivesCallTrayController() = DependencyValues.withValues(DependencyValues.testing()) {
         val server = OpenCodeServer(url = "https://stack.example", username = "", password = "")
-        val root = OpenCodeSession(id = "root", title = "root", projectID = "project", directory = "/project", updatedAt = Instant.ofEpochSecond(10))
-        val child = OpenCodeSession(id = "child", title = "child", projectID = "project", directory = "/project", updatedAt = Instant.ofEpochSecond(20), parentID = "root")
+        val root = OpenCodeSession(id = "root", serverTitle = "root", projectID = "project", directory = "/project", updatedAt = Instant.ofEpochSecond(10))
+        val child = OpenCodeSession(id = "child", serverTitle = "child", projectID = "project", directory = "/project", updatedAt = Instant.ofEpochSecond(20), parentID = "root")
         var home = HomeFeature.State(server, OpenCodeHomeSnapshot(projects = emptyList(), sessions = listOf(root), activeSessionIDs = emptySet()))
         home = home.openingDetail(root, cachedItems = emptyList())
         assertEquals(false, home.sessionDetail?.isCovered)

@@ -62,13 +62,13 @@ class OpenLinksInAppsTests {
 
     private class HomeLinkLab(h: Harness, catchUp: Boolean = false) {
         companion object {
-            val first = OpenCodeSession(id = "ses_first", title = "First", projectID = "p", directory = "/work", updatedAt = date(2_000))
-            val second = OpenCodeSession(id = "ses_second", title = "Second", projectID = "p", directory = "/work", updatedAt = date(1_000))
+            val first = OpenCodeSession(id = "ses_first", serverTitle = "First", projectID = "p", directory = "/work", updatedAt = date(2_000))
+            val second = OpenCodeSession(id = "ses_second", serverTitle = "Second", projectID = "p", directory = "/work", updatedAt = date(1_000))
             val child = OpenCodeSession(
-                id = "ses_child", title = "Explore", projectID = "p", directory = "/work", updatedAt = date(2_500), parentID = "ses_first",
+                id = "ses_child", serverTitle = "Explore", projectID = "p", directory = "/work", updatedAt = date(2_500), parentID = "ses_first",
             )
             val grandchild = OpenCodeSession(
-                id = "ses_grandchild", title = "Check", projectID = "p", directory = "/work", updatedAt = date(2_600), parentID = "ses_child",
+                id = "ses_grandchild", serverTitle = "Check", projectID = "p", directory = "/work", updatedAt = date(2_600), parentID = "ses_child",
             )
         }
 
@@ -313,7 +313,7 @@ class BrowserLifetimeTests {
     private val link = "https://example.com/article"
 
     private fun session(id: String, parent: String? = null) =
-        OpenCodeSession(id = id, title = id, projectID = "project", directory = "/project", updatedAt = date(10), parentID = parent)
+        OpenCodeSession(id = id, serverTitle = id, projectID = "project", directory = "/project", updatedAt = date(10), parentID = parent)
 
     private fun Harness.store(sessions: List<OpenCodeSession>, discarded: LockIsolated<List<UUID>>): TestStore<HomeFeature.State, Action> {
         val state = state {

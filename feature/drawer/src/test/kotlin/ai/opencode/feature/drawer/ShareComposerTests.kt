@@ -52,10 +52,10 @@ class ShareComposerAppTests {
     )
     private val project = OpenCodeProject(id = "proj", name = "Work", directory = "/work")
     private val current = OpenCodeSession(
-        id = "ses_current", title = "Current", projectID = "proj", directory = "/work", updatedAt = Instant.ofEpochSecond(30),
+        id = "ses_current", serverTitle = "Current", projectID = "proj", directory = "/work", updatedAt = Instant.ofEpochSecond(30),
     )
     private val target = OpenCodeSession(
-        id = "ses_target", title = "Target", projectID = "proj", directory = "/work", updatedAt = Instant.ofEpochSecond(20),
+        id = "ses_target", serverTitle = "Target", projectID = "proj", directory = "/work", updatedAt = Instant.ofEpochSecond(20),
     )
 
     private val context = HomeTestContext()
@@ -177,10 +177,10 @@ class ShareComposerAppTests {
                 viewSession = { _, _, _ -> },
                 createSession = { _, directory, id ->
                     created += id ?: "none"
-                    OpenCodeSession(id = id ?: "ses_x", title = "New session", projectID = "proj", directory = directory, updatedAt = Instant.now())
+                    OpenCodeSession(id = id ?: "ses_x", serverTitle = "New session", projectID = "proj", directory = directory, updatedAt = Instant.now())
                 },
                 getSession = { _, id ->
-                    OpenCodeSession(id = id, title = "New session", projectID = "proj", directory = "/work", updatedAt = Instant.now())
+                    OpenCodeSession(id = id, serverTitle = "New session", projectID = "proj", directory = "/work", updatedAt = Instant.now())
                 },
                 message = { _, _, _ -> throw OpenCodeClientError(message = "Missing", statusCode = 404) },
                 sendPrompt = { _, _, _, _, _, _, _ -> },

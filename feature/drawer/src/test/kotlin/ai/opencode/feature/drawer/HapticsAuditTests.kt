@@ -22,7 +22,7 @@ class HapticsAuditTests {
     @get:Rule val isolation = TestIsolationRule()
 
     private val server = OpenCodeServer(url = "http://127.0.0.1:9", username = "opencode", password = "pw")
-    private val session = OpenCodeSession(id = "ses_1", title = "Chat", projectID = "proj_1", directory = "/tmp/demo", updatedAt = Instant.now())
+    private val session = OpenCodeSession(id = "ses_1", serverTitle = "Chat", projectID = "proj_1", directory = "/tmp/demo", updatedAt = Instant.now())
 
     @Test
     fun homeHaptics() = runTest {

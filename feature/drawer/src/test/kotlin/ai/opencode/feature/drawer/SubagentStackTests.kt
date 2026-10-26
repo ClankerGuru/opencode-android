@@ -74,7 +74,7 @@ class SubagentStackTests {
     private val server = OpenCodeServer(url = "https://stack.example", username = "", password = "")
 
     private fun session(id: String, parent: String? = null) =
-        OpenCodeSession(id = id, title = id, projectID = "project", directory = "/project", updatedAt = date(10), parentID = parent)
+        OpenCodeSession(id = id, serverTitle = id, projectID = "project", directory = "/project", updatedAt = date(10), parentID = parent)
 
     private val root get() = session("root")
     private val child get() = session("child", parent = "root")

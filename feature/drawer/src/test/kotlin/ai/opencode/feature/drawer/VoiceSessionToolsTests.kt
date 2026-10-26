@@ -28,11 +28,11 @@ class VoiceSessionToolsTests {
     @get:Rule val isolation = TestIsolationRule()
 
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
-    private val math = OpenCodeSession(id = "ses_math", title = "Math bug", projectID = "math", directory = "/Users/kit/math", updatedAt = Instant.ofEpochSecond(100))
+    private val math = OpenCodeSession(id = "ses_math", serverTitle = "Math bug", projectID = "math", directory = "/Users/kit/math", updatedAt = Instant.ofEpochSecond(100))
 
     @Test
     fun homePublishesTheDrawerStateOnlyDuringACall() = homeTest { h ->
-        val waiting = OpenCodeSession(id = "ses_wait", title = "Waiting", projectID = "p", directory = "/Users/kit/project", updatedAt = Instant.ofEpochSecond(50))
+        val waiting = OpenCodeSession(id = "ses_wait", serverTitle = "Waiting", projectID = "p", directory = "/Users/kit/project", updatedAt = Instant.ofEpochSecond(50))
         h.setShared(SharedKeys.pinnedSessionKeys, listOf("${server.persistenceID}|${math.id}"))
         val home = h.state {
             var home = HomeFeature.State(server, OpenCodeHomeSnapshot(projects = emptyList(), sessions = listOf(waiting, math), activeSessionIDs = setOf(waiting.id)))

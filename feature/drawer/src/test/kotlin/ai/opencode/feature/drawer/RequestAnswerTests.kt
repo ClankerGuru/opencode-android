@@ -44,7 +44,7 @@ import java.time.Instant
 class RequestAnswerTests {
     @get:Rule val isolation = TestIsolationRule()
 
-    private val session = OpenCodeSession(id = "ses_answer", title = "Answer", projectID = "proj", directory = "/tmp/answer", updatedAt = Instant.now())
+    private val session = OpenCodeSession(id = "ses_answer", serverTitle = "Answer", projectID = "proj", directory = "/tmp/answer", updatedAt = Instant.now())
 
     private fun SessionFeature.State.withPermissions(permissions: List<OpenCodePermissionRequest>): SessionFeature.State =
         copy(requestDock = requestDock.copy(permissionRequests = permissions))
@@ -52,7 +52,7 @@ class RequestAnswerTests {
     @Test
     fun switchingIntoASnapshotDuringACallEndsTheRestoredAnswer() = homeTest { h ->
         val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
-        val target = OpenCodeSession(id = "ses_target", title = "Target", projectID = "proj", directory = "/tmp/target", updatedAt = Instant.ofEpochSecond(20))
+        val target = OpenCodeSession(id = "ses_target", serverTitle = "Target", projectID = "proj", directory = "/tmp/target", updatedAt = Instant.ofEpochSecond(20))
         val targetShell = OpenCodePermissionRequest(
             id = "per_target", sessionID = target.id, action = "shell",
             resources = listOf("rm -rf .lab-output"), save = listOf("rm *"),

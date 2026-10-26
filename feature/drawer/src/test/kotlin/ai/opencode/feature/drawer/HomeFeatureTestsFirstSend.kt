@@ -58,7 +58,7 @@ class FirstSendSurvivesNavigationTests {
                 message = { _, _, _ -> throw OpenCodeClientError("Missing", statusCode = 404) },
                 sendPrompt = { server, sessionID, text, _, _, _, _ -> sendPrompt(server, sessionID, text) },
                 waitForIdle = { _, _ -> awaitCancellation() },
-                getSession = { _, id -> OpenCodeSession(id = id, title = "", projectID = projectID, directory = "/tmp/experiments", updatedAt = distantPast) },
+                getSession = { _, id -> OpenCodeSession(id = id, serverTitle = "", projectID = projectID, directory = "/tmp/experiments", updatedAt = distantPast) },
                 transcript = { _, _, _ -> emptyList() },
                 sessionFamily = { _, root -> OpenCodeSessionFamily(listOf(root), emptySet()) },
                 runningShells = { _, _ -> emptyList() },
@@ -73,7 +73,7 @@ class FirstSendSurvivesNavigationTests {
 
     @Test
     fun firstPromptIsDeliveredEvenWhenTheReaderLeavesMidCreate() = homeTest { h ->
-        val created = OpenCodeSession(id = "ses_new", title = "", projectID = "proj_x", directory = "/tmp/experiments", updatedAt = distantPast)
+        val created = OpenCodeSession(id = "ses_new", serverTitle = "", projectID = "proj_x", directory = "/tmp/experiments", updatedAt = distantPast)
         val createStarted = Gate()
         val createGate = Gate()
         val delivered = Channel<Pair<String, String>>(Channel.UNLIMITED)

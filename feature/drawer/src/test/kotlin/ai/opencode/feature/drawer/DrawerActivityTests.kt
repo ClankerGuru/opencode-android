@@ -66,7 +66,7 @@ class DrawerActivityTests {
     private val server = OpenCodeServer(url = "https://drawer.example", username = "", password = "")
 
     private fun session(id: String, parent: String? = null, directory: String = "/app", idle: Long? = null) = OpenCodeSession(
-        id = id, title = id, projectID = directory, directory = directory,
+        id = id, serverTitle = id, projectID = directory, directory = directory,
         updatedAt = Instant.ofEpochSecond(10), idleMilliseconds = idle, parentID = parent,
     )
 
@@ -465,7 +465,7 @@ class DrawerDotArrivalTests {
     private val server = OpenCodeServer(url = "https://drawer-dot.example", username = "", password = "")
 
     private fun session(id: String, idle: Long? = null, viewed: Long? = null) = OpenCodeSession(
-        id = id, title = id, projectID = "/app", directory = "/app",
+        id = id, serverTitle = id, projectID = "/app", directory = "/app",
         updatedAt = Instant.ofEpochSecond(10), idleMilliseconds = idle, viewedMilliseconds = viewed,
     )
 

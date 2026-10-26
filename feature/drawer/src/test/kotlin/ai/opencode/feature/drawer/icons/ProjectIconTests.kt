@@ -64,7 +64,7 @@ class ProjectIconTests {
         val initialProject = OpenCodeProject(id = "prj_1", name = "voice-control", directory = "/code/voice-control")
         val session = OpenCodeSession(
             id = "ses_1",
-            title = "Fix audio route",
+            serverTitle = "Fix audio route",
             projectID = "prj_1",
             directory = "/code/voice-control",
             updatedAt = Instant.ofEpochSecond(1_700_000_000),

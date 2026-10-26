@@ -40,14 +40,14 @@ class SessionLinkTests {
         const val ROOT = "ses_rootrootrootrootrootrootro"
 
         fun found(id: String) = OpenCodeSession(
-            id = id, title = "T${id.last()}", projectID = "p", directory = "/p", updatedAt = Instant.ofEpochSecond(5),
+            id = id, serverTitle = "T${id.last()}", projectID = "p", directory = "/p", updatedAt = Instant.ofEpochSecond(5),
         )
     }
 
     private val server = OpenCodeServer(url = "https://links.example", username = "", password = "")
 
     private fun session(id: String, title: String = "Home", parent: String? = null) = OpenCodeSession(
-        id = id, title = title, projectID = "project", directory = "/project", updatedAt = Instant.ofEpochSecond(10), parentID = parent,
+        id = id, serverTitle = title, projectID = "project", directory = "/project", updatedAt = Instant.ofEpochSecond(10), parentID = parent,
     )
 
     private fun home(): HomeFeature.State {
@@ -75,7 +75,7 @@ class SessionLinkTests {
         val store = TestStore(state, HomeFeature(), this) {
             this[OpenCodeClient] = OpenCodeClient.testValue.copy(getSession = { _, id ->
                 fetched += id
-                OpenCodeSession(id = id, title = "OPENCODE", projectID = "p", directory = "/p", updatedAt = Instant.now())
+                OpenCodeSession(id = id, serverTitle = "OPENCODE", projectID = "p", directory = "/p", updatedAt = Instant.now())
             })
         }
         store.exhaustive = false
@@ -246,7 +246,7 @@ class SessionLinkTests {
         val store = TestStore(home(), HomeFeature(), this) {
             this[OpenCodeClient] = OpenCodeClient.testValue.copy(getSession = { _, id ->
                 if (failures-- > 0) throw OpenCodeClientError(message = "Unavailable", statusCode = 503)
-                OpenCodeSession(id = id, title = "OPENCODE", projectID = "p", directory = "/p", updatedAt = Instant.now())
+                OpenCodeSession(id = id, serverTitle = "OPENCODE", projectID = "p", directory = "/p", updatedAt = Instant.now())
             })
         }
         store.exhaustive = false

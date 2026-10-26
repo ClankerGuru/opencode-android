@@ -59,7 +59,7 @@ class VoiceLiveActivityTests {
     @get:Rule val isolation = TestIsolationRule()
 
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
-    private val session = OpenCodeSession(id = "ses_voice", title = "Fix flaky upload test", projectID = "p", directory = "/Users/kit/project", updatedAt = HomeFeatureTestSupport.distantPast)
+    private val session = OpenCodeSession(id = "ses_voice", serverTitle = "Fix flaky upload test", projectID = "p", directory = "/Users/kit/project", updatedAt = HomeFeatureTestSupport.distantPast)
     private val t0: Instant = Instant.ofEpochSecond(1_000)
 
     private fun content(phase: VoiceCallActivityAttributes.ContentState.Phase, isMuted: Boolean = false, startedAt: Instant? = null) =
@@ -263,10 +263,10 @@ class VoiceLiveActivityTests {
             var detail = home.makeDetail(session).second
             detail = detail.copy(voice = VoiceFeature.State(server, session).live())
             // The server's automatic title for the session a draft call created.
-            detail = detail.updateObservedSession(session.copy(title = "Upload retries"))
+            detail = detail.updateObservedSession(session.copy(serverTitle = "Upload retries"))
             assertEquals("Upload retries", detail.voice?.sessionTitle)
 
-            detail = detail.updateObservedSession(session.copy(id = "ses_other", title = "Other"))
+            detail = detail.updateObservedSession(session.copy(id = "ses_other", serverTitle = "Other"))
             assertEquals("Upload retries", detail.voice?.sessionTitle)
         }
     }

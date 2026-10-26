@@ -74,12 +74,12 @@ class HomeFeatureTests {
         projectID: String = "proj_1",
         directory: String = "/tmp/demo",
         updatedAt: Instant = date(1_000),
-    ) = OpenCodeSession(id = id, title = title, projectID = projectID, directory = directory, updatedAt = updatedAt)
+    ) = OpenCodeSession(id = id, serverTitle = title, projectID = projectID, directory = directory, updatedAt = updatedAt)
 
     /** Notifications need a server plugin most people won't have yet, so a send never interrupts with an offer. */
     @Test
     fun sendingNeverOffersNotificationSetup() = homeTest { h ->
-        val session = OpenCodeSession(id = "ses_first", title = "First", projectID = "p", directory = "/work", updatedAt = Instant.now())
+        val session = OpenCodeSession(id = "ses_first", serverTitle = "First", projectID = "p", directory = "/work", updatedAt = Instant.now())
         val state = h.state {
             val base = HomeFeature.State(savedServer, snapshot(listOf(session)))
             base.copy(
@@ -155,7 +155,7 @@ class HomeFeatureTests {
 
     @Test
     fun buildsWithoutARelayNeverOfferNotifications() = homeTest { h ->
-        val session = OpenCodeSession(id = "ses_first", title = "First", projectID = "p", directory = "/work", updatedAt = Instant.now())
+        val session = OpenCodeSession(id = "ses_first", serverTitle = "First", projectID = "p", directory = "/work", updatedAt = Instant.now())
         val state = h.state {
             HomeFeature.State(savedServer, snapshot(listOf(session)))
                 .copy(sessionDetail = SessionFeature.State.session(savedServer, session, cachedItems = emptyList()))
@@ -258,7 +258,7 @@ class HomeFeatureTests {
 
     @Test
     fun unopenedParentsStayBusyUntilTheirLastDescendantFinishes() = homeTest { h ->
-        val root = OpenCodeSession(id = "root", title = "Main", projectID = "p", directory = "/p", updatedAt = distantPast)
+        val root = OpenCodeSession(id = "root", serverTitle = "Main", projectID = "p", directory = "/p", updatedAt = distantPast)
         val server = OpenCodeServer(url = "http://localhost:9", username = "", password = "")
         val parents = mapOf("child" to "root", "nested" to "child", "sibling" to "root")
         val state = h.state {
@@ -305,7 +305,7 @@ class HomeFeatureTests {
     fun restoresRememberedSessionFromPersistedTranscriptOrStartsDraft() = homeTest { h ->
         h.state {
             val server = OpenCodeServer(url = "https://saved.example", username = "", password = "")
-            val session = OpenCodeSession(id = "remembered", title = "Remembered", projectID = "p", directory = "/p", updatedAt = Instant.now())
+            val session = OpenCodeSession(id = "remembered", serverTitle = "Remembered", projectID = "p", directory = "/p", updatedAt = Instant.now())
             val items = listOf<OpenCodeTranscriptItem>(OpenCodeTranscriptItem.UserText(id = "m1", text = "ready offline"))
             var state = HomeFeature.State(server, snapshot(listOf(session)))
                 .updatingLastViewedSessionIDs { it + (server.persistenceID to session.id) }
@@ -323,7 +323,7 @@ class HomeFeatureTests {
     @Test
     fun viewOnlyRefreshPublishesBoundedTranscriptForNextRestore() = homeTest { h ->
         val server = OpenCodeServer(url = "https://saved.example", username = "", password = "")
-        val session = OpenCodeSession(id = "ses_cached", title = "Cached", projectID = "p", directory = "/p", updatedAt = date(1_000))
+        val session = OpenCodeSession(id = "ses_cached", serverTitle = "Cached", projectID = "p", directory = "/p", updatedAt = date(1_000))
         val stale = listOf<OpenCodeTranscriptItem>(OpenCodeTranscriptItem.UserText(id = "old", text = "Old"))
         val fresh = (0 until 45).map { OpenCodeTranscriptItem.UserText(id = "m$it", text = "Fresh $it") }
         val state = h.state {
@@ -362,7 +362,7 @@ class HomeFeatureTests {
         h.state {
             val server = OpenCodeServer(url = "https://saved.example", username = "", password = "")
             val sessions = (0 until 24).map { index ->
-                OpenCodeSession(id = "ses_$index", title = "Session $index", projectID = "p", directory = "/p", updatedAt = date(index))
+                OpenCodeSession(id = "ses_$index", serverTitle = "Session $index", projectID = "p", directory = "/p", updatedAt = date(index))
             }
             var state = HomeFeature.State(server, snapshot(sessions, active = setOf("ses_0")))
             state = state.copy(
@@ -381,7 +381,7 @@ class HomeFeatureTests {
     @Test
     fun runStartedWhileSnapshotInFlightSurvivesTheSnapshot() = homeTest { h ->
         val server = OpenCodeServer(url = "https://saved.example", username = "", password = "")
-        val session = OpenCodeSession(id = "ses_1", title = "Work", projectID = "p", directory = "/p", updatedAt = distantPast)
+        val session = OpenCodeSession(id = "ses_1", serverTitle = "Work", projectID = "p", directory = "/p", updatedAt = distantPast)
         val stale = snapshot(listOf(session))
         val gate = Gate()
         val store = h.store(h.state { HomeFeature.State(server, stale) }) {
@@ -414,7 +414,7 @@ class HomeFeatureTests {
     @Test
     fun snapshotPrefetchesHotAndRecentTranscriptsWithoutRegressingCache() = homeTest { h ->
         val server = OpenCodeServer(url = "https://saved.example", username = "", password = "")
-        fun session(id: String, seconds: Int) = OpenCodeSession(id = id, title = id, projectID = "p", directory = "/p", updatedAt = date(seconds))
+        fun session(id: String, seconds: Int) = OpenCodeSession(id = id, serverTitle = id, projectID = "p", directory = "/p", updatedAt = date(seconds))
         val sessions = listOf(session("old", 1), session("newest", 5), session("running", 2), session("cached", 4), session("mid", 3))
         val snapshot = snapshot(sessions, active = setOf("running"))
         val longer = listOf<OpenCodeTranscriptItem>(OpenCodeTranscriptItem.UserText(id = "a", text = "a"), OpenCodeTranscriptItem.UserText(id = "b", text = "b"))
@@ -454,7 +454,7 @@ class HomeFeatureTests {
     fun attentionRefreshQueriesOnlyHotDirectoriesWithinAStrictBound() = homeTest { h ->
         val server = OpenCodeServer(url = "https://saved.example", username = "", password = "")
         val roots = (0 until 150).map { index ->
-            OpenCodeSession(id = "ses_$index", title = "Work $index", projectID = "p$index", directory = "/projects/dir$index", updatedAt = date(index))
+            OpenCodeSession(id = "ses_$index", serverTitle = "Work $index", projectID = "p$index", directory = "/projects/dir$index", updatedAt = date(index))
         }
         val state = h.state {
             HomeFeature.State(server, snapshot(roots, active = setOf("ses_3", "ses_40"))).copy(

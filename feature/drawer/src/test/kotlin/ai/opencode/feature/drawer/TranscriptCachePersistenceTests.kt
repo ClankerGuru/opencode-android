@@ -61,7 +61,7 @@ class TranscriptCachePersistenceTests {
 
     private fun makeSession(id: String, updatedAt: Number, idle: Long? = null, viewed: Long? = null) = OpenCodeSession(
         id = id,
-        title = id,
+        serverTitle = id,
         projectID = "p",
         directory = "/project",
         updatedAt = date(updatedAt),

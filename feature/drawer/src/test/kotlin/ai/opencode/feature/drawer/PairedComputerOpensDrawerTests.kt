@@ -32,7 +32,7 @@ class PairedComputerOpensDrawerTests {
     private val server = OpenCodeServer(url = "http://localhost:9", username = "", password = "")
 
     private fun session(id: String, updated: Long, parentID: String? = null) = OpenCodeSession(
-        id = id, title = id, projectID = "web", directory = "/web",
+        id = id, serverTitle = id, projectID = "web", directory = "/web",
         updatedAt = Instant.ofEpochSecond(updated), idleMilliseconds = 1_000, viewedMilliseconds = 1_000,
         parentID = parentID,
     )

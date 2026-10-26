@@ -57,7 +57,7 @@ class VoiceFeatureTests {
 
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
     private val distantPast: Instant = HomeFeatureTestSupport.distantPast
-    private val session = OpenCodeSession(id = "ses_voice", title = "Voice lab", projectID = "p", directory = "/Users/kit/project", updatedAt = distantPast)
+    private val session = OpenCodeSession(id = "ses_voice", serverTitle = "Voice lab", projectID = "p", directory = "/Users/kit/project", updatedAt = distantPast)
 
     /** iOS `await store.skipReceivedActions(strict: false)` once effects settle: drains until [condition] holds (bounded). */
     private suspend fun TestStore<HomeFeature.State, HomeFeature.Action>.drain(condition: () -> Boolean) {
@@ -75,7 +75,7 @@ class VoiceFeatureTests {
      * session's later reply is spoken too. The call follows the screen.
      */
     @Test fun delegatorMovesTheScreenSendsAVoiceMessageAndReportsTheReply() = voiceHomeTest { h ->
-        val other = OpenCodeSession(id = "ses_math", title = "Math bug", projectID = "p", directory = "/Users/kit/math", updatedAt = distantPast)
+        val other = OpenCodeSession(id = "ses_math", serverTitle = "Math bug", projectID = "p", directory = "/Users/kit/math", updatedAt = distantPast)
         h.setShared(SharedKeys.openAIAPIKey, "sk-test")
         val home = h.state {
             var home = HomeFeature.State(server, OpenCodeHomeSnapshot(projects = emptyList(), sessions = listOf(session, other), activeSessionIDs = emptySet()))
@@ -178,7 +178,7 @@ class VoiceFeatureTests {
      * screen moves to a draft in that project, and the call follows.
      */
     @Test fun delegatorPinsUnpinsAndOpensADraft() = voiceHomeTest { h ->
-        val math = OpenCodeSession(id = "ses_math", title = "Math bug", projectID = "p", directory = "/Users/kit/math", updatedAt = distantPast)
+        val math = OpenCodeSession(id = "ses_math", serverTitle = "Math bug", projectID = "p", directory = "/Users/kit/math", updatedAt = distantPast)
         val ios = OpenCodeProject(id = "ios", name = "opencode-ios", directory = "/Users/kit/opencode-ios")
         val other = OpenCodeProject(id = "p", name = "project", directory = "/Users/kit/project")
         h.setShared(SharedKeys.openAIAPIKey, "sk-test")
@@ -240,8 +240,8 @@ class VoiceFeatureTests {
      * is delivered to A, and its result is still spoken.
      */
     @Test fun aSwitchMidDelegationStillDeliversToTheOriginalSession() = voiceHomeTest { h ->
-        val a = OpenCodeSession(id = "ses_mid_a", title = "Upload", projectID = "p", directory = "/Users/kit/a", updatedAt = distantPast)
-        val b = OpenCodeSession(id = "ses_mid_b", title = "Docs", projectID = "p", directory = "/Users/kit/b", updatedAt = distantPast)
+        val a = OpenCodeSession(id = "ses_mid_a", serverTitle = "Upload", projectID = "p", directory = "/Users/kit/a", updatedAt = distantPast)
+        val b = OpenCodeSession(id = "ses_mid_b", serverTitle = "Docs", projectID = "p", directory = "/Users/kit/b", updatedAt = distantPast)
         val project = OpenCodeProject(id = "p", name = "project", directory = "/Users/kit/a")
         val home = h.state {
             var home = HomeFeature.State(server, OpenCodeHomeSnapshot(projects = listOf(project), sessions = listOf(a, b), activeSessionIDs = emptySet()))

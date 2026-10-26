@@ -60,7 +60,7 @@ class VoiceFeatureTestsCallLog {
     @get:Rule val isolation = TestIsolationRule()
 
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
-    private val session = OpenCodeSession(id = "ses_voice", title = "Voice lab", projectID = "p", directory = "/Users/kit/project", updatedAt = Instant.EPOCH)
+    private val session = OpenCodeSession(id = "ses_voice", serverTitle = "Voice lab", projectID = "p", directory = "/Users/kit/project", updatedAt = Instant.EPOCH)
 
     private fun liveCall(home: HomeFeature.State, on: OpenCodeSession): HomeFeature.State =
         home.copy(sessionDetail = home.sessionDetail!!.copy(voice = VoiceFeature.State(server, on).withPhase(VoiceFeature.State.Phase.Live)))
@@ -71,7 +71,7 @@ class VoiceFeatureTestsCallLog {
 
     @Test
     fun switchingSessionsInHomeKeepsAnActiveCallAndRetargetsIt() = runTest {
-        val other = OpenCodeSession(id = "ses_other", title = "iOS UI", projectID = "p", directory = "/Users/kit/opencode-ios", updatedAt = Instant.EPOCH)
+        val other = OpenCodeSession(id = "ses_other", serverTitle = "iOS UI", projectID = "p", directory = "/Users/kit/opencode-ios", updatedAt = Instant.EPOCH)
         var home = HomeFeature.State(server, OpenCodeHomeSnapshot(projects = emptyList(), sessions = listOf(session, other), activeSessionIDs = setOf(other.id)))
         home = home.copy(
             transcriptCache = home.transcriptCache +
@@ -139,7 +139,7 @@ class VoiceFeatureTestsCallLog {
 
     @Test
     fun delegatorSendsToOffScreenSessionAndSSEExecutionEndedAnnouncesReplyWhileViewingAnotherSession() = voiceHomeTest { h ->
-        val blog = OpenCodeSession(id = "ses_blog", title = "Blog game", projectID = "p", directory = "/Users/kit/blog-game", updatedAt = HomeFeatureTestSupport.distantPast)
+        val blog = OpenCodeSession(id = "ses_blog", serverTitle = "Blog game", projectID = "p", directory = "/Users/kit/blog-game", updatedAt = HomeFeatureTestSupport.distantPast)
         val session = session.copy(updatedAt = HomeFeatureTestSupport.distantPast)
         h.setShared(SharedKeys.openAIAPIKey, "sk-test")
         val home = h.state {
@@ -212,7 +212,7 @@ class VoiceFeatureTestsCallLog {
 
     @Test
     fun reconnectSnapshotCatchesUpWatchedSessionThatFinishedWhileOffline() = voiceHomeTest { h ->
-        val blog = OpenCodeSession(id = "ses_blog", title = "Blog game", projectID = "p", directory = "/Users/kit/blog-game", updatedAt = HomeFeatureTestSupport.distantPast)
+        val blog = OpenCodeSession(id = "ses_blog", serverTitle = "Blog game", projectID = "p", directory = "/Users/kit/blog-game", updatedAt = HomeFeatureTestSupport.distantPast)
         val session = session.copy(updatedAt = HomeFeatureTestSupport.distantPast)
         val home = h.state {
             var home = HomeFeature.State(server, OpenCodeHomeSnapshot(projects = emptyList(), sessions = listOf(session, blog), activeSessionIDs = setOf(blog.id)))
