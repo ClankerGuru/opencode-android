@@ -5,6 +5,7 @@ import ai.opencode.core.dependencies.dependency
 import ai.opencode.feature.composer.AttachmentPickerButton
 import ai.opencode.feature.composer.ComposerMorph
 import ai.opencode.feature.composer.ComposerMorphTunables
+import ai.opencode.feature.composer.LocalComposerMorphContentActive
 import ai.opencode.feature.composer.PlusMenuTunables
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
@@ -755,8 +756,16 @@ fun PlusPhotoSheetContent(
         library.savedScrollPhotoID?.let { saved -> photos.indexOfFirst { it.id == saved }.takeIf { it >= 0 }?.plus(1) } ?: 0
     }
     val gridState = rememberLazyGridState(initialFirstVisibleItemIndex = initialIndex)
+    // Kept composed by a closed morph (`retainsContent`): ask, load and report frames only while on screen.
+    val active = LocalComposerMorphContentActive.current
 
-    LaunchedEffect(library) { library.load() }
+    LaunchedEffect(library, active) {
+        if (!active) return@LaunchedEffect
+        // Reopened after the saved place was reset (another session): back to the top, as a fresh sheet.
+        val saved = library.savedScrollPhotoID?.let { id -> library.photos.indexOfFirst { it.id == id }.takeIf { it >= 0 }?.plus(1) } ?: 0
+        if (saved == 0 && (gridState.firstVisibleItemIndex != 0 || gridState.firstVisibleItemScrollOffset != 0)) gridState.scrollToItem(0)
+        library.load()
+    }
     LaunchedEffect(gridState, isExpanded) {
         if (!isExpanded) return@LaunchedEffect
         snapshotFlow { gridState.firstVisibleItemIndex to gridState.firstVisibleItemScrollOffset }
@@ -805,6 +814,7 @@ fun PlusPhotoSheetContent(
                 .clip(gridShape)
                 .onGloballyPositioned { coordinates ->
                     gridCoords.value = coordinates
+                    if (!active) return@onGloballyPositioned
                     val frame = coordinates.boundsOnScreen()
                     flights.sheetViewport = frame
                     camera.viewport = frame
@@ -859,7 +869,7 @@ fun PlusPhotoSheetContent(
                 },
         ) {
             item(key = CAMERA_KEY) {
-                PlusCameraTile(camera = camera, onCamera = { if (!tapSuppression.isSuppressed) onCamera() })
+                PlusCameraTile(camera = camera, active = active, onCamera = { if (!tapSuppression.isSuppressed) onCamera() })
             }
             items(photos.size, key = { photos[it].id }) { index ->
                 val photo = photos[index]
@@ -869,6 +879,7 @@ fun PlusPhotoSheetContent(
                     scale = density,
                     inFlight = flights.hidesPhoto(photo.id),
                     flights = flights,
+                    active = active,
                     cached = library.cachedThumbnail(photo.id, PlusPhotoLibrary.GRID_THUMBNAIL_SIDE, density),
                     load = { id, side, scale, onDegraded -> library.thumbnail(id, side, scale, onDegraded) },
                     onTap = { if (!tapSuppression.isSuppressed) library.toggle(photo.id) },
@@ -882,16 +893,16 @@ fun PlusPhotoSheetContent(
 }
 
 @Composable
-private fun PlusCameraTile(camera: PlusCameraPresentation, onCamera: () -> Unit) {
-    DisposableEffect(camera) {
-        camera.mounted = true
+private fun PlusCameraTile(camera: PlusCameraPresentation, active: Boolean, onCamera: () -> Unit) {
+    DisposableEffect(camera, active) {
+        camera.mounted = active
         onDispose { camera.mounted = false }
     }
     Box(
         Modifier
             .aspectRatio(1f)
             .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-            .onGloballyPositioned { camera.tile = it.boundsOnScreen() }
+            .onGloballyPositioned { if (active) camera.tile = it.boundsOnScreen() }
             .clickable(onClickLabel = null, role = Role.Button, onClick = onCamera)
             .semantics { contentDescription = "Camera" },
         contentAlignment = Alignment.Center,
@@ -1081,12 +1092,14 @@ private fun PlusPhotoTile(
     scale: Float,
     inFlight: Boolean,
     flights: PhotoFlights,
+    active: Boolean,
     cached: ImageBitmap?,
     load: suspend (String, Float, Float, (ImageBitmap) -> Unit) -> ImageBitmap?,
     onTap: () -> Unit,
 ) {
     val reduceMotion = rememberReduceMotion()
-    var image by remember(photo.id) { mutableStateOf<ImageBitmap?>(null) }
+    // Starts from the warm cache, so a warmed tile draws on its first frame without a second composition.
+    var image by remember(photo.id) { mutableStateOf(cached) }
     val resolved = image ?: cached
     val place = remember { PhotoTilePlace() }
     val picked = order != null
@@ -1105,7 +1118,10 @@ private fun PlusPhotoTile(
         val loaded = load(photo.id, PlusPhotoLibrary.GRID_THUMBNAIL_SIDE, scale) { preview -> if (image == null) image = preview }
         if (loaded != null) image = loaded
     }
-    LaunchedEffect(order, resolved) { if (order != null) report() }
+    LaunchedEffect(order, resolved, active) {
+        // Closed but kept composed: nothing leaves from an off-screen tile.
+        if (!active) flights.source(photo.id, null) else if (order != null) report()
+    }
     DisposableEffect(photo.id) { onDispose { flights.source(photo.id, null) } }
 
     val alpha by animateFloatAsState(
@@ -1126,6 +1142,7 @@ private fun PlusPhotoTile(
             .aspectRatio(1f)
             .graphicsLayer { this.alpha = alpha }
             .onGloballyPositioned {
+                if (!active) return@onGloballyPositioned
                 place.frame = it.boundsOnScreen()
                 if (order != null) report()
             }

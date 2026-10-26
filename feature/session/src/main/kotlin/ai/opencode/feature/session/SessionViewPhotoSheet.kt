@@ -591,6 +591,7 @@ fun SessionPlusPhotoSheet(state: SessionPhotoSheetState, modifier: Modifier = Mo
             landsOn = landsOn,
             stretchesUpward = true,
             backdropDim = ComposerMorphTunables.photoBackdropDim,
+            retainsContent = true,
         ) {
             PhotoSheetBody(state)
         }

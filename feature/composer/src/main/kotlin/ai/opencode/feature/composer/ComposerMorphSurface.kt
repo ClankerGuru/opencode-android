@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -14,6 +15,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.ime
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -22,6 +27,9 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusManager
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -40,6 +48,7 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.dismiss
 import androidx.compose.ui.semantics.hideFromAccessibility
@@ -48,6 +57,7 @@ import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
+import kotlinx.coroutines.delay
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -122,6 +132,13 @@ fun ComposerMorphSurface(
     continuousGlass: Boolean = false,
     /** Dismissing slides it down and fades it out while the composer rises back from behind it. */
     dismissesDown: Boolean = false,
+    /**
+     * Keep [content] composed while closed (warmed once the surface has been up a moment), so
+     * opening doesn't rebuild it. Closed, it stands off screen, transparent and outside
+     * semantics, so it takes no touches and TalkBack can't reach it; it reads
+     * [LocalComposerMorphContentActive] false meanwhile and should start nothing then.
+     */
+    retainsContent: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val reduceMotion = rememberReduceMotion()
@@ -159,6 +176,22 @@ fun ComposerMorphSurface(
     val currentOnMenuDrag by rememberUpdatedState(onMenuDrag)
     val currentOnMenuDragEnded by rememberUpdatedState(onMenuDragEnded)
     val currentMenuInteractive by rememberUpdatedState(menuInteractive)
+    // Retained content moves between its open and closed places with its state (one movable slot).
+    val currentContent by rememberUpdatedState(content)
+    val movableContent = remember { movableContentOf { currentContent() } }
+    var warm by remember { mutableStateOf(false) }
+    if (retainsContent && !warm) {
+        if (shown) {
+            SideEffect { warm = true }
+        } else {
+            LaunchedEffect(Unit) {
+                // Prewarm once the host's own first frames have gone, not during its entrance.
+                delay(RETAINED_CONTENT_PREWARM_MILLIS)
+                warm = true
+            }
+        }
+    }
+    val retained = retainsContent && warm
 
     Box(
         modifier
@@ -168,6 +201,7 @@ fun ComposerMorphSurface(
         val anyShown = shown || menuShown || menuProgress > 0.001f
         if (!anyShown || screen == Rect.Zero) {
             SideEffect { morph.backdrop.blurPx = 0f }
+            if (retained && screen != Rect.Zero) RetainedClosedContent(screen, target, movableContent)
             return@Box
         }
         val keyboardTop = if (imeBottom > 0) screen.bottom - imeBottom else null
@@ -369,7 +403,9 @@ fun ComposerMorphSurface(
                     .morphReveal({ morph.content.value }, contentFade, (revealBlur * px).toFloat())
                     .semantics { if (!morph.isOpening) hideFromAccessibility() },
             ) {
-                content()
+                CompositionLocalProvider(LocalComposerMorphContentActive provides true) {
+                    if (retainsContent) movableContent() else content()
+                }
                 // Taps reach the content only once it has mostly grown (iOS `allowsHitTesting(progress > 0.5)`).
                 if (progress <= 0.5f) {
                     Box(
@@ -381,6 +417,8 @@ fun ComposerMorphSurface(
                 }
             }
         }
+
+        if (!shown && retained) RetainedClosedContent(screen, target, movableContent)
 
         if (shown && outgoing != null && !hasUnifiedMenu) {
             val src = placed.source
@@ -449,6 +487,45 @@ fun ComposerMorphSurface(
         }
     }
 }
+
+/**
+ * Whether the morph's content is on screen: false while [ComposerMorphSurface] keeps it
+ * composed closed (`retainsContent`). Content reads it to hold back what only an open sheet
+ * should do (asking for access, reporting frames to flights).
+ */
+val LocalComposerMorphContentActive = compositionLocalOf { true }
+
+/** How long after the surface first appears its retained content is composed closed (ms). */
+private const val RETAINED_CONTENT_PREWARM_MILLIS = 700L
+
+/**
+ * The retained content while closed: laid out at the rest's size (so opening only moves it),
+ * one screen below the window so no pointer reaches it, transparent and out of semantics.
+ */
+@Composable
+private fun RetainedClosedContent(screen: Rect, target: (screen: Rect, keyboardTop: Float?) -> Rect, content: @Composable () -> Unit) {
+    val rest = target(screen, null).translate(-screen.topLeft)
+    val focusManager = LocalFocusManager.current
+    PlacedBox(
+        Rect(Offset(rest.left, screen.height * 2), rest.size),
+        Modifier
+            .graphicsLayer { alpha = 0f }
+            .clearAndSetSemantics {}
+            .inertToFocus(focusManager),
+    ) {
+        CompositionLocalProvider(LocalComposerMorphContentActive provides false) { content() }
+    }
+}
+
+/**
+ * No descendant can take keyboard or D-pad focus: focus moving or requested into the group is
+ * cancelled (`onEnter`, which `requestFocus` on a descendant also goes through), and focus
+ * already inside when it turns inert (a sheet closing on a focused tile) is cleared.
+ */
+internal fun Modifier.inertToFocus(focusManager: FocusManager): Modifier = this
+    .onFocusChanged { if (it.hasFocus) focusManager.clearFocus(force = true) }
+    .focusProperties { onEnter = { cancelFocusChange() } }
+    .focusGroup()
 
 /** UIKit's normal deceleration (0.998 per ms): a throw's predicted travel is velocity × 0.499 s (SwiftUI `predictedEndTranslation`). */
 internal const val PREDICT_SECONDS = 0.499f
