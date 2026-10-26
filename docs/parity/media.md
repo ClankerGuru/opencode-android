@@ -82,7 +82,7 @@ given as the `LinkTextBlock`s the transcript hands media.
 
 Production bugs the ported tests found: none.
 
-Not ported anywhere yet (owner `:server`, absent from server.md's table): `AgentFileReferenceTests`,
-`PagePromptBodyTests`, the first two `LowDataModeTests`.
+`AgentFileReferenceTests`, `PagePromptBodyTests` and the first two `LowDataModeTests` (owner `:server`) are in
+server.md's table.
 
 Total: 158 media tests, all passing.

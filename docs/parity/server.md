@@ -90,7 +90,10 @@ fixtures: `server/src/testFixtures` (`WireFixture`, `ServerTestIsolation`); the 
 | `NetworkRetryTests.swift` | `retry/NetworkRetryTests.kt` | 44 of 51 | 6 `EventStreamReconnectTests` → `:feature:drawer` (`HomeFeature`); `actionsALoopThatOwnsItsRetries…` → `:feature:voice` (`runOwningRetries`); CFNetwork/`NWError` sub-checks deleted (iOS-only domains) |
 | `ServerIDTests.swift` | `ServerIDTests.kt` | 6 of 7 | `shareSheetIDsUseTheSameShape` → `:feature:system`; `TranscriptTimeStamps` readback → `:feature:transcript` |
 | `PairPageLinkTests.swift` | `PairPageLinkTests.kt` | 6 | — |
-| `MultipleWindowsTests.swift` | `EventBatcherTests.kt` | 1 (`batcherOverflowFinishesAndCancelsFurtherEmission`) | 5 `SharedEventStreams`/window tests → `:app`/`:feature:drawer` |
+| `MultipleWindowsTests.swift` | `EventBatcherTests.kt`, `live/MultipleWindowsTests.kt` | 8 (batcher overflow; 7 `SharedEventStreams`/`SharedReads`) | window roster/app-wide work → `:app`; `aFurtherWindowKeepsItsOwnSidebar` → `:feature:drawer` |
+| `AppFeatureTests.swift` | `AppFeatureTests.kt` | 11 (pairing-link decoding, live redemption and redirects, session token, reachability, Home cache wire) | reducer tests → `:app` |
+| `ConnectionErrorReportTests.swift` | `ConnectionErrorReportTests.kt` | 9 (`ConnectionFailureDetail`) | `AppFeature` half → `:app` (iOS `logDescription` reads `URLError -1001`; Android appends the exception type, so the check is a prefix) |
+| `PairingOpensDrawerAppTests.swift` | `PairingOpensDrawerAppTests.kt` | 1 (`isNewComputer`) | rest → `:app` |
 | `ModelVisibilityTests.swift` | `model/ModelVisibilityTests.kt` | 6 (Rules) | Pickers/Settings tests → `:feature:session`/`:feature:settings` |
 | `SessionLinkTests.swift` | `model/SessionLinkTests.kt` | 1 (`linkURLRoundTripsItsIDAndTitle`) | parsing/presentation → `:feature:transcript`; session/Home/menu → features |
 | `TestIsolationGuardTests.swift` | `testing/ServerTestIsolationTests.kt` | 1 (network block) | rest in `:core` (see core.md) |
