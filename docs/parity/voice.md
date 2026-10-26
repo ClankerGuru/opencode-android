@@ -88,7 +88,7 @@ another module are left to that module's port ("skipped"); "dropped" tests can't
 | --- | --- | ---: | --- | --- |
 | `VoiceTurnTakingTests.swift` | `VoiceTurnTakingTests.kt` | 11 | – | – |
 | `VoiceUplinkWatchTests.swift` (+`ReplyWatchCoreTests`) | `VoiceUplinkWatchTests.kt` | 5 | – | – |
-| `VoiceHandoffParseTests.swift` (+`VoiceFramingTests`, `VoiceSteeringInstructionsTests`) | `VoiceHandoffParseTests.kt` | 23 | `promptsFromBeforeTheFramingStillRender`, `aDelegationProjectsToAVoiceMessage…`, `aVoiceMessageWearsTheBadge…`, `theLabelRowFallback…` and the `TranscriptUserMessage` asserts of two more (`:feature:transcript`) | – |
+| `VoiceHandoffParseTests.swift` (+`VoiceFramingTests`, `VoiceSteeringInstructionsTests`) | `VoiceHandoffParseTests.kt` | 23 | `promptsFromBeforeTheFramingStillRender`, `aDelegationProjectsToAVoiceMessage…`, `aVoiceMessageWearsTheBadge…`, and the `TranscriptUserMessage` asserts of two more (`:feature:transcript`); `theLabelRowFallback…` (`:feature:transcript`, ported there) | – |
 | `RealtimeProtocolTests.swift` | `RealtimeProtocolTests.kt` | 24 | – | – |
 | `VoiceCaptionAndQualityTests.swift` | `VoiceCaptionAndQualityTests.kt` | 8 | – | `appendingWordsNeverMovesEarlierWords`, `wordsFadeInWhereTheyLie` (SwiftUI `ImageRenderer` pixel probes) |
 | `LivingOrbTests.swift` | `LivingOrbTests.kt` | 3 | `flagRestoresEveryExistingCallStyleWhenOff` (`:core`), `settingsPersistStyle…` (`:feature:settings`, ported there) | `colourAndShapePresets…` (tuning store not ported; tunables are baked) |
@@ -98,28 +98,30 @@ another module are left to that module's port ("skipped"); "dropped" tests can't
 | `RaiseToTalkTests.swift` | `RaiseToTalkTests.kt` | 16 (the `RaiseToEarDetector` and at-ear engine start) | 8 `SessionFeature` tests (`:feature:session`, ported there) | – |
 | `RaiseToTalkTests+Routing.swift` | `RaiseToTalkRoutingTests.kt` | 8 + the `VoiceAudioEngine` half of `setAtEarBeforeRunningIsNotLost` (`VoiceAudioEngine` routing/ramp, `VoiceCallHost` ear hand-off) | 3 `SessionFeature` tests (`:feature:session`, ported there) | – |
 | `HapticsAuditTests.swift` | `HapticsAuditTests.kt` | 1 (`theCallsFallbacksComeFromTheVocabulary`) | rest (`:core`, `:feature:session`, drawer, ported there) | – |
-| `VoiceLiveTests.swift` | `VoiceLiveTests.kt` | 83 | 8 `VoiceEnginePersistenceTests` migrations (`:app`), 3 compaction/retarget tests (`:feature:session`, drawer) | – |
+| `VoiceLiveTests.swift` | `VoiceLiveTests.kt` | 83 | 3 compaction/retarget tests (`:feature:session`, drawer, ported there) | 8 `VoiceEnginePersistenceTests` (`realtimeMigratesToGPTLive` … `laterManualChoiceSticks`): they test `AppFeature+Migrations`' launch-time engine migration (Realtime/Grok → GPT-Live), which Android doesn't have (see app.md) |
 | `VoiceReconnectReplyTests.swift` | `VoiceReconnectReplyTests.kt` | 7 | – | – |
 | `VoiceRouteTests.swift` | `VoiceRouteTests.kt` | 6 | `inactiveGeminiNeverDisablesThePhoneKey…`, `grokSuppressesUnrelatedServerErrors` (their Settings and session halves, ported in `:feature:settings`/`:feature:session`) | – |
 | `VoiceResultSpeechTests.swift` | `VoiceResultSpeechTests.kt` | 41 | – | – |
 | `CallVoiceTests.swift` | `CallVoiceTests.kt` | 7 | 2 `VoiceSettingsFeature` tests and the `CallVoicePicker.rowValue` half of `anUnsupportedChoice…` (`:feature:settings`, ported there) | – |
-| `ServerVoiceTests.swift` | `ServerVoiceTests.kt` | 16 | HomeFeature half of `serverVoiceReprobesOnce…` (drawer) | – |
+| `ServerVoiceTests.swift` | `ServerVoiceTests.kt` | 16 | HomeFeature half of `serverVoiceReprobesOnce…` (drawer, ported there) | – |
 | `VoiceServerPickerTests.swift` | `VoiceServerPickerTests.kt` | 7 | 4 `VoiceSettingsFeature`, `homeSavesTheChoice…` and the Settings halves of `everyEntryPointRoutes…`, `thisIPhoneUsesThePhonesOwnKey` (`:feature:settings`, ported there) | – |
-| `VoiceSessionToolsTests.swift` (+`VoiceModelToolsTests`) | `VoiceSessionToolsTests.kt` | 24 | `homePublishesTheDrawerState…` (drawer), `theScreenFollowsOnlyItsOwnSessionsSwitch` (`:feature:session`) | – |
-| `FloatingCallModelTests.swift` | `FloatingCallModelTests.kt` | 21 | `canStartCallFromTap` half of `tapIntoProjectPicker…`, `ComposerTunables.bottomGap` (`:feature:session`) | Preset/registry parts of 3 tunables tests (tuning store not ported); 8 `TestWindowHost`/SessionView hosting tests (`onlyTopSessionViewDrivesCallTrayController`, `callTrayReserveGlides…`, `callTrayOverlayResetsReserve…`, `pushingAndPoppingSubagent…`, two `subagentStartedCall…`, `subagentPopDuringEnding…`, `growModelListCloseAndReset…`) |
+| `VoiceSessionToolsTests.swift` (+`VoiceModelToolsTests`) | `VoiceSessionToolsTests.kt` | 24 | `homePublishesTheDrawerState…` (drawer), `theScreenFollowsOnlyItsOwnSessionsSwitch` (`:feature:session`), both ported there | – |
+| `FloatingCallModelTests.swift` | `FloatingCallModelTests.kt` | 21 | `canStartCallFromTap` half of `tapIntoProjectPicker…`, `ComposerTunables.bottomGap` (`:feature:session`, ported there) | Preset/registry parts of 3 tunables tests (tuning store not ported); 8 `TestWindowHost`/SessionView hosting tests (`onlyTopSessionViewDrivesCallTrayController`, `callTrayReserveGlides…`, `callTrayOverlayResetsReserve…`, `pushingAndPoppingSubagent…`, two `subagentStartedCall…`, `subagentPopDuringEnding…`, `growModelListCloseAndReset…`) |
 | `FloatingCallModelTests+Dock.swift` | `FloatingCallModelTestsDock.kt` | 3 | – | – |
-| `VoiceFeatureTests.swift` | `VoiceFeatureTests.kt` | 8 | `voiceAvailabilityRequires…` (`:feature:session`); 3 Home delegator/switch tests (drawer) | – |
+| `VoiceFeatureTests.swift` | `VoiceFeatureTests.kt` | 8 | `voiceAvailabilityRequires…` (`:feature:session`); 3 Home delegator/switch tests (drawer); all ported there | – |
 | `VoiceFeatureTests+Delegation.swift` | `VoiceFeatureTestsDelegation.kt` | 30 | – | – |
-| `VoiceFeatureTests+CallLog.swift` | `VoiceFeatureTestsCallLog.kt` | 9 | 4 Home tests (drawer) | – |
-| `VoiceFeatureTests+Screen.swift` | `VoiceFeatureTestsScreen.kt` | 7 | 10 SessionFeature tests and the session half of `aDraftCallsRefusedModelSendsNothing` (`:feature:session`) | – |
+| `VoiceFeatureTests+CallLog.swift` | `VoiceFeatureTestsCallLog.kt` | 9 | 4 Home tests (drawer, ported there) | – |
+| `VoiceFeatureTests+Screen.swift` | `VoiceFeatureTestsScreen.kt` | 7 | 10 SessionFeature tests and the session half of `aDraftCallsRefusedModelSendsNothing` (`:feature:session`, ported there) | – |
 | `VoiceResumeTests.swift` | `VoiceResumeTests.kt` | 21 | – | – |
 | `VoiceLatencyBudgetTests.swift` | `VoiceLatencyBudgetTests.kt` | 22 | – | – |
+| `BrowserTests.swift` (`BrowserVoiceTests`) | `BrowserVoiceTests.kt` | 3 (`aPageOpenedWhileConnectingIsToldOnConnect`, `anotherSessionNeverInheritsThePage`, `aPageTitleIsDataNotInstructions`) | `aCallStartedOverAPageKnowsIt` (`SessionFeature`, `:feature:session`, ported there); the rest of the file (`:feature:media`, `:feature:session`, drawer) | – |
+| `NetworkRetryTests.swift` | `NetworkRetryTests.kt` | 1 (`actionsALoopThatOwnsItsRetriesSendsStartEffectsOutsideIt`, `runOwningRetries`) | rest (`:server`, `EventStreamReconnectTests` drawer; ported there) | – |
 
-Voice-named iOS files whose subject lives elsewhere (left to those modules' ports): `LabVoiceKeysTests` (ported in `:app`),
+Voice-named iOS files whose subject lives elsewhere (left to those modules' ports; see their parity files): `LabVoiceKeysTests` (ported in `:app`),
 `ScreenAwakeTests`, `VoiceLiveActivityTests` (`:app`/drawer stores), `VoiceRoutingBaselineTests`,
 `ServerQuietStyleTests` (`:feature:settings`, ported there), `SessionVoiceTests`,
 `AgentRevealAndOrbModelTests` (`:feature:session`), `LiveDelegationFeatureTests+Session`,
-`DictationLiveActivityTests` (drawer), `AudioSessionHapticsTests` (`:core` `HapticsClient`, ported there; its live
+`DictationLiveActivityTests` (drawer, `:feature:system`, `:feature:composer`), `AudioSessionHapticsTests` (`:core` `HapticsClient`, ported there; its live
 dictation suite is opt-in device-only), `DictationAudioTests`, `LiveDictationTests` (`:feature:composer`).
 
 Production bugs the ported tests found (each fixed in its own `fix(voice)` commit): DotScopeGrid
@@ -128,4 +130,4 @@ exception class instead of its reason and turned cancellation into an engine err
 that failed when an interruption ended was never retried by the next route/configuration change;
 a just-finished call log was missing from `list()` while its save was still writing; End landed 2 dp left of the call button (48 dp slot kept the 6 dp padding); a reconnect or rotation replayed the connect chord; `RetryBudget.bounded` (`:server`) timed its limit on the scripted clock, so a lost send's answer was never read back; a cancelled speaker ramp re-sent an unchanged 1.0 gain (iOS only sets a changed volume) and a fallback to the built-in output was noted as “Route changed” instead of the ear's route; every call start re-sent its initial ear to the audio (iOS only re-applies one that changed while the audio started).
 
-Total: 507 voice tests (Gradle), all passing. Robolectric (test-only) runs only `VoiceCallTeardownFrameworkTests`.
+Total: 511 voice tests (Gradle), all passing. Robolectric (test-only) runs only `VoiceCallTeardownFrameworkTests`.
