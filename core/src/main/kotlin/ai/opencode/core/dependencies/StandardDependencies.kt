@@ -45,12 +45,17 @@ private object UnimplementedClock : Clock {
         throw AssertionError("Unimplemented: Clock.sleep. Override Clock in this test (TestClock/ImmediateClock).")
 }
 
-/** A clock whose sleeps return at once, advancing its time (swift-clocks' `ImmediateClock`). */
+/**
+ * A clock whose sleeps return at once, advancing its time (swift-clocks' `ImmediateClock`). Like
+ * swift-clocks, each sleep still yields, so a loop that sleeps on it never starves the other
+ * work on its dispatcher.
+ */
 class ImmediateClock : Clock {
     @Volatile private var time = Duration.ZERO
     override fun now(): Duration = time
     override suspend fun sleep(duration: Duration) {
         time += duration
+        yield()
     }
 }
 
