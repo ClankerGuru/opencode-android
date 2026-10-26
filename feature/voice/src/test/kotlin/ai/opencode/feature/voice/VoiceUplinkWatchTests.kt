@@ -228,7 +228,7 @@ class ReplyWatchCoreTests {
 
     @Test fun statusSummaryReflectsLiveSessionRunStateTrackedWorkAndInFlightRequests() {
         val viewing = OpenCodeSession(
-            id = "ses_ios", title = "OPENCODE IOS", projectID = "p",
+            id = "ses_ios", serverTitle = "OPENCODE IOS", projectID = "p",
             directory = "/Users/kit/opencode-ios", updatedAt = Instant.EPOCH,
         )
         var watch = ReplyWatch(activeSessionIDs = setOf("ses_blog"), callPhase = ReplyWatch.CallPhase.live)

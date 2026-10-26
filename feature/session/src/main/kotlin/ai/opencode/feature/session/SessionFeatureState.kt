@@ -37,6 +37,11 @@ import ai.opencode.server.model.OpenCodeTranscriptItem
 import ai.opencode.server.model.ModelVariant
 import ai.opencode.server.model.OpenCodeCompaction
 import ai.opencode.server.model.SessionActivity
+import ai.opencode.server.model.SessionTitle
+import ai.opencode.server.model.isUntitled
+import ai.opencode.server.model.keepingFirstPrompt
+import ai.opencode.server.model.keepingFirstPrompts
+import ai.opencode.server.model.learningFirstPrompt
 import ai.opencode.server.model.model
 import java.time.Instant
 import java.util.UUID
@@ -198,12 +203,12 @@ fun SessionFeature.SwitchSnapshot.restore(state: State): State {
     val selected = next.session
     if (selected != null && session.updatedAt >= selected.updatedAt) {
         next = if (session.updatedAt > selected.updatedAt) {
-            next.copy(session = session)
+            next.copy(session = session.keepingFirstPrompt(selected))
         } else {
             next.copy(session = selected.copy(revertMessageID = session.revertMessageID))
         }
     }
-    next = next.copy(familySessions = family, familyReadAt = familyReadAt, hasLoadedPendingRequests = hasLoadedRequests)
+    next = next.copy(familySessions = family.keepingFirstPrompts(next.familySessions), familyReadAt = familyReadAt, hasLoadedPendingRequests = hasLoadedRequests)
     next = next.updateRequestDock {
         it.copy(
             permissionRequests = permissions,
@@ -744,13 +749,36 @@ fun State.setRevertMessageID(messageID: String?): State {
     return next.copy(refresh = next.refresh?.copy(revertChanged = true))
 }
 
-fun State.updateObservedSession(observed: OpenCodeSession): State {
+fun State.updateObservedSession(fresh: OpenCodeSession): State {
+    val observed = fresh.keepingFirstPrompt(session)
     var next = this
     if (observed.revertMessageID == null) next = next.clearUntouchedUndoDraft()
     next = next.copy(session = observed)
     val index = next.familySessions.indexOfFirst { it.id == observed.id }
     if (index >= 0) next = next.copy(familySessions = next.familySessions.toMutableList().also { it[index] = observed })
     return next.renameVoiceTarget(observed.id, observed.title)
+}
+
+/**
+ * The session on screen (and its family copy) learn their first prompt once the loaded transcript
+ * reaches the start, so an unnamed session reads as it in the header and, through Home, everywhere.
+ */
+fun State.learningFirstPrompt(): State {
+    val shown = session ?: return this
+    if (shown.firstPrompt != null || !shown.isUntitled) return this
+    return learningFirstPrompt(SessionTitle.firstPrompt(items, reachesStart = earlierHistory == State.EarlierHistory.Exhausted))
+}
+
+/** The session on screen (and its family copy) learn [preview] as their first prompt, if unnamed and unknown. */
+fun State.learningFirstPrompt(preview: String?): State {
+    val shown = session ?: return this
+    if (preview == null || shown.firstPrompt != null || !shown.isUntitled) return this
+    val learned = shown.learningFirstPrompt(preview)
+    val index = familySessions.indexOfFirst { it.id == learned.id }
+    return copy(
+        session = learned,
+        familySessions = if (index < 0) familySessions else familySessions.toMutableList().also { it[index] = it[index].learningFirstPrompt(preview) },
+    )
 }
 
 /** Whether [id] (an attachment's `UUID` string) was among the attachments the undo restored. */

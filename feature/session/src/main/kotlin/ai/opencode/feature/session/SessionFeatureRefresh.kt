@@ -15,6 +15,7 @@ import ai.opencode.core.diagnostics.PerfTimeline
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeContextReading
+import ai.opencode.server.model.SessionTitle
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.OpenCodeTranscriptItem
 import ai.opencode.server.transcriptWithContextUsageAndCursor
@@ -296,7 +297,7 @@ internal fun SessionFeature.authoritativeRefresh(
                             scope = AuthoritativeRefresh.Scope.Page,
                             context = loaded.context,
                             observedIsRead = read != null,
-                            pageCursor = loaded.pageCursor?.let { AuthoritativeRefresh.PageCursor(it.next) },
+                            pageCursor = loaded.pageCursor?.let { AuthoritativeRefresh.PageCursor(it.next, it.reachesStart) },
                         ),
                     )
                 }
@@ -399,6 +400,8 @@ internal fun SessionFeature.acceptWindow(
     if (merged != s.items) s = s.copy(items = merged).syncShellToolStatuses()
     s = s.retainRenderedWindowStart(previousFirstID).pinBrowsingWindowIfNeeded()
     s = settleFailedSends(SessionFeature.promptIDs(items), s)
+    // A window from the session's start names an unnamed session after its first prompt.
+    if (pageCursor?.reachesStart == true) s = s.learningFirstPrompt(SessionTitle.firstPrompt(items, reachesStart = true))
     PerfTimeline.snapshotApplied(s.session?.id)?.let { s = s.copy(perfSnapshotRevision = it) }
     return s
 }

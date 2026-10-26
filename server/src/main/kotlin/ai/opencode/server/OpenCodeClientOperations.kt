@@ -95,7 +95,12 @@ data class OpenCodeTranscriptWindow(
     /** Present when the window came from a decoded wire payload: `next` is the older page's cursor. */
     val pageCursor: PageCursor?,
 ) {
-    data class PageCursor(val next: String?)
+    /**
+     * [reachesStart]: the window holds the session's first message. V2 sends a `next` cursor even
+     * when nothing is older, so a page shorter than its limit says so too (it names an unnamed
+     * session after its first prompt; paging still follows [next]).
+     */
+    data class PageCursor(val next: String?, val reachesStart: Boolean = next == null)
 }
 
 /**
@@ -106,7 +111,10 @@ data class OpenCodeTranscriptWindow(
 suspend fun OpenCodeClient.transcriptWithContextUsageAndCursor(server: OpenCodeServer, sessionID: String, limit: Int): OpenCodeTranscriptWindow {
     val capture = TranscriptContextCapture()
     val items = TranscriptContextCapture.current.withValue(capture) { transcript(server, sessionID, limit) }
-    capture.take()?.let { return OpenCodeTranscriptWindow(items, it.reading, OpenCodeTranscriptWindow.PageCursor(it.nextCursor)) }
+    capture.take()?.let {
+        val reachesStart = it.nextCursor == null || it.messageCount < limit
+        return OpenCodeTranscriptWindow(items, it.reading, OpenCodeTranscriptWindow.PageCursor(it.nextCursor, reachesStart))
+    }
     val fallback = try { contextUsage(server, sessionID) } catch (_: OpenCodeClientError) { OpenCodeContextReading.Inconclusive }
     return OpenCodeTranscriptWindow(items, fallback, null)
 }

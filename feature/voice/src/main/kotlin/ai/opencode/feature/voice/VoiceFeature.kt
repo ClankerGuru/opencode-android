@@ -18,6 +18,7 @@ import ai.opencode.core.dependencies.Clock
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeModelRef
 import ai.opencode.server.model.OpenCodeSession
+import ai.opencode.server.model.SessionTitle
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
@@ -480,11 +481,8 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
             }
 
         companion object {
-            fun usableTitle(title: String): String? {
-                val trimmed = title.trim()
-                if (trimmed.isEmpty() || trimmed.equals("Untitled session", ignoreCase = true)) return null
-                return trimmed
-            }
+            /** A session's title to name it by, or null while it reads as untitled ([SessionTitle.isPlaceholder]). */
+            fun usableTitle(title: String): String? = if (SessionTitle.isPlaceholder(title)) null else title.trim()
 
             /** A call on [session], picking up the tail an earlier call left there (iOS `init(server:session:)`). */
             operator fun invoke(server: OpenCodeServer, session: OpenCodeSession): State {

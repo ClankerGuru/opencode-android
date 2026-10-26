@@ -8,6 +8,7 @@ import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.openCodeTapTarget
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.snap
 import androidx.compose.foundation.shape.CircleShape
@@ -400,7 +401,7 @@ fun AttachmentMenuOverlay(
     /** The photo sheet has taken the menu's place: the menu's surface gives way and its rows blur out. */
     handedOff: Boolean = false,
     identity: Any = 0,
-    selection: InlinePhotoSelection? = null,
+    selection: InlinePhotoSelection<Uri>? = null,
 ) {
     val reduceMotion = rememberReduceMotion()
     val density = LocalDensity.current

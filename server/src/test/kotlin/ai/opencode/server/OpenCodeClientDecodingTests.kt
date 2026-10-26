@@ -60,7 +60,7 @@ class OpenCodeClientDecodingTests {
 
     private val rootSession = OpenCodeSession(
         id = "ses_root",
-        title = "Root",
+        serverTitle = "Root",
         projectID = "p",
         directory = "/project",
         updatedAt = Instant.ofEpochSecond(1),
@@ -407,7 +407,7 @@ class OpenCodeClientDecodingTests {
         val serverKey = "lookup-registry-${UUID.randomUUID().toString().lowercase()}"
         val expected = OpenCodeSession(
             id = "ses_target",
-            title = "Target",
+            serverTitle = "Target",
             projectID = "p",
             directory = "/project",
             updatedAt = Instant.ofEpochSecond(1),

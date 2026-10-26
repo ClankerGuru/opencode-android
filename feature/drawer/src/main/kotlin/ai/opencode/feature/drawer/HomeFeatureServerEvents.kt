@@ -224,11 +224,11 @@ internal fun HomeFeature.reduceServerEvent(state: State, event: OpenCodeServerEv
             val s = state.copy(
                 sessionSnapshots = state.sessionSnapshots.mapValues { (id, snapshot) ->
                     snapshot.copy(
-                        session = if (id == sessionID) snapshot.session.copy(title = title) else snapshot.session,
-                        family = snapshot.family.map { if (it.id == sessionID) it.copy(title = title) else it },
+                        session = if (id == sessionID) snapshot.session.copy(serverTitle = title) else snapshot.session,
+                        family = snapshot.family.map { if (it.id == sessionID) it.copy(serverTitle = title) else it },
                     )
                 },
-            ).updatingSession(sessionID) { it.copy(title = title) }
+            ).updatingSession(sessionID) { it.copy(serverTitle = title) }
             val renamed = SessionFeature.Action.FamilySessionRenamed(sessionID, title)
             val pushed = forwardToSubagentFamilies(s, sessionID, renamed)
             val detail = s.sessionDetail

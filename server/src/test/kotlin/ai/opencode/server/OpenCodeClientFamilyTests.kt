@@ -350,7 +350,7 @@ private class FamilyHTTPFixture(
     val host = "family-${UUID.randomUUID().toString().lowercase()}.invalid"
     val server: OpenCodeServer get() = OpenCodeServer(url = "https://$host", username = "", password = "")
     val root = OpenCodeSession(
-        id = "root", title = "Root", projectID = "project", directory = "/fixture", updatedAt = Instant.parse("0001-01-01T00:00:00Z"),
+        id = "root", serverTitle = "Root", projectID = "project", directory = "/fixture", updatedAt = Instant.parse("0001-01-01T00:00:00Z"),
     )
 
     private val responses: Map<String, Response>
