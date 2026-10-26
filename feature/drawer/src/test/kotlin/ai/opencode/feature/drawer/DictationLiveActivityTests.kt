@@ -18,7 +18,9 @@ import ai.opencode.feature.session.SessionFeature
 import ai.opencode.feature.session.isDictating
 import ai.opencode.feature.system.liveactivity.DictationActivityAttributes
 import ai.opencode.feature.system.liveactivity.DictationCommand
+import ai.opencode.feature.system.liveactivity.DictationLiveActivity
 import ai.opencode.feature.system.liveactivity.DictationLiveActivityClient
+import ai.opencode.feature.voice.VoiceFeature
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeHomeSnapshot
@@ -26,6 +28,7 @@ import ai.opencode.server.model.OpenCodeSession
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.emptyFlow
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -33,9 +36,9 @@ import org.junit.Test
 import java.time.Instant
 
 /**
- * Port of iOS `DictationLiveActivityTests.swift`'s Home tests. `onlyALiveHandsFreeRecordingOutsideACallShows`
- * and `theStopIntentSendsItsCommand` are `:feature:system`'s (`DictationLiveActivity`,
- * `DictationIntents`); `dictationFeatureReducesHoldArmingLockingAndFinishExhaustively` is
+ * Port of iOS `DictationLiveActivityTests.swift`'s Home tests and `onlyALiveHandsFreeRecordingOutsideACallShows`
+ * (Home's `liveActivityRecording` reads `SessionFeature.State`, which `:feature:system` can't see).
+ * `theStopIntentSendsItsCommand` is `:feature:system`'s (`DictationIntents`); `dictationFeatureReducesHoldArmingLockingAndFinishExhaustively` is
  * `:feature:composer`'s.
  */
 class DictationLiveActivityTests {
@@ -191,5 +194,28 @@ class DictationLiveActivityTests {
         assertEquals(true, store.state.sessionDetail?.isDictating)
         assertTrue("A message from another session must not send here", sent.value.isEmpty())
         h.skipInFlightEffects()
+    }
+
+    /**
+     * Only hands-free once the mic is live, outside a call: a held mic shows nothing, and a call
+     * that failed or dropped doesn't count as a call. (Home's `liveActivityRecording` is iOS
+     * `DictationLiveActivity.recording(in:)`.)
+     */
+    @Test fun onlyALiveHandsFreeRecordingOutsideACallShows() = homeTest { h ->
+        var detail = requireNotNull(h.state { home() }.sessionDetail)
+        fun edit(change: (DictationFeature.State) -> DictationFeature.State) { detail = detail.copy(dictation = change(detail.dictation)) }
+        edit { it.copy(phase = DictationFeature.Phase.Preparing) }
+        assertNull(liveActivityRecording(detail))
+        edit { it.copy(phase = DictationFeature.Phase.Recording) }
+        assertEquals(DictationLiveActivity.Recording(title = "First", serverID = server.id), liveActivityRecording(detail))
+        edit { it.copy(hold = DictationFeature.Hold(text = "")) }
+        assertNull(liveActivityRecording(detail))
+        edit { it.copy(hold = it.hold?.copy(isLocked = true)) }
+        assertNotNull(liveActivityRecording(detail))
+        val call = h.state { VoiceFeature.State(server, first) }.withPhase(VoiceFeature.State.Phase.Live)
+        detail = detail.copy(voice = call)
+        assertNull(liveActivityRecording(detail))
+        detail = detail.copy(voice = call.withPhase(VoiceFeature.State.Phase.Dropped))
+        assertNotNull(liveActivityRecording(detail))
     }
 }
