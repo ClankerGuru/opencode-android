@@ -281,7 +281,10 @@ private fun TranscriptListContent(
                         .animateItem(
                             fadeInSpec = null,
                             placementSpec = controller.placementSpring?.spec(),
-                            fadeOutSpec = if (item == TranscriptItemID.Empty || !controller.fadesRemovals) null else androidx.compose.animation.core.tween((RowEntrance.EXIT_DURATION * 1000).toInt(), easing = androidx.compose.animation.core.CubicBezierEasing(0f, 0f, 0.58f, 1f)) /* iOS .curveEaseOut */,
+                            // Working handing off to the reply's end has already become it (iOS `handsOff`): no fade.
+                            fadeOutSpec = if (item == TranscriptItemID.Empty || !controller.fadesRemovals ||
+                                (item == TranscriptItemID.Working && configuration.workingHandsOffToCopy)
+                            ) null else androidx.compose.animation.core.tween((RowEntrance.EXIT_DURATION * 1000).toInt(), easing = androidx.compose.animation.core.CubicBezierEasing(0f, 0f, 0.58f, 1f)) /* iOS .curveEaseOut */,
                         )
                         .fillMaxWidth()
                         .wrapContentWidth()
