@@ -67,6 +67,14 @@ class SendLanding {
     /** Whether the host holds a send's words waiting for the list (iOS `sendTransition.isPrepared`). */
     var isAwaitingSend: () -> Boolean = { false }
 
+    /**
+     * Where a new last row's bottom will rest once the follower brings it in (window px): the
+     * list's visible area above its bottom padding. A flight whose bubble is still below the
+     * screen aims here at once (iOS lays the off-screen bubble out at the end, `moveOffset`),
+     * and retargets onto the bubble as it comes into view.
+     */
+    var listEnd: androidx.compose.ui.geometry.Rect? = null
+
     /** The last send generation a list saw, so a list made for the session a draft's send created still lands it. */
     var lastSendGeneration: Int = 0
 
