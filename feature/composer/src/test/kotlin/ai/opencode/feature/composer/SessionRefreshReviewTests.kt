@@ -28,7 +28,7 @@ import kotlin.time.Duration.Companion.seconds
  * `SharedLocationTests` ([SharedLocation], [LocationClient], [ComposerAttachmentsFeature],
  * [ComposerLocationEntrance]). The `SessionFeature` tests and
  * `composerFoldLayoutMatches…` (`ComposerFoldFrames`) are `:feature:session`'s;
- * `theTranscriptShowsTheCardAndOnlyTheTypedText` is `:feature:transcript`'s.
+ * `theTranscriptShowsTheCardAndOnlyTheTypedText` is `:feature:transcript`'s (ported there).
  *
  * Robolectric: the map stub is an `ImageBitmap` (an Android `Bitmap`); iOS's is a `UIImage()`.
  * Time is the test scheduler's virtual time (iOS waits the real 1.2 s).
