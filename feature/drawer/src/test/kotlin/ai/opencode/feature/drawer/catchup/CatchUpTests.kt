@@ -62,9 +62,9 @@ import kotlin.coroutines.cancellation.CancellationException
  *   the main `Looper` (Robolectric, not in this project). The same-session reuse is a composable's.
  * - `hostedTwelveCardCatchUpOpenSwipeAndExitProfile`: UIKit-hosted profile (UIWindow,
  *   UIHostingController, `PlaygroundSessionHost`, Mach RSS); no Android counterpart.
- * - `catchUpPreviewRefreshesWhenPreviewTranscriptIsPrefetchedOrRefreshed`: ported without its
- *   `CatchUpPreviewStores`/`withObservationTracking` half (same reason); `previewRevision` and
- *   every state change are asserted exhaustively.
+ * - `catchUpPreviewRefreshesWhenPreviewTranscriptIsPrefetchedOrRefreshed` and
+ *   `previewStoresPreserveFirstFrameFlag…` are in `CatchUpPreviewStoresTests.kt`: the preview's
+ *   real `Store` needs Android's main looper (Robolectric).
  */
 class CatchUpTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -759,53 +759,6 @@ class CatchUpTests {
         }
         val exiting = store.state.stack
         store.send(CatchUpFeature.Action.ExitTapped) { it.copy(stack = null, exitingStack = exiting) }
-        store.finish()
-    }
-
-    @Test fun catchUpPreviewRefreshesWhenPreviewTranscriptIsPrefetchedOrRefreshed() = runTest {
-        val now = Instant.ofEpochSecond(100)
-        var initial = home()
-        initial = initial.withCatchUp(CatchUpFeature.Stack(queue = listOf("waiting", "newer", "older"), returnSessionID = "read"))
-        initial = initial.openingCatchUpCard().first
-
-        val store = TestStore(initial, HomeFeature(), this) {
-            this[Clock] = ImmediateClock()
-            this[DateClient] = DateClient.constant(now)
-            this[HomeSnapshotDate] = DateClient.constant(now)
-            this[OpenCodeClient] = this[OpenCodeClient].copy(
-                transcript = { _, _, _ -> listOf(OpenCodeTranscriptItem.UserText(id = "u_refreshed", text = "Refreshed preview")) },
-            )
-        }
-
-        assertEquals(0, store.state.previewRevision)
-
-        // 1. Prefetching a session behind the preview card ("older") does not bump previewRevision.
-        val olderItems = listOf(OpenCodeTranscriptItem.UserText(id = "u_older", text = "Older card"))
-        store.send(Action.TranscriptPrefetched(sessionID = "older", items = olderItems)) {
-            store.withDependencies { it.publishingTranscript("older", olderItems).persistingTranscriptCache(including = "older") }
-        }
-        assertEquals(0, store.state.previewRevision)
-
-        // 2. Prefetching the Catch Up preview session ("newer") bumps previewRevision.
-        val prefetchedItems = listOf(OpenCodeTranscriptItem.UserText(id = "u_prefetched", text = "Prefetched preview"))
-        store.send(Action.TranscriptPrefetched(sessionID = "newer", items = prefetchedItems)) {
-            store.withDependencies {
-                it.publishingTranscript("newer", prefetchedItems).persistingTranscriptCache(including = "newer")
-            }.copy(previewRevision = 1)
-        }
-        assertEquals(1, store.state.previewRevision)
-
-        // 3. Refreshing the cached transcript for "newer" bumps previewRevision again.
-        val refreshedItems = listOf(OpenCodeTranscriptItem.UserText(id = "u_refreshed", text = "Refreshed preview"))
-        store.send(Action.DrawerRowPressed("newer")) { it.copy(refreshingTranscripts = setOf("newer")) }
-        store.receive(Action.CachedTranscriptRefreshed(sessionID = "newer", items = refreshedItems)) {
-            store.withDependencies {
-                it.copy(refreshingTranscripts = emptySet(), transcriptReadAt = it.transcriptReadAt + ("newer" to now))
-                    .publishingTranscript("newer", refreshedItems)
-                    .persistingTranscriptCache(including = "newer")
-            }.copy(previewRevision = 2)
-        }
-        assertEquals(2, store.state.previewRevision)
         store.finish()
     }
 }

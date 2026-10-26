@@ -39,20 +39,10 @@ import java.util.concurrent.atomic.AtomicInteger
  *   (`ProjectMark`, `OpenCodeProjectIcon`) and `decodesProjectUpdatedStreamFrame`
  *   (`OpenCodeClient.decodeStreamFrame`): `:server`.
  *
- * Deleted (need Android's graphics stack; Robolectric isn't in the build, and these assert on
- * decoded pixels, which only a real `ImageDecoder`/`Bitmap`/`Canvas` produce):
- * - `rasterizesSVGAndClassifiesFullBleedAndTransparentGlyphs`
- * - `composerWrapperRendersItsLayerAndBackground`
- * - `embeddedImagesStayLocalAndBounded` (its `ProjectSVGPaint.color` rows go through
- *   `android.graphics.ColorSpace`, a stub under JVM tests)
- *
- * Partially ported (the parts that don't decode an image):
- * - `serverDataURLsCacheLocallyAndRefreshWhenContentChanges`: a content change makes a new cache
- *   key; nothing is fetched for a data URL's request.
- * - `loaderCachesOnDiskCoalescesAndRespectsLowDataMode`: Low Data Mode defers without fetching or
- *   caching; external URLs never get the server's credentials or headers; scheme-relative URLs are
- *   rejected; a cached 404 answers synchronously. The decoded-icon steps (coalesced 200, disk
- *   reload, built-in OpenCode icon, ETag/304 reuse) need the decoder.
+ * Rendering and loader tests that decode images (`rasterizesSVG…`, `composerWrapperRenders…`,
+ * `embeddedImagesStayLocalAndBounded`, `serverDataURLsCacheLocally…`, `loaderCachesOnDisk…`)
+ * are in `ProjectIconRenderTests.kt`: they need real `ImageDecoder`/`Bitmap`/`Canvas` pixels
+ * (Robolectric, native graphics).
  */
 class ProjectIconTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -102,81 +92,6 @@ class ProjectIconTests {
             cached,
         )
         store.finish()
-    }
-
-    @Test
-    fun serverDataURLsCacheLocallyAndRefreshWhenContentChanges() {
-        val server = OpenCodeServer(url = "https://example.com", username = "opencode", password = "")
-        val old = OpenCodeProject(id = "p", name = "Project", directory = "/code", icon = OpenCodeProjectIcon(url = cachedSVG))
-        val request = requireNotNull(old.iconRequest(server))
-        assertTrue("A data URL never revalidates", request.isVersioned)
-        val markup = String(requireNotNull(ProjectIcon.decodeDataURL(cachedSVG)), Charsets.UTF_8)
-        val changed = old.copy(
-            icon = OpenCodeProjectIcon(url = "data:image/svg+xml;base64," + Base64.getEncoder().encodeToString(markup.replace("white", "#00ff00").toByteArray())),
-        )
-        val next = requireNotNull(changed.iconRequest(server))
-        assertNotEquals(request.cacheKey, next.cacheKey)
-    }
-
-    @Test
-    fun loaderCachesOnDiskCoalescesAndRespectsLowDataMode() = runTest {
-        val directory = folder.newFolder("project-icons-test")
-        val server = OpenCodeServer(
-            url = "https://studio.tail.ts.net:4096",
-            username = "opencode",
-            password = "secret-password",
-            headers = listOf(OpenCodeServer.Header("CF-Access-Client-Id", "id-1")),
-        )
-        val request = ProjectIconRequest(server = server, projectID = "prj_hex", source = "/assets/hex.svg?v=hash1")
-        val fetchCount = AtomicInteger(0)
-
-        // Under Low Data Mode, network fetches defer without hitting the network or caching `missing`.
-        val loader = ProjectIconLoader(
-            fetch = { _, _, _ ->
-                fetchCount.incrementAndGet()
-                throw IOException("offline")
-            },
-            directory = directory,
-            now = { Instant.ofEpochSecond(1_700_000_000) },
-            isConstrained = { true },
-            scope = backgroundScope,
-        )
-        assertEquals(ProjectIconResult.Deferred, loader.load(request))
-        assertEquals(0, fetchCount.get())
-        assertNull(loader.cached(request))
-
-        // External URLs never receive the server's Authorization or custom headers, and
-        // scheme-relative `//host` URLs are rejected outright.
-        val externalBuilt = ProjectIconLoader.buildURLRequest("https://opencode.ai/favicon.svg", server)
-        assertEquals(false, externalBuilt?.second)
-        assertNull(externalBuilt?.first?.header("Authorization"))
-        assertNull(externalBuilt?.first?.header("CF-Access-Client-Id"))
-        val serverBuilt = requireNotNull(ProjectIconLoader.buildURLRequest(request.source, server))
-        assertTrue(serverBuilt.second)
-        assertNotNull(serverBuilt.first.header("Authorization"))
-        assertEquals("id-1", serverBuilt.first.header("CF-Access-Client-Id"))
-
-        assertNull(ProjectIconLoader.buildURLRequest("//evil.example.com/icon.svg", server))
-        val schemeRelativeReq = ProjectIconRequest(server = server, projectID = "prj_1", source = "//evil.example.com/icon.svg?v=1")
-        assertFalse(schemeRelativeReq.isVersioned)
-        assertEquals("//evil.example.com/icon.svg?v=1", schemeRelativeReq.resolvedURLString)
-
-        // A cached `missing` (e.g. 404) is answered synchronously by `cached`, so the drawer's
-        // project tile doesn't start a load on every appearance.
-        val missingLoader = ProjectIconLoader(
-            fetch = { _, _, _ ->
-                fetchCount.incrementAndGet()
-                ProjectIconLoader.FetchResponse(ByteArray(0), 404, Headers.headersOf())
-            },
-            directory = directory,
-            now = { Instant.ofEpochSecond(1_700_000_150) },
-            scope = backgroundScope,
-        )
-        val missingRequest = ProjectIconRequest(server = server, projectID = "prj_404", source = "/assets/missing.svg?v=none")
-        val before404 = fetchCount.get()
-        assertEquals(ProjectIconResult.Missing, missingLoader.load(missingRequest))
-        assertEquals(before404 + 1, fetchCount.get())
-        assertEquals(ProjectIconResult.Missing, missingLoader.cached(missingRequest))
     }
 
     private companion object {

@@ -1,5 +1,20 @@
 package ai.opencode.feature.drawer.icons
 
+import ai.opencode.server.OpenCodeServer
+import ai.opencode.server.model.OpenCodeProject
+import ai.opencode.server.model.OpenCodeProjectIcon
+import java.io.IOException
+import java.time.Instant
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.test.runTest
+import okhttp3.Headers
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
+import org.junit.Rule
+import org.junit.rules.TemporaryFolder
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -17,14 +32,16 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * iOS `ProjectIconTests`' rendering tests (`rasterizesSVGAndClassifiesFullBleedAndTransparentGlyphs`,
- * `composerWrapperRendersItsLayerAndBackground`, `embeddedImagesStayLocalAndBounded`), apart from
- * `ProjectIconTests.kt` because they need real Android pixels: Robolectric's native graphics.
+ * iOS `ProjectIconTests`' tests that decode images (`rasterizesSVGAndClassifiesFullBleedAndTransparentGlyphs`,
+ * `composerWrapperRendersItsLayerAndBackground`, `embeddedImagesStayLocalAndBounded`,
+ * `serverDataURLsCacheLocallyAndRefreshWhenContentChanges`, `loaderCachesOnDiskCoalescesAndRespectsLowDataMode`),
+ * apart from `ProjectIconTests.kt` because they need real Android pixels: Robolectric's native graphics.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ProjectIconRenderTests {
+    @get:Rule val folder = TemporaryFolder()
 
     private fun png(width: Int, height: Int, draw: (Canvas) -> Unit): ByteArray {
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
@@ -148,5 +165,158 @@ class ProjectIconRenderTests {
         assertNotNull(image)
         assertTrue(Color.red(image!!.getPixel(48, 10)) > 240)
         assertTrue(Color.blue(image.getPixel(48, 85)) > 240)
+    }
+
+    private val cachedSVG = "data:image/svg+xml;base64," + b64(
+        """<svg viewBox="0 0 64 64"><rect width="64" height="64" fill="#111111"/><rect x="16" y="16" width="32" height="32" fill="white"/></svg>""".toByteArray(),
+    )
+
+    @Test
+    fun serverDataURLsCacheLocallyAndRefreshWhenContentChanges() = runTest {
+        val directory = folder.newFolder("data-url-icons")
+        val fetches = AtomicInteger(0)
+        val offline = ProjectIconLoader.Fetch { _, _, _ -> fetches.incrementAndGet(); throw IOException("offline") }
+        val loader = ProjectIconLoader(offline, directory, isConstrained = { true }, scope = backgroundScope)
+        val client = ProjectIconClient(loader)
+        val server = OpenCodeServer(url = "https://example.com", username = "opencode", password = "")
+        val old = OpenCodeProject(id = "p", name = "Project", directory = "/code", icon = OpenCodeProjectIcon(url = cachedSVG))
+        val request = requireNotNull(old.iconRequest(server))
+        val loaded = client.load(request)
+        assertNotNull(loaded.icon)
+        assertEquals(loaded, client.cached(request))
+        val cold = ProjectIconLoader(offline, directory, scope = backgroundScope)
+        assertEquals(loaded, cold.load(request))
+        val markup = String(requireNotNull(ProjectIcon.decodeDataURL(cachedSVG)), Charsets.UTF_8)
+        val changed = old.copy(icon = OpenCodeProjectIcon(url = "data:image/svg+xml;base64," + b64(markup.replace("white", "#00ff00").toByteArray())))
+        val next = requireNotNull(changed.iconRequest(server))
+        assertNotEquals(request.cacheKey, next.cacheKey)
+        assertNotEquals(loaded, client.load(next))
+        assertEquals(0, fetches.get())
+    }
+
+    @Test
+    fun loaderCachesOnDiskCoalescesAndRespectsLowDataMode() = runTest {
+        val directory = folder.newFolder("project-icons-test")
+        val svgBytes = """
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+              <rect width="64" height="64" rx="14" fill="#0b0c0e"/>
+              <path d="M17 16v32M47 16v32M17 32h30" fill="none" stroke="#f2f2ef" stroke-width="6" stroke-linecap="round"/>
+            </svg>
+        """.trimIndent().toByteArray()
+        val server = OpenCodeServer(
+            url = "https://studio.tail.ts.net:4096", username = "opencode", password = "secret-password",
+            headers = listOf(OpenCodeServer.Header("CF-Access-Client-Id", "id-1")),
+        )
+        val request = ProjectIconRequest(server = server, projectID = "prj_hex", source = "/assets/hex.svg?v=hash1")
+        val fetchCount = AtomicInteger(0)
+        var constrained = true
+        val capturedAuth = AtomicReference<String?>(null)
+        val capturedHeader = AtomicReference<String?>(null)
+        val loader = ProjectIconLoader(
+            fetch = { urlRequest, _, isServerRoute ->
+                fetchCount.incrementAndGet()
+                capturedAuth.set(urlRequest.header("Authorization"))
+                capturedHeader.set(urlRequest.header("CF-Access-Client-Id"))
+                assertTrue(isServerRoute)
+                delay(20)
+                ProjectIconLoader.FetchResponse(svgBytes, 200, Headers.headersOf("Content-Type", "image/svg+xml"))
+            },
+            directory = directory,
+            now = { Instant.ofEpochSecond(1_700_000_000) },
+            isConstrained = { constrained },
+            scope = backgroundScope,
+        )
+
+        // Under Low Data Mode, network fetches defer without hitting the network or caching `missing`.
+        assertEquals(ProjectIconResult.Deferred, loader.load(request))
+        assertEquals(0, fetchCount.get())
+        assertNull(loader.cached(request))
+
+        // Once unconstrained, concurrent loads coalesce into one authenticated server request.
+        constrained = false
+        val first = async { loader.load(request) }
+        val second = async { loader.load(request) }
+        val r1 = first.await()
+        val r2 = second.await()
+        assertNotNull(r1.icon)
+        assertEquals(r1, r2)
+        assertEquals(1, fetchCount.get())
+        assertNotNull(capturedAuth.get())
+        assertEquals("id-1", capturedHeader.get())
+        assertNotNull(loader.cached(request)?.icon)
+
+        // A fresh loader over the same disk directory reads from disk without fetching again.
+        val coldLoader = ProjectIconLoader(
+            fetch = { _, _, _ -> fetchCount.incrementAndGet(); throw IOException("offline") },
+            directory = directory,
+            now = { Instant.ofEpochSecond(1_700_000_100) },
+            scope = backgroundScope,
+        )
+        assertEquals(r1, coldLoader.load(request))
+        assertEquals(1, fetchCount.get())
+
+        // External URLs never receive the server's Authorization or custom headers, and
+        // scheme-relative `//host` URLs are rejected outright.
+        val externalBuilt = ProjectIconLoader.buildURLRequest("https://opencode.ai/favicon.svg", server)
+        assertEquals(false, externalBuilt?.second)
+        assertNull(externalBuilt?.first?.header("Authorization"))
+        assertNull(externalBuilt?.first?.header("CF-Access-Client-Id"))
+        assertNull(ProjectIconLoader.buildURLRequest("//evil.example.com/icon.svg", server))
+        val schemeRelativeReq = ProjectIconRequest(server = server, projectID = "prj_1", source = "//evil.example.com/icon.svg?v=1")
+        assertFalse(schemeRelativeReq.isVersioned)
+        assertEquals("//evil.example.com/icon.svg?v=1", schemeRelativeReq.resolvedURLString)
+
+        // A cached `missing` (e.g. 404) is answered synchronously by `cached`, so the drawer's
+        // project tile doesn't start a load on every appearance.
+        val missingLoader = ProjectIconLoader(
+            fetch = { _, _, _ -> fetchCount.incrementAndGet(); ProjectIconLoader.FetchResponse(ByteArray(0), 404, Headers.headersOf()) },
+            directory = directory,
+            now = { Instant.ofEpochSecond(1_700_000_150) },
+            scope = backgroundScope,
+        )
+        val missingRequest = ProjectIconRequest(server = server, projectID = "prj_404", source = "/assets/missing.svg?v=none")
+        val before404 = fetchCount.get()
+        assertEquals(ProjectIconResult.Missing, missingLoader.load(missingRequest))
+        assertEquals(before404 + 1, fetchCount.get())
+        assertEquals(ProjectIconResult.Missing, missingLoader.cached(missingRequest))
+
+        // Built-in OpenCode project IDs resolve without network access even when constrained.
+        constrained = true
+        val beforeOpenCode = fetchCount.get()
+        val openCodeRequest = requireNotNull(
+            OpenCodeProject(id = "012780c4098d08caa4ea8c479ed0a4690489f38d", name = "opencode", directory = "/code/opencode").iconRequest(server),
+        )
+        assertNotNull(loader.load(openCodeRequest).icon)
+        assertEquals(beforeOpenCode, fetchCount.get())
+
+        // Unversioned image URLs (`private, no-cache` + `ETag`) send `If-None-Match` and reuse on 304.
+        constrained = false
+        val ifNoneMatch = AtomicReference<String?>(null)
+        val unversionedCalls = AtomicInteger(0)
+        val etagLoader = ProjectIconLoader(
+            fetch = { urlRequest, _, _ ->
+                val call = unversionedCalls.incrementAndGet()
+                ifNoneMatch.set(urlRequest.header("If-None-Match"))
+                if (call == 1) {
+                    ProjectIconLoader.FetchResponse(
+                        svgBytes, 200,
+                        Headers.headersOf("Content-Type", "image/svg+xml", "ETag", "\"etag-v1\"", "Cache-Control", "private, no-cache"),
+                    )
+                } else {
+                    ProjectIconLoader.FetchResponse(ByteArray(0), 304, Headers.headersOf("ETag", "\"etag-v1\"", "Cache-Control", "private, no-cache"))
+                }
+            },
+            directory = directory,
+            now = { Instant.ofEpochSecond(1_700_000_200) },
+            scope = backgroundScope,
+        )
+        val unversionedRequest = ProjectIconRequest(server = server, projectID = "prj_unversioned", source = "/assets/unversioned.svg")
+        val firstUnversioned = etagLoader.load(unversionedRequest)
+        assertNotNull(firstUnversioned.icon)
+        assertNull(ifNoneMatch.get())
+        val secondUnversioned = etagLoader.load(unversionedRequest)
+        assertEquals(firstUnversioned, secondUnversioned)
+        assertEquals("\"etag-v1\"", ifNoneMatch.get())
+        assertEquals(2, unversionedCalls.get())
     }
 }

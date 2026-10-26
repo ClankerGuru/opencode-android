@@ -63,14 +63,14 @@ Kotlin file per iOS file, split by topic where large). Every test that drives a 
 store or Home state lives here, whichever iOS file it came from (no other module can see Home).
 Shared support: `HomeFeatureTestSupport.kt`, `SystemIntegrationTestSupport.kt`,
 `VoiceHomeTestSupport.kt`. Robolectric (test-only, native graphics) runs only
-`icons/ProjectIconRenderTests` and `catchup/CatchUpPreviewStoresTests`. `./gradlew
+`icons/ProjectIconRenderTests` (decoded pixels, loader's decoding steps) and `catchup/CatchUpPreviewStoresTests` (the preview's real `Store` on the main looper). `./gradlew
 :feature:drawer:testDebugUnitTest`: 400+ tests, offline, virtual time.
 
 | iOS file | Kotlin | Ported | Left elsewhere / deleted (reason) |
 | --- | --- | --- | --- |
 | `HomeFeatureTests.swift` | `HomeFeatureTests.kt`, `HomeFeatureTestsDrawer.kt`, `HomeFeatureTestsNavigation.kt`, `HomeFeatureTestsSessionSwitch.kt`, `HomeFeatureTestsFirstSend.kt` | 78 | 3 transcript-cache tests → `:server` `TranscriptCachePersistenceTests.kt` (`:server` types only); deleted `homeCPUPerformance`, `switchingCPUPerformance` (opt-in timing benchmarks, no assertions) |
 | `HomeChildFeatureTests.swift` | `HomeChildFeatureTests.kt` | 7 of 9 | 2 → `:feature:settings` (`HomeSettingsFeature`) |
-| `CatchUpTests.swift` | `catchup/CatchUpTests.kt`, `catchup/CatchUpPreviewStoresTests.kt` | 31 of 32 | deleted `hostedTwelveCardCatchUpOpenSwipeAndExitProfile` (UIWindow/Mach memory profile); `catchUpPreviewRefreshes…` without its preview-store observation half |
+| `CatchUpTests.swift` | `catchup/CatchUpTests.kt`, `catchup/CatchUpPreviewStoresTests.kt` | 31 of 32 | deleted `hostedTwelveCardCatchUpOpenSwipeAndExitProfile` (UIWindow/Mach memory profile); the two preview-store tests run under Robolectric (`CatchUpPreviewStoresTests`) |
 | `CatchUpFinishTests.swift` | `catchup/CatchUpFinishTests.kt` | 12 | – |
 | `SessionSwitcherTests.swift` | `switcher/SessionSwitcherTests.kt` | 7 | – |
 | `InAppNoticeTests.swift` | `notices/InAppNoticeTests.kt` | 18 of 20 | 2 → `:feature:system` (notification presentation/content) |
@@ -80,7 +80,7 @@ Shared support: `HomeFeatureTestSupport.kt`, `SystemIntegrationTestSupport.kt`,
 | `DrawerKeyboardTests.swift` | `motion/DrawerKeyboardTests.kt` | 13 of 16 | deleted 2 (keys following the card need a real window and IME); 1 → `:feature:transcript` |
 | `DrawerTitleFadeTests.swift` | `list/DrawerTitleFadeTests.kt` | 7 of 9 | deleted `aRelayoutMidRevealKeepsTheFadeAtTheEdge` (Compose recomputes the mask each frame), `catchUpFocusFindsItsElement` (UIKit view walk) |
 | `DrawerActivityTests.swift` | `DrawerActivityTests.kt` | 17 of 19 | 2 `AppFeature` tests → `:app`; tunables test checks defaults only (no Tuning Panel) |
-| `ProjectIconTests.swift` | `icons/ProjectIconTests.kt`, `icons/ProjectIconRenderTests.kt` | 6 of 10 | `experimentalFlagIsOffByDefault` → `:core`; 3 decoding tests → `:server` (`ProjectMark`, `OpenCodeProjectIcon`, stream frame) |
+| `ProjectIconTests.swift` | `icons/ProjectIconTests.kt`, `icons/ProjectIconRenderTests.kt` (Robolectric: everything that decodes an image, loader included) | 6 of 10 | `experimentalFlagIsOffByDefault` → `:core`; 3 decoding tests → `:server` (`ProjectMark`, `OpenCodeProjectIcon`, stream frame) |
 | `ServerSwitchingTests.swift` | `ServerSwitchingTests.kt` | 3 (Home) | names/headers → `:server`; `ServerTitleFeature` → `:feature:settings`; `AppFeature` → `:app` |
 | `ServerTitleRecoveryTests.swift`, `ServerQuietStyleTests.swift`, `ConnectionHealthTests.swift` | – | 0 | `:feature:settings`/`:app` types only (ported there) |
 | `FamilyDiscoveryBenchmarkTests.swift` | – | 0 | deleted: opt-in real-HTTP timing benchmark of `:server`'s family discovery, no behaviour asserted |
