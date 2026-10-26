@@ -1,17 +1,42 @@
 package ai.opencode.feature.session
 
+import ai.opencode.feature.composer.DictationDrag
 import ai.opencode.feature.composer.DictationFeature
 import ai.opencode.feature.session.SessionFeature.State.TaskIdentity
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * The `:feature:session` test of iOS `OpenCodeTests/DictationHoldTrackerTests.swift`
- * ([DictationHoldRetention], `DictationViews.kt`); the tracker and mic press tests are
- * `:feature:composer`'s. iOS mutates the retention in place; Android's is a value, reassigned.
+ * The `:feature:session` tests of iOS `OpenCodeTests/DictationHoldTrackerTests.swift`
+ * ([DictationHoldRetention], [DictationBarPose], `DictationViews.kt`); the tracker and mic press
+ * tests are `:feature:composer`'s. iOS mutates the retention in place; Android's is a value,
+ * reassigned; so are [DictationHoldVisuals]' `begin()`/`end()`.
  */
 class DictationHoldTrackerTests {
+    /**
+     * What one recording's hold showed never carries into the next: the second starts at the
+     * mic's size, with no lock target or chevrons.
+     */
+    @Test fun aSecondDictationStartsWithNoCircleOrGuides() {
+        // The first: held long enough to grow, then slid up to lock.
+        val visuals = DictationHoldVisuals().begin().copy(showsGuides = true)
+        for (start in listOf(false, true)) {
+            // Ended (the bar left), or a new press began without an end between.
+            val next = if (start) visuals.begin() else visuals.end()
+            val pose = DictationBarPose(
+                hold = DictationFeature.Hold(text = ""),
+                phase = DictationFeature.Phase.Preparing,
+                drag = DictationDrag(),
+                reducedMotion = false,
+                visuals = next,
+            )
+            assertFalse("start: $start", pose.guidesShown)
+            assertFalse("start: $start", pose.showsGrownCircle)
+        }
+    }
+
     /**
      * Switching sessions or drafts (or a dictation dropped on switch) immediately hides the
      * previous session's leaving hold and folded-composer state on the new `taskIdentity`,

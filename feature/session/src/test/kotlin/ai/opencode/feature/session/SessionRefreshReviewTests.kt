@@ -54,7 +54,7 @@ import kotlin.math.max
  * (SharedLocation / ComposerAttachmentsFeature, :feature:composer). Ported here:
  * `composerFoldLayoutMatchesMainWhenNoLocationIsMountedIncludingPreparingDictationRow`
  * (`ComposerFoldFrames` lives in this module's `ComposerViews.kt`);
- * `theTranscriptShowsTheCardAndOnlyTheTypedText` (TranscriptUserMessage, :feature:transcript).
+ * `theTranscriptShowsTheCardAndOnlyTheTypedText` (TranscriptUserMessage, :feature:transcript, ported there).
  */
 class SessionRefreshReviewTests {
     private val server = OpenCodeServer(url = "http://localhost:9", username = "", password = "")

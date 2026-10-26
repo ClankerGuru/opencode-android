@@ -71,55 +71,56 @@ Parameterized iOS tests loop over their arguments. Each file's KDoc lists what i
 | `SessionFeatureTests+AgentSelection.swift` | `SessionFeatureTestsAgentSelection.kt` | 11 | — |
 | `SessionFeatureTests+Composer.swift` | `SessionFeatureTestsComposer.kt` | 7 | `composerTextViewReturnKeyType…` deleted (UITextView probe) |
 | `SessionFeatureTests+Dictation.swift` | `SessionFeatureTestsDictation.kt` | 16 | — |
-| `SessionFeatureTests+FailedSends.swift` | `SessionFeatureTestsFailedSends.kt` | 14 | `aFailedMessageRetriedMidRunKeepsItsRowIdentity` → `:feature:transcript` |
+| `SessionFeatureTests+FailedSends.swift` | `SessionFeatureTestsFailedSends.kt` | 14 | `aFailedMessageRetriedMidRunKeepsItsRowIdentity` → `:feature:transcript` (ported there) |
 | `SessionFeatureTests+Inbox.swift` | `SessionFeatureTestsInbox.kt` | 28 | — |
 | `SessionFeatureTests+Loading.swift` | `SessionFeatureTestsLoading.kt` | 21 | — |
 | `SessionFeatureTests+ModelPicks.swift` | `SessionFeatureTestsModelPicks.kt` | 17 | — |
 | `SessionFeatureTests+RecordingLock.swift` | `SessionFeatureTestsRecordingLock.kt` | 16 | — |
 | `SessionFeatureTests+Rendering.swift` | `SessionFeatureTestsRendering.kt` | 11 | — |
 | `SessionFeatureTests+Resume.swift` | `SessionFeatureTestsResume.kt` | 16 | — |
-| `SessionFeatureTests+Sending.swift` | `SessionFeatureTestsSending.kt` | 15 | `twoSessionsInARowEachGetStartingUpAndAFinale` → `:feature:drawer` (`HomeFeature`) |
+| `SessionFeatureTests+Sending.swift` | `SessionFeatureTestsSending.kt` | 15 | `twoSessionsInARowEachGetStartingUpAndAFinale` → `:feature:drawer` (`HomeFeature`, ported there) |
 | `SessionFeatureTests+Stop.swift` | `SessionFeatureTestsStop.kt` | 24 | — |
 | `SessionFeatureTests+Subagents.swift` | `SessionFeatureTestsSubagents.kt` | 12 | — |
 | `SessionFeatureStackBudgetTests.swift` | `SessionFeatureStackBudgetTests.kt` | 1 | Behaviour port: the history page reduces on a 300 KB-stack thread (the JVM can't paint its stack) |
 | `BackgroundWorkTests.swift` | `BackgroundWorkTests.kt` | 30 | — (size probe reads at `Int.MAX_VALUE`; `.task` cancel is `TaskEnded`) |
 | `ShareHandoffTests.swift` (`SharedImageEncoderTests`) | `ShareHandoffTestsSession.kt` | 1 (Robolectric: the composer half of `shareReencodingMatchesTheComposerAndStripsMetadata`, the share sheet's and the composer's encoders give the same bytes) | rest `:feature:system`, `ShareInboxFeatureTests` → drawer |
 | `SessionSheetTests.swift` | `SessionSheetTests.kt` | 28 | Home test → drawer; 4 `OpenCodeClient` wire tests → `:server` `SessionSheetWireTests.kt`; the compact `"32% of 400K"` line runs under Robolectric (`SessionSheetFrameworkTests`, `android.icu`) |
-| `SessionRefreshReviewTests.swift` (+ `SharedLocationTests`) | `SessionRefreshReviewTests.kt` | 24 (incl. `composerFoldLayoutMatches…` through `ComposerFoldFrames`; its `UIHostingController` measurement dropped) | 5 `SharedLocation`/`LocationClient`/`ComposerAttachmentsFeature` tests → `:feature:composer` (ported there); `theTranscriptShowsTheCard…` → `:feature:transcript` |
+| `SessionRefreshReviewTests.swift` (+ `SharedLocationTests`) | `SessionRefreshReviewTests.kt` | 24 (incl. `composerFoldLayoutMatches…` through `ComposerFoldFrames`; its `UIHostingController` measurement dropped) | 5 `SharedLocation`/`LocationClient`/`ComposerAttachmentsFeature` tests → `:feature:composer` (ported there); `theTranscriptShowsTheCard…` → `:feature:transcript` (ported there) |
 | `SinceYouLeftTests.swift` (+ `SinceYouLeftInputTests`, fixtures) | `SinceYouLeftTests.kt` | 18 | 3 UIKit list motion probes and the `TranscriptTextReveal` test → `:feature:transcript`; `SinceYouLeftEvalDump` isn't a test |
-| `SendOutboxTests.swift` | `SendOutboxTests.kt` | 35 | `retryAfterIsReadAsSecondsOrADate` → `:server` |
-| `RunErrorTests.swift` | `RunErrorTests.kt` | 19 | `eachKindNamesItsWayForward` → `:server` |
-| `RequestAnswerTests.swift` | `RequestAnswerTests.kt` | 28 | 1 → drawer, 1 → composer (`RequestDockFeature` alone), 3 UIKit layout/colour probes deleted |
-| `RequestReviewTests.swift` | `RequestReviewTests.kt` | 26 | 1 each → `:server`, `:feature:composer`, `:feature:transcript` |
+| `SendOutboxTests.swift` | `SendOutboxTests.kt` | 35 | `retryAfterIsReadAsSecondsOrADate` → `:feature:composer` (a `:server` helper; ported there) |
+| `RunErrorTests.swift` | `RunErrorTests.kt` | 19 | `eachKindNamesItsWayForward` → `:feature:transcript` (ported there) |
+| `RequestAnswerTests.swift` | `RequestAnswerTests.kt` | 28 | 1 → drawer, 1 → composer (`RequestDockFeature` alone) (both ported there), 3 UIKit layout/colour probes deleted |
+| `RequestReviewTests.swift` | `RequestReviewTests.kt` | 26 | 1 each → `:server`, `:feature:composer`, `:feature:transcript` (all ported there) |
 | `RequestPanelFitTests.swift` | — | 0 | `RequestPanelFit`/`Easing` are `:feature:composer`'s; the rest are UIKit hosting probes |
 | `SyncReconciliationTests.swift` | `SyncReconciliationTests.kt` | 8 | benchmark (`SYNC_BENCH=1`, no assertions) not ported |
 | `WorkingOrderTests.swift` | `WorkingOrderTests.kt` | 11 | 1 → composer (`PromptOutbox` alone, ported there), 2 → drawer |
-| `NewSessionDraftTests.swift` | `NewSessionDraftTests.kt` | 19 | 5 Home/App → drawer; 2 → `:server` |
+| `NewSessionDraftTests.swift` | `NewSessionDraftTests.kt` | 19 | 5 Home/App → drawer; 2 → `:server` (all ported there) |
 | `SessionLinkTests.swift` | `SessionLinkTests.kt` | 4 | 12 parsing/presentation → transcript (11 ported there, 1 UIKit redraw probe dropped); Home → drawer; URL test already in `:server` |
 | `SessionVoiceTests.swift` | `SessionVoiceTests.kt` | 7 | — |
-| `SessionHeaderStyleTests.swift` | `SessionHeaderStyleTests.kt` | 18 | 1 → composer; 7 deleted (TuningStore/Core Animation/UITextView/stack probes); 2 keep only baked defaults (no tuning store) |
+| `SessionHeaderStyleTests.swift` | `SessionHeaderStyleTests.kt` | 18 | 1 → composer (`ComposerSwipeDown`, ported there); 7 deleted (TuningStore/Core Animation/UITextView/stack probes); 2 keep only baked defaults (no tuning store) |
 | `TitleBreathTests.swift` (+ `TitleHoldTests`) | `TitleBreathTests.kt` | 15 | — |
 | `ShellGlyphTests.swift` | `ShellGlyphTests.kt` | 7 | — |
-| `AgentRevealAndOrbModelTests.swift` | `AgentRevealAndOrbModelTests.kt` | 25 | 4 reveal tests → transcript; 2 Metal shader parity tests deleted (AGSL needs a device) |
-| `ModelPickerTests.swift` | `ModelPickerTests.kt` | 15 | 29 → composer; 1 Mac-only deleted |
+| `AgentRevealAndOrbModelTests.swift` | `AgentRevealAndOrbModelTests.kt` | 25 | 4 reveal tests → transcript (ported there); 2 Metal shader parity tests deleted (AGSL needs a device) |
+| `ModelPickerTests.swift` | `ModelPickerTests.kt` | 15 | 29 → composer (ported there); 1 Mac-only deleted |
 | `ModelVisibilityTests.swift` | `ModelVisibilityTests.kt` | 5 | Rules → `:server`, Settings → `:feature:settings` |
 | `VoiceFeatureTests+Screen.swift` (deferred by voice) | `VoiceFeatureTestsScreenSession.kt` | 11 | rest in `:feature:voice` |
 | `VoiceFeatureTests.swift`, `VoiceSessionToolsTests.swift`, `FloatingCallModelTests.swift`, `VoiceRouteTests.swift`, `VoiceLiveTests.swift` (deferred by voice) | `VoiceFeatureTestsSession.kt`, `VoiceSessionToolsTestsSession.kt`, `FloatingCallModelTestsSession.kt`, `VoiceRouteTestsSession.kt`, `VoiceLiveTestsSession.kt` | 8 | Settings halves → settings, Home halves → drawer |
 | `RaiseToTalkTests.swift` (+`Routing`) | `RaiseToTalkTests.kt` | 11 | 24 raise-detector/audio-routing tests → `:feature:voice`, ported there |
-| `NewMessagesTests.swift` | `NewMessagesTests.kt` | 14 | 7 mark/placement → transcript; 3 Home → drawer |
+| `NewMessagesTests.swift` | `NewMessagesTests.kt` | 14 | 7 mark/placement → transcript; 3 Home → drawer (all ported there) |
 | `BrowserTests.swift` | `BrowserTests.kt` | 17 | policy/page-prompt/`BrowserFeature` → `:feature:media`; 9 Home → drawer; 3 → voice; WebKit/UIKit probes deleted |
 | `FileAttachmentTests.swift` | `FileAttachmentTests.kt` | 7 | types/presentation/wire/staging → core, composer, server, transcript, system |
 | `ComposerPersistenceTests.swift` | `ComposerPersistenceTests.kt` | 7 | 4 Home/App → drawer; 3 `isExcludedFromBackup` checks deleted (no Android counterpart) |
 | `PastedTextTests.swift` | `PastedTextTests.kt` | 5 | rules/wire → server, composer, transcript; 1 UIKit card probe deleted |
 | `ComposerAutocompleteTests.swift` | `ComposerAutocompleteTests.kt` | 11 | 6 → composer; prompt body → server; caret probes deleted (UIKit). `commandAction` is a fixed `Fill` (no tuning panel), so the auto-run step checks nothing sends |
-| `ComposerSessionMentionTests.swift` | `ComposerSessionMentionTests.kt` | 4 | 3 → composer, 1 → transcript, 1 → server |
+| `ComposerSessionMentionTests.swift` | `ComposerSessionMentionTests.kt` | 4 | 3 → composer, 1 → transcript, 1 → server (all ported there) |
 | `DictationAudioTests.swift` | `DictationAudioTests.kt` | 3 | `DictationAudio` suite → composer |
 | `HapticsAuditTests.swift` | `HapticsAuditTests.kt` | 20 | `homeHaptics` → drawer; App copy → `:app`; `LiveHapticsTests` → core/voice; swipe-up window checks deleted (UIKit) |
-| `TranscriptScrollBehaviorTests.swift` | `TranscriptScrollBehaviorTests.kt` | 3 | rest → transcript; 4 UIKit list probes deleted |
-| `TranscriptEntryTests.swift` | `TranscriptEntryTests.kt` | 5 (the `State` window: `windowStart`, `visibleItems`, `retainRenderedWindowStart`) | rest → transcript, `executeRows…` → `:server` |
-| `DictationHoldTrackerTests.swift` | `DictationHoldTrackerTests.kt` | 1 (`dictationHoldRetention…`, `DictationViews.kt`) | tracker/press tests → composer; `aSecondDictationStartsWithNoCircleOrGuides` stays pending here |
+| `TranscriptScrollBehaviorTests.swift` | `TranscriptScrollBehaviorTests.kt` | 4 (incl. the `ProjectionCache` half of `projectionCacheIsolates…`, Robolectric for `android.icu` stamps; its UIKit reconfigure count dropped) | rest → transcript (ported there); 4 UIKit list probes deleted |
+| `TranscriptEntryTests.swift` | `TranscriptEntryTests.kt` | 5 (the `State` window: `windowStart`, `visibleItems`, `retainRenderedWindowStart`) | rest → transcript (ported there), `executeRows…` → `:server` |
+| `DictationHoldTrackerTests.swift` | `DictationHoldTrackerTests.kt` | 2 (`aSecondDictationStarts…`, `dictationHoldRetention…`, `DictationViews.kt`) | tracker/press tests → composer (ported there) |
 | `TranscriptDragTests.swift` | `TranscriptDragTests.kt` | 1 (Robolectric: `composerDropCategorizes…` drops text and file `ClipData` on a real store through `SessionAttachmentImporter.handleComposerDrop`) | payload tests → transcript; iOS `acceptedTypes` (`UTType`s) has no counterpart |
-| `MarkdownBlockTests.swift` | — | 0 | `titleLoadingPresetsPickEachVariantAndDefaultsMatchToday` deleted: Tuning presets (`TuningStore.applyPreset`); Android bakes `TitleLoadingTunables` and its defaults are `TitleBreathTests.todaysLookUsesTheShippedBreathing`. `increaseContrastUsesSecondary…` stays pending here |
+| `TranscriptBenchmarkTests.swift` | `TranscriptBenchmarkTests.kt` | 2 (`projectionCacheTailPath…` ×2; `differsOnlyInTailAssistantMarkdown` half dropped: UIKit reconfigure fast path, the entries' tail-only change is checked instead) | `HomeFeature`/`AppFeature` tests → drawer, `:app`; env-gated benchmarks not ported |
+| `MarkdownBlockTests.swift` | `MarkdownBlockTests.kt` | 1 (`increaseContrastUsesSecondary…`, `headerProjectColor(colors)`) | `titleLoadingPresetsPickEachVariantAndDefaultsMatchToday` deleted: Tuning presets (`TuningStore.applyPreset`); Android bakes `TitleLoadingTunables` and its defaults are `TitleBreathTests.todaysLookUsesTheShippedBreathing`. The Markdown tests → transcript (ported there) |
 
 Not ported here (subject is another module): `SubagentStackTests` (`HomeFeature` → drawer;
 `backRulesLetTheEdgeWin…` → `:core` `BackSwipeRules`, `descendantsFollowTheFamilyTree` →
@@ -128,7 +129,7 @@ Not ported here (subject is another module): `SubagentStackTests` (`HomeFeature`
 `SessionFeature` test: server decoding and transcript rows). `DiagnosticsRecorderTests.headerResolutionNotifiesObserversWhenChanged`
 (deferred here by core) is n/a: Android records no resolved header style (`devtools.md`).
 
-Total (`./gradlew :feature:session:testDebugUnitTest`): 714 tests, 0 failures.
+Total (`./gradlew :feature:session:testDebugUnitTest`): 719 tests, 0 failures.
 
 Code bugs the ported tests found (each in its own commit): `:server` `decodeTranscript` dropped
 the page's cursor/context capture (`TaskLocal` gains `currentBlocking()`, mirrored by a

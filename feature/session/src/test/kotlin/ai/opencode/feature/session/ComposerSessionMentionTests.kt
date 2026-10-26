@@ -57,7 +57,7 @@ import kotlin.time.Duration.Companion.seconds
  * Not ported here (:feature:composer, `OpenCodeAutocompleteSession` / `AutocompleteTrigger` / `AutocompleteFuzzy` /
  * `ComposerAutocompleteDraftResolution` alone): `sessionTitleMatchingAndServerSearchFollowDesktop`,
  * `sessionRowsSitBetweenSubagentsAndFilesWithDesktopLimits`, `draftTextMapsSentTokensBackToChipTitles`.
- * Not ported here (:feature:transcript, `SessionLink` / `SessionLinkText` alone): `sentSessionTokensRenderAsSessionLinks`.
+ * Not ported here (:feature:transcript, `SessionLink` / `SessionLinkText` alone, ported there): `sentSessionTokensRenderAsSessionLinks`.
  * Not ported here (:server, `OpenCodeClient.promptBody` is internal to :server): the wire-body tail of
  * `sendingASessionChipSendsDesktopsTokenAndShiftsLaterMentionSpans`.
  */
