@@ -58,6 +58,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.input.pointer.util.addPointerInputChange
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
@@ -360,8 +361,9 @@ fun ModelPickerDetentsSheet(
             while (true) {
                 val event = awaitPointerEvent(PointerEventPass.Initial)
                 val change = event.changes.firstOrNull() ?: continue
-                if (change.pressed && !change.previousPressed) tracker.resetTracking()
-                tracker.addPosition(change.uptimeMillis, change.position)
+                // Local positions move with the sheet and under-report a flick. Track the
+                // original pointer samples, as UIKit's pan.velocity(in: nil) does.
+                tracker.addPointerInputChange(change)
                 val vy = tracker.calculateVelocity().y
                 downwardVelocity = with(density) { maxOf(vy, 0f).toDp().value }
             }
