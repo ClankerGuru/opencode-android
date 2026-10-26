@@ -54,6 +54,14 @@ class TestStore<S, A>(
 
     /** Every action effects send, in the order production would reduce them. */
     private val received = Channel<A>(Channel.UNLIMITED)
+
+    /**
+     * Actions sent synchronously (`Effect.send`): `Store` reduces them right after the action
+     * that sent them, ahead of anything a running effect sent meanwhile, so they come first.
+     */
+    private val immediate = ArrayDeque<A>()
+
+    private fun nextReceived(): A? = synchronized(immediate) { immediate.removeFirstOrNull() } ?: received.tryReceive().getOrNull()
     private var unhandledError: Throwable? = null
 
     var exhaustive: Boolean = true
@@ -63,7 +71,7 @@ class TestStore<S, A>(
 
     private val runner = EffectRunner<A>(
         scope = scope,
-        sendNow = { received.trySend(it) },
+        sendNow = { synchronized(immediate) { immediate.addLast(it) } },
         sendFromEffect = { received.send(it) },
         onUnhandledError = { if (unhandledError == null) unhandledError = it },
     )
@@ -90,7 +98,7 @@ class TestStore<S, A>(
     ) {
         throwUnhandled()
         while (true) {
-            val action = withTimeout(timeout) { received.receive() }
+            val action = nextReceived() ?: withTimeout(timeout) { received.receive() }
             if (matches(action)) {
                 apply(action, update, "receive($action)")
                 break
@@ -126,7 +134,7 @@ class TestStore<S, A>(
 
     private fun drain() {
         while (true) {
-            val action = received.tryReceive().getOrNull() ?: return
+            val action = nextReceived() ?: return
             apply(action, null, "skipped($action)", assert = false)
         }
     }
@@ -151,7 +159,7 @@ class TestStore<S, A>(
     }
 
     private fun assertNoUnreceived(where: String) {
-        val next = received.tryReceive().getOrNull() ?: return
+        val next = nextReceived() ?: return
         throw AssertionError("Unreceived action $where: $next")
     }
 }
