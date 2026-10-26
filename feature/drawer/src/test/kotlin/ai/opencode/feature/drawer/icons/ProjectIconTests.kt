@@ -1,6 +1,8 @@
 package ai.opencode.feature.drawer.icons
 
 import ai.opencode.core.dependencies.DateClient
+import ai.opencode.core.sharing.ExperimentalFeature
+import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.TestStore
 import ai.opencode.core.testing.TestIsolationRule
@@ -33,8 +35,10 @@ import java.util.concurrent.atomic.AtomicInteger
 /**
  * Port of iOS `ProjectIconTests.swift`, for what `:feature:drawer` owns and the JVM can run.
  *
+ * `experimentalFlagIsOffByDefault` checks `:core`'s `ExperimentalFeature.projectIcons` from here
+ * (no `:core` port covered it).
+ *
  * Other modules:
- * - `experimentalFlagIsOffByDefault` (`ExperimentalFeature.projectIcons`): `:core`'s experiments.
  * - `derivesDisplayNameAndDisambiguatedInitials`, `decodesProjectIconSchemaAndFollowsDesktopPrecedence`
  *   (`ProjectMark`, `OpenCodeProjectIcon`) and `decodesProjectUpdatedStreamFrame`
  *   (`OpenCodeClient.decodeStreamFrame`): `:server`.
@@ -47,6 +51,14 @@ import java.util.concurrent.atomic.AtomicInteger
 class ProjectIconTests {
     @get:Rule val isolation = TestIsolationRule()
     @get:Rule val folder = TemporaryFolder()
+
+    @Test
+    fun experimentalFlagIsOffByDefault() {
+        assertEquals("project-icons", ExperimentalFeature.projectIcons.rawValue)
+        assertEquals("Project Icons", ExperimentalFeature.projectIcons.title)
+        assertFalse(ExperimentalFeatures.testValue(ExperimentalFeature.projectIcons))
+        assertTrue(ExperimentalFeatures.enabling(setOf(ExperimentalFeature.projectIcons))(ExperimentalFeature.projectIcons))
+    }
 
     @Test
     fun homeFeatureAppliesProjectUpdatedEvent() = runTest {
