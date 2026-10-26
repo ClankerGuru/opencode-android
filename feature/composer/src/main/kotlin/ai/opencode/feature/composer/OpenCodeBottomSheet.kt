@@ -1,5 +1,6 @@
 package ai.opencode.feature.composer
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Box
@@ -115,6 +116,11 @@ private fun InWindowSheet(
 ) {
     val scope = rememberCoroutineScope()
     val dismiss by rememberUpdatedState(onDismissRequest)
+    // M3 enables predictive Back only once currentValue leaves Hidden. A Dialog used to
+    // consume Back during this entrance gap; keep it from reaching the Activity instead.
+    BackHandler(enabled = !sheetState.isVisible) {
+        scope.launch { sheetState.hide(); if (!sheetState.isVisible) dismiss() }
+    }
     // Match ModalBottomSheet's top-inset consumption without reducing the anchor space:
     // medium stays at half the window even when the IME appears; only its content is inset.
     val offsetInsets = remember(sheetState) {
