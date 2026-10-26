@@ -59,3 +59,24 @@ Android switch-on after the relay deploys: ship the Firebase app's `google_app_i
 - `:feature:session` (round 2b): `SessionFeature.State.absorb` (iOS `ShareInbox.swift`) is in `SessionFeatureShares.kt`; `SharedComposerDraft`/`SharedDraftTarget` sit in `:feature:composer`.
 - `:feature:drawer` (round 2b) wires the Live Activities: `HomeFeatureConnection.kt` collects `VoiceLiveActivityClient.commands()`/`DictationLiveActivityClient.commands()` on `Task` (cancellable, `CancelID.VoiceCallCommands`/`DictationCommands`); `HomeFeatureSystem.kt` routes them (End/Mute → the open session's call, or clears a stale notification when no live call owns it; Stop Recording → the subagent or session recording hands-free, or clears a stale one); `HomeFeatureComposition.kt` maps the call (`liveActivityCall`) and recording (`liveActivityRecording`, hands-free outside a call) and pushes the dictation content through `DictationLiveActivityClient.update` only when it changes. The call's content is kept in `voiceCallActivity` (AppFeature reads it) but not posted: `:feature:voice`'s `VoiceCallService` foreground notification already is the call's ongoing notification, with Mute and End.
 - `:app`: `ShareInboxClient.consume()` on foreground (`pendingSharesRequested`), `SystemIntegrationClient.actions()` (already), session notification taps arrive at `MainActivity` as `NotificationDestination.ACTION_OPEN` (sent by `SystemActionActivity`), `opencode://` links stay on `MainActivity`.
+
+## Tests
+
+iOS `OpenCodeTests` files that test `:feature:system` code, ported into `feature/system/src/test` (JVM,
+`./gradlew :feature:system:testDebugUnitTest`). Test class and method names match iOS. Suites whose store is `HomeFeature` or
+`AppFeature` are left to those modules ("skipped"); "dropped" tests can't exist as JVM unit tests.
+
+| iOS file | Kotlin file | Ported | Skipped (owner) | Dropped (reason) |
+| --- | --- | ---: | --- | --- |
+| `ShareComposerTests.swift` | `share/ShareComposerTests.kt` | 23 | `ShareComposerAppTests` (7, `:feature:drawer`); `sharesJoiningOneComposerSendOnlyWhenAllAskTo` (`SharedComposerDraft`, `:feature:composer`); `PromptOutbox.newSessionID` half of `newIDsHaveTheServersShape` (`:feature:composer`) | `removingAServerForgetsItsCredentialsOnly` (`ShareInboxClient.live` needs an Android `Context`), `keychainItemRoundTripsUpdatesAndRemoves` (Keystore-backed `SharedKey.keychain`), `extensionTransportSecurityMatchesTheApp` (ATS / `NSExtension` plist; the share target runs in-process) |
+| `ShareHandoffTests.swift` | `share/ShareHandoffTests.kt` | 4 | `ShareInboxFeatureTests` (7, `:feature:drawer`) | `SharedImageEncoderTests` (2: Android `ImageDecoder`/`Bitmap`, no Robolectric); 4 of 5 `SharedItemLoaderAndActivationTests` (`NSExtensionActivationRule`, `NSItemProvider` representation order, sparse/FIFO files, cancellation, precedence); the JSON share names of the fifth are ported via `resolvedFileName` |
+| `SystemIntegrationTests.swift` | `SystemIntegrationTests.kt` | 31 | `SystemRoutingTests` (16, Home/`AppFeature`), `SystemColdLaunchTests` (6), `SystemVoiceAvailabilityTests` (2), `SystemCallTests` (2) (`:feature:drawer`/`:app`); Home's `systemDirectoryEntry` tests (2) | `spotlightIndexesOnlyTitlesAndProjects` (AppSearch `GenericDocument` is an Android runtime class) |
+
+Notes: the handoff JSON test decodes this port's own format (Android writes and reads its own handoff files); `promptBodyMatchesTheApps`
+compares with the JSON `:server`'s internal `promptBody` writes; the app's `controlIntentsPostTheirChoice` reads `ControlIntents.perform`
+(what `SystemActionActivity` posts); the publisher runs on virtual time. `AppIconBadgeTests.swift` (the lead's) has pure
+`:feature:system` suites (`AppBadgeLedger` pushes and storage, `SessionNotifications.Saved` refs) besides its Home/App tests.
+
+Production bugs the ported tests found: none.
+
+Total: 58 `:feature:system` tests, all passing.

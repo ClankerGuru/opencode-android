@@ -67,3 +67,12 @@ Ported from iOS `OpenCodeTests/` into `core/src/test` (JVM, same names). Shared 
 | `MotionSystemTests.swift` | `motion/MotionSystemTests.kt` | 5 | empty-state → `:feature:transcript`; drawer shortcuts (4) → `:feature:drawer`; window probe deleted |
 | `RollingNumberTests.swift` | `ui/RollingNumberTests.kt` | 8 of 9 | `rollingTitleSurvivesPixelSnapping` deleted (UIWindow pixel snapping) |
 | `ThemePaletteTests.swift` | `ui/ThemePaletteTests.kt` | 5 of 8 | appearance settings → `:feature:settings`/`:feature:drawer`; `legacyTranscriptRhythmStorageIsCleanedUp` deleted (Android never wrote the key) |
+| `PerfFrameWindowTests.swift` | `diagnostics/PerfFrameWindowTests.kt` | 6 of 9 | deleted: `infoPlistEnablesProMotion120HzOnPhone` (Info.plist), `proMotion120HzFrameRateRangeAndClockIntervals` (live `CADisplayLink`; its `DrawerSpring` half → `:feature:drawer`), `transcriptFollowerDisplayLinkDoesNotRequestAbove60Hz` (`CADisplayLink` rate range) |
+| `PerfFreshTrackerTests.swift` | `diagnostics/PerfFreshTrackerTests.kt` | 4 | – |
+| `MotionWatchTests.swift` (+`MotionAuditDetectorTests`) | `diagnostics/MotionWatchTests.kt` | 9 | `recordsReplayContext…` keeps everything but its `replayContext` asserts (`PlaygroundReplayContext` is the Mac playgrounds', n/a) |
+| `TraceTests.swift` (`DiagnosticsJournalTests`, `InternalBuildTests`, `ProblemReportBundleTests`, `DiagnosticsPrivacyTests`, `CrashReportTests`) | `diagnostics/TraceTests.kt` | 14 | `TraceUploadsTests`, `screenshotsOnly…`, `diagnosticsIndexesMetricsByRequest` → `:devtools`; `VoiceTimelineTests` → `:feature:voice`; `TeamFeedbackTests` deleted (devtools.md) |
+| `GlassShapeTests.swift` | `ui/GlassShapeTests.kt` | 2 of 3 | `GlassShape.clamped` → `OpenCodeShapeGeometry.clamped`; `tuningTabsKeepTheirWholeHitTargetOnScreen` → `:devtools` |
+
+Round 2 (ui helper): no `:core` production bugs found. `InternalBuild.detect(isDebug, installingPackageName)` was pulled out of
+`isEnabled` (unchanged behaviour) so `InternalBuildTests` can check it. 141 `:core` tests in total, all passing
+(`./gradlew :core:testDebugUnitTest`).
