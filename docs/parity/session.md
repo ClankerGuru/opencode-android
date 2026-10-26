@@ -83,6 +83,7 @@ Parameterized iOS tests loop over their arguments. Each file's KDoc lists what i
 | `SessionFeatureTests+Subagents.swift` | `SessionFeatureTestsSubagents.kt` | 12 | — |
 | `SessionFeatureStackBudgetTests.swift` | `SessionFeatureStackBudgetTests.kt` | 1 | Behaviour port: the history page reduces on a 300 KB-stack thread (the JVM can't paint its stack) |
 | `BackgroundWorkTests.swift` | `BackgroundWorkTests.kt` | 30 | — (size probe reads at `Int.MAX_VALUE`; `.task` cancel is `TaskEnded`) |
+| `ShareHandoffTests.swift` (`SharedImageEncoderTests`) | `ShareHandoffTestsSession.kt` | 1 (Robolectric: the composer half of `shareReencodingMatchesTheComposerAndStripsMetadata`, the share sheet's and the composer's encoders give the same bytes) | rest `:feature:system`, `ShareInboxFeatureTests` → drawer |
 | `SessionSheetTests.swift` | `SessionSheetTests.kt` | 28 | Home test → drawer; 4 `OpenCodeClient` wire tests → `:server` `SessionSheetWireTests.kt`; the compact `"32% of 400K"` line runs under Robolectric (`SessionSheetFrameworkTests`, `android.icu`) |
 | `SessionRefreshReviewTests.swift` (+ `SharedLocationTests`) | `SessionRefreshReviewTests.kt` | 23 | 6 `SharedLocation`/`ComposerAttachmentsFeature`/`ComposerFoldLayout` tests → `:feature:composer`; `theTranscriptShowsTheCard…` → `:feature:transcript` |
 | `SinceYouLeftTests.swift` (+ `SinceYouLeftInputTests`, fixtures) | `SinceYouLeftTests.kt` | 18 | 3 UIKit list motion probes and the `TranscriptTextReveal` test → `:feature:transcript`; `SinceYouLeftEvalDump` isn't a test |
