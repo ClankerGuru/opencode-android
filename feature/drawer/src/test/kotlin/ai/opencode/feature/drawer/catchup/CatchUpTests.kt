@@ -56,15 +56,13 @@ import kotlin.coroutines.cancellation.CancellationException
  * Port of iOS `CatchUpTests.swift`: Catch Up through `HomeFeature` (stack, Undo, Mark All, mutes)
  * and `CatchUpFeature`, plus the swipe decision and snap-back spring.
  *
- * Not ported:
- * - `previewStoresPreserveFirstFrameFlagAcrossSameSessionRefreshesAndResetOnNewSession`: Android's
- *   `CatchUpPreviewStores` (private to `HomeView.kt`) builds a `core` `Store`, whose `send` needs
- *   the main `Looper` (Robolectric, not in this project). The same-session reuse is a composable's.
- * - `hostedTwelveCardCatchUpOpenSwipeAndExitProfile`: UIKit-hosted profile (UIWindow,
- *   UIHostingController, `PlaygroundSessionHost`, Mach RSS); no Android counterpart.
- * - `catchUpPreviewRefreshesWhenPreviewTranscriptIsPrefetchedOrRefreshed` and
- *   `previewStoresPreserveFirstFrameFlag…` are in `CatchUpPreviewStoresTests.kt`: the preview's
- *   real `Store` needs Android's main looper (Robolectric).
+ * Elsewhere: `catchUpPreviewRefreshesWhenPreviewTranscriptIsPrefetchedOrRefreshed` and
+ * `previewStoresPreserveFirstFrameFlagAcrossSameSessionRefreshesAndResetOnNewSession` are in
+ * `CatchUpPreviewStoresTests.kt`: the preview's real `Store` needs Android's main looper, so they
+ * run under Robolectric.
+ *
+ * Not ported: `hostedTwelveCardCatchUpOpenSwipeAndExitProfile`: UIKit-hosted profile (UIWindow,
+ * UIHostingController, `PlaygroundSessionHost`, Mach RSS); no Android counterpart.
  */
 class CatchUpTests {
     @get:Rule val isolation = TestIsolationRule()
