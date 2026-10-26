@@ -22,6 +22,7 @@ import ai.opencode.feature.session.header.SessionContextRing
 import ai.opencode.feature.session.header.SessionContextText
 import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.server.model.OpenCodeExportFormat
+import ai.opencode.server.model.isUntitled
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.animateContentSize
@@ -109,6 +110,8 @@ internal data class SessionHeaderModel(
     val contextFraction: Double?,
     val contextTokens: Int?,
     val contextLimit: Int?,
+    /** What Rename starts from: the server's title, or nothing while the session reads as its first prompt. */
+    val renameTitle: String = "",
 ) {
     /** A subagent family's root is elsewhere: Back to main session. */
     val backToRootID: String? get() = familyRootID?.takeIf { it != sessionID }
@@ -139,6 +142,7 @@ internal data class SessionHeaderModel(
                 contextFraction = state.contextFraction,
                 contextTokens = state.contextUsage?.tokens,
                 contextLimit = state.contextLimit,
+                renameTitle = state.session?.let { if (it.isUntitled) "" else it.title }.orEmpty(),
             )
         }
 
@@ -421,6 +425,7 @@ private fun SessionMenuButton(store: StoreOf<State, Action>, model: SessionHeade
             expanded = expanded,
             onDismiss = { expanded = false },
             title = model.sessionTitle ?: "Session",
+            renameTitle = model.renameTitle,
             listContext = listContext,
             send = {
                 expanded = false
@@ -436,6 +441,7 @@ private fun SessionMenu(
     expanded: Boolean,
     onDismiss: () -> Unit,
     title: String,
+    renameTitle: String,
     listContext: SessionListContext,
     send: (Action) -> Unit,
 ) {
@@ -456,7 +462,7 @@ private fun SessionMenu(
                 menu(SessionSheetFeature.Action.PinTapped)
             }
         }
-        MenuItem("Rename", SFSymbol.Pencil) { menu(SessionSheetFeature.Action.RenameTapped(currentTitle = title)) }
+        MenuItem("Rename", SFSymbol.Pencil) { menu(SessionSheetFeature.Action.RenameTapped(currentTitle = renameTitle)) }
         MenuItem("Copy Session ID", SFSymbol.SquareOnSquare) { menu(SessionSheetFeature.Action.CopySessionIDTapped) }
         if (listContext.isPinned != null) {
             MenuItem(
