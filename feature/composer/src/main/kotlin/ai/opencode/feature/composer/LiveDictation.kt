@@ -199,7 +199,18 @@ class LiveDictation(private val engine: DictationEngine) {
             val transcripts = try {
                 task.await()
             } catch (cancellation: CancellationException) {
-                if (!currentCoroutineContext().isActive) task.cancel()
+                if (!currentCoroutineContext().isActive) {
+                    task.cancel()
+                    // iOS awaits the recording even when cancelled, and cancels it the moment the
+                    // press is: here `await` returns at once, so a recording already past its
+                    // checks (the prompt answered as the press was cancelled) could still reach
+                    // the mic. Wait for it to settle, then end the press, so the mic never
+                    // outlives it.
+                    withContext(NonCancellable) {
+                        task.join()
+                        cancelNow(press)
+                    }
+                }
                 throw cancellation
             }
             // Cancelled just as it started: nobody will read it, so end it here.
