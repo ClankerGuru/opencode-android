@@ -13,12 +13,25 @@ android {
         versionName = "0.1.0" + (providers.environmentVariable("OC_VERSION_SUFFIX").orNull?.let { "-$it" } ?: "")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
+    // Google Play upload key, from CI secrets only (Play App Signing holds the app signing key).
+    // Without OC_UPLOAD_KEYSTORE the release build is unsigned, as before.
+    val uploadKeystore = providers.environmentVariable("OC_UPLOAD_KEYSTORE").orNull
+    if (uploadKeystore != null) {
+        signingConfigs.create("upload") {
+            storeFile = file(uploadKeystore)
+            storeType = "PKCS12"
+            storePassword = providers.environmentVariable("OC_UPLOAD_KEYSTORE_PASSWORD").get()
+            keyAlias = providers.environmentVariable("OC_UPLOAD_KEY_ALIAS").get()
+            keyPassword = providers.environmentVariable("OC_UPLOAD_KEYSTORE_PASSWORD").get()
+        }
+    }
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
         }
         release {
             isMinifyEnabled = false
+            if (uploadKeystore != null) signingConfig = signingConfigs.getByName("upload")
         }
         create("benchmark") {
             initWith(getByName("release"))
