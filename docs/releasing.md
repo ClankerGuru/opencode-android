@@ -25,8 +25,13 @@ re-run keeps its number and Play refuses the duplicate: push a new commit instea
   only in repo secrets (`ANDROID_UPLOAD_KEYSTORE_BASE64`, `ANDROID_UPLOAD_KEYSTORE_PASSWORD`,
   `ANDROID_UPLOAD_KEY_ALIAS`). If it's lost or leaks, request an upload key reset in Play Console
   (App integrity → App signing) with a new key's certificate; nothing else changes.
-- The Play upload uses `PLAY_SERVICE_ACCOUNT_JSON`. Without it the `play` job skips with a
-  notice and the bundle stays a workflow artifact (`opencode-android-aab-<sha>`).
+- The Play upload uses `PLAY_SERVICE_ACCOUNT_JSON`: a key for
+  `play-publisher@opencode-android-play.iam.gserviceaccount.com` (Google Cloud project
+  `opencode-android-play` in the anoma.ly org), invited in Play Console with only *View app
+  information* and *Release apps to testing tracks* on OpenCode, so it can't publish to
+  production. Rotate it with `gcloud iam service-accounts keys create` and `gh secret set`, then
+  delete the old key. Without the secret the `play` job skips with a notice and the bundle stays
+  a workflow artifact (`opencode-android-aab-<sha>`).
 - Internal testing: email list **Anomaly team** (everyone on Anomaly's Slack, up to 100).
   Testers opt in once at https://play.google.com/apps/internaltest/4698009188042349382, then
   install OpenCode from Play. Add people by editing that list in Play Console (Testing →
