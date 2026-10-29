@@ -1,7 +1,9 @@
 # OpenCode Android: agent rules
 
 A native Android port of the OpenCode iOS app (Kotlin, Jetpack Compose, Material 3 Expressive).
-Local-only repo: never create a remote or push.
+Lives at github.com/anomalyco/opencode-android-native (private). Push only when Ryan asks.
+CI (`.github/workflows/android.yml`) runs `scripts/check.sh` on every PR and push; each push to
+`main` publishes the debug APK as the `main-latest` pre-release (README, "Try it on Android").
 
 ## The iOS app is the source of truth
 

@@ -1,0 +1,35 @@
+# OpenCode for Android
+
+A native Android port of the OpenCode iOS app, in Kotlin with Jetpack Compose and Material 3
+Expressive. The iOS app is the spec: same features, flows, copy and server contract, with
+Android-native visuals. Contributor and agent rules are in [AGENTS.md](AGENTS.md); parity with
+iOS is tracked file by file in [docs/parity](docs/parity/README.md).
+
+## Try it on Android
+
+Every push to `main` builds a debug APK and publishes it as the rolling
+[`main-latest` pre-release](https://github.com/anomalyco/opencode-android-native/releases/tag/main-latest).
+It runs on Android 15 or newer.
+
+1. On your phone, sign in to GitHub in the browser (the repo is private), then open
+   [opencode-android.apk](https://github.com/anomalyco/opencode-android-native/releases/download/main-latest/opencode-android.apk).
+2. Open the downloaded file. Android asks to allow installing apps from your browser: tap
+   **Settings**, turn on **Allow from this source**, then go back and tap **Install**.
+3. Open **OpenCode** and pair with your computer: run `opencode pair --remote` there (works from
+   any network) or type `/pair` in OpenCode, then scan the code. **Enter a Server Manually**
+   works too.
+
+The version (Settings, at the bottom) ends with the commit it was built from (for example `0.1.0-6be3053`).
+Builds are debug-signed for now, so if Android says the app isn't installed when updating,
+uninstall the previous build first.
+
+To install from a computer instead: `adb install -r opencode-android.apk`.
+
+## Build
+
+```sh
+scripts/check.sh                 # assemble, lint and unit tests for every module (what CI runs)
+./gradlew :app:assembleDebug     # app/build/outputs/apk/debug/app-debug.apk
+```
+
+Needs JDK 17 and the Android SDK with platform 37.

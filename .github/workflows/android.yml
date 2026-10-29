@@ -1,0 +1,99 @@
+# Checks every pull request and push to main (scripts/check.sh: assemble, lint, unit tests).
+# Pushes to main and manual runs also publish the debug APK as the rolling `main-latest`
+# pre-release, so teammates can install the newest build without building locally.
+name: Android
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: blacksmith-8vcpu-ubuntu-2404
+    timeout-minutes: 60
+    env:
+      OC_VERSION_CODE: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Stamp the build
+        run: echo "OC_VERSION_SUFFIX=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install the SDK platform and build tools
+        run: yes | sdkmanager "platforms;android-37.0" "build-tools;37.0.0" > /dev/null
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          # Only main writes the cache, so pull requests can't evict it.
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      - name: Check (assemble, lint, unit tests)
+        run: scripts/check.sh
+
+      - name: Name the APK
+        run: cp app/build/outputs/apk/debug/app-debug.apk "opencode-android-${OC_VERSION_SUFFIX}.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: opencode-android-${{ env.OC_VERSION_SUFFIX }}
+          path: opencode-android-${{ env.OC_VERSION_SUFFIX }}.apk
+          retention-days: 30
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: reports-${{ env.OC_VERSION_SUFFIX }}
+          path: |
+            **/build/reports/
+            **/build/test-results/
+          retention-days: 7
+
+  publish:
+    needs: check
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    concurrency:
+      group: publish-main-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Short SHA
+        run: echo "SHORT=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: opencode-android-${{ env.SHORT }}
+
+      - name: Update the main-latest pre-release
+        run: |
+          cp "opencode-android-${SHORT}.apk" opencode-android.apk
+          title="main-latest · ${SHORT}"
+          notes="Debug build of main at ${GITHUB_SHA} (version 0.1.0-${SHORT}, code ${GITHUB_RUN_NUMBER}). Install steps: see the README's \"Try it on Android\"."
+          if gh release view main-latest > /dev/null 2>&1; then
+            gh api -X PATCH "repos/${GH_REPO}/git/refs/tags/main-latest" -f sha="${GITHUB_SHA}" -F force=true > /dev/null
+            gh release edit main-latest --title "$title" --notes "$notes" --prerelease
+            gh release upload main-latest opencode-android.apk --clobber
+          else
+            gh release create main-latest opencode-android.apk --prerelease --target "${GITHUB_SHA}" --title "$title" --notes "$notes"
+          fi

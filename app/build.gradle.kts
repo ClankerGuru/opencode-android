@@ -7,8 +7,10 @@ android {
     defaultConfig {
         // Matches the iOS bundle identifier.
         applicationId = "ai.opencode.mobilecode"
-        versionCode = 1
-        versionName = "0.1.0"
+        // CI stamps builds so testers can tell them apart: the workflow run number as the
+        // version code (each build installs over the last) and the short commit SHA in the name.
+        versionCode = providers.environmentVariable("OC_VERSION_CODE").orNull?.toIntOrNull() ?: 1
+        versionName = "0.1.0" + (providers.environmentVariable("OC_VERSION_SUFFIX").orNull?.let { "-$it" } ?: "")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildTypes {
