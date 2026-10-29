@@ -8,11 +8,11 @@ iOS is tracked file by file in [docs/parity](docs/parity/README.md).
 ## Try it on Android
 
 Every push to `main` builds a debug APK and publishes it as the rolling
-[`main-latest` pre-release](https://github.com/anomalyco/opencode-android-native/releases/tag/main-latest).
+[`main-latest` pre-release](https://github.com/anomalyco/opencode-android/releases/tag/main-latest).
 It runs on Android 15 or newer.
 
 1. On your phone, sign in to GitHub in the browser (the repo is private), then open
-   [opencode-android.apk](https://github.com/anomalyco/opencode-android-native/releases/download/main-latest/opencode-android.apk).
+   [opencode-android.apk](https://github.com/anomalyco/opencode-android/releases/download/main-latest/opencode-android.apk).
 2. Open the downloaded file. Android asks to allow installing apps from your browser: tap
    **Settings**, turn on **Allow from this source**, then go back and tap **Install**.
 3. Open **OpenCode** and pair with your computer: run `opencode pair --remote` there (works from
