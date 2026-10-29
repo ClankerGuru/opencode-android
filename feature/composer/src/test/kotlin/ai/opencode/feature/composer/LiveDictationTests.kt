@@ -3,6 +3,7 @@ package ai.opencode.feature.composer
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
@@ -132,6 +133,14 @@ class LiveDictationTests {
             delay(2)
         }
     }
+
+    /**
+     * The press's effect adopting its recording, as iOS's `Task { try await dictation.start(press) }`:
+     * a Swift task always runs its body, so `start` is entered even when the task is cancelled
+     * at once. A default-start coroutine cancelled before it is dispatched never would.
+     */
+    private fun adopt(dictation: LiveDictation, press: Int) =
+        background.async(start = CoroutineStart.UNDISPATCHED) { dictation.start(press) }
 
     /** Lets queued actor work run, for checks that something never happens. */
     private suspend fun settle() = delay(60)
@@ -397,7 +406,7 @@ class LiveDictationTests {
             val fake = Fake(permits = false)
             val dictation = LiveDictation(fake.engine)
             val press = dictation.begin()
-            val adopting = background.async { dictation.start(press) }
+            val adopting = adopt(dictation, press)
             until { fake.permissionsAsked.get() == 1 }
             if (end == "stop") dictation.stop(press) else dictation.cancel(press)
             fake.permissionGate.open()
@@ -437,7 +446,7 @@ class LiveDictationTests {
         val fake = Fake(permits = false)
         val dictation = LiveDictation(fake.engine)
         val press = dictation.begin()
-        val adopting = background.async { dictation.start(press) }
+        val adopting = adopt(dictation, press)
         until { fake.permissionsAsked.get() == 1 }
         fake.owner.incrementAndGet() // the call's start claims the session
         fake.permissionGate.open()
@@ -457,7 +466,7 @@ class LiveDictationTests {
         val fake = Fake(permits = false)
         val dictation = LiveDictation(fake.engine)
         val press = dictation.begin()
-        val adopting = background.async { dictation.start(press) }
+        val adopting = adopt(dictation, press)
         until { fake.permissionsAsked.get() == 1 }
         adopting.cancel()
         fake.permissionGate.open()

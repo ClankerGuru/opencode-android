@@ -192,35 +192,38 @@ class LiveDictation(private val engine: DictationEngine) {
     }
 
     /** Adopts [press]'s recording, never another press's. */
-    suspend fun start(press: Int): ReceiveChannel<String> = withContext(actor) {
+    suspend fun start(press: Int): ReceiveChannel<String> {
         val task = synchronized(presses) { presses.begun[press] } ?: throw CancellationException("No recording for the press")
-        try {
-            // The press's effect cancelled (leaving the screen): so is its recording.
-            val transcripts = try {
-                task.await()
-            } catch (cancellation: CancellationException) {
-                if (!currentCoroutineContext().isActive) {
-                    task.cancel()
-                    // iOS awaits the recording even when cancelled, and cancels it the moment the
-                    // press is: here `await` returns at once, so a recording already past its
-                    // checks (the prompt answered as the press was cancelled) could still reach
-                    // the mic. Wait for it to settle, then end the press, so the mic never
-                    // outlives it.
-                    withContext(NonCancellable) {
-                        task.join()
-                        cancelNow(press)
+        return try {
+            withContext(actor) {
+                try {
+                    // The press's effect cancelled (leaving the screen): so is its recording.
+                    val transcripts = task.await()
+                    // Cancelled just as it started: nobody will read it, so end it here.
+                    if (!currentCoroutineContext().isActive) {
+                        withContext(NonCancellable) { cancelNow(press) }
+                        throw CancellationException("Dictation press cancelled")
                     }
+                    transcripts
+                } finally {
+                    synchronized(presses) { presses.begun.remove(press) }
                 }
-                throw cancellation
             }
-            // Cancelled just as it started: nobody will read it, so end it here.
+        } catch (cancellation: CancellationException) {
             if (!currentCoroutineContext().isActive) {
-                withContext(NonCancellable) { cancelNow(press) }
-                throw CancellationException("Dictation press cancelled")
+                // iOS cancels the recording the moment the press is cancelled (even before
+                // `start` runs) and still awaits it. Here `withContext` can give up before its
+                // block runs and `await` returns at once, so a recording past its checks (the
+                // mic prompt answered as the press was cancelled) could still reach the mic with
+                // nobody to stop it. Cancel it, wait for it to settle, then end the press, so the
+                // mic never outlives it.
+                task.cancel()
+                withContext(NonCancellable) {
+                    task.join()
+                    cancel(press)
+                }
             }
-            transcripts
-        } finally {
-            synchronized(presses) { presses.begun.remove(press) }
+            throw cancellation
         }
     }
 
