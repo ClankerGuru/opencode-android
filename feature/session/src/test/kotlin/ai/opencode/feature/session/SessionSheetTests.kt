@@ -667,7 +667,7 @@ class SessionSheetTests {
             client { copy(exportSession = { _, _ -> bodies.withValue { it.drop(1) to it.first() }.getOrThrow() }) }
         }
         openSheet(store)
-        for (message in listOf("Offline", "The export couldn’t be saved.")) {
+        for (message in listOf("Offline", "Couldn’t save export")) {
             store.send(sheet(SessionSheetFeature.Action.ExportTapped(OpenCodeExportFormat.Markdown, title = "Sheet"))) {
                 it.updatingSheet { copy(operation = SessionSheetFeature.Operation.Exporting(OpenCodeExportFormat.Markdown)) }
             }

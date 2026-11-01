@@ -72,7 +72,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
@@ -446,15 +445,8 @@ private fun SessionMenu(
     val developerMode by remember { shared(SharedKeys.developerMode) }.flow.collectAsState()
     var exportOpen by remember(expanded) { mutableStateOf(false) }
     fun menu(action: SessionSheetFeature.Action) = send(Action.SessionMenu(action))
+    // No title heading: the header already shows it (6bbf321d); exports still name the file by it.
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
-        Text(
-            title,
-            style = MaterialTheme.typography.labelMedium,
-            color = OpenCodeTheme.colors.secondaryText,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp).semantics { this.heading() },
-        )
         listContext.isPinned?.let { isPinned ->
             MenuItem(if (isPinned) "Unpin" else "Pin", if (isPinned) SFSymbol.PinSlash else SFSymbol.Pin) {
                 menu(SessionSheetFeature.Action.PinTapped)

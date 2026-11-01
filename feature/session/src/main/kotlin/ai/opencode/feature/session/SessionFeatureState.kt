@@ -1106,7 +1106,7 @@ val State.recentProjects: List<OpenCodeProject>
 val State.canChooseProject: Boolean get() = session == null && outboxDraftID == null && callSessionID == null && items.isEmpty()
 
 val State.queuedInputRows: List<OpenCodeQueuedInput>
-    get() = queuedInputs.map { OpenCodeQueuedInput(it, queuedInputImages[it.id] ?: emptyList()) }
+    get() = queuedInputs.map { input -> OpenCodeQueuedInput(input, queuedInputImages[input.id]?.takeIf { it.isNotEmpty() } ?: input.images) }
 
 // endregion
 

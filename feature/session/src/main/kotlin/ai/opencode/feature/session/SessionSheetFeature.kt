@@ -245,7 +245,7 @@ class SessionSheetFeature : Reducer<SessionSheetFeature.State, SessionSheetFeatu
                             } catch (cancellation: CancellationException) {
                                 throw cancellation
                             } catch (_: Exception) {
-                                throw OpenCodeClientError("The export couldn’t be saved.")
+                                throw OpenCodeClientError("Couldn’t save export")
                             }
                         }
                         send(Action.ExportFinished(result))
