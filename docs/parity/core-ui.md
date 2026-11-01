@@ -55,6 +55,7 @@ literals that aren't symbols). `(fill)` is the filled variant. Weak matches: `st
 | `arrow.counterclockwise` | `replay` | `ms_replay` | `SFSymbol.ArrowCounterclockwise` | OnboardingPlaygroundControls, TuningPanelView |
 | `arrow.down` | `arrow_downward` | `ms_arrow_downward` | `SFSymbol.ArrowDown` | ComposerViews, ShellOutputView, WhatsNewList |
 | `arrow.down.circle` | `arrow_circle_down` | `ms_arrow_circle_down` | `SFSymbol.ArrowDownCircle` | AgentImageGallery |
+| `arrow.down.circle.fill` | `arrow_circle_down` (fill) | `ms_arrow_circle_down_fill` | `SFSymbol.ArrowDownCircleFill` | VoiceProviderViews |
 | `arrow.down.right.and.arrow.up.left` | `close_fullscreen` | `ms_close_fullscreen` | `SFSymbol.ArrowDownRightAndArrowUpLeft` | TuningPanelView |
 | `arrow.left.and.right.text.vertical` | `arrow_range` | `ms_arrow_range` | `SFSymbol.ArrowLeftAndRightTextVertical` | AgentFileViewer, PastedTextViews |
 | `arrow.left.arrow.right` | `swap_horiz` | `ms_swap_horiz` | `SFSymbol.ArrowLeftArrowRight` | ConnectionCard |
@@ -138,6 +139,7 @@ literals that aren't symbols). `(fill)` is the filled variant. Weak matches: `st
 | `envelope.badge` | `mark_email_unread` | `ms_mark_email_unread` | `SFSymbol.EnvelopeBadge` | HomeView+Drawer, SessionView+Header |
 | `envelope.badge.fill` | `mark_email_unread` (fill) | `ms_mark_email_unread_fill` | `SFSymbol.EnvelopeBadgeFill` | SessionSheetView |
 | `envelope.open` | `drafts` | `ms_drafts` | `SFSymbol.EnvelopeOpen` | DrawerListSupportCells, HomeView+Drawer, SessionSheetView, SessionView+Header |
+| `exclamationmark` | `priority_high` | `ms_priority_high` | `SFSymbol.Exclamationmark` | VoiceProviderViews |
 | `exclamationmark.bubble` | `feedback` | `ms_feedback` | `SFSymbol.ExclamationmarkBubble` | SessionView+Header, WhatsNewList |
 | `exclamationmark.circle.fill` | `error` (fill) | `ms_error_fill` | `SFSymbol.ExclamationmarkCircleFill` | RequestDockView, ServerDetailsView, SettingsView, TranscriptEntryView, TranscriptUserMessage |
 | `exclamationmark.triangle` | `warning` | `ms_warning` | `SFSymbol.ExclamationmarkTriangle` | AgentFileViewer, DraftProjects, DrawerListSupportCells, FileAttachmentViews, ModelListContent, ModelPickerSheet, ModelVisibilitySettings, OnboardingPlaygroundControls, ServerDetailsView, SessionView, SessionView+ModelPicker, SettingsServers |
@@ -204,6 +206,7 @@ literals that aren't symbols). `(fill)` is the filled variant. Weak matches: `st
 | `person.2` | `group` | `ms_group` | `SFSymbol.Person2` | WhatsNewList |
 | `person.crop.circle` | `account_circle` | `ms_account_circle` | `SFSymbol.PersonCropCircle` | ExperimentalFeatures, ServerDetailsTrays |
 | `person.crop.circle.badge.checkmark` | `how_to_reg` | `ms_how_to_reg` | `SFSymbol.PersonCropCircleBadgeCheckmark` | TraceTriggers |
+| `person.fill` | `person` (fill) | `ms_person_fill` | `SFSymbol.PersonFill` | VoiceProviderViews |
 | `phone` | `call` | `ms_call` | `SFSymbol.Phone` | AgentImageGallery, AppView, ServerVoiceClient, WhatsNewList |
 | `phone.and.waveform.fill` | `phone_in_talk` (fill) | `ms_phone_in_talk_fill` | `SFSymbol.PhoneAndWaveformFill` | WhatsNewList |
 | `phone.circle.fill` | `call` (fill) | `ms_call_fill` | `SFSymbol.PhoneCircleFill` | ExperimentalFeatures |
@@ -243,6 +246,7 @@ literals that aren't symbols). `(fill)` is the filled variant. Weak matches: `st
 | `slider.horizontal.3` | `tune` | `ms_tune` | `SFSymbol.SliderHorizontal3` | SettingsServers, TuningPanelView, WhatsNewList |
 | `slider.horizontal.below.rectangle` | `instant_mix` | `ms_instant_mix` | `SFSymbol.SliderHorizontalBelowRectangle` | PlaygroundHostView |
 | `smallcircle.filled.circle` | `radio_button_checked` | `ms_radio_button_checked` | `SFSymbol.SmallcircleFilledCircle` | LinkPreviewViews |
+| `sparkle` | `star_shine` (fill) | `ms_star_shine_fill` | `SFSymbol.Sparkle` | VoiceProviderViews |
 | `sparkles` | `auto_awesome` | `ms_auto_awesome` | `SFSymbol.Sparkles` | ModelSwitchRule, SettingsView, WhatsNewEntries, WhatsNewList |
 | `speaker.wave.1` | `volume_down` | `ms_volume_down` | `SFSymbol.SpeakerWave1` | WhatsNewList |
 | `square` | `check_box_outline_blank` | `ms_check_box_outline_blank` | `SFSymbol.Square` | AgentImageGallery, MarkdownBlockView, ProjectIcon, RequestDockView |
@@ -280,6 +284,7 @@ literals that aren't symbols). `(fill)` is the filled variant. Weak matches: `st
 | `waveform.path.ecg` | `monitor_heart` | `ms_monitor_heart` | `SFSymbol.WaveformPathEcg` | ConnectionCard, DiagnosticsView |
 | `wifi` | `wifi` | `ms_wifi` | `SFSymbol.Wifi` | WhatsNewList |
 | `wifi.exclamationmark` | `wifi_tethering_error` | `ms_wifi_tethering_error` | `SFSymbol.WifiExclamationmark` | CallTrayViews, ConnectionCard |
+| `wifi.slash` | `wifi_off` | `ms_wifi_off` | `SFSymbol.WifiSlash` | VoiceProviderViews |
 | `xmark` | `close` | `ms_close` | `SFSymbol.Xmark` | AttachmentCameraView, BrowserView, DrawerSearchPill, OnboardingPlaygroundControls, RequestDockView, RequestReviewView, ServerTitleView, ShareView, ShellOutputView, SinceYouLeft, TranscriptImageViewer, TuningPanelView, VoiceView |
 | `xmark.circle` | `cancel` | `ms_cancel` | `SFSymbol.XmarkCircle` | LinkPreviewViews, TuningPanelView |
 | `xmark.circle.fill` | `cancel` (fill) | `ms_cancel_fill` | `SFSymbol.XmarkCircleFill` | ModelListContent, PhotoFlight, SessionView+Attachments, SharedLocation, ShellOutputView, TranscriptEntryView |

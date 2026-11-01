@@ -13,6 +13,7 @@ all_inbox fill                      # tray.full.fill
 alternate_email                     # at
 app_badging                         # app.badge
 arrow_circle_down                   # arrow.down.circle
+arrow_circle_down fill              # arrow.down.circle.fill
 arrow_circle_up                     # arrow.up.circle
 arrow_circle_up fill                # arrow.up.circle.fill
 arrow_downward                      # arrow.down
@@ -161,6 +162,7 @@ pan_tool_alt                        # hand.point.up.left
 pan_tool_alt fill                   # hand.point.up.left.fill
 pause fill                          # pause.fill
 pending                             # ellipsis.circle
+person fill                         # person.fill
 phone_in_talk fill                  # phone.and.waveform.fill
 photo_camera                        # camera
 photo_camera fill                   # camera.fill
@@ -170,6 +172,7 @@ plagiarism                          # doc.text.magnifyingglass
 play_arrow fill                     # play.fill
 post_add                            # text.badge.plus
 power_settings_new                  # power
+priority_high                       # exclamationmark
 public                              # network
 public_off                          # network.slash
 qr_code                             # qrcode
@@ -198,6 +201,7 @@ stacks                              # rectangle.stack
 star                                # star
 star fill                           # star.fill
 star_half                           # star.slash
+star_shine fill                     # sparkle
 stop fill                           # stop.fill
 subdirectory_arrow_right mirror     # arrow.turn.down.right
 swap_horiz                          # arrow.left.arrow.right
@@ -227,5 +231,6 @@ volume_down                         # speaker.wave.1
 warning                             # exclamationmark.triangle
 warning fill                        # exclamationmark.triangle.fill
 wifi                                # wifi
+wifi_off                            # wifi.slash
 wifi_tethering_error                # wifi.exclamationmark
 wrap_text mirror                    # text.word.spacing
