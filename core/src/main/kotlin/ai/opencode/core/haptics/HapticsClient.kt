@@ -25,7 +25,7 @@ import androidx.lifecycle.ProcessLifecycleOwner
  *
  * - [tap] a control acted (Send, Copy, mic press, a menu opening). Copies play `tap`.
  * - [lightTap] a light control acted: the + menu and its recent photos opening, and choosing
- *   one of their rows. As light as a pick (iOS f0670c5d: “too powerful on those two pluses”).
+ *   one of their rows. As light as a pick.
  * - [selection] a choice changed (toggle, picker, pin, mute, read, a row reached by sliding).
  * - [confirm] a firm commit (start a call, confirmed delete, Stop Shell).
  * - [cancel] backing out (End, Close, cancel dictation, Stop).
