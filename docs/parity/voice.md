@@ -134,9 +134,9 @@ another module are left to that module's port ("skipped"); "dropped" tests can't
 | `VoiceLayLowTests.swift` | `VoiceLayLowTests.kt` | 4 | – | – |
 | `VoicePendingRequestTests.swift` | `VoicePendingRequestTests.kt` | 8 | – | – |
 | `VoiceResultHoldTests.swift` | `VoiceResultHoldTests.kt` | 10 | – | – (6 moved and re-ported from f657969b, 4 new) |
-| `VoiceSessionDelegatorEdgeTests.swift` | – | 0 | – | not ported yet (new at f657969b) |
-| `VoiceSessionDelegatorServerVoiceTests.swift` | – | 0 | – | not ported yet (new at f657969b) |
-| `VoiceSessionDelegatorTests.swift` | – | 0 | – | not ported yet (new at f657969b) |
+| `VoiceSessionDelegatorEdgeTests.swift` | `VoiceSessionDelegatorEdgeTests.kt` | 3 | – | – |
+| `VoiceSessionDelegatorServerVoiceTests.swift` | `VoiceSessionDelegatorServerVoiceTests.kt` | 4 | – | – |
+| `VoiceSessionDelegatorTests.swift` | `VoiceSessionDelegatorTests.kt` (helpers in `VoiceSessionDelegatorTestSupport.kt`) | 11 | `sseIgnoresSupersededExecutionInterruptionsAndDecodesRunMessageToolCalls` (`:server`: tests the internal `decodeStreamFrame`/`decodeRunMessages`; not ported there yet); the `VoiceSettingsFeature` row half of `choiceRoundTripsWithoutStoringServerURLsAndReportsRouteAvailability` (`:feature:settings`); steps 1–4 (say, pin, open, watch through `HomeFeature`) of `phoneSideToolEffectsApplyOpenPinWatchSayAndEndCallFromToolInput` (drawer) | – |
 | `VoiceSessionMoveTests.swift` | `VoiceSessionMoveTests.kt` | 2 | – | – (iOS's `forgetTranscripts` cleanup is unneeded: each harness has its own in-memory store) |
 | `VoiceSharedWaitTests.swift` | `VoiceSharedWaitTests.kt` | 8 (`VoiceWorkCoordinator.sharedWaitForIdle` now refuses an already-cancelled caller, as iOS's guard does) | – | – |
 | `VoiceTurnStampTests.swift` | `VoiceTurnStampTests.kt` | 13 | – | – |
@@ -166,4 +166,4 @@ exception class instead of its reason and turned cancellation into an engine err
 that failed when an interruption ended was never retried by the next route/configuration change;
 a just-finished call log was missing from `list()` while its save was still writing; End landed 2 dp left of the call button (48 dp slot kept the 6 dp padding); a reconnect or rotation replayed the connect chord; `RetryBudget.bounded` (`:server`) timed its limit on the scripted clock, so a lost send's answer was never read back; a cancelled speaker ramp re-sent an unchanged 1.0 gain (iOS only sets a changed volume) and a fallback to the built-in output was noted as “Route changed” instead of the ear's route; every call start re-sent its initial ear to the audio (iOS only re-applies one that changed while the audio started).
 
-Total: 598 voice tests (Gradle), all passing. Robolectric (test-only) runs only `VoiceCallTeardownFrameworkTests`.
+Total: 616 voice tests (Gradle), all passing. Robolectric (test-only) runs only `VoiceCallTeardownFrameworkTests`.
