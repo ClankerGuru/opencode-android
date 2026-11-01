@@ -328,7 +328,6 @@ internal fun SessionFeature.sendComposer(
             Effect.merge(
                 stopDictating,
                 Effect.cancel(SessionFeature.CancelID.AutocompleteAutoRun),
-                Effect.cancel(SessionFeature.CancelID.SinceYouLeft),
                 cancelRevert,
                 Effect.run<Action> { send ->
                     try {
@@ -548,7 +547,6 @@ internal fun SessionFeature.submit(
     return Reduced(
         next,
         Effect.merge(
-            Effect.cancel(SessionFeature.CancelID.SinceYouLeft),
             cancelRevert,
             deliver(
                 pending = pending, target = target, lane = lane, server = next.server,

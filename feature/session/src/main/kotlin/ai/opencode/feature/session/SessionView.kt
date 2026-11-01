@@ -404,11 +404,6 @@ private fun SessionLifecycle(store: StoreOf<State, Action>) {
             store.send(Action.NewMessagesDividerChanged(it))
         }
     }
-    LaunchedEffect(store) {
-        shared(ExperimentalFeature.sinceYouLeft.key).flow.drop(1).collect {
-            store.send(Action.SinceYouLeftChanged(it))
-        }
-    }
 }
 
 /**

@@ -895,7 +895,7 @@ fun HomeFeature.State.makeDetail(
     )
     detail = s.seedingSessionSnapshot(detail)
     detail = detail.copy(streamIsHealthy = s.isEventStreamLive)
-    detail = detail.noteOpening(seen = s.sessionSnapshots[session.id]?.seenItemIDs, leftAt = s.sessionSnapshots[session.id]?.leftAt)
+    detail = detail.noteOpening(seen = s.sessionSnapshots[session.id]?.seenItemIDs, unread = s.sessionSnapshots[session.id]?.hasUnseenItems == true)
     val pick = s.waitingPicks[session.id]
     if (pick != null) {
         s = s.copy(waitingPicks = s.waitingPicks - session.id)
@@ -1168,7 +1168,7 @@ fun HomeFeature.State.pushingSubagent(session: OpenCodeSession): HomeFeature.Sta
     )
     detail = s.seedingSessionSnapshot(detail)
     detail = detail.copy(streamIsHealthy = s.isEventStreamLive || parent.streamIsHealthy)
-    detail = detail.noteOpening(seen = s.sessionSnapshots[session.id]?.seenItemIDs, leftAt = s.sessionSnapshots[session.id]?.leftAt)
+    detail = detail.noteOpening(seen = s.sessionSnapshots[session.id]?.seenItemIDs, unread = s.sessionSnapshots[session.id]?.hasUnseenItems == true)
     val pick = s.waitingPicks[session.id]
     if (pick != null) {
         s = s.copy(waitingPicks = s.waitingPicks - session.id)

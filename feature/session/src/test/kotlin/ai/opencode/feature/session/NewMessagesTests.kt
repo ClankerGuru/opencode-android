@@ -116,7 +116,8 @@ class NewMessagesTests {
         assertEquals(NewMessagesMark(itemID = "m3", lastItemID = "m4", generation = 1), store.state.newMessages)
         assertNull(store.state.newMessagesBaseline)
 
-        // A quick trip away with nothing new shows nothing.
+        // Once read past, a quick trip away with nothing new shows nothing.
+        store.send(Action.NewMessagesPassed(generation = 1))
         store.send(Action.VisibilityChanged(false))
         store.send(Action.VisibilityChanged(true))
         store.receive(Action.RefreshResponse::class, timeout = 1.seconds)
@@ -223,6 +224,8 @@ class NewMessagesTests {
                     lastProjectedMessageID = "msg_live",
                     liveText = mapOf("msg_live-text-0" to "Streaming reply"),
                     items = it.items + OpenCodeTranscriptItem.AssistantMarkdown(id = "msg_live-text-0", text = "Streaming reply"),
+                    // In front of the reader: seen, whatever the read after it brings.
+                    newMessagesWatched = setOf("msg_live-text-0"),
                 )
             }
             assertEquals("fits=$fits", if (fits) null else mark, store.state.newMessages)
@@ -272,7 +275,7 @@ class NewMessagesTests {
         assertNotEquals(early?.generation, state.newMessages?.generation)
         state = h.on { state.noteLeaving() }
         assertNull(state.newMessages)
-        assertEquals(setOf("m1", "m2", "m3", "m4"), state.newMessagesBaseline)
+        assertEquals(setOf("m1", "m2"), state.newMessagesBaseline)
     }
 
     /**
@@ -332,10 +335,7 @@ class NewMessagesTests {
         h.skipInFlightEffects()
     }
 
-    /**
-     * Switched off mid-session, the divider on screen goes; a mark without
-     * one stays, so the list still brings the reader to the end.
-     */
+    /** Switched off mid-session, any mark on screen goes. */
     @Test fun switchingTheExperimentOffClearsTheDivider() = sessionTest { h ->
         val state = h.sessionState("ses_toggle", listOf(user("m1"), reply("m2")))
             .copy(newMessages = NewMessagesMark(itemID = "m2", generation = 1, showsDivider = true))
@@ -347,7 +347,7 @@ class NewMessagesTests {
         val quiet = h.sessionState("ses_toggle_quiet", listOf(user("m1"), reply("m2")))
             .copy(newMessages = NewMessagesMark(itemID = "m2", generation = 1, showsDivider = false))
         val quietStore = h.store(quiet)
-        quietStore.send(Action.NewMessagesDividerChanged(false))
+        quietStore.send(Action.NewMessagesDividerChanged(false)) { it.copy(newMessages = null) }
         quietStore.finish()
     }
 

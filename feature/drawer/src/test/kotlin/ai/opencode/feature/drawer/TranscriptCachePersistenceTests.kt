@@ -4,8 +4,6 @@ import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.DependencyValues
 import ai.opencode.core.dependencies.ImmediateClock
-import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.SharedStore
 import ai.opencode.core.sharing.shared
@@ -135,7 +133,6 @@ class TranscriptCachePersistenceTests {
         val world = World(
             extra = {
                 this[HomeSnapshotDate] = DateClient.constant(now)
-                this[ExperimentalFeatures] = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.sinceYouLeft))
             },
             persistence = counting,
         )
@@ -147,7 +144,6 @@ class TranscriptCachePersistenceTests {
         assertEquals("The first render receives cached rows, never an empty state", items, state.sessionDetail?.items)
         assertEquals(false, state.sessionDetail?.isLoading)
         assertEquals(setOf("cached"), state.sessionDetail?.newMessagesBaseline)
-        assertEquals(setOf("cached"), state.sessionDetail?.sinceYouLeftSeen)
         val store = world.store(this, state)
         val fresh = listOf<OpenCodeTranscriptItem>(OpenCodeTranscriptItem.UserText(id = "fresh", text = "Refreshed"))
         store.send(detail(SessionFeature.Action.AcceptedTranscriptUpdated(sessionID = "open", items = fresh))) { s ->

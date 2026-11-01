@@ -129,7 +129,6 @@ import java.time.Instant
 import java.time.ZoneId
 import java.util.Locale
 import kotlin.math.roundToLong
-import ai.opencode.feature.transcript.SinceYouLeft as TranscriptSinceYouLeft
 
 // Port of iOS `Session/SessionTranscriptView.swift`: the transcript host below the header and
 // above the composer, and the session-owned pieces the transcript draws (the title, the Working
@@ -162,11 +161,8 @@ fun SessionTranscriptView(
     val host = LocalSessionComposerHost.current
     val presenter = LocalMediaPresenter.current
     val reducedMotion = rememberReduceMotion()
-    val sinceYouLeftSetting by remember { shared(ExperimentalFeature.sinceYouLeft.key) }.flow
-        .collectAsState(shared(ExperimentalFeature.sinceYouLeft.key).value)
     val imageLinkPreviewsSetting by remember { shared(ExperimentalFeature.imageLinkPreviews.key) }.flow
         .collectAsState(shared(ExperimentalFeature.imageLinkPreviews.key).value)
-    val usesSinceYouLeft = ExperimentalFeature.sinceYouLeft.isActive(sinceYouLeftSetting)
     val hour24 = remember(context) { DateFormat.is24HourFormat(context) }
     val cache = remember { SessionTranscriptView.ProjectionCache() }
 
@@ -176,12 +172,11 @@ fun SessionTranscriptView(
         state = state,
         cache = cache,
         scrollEdgeBridge = scrollEdgeBridge,
-        usesSinceYouLeft = usesSinceYouLeft,
         hour24 = hour24,
     )
-    val projection by remember(store, usesSinceYouLeft, hour24) {
+    val projection by remember(store, hour24) {
         store.states.map(::project).distinctUntilChanged()
-    }.collectAsState(remember(store, usesSinceYouLeft, hour24) { project(store.state) })
+    }.collectAsState(remember(store, hour24) { project(store.state) })
     val latestProjection by rememberUpdatedState(projection)
     val showsMoveToBackground by store.observe { it.showsMoveToBackground }
 
@@ -204,9 +199,6 @@ fun SessionTranscriptView(
     }
     val rowSlots = remember {
         TranscriptRowSlots(
-            sinceYouLeft = { entryID, summary, onDismiss ->
-                SinceYouLeftRow(entryID, SessionTranscriptView.sinceYouLeft(summary), onDismiss)
-            },
             agentGlyph = { glyph, glyphModifier ->
                 AgentActivityGlyph(
                     source = AgentActivitySource.Subagent(SessionTranscriptView.subagentActivity(glyph)),
@@ -304,7 +296,6 @@ object SessionTranscriptView {
             val showsWorking: Boolean,
             val failedFinale: Boolean,
             val models: List<OpenCodeModel>,
-            val sinceYouLeft: TranscriptSinceYouLeft?,
         )
 
         private data class StampInputs(
@@ -376,7 +367,6 @@ object SessionTranscriptView {
             showsWorking: Boolean,
             failedFinale: Boolean,
             models: List<OpenCodeModel>,
-            sinceYouLeft: TranscriptSinceYouLeft? = null,
             sentNow: Boolean?,
             mark: NewMessagesMark?,
             now: Instant = Instant.now(),
@@ -433,7 +423,7 @@ object SessionTranscriptView {
                     return entries to newMessages
                 }
             }
-            val structural = StructuralInputs(visibleItems, allItems, showsWorking, failedFinale, models, sinceYouLeft)
+            val structural = StructuralInputs(visibleItems, allItems, showsWorking, failedFinale, models)
             if (structural != structuralInputs) {
                 structuralInputs = structural
                 // While the Working line plays Failed, it is the failure: the run's error line
@@ -444,7 +434,6 @@ object SessionTranscriptView {
                     isRunning = showsWorking,
                     models = models,
                     sessionStartModels = TranscriptEntry.sessionStartModelIDs(allItems),
-                    sinceYouLeft = sinceYouLeft,
                 )
                 structuralGeneration += 1
             }
@@ -475,7 +464,6 @@ object SessionTranscriptView {
         state: State,
         cache: ProjectionCache,
         scrollEdgeBridge: SessionScrollEdgeBridge,
-        usesSinceYouLeft: Boolean,
         now: Double = AgentActivityClock.now(),
         hour24: Boolean? = null,
     ): Projection {
@@ -498,7 +486,6 @@ object SessionTranscriptView {
             showsWorking = showsWorking,
             failedFinale = isFailedFinale,
             models = state.models,
-            sinceYouLeft = if (usesSinceYouLeft && !state.isDraft) state.sinceYouLeft?.let(::transcriptSinceYouLeft) else null,
             sentNow = sentNow,
             mark = state.newMessages,
             hour24 = hour24,
@@ -620,7 +607,8 @@ object SessionTranscriptView {
         is TranscriptAction.TranscriptBrowsingChanged -> Action.TranscriptBrowsingChanged(action.isBrowsing)
         is TranscriptAction.NewMessagesPassed -> Action.NewMessagesPassed(action.generation)
         is TranscriptAction.NewMessagesFit -> Action.NewMessagesFit(action.generation)
-        TranscriptAction.SinceYouLeftTapped -> Action.SinceYouLeftTapped
+        // Since You Left was removed in iOS cd6be7c6; the transcript's action goes with it.
+        TranscriptAction.SinceYouLeftTapped -> null
         TranscriptAction.ShowEarlierTapped -> Action.ShowEarlierTapped
         is TranscriptAction.CopyTextTapped -> Action.CopyTextTapped(action.text)
         is TranscriptAction.QuoteTextTapped -> Action.QuoteTextTapped(action.text)
@@ -640,24 +628,6 @@ object SessionTranscriptView {
         is TranscriptAction.PendingInputCancelTapped -> Action.PendingInputCancelTapped(action.inputID)
         is TranscriptAction.OpenFile, is TranscriptAction.PreviewImage, is TranscriptAction.OpenPastedText -> null
     }
-
-    /** The transcript's copy of the Since You Left value (`:feature:transcript` draws its row). */
-    fun transcriptSinceYouLeft(summary: SinceYouLeft) = TranscriptSinceYouLeft(
-        sessionID = summary.sessionID,
-        lastItemID = summary.lastItemID,
-        text = summary.text,
-        phase = if (summary.phase == SinceYouLeft.Phase.Generating) TranscriptSinceYouLeft.Phase.Generating else TranscriptSinceYouLeft.Phase.Done,
-        isFallback = summary.isFallback,
-    )
-
-    /** Back to the session's value for [SinceYouLeftRow]. */
-    fun sinceYouLeft(summary: TranscriptSinceYouLeft) = SinceYouLeft(
-        sessionID = summary.sessionID,
-        lastItemID = summary.lastItemID,
-        text = summary.text,
-        phase = if (summary.phase == TranscriptSinceYouLeft.Phase.Generating) SinceYouLeft.Phase.Generating else SinceYouLeft.Phase.Done,
-        isFallback = summary.isFallback,
-    )
 
     /** A transcript row's subagent glyph as the activity orb reads it. */
     fun subagentActivity(glyph: AgentGlyphState) = SubagentActivity(

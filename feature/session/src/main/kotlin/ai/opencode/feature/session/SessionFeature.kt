@@ -132,18 +132,29 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         val isVisible: Boolean = false,
         /** What was on screen when the reader last left, until the read after their return settles it. */
         val newMessagesBaseline: Set<String>? = null,
+        /**
+         * Server-side viewed timestamp (ms) when an unread session opens without a phone-local seen
+         * snapshot, until the read after opening settles it.
+         */
+        val newMessagesBaselineTimestamp: Long? = null,
+        /** Whether the session opened unread, so an empty baseline marks the unread turn when no item IDs or timestamps match. */
+        val newMessagesUnread: Boolean = false,
+        /**
+         * Unseen baseline retained while the mark sits at the top of a paged window (`earlierHistory
+         * != Exhausted`), so loading an earlier page moves the divider to the true first unseen row.
+         */
+        val newMessagesEarlierBaseline: NewMessagesEarlierBaseline? = null,
+        /** Rows that streamed in while the reader watched, before that read settled: seen, though rows the read brings above them may not be. */
+        val newMessagesWatched: Set<String> = emptySet(),
+        /** What a Catch Up card's reader had seen as it opened: kept unread, it's what they've seen next time too. */
+        val catchUpOpeningSeen: Set<String>? = null,
         /** The New divider: above the first row that arrived while they were away. */
         val newMessages: NewMessagesMark? = null,
         val newMessagesGeneration: Int = 0,
         /** The last row of a mark that fit on screen, seen once the reader is in front of it. */
         val newMessagesFitThrough: String? = null,
-        /** Since You Left unseen baseline, leave time, active summary, and bounded per-session cache. */
-        val sinceYouLeftSeen: Set<String>? = null,
-        val sinceYouLeftAt: Instant? = null,
-        val sinceYouLeft: SinceYouLeft? = null,
-        val sinceYouLeftDismissed: Boolean = false,
-        val sinceYouLeftCache: Map<String, SinceYouLeft.CacheEntry> = emptyMap(),
-        val sinceYouLeftCacheOrder: List<String> = emptyList(),
+        /** The last span of new rows found folded into a group already on screen, so deltas that add no row don't rebuild its turn to find that again. */
+        val newMessagesFolded: NewMessagesFold? = null,
         /** False for a catch-up card: the reader's swipe decides whether it was read. */
         val readsOnView: Boolean = true,
         /** Whether a pending-request snapshot has arrived for this screen yet. */
@@ -296,6 +307,8 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         val callsFromRoot: Boolean = false,
         /** A pushed subagent covers this screen. */
         val isCovered: Boolean = false,
+        /** Something sits over the transcript (a pushed subagent, its browser, Settings): what arrives isn't in front of the reader. */
+        val isTranscriptCovered: Boolean = false,
         /** The in-app browser over this session (Experimental). */
         val browser: BrowserFeature.State = BrowserFeature.State(),
         /** A link tap waiting on the system to say whether an app claims it. */
@@ -365,6 +378,8 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
             val modelChanged: Boolean = false,
             /** A revert was staged, redone, or committed while it was on its way. */
             val revertChanged: Boolean = false,
+            /** The session moved folders while this read was in flight (iOS `directoryChanged`). */
+            val directoryChanged: Boolean = false,
         )
 
         // region Nested types of iOS `SessionFeature+State.swift`
@@ -539,11 +554,6 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         data class NewMessagesFit(val generation: Int) : Action
         /** The New Messages Divider experiment was switched on or off. */
         data class NewMessagesDividerChanged(val isOn: Boolean) : Action
-        /** The Since You Left experiment was switched on or off. */
-        data class SinceYouLeftChanged(val isOn: Boolean) : Action
-        data object SinceYouLeftTapped : Action
-        data class SinceYouLeftChunkReceived(val sessionID: String, val lastItemID: String, val text: String) : Action
-        data class SinceYouLeftFinished(val sessionID: String, val lastItemID: String, val fallback: String) : Action
         data object ShowEarlierTapped : Action
         data object FillEarlierHistory : Action
         data class EarlierHistoryResponse(
@@ -876,8 +886,10 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         val movedWorkKeys: Set<String>,
         /** What was on screen as the reader left, for the New divider. */
         val seenItemIDs: Set<String>,
-        val leftAt: Instant? = null,
-        val sinceYouLeftCache: Map<String, SinceYouLeft.CacheEntry> = emptyMap(),
+        /** Something they hadn't seen was still there as they left. */
+        val hasUnseenItems: Boolean = false,
+        /** The request bar's unsent answers, the one on screen included. */
+        val answerDrafts: Map<String, String> = emptyMap(),
     ) {
         companion object
     }
@@ -914,7 +926,6 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         data object ResyncMinimum : CancelID
         data object VoiceExit : CancelID
         data object VoiceViewing : CancelID
-        data object SinceYouLeft : CancelID
         data object AutocompleteCatalog : CancelID
         data object AutocompleteCommands : CancelID
         data object AutocompleteFiles : CancelID
@@ -975,7 +986,6 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
     internal val pasteboard by Dependency(PasteboardClient)
     internal val universalLinks by Dependency(UniversalLinkClient)
     internal val experimentalFeatures by Dependency(ExperimentalFeatures)
-    internal val sinceYouLeftClient by Dependency(SinceYouLeftClient)
     internal val sessionTimers by Dependency(SessionTimers)
 
     // endregion

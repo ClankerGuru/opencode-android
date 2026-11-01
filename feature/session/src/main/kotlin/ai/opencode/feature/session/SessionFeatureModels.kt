@@ -271,11 +271,11 @@ private fun SessionFeature.familyPicked(id: String, state: State): Reduced<State
     var next = state.copy(
         newMessages = null,
         newMessagesBaseline = null,
+        newMessagesBaselineTimestamp = null,
+        newMessagesUnread = false,
+        newMessagesEarlierBaseline = null,
+        newMessagesWatched = emptySet(),
         newMessagesFitThrough = null,
-        sinceYouLeft = null,
-        sinceYouLeftSeen = null,
-        sinceYouLeftAt = null,
-        sinceYouLeftDismissed = false,
     )
     next = cacheFamilyTranscript(next.itemsWithoutFailedSends, current.id, next)
     // A recording follows the screen, as across Home's switches: what was typed beside it stays in
@@ -367,7 +367,6 @@ private fun SessionFeature.familyPicked(id: String, state: State): Reduced<State
             Effect.cancel(CancelID.EarlierHistory),
             Effect.cancel(CancelID.PromptEcho),
             Effect.cancel(CancelID.InboxFetch),
-            Effect.cancel(CancelID.SinceYouLeft),
             Effect.cancel(CancelID.AutocompleteCatalog),
             Effect.cancel(CancelID.AutocompleteCommands),
             Effect.cancel(CancelID.AutocompleteFiles),

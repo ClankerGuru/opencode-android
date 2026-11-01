@@ -168,7 +168,25 @@ fun SessionFeature.SwitchSnapshot.Companion.from(state: State): SessionFeature.S
     val session = state.session ?: return null
     val queued = state.queuedInputs.filter { state.promptStates[it.id]?.admission != State.PromptState.Admission.sent }
     val queuedIDs = queued.map { it.id }.toSet()
-    val familyIDs = (listOf(session.id) + state.familySessions.map { it.id }).toSet()
+    val seenItemIDs: Set<String>
+    var hasUnseenItems = false
+    val mark = state.newMessages
+    val markIndex = mark?.let { m -> state.items.indexOfFirst { it.id == m.itemID } } ?: -1
+    val baseline = state.newMessagesBaseline
+    if (!state.readsOnView) {
+        seenItemIDs = state.catchUpOpeningSeen ?: baseline ?: emptySet()
+        hasUnseenItems = mark != null || state.newMessagesUnread
+    } else if (markIndex >= 0) {
+        seenItemIDs = state.items.subList(0, markIndex).mapTo(HashSet()) { it.id }
+        hasUnseenItems = true
+    } else if (baseline != null && (baseline.isNotEmpty() || state.newMessagesUnread || state.newMessagesBaselineTimestamp != null ||
+            state.isTranscriptCovered || state.isBackgrounded || state.items.isEmpty())
+    ) {
+        seenItemIDs = baseline + state.newMessagesWatched
+        hasUnseenItems = state.newMessagesUnread
+    } else {
+        seenItemIDs = state.items.mapTo(HashSet()) { it.id }
+    }
     return SessionFeature.SwitchSnapshot(
         session = session,
         family = state.familySessions,
@@ -178,6 +196,7 @@ fun SessionFeature.SwitchSnapshot.Companion.from(state: State): SessionFeature.S
         forms = state.formRequests,
         formAnswers = state.formAnswers,
         questionPageIndices = state.questionPageIndices,
+        answerDrafts = state.answerDraftsIncludingBar,
         hasLoadedRequests = state.hasLoadedPendingRequests,
         completedRequests = state.completedRequestIDs,
         selectedRequest = state.selectedRequestID,
@@ -191,9 +210,8 @@ fun SessionFeature.SwitchSnapshot.Companion.from(state: State): SessionFeature.S
         movableWorkKey = state.movableWorkKey,
         // A claim no send has acted on yet isn't a move.
         movedWorkKeys = state.movedWorkKeys - state.autoBackgroundClaims.values.toSet(),
-        seenItemIDs = state.newMessagesBaseline ?: state.items.map { it.id }.toSet(),
-        leftAt = state.sinceYouLeftAt ?: State.defaultLeaveDate(),
-        sinceYouLeftCache = state.sinceYouLeftCache.filterKeys { it in familyIDs },
+        seenItemIDs = seenItemIDs,
+        hasUnseenItems = hasUnseenItems,
     )
 }
 
@@ -215,6 +233,7 @@ fun SessionFeature.SwitchSnapshot.restore(state: State): State {
             formRequests = forms,
             formAnswers = forms.associate { form -> form.id to (formAnswers[form.id] ?: form.defaultAnswers) },
             questionPageIndices = questionPageIndices,
+            answerDrafts = if (next.isAnsweringRequest) it.answerDrafts else answerDrafts,
             completedRequestIDs = completedRequests,
             // The pin comes back only while its request is still waiting.
             selectedRequestID = selectedRequest,
@@ -222,10 +241,8 @@ fun SessionFeature.SwitchSnapshot.restore(state: State): State {
     }
     next = next.pruneRequests()
     next = restoreSessionData(next)
-    for ((id, entry) in sinceYouLeftCache) {
-        if (next.sinceYouLeftCache[id] == null) next = next.cacheSinceYouLeft(entry.lastItemID, entry.text, id)
-    }
-    // A waiting request takes the composer from the first frame.
+    // A waiting request takes the composer from the first frame: the screen, a Catch Up card, or
+    // the session Catch Up returns to.
     if (next.wantsRequestDock && !next.isAnsweringRequest) next = next.beginAnswering()
     return next
 }
@@ -242,6 +259,7 @@ fun SessionFeature.SwitchSnapshot.pruneRequests(
         forms = forms,
         formAnswers = SessionFeature.prune(formAnswers, live),
         questionPageIndices = SessionFeature.prune(questionPageIndices, live),
+        answerDrafts = SessionFeature.pruneAnswerDrafts(answerDrafts, live),
         selectedRequest = selectedRequest?.takeIf { it in live },
     )
 }
@@ -269,21 +287,6 @@ fun SessionFeature.SwitchSnapshot.restoreSessionData(state: State): State {
     )
     next = next.syncVoiceModel()
     return next.copy(sessionSheet = next.sessionSheet?.copy(pendingModel = pendingModel))
-}
-
-// endregion
-
-// region Since You Left
-
-fun State.cacheSinceYouLeft(lastItemID: String, text: String, sessionID: String): State {
-    val cache = sinceYouLeftCache.toMutableMap()
-    cache[sessionID] = SinceYouLeft.CacheEntry(lastItemID, text)
-    val order = sinceYouLeftCacheOrder.filter { it != sessionID }.toMutableList()
-    order += sessionID
-    while (order.size > SinceYouLeft.maxCachedSessions) {
-        cache.remove(order.removeAt(0))
-    }
-    return copy(sinceYouLeftCache = cache, sinceYouLeftCacheOrder = order)
 }
 
 // endregion
@@ -397,6 +400,15 @@ val State.parkedComposer: DraftState? get() = requestDock.parkedComposer
 fun State.withParkedComposer(value: DraftState?): State = updateRequestDock { it.copy(parkedComposer = value) }
 /** The bar's text for each question page or request it has answered. */
 val State.answerDrafts: Map<String, String> get() = requestDock.answerDrafts
+/**
+ * iOS `answerDraftsIncludingBar` (`Composer/SessionStatePersistence.swift`): [answerDrafts] with the
+ * words on the bar now, which are only filed there when the bar moves to another page or request.
+ */
+val State.answerDraftsIncludingBar: Map<String, String>
+    get() {
+        val shown = answerShownTarget
+        return if (parkedComposer != null && shown != null) answerDrafts + (shown to draft) else answerDrafts
+    }
 fun State.withAnswerDrafts(value: Map<String, String>): State = updateRequestDock { it.copy(answerDrafts = value) }
 /** Whose words the bar holds now (an `answerTarget`). */
 val State.answerShownTarget: String? get() = requestDock.answerShownTarget

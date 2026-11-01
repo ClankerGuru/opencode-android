@@ -146,12 +146,11 @@ private fun SessionFeature.sceneEnteredBackground(state: State): Reduced<State, 
     if (next.hasRenderedFirstContentFrame) next = next.noteLeaving()
     // Stop's request carries on under a background task: people tap Stop and lock the phone. Reads
     // stop here and run again on the return.
-    next = next.copy(sinceYouLeft = null, isBackgrounded = true)
+    next = next.copy(isBackgrounded = true)
     val stopsReads = Effect.cancel(
         listOf(
             CancelID.InterruptSettle(next.runWorkGeneration),
             CancelID.RunEndCheck(next.runWorkGeneration),
-            CancelID.SinceYouLeft,
         ),
     )
     // (Send Now's wake read comes back with the return's run-state read.) Background audio keeps

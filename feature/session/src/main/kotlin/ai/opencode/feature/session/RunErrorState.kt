@@ -6,8 +6,6 @@ import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.store.Effect
 import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.feature.composer.ComposerFileAttachment
-import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.feature.transcript.TranscriptEntry
 import ai.opencode.feature.transcript.rows.RunErrorState as TranscriptRunErrorState
 import ai.opencode.feature.voice.VoiceHandoff
@@ -149,18 +147,15 @@ fun State.dropUndone(): State {
  * The reader sent a message: everything above it is read, so the divider goes and nothing waiting
  * to be settled counts as new (iOS `Transcript/NewMessagesMark.swift` `noteOwnSend()`).
  */
-fun State.noteOwnSend(): State {
-    val showsSinceYouLeft = dependency(ExperimentalFeatures)(ExperimentalFeature.sinceYouLeft)
-    return copy(
-        newMessages = null,
-        newMessagesFitThrough = null,
-        newMessagesBaseline = null,
-        sinceYouLeft = null,
-        sinceYouLeftSeen = null,
-        sinceYouLeftAt = null,
-        sinceYouLeftDismissed = if (showsSinceYouLeft) true else sinceYouLeftDismissed,
-    )
-}
+fun State.noteOwnSend(): State = copy(
+    newMessages = null,
+    newMessagesFitThrough = null,
+    newMessagesBaseline = null,
+    newMessagesBaselineTimestamp = null,
+    newMessagesUnread = false,
+    newMessagesEarlierBaseline = null,
+    newMessagesWatched = emptySet(),
+)
 
 private fun startsMessage(item: OpenCodeTranscriptItem, messageID: String): Boolean = when (item) {
     is OpenCodeTranscriptItem.UserText -> item.id == messageID
