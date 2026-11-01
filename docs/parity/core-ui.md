@@ -139,10 +139,12 @@ literals that aren't symbols). `(fill)` is the filled variant. Weak matches: `st
 | `dot.radiowaves.left.and.right` | `sensors` | `ms_sensors` | `SFSymbol.DotRadiowavesLeftAndRight` | SettingsView |
 | `ellipsis` | `more_horiz` | `ms_more_horiz` | `SFSymbol.Ellipsis` | OnboardingPlaygroundView, SessionSwitcher, SessionView+Header, SettingsView, TuningPanelView, VoiceCallLiveActivity, VoiceCallLogView |
 | `ellipsis.circle` | `pending` | `ms_pending` | `SFSymbol.EllipsisCircle` | SettingsServers |
+| `ellipsis.circle.fill` | `pending` (fill) | `ms_pending_fill` | `SFSymbol.EllipsisCircleFill` | SessionRunLiveActivity |
 | `envelope.badge` | `mark_email_unread` | `ms_mark_email_unread` | `SFSymbol.EnvelopeBadge` | HomeView+Drawer, SessionView+Header |
 | `envelope.badge.fill` | `mark_email_unread` (fill) | `ms_mark_email_unread_fill` | `SFSymbol.EnvelopeBadgeFill` | SessionSheetView |
 | `envelope.open` | `drafts` | `ms_drafts` | `SFSymbol.EnvelopeOpen` | DrawerListSupportCells, HomeView+Drawer, SessionSheetView, SessionView+Header |
 | `exclamationmark.bubble` | `feedback` | `ms_feedback` | `SFSymbol.ExclamationmarkBubble` | SessionView+Header, WhatsNewList |
+| `exclamationmark.bubble.fill` | `feedback` (fill) | `ms_feedback_fill` | `SFSymbol.ExclamationmarkBubbleFill` | SessionRunLiveActivity |
 | `exclamationmark.circle.fill` | `error` (fill) | `ms_error_fill` | `SFSymbol.ExclamationmarkCircleFill` | RequestDockView, ServerDetailsView, SettingsView, TranscriptEntryView, TranscriptUserMessage |
 | `exclamationmark.triangle` | `warning` | `ms_warning` | `SFSymbol.ExclamationmarkTriangle` | AgentFileViewer, DraftProjects, DrawerListSupportCells, FileAttachmentViews, ModelListContent, ModelPickerSheet, ModelVisibilitySettings, OnboardingPlaygroundControls, ServerDetailsView, SessionView, SessionView+ModelPicker, SettingsServers |
 | `exclamationmark.triangle.fill` | `warning` (fill) | `ms_warning_fill` | `SFSymbol.ExclamationmarkTriangleFill` | AppView, SessionView+Composer, TraceTriggers, VoiceView |

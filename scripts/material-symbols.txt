@@ -85,6 +85,7 @@ edit_square                         # square.and.pencil
 error fill                          # exclamationmark.circle.fill
 explore                             # safari
 feedback                            # exclamationmark.bubble
+feedback fill                       # exclamationmark.bubble.fill
 filter_none                         # rectangle.on.rectangle
 flash_auto fill                     # bolt.badge.automatic.fill
 flash_off fill                      # bolt.slash.fill
@@ -165,6 +166,7 @@ pan_tool_alt                        # hand.point.up.left
 pan_tool_alt fill                   # hand.point.up.left.fill
 pause fill                          # pause.fill
 pending                             # ellipsis.circle
+pending fill                        # ellipsis.circle.fill
 person fill                         # person.fill
 phone_in_talk                       # phone.connection
 phone_in_talk fill                  # phone.and.waveform.fill
