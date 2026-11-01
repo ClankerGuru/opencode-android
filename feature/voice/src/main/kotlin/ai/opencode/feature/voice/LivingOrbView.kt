@@ -109,6 +109,8 @@ data class LivingOrbBloom(
  */
 @Composable
 fun LivingOrbView(config: LivingOrbConfig, modifier: Modifier = Modifier, isHidden: Boolean = false) {
+    // iOS `.onAppear { WispOrbTunables.register() }`.
+    LaunchedEffect(Unit) { WispOrbTunables.register() }
     val reduceMotion = rememberReduceMotion()
     val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
     val renderer = remember { WispOrbRenderer.make() } ?: return

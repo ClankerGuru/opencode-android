@@ -19,7 +19,9 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.consumeAsFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -103,9 +105,21 @@ class FakeLiveSocket(val config: LiveSessionConfig) {
     @Volatile var failOnCommentaryIndex: Int? = null
     private var commentaryCount = 0
 
-    /** While set, the first commentary sent stalls inside the socket's send. */
-    @Volatile var stallFirstCommentary = false
+    /**
+     * While set, the first commentary sent stalls inside the socket's send.
+     * Clearing it lets the send go on at once without moving virtual time, as
+     * iOS's real-time poll does while its test clock stands still.
+     */
+    var stallFirstCommentary: Boolean
+        get() = stall.value
+        set(value) { stall.value = value }
+    private val stall = MutableStateFlow(false)
     @Volatile var commentaryEntered = 0
+
+    /** Returns once [stallFirstCommentary] is clear. */
+    suspend fun awaitStallCleared() {
+        stall.first { !it }
+    }
 
     /** iOS `server.yield(_:)`. */
     fun yieldEvent(event: LiveServerEvent) {
@@ -222,7 +236,7 @@ class LiveHarness(
                 send = { command ->
                     yield()
                     if (command is LiveCommand.AppendCommentary && ++socket.commentaryEntered == 1) {
-                        while (socket.stallFirstCommentary) delay(5)
+                        socket.awaitStallCleared()
                     }
                     socket.send(command)
                 },

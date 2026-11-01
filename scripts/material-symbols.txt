@@ -24,7 +24,6 @@ arrow_upward                        # arrow.up
 article                             # doc.plaintext
 attach_file                         # paperclip
 auto_awesome                        # sparkles
-auto_awesome fill                   # sparkle
 autorenew                           # arrow.trianglehead.2.clockwise
 back_hand fill                      # hand.raised.fill
 bedtime                             # moon.zzz
@@ -178,6 +177,7 @@ plagiarism                          # doc.text.magnifyingglass
 play_arrow fill                     # play.fill
 post_add                            # text.badge.plus
 power_settings_new                  # power
+priority_high                       # exclamationmark
 public                              # network
 public_off                          # network.slash
 qr_code                             # qrcode
@@ -208,6 +208,7 @@ stacks                              # rectangle.stack
 star                                # star
 star fill                           # star.fill
 star_half                           # star.slash
+star_shine fill                     # sparkle
 stop fill                           # stop.fill
 subdirectory_arrow_right mirror     # arrow.turn.down.right
 swap_horiz                          # arrow.left.arrow.right
