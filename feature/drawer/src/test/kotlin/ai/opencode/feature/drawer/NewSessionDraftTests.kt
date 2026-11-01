@@ -13,6 +13,7 @@ import ai.opencode.feature.session.currentModelName
 import ai.opencode.feature.session.recentProjects
 import ai.opencode.feature.session.setTyped
 import ai.opencode.feature.session.taskIdentity
+import ai.opencode.feature.session.typeBelow
 import ai.opencode.core.store.PresentationAction
 import ai.opencode.feature.settings.SettingsFeature.SettingsDelegate
 import ai.opencode.feature.settings.SettingsFeature
@@ -23,6 +24,7 @@ import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeHomeSnapshot
 import ai.opencode.server.model.OpenCodeModel
 import ai.opencode.server.model.OpenCodeModelCatalog
+import ai.opencode.server.model.OpenCodeNotifyPluginStatus
 import ai.opencode.server.model.OpenCodeProject
 import ai.opencode.server.model.OpenCodeSession
 import java.time.Instant
@@ -31,6 +33,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -162,21 +165,19 @@ class NewSessionDraftTests {
         assertEquals(SessionFeature.State.TaskIdentity(server.persistenceID, 3, null), store.state.sessionDetail?.taskIdentity)
         runTaskAndLoadModels()
 
-        // 4. Notify plugin "Set Up" from a draft gets a new taskIdentity and loads models.
+        // 4. Notify plugin "Set Up" over a draft keeps what's typed there and adds its prompt below.
         store.send(HomeFeature.Action.NotifyPluginSetUpTapped) {
-            it.copy(
-                detailGeneration = 4,
-                sessionDetail = draft(projects[0], listOf(projects[0], projects[1]), 4).setTyped(HomeFeature.notifyPluginSetUpPrompt),
-            )
+            it.copy(drawerCloseRequests = it.drawerCloseRequests + 1).detail { detail -> detail.typeBelow(HomeFeature.notifyPluginSetUpPrompt) }
         }
-        assertEquals(SessionFeature.State.TaskIdentity(server.persistenceID, 4, null), store.state.sessionDetail?.taskIdentity)
-        runTaskAndLoadModels()
+        assertTrue(store.state.sessionDetail?.draft?.startsWith("Try this") == true)
+        assertTrue(store.state.sessionDetail?.draft?.contains(OpenCodeNotifyPluginStatus.PACKAGE_ENTRY) == true)
+        assertEquals(SessionFeature.State.TaskIdentity(server.persistenceID, 3, null), store.state.sessionDetail?.taskIdentity)
 
         // 5. Voice/deep-link openDraft from a draft gets a new taskIdentity and loads models.
         store.send(HomeFeature.Action.detail(SessionFeature.Action.Delegate(SessionFeature.Delegate.OpenDraft(projects[1].directory)))) {
-            it.copy(detailGeneration = 5, sessionDetail = draft(projects[1], listOf(projects[1], projects[0]), 5))
+            it.copy(detailGeneration = 4, sessionDetail = draft(projects[1], listOf(projects[1], projects[0]), 4))
         }
-        assertEquals(SessionFeature.State.TaskIdentity(server.persistenceID, 5, null), store.state.sessionDetail?.taskIdentity)
+        assertEquals(SessionFeature.State.TaskIdentity(server.persistenceID, 4, null), store.state.sessionDetail?.taskIdentity)
         runTaskAndLoadModels()
         store.finish()
     }

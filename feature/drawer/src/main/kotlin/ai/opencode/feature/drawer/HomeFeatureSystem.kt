@@ -209,7 +209,7 @@ internal fun HomeFeature.openSystemDestination(
         is SystemAction.Destination.Session -> s.sessions.firstOrNull { it.id == destination.id } ?: return Reduced(s)
         SystemAction.Destination.LastViewed ->
             s.lastViewedSessionIDs[s.server.persistenceID]?.let { id -> s.sessions.firstOrNull { it.id == id } }
-                ?: s.sessions.filter { it.parentID == null }.maxByOrNull { it.updatedAt }
+                ?: s.sessions.filter { it.parentID == null && !it.isArchived }.maxByOrNull { it.updatedAt }
         is SystemAction.Destination.Draft -> null
     }
 

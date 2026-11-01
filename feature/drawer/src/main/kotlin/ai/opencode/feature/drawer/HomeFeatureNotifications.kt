@@ -11,7 +11,7 @@ import ai.opencode.feature.drawer.HomeFeature.Action
 import ai.opencode.feature.drawer.HomeFeature.State
 import ai.opencode.feature.drawer.notices.AccessibilityAnnouncer
 import ai.opencode.feature.session.InAppNotice
-import ai.opencode.feature.session.setTyped
+import ai.opencode.feature.settings.whatsnew.WhatsNewEntry
 import ai.opencode.core.experiments.InAppNoticeMode
 import ai.opencode.feature.drawer.notices.InAppNoticeSettings
 import ai.opencode.feature.drawer.notices.InAppNoticeSignal
@@ -40,17 +40,9 @@ internal fun HomeFeature.reduceNotifications(state: State, action: Action): Home
         Reduced(state, Effect.merge(credentials, if (changed && action.permission == NotificationPermission.Enabled) publishAppBadge(state) else Effect.none()))
     }
 
-    Action.NotifyPluginSetUpTapped -> {
-        if (state.connectionStatus == HomeConnectionFeature.State.ConnectionStatus.disconnected) {
-            Reduced(state)
-        } else {
-            val s = state.copy(settings = null)
-                .leavingCatchUp()
-                .openingDraft(reason = "notification setup")
-                .updatingDetail { it.setTyped(HomeFeature.notifyPluginSetUpPrompt) }
-            Reduced(s)
-        }
-    }
+    // Try It's path: onto the new-session draft, keeping anything already typed there.
+    Action.NotifyPluginSetUpTapped ->
+        tryWhatsNew(WhatsNewEntry.Destination.Prompt(HomeFeature.notifyPluginSetUpPrompt), "notification-plugin-setup", state)
 
     else -> Reduced(state)
 }

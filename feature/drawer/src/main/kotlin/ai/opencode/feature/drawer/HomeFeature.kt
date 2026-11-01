@@ -759,11 +759,14 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
     companion object {
         /** Asks the user's own OpenCode to install the plugin; they review it before sending. */
         val notifyPluginSetUpPrompt: String =
-            "Set up OpenCode iOS notifications on this server. Add \"${OpenCodeNotifyPluginStatus.PACKAGE_ENTRY}\" " +
-                "to the \"plugins\" array of my global OpenCode config (~/.config/opencode/opencode.json or opencode.jsonc, " +
-                "whichever exists), keeping every other entry and any comments. Don't restart the server: OpenCode reloads " +
-                "config changes on its own. Then confirm a plugin with ID \"${OpenCodeNotifyPluginStatus.PLUGIN_ID}\" is " +
-                "active (GET /api/plugin) and tell me if anything went wrong."
+            "Set up OpenCode iOS notifications on this server. Run `opencode plugin add " +
+                "${OpenCodeNotifyPluginStatus.PACKAGE_ENTRY}`, which installs the plugin and adds it to my global OpenCode " +
+                "config. If that command isn't available, add \"${OpenCodeNotifyPluginStatus.PACKAGE_ENTRY}\" to the \"plugins\" " +
+                "array of ~/.config/opencode/opencode.json (or opencode.jsonc, whichever exists), keeping every other entry " +
+                "and any comments. If the config lists \"${OpenCodeNotifyPluginStatus.LEGACY_PACKAGE_ENTRY}\", remove that entry. " +
+                "Don't restart the server: OpenCode reloads config changes on its own. Then confirm a plugin with ID " +
+                "\"${OpenCodeNotifyPluginStatus.PLUGIN_ID}\" is active (`opencode api get /api/plugin`). If it's listed but not " +
+                "active, tell me why (the server log says) before changing anything else. Tell me if anything went wrong."
 
         /** Mark All as Read receipts in flight at once. */
         const val receiptConcurrency = CatchUpFeature.receiptConcurrency
