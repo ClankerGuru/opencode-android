@@ -514,6 +514,8 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
             val dictationLiveActivity = dependency(DictationLiveActivityClient)
             Reduced(state, Effect.run { dictationLiveActivity.update(null, null) })
         }
+        // iOS AppFeature+LiveActivities' third ending (a followed run's activity, which can't
+        // update once its Home is gone) waits on drawer's `HomeFeature.State.sessionActivity`.
         .onChange({ it.keepsScreenAwake }) { _, keeps, state ->
             dependency(ScreenAwakeClient).set(keeps)
             Reduced(state)
