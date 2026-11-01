@@ -1,20 +1,18 @@
 package ai.opencode.feature.voice
 
+import ai.opencode.core.tuning.Tunable
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
 
 // Port of iOS `VoiceQuietGate.swift` (`extension ReplyWatch { struct QuietGate }`).
 // The type and its `note…` updates are declared in `ReplyWatch.kt` so it keeps
 // the name `ReplyWatch.QuietGate`; its policy lives here.
 
-/** The call's gate: 900 ms quiet, 1.5 s reply wait, 5 s max hold. */
-val ReplyWatch.QuietGate.Companion.live: ReplyWatch.QuietGate
-    get() = ReplyWatch.QuietGate(
-        quietWindow = 900.milliseconds,
-        replyWait = 1_500.milliseconds,
-        maxHold = 5.seconds,
-    )
+/** GPT-Live turn-taking, read when a call starts. */
+object VoiceTurnTunables {
+    val userQuietGap = Tunable("call.turns.userQuietGap", "Quiet Before Updates (s)", default = 2.0, range = 0.5..5.0, step = 0.1)
+    val micVoiceLevel = Tunable("call.turns.micVoiceLevel", "Mic Voice Level", default = 0.35, range = 0.05..0.9, step = 0.05)
+    val bargeIn = Tunable("call.turns.bargeIn", "Talk-Over Stop (s)", default = 0.6, range = 0.0..2.0, step = 0.1)
+}
 
 /** iOS `VoiceCallTiming.quietGate` (VoiceCallClient.swift): the gate for this call's timing. */
 val VoiceCallTiming.quietGate: ReplyWatch.QuietGate
@@ -22,6 +20,7 @@ val VoiceCallTiming.quietGate: ReplyWatch.QuietGate
         quietWindow = liveAppendQuiet,
         replyWait = liveAppendReplyWait,
         maxHold = liveAppendMaxHold,
+        userQuietGap = liveUserQuietGap,
     )
 
 fun ReplyWatch.QuietGate.delay(now: Duration): Duration? {
@@ -85,19 +84,39 @@ fun ReplyWatch.QuietGate.answerDelay(
 }
 
 /**
- * The user is speaking (their words arrived within the brief pause):
+ * Session context only: like [delay], and while a reply to the user's
+ * last words is due, until it starts or [replyHold] after those words.
+ */
+fun ReplyWatch.QuietGate.contextDelay(now: Duration, replyHold: Duration): Duration? {
+    val gate = delay(now) ?: Duration.ZERO
+    var due = Duration.ZERO
+    val spoke = lastUserSpeechAt
+    if (quietWindow > Duration.ZERO && spoke != null && (lastAssistantSpeechAt?.let { spoke > it } ?: true)) {
+        due = replyHold - (now - spoke)
+    }
+    val wait = maxOf(gate, due)
+    return if (wait > Duration.ZERO) wait else null
+}
+
+/**
+ * The user is speaking (their words or voice arrived within
+ * [ReplyWatch.QuietGate.userQuietGap], or the brief pause without one):
  * how much longer to hold, or null. Nothing caps this.
  */
 fun ReplyWatch.QuietGate.userSpeechHold(now: Duration): Duration? {
-    val spoke = lastUserSpeechAt
-    if (quietWindow <= Duration.ZERO || spoke == null) return null
-    val left = minOf(quietWindow, userPause) - (now - spoke)
+    if (quietWindow <= Duration.ZERO) return null
+    val heard = listOfNotNull(lastUserSpeechAt, lastUserVoiceAt).maxOrNull() ?: return null
+    val gap = if (userQuietGap > Duration.ZERO) userQuietGap else minOf(quietWindow, userPause)
+    val left = gap - (now - heard)
     return if (left > Duration.ZERO) left else null
 }
 
 fun ReplyWatch.QuietGate.holdReason(now: Duration): String {
     if (assistantSpeaking) {
         return "assistant speaking"
+    }
+    if (userSpeechHold(now) != null) {
+        return "user speaking"
     }
     val spoke = lastAssistantSpeechAt
     if (spoke != null && now - spoke < quietWindow) {

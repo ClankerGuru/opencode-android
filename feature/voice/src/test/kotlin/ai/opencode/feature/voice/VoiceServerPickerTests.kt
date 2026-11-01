@@ -67,7 +67,7 @@ class VoiceServerPickerTests {
     private fun resetSharedState(): SpeechTestShared = SpeechTestShared()
 
     /** `servers` saved and `server` the one in use, with Server Voice on and `choice` in Voice Server. */
-    private fun SpeechTestShared.save(servers: List<OpenCodeServer>, choice: VoiceServerChoice = VoiceServerChoice.Connected) = run {
+    private fun SpeechTestShared.save(servers: List<OpenCodeServer>, choice: VoiceServerChoice = VoiceServerChoice.Automatic) = run {
         shared(ServerSharedKeys.savedServers).set(servers)
         shared(ServerSharedKeys.savedServer).set(server)
         shared(experimental(ExperimentalFeature.serverVoice)).set(true)
@@ -111,16 +111,17 @@ class VoiceServerPickerTests {
             ),
             models,
         )
-        assertFalse("Only Grok has a key", ServerVoiceModels.offersVoice(models))
-
-        fun offers(model: String, available: Boolean = true): Boolean =
-            ServerVoiceModels.offersVoice(listOf(ServerVoiceModel(model = model, available = available)))
-        assertTrue(offers("gpt-live-1"))
-        assertTrue(offers("gpt-realtime-2.1"))
-        assertTrue(offers("gemini-3.8-live"))
-        assertFalse(offers("grok-voice-1"))
-        assertFalse(offers("gpt-live-1", available = false))
-        assertFalse("A server without the list (a 404)", ServerVoiceModels.offersVoice(emptyList()))
+        assertFalse("Only Grok has a key", ServerVoiceModels.offers(VoiceRoute.ServerRoute.OpenAI(VoiceRoute.OpenAI.gptLive), models))
+        assertTrue(ServerVoiceModels.offers(VoiceRoute.ServerRoute.OpenAI(VoiceRoute.OpenAI.gptLive), listOf(ServerVoiceModel(model = "gpt-live-1", available = true))))
+        assertTrue(
+            ServerVoiceModels.offers(
+                VoiceRoute.ServerRoute.OpenAI(VoiceRoute.OpenAI.realtime),
+                listOf(ServerVoiceModel(model = "gpt-realtime-2.1", available = true)),
+            ),
+        )
+        assertTrue(ServerVoiceModels.offers(VoiceRoute.ServerRoute.GeminiLive, listOf(ServerVoiceModel(model = "gemini-3.8-live", available = true))))
+        assertFalse(ServerVoiceModels.offers(VoiceRoute.ServerRoute.OpenAI(VoiceRoute.OpenAI.gptLive), listOf(ServerVoiceModel(model = "gpt-live-1", available = false))))
+        assertFalse("A server without the list (a 404)", ServerVoiceModels.offers(VoiceRoute.ServerRoute.OpenAI(VoiceRoute.OpenAI.gptLive), emptyList()))
     }
 
     private sealed interface Reply {
@@ -168,7 +169,8 @@ class VoiceServerPickerTests {
 
     /**
      * Settings, the session and Home route by the chosen server's support,
-     * never the connected server's. (Home's `VoiceRoutePreferences` here.)
+     * never the connected server's. A picked server without the voice routes
+     * fails rather than move to the phone's key. (Home's `VoiceRoutePreferences` here.)
      */
     @Test fun everyEntryPointRoutesByTheChosenServersSupport() {
         val shared = resetSharedState()
@@ -178,7 +180,7 @@ class VoiceServerPickerTests {
         val preferences = shared.run { VoiceRoutePreferences() }
 
         shared.setSupport(mapOf(server.persistenceID to ServerVoiceSupport.supported, studio.persistenceID to ServerVoiceSupport.unsupported))
-        assertEquals(VoiceRoute.PhoneKey(VoiceEngine.gptLive), shared.run { preferences.route(server) })
+        assertEquals(VoiceRoute.Unavailable(VoiceRoute.Reason.ServerUnsupported), shared.run { preferences.route(server) })
 
         shared.setSupport(mapOf(server.persistenceID to ServerVoiceSupport.unsupported, studio.persistenceID to ServerVoiceSupport.supported))
         assertEquals(VoiceRoute.Server(VoiceRoute.ServerRoute.OpenAI(VoiceRoute.OpenAI.gptLive)), shared.run { preferences.route(server) })
@@ -241,6 +243,8 @@ class VoiceServerPickerTests {
         store.send(VoiceFeature.Action.Start) {
             it.copy(
                 serverVoiceBroker = studio,
+                diagnosesFailure = true,
+                callPlace = VoiceCallPlace("Studio", VoiceProviderOption.Brand.openAI),
                 startedTarget = VoiceWorkTarget(server = server, sessionID = session.id, directory = session.directory),
                 activeRoute = VoiceRoute.Server(VoiceRoute.ServerRoute.OpenAI(VoiceRoute.OpenAI.gptLive)),
                 activeEngine = VoiceEngine.gptLive,
@@ -304,6 +308,8 @@ class VoiceServerPickerTests {
             it.copy(
                 serverVoiceBroker = null,
                 serverVoiceSupport = ServerVoiceSupport.unknown,
+                diagnosesFailure = true,
+                callPlace = VoiceCallPlace("My Mac", VoiceProviderOption.Brand.openAI),
                 startedTarget = VoiceWorkTarget(server = server, sessionID = session.id, directory = session.directory),
                 activeRoute = VoiceRoute.Server(VoiceRoute.ServerRoute.OpenAI(VoiceRoute.OpenAI.gptLive)),
                 callPresenceID = presenceID,
@@ -368,6 +374,7 @@ class VoiceServerPickerTests {
 
         store.send(VoiceFeature.Action.Start) {
             it.copy(
+                diagnosesFailure = true,
                 startedTarget = VoiceWorkTarget(server = server, sessionID = session.id, directory = session.directory),
                 callPresenceID = presenceID,
             )
@@ -417,6 +424,8 @@ class VoiceServerPickerTests {
 
         store.send(VoiceFeature.Action.Start) {
             it.copy(
+                diagnosesFailure = true,
+                callPlace = VoiceCallPlace("My Mac", VoiceProviderOption.Brand.openAI),
                 startedTarget = VoiceWorkTarget(server = server, sessionID = session.id, directory = session.directory),
                 activeRoute = VoiceRoute.Server(VoiceRoute.ServerRoute.OpenAI(VoiceRoute.OpenAI.gptLive)),
                 callPresenceID = presenceID,

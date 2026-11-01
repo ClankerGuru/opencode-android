@@ -29,6 +29,17 @@ class AudioSessionOwner(
     private val ready = mutableSetOf<Int>()
     val activeCount: Int get() = synchronized(lock) { active.size }
 
+    /**
+     * Runs [body] under the lock with whether no holder has the session (no call, dictation or
+     * media), so none activates midway. For sounds that borrow the idle session (Sound Effects).
+     */
+    fun <T> withIdleState(body: (isIdle: Boolean) -> T): T = synchronized(lock) { body(active.isEmpty()) }
+
+    /** Stops a borrowed sound as a holder activates, under the lock and before the holder touches the session. */
+    private var borrowerStop: (() -> Unit)? = null
+
+    fun onHolderActivating(stop: () -> Unit) = synchronized(lock) { borrowerStop = stop }
+
     fun holder(deactivate: () -> Unit): Holder = synchronized(lock) {
         Holder(++nextID, deactivate).also { live.add(nextID) }
     }
@@ -56,6 +67,7 @@ class AudioSessionOwner(
     inner class Holder internal constructor(private val id: Int, private val deactivate: () -> Unit) : AutoCloseable {
         fun activate(body: () -> Unit) = synchronized(lock) {
             if (id !in live || Thread.currentThread().isInterrupted) throw CancellationException()
+            borrowerStop?.invoke()
             active.add(id)
             ready.remove(id)
             epoch++
@@ -69,8 +81,16 @@ class AudioSessionOwner(
             if (id !in live || id !in ready || Thread.currentThread().isInterrupted) throw CancellationException()
             body()
         }
+        /**
+         * Ends admission without touching the OS session: later activations and engine starts
+         * throw, and [release] still deactivates. For a hang-up that lands while another thread
+         * configures the engine (on iOS, deactivating alongside the engine's setup deadlocked
+         * audiomxd).
+         */
+        fun withdraw() = synchronized(lock) { live.remove(id); ready.remove(id); Unit }
+        /** Whether this was the last holder and the session deactivated. A refused deactivation returns false and retries in the background. */
         fun release(): Boolean = synchronized(lock) {
-            if (!live.remove(id)) return@synchronized false
+            live.remove(id)
             ready.remove(id)
             if (!active.remove(id) || active.isNotEmpty()) return@synchronized false
             deactivate(deactivate)

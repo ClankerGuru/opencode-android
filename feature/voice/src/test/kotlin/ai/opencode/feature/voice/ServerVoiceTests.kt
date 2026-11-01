@@ -253,6 +253,8 @@ class ServerVoiceTests {
 
         openAIStore.send(VoiceFeature.Action.Start) {
             it.copy(
+                diagnosesFailure = true,
+                callPlace = VoiceCallPlace("Server 1", VoiceProviderOption.Brand.openAI),
                 activeRoute = VoiceRoute.Server(VoiceRoute.ServerRoute.OpenAI(VoiceRoute.OpenAI.gptLive)),
                 startedTarget = startedTarget(),
                 activeEngine = VoiceEngine.gptLive,
@@ -298,6 +300,8 @@ class ServerVoiceTests {
 
         geminiStore.send(VoiceFeature.Action.Start) {
             it.copy(
+                diagnosesFailure = true,
+                callPlace = VoiceCallPlace("Server 1", VoiceProviderOption.Brand.gemini),
                 activeRoute = VoiceRoute.Server(VoiceRoute.ServerRoute.GeminiLive),
                 startedTarget = startedTarget(),
                 activeEngine = null,
@@ -357,6 +361,8 @@ class ServerVoiceTests {
 
         store.send(VoiceFeature.Action.Start) {
             it.copy(
+                diagnosesFailure = true,
+                callPlace = VoiceCallPlace("Server 1", VoiceProviderOption.Brand.openAI),
                 activeRoute = VoiceRoute.Server(VoiceRoute.ServerRoute.OpenAI(VoiceRoute.OpenAI.gptLive)),
                 startedTarget = startedTarget(),
                 activeEngine = VoiceEngine.gptLive,
@@ -371,6 +377,7 @@ class ServerVoiceTests {
         }
         assertEquals(ServerVoiceSupport.unsupported, shared.run { shared(VoiceSharedKeys.serverVoiceSupportByServer).value[server.persistenceID] })
         store.receive(VoiceFeature.Action.Delegate(VoiceFeature.DelegateAction.ServerVoiceSupportChanged(ServerVoiceSupport.unsupported)))
+        store.receive(VoiceFeature.Action.CallPlaceChanged(null)) { it.copy(callPlace = null) }
         store.receive(VoiceFeature.Action.CallRouteResolved(VoiceRoute.PhoneKey(VoiceEngine.gptLive), usesDelegator = false)) {
             it.copy(activeRoute = VoiceRoute.PhoneKey(VoiceEngine.gptLive))
         }
@@ -432,6 +439,7 @@ class ServerVoiceTests {
 
         store.send(VoiceFeature.Action.Start) {
             it.copy(
+                diagnosesFailure = true,
                 activeRoute = VoiceRoute.Unavailable(VoiceRoute.Reason.ServerUnsupported),
                 startedTarget = startedTarget(),
                 activeEngine = null,
@@ -483,6 +491,8 @@ class ServerVoiceTests {
 
         store.send(VoiceFeature.Action.Start) {
             it.copy(
+                diagnosesFailure = true,
+                callPlace = VoiceCallPlace("Server 1", VoiceProviderOption.Brand.openAI),
                 activeRoute = VoiceRoute.Server(VoiceRoute.ServerRoute.OpenAI(VoiceRoute.OpenAI.gptLive)),
                 startedTarget = startedTarget(),
                 activeEngine = VoiceEngine.gptLive,
@@ -863,6 +873,8 @@ class ServerVoiceTests {
 
         store.send(VoiceFeature.Action.Start) {
             it.copy(
+                diagnosesFailure = true,
+                callPlace = VoiceCallPlace("Server 1", VoiceProviderOption.Brand.openAI),
                 activeRoute = VoiceRoute.Server(VoiceRoute.ServerRoute.OpenAI(VoiceRoute.OpenAI.gptLive)),
                 startedTarget = startedTarget(),
                 activeEngine = VoiceEngine.gptLive,

@@ -34,7 +34,8 @@ val ExperimentalFeature.group: ExperimentalGroup
         ExperimentalFeature.projectIcons, ExperimentalFeature.sessionSwitcher,
         ExperimentalFeature.serverTitleSwitch, ExperimentalFeature.serverDetails -> ExperimentalGroup.drawer
         ExperimentalFeature.inAppBrowser -> ExperimentalGroup.transcript
-        ExperimentalFeature.serverVoice, ExperimentalFeature.backgroundCallIntent -> ExperimentalGroup.calls
+        ExperimentalFeature.serverVoice, ExperimentalFeature.backgroundCallIntent,
+        ExperimentalFeature.voiceSessionDelegator -> ExperimentalGroup.calls
     }
 
 /** Written by Settings' Call Style menu rather than shown as a switch. */

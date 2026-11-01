@@ -26,6 +26,7 @@ import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.OpenCodeTransport
 import ai.opencode.server.model.OpenCodeHomeSnapshot
 import ai.opencode.server.model.OpenCodeModelRef
+import ai.opencode.server.model.OpenCodePendingRequests
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.OpenCodeUploadEvent
 import ai.opencode.server.retry.NetworkRetry
@@ -329,6 +330,7 @@ class VoiceLatencyBudgetTests {
                 prompts.increment()
                 "msg_1"
             },
+            familyPendingRequests = { _, _, _ -> OpenCodePendingRequests(permissions = emptyList(), forms = emptyList()) },
         )
         val opus = OpenCodeModelRef(id = "claude-opus-4-6", providerID = "anthropic", variant = "max")
         val result = real { obj(workspace(client, viewing = ear, viewingModel = opus), "send_message", """{"text":"Fix it"}""") }
@@ -536,6 +538,7 @@ class VoiceLatencyBudgetTests {
                 prompts.append(text)
                 "msg_log"
             },
+            familyPendingRequests = { _, _, _ -> OpenCodePendingRequests(permissions = emptyList(), forms = emptyList()) },
         )
         val log = VoiceCallLog(id = UUID.randomUUID(), startedAt = date(1_000), title = "Voice lab", engine = "gptLive")
             .let { it.copy(notes = it.notes + VoiceCallLog.Note(id = 1, t = 1.0, kind = VoiceCallLog.Note.Kind.marker, text = "Marker one")) }

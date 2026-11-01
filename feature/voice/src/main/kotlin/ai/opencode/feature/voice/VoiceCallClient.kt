@@ -67,6 +67,12 @@ class VoiceCallClient(
     val submitDelegatorInput: suspend (delegationID: String, input: List<VoiceDelegator.InputItem>) -> Boolean = { _, _ -> false },
     /** Server Voice: the backend delegator's new instructions, as the screen moves. */
     val updateDelegatorInstructions: suspend (instructions: String) -> Unit = { },
+    /**
+     * GPT-Live: returns when the user next says words, so a delegator wait
+     * can end and free the voice agent to answer them. Otherwise it returns
+     * only once cancelled.
+     */
+    val nextUserWords: suspend () -> Unit = { untilCancelled() },
 ) {
     suspend fun announce(sessionID: String, promptIDs: List<String>, text: String) {
         val announceSession = announceSession
@@ -77,6 +83,8 @@ class VoiceCallClient(
         get() = VoiceDelegatorRounds(next = delegatorRound, submit = submitDelegatorInput)
 
     companion object Key : DependencyKey<VoiceCallClient> {
+        suspend fun untilCancelled(): Unit = kotlinx.coroutines.awaitCancellation()
+
         override val liveValue: VoiceCallClient by lazy {
             if (VoiceLabDemo.isEnabled) VoiceLabDemo.call else {
                 val host = VoiceCallHost()
@@ -100,6 +108,7 @@ class VoiceCallClient(
                     delegatorRound = host::delegatorRound,
                     submitDelegatorInput = host::submitDelegatorInput,
                     updateDelegatorInstructions = host::updateDelegatorInstructions,
+                    nextUserWords = host::nextUserWords,
                 )
             }
         }
@@ -176,6 +185,12 @@ data class VoiceCallTiming(
      */
     val liveAppendReplyWait: Duration = Duration.ZERO,
     /**
+     * Session context (instructions) has nothing to say, and cutting off the
+     * reply the user is owed costs the turn: held alone, it waits for that
+     * reply to start, up to this long after the user's last words.
+     */
+    val liveContextReplyHold: Duration = Duration.ZERO,
+    /**
      * Maximum time an append may be held while assistant audio is not playing,
      * so continuous user fragments or background noise cannot hold a completion
      * notice forever.
@@ -209,6 +224,29 @@ data class VoiceCallTiming(
      * replace it.
      */
     val liveAnswerStartWait: Duration = Duration.ZERO,
+    /**
+     * How long the user must have been quiet (no words transcribed and no
+     * voice on the microphone) before anything held for them is sent. Zero:
+     * a brief pause after their last transcript fragment (`liveAppendQuiet`,
+     * at most 450 ms), the coordinator tests' default.
+     */
+    val liveUserQuietGap: Duration = Duration.ZERO,
+    /**
+     * Microphone level (`VoiceAudioLevels` scale, 0–1) at which a capture
+     * chunk counts as the user's voice. Zero: the microphone isn't read.
+     */
+    val liveMicVoiceLevel: Float = 0f,
+    /**
+     * The microphone counts as the user talking only while their words were
+     * transcribed this recently, so a noise with no words never holds updates.
+     */
+    val liveMicVoiceWordWindow: Duration = 6.seconds,
+    /**
+     * The user talking over the voice agent this long (their voice on the
+     * microphone, with words transcribed over its speech) stops its audio.
+     * Zero: off, full duplex.
+     */
+    val liveBargeIn: Duration = Duration.ZERO,
 ) {
     // iOS `quietGate` (a `ReplyWatch.QuietGate`) is an extension next to ReplyWatch.
 
@@ -236,14 +274,23 @@ data class VoiceCallTiming(
                 return timing.copy(
                     liveAppendQuiet = 900.milliseconds,
                     liveAppendReplyWait = 1_500.milliseconds,
-                    liveAppendMaxHold = 5.seconds,
+                    liveContextReplyHold = 8.seconds,
+                    // No caps: an update waits for a real quiet moment however long that
+                    // takes (Kit's Oct 30 call: a 5 s cap sent one 1.5 s into a pause in his
+                    // dictation, and the voice agent talked over him for 9 s).
+                    liveAppendMaxHold = Duration.ZERO,
+                    liveUserQuietGap = Math.round(VoiceTurnTunables.userQuietGap.value * 1_000).milliseconds,
+                    liveMicVoiceLevel = VoiceTurnTunables.micVoiceLevel.value.toFloat(),
+                    liveBargeIn = Math.round(VoiceTurnTunables.bargeIn.value * 1_000).milliseconds,
                     liveAnswerPressedHold = 2_500.milliseconds,
-                    liveResultMaxHold = 5.seconds,
+                    liveResultMaxHold = Duration.ZERO,
                     liveAnswerSpeakingHold = 15.seconds,
                     liveAnswerStartWait = 1_200.milliseconds,
                     liveUnbackedClaimWait = 1_500.milliseconds,
                 )
             }
+
+        val sessionDelegatorUnbackedClaimWait: Duration = 900.milliseconds
 
         private fun Instant.plusSeconds(seconds: Double): Instant = plusNanos(Math.round(seconds * 1e9))
     }

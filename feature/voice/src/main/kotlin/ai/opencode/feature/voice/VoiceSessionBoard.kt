@@ -39,6 +39,8 @@ data class VoiceSessionBoard(
     val isLive: Boolean,
     /** Home's latest attention read succeeded. Filled in by the client. */
     val attentionKnown: Boolean = false,
+    /** The drawer and composer, for a Developer Mode screenshot's app state. */
+    val home: VoiceAppState.Home? = null,
 ) {
     /** A yes/no answer the tools can also report as unknown. */
     enum class Flag {
@@ -99,6 +101,8 @@ data class VoiceSessionBoard(
             pinnedSessionKeys: List<String>,
             attentionDirectories: Set<String>,
             isLive: Boolean,
+            /** Home's app state for Developer Mode screenshots (iOS `voiceAppStateHome`), else null. */
+            home: VoiceAppState.Home? = null,
         ): VoiceSessionBoard? {
             if (!hasVoiceCall) return null
             val prefix = "$serverID|"
@@ -111,6 +115,7 @@ data class VoiceSessionBoard(
                 pinnedIDs = pinnedSessionKeys.mapNotNull { key -> if (key.startsWith(prefix)) key.removePrefix(prefix) else null },
                 attentionDirectories = attentionDirectories,
                 isLive = isLive,
+                home = home,
             )
         }
     }

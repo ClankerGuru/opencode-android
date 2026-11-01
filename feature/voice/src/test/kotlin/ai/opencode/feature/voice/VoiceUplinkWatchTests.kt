@@ -107,7 +107,12 @@ class ReplyWatchCoreTests {
 
         private fun succeeded(text: String) = Step(
             event = Event.WaitSucceeded(promptID = "msg_blog", reply = text),
-            expectedEffects = listOf(Effect.CancelWatch(promptID = "msg_blog"), resolved(text), announce(text)),
+            expectedEffects = listOf(
+                Effect.CancelWatch(promptID = "msg_blog"),
+                resolved(text),
+                announce(text),
+                Effect.FindBackgroundWork(sessionID = "ses_blog", promptID = "msg_blog", title = "Blog game", turn = 0, reply = text),
+            ),
         )
 
         private fun settled(source: SettlementSource) = listOf(
@@ -253,6 +258,6 @@ class ReplyWatchCoreTests {
             needsInput = true,
             draftDirectory = viewing.directory,
         )
-        assertTrue(activeViewing.contains("The user is viewing session \"OPENCODE IOS\" (id ses_ios, project opencode-ios, working). It is waiting on the user's approval or answer in the app."))
+        assertTrue(activeViewing.contains("The user is viewing session \"OPENCODE IOS\" (id ses_ios, project opencode-ios, working). It is waiting on a pending request: the user's approval or answer goes through list_requests and answer_question or reply_permission, never send_message."))
     }
 }

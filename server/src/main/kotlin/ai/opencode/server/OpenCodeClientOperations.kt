@@ -6,6 +6,7 @@ import ai.opencode.server.model.OpenCodeDelivery
 import ai.opencode.server.model.OpenCodeFileReference
 import ai.opencode.server.model.OpenCodeFormValue
 import ai.opencode.server.model.OpenCodeHomeSnapshot
+import ai.opencode.server.model.OpenCodeOutgoingAttachment
 import ai.opencode.server.model.OpenCodeTranscriptItem
 import ai.opencode.server.model.PromptContext
 import ai.opencode.server.model.SessionActivity
@@ -46,16 +47,17 @@ suspend fun OpenCodeClient.sendPromptConfirming(
     text: String,
     delivery: OpenCodeDelivery,
     files: List<OpenCodeFileReference> = emptyList(),
+    attachments: List<OpenCodeOutgoingAttachment> = emptyList(),
     readBack: Duration = 1500.milliseconds,
     messageID: String? = null,
 ): String {
     val id = messageID ?: ServerIDClient.currentMessageID()
     val error = try {
         return PromptContext.messageID.withValue(id) {
-            if (files.isEmpty()) {
+            if (files.isEmpty() && attachments.isEmpty()) {
                 sendDeliveredPrompt(server, sessionID, text, delivery)
             } else {
-                sendPrompt(server, sessionID, text, emptyList(), files, id, delivery)
+                sendPrompt(server, sessionID, text, attachments, files, id, delivery)
                 id
             }
         }

@@ -3,11 +3,12 @@ package ai.opencode.feature.voice
 import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.server.model.OpenCodeDelivery
 import ai.opencode.server.model.OpenCodeFileReference
+import ai.opencode.server.model.OpenCodeOutgoingAttachment
 
 /**
  * A Voice message the server admitted into a session: the voice-owned stand-in
- * for iOS `SessionFeature.PendingPrompt` as voice builds it (no inline
- * attachments, `requestEpoch` 0). Session/Composer sit above voice, so voice
+ * for iOS `SessionFeature.PendingPrompt` as voice builds it (`requestEpoch` 0;
+ * inline attachments only for a Developer Mode screenshot). Session/Composer sit above voice, so voice
  * hands this to [VoiceAdmissionRecorder] and the app maps it onto its own
  * pending prompt. Path attachments carry [OpenCodeFileReference] (iOS wraps them
  * in `ComposerFileAttachment(uploaded:)`).
@@ -15,6 +16,8 @@ import ai.opencode.server.model.OpenCodeFileReference
 data class VoiceAdmittedPrompt(
     val messageID: String,
     val text: String,
+    /** A Developer Mode screenshot and app log (`capture_app_screenshot`). */
+    val attachments: List<OpenCodeOutgoingAttachment> = emptyList(),
     val files: List<OpenCodeFileReference> = emptyList(),
     val delivery: OpenCodeDelivery = OpenCodeDelivery.Steer,
     /**

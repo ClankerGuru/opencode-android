@@ -143,7 +143,8 @@ object ServerVoiceModels {
     /**
      * Whether a server listing `models` can broker a call: it holds a key for
      * GPT-Live, Realtime or Gemini Live. Grok never counts, since a Grok call
-     * always uses the phone's xAI key (`VoiceRoute.resolve`).
+     * always uses the phone's xAI key (`VoiceRoute.resolve`). iOS dropped it (89231d5f) with
+     * its Voice Server picker; kept until Settings' picker moves to the Voice Provider page.
      */
     fun offersVoice(models: List<ServerVoiceModel>): Boolean = models.any { it.available && brokered(it.model) != null }
 
@@ -153,6 +154,10 @@ object ServerVoiceModels {
      */
     fun hostedByOpenCode(call: VoiceRoute.ServerRoute, models: List<ServerVoiceModel>): Boolean =
         models.any { it.available && it.provider == "opencode" && brokered(it.model) == call }
+
+    /** Whether a server listing `models` holds a key for `call`. */
+    fun offers(call: VoiceRoute.ServerRoute, models: List<ServerVoiceModel>): Boolean =
+        models.any { it.available && brokered(it.model) == call }
 
     /**
      * The call a server's model brokers, by family, as the server resolves a
@@ -177,12 +182,23 @@ fun voiceServerID(server: OpenCodeServer): String =
         .take(4).joinToString("") { "%02x".format(it) }
 
 /**
- * Settings › Voice › Voice Server: which server brokers Server Voice calls.
- * Stored without addresses: a saved server by [voiceServerID].
+ * Settings › Voice › Voice Provider: where Server Voice calls go. Stored
+ * without addresses: a saved server by [voiceServerID].
  */
 @Serializable(with = VoiceServerChoice.Serializer::class)
 sealed interface VoiceServerChoice {
-    /** The server the window is connected to, as before there was a choice. */
+    /**
+     * The first provider that can place the call ([VoicePick.resolve]). The
+     * default, and what earlier builds' “connected server” reads as: it
+     * already moved to the phone's key when the server couldn't.
+     */
+    data object Automatic : VoiceServerChoice
+
+    /**
+     * Read only: an earlier pin of “whichever server is connected”.
+     * [pinningConnected] turns it into that server's own pin, so a
+     * pick never follows a server switch.
+     */
     data object Connected : VoiceServerChoice
 
     /** None: calls use this iPhone's own OpenAI or xAI key. */
@@ -191,10 +207,17 @@ sealed interface VoiceServerChoice {
 
     val rawValue: String
         get() = when (this) {
-            Connected -> ""
+            Automatic -> ""
+            Connected -> "connected"
             Phone -> "phone"
             is Saved -> serverID
         }
+
+    /** A legacy [Connected] pin as the server connected now; any other choice as it is. */
+    fun pinningConnected(server: OpenCodeServer?): VoiceServerChoice {
+        if (this != Connected || server == null) return this
+        return of(server)
+    }
 
     /** The saved server this choice names, if it's still saved. */
     fun savedServer(servers: List<OpenCodeServer>): OpenCodeServer? {
@@ -205,7 +228,8 @@ sealed interface VoiceServerChoice {
     companion object {
         /** iOS `init(rawValue:)`. */
         fun of(rawValue: String): VoiceServerChoice = when (rawValue) {
-            "" -> Connected
+            "" -> Automatic
+            "connected" -> Connected
             "phone" -> Phone
             else -> Saved(rawValue)
         }

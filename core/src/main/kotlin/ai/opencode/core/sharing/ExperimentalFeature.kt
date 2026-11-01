@@ -31,6 +31,7 @@ enum class ExperimentalFeature(val rawValue: String, val title: String, val summ
     inAppBrowser("in-app-browser", "In-App Browser", "Open web pages inside a session", "safari"),
     serverVoice("server-voice", "Server Voice", "Server-key calls and Gemini Live", "waveform"),
     backgroundCallIntent("background-call-intent", "Background Action Button Call", "Calls start without opening the app", "button.programmable"),
+    voiceSessionDelegator("voice-session-delegator", "OpenCode Session Delegator", "Delegate calls to an OpenCode session", "bubble.left.and.bubble.right"),
     ;
 
     /** Whether this experiment is on in a view, from its stored switch. */
