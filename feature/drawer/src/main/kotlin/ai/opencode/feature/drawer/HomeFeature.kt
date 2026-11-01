@@ -1142,6 +1142,19 @@ private fun HomeFeature.State.syncingOutgoingDetailDraft(targetIsDraft: Boolean 
 }
 
 /**
+ * iOS `restorePersistedPick(into:)`: a relaunch brings back the session's waiting model pick,
+ * unless the server's list (once loaded) no longer offers it.
+ */
+internal fun HomeFeature.State.restoringPersistedPick(detail: SessionFeature.State): SessionFeature.State =
+    dependency(ComposerPersistence).restorePersistedPick(
+        serverID = server.persistenceID,
+        session = detail.session,
+        pendingModel = detail.pendingModel,
+        hasSnapshot = detail.session?.let { sessionSnapshots[it.id] } != null,
+        models = detail.models,
+    )?.let { pick -> detail.copy(currentModel = pick, pendingModel = pick) } ?: detail
+
+/**
  * A parked or persisted composer comes back with its session (iOS `restorePersistedDraft(into:)`),
  * and a draft whose send already created its session becomes that session.
  */
@@ -1154,14 +1167,7 @@ private fun HomeFeature.State.restoringPersistedDraft(
     val persistence = dependency(ComposerPersistence)
     var s = this
     var next = detail
-    // iOS `restorePersistedPick(into:)`: a relaunch brings back the session's waiting model pick.
-    persistence.restorePersistedPick(
-        serverID = server.persistenceID,
-        session = next.session,
-        pendingModel = next.pendingModel,
-        hasSnapshot = next.session?.let { sessionSnapshots[it.id] } != null,
-        models = next.models,
-    )?.let { pick -> next = next.copy(currentModel = pick, pendingModel = pick) }
+    next = restoringPersistedPick(next)
     if (next.session == null) {
         val entry = persistence.loadOutbox(server.persistenceID, null).firstOrNull()
         if (entry != null) {

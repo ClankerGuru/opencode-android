@@ -151,8 +151,9 @@ lists them by name. "Dropped" tests can't exist as JVM unit tests. Tests needing
 | `OnePickerTests.swift` | `modelpicker/OnePickerTests.kt` | 8 (catalog idle/curated/search sections, provider marks (asset names and initials; the template image is UIKit), morph trajectory, mid-flight reversal, interactive drag, keyboard drop on open) | – | 6: the reducer step (One Picker's `SessionFeature` wiring is session's), `tunablesRegisterAndUnregisterCleanly` (Tuning Panel), and 4 UIKit window/layer rigs |
 | `OnePickerSettlingTests.swift` | `modelpicker/OnePickerSettlingTests.kt` | 7 (on `OnePickerController`/`OnePickerSimulation`: close landing on the moved composer, keyboard changes while closing, stale rest, detents) | – | 2: `cancelledPullDownSettlesThroughTheLatestCallbacks` (UIKit `OnePickerListView`), `focusRestoreRefusedWhileTheSessionSheetLeavesWaitsForItsDismiss` (`UITextView`) |
 | `SlowMotionTests.swift` | – | 0 | – | All 4 (iOS `Tuning/TuningFeature`'s `SlowMotion` and the Tuning Panel's quick toggle; Android doesn't port the Tuning Panel, `:devtools` has its own Slow Motion row). |
+| `SessionStatePersistenceTests.swift` | `SessionStatePersistenceTests.kt` | 3 of 6 (storage: `savedStateSurvivesARelaunchAndClearsWithItsSession`, `nothingLeftToKeepDropsTheRecord`, `filesWrittenBeforeSessionStatesStillDecode`; the request half is `:feature:session`’s, the Home half `:feature:drawer`’s) |
 
-Total (`./gradlew :feature:composer:testDebugUnitTest`): 245 tests, 0 failures.
+Total (`./gradlew :feature:composer:testDebugUnitTest`): 270 tests, 0 failures.
 
 Composer-named files owned elsewhere: `SessionFeatureTests+Composer/+Dictation/+ModelPicks` (`:feature:session`),
 `ShareComposerTests` (system/drawer; its `SharedComposerDraft`/`PromptOutbox` tests are here), `PairingPasteTests` (`:app`, ported there), `AgentFileTests` (media/transcript),

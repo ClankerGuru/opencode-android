@@ -279,15 +279,16 @@ fun ComposerFoldLayout(
         }
         val sizes = placeables.map { it.height.toFloat() }
         val gap = spacing.toPx()
-        val open = ComposerFoldFrames.frames(sizes, folds, firstStayingFoldTop.toFloat(), isFolded = false, attachmentRevealProgress, gap)
-        val folded = ComposerFoldFrames.frames(sizes, folds, firstStayingFoldTop.toFloat(), isFolded = true, attachmentRevealProgress, gap)
         val p = foldProgress.coerceIn(0f, 1f)
-        val lower = open.visible.start + (folded.visible.start - open.visible.start) * p
-        val upper = open.visible.endInclusive + (folded.visible.endInclusive - open.visible.endInclusive) * p
-        val height = (upper - lower).roundToInt().coerceAtLeast(0)
+        val result = ComposerFoldFrames.frames(
+            sizes, folds, firstStayingFoldTop.toFloat(), isFolded = p >= 1f, foldProgress = p,
+            attachmentRevealProgress = attachmentRevealProgress, spacing = gap,
+        )
+        val lower = result.visible.start
+        val height = (result.visible.endInclusive - lower).roundToInt().coerceAtLeast(0)
         layout(width, height) {
             placeables.forEachIndexed { index, placeable ->
-                placeable.place(0, (open.frames[index] - lower).roundToInt())
+                placeable.place(0, (result.frames[index] - lower).roundToInt())
             }
         }
     }
@@ -295,7 +296,11 @@ fun ComposerFoldLayout(
 
 private val Measurable.folds: Boolean get() = layoutId == ComposerFoldsMarker
 
-/** iOS `ComposerFoldLayout`'s static geometry: each child's top, and the visible range. */
+/**
+ * iOS `ComposerFoldLayout`'s static geometry: each child's top, and the visible range.
+ * `foldProgress` (default: `isFolded`'s end) blends the unfolded and the folded ranges, so the
+ * column's height passes through every height in between (iOS f0670c5d).
+ */
 object ComposerFoldFrames {
     data class Result(val frames: List<Float>, val visible: ClosedFloatingPointRange<Float>)
 
@@ -304,13 +309,14 @@ object ComposerFoldFrames {
         locationPresented: Boolean,
         hasNonLocationAttachments: Boolean,
         reduceMotion: Boolean,
-    ): Float = if (!locationMounted || hasNonLocationAttachments || reduceMotion) 1f else if (locationPresented) 1f else 0f
+    ): Float = if (reduceMotion || hasNonLocationAttachments || (locationMounted && locationPresented)) 1f else 0f
 
     fun frames(
         sizes: List<Float>,
         folds: List<Boolean>,
         firstStayingFoldTop: Float = 0f,
         isFolded: Boolean,
+        foldProgress: Float? = null,
         attachmentRevealProgress: Float = 1f,
         spacing: Float = 8f,
     ): Result {
@@ -321,13 +327,18 @@ object ComposerFoldFrames {
             tops += y
             y += size
         }
+        val fold = (foldProgress ?: if (isFolded) 1f else 0f).coerceIn(0f, 1f)
         val clampedReveal = attachmentRevealProgress.coerceIn(0f, 1f)
-        if (!isFolded && clampedReveal >= 1f) return Result(tops, 0f..y)
         val staying = tops.indices.filter { !folds[it] }
-        val first = staying.firstOrNull() ?: return Result(tops, 0f..y)
+        val first = staying.firstOrNull()
+        val unfolded = if (first != null && clampedReveal < 1f) tops[first] * (1 - clampedReveal)..y else 0f..y
+        if (fold <= 0f || first == null) return Result(tops, unfolded)
         val last = staying.last()
-        if (!isFolded) return Result(tops, tops[first] * (1 - clampedReveal)..y)
-        return Result(tops, (tops[first] + firstStayingFoldTop)..(tops[last] + sizes[last]))
+        val folded = (tops[first] + firstStayingFoldTop)..(tops[last] + sizes[last])
+        if (fold >= 1f) return Result(tops, folded)
+        val lower = unfolded.start + (folded.start - unfolded.start) * fold
+        val upper = unfolded.endInclusive + (folded.endInclusive - unfolded.endInclusive) * fold
+        return Result(tops, lower..maxOf(lower, upper))
     }
 }
 
