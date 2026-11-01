@@ -180,6 +180,7 @@ class ShareTargetsPublication(
         )
         val serverID = server.persistenceID
         fun sessionKey(id: String) = "$serverID|$id"
+        val sessions = sessions.filterNot { it.isArchived }
         val keys = pinnedSessionKeys
         val pinnedSet = keys.toSet()
         val indexed = if (pinnedSet.isEmpty()) emptyMap() else {

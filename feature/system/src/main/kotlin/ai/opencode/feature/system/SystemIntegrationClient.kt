@@ -112,7 +112,7 @@ class SystemPublication(
             )
             val prefix = server.persistenceID + "|"
             val pinnedIDs = pinnedSessionKeys.mapNotNull { key -> if (key.startsWith(prefix)) key.removePrefix(prefix) else null }
-            val roots = sessions.filter { it.parentID == null }.sortedByDescending { it.updatedAt }
+            val roots = sessions.filter { it.parentID == null && !it.isArchived }.sortedByDescending { it.updatedAt }
             val kept = roots.take(SessionDirectory.MAXIMUM_SESSIONS).toMutableList()
             val keptIDs = kept.map { it.id }.toSet()
             kept += roots.filter { it.id in pinnedIDs && it.id !in keptIDs }
@@ -141,7 +141,8 @@ fun List<OpenCodeSession>.hasSameDirectoryMetadata(other: List<OpenCodeSession>)
     if (this === other || this == other) return true
     return zip(other).all { (a, b) ->
         a.id == b.id && a.title == b.title && a.projectID == b.projectID &&
-            a.directory == b.directory && a.updatedAt == b.updatedAt && a.parentID == b.parentID
+            a.directory == b.directory && a.updatedAt == b.updatedAt && a.parentID == b.parentID &&
+            a.isArchived == b.isArchived
     }
 }
 
