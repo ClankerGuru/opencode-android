@@ -1,6 +1,9 @@
 package ai.opencode.server
 
 import ai.opencode.server.retry.TransportFailure
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import java.math.RoundingMode
 import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
@@ -32,6 +35,12 @@ data class OpenCodeClientError(
     /** The iOS `URLError` code equivalent of the transport exception (see [UrlErrorCode]). */
     val urlErrorCode: Int? = null,
 ) : Exception(message) {
+
+    /**
+     * The server answered `LocationNotFoundError`: the folder the request is scoped to (a
+     * session's, say) no longer exists on the computer.
+     */
+    val isLocationMissing: Boolean get() = message == FOLDER_GONE_MESSAGE
 
     val isRetryableWaitError: Boolean
         get() {
@@ -73,6 +82,17 @@ data class OpenCodeClientError(
 
     companion object {
         const val UNREACHABLE_MESSAGE = "Couldn’t reach the OpenCode server"
+        const val FOLDER_GONE_MESSAGE = "The folder is gone"
+
+        /** A 404 whose body is the server's tagged `LocationNotFoundError`. */
+        fun isLocationMissing(status: Int, body: ByteArray): Boolean {
+            if (status != 404) return false
+            val tag = runCatching {
+                ((Json.parseToJsonElement(body.decodeToString()) as? JsonObject)?.get("_tag") as? JsonPrimitive)
+                    ?.takeIf { it.isString }?.content
+            }.getOrNull()
+            return tag == "LocationNotFoundError"
+        }
 
         /** A request that got no answer from the server. */
         fun unreachable(transport: TransportFailure) = OpenCodeClientError(UNREACHABLE_MESSAGE, transport = transport)

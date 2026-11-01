@@ -122,8 +122,12 @@ internal fun requestBody(method: String, body: ByteArray?): RequestBody? = when 
 }
 
 /** The status error copy shared by every route. */
-internal fun statusError(status: Int, retryAfterHeader: String?): OpenCodeClientError = OpenCodeClientError(
-    message = if (status == 401) "The server rejected these credentials." else "The server returned HTTP $status.",
+internal fun statusError(status: Int, retryAfterHeader: String?, locationMissing: Boolean = false): OpenCodeClientError = OpenCodeClientError(
+    message = when {
+        status == 401 -> "The server rejected these credentials."
+        locationMissing -> OpenCodeClientError.FOLDER_GONE_MESSAGE
+        else -> "The server returned HTTP $status."
+    },
     statusCode = status,
     retryAfter = OpenCodeClientError.retryAfter(retryAfterHeader),
 )
@@ -240,8 +244,11 @@ private suspend fun performOnce(
         throw transportError(error, failure)
     }
     if (response.code !in 200..299) {
-        AppLog.network.notice { "$method ${loggablePath(path)}: HTTP ${response.code} after ${(clock.now() - started).logSummary}" }
-        throw statusError(response.code, response.headers["Retry-After"])
+        val locationMissing = OpenCodeClientError.isLocationMissing(response.code, response.body)
+        AppLog.network.notice {
+            "$method ${loggablePath(path)}: HTTP ${response.code}${if (locationMissing) " (location missing)" else ""} after ${(clock.now() - started).logSummary}"
+        }
+        throw statusError(response.code, response.headers["Retry-After"], locationMissing)
     }
     ServerContact.shared.heard(server.persistenceID, response.url)
     return MeasuredResponse(response.body, requestID, correlation)

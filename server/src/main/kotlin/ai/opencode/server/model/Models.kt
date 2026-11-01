@@ -21,6 +21,23 @@ data class OpenCodeProject(
     /** The resolved icon source following desktop precedence. */
     val avatarSource: String? get() = ProjectMark.avatarSource(id, icon)
 
+    /**
+     * The computer's root or a person's home folder (`/Users/kit`, `/home/kit`, `/root`,
+     * `C:\Users\kit`): where sessions land when no project was chosen, not a project someone
+     * works in.
+     */
+    val isHomeFolder: Boolean
+        get() {
+            var parts = directory.replace('\\', '/').split('/').filter { it.isNotEmpty() }.map { it.lowercase() }
+            parts.firstOrNull()?.let { drive -> if (drive.length == 2 && drive.endsWith(":")) parts = parts.drop(1) }
+            return when (parts.size) {
+                0 -> true
+                1 -> parts[0] == "root" || parts[0] == "~"
+                2 -> parts[0] == "users" || parts[0] == "home" || parts == listOf("var", "root")
+                else -> false
+            }
+        }
+
     companion object {
         /** A folder chosen on the server: the known project at that directory, or one named by the folder. */
         fun folder(directory: String, projects: List<OpenCodeProject>): OpenCodeProject {
@@ -200,9 +217,14 @@ data class OpenCodeSession(
      * session learns one; it rides cached Home snapshots so a cold launch shows it too.
      */
     val firstPrompt: String? = null,
+    /** When the session was archived (`time.archived`); null while it isn't. */
+    val archivedMilliseconds: Long? = null,
 ) {
     /** What every surface calls this session: the server's title, else its first prompt ([SessionTitle.display]). */
     val title: String get() = SessionTitle.display(serverTitle, firstPrompt)
+
+    /** Archived sessions stay out of Recents, search, Catch Up and the system's lists, as on desktop. */
+    val isArchived: Boolean get() = archivedMilliseconds != null
 }
 
 /** The context window the session's latest reply filled, as the TUI measures it. */

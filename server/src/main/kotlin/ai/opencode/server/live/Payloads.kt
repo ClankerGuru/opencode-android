@@ -184,7 +184,13 @@ internal data class ModelInfoPayload(
 }
 
 @Serializable
-internal data class TimePayload(val updated: Double, val idle: Long? = null, val viewed: Long? = null)
+internal data class TimePayload(
+    val updated: Double,
+    val idle: Long? = null,
+    val viewed: Long? = null,
+    /** Set (epoch milliseconds) while the session is archived. */
+    val archived: Double? = null,
+)
 
 @Serializable
 internal data class LocationPayload(val directory: String)

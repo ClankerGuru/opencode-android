@@ -7,6 +7,7 @@ import ai.opencode.server.live.MarkdownImageCache
 import ai.opencode.server.live.markdownImageCacheKey
 import ai.opencode.server.live.requestActiveSessionParents
 import ai.opencode.server.live.requestAgents
+import ai.opencode.server.live.requestArchiveSession
 import ai.opencode.server.live.requestAssistantReply
 import ai.opencode.server.live.requestCancelForm
 import ai.opencode.server.live.requestCancelIntegrationOAuth
@@ -35,6 +36,7 @@ import ai.opencode.server.live.requestMarkdownImage
 import ai.opencode.server.live.requestMentionSessions
 import ai.opencode.server.live.requestMessage
 import ai.opencode.server.live.requestModelCatalog
+import ai.opencode.server.live.requestMoveSession
 import ai.opencode.server.live.requestMoveToBackground
 import ai.opencode.server.live.requestNotifyPluginStatus
 import ai.opencode.server.live.requestPendingInputs
@@ -43,6 +45,7 @@ import ai.opencode.server.live.requestRedeemPairing
 import ai.opencode.server.live.requestRenameSession
 import ai.opencode.server.live.requestReplyForm
 import ai.opencode.server.live.requestReplyPermission
+import ai.opencode.server.live.requestRunMessages
 import ai.opencode.server.live.requestRunReply
 import ai.opencode.server.live.requestRunningShells
 import ai.opencode.server.live.requestSearchSessions
@@ -88,6 +91,7 @@ import ai.opencode.server.model.OpenCodeOutgoingAttachment
 import ai.opencode.server.model.OpenCodePendingInput
 import ai.opencode.server.model.OpenCodePendingRequests
 import ai.opencode.server.model.OpenCodePermissionReply
+import ai.opencode.server.model.OpenCodeRunMessagesPage
 import ai.opencode.server.model.OpenCodeServerCapabilities
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.OpenCodeSessionFamily
@@ -142,6 +146,8 @@ data class OpenCodeClient(
     val uploadFile: (server: OpenCodeServer, directory: String?, file: File, name: String) -> Flow<OpenCodeUploadEvent>,
     val waitForIdle: suspend (server: OpenCodeServer, sessionID: String) -> Unit,
     val isSessionActive: suspend (server: OpenCodeServer, sessionID: String) -> Boolean,
+    /** One page of a session's history as a voice watch reads a run, newest page first; `cursor` is the previous page's `next`. */
+    val runMessages: suspend (server: OpenCodeServer, sessionID: String, cursor: String?) -> OpenCodeRunMessagesPage,
     /** Stops the run and resumes its pending steering messages (`resume=true`). True when a run was going. */
     val interrupt: suspend (server: OpenCodeServer, sessionID: String) -> Boolean,
     /** `id`, when given, names the session: creating it again returns the same one. */
@@ -178,6 +184,10 @@ data class OpenCodeClient(
     /** Reads the session's newest messages for the context the last reply filled. */
     val contextUsage: suspend (server: OpenCodeServer, sessionID: String) -> OpenCodeContextReading,
     val renameSession: suspend (server: OpenCodeServer, sessionID: String, title: String) -> Unit,
+    /** Moves the session to another folder on the computer (`POST …/move`), at once when its own folder is gone. */
+    val moveSession: suspend (server: OpenCodeServer, sessionID: String, directory: String) -> Unit,
+    /** Archives the session (`PATCH {archived: true}`), as the desktop Inbox does. */
+    val archiveSession: suspend (server: OpenCodeServer, sessionID: String) -> Unit,
     /** Turns Always Notify on (with the phone's callback URL) or off (null), keeping other metadata. */
     val setAlwaysNotify: suspend (server: OpenCodeServer, sessionID: String, callbackURL: String?) -> Unit,
     /** Queues a compaction; it runs after the session's current run. */
@@ -257,6 +267,7 @@ data class OpenCodeClient(
             uploadFile = ::uploadFile,
             waitForIdle = { server, sessionID -> requestWaitForIdle(server, sessionID, dependency(Clock)) },
             isSessionActive = ::requestIsSessionActive,
+            runMessages = ::requestRunMessages,
             interrupt = ::requestInterrupt,
             createSession = ::requestCreateSession,
             deleteSession = ::requestDeleteSession,
@@ -281,6 +292,8 @@ data class OpenCodeClient(
             viewSession = ::requestViewSession,
             contextUsage = ::requestContextUsage,
             renameSession = ::requestRenameSession,
+            moveSession = ::requestMoveSession,
+            archiveSession = ::requestArchiveSession,
             setAlwaysNotify = ::requestSetAlwaysNotify,
             compactSession = ::requestCompactSession,
             stageRevert = ::requestStageRevert,
@@ -332,6 +345,7 @@ data class OpenCodeClient(
                     uploadFile = { _, _, _, _ -> unimplemented("uploadFile") },
                     waitForIdle = { _, _ -> unimplemented("waitForIdle") },
                     isSessionActive = { _, _ -> unimplemented("isSessionActive") },
+                    runMessages = { _, _, _ -> unimplemented("runMessages") },
                     interrupt = { _, _ -> unimplemented("interrupt") },
                     createSession = { _, _, _ -> unimplemented("createSession") },
                     deleteSession = { _, _ -> unimplemented("deleteSession") },
@@ -356,6 +370,8 @@ data class OpenCodeClient(
                     viewSession = { _, _, _ -> unimplemented("viewSession") },
                     contextUsage = { _, _ -> OpenCodeContextReading.Inconclusive },
                     renameSession = { _, _, _ -> unimplemented("renameSession") },
+                    moveSession = { _, _, _ -> throw OpenCodeClientError("Unstubbed") },
+                    archiveSession = { _, _ -> unimplemented("archiveSession") },
                     setAlwaysNotify = { _, _, _ -> unimplemented("setAlwaysNotify") },
                     compactSession = { _, _ -> unimplemented("compactSession") },
                     stageRevert = { _, _, _ -> unimplemented("stageRevert") },

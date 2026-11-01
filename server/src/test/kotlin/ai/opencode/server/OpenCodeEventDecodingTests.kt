@@ -78,6 +78,36 @@ class OpenCodeEventDecodingTests {
             decodeStreamFrame("""{"type":"session.viewed","data":{"sessionID":"ses_root","idle":1789440123456}}"""),
         )
         assertNull(decodeStreamFrame("""{"type":"session.viewed","data":{"sessionID":"ses_root"}}"""))
+        assertEquals(
+            OpenCodeServerEvent.SessionArchiveChanged("ses_root", isArchived = true),
+            decodeStreamFrame("""{"type":"session.archived","data":{"sessionID":"ses_root"}}"""),
+        )
+        assertEquals(
+            OpenCodeServerEvent.SessionArchiveChanged("ses_root", isArchived = false),
+            decodeStreamFrame("""{"type":"session.unarchived","data":{"sessionID":"ses_root"}}"""),
+        )
+    }
+
+    /**
+     * `session.moved` (Move to, or the server reviving a session whose folder
+     * is gone) carries where the session lives now.
+     */
+    @Test
+    fun sessionMovedFramesCarryTheNewFolder() {
+        assertEquals(
+            OpenCodeServerEvent.SessionMoved("ses_1", "/work/repo"),
+            decodeStreamFrame("""{"type":"session.moved","data":{"sessionID":"ses_1","location":{"directory":"/work/repo","workspaceID":"w"},"projectID":"p"}}"""),
+        )
+        // Without a folder it still settles the session's messages from REST.
+        assertEquals(
+            OpenCodeServerEvent.MessageInvalidated("ses_1"),
+            decodeStreamFrame("""{"type":"session.moved","data":{"sessionID":"ses_1","location":{},"projectID":"p"}}"""),
+        )
+        // Another event's odd location never spoils its payload.
+        assertEquals(
+            OpenCodeServerEvent.SessionRenamed("ses_1", "T"),
+            decodeStreamFrame("""{"type":"session.renamed","data":{"sessionID":"ses_1","title":"T","location":"/p"}}"""),
+        )
     }
 
     @Test

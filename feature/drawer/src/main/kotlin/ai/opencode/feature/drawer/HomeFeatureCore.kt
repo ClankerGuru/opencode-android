@@ -25,7 +25,9 @@ internal fun HomeFeature.core(state: State, action: Action): Reduced<State, Acti
         Action.TranscriptCacheFlushRequested -> true
         is Action.ServerEvent -> action.event is OpenCodeServerEvent.SessionRenamed ||
             action.event is OpenCodeServerEvent.SessionDeleted ||
-            action.event is OpenCodeServerEvent.ProjectUpdated
+            action.event is OpenCodeServerEvent.SessionArchiveChanged ||
+            action.event is OpenCodeServerEvent.ProjectUpdated ||
+            action.event is OpenCodeServerEvent.SessionMoved
         is Action.SessionDetail -> when ((action.action as? PresentationAction.Presented)?.action) {
             is SessionFeature.Action.SessionCreated -> true
             // A session that just learned its first prompt keeps it across launches.

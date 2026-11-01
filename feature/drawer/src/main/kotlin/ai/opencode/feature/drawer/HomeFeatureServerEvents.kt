@@ -4,6 +4,7 @@ import ai.opencode.feature.session.*
 import ai.opencode.core.sharing.shared
 import ai.opencode.feature.voice.VoiceSharedKeys
 import ai.opencode.feature.composer.PromptOutbox
+import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
@@ -265,6 +266,24 @@ internal fun HomeFeature.reduceServerEvent(state: State, event: OpenCodeServerEv
             return Reduced(s, Effect.merge(cancelSelected, sendToDetail(s, deleted), pushed))
         }
 
+        is OpenCodeServerEvent.SessionArchiveChanged -> {
+            // Kept in place, so an open session stays open; the lists hide it. The refresh replaces
+            // a snapshot read before the change, and brings back one unarchived elsewhere that fell
+            // off the listed page.
+            val s = state.updatingSession(event.sessionID) { session ->
+                if (session.isArchived == event.isArchived) session
+                else session.copy(archivedMilliseconds = if (event.isArchived) dependency(DateClient).now().toEpochMilli() else null)
+            }
+            return refreshSnapshot(s)
+        }
+
+        is OpenCodeServerEvent.SessionMoved -> {
+            // REST stays authoritative: the next snapshot and reads replace this.
+            val moved = sessionMoved(state, event.sessionID, event.directory)
+            val invalidated = forwardToSession(moved.state, event.sessionID, SessionFeature.Action.MessageInvalidated(event.sessionID))
+            return Reduced(moved.state, Effect.merge(moved.effect, invalidated))
+        }
+
         is OpenCodeServerEvent.ProjectUpdated -> {
             val project = event.project
             val index = state.projects.indexOfFirst { it.id == project.id }
@@ -280,6 +299,27 @@ internal fun HomeFeature.reduceServerEvent(state: State, event: OpenCodeServerEv
             return Reduced(s)
         }
     }
+}
+
+/**
+ * `sessionID` now lives in `directory` (this phone's Move to, or the server's `session.moved`):
+ * Home's copies follow, so attention reads stop asking the old folder. iOS also tells every screen
+ * holding it (`SessionFeature.Action.sessionMoved`); that lands with the session area's Move to.
+ */
+internal fun HomeFeature.sessionMoved(state: State, sessionID: String, directory: String): HomeReduced {
+    val s = state.updatingSession(sessionID) { if (it.directory == directory) it else it.copy(directory = directory) }
+    var changed = false
+    val snapshots = s.sessionSnapshots.mapValues { (id, snapshot) ->
+        val movesSelf = id == sessionID && snapshot.session.directory != directory
+        val movesMember = snapshot.family.any { it.id == sessionID && it.directory != directory }
+        if (!movesSelf && !movesMember) return@mapValues snapshot
+        changed = true
+        snapshot.copy(
+            session = if (movesSelf) snapshot.session.copy(directory = directory) else snapshot.session,
+            family = if (movesMember) snapshot.family.map { if (it.id == sessionID) it.copy(directory = directory) else it } else snapshot.family,
+        )
+    }
+    return Reduced(if (changed) s.copy(sessionSnapshots = snapshots) else s)
 }
 
 /**

@@ -1,20 +1,23 @@
 package ai.opencode.server.live
 
 import ai.opencode.core.dependencies.Clock
+import ai.opencode.core.dependencies.dependency
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
+import ai.opencode.server.SelfViewReceipts
 import ai.opencode.server.internal.WireJson
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.retry.NetworkRetry
 import ai.opencode.server.retry.RequestIdempotency
 import ai.opencode.server.retry.RetryPolicy
 import ai.opencode.server.retry.withRetryPolicy
+import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlin.time.Duration.Companion.seconds
 
 internal val WAIT_POLL_TIMEOUT = 25.seconds
 
@@ -75,23 +78,30 @@ internal suspend fun requestInterrupt(server: OpenCodeServer, sessionID: String)
     ).interrupted
 
 internal suspend fun requestSearchSessions(server: OpenCodeServer, query: String, limit: Int): List<OpenCodeSession> =
-    request<DataPayload<List<SessionPayload>>>(
-        "/api/session",
-        query = listOf("search" to query, "parentID" to "null", "order" to "desc", "limit" to limit.toString()),
-        server = server,
-    ).data.map(::session)
+    requestRootSessions(server, search = query, includeEmptySearch = true, limit = limit)
 
 /** Desktop's mention list: root sessions that aren't archived, newest first. */
-internal suspend fun requestMentionSessions(server: OpenCodeServer, search: String, limit: Int): List<OpenCodeSession> {
+internal suspend fun requestMentionSessions(server: OpenCodeServer, search: String, limit: Int): List<OpenCodeSession> =
+    requestRootSessions(server, search = search, includeEmptySearch = false, limit = limit)
+
+private suspend fun requestRootSessions(
+    server: OpenCodeServer,
+    search: String,
+    includeEmptySearch: Boolean,
+    limit: Int,
+): List<OpenCodeSession> {
     val query = mutableListOf("parentID" to "null", "archived" to "false", "order" to "desc", "limit" to limit.toString())
-    if (search.isNotEmpty()) query += "search" to search
-    return request<DataPayload<List<SessionPayload>>>("/api/session", query = query, server = server).data.map(::session)
+    if (includeEmptySearch || search.isNotEmpty()) query += "search" to search
+    return request<DataPayload<List<SessionPayload>>>("/api/session", query = query, server = server)
+        .data.map(::session).filterNot { it.isArchived }
 }
 
 internal suspend fun requestGetSession(server: OpenCodeServer, sessionID: String): OpenCodeSession =
     session(request<DataPayload<SessionPayload>>("/api/session/$sessionID", server = server).data)
 
 @Serializable private data class TitleBody(val title: String)
+@Serializable private data class DirectoryBody(val directory: String)
+@Serializable private data class ArchiveBody(val archived: Boolean)
 @Serializable private data class IdleBody(val idle: Long)
 @Serializable private data class MessageIDBody(val messageID: String)
 @Serializable private data class CreateBody(val id: String? = null, val location: Location) {
@@ -107,6 +117,31 @@ internal suspend fun requestRenameSession(server: OpenCodeServer, sessionID: Str
         body = encodedBody(TitleBody(title)),
         timeout = if (title.isEmpty()) 60.seconds else 10.seconds,
         idempotency = if (title.isEmpty()) RequestIdempotency.Unsafe else RequestIdempotency.Idempotent,
+        server = server,
+    )
+}
+
+internal suspend fun requestMoveSession(server: OpenCodeServer, sessionID: String, directory: String) {
+    // A session that's already there gets another move queued, so a repeat isn't harmless: it goes
+    // again only when it provably never left.
+    perform(
+        "/api/session/$sessionID/move",
+        method = "POST",
+        body = encodedBody(DirectoryBody(directory)),
+        timeout = 15.seconds,
+        idempotency = RequestIdempotency.Unsafe,
+        server = server,
+    )
+}
+
+internal suspend fun requestArchiveSession(server: OpenCodeServer, sessionID: String) {
+    // Archiving an archived session changes nothing, so a repeat is safe.
+    perform(
+        "/api/session/$sessionID",
+        method = "PATCH",
+        body = encodedBody(ArchiveBody(archived = true)),
+        timeout = 10.seconds,
+        idempotency = RequestIdempotency.Idempotent,
         server = server,
     )
 }
@@ -152,11 +187,24 @@ internal suspend fun requestExportSession(server: OpenCodeServer, sessionID: Str
     perform("/api/experimental/session/$sessionID/export", timeout = 60.seconds, server = server).data
 
 internal suspend fun requestViewSession(server: OpenCodeServer, sessionID: String, idle: Long) {
-    // A read receipt: the server keeps the newest watermark, so it repeats safely.
-    perform(
-        "/api/session/$sessionID/view", method = "POST", body = encodedBody(IdleBody(idle)),
-        idempotency = RequestIdempotency.Idempotent, server = server,
-    )
+    val receipts = dependency(SelfViewReceipts)
+    val receiptID = receipts.begin(server.persistenceID, sessionID, idle)
+    try {
+        // A read receipt: the server keeps the newest watermark, so it repeats safely.
+        perform(
+            "/api/session/$sessionID/view", method = "POST", body = encodedBody(IdleBody(idle)),
+            idempotency = RequestIdempotency.Idempotent, server = server,
+        )
+        receipts.answered(receiptID)
+    } catch (error: Throwable) {
+        // Cancelled, it may still have landed: its echo is still this client's.
+        if (error is CancellationException || !currentCoroutineContext().isActive) {
+            receipts.answered(receiptID)
+        } else {
+            receipts.failed(receiptID)
+        }
+        throw error
+    }
 }
 
 internal suspend fun requestCreateSession(server: OpenCodeServer, directory: String, id: String?): OpenCodeSession {

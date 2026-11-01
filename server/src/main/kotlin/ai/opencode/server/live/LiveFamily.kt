@@ -39,13 +39,14 @@ internal suspend fun requestHomeSnapshot(server: OpenCodeServer): OpenCodeHomeSn
             val sessions = async {
                 capturedRequest<DataPayload<List<SessionPayload>>>(
                     "/api/session",
-                    query = listOf("parentID" to "null", "order" to "desc", "limit" to "50"),
+                    query = listOf("parentID" to "null", "archived" to "false", "order" to "desc", "limit" to "50"),
                     server = server,
                 )
             }
             val active = async { capturedRequest<ActivePayload>("/api/session/active", server = server) }
             val projectPayloads = projects.await().getOrThrow()
-            val roots = sessions.await().getOrThrow().data.map(::session)
+            // A server that ignores `archived=false` still lists them.
+            val roots = sessions.await().getOrThrow().data.map(::session).filterNot { it.isArchived }
             val activeIDs = active.await().getOrThrow().data.keys
             val parents = cachedActiveSessionParents(server, activeIDs, roots.map { it.id })
             OpenCodeHomeSnapshot(
@@ -310,4 +311,5 @@ internal fun session(payload: SessionPayload) = OpenCodeSession(
     cost = payload.cost,
     alwaysNotify = payload.metadata?.alwaysNotify == true,
     revertMessageID = payload.revert?.messageID,
+    archivedMilliseconds = payload.time.archived?.toLong(),
 )
