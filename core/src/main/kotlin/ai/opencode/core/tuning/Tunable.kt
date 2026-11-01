@@ -29,7 +29,7 @@ import kotlin.random.Random
 
 /**
  * Port of iOS `Tunable` (`OpenCode/Tuning/Tunable.swift`): a visual or motion value to dial in
- * live (Settings › Advanced › Developer › Tuning Panel). Declare it once, where it's used, in an
+ * live (Settings › Developer › Tuning Panel). Declare it once, where it's used, in an
  * `object` named for its feature, and read [value]:
  *
  * ```kotlin
