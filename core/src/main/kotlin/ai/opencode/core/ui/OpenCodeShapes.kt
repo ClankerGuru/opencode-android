@@ -59,15 +59,14 @@ val OpenCodeShapes = Shapes(
 )
 
 /**
- * Port of `GlassGeometry` / `GlassShape` (`Glass.swift`): a rounded rectangle's radius must be
- * at most half its smallest drawn side. Material shapes clamp on their own, but animated
- * shapes computed by hand (morphs, growing panels) should clamp with this so every
- * intermediate frame stays a valid capsule-or-less (docs/native-ui-guidance.md).
+ * Port of `GlassGeometry` (`Glass.swift`): a rounded rectangle's radius must be at most half its
+ * height. Material shapes clamp on their own, but animated shapes computed by hand (morphs,
+ * growing panels) should clamp with this so every intermediate frame stays a valid
+ * capsule-or-less (docs/native-ui-guidance.md). iOS removed the unused `GlassShape.clamped`
+ * wrapper in 18771799.
  */
 object OpenCodeShapeGeometry {
     fun radius(radius: Float, height: Float): Float = min(max(0f, radius), max(0f, height) / 2)
-
-    fun clamped(radius: Float, width: Float, height: Float): Float = radius(radius, min(width, height))
 }
 
 /**
