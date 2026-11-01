@@ -91,7 +91,7 @@ fixtures: `server/src/testFixtures` (`WireFixture`, `ServerTestIsolation`); the 
 | `PassiveNetworkWireTests.swift` | `PassiveNetworkWireTests.kt` | 5 | — |
 | `AppLogTests.swift` | `AppLogTests.kt` | 3 | — |
 | `PairingDeviceNameTests.swift` | `PairingDeviceNameTests.kt` | 3 | — |
-| `NetworkRetryTests.swift` | `retry/NetworkRetryTests.kt` | 44 of 51 | 6 `EventStreamReconnectTests` → `:feature:drawer` (`HomeFeature`); `actionsALoopThatOwnsItsRetries…` → `:feature:voice` (`runOwningRetries`); CFNetwork/`NWError` sub-checks deleted (iOS-only domains) |
+| `NetworkRetryTests.swift` | `retry/NetworkRetryTests.kt` | 45 of 52 | 6 `EventStreamReconnectTests` → `:feature:drawer` (`HomeFeature`); `actionsALoopThatOwnsItsRetries…` → `:feature:voice` (`runOwningRetries`); CFNetwork/`NWError` sub-checks deleted (iOS-only domains) |
 | `ServerIDTests.swift` | `ServerIDTests.kt` | 6 of 7 | `shareSheetIDsUseTheSameShape` → `:feature:system`; `TranscriptTimeStamps` readback → `:feature:transcript` |
 | `PairPageLinkTests.swift` | `PairPageLinkTests.kt` | 6 | — |
 | `MultipleWindowsTests.swift` | `EventBatcherTests.kt`, `live/MultipleWindowsTests.kt` | 8 (batcher overflow; 7 `SharedEventStreams`/`SharedReads`) | window roster/app-wide work → `:app`; `aFurtherWindowKeepsItsOwnSidebar` → `:feature:drawer` |
@@ -121,4 +121,4 @@ another host read as interrupted; OkHttp's 5-per-host cap queued family fan-out;
 queries encoded `/` as `%2F`; transport failures recorded no failure phase
 (`DiagnosticsNetworkPhases`, found by the core `DiagnosticsRecorderTests`).
 
-Total: 244 `:server` tests (`./gradlew :server:testDebugUnitTest`; 2 skipped: opt-in live checks), all passing.
+Total: 250 `:server` tests (`./gradlew :server:testDebugUnitTest`; 2 skipped: opt-in live checks), all passing.

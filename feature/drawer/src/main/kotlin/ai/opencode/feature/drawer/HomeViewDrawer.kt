@@ -1,5 +1,7 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.feature.drawer.list.rememberInboxSidebarOn
+import ai.opencode.feature.drawer.list.InboxSidebarList
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.feature.system.SessionWindowTarget
 import ai.opencode.feature.system.WindowsClient
@@ -184,6 +186,7 @@ fun HomeDrawer(
     val search by store.observe { it.search }
     val projectIconsSwitch by remember { shared(ExperimentalFeature.projectIcons.key).flow }.collectAsState()
     val showsProjectIcons = ExperimentalFeature.projectIcons.isActive(projectIconsSwitch)
+    val inboxSidebarOn = rememberInboxSidebarOn()
 
     // iOS draws its own bottom edge only with a keyboard on screen (`customBottom`); Android always does.
     val keyboardMonitor: DrawerKeyboardMonitor = viewState.keyboardMonitor
@@ -226,7 +229,21 @@ fun HomeDrawer(
             .fillMaxSize()
             .background(colors.canvas),
     ) {
-        DrawerListView(
+        val listPadding = PaddingValues(
+            top = headerHeight.dp + DrawerTunables.topGap,
+            bottom = controlsHeight.dp + callTrayLift + insetBottom + footerBottom + DrawerTunables.bottomGap,
+        )
+        // Inbox Sidebar (experimental, iOS 338d8d92): the sessions as an inbox.
+        if (inboxSidebarOn) InboxSidebarList(
+            store = store,
+            selectedSessionID = selectedSessionID,
+            headerScroll = viewState.headerScroll,
+            panRegions = viewState.panRegions,
+            contentPadding = listPadding,
+            select = viewState::selectSession,
+            openCatchUp = viewState::openCatchUp,
+            modifier = Modifier.fillMaxSize(),
+        ) else DrawerListView(
             store = store,
             pinDrag = pinDrag,
             timeReveal = viewState.timeReveal,
@@ -236,10 +253,7 @@ fun HomeDrawer(
             isDrawerVisible = isDrawerVisible,
             catchUpFocusRequests = viewState.catchUpFocusRequests,
             actions = actions,
-            contentPadding = PaddingValues(
-                top = headerHeight.dp + DrawerTunables.topGap,
-                bottom = controlsHeight.dp + callTrayLift + insetBottom + footerBottom + DrawerTunables.bottomGap,
-            ),
+            contentPadding = listPadding,
             modifier = Modifier.fillMaxSize(),
         )
         // The list as the drawer's pan sees it: between the title band and the controls, which

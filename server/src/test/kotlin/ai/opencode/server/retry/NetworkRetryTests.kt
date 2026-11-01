@@ -814,6 +814,17 @@ class NetworkRetryWireTests {
     }
 
     @Test
+    fun archivingASessionPatchesArchivedAndRidesOutADrop() = runTest {
+        val attempts = AtomicInteger(0)
+        WireFixture { if (attempts.incrementAndGet() == 1) Reply.Failure(UrlErrorCode.NETWORK_CONNECTION_LOST) else Reply.status(204) }.use { fixture ->
+            retrying { client.archiveSession(fixture.server, "ses_1") }
+            assertEquals(List(2) { "PATCH /api/session/ses_1" }, fixture.requests.map { it.route })
+            assertEquals("true", fixture.requests[0].json()["archived"]?.jsonPrimitive?.content)
+            assertEquals(1, fixture.requests[0].json().size)
+        }
+    }
+
+    @Test
     fun cancellingAPendingMessageIsRepeatable() = runTest {
         // V2 answers 204 for an item no longer pending.
         val attempts = AtomicInteger(0)

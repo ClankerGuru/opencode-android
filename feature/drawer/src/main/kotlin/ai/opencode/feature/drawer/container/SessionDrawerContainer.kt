@@ -2,6 +2,7 @@
 
 package ai.opencode.feature.drawer.container
 
+import ai.opencode.feature.drawer.list.rememberInboxSidebarOn
 import ai.opencode.core.motion.rememberFrameDurationSeconds
 import ai.opencode.core.ui.LocalDrawerKeyboardSignals
 import ai.opencode.core.ui.LocalDrawerPanExclusion
@@ -229,6 +230,8 @@ fun SessionDrawerContainer(
     val chromeBackground = if (isDark) Color(0.04f, 0.04f, 0.04f, 1f) else colors.userBubble
     val borderColor = CatchUpMetrics.borderColor(isDark, colors.border)
     val borderWidthPx = if (isDark) with(density) { 1.dp.toPx() } else 1f
+    // Inbox Sidebar rows swipe Mark as Read and Archive themselves (iOS `rowsOwnSwipes`).
+    val inboxSidebarOn = rememberInboxSidebarOn()
 
     Box(
         modifier
@@ -241,6 +244,7 @@ fun SessionDrawerContainer(
                 isContentPushed = { pushed },
                 // Beside a sidebar the drawer doesn't move; Catch Up's stack runs its own swipe.
                 enabled = { controller.sidebarShown == null && controller.catchUp == null },
+                rowsOwnSwipes = { inboxSidebarOn },
                 onTouchDown = motion::touchDown,
             ) { event ->
                 if (!controller.acceptsPan(event)) return@drawerDirectionalPan
