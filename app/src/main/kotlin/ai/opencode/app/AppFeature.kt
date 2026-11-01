@@ -1,5 +1,9 @@
 package ai.opencode.app
 
+import ai.opencode.core.sharing.installHistory
+import ai.opencode.core.sound.SoundEffectsClient
+import ai.opencode.core.sharing.ExperimentalFeatures
+import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.store.onChange
 import ai.opencode.core.store.PresentationAction
 import ai.opencode.feature.session.SessionFeature
@@ -348,8 +352,8 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
     data class ConnectionAttempt(
         val id: Int,
         val server: OpenCodeServer,
-        /** A computer paired for the first time: its Home opens the drawer on its sessions. */
-        val opensDrawer: Boolean = false,
+        /** A pairing: where its Home lands, and its handshake ([landPairing]). */
+        val pairing: PairingArrival? = null,
     )
 
     /** Safe to display or copy: no full URL, credentials, or raw network payload. */
@@ -507,6 +511,8 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
 
     private fun reduceCore(state: State, action: Action): Reduced<State, Action> = when (action) {
         Action.Task -> {
+            migrateSettingsIfNeeded(state.knownServers)
+            if (dependency(ExperimentalFeatures).isEnabled(ExperimentalFeature.soundEffects)) dependency(SoundEffectsClient).prepare()
             // Restored home owns revalidation; never replace its cached list with setup.
             val saved = state.savedServer.value
             if (state.connection != State.Connection.Idle || state.home != null) Reduced(state)
@@ -870,7 +876,8 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         val haptics = dependency(HapticsClient)
         return validatePairing(text).fold(
             onSuccess = { link ->
-                haptics.play(Haptic.success)
+                // The code was read; `success` waits for the pairing to land.
+                haptics.play(Haptic.tap)
                 redeem(link, next)
             },
             onFailure = { error ->
@@ -921,7 +928,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
                 manualEntryDraft = null,
             ),
         )
-        dependency(HapticsClient).play(Haptic.success)
+        dependency(HapticsClient).play(Haptic.tap)
         return redeem(link, next)
     }
 
@@ -965,8 +972,9 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
                 ),
             )
         }
-        val isNewComputer = server.isNewComputer(state.knownServers)
-        return connect(state.load(server.keepingLocalSettings(state.knownServers)), opensDrawer = isNewComputer)
+        val history = shared(SharedKeys.installHistory).value
+        val arrival = PairingArrival.of(server, state.knownServers, history)
+        return connect(state.load(server.keepingLocalSettings(state.knownServers)), pairing = arrival)
     }
 
     // MARK: Connecting
@@ -1053,7 +1061,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         // A switch made from Settings stays in Settings: the connection card shows the new server arrive.
         val previous = next.home
         val keepsSettings = previous?.isSettingsShown == true && previous.switchingTo?.persistenceID == server.persistenceID
-        val opensDrawer = next.connectionAttempt?.opensDrawer == true
+        val pairing = next.connectionAttempt?.pairing
         next = next.withHome(server, snapshot)
         next = next.copy(
             home = next.home
@@ -1079,14 +1087,12 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
             next = reduced.state
             system = reduced.effect
         }
+        val landing = landPairing(pairing, server, asked)
         val destination = next.pendingNotification
         if (destination != null && destination.serverKey == server.persistenceID) {
-            return Reduced(next, Effect.merge(forgotten, shares, system, loadNotificationSession(destination, server)))
+            return Reduced(next, Effect.merge(forgotten, shares, system, landing, loadNotificationSession(destination, server)))
         }
-        if (opensDrawer && !asked) {
-            return Reduced(next, Effect.merge(forgotten, shares, Effect.send(Action.Home(HomeFeature.Action.PairedComputerOpened))))
-        }
-        return Reduced(next, Effect.merge(forgotten, shares, system))
+        return Reduced(next, Effect.merge(forgotten, shares, system, landing))
     }
 
     /**
@@ -1097,12 +1103,12 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         state: State,
         preservingPending: Boolean = false,
         keepingHome: Boolean = false,
-        opensDrawer: Boolean = false,
+        pairing: PairingArrival? = null,
     ): Reduced<State, Action> {
         var next = state
         if (!preservingPending) next = next.copy(pendingNotification = null, pendingSystemAction = null)
         val generation = next.connectionGeneration + 1
-        val attempt = ConnectionAttempt(id = generation, server = next.server, opensDrawer = opensDrawer)
+        val attempt = ConnectionAttempt(id = generation, server = next.server, pairing = pairing)
         next = next.copy(connection = State.Connection.Connecting, connectionGeneration = generation, connectionAttempt = attempt)
         if (!keepingHome) next = next.withoutHome()
         val client = dependency(OpenCodeClient)

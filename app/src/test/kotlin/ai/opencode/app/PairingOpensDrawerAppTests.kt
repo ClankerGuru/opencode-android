@@ -40,7 +40,8 @@ import java.util.UUID
 
 /**
  * Port of iOS `PairingOpensDrawerAppTests.swift`: pairing a computer for the first time opens
- * the drawer on its sessions once its list loads; anything else keeps today's landing.
+ * the drawer on its sessions once its list loads (the install's very first computer opens a
+ * ready session instead: `FirstComputerPairingTests`); anything else keeps today's landing.
  * `aComputerSharingAnAddressWithASavedOneIsNotNew` (`OpenCodeServer.isNewComputer`) is
  * `:server`'s `PairingOpensDrawerAppTests`. In `pickingASessionBeforeTheDrawerOpensDropsIt`
  * Home's own bookkeeping on the tap (read dates, transcript publishing) is asserted by the
@@ -56,6 +57,15 @@ class PairingOpensDrawerAppTests {
     private val link = "http://10.0.10.26:4196/auth/connect/abc"
     private val paired = OpenCodeServer(url = "http://10.0.10.26:4196", username = "opencode", password = "1790000000.sig")
 
+    /** A computer saved before, sharing no address: the paired one is new, but not the install's first. */
+    private val elsewhere = OpenCodeServer(url = "http://10.0.0.9:4096", username = "opencode", password = "c")
+
+    private val withAnotherComputer: AppFeature.State
+        get() = shared.run {
+            shared(ServerSharedKeys.savedServers).set(listOf(elsewhere))
+            AppFeature.State.initial()
+        }
+
     /** What the link names before it's redeemed. */
     private val unredeemed: OpenCodeServer get() = OpenCodeServer(url = paired.url, username = "opencode", password = "")
 
@@ -66,13 +76,13 @@ class PairingOpensDrawerAppTests {
     }
 
     private fun TestScope.pairingStore(
-        state: AppFeature.State = shared.appState(),
+        state: AppFeature.State? = null,
         paired: OpenCodeServer,
         gates: Gates = Gates(),
         homeSnapshot: suspend () -> OpenCodeHomeSnapshot,
     ): TestStore<AppFeature.State, AppFeature.Action> {
         effects = detachedScope(coroutineContext)
-        return shared.appStore(state, effects) {
+        return shared.appStore(state ?: withAnotherComputer, effects) {
             this[Clock] = ImmediateClock()
             this[OpenCodeClient] = OpenCodeClient.testValue.copy(
                 redeemPairing = { paired },
@@ -122,8 +132,8 @@ class PairingOpensDrawerAppTests {
     private suspend fun pairUntilListLoads(
         store: TestStore<AppFeature.State, AppFeature.Action>,
         gates: Gates,
-        opensDrawer: Boolean,
-        saved: List<OpenCodeServer> = emptyList(),
+        arrival: PairingArrival = PairingArrival.newComputer,
+        saved: List<OpenCodeServer> = listOf(elsewhere),
     ) {
         store.send(AppFeature.Action.PairingCodeScanned(link)) {
             it.copy(
@@ -136,7 +146,7 @@ class PairingOpensDrawerAppTests {
             it.load(paired).copy(
                 connection = AppFeature.State.Connection.Connecting,
                 connectionGeneration = 2,
-                connectionAttempt = AppFeature.ConnectionAttempt(id = 2, server = paired, opensDrawer = opensDrawer),
+                connectionAttempt = AppFeature.ConnectionAttempt(id = 2, server = paired, pairing = arrival),
             )
         }
         gates.health.trySend(Unit)
@@ -164,7 +174,7 @@ class PairingOpensDrawerAppTests {
         val gates = Gates()
         val list = GatedSnapshot(snapshot)
         val store = pairingStore(paired = paired, gates = gates, homeSnapshot = list.read)
-        pairUntilListLoads(store, gates, opensDrawer = true)
+        pairUntilListLoads(store, gates)
         list.release.complete(Unit)
         store.receiveCase<AppFeature.Action.HomeResponse> { landHome(it, snapshot) }
         receivePairedComputerOpened(store)
@@ -182,7 +192,7 @@ class PairingOpensDrawerAppTests {
         val gates = Gates()
         val list = GatedSnapshot(snapshot)
         val store = pairingStore(shared.appState(), paired = paired, gates = gates, homeSnapshot = list.read)
-        pairUntilListLoads(store, gates, opensDrawer = false, saved = listOf(saved))
+        pairUntilListLoads(store, gates, arrival = PairingArrival.knownComputer, saved = listOf(saved))
         list.release.complete(Unit)
         store.receiveCase<AppFeature.Action.HomeResponse> { landHome(it, snapshot) }
         assertEquals(true, store.state.home?.sessionDetail?.isDraft)
@@ -194,7 +204,7 @@ class PairingOpensDrawerAppTests {
     fun aFailedListReadAfterPairingKeepsTodaysFailure() = runTest {
         val gates = Gates()
         val store = pairingStore(paired = paired, gates = gates) { throw OpenCodeClientError("Couldn’t load projects and sessions") }
-        pairUntilListLoads(store, gates, opensDrawer = true)
+        pairUntilListLoads(store, gates)
         store.receiveCase<AppFeature.Action.HomeResponse> {
             it.copy(
                 connectionAttempt = null,
@@ -220,7 +230,7 @@ class PairingOpensDrawerAppTests {
                 cancelled.set(true)
             }
         }
-        pairUntilListLoads(store, gates, opensDrawer = true)
+        pairUntilListLoads(store, gates)
         store.send(AppFeature.Action.CancelEditingTapped) {
             it.copy(connection = AppFeature.State.Connection.Picking, connectionAttempt = null)
         }
@@ -241,7 +251,7 @@ class PairingOpensDrawerAppTests {
         val gates = Gates()
         val list = GatedSnapshot(snapshot)
         val store = pairingStore(paired = paired, gates = gates, homeSnapshot = list.read)
-        pairUntilListLoads(store, gates, opensDrawer = true)
+        pairUntilListLoads(store, gates)
         list.release.complete(Unit)
         store.receiveCase<AppFeature.Action.HomeResponse> { landHome(it, snapshot) }
         receivePairedComputerOpened(store)
@@ -273,7 +283,7 @@ class PairingOpensDrawerAppTests {
         val gates = Gates()
         val list = GatedSnapshot(snapshot)
         val store = pairingStore(paired = paired, gates = gates, homeSnapshot = list.read)
-        pairUntilListLoads(store, gates, opensDrawer = true)
+        pairUntilListLoads(store, gates)
         list.release.complete(Unit)
         store.receiveCase<AppFeature.Action.HomeResponse> { landHome(it, snapshot) }
         receivePairedComputerOpened(store)
