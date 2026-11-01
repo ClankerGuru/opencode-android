@@ -111,7 +111,7 @@ another module are left to that module's port ("skipped"); "dropped" tests can't
 | `RaiseToTalkTests.swift` | `RaiseToTalkTests.kt` | 16 (the `RaiseToEarDetector` and at-ear engine start) | 8 `SessionFeature` tests (`:feature:session`, ported there) | – |
 | `RaiseToTalkTests+Routing.swift` | `RaiseToTalkRoutingTests.kt` | 8 + the `VoiceAudioEngine` half of `setAtEarBeforeRunningIsNotLost` (`VoiceAudioEngine` routing/ramp, `VoiceCallHost` ear hand-off) | 3 `SessionFeature` tests (`:feature:session`, ported there) | – |
 | `HapticsAuditTests.swift` | `HapticsAuditTests.kt` | 1 (`theCallsFallbacksComeFromTheVocabulary`) | rest (`:core`, `:feature:session`, drawer, ported there) | – |
-| `VoiceLiveTests.swift` | `VoiceLiveTests.kt` | 83 | 3 compaction/retarget tests (`:feature:session`, drawer, ported there) | 8 `VoiceEnginePersistenceTests` (`realtimeMigratesToGPTLive` … `laterManualChoiceSticks`): they test `AppFeature+Migrations`' launch-time engine migration (Realtime/Grok → GPT-Live), which Android doesn't have (see app.md) |
+| `VoiceLiveTests.swift` | `VoiceLiveTests.kt` | 25 | – | 8 `VoiceEnginePersistenceTests` (`realtimeMigratesToGPTLive` … `laterManualChoiceSticks`): they test `AppFeature+Migrations`' launch-time engine migration (Realtime/Grok → GPT-Live), which Android doesn't have (see app.md). The rest moved out as iOS split it (`VoiceAnswerHoldTests`, `VoiceClaimTests`, `VoiceResultHoldTests`, `LiveCallCoordinatorTests`, `LiveDelegationFeatureTests`) |
 | `VoiceReconnectReplyTests.swift` | `VoiceReconnectReplyTests.kt` | 7 | – | – |
 | `VoiceRouteTests.swift` | `VoiceRouteTests.kt` | 6 | `inactiveGeminiNeverDisablesThePhoneKey…`, `grokSuppressesUnrelatedServerErrors` (their Settings and session halves, ported in `:feature:settings`/`:feature:session`) | – |
 | `VoiceResultSpeechTests.swift` | `VoiceResultSpeechTests.kt` | 44 (+ `VoiceWaitYieldTests`) | – | – |
@@ -122,25 +122,25 @@ another module are left to that module's port ("skipped"); "dropped" tests can't
 | `WispOrbTests.swift` | `WispOrbTests.kt` | 7 | – | – (layout checks slot indices of the flat uniform array; the kernel test runs the CPU kernel instead of a Metal pipeline) |
 | `FloatingCallStageTests.swift` | `FloatingCallStageTests.kt` | 8 (the `FloatingCallStageFeature` store half, incl. `theCallKeepsItsStage`) | `FloatingCallStageGeometry`, `FloatingCallWindowTests`, `FloatingCallConnectTests` (wait on the One Shape views; see the FloatingCallStages row) | – |
 | `VoiceCallCueTests.swift` | `VoiceCallCueTests.kt` | 9 (the parameterised pack tests loop over the packs) | – | – |
-| `LiveDelegationFeatureTests.swift` (+`+Session`) | – | 0 | – | not re-homed yet: split out of `VoiceLiveTests` on iOS (0eb46803); the Kotlin tests still sit in `VoiceLiveTests.kt` and drawer `LiveDelegationFeatureTestsSession.kt` |
+| `LiveDelegationFeatureTests.swift` (+`+Session`) | `LiveDelegationFeatureTests.kt` | 9 | 3 compaction/retarget tests (`:feature:session`, drawer `LiveDelegationFeatureTestsSession.kt`, ported there) | – (moved out of `VoiceLiveTests.kt` unchanged; iOS hasn't changed them since 062f3732) |
 | `VoiceScreenshotToolTests.swift` | – | 0 | – | not ported yet (the Developer Mode `capture_app_screenshot` tool is ported in `VoiceDelegatorWorkspace`/`VoiceAppState`) |
 | `VoiceRequestDockTests.swift` | – | 0 | – | not ported yet (the request dock is the session area’s; voice sends `RequestSettled`) |
 | `FloatingOrbTests.swift` | – | 0 | – | not ported yet (waits on the One Shape surface) |
-| `VoiceTestClock.swift` | – | – | – | n/a: Android drives coordinator timing through the `Clock` dependency already |
-| `VoiceAnswerHoldTests.swift` | – | 0 | – | not ported yet (new at f657969b, mostly split out of `VoiceLiveTests`, whose Kotlin tests still cover the moved ones) |
+| `VoiceTestClock.swift` | `VoiceTestClock.kt` | – | – | `VoiceTestClock` itself n/a: `runTest` virtual time is that clock (the coordinator runs on the test scheduler and reads `Clock`). `VoiceClockedCall` keeps iOS's steps (`start`, `idle`, `advance` = `advanceTimeBy` + `runCurrent`, `userSays`, `delegates`, `agentSpeaks`, `micHearsUser`, `playbackDrains`, `waitFor`/`until` polling state without moving time) plus `settle` (iOS's real-time sleeps), `join` and `retryDelayPasses` (below) |
+| `VoiceAnswerHoldTests.swift` | `VoiceAnswerHoldTests.kt` | 13 | – | – (re-ported from f657969b on `VoiceClockedCall`) |
 | `VoiceBackgroundResultTests.swift` | – | 0 | – | not ported yet (new at f657969b) |
-| `VoiceClaimTests.swift` | – | 0 | – | not ported yet (new at f657969b, mostly split out of `VoiceLiveTests`, whose Kotlin tests still cover the moved ones) |
-| `VoiceContextHoldTests.swift` | – | 0 | – | not ported yet (new at f657969b) |
-| `VoiceLayLowTests.swift` | – | 0 | – | not ported yet (new at f657969b) |
+| `VoiceClaimTests.swift` | `VoiceClaimTests.kt` | 4 | – | – (the parameterized acknowledgement test loops over both arguments) |
+| `VoiceContextHoldTests.swift` | `VoiceContextHoldTests.kt` | 2 | – | – |
+| `VoiceLayLowTests.swift` | `VoiceLayLowTests.kt` | 4 | – | – |
 | `VoicePendingRequestTests.swift` | – | 0 | – | not ported yet (new at f657969b) |
-| `VoiceResultHoldTests.swift` | – | 0 | – | not ported yet (new at f657969b, mostly split out of `VoiceLiveTests`, whose Kotlin tests still cover the moved ones) |
+| `VoiceResultHoldTests.swift` | `VoiceResultHoldTests.kt` | 10 | – | – (6 moved and re-ported from f657969b, 4 new) |
 | `VoiceSessionDelegatorEdgeTests.swift` | – | 0 | – | not ported yet (new at f657969b) |
 | `VoiceSessionDelegatorServerVoiceTests.swift` | – | 0 | – | not ported yet (new at f657969b) |
 | `VoiceSessionDelegatorTests.swift` | – | 0 | – | not ported yet (new at f657969b) |
-| `VoiceSessionMoveTests.swift` | – | 0 | – | not ported yet (new at f657969b) |
+| `VoiceSessionMoveTests.swift` | `VoiceSessionMoveTests.kt` | 2 | – | – (iOS's `forgetTranscripts` cleanup is unneeded: each harness has its own in-memory store) |
 | `VoiceSharedWaitTests.swift` | – | 0 | – | not ported yet (new at f657969b) |
 | `VoiceTurnStampTests.swift` | – | 0 | – | not ported yet (new at f657969b) |
-| `LiveCallCoordinatorTests.swift` | – | 0 | – | not ported yet (new at f657969b, mostly split out of `VoiceLiveTests`, whose Kotlin tests still cover the moved ones) |
+| `LiveCallCoordinatorTests.swift` | `LiveCallCoordinatorTests.kt` | 26 | – | – (12 re-ported from f657969b, 14 moved unchanged). iOS sleeps reconnect/rotation/uplink/keepalive delays on the wall clock; Kotlin sleeps them on the one `Clock`, so the 3 tests whose answer waits for a replacement socket advance the retry delay (`retryDelayPasses`, 10 ms) before waiting for it |
 | `VoiceSessionToolsTests.swift` (+`VoiceModelToolsTests`) | `VoiceSessionToolsTests.kt` | 24 | `homePublishesTheDrawerState…` (drawer), `theScreenFollowsOnlyItsOwnSessionsSwitch` (`:feature:session`), both ported there | – |
 | `FloatingCallModelTests.swift` | `FloatingCallModelTests.kt` | 14 | `canStartCallFromTap` half of `tapIntoProjectPicker…`, `ComposerTunables.bottomGap` (`:feature:session`, ported there) | Preset/registry parts of 3 tunables tests (tuning store not ported); 8 `TestWindowHost`/SessionView hosting tests (`onlyTopSessionViewDrivesCallTrayController`, `callTrayReserveGlides…`, `callTrayOverlayResetsReserve…`, `pushingAndPoppingSubagent…`, two `subagentStartedCall…`, `subagentPopDuringEnding…`, `growModelListCloseAndReset…`) Sync: iOS 58507d6c/64ff3ed7 moved `stylePresets…`, `theOrbRestsAboveTheComposer…` and `theExperimentIsOffByDefault` to `FloatingOrbTests` and 19f4d63c dropped the face tests (`feelPresets…`, `thinkingTurnsTheFigures…`, `everyDotTake…`, `playgroundScenes…`); deleted here with them. |
 | `FloatingCallModelTests+Dock.swift` | `FloatingCallModelTestsDock.kt` | 3 | – | – |
@@ -166,4 +166,4 @@ exception class instead of its reason and turned cancellation into an engine err
 that failed when an interruption ended was never retried by the next route/configuration change;
 a just-finished call log was missing from `list()` while its save was still writing; End landed 2 dp left of the call button (48 dp slot kept the 6 dp padding); a reconnect or rotation replayed the connect chord; `RetryBudget.bounded` (`:server`) timed its limit on the scripted clock, so a lost send's answer was never read back; a cancelled speaker ramp re-sent an unchanged 1.0 gain (iOS only sets a changed volume) and a fallback to the built-in output was noted as “Route changed” instead of the ear's route; every call start re-sent its initial ear to the audio (iOS only re-applies one that changed while the audio started).
 
-Total: 539 voice tests (Gradle), all passing. Robolectric (test-only) runs only `VoiceCallTeardownFrameworkTests`.
+Total: 553 voice tests (Gradle), all passing. Robolectric (test-only) runs only `VoiceCallTeardownFrameworkTests`.
