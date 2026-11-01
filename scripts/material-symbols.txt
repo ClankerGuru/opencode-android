@@ -13,6 +13,7 @@ all_inbox fill                      # tray.full.fill
 alternate_email                     # at
 app_badging                         # app.badge
 arrow_circle_down                   # arrow.down.circle
+arrow_circle_down fill              # arrow.down.circle.fill
 arrow_circle_up                     # arrow.up.circle
 arrow_circle_up fill                # arrow.up.circle.fill
 arrow_downward                      # arrow.down
@@ -23,6 +24,7 @@ arrow_upward                        # arrow.up
 article                             # doc.plaintext
 attach_file                         # paperclip
 auto_awesome                        # sparkles
+auto_awesome fill                   # sparkle
 autorenew                           # arrow.trianglehead.2.clockwise
 back_hand fill                      # hand.raised.fill
 bedtime                             # moon.zzz
@@ -163,6 +165,7 @@ pan_tool_alt                        # hand.point.up.left
 pan_tool_alt fill                   # hand.point.up.left.fill
 pause fill                          # pause.fill
 pending                             # ellipsis.circle
+person fill                         # person.fill
 phone_in_talk                       # phone.connection
 phone_in_talk fill                  # phone.and.waveform.fill
 photo_camera                        # camera
@@ -237,5 +240,6 @@ warning                             # exclamationmark.triangle
 warning fill                        # exclamationmark.triangle.fill
 waving_hand                         # hand.wave
 wifi                                # wifi
+wifi_off                            # wifi.slash
 wifi_tethering_error                # wifi.exclamationmark
 wrap_text mirror                    # text.word.spacing
