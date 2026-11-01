@@ -162,6 +162,35 @@ object TranscriptTimeStamps {
      * IDs, such as the app's own `msg_<UUID>`, have no time.
      */
     fun date(id: String, now: Instant): Instant? {
+        val value = parsedValue(id) ?: return null
+        return recoveredDate(value, now)
+    }
+
+    /** Whether [id] carries an OpenCode timestamp minted at or before [milliseconds]. */
+    fun isAtOrBefore(milliseconds: Long, id: String): Boolean? {
+        val ahead = millisecondsAhead(milliseconds, id) ?: return null
+        return ahead == 0L || ahead > (MS_MASK shr 1)
+    }
+
+    /** Whether [id] carries an OpenCode timestamp minted strictly before [milliseconds]. */
+    fun isBefore(milliseconds: Long, id: String): Boolean? {
+        val ahead = millisecondsAhead(milliseconds, id) ?: return null
+        return ahead > (MS_MASK shr 1)
+    }
+
+    /** The 36 bits of milliseconds an ID holds. */
+    private const val MS_MASK: Long = 0xF_FFFF_FFFFL
+
+    /** How far [id]'s milliseconds are ahead of [milliseconds], wrapped to the ID's 36 bits. */
+    private fun millisecondsAhead(milliseconds: Long, id: String): Long? {
+        if (milliseconds <= 0) return null
+        val value = parsedValue(id) ?: return null
+        val itemMS = (value ushr 12) and MS_MASK
+        val cutoffMS = milliseconds and MS_MASK
+        return (itemMS - cutoffMS) and MS_MASK
+    }
+
+    private fun parsedValue(id: String): Long? {
         val underscore = id.indexOf('_')
         if (underscore < 0) return null
         val bodyStart = underscore + 1
@@ -182,7 +211,7 @@ object TranscriptTimeStamps {
             val c = id[i]
             if (c !in '0'..'9' && c !in 'A'..'Z' && c !in 'a'..'z') return null
         }
-        return recoveredDate(value, now)
+        return value
     }
 
     private fun recoveredDate(value: Long, now: Instant): Instant {

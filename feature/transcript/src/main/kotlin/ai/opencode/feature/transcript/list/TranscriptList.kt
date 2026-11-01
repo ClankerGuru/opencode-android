@@ -314,7 +314,20 @@ private fun TranscriptListContent(
                             pulsePaused = !controller.isShowingToReader,
                             modifier = rowModifier.fillParentMaxHeight(),
                         )
-                        TranscriptItemID.NewDivider -> NewMessagesDivider(rowModifier)
+                        TranscriptItemID.NewDivider -> NewMessagesDivider(
+                            rowModifier
+                                .graphicsLayer {
+                                    alpha = controller.dividerAlpha()
+                                    clip = true
+                                }
+                                .layout { measurable, constraints ->
+                                    // Its motion fits the row (iOS `fittedDividerHeight`); the rule stays centred.
+                                    val placeable = measurable.measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
+                                    val height = controller.fittedDividerHeight(placeable.height)
+                                    layout(placeable.width, height) { placeable.place(0, (height - placeable.height) / 2) }
+                                },
+                            glowStart = controller.dividerGlowStart,
+                        )
                         TranscriptItemID.Working -> GrowingRow(controller, item.key, rowModifier) {
                             val working = slots.workingLine
                             if (working != null) {
