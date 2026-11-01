@@ -103,7 +103,7 @@ internal fun HomeFeature.reduceWhatsNew(state: State, action: WhatsNewFeature.Ac
             Reduced(state)
         } else {
             val whatsNew = SettingsFeature.State.whatsNew(state.server)
-            Reduced(state.presentingSettings(whatsNew.copy(whatsNew = whatsNew.whatsNew.copy(isPresented = true))))
+            Reduced(state.copy(settingsVoicePage = null).presentingSettings(whatsNew.copy(whatsNew = whatsNew.whatsNew.copy(isPresented = true))))
         }
     WhatsNewFeature.Action.HideTapped -> {
         WhatsNewFeature().reduce(WhatsNewFeature.State(), action)

@@ -1,9 +1,12 @@
 package ai.opencode.feature.drawer
 
 import ai.opencode.core.dependencies.Clock
+import ai.opencode.core.dependencies.DateClient
+import ai.opencode.core.dependencies.DependencyValues
 import ai.opencode.core.dependencies.ImmediateClock
 import ai.opencode.core.store.TestStore
 import ai.opencode.core.testing.TestIsolationRule
+import ai.opencode.core.testing.eventually
 import ai.opencode.feature.drawer.HomeFeature.Action
 import ai.opencode.feature.drawer.HomeFeatureTestSupport.Harness
 import ai.opencode.feature.drawer.HomeFeatureTestSupport.detail
@@ -13,6 +16,11 @@ import ai.opencode.feature.drawer.HomeFeatureTestSupport.snapshot
 import ai.opencode.feature.session.SessionFeature
 import ai.opencode.feature.session.from
 import ai.opencode.feature.session.missingFolderMoveTarget
+import ai.opencode.feature.voice.VoiceCallClient
+import ai.opencode.feature.voice.VoiceCallLogClient
+import ai.opencode.feature.voice.VoiceCallLogRecorder
+import ai.opencode.feature.voice.VoiceEngine
+import ai.opencode.feature.voice.VoiceFeature
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.OpenCodeServerEvent
@@ -21,9 +29,14 @@ import ai.opencode.server.model.OpenCodePendingRequests
 import ai.opencode.server.model.OpenCodeProject
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.OpenCodeSessionFamily
+import java.nio.file.Files
+import java.time.Instant
+import java.util.UUID
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.flow.emptyFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -31,9 +44,6 @@ import org.junit.Test
  * Port of iOS `HomeFeatureTests+MovedSessions.swift`: a session whose folder is gone moves to its
  * project's folder (Move to, or the server's `session.moved`): every screen knows the project to
  * offer, and every copy Home holds follows the move.
- *
- * Not ported yet: `aCallStaysOnItsSessionWhenTheSessionMoves` needs `VoiceFeature`'s
- * `sessionMoved` (iOS 1e7a7b7e), which the voice area ports.
  */
 class HomeFeatureTestsMovedSessions {
     @get:Rule val isolation = TestIsolationRule()
@@ -44,7 +54,10 @@ class HomeFeatureTestsMovedSessions {
     private fun worktreeSession(id: String = "ses_1", parentID: String? = null): OpenCodeSession =
         session(id, title = "Fix login bug", projectID = "proj_1", directory = "/work/linked", parentID = parentID)
 
-    private fun Harness.quietStore(state: HomeFeature.State): TestStore<HomeFeature.State, Action> {
+    private fun Harness.quietStore(
+        state: HomeFeature.State,
+        dependencies: DependencyValues.Builder.() -> Unit = {},
+    ): TestStore<HomeFeature.State, Action> {
         val store = store(state) {
             this[Clock] = ImmediateClock()
             this[OpenCodeClient] = OpenCodeClient.testValue.copy(
@@ -57,6 +70,7 @@ class HomeFeatureTestsMovedSessions {
                 modelCatalog = { _, _ -> OpenCodeModelCatalog(models = emptyList(), defaultModel = null) },
                 homeAttention = { _, _, _ -> emptySet() },
             )
+            dependencies()
         }
         store.exhaustive = false
         return store
@@ -124,5 +138,66 @@ class HomeFeatureTestsMovedSessions {
         assertEquals(listOf("/work/repo"), store.state.sessionDetail?.familySessions?.map { it.directory })
         assertNull(store.state.sessionDetail?.missingFolderMoveTarget)
         h.skipInFlightEffects()
+    }
+
+    /**
+     * A call on a session that moves stays on it, now in its new folder: no "Moved to" note, no
+     * retarget. Opening another session is a move.
+     */
+    @Test
+    fun aCallStaysOnItsSessionWhenTheSessionMoves() = homeTest { h ->
+        val directory = Files.createTempDirectory("voice-logs-").toFile()
+        try {
+            val logID = UUID.randomUUID()
+            val recorder = DependencyValues.withValues(DependencyValues.testing().update { this[DateClient] = DateClient.constant(Instant.EPOCH) }) {
+                VoiceCallLogRecorder(directory = directory)
+            }
+            recorder.begin(logID, title = "Fix login bug", engine = "test")
+            val session = worktreeSession()
+            val other = session("ses_2", title = "Docs", projectID = "proj_1", directory = "/work/repo")
+            val state = h.state {
+                val home = HomeFeature.State(testServer, snapshot(listOf(session, other), projects = listOf(repo)))
+                    .let { it.copy(transcriptCache = it.transcriptCache + mapOf(session.id to emptyList(), other.id to emptyList())) }
+                val (made, detail) = home.makeDetail(session, cachedItems = emptyList())
+                val voice = VoiceFeature.State(testServer, session)
+                    .withPhase(VoiceFeature.State.Phase.Live)
+                    .copy(activeEngine = VoiceEngine.realtime, callLogID = logID)
+                made.copy(sessionDetail = detail.copy(voice = voice))
+            }
+            var retargets = 0
+            val store = h.quietStore(state) {
+                this[VoiceCallLogClient] = VoiceCallLogClient(recorder = recorder)
+                this[DateClient] = DateClient.constant(Instant.EPOCH)
+                this[VoiceCallClient] = VoiceCallClient(
+                    start = { _, _ -> emptyFlow() },
+                    completeFunction = { _, _ -> },
+                    retarget = { retargets += 1 },
+                    setMuted = { },
+                    updateInstructions = { _, _ -> },
+                    updateDelegatorInstructions = { },
+                    end = { },
+                )
+            }
+            fun moves(): List<String> = (recorder.snapshot(logID)?.notes ?: emptyList()).map { it.text }.filter { it.startsWith("Moved to") }
+
+            // The server revived it in its project's folder.
+            store.send(Action.ServerEvent(OpenCodeServerEvent.SessionMoved(sessionID = session.id, directory = "/work/repo")))
+            store.receive(detail(SessionFeature.Action.SessionMoved(sessionID = session.id, directory = "/work/repo")))
+            assertEquals(session.id, store.state.sessionDetail?.voice?.target?.sessionID)
+            assertEquals("/work/repo", store.state.sessionDetail?.voice?.target?.directory)
+            assertEquals("repo", store.state.sessionDetail?.voice?.directoryName)
+            assertTrue(moves().isEmpty())
+
+            // Another session is a move.
+            store.send(Action.SessionTapped(other.id))
+            store.receive({ it == detail(SessionFeature.Action.voicePresented(VoiceFeature.Action.TargetChanged)) }, "voice target changed")
+            assertEquals(other.id, store.state.sessionDetail?.voice?.target?.sessionID)
+            assertTrue(moves().size == 1 && moves().first().startsWith("Moved to “Docs”"))
+            eventually { retargets > 0 }
+            assertEquals(1, retargets)
+            h.skipInFlightEffects()
+        } finally {
+            directory.deleteRecursively()
+        }
     }
 }

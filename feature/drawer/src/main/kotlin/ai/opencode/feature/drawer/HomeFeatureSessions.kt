@@ -21,6 +21,7 @@ import ai.opencode.feature.system.share.ShareInboxClient
 import ai.opencode.feature.voice.ReplyWatch
 import ai.opencode.feature.voice.VoiceFeature
 import ai.opencode.feature.voice.VoiceWorkClient
+import ai.opencode.feature.voice.tracksSessionDelegatorTools
 import ai.opencode.server.OpenCodeLiveContentEvent
 
 /*
@@ -97,8 +98,20 @@ internal fun HomeFeature.reduceSessionDetail(state: State, action: SessionFeatur
             val voiceAction = (action.action as? PresentationAction.Presented)?.action
             val delegate = (voiceAction as? VoiceFeature.Action.Delegate)?.action ?: return Reduced(state)
             return when (delegate) {
-                // iOS opens Settings at the page (`showSettings(at:)`); the page is the drawer's to honour.
-                is VoiceFeature.DelegateAction.OpenVoiceSettings -> Reduced(state.showingSettings())
+                is VoiceFeature.DelegateAction.OpenVoiceSettings -> Reduced(state.showingSettings(voicePage = delegate.page))
+                // As the server's attention event does: REST settles every screen's requests (the
+                // answered one may be a subagent's) and the drawer's.
+                is VoiceFeature.DelegateAction.RequestSettled -> Reduced(
+                    state,
+                    Effect.merge(refreshAttention(state), forwardToScreens(state, SessionFeature.Action.RequestsChanged) { it.session != null }),
+                )
+                is VoiceFeature.DelegateAction.DelegatorSessionCreated -> {
+                    if (state.sessions.any { it.id == delegate.session.id }) {
+                        Reduced(state)
+                    } else {
+                        Reduced(state.copy(sessions = listOf(delegate.session) + state.sessions))
+                    }
+                }
                 // The root owns the call even when it targets a pushed subagent.
                 is VoiceFeature.DelegateAction.PromptAdmitted ->
                     Reduced(state, forwardToSubagents(state, delegate.sessionID, SessionFeature.Action.VoicePromptAdmitted(delegate.sessionID)))
@@ -357,9 +370,19 @@ internal fun notifyVoiceContentBatch(state: State, sessionID: String, events: Li
     } else {
         Effect.none()
     }
+    val toolEvents = if (state.sessionDetail?.voice?.tracksSessionDelegatorTools(sessionID) == true) {
+        events.filter { it.isToolLifecycleEvent }
+    } else {
+        emptyList()
+    }
+    val delegatorToolsEffect: Effect<Action> = if (toolEvents.isEmpty()) {
+        Effect.none()
+    } else {
+        Effect.send(Action.detail(SessionFeature.Action.voicePresented(VoiceFeature.Action.SessionDelegatorTools(sessionID, toolEvents))))
+    }
     val pushed = forwardToSubagents(state, sessionID, SessionFeature.Action.ContentBatch(sessionID, events))
-    if (state.sessionDetail?.session?.id != sessionID) return Effect.merge(voiceEffect, pushed)
-    return Effect.merge(Effect.send(Action.detail(SessionFeature.Action.ContentBatch(sessionID, events))), voiceEffect, pushed)
+    if (state.sessionDetail?.session?.id != sessionID) return Effect.merge(voiceEffect, delegatorToolsEffect, pushed)
+    return Effect.merge(Effect.send(Action.detail(SessionFeature.Action.ContentBatch(sessionID, events))), voiceEffect, delegatorToolsEffect, pushed)
 }
 
 /** A run ended: the call's reply watch settles it, or just hears it stopped (iOS `notifyVoiceExecutionEnded`). */

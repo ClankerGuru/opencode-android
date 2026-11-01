@@ -983,7 +983,7 @@ internal fun SessionFeature.sessionMoved(sessionID: String, directory: String, s
     if (index >= 0 && next.familySessions[index].directory != directory) {
         next = next.copy(familySessions = next.familySessions.toMutableList().also { it[index] = it[index].copy(directory = directory) })
     }
-    // iOS also tells the voice state (`voice?.sessionMoved`); VoiceFeature.State has no move yet.
+    next.voice?.let { voice -> next = next.copy(voice = voice.sessionMoved(sessionID, directory)) }
     val session = next.session
     if (session?.id != sessionID || session.directory == directory) return Reduced(next)
     next = next.copy(session = session.copy(directory = directory), refresh = next.refresh?.copy(directoryChanged = true))

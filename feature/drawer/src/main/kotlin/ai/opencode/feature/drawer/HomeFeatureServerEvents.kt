@@ -3,6 +3,9 @@ package ai.opencode.feature.drawer
 import ai.opencode.feature.session.*
 import ai.opencode.core.sharing.shared
 import ai.opencode.feature.voice.VoiceSharedKeys
+import ai.opencode.feature.voice.hasActiveSessionDelegatorTurn
+import ai.opencode.feature.voice.VoiceFeature
+import ai.opencode.feature.voice.VoiceModelsCache
 import ai.opencode.feature.composer.PromptOutbox
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.dependency
@@ -53,7 +56,16 @@ internal fun HomeFeature.reduceServerEvent(state: State, event: OpenCodeServerEv
             if (support != null && support != ServerVoiceSupport.unknown) {
                 s = s.updatingDetail { it.copy(voice = it.voice?.copy(serverVoiceSupport = ServerVoiceSupport.unknown)) }
             }
-            return familyAndListRefresh(s)
+            // It may have been set up, updated or come back since: what Voice Provider knew of it,
+            // and anything still being asked, no longer counts.
+            VoiceModelsCache.invalidate(serverID)
+            val voiceReconnect: Effect<Action> = if (s.sessionDetail?.voice?.hasActiveSessionDelegatorTurn == true) {
+                Effect.send(Action.detail(SessionFeature.Action.voicePresented(VoiceFeature.Action.SessionDelegatorStreamReconnected)))
+            } else {
+                Effect.none()
+            }
+            val refreshed = familyAndListRefresh(s)
+            return Reduced(refreshed.state, Effect.merge(refreshed.effect, voiceReconnect))
         }
 
         is OpenCodeServerEvent.SessionCreated -> {
@@ -266,17 +278,22 @@ internal fun HomeFeature.reduceServerEvent(state: State, event: OpenCodeServerEv
             }
             s = s.purgingSession(sessionID)
             s = s.copy(recentlyDeletedIDs = s.recentlyDeletedIDs - sessionID)
+            val voiceDeleted: Effect<Action> = if (s.sessionDetail?.voice?.usesSessionDelegator == true) {
+                Effect.send(Action.detail(SessionFeature.Action.voicePresented(VoiceFeature.Action.SessionDelegatorSessionDeleted(sessionID))))
+            } else {
+                Effect.none()
+            }
             val deleted = SessionFeature.Action.FamilySessionDeleted(sessionID)
             val pushed = forwardToSubagentFamilies(s, sessionID, deleted)
             // A subagent the family read hasn't listed may still own a docked request.
             val detail = s.sessionDetail
             if (detail == null || (detail.familySessions.none { it.id == sessionID } && sessionID !in detail.waitingSessionIDs)) {
-                return Reduced(s, Effect.merge(cancelSelected, pushed))
+                return Reduced(s, Effect.merge(cancelSelected, voiceDeleted, pushed))
             }
             if (detail.familyRootID == sessionID) {
-                return Reduced(s.openingDraft(reason = "the session went away on the server"), cancelSelected)
+                return Reduced(s.openingDraft(reason = VoiceFeature.State.MoveReason.sessionWentAway), Effect.merge(cancelSelected, voiceDeleted))
             }
-            return Reduced(s, Effect.merge(cancelSelected, sendToDetail(s, deleted), pushed))
+            return Reduced(s, Effect.merge(cancelSelected, voiceDeleted, sendToDetail(s, deleted), pushed))
         }
 
         is OpenCodeServerEvent.SessionArchiveChanged -> {

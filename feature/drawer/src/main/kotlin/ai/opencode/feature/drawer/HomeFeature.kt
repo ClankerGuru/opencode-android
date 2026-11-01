@@ -25,6 +25,7 @@ import ai.opencode.feature.session.*
 import ai.opencode.feature.system.liveactivity.DictationActivityAttributes
 import ai.opencode.feature.system.liveactivity.VoiceCallActivityAttributes
 import ai.opencode.feature.voice.VoiceFeature
+import ai.opencode.feature.voice.VoiceSettingsPage
 import ai.opencode.feature.system.SystemAction
 import ai.opencode.feature.system.liveactivity.DictationCommand
 import ai.opencode.feature.system.liveactivity.VoiceCallCommand
@@ -165,6 +166,11 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
          * effects end when it closes. What's New from the drawer's row is this with `root = whatsNew`.
          */
         val settings: SettingsFeature.State? = null,
+        /**
+         * The Voice page Settings opens at, when a call asked for it (iOS `settingsVoicePage`); the
+         * cog and What's New open Settings' root.
+         */
+        val settingsVoicePage: VoiceSettingsPage? = null,
         val sessionDetail: SessionFeature.State? = null,
         /** A subagent waiting for its parent to open under it (`sessionTapped`). */
         val pendingSubagentPush: OpenCodeSession? = null,
@@ -452,10 +458,11 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
          * Settings pushed as Settings, never as What's New (a call needing Voice set up, the cog):
          * already up with What's New as its page, it cross-fades to Settings' root.
          */
-        fun showingSettings(): State {
-            val shown = settings ?: return presentingSettings(SettingsFeature.State(server = server))
-            if (shown.root != SettingsFeature.State.Root.whatsNew) return this
-            return copy(settings = SettingsFeature().reduce(shown, SettingsFeature.Action.ShowSettingsRoot).state)
+        fun showingSettings(voicePage: VoiceSettingsPage? = null): State {
+            val next = copy(settingsVoicePage = voicePage)
+            val shown = settings ?: return next.presentingSettings(SettingsFeature.State(server = server))
+            if (shown.root != SettingsFeature.State.Root.whatsNew) return next
+            return next.copy(settings = SettingsFeature().reduce(shown, SettingsFeature.Action.ShowSettingsRoot).state)
         }
 
         /** A reconnect, a server's first connection, or a return to the app: the next list and attention read set the baseline quietly. */

@@ -25,10 +25,14 @@ import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.SessionActivity
 import ai.opencode.server.model.keepingFirstPrompts
 import ai.opencode.server.remember
+import ai.opencode.feature.voice.VoiceFeature
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlin.time.Duration.Companion.milliseconds
+import ai.opencode.feature.voice.VoiceAppState
+import ai.opencode.feature.composer.DictationFeature
+import ai.opencode.core.tuning.DeveloperMode
 
 /*
  * Port of iOS `HomeFeature+Connection.swift`: what Home does as the connection comes and goes
@@ -234,7 +238,7 @@ private fun HomeFeature.snapshotRefreshed(state: State, action: Action.SnapshotR
     val openID = s.sessionDetail?.familyRootID
     if (openID != null && s.sessions.none { it.id == openID }) {
         val serverID = s.server.persistenceID
-        s = s.updatingLastViewedSessionIDs { it - serverID }.openingDraft(reason = "the session went away on the server")
+        s = s.updatingLastViewedSessionIDs { it - serverID }.openingDraft(reason = VoiceFeature.State.MoveReason.sessionWentAway)
     } else if (s.sessionDetail?.isDraft == true) {
         // A draft opened before the first snapshot (cold launch, empty cache) has no folders to
         // offer; refresh its choices as the list arrives so the Project picker is never empty on a
@@ -460,5 +464,29 @@ internal val State.voiceSessionBoard: VoiceSessionBoard?
             pinnedSessionKeys = pinnedSessionKeys,
             attentionDirectories = HomeFeature.attentionDirectories(this).toSet(),
             isLive = status.showsActivity,
+            home = if (DeveloperMode.isEnabled) voiceAppStateHome else null,
         )
     }
+
+/** The drawer and the top session's composer, for a call's screenshots (iOS `voiceAppStateHome`). */
+internal val State.voiceAppStateHome: VoiceAppState.Home
+    get() = VoiceAppState.Home(
+        drawerOpen = isDrawerOpen,
+        settingsShown = isSettingsShown,
+        catchUpShown = catchUp != null,
+        composer = topDetail?.let { detail ->
+            VoiceAppState.Composer(
+                draftCharacters = detail.draft.length,
+                dictation = when (val phase = detail.dictation.phase) {
+                    DictationFeature.Phase.Idle -> "idle"
+                    DictationFeature.Phase.Preparing -> "preparing"
+                    DictationFeature.Phase.Recording -> "recording"
+                    is DictationFeature.Phase.Finishing -> "finishing(send: ${phase.send ?: "nil"})"
+                },
+                images = detail.composerAttachments.pendingAttachments.size,
+                files = detail.composerAttachments.pendingFiles.size,
+                pendingPermissions = detail.requestDock.permissionRequests.size,
+                pendingQuestions = detail.requestDock.formRequests.size,
+            )
+        },
+    )
