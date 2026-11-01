@@ -174,6 +174,20 @@ class CatchUpFinishTests {
         assertTrue(abs(peak.sweepOpacity - timeline.glowOpacity) < 0.001)
         assertTrue(timeline.restEnd > timeline.settlesAt)
     }
+
+    /**
+     * Never wait for the exit: the check lands, and the glow starts, while Catch Up is still
+     * closing (`returnToDrawer`'s 0.45 s), so it reads as one motion; only the slower shimmer runs
+     * on past it.
+     */
+    @Test fun theCheckAndGlowPlayWhileCatchUpCloses() {
+        val closing = 0.45
+        val full = CatchUpFinishTimeline.current(reducedMotion = false)
+        val calm = CatchUpFinishTimeline.current(reducedMotion = true)
+        assertTrue(full.checkTime + full.glowDelay < closing)
+        assertTrue(calm.checkTime < closing)
+        assertTrue(full.settlesAt < 1.8)
+    }
 }
 
 /**

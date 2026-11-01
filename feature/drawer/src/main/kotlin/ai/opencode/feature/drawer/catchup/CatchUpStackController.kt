@@ -241,7 +241,10 @@ class CatchUpStackController internal constructor() {
         if (!keepsPreview) releasePreview()
     }
 
-    /** Nothing left once the last card has flown: Catch Up closes itself `closeDelay` later. */
+    /**
+     * Emptied without a flight (another device read the last card): Catch Up closes itself
+     * `closeDelay` later. A flung last card closes it at once.
+     */
     private fun scheduleFinish(finish: () -> Unit) {
         if (finishJob != null) return
         finishJob = scope.launch {
@@ -637,8 +640,13 @@ class CatchUpStackController internal constructor() {
             endDragSurface()
             live.alpha = 0f
             live.pose = CatchUpPose.Identity
-            // The store hears it a frame later, once the flight is on screen.
-            dismissal.schedule { dismissNow() }
+            // The store hears it a frame later, once the flight is on screen. The last card takes
+            // Catch Up with it: the stage starts leaving on the same frame, under the flight,
+            // never waiting for it to land.
+            dismissal.schedule {
+                dismissNow()
+                if (next == null) stage.onFinish()
+            }
         }
 
         val target = offscreenPose(disposition, startOffset, velocity)

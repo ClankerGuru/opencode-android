@@ -34,6 +34,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -44,6 +45,7 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -59,50 +61,54 @@ import kotlin.math.sin
 /**
  * Catch Up's finish (D-133, Count to Check; iOS `CatchUpFinish.swift`): the last card gone, Catch
  * Up closes itself and the drawer's Catch Up row rolls its count to 0, draws the 0 into a
- * checkmark, turns its title to All Caught Up and sweeps a glow across once, rests, then folds
- * away like any shortcut. [CatchUpFeature] owns the moment (`justFinished`, the `.success` haptic,
+ * checkmark, turns its title to All Caught Up and sweeps a shimmer across once (a soft band, then
+ * a narrow glint that overtakes it), rests, then folds away like any shortcut. It plays while Catch
+ * Up is still closing (the return takes 0.45 s), so the close, the check and the glow read as one
+ * motion rather than waiting for the exit. [CatchUpFeature] owns the moment (`justFinished`, the `.success` haptic,
  * the rest); the drawer list's shortcut motion clocks it and [DrawerCatchUpFinishedLabel] draws it.
  *
  * iOS `CatchUpFinishTunables`, as baked defaults (seconds unless noted).
  */
 object CatchUpFinishTunables {
-    /** Close after last card (s). */
-    const val closeDelay = 0.16
-    /** Row starts after close (s). */
-    const val landDelay = 0.3
+    /** Close once emptied elsewhere (s). */
+    const val closeDelay = 0.1
+    /** Row starts as Catch Up closes (s). */
+    const val landDelay = 0.06
     /** Count roll (s). */
-    const val roll = 0.3
+    const val roll = 0.26
     /** Check starts after landing (s). */
-    const val checkDelay = 0.6
+    const val checkDelay = 0.22
     /** 0 fade (s). */
-    const val zeroFade = 0.18
+    const val zeroFade = 0.16
     /** Check draw (s). */
-    const val checkDraw = 0.36
+    const val checkDraw = 0.32
     /** Title swap (s). */
-    const val titleSwap = 0.36
+    const val titleSwap = 0.32
     /** Title travel (pt). */
     const val titleTravel = 8.0
     /** Swap blur (pt). */
     const val blur = 3.0
     /** Glow starts after check (s). */
-    const val glowDelay = 0.22
-    /** Glow sweep (s). */
-    const val glowDuration = 0.95
+    const val glowDelay = 0.04
+    /** Shimmer sweep (s). */
+    const val glowDuration = 1.25
     /** Glow opacity. */
     const val glowOpacity = 0.75
+    /** Glint opacity. */
+    const val glintOpacity = 0.55
     /** Row tint at peak. */
     const val glowTint = 0.10
     /** Stays for (s). */
     const val rest = 4.0
-    /** Reduce Motion: row starts after close (s). */
-    const val reducedLandDelay = 0.22
+    /** Reduce Motion: row starts as Catch Up closes (s). */
+    const val reducedLandDelay = 0.06
     /** Reduce Motion: check starts after landing (s). */
-    const val reducedCheckDelay = 0.25
+    const val reducedCheckDelay = 0.16
 }
 
 /**
  * When each part of the finish happens and how the row looks at a moment, in seconds from the
- * row's landing (`landDelay` after Catch Up closes). iOS `CatchUpFinishTimeline`.
+ * row's landing (`landDelay` after Catch Up starts closing). iOS `CatchUpFinishTimeline`.
  */
 data class CatchUpFinishTimeline(
     val landDelay: Double,
@@ -116,18 +122,19 @@ data class CatchUpFinishTimeline(
     val glowDelay: Double,
     val glowDuration: Double,
     val glowOpacity: Double,
+    val glintOpacity: Double,
     val glowTint: Double,
     val rest: Double,
     val fade: Double,
     val reducedMotion: Boolean,
 ) {
-    /** Seconds after Catch Up closes that the check starts and `.success` plays. */
+    /** Seconds after Catch Up starts closing that the check starts and `.success` plays. */
     val checkTime: Double get() = landDelay + checkDelay
 
-    /** Seconds after Catch Up closes that the row folds away. */
+    /** Seconds after Catch Up starts closing that the row folds away. */
     val restEnd: Double get() = max(landDelay + rest, settlesAt)
 
-    /** Seconds after Catch Up closes that the row stops moving. */
+    /** Seconds after Catch Up starts closing that the row stops moving. */
     val settlesAt: Double
         get() = if (reducedMotion) checkTime + fade
         else checkTime + maxOf(glowDelay + glowDuration + 0.15, checkDraw * 2, titleSwap * 2)
@@ -148,6 +155,9 @@ data class CatchUpFinishTimeline(
         /** 0 (off the leading edge) to 1 (off the trailing edge). */
         val sweepPosition: Double,
         val sweepOpacity: Double,
+        /** A narrow glint that sets off after the sweep and overtakes it. */
+        val glintPosition: Double,
+        val glintOpacity: Double,
         val tint: Double,
     )
 
@@ -163,7 +173,7 @@ data class CatchUpFinishTimeline(
                 checkTrim = 1.0, checkOpacity = s,
                 oldTitleOpacity = 1 - s, oldTitleOffset = 0.0, oldTitleBlur = 0.0,
                 newTitleOpacity = s, newTitleOffset = 0.0, newTitleBlur = 0.0,
-                sweepPosition = 0.0, sweepOpacity = 0.0, tint = 0.0,
+                sweepPosition = 0.0, sweepOpacity = 0.0, glintPosition = 0.0, glintOpacity = 0.0, tint = 0.0,
             )
         }
         val z = easeOut(segment(u, t2 - 0.04, zeroFade))
@@ -171,6 +181,7 @@ data class CatchUpFinishTimeline(
         val s = spring(u - t2, titleSwap)
         val sweepStart = t2 + glowDelay
         val k = segment(u, sweepStart, glowDuration)
+        val glint = segment(u, sweepStart + glowDuration * 0.2, glowDuration * 0.5)
         val tintK = segment(u, sweepStart - 0.1, glowDuration + 0.25)
         return Frame(
             showsZero = u >= 0,
@@ -187,6 +198,8 @@ data class CatchUpFinishTimeline(
             newTitleBlur = blur * (1 - clamp(s)),
             sweepPosition = easeInOut(k),
             sweepOpacity = sin(PI * k) * glowOpacity,
+            glintPosition = easeInOut(glint),
+            glintOpacity = sin(PI * glint) * glintOpacity,
             tint = glowTint * sin(PI * tintK),
         )
     }
@@ -206,6 +219,7 @@ data class CatchUpFinishTimeline(
                 glowDelay = t.glowDelay,
                 glowDuration = t.glowDuration,
                 glowOpacity = t.glowOpacity,
+                glintOpacity = t.glintOpacity,
                 glowTint = t.glowTint,
                 rest = t.rest,
                 fade = Motion.reducedFade,
@@ -303,6 +317,22 @@ fun DrawerCatchUpFinishedLabel(
                         end = Offset(x + bandWidth, size.height * 0.59f),
                     )
                     drawRect(brush, topLeft = Offset(x, 0f), size = Size(bandWidth, size.height))
+                }
+                if (frame.glintOpacity > 0.001) {
+                    // A 30-wide band twice the row's height, leaning 18°, lightening what's under it.
+                    val glintWidth = 30.dp.toPx()
+                    val x = -40.dp.toPx() + (size.width + 50.dp.toPx()) * frame.glintPosition.toFloat()
+                    val alpha = frame.glintOpacity.toFloat().coerceIn(0f, 1f)
+                    val brush = Brush.horizontalGradient(
+                        0f to Color.White.copy(alpha = 0f),
+                        0.5f to Color.White.copy(alpha = 0.7f * alpha),
+                        1f to Color.White.copy(alpha = 0f),
+                        startX = x,
+                        endX = x + glintWidth,
+                    )
+                    rotate(18f, pivot = Offset(x + glintWidth / 2, size.height / 2)) {
+                        drawRect(brush, topLeft = Offset(x, -size.height / 2), size = Size(glintWidth, size.height * 2), blendMode = BlendMode.Plus)
+                    }
                 }
             }
             .padding(start = 10.dp, end = 12.dp)

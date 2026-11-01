@@ -647,8 +647,9 @@ internal class CatchUpPreviewStores {
         val next = Inputs(session, items, isRunning, snapshot, active)
         val existing = store
         if (existing != null && inputs == next) return existing
-        var state = SessionFeature.State.session(home.server, session, cachedItems = items, isRunning = isRunning)
-        state = home.seedingSessionSnapshot(state).copy(readsOnView = false)
+        var state = SessionFeature.State.session(home.server, session, projects = home.projects, cachedItems = items, isRunning = isRunning)
+        // Marked as the card will be once it's open, so it doesn't jump then.
+        state = home.applyingOpening(session, detail = home.seedingSessionSnapshot(state)).copy(readsOnView = false)
         if (existing != null && inputs?.session?.id == session.id && existing.state.hasRenderedFirstContentFrame) {
             state = state.copy(hasRenderedFirstContentFrame = true)
         }
