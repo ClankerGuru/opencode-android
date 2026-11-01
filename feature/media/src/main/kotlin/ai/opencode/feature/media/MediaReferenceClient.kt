@@ -344,6 +344,13 @@ object CachedImage {
         cache.insert(image, key)
         return image
     }
+
+    /**
+     * [decoded]'s cache hit alone, without decoding: what a tile shows on its first frame
+     * while it decodes off the main thread (Android decodes eagerly; UIKit decodes lazily on draw).
+     */
+    fun cached(id: String, mediaHash: String? = null): Bitmap? =
+        dependency(DecodedImageCache).image(mediaHash?.let { "media:$it" } ?: "attachment:$id")
 }
 
 /**
