@@ -5,10 +5,13 @@ import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.log.AppLog
 import ai.opencode.core.sharing.FileDirectory
+import ai.opencode.core.sharing.InstallHistory
 import ai.opencode.core.sharing.InstantSerializer
 import ai.opencode.core.sharing.Shared
 import ai.opencode.core.sharing.SharedKey
+import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.SharedStore
+import ai.opencode.core.sharing.installHistory
 import ai.opencode.core.sharing.shared
 import ai.opencode.server.model.OpenCodeHomeSnapshot
 import ai.opencode.server.model.OpenCodeSession
@@ -401,13 +404,16 @@ object ServerSharedKeys {
 }
 
 /**
- * Saves this as the last-used server at the top of the list. Unchanged values are not
+ * Saves this as the last-used server at the top of the list, and marks the install as having
+ * paired ([InstallHistory.paired], kept when servers are removed). Unchanged values are not
  * rewritten. An edited address no longer shares an ID with its old entry: replace that entry
  * explicitly ([original]) after the new connection has loaded.
  */
 fun OpenCodeServer.remember(original: OpenCodeServer? = null) {
     val savedServer = shared(ServerSharedKeys.savedServer)
     val savedServers = shared(ServerSharedKeys.savedServers)
+    val installHistory = shared(SharedKeys.installHistory)
+    if (installHistory.value != InstallHistory.paired) installHistory.set(InstallHistory.paired)
     if (savedServer.value != this) savedServer.set(this)
     if (savedServers.value.firstOrNull() == this && original == null) return
     savedServers.update { servers ->
