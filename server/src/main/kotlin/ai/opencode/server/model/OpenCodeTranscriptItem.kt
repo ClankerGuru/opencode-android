@@ -36,6 +36,11 @@ class OpenCodeOutgoingAttachment(
     /** A long paste's text and its card's summary, kept so nothing decodes the bytes again. */
     val pastedText: String? = null,
     val pasted: PastedTextSummary? = null,
+    /** Content-addressed blob hash when re-sending a `media:<hash>` reference (its bytes may be empty). */
+    val mediaHash: String? = null,
+    val byteCount: Long? = null,
+    /** A frame of a library video, sent as an image: its duration in seconds, for the composer thumbnail's “▶ 0:50” badge. */
+    val videoDuration: Double? = null,
 ) {
     val isImage: Boolean get() = mime.startsWith("image/")
 
@@ -43,7 +48,8 @@ class OpenCodeOutgoingAttachment(
 
     override fun equals(other: Any?): Boolean = other is OpenCodeOutgoingAttachment && other.id == id &&
         other.data.contentEquals(data) && other.mime == mime && other.name == name &&
-        other.pastedText == pastedText && other.pasted == pasted
+        other.pastedText == pastedText && other.pasted == pasted && other.mediaHash == mediaHash &&
+        other.byteCount == byteCount && other.videoDuration == videoDuration
 
     override fun hashCode(): Int = id.hashCode()
     override fun toString(): String = "OpenCodeOutgoingAttachment(id=$id, mime=$mime, ${data.size} bytes)"

@@ -223,12 +223,14 @@ class PhotoLibraryClient(
             return PhotoLibraryClient(
                 access = {
                     val status = live.currentAccess()
-                    if (!status.canRead) live.stopCaching()
+                    // Only a refusal drops the cache: never asked, nothing was cached, and the
+                    // library stays untouched until the sheet asks (iOS f0670c5d).
+                    if (status == PhotoLibraryAccess.Denied) live.stopCaching()
                     status
                 },
                 requestAccess = {
                     val status = live.requestAccess(limitedSelection = false)
-                    if (!status.canRead) live.stopCaching()
+                    if (status == PhotoLibraryAccess.Denied) live.stopCaching()
                     status
                 },
                 recent = { limit ->

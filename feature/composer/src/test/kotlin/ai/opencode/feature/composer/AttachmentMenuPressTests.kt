@@ -45,17 +45,17 @@ class AttachmentMenuPressTests {
     private fun AttachmentMenuPress.ended(at: Offset, rows: Map<AttachmentMenuItem, Rect> = this@AttachmentMenuPressTests.rows) =
         ended(at, button, rows, slop)
 
-    @Test fun aTapTogglesAndOpeningPlaysOneLightImpact() {
+    @Test fun aTapTogglesAndOpeningPlaysOneLightTap() {
         val log = mutableListOf<String>()
         val press = press(log)
         press.began(isOpen = false)
         assertEquals(AttachmentMenuPress.Outcome.Toggle, press.ended(onButton))
         press.menuOpened()
-        assertEquals(listOf("tap"), log)
+        assertEquals(listOf("lightTap"), log)
 
         press.began(isOpen = true)
         assertEquals("The × closes it", AttachmentMenuPress.Outcome.Toggle, press.ended(onButton))
-        assertEquals("Closing plays nothing", listOf("tap"), log)
+        assertEquals("Closing plays nothing", listOf("lightTap"), log)
     }
 
     @Test fun holdingOpensOnceAndSlidingTicksOncePerRow() {
@@ -76,10 +76,10 @@ class AttachmentMenuPressTests {
         press.moved(Offset(100f, 660f))
         press.moved(point(AttachmentMenuItem.Camera))
         assertEquals(AttachmentMenuItem.Camera, press.highlighted)
-        assertEquals(listOf("tap", "selection", "selection", "selection"), log)
+        assertEquals(listOf("lightTap", "selection", "selection", "selection"), log)
 
         assertEquals(AttachmentMenuPress.Outcome.Choose(AttachmentMenuItem.Camera), press.ended(point(AttachmentMenuItem.Camera)))
-        assertEquals(listOf("tap", "selection", "selection", "selection", "tap"), log)
+        assertEquals(listOf("lightTap", "selection", "selection", "selection", "lightTap"), log)
         assertNull(press.highlighted)
     }
 
@@ -90,7 +90,7 @@ class AttachmentMenuPressTests {
         press.holdElapsed()
         press.moved(point(AttachmentMenuItem.Files))
         assertEquals(AttachmentMenuPress.Outcome.Choose(AttachmentMenuItem.Files), press.ended(point(AttachmentMenuItem.Files)))
-        assertEquals(listOf("selection", "tap"), log)
+        assertEquals(listOf("selection", "lightTap"), log)
     }
 
     @Test fun pasteIsNeverChosenByDrag() {
@@ -138,7 +138,7 @@ class AttachmentMenuPressTests {
         assertFalse("An open menu doesn't reopen", press.holdElapsed())
         press.moved(point(AttachmentMenuItem.Photos))
         assertEquals(AttachmentMenuPress.Outcome.Choose(AttachmentMenuItem.Photos), press.ended(point(AttachmentMenuItem.Photos)))
-        assertEquals(listOf("selection", "tap"), log)
+        assertEquals(listOf("selection", "lightTap"), log)
     }
 
     /** With the photo card up, the button passes no rows: sliding from the × across the card ticks nothing and chooses nothing. */

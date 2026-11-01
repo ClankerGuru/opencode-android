@@ -25,6 +25,13 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.abs
+import kotlin.math.sqrt
+import kotlin.math.sin
+import kotlin.math.max
+import kotlin.math.hypot
+import kotlin.math.exp
+import kotlin.math.cos
+import kotlin.math.PI
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -610,4 +617,54 @@ class ModelPickerTests {
         }
         return CoroutineScope(backgroundScope.coroutineContext + clock)
     }
+}
+
+// iOS 89231d5f moved these test-only samplers out of `FusedPickerMotionTrace` into the tests.
+
+/** The exact spring position `x(t)` for a `Spring(duration:bounce:)` from 0 to 1 at [fps] Hz. */
+private fun FusedPickerMotionTrace.springPositions(duration: Double, bounce: Double, fps: Double = 120.0, totalSeconds: Double = 0.7): List<Double> {
+    val omega = (2 * PI) / max(duration, 0.01)
+    val zeta = max(if (bounce >= 0) 1 - bounce else 1 / (1 + abs(bounce)), 0.01)
+    val dt = 1.0 / fps
+    val steps = roundHalfAwayFromZero(totalSeconds * fps).toInt()
+    var x = 0.0
+    var v = 0.0
+    val target = 1.0
+    val out = mutableListOf(0.0)
+    repeat(steps) {
+        val x0 = x - target
+        val v0 = v
+        if (abs(zeta - 1) < 1e-4) {
+            val decay = exp(-omega * dt)
+            val a = v0 + omega * x0
+            x = target + (x0 + a * dt) * decay
+            v = (v0 - omega * a * dt) * decay
+        } else if (zeta < 1) {
+            val wd = omega * sqrt(1 - zeta * zeta)
+            val decay = exp(-zeta * omega * dt)
+            val c = cos(wd * dt)
+            val s = sin(wd * dt)
+            x = target + decay * (x0 * c + ((v0 + zeta * omega * x0) / wd) * s)
+            v = decay * (v0 * c - ((zeta * omega * v0 + omega * omega * x0) / wd) * s)
+        }
+        out += x
+    }
+    return out
+}
+
+/** The worst handoff snap or mid-flight jump spike across a point trace. */
+private fun FusedPickerMotionTrace.maxDiscontinuity(points: List<Offset>, expectedStart: Offset, expectedEnd: Offset): Float {
+    val first = points.firstOrNull() ?: return 0f
+    val last = points.last()
+    val startSnap = hypot(first.x - expectedStart.x, first.y - expectedStart.y)
+    val endSnap = hypot(last.x - expectedEnd.x, last.y - expectedEnd.y)
+    val steps = points.zipWithNext { a, b -> hypot(b.x - a.x, b.y - a.y) }
+    var maxSpike = 0f
+    if (steps.size >= 3) {
+        for (idx in 1 until steps.size - 1) {
+            val envelope = max(steps[idx - 1], steps[idx + 1]) * 1.5f
+            if (steps[idx] > envelope) maxSpike = max(maxSpike, steps[idx] - envelope)
+        }
+    }
+    return maxOf(startSnap, endSnap, maxSpike)
 }

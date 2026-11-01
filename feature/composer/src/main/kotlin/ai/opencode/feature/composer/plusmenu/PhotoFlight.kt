@@ -16,6 +16,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -95,6 +96,17 @@ class PhotoFlights {
     /** Incoming attachments whose 76×76 slot is reserved in the composer row on frame 0 while the importer decodes them. */
     var reservedAttachments: List<UUID> by mutableStateOf(emptyList())
         private set
+
+    /**
+     * A row of reserved slots that just mounted stays collapsed until the first frame after it
+     * commits ([revealHeldRow]). Mounting it can stall the main thread, and a spring that starts
+     * inside the stall is drawn most of the way along in its first frame: a leap, not a glide.
+     */
+    var holdsReservedRow: Boolean by mutableStateOf(false)
+        private set
+
+    /** Bumped by every reveal and release, so only the latest reveal opens the row. */
+    private var revealGeneration = 0
 
     /** Tiles whose photo is in the air. */
     var hiddenPhotos: Set<String> by mutableStateOf(emptySet())
@@ -191,13 +203,31 @@ class PhotoFlights {
         slots[id] = frame
     }
 
-    fun reserve(ids: List<UUID>, batch: UUID = UUID.randomUUID()) {
+    fun reserve(ids: List<UUID>, batch: UUID = UUID.randomUUID(), holdingRow: Boolean = false) {
         val existing = present.toSet() + reservedAttachments
         val added = ids.filter { it !in existing }
         for (id in ids) reservationBatches[id] = batch
         if (added.isEmpty()) return
         reservedAttachments = reservedAttachments + added
+        if (holdingRow) holdsReservedRow = true
         rowChangedAt = now()
+    }
+
+    /**
+     * Opens a held row at the next frame, once the frame that mounted it has drawn (iOS
+     * `revealHeldRow(_:)` on a display link). Call it from the row's effect; the row animates the
+     * opening itself. A later reveal or a release supersedes this one.
+     */
+    suspend fun revealHeldRow() {
+        if (!holdsReservedRow) return
+        val generation = ++revealGeneration
+        withFrameNanos { }
+        if (generation == revealGeneration) holdsReservedRow = false
+    }
+
+    private fun releaseHeldRow() {
+        revealGeneration += 1
+        holdsReservedRow = false
     }
 
     /** Releases a single reserved slot (one source in a batch failed to load) and softens its flight away. */
@@ -303,6 +333,7 @@ class PhotoFlights {
         restingComposer = null
         reservedAttachments = emptyList()
         reservationBatches.clear()
+        releaseHeldRow()
         sources.entries.removeAll { it.value.isEphemeral }
         for (flight in flights) if (flight.state == Flight.State.Flying) leave(flight)
         importing = false
@@ -321,6 +352,7 @@ class PhotoFlights {
         hiddenAttachments = emptySet()
         reservedAttachments = emptyList()
         reservationBatches.clear()
+        releaseHeldRow()
         hiddenPhotos = emptySet()
         importing = false
         sleep()

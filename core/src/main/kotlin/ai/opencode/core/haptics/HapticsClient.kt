@@ -24,6 +24,8 @@ import androidx.lifecycle.ProcessLifecycleOwner
  * named by what it means. Same vocabulary, same rules:
  *
  * - [tap] a control acted (Send, Copy, mic press, a menu opening). Copies play `tap`.
+ * - [lightTap] a light control acted: the + menu and its recent photos opening, and choosing
+ *   one of their rows. As light as a pick.
  * - [selection] a choice changed (toggle, picker, pin, mute, read, a row reached by sliding).
  * - [confirm] a firm commit (start a call, confirmed delete, Stop Shell).
  * - [cancel] backing out (End, Close, cancel dictation, Stop).
@@ -38,12 +40,13 @@ import androidx.lifecycle.ProcessLifecycleOwner
  * `Vibrator` or `View.performHapticFeedback` elsewhere.
  */
 enum class Haptic {
-    tap, selection, confirm, cancel, threshold, snap, attention, success, warning, error;
+    tap, lightTap, selection, confirm, cancel, threshold, snap, attention, success, warning, error;
 
     /** How each feels. iOS's generator/intensity table, mapped to Android composition primitives. */
     val feedback: HapticFeedback
         get() = when (this) {
             tap -> HapticFeedback.Impact(HapticFeedback.Style.Light)
+            lightTap -> HapticFeedback.Selection
             selection -> HapticFeedback.Selection
             confirm -> HapticFeedback.Impact(HapticFeedback.Style.Medium, 0.75f)
             cancel -> HapticFeedback.Impact(HapticFeedback.Style.Soft, 0.85f)

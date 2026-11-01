@@ -193,10 +193,11 @@ class ComposerImageImporter(private val scope: CoroutineScope) {
         onFailure: (UUID?) -> Unit = {},
         onCancel: () -> Unit = {},
         onCompletion: (Result) -> Unit = {},
+        limit: Int = AttachmentPickerButton.maxPhotoSelection(plusMenu = false),
     ) {
         cancel()
-        for (dropped in sources.drop(AttachmentPickerButton.MAX_PHOTO_SELECTION)) onFailure(dropped.attachmentID)
-        val kept = sources.take(AttachmentPickerButton.MAX_PHOTO_SELECTION)
+        for (dropped in sources.drop(limit)) onFailure(dropped.attachmentID)
+        val kept = sources.take(limit)
         if (kept.isEmpty()) {
             onCancel()
             return
