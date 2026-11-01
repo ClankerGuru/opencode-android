@@ -1,5 +1,6 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.sound.SoundEffectsClient
 import ai.opencode.feature.composer.RequestDockFeature
 import ai.opencode.feature.composer.UndeliveredPrompts
 import ai.opencode.feature.composer.PromptOutbox
@@ -57,6 +58,8 @@ import ai.opencode.feature.voice.VoiceFeature
 import ai.opencode.feature.voice.VoiceServerChoice
 import ai.opencode.feature.media.VoiceViewingPage
 import ai.opencode.feature.voice.ServerVoiceProvider
+import ai.opencode.feature.media.MediaReferenceClient
+import ai.opencode.feature.voice.ServerVoiceModelsAnswer
 import ai.opencode.feature.voice.ServerVoiceSupport
 import ai.opencode.feature.voice.VoiceEngine
 import ai.opencode.feature.voice.VoiceSharedKeys
@@ -334,6 +337,7 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         val serverVoiceProvider: Shared<ServerVoiceProvider> = shared(VoiceSharedKeys.serverVoiceProvider),
         val voiceServer: Shared<VoiceServerChoice> = shared(VoiceSharedKeys.voiceServerChoice),
         val serverVoiceSupportByServer: Shared<Map<String, ServerVoiceSupport>> = shared(VoiceSharedKeys.serverVoiceSupportByServer),
+        val voiceModelsByServer: Shared<Map<String, ServerVoiceModelsAnswer>> = shared(VoiceSharedKeys.voiceModelsByServer),
         val uploadUnsupportedServerIDs: Shared<Set<String>> = shared(SharedKeys.uploadUnsupportedServerIDs),
         val returnKeySends: Shared<Boolean> = shared(SharedKeys.returnKeySends),
         /**
@@ -991,6 +995,8 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
     internal val promptOutbox by Dependency(PromptOutbox)
     internal val sessionNotifications by Dependency(SessionNotificationsClient)
     internal val haptics by Dependency(HapticsClient)
+    internal val soundEffects by Dependency(SoundEffectsClient)
+    internal val mediaReferences by Dependency(MediaReferenceClient)
     internal val sceneWindow by Dependency(SceneWindowClient)
     internal val markdownStream by Dependency(MarkdownStreamClient)
     internal val dictation by Dependency(DictationClient)
@@ -1161,6 +1167,7 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
                 Reduced(if (state.composingRetiresStarterPrompts) state.copy(starterPrompts = emptyList()) else state)
             }
             .onChange({ it.persistedComposerWatch }) { old, _, state -> reconcilePersistedComposer(old, state) }
+            .onChange({ it.persistedSessionWatch }) { old, _, state -> reconcilePersistedSession(old, state) }
             // Each admission and answer of a voice prompt re-reads the pinned session and retunes
             // the watchdog, as a typed send and its reply do.
             .onChange({ it.voice?.admittedPromptIDs ?: emptyList() }) { _, _, state ->

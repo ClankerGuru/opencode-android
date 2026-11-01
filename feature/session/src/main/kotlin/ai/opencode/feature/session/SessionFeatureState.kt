@@ -20,6 +20,7 @@ import ai.opencode.feature.transcript.TranscriptSubagent
 import ai.opencode.feature.voice.VoiceBroker
 import ai.opencode.feature.voice.VoiceFeature
 import ai.opencode.feature.voice.VoiceLabDemo
+import ai.opencode.feature.voice.VoiceReadiness
 import ai.opencode.feature.voice.VoiceRoute
 import ai.opencode.server.model.OpenCodeDelivery
 import ai.opencode.server.model.OpenCodeFormRequest
@@ -45,6 +46,9 @@ import ai.opencode.server.model.learningFirstPrompt
 import ai.opencode.server.model.model
 import java.time.Instant
 import java.util.UUID
+import ai.opencode.core.experiments.ExperimentalCallStyle
+import ai.opencode.core.experiments.key
+import ai.opencode.core.sharing.shared
 
 // Port of iOS `SessionFeature+State.swift` (and the computed members of `SessionFeature.swift`'s
 // `State`): computed properties as extension `val`s, `mutating func`s as `fun State.x(): State`.
@@ -387,6 +391,9 @@ fun State.withQuestionPageIndices(value: Map<String, Int>): State = updateReques
 val State.requestLoadError: String? get() = requestDock.requestLoadError
 fun State.withRequestLoadError(value: String?): State = updateRequestDock { it.copy(requestLoadError = value) }
 val State.requestLoadAttempt: RequestDockFeature.State.LoadAttempt? get() = requestDock.requestLoadAttempt
+/** Requests that show up from here on arrived while the screen watched (not a snapshot's backlog). */
+val State.requestArrivalsAreLive: Boolean get() = requestDock.requestArrivalsAreLive
+fun State.withRequestArrivalsAreLive(value: Boolean): State = updateRequestDock { it.copy(requestArrivalsAreLive = value) }
 fun State.withRequestLoadAttempt(value: RequestDockFeature.State.LoadAttempt?): State = updateRequestDock { it.copy(requestLoadAttempt = value) }
 val State.requestFailureAwaitingReconnect: Boolean get() = requestDock.requestFailureAwaitingReconnect
 fun State.withRequestFailureAwaitingReconnect(value: Boolean): State =
@@ -509,18 +516,24 @@ fun State.Companion.peekText(markdown: String): String {
  */
 val State.voiceRoute: VoiceRoute
     get() {
+        val hasOpenAIKey = !openAIAPIKey.value.isNullOrBlank()
         val broker = VoiceBroker(
             serverVoice = ExperimentalFeature.serverVoice.isActive(serverVoiceExperiment.value),
             choice = voiceServer.value,
+            provider = serverVoiceProvider.value,
             connected = server,
             saved = { VoiceFeature.savedServers },
+            readiness = VoiceReadiness(
+                answers = voiceModelsByServer.value,
+                support = serverVoiceSupportByServer.value,
+                hasPhoneKey = hasOpenAIKey,
+                engine = voiceEngine.value,
+            ),
         )
-        return VoiceRoute.resolve(
-            selectedEngine = voiceEngine.value,
-            serverVoiceEnabled = broker.isEnabled,
-            serverVoiceProvider = serverVoiceProvider.value,
-            serverVoiceSupport = broker.support(serverVoiceSupportByServer.value),
-            hasOpenAIKey = !openAIAPIKey.value.isNullOrBlank(),
+        return broker.route(
+            engine = voiceEngine.value,
+            support = broker.support(serverVoiceSupportByServer.value),
+            hasOpenAIKey = hasOpenAIKey,
             hasXAIKey = !xaiAPIKey.value.isNullOrBlank(),
         )
     }
@@ -610,6 +623,13 @@ fun State.renameVoiceTarget(sessionID: String, title: String): State {
 
 /** A call is connecting, live, or leaving: its bar holds the composer's place and its audio holds the session. */
 val State.callOwnsAudio: Boolean get() = voice?.let { !it.phase.showsCard } ?: false
+
+/** A Living Orb or tray call leaves the composer where it is (iOS `callKeepsComposer`). */
+val State.callKeepsComposer: Boolean
+    get() = ExperimentalCallStyle.of(
+        callTray = ExperimentalFeature.callTray.isActive(shared(ExperimentalFeature.callTray.key).value),
+        livingOrb = ExperimentalFeature.livingOrb.isActive(shared(ExperimentalFeature.livingOrb.key).value),
+    ) != ExperimentalCallStyle.standard
 
 /** Whether tapping the composer's call button starts a call rather than opening the project picker or Settings. */
 val State.canStartCallFromTap: Boolean

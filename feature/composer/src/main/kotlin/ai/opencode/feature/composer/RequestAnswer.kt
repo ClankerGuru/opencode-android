@@ -287,7 +287,11 @@ class RequestDockFeature<Draft> : Reducer<RequestDockFeature.State<Draft>, Reque
          * is whether new requests appeared (the session plays `.attention` when
          * [RequestAnswering.announcesArrival] also holds).
          */
-        fun reconciled(requests: OpenCodePendingRequests, familySessionIDs: Set<String>): Reconciled<Draft> {
+        fun reconciled(
+            requests: OpenCodePendingRequests,
+            familySessionIDs: Set<String>,
+            restoring: (State<Draft>) -> State<Draft> = { it },
+        ): Reconciled<Draft> {
             val oldIDs = reviewRequestIDs.toSet()
             val docked = dockRequestID
             val protectedIDs = respondingRequestIDs + requestErrors.keys
@@ -300,16 +304,19 @@ class RequestDockFeature<Draft> : Reducer<RequestDockFeature.State<Draft>, Reque
                 }
             }
             val forms = reconcile(requests.forms, formRequests, { it.id }, { it.sessionID })
-            var answers = formAnswers
-            for (form in forms) if (answers[form.id] == null) answers = answers + (form.id to form.defaultAnswers)
-            var next = copy(
-                requestLoadAttempt = null,
-                requestFailureAwaitingReconnect = false,
-                permissionRequests = reconcile(requests.permissions, permissionRequests, { it.id }, { it.sessionID }),
-                formRequests = forms,
-                requestLoadError = null,
-                formAnswers = answers,
+            // iOS `restorePersistedAnswers` runs before the defaults fill in what's left.
+            var next = restoring(
+                copy(
+                    requestLoadAttempt = null,
+                    requestFailureAwaitingReconnect = false,
+                    permissionRequests = reconcile(requests.permissions, permissionRequests, { it.id }, { it.sessionID }),
+                    formRequests = forms,
+                    requestLoadError = null,
+                ),
             )
+            var answers = next.formAnswers
+            for (form in next.formRequests) if (answers[form.id] == null) answers = answers + (form.id to form.defaultAnswers)
+            next = next.copy(formAnswers = answers)
             // Answered elsewhere or interrupted: the dock moves on.
             val (pruned, clearedSelection) = next.prune(keepingSelection = next.respondingRequestIDs)
             next = pruned

@@ -316,9 +316,6 @@ class SessionFeatureTestsFailedSends {
     /**
      * Moved by the server (or another screen's Move to): what was read in the old folder is read
      * again in the new one, which clears a failed request read.
-     *
-     * iOS also expects `requestArrivalsAreLive = true` once requests land; that flag is the
-     * composer area's (`RequestDockFeature`) and isn't ported yet.
      */
     @Test fun aMovedSessionRereadsRequestsModelsAndShellsInItsNewFolder() = sessionTest { h ->
         val reads = LockIsolated(listOf<String>())
@@ -360,7 +357,7 @@ class SessionFeatureTestsFailedSends {
         store.receive(Action.PendingInputsResponse(sessionID = "ses_1", inputs = emptyList()))
         requestsGate.complete(Unit)
         store.receive(Action.PendingRequestsResponse(sessionID = "ses_1", result = Result.success(OpenCodePendingRequests(permissions = emptyList())))) {
-            it.withRequestLoadAttempt(null).withRequestFailureAwaitingReconnect(false)
+            it.withRequestLoadAttempt(null).withRequestFailureAwaitingReconnect(false).withRequestArrivalsAreLive(true)
         }
         modelsGate.complete(Unit)
         store.receive(Action.ModelsResponse(Result.success(OpenCodeModelCatalog(models = emptyList(), defaultModel = null)))) {

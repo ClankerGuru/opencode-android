@@ -25,6 +25,7 @@ val State.wantsRequestDock: Boolean
     get() = RequestAnswering.wantsRequestDock(
         hasPendingRequests = hasPendingRequests,
         callOwnsAudio = callOwnsAudio,
+        callKeepsComposer = callKeepsComposer,
         dictationSendPending = dictationSendPending,
         isAnsweringRequest = isAnsweringRequest,
         hasLiveDictation = hasLiveDictation,

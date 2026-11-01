@@ -2,8 +2,12 @@ package ai.opencode.feature.drawer
 
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.experiments.ExperimentalFeature
+import ai.opencode.core.experiments.ExperimentalFeatures
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
+import ai.opencode.core.sound.SoundEffect
+import ai.opencode.core.sound.SoundEffectsClient
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.cancellable
@@ -268,6 +272,9 @@ internal fun HomeFeature.inAppNoticeSignalChanged(oldInput: InAppNoticeInput, ne
     // iOS speaks up only from the window in use (Multiple Windows, `sceneWindow.isFront`); the
     // Android app has one task, so the window is always the one in use.
     if (urgent && !inCall) dependency(HapticsClient).play(Haptic.attention)
+    if (!inCall && dependency(ExperimentalFeatures)(ExperimentalFeature.soundEffects)) {
+        dependency(SoundEffectsClient).play(if (urgent) SoundEffect.needsInput else SoundEffect.replyDone)
+    }
     dependency(AccessibilityAnnouncer).announce(notice.announcement, urgent)
     val id = notice.id
     val hold = notice.hold

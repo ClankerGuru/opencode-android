@@ -17,6 +17,8 @@ import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.model.OpenCodeFormRequest
 import ai.opencode.server.model.OpenCodePermissionRequest
 import kotlin.time.Duration.Companion.seconds
+import ai.opencode.core.sound.SoundEffect
+import ai.opencode.core.experiments.ExperimentalFeature
 
 // Port of iOS `SessionFeature+Requests.swift`: pending requests (permissions, questions, forms).
 
@@ -68,7 +70,8 @@ internal fun SessionFeature.reduceRequests(state: State, action: Action): Reduce
                 .copy(streamIsHealthy = action.isAvailable && state.streamIsHealthy)
                 .withRequestLoadError(null)
             if (!action.isAvailable) {
-                next = next.withRequestLoadAttempt(null).withRequestFailureAwaitingReconnect(true).copy(pendingWorkPollSeconds = null)
+                next = next.withRequestLoadAttempt(null).withRequestArrivalsAreLive(false)
+                    .withRequestFailureAwaitingReconnect(true).copy(pendingWorkPollSeconds = null)
                 // This read may predate the gap (including a local buffer overflow). Do not let
                 // reconnect join it or replay its pre-gap deltas over REST.
                 next = next.copy(liveText = emptyMap(), gappedLiveText = next.gappedLiveText + next.liveText.keys)
@@ -113,16 +116,22 @@ internal fun SessionFeature.reduceRequests(state: State, action: Action): Reduce
 }
 
 private fun SessionFeature.pendingRequestsLoaded(requests: OpenCodePendingRequests, state: State): Reduced<State, Action> {
-    val reconciled = state.requestDock.reconciled(requests, state.familySessions.map { it.id }.toSet())
+    val reconciled = state.requestDock.reconciled(requests, state.familySessions.map { it.id }.toSet()) { dock ->
+        restoringPersistedAnswers(dock, state)
+    }
     var next = state.copy(requestDock = reconciled.state)
     if (reconciled.clearedSelection && next.activePicker == State.ActivePicker.requests) next = next.copy(activePicker = null)
     // Requests dock in the composer's place; nothing opens on its own. A catch-up card's waiting
     // requests were already there.
     val announcesArrivals = next.readsOnView || next.hasLoadedPendingRequests
     if (!next.readsOnView) next = next.copy(hasLoadedPendingRequests = true)
+    val arrivedLive = next.requestArrivalsAreLive
+    if (!arrivedLive) next = next.withRequestArrivalsAreLive(true)
     // A call's bar takes the dock's place and has its own cues.
     if (RequestAnswering.announcesArrival(reconciled.arrived, announcesArrivals, next.callOwnsAudio, next.isCovered, sceneWindow.isFront)) {
         haptics.play(Haptic.attention)
+        // Never for what was already waiting when the screen opened or reconnected.
+        if (arrivedLive && experimentalFeatures(ExperimentalFeature.soundEffects)) soundEffects.play(SoundEffect.needsInput)
     }
     return Reduced(next)
 }

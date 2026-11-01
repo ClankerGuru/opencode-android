@@ -158,6 +158,7 @@ class SessionFeatureTestsRendering {
                 .withDraft("")
                 .withPendingAttachments(emptyList())
                 .withAnswerShownTarget("frm_1/answer")
+                .withRequestArrivalsAreLive(true)
         }
         store.send(Action.QuoteTextTapped("Use the safe flag")) {
             it.withDraft("> Use the safe flag\n\n")
@@ -458,7 +459,7 @@ class SessionFeatureTestsRendering {
                 sessionID = root.id,
                 result = Result.success(OpenCodePendingRequests(permissions = emptyList(), forms = emptyList())),
             ),
-        )
+        ) { it.withRequestArrivalsAreLive(true) }
         store.receive(Action.PendingInputsRequested(sessionID = root.id))
         store.receive(Action.PendingInputsResponse(sessionID = root.id, inputs = emptyList()))
         assertEquals(listOf(listOf(root.id, child.id, grandchild.id)), polledFamilies.value)
@@ -468,6 +469,7 @@ class SessionFeatureTestsRendering {
             it.withRequestsConnectionIsAvailable(false)
                 .copy(streamIsHealthy = false, pendingWorkPollSeconds = null)
                 .withRequestFailureAwaitingReconnect(true)
+                .withRequestArrivalsAreLive(false)
         }
         store.finish()
     }
@@ -670,7 +672,7 @@ class SessionFeatureTestsRendering {
                 sessionID = root.id,
                 result = Result.success(OpenCodePendingRequests(permissions = emptyList(), forms = emptyList())),
             ),
-        )
+        ) { it.withRequestArrivalsAreLive(true) }
         store.receive(Action.PendingInputsRequested(sessionID = root.id))
         store.receive(Action.PendingInputsResponse(sessionID = root.id, inputs = emptyList()))
 
@@ -689,6 +691,7 @@ class SessionFeatureTestsRendering {
             it.withRequestsConnectionIsAvailable(false)
                 .copy(streamIsHealthy = false, pendingWorkPollSeconds = null)
                 .withRequestFailureAwaitingReconnect(true)
+                .withRequestArrivalsAreLive(false)
         }
         store.finish()
     }

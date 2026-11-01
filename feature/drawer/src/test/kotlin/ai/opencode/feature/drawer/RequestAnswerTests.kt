@@ -36,6 +36,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import java.time.Instant
+import ai.opencode.feature.session.withRequestArrivalsAreLive
 
 /**
  * Port of iOS `RequestAnswerTests.swift`'s Home test. The rest are `:feature:session`'s
@@ -115,7 +116,7 @@ class RequestAnswerTests {
 
         store.send(detail(SessionFeature.Action.PendingRequestsResponse(sessionID = target.id, result = Result.success(OpenCodePendingRequests(permissions = emptyList(), forms = emptyList()))))) { state ->
             val detail = state.sessionDetail!!
-            state.copy(sessionDetail = detail.withPermissions(emptyList()).copy(voice = detail.voice?.copy(targetNeedsInput = false)))
+            state.copy(sessionDetail = detail.withPermissions(emptyList()).withRequestArrivalsAreLive(true).copy(voice = detail.voice?.copy(targetNeedsInput = false)))
         }
         assertEquals(false, store.state.sessionDetail?.isAnsweringRequest)
         assertEquals(false, store.state.sessionDetail?.wantsRequestDock)

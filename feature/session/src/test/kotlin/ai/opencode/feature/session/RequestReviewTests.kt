@@ -336,7 +336,7 @@ class RequestReviewTests {
                 .endAnswering()
         }
         firstRefreshCancelled.await()
-        store.receive(Action.PendingRequestsResponse(session.id, Result.success(empty)))
+        store.receive(Action.PendingRequestsResponse(session.id, Result.success(empty))) { it.withRequestArrivalsAreLive(true) }
 
         assertEquals(
             listOf(
@@ -394,7 +394,7 @@ class RequestReviewTests {
                 .withFormRequests(emptyList())
                 .withFormAnswers(emptyMap())
         }
-        store.receive(Action.PendingRequestsResponse(session.id, Result.success(empty)))
+        store.receive(Action.PendingRequestsResponse(session.id, Result.success(empty))) { it.withRequestArrivalsAreLive(true) }
         assertNull(store.state.dockRequestID)
         assertNull(store.state.activePicker)
         store.finish()
@@ -470,7 +470,7 @@ class RequestReviewTests {
                 .withFormRequests(emptyList())
                 .withFormAnswers(emptyMap())
         }
-        store.receive(Action.PendingRequestsResponse(session.id, Result.success(empty)))
+        store.receive(Action.PendingRequestsResponse(session.id, Result.success(empty))) { it.withRequestArrivalsAreLive(true) }
         assertEquals(listOf("Draft it instead"), sent.value)
         store.finish()
     }
@@ -498,7 +498,7 @@ class RequestReviewTests {
                 .withRequestErrors(it.requestErrors + (request.id to "HTTP 503"))
                 .withFailedReplyIDs(setOf(request.id))
         }
-        store.receive(Action.PendingRequestsResponse(session.id, Result.success(OpenCodePendingRequests(permissions = emptyList(), forms = listOf(request)))))
+        store.receive(Action.PendingRequestsResponse(session.id, Result.success(OpenCodePendingRequests(permissions = emptyList(), forms = listOf(request))))) { it.withRequestArrivalsAreLive(true) }
         // The dock keeps the answer for the retry.
         assertEquals(mapOf("q0" to OpenCodeFormValue.Str("Native")), store.state.formAnswers[request.id])
         store.send(Action.formSubmitTapped(request.id)) {

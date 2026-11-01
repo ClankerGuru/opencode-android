@@ -279,6 +279,7 @@ class ComposerPersistenceTests {
                     permissionRequests = listOf(request),
                     parkedComposer = DraftState(text = "Real session message draft"),
                     answerShownTarget = "perm_1",
+                    requestArrivalsAreLive = true,
                 )
             }.withDraft("")
         }

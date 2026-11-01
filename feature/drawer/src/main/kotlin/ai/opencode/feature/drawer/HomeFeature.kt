@@ -56,6 +56,7 @@ import ai.opencode.server.model.learningFirstPrompt
 import java.time.Instant
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
+import ai.opencode.feature.composer.restorePersistedPick
 
 /**
  * Port of iOS `HomeFeature` (`OpenCode/Drawer/HomeFeature.swift` and its `HomeFeature+*.swift`
@@ -1153,6 +1154,14 @@ private fun HomeFeature.State.restoringPersistedDraft(
     val persistence = dependency(ComposerPersistence)
     var s = this
     var next = detail
+    // iOS `restorePersistedPick(into:)`: a relaunch brings back the session's waiting model pick.
+    persistence.restorePersistedPick(
+        serverID = server.persistenceID,
+        session = next.session,
+        pendingModel = next.pendingModel,
+        hasSnapshot = next.session?.let { sessionSnapshots[it.id] } != null,
+        models = next.models,
+    )?.let { pick -> next = next.copy(currentModel = pick, pendingModel = pick) }
     if (next.session == null) {
         val entry = persistence.loadOutbox(server.persistenceID, null).firstOrNull()
         if (entry != null) {

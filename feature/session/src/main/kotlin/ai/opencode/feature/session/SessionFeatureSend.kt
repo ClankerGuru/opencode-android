@@ -1,5 +1,12 @@
 package ai.opencode.feature.session
 
+import ai.opencode.server.model.PastedTextSummary
+import ai.opencode.feature.media.MediaReferenceLoadResult
+import ai.opencode.feature.media.MediaReferenceClient
+import ai.opencode.core.sharing.SharedKeys
+import ai.opencode.core.sharing.shared
+import ai.opencode.core.sound.SoundEffect
+import ai.opencode.core.sound.soundEffectsSend
 import ai.opencode.feature.composer.RequestDockFeature
 import ai.opencode.feature.composer.SharedLocation
 import ai.opencode.feature.composer.AutocompleteItem
@@ -336,7 +343,10 @@ internal fun SessionFeature.sendComposer(
         return Reduced(next.withSendAfterUploads(delivery))
     }
     next = next.withSendAfterUploads(null)
-    if (!isDeferred) haptics.play(Haptic.tap)
+    if (!isDeferred) {
+        haptics.play(Haptic.tap)
+        playSendSound(next)
+    }
     var stopDictating: Effect<Action> = Effect.none()
     if (!keepsDictation) {
         val stopped = stopDictation(next)
@@ -717,17 +727,39 @@ internal fun SessionFeature.stageRevert(
 ): Reduced<State, Action> {
     val server = state.server
     val client = openCodeClient
+    val references = mediaReferences
     return Reduced(
         state.copy(isUndoingLastMessage = true),
         Effect.run<Action> { send ->
-            val error = try {
+            try {
                 client.stageRevert(server, sessionID, messageID)
-                null
             } catch (error: OpenCodeClientError) {
-                error
+                send(Action.MessageReverted(sessionID, messageID, restoring, error))
+                return@run
             }
-            send(Action.MessageReverted(sessionID, messageID, restoring, error))
+            // A `media:<hash>` attachment comes back without its bytes: load them so Edit's
+            // composer shows the image (or Pasted Text card) again (7f5ac4c5).
+            val hydrated = restoring.copy(attachments = restoring.attachments.map { attachment -> hydrated(attachment, server, references) })
+            send(Action.MessageReverted(sessionID, messageID, hydrated, null))
         }.cancellable(SessionFeature.CancelID.Revert, cancelInFlight = true),
+    )
+}
+
+private suspend fun hydrated(attachment: OpenCodeOutgoingAttachment, server: OpenCodeServer, references: MediaReferenceClient): OpenCodeOutgoingAttachment {
+    val hash = attachment.mediaHash
+    if (attachment.data.isNotEmpty() || hash == null) return attachment
+    val data = (references.load(server, hash) as? MediaReferenceLoadResult.Loaded)?.data ?: return attachment
+    val pastedText = attachment.pastedText ?: PastedText.text(attachment.mime, data)
+    return OpenCodeOutgoingAttachment(
+        id = attachment.id,
+        data = data,
+        mime = attachment.mime,
+        name = attachment.name,
+        pastedText = pastedText,
+        pasted = if (attachment.pastedText == null && pastedText != null) PastedTextSummary(pastedText) else attachment.pasted,
+        mediaHash = attachment.mediaHash,
+        byteCount = attachment.byteCount ?: data.size.toLong(),
+        videoDuration = attachment.videoDuration,
     )
 }
 
@@ -865,7 +897,16 @@ private fun showRestored(pending: PendingPrompt, admission: State.PromptState.Ad
  */
 private fun localImages(attachments: List<OpenCodeOutgoingAttachment>, messageID: String): List<OpenCodeImageAttachment> =
     attachments.mapIndexedNotNull { index, attachment ->
-        if (attachment.isImage) OpenCodeImageAttachment(id = "$messageID-img-$index", data = attachment.data) else null
+        if (attachment.isImage) {
+            OpenCodeImageAttachment(
+                id = "$messageID-img-$index",
+                data = attachment.data,
+                mediaHash = attachment.mediaHash,
+                name = attachment.name,
+                mime = attachment.mime,
+                byteCount = attachment.byteCount,
+            )
+        } else null
     }
 
 /**
@@ -920,6 +961,8 @@ internal fun SessionFeature.Companion.inlineFiles(messageID: String, attachments
             mime = attachment.mime,
             text = text,
             pasted = attachment.pasted,
+            mediaHash = attachment.mediaHash,
+            byteCount = attachment.byteCount,
         )
     }
 
@@ -1124,4 +1167,10 @@ internal fun SessionFeature.follow(statuses: Flow<PromptOutbox.Status>, pending:
         if (!currentCoroutineContext().isActive) return@run
         send(Action.ReplyCompleted(sessionID))
     }
+}
+
+/** Sound Effects' Send, only when Send Sound is on: the `.tap` already answers the finger. */
+private fun SessionFeature.playSendSound(state: State) {
+    if (state.callOwnsAudio || !experimentalFeatures(ExperimentalFeature.soundEffects)) return
+    if (shared(SharedKeys.soundEffectsSend).value) soundEffects.play(SoundEffect.send)
 }

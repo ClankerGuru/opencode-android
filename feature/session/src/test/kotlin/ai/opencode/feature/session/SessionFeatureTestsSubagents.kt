@@ -214,6 +214,7 @@ class SessionFeatureTestsSubagents {
                 // The composer becomes the answer, its message parked.
                 .withParkedComposer(DraftState())
                 .withAnswerShownTarget(permission.id)
+                .withRequestArrivalsAreLive(true)
         }
         assertEquals(permission.id, store.state.dockRequestID)
         store.send(Action.permissionReplyTapped(permission.id, OpenCodePermissionReply.Once)) { it.withRespondingRequestIDs(setOf(permission.id)) }
@@ -254,6 +255,7 @@ class SessionFeatureTestsSubagents {
                 .withFormAnswers(it.formAnswers + (form.id to mapOf("confirm" to OpenCodeFormValue.Boolean(true))))
                 .withParkedComposer(DraftState())
                 .withAnswerShownTarget(form.id)
+                .withRequestArrivalsAreLive(true)
         }
         store.send(Action.formSubmitTapped(form.id)) {
             it.withRequestErrors(it.requestErrors + (form.id to "Required"))

@@ -354,6 +354,20 @@ class RequestAnswerTests {
         assertEquals("Giving the composer back keeps the location", place, store.state.pendingLocation)
     }
 
+    @Test fun aPreparedPhotoBatchFinishingWhileAnsweringWaitsWithTheMessage() = sessionTest { h ->
+        val photos = listOf(1, 2).map { OpenCodeOutgoingAttachment(id = UUID(0, it.toLong()).toString(), data = byteArrayOf(it.toByte()), mime = "image/jpeg") }
+        val store = h.store(h.state(draft = "Half a message", forms = listOf(slack)))
+        store.send(Action.ComposerAttachments(ComposerAttachmentsFeature.Action.AttachmentLanded(photos[0]))) { s ->
+            s.withParkedComposer(checkNotNull(s.parkedComposer).copy(attachments = listOf(photos[0])))
+        }
+        store.send(Action.ComposerAttachments(ComposerAttachmentsFeature.Action.AttachmentLanded(photos[1]))) { s ->
+            s.withParkedComposer(checkNotNull(s.parkedComposer).copy(attachments = photos))
+        }
+        assertTrue(store.state.pendingAttachments.isEmpty())
+        assertEquals(photos, store.state.sessionComposer.attachments)
+        store.finish()
+    }
+
     @Test fun anImportFinishingWhileAnsweringWaitsWithTheMessage() = sessionTest { h ->
         val store = h.store(h.state(draft = "Half a message", forms = listOf(slack))) {
             this[OpenCodeClient] = this[OpenCodeClient].copy(uploadFile = { _, _, _, _ -> emptyFlow() })
