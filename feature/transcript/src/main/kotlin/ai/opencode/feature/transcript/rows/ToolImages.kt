@@ -64,7 +64,7 @@ private object ToolImageCache {
  * order, opened at [selectedID]; null when the selected one didn't decode.
  */
 fun transcriptImagePreview(decoded: List<Pair<String, ImageBitmap>>, selectedID: String, label: String): TranscriptImagePreview? =
-    TranscriptImagePreview.fromAttachments(decoded.map { (id, image) -> id to image.asAndroidBitmap() }, selectedID, label)
+    TranscriptImagePreview.fromImages(decoded.map { (id, image) -> id to image.asAndroidBitmap() }, selectedID, label)
 
 /**
  * Every image a tool read, whole and in order, so it can be read without opening it (iOS

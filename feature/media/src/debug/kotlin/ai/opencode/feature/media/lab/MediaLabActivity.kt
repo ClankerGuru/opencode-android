@@ -282,7 +282,7 @@ private fun ToolImages(item: OpenCodeTranscriptItem.Tool, attachments: List<Pair
             bitmap ?: continue
             Box(
                 Modifier.clip(RoundedCornerShape(TranscriptMetrics.cardCornerRadius)).clickable {
-                    TranscriptImagePreview.fromAttachments(decoded, id, "Tool image")?.let { presenter?.presentImage(it) }
+                    TranscriptImagePreview.fromImages(decoded, id, "Tool image")?.let { presenter?.presentImage(it) }
                 },
             ) {
                 MediaThumbnail(bitmap, listOf(id), Modifier.size(if (decoded.size == 1) 240.dp else 140.dp), cornerRadius = TranscriptMetrics.cardCornerRadius)

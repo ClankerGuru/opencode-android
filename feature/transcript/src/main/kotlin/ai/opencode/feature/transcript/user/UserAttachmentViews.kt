@@ -109,7 +109,7 @@ internal fun rememberDecodedImage(attachment: OpenCodeImageAttachment): ImageBit
  * `TranscriptImagePreview(attachments:selectedID:label:)`).
  */
 internal fun transcriptImagePreview(attachments: List<OpenCodeImageAttachment>, selectedID: String, label: String): TranscriptImagePreview? =
-    TranscriptImagePreview.fromAttachments(
+    TranscriptImagePreview.fromImages(
         attachments.map { a -> a.id to UserImageCache.decoded(a.id, a.data)?.asAndroidBitmap() },
         selectedID,
         label,

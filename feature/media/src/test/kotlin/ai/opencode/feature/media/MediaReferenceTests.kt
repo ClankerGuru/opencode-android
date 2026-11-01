@@ -1,36 +1,55 @@
 package ai.opencode.feature.media
 
+import ai.opencode.core.dependencies.withDependencies
+import ai.opencode.core.store.TestStore
 import ai.opencode.core.testing.TestIsolationRule
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.live.MediaReferenceFetch
+import ai.opencode.server.model.OpenCodeImageAttachment
+import android.graphics.Bitmap
+import android.graphics.Color
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.nio.file.Files
 import java.util.Collections
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * The media half of iOS `MediaReferenceTests` (the loader's tiers, the retry state). The wire
- * and decoding tests are `:server`'s `MediaReferenceTests`; the mosaic's are the transcript's.
+ * The media half of iOS `MediaReferenceTests` (the loader's tiers, the retry state and the
+ * viewer's page loads). The wire and decoding tests are `:server`'s `MediaReferenceTests`; the
+ * mosaic's are the transcript's. Robolectric's native graphics decode the sample PNG as iOS's
+ * `UIImage(data:)` does.
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35])
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class MediaReferenceTests {
     @get:Rule val isolation = TestIsolationRule()
 
     private val hashA = "a1".repeat(32)
     private val hashB = "b2".repeat(32)
 
-    private fun samplePNGData(): ByteArray = byteArrayOf(
-        0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
-        0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
-        0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00,
-    )
+    private fun samplePNGData(color: Int = Color.BLUE): ByteArray {
+        val image = Bitmap.createBitmap(12, 8, Bitmap.Config.ARGB_8888).apply { eraseColor(color) }
+        return ByteArrayOutputStream().use { out ->
+            image.compress(Bitmap.CompressFormat.PNG, 100, out)
+            out.toByteArray()
+        }
+    }
 
     private fun tempDir(): File = Files.createTempDirectory("media-ref-tests-").toFile()
 
@@ -135,4 +154,79 @@ class MediaReferenceTests {
             tempDir.deleteRecursively()
         }
     }
+
+    @Test
+    fun retryStateClearsTransientFailureAndImageViewerRetriesFailedPage() = runTest {
+        var retryState = MediaAttachmentRetryState(failure = MediaAttachmentFailure.Failed, attempt = 0)
+        assertTrue(retryState.isTransientFailure)
+        retryState = retryState.retry()
+        assertNull(retryState.failure)
+        assertFalse(retryState.isTransientFailure)
+        assertEquals(1, retryState.attempt)
+
+        val pngData = samplePNGData()
+        val server = OpenCodeServer(url = "https://example.invalid", username = "user", password = "secret")
+        val attachments = listOf(
+            OpenCodeImageAttachment(id = "img-1", data = ByteArray(0), mediaHash = hashA, name = "diagram.png", mime = "image/png"),
+            OpenCodeImageAttachment(id = "img-2", data = ByteArray(0), mediaHash = hashB, name = "missing.png", mime = "image/png"),
+        )
+        val decodedCache = DecodedImageCache()
+        val shouldFailFirst = AtomicBoolean(true)
+        val mediaReferences = MediaReferenceClient(
+            cachedData = { null },
+            unavailable = { _, _ -> false },
+            loader = { _, hash ->
+                when {
+                    hash != hashA -> MediaReferenceLoadResult.Unavailable
+                    shouldFailFirst.getAndSet(false) -> MediaReferenceLoadResult.Failed("Couldn’t load image")
+                    else -> MediaReferenceLoadResult.Loaded(pngData)
+                }
+            },
+        )
+        val preview = withDependencies({
+            this[DecodedImageCache] = decodedCache
+            this[MediaReferenceClient] = mediaReferences
+        }) {
+            TranscriptImagePreview.fromAttachments(attachments, selectedID = "img-1", label = "Attached image", server = server)
+        }
+        assertNotNull(preview)
+
+        val store = TestStore(TranscriptImageViewerFeature.State(preview!!), TranscriptImageViewerFeature(), this) {
+            this[DecodedImageCache] = decodedCache
+            this[MediaReferenceClient] = mediaReferences
+        }
+
+        store.send(TranscriptImageViewerFeature.Action.Task)
+        store.receive({ it is TranscriptImageViewerFeature.Action.MediaLoaded }) {
+            it.withPage(0) { page -> page.copy(loadFailed = true) }
+        }
+
+        val expectedImage = store.withDependencies { CachedImage.decoded("img-1", pngData, hashA) }
+        assertNotNull(expectedImage)
+
+        store.send(TranscriptImageViewerFeature.Action.RetryPageTapped("img-1")) {
+            it.withPage(0) { page -> page.copy(loadFailed = false) }
+        }
+        store.receive({ it is TranscriptImageViewerFeature.Action.MediaLoaded }) {
+            it.withPage(0) { page -> page.copy(image = expectedImage, loadFailed = false) }
+        }
+        assertTrue(store.state.preview.pages[0].image === expectedImage)
+
+        store.send(TranscriptImageViewerFeature.Action.PageSelected("img-2")) {
+            it.copy(selectedID = "img-2")
+        }
+        store.receive({ it is TranscriptImageViewerFeature.Action.MediaLoaded }) {
+            it.withPage(1) { page -> page.copy(isUnavailable = true) }
+        }
+
+        // Saving an unavailable page is a no-op.
+        store.send(TranscriptImageViewerFeature.Action.SaveTapped)
+        store.finish()
+    }
+
+    private fun TranscriptImageViewerFeature.State.withPage(
+        index: Int,
+        update: (TranscriptImagePreview.Page) -> TranscriptImagePreview.Page,
+    ): TranscriptImageViewerFeature.State =
+        copy(preview = preview.copy(pages = preview.pages.toMutableList().also { it[index] = update(it[index]) }))
 }
