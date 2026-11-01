@@ -108,18 +108,24 @@ class ComposerItemProviderLoaderTests {
         assertEquals(listOf<Byte>(1, 2, 3), imported)
     }
 
+    /** 4 with New Plus Menu off, as on main; 8 with it on. */
     @Test fun imageImportEnforcesSelectionLimitOnce() = runTest {
-        val importer = importer()
-        val imported = mutableListOf<Byte>()
+        for (plusMenu in listOf(false, true)) {
+            val limit = AttachmentPickerButton.maxPhotoSelection(plusMenu = plusMenu)
+            assertEquals(if (plusMenu) 8 else 4, limit)
+            val importer = importer()
+            val imported = mutableListOf<Byte>()
 
-        importer.start(
-            (1..6).map { ComposerImageSource.Data(byteArrayOf(it.toByte())) },
-            process = process,
-            onAttachment = { imported += it.data[0] },
-        )
-        waitForImport(importer)
+            importer.start(
+                (1..(limit + 2)).map { ComposerImageSource.Data(byteArrayOf(it.toByte())) },
+                process = process,
+                onAttachment = { imported += it.data[0] },
+                limit = limit,
+            )
+            waitForImport(importer)
 
-        assertEquals(listOf<Byte>(1, 2, 3, 4), imported)
+            assertEquals((1..limit).map { it.toByte() }, imported)
+        }
     }
 
     @Test fun secondImageImportCancelsFirst() = runTest {
