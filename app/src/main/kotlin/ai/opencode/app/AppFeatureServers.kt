@@ -48,6 +48,10 @@ internal fun AppFeature.selectServer(
     keepingHome = keepingHome,
 )
 
+/** Opens the pairing scanner (iOS `beginPairing`). */
+internal fun beginPairing(state: AppFeature.State): AppFeature.State =
+    state.copy(editingSavedServer = null, isScanningPairingCode = true)
+
 /** Opens the form for a new server: the last failed entry, or a blank one. */
 internal fun beginNewServer(state: AppFeature.State): AppFeature.State {
     val next = state.copy(isEditingServer = true, editingSavedServer = null)
@@ -70,18 +74,20 @@ internal fun leaveHome(state: AppFeature.State): AppFeature.State {
 
 /** An empty or wrong clipboard is an ordinary mistake: say so beside Paste, not in an error report. */
 internal fun pastePairingCode(state: AppFeature.State): Reduced<AppFeature.State, AppFeature.Action> {
-    val haptics = dependency(HapticsClient)
-    val text = dependency(PasteboardClient).string()
-    if (text == null || text.isBlank()) {
-        haptics.play(Haptic.error)
-        return cancelConnection(state.copy(pasteError = AppFeature.EMPTY_CLIPBOARD_MESSAGE))
-    }
-    validatePairing(text).exceptionOrNull()?.let { error ->
-        haptics.play(Haptic.error)
-        val message = if (error.message == AppFeature.invalidPairingCodeMessage) AppFeature.NOT_A_PAIRING_LINK_MESSAGE else error.message.orEmpty()
-        return cancelConnection(state.copy(pasteError = message))
+    val text = dependency(PasteboardClient).string().orEmpty()
+    val problem = pasteProblem(text)
+    if (problem != null) {
+        dependency(HapticsClient).play(Haptic.error)
+        return cancelConnection(state.copy(pasteError = problem))
     }
     return Reduced(state, Effect.send(AppFeature.Action.PairingCodeScanned(text)))
+}
+
+/** Why pasted text can't pair, or null when it can. */
+internal fun pasteProblem(text: String): String? {
+    if (text.isBlank()) return AppFeature.EMPTY_CLIPBOARD_MESSAGE
+    val error = validatePairing(text).exceptionOrNull() ?: return null
+    return if (error.message == AppFeature.invalidPairingCodeMessage) AppFeature.NOT_A_PAIRING_LINK_MESSAGE else error.message.orEmpty()
 }
 
 /** Exchange a one-time pairing link for a token, then connect normally. */

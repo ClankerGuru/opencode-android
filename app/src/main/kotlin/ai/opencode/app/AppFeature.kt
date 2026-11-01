@@ -25,7 +25,10 @@ import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
 import ai.opencode.core.store.cancellable
+import ai.opencode.core.store.combine
 import ai.opencode.core.store.ifLet
+import ai.opencode.core.store.scope
+import ai.opencode.feature.settings.onboarding.WelcomeFeature
 import ai.opencode.core.ui.ThisDevice
 import ai.opencode.feature.drawer.HomeConnectionFeature
 import ai.opencode.feature.drawer.HomeFeature
@@ -78,6 +81,8 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         val returnServer: OpenCodeServer? = null,
         /** Why the welcome's Paste didn't pair, shown beside it. */
         val pasteError: String? = null,
+        /** The first-run welcome, with no saved server (Welcome Preview). */
+        val welcome: WelcomeFeature.State = WelcomeFeature.State(),
         val connection: Connection = Connection.Idle,
         val connectionGeneration: Int = 0,
         val connectionAttempt: ConnectionAttempt? = null,
@@ -454,6 +459,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         data class HealthResponse(val attemptID: Int, val result: Result<OpenCodeServer>) : Action
         data class CopyTextTapped(val text: String) : Action
         data class Home(val action: HomeFeature.Action) : Action
+        data class Welcome(val action: WelcomeFeature.Action) : Action
         data class HomeResponse(val attemptID: Int, val result: Result<OpenCodeHomeSnapshot>) : Action
     }
 
@@ -475,6 +481,19 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
     /** iOS `.keepingWhatsNewAcrossHomes()` (`AppFeatureWhatsNew.kt`). */
     private val whatsNewBody: Reducer<State, Action> = body.keepingWhatsNewAcrossHomes()
 
+    /** iOS `Scope(\.welcome) { WelcomeFeature() }` then `welcomeRequests` (`AppFeatureWelcome.kt`). */
+    private val welcomeBody: Reducer<State, Action> = combine(
+        whatsNewBody,
+        scope(
+            state = { it.welcome },
+            setState = { s, welcome -> s.copy(welcome = welcome) },
+            action = { (it as? Action.Welcome)?.action },
+            embed = Action::Welcome,
+            child = WelcomeFeature(),
+        ),
+        welcomeRequests,
+    )
+
     /**
      * Leaving Home cancels a call or a recording without Home seeing it end, so their ongoing
      * notifications are ended here (iOS `.onChange` of `voiceCallActivity`/`dictationActivity`).
@@ -483,7 +502,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
      * on-then-off can't land out of order (watched from here so leaving Home mid-call lets the
      * screen sleep again too).
      */
-    private val liveBody: Reducer<State, Action> = whatsNewBody
+    private val liveBody: Reducer<State, Action> = welcomeBody
         .onChange({ it.home?.sessionDetail?.voice?.callPresenceID }) { old, _, state ->
             if (old == null || state.home != null) return@onChange Reduced(state)
             val service = dependency(VoiceCallServiceClient)
@@ -572,9 +591,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         is Action.ServerTapped -> selectServer(action.server, state)
         Action.ReturnToServerTapped -> state.returnServer?.let { selectServer(it, state) } ?: Reduced(state)
         is Action.ServerDeleted -> serverDeleted(state, action.server)
-        Action.ScanPairingCodeTapped -> cancelConnection(
-            state.copy(pasteError = null, isScanningPairingCode = true, editingSavedServer = null),
-        )
+        Action.ScanPairingCodeTapped -> cancelConnection(beginPairing(state.copy(pasteError = null)))
         Action.ScannerDismissed -> {
             val next = state.copy(isScanningPairingCode = false)
             // Opened over Home, there's no attempt to cancel and Home carries on.
@@ -608,6 +625,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         is Action.HealthResponse -> healthResponse(state, action)
         is Action.HomeResponse -> homeResponse(state, action)
         is Action.Home -> home(state, action.action)
+        is Action.Welcome -> Reduced(state)
     }
 
     /**

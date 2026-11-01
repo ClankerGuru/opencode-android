@@ -1,5 +1,11 @@
 package ai.opencode.app
 
+import androidx.compose.runtime.collectAsState
+import ai.opencode.feature.settings.onboarding.WelcomeView
+import ai.opencode.feature.settings.onboarding.WelcomeFeature
+import ai.opencode.core.sharing.shared
+import ai.opencode.core.sharing.ExperimentalFeature
+import ai.opencode.core.experiments.key
 import ai.opencode.core.diagnostics.HidesFromScreenshots
 import ai.opencode.core.store.Store
 import ai.opencode.core.store.StoreOf
@@ -114,6 +120,9 @@ fun AppView(store: StoreOf<AppFeature.State, AppFeature.Action>) {
     val hasHome by store.observe { it.home != null }
     val isEditingServer by store.observe { it.isEditingServer }
     val isScanning by store.observe { it.isScanningPairingCode }
+    val hasSavedServers by store.observe { it.savedServers.value.isNotEmpty() }
+    val welcomePreview by remember { shared(ExperimentalFeature.welcomePreview.key).flow }.collectAsState()
+    val showsWelcome = !hasSavedServers && ExperimentalFeature.welcomePreview.isActive(welcomePreview)
     OpenCodeAppTheme {
         // Media's file viewer renders Markdown files with the transcript's renderer.
         TranscriptMediaProviders {
@@ -127,6 +136,14 @@ fun AppView(store: StoreOf<AppFeature.State, AppFeature.Action>) {
                 // transcript image viewer and file/diagram/pasted-text viewers cover the whole Home.
                 val media = remember { Store(MediaFeature.State(), MediaFeature()) }
                 MediaView(media) { HomeView(home) }
+            } else if (showsWelcome) {
+                val welcome = store.rememberScope<AppFeature.State, AppFeature.Action, WelcomeFeature.State, WelcomeFeature.Action>(
+                    state = { it.welcome },
+                    action = AppFeature.Action::Welcome,
+                )
+                val progress by store.observe { it.connectionProgressLabel }
+                val problem by store.observe { it.errorMessage }
+                WelcomeView(welcome, progress, problem, mark = painterResource(R.drawable.opencode_app_mark))
             } else {
                 ConnectionView(store)
             }
