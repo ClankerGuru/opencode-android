@@ -2,7 +2,6 @@ package ai.opencode.feature.transcript.list
 
 import ai.opencode.feature.media.AgentImageViewport
 import ai.opencode.feature.media.AgentImageVisibility
-import ai.opencode.feature.media.AgentImageMarkerView
 import ai.opencode.feature.media.LocalAgentImageViewport
 import ai.opencode.feature.media.LocalAgentImageRow
 import ai.opencode.core.dependencies.dependency
@@ -450,7 +449,7 @@ private class TranscriptImageViewport(private val controller: TranscriptListCont
 
     override val imageViewportIsVisible: Boolean get() = controller.isShowingToReader
 
-    override fun imageContentRevised(marker: AgentImageMarkerView) {
-        (marker.rowKey as? String)?.let(controller::imageContentRevised)
+    override fun imageContentRevised(row: Any?) {
+        (row as? String)?.let(controller::imageContentRevised)
     }
 }
