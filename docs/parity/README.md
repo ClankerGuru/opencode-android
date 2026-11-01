@@ -77,7 +77,7 @@ under the same name; anything not ported anywhere is listed as deleted with its 
 | Module | iOS test files covered | iOS tests ported | Deleted with reason | JVM tests (Gradle) |
 | --- | ---: | ---: | ---: | ---: |
 | `:app` | 21 | 125 | 27 | 125 |
-| `:core` | 18 | 109 | 72 | 113 |
+| `:core` | 19 | 112 | 74 | 116 |
 | `:server` | 36 | 230 | 3 | 254 (2 opt-in live checks skipped) |
 | `:devtools` | 4 | 14 | 10 | 14 |
 | `:feature:media` | 17 | 178 | 15 | 183 |
