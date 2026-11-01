@@ -123,7 +123,7 @@ another module are left to that module's port ("skipped"); "dropped" tests can't
 | `FloatingCallStageTests.swift` | `FloatingCallStageTests.kt` | 8 (the `FloatingCallStageFeature` store half, incl. `theCallKeepsItsStage`) | `FloatingCallStageGeometry`, `FloatingCallWindowTests`, `FloatingCallConnectTests` (wait on the One Shape views; see the FloatingCallStages row) | – |
 | `VoiceCallCueTests.swift` | `VoiceCallCueTests.kt` | 9 (the parameterised pack tests loop over the packs) | – | – |
 | `LiveDelegationFeatureTests.swift` (+`+Session`) | – | 0 | – | not re-homed yet: split out of `VoiceLiveTests` on iOS (0eb46803); the Kotlin tests still sit in `VoiceLiveTests.kt` and drawer `LiveDelegationFeatureTestsSession.kt` |
-| `VoiceScreenshotToolTests.swift` | – | 0 | – | not ported yet (the Developer Mode `capture_app_screenshot` tool is ported in `VoiceDelegatorWorkspace`/`VoiceAppState`) |
+| `VoiceScreenshotToolTests.swift` | – | 0 | – | `problemReportsAndVoiceScreenshotsKeepSeparatePolicies`’ `Marks` half → `:core` `diagnostics/VoiceScreenshotToolTests.kt`; the rest not ported yet (the Developer Mode `capture_app_screenshot` tool is ported in `VoiceDelegatorWorkspace`/`VoiceAppState`) |
 | `VoiceRequestDockTests.swift` | – | 0 | – | not ported yet (the request dock is the session area’s; voice sends `RequestSettled`) |
 | `FloatingOrbTests.swift` | – | 0 | – | not ported yet (waits on the One Shape surface) |
 | `VoiceTestClock.swift` | – | – | – | n/a: Android drives coordinator timing through the `Clock` dependency already |

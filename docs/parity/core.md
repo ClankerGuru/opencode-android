@@ -79,8 +79,9 @@ Ported from iOS `OpenCodeTests/` into `core/src/test` (JVM, same names). Shared 
 | `TraceTests.swift` (`DiagnosticsJournalTests`, `InternalBuildTests`, `ProblemReportBundleTests`, `DiagnosticsPrivacyTests`, `CrashReportTests`) | `diagnostics/TraceTests.kt` | 14 | `TraceUploadsTests`, `screenshotsOnly…`, `diagnosticsIndexesMetricsByRequest` → `:devtools`; `VoiceTimelineTests` → `:feature:voice`; `TeamFeedbackTests` deleted (devtools.md) |
 | `SubagentStackTests.swift` | `ui/SubagentStackTests.kt` | 1 (`backRulesLetTheEdgeWinAndContentKeepItsClaims`; iOS `BackSwipeSpring.goesBack` is `BackSwipeRules.goesBack`, decision distance passed as iOS's 8) | stack → `:feature:drawer`; `descendantsFollowTheFamilyTree` → `:server` |
 | `SoundEffectsTests.swift` (`SoundEffectsTests`, `SoundEffectsPlaybackTests`) | `sound/SoundEffectsTests.kt` | 15 (`soundEffectsAreOffByDefault`, the 3 live gate tests, all 11 playback tests; iOS's notification posts are `SoundEffectsEvent`s, the owner a fake `AudioSessionIdleState`) | `settingsPrepareTheSoundsAndSampleTheVolume` → `:feature:settings`; session/Home/Catch Up reducer tests → `:feature:session`/`:feature:drawer` |
+| `VoiceScreenshotToolTests.swift` | `diagnostics/VoiceScreenshotToolTests.kt` | 1 (`problemReportsAndVoiceScreenshotsKeepSeparatePolicies`, the `Marks` half; the window password-field half scans UIKit views) | the screenshot tool tests → `:feature:voice`; `settingsCredentialsAreMarkedForEveryScreenshot` hosts a UIKit window (the marks are `HidesFromScreenshots` calls, covered by this policy test) | |
 
 Round 2 (ui helper): no `:core` production bugs found. `InternalBuild.detect(isDebug, installingPackageName)` was pulled out of
-`isEnabled` (unchanged behaviour) so `InternalBuildTests` can check it. 133 `:core` tests in total, all passing
+`isEnabled` (unchanged behaviour) so `InternalBuildTests` can check it. 134 `:core` tests in total, all passing
 (`./gradlew :core:testDebugUnitTest`). Robolectric (test-only) runs only `LiveHapticsFrameworkTests`; `LiveHaptics` is `internal` (was
 `private`) so it can.
