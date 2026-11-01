@@ -63,6 +63,9 @@ enum class StreamTextRevealStyle(override val rawValue: String) : TunableChoice 
  * chunk reads them as it arrives, so a change shows on the next chunk without a relaunch.
  */
 object TextRevealTunables {
+    /** The Tuning Panel sections it registers (the key segment after the group), in order. */
+    val sectionTitles = listOf("Text Reveal")
+
     val style = Tunable("transcript.textReveal.style", "Stream reveal style", default = StreamTextRevealStyle.Chunk)
     val feather = Tunable("transcript.textReveal.feather", "Frontier feather (×)", default = 1.0, range = 0.25..3.0, step = 0.05)
     val blurRadius = Tunable("transcript.textReveal.blurRadius", "Focus blur radius (pt)", default = 2.5, range = 0.0..8.0, step = 0.25)

@@ -88,6 +88,9 @@ fun DelayedProgressView(modifier: Modifier = Modifier, delayMillis: Long = 400) 
 
 /** Tunables for the empty and loading session state (iOS `EmptyStateTunables`, OC-430), baked defaults. */
 object EmptyStateTunables {
+    /** The Tuning Panel sections it registers (the key segment after the group), in order. */
+    val sectionTitles = listOf("Empty")
+
     const val breathPeriod = 1.7
     const val breathMinOpacity = 0.45
     const val breathMinScale = 0.94f
@@ -355,7 +358,7 @@ fun TranscriptEmptyView(
             )
             Spacer(Modifier.height(EmptyStateTunables.subtitleSpacing.dp))
             Text(
-                "Start the conversation below.",
+                "Start the session below",
                 modifier = Modifier.motionBlurReveal(motion.text(now, true).first.toFloat(), EmptyStateTunables.revealBlur.dp, EmptyStateTunables.revealRise.dp, reduceMotion)
                     .then(if (!showsText) Modifier.clearAndSetSemantics { } else Modifier),
                 style = OpenCodeTextStyles.subheadline,
