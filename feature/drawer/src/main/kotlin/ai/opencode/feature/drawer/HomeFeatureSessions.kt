@@ -146,7 +146,7 @@ internal fun HomeFeature.reduceSessionDetail(state: State, action: SessionFeatur
                     dependency(ShareInboxClient).donateSuggestion(s.server.persistenceID, sessionID, session.title)
                 }
             }
-            return Reduced(s)
+            return if (sessionID == null) Reduced(s) else startSessionActivity(s, sessionID)
         }
 
         is SessionFeature.Action.ViewAcknowledged -> return Reduced(state.notingViewAcknowledged(action.sessionID, action.idle))
@@ -222,8 +222,11 @@ internal fun HomeFeature.reduceSessionDetail(state: State, action: SessionFeatur
             val s = state.copy(sessions = listOf(session) + state.sessions.filterNot { it.id == session.id })
                 .updatingSessionReadDates { it + (state.sessionKey(session.id) to session.updatedAt) }
                 .updatingLastViewedSessionIDs { it + (state.server.persistenceID to session.id) }
-            // `core` persists the snapshot after this action.
-            return Reduced(s)
+            // `core` persists the snapshot after this action. A draft's send has a session to follow
+            // only now.
+            val detail = s.sessionDetail
+            if (session.parentID != null || detail?.session?.id != session.id || !detail.isAwaitingReply) return Reduced(s)
+            return startSessionActivity(s, session.id)
         }
 
         is SessionFeature.Action.Delegate -> return reduceSessionDelegate(state, action.delegate)

@@ -3,6 +3,7 @@ package ai.opencode.feature.drawer
 import ai.opencode.feature.session.*
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
+import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.PresentationAction
 import ai.opencode.core.store.Reduced
@@ -21,6 +22,7 @@ import ai.opencode.feature.settings.NotifyPluginCheck
 import ai.opencode.feature.settings.ConnectionStatus
 import ai.opencode.feature.settings.HomeSettingsFeature
 import ai.opencode.feature.settings.SettingsFeature
+import ai.opencode.feature.settings.onboarding.WelcomeFeature
 import ai.opencode.feature.settings.SettingsFeature.SettingsDelegate
 import ai.opencode.feature.settings.whatsnew.WhatsNewEntry
 import ai.opencode.feature.settings.whatsnew.WhatsNewFeature
@@ -142,6 +144,14 @@ internal fun HomeFeature.reduceSettingsScreen(state: State, action: Presentation
     return when (presented) {
         // iOS removed `.serversRequested` with Title Is the Switch (c75d4a1e): nothing sends it.
         SettingsFeature.Action.ServersTapped -> Reduced(state)
+        // Settings › Experimental › Show Welcome: the first-run welcome, over Settings and Home.
+        is SettingsFeature.Action.Settings ->
+            when {
+                presented.action == HomeSettingsFeature.Action.WelcomeOpened ->
+                    Reduced(state.copy(welcome = WelcomeFeature.State(isPreview = true)))
+                presented.action.switchesOffSessionLiveActivity -> stopSessionActivity(state)
+                else -> Reduced(state)
+            }
         is SettingsFeature.Action.Delegate -> when (val delegate = presented.action) {
             SettingsDelegate.Close -> Reduced(state.copy(settings = null))
             is SettingsDelegate.SwitchServer -> Reduced(state, Effect.send(Action.Delegate(DelegateAction.ServerSwitchTapped(delegate.server))))
@@ -226,3 +236,7 @@ internal fun HomeFeature.tryWhatsNew(destination: WhatsNewEntry.Destination, ent
         is WhatsNewEntry.Destination.Open -> Reduced(s)
     }
 }
+
+/** iOS `.settings(.experimentalFeatureChanged(.sessionLiveActivity, false))`. */
+internal val HomeSettingsFeature.Action.switchesOffSessionLiveActivity: Boolean
+    get() = this is HomeSettingsFeature.Action.ExperimentalFeatureChanged && feature == ExperimentalFeature.sessionLiveActivity && !on

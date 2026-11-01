@@ -178,6 +178,8 @@ private fun HomeFeature.coreRoute(state: State, action: Action): Reduced<State, 
 
     is Action.WhatsNew -> reduceWhatsNew(state, action.action)
     is Action.SettingsScreen -> reduceSettingsScreen(state, action.action)
+    // Show Welcome: WelcomeFeature reduces it; its pairing requests are the app's (AppFeature+Welcome).
+    is Action.Welcome -> Reduced(state)
 
     Action.InAppNoticeTapped -> {
         val notice = state.inAppNotice
@@ -213,6 +215,16 @@ private fun HomeFeature.coreRoute(state: State, action: Action): Reduced<State, 
         Reduced(if (action.isShown) state.showingSettings() else state.copy(settings = null))
 
     // The Onboarding Playground opens inside Settings (`SettingsFeature`), which sends it there.
-    is Action.Settings -> reducePreferences(state, action.action)
+    is Action.Settings -> {
+        val reduced = reducePreferences(state, action.action)
+        if (!action.action.switchesOffSessionLiveActivity) {
+            reduced
+        } else {
+            val stopped = stopSessionActivity(reduced.state)
+            Reduced(stopped.state, Effect.merge(reduced.effect, stopped.effect))
+        }
+    }
+
+    is Action.SessionActivitySettled -> Reduced(state.notingSessionActivitySettled(action.sessionID, action.items))
 
 }

@@ -32,7 +32,14 @@ import ai.opencode.feature.system.liveactivity.VoiceCallCommand
 import ai.opencode.feature.system.notifications.NotificationPermission
 import ai.opencode.feature.system.share.ReceivedShare
 import ai.opencode.feature.settings.HomeSettingsFeature
+import ai.opencode.feature.system.liveactivity.SessionLiveActivity
+import ai.opencode.core.sharing.ExperimentalFeatures
+import ai.opencode.core.sharing.ExperimentalFeature
+import ai.opencode.feature.voice.VoiceSharedKeys
+import ai.opencode.feature.voice.VoiceEngine
 import ai.opencode.feature.settings.SettingsFeature
+import ai.opencode.feature.settings.SettingsPage
+import ai.opencode.feature.settings.onboarding.WelcomeFeature
 import ai.opencode.feature.settings.whatsnew.WhatsNewFeature
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
@@ -171,6 +178,13 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
          * cog and What's New open Settings' root.
          */
         val settingsVoicePage: VoiceSettingsPage? = null,
+        /**
+         * Settings › Experimental › Show Welcome (Welcome Preview): the first-run welcome over the
+         * paired app, closed back to it with nothing unpaired (iOS `@Presents var welcome`).
+         */
+        val welcome: WelcomeFeature.State? = null,
+        /** The run the Session Live Activity follows (Experimental), from an accepted send until it settles or another send takes over. */
+        val sessionActivity: SessionLiveActivity.Tracked? = null,
         val sessionDetail: SessionFeature.State? = null,
         /** A subagent waiting for its parent to open under it (`sessionTapped`). */
         val pendingSubagentPush: OpenCodeSession? = null,
@@ -445,6 +459,7 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         val presentsOverHome: Boolean
             get() = catchUp != null ||
                 isSettingsShown ||
+                welcome != null ||
                 pendingDeletion != null ||
                 selectedTranscriptFetch != null ||
                 pendingSubagentPush != null ||
@@ -460,9 +475,23 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
          */
         fun showingSettings(voicePage: VoiceSettingsPage? = null): State {
             val next = copy(settingsVoicePage = voicePage)
-            val shown = settings ?: return next.presentingSettings(SettingsFeature.State(server = server))
+            val shown = settings ?: return next.presentingSettings(SettingsFeature.State(server = server, path = voiceSettingsPath(voicePage)))
             if (shown.root != SettingsFeature.State.Root.whatsNew) return next
-            return next.copy(settings = SettingsFeature().reduce(shown, SettingsFeature.Action.ShowSettingsRoot).state)
+            val root = SettingsFeature().reduce(shown, SettingsFeature.Action.ShowSettingsRoot).state
+            return next.copy(settings = root.copy(path = voiceSettingsPath(voicePage)))
+        }
+
+        /**
+         * The pages a call's card opens Settings at (iOS `SettingsView`'s `voicePage` and
+         * `VoiceSettingsView`'s `opensPage`, which push on appearing): Voice, then Voice Provider
+         * (with Your Account over it) when Server Voice's provider row stands in for the key row.
+         */
+        private fun voiceSettingsPath(voicePage: VoiceSettingsPage?): List<SettingsPage> {
+            voicePage ?: return emptyList()
+            val showsProviderRow = dependency(ExperimentalFeatures)(ExperimentalFeature.serverVoice) &&
+                shared(VoiceSharedKeys.voiceEngine).value != VoiceEngine.grok
+            if (!showsProviderRow || voicePage == VoiceSettingsPage.voice) return listOf(SettingsPage.Voice)
+            return listOf(SettingsPage.Voice, SettingsPage.VoiceProvider(opensAccount = voicePage == VoiceSettingsPage.account))
         }
 
         /** A reconnect, a server's first connection, or a return to the app: the next list and attention read set the baseline quietly. */
@@ -617,6 +646,8 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         data class Settings(val action: HomeSettingsFeature.Action) : Action
         /** The presented Settings ([State.settings]); its delegates are handled in `HomeFeatureSettings.kt`. */
         data class SettingsScreen(val action: PresentationAction<SettingsFeature.Action>) : Action
+        /** Show Welcome over Home ([State.welcome]); its pairing requests go to the app. */
+        data class Welcome(val action: PresentationAction<WelcomeFeature.Action>) : Action
         /** iOS `.binding(.set(\.search, …))`. */
         data class SearchChanged(val text: String) : Action
         /** iOS `.binding(.set(\.isSettingsShown, …))`: the view popped (or pushed) Settings. */
@@ -658,6 +689,8 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         data object PairedComputerOpened : Action
         /** The install's first computer paired: a ready session in its latest project, with starter prompts. */
         data object FirstComputerPaired : Action
+        /** The background wait found the followed run's session idle and read its last items. */
+        data class SessionActivitySettled(val sessionID: String, val items: List<OpenCodeTranscriptItem>) : Action
         /** The view opened the drawer `drawerOpenRequest` asked for. */
         data object DrawerOpenRequestHandled : Action
         data class SessionTapped(val sessionID: String) : Action
@@ -756,6 +789,7 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         data object NetworkPath : CancelID
         data object InAppNotice : CancelID
         data object LiveUpdatesAfterLeaving : CancelID
+        data object SessionActivityWait : CancelID
         data class CachedTranscript(val sessionID: String) : CancelID
         data object LinkedSessionOpen : CancelID
         data class DeleteSession(val sessionID: String) : CancelID

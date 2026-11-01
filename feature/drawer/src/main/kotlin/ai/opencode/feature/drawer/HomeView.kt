@@ -1,5 +1,10 @@
 package ai.opencode.feature.drawer
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import ai.opencode.feature.settings.onboarding.WelcomeView
+import ai.opencode.feature.settings.onboarding.WelcomeFeature
+import androidx.compose.ui.graphics.painter.Painter
 import ai.opencode.devtools.traces.TraceUploadsHost
 import ai.opencode.core.store.rememberScope
 import ai.opencode.core.dependencies.dependency
@@ -32,7 +37,6 @@ import ai.opencode.feature.system.notifications.SessionNotificationsClient
 import ai.opencode.core.experiments.ExperimentalCallStyle
 import ai.opencode.core.experiments.ExperimentalFeature
 import ai.opencode.core.experiments.key
-import ai.opencode.core.motion.Motion
 import ai.opencode.core.sharing.shared
 import ai.opencode.feature.drawer.style.DrawerMetrics
 import ai.opencode.feature.voice.CallTrayController
@@ -41,11 +45,10 @@ import ai.opencode.feature.voice.CallTrayDockGeometry
 import ai.opencode.feature.voice.CallTrayDockOverlay
 import ai.opencode.feature.voice.CallTrayTunables
 import ai.opencode.feature.voice.FloatingCallCenter
-import ai.opencode.feature.voice.FloatingCallOverlay
+import ai.opencode.feature.voice.FloatingCallWindow
 import ai.opencode.feature.voice.VoiceRoutePreferences
 import ai.opencode.feature.voice.VoiceStoreOf
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.displayCutout
@@ -130,6 +133,7 @@ fun HomeView(
     store: StoreOf<HomeFeature.State, HomeFeature.Action>,
     modifier: Modifier = Modifier,
     initiallyOpenDrawer: Boolean = false,
+    welcomeMark: Painter? = null,
 ) {
     val view = rememberHomeViewState(store, initiallyOpenDrawer)
     val reducedMotion = rememberReduceMotion()
@@ -162,6 +166,8 @@ fun HomeView(
         }
     }
     HomeSettingsBack(store)
+    HomeWelcome(store, welcomeMark)
+    HomeFloatingCallWindow(store)
     HomeLifecycle(store, view)
     // iOS hosts it on Home, so deletes from the session's own menu confirm too.
     HomeDeleteConfirmation(store)
@@ -312,9 +318,6 @@ private fun HomeLayout(
             drawerTravels = { drawerTravels.value },
         )
     }
-    // A floating call stays put above both while the card slides and sessions change: the call
-    // belongs to the root session.
-    HomeFloatingCall(if (callPresentation == ExperimentalCallStyle.floating) call else null)
 }
 
 /** iOS `HomeView.callPresentation`: Settings' Call Style, from the call experiments. */
@@ -373,20 +376,18 @@ private fun HomeCallTrayDock(
 }
 
 /**
- * The floating call, full-window over Home (iOS `homeLayout`'s second overlay): shown while the
- * call doesn't show its card. A call that fails or drops hands over to its card: the orb fades
- * rather than vanishing (a hang-up already shrinks it away).
+ * The floating call's window (iOS `homeLayout`'s `FloatingCallWindowAnchor`): a floating call stays
+ * put above everything while the card slides, sessions change and Settings, Welcome or a sheet
+ * opens: the call belongs to the root session, and its orb has a window of its own. Only while the
+ * call doesn't show its card (`call.flatMap { $0.phase.showsCard ? nil : $0 }`); a failed or
+ * dropped call hands over to its card, and the window fades the orb.
  */
 @Composable
-private fun HomeFloatingCall(call: VoiceStoreOf?) {
-    val showsCard = if (call == null) null else call.observe { it.phase.showsCard }.value
-    AnimatedVisibility(
-        visible = call != null && showsCard == false,
-        enter = EnterTransition.None,
-        exit = fadeOut(Motion.easeOut(0.25)),
-    ) {
-        if (call != null) FloatingCallOverlay(call)
-    }
+private fun HomeFloatingCallWindow(store: StoreOf<HomeFeature.State, HomeFeature.Action>) {
+    val floats = rememberCallPresentation() == ExperimentalCallStyle.floating
+    val call = rememberHomeCall(store)
+    val showsCard = call?.observe { it.phase.showsCard }?.value
+    FloatingCallWindow(if (floats && call != null && showsCard == false) call else null)
 }
 
 /**
@@ -836,6 +837,31 @@ private fun HomeSettings(store: StoreOf<HomeFeature.State, HomeFeature.Action>) 
     }
     CompositionLocalProvider(LocalAppearanceTranscriptPreview provides AppearanceTranscriptPreviewRows) { SettingsView(settings) }
 }
+
+/**
+ * Show Welcome (iOS `SettingsPresentation`'s welcome overlay): the first-run welcome, faded in over
+ * Settings and Home, never a cover, so pairing's scanner and the server form still present over
+ * it from the root. Close (and Back) dismiss it. [mark] is the app mark, from `:app`'s resources.
+ */
+@Composable
+private fun HomeWelcome(store: StoreOf<HomeFeature.State, HomeFeature.Action>, mark: Painter?) {
+    val shown by store.observe { it.welcome != null }
+    val dismiss = { store.send(HomeFeature.Action.Welcome(PresentationAction.Dismiss)) }
+    val welcome = remember(store) {
+        var last: WelcomeFeature.State? = null
+        store.scope<HomeFeature.State, HomeFeature.Action, WelcomeFeature.State, WelcomeFeature.Action>(
+            state = { home -> home.welcome?.also { last = it } ?: last ?: WelcomeFeature.State(isPreview = true) },
+            action = { HomeFeature.Action.Welcome(PresentationAction.Presented(it)) },
+        )
+    }
+    AnimatedVisibility(shown, enter = fadeIn(tween(WELCOME_FADE_MS)), exit = fadeOut(tween(WELCOME_FADE_MS))) {
+        BackHandler(onBack = dismiss)
+        WelcomeView(welcome, progress = null, problem = null, mark = mark, onClose = dismiss)
+    }
+}
+
+/** iOS `SettingsPresentation.fade`. */
+private const val WELCOME_FADE_MS = 300
 
 /**
  * Back closes Settings at its root, not what waits beneath it. `:feature:settings`'

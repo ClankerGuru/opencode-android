@@ -74,7 +74,7 @@ internal fun HomeFeature.reduceConnection(state: State, action: Action): HomeRed
     Action.SceneEnteredBackground -> {
         val sessionID = state.sessionDetail?.session?.id
         val s = if (sessionID != null) state.syncingSeenItemsFromOpenDetail(sessionID) else state
-        Reduced(s, publishAppBadge(s))
+        Reduced(s, Effect.merge(publishAppBadge(s), waitToSettleSessionActivity(s)))
     }
 
     is Action.ServerConnected -> {

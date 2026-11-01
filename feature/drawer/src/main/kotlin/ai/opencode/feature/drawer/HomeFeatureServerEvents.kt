@@ -103,7 +103,7 @@ internal fun HomeFeature.reduceServerEvent(state: State, event: OpenCodeServerEv
 
         is OpenCodeServerEvent.ContentBatch -> {
             // A cached session's copy follows its live events, one read per pause.
-            var s = state
+            var s = state.notingSessionActivityStep(event.sessionID, event.events)
             val refresh = if (event.sessionID !in s.transcriptCache) {
                 Effect.none()
             } else {
