@@ -66,6 +66,16 @@ class LiveHapticsTests {
             violations.isEmpty(),
         )
     }
+
+    /**
+     * The + menu opening and choosing its rows feel as light as a photo pick, lighter than
+     * `.tap`'s impact. The `AttachmentMenuPress`/`RecentPhotoPeek` half is `:feature:composer`'s.
+     */
+    @Test
+    fun thePlusMenusTapsAreAsLightAsAPick() {
+        assertEquals(Haptic.selection.feedback, Haptic.lightTap.feedback)
+        assertTrue(Haptic.lightTap.feedback != Haptic.tap.feedback)
+    }
 }
 
 /**
