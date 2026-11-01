@@ -123,23 +123,23 @@ another module are left to that module's port ("skipped"); "dropped" tests can't
 | `FloatingCallStageTests.swift` | `FloatingCallStageTests.kt` | 8 (the `FloatingCallStageFeature` store half, incl. `theCallKeepsItsStage`) | `FloatingCallStageGeometry`, `FloatingCallWindowTests`, `FloatingCallConnectTests` (wait on the One Shape views; see the FloatingCallStages row) | – |
 | `VoiceCallCueTests.swift` | `VoiceCallCueTests.kt` | 9 (the parameterised pack tests loop over the packs) | – | – |
 | `LiveDelegationFeatureTests.swift` (+`+Session`) | `LiveDelegationFeatureTests.kt` | 9 | 3 compaction/retarget tests (`:feature:session`, drawer `LiveDelegationFeatureTestsSession.kt`, ported there) | – (moved out of `VoiceLiveTests.kt` unchanged; iOS hasn't changed them since 062f3732) |
-| `VoiceScreenshotToolTests.swift` | – | 0 | – | not ported yet (the Developer Mode `capture_app_screenshot` tool is ported in `VoiceDelegatorWorkspace`/`VoiceAppState`) |
+| `VoiceScreenshotToolTests.swift` | `VoiceScreenshotToolTests.kt` | 9 (`appStateCarriesNamesAndCountsButNoSecrets` builds Home's part directly) | Home's half of `appStateCarriesNamesAndCountsButNoSecrets` (drawer `HomeFeature.State.voiceAppStateHome`; see the VoiceAppState row) | 6 UIKit capture/credential-policy probes (`refusesAnyWindowShowingAPasswordFieldMarkedOrNot`, `onlyAPasswordFieldOnScreenRefuses`, `aPasswordFieldMidAnimationStillRefuses`, `settingsCredentialsAreMarkedForEveryScreenshot`, `problemReportsAndVoiceScreenshotsKeepSeparatePolicies`, `captureDrawsTheHostedWindowNotABlankImage`): Android captures with `PixelCopy` and refuses while a `CredentialSurface` is composed or the window is `FLAG_SECURE`; there are no `UIWindow` hierarchies to probe |
 | `VoiceRequestDockTests.swift` | – | 0 | – | not ported yet (the request dock is the session area’s; voice sends `RequestSettled`) |
 | `FloatingOrbTests.swift` | – | 0 | – | not ported yet (waits on the One Shape surface) |
 | `VoiceTestClock.swift` | `VoiceTestClock.kt` | – | – | `VoiceTestClock` itself n/a: `runTest` virtual time is that clock (the coordinator runs on the test scheduler and reads `Clock`). `VoiceClockedCall` keeps iOS's steps (`start`, `idle`, `advance` = `advanceTimeBy` + `runCurrent`, `userSays`, `delegates`, `agentSpeaks`, `micHearsUser`, `playbackDrains`, `waitFor`/`until` polling state without moving time) plus `settle` (iOS's real-time sleeps), `join` and `retryDelayPasses` (below) |
 | `VoiceAnswerHoldTests.swift` | `VoiceAnswerHoldTests.kt` | 13 | – | – (re-ported from f657969b on `VoiceClockedCall`) |
-| `VoiceBackgroundResultTests.swift` | – | 0 | – | not ported yet (new at f657969b) |
+| `VoiceBackgroundResultTests.swift` | `VoiceBackgroundResultTests.kt` | 7 | `runMessagesDecodeLaunchesAndCompletions` (`:server`: tests `OpenCodeClient.decodeRunMessages`, internal to `:server`; not ported there yet) | – |
 | `VoiceClaimTests.swift` | `VoiceClaimTests.kt` | 4 | – | – (the parameterized acknowledgement test loops over both arguments) |
 | `VoiceContextHoldTests.swift` | `VoiceContextHoldTests.kt` | 2 | – | – |
 | `VoiceLayLowTests.swift` | `VoiceLayLowTests.kt` | 4 | – | – |
-| `VoicePendingRequestTests.swift` | – | 0 | – | not ported yet (new at f657969b) |
+| `VoicePendingRequestTests.swift` | `VoicePendingRequestTests.kt` | 8 | – | – |
 | `VoiceResultHoldTests.swift` | `VoiceResultHoldTests.kt` | 10 | – | – (6 moved and re-ported from f657969b, 4 new) |
 | `VoiceSessionDelegatorEdgeTests.swift` | – | 0 | – | not ported yet (new at f657969b) |
 | `VoiceSessionDelegatorServerVoiceTests.swift` | – | 0 | – | not ported yet (new at f657969b) |
 | `VoiceSessionDelegatorTests.swift` | – | 0 | – | not ported yet (new at f657969b) |
 | `VoiceSessionMoveTests.swift` | `VoiceSessionMoveTests.kt` | 2 | – | – (iOS's `forgetTranscripts` cleanup is unneeded: each harness has its own in-memory store) |
-| `VoiceSharedWaitTests.swift` | – | 0 | – | not ported yet (new at f657969b) |
-| `VoiceTurnStampTests.swift` | – | 0 | – | not ported yet (new at f657969b) |
+| `VoiceSharedWaitTests.swift` | `VoiceSharedWaitTests.kt` | 8 (`VoiceWorkCoordinator.sharedWaitForIdle` now refuses an already-cancelled caller, as iOS's guard does) | – | – |
+| `VoiceTurnStampTests.swift` | `VoiceTurnStampTests.kt` | 13 | – | – |
 | `LiveCallCoordinatorTests.swift` | `LiveCallCoordinatorTests.kt` | 26 | – | – (12 re-ported from f657969b, 14 moved unchanged). iOS sleeps reconnect/rotation/uplink/keepalive delays on the wall clock; Kotlin sleeps them on the one `Clock`, so the 3 tests whose answer waits for a replacement socket advance the retry delay (`retryDelayPasses`, 10 ms) before waiting for it |
 | `VoiceSessionToolsTests.swift` (+`VoiceModelToolsTests`) | `VoiceSessionToolsTests.kt` | 24 | `homePublishesTheDrawerState…` (drawer), `theScreenFollowsOnlyItsOwnSessionsSwitch` (`:feature:session`), both ported there | – |
 | `FloatingCallModelTests.swift` | `FloatingCallModelTests.kt` | 14 | `canStartCallFromTap` half of `tapIntoProjectPicker…`, `ComposerTunables.bottomGap` (`:feature:session`, ported there) | Preset/registry parts of 3 tunables tests (tuning store not ported); 8 `TestWindowHost`/SessionView hosting tests (`onlyTopSessionViewDrivesCallTrayController`, `callTrayReserveGlides…`, `callTrayOverlayResetsReserve…`, `pushingAndPoppingSubagent…`, two `subagentStartedCall…`, `subagentPopDuringEnding…`, `growModelListCloseAndReset…`) Sync: iOS 58507d6c/64ff3ed7 moved `stylePresets…`, `theOrbRestsAboveTheComposer…` and `theExperimentIsOffByDefault` to `FloatingOrbTests` and 19f4d63c dropped the face tests (`feelPresets…`, `thinkingTurnsTheFigures…`, `everyDotTake…`, `playgroundScenes…`); deleted here with them. |
@@ -166,4 +166,4 @@ exception class instead of its reason and turned cancellation into an engine err
 that failed when an interruption ended was never retried by the next route/configuration change;
 a just-finished call log was missing from `list()` while its save was still writing; End landed 2 dp left of the call button (48 dp slot kept the 6 dp padding); a reconnect or rotation replayed the connect chord; `RetryBudget.bounded` (`:server`) timed its limit on the scripted clock, so a lost send's answer was never read back; a cancelled speaker ramp re-sent an unchanged 1.0 gain (iOS only sets a changed volume) and a fallback to the built-in output was noted as “Route changed” instead of the ear's route; every call start re-sent its initial ear to the audio (iOS only re-applies one that changed while the audio started).
 
-Total: 553 voice tests (Gradle), all passing. Robolectric (test-only) runs only `VoiceCallTeardownFrameworkTests`.
+Total: 598 voice tests (Gradle), all passing. Robolectric (test-only) runs only `VoiceCallTeardownFrameworkTests`.
