@@ -1,5 +1,6 @@
 package ai.opencode.feature.session
 
+import ai.opencode.feature.composer.RequestDockFeature
 import ai.opencode.feature.composer.SharedLocation
 import ai.opencode.feature.composer.AutocompleteItem
 import ai.opencode.feature.composer.ComposerCommandResult
@@ -77,21 +78,61 @@ internal fun SessionFeature.reduceSending(state: State, action: Action): Reduced
         }
 
         is Action.FailedSendRetryTapped -> {
-            val id = action.id
-            val failed = state.failedSends.withID(id) ?: return Reduced(state)
+            // A move on its way sends it again once the session has moved.
+            if (state.movingFailedSendID != null) return Reduced(state)
+            val failed = state.failedSends.withID(action.id) ?: return Reduced(state)
             if (state.session == null && state.draftProject == null) return Reduced(state)
             haptics.play(Haptic.tap)
-            // It goes again from its own place in the outbox, ahead of the sends that waited behind
-            // it. In an idle session its bubble stays where it is; mid-run it becomes a pending row again.
-            val next = removeFailedSend(id, state, leavesOutbox = false, keepsBubble = !state.isRunning)
-            // The same ID and delivery: the server admits an ID once, so a send that landed after all can't arrive twice.
-            val pending = failed.pending
-            return submit(
-                messageID = id, text = pending.text, attachments = pending.attachments, files = pending.files,
-                delivery = pending.delivery, page = pending.page, mentions = pending.mentions, chips = pending.chips,
-                isRetry = true, state = next,
+            return retry(failed, state)
+        }
+
+        is Action.FailedSendMoveTapped -> {
+            val id = action.id
+            if (state.movingFailedSendID != null) return Reduced(state)
+            val failed = state.failedSends.withID(id)?.takeIf { it.isFolderGone } ?: return Reduced(state)
+            val session = state.session ?: return Reduced(state)
+            val target = state.missingFolderMoveTarget ?: return Reduced(state)
+            haptics.play(Haptic.tap)
+            val server = state.server
+            AppLog.send.notice { "$id: ${session.id}'s folder is gone, moving it to its project's folder" }
+            return Reduced(
+                state.copy(movingFailedSendID = id),
+                Effect.run<Action> { send ->
+                    try {
+                        openCodeClient.moveSession(server, session.id, target.directory)
+                        send(Action.MissingFolderMoved(sessionID = session.id, messageID = failed.id, directory = target.directory))
+                    } catch (error: OpenCodeClientError) {
+                        send(Action.MissingFolderMoveFailed(sessionID = session.id, messageID = failed.id, error = error))
+                    }
+                }.cancellable(SessionFeature.CancelID.MissingFolderMove, cancelInFlight = true),
             )
         }
+
+        is Action.MissingFolderMoved -> {
+            var next = state
+            if (next.movingFailedSendID == action.messageID) next = next.copy(movingFailedSendID = null)
+            AppLog.send.notice { "${action.sessionID} moved to its project's folder" }
+            // The server's move event says the same; the send can't wait for it.
+            val moved = sessionMoved(action.sessionID, action.directory, next)
+            val failed = moved.state.failedSends.withID(action.messageID)
+            if (moved.state.session?.id != action.sessionID || failed == null) return moved
+            val retried = retry(failed, moved.state)
+            return Reduced(retried.state, Effect.merge(moved.effect, retried.effect))
+        }
+
+        is Action.MissingFolderMoveFailed -> {
+            var next = state
+            if (next.movingFailedSendID == action.messageID) next = next.copy(movingFailedSendID = null)
+            if (next.session?.id != action.sessionID || next.failedSends.withID(action.messageID) == null) return Reduced(next)
+            AppLog.send.error { "${action.sessionID} couldn’t move to its project's folder: ${action.error.logSummary}" }
+            next = next.copy(
+                failedSends = next.failedSends.map { if (it.id == action.messageID) it.copy(reason = FailedSend.moveFailedReason) else it },
+            )
+            haptics.play(Haptic.error)
+            return Reduced(next)
+        }
+
+        is Action.SessionMoved -> return sessionMoved(action.sessionID, action.directory, state)
 
         is Action.FailedSendEditTapped -> {
             val failed = state.failedSends.withID(action.id) ?: return Reduced(state)
@@ -916,8 +957,45 @@ internal fun pick(model: OpenCodeModelRef, state: State): State {
 }
 
 /** Retry, Edit, and Delete all take the failed bubble away first. Edit and Delete also take it out of the outbox, so the sends behind it go on. */
+/**
+ * Sends a failed message again from its own place in the outbox, ahead of the sends that waited
+ * behind it. In an idle session its bubble stays where it is; mid-run it becomes a pending row again.
+ */
+internal fun SessionFeature.retry(failed: FailedSend, state: State): Reduced<State, Action> {
+    val next = removeFailedSend(failed.id, state, leavesOutbox = false, keepsBubble = !state.isRunning)
+    // The same ID and delivery: the server admits an ID once, so a send that landed after all can't arrive twice.
+    val pending = failed.pending
+    return submit(
+        messageID = failed.id, text = pending.text, attachments = pending.attachments, files = pending.files,
+        delivery = pending.delivery, page = pending.page, mentions = pending.mentions, chips = pending.chips,
+        isRetry = true, state = next,
+    )
+}
+
+/**
+ * [sessionID] now lives in [directory]. On its own screen, what was read in the old folder
+ * (requests, models, shells) is read again in the new one, and a read already on its way keeps
+ * the new folder.
+ */
+internal fun SessionFeature.sessionMoved(sessionID: String, directory: String, state: State): Reduced<State, Action> {
+    var next = state
+    val index = next.familySessions.indexOfFirst { it.id == sessionID }
+    if (index >= 0 && next.familySessions[index].directory != directory) {
+        next = next.copy(familySessions = next.familySessions.toMutableList().also { it[index] = it[index].copy(directory = directory) })
+    }
+    // iOS also tells the voice state (`voice?.sessionMoved`); VoiceFeature.State has no move yet.
+    val session = next.session
+    if (session?.id != sessionID || session.directory == directory) return Reduced(next)
+    next = next.copy(session = session.copy(directory = directory), refresh = next.refresh?.copy(directoryChanged = true))
+    val pending = startPendingWork(next, RequestDockFeature.State.LoadAttempt.Initial)
+    val models = if (pending.state.models.isEmpty()) reloadModels(pending.state) else Reduced(pending.state)
+    val shells = refreshShells(models.state)
+    return Reduced(shells.state, Effect.merge(pending.effect, models.effect, shells.effect))
+}
+
 private fun SessionFeature.removeFailedSend(id: String, state: State, leavesOutbox: Boolean = true, keepsBubble: Boolean = false): State {
     var next = state.copy(failedSends = state.failedSends.filterNot { it.id == id })
+    if (next.movingFailedSendID == id) next = next.copy(movingFailedSendID = null)
     if (!keepsBubble) {
         next = next.copy(
             queuedPicks = next.queuedPicks - id,

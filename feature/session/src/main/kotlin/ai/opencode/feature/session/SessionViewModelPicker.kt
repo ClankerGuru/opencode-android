@@ -96,8 +96,8 @@ internal fun SessionFeature.State.modelPickerState(
     showsAllModels = showsAllModels,
 )
 
-/** The `SessionFeature` action a picker event stands for. */
-internal fun modelPickerAction(event: ModelPickerEvent): SessionFeature.Action = when (event) {
+/** The `SessionFeature` action a picker event stands for; null when none does. */
+internal fun modelPickerAction(event: ModelPickerEvent): SessionFeature.Action? = when (event) {
     is ModelPickerEvent.ModelPicked -> SessionFeature.Action.ModelPicked(event.model)
     is ModelPickerEvent.ModelPickedWithLevel -> SessionFeature.Action.ModelPickedWithLevel(event.model, event.level, event.ticked)
     is ModelPickerEvent.ModelLevelPicked -> SessionFeature.Action.ModelLevelPicked(event.model, event.level)
@@ -105,7 +105,8 @@ internal fun modelPickerAction(event: ModelPickerEvent): SessionFeature.Action =
     is ModelPickerEvent.VariantPicked -> SessionFeature.Action.VariantPicked(event.variant)
     is ModelPickerEvent.ToggleFavoriteModel -> SessionFeature.Action.ToggleFavoriteModel(event.model)
     is ModelPickerEvent.FilterChanged -> SessionFeature.Action.Binding(BindingAction.ModelFilter(event.text))
-    ModelPickerEvent.ModelSearchSubmitted -> SessionFeature.Action.ModelSearchSubmitted
+    // Never sent; iOS 8069f6e9 removed the reducer action as dead.
+    ModelPickerEvent.ModelSearchSubmitted -> null
     ModelPickerEvent.ShowAllModelsToggled -> SessionFeature.Action.ShowAllModelsToggled
     ModelPickerEvent.ModelListOpened -> SessionFeature.Action.ModelListOpened
     ModelPickerEvent.ModelListClosed -> SessionFeature.Action.ModelListClosed
@@ -153,7 +154,7 @@ internal fun rememberModelPickerState(store: StoreOf<SessionFeature.State, Sessi
 fun SessionModelPicker(store: StoreOf<SessionFeature.State, SessionFeature.Action>) {
     val styleSetting by remember { shared(ModelPickerStyle.key) }.flow.collectAsState()
     val state = rememberModelPickerState(store)
-    val onEvent: (ModelPickerEvent) -> Unit = { store.send(modelPickerAction(it)) }
+    val onEvent: (ModelPickerEvent) -> Unit = { event -> modelPickerAction(event)?.let(store::send) }
     when (ModelPickerStyle.active(styleSetting)) {
         ModelPickerStyle.today -> PlainModelPickerSheet(state, onEvent)
         ModelPickerStyle.sheet -> ModelPickerSheet(state, onEvent)
@@ -562,7 +563,7 @@ internal fun SessionModelPickerOverlays(
     Box(Modifier.fillMaxSize().onGloballyPositioned { screenTop = it.boundsInRoot().top })
     if (!grows) return
     val state = rememberModelPickerState(store)
-    val onEvent: (ModelPickerEvent) -> Unit = { store.send(modelPickerAction(it)) }
+    val onEvent: (ModelPickerEvent) -> Unit = { event -> modelPickerAction(event)?.let(store::send) }
 
     // Always mounted while it can open, so opening grows it from the composer.
     val composer = host.attachmentAnchors.composer

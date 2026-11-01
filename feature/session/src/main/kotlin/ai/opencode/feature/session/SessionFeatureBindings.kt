@@ -131,9 +131,10 @@ internal fun SessionFeature.reduceCallAndBindings(state: State, action: Action):
         if (state.session?.id != action.sessionID) {
             Reduced(state)
         } else {
+            // Spoken into the session, it reads what's above it, as a send does.
             // Reuse the outbox's delivery/echo guards: an early SSE delivery stays delivered, and a
             // late admission never duplicates an existing row.
-            val restored = restoreOutbox(state)
+            val restored = restoreOutbox(state.noteOwnSend())
             Reduced(
                 restored.state,
                 Effect.merge(

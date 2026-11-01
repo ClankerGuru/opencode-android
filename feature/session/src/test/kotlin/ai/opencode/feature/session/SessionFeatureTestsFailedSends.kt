@@ -5,6 +5,7 @@ import ai.opencode.core.dependencies.ImmediateClock
 import ai.opencode.core.dependencies.TestClock
 import ai.opencode.core.dependencies.UuidClient
 import ai.opencode.core.store.TestStore
+import ai.opencode.feature.composer.RequestDockFeature
 import ai.opencode.feature.composer.PendingPrompt
 import ai.opencode.feature.composer.UndeliveredPrompts
 import ai.opencode.feature.session.FailedSendsSupport.expectOptimisticSend
@@ -25,6 +26,9 @@ import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.ServerIDClient
 import ai.opencode.server.model.OpenCodeDelivery
+import ai.opencode.server.model.OpenCodeModelCatalog
+import ai.opencode.server.model.OpenCodePendingRequests
+import ai.opencode.server.model.OpenCodeProject
 import ai.opencode.server.model.OpenCodeOutgoingAttachment
 import ai.opencode.server.model.OpenCodePendingInput
 import ai.opencode.server.model.OpenCodeTranscriptItem
@@ -32,6 +36,7 @@ import ai.opencode.server.retry.TransportFailure
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.awaitCancellation
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -52,6 +57,7 @@ class SessionFeatureTestsFailedSends {
         kept: UndeliveredPrompts = UndeliveredPrompts(),
         attempts: LockIsolated<List<Pair<String, OpenCodeDelivery>>>,
         serverHasIt: LockIsolated<Boolean> = LockIsolated(false),
+        moveSession: suspend (sessionID: String, directory: String) -> Unit = { _, _ -> },
         attempt: (Int) -> Unit,
     ): TestStore<State, Action> = store(state) {
         this[UuidClient] = UuidClient.incrementing()
@@ -72,6 +78,8 @@ class SessionFeatureTestsFailedSends {
             transcript = { _, _, _ -> awaitCancellation() },
             runningShells = { _, _ -> emptyList() },
             familyPendingRequests = { _, _, _ -> throw OpenCodeClientError("Offline") },
+            modelCatalog = { _, _ -> OpenCodeModelCatalog(models = emptyList(), defaultModel = null) },
+            moveSession = { _, sessionID, directory -> moveSession(sessionID, directory) },
             // The reply's wait isn't part of these tests.
             waitForIdle = { _, _ -> awaitCancellation() },
         )
@@ -163,6 +171,236 @@ class SessionFeatureTestsFailedSends {
         assertEquals("No further POST", tried, attempts.value.size)
         assertTrue(store.state.failedSends.isEmpty())
         assertEquals(listOf(OpenCodeTranscriptItem.UserText(id = sentID, text = "hello")), store.state.items)
+        h.skipInFlightEffects()
+    }
+
+    private val folderGone = OpenCodeClientError(OpenCodeClientError.FOLDER_GONE_MESSAGE, statusCode = 404)
+
+    /** A session in a worktree that was removed, whose project lives on. */
+    private fun Harness.folderGoneState(): State =
+        makeState(session = testSession(directory = "/work/linked"), draft = "hello")
+            .copy(projects = listOf(OpenCodeProject(id = "p", name = "repo", directory = "/work/repo")))
+
+    private suspend fun expectFolderGoneFailure(store: TestStore<State, Action>, sessionID: String) {
+        store.send(Action.SendTapped) { it.expectOptimisticSend() }
+        store.receive(Action.PromptFailed::class) {
+            it.copy(
+                promptStates = emptyMap(),
+                isAwaitingReply = false,
+                failedSends = listOf(
+                    FailedSend(
+                        pending = PendingPrompt(messageID = sentID, text = "hello", attachments = emptyList(), requestEpoch = 1),
+                        reason = OpenCodeClientError.FOLDER_GONE_MESSAGE,
+                    ),
+                ),
+            )
+        }
+        store.receive(Action.AcceptedTranscriptUpdated(sessionID = sessionID, items = emptyList()))
+    }
+
+    private fun State.movedTo(directory: String): State = copy(
+        session = session?.copy(directory = directory),
+        familySessions = familySessions.mapIndexed { index, it -> if (index == 0) it.copy(directory = directory) else it },
+    )
+
+    @Test fun aSessionWhoseFolderIsGoneMovesToItsProjectAndSendsAgain() = sessionTest { h ->
+        val attempts = LockIsolated(listOf<Pair<String, OpenCodeDelivery>>())
+        val moves = LockIsolated(listOf<String>())
+        val store = h.failedSendStore(
+            h.folderGoneState(),
+            attempts = attempts,
+            moveSession = { sessionID, directory -> moves.append("$sessionID → $directory") },
+        ) { count ->
+            if (count == 1) throw folderGone
+        }
+
+        expectFolderGoneFailure(store, sessionID = "ses_1")
+        assertEquals(true, store.state.failedSends.firstOrNull()?.isFolderGone)
+        assertEquals("/work/repo", store.state.missingFolderMoveTarget?.directory)
+
+        store.send(Action.FailedSendMoveTapped(sentID)) { it.copy(movingFailedSendID = sentID) }
+        // The send goes again under its own ID once the session has moved.
+        store.exhaustive = false
+        store.receive(Action.MissingFolderMoved(sessionID = "ses_1", messageID = sentID, directory = "/work/repo")) {
+            // Requests, models, and shells are read again in the new folder.
+            it.movedTo("/work/repo")
+                .withRequestLoadAttempt(RequestDockFeature.State.LoadAttempt.Initial)
+                .copy(
+                    movingFailedSendID = null,
+                    pendingWorkPollSeconds = 2,
+                    isLoadingModels = true,
+                    failedSends = emptyList(),
+                    isAwaitingReply = true,
+                    promptStates = it.promptStates + (sentID to State.PromptState(requestEpoch = 2)),
+                )
+        }
+        store.receive(Action.PromptAdmitted(sessionID = "ses_1", messageID = sentID, requestEpoch = 2))
+        assertEquals(listOf("ses_1 → /work/repo"), moves.value)
+        assertEquals(listOf(sentID, sentID), attempts.value.map { it.first })
+        assertNull("Already in its project's folder", store.state.missingFolderMoveTarget)
+        h.skipInFlightEffects()
+    }
+
+    @Test fun aSessionWithNowhereToMoveOffersOnlyRetry() = sessionTest { h ->
+        // Its project's folder is the one that's gone.
+        val state = h.folderGoneState().copy(projects = listOf(OpenCodeProject(id = "p", name = "linked", directory = "/work/linked")))
+        val store = h.failedSendStore(state, attempts = LockIsolated(emptyList())) { throw folderGone }
+
+        expectFolderGoneFailure(store, sessionID = "ses_1")
+        assertNull(store.state.missingFolderMoveTarget)
+        store.send(Action.FailedSendMoveTapped(sentID))
+    }
+
+    /** A move on its way holds Move to and Retry, and a failed move keeps offering Move to once settled. */
+    @Test fun aMoveOnItsWayHoldsAnotherMoveAndRetry() = sessionTest { h ->
+        val attempts = LockIsolated(listOf<Pair<String, OpenCodeDelivery>>())
+        val moves = LockIsolated(0)
+        val gate = CompletableDeferred<Unit>()
+        val store = h.failedSendStore(
+            h.folderGoneState(),
+            attempts = attempts,
+            moveSession = { _, _ ->
+                val count = moves.withValue { (it + 1).let { next -> next to next } }
+                if (count == 1) gate.await()
+                throw OpenCodeClientError("Directory does not exist: /work/repo", statusCode = 400)
+            },
+        ) { throw folderGone }
+
+        expectFolderGoneFailure(store, sessionID = "ses_1")
+        store.send(Action.FailedSendMoveTapped(sentID)) { it.copy(movingFailedSendID = sentID) }
+        store.send(Action.FailedSendMoveTapped(sentID))
+        store.send(Action.FailedSendRetryTapped(sentID))
+        gate.complete(Unit)
+        store.receive(Action.MissingFolderMoveFailed::class) {
+            it.copy(
+                movingFailedSendID = null,
+                failedSends = it.failedSends.map { failed -> if (failed.id == sentID) failed.copy(reason = "Couldn’t move session") else failed },
+            )
+        }
+        assertEquals(1, moves.value)
+        assertEquals("Retry waited for the move", 1, attempts.value.size)
+        assertEquals(true, store.state.failedSends.firstOrNull { it.id == sentID }?.isFolderGone)
+        assertEquals("/work/linked", store.state.session?.directory)
+
+        // Settled, it can move again.
+        store.send(Action.FailedSendMoveTapped(sentID)) { it.copy(movingFailedSendID = sentID) }
+        store.receive(Action.MissingFolderMoveFailed::class) { it.copy(movingFailedSendID = null) }
+        assertEquals(2, moves.value)
+    }
+
+    /** Deleted while its move is on its way: the session still moves, and nothing is sent. */
+    @Test fun deletingTheMovingSendLetsTheMoveFinishWithoutSending() = sessionTest { h ->
+        val attempts = LockIsolated(listOf<Pair<String, OpenCodeDelivery>>())
+        val gate = CompletableDeferred<Unit>()
+        val store = h.failedSendStore(h.folderGoneState(), attempts = attempts, moveSession = { _, _ -> gate.await() }) {
+            throw folderGone
+        }
+
+        expectFolderGoneFailure(store, sessionID = "ses_1")
+        store.send(Action.FailedSendMoveTapped(sentID)) { it.copy(movingFailedSendID = sentID) }
+        store.send(Action.FailedSendDeleteTapped(sentID)) {
+            it.copy(movingFailedSendID = null, failedSends = emptyList(), items = emptyList(), optimisticPromptIDs = emptySet())
+        }
+        store.receive(Action.AcceptedTranscriptUpdated(sessionID = "ses_1", items = emptyList()))
+        store.exhaustive = false
+        gate.complete(Unit)
+        store.receive(Action.MissingFolderMoved(sessionID = "ses_1", messageID = sentID, directory = "/work/repo")) {
+            it.movedTo("/work/repo")
+                .withRequestLoadAttempt(RequestDockFeature.State.LoadAttempt.Initial)
+                .copy(pendingWorkPollSeconds = 2, isLoadingModels = true)
+        }
+        assertEquals("Nothing sent", 1, attempts.value.size)
+        h.skipInFlightEffects()
+    }
+
+    /**
+     * Moved by the server (or another screen's Move to): what was read in the old folder is read
+     * again in the new one, which clears a failed request read.
+     *
+     * iOS also expects `requestArrivalsAreLive = true` once requests land; that flag is the
+     * composer area's (`RequestDockFeature`) and isn't ported yet.
+     */
+    @Test fun aMovedSessionRereadsRequestsModelsAndShellsInItsNewFolder() = sessionTest { h ->
+        val reads = LockIsolated(listOf<String>())
+        val requestsGate = CompletableDeferred<Unit>()
+        val modelsGate = CompletableDeferred<Unit>()
+        val shellsGate = CompletableDeferred<Unit>()
+        val state = h.makeState(session = testSession(directory = "/work/linked"))
+            .copy(streamIsHealthy = true)
+            .withRequestLoadError("Couldn’t load requests")
+            .withRequestFailureAwaitingReconnect(true)
+        val store = h.store(state) {
+            this[OpenCodeClient] = this[OpenCodeClient].copy(
+                familyPendingRequests = { _, _, directory ->
+                    reads.append("requests $directory")
+                    requestsGate.await()
+                    OpenCodePendingRequests(permissions = emptyList())
+                },
+                pendingInputs = { _, _ -> emptyList() },
+                modelCatalog = { _, directory ->
+                    reads.append("models ${directory ?: "none"}")
+                    modelsGate.await()
+                    OpenCodeModelCatalog(models = emptyList(), defaultModel = null)
+                },
+                runningShells = { _, directory ->
+                    reads.append("shells $directory")
+                    shellsGate.await()
+                    emptyList()
+                },
+            )
+        }
+
+        store.send(Action.SessionMoved(sessionID = "ses_1", directory = "/work/repo")) {
+            it.movedTo("/work/repo")
+                .withRequestLoadAttempt(RequestDockFeature.State.LoadAttempt.Initial)
+                .withRequestLoadError(null)
+                .copy(pendingWorkPollSeconds = 12, isLoadingModels = true)
+        }
+        store.receive(Action.PendingInputsRequested(sessionID = "ses_1"))
+        store.receive(Action.PendingInputsResponse(sessionID = "ses_1", inputs = emptyList()))
+        requestsGate.complete(Unit)
+        store.receive(Action.PendingRequestsResponse(sessionID = "ses_1", result = Result.success(OpenCodePendingRequests(permissions = emptyList())))) {
+            it.withRequestLoadAttempt(null).withRequestFailureAwaitingReconnect(false)
+        }
+        modelsGate.complete(Unit)
+        store.receive(Action.ModelsResponse(Result.success(OpenCodeModelCatalog(models = emptyList(), defaultModel = null)))) {
+            it.copy(isLoadingModels = false)
+        }
+        shellsGate.complete(Unit)
+        store.receive(Action.ShellsResponse(sessionID = "ses_1", result = Result.success(emptyList())))
+        assertEquals(listOf("models /work/repo", "requests /work/repo", "shells /work/repo"), reads.value.sorted())
+
+        // Already there: the server's event after this phone's move changes nothing.
+        store.send(Action.SessionMoved(sessionID = "ses_1", directory = "/work/repo"))
+        h.skipInFlightEffects()
+    }
+
+    /**
+     * A read on its way when the session moved, or a message read carrying the copy it started
+     * with, never takes the session back to the old folder.
+     */
+    @Test fun aReadThatPredatesTheMoveKeepsTheNewFolder() = sessionTest { h ->
+        val state = h.makeState(session = testSession(directory = "/work/repo"))
+            .copy(refresh = State.Refresh(id = 1, reason = RefreshReason.Invalidation, directoryChanged = true))
+        val store = h.store(state)
+        store.exhaustive = false
+
+        store.send(
+            Action.RefreshResponse(
+                sessionID = "ses_1",
+                requestID = 1,
+                result = Result.success(
+                    SessionFeature.AuthoritativeRefresh(
+                        observed = testSession(directory = "/work/linked"),
+                        items = emptyList(),
+                        scope = SessionFeature.AuthoritativeRefresh.Scope.Page,
+                        observedIsRead = true,
+                    ),
+                ),
+            ),
+        )
+        assertEquals("/work/repo", store.state.session?.directory)
+        assertEquals(listOf("/work/repo"), store.state.familySessions.map { it.directory })
         h.skipInFlightEffects()
     }
 

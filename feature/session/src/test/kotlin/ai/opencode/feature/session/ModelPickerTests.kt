@@ -308,7 +308,16 @@ class ModelPickerTests {
         initial.modelVariants.set(mapOf(argon.id to "low"))
 
         val store = h.store(initial)
-        store.send(Action.ModelSearchSubmitted) {
+        val resolved = checkNotNull(
+            ModelSearch.resolvePick(
+                store.state.models,
+                query = store.state.modelFilter,
+                favorites = store.state.favoriteModelIDs.value,
+                recents = store.state.recentModelIDs.value,
+            ),
+        )
+        val level = if (resolved.hasExplicitLevel) resolved.variant else store.state.rememberedLevel(resolved.model)
+        store.send(Action.ModelPickedWithLevel(resolved.model, level)) {
             it.copy(currentModel = argon.ref(variant = "high"), pendingModel = argon.ref(variant = "high"))
         }
         assertEquals(listOf(argon.id), store.state.recentModelIDs.value)

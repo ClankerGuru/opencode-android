@@ -1072,14 +1072,31 @@ val State.favoriteModels: List<OpenCodeModel> get() = filteredModels.filter { it
 
 val State.unfavoriteModels: List<OpenCodeModel> get() = filteredModels.filter { it.id !in favoriteModelIDs.value }
 
-val State.filteredProjects: List<OpenCodeProject> get() = projects.filtered(projectFilter) { listOf(it.name, it.directory) }
+val State.filteredProjects: List<OpenCodeProject> get() = uniqueProjects.filtered(projectFilter) { listOf(it.name, it.directory) }
+
+/** Each folder once, most recent first: the server can list one folder under more than one project. */
+private val State.uniqueProjects: List<OpenCodeProject>
+    get() {
+        val directories = HashSet<String>()
+        return projects.filter { directories.add(it.directory) }
+    }
+
+/**
+ * Where a session whose folder is gone can move: its project's folder, when that's somewhere
+ * else and isn't the home folder (iOS `missingFolderMoveTarget`).
+ */
+val State.missingFolderMoveTarget: OpenCodeProject?
+    get() {
+        val session = session ?: return null
+        val project = SessionListContext.project(session, projects) ?: return null
+        if (project.directory == session.directory || project.isHomeFolder) return null
+        return project
+    }
 
 /** The projects a draft lists above its composer: the five most recent, with the chosen one first when it isn't among them. */
 val State.recentProjects: List<OpenCodeProject>
     get() {
-        val directories = HashSet<String>()
-        val unique = projects.filter { directories.add(it.directory) }
-        val recent = unique.take(State.recentProjectLimit)
+        val recent = uniqueProjects.take(State.recentProjectLimit)
         val chosen = draftProject ?: return recent
         if (recent.any { it.id == chosen.id || it.directory == chosen.directory }) return recent
         return listOf(chosen) + recent.take(State.recentProjectLimit - 1)

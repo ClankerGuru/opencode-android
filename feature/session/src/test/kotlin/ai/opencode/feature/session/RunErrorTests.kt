@@ -758,6 +758,7 @@ class RunErrorTests {
                     familyTranscriptCache = it.familyTranscriptCache + ("ses_2" to emptyList()),
                     session = restoredSession,
                     items = items,
+                    newMessagesBaseline = items.map { item -> item.id }.toSet(),
                     runWorkGeneration = 2,
                     historyGeneration = 2,
                     earlierHistoryGeneration = 2,

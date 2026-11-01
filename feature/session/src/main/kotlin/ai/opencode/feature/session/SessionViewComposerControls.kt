@@ -154,7 +154,7 @@ private fun SessionComposerEnv.ModelButton(enabled: Boolean) {
                 state = picker,
                 anchors = anchors,
                 composerTop = host.attachmentAnchors.composer.top,
-                onEvent = { store.send(modelPickerAction(it)) },
+                onEvent = { event -> modelPickerAction(event)?.let(store::send) },
                 // iOS `openModelList`: the list grows out of the composer as the sheet it morphs into.
                 onOpenList = {
                     if (host.modelPanels != null) {

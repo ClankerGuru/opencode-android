@@ -164,6 +164,8 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         val session: OpenCodeSession? = null,
         val draftProject: OpenCodeProject? = null,
         val projects: List<OpenCodeProject> = emptyList(),
+        /** A new computer's first session offers these until composing retires them (iOS `starterPrompts`). */
+        val starterPrompts: List<String> = emptyList(),
         val items: List<OpenCodeTranscriptItem> = emptyList(),
         val isLoading: Boolean = false,
         val initialTranscriptRequestIsExternal: Boolean = false,
@@ -243,6 +245,8 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         val deliveryOverrides: Map<String, OpenCodeDelivery> = emptyMap(),
         /** Sends the server never took, in the order they failed. */
         val failedSends: List<FailedSend> = emptyList(),
+        /** The failed send whose Move to is on its way; Move to and Retry wait. */
+        val movingFailedSendID: String? = null,
         /** Prompt IDs whose client-rendered parts have not appeared in an authoritative window yet. */
         val optimisticPromptIDs: Set<String> = emptySet(),
         /** Durable per-message echoes waiting for a page that includes them. */
@@ -447,6 +451,7 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
             fun session(
                 server: OpenCodeServer,
                 session: OpenCodeSession,
+                projects: List<OpenCodeProject> = emptyList(),
                 cachedItems: List<OpenCodeTranscriptItem>? = null,
                 initialTranscriptRequestIsExternal: Boolean = false,
                 isRunning: Boolean = false,
@@ -459,6 +464,8 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
                     navigationID = navigationID,
                     visit = visit ?: navigationID,
                     session = session,
+                    // Every screen knows its projects, so a session whose folder is gone can offer a move.
+                    projects = projects,
                     familySessions = listOf(session),
                     familyRootID = session.id,
                     activeFamilySessionIDs = if (isRunning) setOf(session.id) else emptySet(),
@@ -650,8 +657,6 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         data class ModelLevelPicked(val model: OpenCodeModel, val level: String?) : Action
         /** Scrubs or adjusts a model's remembered reasoning level in place. */
         data class ModelRowLevelChanged(val model: OpenCodeModel, val level: String?) : Action
-        /** Return in the picker's search field: picks the top match and any level word. */
-        data object ModelSearchSubmitted : Action
         /** A reasoning variant for the current model; null is its default. */
         data class VariantPicked(val variant: String?) : Action
         data class ToggleFavoriteModel(val model: OpenCodeModel) : Action
@@ -670,6 +675,8 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         data class ProjectPicked(val project: OpenCodeProject) : Action
         /** A recent project above a draft's composer was tapped. */
         data class DraftProjectTapped(val project: OpenCodeProject) : Action
+        /** A starter prompt was tapped: it's typed into the composer, not sent. */
+        data class StarterPromptTapped(val text: String) : Action
         /** Swaps the family member on screen in place. */
         data class FamilyPicked(val sessionID: String) : Action
         /** A subagent's card or row was tapped: Home pushes it over this screen. */
@@ -703,6 +710,12 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         /** Put a failed message's text and attachments back in the composer. */
         data class FailedSendEditTapped(val id: String) : Action
         data class FailedSendDeleteTapped(val id: String) : Action
+        /** Folder gone: move to `missingFolderMoveTarget`, then send again. */
+        data class FailedSendMoveTapped(val id: String) : Action
+        data class MissingFolderMoved(val sessionID: String, val messageID: String, val directory: String) : Action
+        data class MissingFolderMoveFailed(val sessionID: String, val messageID: String, val error: OpenCodeClientError) : Action
+        /** A family session now lives in [directory] (this phone's move or `session.moved`). */
+        data class SessionMoved(val sessionID: String, val directory: String) : Action
         /** A run error's action: Try Again, Edit, Compact, or Switch Model. */
         data class RunErrorActionTapped(val action: OpenCodeRunError.Action) : Action
         /** Edit's undo landed (or failed): the message's words go back to the composer. */
@@ -915,6 +928,7 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         data object FamilyRefresh : CancelID
         data object Shells : CancelID
         data object Revert : CancelID
+        data object MissingFolderMove : CancelID
         data class Interrupt(val generation: Int) : CancelID
         data class InterruptSettle(val generation: Int) : CancelID
         data class RunEndCheck(val generation: Int) : CancelID
@@ -1141,6 +1155,9 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
             // A pending request takes the composer as its answer and gives it back as it was
             // (D-31 B); paging or switching requests moves the bar's words.
             .onChange({ it.answerContext }) { old, _, state -> reconcileAnswering(old, state) }
+            .onChange({ it.composingRetiresStarterPrompts }) { _, _, state ->
+                Reduced(if (state.composingRetiresStarterPrompts) state.copy(starterPrompts = emptyList()) else state)
+            }
             .onChange({ it.persistedComposerWatch }) { old, _, state -> reconcilePersistedComposer(old, state) }
             // Each admission and answer of a voice prompt re-reads the pinned session and retunes
             // the watchdog, as a typed send and its reply do.

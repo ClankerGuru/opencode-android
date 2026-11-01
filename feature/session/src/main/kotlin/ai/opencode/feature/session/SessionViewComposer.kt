@@ -324,6 +324,7 @@ internal data class ComposerSnapshot(
     val settledRequestLoadError: String?,
     val canChooseProject: Boolean,
     val recentProjects: List<OpenCodeProject>,
+    val starterPrompts: List<String>,
     val draftProject: OpenCodeProject?,
     val dockResponding: Boolean,
     val composerFocusRequest: Int,
@@ -373,6 +374,7 @@ internal data class ComposerSnapshot(
                 settledRequestLoadError = state.settledRequestLoadError,
                 canChooseProject = state.canChooseProject,
                 recentProjects = state.recentProjects,
+                starterPrompts = state.starterPrompts,
                 draftProject = state.draftProject,
                 dockResponding = dock != null && dock in state.respondingRequestIDs,
                 composerFocusRequest = state.composerFocusRequest,
@@ -695,6 +697,9 @@ internal class SessionComposerEnv(
     /** iOS `showsDraftProjects`: a draft lists its recent projects above the composer until its first send leaves. */
     val showsDraftProjects: Boolean get() = s.canChooseProject && !host.isCatchUpCard
 
+    /** iOS `showsStarterPrompts`: the first computer's starter prompts stand above the projects until composing. */
+    val showsStarterPrompts: Boolean get() = s.starterPrompts.isNotEmpty() && !isComposingDraft
+
     /** iOS `isComposingDraft`: composing, the list folds down to the chosen project. */
     val isComposingDraft: Boolean
         get() {
@@ -863,14 +868,19 @@ private fun SessionComposerEnv.DraftProjectsOverlay(modifier: Modifier) {
     ) {
         AnimatedVisibility(visible = showsDraftProjects, enter = enter, exit = exit) {
             HiddenUnderComposerPanel(host.composerPanelCovers, Modifier.hiddenUnderVoiceTranscript(showsCallTranscript)) {
-                DraftProjectList(
-                    identity = s.taskIdentity,
-                    projects = s.recentProjects,
-                    chosen = s.draftProject,
-                    isComposing = isComposingDraft,
-                    onPick = { store.send(Action.DraftProjectTapped(it)) },
-                    onAll = { store.send(Action.ProjectButtonTapped) },
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(StarterPromptTunables.listGap.dp)) {
+                    AnimatedVisibility(visible = showsStarterPrompts, enter = fadeIn(), exit = fadeOut()) {
+                        StarterPromptList(s.starterPrompts, onPick = { store.send(Action.StarterPromptTapped(it)) })
+                    }
+                    DraftProjectList(
+                        identity = s.taskIdentity,
+                        projects = s.recentProjects,
+                        chosen = s.draftProject,
+                        isComposing = isComposingDraft,
+                        onPick = { store.send(Action.DraftProjectTapped(it)) },
+                        onAll = { store.send(Action.ProjectButtonTapped) },
+                    )
+                }
             }
         }
     }
