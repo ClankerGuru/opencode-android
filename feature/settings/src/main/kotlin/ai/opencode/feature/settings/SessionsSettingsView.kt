@@ -12,20 +12,39 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 
 /**
- * Port of iOS `Settings/ComposerSettingsView.swift` (and `DefaultAgentSection` from
- * `Composer/AgentPicker.swift`): Settings › Composer, Return Key Sends and the default agent.
+ * Port of iOS `Settings/SessionsSettingsView.swift` (and `DefaultAgentSection` from
+ * `Composer/AgentPicker.swift`): Settings › Sessions, Transcript (New Messages Divider) above
+ * Composer (Return Key Sends and the default agent). Replaces Settings › Composer (iOS 302b95e7).
  */
 @Composable
-fun ComposerSettingsView(store: SettingsStore) {
+fun SessionsSettingsView(store: SettingsStore) {
+    val newMessagesDivider by remember { shared(ExperimentalFeature.newMessagesDivider.key).flow }.collectAsState()
     val returnKeySends by remember { shared(SharedKeys.returnKeySends).flow }.collectAsState()
     val agentSelection by remember { shared(ExperimentalFeature.agentSelection.key).flow }.collectAsState()
     val defaultAgent by remember { shared(SharedKeys.defaultAgentID).flow }.collectAsState()
     val agents by remember { shared(ServerSharedKeys.knownPrimaryAgents).flow }.collectAsState()
     val send = { action: HomeSettingsFeature.Action -> store.send(SettingsFeature.Action.Settings(action)) }
 
-    SettingsPageScaffold(title = "Composer", store = store) {
+    SettingsPageScaffold(title = "Sessions", store = store) {
+        settingsSection(
+            key = "transcript",
+            header = "Transcript",
+            footer = footerText("A long reply that arrived while you were away opens at a New divider."),
+        ) {
+            SettingsToggleRow(
+                "New Messages Divider",
+                checked = newMessagesDivider,
+                onCheckedChange = {
+                    send(HomeSettingsFeature.Action.ExperimentalFeatureChanged(ExperimentalFeature.newMessagesDivider, it))
+                },
+            )
+        }
         // iOS: “⌘↩︎ always sends.”; Android hardware keyboards send with Ctrl+Enter.
-        settingsSection(key = "return", footer = footerText("Ctrl+Enter always sends on a hardware keyboard.")) {
+        settingsSection(
+            key = "return",
+            header = "Composer",
+            footer = footerText("Ctrl+Enter always sends on a hardware keyboard."),
+        ) {
             SettingsToggleRow(
                 "Return Key Sends",
                 checked = returnKeySends,

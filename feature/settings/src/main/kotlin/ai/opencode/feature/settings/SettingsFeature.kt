@@ -36,7 +36,8 @@ sealed interface SettingsPage {
     data object Server : SettingsPage
     data object Appearance : SettingsPage
     data object Themes : SettingsPage
-    data object Composer : SettingsPage
+    /** Settings › Sessions (iOS `SessionsSettingsView`): the transcript and composer preferences. */
+    data object Sessions : SettingsPage
     /** Settings › Models (experimental `hideModels`). */
     data object Models : SettingsPage
     /** Settings › Models › one provider (`ModelVisibilityProviderView`). */
@@ -56,8 +57,9 @@ sealed interface SettingsPage {
     data object WhatsNewSmallerChanges : SettingsPage
     /** Settings › Server Details (experimental `serverDetails`). */
     data object ServerDetails : SettingsPage
-    /** Settings › Advanced; [focus] scrolls to and tints that experiment's row (What's New). */
-    data class Advanced(val focus: String? = null) : SettingsPage
+    /** Settings › Experimental; [focus] scrolls to and tints that experiment's row (What's New). */
+    data class Experimental(val focus: String? = null) : SettingsPage
+    /** Settings › Developer (iOS `DiagnosticsView`; Android's `:devtools` page). */
     data object Developer : SettingsPage
     data object Playgrounds : SettingsPage
 }
@@ -365,11 +367,11 @@ class SettingsFeature : Reducer<SettingsFeature.State, SettingsFeature.Action> {
 /** The Settings page a What's New action opens (iOS `WhatsNewSettingsPage`). */
 fun WhatsNewEntry.SettingsDestination.settingsPage(): SettingsPage = when (this) {
     WhatsNewEntry.SettingsDestination.Themes -> SettingsPage.Themes
-    WhatsNewEntry.SettingsDestination.Sessions -> SettingsPage.Composer
+    WhatsNewEntry.SettingsDestination.Sessions -> SettingsPage.Sessions
     WhatsNewEntry.SettingsDestination.Voice -> SettingsPage.Voice
     WhatsNewEntry.SettingsDestination.Notifications -> SettingsPage.Notifications
     WhatsNewEntry.SettingsDestination.Servers -> SettingsPage.Server
-    WhatsNewEntry.SettingsDestination.Experimental -> SettingsPage.Advanced()
-    is WhatsNewEntry.SettingsDestination.Experiment -> SettingsPage.Advanced(focus = id)
+    WhatsNewEntry.SettingsDestination.Experimental -> SettingsPage.Experimental()
+    is WhatsNewEntry.SettingsDestination.Experiment -> SettingsPage.Experimental(focus = id)
     WhatsNewEntry.SettingsDestination.Developer -> SettingsPage.Developer
 }

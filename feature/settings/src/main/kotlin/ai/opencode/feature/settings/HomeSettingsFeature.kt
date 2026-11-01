@@ -10,6 +10,10 @@ import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.sharing.SharedKey
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
+import ai.opencode.core.sound.SoundEffect
+import ai.opencode.core.sound.SoundEffectsClient
+import ai.opencode.core.sound.soundEffectsSend
+import ai.opencode.core.sound.soundEffectsVolume
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
@@ -17,7 +21,6 @@ import ai.opencode.core.ui.AppTheme
 import ai.opencode.core.ui.AppearanceColorScheme
 import ai.opencode.core.ui.ThemeSharedKeys
 import ai.opencode.feature.voice.CallVoice
-import ai.opencode.feature.voice.LivingOrbStyle
 import ai.opencode.feature.voice.ServerVoiceClient
 import ai.opencode.feature.voice.ServerVoiceProvider
 import ai.opencode.feature.voice.ServerVoiceSupport
@@ -26,7 +29,6 @@ import ai.opencode.feature.voice.VoiceEngine
 import ai.opencode.feature.voice.VoiceFeature
 import ai.opencode.feature.voice.VoiceServerChoice
 import ai.opencode.feature.voice.VoiceSharedKeys
-import ai.opencode.feature.voice.livingOrbStyle
 import ai.opencode.server.OpenCodeServer
 
 /**
@@ -50,7 +52,10 @@ class HomeSettingsFeature : Reducer<HomeSettingsFeature.State, HomeSettingsFeatu
         data class InAppNoticeModeChanged(val mode: InAppNoticeMode) : Action
         data class ExperimentalFeatureChanged(val feature: ExperimentalFeature, val on: Boolean) : Action
         data class ModelPickerStyleChanged(val style: ModelPickerStyle) : Action
-        data class LivingOrbStyleChanged(val style: LivingOrbStyle) : Action
+        /** Settings › Experimental › Sound Effects › Volume (0…1). */
+        data class SoundEffectsVolumeChanged(val volume: Double) : Action
+        /** Settings › Experimental › Sound Effects › Send Sound. */
+        data class SoundEffectsSendChanged(val on: Boolean) : Action
         data class VoiceModeEnabledChanged(val on: Boolean) : Action
         data class RaiseToTalkChanged(val on: Boolean) : Action
         data class VoiceEngineChanged(val engine: VoiceEngine) : Action
@@ -65,6 +70,8 @@ class HomeSettingsFeature : Reducer<HomeSettingsFeature.State, HomeSettingsFeatu
         data class XaiAPIKeyChanged(val key: String?) : Action
         data class VerifiedVoiceKeyFingerprintChanged(val fingerprint: String?) : Action
         data object OnboardingPlaygroundOpened : Action
+        /** Settings › Experimental › Show Welcome (Welcome Preview). */
+        data object WelcomeOpened : Action
         data class AppThemeChanged(val theme: AppTheme) : Action
         data class AppearanceColorSchemeChanged(val scheme: AppearanceColorScheme) : Action
         data class ReturnKeySendsChanged(val on: Boolean) : Action
@@ -74,6 +81,7 @@ class HomeSettingsFeature : Reducer<HomeSettingsFeature.State, HomeSettingsFeatu
 
     private val haptics by Dependency(HapticsClient)
     private val serverVoice by Dependency(ServerVoiceClient)
+    private val soundEffects by Dependency(SoundEffectsClient)
 
     private fun <T> setShared(key: SharedKey<T>, next: T): Boolean {
         val current = shared(key)
@@ -91,10 +99,17 @@ class HomeSettingsFeature : Reducer<HomeSettingsFeature.State, HomeSettingsFeatu
                 if (action.feature == ExperimentalFeature.serverVoice && ExperimentalFeature.serverVoice.isActive(action.on)) {
                     return Reduced(state, Effect.send(Action.CheckServerVoiceSupport))
                 }
+                if (action.feature == ExperimentalFeature.soundEffects && ExperimentalFeature.soundEffects.isActive(action.on)) {
+                    soundEffects.prepare()
+                }
             }
             is Action.ModelPickerStyleChanged -> setShared(ModelPickerStyle.key, action.style)
-            is Action.LivingOrbStyleChanged ->
-                if (setShared(VoiceSharedKeys.livingOrbStyle, action.style)) haptics.play(Haptic.selection)
+            is Action.SoundEffectsVolumeChanged ->
+                // Each new level plays a sample at it.
+                if (setShared(SharedKeys.soundEffectsVolume, action.volume.coerceIn(0.0, 1.0))) {
+                    soundEffects.play(SoundEffect.replyDone)
+                }
+            is Action.SoundEffectsSendChanged -> setShared(SharedKeys.soundEffectsSend, action.on)
             is Action.VoiceModeEnabledChanged -> setShared(SharedKeys.voiceModeEnabled, action.on)
             is Action.RaiseToTalkChanged -> setShared(SharedKeys.raiseToTalk, action.on)
             is Action.VoiceEngineChanged -> {
@@ -129,7 +144,7 @@ class HomeSettingsFeature : Reducer<HomeSettingsFeature.State, HomeSettingsFeatu
             is Action.XaiAPIKeyChanged -> setShared(SharedKeys.xaiAPIKey, action.key)
             is Action.VerifiedVoiceKeyFingerprintChanged ->
                 setShared(SharedKeys.verifiedVoiceKeyFingerprint, action.fingerprint)
-            Action.OnboardingPlaygroundOpened -> Unit
+            Action.OnboardingPlaygroundOpened, Action.WelcomeOpened -> Unit
             is Action.AppThemeChanged ->
                 // The theme cross-fades in place: OpenCodeAppTheme observes the key.
                 if (setShared(ThemeSharedKeys.appTheme, action.theme)) haptics.play(Haptic.selection)
