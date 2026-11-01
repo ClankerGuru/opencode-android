@@ -83,7 +83,7 @@ under the same name; anything not ported anywhere is listed as deleted with its 
 | `:feature:media` | 17 | 178 | 15 | 183 |
 | `:feature:voice` | 30 | 444 | 16 | 511 |
 | `:feature:system` | 9 | 88 | 2 | 89 |
-| `:feature:transcript` | 32 | 274 | 57 | 282 (1 env-gated metric skipped) |
+| `:feature:transcript` | 34 | 274 | 57 | 282 (1 env-gated metric skipped) |
 | `:feature:composer` | 26 | 229 | 18 | 230 |
 | `:feature:settings` | 17 | 98 | 10 | 98 |
 | `:feature:session` | 58 | 706 | 41 | 719 |
