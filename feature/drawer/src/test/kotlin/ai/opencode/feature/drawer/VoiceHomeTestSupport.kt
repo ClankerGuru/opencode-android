@@ -5,6 +5,7 @@ import ai.opencode.core.store.TestStore
 import ai.opencode.feature.session.SessionFeature
 import ai.opencode.feature.voice.RealtimeJSON
 import ai.opencode.feature.voice.RealtimeSessionConfig
+import ai.opencode.feature.voice.VoiceBackgroundWork
 import ai.opencode.feature.voice.VoiceCallClient
 import ai.opencode.feature.voice.VoiceCallEvent
 import ai.opencode.feature.voice.VoiceDelegator
@@ -125,14 +126,30 @@ internal object VoiceHomeTestSupport {
     fun VoiceWorkClient.copy(
         submit: suspend (VoiceWorkTarget, String) -> VoiceWorkAdmission = this.submit,
         awaitReply: suspend (OpenCodeServer, String, String) -> String? = this.awaitReply,
+        awaitIdle: suspend (OpenCodeServer, String) -> Unit = this.awaitIdle,
         fetchReply: suspend (OpenCodeServer, String, String) -> String? = this.fetchReply,
         fetchRunReply: suspend (OpenCodeServer, String, String) -> String? = this.fetchRunReply,
+        backgroundWork: suspend (OpenCodeServer, String, String, String?) -> List<VoiceBackgroundWork> = this.backgroundWork,
+        backgroundReply: suspend (OpenCodeServer, String) -> String? = this.backgroundReply,
         checkSessionActive: suspend (OpenCodeServer, String) -> Boolean? = this.checkSessionActive,
         activeSessionIDs: suspend (OpenCodeServer) -> Set<String> = this.activeSessionIDs,
-        noteSessionSettled: suspend (String) -> Unit = this.noteSessionSettled,
-        noteActiveSessions: suspend (Set<String>) -> Unit = this.noteActiveSessions,
+        noteSessionSettled: suspend (OpenCodeServer, String) -> Unit = this.noteSessionSettled,
+        noteActiveSessions: suspend (OpenCodeServer, Set<String>) -> Unit = this.noteActiveSessions,
         recentMessages: suspend (OpenCodeServer, String, Int) -> List<String> = this.recentMessages,
-    ) = VoiceWorkClient(submit, awaitReply, fetchReply, fetchRunReply, checkSessionActive, activeSessionIDs, noteSessionSettled, noteActiveSessions, recentMessages)
+    ) = VoiceWorkClient(
+        submit = submit,
+        awaitReply = awaitReply,
+        awaitIdle = awaitIdle,
+        fetchReply = fetchReply,
+        fetchRunReply = fetchRunReply,
+        backgroundWork = backgroundWork,
+        backgroundReply = backgroundReply,
+        checkSessionActive = checkSessionActive,
+        activeSessionIDs = activeSessionIDs,
+        noteSessionSettled = noteSessionSettled,
+        noteActiveSessions = noteActiveSessions,
+        recentMessages = recentMessages,
+    )
 
     fun DependencyValues.Builder.voiceCall(update: VoiceCallClient.() -> VoiceCallClient) {
         this[VoiceCallClient] = this[VoiceCallClient].update()

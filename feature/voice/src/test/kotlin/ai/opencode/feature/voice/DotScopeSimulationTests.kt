@@ -16,7 +16,6 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sin
-import kotlin.math.sqrt
 
 /**
  * Port of iOS `DotScopeSimulationTests.swift`. Dropped: the five `MTKView`/`UIHostingController`
@@ -253,69 +252,6 @@ class DotScopeSimulationTests {
         assertEquals(VoiceCallHaptic.ended, VoiceCallHaptic.forCue(Cue.ended))
         assertEquals(VoiceCallHaptic.muted, VoiceCallHaptic.forMute(isMuted = true))
         assertEquals(VoiceCallHaptic.unmuted, VoiceCallHaptic.forMute(isMuted = false))
-    }
-
-    @Test fun synthesizerGeneratesNonSilentWaveformsForEveryCue() {
-        for (cue in listOf(Cue.sweepRight, Cue.sweepLeft, Cue.connected, Cue.ended)) {
-            val samples = VoiceCallSynthesizer.samples(cue)
-            assertTrue(samples.size > 3_000)
-            val rms = sqrt(samples.fold(0f) { sum, s -> sum + s * s } / samples.size)
-            val peak = samples.maxOf { abs(it) }
-            assertTrue("Cue $cue has soft non-silent RMS ($rms)", rms > 0.002f && rms < 0.25f)
-            assertTrue("Cue $cue does not clip ($peak)", peak > 0.01f && peak <= 1.0f)
-        }
-    }
-
-    /**
-     * The hang-up tail plays the whole cue before it's stopped, at default
-     * and at the longest decay and spacing the tunables allow.
-     */
-    @Test fun endTailOutlastsTheHangUpCue() {
-        // iOS `CallSoundTunables.decay.range` (0.5…2) and `.spacing.range` (0.4…2.5) upper bounds.
-        val longest = VoiceCallSynthesizer.Settings(decay = 2.0, spacing = 2.5)
-        for (settings in listOf(VoiceCallSynthesizer.Settings(), longest)) {
-            val samples = VoiceCallSynthesizer.render(Cue.ended, settings)
-            val length = samples.size / PCM.sampleRate
-            assertTrue("tail for a $length s hang-up", VoiceCallSynthesizer.endTailWait(samples) > length + 0.05)
-        }
-        assertTrue(VoiceCallSynthesizer.render(Cue.ended, longest).size / PCM.sampleRate > 1.5)
-    }
-
-    private data class Prototype(val count: Int, val peak: Float, val at1200: Float, val at4000: Float)
-
-    /**
-     * The breath ping set matches the D-128 web prototype it was chosen from:
-     * its length, peak and two samples per cue.
-     */
-    @Test fun breathPingCuesMatchThePrototype() {
-        val defaults = VoiceCallSynthesizer.Settings()
-        val rendered = listOf(
-            "sweepRight" to VoiceCallSynthesizer.render(Cue.sweepRight, defaults),
-            "sweepLeft" to VoiceCallSynthesizer.render(Cue.sweepLeft, defaults),
-            "connected" to VoiceCallSynthesizer.render(Cue.connected, defaults),
-            "ended" to VoiceCallSynthesizer.render(Cue.ended, defaults),
-            "mute" to VoiceCallSynthesizer.muteSamples(muted = true, settings = defaults),
-            "unmute" to VoiceCallSynthesizer.muteSamples(muted = false, settings = defaults),
-        )
-        val prototype = mapOf(
-            "sweepRight" to Prototype(9_600, 0.017676122f, -0.0035037478f, 0.0012820613f),
-            "sweepLeft" to Prototype(9_600, 0.017382188f, 0.010709052f, -0.0011834651f),
-            "connected" to Prototype(24_240, 0.073754534f, -0.014271764f, 0.027006725f),
-            "ended" to Prototype(18_240, 0.069794223f, 0.044520687f, -0.014266015f),
-            "mute" to Prototype(6_720, 0.020073203f, -0.0025383446f, 0.00038064722f),
-            "unmute" to Prototype(6_720, 0.019921213f, 0.0079313954f, -0.00035919933f),
-        )
-        for ((name, samples) in rendered) {
-            val expected = prototype.getValue(name)
-            assertEquals("$name length", expected.count, samples.size)
-            assertTrue("$name peak", abs(samples.maxOf { abs(it) } - expected.peak) < 1e-7f)
-            assertTrue("$name at 50 ms", abs(samples[1_200] - expected.at1200) < 1e-7f)
-            assertTrue("$name at 167 ms", abs(samples[4_000] - expected.at4000) < 1e-7f)
-        }
-        // The repeating pings stay well under connect and hang-up.
-        fun peak(samples: FloatArray) = samples.maxOfOrNull { abs(it) } ?: 0f
-        assertTrue(peak(rendered[0].second) * 3 < peak(rendered[2].second))
-        assertTrue(peak(rendered[1].second) * 3 < peak(rendered[3].second))
     }
 
     @Test fun providedBandsReplaceTheStandIn() {

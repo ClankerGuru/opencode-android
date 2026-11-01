@@ -60,7 +60,8 @@ class VoiceTimeline : Reducer<VoiceFeature.State, VoiceFeature.Action> {
             VoiceFeature.Action.StartIfNeeded, VoiceFeature.Action.EndPressed, VoiceFeature.Action.ReconnectingShown,
             is VoiceFeature.Action.SessionRenamed, VoiceFeature.Action.CaptionsTapped, VoiceFeature.Action.CaptionsDismissed,
             is VoiceFeature.Action.CompactionObserved, is VoiceFeature.Action.DelegatorExplained, is VoiceFeature.Action.DelegatorPinned,
-            is VoiceFeature.Action.DelegatorOpenedDraft, VoiceFeature.Action.DelegatorRequestedEnd, is VoiceFeature.Action.PendingModelApplied,
+            is VoiceFeature.Action.DelegatorOpenedDraft, VoiceFeature.Action.DelegatorRequestedEnd, is VoiceFeature.Action.DelegatorSettledRequest,
+            is VoiceFeature.Action.PendingModelApplied, is VoiceFeature.Action.FloatingStage,
             is VoiceFeature.Action.DelegatorKeptPick, is VoiceFeature.Action.AtEarChanged, is VoiceFeature.Action.ServerVoiceSupportUpdated,
             is VoiceFeature.Action.CallRouteResolved, is VoiceFeature.Action.CallCommand, is VoiceFeature.Action.Delegate,
             -> Unit

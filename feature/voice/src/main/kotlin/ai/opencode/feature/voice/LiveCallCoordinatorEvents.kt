@@ -22,12 +22,17 @@ internal suspend fun LiveCallCoordinator.handleLiveEvent(event: LiveServerEvent,
             quietGate = quietGate.noteUserSpoke(clock.now())
             if (LiveCallCoordinator.hasWords(event.delta)) {
                 lastUserWordsAt = clock.now()
+                resumeUserWordWaiters()
                 val reply = currentAssistantUtterance
                 if (event.startMilliseconds != null && reply?.startMilliseconds != null && event.startMilliseconds < reply.startMilliseconds) {
                     currentAssistantUtterance = reply.copy(userWordsBefore = lastUserWordsAt)
                 }
             }
-            // Full duplex: the user's words NEVER flush the assistant's audio.
+            // GPT-Live is full duplex: user speech and assistant speech can overlap.
+            // A transcript fragment alone never cuts assistant playback (a
+            // backchannel, or words from before the reply, mustn't); the user
+            // talking over it on the microphone does (`yieldIfUserTalksOver`).
+            yieldIfUserTalksOver(clock.now())
             currentUserUtterance?.let { utterance ->
                 if (utterance.endMilliseconds != null && event.startMilliseconds != null) {
                     val gap = event.startMilliseconds - utterance.endMilliseconds
@@ -49,7 +54,8 @@ internal suspend fun LiveCallCoordinator.handleLiveEvent(event: LiveServerEvent,
             if (timing.liveDelegationSettle > Duration.ZERO) pendingDelegationTasks.keys.toList().forEach { scheduleDelegation(it) }
         }
         is LiveServerEvent.OutputTranscriptDelta -> {
-            if (event.delta.isEmpty()) return
+            // Speech the user talked over isn't heard, so it isn't shown either.
+            if (event.delta.isEmpty() || droppingAssistantSpeech) return
             noteAssistantSpeech(assistantAudioPlaying)
             val previousEnd = currentAssistantUtterance?.endMilliseconds
             if (previousEnd != null && event.startMilliseconds != null && event.startMilliseconds - previousEnd >= 1_200) settleAssistantUtterance()
@@ -63,7 +69,19 @@ internal suspend fun LiveCallCoordinator.handleLiveEvent(event: LiveServerEvent,
         }
         is LiveServerEvent.OutputAudio -> {
             if (event.pcm.size < 2 || audioInterrupted) return
-            if (PCM.hasSpeechEnergy(event.pcm)) {
+            val isSpeech = PCM.hasSpeechEnergy(event.pcm)
+            if (droppingAssistantSpeech) {
+                // GPT-Live talks on after the user cut in: drop the rest of it, and
+                // play again once its stream goes quiet.
+                if (isSpeech) {
+                    droppedQuietMilliseconds = 0
+                } else {
+                    droppedQuietMilliseconds += maxOf(1, event.pcm.size / 2 * 1_000 / PCM.sampleRate.toInt())
+                    if (droppedQuietMilliseconds >= LiveCallCoordinator.droppedSpeechEndsAfterMilliseconds) droppingAssistantSpeech = false
+                }
+                return
+            }
+            if (isSpeech) {
                 speechAudioHangover = LiveCallCoordinator.speechHangoverMilliseconds
                 assistantAudioPlaying = true; noteAssistantSpeech(true, frame = true)
                 audio?.enqueue?.invoke(event.pcm, currentAssistantUtterance?.id)
@@ -196,6 +214,58 @@ private fun LiveCallCoordinator.watchForUnbackedClaim(text: String, userWordsBef
         emit(VoiceCallEvent.FunctionCall(id, "delegate", RealtimeJSONs.obj("text" to RealtimeJSONs.string(text))))
     }
 }
+/**
+ * One capture chunk's level. Transcript fragments arrive in bursts, a
+ * second or more apart while the user talks on, so the microphone tells
+ * the quiet gate they're still talking: in Kit's Oct 30 call an update
+ * went out 1.5 s after a fragment, mid-dictation, and the voice agent
+ * talked over him for 9 s. It counts only while their words were
+ * transcribed recently, so a noise with no words holds nothing.
+ */
+internal suspend fun LiveCallCoordinator.noteMicLevel(level: Float) {
+    val now = clock.now()
+    if (level < timing.liveMicVoiceLevel) {
+        val last = micVoiceLastAt
+        if (last != null && now - last > LiveCallCoordinator.micVoiceGapTolerance) micVoiceStartedAt = null
+        return
+    }
+    val last = micVoiceLastAt
+    if (micVoiceStartedAt == null || last == null || now - last > LiveCallCoordinator.micVoiceGapTolerance) {
+        micVoiceStartedAt = now
+    }
+    micVoiceLastAt = now
+    val words = lastUserWordsAt
+    if (words != null && now - words <= timing.liveMicVoiceWordWindow) {
+        quietGate = quietGate.noteUserVoice(now)
+    }
+    yieldIfUserTalksOver(now)
+}
+
+/**
+ * The user has been talking over the voice agent for `liveBargeIn`, on
+ * the microphone, with words transcribed since its speech began: its
+ * audio stops. GPT-Live doesn't always stop on its own (in Kit's Oct 30
+ * call it spoke an update over him for 9 s).
+ */
+internal suspend fun LiveCallCoordinator.yieldIfUserTalksOver(now: Duration) {
+    if (timing.liveBargeIn <= Duration.ZERO || !assistantAudioPlaying || droppingAssistantSpeech) return
+    val started = micVoiceStartedAt ?: return
+    val last = micVoiceLastAt ?: return
+    if (now - last > LiveCallCoordinator.micVoiceGapTolerance || now - started < timing.liveBargeIn) return
+    val words = lastUserWordsAt ?: return
+    val speech = quietGate.assistantSpeechRunStartedAt ?: return
+    if (words < speech) return
+    droppingAssistantSpeech = true
+    droppedQuietMilliseconds = 0
+    settleAssistantUtterance(cutOff = true)
+    assistantAudioPlaying = false
+    noteAssistantSpeech(false)
+    speechAudioHangover = 0
+    audio?.flush?.invoke()
+    emit(VoiceCallEvent.AssistantPlaybackFinished)
+    callLogMarker("Stopped the voice agent: the user talked over it")
+}
+
 internal suspend fun LiveCallCoordinator.handleLiveAudio(event: VoiceAudioEvent) {
     when (event) {
         VoiceAudioEvent.playbackDrained -> {

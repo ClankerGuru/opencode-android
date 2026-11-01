@@ -99,6 +99,11 @@ data class RealtimeSessionConfig(
      * the server's key through Responses delegation).
      */
     val liveDelegation: LiveDelegation = LiveDelegation.client,
+    /**
+     * OpenCode Session Delegator: sends unbound spoken updates (`delegationID == null`)
+     * via `session.instructions.append` and runs the 900 ms action-claim backstop.
+     */
+    val unboundSpeechUsesInstructions: Boolean = false,
 ) {
     fun liveSessionConfig(input: List<LiveInputMessage> = emptyList()): LiveSessionConfig = LiveSessionConfig(
         model = if (model == defaultModel) LiveSessionConfig.defaultModel else model,
@@ -108,6 +113,7 @@ data class RealtimeSessionConfig(
         isAtEar = isAtEar,
         serverVoice = serverVoice,
         delegation = liveDelegation,
+        unboundSpeechUsesInstructions = unboundSpeechUsesInstructions,
     )
 
     /** The socket address: the model rides in the query on both services. */

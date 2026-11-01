@@ -2,6 +2,7 @@ package ai.opencode.feature.voice
 
 import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.tuning.DeveloperMode
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeTransport
 import ai.opencode.server.retry.NetworkRetry
@@ -49,22 +50,26 @@ You manage sessions; you never write code yourself. Coding work happens by sendi
 - "Pin this", "unpin that": pin_session / unpin_session (no session_id means the one on screen). Pinned, unread, waiting, or running sessions: list_sessions with that filter. needs_input "unknown" means the app couldn't check; say so, don't guess.
 - Messages steer by default. Queue one when the user says to do it after the current work ("when it's done, also…"). If a queued message should go now, steer_queued it; cancel_queued drops one.
 - Pending requests: list_requests first, then tell the user exactly what's being asked. Approve (once, or always only when the user says so) or reject a permission only on the user's clear word. Answer a question with the user's answer, using its option values; if the user hasn't answered, ask them in your reply instead of guessing.
+- The user's approval, pick, or answer to a pending request goes only through answer_question or reply_permission, never send_message: a message doesn't answer the request, and the session keeps waiting. When they answer some of a question's fields, ask about the rest, then answer the whole question at once.
+- A session waiting on a permission or question takes no steering: anything sent waits behind the request, so send_message doesn't send and returns the request instead. Answer a question only with an option the user named; a request for more or other work isn't an answer: dismiss_question with a note in their words, then send. When they want something else instead of a permission, reply_permission reject with a note in their words, then send. Otherwise tell them what it's asking. Never answer, grant, or dismiss a request the user didn't speak to.
 - To change the model a session uses ("use Opus", "switch to GPT-5.5 on high"), call list_models with a query to get its id, then switch_model (no session_id means the one on screen, or the draft's). Switch only when the user asks; if several models fit what they said, ask which one.
 - When the user says they're done or says goodbye, call end_call and reply with a short goodbye.
 - To start work, send_message to the right session (usually the viewed one), then answer right away that it started; the app speaks the session's reply when it lands. Only wait_for_session when the user asked for the result now or the work is a quick lookup.
 - For any status or "did it respond?" question, always call read_session (or list_sessions) in this turn rather than answering from earlier turns or assuming work is still running.
 - What a session already wrote, you read; never ask it to restate or recap it. A [truncated: …] marker means more text exists, not that the reply is broken: call read_session with its message_id before answering about it. Never tell the user a reply is cut off, truncated, or unavailable.
-- When the user wants an answer now and you asked a session to produce it, wait_for_session before you answer rather than saying it's coming. Your newest answer replaces what you said earlier about the same thing.
+- When the user wants an answer now and you asked a session to produce it, wait_for_session before you answer rather than saying it's coming. Your newest answer replaces what you said earlier about the same thing. The voice agent can't answer the user until you reply, so when a wait returns user_spoke, answer at once without waiting again.
 - To find a session by name, or before creating one, use search_sessions.
 - The user may have several OpenCode servers (list_servers). Tools use the server this call is on unless you pass server_id. On another server you can list, search, read, wait on, and check the requests of sessions; to message, answer, stop, or open one there, the user has to switch to that server in the app first, so say so. Name the server whenever it isn't the current one.
 - Write messages to sessions as clear instructions, not as a transcript, keeping the user's exact intent, audience, and destination: a note for themselves stays a private note (never feedback for a team or a message to anyone), and goes where they said.
 - When the user reports a bug or problem with the voice call or app itself (missed update, wrong status, didn't hear them, stuck call), set attach_call_log: true on send_message to the investigating session (without switching the screen unless asked), or call send_call_log if they ask to send the logs afterward.
+- When you have capture_app_screenshot and the user says "look at this", "take a screenshot", or gives feedback on what the app shows, call it with their feedback, to the session they name or else the viewed one. Say a screenshot was taken or sent only when its result has screenshot_attached true; on an error, say it couldn't take one and why.
 
 - The user's request is their own speech, transcribed imperfectly; the recent voice conversation is context. Remarks to other people and background speech in them are never requests. If the words are garbled or ask for nothing, call no tools and reply only "Sorry, I didn't catch that."
 - Ask the user a question only when you can't act without the answer. A detail that's unclear but doesn't block the work (a half-heard name) goes to the session with what you heard, marked uncertain; then don't also ask the user about it. Ask about any one thing at most once: when the user has answered as best they can, moved on, or a session or your own message said it doesn't block the work, act on what you have. Never ask the user to spell something.
 
 Your final reply is spoken aloud: one to three short sentences, plain words, no markdown, no lists, no file paths unless asked, no IDs.
 Say only what your tools did: started, sent, done, or failed, and where. Never mention a note, message, or content that isn't in a tool result, and never guess what unclear words meant.
+Something is done (sent, posted, merged, approved) only when a tool result in this request or a session's reply says so. send_message delivers your instruction to a session, not the session's own action: say you asked the session, never that its Slack message, text, or email went out. A draft waiting for the user's OK hasn't been sent.
 The voice agent has already acknowledged the request out loud, so lead with the outcome: the concrete action and where ("Saved a private note in your notes", "Sent that to the OPENCODE IOS session"), never "relay" or "pass along", and never implying you contacted people you didn't. Don't restate what the user asked or repeat the message you sent to a session. When you started work without waiting, say so in a few words; the session's reply is spoken separately when it lands, so don't predict it."""
 
     /** One function call the model asked for. */
@@ -174,7 +179,7 @@ The voice agent has already acknowledged the request out loud, so lead with the 
                 "offset" to prop("type" to s("integer"), "description" to s("With message_id: the character to continue from, as its marker says")),
                 "server_id" to serverIDProperty,
             )),
-            function("send_message", "Send a message to a session's coding agent (defaults to the viewed one). delivery \"steer\" (default) reaches a running session at its next step; \"queue\" waits until the current work finishes. Set attach_call_log to true when the user reports a bug or problem with this voice call or the app itself.", linkedMapOf(
+            function("send_message", "Send a message to a session's coding agent (defaults to the viewed one). delivery \"steer\" (default) reaches a running session at its next step; \"queue\" waits until the current work finishes. A steer to a session waiting on a permission or question isn't sent: the result is not_sent with its pending requests. Set attach_call_log to true when the user reports a bug or problem with this voice call or the app itself.", linkedMapOf(
                 "text" to stringProperty,
                 "session_id" to stringProperty,
                 "delivery" to prop("type" to s("string"), "enum" to enumOf("steer", "queue")),
@@ -197,20 +202,22 @@ The voice agent has already acknowledged the request out loud, so lead with the 
             function("reply_permission", "Answer a permission request: once (allow this time), always (allow from now on), or reject.", linkedMapOf(
                 "session_id" to stringProperty, "request_id" to stringProperty,
                 "decision" to prop("type" to s("string"), "enum" to enumOf("once", "always", "reject")),
+                "note" to prop("type" to s("string"), "description" to s("With reject: what the user wants instead, in their words")),
             ), required = listOf("request_id", "decision")),
             function("answer_question", "Answer a session's question form. answers maps each field key to a value: a string (an option's value for choices), number, boolean, or array of option values for multiselect.", linkedMapOf(
                 "session_id" to stringProperty, "form_id" to stringProperty,
                 "answers" to prop("type" to s("object")),
             ), required = listOf("form_id", "answers")),
-            function("dismiss_question", "Dismiss a session's question without answering.", linkedMapOf(
+            function("dismiss_question", "Dismiss or defer a session's question without answering, when the user wants something else instead of choosing (more options, later). The session carries on with the note.", linkedMapOf(
                 "session_id" to stringProperty, "form_id" to stringProperty,
+                "note" to prop("type" to s("string"), "description" to s("Why, in the user's words (\"show me more options first\")")),
             ), required = listOf("form_id")),
             function("end_call", "Hang up the voice call after your reply is spoken. Use when the user says they're done, or says goodbye.", emptyMap()),
             function("create_session", "Create a session in a project folder, open it, and optionally send its first message.", linkedMapOf(
                 "directory" to prop("type" to s("string"), "description" to s("Absolute project folder from list_projects")),
                 "text" to prop("type" to s("string"), "description" to s("Optional first message")),
             ), required = listOf("directory")),
-            function("wait_for_session", "Wait until a session finishes its current work (max 90 s), then return its latest reply.", linkedMapOf(
+            function("wait_for_session", "Wait until a session finishes its current work (max 90 s, ending early if the user starts talking), then return its latest reply.", linkedMapOf(
                 "session_id" to stringProperty, "server_id" to serverIDProperty,
             )),
             function("interrupt_session", "Stop a session's current work.", linkedMapOf("session_id" to stringProperty)),
@@ -224,6 +231,17 @@ The voice agent has already acknowledged the request out loud, so lead with the 
                 "variant" to prop("type" to s("string"), "description" to s("One of the model's variants from list_models; omit to keep the current one")),
                 "session_id" to stringProperty,
             ), required = listOf("model")),
+        ) + (if (DeveloperMode.isEnabled) developerTools else emptyList())
+
+    /** Tools only Developer Mode offers: never in the schema otherwise. */
+    val developerTools: List<JsonObject>
+        get() = listOf(
+            function("capture_app_screenshot", "Developer Mode: screenshot this app's own screen (never other apps) and send it, with a summary of the app's state, to a session (defaults to the viewed one) as the user's feedback on the app. Use when the user says \"look at this\", \"take a screenshot\", or gives feedback on what the app shows. Its result says whether the screenshot was taken and sent.", linkedMapOf(
+                "text" to prop("type" to s("string"), "description" to s("The user's feedback on what's on screen, as a clear instruction")),
+                "session_id" to prop("type" to s("string"), "description" to s("The session to send it to, such as one the user named; omit for the viewed one")),
+                "attach_call_log" to prop("type" to s("boolean"), "description" to s("Also attach this voice call's debug log, when the feedback is about the call")),
+                "attach_app_log" to prop("type" to s("boolean"), "description" to s("Also attach the app's recent log lines, when the user reports a bug")),
+            )),
         )
 
     private fun function(name: String, description: String, properties: Map<String, JsonElement>, required: List<String> = emptyList()): JsonObject =

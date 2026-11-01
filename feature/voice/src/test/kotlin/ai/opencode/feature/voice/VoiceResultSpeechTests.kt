@@ -15,11 +15,13 @@ import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.live.assistantReply
 import ai.opencode.server.live.decodeTranscript
 import ai.opencode.server.model.OpenCodeJSONValue
+import ai.opencode.server.model.OpenCodePendingRequests
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.OpenCodeToolCall
 import ai.opencode.server.model.OpenCodeTranscriptItem
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.consumeAsFlow
 import kotlinx.coroutines.channels.Channel
@@ -100,7 +102,11 @@ class VoiceLateResultTests {
             val effects = resolved(after = 0) { it.step(ReplyWatch.Event.WaitSucceeded(promptID = "msg_ios", reply = text)) }
             assertEquals(
                 text,
-                listOf(ReplyWatch.Effect.CancelWatch(promptID = "msg_ios"), ReplyWatch.Effect.Announce(sessionID = "ses_ios", promptIDs = listOf("msg_ios"), text = reply(text))),
+                listOf(
+                    ReplyWatch.Effect.CancelWatch(promptID = "msg_ios"),
+                    ReplyWatch.Effect.Announce(sessionID = "ses_ios", promptIDs = listOf("msg_ios"), text = reply(text)),
+                    ReplyWatch.Effect.FindBackgroundWork(sessionID = "ses_ios", promptID = "msg_ios", title = "OpenCode iOS", turn = 0, reply = text),
+                ),
                 effects,
             )
         }
@@ -118,6 +124,29 @@ class VoiceLateResultTests {
             assertTrue(effects.contains(ReplyWatch.Effect.Announce(sessionID = "ses_ios", promptIDs = listOf("msg_ios"), text = VoiceHandoff.earlierRequest(reply(text)))))
         }
         assertEquals(VoiceHandoff.earlierRequest("x"), VoiceHandoff.earlierRequest(VoiceHandoff.earlierRequest("x")))
+    }
+
+    /**
+     * From a call log: asked about a URI, the voice opened with an earlier
+     * request's result as if it answered him. A late result names its request.
+     */
+    @Test fun aLateResultNamesTheRequestItAnswers() {
+        val topic = "Rename Seer to Opticon and redo its icon"
+        val watch = Watch()
+        watch.step(ReplyWatch.Event.Sent(listOf(ReplyWatch.Prompt(promptID = "msg_rename", sessionID = "ses_ios", title = "OpenCode iOS", topic = topic))))
+        watch.noteUserActed()
+        val text = "Renamed it and drew the new icon."
+        val effects = watch.step(ReplyWatch.Event.WaitSucceeded(promptID = "msg_rename", reply = text))
+        val notice = ReplyWatch.Outcome.Replied(text).notice("OpenCode iOS", answering = listOf(topic), alreadyTold = null)
+        val spoken = VoiceHandoff.earlierRequest(notice, topic = topic)
+        assertTrue(spoken.startsWith(VoiceHandoff.earlierRequestLead + VoiceHandoff.earlierTopicLead + topic + "”. "))
+        assertTrue(effects.contains(ReplyWatch.Effect.Announce(sessionID = "ses_ios", promptIDs = listOf("msg_rename"), text = spoken)))
+        // Untitled prompts don't name a made-up topic.
+        assertFalse(
+            resolved(after = 1) { it.step(ReplyWatch.Event.WaitSucceeded(promptID = "msg_ios", reply = text)) }.any {
+                it is ReplyWatch.Effect.Announce && it.text.contains(VoiceHandoff.earlierTopicLead)
+            },
+        )
     }
 
     @Test fun failuresSpeak() {
@@ -448,6 +477,8 @@ class VoiceSuppressionTests {
             }
             this[OpenCodeClient] = OpenCodeClient.testValue.copy(
                 sendDeliveredPrompt = { _, _, _, _ -> "msg_cafe" },
+                // Every steer reads its target's requests first: none here.
+                familyPendingRequests = { _, _, _ -> OpenCodePendingRequests(permissions = emptyList(), forms = emptyList()) },
                 waitForIdle = { _, _ -> },
                 transcript = { _, _, _ -> transcript },
             )
@@ -678,7 +709,10 @@ class VoiceSuppressionTests {
                     throw OpenCodeClientError("The delegator's reply wasn't readable.")
                 }
             }
-            this[OpenCodeClient] = OpenCodeClient.testValue.copy(sendDeliveredPrompt = { _, _, _, _ -> "msg_rename" })
+            this[OpenCodeClient] = OpenCodeClient.testValue.copy(
+                sendDeliveredPrompt = { _, _, _, _ -> "msg_rename" },
+                familyPendingRequests = { _, _, _ -> OpenCodePendingRequests(permissions = emptyList(), forms = emptyList()) },
+            )
             this[VoiceWorkClient] = VoiceWorkClient.testValue.let { work ->
                 VoiceWorkClient(
                     submit = work.submit,
@@ -919,6 +953,58 @@ class VoiceSuppressionTests {
         assertTrue(none.contains(""""latest_reply":"""""))
     }
 
+    /**
+     * From a call log: a 90 s wait held the delegation open while the user
+     * asked six times whether it heard them. Their words end the wait.
+     */
+    @Test fun waitForSessionEndsWhenTheUserSpeaks() = runTest {
+        val sleeping = OpenCodeClient.testValue.copy(
+            getSession = { _, _ -> gameEngine },
+            waitForIdle = { _, _ -> delay(600.seconds) },
+            // A read after the yield would hang: the answer can't wait on it.
+            transcript = { _, _, _ -> delay(600.seconds); emptyList() },
+        )
+        val notes = mutableListOf<String>()
+        val waits = mutableListOf<Boolean>()
+        val workspace = VoiceDelegatorWorkspace(
+            client = sleeping,
+            start = VoiceDelegatorWorkspace.Start(server = server, viewing = gameEngine, draftDirectory = gameEngine.directory, draftModel = null, transcriptDelta = emptyList(), explained = emptySet()),
+            effects = VoiceDelegatorWorkspace.Effects(
+                open = {},
+                explained = {},
+                waiting = { _, isWaiting -> waits += isWaiting },
+                userSpoke = { delay(50) },
+                note = { notes += it },
+            ),
+        )
+        // The wait and the read never finish on their own: only the user's words
+        // can have ended it.
+        val output = workspace.run(VoiceDelegator.ToolCall(callID = "c", name = "wait_for_session", arguments = "{}"))
+        val json = jsonObject(output)
+        assertEquals(false, json["finished"]?.jsonPrimitive?.content?.toBooleanStrictOrNull())
+        assertEquals(VoiceDelegatorWorkspace.userSpokeNote, json["user_spoke"]?.jsonPrimitive?.content)
+        assertEquals(listOf(true, false), waits)
+        assertTrue(notes.contains("Stopped waiting on “${gameEngine.title}”: the user spoke."))
+
+        // Nor can a failing read turn it into an error and lose user_spoke.
+        val failing = sleeping.copy(transcript = { _, _, _ -> throw OpenCodeClientError("Offline") })
+        val yielded = VoiceDelegatorWorkspace(
+            client = failing,
+            start = VoiceDelegatorWorkspace.Start(server = server, viewing = gameEngine, draftDirectory = gameEngine.directory, draftModel = null, transcriptDelta = emptyList(), explained = emptySet()),
+            effects = VoiceDelegatorWorkspace.Effects(open = {}, explained = {}, userSpoke = {}, note = {}),
+        ).run(VoiceDelegator.ToolCall(callID = "c", name = "wait_for_session", arguments = "{}"))
+        assertTrue(yielded.contains(""""user_spoke"""") && !yielded.contains("error"))
+
+        // A wait that finishes first says nothing of the user.
+        val idle = sleeping.copy(
+            transcript = { _, _, _ -> listOf(userText("msg_inbox", "Check my inbox")) },
+            waitForIdle = { _, _ -> },
+        )
+        val finished = gameWorkspace(idle).run(VoiceDelegator.ToolCall(callID = "c", name = "wait_for_session", arguments = "{}"))
+        assertTrue(finished.contains(""""finished":true"""))
+        assertFalse(finished.contains("user_spoke"))
+    }
+
     /** A small cut keeps most of its budget: it snaps back to a break only near its end. */
     @Test fun aShortCutKeepsMostOfItsBudget() {
         val part = "### Rules\n" + "The critters curl into balls to roll fast but blind. ".repeat(10)
@@ -943,7 +1029,7 @@ class VoiceSuppressionTests {
         val live = VoiceInstructions.buildLive(
             VoiceInstructions.Context(sessionTitle = "HOME", directoryName = "home", recentMessages = emptyList(), previousTail = emptyList(), previousEndedAt = null, managesSessions = true),
         )
-        assertTrue(live.contains("without predicting what will be done or found"))
+        assertTrue(live.contains("without predicting the session's steps or what will be found"))
         assertTrue(live.contains("While a request is out, never answer it from earlier results"))
         assertTrue(live.contains("The newest result about something replaces everything earlier about it"))
         assertTrue(VoiceDelegator.instructions.contains("never ask it to restate or recap it"))
@@ -1338,5 +1424,40 @@ class VoiceSuppressionTests {
             - A cocooned critter can be cut free by a teammate within 20 seconds.
             - Curling into a ball makes a critter fast but blind; uncurled it sees the spider's web lines.
         """.trimIndent()
+    }
+}
+
+/**
+ * From a call log: GPT-Live took no new turn while the delegator's 90 s wait
+ * held its delegation open. A wait gives way to the user's words, not to a
+ * tag or a cancelled wait.
+ */
+class VoiceWaitYieldTests {
+    @Test fun theUsersNextWordsEndADelegatorWait() = runTest {
+        val harness = LiveHarness(this)
+        val events = EventIterator(harness.start(), backgroundScope)
+        val socket = harness.nextOpened()
+        socket.yieldEvent(LiveServerEvent.SessionStarted(id = "live_1", expiresAt = null))
+        assertEquals(VoiceCallEvent.Connected, events.next())
+
+        var heard = false
+        val wait = launch {
+            harness.coordinator.nextUserWords()
+            heard = true
+        }
+        delay(50)
+        socket.yieldEvent(LiveServerEvent.InputTranscriptDelta(delta = "[gasp", startMilliseconds = 1_000, endMilliseconds = 1_100))
+        delay(100)
+        assertFalse("A tag isn't the user talking", heard)
+        socket.yieldEvent(LiveServerEvent.InputTranscriptDelta(delta = "Hello?", startMilliseconds = 1_200, endMilliseconds = 1_500))
+        wait.join()
+        assertTrue(heard)
+
+        val cancelled = launch { harness.coordinator.nextUserWords() }
+        delay(50)
+        cancelled.cancel()
+        cancelled.join()
+        assertTrue(harness.coordinator.userWordWaiters.isEmpty())
+        harness.coordinator.end()
     }
 }

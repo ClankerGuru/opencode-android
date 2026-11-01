@@ -75,45 +75,41 @@ class VoiceHapticTests {
 
     // MARK: Sounds
 
-    /** iOS `@Test(arguments: [.sweepRight, .sweepLeft, .connected, .ended])`. */
+    /** iOS `@Test(arguments: [VoiceCallCue.connect, .hangUp])`. */
     @Test fun envelopeFindsEachCuesAttack() {
-        for (cue in listOf(Cue.sweepRight, Cue.sweepLeft, Cue.connected, Cue.ended)) {
-            val samples = VoiceCallSynthesizer.samples(cue)
+        for (cue in listOf(VoiceCallCue.connect, VoiceCallCue.hangUp)) {
+            val samples = VoiceCallSoundBank.samples(cue)
             val envelope = VoiceHapticDesign.envelope(cue)
-            // Every cue opens with the synthesizer's 25 ms raised-cosine fade in: half way at 12.5 ms.
-            assertTrue("$cue onset ${envelope.onset}", abs(envelope.onset - 0.0125) < 0.002)
-            // The slow fade in spreads the half-peak point by a few ms between the two measures.
+            // Connect strikes at once; the hang-up's air swells in over 50 ms.
+            assertTrue("$cue onset ${envelope.onset}", envelope.onset < 0.03)
             assertTrue("$cue onset disagrees with its samples", abs(envelope.onset - halfPeakOnset(samples)) < 0.005)
             assertTrue(envelope.peak >= envelope.onset)
             val length = samples.size / PCM.sampleRate
             assertTrue(envelope.end > envelope.peak && envelope.end <= length)
-            assertTrue(envelope.level(envelope.end + 0.01) < VoiceCueEnvelope.floor)
+            // The bundled hang-up rings to its last sample (its final 2.5 ms sit at −27 dB), so
+            // past its end `level` reads that clamped last level; only a cue that falls quiet
+            // inside its file can be checked here. The same CAF decodes the same on iOS.
+            if (envelope.end + 0.01 < length) assertTrue(envelope.level(envelope.end + 0.01) < VoiceCueEnvelope.floor)
         }
     }
 
-    @Test fun chordAndGlideRingAsLongAsTheirNotes() {
-        val chord = VoiceHapticDesign.envelope(Cue.connected)
-        val glide = VoiceHapticDesign.envelope(Cue.ended)
-        val ping = VoiceHapticDesign.envelope(Cue.sweepRight)
-        // −30 dB of each: the 0.4 s ping, the 0.75 s notes staggered over 0.26 s, the two 0.6 s hang-up notes.
-        assertTrue(ping.end > 0.15 && ping.end < 0.4)
-        assertTrue(chord.end > 0.4 && chord.end < 1.01)
-        assertTrue(glide.end > 0.3 && glide.end < 0.76)
-        // The arpeggio's later notes keep the chord near its peak past the first note's.
-        assertTrue(chord.peak > 0.012)
+    @Test fun connectAndHangUpRingAsLongAsTheirSounds() {
+        val connect = VoiceHapticDesign.envelope(VoiceCallCue.connect)
+        val hangUp = VoiceHapticDesign.envelope(VoiceCallCue.hangUp)
+        // −30 dB of each: Wisp's 0.96 s connect bell and 0.38 s hang-up.
+        assertTrue(connect.end > 0.6 && connect.end <= 0.96)
+        assertTrue(hangUp.end > 0.3 && hangUp.end <= 0.38)
     }
 
     // MARK: Connecting
 
-    @Test fun ticksLandOnEachPingsAttack() {
+    @Test fun ticksLandAtEachTurnaroundAsItsHeard() {
         for (cue in listOf(Cue.sweepRight, Cue.sweepLeft)) {
             val pattern = VoiceHapticDesign.tick(cue, audioDelay = audioDelay)
             assertTrue(pattern.shaped.isEmpty())
-            assertEquals(1, pattern.transients.size)
-            val heard = audioDelay + halfPeakOnset(VoiceCallSynthesizer.samples(cue))
-            assertTrue(abs(pattern.transients[0] - heard) < 0.003)
+            assertEquals(listOf(audioDelay), pattern.transients)
         }
-        // The higher D5 ping ticks crisper than G4.
+        // The left turnaround ticks crisper than the right.
         val right = VoiceHapticDesign.tick(Cue.sweepRight, audioDelay = 0.0).events[0]
         val left = VoiceHapticDesign.tick(Cue.sweepLeft, audioDelay = 0.0).events[0]
         assertTrue(left.sharpness > right.sharpness)
@@ -170,14 +166,14 @@ class VoiceHapticTests {
         }
     }
 
-    @Test fun connectStrikesWithTheChordAndTapsAsEachFrontArrives() {
-        val envelope = VoiceHapticDesign.envelope(Cue.connected)
+    @Test fun connectStrikesWithItsCueAndTapsAsEachFrontArrives() {
+        val envelope = VoiceHapticDesign.envelope(VoiceCallCue.connect)
         val strike = audioDelay + envelope.onset
         for (width in widths) {
             for (origin in origins) {
                 val pattern = VoiceHapticDesign.connect(audioDelay = audioDelay, origin = origin, width = width)
                 assertTrue(abs(pattern.transients[0] - strike) < 1e-9)
-                assertTrue(abs(strike - (audioDelay + halfPeakOnset(VoiceCallSynthesizer.samples(Cue.connected)))) < 0.005)
+                assertTrue(abs(strike - (audioDelay + halfPeakOnset(VoiceCallSoundBank.samples(VoiceCallCue.connect)))) < 0.005)
 
                 val arrivals = Scan.bloomArrivals(origin = origin, width = width)
                 val expected = listOf(arrivals.mute, arrivals.end)
@@ -202,8 +198,8 @@ class VoiceHapticTests {
         assertEquals(2, VoiceHapticDesign.connect(audioDelay = audioDelay, origin = 0.5f, width = 408f).transients.size)
     }
 
-    @Test fun connectSwellFollowsTheChordsEnvelope() {
-        val envelope = VoiceHapticDesign.envelope(Cue.connected)
+    @Test fun connectSwellFollowsItsCuesEnvelope() {
+        val envelope = VoiceHapticDesign.envelope(VoiceCallCue.connect)
         val pattern = VoiceHapticDesign.connect(audioDelay = audioDelay, origin = 0.4f, width = 408f)
         val swell = pattern.shaped[0]
         assertTrue(abs(swell.time - (audioDelay + envelope.onset)) < 1e-9)
@@ -214,9 +210,9 @@ class VoiceHapticTests {
             assertTrue(abs(point.value - sqrt(envelope.level(point.time - audioDelay))) < 1e-6f)
         }
         assertEquals(0f, pattern.intensity.last().value)
-        // Loudest on one of the chord's notes (each lands near the same level), then decaying.
+        // Loudest as the ninth joins the root, then decaying.
         val loudest = pattern.intensity.maxBy { it.value }
-        assertTrue(envelope.level(loudest.time - audioDelay) > 0.85f)
+        assertTrue(envelope.level(loudest.time - audioDelay) > 0.75f)
         assertTrue(loudest.time - audioDelay < envelope.end / 2)
         // Brightens as the fronts spread, settling as the bloom completes.
         assertTrue(pattern.sharpness.zipWithNext().all { (a, b) -> a.value < b.value })
@@ -252,10 +248,10 @@ class VoiceHapticTests {
     }
 
     @Test fun glideRumblesWithItsSoundAndDullsAsItFalls() {
-        val envelope = VoiceHapticDesign.envelope(Cue.ended)
+        val envelope = VoiceHapticDesign.envelope(VoiceCallCue.hangUp)
         val pattern = VoiceHapticDesign.glide(audioDelay = audioDelay)
         assertTrue(pattern.events.isEmpty())
-        assertTrue(abs(pattern.shaped[0].time - (audioDelay + halfPeakOnset(VoiceCallSynthesizer.samples(Cue.ended)))) < 0.003)
+        assertTrue(abs(pattern.shaped[0].time - (audioDelay + halfPeakOnset(VoiceCallSoundBank.samples(VoiceCallCue.hangUp)))) < 0.003)
         assertTrue(abs(pattern.shaped[0].end - (audioDelay + envelope.end)) < 1e-9)
         assertTrue(pattern.intensity.size <= VoiceHapticPattern.maxCurvePoints)
         assertTrue(abs(pattern.sharpness.first().value) < 0.02f)
@@ -431,7 +427,8 @@ class VoiceTickRaceTests {
 
 /**
  * The scanner runs from the tap; the call clock joins its timeline once the
- * audio engine is up, and turnarounds passed during startup stay silent.
+ * audio engine is up, playing the call start then, and turnarounds passed
+ * during startup don't tick.
  */
 class VoiceCallStartupTests {
     @Test fun connectingRunsFromTheTapBeforeTheEngineIsUp() = runTest {
@@ -449,7 +446,7 @@ class VoiceCallStartupTests {
         assertTrue(!ending.drawn && ending.overshoot > 0)
     }
 
-    @Test fun noPingOrTickForATurnaroundPassedBeforeTheEngineWasReady() = runTest {
+    @Test fun noTickForATurnaroundPassedBeforeTheEngineWasReady() = runTest {
         val harness = SoundsHarness(this)
         val sounds = harness.sounds()
         var played = 0
@@ -462,11 +459,11 @@ class VoiceCallStartupTests {
         harness.with { sounds.startCallClock(id) { played += 1 } }
         val adopted = required(sounds.stageElapsed(DotScopeSimulation.Stage.connecting))
         assertTrue("The call clock adopts the scanner's timeline: $adopted", adopted >= 0.64)
+        assertEquals("The call start plays as the engine is up", 1, played)
         harness.waitUntil(ready + 150.milliseconds)
-        assertTrue("The missed turnaround stays silent", sounds.snapshot().scheduledCues.isEmpty())
-        assertEquals(0, played)
+        assertTrue("The missed turnaround doesn't tick", sounds.snapshot().scheduledCues.isEmpty())
 
-        // The first ping is the next turnaround the beam reaches: End's, at 1.12 s.
+        // The first tick is the next turnaround the beam reaches: End's, at 1.12 s.
         harness.waitUntil(tapped + (DotScopeSimulation.SoundScheduler.pingTime(2) + 0.2).seconds)
         val snapshot = sounds.snapshot()
         harness.with { sounds.endCallClock(id, playEndCue = false) }
@@ -474,7 +471,7 @@ class VoiceCallStartupTests {
         val ping = required(snapshot.scheduledCues.firstOrNull())
         assertTrue("On the tap's timeline: ${ping.time}", abs(ping.time - DotScopeSimulation.SoundScheduler.pingTime(2)) < 0.1)
         assertEquals(listOf(VoiceCallHaptic.callStarted, VoiceCallHaptic.sweepPass), snapshot.hapticEvents.map { it.haptic })
-        assertEquals(1, played)
+        assertEquals("Turnarounds make no sound over the connecting loop", 1, played)
     }
 
     @Test fun theFirstCueIsReportedOnceFromTheTap() = runTest {
@@ -487,15 +484,14 @@ class VoiceCallStartupTests {
         harness.waitUntil(tapped + 200.milliseconds)
         val id = UUID.randomUUID()
         harness.with { sounds.startCallClock(id, latency = 0.03, reportFirstCue = { reports.trySend(it) }) {} }
-        harness.waitUntil(tapped + (DotScopeSimulation.SoundScheduler.pingTime(1) + 0.05).seconds)
+        runCurrent()
         val first = reports.receive()
-        val expected = ((DotScopeSimulation.SoundScheduler.pingTime(1) + 0.03) * 1_000).toInt()
-        assertEquals(Cue.sweepRight, first.cue)
-        assertTrue("Tap → first ping heard: ${first.milliseconds} ms", abs(first.milliseconds - expected) < 80)
+        assertEquals(VoiceCallCue.callStart, first.cue)
+        assertTrue("Tap → call start heard: ${first.milliseconds} ms", abs(first.milliseconds - (first.audioReadyMilliseconds + 30)) < 10)
         assertTrue(first.audioReadyMilliseconds in 200 until 300)
-        assertTrue(first.logLine.startsWith("Call cue: first sweepRight heard"))
+        assertTrue(first.logLine.startsWith("Call cue: first call_start heard"))
 
-        // The connect chord after it is not a first cue.
+        // The connect cue after it is not a first cue.
         harness.with {
             sounds.noteConnected(id)
             sounds.endCallClock(id, playEndCue = false)

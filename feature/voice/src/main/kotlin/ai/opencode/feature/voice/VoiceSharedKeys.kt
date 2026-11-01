@@ -26,6 +26,9 @@ object VoiceSharedKeys {
     /** The voice new calls speak with. A call on an engine that doesn't offer it uses the default instead (`CallVoice.resolved(engine)`). */
     val callVoice = SharedKey.appStorage("voice-call-voice", CallVoice.default)
 
+    /** Settings › Voice › Call Sounds (iOS `callSoundPack`, declared in `VoiceCallCues.swift`). */
+    val callSoundPack = SharedKey.appStorage("call-sound-pack", VoiceCallSoundPack.default)
+
     /** Settings › Voice › Voice Server. The connected server by default. */
     val voiceServerChoice = SharedKey.appStorage<VoiceServerChoice>("voice-server", VoiceServerChoice.Connected)
 

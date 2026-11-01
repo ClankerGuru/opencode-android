@@ -247,6 +247,7 @@ class VoiceFeatureTestsScreenSession {
                 pendingInputs = { _, _ -> emptyList() },
                 message = { _, _, _ -> throw OpenCodeClientError("Offline") },
                 transcript = { _, _, _ -> earlier },
+                familyPendingRequests = { _, _, _ -> OpenCodePendingRequests(permissions = emptyList(), forms = emptyList()) },
             )
             this[VoiceWorkClient] = VoiceWorkClient.liveValue.let { live ->
                 VoiceWorkClient(

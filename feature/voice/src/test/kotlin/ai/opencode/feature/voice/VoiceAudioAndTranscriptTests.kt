@@ -30,6 +30,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
@@ -779,6 +780,48 @@ class VoiceAudioFailedStartTests {
         assertTrue("$events", activated >= 0)
         assertTrue("$events", events.drop(activated).contains(Event.Deactivated))
         assertFalse(engine.running)
+    }
+
+    /**
+     * Kit's phone: ending a call while it connected deactivated the session
+     * from the main thread as the engine enabled voice processing, which
+     * deadlocked audiomxd and took the app down with it.
+     */
+    @Test fun aHangUpMidSetupLeavesDeactivationToTheStart() = engineTest {
+        val fake = FakeVoiceAudioSession(bluetoothHFP)
+        val owner = AudioSessionOwner(schedule = { _, _ -> })
+        var atHangUp: List<Event>? = null
+        val engine = engine(fake, owner)
+        val start = async(Dispatchers.Default, start = CoroutineStart.LAZY) { engine.start() }
+        fake.onRoute = {
+            if (atHangUp == null) {
+                start.cancel()
+                atHangUp = fake.events
+            }
+        }
+        start.start()
+        assertThrowsSuspending<CancellationException> { start.await() }
+        val hangUp = atHangUp ?: throw AssertionError("The engine never read the route")
+        assertTrue("$hangUp", hangUp.contains(Event.SetActive(true)))
+        assertFalse("The hang-up itself touched the session: $hangUp", hangUp.contains(Event.Deactivated))
+        assertEquals("${fake.events}", 1, fake.events.count { it == Event.Deactivated })
+        assertFalse(fake.events.contains(Event.PlaybackStarted))
+        assertEquals(0, owner.activeCount)
+    }
+
+    @Test fun aWithdrawnHolderCannotActivateButStillReleases() {
+        val owner = AudioSessionOwner(schedule = { _, _ -> })
+        var deactivated = 0
+        val holder = owner.holder { deactivated += 1 }
+        holder.activate {}
+        holder.withdraw()
+        assertEquals(0, deactivated)
+        assertThrows(CancellationException::class.java) { holder.withActive {} }
+        assertThrows(CancellationException::class.java) { holder.activate {} }
+        assertTrue(holder.release())
+        assertFalse(holder.release())
+        assertEquals(1, deactivated)
+        assertEquals(0, owner.activeCount)
     }
 
     @Test fun aStartThatFailsAfterANewerClaimLeavesTheSessionAlone() = engineTest {

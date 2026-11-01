@@ -14,6 +14,7 @@ import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
 import ai.opencode.core.store.cancellable
 import ai.opencode.core.store.concatenate
+import ai.opencode.core.store.map
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeModelRef
@@ -63,7 +64,6 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
          * "the voice agent switched").
          */
         val moveReason: String? = null,
-        val directoryName: String,
         /** The session is waiting on a native approval or answer. */
         val targetNeedsInput: Boolean = false,
         /** Set through [withPhase], which keeps `replyWatch.callPhase` in step (iOS `didSet`). */
@@ -89,6 +89,8 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
         /** Where the screen last moved from, for a request spoken around the move. */
         val lastMove: Move? = null,
         val showsCaptions: Boolean = false,
+        /** How far the floating call (Living Orb) has grown: orb, card or sheet. */
+        val floatingStage: FloatingCallStageFeature.State = FloatingCallStageFeature.State(),
         /** Another app or call took the audio; the bar shows a pause glyph until it's back. */
         val isAudioInterrupted: Boolean = false,
         /** The call is moving to a new connection and it has taken over a second. */
@@ -240,14 +242,41 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
 
         data class Move(val sessionID: String?, val title: String, val at: Instant)
 
+        /** Moves the user didn't make; every other reason is their own switch. */
+        object MoveReason {
+            const val agentSwitched = "the voice agent switched"
+            const val agentOpenedDraft = "the voice agent opened a draft"
+            const val sessionWentAway = "the session went away on the server"
+            val unprompted: Set<String> = setOf(agentSwitched, agentOpenedDraft, sessionWentAway)
+        }
+
+        /**
+         * The last move was one the user didn't make ([MoveReason.unprompted]), keyed by the
+         * move: only those get a notice. Their own switches stay quiet.
+         */
+        val unpromptedMove: Int? get() = if (moveReason != null && moveReason in MoveReason.unprompted) moves else null
+
+        val directoryName: String get() = lastPathComponent(target.directory)
+
         /**
          * Where the call is and what it let go of. Home tells the voice model
          * when either changes; New Session from a draft in the same folder
-         * leaves the target as it was but still lets work go.
+         * leaves the target as it was but still lets work go, while a session
+         * changing folders stays the same session.
          */
-        data class Placement(val target: VoiceWorkTarget, val abandonedCallIDs: List<String>)
+        data class Placement(val target: Target, val abandonedCallIDs: List<String>) {
+            data class Target(val server: OpenCodeServer, val sessionID: String?, val draftDirectory: String?)
+        }
 
-        val placement: Placement get() = Placement(target, abandonedCallIDs)
+        val placement: Placement
+            get() = Placement(
+                target = Placement.Target(
+                    server = target.server,
+                    sessionID = target.sessionID,
+                    draftDirectory = if (target.sessionID == null) target.directory else null,
+                ),
+                abandonedCallIDs = abandonedCallIDs,
+            )
 
         /**
          * No start has run yet: the call bar's appearance may start it. After
@@ -358,7 +387,6 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
             next = next.copy(
                 pendingModel = null,
                 target = next.target.copy(sessionID = session.id, directory = session.directory),
-                directoryName = lastPathComponent(session.directory),
             )
             val previous = next.transcriptKey?.let { next.transcripts[it] }
             // Records written since the call connected are its own.
@@ -384,7 +412,6 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
                 pendingModel = model,
                 target = next.target.copy(sessionID = null, directory = directory),
                 sessionTitle = "New session",
-                directoryName = lastPathComponent(directory),
             )
         }
 
@@ -413,7 +440,23 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
             if (!isOnDraft || target.directory == directory) return this
             return copy(adoptedDraftSessionID = null, draftSessionID = null)
                 .abandonWork()
-                .let { it.copy(target = it.target.copy(directory = directory), directoryName = lastPathComponent(directory)) }
+                .let { it.copy(target = it.target.copy(directory = directory)) }
+        }
+
+        /**
+         * The session the call is on moved folders: the same session, so nothing the voice
+         * model was told changes.
+         */
+        fun sessionMoved(sessionID: String, directory: String): State {
+            var next = this
+            val started = startedTarget
+            if (started?.sessionID == sessionID && started.directory != directory) {
+                next = next.copy(startedTarget = started.copy(directory = directory))
+            }
+            if (next.target.sessionID == sessionID && next.target.directory != directory) {
+                next = next.copy(target = next.target.copy(directory = directory))
+            }
+            return next
         }
 
         /** Drops a reply still being spoken: it was cut off, or the call moved on. */
@@ -490,7 +533,6 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
                 return State(
                     target = VoiceWorkTarget(server = server, sessionID = session.id, directory = session.directory),
                     sessionTitle = usableTitle(session.title) ?: "New session",
-                    directoryName = lastPathComponent(session.directory),
                     tail = VoiceTranscriptTail(lines = previous?.tail ?: emptyList()),
                     previousCallTail = previous?.tail ?: emptyList(),
                     previousEndedAt = previous?.endedAt,
@@ -505,7 +547,6 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
                 target = VoiceWorkTarget(server = server, sessionID = null, directory = draftDirectory),
                 pendingModel = model,
                 sessionTitle = "New session",
-                directoryName = lastPathComponent(draftDirectory),
                 tail = VoiceTranscriptTail(lines = emptyList()),
             )
 
@@ -555,6 +596,9 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
         data class DelegatorOpened(val session: OpenCodeSession) : Action
         data class DelegatorPinned(val session: OpenCodeSession, val pinned: Boolean) : Action
         data object DelegatorRequestedEnd : Action
+
+        /** The delegator answered or dismissed a request in this session. */
+        data class DelegatorSettledRequest(val sessionID: String) : Action
         data class DelegatorOpenedDraft(val directory: String?) : Action
 
         /** The delegator switched a session's model, or the draft's when null. */
@@ -581,6 +625,7 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
         data object EndTapped : Action
         data object CaptionsTapped : Action
         data object CaptionsDismissed : Action
+        data class FloatingStage(val action: FloatingCallStageFeature.Action) : Action
         data class ServerVoiceSupportUpdated(val support: ServerVoiceSupport) : Action
         data class CallRouteResolved(val route: VoiceRoute, val usesDelegator: Boolean) : Action
 
@@ -606,6 +651,12 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
 
         /** The delegator pinned or unpinned a session. */
         data class SetPinned(val session: OpenCodeSession, val pinned: Boolean) : DelegateAction
+
+        /**
+         * The delegator answered or dismissed a request in this session: its requests are
+         * read again, so the dock and “Needs your input” follow the server.
+         */
+        data class RequestSettled(val sessionID: String) : DelegateAction
 
         /** The delegator opened a new session's draft, in a project when given. */
         data class OpenDraft(val directory: String?) : DelegateAction
@@ -651,14 +702,24 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
     }
 
     private val timeline = VoiceTimeline()
+    private val floatingStage = FloatingCallStageFeature()
 
     override fun reduce(state: State, action: Action): Reduced<State, Action> {
         // VoiceTimeline sees the state the action arrives to.
         timeline.reduce(state, action)
-        val core = reduceCall(state, action)
+        val scoped = scopeFloatingStage(state, action)
+        val reduced = reduceCall(scoped.state, action)
+        val core = Reduced(reduced.state, Effect.merge(scoped.effect, reduced.effect))
         val logged = logCall(core.state, action)
         val presence = presenceEffect(state, logged)
         return Reduced(logged, Effect.merge(core.effect, presence))
+    }
+
+    /** iOS `Scope(state: \.floatingStage, action: \.floatingStage)`. */
+    private fun scopeFloatingStage(state: State, action: Action): Reduced<State, Action> {
+        if (action !is Action.FloatingStage) return Reduced(state)
+        val child = floatingStage.reduce(state.floatingStage, action.action)
+        return Reduced(state.copy(floatingStage = child.state), child.effect.map { Action.FloatingStage(it) })
     }
 
     private fun reduceCall(state: State, action: Action): Reduced<State, Action> {
@@ -819,6 +880,8 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
 
             Action.DelegatorRequestedEnd -> Reduced(state.copy(endsAfterDelegation = true))
 
+            is Action.DelegatorSettledRequest -> Reduced(state, Effect.send(Action.Delegate(DelegateAction.RequestSettled(action.sessionID))))
+
             is Action.DelegatorOpenedDraft -> {
                 if (state.phase.isTerminal) Reduced(state)
                 else Reduced(state, Effect.send(Action.Delegate(DelegateAction.OpenDraft(action.directory))))
@@ -924,7 +987,7 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
                 }
             }
 
-            is Action.Delegate -> Reduced(state)
+            is Action.FloatingStage, is Action.Delegate -> Reduced(state)
         }
     }
 

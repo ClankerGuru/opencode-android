@@ -392,7 +392,7 @@ private class FloatingCallFrameNode(var kind: FloatingCallFrameKind) : Modifier.
 
 /** The overlay's stages (iOS `FloatingCallSurface.Stage`). */
 @Suppress("EnumEntryName")
-enum class FloatingCallStage { seed, lifted, resting, panel, leaving }
+enum class FloatingCallSurfaceStage { seed, lifted, resting, panel, leaving }
 
 /**
  * The floating call's geometry, in the overlay's coordinates (dp): where the orb rests, where
@@ -456,16 +456,16 @@ data class FloatingCallLayout(
     }
 
     /** The frame of [stage]; [drag] is the finger's translation while carrying the orb. */
-    fun frame(stage: FloatingCallStage, place: FloatingCallPlace, drag: Offset?, seedFrame: Rect?): Rect {
+    fun frame(stage: FloatingCallSurfaceStage, place: FloatingCallPlace, drag: Offset?, seedFrame: Rect?): Rect {
         val rest = restFrame(place)
         return when (stage) {
-            FloatingCallStage.seed -> seedFrame ?: rest.inset(rest.width * 0.2f, rest.height * 0.2f)
-            FloatingCallStage.lifted -> {
+            FloatingCallSurfaceStage.seed -> seedFrame ?: rest.inset(rest.width * 0.2f, rest.height * 0.2f)
+            FloatingCallSurfaceStage.lifted -> {
                 val seed = seedFrame ?: rest
                 val scale = FloatingCallTunables.liftScale
                 seed.inset(-seed.width * (scale - 1) / 2, -seed.height * (scale - 1) / 2)
             }
-            FloatingCallStage.resting -> {
+            FloatingCallSurfaceStage.resting -> {
                 if (drag == null) return rest
                 // Under the finger: floating size, wherever it's carried.
                 val floating = restFrame(place.copy(docked = false))
@@ -473,21 +473,21 @@ data class FloatingCallLayout(
                 val cy = rest.center.y + drag.y
                 Rect(cx - floating.width / 2, cy - floating.height / 2, cx + floating.width / 2, cy + floating.height / 2)
             }
-            FloatingCallStage.panel -> panelFrame(place)
-            FloatingCallStage.leaving -> rest.inset(rest.width * 0.25f, rest.height * 0.25f)
+            FloatingCallSurfaceStage.panel -> panelFrame(place)
+            FloatingCallSurfaceStage.leaving -> rest.inset(rest.width * 0.25f, rest.height * 0.25f)
         }
     }
 
-    fun cornerRadius(stage: FloatingCallStage, frame: Rect): Float {
-        val radius = if (stage == FloatingCallStage.panel) 28f else min(frame.width, frame.height) / 2
+    fun cornerRadius(stage: FloatingCallSurfaceStage, frame: Rect): Float {
+        val radius = if (stage == FloatingCallSurfaceStage.panel) 28f else min(frame.width, frame.height) / 2
         // iOS `GlassShape.clamped`: never more than half the shorter side.
         return min(max(0f, radius), max(0f, min(frame.width, frame.height)) / 2)
     }
 
     /** How close the orb is to its nearer side edge, 0 (far) to 1 (touching or docked). */
-    fun edgeProximity(frame: Rect, stage: FloatingCallStage, place: FloatingCallPlace, dragging: Boolean): Pair<FloatingCallPlace.Side, Float> {
-        if (stage == FloatingCallStage.resting && !dragging && place.docked) return place.side to 1f
-        if (stage != FloatingCallStage.resting || !dragging) return place.side to 0f
+    fun edgeProximity(frame: Rect, stage: FloatingCallSurfaceStage, place: FloatingCallPlace, dragging: Boolean): Pair<FloatingCallPlace.Side, Float> {
+        if (stage == FloatingCallSurfaceStage.resting && !dragging && place.docked) return place.side to 1f
+        if (stage != FloatingCallSurfaceStage.resting || !dragging) return place.side to 0f
         val leading = frame.left
         val trailing = screenWidth - frame.right
         val side = if (leading < trailing) FloatingCallPlace.Side.leading else FloatingCallPlace.Side.trailing
@@ -500,7 +500,7 @@ data class FloatingCallLayout(
      * waits off screen, past the merge distance, so it slides in and out with the orb rather
      * than appearing or vanishing.
      */
-    fun beadFrame(frame: Rect, stage: FloatingCallStage, place: FloatingCallPlace, dragging: Boolean): Rect {
+    fun beadFrame(frame: Rect, stage: FloatingCallSurfaceStage, place: FloatingCallPlace, dragging: Boolean): Rect {
         val (side, amount) = edgeProximity(frame, stage, place, dragging)
         val width = FloatingCallTunables.beadWidth * amount
         val length = FloatingCallTunables.beadLength * (0.4f + 0.6f * amount)
@@ -617,7 +617,7 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screenWidth: Float, screenH
         val from = center.breakoutFrom
         if (state.phase == VoiceFeature.State.Phase.Connecting && state.connectedAt == null && !reduceMotion) from else null
     }
-    var stage by remember { mutableStateOf(if (breakout != null) FloatingCallStage.seed else FloatingCallStage.resting) }
+    var stage by remember { mutableStateOf(if (breakout != null) FloatingCallSurfaceStage.seed else FloatingCallSurfaceStage.resting) }
     var seedFrame by remember { mutableStateOf(breakout) }
     var place by remember { mutableStateOf(center.place ?: FloatingCallPlace(docked = defaultDocked)) }
     var drag by remember { mutableStateOf<Offset?>(null) }
@@ -683,7 +683,7 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screenWidth: Float, screenH
         jobs.awake?.cancel()
         jobs.awake = scope.launch {
             delay(600)
-            val open = stage == FloatingCallStage.panel
+            val open = stage == FloatingCallSurfaceStage.panel
             faceAwake = !open
             panelAwake = open
             restMounted = !open
@@ -692,7 +692,7 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screenWidth: Float, screenH
     }
 
     fun expand() {
-        if (store.state.phase.isTerminal || stage == FloatingCallStage.panel || drag != null) return
+        if (store.state.phase.isTerminal || stage == FloatingCallSurfaceStage.panel || drag != null) return
         jobs.breakout?.cancel()
         haptics.play(Haptic.tap)
         hideTag()
@@ -701,17 +701,17 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screenWidth: Float, screenH
             // Mounted in the same frame, the controls fade in with it.
             panelMounted = true
             scopeMounted = true
-            stage = FloatingCallStage.panel
+            stage = FloatingCallSurfaceStage.panel
         }
         settleHidden()
     }
 
     fun collapse() {
-        if (stage != FloatingCallStage.panel) return
+        if (stage != FloatingCallSurfaceStage.panel) return
         faceAwake = true
         move(expandMove) {
             restMounted = true
-            stage = FloatingCallStage.resting
+            stage = FloatingCallSurfaceStage.resting
         }
         settleHidden()
     }
@@ -724,7 +724,7 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screenWidth: Float, screenH
         val leaveMove = if (reduceMotion) FloatingMove.EaseInOut(0.2) else FloatingMove.Spring(FloatingCallTunables.leave)
         move(leaveMove) {
             restMounted = true
-            stage = FloatingCallStage.leaving
+            stage = FloatingCallSurfaceStage.leaving
         }
         scope.launch { opacity.animateTo(0f, if (reduceMotion) Motion.easeOut(0.2) else FloatingCallTunables.leave.spec()) }
     }
@@ -766,10 +766,10 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screenWidth: Float, screenH
             // shadow), then the same shape moves up into its rest and grows into the orb, one
             // spring retargeting the other.
             yield()
-            move(FloatingMove.Spring(FloatingCallTunables.lift)) { stage = FloatingCallStage.lifted }
+            move(FloatingMove.Spring(FloatingCallTunables.lift)) { stage = FloatingCallSurfaceStage.lifted }
             delay((FloatingCallTunables.liftHold * 1000).toLong())
-            if (stage != FloatingCallStage.lifted) return@launch
-            move(if (reduceMotion) FloatingMove.Instant else FloatingMove.Spring(FloatingCallTunables.breakout)) { stage = FloatingCallStage.resting }
+            if (stage != FloatingCallSurfaceStage.lifted) return@launch
+            move(if (reduceMotion) FloatingMove.Instant else FloatingMove.Spring(FloatingCallTunables.breakout)) { stage = FloatingCallSurfaceStage.resting }
         }
     }
     LaunchedEffect(screenWidth) { center.screenWidth = screenWidth }
@@ -827,7 +827,7 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screenWidth: Float, screenH
 
     val rest = geometry.restFrame(place)
     val panel = geometry.panelFrame(place)
-    val lifted = stage == FloatingCallStage.seed || stage == FloatingCallStage.lifted || drag != null
+    val lifted = stage == FloatingCallSurfaceStage.seed || stage == FloatingCallSurfaceStage.lifted || drag != null
     val elevation by animateFloatAsState(
         (if (lifted) FloatingCallTunables.liftElevation else FloatingCallTunables.restElevation).value,
         FloatingCallTunables.lift.spec(),
@@ -840,10 +840,10 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screenWidth: Float, screenH
             .fillMaxSize()
             .semantics {
                 isTraversalGroup = true
-                if (stage == FloatingCallStage.panel) dismiss { collapse(); true }
+                if (stage == FloatingCallSurfaceStage.panel) dismiss { collapse(); true }
             },
     ) {
-        if (stage == FloatingCallStage.panel) {
+        if (stage == FloatingCallSurfaceStage.panel) {
             // Outside the panel: a tap folds it back into the orb.
             Box(
                 Modifier
@@ -853,7 +853,7 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screenWidth: Float, screenH
             )
         }
         // Light from the face spills onto what's behind the surface, as Siri's does.
-        if (!usesLivingOrb && FloatingCallTunables.glow > 0 && stage != FloatingCallStage.panel && orbStyle != FloatingCallOrbStyle.dots) {
+        if (!usesLivingOrb && FloatingCallTunables.glow > 0 && stage != FloatingCallSurfaceStage.panel && orbStyle != FloatingCallOrbStyle.dots) {
             val colors = when {
                 // The pearls' own light, subtle like the dots.
                 orbStyle.dotTake != null -> listOf(Color(0.98f, 0.9f, 0.78f), Color(0.78f, 0.86f, 1.0f))
@@ -875,7 +875,7 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screenWidth: Float, screenH
         }
         val tag = tagText
         AnimatedVisibility(
-            visible = tag != null && stage == FloatingCallStage.resting && drag == null,
+            visible = tag != null && stage == FloatingCallSurfaceStage.resting && drag == null,
             enter = fadeIn(if (reduceMotion) Motion.easeOut(0.2) else MotionSpring(0.3, 0.2).spec()) +
                 scaleIn(if (reduceMotion) Motion.easeOut(0.2) else MotionSpring(0.3, 0.2).spec(), initialScale = 0.92f, transformOrigin = TransformOrigin(if (place.side == FloatingCallPlace.Side.trailing) 1f else 0f, 0.5f)),
             exit = fadeOut(Motion.easeOut(0.2)) + scaleOut(Motion.easeOut(0.2), targetScale = 0.92f, transformOrigin = TransformOrigin(if (place.side == FloatingCallPlace.Side.trailing) 1f else 0f, 0.5f)),
@@ -914,12 +914,12 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screenWidth: Float, screenH
             // Resting or opening, the face stays laid out at its rest and the panel grows over
             // it; lifting, leaving or under the finger it rides with the surface instead of
             // wiping through it.
-            val rides = drag != null || stage == FloatingCallStage.seed || stage == FloatingCallStage.lifted || stage == FloatingCallStage.leaving
+            val rides = drag != null || stage == FloatingCallSurfaceStage.seed || stage == FloatingCallSurfaceStage.lifted || stage == FloatingCallSurfaceStage.leaving
             fun restBox(): Rect = if (rides) frameAnim.value.let { Rect(0f, 0f, it.width, it.height) } else rest.translate(-frameAnim.value.left, -frameAnim.value.top)
 
             // The composer's call button, lifting out of it.
             val seedAlpha by animateFloatAsState(
-                when (stage) { FloatingCallStage.seed -> 1f; FloatingCallStage.lifted -> 0.55f; else -> 0f },
+                when (stage) { FloatingCallSurfaceStage.seed -> 1f; FloatingCallSurfaceStage.lifted -> 0.55f; else -> 0f },
                 if (reduceMotion) snap() else FloatingCallTunables.breakout.spec(),
                 label = "floatingCallSeed",
             )
@@ -938,12 +938,12 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screenWidth: Float, screenH
 
             // The face clears out fast as the panel opens, so it never sits under End, and comes
             // back just behind the panel folding away.
-            val restShown = stage == FloatingCallStage.resting || stage == FloatingCallStage.leaving || stage == FloatingCallStage.lifted
+            val restShown = stage == FloatingCallSurfaceStage.resting || stage == FloatingCallSurfaceStage.leaving || stage == FloatingCallSurfaceStage.lifted
             val restAlpha by animateFloatAsState(
                 if (restShown) 1f else 0f,
                 when {
                     reduceMotion -> snap()
-                    stage == FloatingCallStage.panel -> Motion.easeOut(0.14)
+                    stage == FloatingCallSurfaceStage.panel -> Motion.easeOut(0.14)
                     else -> Motion.easeOut(0.2, delaySeconds = 0.06)
                 },
                 label = "floatingCallRest",
@@ -1000,7 +1000,7 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screenWidth: Float, screenH
                                 reduceMotion = reduceMotion,
                                 onTap = { expand() },
                                 onDragChanged = { translation ->
-                                    if (stage == FloatingCallStage.resting) {
+                                    if (stage == FloatingCallSurfaceStage.resting) {
                                         if (drag == null) hideTag()
                                         // A short spring under the finger: picking up a docked
                                         // orb grows it back to its floating size instead of
@@ -1009,7 +1009,7 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screenWidth: Float, screenH
                                     }
                                 },
                                 onDragEnded = { translation, predicted ->
-                                    if (stage == FloatingCallStage.resting && drag != null) {
+                                    if (stage == FloatingCallSurfaceStage.resting && drag != null) {
                                         val next = geometry.settle(place, translation, predicted)
                                         if (next.docked != place.docked || next.side != place.side) haptics.play(Haptic.selection)
                                         move(dragMove) {
@@ -1026,7 +1026,7 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screenWidth: Float, screenH
                 }
             }
 
-            val panelShown = stage == FloatingCallStage.panel
+            val panelShown = stage == FloatingCallSurfaceStage.panel
             val panelAlpha by animateFloatAsState(
                 if (panelShown) 1f else 0f,
                 when {

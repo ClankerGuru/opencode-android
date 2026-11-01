@@ -1,6 +1,7 @@
 package ai.opencode.feature.voice
 
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.log.AppLog
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
@@ -13,6 +14,8 @@ import ai.opencode.server.model.OpenCodeFileReference
 import ai.opencode.server.model.OpenCodeFormValue
 import ai.opencode.server.model.OpenCodeModel
 import ai.opencode.server.model.OpenCodeModelRef
+import ai.opencode.server.model.OpenCodeOutgoingAttachment
+import ai.opencode.server.model.OpenCodePendingRequests
 import ai.opencode.server.model.OpenCodePermissionReply
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.OpenCodeTranscriptItem
@@ -24,6 +27,7 @@ import ai.opencode.server.sendPromptConfirming
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -107,6 +111,17 @@ class VoiceDelegatorWorkspace(
         val watchedPromptIDs: Map<String, List<String>> = emptyMap(),
         /** Snapshot of the current call's debug log, when requested for a bug report. */
         val callLogSnapshot: () -> VoiceCallLog? = { null },
+        /**
+         * Developer Mode was on when the request started: `capture_app_screenshot`
+         * works only then.
+         */
+        val developerMode: Boolean = false,
+        /** What the call knows of the app, for a screenshot's message. */
+        val appState: VoiceAppState? = null,
+        /** The app's own window as a JPEG ([VoiceScreenshotClient]). */
+        val captureScreenshot: suspend () -> VoiceScreenshotClient.Result = { VoiceScreenshotClient.Result.Failed(VoiceScreenshotClient.Failure.noWindow) },
+        /** Recent `AppLog` lines, oldest first. */
+        val appLog: () -> List<String> = { emptyList() },
         /** The model picker's favorites (`OpenCodeModel.id`), listed first. */
         val favoriteModelIDs: Set<String> = emptySet(),
         /** How long a tool may take; tests shorten it. */
@@ -158,6 +173,11 @@ class VoiceDelegatorWorkspace(
          * waits on the session's screen for the next send.
          */
         val keptPick: suspend (sessionID: String, model: OpenCodeModelRef) -> Unit = { _, _ -> },
+        /**
+         * A permission or question was answered or dismissed: the screens
+         * read their requests again rather than wait for the server's event.
+         */
+        val settledRequest: suspend (sessionID: String) -> Unit = {},
         /** Hang up once the delegator's answer (the goodbye) has been spoken. */
         val endCall: suspend () -> Unit = {},
         /** A Voice message carried the long header into this session. */
@@ -182,6 +202,13 @@ class VoiceDelegatorWorkspace(
          * request's answer rather than speaking over it.
          */
         val waiting: suspend (sessionID: String, isWaiting: Boolean) -> Unit = { _, _ -> },
+        /** Returns when the user next says words: a wait gives way to them. */
+        val userSpoke: suspend () -> Unit = { awaitCancellation() },
+        /**
+         * `wait_for_session`'s wait, shared with the session's reply watches so
+         * a session has one `/wait`. Without it, the client's own.
+         */
+        val awaitIdle: (suspend (server: OpenCodeServer, sessionID: String) -> Unit)? = null,
         val note: suspend (String) -> Unit,
         val trace: suspend (VoiceDelegator.Trace) -> Unit = {},
     )
@@ -218,7 +245,7 @@ class VoiceDelegatorWorkspace(
         get() = VoiceDelegatorTools(
             run = { call -> run(call) },
             sent = { unanswered() },
-            delivered = { deliveredPrompts() },
+            delivered = { withContext(confined) { prompts.toList() } },
             note = { text -> effects.note(text) },
             trace = { trace -> effects.trace(trace) },
         )
@@ -226,8 +253,6 @@ class VoiceDelegatorWorkspace(
     private suspend fun unanswered(): List<VoiceDelegator.SentPrompt> = withContext(confined) {
         prompts.filter { it.promptID !in answered }
     }
-
-    private suspend fun deliveredPrompts(): List<VoiceDelegator.SentPrompt> = withContext(confined) { prompts.toList() }
 
     suspend fun run(call: VoiceDelegator.ToolCall): String = withContext(confined) {
         val arguments = try {
@@ -270,7 +295,7 @@ class VoiceDelegatorWorkspace(
                 val (sessions, running) = listed(board, server)
                 val limit = minOf(arguments.int("limit") ?: 15, 40)
                 val filter = if (arguments.bool("pinned_only") ?: false) "pinned" else arguments.string("filter")
-                val pins = if (elsewhere) pinOrder(server) else pinOrder(board)
+                val pins = pinOrder(board, server)
                 var rows = sessions.filter { it.parentID == null }.map { status(it, it.id in running, board, pins, server) }
                 when (filter) {
                     "pinned" -> rows = rows.filter { it.pinOrder != null }.sortedBy { it.pinOrder!! }
@@ -327,7 +352,7 @@ class VoiceDelegatorWorkspace(
                 if (matches.isEmpty() && searchFailed) {
                     throw OpenCodeClientError("Couldn’t search sessions, and no recent session matched.")
                 }
-                val pins = if (elsewhere) pinOrder(server) else pinOrder(board)
+                val pins = pinOrder(board, server)
                 return json(matches.take(maxOf(0, limit)).map { status(it, it.id in running, board, pins, server).json })
             }
 
@@ -403,6 +428,7 @@ class VoiceDelegatorWorkspace(
                 val session = budget.required { target(arguments) }
                 val delivery = if (arguments.string("delivery") == "queue") OpenCodeDelivery.Queue else OpenCodeDelivery.Steer
                 val attachCallLog = arguments.bool("attach_call_log") ?: false
+                if (delivery == OpenCodeDelivery.Steer) heldByRequest(session, budget)?.let { return it }
                 val outcome = send(
                     string(arguments, "text"),
                     to = session,
@@ -422,8 +448,8 @@ class VoiceDelegatorWorkspace(
             "send_call_log" -> {
                 val budget = RetryBudget(start.latency.total)
                 val session = budget.required { target(arguments) }
-                val note = arguments.string("note")?.trim()
-                val instruction = if (!note.isNullOrEmpty()) note else "Inspect the attached voice call log from this call."
+                val instruction = note(arguments) ?: "Inspect the attached voice call log from this call."
+                heldByRequest(session, budget)?.let { return it }
                 val outcome = send(instruction, to = session, delivery = OpenCodeDelivery.Steer, attachCallLog = true, budget = budget)
                 return json(
                     mapOf(
@@ -434,29 +460,49 @@ class VoiceDelegatorWorkspace(
                 )
             }
 
+            "capture_app_screenshot" -> {
+                if (!start.developerMode) {
+                    throw OpenCodeClientError("Screenshots need Developer Mode, in Settings › Developer.")
+                }
+                // The screen as the user sees it now, before any read moves on.
+                val capture = when (val taken = start.captureScreenshot()) {
+                    is VoiceScreenshotClient.Result.Taken -> taken.capture
+                    is VoiceScreenshotClient.Result.Failed -> {
+                        AppLog.voice.notice("Delegator screenshot refused: ${taken.failure.name}")
+                        return json(mapOf("error" to taken.failure.message, "screenshot_attached" to false))
+                    }
+                }
+                val budget = RetryBudget(start.latency.total)
+                val session = budget.required { target(arguments) }
+                heldByRequest(session, budget)?.let { return it }
+                val appState = start.appState?.copy(
+                    screen = capture.screen,
+                    appearance = capture.appearance,
+                    home = start.board()?.home,
+                )
+                val screenshot = OpenCodeOutgoingAttachment(data = capture.jpeg, mime = "image/jpeg", name = "screenshot.jpg")
+                val appLog = if (arguments.bool("attach_app_log") == true) VoiceAppLog.attachment(start.appLog()) else null
+                val feedback = arguments.string("text")?.trim().orEmpty()
+                val outcome = send(
+                    feedback.ifEmpty { "Look at the attached screenshot of the app." },
+                    to = session,
+                    delivery = OpenCodeDelivery.Steer,
+                    attachCallLog = arguments.bool("attach_call_log") ?: false,
+                    attachments = listOfNotNull(screenshot, appLog),
+                    appState = appState,
+                    budget = budget,
+                )
+                val result = linkedMapOf<String, Any?>("sent_to" to session.title, "message_id" to outcome.promptID, "screenshot_attached" to true)
+                capture.screen?.let { result["screen"] = it }
+                if (outcome.callLogAttached) result["call_log_attached"] = true
+                if (appLog != null) result["app_log_attached"] = true
+                return json(result)
+            }
+
             "list_requests" -> {
                 val session = target(arguments, server)
                 val pending = client.familyPendingRequests(server, listOf(session.id), session.directory)
-                val requests = mapOf<String, Any?>(
-                    "session" to session.title,
-                    "permissions" to pending.permissions.map {
-                        mapOf("request_id" to it.id, "action" to it.action, "resources" to it.resources)
-                    },
-                    "questions" to pending.forms.map { form ->
-                        mapOf(
-                            "form_id" to form.id,
-                            "title" to form.title,
-                            "fields" to form.fields.map { field ->
-                                val item = linkedMapOf<String, Any?>("key" to field.key, "type" to field.type.name.lowercase())
-                                field.title?.let { item["title"] = it }
-                                field.description?.let { item["description"] = it }
-                                field.options?.let { options -> item["options"] = options.map { mapOf("value" to it.value, "label" to it.label) } }
-                                if (field.required == true) item["required"] = true
-                                item
-                            },
-                        )
-                    },
-                )
+                val requests = requests(pending, session)
                 return json(if (elsewhere) tagged(requests, server) else requests)
             }
 
@@ -466,7 +512,8 @@ class VoiceDelegatorWorkspace(
                 val decision = string(arguments, "decision")
                 val reply = permissionReply(decision)
                     ?: throw OpenCodeClientError("decision must be once, always, or reject.")
-                client.replyPermission(server, session.id, requestID, reply, null)
+                client.replyPermission(server, session.id, requestID, reply, if (reply == OpenCodePermissionReply.Reject) note(arguments) else null)
+                effects.settledRequest(session.id)
                 effects.note(
                     if (reply == OpenCodePermissionReply.Reject) {
                         "Denied a permission in “${session.title}”."
@@ -487,13 +534,15 @@ class VoiceDelegatorWorkspace(
                 val answers = LinkedHashMap<String, OpenCodeFormValue>()
                 for ((key, value) in raw) answers[key] = formValue(value)
                 client.replyForm(server, session.id, formID, answers)
+                effects.settledRequest(session.id)
                 effects.note("Answered a question in “${session.title}”.")
                 return json(mapOf("answered" to formID, "session" to session.title))
             }
 
             "dismiss_question" -> {
                 val session = target(arguments)
-                client.cancelForm(server, session.id, string(arguments, "form_id"), null)
+                client.cancelForm(server, session.id, string(arguments, "form_id"), note(arguments))
+                effects.settledRequest(session.id)
                 effects.note("Dismissed a question in “${session.title}”.")
                 return json(mapOf("dismissed" to true))
             }
@@ -518,11 +567,7 @@ class VoiceDelegatorWorkspace(
                 // A steer applies a waiting pick first, as a typed Send Now does.
                 val pick = pendingPicks[session.id]
                 if (pick != null) {
-                    try {
-                        client.switchModel(server, session.id, pick)
-                    } catch (error: OpenCodeClientError) {
-                        throw error.copy(message = "Couldn’t switch model: ${error.message}")
-                    }
+                    switchPendingPick(pick, session.id)
                     pendingPicks.remove(session.id)
                     effects.appliedPick(session.id, pick)
                 }
@@ -552,7 +597,22 @@ class VoiceDelegatorWorkspace(
                 // (bounded), so the two never say the same thing twice.
                 if (!elsewhere) effects.waiting(session.id, true)
                 try {
-                    val finished = idle(90.seconds) { client.waitForIdle(server, session.id) }
+                    // GPT-Live takes no new turn while this request is open, so the user
+                    // speaking ends the wait: the answer frees the voice agent for them.
+                    val awaitIdle = effects.awaitIdle
+                    val end = waitEnd(90.seconds, userSpoke = effects.userSpoke) {
+                        if (awaitIdle != null) awaitIdle(server, session.id) else client.waitForIdle(server, session.id)
+                    }
+                    val finished = end == WaitEnd.idle
+                    if (end == WaitEnd.userSpoke) {
+                        AppLog.voice.notice("Delegator wait ended early: the user spoke")
+                        effects.note("Stopped waiting on “${session.title}”: the user spoke.")
+                        // The user is waiting for the answer: no read that could hold it
+                        // up or lose it. The reply is spoken when it lands.
+                        if (!elsewhere) effects.waiting(session.id, false)
+                        val yielded = mapOf<String, Any?>("finished" to false, "user_spoke" to userSpokeNote)
+                        return json(if (elsewhere) tagged(yielded, server) else yielded)
+                    }
                     // The wait may have used up the tool's budget: the read after it
                     // gets one of its own.
                     val items = RetryBudget(start.latency.total).scope { client.transcript(server, session.id, 40) }
@@ -734,11 +794,9 @@ class VoiceDelegatorWorkspace(
         }
     }
 
-    /** Another server's pins, in drawer order. This request only pins on its own server. */
-    private fun pinOrder(server: OpenCodeServer): List<String> = pins(start.pinnedSessionKeys, server)
-
-    /** Drawer order, with this request's own pins and unpins applied. */
-    private fun pinOrder(board: VoiceSessionBoard?): List<String> {
+    /** Drawer order on `server`, with this request's own pins and unpins applied. */
+    private fun pinOrder(board: VoiceSessionBoard?, server: OpenCodeServer): List<String> {
+        if (server.persistenceID != start.server.persistenceID) return pins(start.pinnedSessionKeys, server)
         val order = (board?.pinnedIDs ?: if (start.pinnedOrder.isEmpty()) start.pinned.sorted() else start.pinnedOrder).toMutableList()
         order.removeAll { pinChanges[it] == false }
         for ((id, pin) in pinChanges.entries.sortedBy { it.key }) {
@@ -848,6 +906,34 @@ class VoiceDelegatorWorkspace(
     private fun latestPromptID(sessionID: String): String? = prompts.lastOrNull { it.sessionID == sessionID }?.promptID
 
     /**
+     * A steer into a session blocked on a permission or question would wait
+     * behind it, and a steered "yes" never answers the request, so it isn't
+     * sent: the delegator gets the requests to answer or dismiss first. Every
+     * steer reads its one target's requests (Home's flags lag a request that
+     * just arrived); an unreadable session Home or the screen flags still
+     * holds the message. A global (MCP) form belongs to no session, so it
+     * never holds one.
+     */
+    private suspend fun heldByRequest(session: OpenCodeSession, budget: RetryBudget): String? {
+        val board = start.board()
+        var flag = board?.let { it.needsInput(session, running = it.isRunning(session.id)) } ?: VoiceSessionBoard.Flag.no
+        if (start.viewingNeedsInput && session.id == start.viewing?.id) flag = VoiceSessionBoard.Flag.yes
+        val server = start.server
+        val pending = budget.optional(start.latency.optional) {
+            client.familyPendingRequests(server, listOf(session.id), session.directory)
+        }?.let { it.copy(forms = it.forms.filter { form -> !form.isGlobal }) }
+        val waiting = pending?.let { it.permissions.isNotEmpty() || it.forms.isNotEmpty() } ?: (flag == VoiceSessionBoard.Flag.yes)
+        if (!waiting) return null
+        AppLog.voice.notice(
+            "Delegator held a steer: ${pending?.let { "${it.permissions.size} permissions, ${it.forms.size} questions" } ?: "requests unread"} pending",
+        )
+        val result = LinkedHashMap(pending?.let { requests(it, session) } ?: mapOf("session" to session.title))
+        result["not_sent"] = true
+        result["note"] = heldNote(listed = pending != null)
+        return json(result)
+    }
+
+    /**
      * A Voice message: the delegator's instruction, rendered in the session
      * like any voice delegation. The instruction is already the voice side's
      * written request, so it is what the message shows; the spoken
@@ -858,6 +944,8 @@ class VoiceDelegatorWorkspace(
         to: OpenCodeSession,
         delivery: OpenCodeDelivery,
         attachCallLog: Boolean = false,
+        attachments: List<OpenCodeOutgoingAttachment> = emptyList(),
+        appState: VoiceAppState? = null,
         isNewSession: Boolean = false,
         budget: RetryBudget,
     ): SendOutcome {
@@ -930,6 +1018,9 @@ class VoiceDelegatorWorkspace(
             callLogAttached = callLogAttached,
             callLogURL = callLogURL,
             inlineCallLog = inlineCallLog,
+            appState = appState,
+            screenshotAttached = attachments.any { it.mime.startsWith("image/") },
+            appLogAttached = attachments.any { it.name == VoiceAppLog.fileName },
         )
         // Like a typed send: the session's waiting pick goes just before the
         // prompt, within the tool's budget, and a refused one sends nothing. A
@@ -938,23 +1029,22 @@ class VoiceDelegatorWorkspace(
         val server = start.server
         val pick = if (delivery == OpenCodeDelivery.Queue && !isNewSession) null else pendingPicks[session.id]
         if (pick != null) {
-            try {
-                budget.required { client.switchModel(server, session.id, pick) }
-            } catch (error: OpenCodeClientError) {
-                throw error.copy(message = "Couldn’t switch model: ${error.message}")
-            }
+            budget.required { switchPendingPick(pick, session.id) }
         }
         if (delivery == OpenCodeDelivery.Steer && !isNewSession) client.moveToBackgroundBeforeSteer(server, session.id)
         // One ID for every attempt, read back if its sending ends in doubt.
         val promptID = budget.required {
-            client.sendPromptConfirming(server, session.id, text, delivery, files = files.toList(), readBack = start.latency.optional)
+            client.sendPromptConfirming(server, session.id, text, delivery, files = files.toList(), attachments = attachments, readBack = start.latency.optional)
         }
         // The pick waits until a prompt that carried it was taken.
         if (pick != null) {
             pendingPicks.remove(session.id)
             effects.appliedPick(session.id, pick)
         }
-        effects.sent(session.id, VoiceAdmittedPrompt(messageID = promptID, text = text, files = files.toList(), delivery = delivery))
+        effects.sent(
+            session.id,
+            VoiceAdmittedPrompt(messageID = promptID, text = text, attachments = attachments, files = files.toList(), delivery = delivery),
+        )
         if (fresh) {
             explained += session.id
             effects.explained(session.id)
@@ -1027,6 +1117,14 @@ class VoiceDelegatorWorkspace(
     }
 
     private data class NewSessionModel(val ref: OpenCodeModelRef, val chosen: Boolean)
+
+    private suspend fun switchPendingPick(pick: OpenCodeModelRef, sessionID: String) {
+        try {
+            client.switchModel(start.server, sessionID, pick)
+        } catch (error: OpenCodeClientError) {
+            throw error.copy(message = "Couldn’t switch model: ${error.message}")
+        }
+    }
 
     /** The model the viewed session's screen picked and hasn't sent yet. */
     private fun pickedModel(session: OpenCodeSession?): OpenCodeModelRef? = session?.let { pendingPicks[it.id] }
@@ -1110,26 +1208,64 @@ class VoiceDelegatorWorkspace(
             )
         }
 
-        private suspend fun idle(within: Duration, wait: suspend () -> Unit): Boolean = coroutineScope {
+        @Suppress("EnumEntryName")
+        enum class WaitEnd { idle, notIdle, userSpoke }
+
+        /** Told to the delegator when the user's words ended its wait. */
+        const val userSpokeNote = "The user started talking while you waited, so the wait ended. Answer now in a few words: the work is still going and its reply is spoken when it lands. Don't wait again in this request."
+
+        fun heldNote(listed: Boolean): String =
+            "This session is waiting on the request${if (listed) "" else " (list_requests shows it)"} and would hold anything sent until it's resolved. A message never answers it. When the user approved, picked, or answered, that is the answer: answer_question with their option values, or reply_permission. If they answered only some of a question's fields, ask about the rest before answering. A request for more or other work isn't an answer: dismiss_question with a note in their words. A permission they want something else instead of: reply_permission reject with a note in their words. Otherwise ask them. Then send again."
+
+        private suspend fun waitEnd(within: Duration, userSpoke: suspend () -> Unit, wait: suspend () -> Unit): WaitEnd = coroutineScope {
             val waited = async {
                 try {
                     wait()
-                    true
+                    WaitEnd.idle
                 } catch (_: OpenCodeClientError) {
-                    false
+                    WaitEnd.notIdle
                 }
             }
             val timer = async {
                 delay(within)
-                false
+                WaitEnd.notIdle
+            }
+            val spoke = async {
+                userSpoke()
+                WaitEnd.userSpoke
             }
             val first = select {
                 waited.onAwait { it }
                 timer.onAwait { it }
+                spoke.onAwait { it }
             }
             coroutineContext.cancelChildren()
             first
         }
+
+        /** An optional `note` argument, trimmed; null when empty. */
+        private fun note(arguments: JsonObject): String? = arguments.string("note")?.trim()?.takeIf { it.isNotEmpty() }
+
+        fun requests(pending: OpenCodePendingRequests, session: OpenCodeSession): Map<String, Any?> = mapOf(
+            "session" to session.title,
+            "permissions" to pending.permissions.map {
+                mapOf("request_id" to it.id, "action" to it.action, "resources" to it.resources)
+            },
+            "questions" to pending.forms.map { form ->
+                mapOf(
+                    "form_id" to form.id,
+                    "title" to form.title,
+                    "fields" to form.fields.map { field ->
+                        val item = linkedMapOf<String, Any?>("key" to field.key, "type" to field.type.name.lowercase())
+                        field.title?.let { item["title"] = it }
+                        field.description?.let { item["description"] = it }
+                        field.options?.let { options -> item["options"] = options.map { mapOf("value" to it.value, "label" to it.label) } }
+                        if (field.required == true) item["required"] = true
+                        item
+                    },
+                )
+            },
+        )
 
         private fun string(arguments: JsonObject, key: String): String {
             val value = arguments.string(key)
