@@ -4,6 +4,7 @@ import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.LocalTranscriptLayoutTuning
+import ai.opencode.feature.transcript.list.LocalTranscriptTimelinePaused
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -143,8 +144,10 @@ object InlineRowPulse {
 fun Modifier.inlineRowPulse(isActive: Boolean): Modifier {
     val reduceMotion = rememberReduceMotion()
     if (!isActive || reduceMotion) return this
+    val paused = LocalTranscriptTimelinePaused.current
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(paused) {
+        if (paused) return@LaunchedEffect
         // ~30 Hz like iOS's `TimelineView(.animation(minimumInterval: 1 / 30))`.
         var last = 0L
         while (true) {

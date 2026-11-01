@@ -1,5 +1,6 @@
 package ai.opencode.feature.transcript
 
+import ai.opencode.feature.transcript.user.TranscriptSendFailure
 import ai.opencode.server.model.PastedTextSummary
 import ai.opencode.feature.media.LinkMenuAction
 import ai.opencode.feature.media.TranscriptImagePreview
@@ -28,6 +29,7 @@ sealed interface TranscriptAction {
     data class SessionLinksAppeared(val ids: List<String>) : TranscriptAction
     data class SubagentTapped(val sessionID: String) : TranscriptAction
     data object MoveToBackgroundTapped : TranscriptAction
+    data class FailedSendMoveTapped(val messageID: String) : TranscriptAction
     data class FailedSendRetryTapped(val messageID: String) : TranscriptAction
     data class FailedSendEditTapped(val messageID: String) : TranscriptAction
     data class FailedSendDeleteTapped(val messageID: String) : TranscriptAction
@@ -144,7 +146,7 @@ data class TranscriptConfiguration(
     val isDraft: Boolean = false,
     val queuedInputs: List<OpenCodeQueuedInput> = emptyList(),
     /** Why each failed send failed, by message ID; its bubble offers Retry. */
-    val failedSends: Map<String, String> = emptyMap(),
+    val failedSends: Map<String, TranscriptSendFailure> = emptyMap(),
     /** A quiet line under a send that's taking a while, by message ID. */
     val deliveryNotes: Map<String, String> = emptyMap(),
     /** Messages waiting in the queued pill: a steering row that leaves for one flies into the pill. */

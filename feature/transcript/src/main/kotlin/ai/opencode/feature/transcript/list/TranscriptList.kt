@@ -267,6 +267,14 @@ private fun TranscriptListContent(
         LocalTranscriptLayoutTuning provides layoutTuning,
         LocalTranscriptTextReveal provides textReveal,
         LocalLinkPreviewStore provides linkPreviews,
+        // A covering screen isn't composed and a stopped activity's frame clock pauses, so
+        // only the lifecycle below RESUMED is left to gate (iOS `emptyPulsePaused`).
+        LocalTranscriptTimelinePaused provides TranscriptTimelineGate.pauses(
+            listHidden = !resumed.isAtLeast(Lifecycle.State.RESUMED),
+            sceneInBackground = false,
+            covered = false,
+            drawn = true,
+        ),
     ) {
         Box(modifier.nestedScroll(controller.nestedScrollConnection)) {
             LazyColumn(

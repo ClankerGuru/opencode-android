@@ -26,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -387,3 +388,20 @@ fun TranscriptQueuedInputView(input: OpenCodeQueuedInput, modifier: Modifier = M
         Box(Modifier.weight(1f).height(1.dp).background(line))
     }
 }
+
+/**
+ * iOS `TranscriptTimelineGate`: the list's rows' running timelines (`InlineRowPulse`, the
+ * session's `AgentActivityGlyph` and `WorkingLineRow`) stop whenever the reader can't see the
+ * list. Plain text and code rows never read it.
+ */
+object TranscriptTimelineGate {
+    /**
+     * Paused whenever the reader can't see the list: the list off screen, the app in the
+     * background, another screen over it, or the list not drawn.
+     */
+    fun pauses(listHidden: Boolean, sceneInBackground: Boolean, covered: Boolean, drawn: Boolean): Boolean =
+        listHidden || sceneInBackground || covered || !drawn
+}
+
+/** Whether the list's row timelines are paused ([TranscriptTimelineGate]); false outside a list. */
+val LocalTranscriptTimelinePaused = compositionLocalOf { false }
