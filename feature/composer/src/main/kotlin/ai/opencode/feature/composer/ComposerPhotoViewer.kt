@@ -16,9 +16,8 @@ import java.util.UUID
  * photo's dimensions and size and a Remove action.
  *
  * The viewer's Remove (`TranscriptImageViewerFeature.State.allowsRemove`, `removeTapped`, the
- * `removed` delegate, `isDiscarded`), `TranscriptImagePreview.Page.detail` and the flight's
- * accessories (`MediaFlightAccessory`) are `:feature:media`'s; until they land the preview's
- * pages carry no detail line and [ComposerPhotoViewerFeature] isn't ported.
+ * `removed` delegate, `isDiscarded`) and the flight's accessories (`MediaFlightAccessory`) are
+ * `:feature:media`'s; [ComposerPhotoViewerFeature] isn't ported yet.
  */
 object ComposerPhotoViewer {
     private const val PREFIX = "composer-photo-"
@@ -52,6 +51,7 @@ object ComposerPhotoViewer {
                 id = mediaID(attachment.id),
                 image = image,
                 label = attachment.name ?: "Image attachment ${index + 1} of ${images.size}",
+                detail = detail(attachment, image),
             )
         }
         return TranscriptImagePreview(mediaID(selected), pages)

@@ -1,6 +1,13 @@
 package ai.opencode.feature.transcript.rows
 
 import ai.opencode.core.ui.OpenCodeTextStyles
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.getValue
+import ai.opencode.feature.transcript.list.transcriptNow
+import ai.opencode.feature.transcript.TranscriptTunables
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.feature.media.TranscriptMetrics
 import androidx.compose.foundation.background
@@ -83,14 +90,43 @@ fun TranscriptRule(
 
 /**
  * Where the reader left off (iOS `NewMessagesDivider`): a labelled rule like a compaction's,
- * above the first row that arrived while they were away.
+ * above the first row that arrived while they were away. The first time the reader sees it
+ * ([glowStart], on [transcriptNow]'s clock; null with Reduce Motion) its rule and label start
+ * brighter and dim to the quiet rule over `dividerGlowDuration`.
  */
 @Composable
-fun NewMessagesDivider(modifier: Modifier = Modifier) {
-    TranscriptRule(
-        modifier.padding(vertical = TranscriptMetrics.sectionHalf).clearAndSetSemantics { contentDescription = "New messages" },
-        labelColor = OpenCodeTheme.colors.secondaryText,
-    ) {
-        Text("New")
+fun NewMessagesDivider(modifier: Modifier = Modifier, glowStart: Double? = null) {
+    val glow by produceState(initialValue = newDividerGlow(glowStart, transcriptNow()), glowStart) {
+        while (value > 0f) {
+            withFrameNanos { }
+            value = newDividerGlow(glowStart, transcriptNow())
+        }
     }
+    Box(
+        modifier
+            .padding(vertical = TranscriptMetrics.sectionHalf)
+            .testTag("transcript-new-messages")
+            .clearAndSetSemantics { contentDescription = "New messages" },
+    ) {
+        TranscriptRule(labelColor = OpenCodeTheme.colors.secondaryText) { Text("New") }
+        if (glow > 0f) {
+            TranscriptRule(
+                Modifier.matchParentSize().graphicsLayer { alpha = glow },
+                lineColor = OpenCodeTheme.colors.secondaryText,
+                labelColor = OpenCodeTheme.colors.text,
+            ) { Text("New") }
+        }
+    }
+}
+
+/**
+ * The divider's glow [now]: from `dividerGlowLift` to nothing on a cubic over
+ * `dividerGlowDuration` (iOS's `CubicKeyframe`), none before it's seen.
+ */
+internal fun newDividerGlow(glowStart: Double?, now: Double): Float {
+    if (glowStart == null) return 0f
+    val duration = TranscriptTunables.dividerGlowDuration
+    val progress = if (duration <= 0) 1.0 else ((now - glowStart) / duration).coerceIn(0.0, 1.0)
+    val eased = progress * progress * (3 - 2 * progress)
+    return (TranscriptTunables.dividerGlowLift * (1 - eased)).toFloat()
 }

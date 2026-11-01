@@ -81,7 +81,11 @@ fun MediaView(
                     isMedia = presentation.isMedia,
                     reducesMotion = presentation.reducesMotion,
                     screenName = presentation.screenName,
-                    onDismissed = { if (presenter.presentation === presentation) presenter.presentation = null },
+                    onDismissed = {
+                        if (presenter.presentation === presentation) presenter.presentation = null
+                        presentation.onDismiss?.invoke()
+                    },
+                    flightAccessories = presentation.flightAccessories,
                     content = presentation.content,
                 )
             }

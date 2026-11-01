@@ -115,6 +115,12 @@ class SendLanding {
 
         /** Marks a pending label above a message (iOS `SendLandingProbe.labelSuffix`). */
         const val LABEL_SUFFIX = "#label"
+
+        /**
+         * iOS `SendLandingProbe.imageID`: a sent message's image slot, by its index among the
+         * message's images (the wire order), for the composer's `SentImageFlight` to land on.
+         */
+        fun imageID(messageID: String, index: Int): String = "$messageID#image-$index"
     }
 }
 
@@ -139,6 +145,28 @@ internal fun rememberSendLandingProbe(itemID: String?, suffix: String = ""): Sen
     }
     return probe
 }
+
+/**
+ * A frame-only marker for [key] while a [LocalSendLanding] is provided (iOS `SendLandingProbe`
+ * on a sent image's slot): it reports where it sits and never records, since the message's
+ * surfaces marker already draws the slot for the flight.
+ */
+@Composable
+internal fun rememberSendLandingMarker(key: String?): SendLanding.Marker? {
+    val landing = LocalSendLanding.current
+    if (landing == null || key == null) return null
+    val layer = rememberGraphicsLayer()
+    val marker = remember(landing, key, layer) { SendLanding.Marker(layer) }
+    DisposableEffect(landing, key, marker) {
+        landing.register(key, marker)
+        onDispose { landing.unregister(key, marker) }
+    }
+    return marker
+}
+
+/** Reports where a frame-only [marker] sits (window px, unclipped). */
+internal fun Modifier.sendLandingMarker(marker: SendLanding.Marker?): Modifier =
+    if (marker == null) this else onGloballyPositioned { marker.bounds = Rect(it.positionInWindow(), it.size.toSize()) }
 
 /**
  * Reports where this part of [probe]'s message sits, and records its drawing instead of

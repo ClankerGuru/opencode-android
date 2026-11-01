@@ -70,6 +70,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -85,13 +86,20 @@ object MermaidDiagramMetrics {
         val scale = min(1f, min(width / natural.width, maxHeight.value / natural.height))
         return Size((natural.width * scale).roundToInt().toFloat(), (natural.height * scale).roundToInt().toFloat())
     }
+
+    /** Whether a completed diagram render alters the laid-out height from [laidOutSize] (iOS `MermaidDiagramCard.revisesRow`). */
+    fun revisesRow(laidOutSize: Size?, renderedSize: Size): Boolean {
+        if (laidOutSize == null) return true
+        return abs(laidOutSize.width - renderedSize.width) >= 0.5f || abs(laidOutSize.height - renderedSize.height) >= 0.5f
+    }
 }
 
 /**
  * A finished Mermaid block as a card showing the diagram at its natural aspect, at most
- * [MermaidDiagramMetrics.maxHeight] tall. It holds a steady height while the diagram renders,
+ * [MermaidDiagramMetrics.maxHeight] tall. It holds a steady height while the diagram renders
+ * (its final one once Pele has sized the source), marking its row revised before any change,
  * opens full screen (zoomable, sharp) on a tap, and shows its source from the hold menu. A
- * diagram Mermaid rejects shows as the code it is; one whose render was interrupted is tried once
+ * diagram Pele rejects shows as the code it is; one whose render was interrupted is tried once
  * more, then shows the code until it appears again or is tapped. Port of iOS `MermaidDiagramCard`.
  */
 @OptIn(ExperimentalFoundationApi::class)
@@ -123,12 +131,18 @@ fun MermaidDiagramCard(
     var interrupted by remember { mutableStateOf<MermaidCacheKey?>(null) }
     var retries by remember { mutableIntStateOf(0) }
     var menuOpen by remember { mutableStateOf(false) }
+    // Marks the hosting row revised before a fallback to code, retry, or uncached size changes height.
+    val row = remember { AgentImageRowAnchor() }
+    AgentImageRowAnchor.Placement(row)
 
+    // The draw (below) sets this, straight from the renderer's cache when it's there.
+    val isRendered = natural?.first == diagramKey
     val naturalSize: Size? = natural?.takeIf { it.first == diagramKey }?.second
-        ?: renderer.cachedDiagram(source, theme)?.let { Size(it.width, it.height) }
+        ?: renderer.naturalSize(source, theme)
     val hasFailed = failed == diagramKey || renderer.cachedFailure(source, theme)
 
     fun retry() {
+        row.revised()
         interrupted = null
         retries += 1
     }
@@ -186,7 +200,7 @@ fun MermaidDiagramCard(
                     )
                     .clearAndSetSemantics {
                         contentDescription = "Diagram"
-                        stateDescription = if (naturalSize == null) "$diagramType, loading" else diagramType
+                        stateDescription = if (!isRendered) "$diagramType, loading" else diagramType
                         role = Role.Button
                         onClick { open(); true }
                         customActions = listOf(CustomAccessibilityAction("View Source") { showSource(); true })
@@ -217,8 +231,10 @@ fun MermaidDiagramCard(
                     )
                 }
             }
-            LaunchedEffect(key) {
-                if (shown != null || display.width <= 0) return@LaunchedEffect
+            // Waits for the draw: the size can be known before the diagram renders, so a failed
+            // first render followed by a good retry wouldn't change `key`.
+            LaunchedEffect(key, isRendered) {
+                if (!isRendered || shown != null || display.width <= 0) return@LaunchedEffect
                 val drawn = try {
                     renderer.image(source, theme, display.width, display.height, density)
                 } catch (cancellation: CancellationException) {
@@ -234,15 +250,19 @@ fun MermaidDiagramCard(
     LaunchedEffect(diagramKey, retries) {
         renderer.useHost(view)
         val key = diagramKey
-        if (naturalSize != null || hasFailed) return@LaunchedEffect
+        if (isRendered || hasFailed) return@LaunchedEffect
+        val initialSize = naturalSize
         for (attempt in 0 until 2) {
             try {
                 val diagram = renderer.diagram(source, theme)
-                natural = key to Size(diagram.width, diagram.height)
+                val size = Size(diagram.width, diagram.height)
+                if (MermaidDiagramMetrics.revisesRow(initialSize, size)) row.revised()
+                natural = key to size
                 return@LaunchedEffect
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (_: MermaidRenderError.InvalidDiagram) {
+                row.revised()
                 failed = key
                 return@LaunchedEffect
             } catch (_: Throwable) {
@@ -250,6 +270,7 @@ fun MermaidDiagramCard(
                 if (attempt == 0) delay(1_000)
             }
         }
+        row.revised()
         interrupted = key
     }
 }

@@ -23,6 +23,9 @@ import androidx.compose.ui.platform.LocalDensity
 
 /** Developer Mode → Tuning → Transcript → Session Links (iOS `SessionLinkTunables`). */
 object SessionLinkTunables {
+    /** The Tuning Panel sections it registers (the key segment after the group), in order. */
+    val sectionTitles = listOf("Session Link")
+
     /** The chip's corner radius at body size (17 pt); it scales with the text. */
     val radius = Tunable("transcript.sessionLink.radius", "Chip corner radius (pt at body size)", default = 4.5f, range = 0.0..10.0, step = 0.25)
     /** The chip's height and how far its centre sits above the baseline, in ems. */

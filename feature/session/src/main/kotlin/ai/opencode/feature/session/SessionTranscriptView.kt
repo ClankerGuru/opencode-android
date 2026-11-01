@@ -41,6 +41,7 @@ import ai.opencode.feature.transcript.rows.ReplyCopyGlyph
 import ai.opencode.feature.transcript.rows.TranscriptFonts
 import ai.opencode.feature.transcript.rows.TranscriptRowSlots
 import ai.opencode.feature.transcript.rows.TranscriptTimeStamps
+import ai.opencode.feature.transcript.user.TranscriptSendFailure
 import ai.opencode.feature.transcript.user.TranscriptUserMessage
 import ai.opencode.server.OpenCodePairingLink
 import ai.opencode.server.model.OpenCodeModel
@@ -522,7 +523,7 @@ object SessionTranscriptView {
             failedSends = if (state.failedSends.isEmpty()) {
                 emptyMap()
             } else {
-                buildMap { for (failed in state.failedSends) putIfAbsent(failed.id, failed.reason) }
+                buildMap { for (failed in state.failedSends) putIfAbsent(failed.id, TranscriptSendFailure(failed.reason)) }
             },
             deliveryNotes = if (state.failedSends.isEmpty()) emptyMap() else state.deliveryNotes.mapValues { it.value.label },
             queuedPillTexts = if (queuedRows.isEmpty()) {
@@ -621,6 +622,8 @@ object SessionTranscriptView {
         is TranscriptAction.SessionLinksAppeared -> Action.SessionLinksAppeared(action.ids)
         is TranscriptAction.SubagentTapped -> Action.SubagentTapped(action.sessionID)
         TranscriptAction.MoveToBackgroundTapped -> Action.MoveToBackgroundTapped
+        // Move to needs the session's missing-folder move (iOS b629d780), not ported here yet.
+        is TranscriptAction.FailedSendMoveTapped -> null
         is TranscriptAction.FailedSendRetryTapped -> Action.FailedSendRetryTapped(action.messageID)
         is TranscriptAction.FailedSendEditTapped -> Action.FailedSendEditTapped(action.messageID)
         is TranscriptAction.FailedSendDeleteTapped -> Action.FailedSendDeleteTapped(action.messageID)

@@ -177,7 +177,7 @@ private fun UserMessage(
                     verticalArrangement = Arrangement.spacedBy(UserMessageRun.spacing),
                 ) {
                     if (message.images.isNotEmpty()) {
-                        UserMessageImages(message.images, isPending, corners(Surface.Images), onPreviewImage)
+                        UserMessageImages(message.id, message.images, isPending, corners(Surface.Images), onPreviewImage)
                     }
                     if (message.files.isNotEmpty()) {
                         TranscriptFileChips(

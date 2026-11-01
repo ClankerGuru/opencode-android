@@ -13,7 +13,6 @@ import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.feature.media.AgentFileViewer
 import ai.opencode.feature.media.AgentImageGallery
-import ai.opencode.feature.media.AgentImageMarkerView
 import ai.opencode.feature.media.AgentImageViewport
 import ai.opencode.feature.media.AgentImageVisibility
 import ai.opencode.feature.media.BrowserFeature
@@ -154,7 +153,7 @@ private class LabViewport : AgentImageViewport {
     override val imageViewportVisibleRect: Rect get() = rect
     override val imageViewportIsSettling: Boolean get() = false
     override val imageViewportIsVisible: Boolean get() = true
-    override fun imageContentRevised(marker: AgentImageMarkerView) {}
+    override fun imageContentRevised(row: Any?) {}
 }
 
 @Composable
@@ -282,7 +281,7 @@ private fun ToolImages(item: OpenCodeTranscriptItem.Tool, attachments: List<Pair
             bitmap ?: continue
             Box(
                 Modifier.clip(RoundedCornerShape(TranscriptMetrics.cardCornerRadius)).clickable {
-                    TranscriptImagePreview.fromAttachments(decoded, id, "Tool image")?.let { presenter?.presentImage(it) }
+                    TranscriptImagePreview.fromImages(decoded, id, "Tool image")?.let { presenter?.presentImage(it) }
                 },
             ) {
                 MediaThumbnail(bitmap, listOf(id), Modifier.size(if (decoded.size == 1) 240.dp else 140.dp), cornerRadius = TranscriptMetrics.cardCornerRadius)
