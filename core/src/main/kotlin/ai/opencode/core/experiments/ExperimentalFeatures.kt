@@ -95,14 +95,6 @@ enum class ExperimentalCallStyle {
             if (livingOrb) floating else if (callTray) tray else standard
 
         /**
-         * The pre-c75d4a1e three-switch form, kept while Home and Session still pass the
-         * Floating Call center's forced flag; Living Orb, then the tray, then a floating call.
-         */
-        @Deprecated("Floating Call is Living Orb (iOS 64ff3ed7)", ReplaceWith("of(callTray, livingOrb)"))
-        fun of(callTray: Boolean, floatingCall: Boolean, livingOrb: Boolean): ExperimentalCallStyle =
-            if (livingOrb) floating else if (callTray) tray else if (floatingCall) floating else standard
-
-        /**
          * Moves a saved Floating Call switch to Living Orb once, then removes it. Call Tray won
          * over Floating Call, so a saved tray stays the tray.
          */

@@ -39,7 +39,7 @@ enum class ExperimentalFeature(
     val isGraduated: Boolean = false,
     /**
      * Removed on iOS but still read by modules whose port of the removal hasn't landed. Not in
-     * [allCases], never listed, never on (Floating Call reads Living Orb's switch, see [storedAs]).
+     * [allCases], never listed, never on.
      */
     val isRetired: Boolean = false,
 ) {
@@ -77,10 +77,6 @@ enum class ExperimentalFeature(
 
     // Removed on iOS; kept only until the modules that still read them port the removal.
 
-    /** iOS 64ff3ed7/e4aeb212: Living Orb is the floating call. Reads Living Orb's switch ([storedAs]). */
-    @Deprecated("Removed on iOS (64ff3ed7): read livingOrb")
-    floatingCall("floating-call", "Floating Call", ExperimentalGroup.calls, "Keep calls in a floating orb", "phone.circle.fill", order = Int.MAX_VALUE, isRetired = true),
-
     /** iOS cd6be7c6 removed the Since You Left experiment. Never on. */
     @Deprecated("Removed on iOS (cd6be7c6)")
     sinceYouLeft("since-you-left", "Since You Left", ExperimentalGroup.transcript, "Recap activity since you left", "clock.arrow.circlepath", order = Int.MAX_VALUE, isRetired = true),
@@ -96,12 +92,8 @@ enum class ExperimentalFeature(
 
     val id: String get() = rawValue
 
-    /** The experiment whose switch this one reads: itself, or the one a retired experiment became. */
-    @Suppress("DEPRECATION")
-    val storedAs: ExperimentalFeature get() = if (this == floatingCall) livingOrb else this
-
-    /** Retired with nothing to read: always off. */
-    private val isOff: Boolean get() = isRetired && storedAs == this
+    /** Retired: always off. */
+    private val isOff: Boolean get() = isRetired
 
     /** Whether this experiment is on in a view, from its stored switch (`shared(experimental(this))`). */
     fun isActive(stored: Boolean): Boolean = if (isOff) false else stored
@@ -131,9 +123,8 @@ enum class ExperimentalFeature(
  * One experimental feature's switch (iOS `.experimental(feature)`): `experimental-<rawValue>`,
  * off by default unless it has graduated ([ExperimentalFeature.defaultEnabled]).
  */
-fun experimental(feature: ExperimentalFeature): SharedKey<Boolean> = feature.storedAs.let {
-    SharedKey.appStorage("experimental-${it.rawValue}", it.defaultEnabled)
-}
+fun experimental(feature: ExperimentalFeature): SharedKey<Boolean> =
+    SharedKey.appStorage("experimental-${feature.rawValue}", feature.defaultEnabled)
 
 /** The experimental switches as reducers read them, overridable in tests. */
 class ExperimentalFeatures(val isEnabled: (ExperimentalFeature) -> Boolean) {

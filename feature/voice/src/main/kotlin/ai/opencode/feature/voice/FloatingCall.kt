@@ -307,7 +307,7 @@ class FloatingCallCenter(readsLabHooks: Boolean = false) {
         }
     }
 
-    fun isOn(stored: Boolean): Boolean = forced || ExperimentalFeature.floatingCall.isActive(stored)
+    fun isOn(stored: Boolean): Boolean = forced || ExperimentalFeature.livingOrb.isActive(stored)
 
     /** Kept only while the card rests shut: the composer slides with the drawer, and the orb stays where it was. */
     fun noteComposer(frame: Rect) {
@@ -536,8 +536,8 @@ private sealed interface FloatingMove {
  *
  * Hosting: Session (or Drawer, which keeps the call over the drawer swipe) places it over
  * everything, filling the whole window edge to edge (not inset by the system bars), while the
- * call shows and `FloatingCallCenter.shared.isOn(shared(experimental(.floatingCall)))` or the
- * Living Orb experiment is on. Report the composer with [floatingCallComposer] and its call
+ * call shows and `FloatingCallCenter.shared.isOn(shared(experimental(.livingOrb)))` (the Living
+ * Orb experiment, or the lab's forced flag). Report the composer with [floatingCallComposer] and its call
  * button with [floatingCallButton]; set `FloatingCallCenter.shared.breakoutFrom =
  * callButton` when the call button starts a call. Touches outside the orb pass through.
  *

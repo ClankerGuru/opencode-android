@@ -328,13 +328,11 @@ private fun HomeLayout(
 @Composable
 private fun rememberCallPresentation(): ExperimentalCallStyle {
     val callTraySetting by remember { shared(ExperimentalFeature.callTray.key).flow }.collectAsState()
-    val floatingCallSetting by remember { shared(ExperimentalFeature.floatingCall.key).flow }.collectAsState()
     val livingOrbSetting by remember { shared(ExperimentalFeature.livingOrb.key).flow }.collectAsState()
     val floatingCenter = remember { FloatingCallCenter.shared }
     return ExperimentalCallStyle.of(
         callTray = ExperimentalFeature.callTray.isActive(callTraySetting),
-        floatingCall = floatingCenter.isOn(floatingCallSetting),
-        livingOrb = ExperimentalFeature.livingOrb.isActive(livingOrbSetting),
+        livingOrb = floatingCenter.isOn(livingOrbSetting),
     )
 }
 

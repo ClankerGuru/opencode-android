@@ -59,24 +59,22 @@ internal fun StoreOf<State, Action>.rememberCallStore(hostedCall: VoiceStoreOf?)
 
 /**
  * iOS `callPresentation`: Settings' Call Style, from the call experiments. The Call Tray applies
- * only when Home hands the screen its [CallTrayController] ([callTray]); Living Orb outranks it,
- * and it outranks Floating Call (`ExperimentalCallStyle.of`).
+ * only when Home hands the screen its [CallTrayController] ([callTray]); Living Orb outranks it
+ * (`ExperimentalCallStyle.of`). The Living Orb switch counts through [FloatingCallCenter.isOn].
  */
 @Composable
 internal fun rememberCallPresentation(callTray: CallTrayController?): ExperimentalCallStyle {
     val center = remember { dependency(FloatingCallCenter) }
     val tray by remember { shared(ExperimentalFeature.callTray.key).flow }.collectAsState(shared(ExperimentalFeature.callTray.key).value)
-    val floating by remember { shared(ExperimentalFeature.floatingCall.key).flow }.collectAsState(shared(ExperimentalFeature.floatingCall.key).value)
     val livingOrb by remember { shared(ExperimentalFeature.livingOrb.key).flow }.collectAsState(shared(ExperimentalFeature.livingOrb.key).value)
     return ExperimentalCallStyle.of(
         callTray = callTray != null && ExperimentalFeature.callTray.isActive(tray),
-        floatingCall = center.isOn(floating),
-        livingOrb = ExperimentalFeature.livingOrb.isActive(livingOrb),
+        livingOrb = center.isOn(livingOrb),
     )
 }
 
 /**
- * iOS `floatsCall` (`callPresentation == .floating`): Floating Call or Living Orb is on, so the call
+ * iOS `floatsCall` (`callPresentation == .floating`): Living Orb is on, so the call
  * floats over the screen (Home hosts `FloatingCallOverlay`) and the composer stays a composer.
  */
 @Composable
