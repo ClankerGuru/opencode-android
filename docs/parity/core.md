@@ -46,7 +46,7 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 | `OpenCode/Core/ScrollsToTop.swift` | 31 |  | todo |  |
 | `OpenCode/Core/ServerID.swift` | 75 | see server.md | — | ported into `:server` |
 | `OpenCode/Core/ServerIDClient.swift` | 55 | see server.md | — | ported into `:server` |
-| `OpenCode/Core/SharedKeys.swift` | 821 | `core/.../sharing/SharedKeys.kt`, `server/.../ServerSharedKeys.kt`, `feature/voice/.../VoiceSharedKeys.kt` | sync: done | primitive keys in `:core`; server-typed keys + `CachedHomeSnapshot`/`CachedTranscriptSnapshots`/`TranscriptCachePersistence` in `:server`; voice-typed keys in `:feature:voice`. Same ids and defaults |
+| `OpenCode/Core/SharedKeys.swift` | 821 | `core/.../sharing/SharedKeys.kt`, `core/.../sharing/InstallHistory.kt`, `server/.../ServerSharedKeys.kt`, `feature/voice/.../VoiceSharedKeys.kt` | partial: `sessionSeenWatermarks` (`SessionSeenWatermark(s)`) → transcript/drawer | primitive keys in `:core`; server-typed keys + `CachedHomeSnapshot`/`CachedTranscriptSnapshots`/`TranscriptCachePersistence` in `:server`; voice-typed keys in `:feature:voice`. Same ids and defaults. `remember` marks `installHistory` `.paired` (b13208e9); `InstallHistory` (iOS `AppFeature+Migrations.swift`) moved down to `:core` (`sharing/InstallHistory.kt`) so `:server`'s `remember` can write it, see app.md |
 | `OpenCode/Core/SoundEffectsClient.swift` | 135 |  | todo |  |
 | `OpenCode/Core/SoundEffectsPlayback.swift` | 259 |  | todo |  |
 | `OpenCode/Core/TapTarget.swift` | 37 | see core-ui.md | — | |
@@ -65,7 +65,7 @@ Ported from iOS `OpenCodeTests/` into `core/src/test` (JVM, same names). Shared 
 | `TestIsolationGuardTests.swift` | `testing/TestIsolationGuardTests.kt` | 4 (+1 in `:server`) | deleted: keyboard frame, window/first responder, `UIView` animations (UIKit), seeded order (Swift Testing hook) |
 | `DiagnosticsRecorderTests.swift` | `diagnostics/DiagnosticsRecorderTests.kt` | 12 of 13 | `headerResolutionNotifiesObserversWhenChanged` → `:feature:session` (`SessionHeaderStyle`); `RealtimeTransportDiagnostic` half → `:feature:voice` |
 | `PrivacyManifestTests.swift` | `diagnostics/DiagnosticsRecorderTests.kt` | 1 of 2 | manifest plist test deleted (iOS `PrivacyInfo.xcprivacy`) |
-| `ExperimentalFeatureTests.swift` | `experiments/ExperimentalFeatureTests.kt` | 8 | `VoiceAudioDemoMode` half → `:feature:voice` |
+| `ExperimentalFeatureTests.swift` | `experiments/ExperimentalFeatureTests.kt` | 12 of 13 (migrations run against a fresh `SharedStore` in place of a `UserDefaults` suite) | `theSessionsPageDividerSwitchKeepsTheSavedChoice` (`HomeSettingsFeature`) → `:feature:settings`; `VoiceAudioDemoMode` half → `:feature:voice` |
 | `HapticsAuditTests.swift` | `haptics/HapticsAuditTests.kt` | 2 (`LiveHapticsTests` source scan; `aRequestArrivingInTheBackgroundPlaysNothing` under Robolectric in `LiveHapticsFrameworkTests`: `LiveHaptics` gated by `ProcessLifecycleOwner`, shadow `Vibrator`) | `HapticsAuditTests` suite → `:feature:session`/`:feature:drawer`; `VoiceCallHaptic` fallbacks → `:feature:voice`, ported there |
 | `AudioSessionHapticsTests.swift` | `haptics/AudioSessionHapticsTests.kt` | 1 (`traceLineIsContentFreeAndNamesWhatMutesHaptics`) | deleted: `LiveDictationAudioSessionTests` (6, opt-in suite on the simulator's real microphone and `AVAudioSession`) |
 | `TuningTests.swift` | `tuning/TuningTests.kt` | 27 | TuningFeature/Wire/Placement/summon gesture → `:devtools`; drawer/composer/transcript tunables → features; MotionXRay not ported; CALayer checks deleted |
@@ -76,11 +76,10 @@ Ported from iOS `OpenCodeTests/` into `core/src/test` (JVM, same names). Shared 
 | `PerfFreshTrackerTests.swift` | `diagnostics/PerfFreshTrackerTests.kt` | 4 | – |
 | `MotionWatchTests.swift` (+`MotionAuditDetectorTests`) | `diagnostics/MotionWatchTests.kt` | 9 | `recordsReplayContext…` keeps everything but its `replayContext` asserts (`PlaygroundReplayContext` is the Mac playgrounds', n/a) |
 | `TraceTests.swift` (`DiagnosticsJournalTests`, `InternalBuildTests`, `ProblemReportBundleTests`, `DiagnosticsPrivacyTests`, `CrashReportTests`) | `diagnostics/TraceTests.kt` | 14 | `TraceUploadsTests`, `screenshotsOnly…`, `diagnosticsIndexesMetricsByRequest` → `:devtools`; `VoiceTimelineTests` → `:feature:voice`; `TeamFeedbackTests` deleted (devtools.md) |
-| `LivingOrbTests.swift` | `experiments/LivingOrbTests.kt` | 1 (`flagRestoresEveryExistingCallStyleWhenOff`, `ExperimentalCallStyle.of`) | orb → `:feature:voice`; style setting → `:feature:settings` |
 | `SubagentStackTests.swift` | `ui/SubagentStackTests.kt` | 1 (`backRulesLetTheEdgeWinAndContentKeepItsClaims`; iOS `BackSwipeSpring.goesBack` is `BackSwipeRules.goesBack`, decision distance passed as iOS's 8) | stack → `:feature:drawer`; `descendantsFollowTheFamilyTree` → `:server` |
 | `GlassShapeTests.swift` | `ui/GlassShapeTests.kt` | 2 of 3 | `GlassShape.clamped` → `OpenCodeShapeGeometry.clamped`; `tuningTabsKeepTheirWholeHitTargetOnScreen` → `:devtools` |
 
 Round 2 (ui helper): no `:core` production bugs found. `InternalBuild.detect(isDebug, installingPackageName)` was pulled out of
-`isEnabled` (unchanged behaviour) so `InternalBuildTests` can check it. 113 `:core` tests in total, all passing
+`isEnabled` (unchanged behaviour) so `InternalBuildTests` can check it. 116 `:core` tests in total, all passing
 (`./gradlew :core:testDebugUnitTest`). Robolectric (test-only) runs only `LiveHapticsFrameworkTests`; `LiveHaptics` is `internal` (was
 `private`) so it can.

@@ -157,6 +157,8 @@ fun SessionModelPicker(store: StoreOf<SessionFeature.State, SessionFeature.Actio
     when (ModelPickerStyle.active(styleSetting)) {
         ModelPickerStyle.today -> PlainModelPickerSheet(state, onEvent)
         ModelPickerStyle.sheet -> ModelPickerSheet(state, onEvent)
+        // One Picker (iOS 20438517) is the session area's to port; until then it shows the sheet.
+        ModelPickerStyle.onePicker -> ModelPickerSheet(state, onEvent)
         ModelPickerStyle.growFromComposer -> ModelPickerSheetContent(state, onEvent)
     }
 }

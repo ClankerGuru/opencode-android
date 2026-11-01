@@ -1,20 +1,24 @@
 package ai.opencode.core.experiments
 
 import ai.opencode.core.sharing.SharedKey
+import ai.opencode.core.sharing.SharedStore
 import ai.opencode.core.sharing.experimental
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
  * Settings' half of iOS `OpenCode/Settings/ExperimentalFeatures.swift`, in `:core` beside the
- * enum itself (`ai.opencode.core.sharing.ExperimentalFeature`, `experimental(feature)`,
- * `ExperimentalFeatures`): each case's Settings group, the groups, Call Style and Model Picker.
- * The typealiases let code import everything experimental from this package.
+ * registry itself (`ai.opencode.core.sharing.ExperimentalFeature`, `experimental(feature)`,
+ * `ExperimentalFeatures`): the groups, Call Style, Model Picker and the launch migrations of
+ * removed switches. The typealiases let code import everything experimental from this package.
  */
 typealias ExperimentalFeature = ai.opencode.core.sharing.ExperimentalFeature
 typealias ExperimentalFeatures = ai.opencode.core.sharing.ExperimentalFeatures
 
-/** One experimental feature's switch (iOS `.experimental(feature)`): `experimental-<raw>`, off by default. */
+/**
+ * One experimental feature's switch (iOS `.experimental(feature)`): `experimental-<raw>`, off by
+ * default unless it has graduated.
+ */
 val ExperimentalFeature.key: SharedKey<Boolean> get() = experimentalKeys.getValue(this)
 
 private val experimentalKeys: Map<ExperimentalFeature, SharedKey<Boolean>> =
@@ -23,24 +27,10 @@ private val experimentalKeys: Map<ExperimentalFeature, SharedKey<Boolean>> =
 /** SF Symbol name (iOS `systemImage`). */
 val ExperimentalFeature.systemImage: String get() = symbol
 
-/** Settings section the switch sits in. */
-val ExperimentalFeature.group: ExperimentalGroup
-    get() = when (this) {
-        ExperimentalFeature.composerAutocomplete, ExperimentalFeature.plusMenuSheet,
-        ExperimentalFeature.agentSelection, ExperimentalFeature.hideModels -> ExperimentalGroup.composer
-        ExperimentalFeature.callTray, ExperimentalFeature.floatingCall, ExperimentalFeature.livingOrb -> ExperimentalGroup.calls
-        ExperimentalFeature.newMessagesDivider, ExperimentalFeature.sinceYouLeft,
-        ExperimentalFeature.imageLinkPreviews -> ExperimentalGroup.transcript
-        ExperimentalFeature.projectIcons, ExperimentalFeature.sessionSwitcher,
-        ExperimentalFeature.serverTitleSwitch, ExperimentalFeature.serverDetails -> ExperimentalGroup.drawer
-        ExperimentalFeature.inAppBrowser -> ExperimentalGroup.transcript
-        ExperimentalFeature.serverVoice, ExperimentalFeature.backgroundCallIntent -> ExperimentalGroup.calls
-    }
-
 /** Written by Settings' Call Style menu rather than shown as a switch. */
 val ExperimentalFeature.isCallStyle: Boolean get() = ExperimentalCallStyle.entries.any { it.feature == this }
 
-/** The sections of Settings › Advanced's experiments, in order, all open. */
+/** The sections of Settings › Experimental, in order, all open. */
 enum class ExperimentalGroup {
     composer, calls, transcript, drawer;
 
@@ -54,60 +44,90 @@ enum class ExperimentalGroup {
             drawer -> "Drawer"
         }
 
-    val features: List<ExperimentalFeature> get() = ExperimentalFeature.entries.filter { it.group == this }
+    /** The group's experiments, graduated ones aside. */
+    val features: List<ExperimentalFeature>
+        get() = ExperimentalFeature.allCases.filter { it.group == this && !it.isGraduated }
 
     /** The group's switches: every feature but those a style menu writes (Call Style's). */
     val toggles: List<ExperimentalFeature> get() = features.filter { !it.isCallStyle }
 }
 
 /**
- * Settings' one Call Style choice, stored as the two call experiments so saved switches
- * carry over. Call Tray wins when both are on, as in `SessionView`.
+ * Settings' one Call Style choice, stored as the two call experiments so saved switches carry
+ * over. Living Orb is the floating call: it replaced the old Floating Call switch
+ * ([migrateFloatingCall]). Living Orb wins when both are on.
  */
 enum class ExperimentalCallStyle {
     standard, floating, tray;
 
     val id: String get() = name
     val callTray: Boolean get() = this == tray
-    val floatingCall: Boolean get() = this == floating
+    val livingOrb: Boolean get() = this == floating
 
     /** The experiment this style turns on. */
     val feature: ExperimentalFeature?
         get() = when (this) {
             standard -> null
-            floating -> ExperimentalFeature.floatingCall
+            floating -> ExperimentalFeature.livingOrb
             tray -> ExperimentalFeature.callTray
         }
 
     val title: String
         get() = when (this) {
             standard -> "Standard"
-            floating -> "Floating"
+            floating -> ExperimentalFeature.livingOrb.title
             tray -> "Tray"
         }
 
     val summary: String
         get() = when (this) {
             standard -> "The built-in call view"
-            floating -> ExperimentalFeature.floatingCall.summary
+            floating -> ExperimentalFeature.livingOrb.summary
             tray -> ExperimentalFeature.callTray.summary
         }
 
     companion object {
-        fun of(callTray: Boolean, floatingCall: Boolean, livingOrb: Boolean = false): ExperimentalCallStyle =
+        /** The old Floating Call switch's saved key. */
+        const val LEGACY_FLOATING_KEY = "experimental-floating-call"
+
+        /** iOS `init(callTray:livingOrb:)`. */
+        fun of(callTray: Boolean, livingOrb: Boolean): ExperimentalCallStyle =
+            if (livingOrb) floating else if (callTray) tray else standard
+
+        /**
+         * The pre-c75d4a1e three-switch form, kept while Home and Session still pass the
+         * Floating Call center's forced flag; Living Orb, then the tray, then a floating call.
+         */
+        @Deprecated("Floating Call is Living Orb (iOS 64ff3ed7)", ReplaceWith("of(callTray, livingOrb)"))
+        fun of(callTray: Boolean, floatingCall: Boolean, livingOrb: Boolean): ExperimentalCallStyle =
             if (livingOrb) floating else if (callTray) tray else if (floatingCall) floating else standard
+
+        /**
+         * Moves a saved Floating Call switch to Living Orb once, then removes it. Call Tray won
+         * over Floating Call, so a saved tray stays the tray.
+         */
+        fun migrateFloatingCall(store: SharedStore) {
+            val legacy = SharedKey.appStorage(LEGACY_FLOATING_KEY, false)
+            if (!store.contains(legacy)) return
+            val livingOrb = store.reference(experimental(ExperimentalFeature.livingOrb))
+            val tray = store.reference(experimental(ExperimentalFeature.callTray))
+            if (store.reference(legacy).value && !tray.value) livingOrb.set(true)
+            store.remove(legacy)
+        }
     }
 }
 
 /**
- * Settings' one Model Picker choice: the model chip opens today's menu, a stock sheet with
- * each model's level, or the composer grows into the custom picker (WIP). Replaced the New
- * Model Picker and Custom Model Picker switches; [migrateLegacySwitches] carries them over.
+ * Settings' one Model Picker choice: the model chip opens today's menu, a stock sheet with each
+ * model's level (`ModelPickerSheet`), One Picker, or the composer grows into the custom picker
+ * (WIP). Replaced the New Model Picker and Custom Model Picker switches; [migrateLegacySwitches]
+ * carries them over.
  */
 @Serializable
 enum class ModelPickerStyle(val rawValue: String) {
     @SerialName("today") today("today"),
     @SerialName("sheet") sheet("sheet"),
+    @SerialName("one-picker") onePicker("one-picker"),
     @SerialName("grow-from-composer") growFromComposer("grow-from-composer");
 
     val id: String get() = rawValue
@@ -116,6 +136,7 @@ enum class ModelPickerStyle(val rawValue: String) {
         get() = when (this) {
             today -> "Today"
             sheet -> "Sheet"
+            onePicker -> "One Picker"
             growFromComposer -> "Grow from Composer"
         }
 
@@ -123,6 +144,7 @@ enum class ModelPickerStyle(val rawValue: String) {
         get() = when (this) {
             today -> "The built-in model menu"
             sheet -> "Pick a model in a sheet"
+            onePicker -> "Favorites, recents, and bottom search"
             growFromComposer -> "Composer grows into a model picker"
         }
 
@@ -136,19 +158,21 @@ enum class ModelPickerStyle(val rawValue: String) {
             if (customModelPicker) growFromComposer else if (newModelPicker) sheet else today
 
         /**
-         * Moves the old switches into the style once, then removes them. A style already chosen
-         * stays. Android never shipped the legacy switches, so callers pass what they read
-         * (null when absent) and apply the returned style, if any.
+         * Moves the old New Model Picker and Custom Model Picker switches into the style once,
+         * then removes them. A style already chosen stays.
          */
-        fun migrateLegacySwitches(
-            storedStyle: ModelPickerStyle?,
-            legacySheet: Boolean?,
-            legacyGrow: Boolean?,
-        ): ModelPickerStyle? {
-            if (legacySheet == null && legacyGrow == null) return null
-            if (storedStyle != null) return null
-            val style = of(legacySheet == true, legacyGrow == true)
-            return style.takeIf { it != today }
+        fun migrateLegacySwitches(store: SharedStore) {
+            val sheetKey = SharedKey.appStorage(LEGACY_SHEET_KEY, false)
+            val growKey = SharedKey.appStorage(LEGACY_GROW_KEY, false)
+            val sheet = store.contains(sheetKey)
+            val grow = store.contains(growKey)
+            if (!sheet && !grow) return
+            if (!store.contains(key)) {
+                val style = of(store.reference(sheetKey).value, store.reference(growKey).value)
+                if (style != today) store.reference(key).set(style)
+            }
+            store.remove(sheetKey)
+            store.remove(growKey)
         }
 
         /** The style in use. iOS lab runs may override it; Android uses the saved one. */
@@ -157,7 +181,7 @@ enum class ModelPickerStyle(val rawValue: String) {
         /**
          * `model-picker=sheet` (or `=grow-from-composer`, `=today`) in an experiments list; the
          * old `new-model-picker` and `custom-model-picker` names still pick Sheet and Grow from
-         * Composer.
+         * Composer, and `one-picker` picks One Picker.
          */
         fun labStyle(experiments: String): ModelPickerStyle? {
             val names = experiments.split(",").map { it.trim() }.toSet()
@@ -165,12 +189,13 @@ enum class ModelPickerStyle(val rawValue: String) {
                 if (!name.startsWith("model-picker=")) null
                 else entries.firstOrNull { it.rawValue == name.removePrefix("model-picker=") }
             }?.let { return it }
+            if ("one-picker" in names) return onePicker
             if ("custom-model-picker" in names) return growFromComposer
             if ("new-model-picker" in names) return sheet
             return null
         }
 
-        /** Settings › Advanced › Model Picker. Today by default. Lazy: the enum serializer isn't ready during companion init. */
+        /** Settings › Experimental › Model Picker. Today by default. Lazy: the enum serializer isn't ready during companion init. */
         val key: SharedKey<ModelPickerStyle> by lazy { SharedKey.appStorage(STORAGE_KEY, today) }
     }
 }

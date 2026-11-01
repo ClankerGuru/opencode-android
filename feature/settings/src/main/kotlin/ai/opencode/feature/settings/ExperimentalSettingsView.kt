@@ -1,7 +1,6 @@
 package ai.opencode.feature.settings
 
 import ai.opencode.core.experiments.key
-import ai.opencode.core.experiments.group
 import ai.opencode.core.experiments.systemImage
 import ai.opencode.core.experiments.isCallStyle
 import ai.opencode.core.experiments.ExperimentalCallStyle
@@ -49,15 +48,18 @@ fun ExperimentalSettingsView(store: SettingsStore, focus: ExperimentalFeature?) 
     val developerMode by remember { shared(SharedKeys.developerMode).flow }.collectAsState()
     val modelPickerStored by remember { shared(ModelPickerStyle.key).flow }.collectAsState()
     val callTray by remember { shared(ExperimentalFeature.callTray.key).flow }.collectAsState()
-    val floatingCall by remember { shared(ExperimentalFeature.floatingCall.key).flow }.collectAsState()
+    val livingOrb by remember { shared(ExperimentalFeature.livingOrb.key).flow }.collectAsState()
     val livingOrbStyle by remember { shared(VoiceSharedKeys.livingOrbStyle).flow }.collectAsState()
     // Every switch, so headers count what's on and rows redraw when a value changes.
-    val enabled = ExperimentalFeature.entries.associateWith { feature ->
+    val enabled = ExperimentalFeature.allCases.associateWith { feature ->
         remember(feature) { shared(feature.key).flow }.collectAsState().value
     }
     val send = { action: HomeSettingsFeature.Action -> store.send(SettingsFeature.Action.Settings(action)) }
     val modelPicker = ModelPickerStyle.active(modelPickerStored)
-    val callStyle = ExperimentalCallStyle.of(callTray = callTray, floatingCall = floatingCall)
+    val callStyle = ExperimentalCallStyle.of(
+        callTray = ExperimentalFeature.callTray.isActive(callTray),
+        livingOrb = ExperimentalFeature.livingOrb.isActive(livingOrb),
+    )
     val listState = rememberLazyListState()
     var highlighted by remember { mutableStateOf<ExperimentalFeature?>(null) }
 
@@ -130,7 +132,7 @@ fun ExperimentalSettingsView(store: SettingsStore, focus: ExperimentalFeature?) 
                 options = ExperimentalCallStyle.entries.map { SettingsMenuOption(it, it.title) },
                 onSelect = { style ->
                     send(HomeSettingsFeature.Action.ExperimentalFeatureChanged(ExperimentalFeature.callTray, style.callTray))
-                    send(HomeSettingsFeature.Action.ExperimentalFeatureChanged(ExperimentalFeature.floatingCall, style.floatingCall))
+                    send(HomeSettingsFeature.Action.ExperimentalFeatureChanged(ExperimentalFeature.livingOrb, style.livingOrb))
                 },
                 caption = callStyle.summary,
                 symbol = "phone.fill",
