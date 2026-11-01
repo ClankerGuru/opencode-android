@@ -67,7 +67,7 @@ class PairedComputerOpensDrawerTests {
         val store = store(home(listOf(session("recent", 30))))
         store.send(HomeFeature.Action.PairedComputerOpened) { it.copy(drawerOpenRequest = it.detailGeneration) }
         store.send(HomeFeature.Action.SettingsTapped) {
-            store.withDependencies { it.showingSettings() }.copy(drawerOpenRequest = null)
+            store.withDependencies { it.showingSettings().syncingTranscriptCover() }.copy(drawerOpenRequest = null)
         }
         assertFalse(store.state.opensDrawerForPairing)
         store.finish()

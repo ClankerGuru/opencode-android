@@ -67,7 +67,11 @@ internal fun HomeFeature.reduceConnection(state: State, action: Action): HomeRed
         Reduced(state, Effect.merge(Effect.run { persistence.flush() }, flushPersistedComposer(state)))
     }
 
-    Action.SceneEnteredBackground -> Reduced(state, publishAppBadge(state))
+    Action.SceneEnteredBackground -> {
+        val sessionID = state.sessionDetail?.session?.id
+        val s = if (sessionID != null) state.syncingSeenItemsFromOpenDetail(sessionID) else state
+        Reduced(s, publishAppBadge(s))
+    }
 
     is Action.ServerConnected -> {
         // The stream started before any rename since; the name on screen wins.
@@ -235,8 +239,16 @@ private fun HomeFeature.snapshotRefreshed(state: State, action: Action.SnapshotR
         // A draft opened before the first snapshot (cold launch, empty cache) has no folders to
         // offer; refresh its choices as the list arrives so the Project picker is never empty on a
         // live server.
-        val projects = s.projectsByRecency
-        s = s.updatingDetail { it.copy(projects = projects, draftProject = it.draftProject ?: projects.firstOrNull()) }
+        val recents = s.projectsByRecency
+        s = s.updatingDetail { it.copy(projects = recents, draftProject = it.draftProject ?: recents.firstOrNull()) }
+    } else if (s.sessionDetail != null && s.sessionDetail?.projects != s.projects) {
+        // A session finds its project's folder here (Move to).
+        val projects = s.projects
+        s = s.updatingDetail { it.copy(projects = projects) }
+    }
+    if (s.subagentStack.any { it.projects != s.projects }) {
+        val projects = s.projects
+        s = s.updatingSubagents { if (it.projects != projects) it.copy(projects = projects) else it }
     }
     val currentUpdatedAt = s.sessions.associate { it.id to it.updatedAt }
     // A cached session that changed is read again rather than dropped, so opening it shows what's

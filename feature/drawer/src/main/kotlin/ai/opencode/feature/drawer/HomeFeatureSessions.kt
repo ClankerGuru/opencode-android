@@ -59,6 +59,7 @@ internal fun HomeFeature.reduceSubagent(state: State, id: Int, action: SessionFe
         is SessionFeature.Action.PendingRequestsResponse, is SessionFeature.Action.RequestDock,
         -> Reduced(state.syncingTopSubagentVoiceTarget(id))
         is SessionFeature.Action.ViewAcknowledged -> Reduced(state.notingViewAcknowledged(action.sessionID, action.idle))
+        is SessionFeature.Action.MissingFolderMoved -> sessionMoved(state, action.sessionID, action.directory)
         is SessionFeature.Action.Delegate -> reduceSessionDelegate(state, action.delegate)
         else -> Reduced(state)
     }
@@ -136,6 +137,8 @@ internal fun HomeFeature.reduceSessionDetail(state: State, action: SessionFeatur
 
         is SessionFeature.Action.ViewAcknowledged -> return Reduced(state.notingViewAcknowledged(action.sessionID, action.idle))
 
+        is SessionFeature.Action.MissingFolderMoved -> return sessionMoved(state, action.sessionID, action.directory)
+
         is SessionFeature.Action.FamilyPicked -> {
             var s = state
             val detail = s.sessionDetail
@@ -143,7 +146,9 @@ internal fun HomeFeature.reduceSessionDetail(state: State, action: SessionFeatur
             if (detail != null && detail.session?.id == action.sessionID && snapshot != null &&
                 snapshot.session.directory == detail.session?.directory
             ) {
-                s = s.copy(sessionDetail = snapshot.restoreSessionData(detail).reconcileInvariants())
+                // What the reader saw there last time, as reopening it would.
+                val restored = snapshot.restoreSessionData(detail).noteOpening(seen = snapshot.seenItemIDs, unread = snapshot.hasUnseenItems)
+                s = s.copy(sessionDetail = restored.reconcileInvariants())
             }
             if (s.sessionDetail?.readsOnView == true) {
                 s.sessionDetail?.familySessions?.firstOrNull { it.id == action.sessionID }?.let { s = s.markingReadLocally(it) }
@@ -178,7 +183,13 @@ internal fun HomeFeature.reduceSessionDetail(state: State, action: SessionFeatur
         is SessionFeature.Action.AcceptedTranscriptUpdated -> {
             val s = state.learningFirstPrompt(state.sessionDetail?.session?.takeIf { it.id == action.sessionID })
                 .publishingTranscript(action.sessionID, action.items).persistingTranscriptCache(action.sessionID)
+                .syncingSeenItemsFromOpenDetail(action.sessionID)
             return Reduced(s, prefetchTranscripts(s))
+        }
+
+        is SessionFeature.Action.NewMessagesPassed, is SessionFeature.Action.NewMessagesFit -> {
+            val sessionID = state.sessionDetail?.session?.id ?: return Reduced(state)
+            return Reduced(state.syncingSeenItemsFromOpenDetail(sessionID))
         }
 
         is SessionFeature.Action.ModelApplied -> return Reduced(state.notingModel(action.model, action.sessionID))

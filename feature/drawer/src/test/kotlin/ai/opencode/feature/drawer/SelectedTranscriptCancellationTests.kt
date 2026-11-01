@@ -450,7 +450,7 @@ class SelectedTranscriptCancellationTests {
         assertTrue(eventually { startedTranscripts.count { it == "other" } == 4 })
         store.send(Action.detail(SessionFeature.Action.Delegate(SessionFeature.Delegate.OpenSubagent(childSession)))) {
             store.withDependencies {
-                it.copy(refreshingTranscripts = emptySet(), dirtyCachedTranscriptIDs = listOf("other")).pushingSubagent(childSession)
+                it.copy(refreshingTranscripts = emptySet(), dirtyCachedTranscriptIDs = listOf("other")).pushingSubagent(childSession).syncingTranscriptCover()
             }
         }
         assertTrue(eventually { cancelledTranscripts.count { it == "other" } == 4 })

@@ -5,7 +5,9 @@ import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.feature.session.SessionFeature.State.EarlierHistory
 import ai.opencode.feature.transcript.TranscriptEntry
+import ai.opencode.feature.transcript.isAtOrBefore
 import ai.opencode.feature.transcript.list.NewMessagesMark
+import ai.opencode.feature.transcript.rows.TranscriptTimeStamps
 import ai.opencode.server.OpenCodeLiveContentEvent
 import ai.opencode.server.model.OpenCodeTranscriptItem
 
@@ -15,9 +17,9 @@ import ai.opencode.server.model.OpenCodeTranscriptItem
 // `NewMessagesPlacement`) belong to `:feature:transcript`.
 //
 // Bridge: iOS's `NewMessagesMark.firstUnseen(in:seen:watched:viewedMilliseconds:unread:)`,
-// `NewMessagesMark.ownPrompts(in:)`, `NewMessagesMark.recordSpan` and
-// `TranscriptTimeStamps.isAtOrBefore` belong to `:feature:transcript`; until that module has
-// them, [NewMessagesUnseen] holds a port of each here.
+// `NewMessagesMark.ownPrompts(in:)` and `NewMessagesMark.recordSpan` belong to
+// `:feature:transcript`; until that module has them, [NewMessagesUnseen] holds a port of each
+// here. (`TranscriptTimeStamps.isAtOrBefore` is in `:feature:transcript`'s SessionSeenWatermarks.kt.)
 
 /**
  * iOS `NewMessagesEarlierBaseline`: unseen baseline kept when a settled mark starts at the top of a
@@ -79,12 +81,12 @@ object NewMessagesUnseen {
         unread: Boolean = false,
     ): String? {
         val hasTimedAfterViewed = viewedMilliseconds?.let { cutoff ->
-            items.any { isAtOrBefore(cutoff, it.id) == false }
+            items.any { TranscriptTimeStamps.isAtOrBefore(cutoff, it.id) == false }
         } ?: false
         if (seen.isEmpty() && !unread && !hasTimedAfterViewed) return null
         fun isSeen(item: OpenCodeTranscriptItem): Boolean {
             if (item.id in seen) return true
-            return viewedMilliseconds != null && isAtOrBefore(viewedMilliseconds, item.id) == true
+            return viewedMilliseconds != null && TranscriptTimeStamps.isAtOrBefore(viewedMilliseconds, item.id) == true
         }
         // After the last row they saw: older rows paged in or a notice placed in an earlier turn
         // aren't news.
@@ -105,41 +107,6 @@ object NewMessagesUnseen {
             (item as? OpenCodeTranscriptItem.UserText)?.takeIf { it.source != null }?.id
         }
         return { item -> TranscriptEntry.promptID(item)?.let { it !in agentPrompts } ?: false }
-    }
-
-    /** iOS `TranscriptTimeStamps.isAtOrBefore(_:id:)`: whether [id] carries an OpenCode timestamp minted at or before [milliseconds]. */
-    fun isAtOrBefore(milliseconds: Long, id: String): Boolean? {
-        if (milliseconds <= 0) return null
-        val value = parsedValue(id) ?: return null
-        val mask = 0xF_FFFF_FFFFL
-        val itemMS = (value ushr 12) and mask
-        val cutoffMS = milliseconds and mask
-        val ahead = (itemMS - cutoffMS) and mask
-        return ahead == 0L || ahead > (mask ushr 1)
-    }
-
-    /** iOS `TranscriptTimeStamps.parsedValue(ofID:)`: the 48-bit prefix of an OpenCode ID's 26-character body. */
-    private fun parsedValue(id: String): Long? {
-        val underscore = id.indexOf('_')
-        if (underscore < 0) return null
-        val bodyStart = underscore + 1
-        var bodyEnd = bodyStart
-        while (bodyEnd < id.length && id[bodyEnd] != '-') bodyEnd++
-        if (bodyEnd - bodyStart != 26) return null
-        var value = 0L
-        for (i in bodyStart until bodyStart + 12) {
-            val digit = when (val c = id[i]) {
-                in '0'..'9' -> c - '0'
-                in 'a'..'f' -> c - 'a' + 10
-                else -> return null
-            }
-            value = (value shl 4) or digit.toLong()
-        }
-        for (i in bodyStart + 12 until bodyEnd) {
-            val c = id[i]
-            if (c !in '0'..'9' && c !in 'A'..'Z' && c !in 'a'..'z') return null
-        }
-        return value
     }
 
     /**

@@ -46,7 +46,7 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 | `OpenCode/Core/ScrollsToTop.swift` | 31 |  | todo |  |
 | `OpenCode/Core/ServerID.swift` | 75 | see server.md | — | ported into `:server` |
 | `OpenCode/Core/ServerIDClient.swift` | 55 | see server.md | — | ported into `:server` |
-| `OpenCode/Core/SharedKeys.swift` | 821 | `core/.../sharing/SharedKeys.kt`, `server/.../ServerSharedKeys.kt`, `feature/voice/.../VoiceSharedKeys.kt` | sync: done | primitive keys in `:core`; server-typed keys + `CachedHomeSnapshot`/`CachedTranscriptSnapshots`/`TranscriptCachePersistence` in `:server`; voice-typed keys in `:feature:voice`. Same ids and defaults |
+| `OpenCode/Core/SharedKeys.swift` | 821 | `core/.../sharing/SharedKeys.kt`, `server/.../ServerSharedKeys.kt`, `feature/voice/.../VoiceSharedKeys.kt` | sync: done | primitive keys in `:core`; server-typed keys + `CachedHomeSnapshot`/`CachedTranscriptSnapshots`/`TranscriptCachePersistence` in `:server`; voice-typed keys in `:feature:voice`. Same ids and defaults. Sync f657969b (drawer): `sessionSeenWatermarks` (`session-seen-watermarks.json`) with `SessionSeenWatermark`/`SessionSeenWatermarks` (64 entries, LRU) lives in `:feature:transcript` `SessionSeenWatermarks.kt` with `TranscriptTimeStamps.isAtOrBefore`/`isBefore`, because it needs `TranscriptTimeStamps` |
 | `OpenCode/Core/SoundEffectsClient.swift` | 135 |  | todo |  |
 | `OpenCode/Core/SoundEffectsPlayback.swift` | 259 |  | todo |  |
 | `OpenCode/Core/TapTarget.swift` | 37 | see core-ui.md | — | |

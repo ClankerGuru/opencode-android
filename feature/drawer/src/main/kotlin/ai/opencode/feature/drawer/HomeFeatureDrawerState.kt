@@ -13,11 +13,16 @@ import ai.opencode.feature.session.pruneRequests
 import ai.opencode.feature.drawer.catchup.CatchUpFeature
 import ai.opencode.server.ServerSharedKeys
 import ai.opencode.server.model.OpenCodeSession
+import ai.opencode.server.model.OpenCodeTranscriptItem
 import ai.opencode.server.model.SessionActivity
 import ai.opencode.server.model.learningFirstPrompt
 import ai.opencode.feature.drawer.HomeFeature.State.Indicator
 import ai.opencode.feature.drawer.HomeFeature.State.StatusSnapshot
 import ai.opencode.feature.drawer.HomeFeature.State.Viewing
+import ai.opencode.feature.transcript.SessionSeenWatermark
+import ai.opencode.feature.transcript.SessionSeenWatermarks
+import ai.opencode.feature.transcript.sessionSeenWatermarks
+import ai.opencode.server.model.OpenCodeProject
 import java.time.Instant
 
 /*
@@ -63,6 +68,10 @@ internal fun HomeFeature.State.updatingManuallyUnreadSessionKeys(transform: (Set
     writingThrough(SharedKeys.manuallyUnreadSessionKeys, manuallyUnreadSessionKeys, transform) { copy(manuallyUnreadSessionKeys = it) }
 
 /** `$mutedSessionKeys.withLock { … }`. */
+/** `$sessionSeenWatermarks.withLock { … }`. */
+internal fun HomeFeature.State.updatingSessionSeenWatermarks(transform: (SessionSeenWatermarks) -> SessionSeenWatermarks): HomeFeature.State =
+    writingThrough(SharedKeys.sessionSeenWatermarks, sessionSeenWatermarks, transform) { copy(sessionSeenWatermarks = it) }
+
 internal fun HomeFeature.State.updatingMutedSessionKeys(transform: (Set<String>) -> Set<String>): HomeFeature.State =
     writingThrough(SharedKeys.mutedSessionKeys, mutedSessionKeys, transform) { copy(mutedSessionKeys = it) }
 
@@ -141,8 +150,20 @@ fun HomeFeature.State.sessionsByPriority(): List<OpenCodeSession> {
     }
 }
 
+/** Where the first computer's ready session starts: its most recently used project, never the home folder or root sessions fall back to. */
+val HomeFeature.State.firstSessionProject: OpenCodeProject?
+    get() = projectsByRecency.firstOrNull { !it.isHomeFolder }
+
+/**
+ * Root sessions only: subagents' sessions are kept for their family's activity but open from their
+ * parent, as on desktop. Archived sessions stay out of every list.
+ */
 val HomeFeature.State.visibleSessions: List<OpenCodeSession>
-    get() = if (search.isEmpty()) sessions else sessions.filter { it.title.contains(search, ignoreCase = true) }
+    get() = if (search.isEmpty()) {
+        sessions.filter { it.parentID == null && !it.isArchived }
+    } else {
+        sessions.filter { it.parentID == null && !it.isArchived && it.title.contains(search, ignoreCase = true) }
+    }
 
 val HomeFeature.State.pinnedSessions: List<OpenCodeSession>
     get() {
@@ -168,7 +189,10 @@ val HomeFeature.State.catchUpSessions: List<OpenCodeSession> get() = catchUpSess
 
 private fun HomeFeature.State.catchUpSessions(status: StatusSnapshot): List<OpenCodeSession> {
     val attention = status.attention
-    return sessions.filter { status.needsCatchUp(it) }.sortedWith { a, b ->
+    val archiving = inboxSidebarStatus.archivedIDs
+    return sessions.filter { session ->
+        session.archivedMilliseconds == null && session.id !in archiving && status.needsCatchUp(session)
+    }.sortedWith { a, b ->
         val aWaiting = a.id in attention
         val bWaiting = b.id in attention
         if (aWaiting != bWaiting) (if (aWaiting) -1 else 1) else b.updatedAt.compareTo(a.updatedAt)
@@ -210,7 +234,7 @@ fun HomeFeature.State.openingCatchUpCard(): Pair<HomeFeature.State, Boolean> {
     val session = sessions.firstOrNull { it.id == id } ?: return this to false
     val changedSession = sessionDetail?.session?.id != id
     val (next, detail) = makeDetail(session, cachedItems = cachedTranscriptItems(session), reason = "you opened it from Catch Up")
-    return next.copy(sessionDetail = detail.copy(readsOnView = false)) to changedSession
+    return next.copy(sessionDetail = detail.copy(readsOnView = false, catchUpOpeningSeen = detail.newMessagesBaseline)) to changedSession
 }
 
 /** Follows reads, answers, and new activity from any device. The open card stays until the reader moves it along. */
@@ -232,7 +256,15 @@ fun HomeFeature.State.reconcilingCatchUp(): HomeFeature.State {
 
 fun HomeFeature.State.markingUnreadLocally(session: OpenCodeSession): HomeFeature.State {
     var s = withMarkAllReceipts(markAllReceipts - session.id)
-        .copy(locallyViewedMilliseconds = locallyViewedMilliseconds - session.id)
+        .copy(
+            locallyViewedMilliseconds = locallyViewedMilliseconds - session.id,
+            pendingOpenReadState = pendingOpenReadState - session.id,
+            unopenedSeen = unopenedSeen - session.id,
+        )
+    s.sessionSnapshots[session.id]?.let { snapshot ->
+        s = s.copy(sessionSnapshots = s.sessionSnapshots + (session.id to snapshot.copy(seenItemIDs = emptySet(), hasUnseenItems = true)))
+    }
+    s = s.clearingSeenWatermark(session.id)
     val key = sessionKey(session.id)
     s = s.updatingSessionReadDates { it + (key to session.updatedAt.minusSeconds(1)) }
     if (session.idleMilliseconds != null) s = s.updatingManuallyUnreadSessionKeys { it + key }
@@ -276,6 +308,176 @@ fun HomeFeature.State.notingViewAcknowledged(sessionID: String, idle: Long): Hom
     return s
 }
 
+/** iOS `hasUnreadWatermark(_:)`: whether the session had something unread before this phone read it. */
+fun HomeFeature.State.hasUnreadWatermark(session: OpenCodeSession): Boolean {
+    val key = sessionKey(session.id)
+    if (key in manuallyUnreadSessionKeys) return true
+    session.idleMilliseconds?.let { idle -> return idle > (session.viewedMilliseconds ?: -1) }
+    sessionReadDates[key]?.let { return it < session.updatedAt }
+    return false
+}
+
+/** iOS `unseenCutoffMilliseconds(for:wasUnread:)`: the server read unseen rows count from, if it marks any. */
+fun HomeFeature.State.unseenCutoffMilliseconds(session: OpenCodeSession, wasUnread: Boolean): Long? {
+    if (sessionKey(session.id) in manuallyUnreadSessionKeys) return null
+    val listed = sessions.firstOrNull { it.id == session.id }
+    val viewed = listed?.viewedMilliseconds ?: session.viewedMilliseconds ?: return null
+    if (viewed <= 0) return null
+    val idle = listed?.idleMilliseconds ?: session.idleMilliseconds
+    if (idle != null && !(viewed < idle || !wasUnread)) return null
+    return viewed
+}
+
+/** iOS `HomeFeature.State.OpeningParameters`: what a session opens with for its New divider. */
+data class OpeningParameters(val seen: Set<String>?, val viewedMilliseconds: Long?, val unread: Boolean)
+
+/** iOS `openingParameters(for:pending:)`. */
+fun HomeFeature.State.openingParameters(
+    session: OpenCodeSession,
+    pending: HomeFeature.State.PendingOpenReadState? = null,
+): OpeningParameters {
+    val snapshot = sessionSnapshots[session.id]
+    if (!SessionFeature.State.showsNewMessagesDivider) {
+        return OpeningParameters(seen = snapshot?.seenItemIDs ?: unopenedSeen[session.id], viewedMilliseconds = null, unread = false)
+    }
+    val serverViewed = if (pending != null) pending.viewedMilliseconds else unseenCutoffMilliseconds(session, wasUnread = false)
+    val snapshotSeen = snapshot?.seenItemIDs
+    val unopened = unopenedSeen[session.id]
+    val persisted = sessionSeenWatermarks[sessionKey(session.id)]
+    val persistedIsStale = persisted != null && serverViewed != null && persisted.isOlderThanServerViewed(serverViewed)
+    val activePersisted = if (persistedIsStale) null else persisted
+    val persistedHasUnseen = activePersisted?.acknowledgedViewedMilliseconds != null
+    val wasUnread = (pending?.wasUnread ?: hasUnreadWatermark(session)) ||
+        snapshot?.hasUnseenItems == true ||
+        persistedHasUnseen
+    val persistedSeen = activePersisted?.itemID?.let { setOf(it) }
+    val viewedMilliseconds = when {
+        !wasUnread -> null
+        persistedHasUnseen -> activePersisted?.viewedMilliseconds
+        else -> activePersisted?.viewedMilliseconds?.let { maxOf(serverViewed ?: 0, it) } ?: serverViewed
+    }
+    val seen = when {
+        snapshotSeen != null && (snapshotSeen.isNotEmpty() || snapshot.hasUnseenItems) -> snapshotSeen
+        !unopened.isNullOrEmpty() -> unopened
+        !persistedSeen.isNullOrEmpty() -> persistedSeen
+        else -> null
+    }
+    return OpeningParameters(seen = seen, viewedMilliseconds = viewedMilliseconds, unread = wasUnread)
+}
+
+/** iOS `applyOpening(for:pending:to:)`. */
+fun HomeFeature.State.applyingOpening(
+    session: OpenCodeSession,
+    pending: HomeFeature.State.PendingOpenReadState? = null,
+    detail: SessionFeature.State,
+): SessionFeature.State {
+    val opening = openingParameters(session, pending)
+    return detail.noteOpening(seen = opening.seen, viewedMilliseconds = opening.viewedMilliseconds, unread = opening.unread)
+}
+
+/** iOS `setSeenWatermark(_:for:)`. */
+fun HomeFeature.State.settingSeenWatermark(watermark: SessionSeenWatermark, sessionID: String): HomeFeature.State {
+    if (!SessionFeature.State.showsNewMessagesDivider) return this
+    val key = sessionKey(sessionID)
+    if (sessionSeenWatermarks[key] == watermark && sessionSeenWatermarks.order.lastOrNull() == key) return this
+    return updatingSessionSeenWatermarks { it.setting(watermark, key) }
+}
+
+/** iOS `clearSeenWatermark(for:)`. */
+fun HomeFeature.State.clearingSeenWatermark(sessionID: String): HomeFeature.State {
+    val key = sessionKey(sessionID)
+    if (sessionSeenWatermarks[key] == null) return this
+    return updatingSessionSeenWatermarks { it.removing(key) }
+}
+
+/** The last row's ID, skipping the info rows the transcript adds (iOS `last(where: { !$0.id.hasPrefix("info-") })`). */
+private fun List<OpenCodeTranscriptItem>.lastSeenRowID(seen: (String) -> Boolean = { true }): String? =
+    lastOrNull { seen(it.id) && !it.id.startsWith("info-") }?.id ?: lastOrNull { seen(it.id) }?.id
+
+/**
+ * iOS `clearUnseenBaseline(for:)`: clears any unseen baseline when a session is marked read from
+ * outside (the drawer, Catch Up, or another device's `session.viewed`).
+ */
+fun HomeFeature.State.clearingUnseenBaseline(sessionID: String): HomeFeature.State {
+    var s = copy(pendingOpenReadState = pendingOpenReadState - sessionID, unopenedSeen = unopenedSeen - sessionID)
+    val items = (if (s.sessionDetail?.session?.id == sessionID) s.sessionDetail?.items else null)
+        ?: s.transcriptCache[sessionID]
+    s.sessionSnapshots[sessionID]?.let { snapshot ->
+        val cachedIDs = items?.mapTo(HashSet()) { it.id } ?: emptySet()
+        s = s.copy(sessionSnapshots = s.sessionSnapshots + (sessionID to snapshot.copy(seenItemIDs = cachedIDs, hasUnseenItems = false)))
+    }
+    val lastCachedID = items?.lastSeenRowID()
+    val session = s.sessions.firstOrNull { it.id == sessionID }
+    val viewed = maxOf(s.locallyViewedMilliseconds[sessionID] ?: 0, session?.viewedMilliseconds ?: 0, session?.idleMilliseconds ?: 0)
+    val viewedMS = viewed.takeIf { it > 0 }
+    s = if (lastCachedID != null || viewedMS != null) {
+        s.settingSeenWatermark(SessionSeenWatermark(itemID = lastCachedID, viewedMilliseconds = viewedMS), sessionID)
+    } else {
+        s.clearingSeenWatermark(sessionID)
+    }
+    if (s.sessionDetail?.session?.id == sessionID && s.sessionDetail?.readsOnView == true) {
+        s = s.updatingDetail { it.noteOwnSend() }
+    }
+    return s.updatingSubagents { if (it.session?.id == sessionID && it.readsOnView) it.noteOwnSend() else it }
+}
+
+/** iOS `syncSeenItemsFromOpenDetail(sessionID:)`. */
+fun HomeFeature.State.syncingSeenItemsFromOpenDetail(sessionID: String): HomeFeature.State {
+    val detail = sessionDetail ?: return this
+    if (detail.session?.id != sessionID) return this
+    return syncingSeenWatermark(detail, sessionID)
+}
+
+/** iOS `syncSeenWatermark(from:sessionID:)`: keeps how far the reader had seen [detail], for a cold launch into it. */
+fun HomeFeature.State.syncingSeenWatermark(detail: SessionFeature.State, sessionID: String): HomeFeature.State {
+    if (!SessionFeature.State.showsNewMessagesDivider || !detail.readsOnView) return this
+    val sessionViewed = maxOf(
+        locallyViewedMilliseconds[sessionID] ?: 0,
+        detail.viewedIdle[sessionID] ?: 0,
+        sessions.firstOrNull { it.id == sessionID }?.viewedMilliseconds ?: 0,
+        detail.session?.viewedMilliseconds ?: 0,
+        detail.session?.idleMilliseconds ?: 0,
+    )
+    val sessionViewedMS = sessionViewed.takeIf { it > 0 }
+    val lastSeenID: String?
+    val viewedMS: Long?
+    val acknowledgedMS: Long?
+    val mark = detail.newMessages
+    val markIndex = mark?.let { m -> detail.items.indexOfFirst { it.id == m.itemID } } ?: -1
+    val baseline = detail.newMessagesBaseline
+    if (mark != null && markIndex >= 0) {
+        lastSeenID = detail.items.subList(0, markIndex).lastSeenRowID()
+        viewedMS = detail.newMessagesBaselineTimestamp
+        acknowledgedMS = sessionViewedMS
+    } else if (baseline != null &&
+        (baseline.isNotEmpty() || detail.newMessagesUnread || detail.newMessagesBaselineTimestamp != null ||
+            detail.isTranscriptCovered || detail.isBackgrounded || detail.items.isEmpty())
+    ) {
+        val seen = baseline + detail.newMessagesWatched
+        lastSeenID = detail.items.lastSeenRowID { it in seen } ?: seen.maxOrNull()
+        val hasUnseen = detail.newMessagesUnread ||
+            detail.newMessagesBaselineTimestamp != null ||
+            NewMessagesUnseen.firstUnseen(
+                items = detail.items,
+                seen = seen,
+                watched = detail.newMessagesWatched,
+                viewedMilliseconds = detail.newMessagesBaselineTimestamp,
+                unread = detail.newMessagesUnread,
+            ) != null
+        viewedMS = if (hasUnseen) detail.newMessagesBaselineTimestamp else sessionViewedMS
+        acknowledgedMS = if (hasUnseen) sessionViewedMS else null
+    } else {
+        lastSeenID = detail.items.lastSeenRowID()
+        viewedMS = sessionViewedMS
+        acknowledgedMS = null
+    }
+    if (lastSeenID == null && viewedMS == null && acknowledgedMS == null) return this
+    return settingSeenWatermark(
+        SessionSeenWatermark(itemID = lastSeenID, viewedMilliseconds = viewedMS, acknowledgedViewedMilliseconds = acknowledgedMS),
+        sessionID,
+    )
+}
+
 fun HomeFeature.State.sessionKey(id: String): String = "${server.persistenceID}|$id"
 fun HomeFeature.State.isPinned(id: String): Boolean = sessionKey(id) in pinnedSessionKeys
 fun HomeFeature.State.isMuted(id: String): Boolean = sessionKey(id) in mutedSessionKeys
@@ -299,8 +501,19 @@ fun HomeFeature.State.notingLocalActivity(sessionID: String, at: Instant): HomeF
 }
 
 fun HomeFeature.State.markingReadLocally(session: OpenCodeSession): HomeFeature.State {
-    val key = sessionKey(session.id)
     var s = this
+    if (SessionFeature.State.showsNewMessagesDivider &&
+        sessionDetail?.session?.id != session.id &&
+        pendingOpenReadState[session.id] == null
+    ) {
+        val current = sessions.firstOrNull { it.id == session.id } ?: session
+        val pending = HomeFeature.State.PendingOpenReadState(
+            viewedMilliseconds = unseenCutoffMilliseconds(current, wasUnread = false),
+            wasUnread = hasUnreadWatermark(current),
+        )
+        s = s.copy(pendingOpenReadState = s.pendingOpenReadState + (session.id to pending))
+    }
+    val key = sessionKey(session.id)
     if (s.markAllReceipts[session.id] != null) s = s.withMarkAllReceipts(s.markAllReceipts - session.id)
     val idle = session.idleMilliseconds
     if (idle != null && s.sessions.any { it.id == session.id }) {
@@ -324,6 +537,8 @@ fun HomeFeature.State.purgingSession(sessionID: String): HomeFeature.State {
         attentionSessionIDs = attentionSessionIDs - sessionID,
         runChangesDuringRefresh = runChangesDuringRefresh - sessionID,
         locallyViewedMilliseconds = locallyViewedMilliseconds - sessionID,
+        pendingOpenReadState = pendingOpenReadState - sessionID,
+        unopenedSeen = unopenedSeen - sessionID,
         localActivity = localActivity - sessionID,
         transcriptCache = transcriptCache - sessionID,
         refreshingTranscripts = refreshingTranscripts - sessionID,
@@ -343,6 +558,7 @@ fun HomeFeature.State.purgingSession(sessionID: String): HomeFeature.State {
     val key = sessionKey(sessionID)
     s = s.updatingPinnedSessionKeys { keys -> keys.filterNot { it == key } }
         .updatingSessionReadDates { it - key }
+        .clearingSeenWatermark(sessionID)
         .updatingManuallyUnreadSessionKeys { it - key }
         .updatingMutedSessionKeys { it - key }
     if (s.lastViewedSessionIDs[serverID] == sessionID) s = s.updatingLastViewedSessionIDs { it - serverID }
@@ -400,7 +616,7 @@ fun HomeFeature.State.drawerBadge(excluding: String?): DrawerBadge? {
     val attention = attentionSessionIDs
     val unreadCandidates = mutableListOf<String>()
     for (session in sessions) {
-        if (session.id == excluding || isMuted(session.id)) continue
+        if (session.id == excluding || session.isArchived || isMuted(session.id)) continue
         if (session.id in attention) return DrawerBadge.Attention
         if (isUnread(session)) unreadCandidates += session.id
     }

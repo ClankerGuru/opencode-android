@@ -4,6 +4,8 @@ import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.sharing.SharedKeys
+import ai.opencode.feature.transcript.SessionSeenWatermarks
+import ai.opencode.feature.transcript.sessionSeenWatermarks
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.PresentationAction
 import ai.opencode.core.store.Reduced
@@ -75,6 +77,8 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
     data class State(
         val connection: HomeConnectionFeature.State,
         val notificationState: HomeNotificationsFeature.Status = HomeNotificationsFeature.Status(),
+        /** The Inbox Sidebar's archives in flight and its last archive error. */
+        val inboxSidebarStatus: InboxSidebarFeature.Status = InboxSidebarFeature.Status(),
         /** The server being connected to from the drawer, while this Home stays up until that server's Home replaces it. */
         val switchingTo: OpenCodeServer? = null,
         val projects: List<OpenCodeProject> = emptyList(),
@@ -101,6 +105,12 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         val dirtyCachedTranscriptIDs: List<String> = emptyList(),
         /** When each cached transcript was last read, so a session already fresh isn't read again. */
         val transcriptReadAt: Map<String, Instant> = emptyMap(),
+        /**
+         * The copy a session would have opened with before a background read replaced it, for
+         * sessions not opened yet this run: opening compares with it whether the read or the tap
+         * came first.
+         */
+        val unopenedSeen: Map<String, Set<String>> = emptyMap(),
         /** An uncached session's transcript being read for the tap that opened it (`CancelID.selectedTranscript`). */
         val selectedTranscriptFetch: SelectedTranscriptFetch? = null,
         /** Last-known chrome for the last few visited sessions, scoped to this server. */
@@ -117,8 +127,12 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         val lastViewedSessionIDs: Map<String, String> = emptyMap(),
         /** Mirror of `SharedKeys.sessionReadDates`. */
         val sessionReadDates: Map<String, Instant> = emptyMap(),
+        /** Mirror of `SharedKeys.sessionSeenWatermarks` (`:feature:transcript`). */
+        val sessionSeenWatermarks: SessionSeenWatermarks = SessionSeenWatermarks(),
         /** Mirror of `SharedKeys.manuallyUnreadSessionKeys`. */
         val manuallyUnreadSessionKeys: Set<String> = emptySet(),
+        /** How a session read from the drawer stood before the read, for the New divider when it opens. */
+        val pendingOpenReadState: Map<String, PendingOpenReadState> = emptyMap(),
         /** Mirror of `SharedKeys.mutedSessionKeys`. */
         val mutedSessionKeys: Set<String> = emptySet(),
         /** Mirror of `SharedKeys.sidebarShown`: beside a wide window's sidebar, whether it shows. */
@@ -246,15 +260,18 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
                 return Indicator.none
             }
 
-            /** Idle with something new, or waiting on the reader. Muted sessions never do, even while waiting. */
+            /** Idle with something new, or waiting on the reader. Muted and archived sessions never do. */
             fun needsCatchUp(session: OpenCodeSession): Boolean {
-                if (isMuted(session.id)) return false
+                if (session.isArchived || isMuted(session.id)) return false
                 return when (indicator(session)) {
                     Indicator.attention, Indicator.unread -> true
                     Indicator.running, Indicator.none -> false
                 }
             }
         }
+
+        /** iOS `PendingOpenReadState`: the server read and unread state a drawer read replaced. */
+        data class PendingOpenReadState(val viewedMilliseconds: Long?, val wasUnread: Boolean)
 
         /** What the reader views (iOS `Viewing`): equal when the threads are. */
         data class Viewing(val sessionID: String? = null, val rootID: String? = null) {
@@ -514,6 +531,7 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
                     pinnedSessionKeys = shared(SharedKeys.pinnedSessionKeys).value,
                     lastViewedSessionIDs = shared(SharedKeys.lastViewedSessionIDs).value,
                     sessionReadDates = shared(SharedKeys.sessionReadDates).value,
+                    sessionSeenWatermarks = shared(SharedKeys.sessionSeenWatermarks).value,
                     manuallyUnreadSessionKeys = shared(SharedKeys.manuallyUnreadSessionKeys).value,
                     mutedSessionKeys = shared(SharedKeys.mutedSessionKeys).value,
                     isSidebarShown = shared(SharedKeys.sidebarShown).value,
@@ -583,6 +601,7 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
     sealed interface Action {
         data class CatchUp(val action: CatchUpFeature.Action) : Action
         data class Traces(val action: TraceUploadsFeature.Action) : Action
+        data class InboxSidebar(val action: InboxSidebarFeature.Action) : Action
         /** The drawer's What's New row: open (`buttonTapped`) or hide (`hideTapped`). */
         data class WhatsNew(val action: WhatsNewFeature.Action) : Action
         /** Preferences (`:feature:settings`' `HomeSettingsFeature`); Home's own sender is the sidebar toggle. */
@@ -626,6 +645,8 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         data object NewSessionTapped : Action
         /** A computer paired for the first time: open the drawer on its sessions. */
         data object PairedComputerOpened : Action
+        /** The install's first computer paired: a ready session in its latest project, with starter prompts. */
+        data object FirstComputerPaired : Action
         /** The view opened the drawer `drawerOpenRequest` asked for. */
         data object DrawerOpenRequestHandled : Action
         data class SessionTapped(val sessionID: String) : Action
@@ -887,6 +908,7 @@ fun HomeFeature.State.makeDetail(
     var detail = SessionFeature.State.session(
         server = server,
         session = session,
+        projects = projects,
         cachedItems = cachedItems,
         initialTranscriptRequestIsExternal = externalTranscript,
         isRunning = session.id in s.activeSessionIDs,
@@ -895,7 +917,10 @@ fun HomeFeature.State.makeDetail(
     )
     detail = s.seedingSessionSnapshot(detail)
     detail = detail.copy(streamIsHealthy = s.isEventStreamLive)
-    detail = detail.noteOpening(seen = s.sessionSnapshots[session.id]?.seenItemIDs, unread = s.sessionSnapshots[session.id]?.hasUnseenItems == true)
+    val pending = s.pendingOpenReadState[session.id]
+    if (pending != null) s = s.copy(pendingOpenReadState = s.pendingOpenReadState - session.id)
+    detail = s.applyingOpening(session, pending, detail)
+    if (session.id in s.unopenedSeen) s = s.copy(unopenedSeen = s.unopenedSeen - session.id)
     val pick = s.waitingPicks[session.id]
     if (pick != null) {
         s = s.copy(waitingPicks = s.waitingPicks - session.id)
@@ -1128,6 +1153,7 @@ fun HomeFeature.State.remembering(detail: SessionFeature.State): HomeFeature.Sta
     if (sessions.none { it.id == id } && snapshot.session.parentID == null) return this
     val snapshots = sessionSnapshots.toMutableMap()
     snapshots[id] = snapshot
+    val watermarked = syncingSeenWatermark(detail, id)
     val rootID = detail.familyRootID
     if (rootID != null && rootID != id) {
         snapshots[rootID]?.let { root ->
@@ -1138,6 +1164,7 @@ fun HomeFeature.State.remembering(detail: SessionFeature.State): HomeFeature.Sta
                 forms = snapshot.forms,
                 formAnswers = snapshot.formAnswers,
                 questionPageIndices = snapshot.questionPageIndices,
+                answerDrafts = snapshot.answerDrafts,
                 hasLoadedRequests = snapshot.hasLoadedRequests,
                 completedRequests = snapshot.completedRequests,
                 selectedRequest = snapshot.selectedRequest,
@@ -1146,7 +1173,7 @@ fun HomeFeature.State.remembering(detail: SessionFeature.State): HomeFeature.Sta
     }
     val order = (sessionSnapshotOrder - id + id).toMutableList()
     while (order.size > HomeFeature.transcriptMemoryLimit) snapshots.remove(order.removeAt(0))
-    return copy(sessionSnapshots = snapshots, sessionSnapshotOrder = order)
+    return watermarked.copy(sessionSnapshots = snapshots, sessionSnapshotOrder = order)
 }
 
 /**
@@ -1162,13 +1189,15 @@ fun HomeFeature.State.pushingSubagent(session: OpenCodeSession): HomeFeature.Sta
     var detail = SessionFeature.State.session(
         server = server,
         session = session,
+        projects = projects,
         cachedItems = parent.familyTranscriptCache[session.id] ?: s.cachedTranscriptItems(session),
         isRunning = session.id in s.activeSessionIDs || session.id in parent.activeFamilySessionIDs,
         navigationID = -pushedCount,
     )
     detail = s.seedingSessionSnapshot(detail)
     detail = detail.copy(streamIsHealthy = s.isEventStreamLive || parent.streamIsHealthy)
-    detail = detail.noteOpening(seen = s.sessionSnapshots[session.id]?.seenItemIDs, unread = s.sessionSnapshots[session.id]?.hasUnseenItems == true)
+    detail = s.applyingOpening(session, detail = detail)
+    if (session.id in s.unopenedSeen) s = s.copy(unopenedSeen = s.unopenedSeen - session.id)
     val pick = s.waitingPicks[session.id]
     if (pick != null) {
         s = s.copy(waitingPicks = s.waitingPicks - session.id)

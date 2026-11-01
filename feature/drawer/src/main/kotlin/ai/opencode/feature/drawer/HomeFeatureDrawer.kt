@@ -68,6 +68,7 @@ internal fun HomeFeature.reduceDrawer(state: State, action: Action): HomeReduced
             val items = action.items ?: return Reduced(s)
             if (!canCacheBackgroundTranscript(s, action.sessionID)) return Reduced(s)
             s = s.copy(transcriptReadAt = s.transcriptReadAt + (action.sessionID to dependency(DateClient).now()))
+            s = s.notingUnopenedCopy(action.sessionID)
             s = s.publishingTranscript(action.sessionID, items).persistingTranscriptCache(action.sessionID)
             return Reduced(s)
         }
@@ -120,6 +121,20 @@ internal fun HomeFeature.reduceDrawer(state: State, action: Action): HomeReduced
             }
             AppLog.app.info { "paired computer opens drawer sessions=$roots" }
             return Reduced(state.copy(drawerOpenRequest = state.detailGeneration))
+        }
+
+        Action.FirstComputerPaired -> {
+            // The install's first computer opens a new session in its latest project, with starter
+            // prompts, ready to send. With no project but the home folder, or something already on
+            // screen, it lands as any new computer does.
+            val project = state.firstSessionProject
+            if (state.sessionDetail?.isDraft == false || state.catchUp != null || project == null) {
+                AppLog.app.info { "first computer has no project to open projects=${state.projects.size}" }
+                return reduceDrawer(state, Action.PairedComputerOpened)
+            }
+            AppLog.app.info { "first computer opens a ready session projects=${state.projects.size}" }
+            val (s, draft) = state.makeDraft(directory = project.directory, reason = "you paired your first computer")
+            return Reduced(s.copy(sessionDetail = draft.copy(starterPrompts = SessionFeature.State.firstSessionStarters)))
         }
 
         Action.DrawerOpenRequestHandled -> return Reduced(state.copy(drawerOpenRequest = null))
@@ -244,7 +259,7 @@ internal fun HomeFeature.reduceDrawer(state: State, action: Action): HomeReduced
         is Action.MarkRead -> {
             val session = state.sessions.firstOrNull { it.id == action.sessionID } ?: return Reduced(state)
             haptics.play(Haptic.selection)
-            return Reduced(state.markingReadLocally(session), acknowledgeView(session, state.server))
+            return Reduced(state.markingReadLocally(session).clearingUnseenBaseline(session.id), acknowledgeView(session, state.server))
         }
 
         is Action.MarkUnread -> {

@@ -149,8 +149,8 @@ class WhatsNewTests {
     @Test
     fun closingSettingsWithoutWhatsNewSendsNothingMore() = homeTest { h ->
         val store = h.whatsNewStore(h.home(), exhaustive = true)
-        store.send(Action.SettingsTapped) { it.presentingSettings(SettingsFeature.State(server = server)) }
-        store.send(Action.SettingsShownChanged(false)) { it.copy(settings = null) }
+        store.send(Action.SettingsTapped) { it.presentingSettings(SettingsFeature.State(server = server)).syncingTranscriptCover() }
+        store.send(Action.SettingsShownChanged(false)) { it.copy(settings = null).syncingTranscriptCover() }
     }
 
     /**
@@ -257,9 +257,9 @@ class WhatsNewTests {
         store.receiveTryWhatsNew {
             it.copy(settings = null, drawerCloseRequests = 1, sessionDetail = it.sessionDetail!!.withDraft("  Half a thought \n\n\nList my sessions"))
         }
-        store.send(Action.WhatsNew(WhatsNewFeature.Action.ButtonTapped)) { it.presentingWhatsNew() }
+        store.send(Action.WhatsNew(WhatsNewFeature.Action.ButtonTapped)) { it.presentingWhatsNew().syncingTranscriptCover() }
         store.send(tryTapped(WhatsNewEntry.Destination.Prompt(" List my sessions\n"), "a"))
-        store.receiveTryWhatsNew { it.copy(settings = null, drawerCloseRequests = 2) }
+        store.receiveTryWhatsNew { it.copy(settings = null, drawerCloseRequests = 2).syncingTranscriptCover() }
         assertEquals(listOf(photo), store.state.sessionDetail?.pendingAttachments)
     }
 
@@ -279,9 +279,9 @@ class WhatsNewTests {
             }
             home.copy(settings = null, drawerCloseRequests = 1, detailGeneration = generation + 1, sessionDetail = draft)
         }
-        store.send(Action.WhatsNew(WhatsNewFeature.Action.ButtonTapped)) { it.presentingWhatsNew() }
+        store.send(Action.WhatsNew(WhatsNewFeature.Action.ButtonTapped)) { it.presentingWhatsNew().syncingTranscriptCover() }
         store.send(tryTapped(WhatsNewEntry.Destination.Prompt("List my sessions"), "a"))
-        store.receiveTryWhatsNew { it.copy(settings = null, drawerCloseRequests = 2) }
+        store.receiveTryWhatsNew { it.copy(settings = null, drawerCloseRequests = 2).syncingTranscriptCover() }
     }
 
     /** A saved new-session draft comes back when Try It opens one, with the prompt below its words. */

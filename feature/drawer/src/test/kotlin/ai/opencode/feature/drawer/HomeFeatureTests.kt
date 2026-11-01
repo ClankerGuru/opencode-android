@@ -131,9 +131,9 @@ class HomeFeatureTests {
     fun settingsPushesOverTheDrawerAndBackReturnsToIt() = homeTest { h ->
         val state = h.state { HomeFeature.State(savedServer, snapshot(emptyList())) }
         val store = h.store(state)
-        store.send(Action.SettingsTapped) { h.state { it.presentingSettings(SettingsFeature.State(server = savedServer)) } }
+        store.send(Action.SettingsTapped) { h.state { it.presentingSettings(SettingsFeature.State(server = savedServer)).syncingTranscriptCover() } }
         assertTrue(store.state.isSettingsShown)
-        store.send(Action.SettingsShownChanged(false)) { it.copy(settings = null) }
+        store.send(Action.SettingsShownChanged(false)) { it.copy(settings = null).syncingTranscriptCover() }
         assertFalse(store.state.isSettingsShown)
     }
 

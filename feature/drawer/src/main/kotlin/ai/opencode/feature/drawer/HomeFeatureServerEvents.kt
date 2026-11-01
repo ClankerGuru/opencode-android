@@ -15,6 +15,7 @@ import ai.opencode.feature.session.waitingSessionIDs
 import ai.opencode.feature.voice.ServerVoiceSupport
 import ai.opencode.server.OpenCodeLiveContentEvent
 import ai.opencode.server.OpenCodeServerEvent
+import ai.opencode.server.model.OpenCodeProject
 
 /*
  * Port of iOS `HomeFeature+ServerEvents.swift`: the event stream projected onto Home's list and
@@ -26,8 +27,20 @@ import ai.opencode.server.OpenCodeServerEvent
 internal fun HomeFeature.reduceServerEvent(state: State, event: OpenCodeServerEvent): HomeReduced {
     when (event) {
         is OpenCodeServerEvent.SessionViewChanged -> {
-            // The event carries the watermark, so unread updates in place rather than refetching the list.
-            return Reduced(state.updatingSession(event.sessionID) { it.copy(viewedMilliseconds = maxOf(it.viewedMilliseconds ?: 0, event.idle)) })
+            // The event carries the watermark, so unread updates in place rather than refetching the
+            // list (which also cancelled the snapshot in flight). `OpenCodeClient` consumes the SSE
+            // echo of this device's own `POST /view`, so an event here means another client read the
+            // session.
+            var becameRead = true
+            var s = state.updatingSession(event.sessionID) { session ->
+                val next = maxOf(session.viewedMilliseconds ?: 0, event.idle)
+                session.idleMilliseconds?.let { becameRead = event.idle >= it }
+                if (session.viewedMilliseconds == next) session else session.copy(viewedMilliseconds = next)
+            }
+            val key = s.sessionKey(event.sessionID)
+            if (key in s.manuallyUnreadSessionKeys) s = s.updatingManuallyUnreadSessionKeys { it - key }
+            if (becameRead) s = s.clearingUnseenBaseline(event.sessionID)
+            return Reduced(s)
         }
 
         OpenCodeServerEvent.Connected -> {
@@ -286,16 +299,14 @@ internal fun HomeFeature.reduceServerEvent(state: State, event: OpenCodeServerEv
 
         is OpenCodeServerEvent.ProjectUpdated -> {
             val project = event.project
-            val index = state.projects.indexOfFirst { it.id == project.id }
-            val projects = if (index >= 0) state.projects.toMutableList().also { it[index] = project } else listOf(project) + state.projects
-            val s = state.copy(projects = projects)
+            val s = state.copy(projects = state.projects.upserting(project))
                 .updatingDetail { detail ->
                     detail.copy(
-                        projects = detail.projects.map { if (it.id == project.id) project else it },
+                        projects = detail.projects.upserting(project),
                         draftProject = if (detail.draftProject?.id == project.id) project else detail.draftProject,
                     )
                 }
-                .updatingSubagents { screen -> screen.copy(projects = screen.projects.map { if (it.id == project.id) project else it }) }
+                .updatingSubagents { screen -> screen.copy(projects = screen.projects.upserting(project)) }
             return Reduced(s)
         }
     }
@@ -303,8 +314,8 @@ internal fun HomeFeature.reduceServerEvent(state: State, event: OpenCodeServerEv
 
 /**
  * `sessionID` now lives in `directory` (this phone's Move to, or the server's `session.moved`):
- * Home's copies follow, so attention reads stop asking the old folder. iOS also tells every screen
- * holding it (`SessionFeature.Action.sessionMoved`); that lands with the session area's Move to.
+ * Home's copies follow, so attention reads stop asking the old folder, and every screen holding it
+ * hears.
  */
 internal fun HomeFeature.sessionMoved(state: State, sessionID: String, directory: String): HomeReduced {
     val s = state.updatingSession(sessionID) { if (it.directory == directory) it else it.copy(directory = directory) }
@@ -319,7 +330,22 @@ internal fun HomeFeature.sessionMoved(state: State, sessionID: String, directory
             family = if (movesMember) snapshot.family.map { if (it.id == sessionID) it.copy(directory = directory) else it } else snapshot.family,
         )
     }
-    return Reduced(if (changed) s.copy(sessionSnapshots = snapshots) else s)
+    val next = if (changed) s.copy(sessionSnapshots = snapshots) else s
+    return Reduced(
+        next,
+        forwardToScreens(next, SessionFeature.Action.SessionMoved(sessionID, directory)) { screen ->
+            screen.familySessions.any { it.id == sessionID && it.directory != directory } ||
+                (screen.voice?.target?.sessionID == sessionID && screen.voice?.target?.directory != directory)
+        },
+    )
+}
+
+/** Replaces the project with its ID, or puts a new one first. */
+private fun List<OpenCodeProject>.upserting(project: OpenCodeProject): List<OpenCodeProject> {
+    val index = indexOfFirst { it.id == project.id }
+    if (index < 0) return listOf(project) + this
+    if (this[index] == project) return this
+    return toMutableList().also { it[index] = project }
 }
 
 /**

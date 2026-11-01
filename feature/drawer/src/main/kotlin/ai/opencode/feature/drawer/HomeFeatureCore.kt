@@ -28,7 +28,7 @@ internal fun HomeFeature.core(state: State, action: Action): Reduced<State, Acti
             action.event is OpenCodeServerEvent.ProjectUpdated ||
             action.event is OpenCodeServerEvent.SessionMoved
         is Action.SessionDetail -> when ((action.action as? PresentationAction.Presented)?.action) {
-            is SessionFeature.Action.SessionCreated -> true
+            is SessionFeature.Action.SessionCreated, is SessionFeature.Action.MissingFolderMoved -> true
             // A session that just learned its first prompt keeps it across launches.
             is SessionFeature.Action.AcceptedTranscriptUpdated -> reduced.state.sessions != state.sessions
             else -> false
@@ -43,6 +43,11 @@ private fun HomeFeature.coreRoute(state: State, action: Action): Reduced<State, 
     is Action.CatchUp -> reduceCatchUp(state, action.action)
     // The scoped `TraceUploadsFeature` reduces it (`HomeFeature+Composition`).
     is Action.Traces -> Reduced(state)
+    // The scoped `InboxSidebarFeature` owns Archive; Home stamps a confirmed one.
+    is Action.InboxSidebar -> {
+        val response = action.action as? InboxSidebarFeature.Action.ArchiveResponse
+        if (response != null && response.error == null) archiveConfirmed(state, response.sessionID) else Reduced(state)
+    }
 
     Action.NotificationSettingsRequested,
     is Action.NotificationPermissionLoaded,
@@ -143,6 +148,7 @@ private fun HomeFeature.coreRoute(state: State, action: Action): Reduced<State, 
     is Action.PlaygroundSetSessionDetail,
     is Action.PlaygroundReplaceState,
     Action.PairedComputerOpened,
+    Action.FirstComputerPaired,
     Action.DrawerOpenRequestHandled,
     -> reduceDrawer(state, action)
 

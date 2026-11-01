@@ -98,6 +98,11 @@ private fun HomeFeature.fullBody(): Reducer<State, Action> =
         .onChange({ it.settings?.whatsNew }) { old, new, state ->
             if (old == null || new != null) Reduced(state) else Reduced(settingsClosed(old, state))
         }
+        // Only the screen on top shows its transcript: a subagent pushed over it, its browser or
+        // Settings covers it (what arrives is new there).
+        .onChange({ it.transcriptCoverIsStale }) { _, _, state ->
+            Reduced(if (state.transcriptCoverIsStale) state.syncingTranscriptCover() else state)
+        }
         .onChange({ it.settingsHomeInput }) { old, new, state ->
             if (old == null || new == null) {
                 Reduced(state)
@@ -211,6 +216,7 @@ private fun HomeFeature.detailSessionsCore(): Reducer<State, Action> {
     val catchUp = CatchUpFeature()
     val notifications = HomeNotificationsFeature()
     val connection = HomeConnectionFeature()
+    val inboxSidebar = InboxSidebarFeature()
     val session = SessionFeature()
     val home = combine<State, Action>(
         scope(
@@ -229,6 +235,13 @@ private fun HomeFeature.detailSessionsCore(): Reducer<State, Action> {
             action = ::notificationsAction,
             embed = ::homeAction,
             child = notifications,
+        ),
+        scope(
+            state = { it.inboxSidebar },
+            setState = { s: State, c: InboxSidebarFeature.State -> s.copy(inboxSidebarStatus = c.status) },
+            action = { (it as? Action.InboxSidebar)?.action },
+            embed = Action::InboxSidebar,
+            child = inboxSidebar,
         ),
         scope(
             state = { it.connection },
