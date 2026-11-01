@@ -32,7 +32,7 @@ import kotlin.math.pow
  * (`prototypes/settings-connection`, round 4): the status follows the trace, so each change lands
  * at its moment on it.
  *
- * Not here: `routes` and `routesClassifyParsedAddressesNotSpellings` test `ConnectionRoute`,
+ * Not here: `routesClassifyParsedAddressesNotSpellings` tests `ConnectionRoute`,
  * `OpenCodeServer.reachabilityRank` and `isLoopback`, which live in `:server` (its port).
  */
 class ConnectionHealthTests {
@@ -232,18 +232,48 @@ class ConnectionHealthTests {
         health.advance(beat(health, 2.0, 480))
         assertEquals("One slow answer is a blip", Status.connected, health.display.status)
         health.advance(beat(health, 4.0, 520))
-        assertEquals(Display(Status.slow, 520, null), health.display)
+        assertEquals("The number is the average", Display(Status.slow, 347, null), health.display)
         health.advance(beat(health, 6.0, 35))
         health.advance(beat(health, 8.0, 30))
-        assertEquals(Display(Status.connected, 30, null), health.display)
+        assertEquals(Display(Status.connected, 195, null), health.display)
     }
 
-    @Test fun numbersFollowEachBeat() {
+    /**
+     * Like a game's ping: the number is the rolling average of the last `averaged` answers, so
+     * one slow answer nudges it instead of jolting it.
+     */
+    @Test fun theNumberIsARollingAverageOfTheLastThreeAnswers() {
         val health = ConnectionHealth(Link.Connected, 0.0)
-        for ((k, ms) in listOf(38, 41, 29).withIndex()) {
-            health.advance(beat(health, k * 2.0, ms))
-            assertEquals(ms, health.display.milliseconds)
+        for ((k, pair) in listOf(30 to 30, 90 to 60, 30 to 50, 30 to 50, 30 to 30).withIndex()) {
+            val (ms, shown) = pair
+            health.advance(beat(health, k * ConnectionHealth.cadence, ms))
+            assertEquals("check ${k + 1}", shown, health.display.milliseconds)
         }
+        // A drop doesn't count toward the average; it keeps the number.
+        health.beginCheck(10.0)
+        health.advance(10 + ConnectionHealth.answerDeadline + 0.01)
+        assertEquals(Display(Status.unstable, 30, null), health.display)
+        health.advance(beat(health, 12.0, 80))
+        assertEquals(47, health.display.milliseconds)
+    }
+
+    /**
+     * The number Settings opens on averages in until three real answers arrive, so the first
+     * check doesn't jump from it; a new link drops it.
+     */
+    @Test fun theOpeningNumberAveragesInUntilThreeAnswers() {
+        val health = ConnectionHealth(Link.Connected, 0.0, milliseconds = 100)
+        assertEquals(100, health.display.milliseconds)
+        health.advance(beat(health, 0.0, 40))
+        assertEquals(70, health.display.milliseconds)
+        for (k in 1..2) health.advance(beat(health, k * ConnectionHealth.cadence, 40))
+        assertEquals("Three answers fill the window", 40, health.display.milliseconds)
+
+        val reconnected = ConnectionHealth(Link.Connected, 0.0, milliseconds = 100)
+        reconnected.setLink(Link.Reconnecting, 1.0)
+        reconnected.setLink(Link.Connected, 2.0)
+        reconnected.advance(beat(reconnected, 2.15, 40))
+        assertEquals("A new connection starts its own average", 40, reconnected.display.milliseconds)
     }
 
     @Test fun checkCadence() {

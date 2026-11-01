@@ -65,7 +65,7 @@ class ShareCredentialsTests {
         var writes = 0
         val memory = ShareCredentialStore.inMemory()
         val store = ShareCredentialStore(load = memory.load, save = { writes += 1; memory.save(it) }, remove = memory.remove)
-        val callback = "https://relay.example/v1/notify/sealed"
+        val callback = "https://relay.example/v2/notify/sealed"
         ShareCredentials.publish(ShareCredentials(server, callbackURL = callback), store)
         // Leaving the app republishes without a callback: the last one stays, unwritten.
         ShareCredentials.publish(ShareCredentials(server), store)
@@ -96,6 +96,15 @@ class ShareCredentialsTests {
         val other = OpenCodeServer(url = "http://other.local:4096", username = "opencode", password = "x")
         ShareCredentials.publish(ShareCredentials(other), store)
         assertEquals(other.persistenceID, store.load()?.serverID)
+        assertNull(store.load()?.callbackURL)
+    }
+
+    @Test
+    fun upgradingShareKeepsTheServerButDropsThePlaintextCallback() {
+        val store = ShareCredentialStore.inMemory()
+        val old = ShareCredentials(server, "https://relay.example/v1/notify/sealed").copy(version = 1)
+        store.save(old)
+        assertEquals(server, store.load()?.server)
         assertNull(store.load()?.callbackURL)
     }
 }
@@ -202,7 +211,7 @@ class ShareSenderTests {
     @get:Rule val isolation = TestIsolationRule()
 
     private val image = ShareSendRequest.Image(byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0x01), "image/jpeg")
-    private val callback = "https://relay.example/v1/notify/sealed"
+    private val callback = "https://relay.example/v2/notify/sealed"
 
     /** The sheet's prompt is the app's prompt, byte for byte, for the same message. */
     @Test
@@ -210,7 +219,7 @@ class ShareSenderTests {
         val file = ShareFileReference(name = "crash.pdf", mime = "application/pdf", path = "/tmp/uploads/x/crash.pdf")
         val share = ShareSender.promptBody(messageID = "msg_1", text = "What failed?", images = listOf(image), files = listOf(file), callbackURL = callback)
         val app = Json.parseToJsonElement(
-            """{"id":"msg_1","text":"What failed?\nAttached file: `/tmp/uploads/x/crash.pdf`","files":[{"uri":"data:image/jpeg;base64,/9gB"}],"delivery":"steer","metadata":{"displayText":"What failed?","comments":[],"attachments":[{"name":"crash.pdf","mime":"application/pdf","path":"/tmp/uploads/x/crash.pdf"}],"notification":{"callbackURL":"https://relay.example/v1/notify/sealed"}}}""",
+            """{"id":"msg_1","text":"What failed?\nAttached file: `/tmp/uploads/x/crash.pdf`","files":[{"uri":"data:image/jpeg;base64,/9gB"}],"delivery":"steer","metadata":{"displayText":"What failed?","comments":[],"attachments":[{"name":"crash.pdf","mime":"application/pdf","path":"/tmp/uploads/x/crash.pdf"}],"notification":{"callbackURL":"https://relay.example/v2/notify/sealed"}}}""",
         )
         assertEquals(app, encoder.encodeToJsonElement(ShareSender.PromptBody.serializer(), share))
 

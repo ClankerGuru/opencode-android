@@ -4,6 +4,7 @@ import ai.opencode.core.diagnostics.HidesFromProblemReports
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
+import ai.opencode.core.ui.LocalScreenCovered
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationSpec
@@ -17,11 +18,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,12 +54,17 @@ import kotlinx.coroutines.launch
  *
  * Home (`:feature:drawer`) wraps its content with this and passes Settings' content.
  *
+ * While Settings covers Home completely and at rest ([SettingsCover]), what's beneath reads
+ * [LocalScreenCovered] as true and pauses its running animations (iOS `ScreenCoveredTrait`, which
+ * Home's drawer container sets from the same cover).
+ *
  * @param isShown iOS `HomeFeature.State.isSettingsShown` (`settings != null`).
  * @param atRoot whether Settings shows its root page (`path.isEmpty()`): only then does the back
  *   gesture close Settings.
  * @param onClose the back gesture committed (send `SettingsFeature.Action.BackTapped`, which closes
  *   at the root via `SettingsDelegate.Close`).
  * @param settings Settings itself ([SettingsView]); kept composed while it slides out.
+ * @param cover iOS `SettingsCover`: Home can hold it to read [SettingsCover.covers] itself.
  * @param content what's beneath (Home).
  */
 @Composable
@@ -66,6 +74,7 @@ fun SettingsPresentation(
     onClose: () -> Unit,
     settings: @Composable () -> Unit,
     modifier: Modifier = Modifier,
+    cover: SettingsCover = remember { SettingsCover() },
     content: @Composable () -> Unit,
 ) {
     val reduceMotion = rememberReduceMotion()
@@ -73,14 +82,19 @@ fun SettingsPresentation(
     var isMounted by remember { mutableStateOf(isShown) }
     val scope = rememberCoroutineScope()
     val focus = LocalFocusManager.current
+    val shown by rememberUpdatedState(isShown)
 
     LaunchedEffect(isShown, reduceMotion) {
         if (isShown) {
             // Mounted off screen first, then pushed in, so the page slides rather than appearing in place.
             focus.clearFocus(force = true)
             isMounted = true
+            // Pushes (or fades) Settings fully open; Home counts as covered once it lands.
+            val move = cover.moving()
             progress.animateTo(1f, if (reduceMotion) FadeSpec else PushSpec)
+            if (shown) cover.landedOpen(move)
         } else if (isMounted) {
+            cover.moving()
             progress.animateTo(0f, if (reduceMotion) FadeSpec else PushSpec)
             isMounted = false
         }
@@ -95,7 +109,9 @@ fun SettingsPresentation(
                 .graphicsLayer { translationX = if (reduceMotion) 0f else -widthPx * PARALLAX * p }
                 .then(if (isMounted) Modifier.clearAndSetSemantics {} else Modifier),
         ) {
-            content()
+            CompositionLocalProvider(LocalScreenCovered provides (cover.covers || LocalScreenCovered.current)) {
+                content()
+            }
         }
         if (isMounted) {
             // Dims what's beneath, and keeps its touches while Settings is up.
@@ -138,14 +154,20 @@ fun SettingsPresentation(
             PredictiveBackHandler(enabled = isShown && atRoot) { events ->
                 try {
                     events.collect { event ->
+                        // Home shows under the finger: its animations run again.
+                        if (event.progress > 0f) cover.moving()
                         // The page follows the finger: progress 1 is open, 0 is closed.
                         if (!reduceMotion) progress.snapTo(1f - event.progress)
                     }
                     // Committed: close from where the finger left it (isShown → false animates to 0).
                     onClose()
                 } catch (cancelled: CancellationException) {
-                    // Cancelled: spring back open.
-                    scope.launch { progress.animateTo(1f, if (reduceMotion) FadeSpec else PushSpec) }
+                    // Cancelled: spring back open, covered again once it settles fully open.
+                    val move = cover.moving()
+                    scope.launch {
+                        progress.animateTo(1f, if (reduceMotion) FadeSpec else PushSpec)
+                        if (shown) cover.landedOpen(move)
+                    }
                     throw cancelled
                 }
             }
@@ -166,3 +188,38 @@ private val PushSpec: AnimationSpec<Float> get() = MotionSpring(duration = 0.42,
 
 /** iOS `.easeInOut(duration: 0.3)` cross-fade under reduce motion. */
 private val FadeSpec: AnimationSpec<Float> get() = Motion.easeInOut(0.3)
+
+/**
+ * iOS `SettingsCover`: whether Settings or What’s New covers Home completely and at rest, which
+ * pauses the running animations beneath ([LocalScreenCovered]). Follows the presentation itself,
+ * not `isSettingsShown`: uncovered the moment it moves (closing, a back swipe under the finger),
+ * covered again only when a move that ends fully open lands (the push, a swipe springing back).
+ */
+class SettingsCover {
+    private var coversState by mutableStateOf(false)
+
+    /** Read in composition, so what's beneath follows it. */
+    var covers: Boolean
+        get() = coversState
+        private set(value) {
+            if (value == coversState) return
+            coversState = value
+            onChange(value)
+        }
+
+    /** Told each time [covers] changes. */
+    var onChange: (Boolean) -> Unit = {}
+    private var move = 0
+
+    /** The presentation starts moving: uncovered until this move lands open. */
+    fun moving(): Int {
+        move += 1
+        covers = false
+        return move
+    }
+
+    /** [move] ended fully open; any move since then wins. */
+    fun landedOpen(move: Int) {
+        if (move == this.move) covers = true
+    }
+}

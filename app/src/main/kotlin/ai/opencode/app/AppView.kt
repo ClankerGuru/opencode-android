@@ -1,5 +1,12 @@
 package ai.opencode.app
 
+import androidx.compose.runtime.collectAsState
+import ai.opencode.feature.settings.onboarding.WelcomeView
+import ai.opencode.feature.settings.onboarding.WelcomeFeature
+import ai.opencode.core.sharing.shared
+import ai.opencode.core.sharing.ExperimentalFeature
+import ai.opencode.core.experiments.key
+import ai.opencode.core.diagnostics.HidesFromScreenshots
 import ai.opencode.core.store.Store
 import ai.opencode.core.store.StoreOf
 import ai.opencode.feature.media.MediaFeature
@@ -19,27 +26,10 @@ import ai.opencode.core.ui.ThisDevice
 import ai.opencode.feature.drawer.HomeFeature
 import ai.opencode.feature.drawer.HomeView
 import ai.opencode.feature.settings.servers.PairingScannerView
-import ai.opencode.feature.settings.servers.ServerMarkTile
-import ai.opencode.feature.settings.servers.ServerTitleFeature
-import ai.opencode.feature.settings.servers.ServerTitleStore
-import ai.opencode.feature.settings.servers.ServerTitleView
-import ai.opencode.core.store.PresentationAction
-import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.core.sharing.experimental
-import ai.opencode.core.sharing.shared
-import ai.opencode.core.ui.OpenCodePrimaryButton
 import ai.opencode.server.friendlyName
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.material3.ModalBottomSheetProperties
-import androidx.compose.material3.SheetValue
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.rememberUpdatedState
 import ai.opencode.feature.transcript.TranscriptMediaProviders
 import ai.opencode.server.OpenCodeServer
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -130,6 +120,9 @@ fun AppView(store: StoreOf<AppFeature.State, AppFeature.Action>) {
     val hasHome by store.observe { it.home != null }
     val isEditingServer by store.observe { it.isEditingServer }
     val isScanning by store.observe { it.isScanningPairingCode }
+    val hasSavedServers by store.observe { it.savedServers.value.isNotEmpty() }
+    val welcomePreview by remember { shared(ExperimentalFeature.welcomePreview.key).flow }.collectAsState()
+    val showsWelcome = !hasSavedServers && ExperimentalFeature.welcomePreview.isActive(welcomePreview)
     OpenCodeAppTheme {
         // Media's file viewer renders Markdown files with the transcript's renderer.
         TranscriptMediaProviders {
@@ -143,44 +136,23 @@ fun AppView(store: StoreOf<AppFeature.State, AppFeature.Action>) {
                 // transcript image viewer and file/diagram/pasted-text viewers cover the whole Home.
                 val media = remember { Store(MediaFeature.State(), MediaFeature()) }
                 MediaView(media) { HomeView(home) }
+            } else if (showsWelcome) {
+                val welcome = store.rememberScope<AppFeature.State, AppFeature.Action, WelcomeFeature.State, WelcomeFeature.Action>(
+                    state = { it.welcome },
+                    action = AppFeature.Action::Welcome,
+                )
+                val progress by store.observe { it.connectionProgressLabel }
+                val problem by store.observe { it.errorMessage }
+                WelcomeView(welcome, progress, problem, mark = painterResource(R.drawable.opencode_app_mark))
             } else {
-                ConnectionScreen(store)
+                ConnectionView(store)
             }
-            ServerSwitchToast(store)
-            ServerTitleSheet(store)
             // Over Home too: the drawer adds and edits servers without leaving it.
             if (isEditingServer) ServerFormSheet(store)
             if (isScanning) PairingScannerPresenter(store)
             AppAlerts(store)
         }
         }
-    }
-}
-
-/** iOS `.overlay(alignment: .bottom)`: below the content, never over the title that just changed. */
-@Composable
-private fun ServerSwitchToast(store: StoreOf<AppFeature.State, AppFeature.Action>) {
-    val confirmation by store.observe { it.serverSwitchConfirmation }
-    Box(Modifier.fillMaxSize().safeDrawingPadding(), contentAlignment = Alignment.BottomCenter) {
-        AnimatedVisibility(visible = confirmation != null, enter = fadeIn(), exit = fadeOut()) {
-            Surface(
-                shape = RoundedCornerShape(percent = 50),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                contentColor = OpenCodeTheme.colors.text,
-                modifier = Modifier.padding(bottom = 92.dp),
-            ) {
-                Text(
-                    confirmation.orEmpty(),
-                    style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium),
-                    modifier = Modifier.padding(horizontal = 18.dp).heightIn(min = 44.dp).padding(vertical = 12.dp),
-                )
-            }
-        }
-    }
-    LaunchedEffect(confirmation) {
-        if (confirmation == null) return@LaunchedEffect
-        delay(2_500)
-        store.send(AppFeature.Action.ServerSwitchConfirmationDismissed)
     }
 }
 
@@ -224,117 +196,7 @@ private fun isAccessibilitySize(): Boolean = LocalDensity.current.fontScale > 1.
 @Composable
 private fun systemOrange(): Color = if (OpenCodeTheme.colors.isDark) Color(0xFFFF9F0A) else Color(0xFFFF9500)
 
-/** The scoped server sheet store (iOS `$store.scope(state: \.serverTitle, action: \.serverTitle)`). */
-@Composable
-private fun rememberServerTitleStore(store: StoreOf<AppFeature.State, AppFeature.Action>): ServerTitleStore {
-    // The last state keeps drawing while the sheet animates away.
-    val last = remember { arrayOfNulls<ServerTitleFeature.State>(1) }
-    return store.rememberScope<AppFeature.State, AppFeature.Action, ServerTitleFeature.State, ServerTitleFeature.Action>(
-        state = { app -> (app.serverTitle ?: last[0] ?: ServerTitleFeature.State()).also { last[0] = it } },
-        action = { AppFeature.Action.ServerTitle(PresentationAction.Presented(it)) },
-    )
-}
-
-/**
- * iOS `.sheet(item: serverSheet)`: the Experimental server sheet at full height (`.large`), which
- * can't be swiped away while a connection is in progress (`interactiveDismissDisabled(busy)`).
- * Not the first-run connect page, which is the screen itself.
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ServerTitleSheet(store: StoreOf<AppFeature.State, AppFeature.Action>) {
-    val presented by store.observe { it.serverTitle != null && it.serverTitle?.connectOnly != true }
-    if (!presented) return
-    val titleStore = rememberServerTitleStore(store)
-    val busy by store.observe { it.serverTitle?.busy == true }
-    val currentBusy by rememberUpdatedState(busy)
-    val sheetState = rememberModalBottomSheetState(
-        skipPartiallyExpanded = true,
-        confirmValueChange = { it != SheetValue.Hidden || !currentBusy },
-    )
-    ModalBottomSheet(
-        onDismissRequest = { if (!currentBusy) store.send(AppFeature.Action.ServerTitle(PresentationAction.Dismiss)) },
-        sheetState = sheetState,
-        dragHandle = null,
-        containerColor = OpenCodeTheme.colors.groupedCanvas,
-        properties = ModalBottomSheetProperties(shouldDismissOnBackPress = !busy),
-    ) {
-        ServerTitleView(titleStore, Modifier.fillMaxHeight())
-    }
-}
-
-/**
- * iOS `connectionView`: with Title Is the Switch on, the first-run connect page (no servers) or the
- * “Connect Your Computer” screen whose Get Started opens the server sheet; otherwise the legacy screen.
- */
-@Composable
-private fun ConnectionScreen(store: StoreOf<AppFeature.State, AppFeature.Action>) {
-    val titleSwitchStored by remember { shared(experimental(ExperimentalFeature.serverTitleSwitch)).flow }
-        .collectAsState(initial = shared(experimental(ExperimentalFeature.serverTitleSwitch)).value)
-    val titleSwitch = ExperimentalFeature.serverTitleSwitch.isActive(titleSwitchStored)
-    val connectOnly by store.observe { it.serverTitle?.connectOnly == true }
-    when {
-        titleSwitch && connectOnly -> ServerTitleView(rememberServerTitleStore(store), Modifier.fillMaxSize())
-        titleSwitch -> TitleSwitchConnectionView(store)
-        else -> ConnectionView(store)
-    }
-}
-
-/** iOS `connectionView` under Title Is the Switch: the mark, “Connect Your Computer”, Get Started. */
-@Composable
-private fun TitleSwitchConnectionView(store: StoreOf<AppFeature.State, AppFeature.Action>) {
-    val errorMessage by store.observe { it.errorMessage }
-    val returnServer by store.observe { it.returnServer }
-    Column(
-        Modifier.fillMaxSize().background(OpenCodeTheme.colors.groupedCanvas).safeDrawingPadding()
-            .padding(horizontal = 20.dp).padding(bottom = 12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Spacer(Modifier.weight(1f))
-        ServerMarkTile()
-        Text(
-            "Connect Your Computer",
-            style = OpenCodeTextStyles.title1.copy(fontWeight = FontWeight.Bold),
-            color = OpenCodeTheme.colors.text,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 20.dp).semantics { heading() },
-        )
-        Text(
-            "Pair this ${ThisDevice.name} with OpenCode on your computer.",
-            style = OpenCodeTextStyles.subheadline,
-            color = OpenCodeTheme.colors.secondaryText,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 6.dp),
-        )
-        errorMessage?.let {
-            Text(
-                it,
-                style = OpenCodeTextStyles.footnote,
-                color = OpenCodeTheme.colors.secondaryText,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top = 12.dp),
-            )
-        }
-        Spacer(Modifier.weight(1f))
-        Column(
-            Modifier.widthIn(max = 480.dp).fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            OpenCodePrimaryButton(onClick = { store.send(AppFeature.Action.ServerTitleOpened) }, modifier = Modifier.fillMaxWidth()) {
-                Text("Get Started")
-            }
-            returnServer?.let { server ->
-                TextButton(
-                    onClick = { store.send(AppFeature.Action.ReturnToServerTapped) },
-                    modifier = Modifier.heightIn(min = 48.dp),
-                ) { Text("Back to ${server.friendlyName}", style = OpenCodeTextStyles.body.copy(fontWeight = FontWeight.Medium)) }
-            }
-        }
-    }
-}
-
-/** iOS `legacyConnectionView` (the default while the Title-Is-the-Switch experiment is off). */
+/** iOS `connectionView`: the saved servers, pairing and the manual form. */
 @Composable
 private fun ConnectionView(store: StoreOf<AppFeature.State, AppFeature.Action>) {
     val savedServers by store.observe { it.savedServers.value }
@@ -755,6 +617,8 @@ private fun ServerFormSheet(store: StoreOf<AppFeature.State, AppFeature.Action>)
         onDismissRequest = { store.send(AppFeature.Action.CancelEditingTapped) },
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
+        // Its password and headers, out of problem reports and voice screenshots.
+        HidesFromScreenshots()
         Box(Modifier.fillMaxWidth().heightIn(min = 48.dp), contentAlignment = Alignment.Center) {
             Text(
                 if (state.editingSavedServer == null) "New Server" else "Edit Server",
@@ -969,6 +833,7 @@ private fun PairingScannerPresenter(store: StoreOf<AppFeature.State, AppFeature.
         onDismissRequest = { store.send(AppFeature.Action.ScannerDismissed) },
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
+        HidesFromScreenshots()
         PairingScannerView(
             onScanned = { store.send(AppFeature.Action.PairingCodeScanned(it)) },
             onCancel = { store.send(AppFeature.Action.ScannerDismissed) },

@@ -64,7 +64,7 @@ import androidx.compose.ui.unit.dp
 import java.util.Locale
 
 /**
- * Settings › Advanced › Developer (iOS `DiagnosticsView`), with Android's developer tools. Pass
+ * Settings › Developer (iOS `DiagnosticsView`), with Android's developer tools. Pass
  * [onClose] to show a back arrow on the main page (the settings stack owns navigation into it),
  * and [onOpenPlaygrounds] to list Settings' Playgrounds under Tuning, as iOS does.
  */

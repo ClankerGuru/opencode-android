@@ -13,6 +13,8 @@ object SystemNotificationChannels {
     const val VOICE_CALL = "voice-call"
     /** A hands-free recording's Live Update (iOS: the dictation Live Activity). */
     const val DICTATION = "dictation"
+    /** A run sent from this phone, while the app is away (iOS: the Session Live Activity). */
+    const val SESSION_RUN = "session-run"
     /** A session finished or needs input (iOS: the relay's push). */
     const val SESSIONS = "sessions"
     /** The share sheet's “sent” and “continue” notices (iOS: `ShareNotifier`). */
@@ -28,6 +30,11 @@ object SystemNotificationChannels {
                     setShowBadge(false)
                 },
                 NotificationChannel(DICTATION, "Recording", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                    setSound(null, null)
+                    enableVibration(false)
+                    setShowBadge(false)
+                },
+                NotificationChannel(SESSION_RUN, "Session Runs", NotificationManager.IMPORTANCE_DEFAULT).apply {
                     setSound(null, null)
                     enableVibration(false)
                     setShowBadge(false)

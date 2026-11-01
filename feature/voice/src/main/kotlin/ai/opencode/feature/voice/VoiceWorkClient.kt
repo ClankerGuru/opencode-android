@@ -194,6 +194,8 @@ class VoiceWorkCoordinator {
      * one leaves.
      */
     suspend fun sharedWaitForIdle(server: OpenCodeServer, sessionID: String, client: OpenCodeClient) {
+        // Already cancelled: it never opens a wait.
+        if (!currentCoroutineContext().isActive) throw leftWait
         val key = SessionKey(server, sessionID)
         val result = CompletableDeferred<Result<Unit>>()
         val id = mutex.withLock {

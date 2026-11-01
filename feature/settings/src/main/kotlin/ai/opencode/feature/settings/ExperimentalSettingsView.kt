@@ -1,8 +1,6 @@
 package ai.opencode.feature.settings
 
 import ai.opencode.core.experiments.key
-import ai.opencode.core.experiments.group
-import ai.opencode.core.experiments.systemImage
 import ai.opencode.core.experiments.isCallStyle
 import ai.opencode.core.experiments.ExperimentalCallStyle
 import ai.opencode.core.experiments.ExperimentalFeature
@@ -36,24 +34,27 @@ import androidx.compose.ui.graphics.Color
 import kotlinx.coroutines.delay
 
 /**
- * Port of iOS `Settings/ExperimentalSettingsView.swift`: Settings → Advanced, the experimental
- * switches in open groups (Composer, Calls, Transcript, Drawer) and Developer at the bottom.
+ * Port of iOS `Settings/ExperimentalSettingsView.swift`: Settings › Experimental, the experimental
+ * switches in open groups (Composer, Calls, Transcript, Drawer). Sound Effects' volume and send
+ * rows and Welcome Preview's Show Welcome sit under the drawer's switches while they're on.
  * Opened for one experiment (What’s New), it scrolls to that row and briefly highlights it
  * (1.2 s, then a 0.6 s ease-out).
  */
 @Composable
 fun ExperimentalSettingsView(store: SettingsStore, focus: ExperimentalFeature?) {
-    val developerMode by remember { shared(SharedKeys.developerMode).flow }.collectAsState()
     val modelPickerStored by remember { shared(ModelPickerStyle.key).flow }.collectAsState()
     val callTray by remember { shared(ExperimentalFeature.callTray.key).flow }.collectAsState()
-    val floatingCall by remember { shared(ExperimentalFeature.floatingCall.key).flow }.collectAsState()
+    val livingOrb by remember { shared(ExperimentalFeature.livingOrb.key).flow }.collectAsState()
     // Every switch, so headers count what's on and rows redraw when a value changes.
-    val enabled = ExperimentalFeature.entries.associateWith { feature ->
+    val enabled = ExperimentalFeature.allCases.associateWith { feature ->
         remember(feature) { shared(feature.key).flow }.collectAsState().value
     }
     val send = { action: HomeSettingsFeature.Action -> store.send(SettingsFeature.Action.Settings(action)) }
     val modelPicker = ModelPickerStyle.active(modelPickerStored)
-    val callStyle = ExperimentalCallStyle.of(callTray = callTray, floatingCall = floatingCall)
+    val callStyle = ExperimentalCallStyle.of(
+        callTray = ExperimentalFeature.callTray.isActive(callTray),
+        livingOrb = ExperimentalFeature.livingOrb.isActive(livingOrb),
+    )
     val listState = rememberLazyListState()
     var highlighted by remember { mutableStateOf<ExperimentalFeature?>(null) }
 
@@ -93,7 +94,7 @@ fun ExperimentalSettingsView(store: SettingsStore, focus: ExperimentalFeature?) 
         return if (on == 0) group.title else "${group.title} · $on on"
     }
 
-    SettingsPageScaffold(title = "Advanced", store = store, listState = listState) {
+    SettingsPageScaffold(title = "Experimental", store = store, listState = listState) {
         settingsSection(
             key = ExperimentalGroup.composer,
             header = header(ExperimentalGroup.composer, if (modelPicker != ModelPickerStyle.today) 1 else 0),
@@ -126,7 +127,7 @@ fun ExperimentalSettingsView(store: SettingsStore, focus: ExperimentalFeature?) 
                 options = ExperimentalCallStyle.entries.map { SettingsMenuOption(it, it.title) },
                 onSelect = { style ->
                     send(HomeSettingsFeature.Action.ExperimentalFeatureChanged(ExperimentalFeature.callTray, style.callTray))
-                    send(HomeSettingsFeature.Action.ExperimentalFeatureChanged(ExperimentalFeature.floatingCall, style.floatingCall))
+                    send(HomeSettingsFeature.Action.ExperimentalFeatureChanged(ExperimentalFeature.livingOrb, style.livingOrb))
                 },
                 caption = callStyle.summary,
                 symbol = "phone.fill",
@@ -144,13 +145,15 @@ fun ExperimentalSettingsView(store: SettingsStore, focus: ExperimentalFeature?) 
             footer = footerText("Unfinished features that may change or go away."),
         ) {
             toggles(ExperimentalGroup.drawer, leadingDivider = false)
-        }
-        settingsSection(
-            key = "developer",
-            footer = footerText("Diagnostics, live motion tuning, and developer sandboxes."),
-        ) {
-            SettingsRow("Developer", "hammer.fill", SettingsTint.Teal, value = if (developerMode) "On" else "Off") {
-                store.send(SettingsFeature.Action.PagePushed(SettingsPage.Developer))
+            if (ExperimentalFeature.soundEffects.isActive(enabled.getValue(ExperimentalFeature.soundEffects))) {
+                SettingsDivider(inset = true)
+                SoundEffectsSettingsRows(send)
+            }
+            if (ExperimentalFeature.welcomePreview.isActive(enabled.getValue(ExperimentalFeature.welcomePreview))) {
+                SettingsDivider(inset = true)
+                SettingsRow("Show Welcome", "hand.wave", SettingsTint.Indigo, showsChevron = false) {
+                    send(HomeSettingsFeature.Action.WelcomeOpened)
+                }
             }
         }
     }
@@ -173,7 +176,7 @@ fun ExperimentalFeatureToggle(
         title = feature.title,
         checked = enabled,
         onCheckedChange = onChange,
-        symbol = feature.systemImage,
+        symbol = feature.symbol,
         tint = feature.group.tint,
         summary = feature.summary,
         modifier = Modifier.background(highlight),
@@ -183,6 +186,23 @@ fun ExperimentalFeatureToggle(
 /** Tinted at once, then fades out over 0.6 s (iOS `withAnimation(.easeOut(duration: 0.6))`). */
 private fun highlightSpec(highlighted: Boolean): AnimationSpec<Color> =
     if (highlighted) snap() else tween(durationMillis = 600, easing = Motion.EaseOut)
+
+/**
+ * iOS `ExperimentalSettingsRow`: Settings' row into Experimental, counting what's on (a Model
+ * Picker or Call Style other than the default counts as one).
+ */
+@Composable
+fun ExperimentalSettingsRow(onClick: () -> Unit) {
+    val modelPickerStored by remember { shared(ModelPickerStyle.key).flow }.collectAsState()
+    val callTray by remember { shared(ExperimentalFeature.callTray.key).flow }.collectAsState()
+    val livingOrb by remember { shared(ExperimentalFeature.livingOrb.key).flow }.collectAsState()
+    val toggles = ExperimentalGroup.entries.flatMap { it.toggles }
+    val enabled = toggles.map { feature -> remember(feature) { shared(feature.key).flow }.collectAsState().value }
+    val styled = (if (ModelPickerStyle.active(modelPickerStored) != ModelPickerStyle.today) 1 else 0) +
+        (if (ExperimentalCallStyle.of(callTray = callTray, livingOrb = livingOrb) != ExperimentalCallStyle.standard) 1 else 0)
+    val on = styled + enabled.count { it }
+    SettingsRow("Experimental", "flask.fill", SettingsTint.Gray, value = if (on == 0) null else "$on On", onClick = onClick)
+}
 
 /** The row an experiment lives on: Call Style's for the styles it writes. */
 val ExperimentalFeature.settingsRowID: ExperimentalFeature
@@ -197,7 +217,7 @@ val ExperimentalGroup.tint: SettingsTint
     }
 
 /**
- * Settings › Advanced › Developer (iOS `Diagnostics/DiagnosticsView.swift`): `:devtools`'
+ * Settings › Developer (iOS `Diagnostics/DiagnosticsView.swift`): `:devtools`'
  * Developer screen (Developer Mode, Record Diagnostics, Demo Call Audio, Troubleshooting,
  * Tuning, Android's tools), with Settings' Playgrounds under Tuning as on iOS. Its sub-pages
  * go back inside it; its main page's back pops Settings' stack. The overlay shares the store.

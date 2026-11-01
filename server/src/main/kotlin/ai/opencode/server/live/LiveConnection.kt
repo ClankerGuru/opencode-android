@@ -10,6 +10,7 @@ import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
 import kotlin.time.Duration.Companion.seconds
 
 internal suspend fun requestHealth(server: OpenCodeServer) {
@@ -89,4 +90,42 @@ internal suspend fun requestNotifyPluginStatus(server: OpenCodeServer): OpenCode
     val payload = request<DataPayload<List<PluginPayload>>>("/api/plugin", server = server)
     val plugin = payload.data.firstOrNull { it.id == OpenCodeNotifyPluginStatus.PLUGIN_ID } ?: return OpenCodeNotifyPluginStatus.Missing
     return if (plugin.state?.status == "active") OpenCodeNotifyPluginStatus.Active else OpenCodeNotifyPluginStatus.Inactive
+}
+
+@Serializable
+private data class NotificationPreviewPairBody(val input: Input) {
+    @Serializable
+    data class Input(val callbackURL: String, val ref: String, val publicKey: String)
+}
+
+@Serializable
+private data class NotificationPreviewPairReply(val output: Output) {
+    @Serializable
+    data class Output(val publicKey: String)
+}
+
+/**
+ * iOS `OpenCodeClient.pairNotificationPreview` (1ddd36b2): exchanges public keys on the saved
+ * server, never on the push relay. A plain LAN connection can't authenticate this exchange, so
+ * only a paired HTTPS address is used; without one it fails before sending anything.
+ */
+internal suspend fun requestPairNotificationPreview(
+    server: OpenCodeServer,
+    callbackURL: String,
+    ref: String,
+    publicKey: String,
+): String {
+    val secure = server.candidateURLs.firstOrNull { it.substringBefore("://", "").lowercase() == "https" }
+        ?: throw OpenCodeClientError("Encrypted notification previews need an HTTPS server connection.")
+    val reply = request<NotificationPreviewPairReply>(
+        "/api/rpc/mobile-notifications/pair",
+        method = "POST",
+        body = encodedBody(NotificationPreviewPairBody(NotificationPreviewPairBody.Input(callbackURL, ref, publicKey))),
+        timeout = 3.seconds,
+        idempotency = RequestIdempotency.Idempotent,
+        retry = RetryPolicy.once,
+        followsRedirects = false,
+        server = server.at(secure),
+    )
+    return reply.output.publicKey
 }

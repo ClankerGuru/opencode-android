@@ -32,12 +32,12 @@ val WhatsNewEntry.Destination.hint: String?
 val WhatsNewEntry.SettingsDestination.title: String
     get() = when (this) {
         WhatsNewEntry.SettingsDestination.Themes -> "Themes"
-        WhatsNewEntry.SettingsDestination.Composer -> "Composer"
+        WhatsNewEntry.SettingsDestination.Sessions -> "Sessions"
         WhatsNewEntry.SettingsDestination.Voice -> "Voice"
         WhatsNewEntry.SettingsDestination.Notifications -> "Notifications"
         WhatsNewEntry.SettingsDestination.Servers -> "Servers"
-        WhatsNewEntry.SettingsDestination.Advanced -> "Advanced"
-        is WhatsNewEntry.SettingsDestination.Experiment -> ExperimentalFeature.fromRawValue(id)?.title ?: "Advanced"
+        WhatsNewEntry.SettingsDestination.Experimental -> "Experimental"
+        is WhatsNewEntry.SettingsDestination.Experiment -> ExperimentalFeature.fromRawValue(id)?.title ?: "Experimental"
         WhatsNewEntry.SettingsDestination.Developer -> "Developer"
     }
 

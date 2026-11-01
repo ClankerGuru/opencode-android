@@ -69,7 +69,7 @@ class VoiceLiveActivityTests {
         val store = shared.appStore(app, effects) { this[VoiceLiveActivityClient] = pushRecorder(pushes) }
         store.exhaustive = false
 
-        store.send(AppFeature.Action.Home(HomeFeature.Action.Delegate(HomeFeature.DelegateAction.ServerBadgeTapped)))
+        store.send(AppFeature.Action.PairingCodeScanned("not a pairing code"))
         finish(store)
         assertNull(store.state.home)
         assertEquals(listOf<VoiceCallActivityAttributes.ContentState?>(null), pushes.value)

@@ -23,7 +23,9 @@ import ai.opencode.feature.voice.VoiceCallReplayView
 import ai.opencode.feature.voice.VoiceEngine
 import ai.opencode.feature.voice.VoiceRoute
 import ai.opencode.feature.voice.VoiceServerChoice
+import ai.opencode.feature.voice.VoiceCallSoundPack
 import ai.opencode.feature.voice.VoiceSharedKeys
+import ai.opencode.server.ServerSharedKeys
 import ai.opencode.core.motion.MotionSpring
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
@@ -34,7 +36,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -48,11 +49,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -71,16 +69,12 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 
-private typealias VoiceStore = StoreOf<VoiceSettingsFeature.State, VoiceSettingsFeature.Action>
+internal typealias VoiceStore = StoreOf<VoiceSettingsFeature.State, VoiceSettingsFeature.Action>
 
 @Composable
-private fun rememberVoiceStore(store: SettingsStore): VoiceStore = remember(store) {
+internal fun rememberVoiceStore(store: SettingsStore): VoiceStore = remember(store) {
     store.scope<SettingsFeature.State, SettingsFeature.Action, VoiceSettingsFeature.State, VoiceSettingsFeature.Action>(
         state = { it.voice },
         action = { SettingsFeature.Action.Voice(it) },
@@ -92,7 +86,7 @@ private fun rememberVoiceStore(store: SettingsStore): VoiceStore = remember(stor
  * reducer's state reads them live; `State` equality doesn't include them).
  */
 @Composable
-private fun rememberVoiceSharedRevision(): Any {
+internal fun rememberVoiceSharedRevision(): Any {
     val values = listOf(
         remember { shared(SharedKeys.voiceModeEnabled).flow }.collectAsState().value,
         remember { shared(VoiceSharedKeys.voiceEngine).flow }.collectAsState().value,
@@ -105,6 +99,11 @@ private fun rememberVoiceSharedRevision(): Any {
         remember { shared(VoiceSharedKeys.serverVoiceSupportByServer).flow }.collectAsState().value,
         remember { shared(VoiceSharedKeys.voiceServerChoice).flow }.collectAsState().value,
         remember { shared(ExperimentalFeature.serverVoice.key).flow }.collectAsState().value,
+        remember { shared(ExperimentalFeature.voiceSessionDelegator.key).flow }.collectAsState().value,
+        remember { shared(VoiceSharedKeys.voiceDelegatorChoice).flow }.collectAsState().value,
+        remember { shared(VoiceSharedKeys.voiceModelsByServer).flow }.collectAsState().value,
+        remember { shared(VoiceSharedKeys.callSoundPack).flow }.collectAsState().value,
+        remember { shared(ServerSharedKeys.cachedHomeSnapshots).flow }.collectAsState().value,
     )
     return values
 }
@@ -161,7 +160,7 @@ fun VoiceSettingsView(store: SettingsStore) {
             settingsSection(
                 key = "configuration",
                 footer = {
-                    if (state.showsServerUnsupported) {
+                    if (state.showsServerUnsupported && !state.showsProviderRow) {
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                             OpenCodeIcon(SFSymbol.InfoCircle, contentDescription = null, size = 16.dp, tint = OpenCodeTheme.colors.secondaryText)
                             SettingsFooterText(ServerVoiceError.unsupportedServerNotice)
@@ -172,13 +171,13 @@ fun VoiceSettingsView(store: SettingsStore) {
             ) {
                 var first = true
                 fun divider() = if (first) { first = false; false } else true
-                if (ExperimentalFeature.serverVoice.isActive(state.serverVoiceExperiment) && state.voiceEngine != VoiceEngine.grok) {
-                    ServerVoiceRows(state, settings)
-                    first = false
+                if (state.showsProviderRow) {
+                    divider()
+                    VoiceProviderSettingsRow(state) { store.send(SettingsFeature.Action.PagePushed(SettingsPage.VoiceProvider())) }
                 }
                 val route = state.route
                 if (route != VoiceRoute.Server(VoiceRoute.ServerRoute.GeminiLive) &&
-                    route != VoiceRoute.Unavailable(VoiceRoute.Reason.ServerUnsupported)
+                    (state.showsProviderRow || route != VoiceRoute.Unavailable(VoiceRoute.Reason.ServerUnsupported))
                 ) {
                     if (divider()) SettingsDivider()
                     SettingsMenuRow(
@@ -195,25 +194,31 @@ fun VoiceSettingsView(store: SettingsStore) {
                         accessibilityLabel = "Voice Model",
                     )
                 }
-                if (divider()) SettingsDivider()
-                KeyRow(state, reduceMotion) { voice.send(VoiceSettingsFeature.Action.KeyRowTapped) }
-                // iOS inserts the editor with `.snappy(duration: 0.2)`, at once under Reduce Motion.
-                AnimatedVisibility(
-                    visible = state.isEditingKey && keySource.isPhoneKey,
-                    enter = if (reduceMotion) EnterTransition.None else expandVertically(KeySnappy.spec()) + fadeIn(KeySnappy.spec()),
-                    exit = if (reduceMotion) ExitTransition.None else shrinkVertically(KeySnappy.spec()) + fadeOut(KeySnappy.spec()),
-                ) {
-                    Column {
-                        SettingsDivider()
-                        KeyEditorRow(state, voice, settings)
+                if (!state.showsProviderRow) {
+                    if (divider()) SettingsDivider()
+                    KeyRow(state, reduceMotion) { voice.send(VoiceSettingsFeature.Action.KeyRowTapped) }
+                    // iOS inserts the editor with `.snappy(duration: 0.2)`, at once under Reduce Motion.
+                    AnimatedVisibility(
+                        visible = state.isEditingKey && keySource.isPhoneKey,
+                        enter = if (reduceMotion) EnterTransition.None else expandVertically(KeySnappy.spec()) + fadeIn(KeySnappy.spec()),
+                        exit = if (reduceMotion) ExitTransition.None else shrinkVertically(KeySnappy.spec()) + fadeOut(KeySnappy.spec()),
+                    ) {
+                        Column {
+                            SettingsDivider()
+                            VoiceKeyEditor(state, voice, settings)
+                        }
                     }
                 }
-                SettingsDivider()
+                if (divider()) SettingsDivider()
                 SettingsRow(
                     "Voice",
                     symbol = null,
                     value = CallVoicePicker.rowValue(state.callVoice, state.voiceEngine),
                 ) { store.send(SettingsFeature.Action.PagePushed(SettingsPage.CallVoicePicker)) }
+                if (state.showsDelegatorRow) {
+                    SettingsDivider()
+                    VoiceDelegatorSettingsRow(state) { store.send(SettingsFeature.Action.PagePushed(SettingsPage.VoiceDelegator)) }
+                }
             }
         }
         settingsSection(key = "options") {
@@ -234,6 +239,16 @@ fun VoiceSettingsView(store: SettingsStore) {
                             true
                         }
                     },
+                )
+                SettingsDivider()
+            }
+            if (state.voiceModeEnabled) {
+                SettingsMenuRow(
+                    title = "Call Sounds",
+                    value = state.callSoundPack.title,
+                    selection = state.callSoundPack,
+                    sections = listOf(null to VoiceCallSoundPack.entries.map { SettingsMenuOption(it, it.title) }),
+                    onSelect = { voice.send(VoiceSettingsFeature.Action.CallSoundPackSelected(it)) },
                 )
                 SettingsDivider()
             }
@@ -304,70 +319,6 @@ private fun KeyStatusAccessory(state: VoiceSettingsFeature.State, rotation: Floa
             tint = OpenCodeTheme.colors.tertiaryText,
             modifier = Modifier.rotate(rotation),
         )
-    }
-}
-
-@Composable
-private fun KeyEditorRow(state: VoiceSettingsFeature.State, voice: VoiceStore, settings: (HomeSettingsFeature.Action) -> Unit) {
-    val key = state.voiceEngine.apiKey(state.openAIAPIKey, state.xaiAPIKey).orEmpty()
-    val provider = state.activeProvider
-    val stacked = isAccessibilitySize()
-    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        val keyInput = @Composable { fieldModifier: Modifier ->
-            OutlinedTextField(
-                value = key,
-                onValueChange = { value ->
-                    voice.send(VoiceSettingsFeature.Action.ApiKeyEdited(value))
-                    val saved = value.trim().ifEmpty { null }
-                    when (provider) {
-                        ai.opencode.feature.voice.VoiceProvider.openAI -> settings(HomeSettingsFeature.Action.OpenAIAPIKeyChanged(saved))
-                        ai.opencode.feature.voice.VoiceProvider.xAI -> settings(HomeSettingsFeature.Action.XaiAPIKeyChanged(saved))
-                    }
-                },
-                placeholder = { Text(provider.keyPlaceholder) },
-                singleLine = true,
-                visualTransformation = if (state.revealsKey) VisualTransformation.None else PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false),
-                textStyle = if (state.revealsKey) OpenCodeTextStyles.subheadline.copy(fontFamily = FontFamily.Monospace) else OpenCodeTextStyles.body,
-                trailingIcon = {
-                    Box(
-                        Modifier
-                            .clickable(role = Role.Button) { voice.send(VoiceSettingsFeature.Action.ToggleRevealKeyTapped) }
-                            .openCodeTapTarget()
-                            .semantics { contentDescription = if (state.revealsKey) "Hide key" else "Show key" },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        OpenCodeIcon(if (state.revealsKey) SFSymbol.EyeSlash else SFSymbol.Eye, contentDescription = null, tint = OpenCodeTheme.colors.secondaryText)
-                    }
-                },
-                modifier = fieldModifier,
-            )
-        }
-        val verifyButton = @Composable {
-            FilledTonalButton(
-                onClick = { voice.send(VoiceSettingsFeature.Action.VerifyKeyTapped) },
-                enabled = state.activeAPIKey.isNotEmpty() && !state.isCheckingKey,
-            ) { Text("Verify") }
-        }
-        if (stacked) {
-            // iOS at accessibility sizes: Verify goes under the field.
-            keyInput(Modifier.fillMaxWidth())
-            verifyButton()
-        } else {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                keyInput(Modifier.weight(1f))
-                verifyButton()
-            }
-        }
-        state.keyVerificationError?.let { error ->
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                OpenCodeIcon(SFSymbol.ExclamationmarkCircleFill, contentDescription = null, size = 16.dp, tint = OpenCodeTheme.colors.destructive)
-                // iOS `.textSelection(.enabled)`.
-                SelectionContainer {
-                    Text(error, style = OpenCodeTextStyles.footnote, color = OpenCodeTheme.colors.destructive)
-                }
-            }
-        }
     }
 }
 

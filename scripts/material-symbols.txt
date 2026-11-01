@@ -14,6 +14,7 @@ alternate_email                     # at
 app_badging                         # app.badge
 archive                             # archivebox
 arrow_circle_down                   # arrow.down.circle
+arrow_circle_down fill              # arrow.down.circle.fill
 arrow_circle_up                     # arrow.up.circle
 arrow_circle_up fill                # arrow.up.circle.fill
 arrow_downward                      # arrow.down
@@ -85,6 +86,7 @@ error                               # exclamationmark.circle
 error fill                          # exclamationmark.circle.fill
 explore                             # safari
 feedback                            # exclamationmark.bubble
+feedback fill                       # exclamationmark.bubble.fill
 filter_none                         # rectangle.on.rectangle
 flash_auto fill                     # bolt.badge.automatic.fill
 flash_off fill                      # bolt.slash.fill
@@ -104,6 +106,7 @@ group                               # person.2
 help                                # (fallback for unknown SF names)
 history                             # clock.arrow.circlepath
 history_toggle_off                  # clock.badge.exclamationmark
+hive                                # circle.hexagongrid
 hive fill                           # circle.hexagongrid.fill
 hourglass                           # hourglass
 how_to_reg                          # person.crop.circle.badge.checkmark
@@ -143,6 +146,7 @@ mic                                 # mic
 mic fill                            # mic.fill
 mic_off                             # mic.slash
 mic_off fill                        # mic.slash.fill
+mobile_layout                       # platter.filled.top.iphone
 monitor_heart                       # waveform.path.ecg
 more_horiz                          # ellipsis
 motion_photos_on                    # circle.dotted.circle
@@ -164,6 +168,9 @@ pan_tool_alt                        # hand.point.up.left
 pan_tool_alt fill                   # hand.point.up.left.fill
 pause fill                          # pause.fill
 pending                             # ellipsis.circle
+pending fill                        # ellipsis.circle.fill
+person fill                         # person.fill
+phone_in_talk                       # phone.connection
 phone_in_talk fill                  # phone.and.waveform.fill
 photo_camera                        # camera
 photo_camera fill                   # camera.fill
@@ -173,6 +180,7 @@ plagiarism                          # doc.text.magnifyingglass
 play_arrow fill                     # play.fill
 post_add                            # text.badge.plus
 power_settings_new                  # power
+priority_high                       # exclamationmark
 public                              # network
 public_off                          # network.slash
 qr_code                             # qrcode
@@ -186,8 +194,10 @@ refresh                             # arrow.clockwise
 replay                              # arrow.counterclockwise
 schedule                            # clock
 science                             # flask
+science fill                        # flask.fill
 search                              # magnifyingglass
 select                              # app.dashed
+send mirror                         # paperplane
 sensors                             # dot.radiowaves.left.and.right
 settings                            # gearshape
 settings fill                       # gearshape.fill
@@ -201,6 +211,7 @@ stacks                              # rectangle.stack
 star                                # star
 star fill                           # star.fill
 star_half                           # star.slash
+star_shine fill                     # sparkle
 stop fill                           # stop.fill
 subdirectory_arrow_right mirror     # arrow.turn.down.right
 swap_horiz                          # arrow.left.arrow.right
@@ -208,7 +219,7 @@ sync                                # arrow.triangle.2.circlepath
 table                               # tablecells
 tag                                 # number
 terminal                            # apple.terminal, terminal
-text_select_start                   # selection.pin.in.out
+text_select_start                   # selection.pin.in.out, character.cursor.ibeam
 toggle_off                          # capsule
 toggle_on                           # switch.2
 touch_app                           # hand.tap
@@ -218,6 +229,7 @@ tune                                # slider.horizontal.3
 turn_right mirror                   # arrow.turn.up.right
 undo mirror                         # arrow.uturn.backward
 unfold_more                         # chevron.up.chevron.down
+verified                            # checkmark.seal
 vertical_align_bottom               # text.line.last.and.arrowtriangle.forward
 vertical_align_top                  # text.line.first.and.arrowtriangle.forward
 vertical_split                      # rectangle.split.2x1
@@ -227,8 +239,13 @@ videocam fill                       # video.fill
 visibility                          # eye
 visibility_off                      # eye.slash
 volume_down                         # speaker.wave.1
+volume_mute fill                    # speaker.fill
+volume_up                           # speaker.wave.2
+volume_up fill                      # speaker.wave.2.fill, speaker.wave.3.fill
 warning                             # exclamationmark.triangle
 warning fill                        # exclamationmark.triangle.fill
+waving_hand                         # hand.wave
 wifi                                # wifi
+wifi_off                            # wifi.slash
 wifi_tethering_error                # wifi.exclamationmark
 wrap_text mirror                    # text.word.spacing

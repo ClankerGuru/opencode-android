@@ -9,13 +9,26 @@ import android.app.PendingIntent
 import android.content.Context
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 
 /**
  * Port of `OpenCodeNotifications/NotificationService.swift` plus the app delegate's
- * presentation: turns a session push's data (`title`, `body`, `sessionID`, `status`, `ref`,
- * the relay's whole payload) into a notification. iOS's service extension only adds the
- * badge; on Android the app posts the notification itself, so this also decides how it shows
- * in the foreground and where a tap leads.
+ * presentation: turns a session push into a notification. iOS's service extension rewrites
+ * the alert; on Android the app posts the notification itself, so this also decides how it
+ * shows in the foreground and where a tap leads.
+ *
+ * A push carries only the encrypted `v2` envelope under `opencode` (iOS 1ddd36b2). Its title,
+ * body, session and status show only once [NotificationContent.verifiedPayload] opens the box
+ * with this phone's key for its ref; anything else ("no key yet", a tampered box, a v1 push)
+ * shows the generic "OpenCode" / "New activity" notification, never clear text from the
+ * transport. The badge counts verified pushes only.
+ *
+ * Taps: the content intent is built from the verified payload and targets the unexported
+ * [SystemActionActivity], so only this app can send it; iOS authenticates the envelope again
+ * on tap because its alert carries nothing else. FCM gives `onMessageReceived` its own time,
+ * so iOS's extension timeout (fall back to the placeholder) has no counterpart.
  *
  * The transport (FCM's `onMessageReceived`) calls [handle]; nothing calls it until a push
  * channel exists (see [SessionNotifications]).
@@ -26,14 +39,13 @@ object SessionPushNotifications {
 
     private const val EXTRA_SESSION = "opencode.sessionID"
     private const val EXTRA_STATUS = "opencode.status"
+    private const val EXTRA_ENVELOPE = "opencode.envelope"
 
     @SuppressLint("MissingPermission")
     fun handle(context: Context, data: Map<String, String>) {
-        val title = data["title"].orEmpty()
-        val body = data["body"].orEmpty()
-        val sessionID = data["sessionID"]
-        val ref = data["ref"]
-        val status = data["status"]
+        val verified = NotificationContent.verifiedPayload(data)
+        val shown = NotificationContent.content(data, verified)
+        val sessionID = verified?.payload?.sessionID
         val notifications = SessionNotifications.shared
         val presentation = notifications.presentation(sessionID)
         if (presentation == NotificationPresentation.None) return
@@ -41,32 +53,39 @@ object SessionPushNotifications {
         SystemNotificationChannels.ensure(context)
         val builder = NotificationCompat.Builder(context, SystemNotificationChannels.SESSIONS)
             .setSmallIcon(R.drawable.ic_opencode_mark)
-            .setContentTitle(title)
-            .setContentText(body)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setContentTitle(shown.title)
+            .setContentText(shown.body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(shown.body))
             .setAutoCancel(true)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setSilent(presentation == NotificationPresentation.ListOnly)
             .setPriority(if (presentation == NotificationPresentation.ListOnly) NotificationCompat.PRIORITY_LOW else NotificationCompat.PRIORITY_HIGH)
-        // The thread is the session (iOS `threadIdentifier`).
-        sessionID?.let { builder.setGroup(it) }
+        // The thread is "<ref>:<session>" (iOS `threadIdentifier`), set only after verifying.
+        shown.thread?.let { builder.setGroup(it) }
         builder.extras.putString(EXTRA_SESSION, sessionID)
-        builder.extras.putString(EXTRA_STATUS, status)
-        // The badge the ledger counts for its session (iOS `NotificationService.badged`).
-        if (ref != null && sessionID != null) {
+        builder.extras.putString(EXTRA_STATUS, verified?.payload?.status)
+        builder.extras.putString(EXTRA_ENVELOPE, shown.envelope?.toString())
+        if (verified != null) {
+            // The badge the ledger counts for its session (iOS `NotificationService.badged`).
             val defaults = AppBadgeLedger.groupDefaults(context)
-            AppBadgeLedger.load(defaults)?.badgeAfterPush(sessionID = sessionID, ref = ref)?.let { (ledger, badge) ->
+            AppBadgeLedger.load(defaults)?.badgeAfterPush(sessionID = verified.payload.sessionID, ref = verified.ref)?.let { (ledger, badge) ->
                 ledger.save(defaults)
                 builder.setNumber(badge)
             }
             builder.setContentIntent(
                 PendingIntent.getActivity(
-                    context, sessionID.hashCode(), SystemActionActivity.pushIntent(context, ref, sessionID),
+                    context, verified.payload.sessionID.hashCode(),
+                    SystemActionActivity.pushIntent(context, verified.ref, verified.payload.sessionID),
                     PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
                 ),
             )
+        } else {
+            context.packageManager.getLaunchIntentForPackage(context.packageName)?.let { launch ->
+                builder.setContentIntent(PendingIntent.getActivity(context, 0, launch, PendingIntent.FLAG_IMMUTABLE))
+            }
         }
-        runCatching { NotificationManagerCompat.from(context).notify(sessionID, NOTIFICATION_ID, builder.build()) }
+        val tag = sessionID ?: shown.envelope?.toString()?.hashCode()?.toString()
+        runCatching { NotificationManagerCompat.from(context).notify(tag, NOTIFICATION_ID, builder.build()) }
             .onFailure { AppLog.app.error { "Session notification not posted: ${it::class.java.simpleName}" } }
     }
 
@@ -81,12 +100,58 @@ object SessionPushNotifications {
         for (notification in manager.activeNotifications) {
             if (notification.id != NOTIFICATION_ID) continue
             val extras = notification.notification.extras
-            val id = extras.getString(EXTRA_SESSION) ?: notification.tag ?: continue
+            val content = Delivered(
+                tag = notification.tag,
+                group = notification.notification.group,
+                sessionID = extras.getString(EXTRA_SESSION),
+                status = extras.getString(EXTRA_STATUS),
+                envelope = extras.getString(EXTRA_ENVELOPE),
+            )
+            if (needsInputOnly && !isNeedsInput(content)) continue
+            val id = sessionID(content) ?: continue
             if (id !in sessionIDs) continue
-            if (needsInputOnly && extras.getString(EXTRA_STATUS) !in needsInputStatuses) continue
             manager.cancel(notification.tag, notification.id)
         }
     }
+
+    /** What [remove] reads from a shown notification (iOS `UNNotificationContent`'s thread and `opencode` user info). */
+    internal data class Delivered(
+        val tag: String? = null,
+        val group: String? = null,
+        val sessionID: String? = null,
+        val status: String? = null,
+        val envelope: String? = null,
+    )
+
+    /**
+     * iOS `DeliveredNotifications.sessionID(of:)`: an encrypted preview names its session by the
+     * thread [handle] wrote after verifying, else by verifying again (a push that couldn't be
+     * decrypted when it arrived); anything else by its session extra, then its tag.
+     */
+    internal fun sessionID(
+        content: Delivered,
+        sharedKey: (String) -> ByteArray = { NotificationKeyStore.live.sharedKey(it) },
+    ): String? {
+        if (encrypted(content) != null) {
+            val envelope = NotificationContent.Envelope.from(content.envelope)
+            return NotificationContent.threadSessionID(content.group, envelope)
+                ?: envelope?.let { NotificationContent.verify(it, sharedKey)?.payload?.sessionID }
+        }
+        return content.sessionID ?: content.tag
+    }
+
+    /** iOS `DeliveredNotifications.isNeedsInput`. */
+    internal fun isNeedsInput(content: Delivered): Boolean {
+        // Encrypted previews are run completions, not local pending-request notices.
+        if (encrypted(content) != null) return false
+        return content.status in needsInputStatuses
+    }
+
+    /** The `opencode` envelope when it is an encrypted one (iOS: `payload["v"] != nil`). */
+    private fun encrypted(content: Delivered): JsonObject? =
+        content.envelope
+            ?.let { runCatching { Json.parseToJsonElement(it).jsonObject }.getOrNull() }
+            ?.takeIf { "v" in it }
 
     /**
      * The app icon's count (iOS `setBadgeCount`): Android launchers count from the shown

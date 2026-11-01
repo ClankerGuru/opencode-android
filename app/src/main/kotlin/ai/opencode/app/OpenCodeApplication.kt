@@ -14,6 +14,7 @@ import ai.opencode.core.dependencies.dependency
 import ai.opencode.devtools.DevToolsClient
 import ai.opencode.feature.settings.AppVersion
 import ai.opencode.feature.system.liveactivity.DictationLiveActivityClient
+import ai.opencode.feature.system.liveactivity.SessionLiveActivityClient
 import ai.opencode.feature.system.liveactivity.VoiceLiveActivityClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -62,11 +63,13 @@ class OpenCodeApplication : Application() {
         // iOS `OpenCodeApp.init`'s launch line: version, distribution, model, system.
         val device = dependency(DevToolsClient).device()
         AppLog.app.notice { "Launch: ${AppVersion.current.label}, ${device.distribution}, ${device.model}, ${device.system}" }
-        // A call or a recording never outlives its process: end any ongoing notification a
-        // killed process left behind (iOS ends stale Live Activities at launch).
+        // A call, a recording or a followed run never outlives its process: end any ongoing
+        // notification a killed process left behind (iOS ends stale Live Activities at launch).
         val voiceActivity = dependency(VoiceLiveActivityClient)
         val dictationActivity = dependency(DictationLiveActivityClient)
+        val sessionActivity = dependency(SessionLiveActivityClient)
         launchScope.launch { voiceActivity.endAll() }
         launchScope.launch { dictationActivity.endAll() }
+        launchScope.launch { sessionActivity.endAll() }
     }
 }

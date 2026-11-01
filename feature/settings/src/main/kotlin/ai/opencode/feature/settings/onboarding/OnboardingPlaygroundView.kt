@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings.onboarding
 
+import ai.opencode.core.diagnostics.HidesFromScreenshots
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.StoreOf
@@ -115,7 +116,7 @@ private typealias PlaygroundStore = StoreOf<OnboardingPlaygroundFeature.State, A
  *
  * The Onboarding Playground: the onboarding's pages over the dot field, with a hideable control
  * bar for the variant, every phase, the simulated server's latency and failures, and Replay.
- * Shown full screen from Settings › Advanced › Developer › Playgrounds › Onboarding. It is a
+ * Shown full screen from Settings › Developer › Playgrounds › Onboarding. It is a
  * sandbox only; iOS has no first-run entry to it (the real first run is `:app`'s connection
  * screen), so there is none here either.
  */
@@ -720,6 +721,7 @@ private fun ApertureLayer(
         ) {
             if (cameraFeed == CameraFeed.live) {
                 QRCameraPreview(isRunning = phase == Phase.camera, modifier = Modifier.fillMaxSize(), onScanned = onScanned)
+                HidesFromScreenshots()
             } else {
                 SimulatedCameraFeed(isRunning = phase == Phase.camera && !reduceMotion, modifier = Modifier.fillMaxSize())
             }

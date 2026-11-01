@@ -117,6 +117,12 @@ internal class SharedReference<T>(
         // Inside the lock (it only enqueues onto the serial writer), so writes keep transition order.
         bytes.write(key.storage, key.id, json.encodeToString(key.serializer, new).encodeToByteArray())
     }
+
+    /** Drops the saved value and goes back to the default ([SharedStore.remove]). */
+    fun remove() = synchronized(lock) {
+        state.value = key.default
+        bytes.write(key.storage, key.id, null)
+    }
 }
 
 /**
@@ -142,6 +148,21 @@ class SharedStore internal constructor(private val bytes: SharedBytes) {
 
     /** Waits for every pending write (backgrounding, tests). */
     fun flush() = bytes.flush()
+
+    /**
+     * Whether [key] has a saved value, not just its default (iOS `defaults.object(forKey:) !=
+     * nil`). For one-time migrations of keys earlier builds wrote.
+     */
+    fun contains(key: SharedKey<*>): Boolean = bytes.read(key.storage, key.id) != null
+
+    /**
+     * Removes [key]'s saved value (iOS `defaults.removeObject(forKey:)`); a reference already
+     * open falls back to the key's default. For one-time migrations of retired keys.
+     */
+    fun remove(key: SharedKey<*>) {
+        val ref = synchronized(references) { references[key.storage to key.id] }
+        if (ref != null) ref.remove() else bytes.write(key.storage, key.id, null)
+    }
 
     companion object Key : DependencyKey<SharedStore> {
         override val liveValue: SharedStore by lazy { SharedStore(LiveSharedBytes.create()) }

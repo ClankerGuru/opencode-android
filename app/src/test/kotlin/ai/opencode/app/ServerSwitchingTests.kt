@@ -1,14 +1,10 @@
 package ai.opencode.app
 
 import ai.opencode.core.dependencies.DependencyValues
-import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.core.sharing.shared
-import ai.opencode.core.store.PresentationAction
 import ai.opencode.core.store.TestStore
 import ai.opencode.core.testing.TestIsolationRule
 import ai.opencode.feature.drawer.HomeFeature
-import ai.opencode.feature.settings.servers.ServerTitleFeature
 import ai.opencode.server.CachedHomeSnapshot
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeClientError
@@ -29,9 +25,8 @@ import java.time.Instant
 /**
  * Port of iOS `ServerSwitchingTests.swift`, the `AppFeature` part: renaming, re-pairing,
  * switching from Home and Settings, the server form and scanner over Home, removal from the
- * drawer, closing the server sheet mid-switch, where the sheet opens, and the form's headers.
- * Names, decoding and headers on requests are `:server`'s; Home's own tests `:feature:drawer`'s;
- * `ServerTitleFeature` alone `:feature:settings`'.
+ * drawer, and the form's headers. Names, decoding and headers on requests are `:server`'s; Home's
+ * own tests `:feature:drawer`'s. (iOS c75d4a1e removed the Title Is the Switch sheet's tests.)
  *
  * iOS asserts shared values inside state closures; a `Shared` here is a reference (equal across
  * states), so those values are checked after the step.
@@ -301,74 +296,6 @@ class ServerSwitchingTests {
     }
 
     // MARK: Headers
-
-    @Test
-    fun closingTitleSheetCancelsTheHomeReadAndRestoresTheVisibleServer() = runTest {
-        val laptop = OpenCodeServer(url = "http://laptop.test", username = "opencode", password = "", name = "My Mac")
-        val studio = OpenCodeServer(url = "http://studio.test", username = "opencode", password = "", name = "Studio")
-        val state = connected(laptop)
-            .copy(serverTitle = shared.run { ServerTitleFeature.State(current = laptop) })
-            .load(laptop)
-        save(laptop)
-        saveAll(listOf(laptop, studio))
-        val gate = GatedHome()
-        val store = store(state) { this[OpenCodeClient] = gate.client() }
-        try {
-            store.send(delegate(HomeFeature.DelegateAction.ServerSwitchTapped(studio))) {
-                it.copy(
-                    returnServer = laptop,
-                    home = it.home?.copy(switchingTo = studio),
-                    connection = AppFeature.State.Connection.Connecting,
-                    connectionGeneration = 1,
-                    connectionAttempt = AppFeature.ConnectionAttempt(id = 1, server = studio),
-                ).load(studio)
-            }
-            store.receiveCase<AppFeature.Action.HealthResponse> { it.copy(connection = AppFeature.State.Connection.LoadingHome(studio)) }
-            assertEquals(studio, savedServer)
-            assertEquals(listOf(studio, laptop), savedServers)
-            store.send(AppFeature.Action.ServerTitle(PresentationAction.Presented(ServerTitleFeature.Action.Delegate(ServerTitleFeature.Delegate.Close)))) {
-                it.copy(
-                    serverTitle = null,
-                    home = it.home?.copy(switchingTo = null),
-                    returnServer = null,
-                    connection = AppFeature.State.Connection.Connected,
-                    connectionAttempt = null,
-                ).load(laptop)
-            }
-            assertEquals(laptop, savedServer)
-            store.finish()
-            // A response which raced with dismissal cannot replace Home.
-            store.send(AppFeature.Action.HomeResponse(attemptID = 1, result = Result.success(snapshot)))
-        } finally {
-            gate.finish()
-        }
-    }
-
-    @Test
-    fun firstRunWithNoServersOpensOnlyTheConnectPage() = runTest {
-        val store = store(shared.appState()) {
-            this[ExperimentalFeatures] = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.serverTitleSwitch))
-        }
-        store.send(AppFeature.Action.ServerTitleOpened) {
-            it.copy(serverTitle = shared.run { ServerTitleFeature.State() }.copy(connectOnly = true))
-        }
-        assertEquals(emptyList<ServerTitleFeature.Page>(), store.state.serverTitle?.path)
-        store.finish()
-    }
-
-    @Test
-    fun withSavedServersAndNoHomeTheSheetOpensOnConnectOverTheList() = runTest {
-        val laptop = OpenCodeServer(url = "http://laptop.test", username = "opencode", password = "", name = "My Mac")
-        saveAll(listOf(laptop))
-        val store = store(shared.appState()) {
-            this[ExperimentalFeatures] = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.serverTitleSwitch))
-        }
-        store.send(AppFeature.Action.ServerTitleOpened) {
-            it.copy(serverTitle = shared.run { ServerTitleFeature.State() }.withPage(ServerTitleFeature.Page.Connect))
-        }
-        assertEquals(false, store.state.serverTitle?.connectOnly)
-        store.finish()
-    }
 
     @Test
     fun theFormDropsBlankHeaderRowsAndNamesAnInvalidOne() {

@@ -7,226 +7,219 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 | iOS file | Lines | Kotlin file(s) | Status | Notes |
 | --- | ---: | --- | --- | --- |
 | `OpenCode/Settings/AppearanceSettingsView.swift` | 517 | `feature/settings/.../AppearanceSettingsView.kt`, `feature/drawer/.../AppearanceTranscriptPreview.kt` | done | Mode segmented control, Theme row + swatch (stacked at accessibility sizes), Themes list, swatch tile, live re-theme via `OpenCodeAppTheme`; haptics in `HomeSettingsFeature`. The Themes stage is pinned and draws real `TranscriptMessageRow`s (same preview entries, server, tuning, readable column), provided by Home through `LocalAppearanceTranscriptPreview` because `:feature:transcript` is a sibling of Settings; type capped at xLarge, inert, one TalkBack element; 0.22 s ease-in-out theme cross-fade. `ThemesSoftEdgeBackdrop`: canvas through the fade origin, a progressive blur over the 14 + 22 band (an AGSL `RenderEffect` on the list's own layer: radius 12 over the inset, smoothstep falloff across the feather), smoothstep gradient feather; opaque under high contrast. No 6 pt pull under the bar (Android's bar is opaque) |
-| `OpenCode/Settings/ComposerSettingsView.swift` | 24 | `feature/settings/.../ComposerSettingsView.kt` | removed in 302b95e7: done | footer “⌘↩︎ always sends.” → “Ctrl+Enter always sends on a hardware keyboard.”; + `DefaultAgentSection` from `Composer/AgentPicker.swift` (keys `default-agent`, `primary-agents.json` moved to `:core`/`:server`) |
 | `OpenCode/Settings/ConnectionCard.swift` | 511 | `feature/settings/.../connection/ConnectionCard.kt` | done | card, `ConnectionStatusPresentation`, status label (word swaps on `.smooth(duration: 0.42)`), Retry reservation (inline action: 48 dp target, dims to 55 % pressed as `RetryStyle`), `ServerPage`; `credentialsRejectedStatus = 401`; one monitor per Settings store shared by card and page |
-| `OpenCode/Settings/ConnectionHealth.swift` | 404 | `feature/settings/.../connection/ConnectionHealth.kt` | sync: done | incl. `BeatShape`, `ConnectionTrace`, `ServerCardName` |
-| `OpenCode/Settings/ConnectionMonitor.swift` | 439 | `feature/settings/.../connection/ConnectionMonitor.kt` | sync: done | single-shot `GET /api/info` probe (4 s, retry `.once`, `ServerContact` noted), machine names under `connection-card-machine-names`. `ConnectionLabScenario` n/a: no lab launch arguments on Android; fixture servers drive the states |
+| `OpenCode/Settings/ConnectionHealth.swift` | 404 | `feature/settings/.../connection/ConnectionHealth.kt` | done | incl. `BeatShape`, `ConnectionTrace`, `ServerCardName`; the number is the rolling average of the last 3 answers, the opening number averaging in (840f7c89) |
+| `OpenCode/Settings/ConnectionMonitor.swift` | 439 | `feature/settings/.../connection/ConnectionMonitor.kt` | done | last averaged round trip per server (840f7c89); single-shot `GET /api/info` probe (4 s, retry `.once`, `ServerContact` noted), machine names under `connection-card-machine-names`. `ConnectionLabScenario` n/a: no lab launch arguments on Android; fixture servers drive the states |
 | `OpenCode/Settings/ConnectionScope.swift` | 305 | `feature/settings/.../connection/ConnectionScope.kt` | done | Canvas + AGSL at 30 fps, paused when not resumed; reduce motion draws a still trace |
 | `OpenCode/Settings/ConnectionScopeShaders.metal` | 66 | `feature/settings/.../connection/ConnectionScopeShaders.kt` | done | AGSL `RuntimeShader` |
-| `OpenCode/Settings/Experimental/ExperimentalFeature.swift` | 74 |  | todo |  |
-| `OpenCode/Settings/Experimental/Features/AgentSelectionExperiment.swift` | 10 |  | todo |  |
-| `OpenCode/Settings/Experimental/Features/BackgroundCallIntentExperiment.swift` | 10 |  | todo |  |
-| `OpenCode/Settings/Experimental/Features/CallTrayExperiment.swift` | 10 |  | todo |  |
-| `OpenCode/Settings/Experimental/Features/ComposerAutocompleteExperiment.swift` | 10 |  | todo |  |
-| `OpenCode/Settings/Experimental/Features/HideModelsExperiment.swift` | 10 |  | todo |  |
-| `OpenCode/Settings/Experimental/Features/ImageLinkPreviewsExperiment.swift` | 10 |  | todo |  |
-| `OpenCode/Settings/Experimental/Features/InAppBrowserExperiment.swift` | 10 |  | todo |  |
-| `OpenCode/Settings/Experimental/Features/InboxSidebarExperiment.swift` | 10 |  | todo |  |
-| `OpenCode/Settings/Experimental/Features/LivingOrbExperiment.swift` | 10 |  | todo |  |
-| `OpenCode/Settings/Experimental/Features/NewMessagesDividerExperiment.swift` | 12 |  | todo |  |
-| `OpenCode/Settings/Experimental/Features/PlusMenuSheetExperiment.swift` | 10 |  | todo |  |
-| `OpenCode/Settings/Experimental/Features/ProjectIconsExperiment.swift` | 11 |  | todo |  |
-| `OpenCode/Settings/Experimental/Features/ServerDetailsExperiment.swift` | 10 |  | todo |  |
-| `OpenCode/Settings/Experimental/Features/ServerFlowExperiment.swift` | 10 |  | todo |  |
-| `OpenCode/Settings/Experimental/Features/ServerVoiceExperiment.swift` | 10 |  | todo |  |
-| `OpenCode/Settings/Experimental/Features/SessionLiveActivityExperiment.swift` | 10 |  | todo |  |
-| `OpenCode/Settings/Experimental/Features/SoundEffectsExperiment.swift` | 10 |  | todo |  |
-| `OpenCode/Settings/Experimental/Features/VoiceSessionDelegatorExperiment.swift` | 10 |  | todo |  |
-| `OpenCode/Settings/Experimental/Features/WelcomePreviewExperiment.swift` | 10 |  | todo |  |
-| `OpenCode/Settings/ExperimentalFeatures.swift` | 244 | `core/.../sharing/ExperimentalFeature.kt` (enum, `experimental(f)`, `ExperimentalFeatures`; same file as the voice area's), `core/.../experiments/ExperimentalFeatures.kt` (group, `key`, `ExperimentalGroup`, `ExperimentalCallStyle`, `ModelPickerStyle`) | sync: done | moved down to `:core` (every feature reads it). `OPENCODE_LAB_EXPERIMENTS` lab overrides n/a (no launch environment on Android) |
-| `OpenCode/Settings/ExperimentalSettingsView.swift` | 209 | `feature/settings/.../ExperimentalSettingsView.kt` | sync: done | groups with on-counts, Model Picker, Call Style and (with Living Orb on) Orb Style menus (`VoiceSharedKeys.livingOrbStyle`, `HomeSettingsFeature.LivingOrbStyleChanged`), focus scroll (row centred, as `scrollTo(anchor: .center)`) + 1.2 s tint, then a 0.6 s ease-out fade; also hosts the Developer page (`:devtools` `DevToolsView`, the Android stand-in for iOS `DiagnosticsView`, with Playgrounds under Tuning via `onOpenPlaygrounds`) and `PlaygroundsSettingsView` |
+| `OpenCode/Settings/Experimental/ExperimentalFeature.swift` | 74 | `core/.../sharing/ExperimentalFeature.kt` | done | iOS's registered struct is a Kotlin enum (`group`, `order`, `defaultEnabled`, `isGraduated`; `allCases` sorted by order then raw value; `fromRawValue` only finds listed cases). Lab overrides n/a (no launch environment). Retired entries (`sinceYouLeft`, `sessionSwitcher`, `serverTitleSwitch`) stay `@Deprecated`, unlisted and never on, until the session/drawer ports drop their readers. `floatingCall` is gone (iOS 64ff3ed7): `FloatingCallCenter.isOn` reads Living Orb's switch and Home/Session pass it, and a saved Floating Call switch moves to Living Orb at launch (`migrateFloatingCall`) |
+| `OpenCode/Settings/Experimental/Features/AgentSelectionExperiment.swift` | 10 | `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.agentSelection`) | done | one enum entry per iOS file (same raw value, title, group, summary, symbol, order, default and graduation) |
+| `OpenCode/Settings/Experimental/Features/BackgroundCallIntentExperiment.swift` | 10 | `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.backgroundCallIntent`) | done | one enum entry per iOS file (same raw value, title, group, summary, symbol, order, default and graduation) |
+| `OpenCode/Settings/Experimental/Features/CallTrayExperiment.swift` | 10 | `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.callTray`) | done | one enum entry per iOS file (same raw value, title, group, summary, symbol, order, default and graduation) |
+| `OpenCode/Settings/Experimental/Features/ComposerAutocompleteExperiment.swift` | 10 | `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.composerAutocomplete`) | done | one enum entry per iOS file (same raw value, title, group, summary, symbol, order, default and graduation) |
+| `OpenCode/Settings/Experimental/Features/HideModelsExperiment.swift` | 10 | `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.hideModels`) | done | one enum entry per iOS file (same raw value, title, group, summary, symbol, order, default and graduation) |
+| `OpenCode/Settings/Experimental/Features/ImageLinkPreviewsExperiment.swift` | 10 | `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.imageLinkPreviews`) | done | one enum entry per iOS file (same raw value, title, group, summary, symbol, order, default and graduation) |
+| `OpenCode/Settings/Experimental/Features/InAppBrowserExperiment.swift` | 10 | `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.inAppBrowser`) | done | one enum entry per iOS file (same raw value, title, group, summary, symbol, order, default and graduation) |
+| `OpenCode/Settings/Experimental/Features/InboxSidebarExperiment.swift` | 10 | `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.inboxSidebar`) | done | one enum entry per iOS file (same raw value, title, group, summary, symbol, order, default and graduation) |
+| `OpenCode/Settings/Experimental/Features/LivingOrbExperiment.swift` | 10 | `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.livingOrb`) | done | one enum entry per iOS file (same raw value, title, group, summary, symbol, order, default and graduation) |
+| `OpenCode/Settings/Experimental/Features/NewMessagesDividerExperiment.swift` | 12 | `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.newMessagesDivider`) | done | one enum entry per iOS file (same raw value, title, group, summary, symbol, order, default and graduation) |
+| `OpenCode/Settings/Experimental/Features/PlusMenuSheetExperiment.swift` | 10 | `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.plusMenuSheet`) | done | one enum entry per iOS file (same raw value, title, group, summary, symbol, order, default and graduation) |
+| `OpenCode/Settings/Experimental/Features/ProjectIconsExperiment.swift` | 11 | `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.projectIcons`) | done | one enum entry per iOS file (same raw value, title, group, summary, symbol, order, default and graduation) |
+| `OpenCode/Settings/Experimental/Features/ServerDetailsExperiment.swift` | 10 | `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.serverDetails`) | done | one enum entry per iOS file (same raw value, title, group, summary, symbol, order, default and graduation) |
+| `OpenCode/Settings/Experimental/Features/ServerFlowExperiment.swift` | 10 | `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.serverFlow`) | done | one enum entry per iOS file (same raw value, title, group, summary, symbol, order, default and graduation) |
+| `OpenCode/Settings/Experimental/Features/ServerVoiceExperiment.swift` | 10 | `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.serverVoice`) | done | one enum entry per iOS file (same raw value, title, group, summary, symbol, order, default and graduation) |
+| `OpenCode/Settings/Experimental/Features/SessionLiveActivityExperiment.swift` | 10 | `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.sessionLiveActivity`) | done | one enum entry per iOS file (same raw value, title, group, summary, symbol, order, default and graduation) |
+| `OpenCode/Settings/Experimental/Features/SoundEffectsExperiment.swift` | 10 | `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.soundEffects`) | done | one enum entry per iOS file (same raw value, title, group, summary, symbol, order, default and graduation) |
+| `OpenCode/Settings/Experimental/Features/VoiceSessionDelegatorExperiment.swift` | 10 | `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.voiceSessionDelegator`) | done | one enum entry per iOS file (same raw value, title, group, summary, symbol, order, default and graduation) |
+| `OpenCode/Settings/Experimental/Features/WelcomePreviewExperiment.swift` | 10 | `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.welcomePreview`) | done | one enum entry per iOS file (same raw value, title, group, summary, symbol, order, default and graduation) |
+| `OpenCode/Settings/ExperimentalFeatures.swift` | 244 | `core/.../sharing/ExperimentalFeature.kt` (`experimental(f)`, `ExperimentalFeatures`, `retiredKeys`/`removeRetiredSwitches`), `core/.../experiments/ExperimentalFeatures.kt` (`key`, `ExperimentalGroup`, `ExperimentalCallStyle` + `migrateFloatingCall`, `ModelPickerStyle` + `onePicker` + `migrateLegacySwitches`) | done | moved down to `:core` (every feature reads it). Migrations take a `SharedStore` (iOS `UserDefaults`; `SharedStore.contains/remove` added for them). `OPENCODE_LAB_EXPERIMENTS` lab overrides n/a (no launch environment on Android); `labStyle` kept for the tests. |
+| `OpenCode/Settings/ExperimentalSettingsView.swift` | 209 | `feature/settings/.../ExperimentalSettingsView.kt` | done | Settings › Experimental: groups with on-counts, Model Picker and Call Style menus (Call Style picks Living Orb or Call Tray), the drawer's switches with Sound Effects' rows (`SoundEffectsSettingsRows`) and Show Welcome (`HomeSettingsFeature.WelcomeOpened`) beneath while they're on, focus scroll (row centred, as `scrollTo(anchor: .center)`) + 1.2 s tint, then a 0.6 s ease-out fade; `ExperimentalSettingsRow` (“N On”). Orb Style and the Developer section are gone (iOS e4aeb212, 372255a6). Also hosts the Developer page (`:devtools` `DevToolsView`, the Android stand-in for iOS `DiagnosticsView`, with Playgrounds under Tuning via `onOpenPlaygrounds`) and `PlaygroundsSettingsView` |
 | `OpenCode/Settings/ModelVisibilitySettings.swift` | 273 | `feature/settings/.../ModelVisibilitySettings.kt` | done | `ModelVisibility` type in `:server`; provider search ranks with `ModelSearch` (moved to `:server`); provider rows draw `:core`'s `ProviderIcon` (20 dp, secondary); iOS accessibility identifiers → `testTag`s. `.screenName` (Scrawl tag) has no Android counterpart |
-| `OpenCode/Settings/NotificationSettingsView.swift` | 101 | `feature/settings/.../NotificationSettingsView.kt` | sync: done | permission (`:feature:system`'s `NotificationPermission`) comes from Home (`NotificationsChanged`); enabling/opening settings is `SettingsDelegate.EnableNotificationsTapped`; notify-plugin section hidden as on iOS (`showsNotifyPlugin = false`); “Open iOS Settings”/“in iOS Settings” → “Android Settings” |
+| `OpenCode/Settings/NotificationSettingsView.swift` | 101 | `feature/settings/.../NotificationSettingsView.kt` | done | permission (`:feature:system`'s `NotificationPermission`) and the notify plugin check come from Home (`NotificationsChanged`; `NotifyPluginCheck` is Settings' copy of drawer's `HomeNotificationsFeature.NotifyPluginCheck`, mapped in drawer's `HomeFeatureSettings.kt`); enabling/opening settings, Check Again and Set Up with OpenCode (7969c85c, disabled while disconnected) are `SettingsDelegate`s Home runs; “Open iOS Settings”/“in iOS Settings” → “Android Settings” |
 | `OpenCode/Settings/Onboarding/OnboardingCamera.swift` | 140 | `feature/settings/.../onboarding/OnboardingCamera.kt` | done | live camera via `servers/QRCameraPreview` (`once = false`) |
 | `OpenCode/Settings/Onboarding/OnboardingPlaygroundControls.swift` | 119 | `feature/settings/.../onboarding/OnboardingPlaygroundControls.kt` | done |  |
 | `OpenCode/Settings/Onboarding/OnboardingPlaygroundFeature.swift` | 372 | `feature/settings/.../onboarding/OnboardingPlaygroundFeature.kt` | done | + `OnboardingCameraClient` |
-| `OpenCode/Settings/Onboarding/OnboardingPlaygroundView.swift` | 602 | `feature/settings/.../onboarding/OnboardingPlaygroundView.kt` | sync: done | “OpenCode on iPhone” → “OpenCode on Android”; `OnboardingSkeleton` splits the free height between the blocks above and below the centre as iOS's two `maxHeight: .infinity` frames, gives a block that needs more its height and scrolls when nothing fits (no clipped subtitle at large text); the shared aperture follows the active page's centre slot and the field waits for its first bounds |
+| `OpenCode/Settings/Onboarding/OnboardingPlaygroundView.swift` | 602 | `feature/settings/.../onboarding/OnboardingPlaygroundView.kt` | done | the live camera feed is out of every screenshot (`HidesFromScreenshots`, 0ef53b54); “OpenCode on iPhone” → “OpenCode on Android”; `OnboardingSkeleton` splits the free height between the blocks above and below the centre as iOS's two `maxHeight: .infinity` frames, gives a block that needs more its height and scrolls when nothing fits (no clipped subtitle at large text); the shared aperture follows the active page's centre slot and the field waits for its first bounds |
 | `OpenCode/Settings/Onboarding/SignalField.swift` | 357 | `feature/settings/.../onboarding/SignalField.kt` | done | Tunables baked to iOS defaults; no slow-motion time scale |
 | `OpenCode/Settings/Onboarding/SignalFieldShaders.metal` | 101 | `feature/settings/.../onboarding/SignalFieldShaders.kt` | done | AGSL `RuntimeShader` |
-| `OpenCode/Settings/Onboarding/WelcomeBrowser.swift` | 333 |  | todo |  |
-| `OpenCode/Settings/Onboarding/WelcomeCarriers.swift` | 269 |  | todo |  |
-| `OpenCode/Settings/Onboarding/WelcomeDesktop.swift` | 396 |  | todo |  |
-| `OpenCode/Settings/Onboarding/WelcomeFeature.swift` | 99 |  | todo |  |
-| `OpenCode/Settings/Onboarding/WelcomeMockParts.swift` | 277 |  | todo |  |
-| `OpenCode/Settings/Onboarding/WelcomePhone.swift` | 320 |  | todo |  |
-| `OpenCode/Settings/Onboarding/WelcomeScene.swift` | 319 |  | todo |  |
-| `OpenCode/Settings/Onboarding/WelcomeStory.swift` | 328 |  | todo |  |
-| `OpenCode/Settings/Onboarding/WelcomeView.swift` | 303 |  | todo |  |
+| `OpenCode/Settings/Onboarding/WelcomeBrowser.swift` | 333 | `feature/settings/.../onboarding/WelcomeScene.kt` | partial: the Welcome's animated story isn't ported: the dark OpenCode meta site the story browses | Part of the Welcome Preview experiment (off by default). |
+| `OpenCode/Settings/Onboarding/WelcomeCarriers.swift` | 269 | `feature/settings/.../onboarding/WelcomeScene.kt` | partial: the Welcome's animated story isn't ported: the carriers (pearl, shot) that fly between the devices | Part of the Welcome Preview experiment (off by default). |
+| `OpenCode/Settings/Onboarding/WelcomeDesktop.swift` | 396 | `feature/settings/.../onboarding/WelcomeScene.kt` | partial: the Welcome's animated story isn't ported: the desktop's animated session and pairing page; `WelcomeScene.kt` draws a still session and the pairing page with its code | Part of the Welcome Preview experiment (off by default). |
+| `OpenCode/Settings/Onboarding/WelcomeFeature.swift` | 99 | `feature/settings/.../onboarding/WelcomeFeature.kt` | done | Steps intro/pair, Other Ways sheet with a pending request sent once it closes, paste error set by `AppFeature`. Android: Close only cancels effects and the view's `onClose` dismisses (as `OnboardingPlaygroundFeature`); Other Ways to Install opens `https://opencode.ai/download` through `OpenURLClient` (iOS `Link`). |
+| `OpenCode/Settings/Onboarding/WelcomeMockParts.swift` | 277 | `feature/settings/.../onboarding/WelcomeScene.kt` | partial: the Welcome's animated story isn't ported: the mock transcript, composer and dictation meter parts the screens are built from | Part of the Welcome Preview experiment (off by default). |
+| `OpenCode/Settings/Onboarding/WelcomePhone.swift` | 320 | `feature/settings/.../onboarding/WelcomeScene.kt` | partial: the Welcome's animated story isn't ported: the phone's animated session, dictation and screenshot; `WelcomeScene.kt` draws a still session and the viewfinder | Part of the Welcome Preview experiment (off by default). |
+| `OpenCode/Settings/Onboarding/WelcomeScene.swift` | 319 | `feature/settings/.../onboarding/WelcomeScene.kt` | partial: the scene is still; the story's motion (`WelcomeStory` frames driving the screens, focus shifts, pearl and shot arcs) isn't ported | `WelcomeSceneLayout` geometry ported exactly (phone ratio, overlap, bezels, base), laptop and phone drawn with the iOS proportions, the devices settle with `WelcomeTunables.devices` (0.36 s / 0.56 s delays, none with reduce motion), iOS accessibility labels. `TuningContext.welcome`. |
+| `OpenCode/Settings/Onboarding/WelcomeStory.swift` | 328 | `feature/settings/.../onboarding/WelcomeScene.kt` | partial: the Welcome's animated story isn't ported: the story clock (words, stream, travel, browse, proof, hold, dim) and its frames | Part of the Welcome Preview experiment (off by default). |
+| `OpenCode/Settings/Onboarding/WelcomeView.swift` | 303 | `feature/settings/.../onboarding/WelcomeView.kt`, `app/.../AppView.kt` (host), `app/src/main/res/drawable{,-night}/opencode_app_mark.xml` | done | `WelcomeCopy` text, header (Back while pairing, Close in preview), 48dp app mark, copy swap, scene, Get Started → Scan Pairing Code with progress, Other Ways to Connect sheet (terminal command, Paste a Pairing Link, Enter a Server Address, orange paste error, install command, Other Ways to Install), `WelcomeCommand` (1.5 s checkmark), iOS springs via `WelcomeTunables`. Shown by `AppView` with no Home, no saved server and Welcome Preview on. Android: the swap fades and scales without blur (no blur imitation); the app mark is the iOS `OpenCodeAppMark` SVGs as vectors. Not checked on an emulator. |
 | `OpenCode/Settings/PairingScanner.swift` | 259 | `feature/settings/.../servers/PairingScanner.kt`, `servers/QRCameraPreview.kt`, `servers/ServerCameraClient.kt` | done | CameraX + ZXing; no camera → paste; denied → Open Settings + paste; raw text handed to `:app` (`OpenCodePairingLink.decode`) |
-| `OpenCode/Settings/ServerBrand.swift` | 219 | `feature/settings/.../serverdetails/ServerBrand.kt` | sync: done | brand table, fills/glyph colours, iOS lookup order (known MCP match or `provider-<integrationID>`, monogram tile only when the mark isn't bundled), monogram hash and status ring ported; marks are `:core`'s bundled SVGs (`BrandAssets`, `TemplateAssetImage`) tinted with the glyph colour; `muted` desaturates the whole tile (fill, glyph) like `.saturation(0)` |
-| `OpenCode/Settings/ServerConnectView.swift` | 204 | `feature/settings/.../servers/ServerConnectView.kt` | removed in c75d4a1e: done | Scan Code / Enter Address rows swap with `animateItem` on `.smooth(duration: 0.3)`; `ServerTitleTunables` live here (baked defaults) |
+| `OpenCode/Settings/ServerBrand.swift` | 219 | `feature/settings/.../serverdetails/ServerBrand.kt` | done | brand table, fills/glyph colours, iOS lookup order (known MCP match or `provider-<integrationID>`, monogram tile only when the mark isn't bundled), monogram hash and status ring ported; marks are `:core`'s bundled SVGs (`BrandAssets`, `TemplateAssetImage`) tinted with the glyph colour; `muted` desaturates the whole tile (fill, glyph) like `.saturation(0)`; the status ring's turn (82b1ede8: paused off-screen, slow-motion scaled) is a `rememberInfiniteTransition`, which already stops when the window isn't drawn and follows the system animator scale |
 | `OpenCode/Settings/ServerDetails.swift` | 303 | `feature/settings/.../serverdetails/ServerDetails.kt` | done | + `OpenURLClient` (opens sign-in pages in the browser); `Disappeared` cancels read, polling and sign-in. Settings' optional navigation scopes cancel reads on removal/server replacement; only server-side OAuth cleanup runs in the parent, replacing global child-ID cancellation |
 | `OpenCode/Settings/ServerDetailsTrays.swift` | 322 | `feature/settings/.../serverdetails/ServerDetailsTrays.kt` | done | “in Safari” → “in your browser”; the MCP tray's server page pushes and pops inside the sheet (slide on the 0.42 s push spring, cross-fade under reduce motion); pages are opaque and paint to the sheet's bottom, and the sheet holds its height through the slide (grows at once, shrinks after 0.42 s) as iOS's tray stays at its detent; rows animate on iOS's 0.3 s spring |
-| `OpenCode/Settings/ServerDetailsView.swift` | 370 | `feature/settings/.../serverdetails/ServerDetailsView.kt` | sync: done | sheets are Material bottom sheets (no zoom-out-of-tile transition: Material sheets rise from the bottom); banners and tiles move on iOS's 0.4 s spring, the MCP error on its 0.3 s one |
-| `OpenCode/Settings/ServerPulseScope.swift` | 167 | `feature/settings/.../servers/ServerPulseScope.kt` | removed in c75d4a1e: done |  |
-| `OpenCode/Settings/ServerQuietStyle.swift` | 272 | `feature/settings/.../servers/ServerQuietStyle.kt` | removed in c75d4a1e: done | `ServerWireframeMark` n/a (unused on iOS); `ServerCommandRow` shrinks to 0.8× (`TextAutoSize`, iOS `minimumScaleFactor`), selectable, `.smooth(duration: 0.25)` Copy/Copied |
-| `OpenCode/Settings/ServerTitleFeature.swift` | 257 | `feature/settings/.../servers/ServerTitleFeature.kt` | removed in c75d4a1e: done | incl. `ServerCameraClient`; `:app`/drawer present `ServerTitleView` and handle its delegates |
-| `OpenCode/Settings/ServerTitleView.swift` | 323 | `feature/settings/.../servers/ServerTitleView.kt` | removed in c75d4a1e: done |  |
-| `OpenCode/Settings/SessionsSettingsView.swift` | 39 |  | todo |  |
-| `OpenCode/Settings/SettingsPresentation.swift` | 397 | `feature/settings/.../SettingsPresentation.kt` | sync: done | overlay push with 30 % parallax, 12 % dim, edge shadow, touch shield; predictive back at the root follows the finger (its handler registers with Settings’ content each time it mounts, so it outranks the handlers Home registered beneath; cancel springs back, commit closes from the finger’s position); reduce motion cross-fades (0.3 s ease-in-out); the push spring follows Developer Mode slow motion; What’s New → Settings root cross-fades (`SettingsView`). `SettingsNavigator` → `SettingsFeature.path` + `NavDisplay`. Drawer wraps Home with it |
+| `OpenCode/Settings/ServerDetailsView.swift` | 370 | `feature/settings/.../serverdetails/ServerDetailsView.kt` | done | the sign-in code alert keeps every screenshot out while it's up (`HidesFromScreenshots(shown)`, 2c71a067); sheets are Material bottom sheets (no zoom-out-of-tile transition: Material sheets rise from the bottom); banners and tiles move on iOS's 0.4 s spring, the MCP error on its 0.3 s one |
+| `OpenCode/Settings/SessionsSettingsView.swift` | 39 | `feature/settings/.../SessionsSettingsView.kt` | done | Transcript (New Messages Divider, through `ExperimentalFeatureChanged`) above Composer (Return Key Sends) and `DefaultAgentSection` (from `Composer/AgentPicker.swift`, under Agent Selection); footer “⌘↩︎ always sends.” → “Ctrl+Enter always sends on a hardware keyboard.”. Replaces `ComposerSettingsView.kt` (iOS 302b95e7) |
+| `OpenCode/Settings/SettingsPresentation.swift` | 397 | `feature/settings/.../SettingsPresentation.kt` | partial: Show Welcome over Settings (7f411b1c; `store.welcome`) needs drawer’s `HomeFeature.State.welcome`, and `voicePage` (ce694097) drawer’s `settingsVoicePage` | overlay push with 30 % parallax, 12 % dim, edge shadow, touch shield; predictive back at the root follows the finger (its handler registers with Settings’ content each time it mounts, so it outranks the handlers Home registered beneath; cancel springs back, commit closes from the finger’s position); reduce motion cross-fades (0.3 s ease-in-out); the push spring follows Developer Mode slow motion; What’s New → Settings root cross-fades (`SettingsView`). `SettingsNavigator` → `SettingsFeature.path` + `NavDisplay`. Drawer wraps Home with it; `SettingsCover` (ce3fd729, c8e9b8f4): uncovered the moment the presentation moves (push start, close, a back swipe under the finger), covered once a move that ends fully open lands (the push, a cancelled swipe’s spring back); `SettingsPresentation(cover:)` provides it beneath as `LocalScreenCovered` (iOS `ScreenCoveredTrait`, which Home’s drawer container sets), so Home needs no wiring. Voice screenshot policies (9436b567, cd05bfe5): Settings stays a problem report credential sheet (`HidesFromProblemReports`), and only the key editor and Your Account hide from voice screenshots |
 | `OpenCode/Settings/SettingsRows.swift` | 141 | `feature/settings/.../SettingsRows.kt` | done | + inset-grouped section chrome (`settingsSection`, toggles, buttons, value rows); `SettingsMenuRow` stacks its value under the title at accessibility sizes (`isAccessibilitySize`, fontScale ≥ 28/17) |
 | `OpenCode/Settings/SettingsServers.swift` | 137 | `feature/settings/.../connection/SettingsServers.kt` | done | local `switchableServers` (drawer is above Settings); long press opens the row menu |
-| `OpenCode/Settings/SettingsView.swift` | 1172 | `feature/settings/.../SettingsView.kt`, `SettingsFeature.kt`, `AppVersion.kt`, `VoiceSettingsFeature.kt` (`VoiceProviderGroup`, `VoiceSettingsFeature`), `VoiceSettingsView.kt` (`VoiceSettingsView`/`AdvancedSettingsView`, `CallVoicePicker`, Call History), `ExperimentalSettingsView.kt` (`PlaygroundsSettingsView`) | sync: done | root page, stack, delegates to Home; `SettingsNavigator` → `SettingsFeature.path`. Voice page: dot scope (`DotScopeView`), Enable Voice, Server Voice rows, Model menu, key row + editor (`RealtimePreflightClient`, `VoiceKeyFingerprint`, 800 ms debounce), Voice picker with previews (`VoicePreviewClient`), Raise to Talk (`RaiseToEarClient.isSupported`), Call History (`VoiceCallLogList` → `VoiceCallReplayView` as `SettingsPage.CallReplay`; Developer Mode’s web links hidden, no `DeveloperMode.webURL` on Android). “This iPhone” → “This Phone”. At accessibility sizes the Model, key and key-editor rows stack as on iOS; the key editor opens with `.snappy(duration: 0.2)` (at once under reduce motion) |
-| `OpenCode/Settings/SoundEffectsSettings.swift` | 34 |  | todo |  |
-| `OpenCode/Settings/VoiceDelegatorSettings.swift` | 271 |  | todo |  |
-| `OpenCode/Settings/VoiceKeyEditor.swift` | 89 |  | todo |  |
+| `OpenCode/Settings/SettingsView.swift` | 1172 | `feature/settings/.../SettingsView.kt`, `SettingsFeature.kt`, `AppVersion.kt`, `VoiceSettingsFeature.kt` (`VoiceProviderGroup`, `VoiceSettingsFeature`), `VoiceSettingsView.kt` (`VoiceSettingsView`/`AdvancedSettingsView`, `CallVoicePicker`, Call History), `ExperimentalSettingsView.kt` (`PlaygroundsSettingsView`) | partial: `voicePage` (a failed call’s card opening Settings › Voice › Voice Provider or Your Account) needs drawer’s `HomeFeature.settingsVoicePage`; `SettingsPage.VoiceProvider(opensAccount)` is ready for it. Voice’s `sessions` arrive empty from Settings, so the delegator page uses the cached Home snapshot until its own load lands | root page as iOS 372255a6/302b95e7: Preferences (Appearance, Sessions, Models, Voice, Notifications), What’s New in its own section, Server Details, then Experimental (`ExperimentalSettingsRow`) and Developer (On/Off) over “Unfinished features, diagnostics, and live tuning.”; stack, delegates to Home; `SettingsNavigator` → `SettingsFeature.path`. Voice page (ce694097, 7c2fe747, bede4aa0): dot scope (`DotScopeView`), Enable Voice, the Voice Provider row (`VoiceProviderPage.kt`) with Server Voice on and not Grok, Model menu (hidden for Gemini Live, and for a server that can’t take the call unless the provider row shows), key row + editor (`VoiceKeyEditor.kt`, only without the provider row) (`RealtimePreflightClient`, `VoiceKeyFingerprint`, 800 ms debounce), Voice picker with previews (`VoicePreviewClient`), the Delegator row (`VoiceDelegatorSettings.kt`) under OpenCode Session Delegator, Raise to Talk, Call Sounds (`VoiceSharedKeys.callSoundPack`, only with Voice on) (`RaiseToEarClient.isSupported`), Call History (`VoiceCallLogList` → `VoiceCallReplayView` as `SettingsPage.CallReplay`; Developer Mode’s web links hidden, no `DeveloperMode.webURL` on Android). “This iPhone” → “This Phone”. At accessibility sizes the Model, key and key-editor rows stack as on iOS; the key editor opens with `.snappy(duration: 0.2)` (at once under reduce motion); `VoiceSettingsFeature` answers land in `VoiceModelsCache.record` (`voiceModelsLoaded(asked:)`), `route` is `broker.route`, Verify no longer needs the phone key source, and the delegator page loads the connected server’s sessions (`delegatorPageAppeared`, cancellable) |
+| `OpenCode/Settings/SoundEffectsSettings.swift` | 34 | `feature/settings/.../SoundEffectsSettings.kt` | done | Volume (percent) and an M3 slider in tenths between speaker glyphs (each new level plays a sample, `SoundEffectsVolumeChanged`), Send Sound |
+| `OpenCode/Settings/VoiceDelegatorSettings.swift` | 271 | `feature/settings/.../VoiceDelegatorSettings.kt` | done | `showsDelegatorRow`, `delegatorRouteAvailability`, `delegatorSessions` (root sessions, unarchived or the picked one, newest first), `crossServerPickedSession`, `delegatorRowValue`; Delegator page with the unavailable and other-server notes, Built-in / OpenCode Session, Session Target (Automatic, Viewed Session, a pick on another server) and a filtered Pick a Session list (`.searchable` → an outlined “Filter sessions” field above the list); a choice goes to both the page’s store and `HomeSettingsFeature.VoiceDelegatorChoiceChanged` as iOS `select` does |
+| `OpenCode/Settings/VoiceKeyEditor.swift` | 89 | `feature/settings/.../VoiceKeyEditor.kt` | done | moved out of `VoiceSettingsView.kt`’s key row as iOS ce694097 did; kept out of every screenshot (`HidesFromScreenshots`, iOS `.hidesFromScreenshots()` in `SettingsView`); used by Settings › Voice and Your Account (`VoiceProviderPage.kt`) |
 | `OpenCode/Settings/VoiceKeySource.swift` | 53 | `feature/voice/.../VoiceRoute.kt` (`VoiceKeySource`), `feature/settings/.../VoiceKeySource.kt` (`VoiceKeyStatus`) | done | `VoiceKeySource` moved down to `:feature:voice` (`VoiceRoute.keySource` returns it) |
-| `OpenCode/Settings/VoiceProviderPage.swift` | 249 |  | todo |  |
-| `OpenCode/Settings/VoiceServerPicker.swift` | 67 | `feature/settings/.../VoiceServerPicker.kt` | sync: done | state extensions (`connectedServer`, `broker`, `voiceServerOptions`, `voiceServerSelection`, `keySource`, `voiceServerValue`), `checkVoiceServers` (`ServerVoiceClient.models`), `ServerVoiceRows`; “This iPhone” → “This Phone” |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-06-01-voice-messages.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-07-01-attachment-menu-hold.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-08-01-voice-webrtc-weak-connection.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-08-02-mute-sessions.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-08-03-pair-from-anywhere.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-08-04-drawer-peek.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-08-05-dictation-keeps-going.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-08-06-siri-shortcuts-spotlight.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-09-01-working-orb.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-09-02-shell-glyph.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-09-03-math-and-diagrams.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-09-04-always-notify.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-09-05-server-switcher.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-10-01-share-opened-files.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-10-02-call-voice.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-10-03-drawer-one-edge.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-11-01-paste-as-a-card.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-11-02-ride-out-drops.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-11-03-new-session-recent-projects.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-11-04-stop-runs-your-steer.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-01-browser-push-in.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-02-answer-from-the-bar.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-03-new-messages-divider.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-04-model-list-and-level-meter.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-05-run-error-line.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-06-transcript-keyboard-space.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-07-share-sheet-sends.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-08-app-icon-badge.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-09-drawer-keeps-keyboard.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-10-whats-new-page.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-11-catch-up-returns-to-drawer.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-12-transcript-day-stamps.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-13-rich-link-previews.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-13-01-rolling-numbers.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-13-02-grouped-steering.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-13-03-inline-tool-rows.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-13-04-mac-motion-playgrounds.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-13-05-catch-up-flicks.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-14-01-settings-grouped-by-purpose.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-14-02-send-ats-recovery.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-14-03-keyboard-menus-and-header.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-14-04-open-links-in-apps.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-14-05-session-list-quiet-hierarchy.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-14-06-queued-messages-fitted-sheet.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-14-07-control-center-sessions.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-15-01-settings-keyboard-down.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-15-02-session-list-sidebar-grey.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-15-03-voice-varied-acknowledgements.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-15-04-smoother-streaming.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-15-05-model-list-sheet.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-15-06-queued-pill-whole-title.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-16-01-plus-menu-photo-sheet.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-16-02-composer-large-text-targets.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-16-03-project-pick-haptic.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-16-04-fork-opens-copy.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-16-05-transcript-row-targets.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-16-06-image-previews.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-16-07-connection-error-details.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-16-08-outage-reconnect-delay.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-17-01-every-running-subagent.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-17-02-session-view-refined-standard.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-17-03-bottom-follow-on-load.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-17-04-drafts-stay-put.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-18-01-themes.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-18-02-return-key-sends.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-18-03-quote-replies.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-18-04-launch-bloom.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-18-05-drag-to-pin.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-19-01-call-tray-colour-blend.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-19-02-optical-insets.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-19-03-smart-dictation-audio.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-19-04-interrupted-hand.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-19-05-autocomplete-fast-scroll.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-19-06-experimental-groups.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-19-07-model-picker-standard-sheet.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-19-08-problem-reports-reach-session.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-19-09-team-scrawl-feedback.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-19-10-scrawl-faster-start.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-01-call-tray-docks-in-drawer.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-02-markdown-streams-smoothly.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-03-server-voice-experiment.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-04-return-newline-default.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-05-drawer-session-alignment.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-06-call-tray-switch-continuity.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-07-voice-delegation-visible-on-admission.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-08-inline-image-links.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-09-smooth-link-preview-arrival.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-10-subagent-capsule-press.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-11-advanced-settings-open.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-12-revert-to-here.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-13-drag-from-transcript.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-14-tuning-glass-tap-targets.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-15-new-session-project-continuity.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-16-simple-session-loading.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-17-voice-route-consistency.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-18-call-tray-edge-continuity.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-01-call-tray-keyboard-return.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-02-drawer-title-fade.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-03-call-sounds-from-the-tap.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-04-calm-wireframe-launch.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-05-request-dictation-last-line.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-06-first-run-pairing-fixes.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-07-welcome-pairing-copy.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-08-session-id-links.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-09-uikit-drawer-experiment.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-10-ipad-multiple-windows.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-11-plain-launch.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-12-breath-ping-call-sounds.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-13-smoother-session-list.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-22-01-whats-new-actions.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-22-02-project-icons-current-discovery.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-22-03-new-divider-off-page.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-22-04-catch-up-all-caught-up-row.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-23-01-session-mentions.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-23-02-gpt-live-own-key.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-23-03-pair-opens-drawer.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-23-04-voice-server-picker.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-24-01-living-orb-floats.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-24-02-new-messages-divider-on.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-24-03-composer-keyboard-morph.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-24-04-composer-photo-viewer.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-24-05-plus-menu-photo-picker.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-24-06-project-icons-lit.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-24-07-session-live-activity.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-24-08-sign-in-failed-edit-server.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-25-01-voice-app-screenshot.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-25-02-voice-background-results.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-25-03-sound-effects-experiment.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-26-01-settings-sessions-page.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-26-02-project-icons-default.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-26-03-plus-menu-over-keyboard.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-26-04-living-orb-connect-motion.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-26-05-living-orb-presets.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-26-06-send-after-a-pause.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-27-01-steadier-round-trip.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-27-02-drawer-drag-follows-finger.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-27-03-inbox-sidebar-experiment.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-28-01-first-pairing-ready-session.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-28-01-voice-provider-page.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-28-02-welcome-preview.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-29-01-composer-text-selection.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-30-01-voice-waits-for-you.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-30-02-wisp-call-sounds.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-30-03-wisp-orb.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-31-01-encrypted-notification-previews.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-31-02-move-session-folder-gone.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-31-03-notification-plugin-setup.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/WhatsNewActions.swift` | 84 | `feature/settings/.../whatsnew/WhatsNewActions.kt` | sync: done | voice availability is `:feature:voice`'s `VoiceRoutePreferences.isAvailable(server)` |
-| `OpenCode/Settings/WhatsNew/WhatsNewEntries.swift` | 154 | `feature/settings/.../whatsnew/WhatsNewEntries.kt` | sync: done |  |
+| `OpenCode/Settings/VoiceProviderPage.swift` | 249 | `feature/settings/.../VoiceProviderPage.kt` | done | Voice Provider row (tile, name, status), detail page (header, API Key link on the phone, Choose Automatically, Other Providers with Use buttons, the account row, the “N Not Available” disclosure) and Your Account (key editor out of screenshots, Use for Calls); `use()` as iOS. Tiles and statuses are voice’s `VoiceProviderTile`/`VoiceProviderStatus` (`VoiceProviderViews.kt`), sized by `VoiceProviderTunables`; pages are `SettingsPage.VoiceProvider(opensAccount)`/`VoiceAccount` |
+| `OpenCode/Settings/VoiceServerPicker.swift` | 67 | `feature/settings/.../VoiceServerPicker.kt` | done | `connectedServer`, `hasOpenAIKey`, `readiness`, `broker(provider:readiness:)`, `otherSavedServers`, `providerCatalog`, `keySource` (models from `VoiceModelsCache` answers) and `checkVoiceServers` (each answer as `voiceModelsLoaded(asked: epoch)`, `.listed`/`.noAnswer`), as iOS ce694097/9a634cb6; `ServerVoiceRows` and the server menu went with the Voice Provider row |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-06-01-voice-messages.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-06-01-voice-messages.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-07-01-attachment-menu-hold.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-07-01-attachment-menu-hold.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-08-01-voice-webrtc-weak-connection.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-08-01-voice-webrtc-weak-connection.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-08-02-mute-sessions.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-08-02-mute-sessions.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-08-03-pair-from-anywhere.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-08-03-pair-from-anywhere.kt` | done | Android copy: “on your phone” |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-08-04-drawer-peek.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-08-04-drawer-peek.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-08-05-dictation-keeps-going.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-08-05-dictation-keeps-going.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-08-06-siri-shortcuts-spotlight.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-08-06-siri-shortcuts-spotlight.kt` | done | Android copy: Google Assistant App Actions, app shortcuts, Quick Settings |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-09-01-working-orb.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-09-01-working-orb.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-09-02-shell-glyph.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-09-02-shell-glyph.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-09-03-math-and-diagrams.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-09-03-math-and-diagrams.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-09-04-always-notify.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-09-04-always-notify.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-09-05-server-switcher.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-09-05-server-switcher.kt` | done | Android copy: “this phone” |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-10-01-share-opened-files.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-10-01-share-opened-files.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-10-02-call-voice.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-10-02-call-voice.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-10-03-drawer-one-edge.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-10-03-drawer-one-edge.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-11-01-paste-as-a-card.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-11-01-paste-as-a-card.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-11-02-ride-out-drops.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-11-02-ride-out-drops.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-11-03-new-session-recent-projects.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-11-03-new-session-recent-projects.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-11-04-stop-runs-your-steer.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-11-04-stop-runs-your-steer.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-01-browser-push-in.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-12-01-browser-push-in.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-02-answer-from-the-bar.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-12-02-answer-from-the-bar.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-03-new-messages-divider.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-12-03-new-messages-divider.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-04-model-list-and-level-meter.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-12-04-model-list-and-level-meter.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-05-run-error-line.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-12-05-run-error-line.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-06-transcript-keyboard-space.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-12-06-transcript-keyboard-space.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-07-share-sheet-sends.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-12-07-share-sheet-sends.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-08-app-icon-badge.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-12-08-app-icon-badge.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-09-drawer-keeps-keyboard.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-12-09-drawer-keeps-keyboard.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-10-whats-new-page.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-12-10-whats-new-page.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-11-catch-up-returns-to-drawer.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-12-11-catch-up-returns-to-drawer.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-12-transcript-day-stamps.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-12-12-transcript-day-stamps.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-13-rich-link-previews.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-12-13-rich-link-previews.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-13-01-rolling-numbers.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-13-01-rolling-numbers.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-13-02-grouped-steering.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-13-02-grouped-steering.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-13-03-inline-tool-rows.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-13-03-inline-tool-rows.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-13-04-mac-motion-playgrounds.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-13-04-mac-motion-playgrounds.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-13-05-catch-up-flicks.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-13-05-catch-up-flicks.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-14-01-settings-grouped-by-purpose.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-14-01-settings-grouped-by-purpose.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-14-02-send-ats-recovery.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-14-02-send-ats-recovery.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-14-03-keyboard-menus-and-header.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-14-03-keyboard-menus-and-header.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-14-04-open-links-in-apps.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-14-04-open-links-in-apps.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-14-05-session-list-quiet-hierarchy.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-14-05-session-list-quiet-hierarchy.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-14-06-queued-messages-fitted-sheet.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-14-06-queued-messages-fitted-sheet.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-14-07-control-center-sessions.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-14-07-control-center-sessions.kt` | done | Android copy: Quick Settings tiles |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-15-01-settings-keyboard-down.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-15-01-settings-keyboard-down.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-15-02-session-list-sidebar-grey.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-15-02-session-list-sidebar-grey.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-15-03-voice-varied-acknowledgements.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-15-03-voice-varied-acknowledgements.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-15-04-smoother-streaming.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-15-04-smoother-streaming.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-15-05-model-list-sheet.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-15-05-model-list-sheet.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-15-06-queued-pill-whole-title.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-15-06-queued-pill-whole-title.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-16-01-plus-menu-photo-sheet.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-16-01-plus-menu-photo-sheet.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-16-02-composer-large-text-targets.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-16-02-composer-large-text-targets.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-16-03-project-pick-haptic.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-16-03-project-pick-haptic.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-16-04-fork-opens-copy.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-16-04-fork-opens-copy.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-16-05-transcript-row-targets.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-16-05-transcript-row-targets.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-16-06-image-previews.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-16-06-image-previews.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-16-07-connection-error-details.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-16-07-connection-error-details.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-16-08-outage-reconnect-delay.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-16-08-outage-reconnect-delay.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-17-01-every-running-subagent.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-17-01-every-running-subagent.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-17-02-session-view-refined-standard.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-17-02-session-view-refined-standard.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-17-03-bottom-follow-on-load.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-17-03-bottom-follow-on-load.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-17-04-drafts-stay-put.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-17-04-drafts-stay-put.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-18-01-themes.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-18-01-themes.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-18-02-return-key-sends.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-18-02-return-key-sends.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-18-03-quote-replies.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-18-03-quote-replies.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-18-04-launch-bloom.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-18-04-launch-bloom.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-18-05-drag-to-pin.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-18-05-drag-to-pin.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-19-01-call-tray-colour-blend.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-19-01-call-tray-colour-blend.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-19-02-optical-insets.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-19-02-optical-insets.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-19-03-smart-dictation-audio.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-19-03-smart-dictation-audio.kt` | done | Android copy: “your phone” |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-19-04-interrupted-hand.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-19-04-interrupted-hand.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-19-05-autocomplete-fast-scroll.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-19-05-autocomplete-fast-scroll.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-19-06-experimental-groups.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-19-06-experimental-groups.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-19-07-model-picker-standard-sheet.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-19-07-model-picker-standard-sheet.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-19-08-problem-reports-reach-session.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-19-08-problem-reports-reach-session.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-19-09-team-scrawl-feedback.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-19-09-team-scrawl-feedback.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-19-10-scrawl-faster-start.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-19-10-scrawl-faster-start.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-01-call-tray-docks-in-drawer.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-01-call-tray-docks-in-drawer.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-02-markdown-streams-smoothly.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-02-markdown-streams-smoothly.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-03-server-voice-experiment.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-03-server-voice-experiment.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-04-return-newline-default.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-04-return-newline-default.kt` | done | Android copy: Ctrl+Enter instead of ⌘Return |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-05-drawer-session-alignment.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-05-drawer-session-alignment.kt` | done | Android copy: phones and tablets |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-06-call-tray-switch-continuity.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-06-call-tray-switch-continuity.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-07-voice-delegation-visible-on-admission.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-07-voice-delegation-visible-on-admission.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-08-inline-image-links.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-08-inline-image-links.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-09-smooth-link-preview-arrival.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-09-smooth-link-preview-arrival.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-10-subagent-capsule-press.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-10-subagent-capsule-press.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-11-advanced-settings-open.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-11-advanced-settings-open.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-12-revert-to-here.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-12-revert-to-here.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-13-drag-from-transcript.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-13-drag-from-transcript.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-14-tuning-glass-tap-targets.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-14-tuning-glass-tap-targets.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-15-new-session-project-continuity.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-15-new-session-project-continuity.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-16-simple-session-loading.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-16-simple-session-loading.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-17-voice-route-consistency.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-17-voice-route-consistency.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-18-call-tray-edge-continuity.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-18-call-tray-edge-continuity.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-01-call-tray-keyboard-return.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-21-01-call-tray-keyboard-return.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-02-drawer-title-fade.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-21-02-drawer-title-fade.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-03-call-sounds-from-the-tap.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-21-03-call-sounds-from-the-tap.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-04-calm-wireframe-launch.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-21-04-calm-wireframe-launch.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-05-request-dictation-last-line.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-21-05-request-dictation-last-line.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-06-first-run-pairing-fixes.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-21-06-first-run-pairing-fixes.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-07-welcome-pairing-copy.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-21-07-welcome-pairing-copy.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-08-session-id-links.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-21-08-session-id-links.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-09-uikit-drawer-experiment.swift` | 3 | – | n/a: the UIKit drawer A/B is an iOS-only experiment (no experiment row on Android) |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-10-ipad-multiple-windows.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-21-10-ipad-multiple-windows.kt` | done | Android copy: “Multiple Windows on Tablets” |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-11-plain-launch.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-21-11-plain-launch.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-12-breath-ping-call-sounds.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-21-12-breath-ping-call-sounds.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-13-smoother-session-list.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-21-13-smoother-session-list.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-22-01-whats-new-actions.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-22-01-whats-new-actions.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-22-02-project-icons-current-discovery.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-22-02-project-icons-current-discovery.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-22-03-new-divider-off-page.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-22-03-new-divider-off-page.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-22-04-catch-up-all-caught-up-row.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-22-04-catch-up-all-caught-up-row.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-23-01-session-mentions.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-23-01-session-mentions.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-23-02-gpt-live-own-key.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-23-02-gpt-live-own-key.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-23-03-pair-opens-drawer.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-23-03-pair-opens-drawer.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-23-04-voice-server-picker.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-23-04-voice-server-picker.kt` | done | Android copy: “on this phone” |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-24-01-living-orb-floats.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-24-01-living-orb-floats.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-24-02-new-messages-divider-on.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-24-02-new-messages-divider-on.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-24-03-composer-keyboard-morph.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-24-03-composer-keyboard-morph.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-24-04-composer-photo-viewer.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-24-04-composer-photo-viewer.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-24-05-plus-menu-photo-picker.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-24-05-plus-menu-photo-picker.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-24-06-project-icons-lit.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-24-06-project-icons-lit.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-24-07-session-live-activity.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-24-07-session-live-activity.kt` | done | Android copy: a notification (on the Lock Screen too) for the Lock Screen and Dynamic Island |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-24-08-sign-in-failed-edit-server.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-24-08-sign-in-failed-edit-server.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-25-01-voice-app-screenshot.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-25-01-voice-app-screenshot.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-25-02-voice-background-results.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-25-02-voice-background-results.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-25-03-sound-effects-experiment.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-25-03-sound-effects-experiment.kt` | done | Android copy: “Silent and vibrate modes mute them” for the silent switch |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-26-01-settings-sessions-page.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-26-01-settings-sessions-page.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-26-02-project-icons-default.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-26-02-project-icons-default.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-26-03-plus-menu-over-keyboard.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-26-03-plus-menu-over-keyboard.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-26-04-living-orb-connect-motion.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-26-04-living-orb-connect-motion.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-26-05-living-orb-presets.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-26-05-living-orb-presets.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-26-06-send-after-a-pause.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-26-06-send-after-a-pause.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-27-01-steadier-round-trip.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-27-01-steadier-round-trip.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-27-02-drawer-drag-follows-finger.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-27-02-drawer-drag-follows-finger.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-27-03-inbox-sidebar-experiment.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-27-03-inbox-sidebar-experiment.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-28-01-first-pairing-ready-session.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-28-01-first-pairing-ready-session.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-28-01-voice-provider-page.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-28-01-voice-provider-page.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-28-02-welcome-preview.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-28-02-welcome-preview.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-29-01-composer-text-selection.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-29-01-composer-text-selection.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-30-01-voice-waits-for-you.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-30-01-voice-waits-for-you.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-30-02-wisp-call-sounds.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-30-02-wisp-call-sounds.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-30-03-wisp-orb.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-30-03-wisp-orb.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-31-01-encrypted-notification-previews.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-31-01-encrypted-notification-previews.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-31-02-move-session-folder-gone.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-31-02-move-session-folder-gone.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-31-03-notification-plugin-setup.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-31-03-notification-plugin-setup.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/WhatsNewActions.swift` | 84 | `feature/settings/.../whatsnew/WhatsNewActions.kt` | done | Sessions/Experimental titles (an unknown experiment falls back to “Experimental”); the pages are `SettingsFeature`'s `SettingsPage.Sessions`/`Experimental` (the Voice page's `sessions` arrive with SettingsView's voice partial); voice availability is `:feature:voice`'s `VoiceRoutePreferences.isAvailable(server)` |
+| `OpenCode/Settings/WhatsNew/WhatsNewEntries.swift` | 154 | `feature/settings/.../whatsnew/WhatsNewEntries.kt`, `feature/settings/.../whatsnew/entries/WhatsNewShippedList.kt` | done | `SettingsDestination` `Sessions`/`Experimental`/`Developer` (302b95e7, 372255a6). `object WhatsNewShipped` with one `internal val WhatsNewShipped.<name>` per file in `whatsnew/entries/` (same `<day>-<NN>-<id>` stems); iOS generates `WhatsNewEntry.all` at build time (`scripts/registries.py`), Android keeps `whatsNewShippedEntries` by hand in file-name order, newest first. Android-only entry: `entries/2026-10-25-90-session-title-first-prompt.kt` (the title fallback; iOS has it in its draft PR `feat/session-title-fallback`). Every entry is verbatim except the Android copy noted on its row; `uikit-drawer-experiment` is left out |
 | `OpenCode/Settings/WhatsNew/WhatsNewFeature.swift` | 166 | `feature/settings/.../whatsnew/WhatsNewFeature.kt` | done | `settingsPage` folds into Settings' stack; `WhatsNewAcrossHomes` is ported in `:app` (`AppFeatureWhatsNew.kt`, applied as `keepingWhatsNewAcrossHomes()`; see app.md); lab launch state n/a (no XCUITest lab env on Android) |
-| `OpenCode/Settings/WhatsNew/WhatsNewList.swift` | 131 | `feature/settings/.../whatsnew/WhatsNewList.kt` | removed in 3f425e0c: done | 118 of 119 entries; `uikit-drawer-experiment` dropped (iOS UIKit drawer A/B); `ipad-multiple-windows` → “Multiple Windows on Tablets” (iPad → tablet). iOS-only copy reworded for Android: `control-center-sessions` (Quick Settings tiles), `siri-shortcuts-spotlight` (App Actions and app shortcuts; no Spotlight detail), `return-newline-default` (Ctrl+Enter), iPhone/iPad → phone/tablets in `voice-server-picker`, `drawer-session-alignment`, `smart-dictation-audio`, `server-switcher`, `pair-from-anywhere`; every other entry verbatim. `session-title-first-prompt` is Android-first (the title fallback; iOS has it in its draft PR `feat/session-title-fallback`) |
 | `OpenCode/Settings/WhatsNew/WhatsNewView.swift` | 553 | `feature/settings/.../whatsnew/WhatsNewView.kt` | done | the entry page's bar title fades in over 0.15 s ease-out once its own title scrolls under the bar (`SettingsPageScaffold(titleVisible)`); button hint is TalkBack's click label |
 
-Also here: `HomeSettingsFeature.kt` (iOS `Drawer/HomeSettingsFeature.swift`, moved down; see drawer.md): every action but `developerModeChanged`/`motionWatchChanged`/`touchProbeChanged`/`voiceDemoModeChanged` (iOS sends them from `DiagnosticsView`; Android's `:devtools` `DevToolsFeature` owns Developer Mode and Demo Call Audio, Motion Watch and Touch Probe are iOS-only) and the Tuning mirrors of `plusMenuSheet`/`composerAutocomplete` (the composer reads the keys). Settings-owned Android extras: `SettingsPresentation.kt` is the overlay Home wraps itself in.
+Also here: `HomeSettingsFeature.kt` (iOS `Drawer/HomeSettingsFeature.swift`, moved down; see drawer.md): every action but `developerModeChanged`/`motionWatchChanged`/`touchProbeChanged`/`voiceDemoModeChanged` (iOS sends them from `DiagnosticsView`; Android's `:devtools` `DevToolsFeature` owns Developer Mode and Demo Call Audio, Motion Watch and Touch Probe are iOS-only) and the Tuning mirrors of `plusMenuSheet`/`composerAutocomplete` (the composer reads the keys). Synced to iOS f657969b: Sound Effects volume/send and `prepare` on enabling (b275ccb6), `welcomeOpened` (7f411b1c), Orb Style gone (e4aeb212); `voiceDelegatorChoiceChanged`, `callSoundPackSelected`, `voiceModelsLoaded(asked:)` and the delegator's session list wait on voice (see the SettingsView row). Settings-owned Android extras: `SettingsPresentation.kt` is the overlay Home wraps itself in.
 
 ## Tests
 
@@ -244,23 +237,22 @@ left to that module's port ("skipped"); "dropped" tests can't exist on Android.
 | `OnboardingPlaygroundFeatureTests.swift` | `onboarding/OnboardingPlaygroundFeatureTests.kt` | 10 | – | – (Close: Android's view dismisses, so the test checks no effect keeps running instead of counting `dismiss`) |
 | `PlaygroundFixtureTests.swift` | – | 0 | – | all 7: `PlaygroundFixtureEngine` presets/replays/session host and `TuningFeature`'s playground selection are n/a on Android (devtools.md: Session Lab and `session-lab.py` checkpoints replace the in-app fixture playgrounds) |
 | `ServerDetailsTests.swift` | `serverdetails/ServerDetailsTests.kt` | 11 | `decodesEveryMCPStatus`, `decodesCredentialAndEnvironmentAccounts`, `onlyMCPConnectIsRetriedWhenUnsent` (`:server` internal payloads / `mcpConnectionIdempotency`) | – |
-| `WhatsNewTests.swift` (`WhatsNewTests`) | `whatsnew/WhatsNewTests.kt` | 14 (3 are the Settings halves of Home tests: `homePushes…`, `readingItInSettings…`, `openPushes…`, against `SettingsFeature`, where Android keeps the page) | `tryItTypesAPrompt…`, `closingSettingsWithoutWhatsNew…`, `closingWhatsNewDropsItsSettingsPage`, `tryItTypesThePrompt…OnThisServer…`, `tryItKeepsTheOpenDrafts…`, `tryItAgain…`, `tryItTwice…`, `tryItKeepsASavedDrafts…` (`:feature:drawer`) | – |
+| `WhatsNewTests.swift` (`WhatsNewTests`) | `whatsnew/WhatsNewTests.kt` | 14 (`splitDayAdditionsEachNameAnEntry` replaces `addedIDsAreUnique…`, with `addedSinceSplit` computed from `all` as iOS 7b9c7346 does; 3 are the Settings halves of Home tests: `homePushes…`, `readingItInSettings…`, `openPushes…`, against `SettingsFeature`, where Android keeps the page) | `tryItTypesAPrompt…`, `closingSettingsWithoutWhatsNew…`, `closingWhatsNewDropsItsSettingsPage`, `tryItTypesThePrompt…OnThisServer…`, `tryItKeepsTheOpenDrafts…`, `tryItAgain…`, `tryItTwice…`, `tryItKeepsASavedDrafts…` (`:feature:drawer`) | – |
 | `WhatsNewTests.swift` (`WhatsNewTryItTests`) | `whatsnew/WhatsNewTests.kt` (`WhatsNewTryItTests`) | 3 (Settings halves of `aNewSessionWhileOffline…`, `aCallBeforeVoiceIsSetUp…`; `settingsAskedForOverWhatsNew…`) | 4 `modelList…` (`:feature:drawer`), `whatsNewSurvivesAHomeReplacement` (`:app`, ported there) | – |
 | `WhatsNewTests.swift` (`WhatsNewDotSymbolTests`) | `whatsnew/WhatsNewTests.kt` (`WhatsNewDotSymbolTests`, Robolectric) | 1 (`DotField` over the `plus` Material Symbol drawable, native graphics with the module's resources; `DotField` is `internal`, was `private`) | – | – |
-| `WhatsNewAddedIDs.swift` | `whatsnew/WhatsNewAddedIDs.kt` | data | – | `uikit-drawer-experiment` left out (its entry isn't on Android's list) |
 | `ModelVisibilityTests.swift` | `ModelVisibilityTests.kt` | 4 (Settings › Models, against `ModelVisibilityFeature`) | 6 Rules (`:server`, ported there), 5 Pickers (`:feature:session`) | – |
-| `ServerQuietStyleTests.swift` | `servers/ServerQuietStyleTests.kt` | 2 | – | `markIntroWindsBack…`, `markFrontOnIs…`: `ServerMarkGeometry` (the wireframe mark, unused on iOS) isn't ported |
-| `ConnectionHealthTests.swift` | `connection/ConnectionHealthTests.kt` | 28 | `routes`, `routesClassifyParsedAddressesNotSpellings` (`ConnectionRoute`, `reachabilityRank`, `isLoopback` live in `:server`) | – (the probe test answers through an OkHttp interceptor; its `NetworkRetry.policy == .once` check can't be observed on OkHttp's dispatcher thread) |
+| `ConnectionHealthTests.swift` | `connection/ConnectionHealthTests.kt` | 29 | `routesClassifyParsedAddressesNotSpellings` (`ConnectionRoute`, `reachabilityRank`, `isLoopback` live in `:server`) | – (the probe test answers through an OkHttp interceptor; its `NetworkRetry.policy == .once` check can't be observed on OkHttp's dispatcher thread) |
 | `ThemePaletteTests.swift` | `ThemePaletteTests.kt` | 1 (`appearanceSettingsActions…` through `HomeSettingsFeature`, minus its `TranscriptTunables`/`MarkdownStyle` half, `:feature:transcript`) | 5 + legacy (`:core`, see core.md) | `appearanceTunablesRegisterSoftEdgeControls` (tuning store not ported; the soft edge's 22/12 are baked) |
+| `ExperimentalFeatureTests.swift` | `ExperimentalFeatureTests.kt` | 2 (`theSessionsPageDividerSwitchKeepsTheSavedChoice` through `HomeSettingsFeature`; the `settingsRowID` half of `callStyleMapsOntoTheTwoCallExperiments`) | rest (`:core`, ported there) | – |
+| `SoundEffectsTests.swift` | `SoundEffectsTests.kt` | 1 (`settingsPrepareTheSoundsAndSampleTheVolume`) | live gate and playback (`:core`, ported there); session, Home and Catch Up reducers (`:feature:session`, `:feature:drawer`) | – |
+| `TranscriptCoverPauseTests.swift` | `TranscriptCoverPauseTests.kt` | 1 (`settingsCoverFollowsThePresentationNotTheShownFlag`) | the list pause and drawer stack tests (`:feature:transcript`, `:feature:drawer`) | `settingsPresentationCoversOnceLandedAndUncoversOnClose` drives a hosted SwiftUI window (no Compose UI test harness in `:feature:settings`) |
 | `CallVoiceTests.swift` | `CallVoiceTests.kt` | 3 (`CallVoicePicker.rowValue` half of `anUnsupportedChoice…`, `keyRowSwitches…`, `previewRequiresAKey…`) | rest (`:feature:voice`) | – |
-| `VoiceServerPickerTests.swift` | `VoiceServerPickerTests.kt` | 7 (4 `VoiceSettingsFeature`, `homeSavesTheChoice…`, Settings halves of `everyEntryPointRoutes…`, `thisIPhoneUsesThePhonesOwnKey`) | rest (`:feature:voice`); `SessionFeature.State` checks (`:feature:session`) | – |
+| `VoiceServerPickerTests.swift` | `VoiceServerPickerTests.kt` | 7 (4 `VoiceSettingsFeature` with the provider catalog and `aPickBrokersAndAStaleOneChoosesAutomatically`, `homeSavesTheChoice…`, Settings halves of `everyEntryPointRoutes…`, `thisIPhoneUsesThePhonesOwnKey`) | rest (`:feature:voice`); `SessionFeature.State` checks (`:feature:session`) | – |
 | `VoiceRouteTests.swift` | `VoiceRouteTests.kt` | 2 (Settings/`VoiceRoutePreferences` halves of `inactiveGemini…`, `grokSuppresses…`) | rest (`:feature:voice`); `SessionFeature.State` checks (`:feature:session`) | – |
 | `VoiceRoutingBaselineTests.swift` | `VoiceRoutingBaselineTests.kt` | 1 | – | – |
-| `HomeChildFeatureTests.swift` | `HomeChildFeatureTests.kt` | 2 (`HomeSettingsFeature`) | `HomeNotificationsFeature` and other Home children (`:feature:drawer`) | – |
-| `ServerSwitchingTests.swift` | `servers/ServerSwitchingTests.kt` | 5 (`ServerTitleFeature` alone) | `AppFeature` tests (`:app`), header tests (`:server`), ported there | – |
-| `ServerTitleRecoveryTests.swift` | `servers/ServerTitleRecoveryTests.kt` | 2 (`ServerTitleFeature` alone) | `AppFeature` tests (`:app`, ported there) | – |
+| `HomeChildFeatureTests.swift` | `HomeChildFeatureTests.kt` | 2 (`HomeSettingsFeature`: support plus the Automatic models answer, One Picker in the style setting) | `HomeNotificationsFeature` and other Home children (`:feature:drawer`) | – |
 | `AppFeatureTests.swift` | `AppFeatureTests.kt` | 1 (`appVersionPrefersOpenCodeVersion`: the label; Android reads the package version, no Info.plist key) | the rest (`:app`, `:server`) | – |
 
 Production bugs the ported tests found: none (every ported test passed against the existing port).
 
-Total: 98 settings tests, all passing. Robolectric (test-only, `isIncludeAndroidResources`) runs only `WhatsNewDotSymbolTests`.
+Total: 93 settings tests, all passing. Robolectric (test-only, `isIncludeAndroidResources`) runs only `WhatsNewDotSymbolTests`.

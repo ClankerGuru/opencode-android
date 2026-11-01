@@ -145,7 +145,7 @@ class ScreenAwakeTests {
 
         store.send(AppFeature.Action.Home(HomeFeature.Action.detail(SessionFeature.Action.VoiceTapped)))
         voice(store, VoiceFeature.Action.CallEvent(VoiceCallEvent.Connected))
-        store.send(AppFeature.Action.Home(HomeFeature.Action.Delegate(HomeFeature.DelegateAction.ServerBadgeTapped)))
+        store.send(AppFeature.Action.PairingCodeScanned("not a pairing code"))
         assertNull(store.state.home)
         assertEquals(listOf(true, false), settled(store, calls))
         effects.skipInFlightEffects()

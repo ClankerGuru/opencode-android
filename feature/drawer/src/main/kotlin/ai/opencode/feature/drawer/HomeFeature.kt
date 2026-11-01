@@ -593,8 +593,6 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
 
     /** What Home asks its parent (`AppFeature`) to do; iOS handles these cases in `AppFeature`. */
     sealed interface DelegateAction {
-        /** Returns to the server picker. */
-        data object ServerBadgeTapped : DelegateAction
         /** Connects to another saved server. */
         data class ServerSwitchTapped(val server: OpenCodeServer) : DelegateAction
         /** Renames a saved server in place, without reconnecting (Home also takes the name). */

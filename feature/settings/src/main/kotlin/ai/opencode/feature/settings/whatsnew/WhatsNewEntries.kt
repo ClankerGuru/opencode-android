@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings.whatsnew
 
+import ai.opencode.feature.settings.whatsnew.entries.whatsNewShippedEntries
 import java.time.LocalDate
 
 /**
@@ -63,19 +64,22 @@ data class WhatsNewEntry(
     sealed interface SettingsDestination {
         /** Settings › Appearance › Themes. */
         data object Themes : SettingsDestination
-        /** Settings › Composer. */
-        data object Composer : SettingsDestination
+        /** Settings › Sessions (the transcript and the composer). */
+        data object Sessions : SettingsDestination
         /** Settings › Voice. */
         data object Voice : SettingsDestination
         /** Settings › Notifications. */
         data object Notifications : SettingsDestination
         /** Settings’ server page, with the Servers section. */
         data object Servers : SettingsDestination
-        /** Settings › Advanced. */
-        data object Advanced : SettingsDestination
-        /** Settings › Advanced, scrolled to this experiment’s row (`ExperimentalFeature.rawValue`). */
+        /** Settings › Experimental. */
+        data object Experimental : SettingsDestination
+        /**
+         * Settings › Experimental, scrolled to this experiment’s row (`ExperimentalFeature.rawValue`;
+         * `WhatsNewTests` checks each names one).
+         */
         data class Experiment(val id: String) : SettingsDestination
-        /** Settings › Advanced › Developer. */
+        /** Settings › Developer. */
         data object Developer : SettingsDestination
     }
 
@@ -113,6 +117,18 @@ data class WhatsNewEntry(
         val smallerChanges: List<WhatsNewEntry> get() = all.filter { it.kind == Kind.smaller }
     }
 }
+
+/**
+ * Every shipped entry, one file each in `entries/`; [all] lists them newest first
+ * (`entries/WhatsNewShippedList.kt`; iOS generates its list at build time).
+ */
+object WhatsNewShipped
+
+/**
+ * Newest first. A feature for each user-facing feature shipped, and a smaller change for a fix or
+ * nuance worth a line.
+ */
+val WhatsNewEntry.Companion.all: List<WhatsNewEntry> get() = whatsNewShippedEntries
 
 /** The entries that shipped on one day: one section in the list. */
 data class WhatsNewDay(val day: LocalDate, val entries: List<WhatsNewEntry>) {

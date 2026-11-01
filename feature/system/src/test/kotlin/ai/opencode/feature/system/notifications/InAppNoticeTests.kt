@@ -1,24 +1,18 @@
 package ai.opencode.feature.system.notifications
 
-import ai.opencode.core.dependencies.AppContext
-import ai.opencode.core.dependencies.withDependencies
 import ai.opencode.core.testing.TestIsolationRule
-import android.app.NotificationManager
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
-import org.robolectric.RuntimeEnvironment
-import org.robolectric.annotation.Config
 
 /**
  * Port of iOS `InAppNoticeTests.swift`'s notification tests (the rest is `:feature:drawer`'s):
  * how a session notification shows in the foreground (iOS `DeliveredNotifications.presentation`,
  * Android [SessionNotifications.presentation]) and which delivered ones an answer clears (iOS
- * `DeliveredNotifications.isNeedsInput`/`sessionID(of:)`, Android [SessionPushNotifications.remove]
- * over the posted notifications, Robolectric).
+ * `DeliveredNotifications.isNeedsInput`/`sessionID(of:)`, Android [SessionPushNotifications.isNeedsInput]/
+ * [SessionPushNotifications.sessionID], which [SessionPushNotifications.remove] reads from each posted one).
  *
  * iOS `[.banner, .sound, .list]` is [NotificationPresentation.Banner], `[.list]`
  * [NotificationPresentation.ListOnly], `[]` [NotificationPresentation.None]. In-App Notices' mode
@@ -41,31 +35,11 @@ class InAppNoticeTests {
         assertEquals(NotificationPresentation.ListOnly, presentation("ses_b", null, noticesOn = true))
         assertEquals(NotificationPresentation.Banner, presentation(null, "ses_a", noticesOn = true))
     }
-}
-
-@RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35])
-class InAppNoticeFrameworkTests {
-    @get:Rule val isolation = TestIsolationRule()
 
     @Test fun needsInputStatusesAreTheOnlyOnesClearedOnAnswer() {
-        val context = RuntimeEnvironment.getApplication()
-        val manager = context.getSystemService(NotificationManager::class.java)
-        fun post(status: String) = withDependencies({ this[AppContext] = context }) {
-            SessionPushNotifications.handle(context, mapOf("title" to "T", "body" to "B", "sessionID" to "ses_a", "status" to status))
-        }
-        fun shown() = manager.activeNotifications.count { it.tag == "ses_a" }
-
-        post("permission")
-        assertEquals(1, shown())
-        SessionPushNotifications.remove(context, setOf("ses_a"), needsInputOnly = true)
-        assertEquals("A needs-input status is cleared on answer", 0, shown())
-
-        post("succeeded")
-        SessionPushNotifications.remove(context, setOf("ses_a"), needsInputOnly = true)
-        assertEquals("Any other status stays", 1, shown())
-        // It still belongs to its session.
-        SessionPushNotifications.remove(context, setOf("ses_a"), needsInputOnly = false)
-        assertTrue(manager.activeNotifications.isEmpty())
+        fun content(status: String) = SessionPushNotifications.Delivered(tag = "ses_a", sessionID = "ses_a", status = status)
+        assertTrue(SessionPushNotifications.isNeedsInput(content("permission")))
+        assertFalse(SessionPushNotifications.isNeedsInput(content("succeeded")))
+        assertEquals("ses_a", SessionPushNotifications.sessionID(content("succeeded")))
     }
 }

@@ -69,8 +69,8 @@ private sealed interface SettingsRoute {
 
 /**
  * Port of iOS `SessionSettingsView` (`Settings/SettingsView.swift`): Settings' own stack, the root
- * page (connection card; Appearance, Composer, Models, Voice, Notifications, What’s New; Server
- * Details; Advanced and the version line) and the pages it pushes. Back on a pushed page goes back
+ * page (connection card; Appearance, Sessions, Models, Voice, Notifications; What’s New; Server
+ * Details; Experimental, Developer and the version line) and the pages it pushes. Back on a pushed page goes back
  * one level; at the root it closes Settings ([SettingsFeature.SettingsDelegate.Close]).
  */
 @Composable
@@ -111,10 +111,13 @@ private fun SettingsPageContent(store: SettingsStore, page: SettingsPage) {
         SettingsPage.Server -> ServerPage(store)
         SettingsPage.Appearance -> AppearanceSettingsView(store)
         SettingsPage.Themes -> ThemesSettingsView(store)
-        SettingsPage.Composer -> ComposerSettingsView(store)
+        SettingsPage.Sessions -> SessionsSettingsView(store)
         SettingsPage.Models -> ModelVisibilitySettingsView(store)
         is SettingsPage.ModelProvider -> ModelVisibilityProviderView(store, page.providerID)
         SettingsPage.Voice -> VoiceSettingsView(store)
+        is SettingsPage.VoiceProvider -> VoiceProviderDetailPage(store, page.opensAccount)
+        SettingsPage.VoiceAccount -> VoiceProviderAccountPage(store)
+        SettingsPage.VoiceDelegator -> VoiceDelegatorSettingsPage(store)
         SettingsPage.CallVoicePicker -> CallVoicePickerView(store)
         SettingsPage.CallHistory -> CallHistoryView(store)
         is SettingsPage.CallReplay -> CallReplayView(store, page.log)
@@ -123,7 +126,7 @@ private fun SettingsPageContent(store: SettingsStore, page: SettingsPage) {
         is SettingsPage.WhatsNewDetail -> WhatsNewDetailPage(store, page.entryID)
         SettingsPage.WhatsNewSmallerChanges -> WhatsNewSmallerListPage(store)
         SettingsPage.ServerDetails -> ServerDetailsPage(store)
-        is SettingsPage.Advanced -> ExperimentalSettingsView(store, focus = page.focus?.let(ExperimentalFeature::fromRawValue))
+        is SettingsPage.Experimental -> ExperimentalSettingsView(store, focus = page.focus?.let(ExperimentalFeature::fromRawValue))
         SettingsPage.Developer -> DeveloperSettingsView(store)
         SettingsPage.Playgrounds -> PlaygroundsSettingsView(store)
     }
@@ -223,11 +226,11 @@ private fun SettingsRootPage(store: SettingsStore) {
         item(key = "connection", contentType = "connection") {
             ConnectionCard(store, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
         }
-        // Preferences: Appearance, Composer, Voice, Notifications, and What’s New.
+        // Preferences: Appearance, Sessions, Models, Voice and Notifications.
         settingsSection(key = "preferences") {
             SettingsRow("Appearance", "paintpalette.fill", SettingsTint.Purple, value = appTheme.title) { push(SettingsPage.Appearance) }
             SettingsDivider(inset = true)
-            SettingsRow("Composer", "keyboard.fill", SettingsTint.Blue) { push(SettingsPage.Composer) }
+            SettingsRow("Sessions", "bubble.left.fill", SettingsTint.Blue) { push(SettingsPage.Sessions) }
             if (ExperimentalFeature.hideModels.isActive(hideModels)) {
                 SettingsDivider(inset = true)
                 SettingsRow("Models", "cpu", SettingsTint.Teal) { push(SettingsPage.Models) }
@@ -245,7 +248,8 @@ private fun SettingsRootPage(store: SettingsStore) {
                     value = if (permission == NotificationPermission.Enabled) "On" else "Off",
                 ) { push(SettingsPage.Notifications) }
             }
-            SettingsDivider(inset = true)
+        }
+        settingsSection(key = "whats-new") {
             SettingsRow("What’s New", "sparkles", SettingsTint.Orange) { push(SettingsPage.WhatsNew) }
         }
         if (ExperimentalFeature.serverDetails.isActive(serverDetails)) {
@@ -254,9 +258,9 @@ private fun SettingsRootPage(store: SettingsStore) {
             }
         }
         settingsSection(
-            key = "advanced",
+            key = "experimental",
             footer = {
-                SettingsFooterText("Experimental features, diagnostics, and developer tools.")
+                SettingsFooterText("Unfinished features, diagnostics, and live tuning.")
                 // iOS stacks the footer's lines 14 apart; the footer column already spaces them 6.
                 SelectionContainer(Modifier.fillMaxWidth().padding(top = 8.dp)) {
                     Text(
@@ -269,12 +273,11 @@ private fun SettingsRootPage(store: SettingsStore) {
                 }
             },
         ) {
-            SettingsRow(
-                "Advanced",
-                "gearshape.2.fill",
-                SettingsTint.Gray,
-                value = if (developerMode) "Developer Mode" else null,
-            ) { push(SettingsPage.Advanced()) }
+            ExperimentalSettingsRow { push(SettingsPage.Experimental()) }
+            SettingsDivider(inset = true)
+            SettingsRow("Developer", "hammer.fill", SettingsTint.Teal, value = if (developerMode) "On" else "Off") {
+                push(SettingsPage.Developer)
+            }
         }
     }
 }

@@ -161,11 +161,11 @@ class WhatsNewTests {
     fun openPushesItsSettingsPageOverTheEntrysPage() = homeTest { h ->
         val pages = listOf(
             WhatsNewEntry.SettingsDestination.Themes,
-            WhatsNewEntry.SettingsDestination.Composer,
+            WhatsNewEntry.SettingsDestination.Sessions,
             WhatsNewEntry.SettingsDestination.Voice,
             WhatsNewEntry.SettingsDestination.Notifications,
             WhatsNewEntry.SettingsDestination.Servers,
-            WhatsNewEntry.SettingsDestination.Advanced,
+            WhatsNewEntry.SettingsDestination.Experimental,
             WhatsNewEntry.SettingsDestination.Experiment("living-orb"),
             WhatsNewEntry.SettingsDestination.Developer,
         )

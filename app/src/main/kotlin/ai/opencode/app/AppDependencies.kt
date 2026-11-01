@@ -17,11 +17,13 @@ import ai.opencode.feature.voice.VoiceLogUploader
 import ai.opencode.feature.voice.VoiceScreenActivityRegistry
 import ai.opencode.server.DeveloperModeUploads
 import ai.opencode.devtools.SavedVoiceLogUploads
+import ai.opencode.feature.voice.AudioSessionOwner
 import ai.opencode.feature.voice.VoiceCallLogClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import ai.opencode.core.sound.AudioSessionIdleState
 import android.app.Activity
 import android.app.Application
 import android.os.Bundle
@@ -40,6 +42,16 @@ internal object AppDependencies {
     fun install(application: Application) {
         val registry = VoiceScreenActivityRegistry()
         DependencyValues.installRoot {
+            // Sound Effects borrow the idle audio session through voice's owner (iOS
+            // `SoundEffectsPlayback` takes `AudioSessionOwner.shared`): a call, dictation or
+            // media holder stops a sound before it activates, and none plays while one is held.
+            this[AudioSessionIdleState] = object : AudioSessionIdleState {
+                override fun <T> withIdleState(body: (isIdle: Boolean) -> T): T =
+                    dependency(AudioSessionOwner).withIdleState(body)
+
+                override fun onHolderActivating(stop: () -> Unit) =
+                    dependency(AudioSessionOwner).onHolderActivating(stop)
+            }
             // iOS `VoiceFeature+Admission`: `PromptOutbox.recordAdmitted` with the send voice made.
             this[VoiceAdmissionRecorder] = VoiceAdmissionRecorder { prompt, sessionID, serverKey ->
                 dependency(PromptOutbox).recordAdmitted(
