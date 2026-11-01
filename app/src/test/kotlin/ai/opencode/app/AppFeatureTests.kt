@@ -402,18 +402,15 @@ class AppFeatureTests {
     }
 
     @Test
-    fun serverBadgeReturnsToThePickerAndAnotherServerConnects() = runTest {
+    fun thePickerConnectsAnotherServer() = runTest {
         val snapshot = emptySnapshot
         val laptop = OpenCodeServer(url = "http://127.0.0.1:4096", username = "opencode", password = "a")
         val tailnet = OpenCodeServer(url = "https://box.ts.net:4096", username = "opencode", password = "b")
         saveAll(listOf(laptop, tailnet))
-        val initial = shared.appState().copy(connection = AppFeature.State.Connection.Connected, home = home(laptop, snapshot))
+        val initial = shared.appState().copy(connection = AppFeature.State.Connection.Picking, returnServer = laptop)
         val gate = GatedHome()
         val store = store(initial, gated(gate))
 
-        store.send(AppFeature.Action.Home(HomeFeature.Action.Delegate(HomeFeature.DelegateAction.ServerBadgeTapped))) {
-            it.copy(home = null, connection = AppFeature.State.Connection.Picking, returnServer = laptop)
-        }
         // `.picking` must not auto-reconnect when the view's task re-runs.
         store.send(AppFeature.Action.Task)
 
@@ -941,13 +938,10 @@ class AppFeatureTests {
         val server = OpenCodeServer(url = "http://10.0.10.26:4196", username = "opencode", password = "pw")
         save(server)
         saveAll(listOf(server))
-        val state = shared.appState().copy(home = home(server, emptySnapshot), connection = AppFeature.State.Connection.Connected)
+        val state = shared.appState().copy(connection = AppFeature.State.Connection.Picking, returnServer = server)
         val store = store(state, OpenCodeClient.testValue.copy(health = {}, homeSnapshot = { emptySnapshot }))
         store.exhaustive = false
 
-        store.send(AppFeature.Action.Home(HomeFeature.Action.Delegate(HomeFeature.DelegateAction.ServerBadgeTapped))) {
-            it.copy(home = null, connection = AppFeature.State.Connection.Picking, returnServer = server)
-        }
         store.send(AppFeature.Action.ReturnToServerTapped) { it.copy(connection = AppFeature.State.Connection.Connecting) }
         store.receiveCase<AppFeature.Action.HealthResponse>()
         store.receiveCase<AppFeature.Action.HomeResponse> {
@@ -1208,7 +1202,7 @@ class AppFeatureTests {
         val gate = GatedHome()
         save(lan)
         saveAll(listOf(lan, other))
-        val state = shared.appState().load(lan).copy(home = home(lan, snapshot), connection = AppFeature.State.Connection.Connected)
+        val state = shared.appState().load(lan).copy(connection = AppFeature.State.Connection.Picking, returnServer = lan)
         val store = store(
             state,
             gated(gate).let { client ->
@@ -1223,7 +1217,6 @@ class AppFeatureTests {
         )
         store.exhaustive = false
 
-        store.send(AppFeature.Action.Home(HomeFeature.Action.Delegate(HomeFeature.DelegateAction.ServerBadgeTapped)))
         store.send(AppFeature.Action.EditServerTapped(lan))
         assertTrue(store.state.isEditingServer)
         assertEquals(lan, store.state.server)
@@ -1403,7 +1396,7 @@ class AppFeatureTests {
         assertEquals(second, savedServer)
         assertEquals(AppFeature.State.Connection.Connected, store.state.connection)
         assertNull(store.state.connectionProgressLabel)
-        store.send(AppFeature.Action.Home(HomeFeature.Action.Delegate(HomeFeature.DelegateAction.ServerBadgeTapped)))
+        store.send(AppFeature.Action.PairingCodeScanned("not a pairing code"))
         store.finish()
     }
 

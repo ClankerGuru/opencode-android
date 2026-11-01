@@ -702,10 +702,9 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         // iOS c75d4a1e removed `serversRequested` with Title Is the Switch; Home's drawer port
         // drops the action, and until then it opens nothing.
         HomeFeature.DelegateAction.ServersRequested -> Reduced(state)
-        // Back to the picker: Home is rebuilt from scratch on reconnect since sessions, projects
-        // and the event stream are all server-scoped.
-        HomeFeature.DelegateAction.ServerBadgeTapped,
-        -> cancelConnection(state.copy(returnServer = state.homeServer).withoutHome())
+        // iOS 897aa38c removed the unsent `serverBadgeTapped`; nothing sends Home's either, and
+        // the drawer port drops it.
+        HomeFeature.DelegateAction.ServerBadgeTapped -> Reduced(state)
         is HomeFeature.DelegateAction.ServerSwitchTapped -> {
             val home = state.home
             if (home == null || home.server.persistenceID == action.server.persistenceID) Reduced(state)
