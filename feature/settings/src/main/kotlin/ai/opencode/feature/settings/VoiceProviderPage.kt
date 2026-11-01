@@ -8,10 +8,11 @@ import ai.opencode.core.ui.SFSymbol
 import ai.opencode.feature.voice.ServerVoiceProvider
 import ai.opencode.feature.voice.VoiceProviderOption
 import ai.opencode.feature.voice.VoiceProviderState
+import ai.opencode.feature.voice.VoiceProviderTunables
+import ai.opencode.feature.voice.VoiceProviderTileKind
+import ai.opencode.feature.voice.VoiceProviderTile
+import ai.opencode.feature.voice.VoiceProviderStatus
 import ai.opencode.feature.voice.VoiceServerChoice
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,46 +24,33 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Text
 import ai.opencode.core.store.observe
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /*
  * Port of iOS `Settings/VoiceProviderPage.swift` (ce694097, Server Voice experiment): Settings ›
- * Voice's Voice Provider row, its page, and Your OpenAI Account. The tile and status are drawn
- * here (iOS `VoiceProviderTile`/`VoiceProviderStatus` in `Voice/VoiceProviderViews.swift`, not
- * yet ported by voice) with the iOS sizes as constants instead of its tunables.
+ * Voice's Voice Provider row, its page, and Your OpenAI Account. Tiles and statuses are voice's
+ * `VoiceProviderTile`/`VoiceProviderStatus` (iOS `Voice/VoiceProviderViews.swift`), sized by
+ * `VoiceProviderTunables`.
  */
-
-private object VoiceProviderSizes {
-    val rowTile = 52.dp
-    val headerTile = 72.dp
-    val listTile = 36.dp
-    const val CORNER_RATIO = 0.27f
-    const val SYMBOL_RATIO = 0.44f
-    const val UNAVAILABLE_OPACITY = 0.6f
-}
 
 /**
  * Settings › Voice's Voice Provider row (the Server Voice experiment): who runs calls, where, and
@@ -83,7 +71,7 @@ internal fun VoiceProviderSettingsRow(state: VoiceSettingsFeature.State, onClick
             horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            VoiceProviderTile(active, VoiceProviderSizes.rowTile)
+            VoiceProviderTile(active, size = VoiceProviderTunables.rowTile.value)
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text("Voice Provider", style = OpenCodeTextStyles.footnote, color = OpenCodeTheme.colors.secondaryText)
                 Text(active.name, style = OpenCodeTextStyles.headline, color = OpenCodeTheme.colors.text)
@@ -185,7 +173,7 @@ internal fun VoiceProviderDetailPage(store: SettingsStore, opensAccount: Boolean
                 SettingsRowFrame(onClick = { showsUnavailable = !showsUnavailable }) {
                     Text(
                         "${catalog.unavailable.size} Not Available",
-                        modifier = Modifier.weight(1f).padding(start = VoiceProviderSizes.listTile + 12.dp),
+                        modifier = Modifier.weight(1f).padding(start = VoiceProviderTunables.listTile.value.dp + 12.dp),
                         style = OpenCodeTextStyles.body,
                         color = OpenCodeTheme.colors.secondaryText,
                     )
@@ -256,7 +244,7 @@ private fun VoiceProviderHeader(option: VoiceProviderOption?, title: String, sub
             .semantics(mergeDescendants = true) {},
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        if (option != null) VoiceProviderTile(option, VoiceProviderSizes.headerTile) else VoiceProviderTile(TileKind.openAIAccount, VoiceProviderSizes.headerTile)
+        if (option != null) VoiceProviderTile(option, size = VoiceProviderTunables.headerTile.value) else VoiceProviderTile(VoiceProviderTileKind.openAIAccount, size = VoiceProviderTunables.headerTile.value)
         Text(
             title,
             modifier = Modifier.padding(top = 14.dp).semantics { heading() },
@@ -296,8 +284,8 @@ private fun VoiceProviderListRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(Modifier.alpha(if (isAvailable) 1f else VoiceProviderSizes.UNAVAILABLE_OPACITY)) {
-                VoiceProviderTile(option, VoiceProviderSizes.listTile)
+            Box(Modifier.alpha(if (isAvailable) 1f else VoiceProviderTunables.unavailableOpacity.value.toFloat())) {
+                VoiceProviderTile(option, size = VoiceProviderTunables.listTile.value)
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
@@ -313,85 +301,5 @@ private fun VoiceProviderListRow(
         Spacer(Modifier.width(8.dp))
         if (showsStatus) VoiceProviderStatus(option.state)
         accessory()
-    }
-}
-
-/** iOS `VoiceProviderTile.Kind`. */
-private enum class TileKind { openAI, openAIAccount, openCode, gemini, device }
-
-private val VoiceProviderOption.tileKind: TileKind
-    get() = if (place == VoiceProviderOption.Place.Phone) {
-        TileKind.openAIAccount
-    } else {
-        when (brand) {
-            VoiceProviderOption.Brand.openAI -> TileKind.openAI
-            VoiceProviderOption.Brand.openAIAccount -> TileKind.openAIAccount
-            VoiceProviderOption.Brand.openCode -> TileKind.openCode
-            VoiceProviderOption.Brand.gemini -> TileKind.gemini
-            null -> TileKind.device
-        }
-    }
-
-@Composable
-private fun VoiceProviderTile(option: VoiceProviderOption, size: Dp) = VoiceProviderTile(option.tileKind, size)
-
-/**
- * A logo-free tile: a waveform for OpenAI, a person for your own account, code brackets for
- * OpenCode, a sparkle for Gemini, the device for a server that can't run calls.
- */
-@Composable
-private fun VoiceProviderTile(kind: TileKind, size: Dp) {
-    val symbol = when (kind) {
-        TileKind.openAI -> "waveform"
-        TileKind.openAIAccount -> "person.fill"
-        TileKind.openCode -> "chevron.left.forwardslash.chevron.right"
-        TileKind.gemini -> "sparkle"
-        TileKind.device -> "desktopcomputer"
-    }
-    val colors = when (kind) {
-        TileKind.openAI, TileKind.openAIAccount -> listOf(Color(0.13f, 0.72f, 0.56f), Color(0.04f, 0.52f, 0.42f))
-        TileKind.openCode -> listOf(Color(0.32f, 0.32f, 0.32f), Color(0.12f, 0.12f, 0.12f))
-        TileKind.gemini -> listOf(Color(0.36f, 0.47f, 1f), Color(0.52f, 0.3f, 0.93f))
-        TileKind.device -> listOf(Color(0.62f, 0.62f, 0.62f), Color(0.5f, 0.5f, 0.5f))
-    }
-    val shape = RoundedCornerShape(size * VoiceProviderSizes.CORNER_RATIO)
-    Box(
-        Modifier
-            .size(size)
-            .background(Brush.verticalGradient(colors), shape)
-            .border(BorderStroke(0.5.dp, Color.White.copy(alpha = 0.12f)), shape),
-        contentAlignment = Alignment.Center,
-    ) {
-        OpenCodeIcon(symbol, contentDescription = null, size = size * VoiceProviderSizes.SYMBOL_RATIO, tint = Color.White)
-    }
-}
-
-/** A provider's state as a symbol and a word, so it never rests on colour alone. Nothing while the state isn't known. */
-@Composable
-private fun VoiceProviderStatus(state: VoiceProviderState, prominent: Boolean = false) {
-    val label = state.label ?: return
-    val symbol = state.symbol ?: return
-    val color = when (state) {
-        VoiceProviderState.ready -> SettingsTint.Green.color()
-        VoiceProviderState.noKey -> SettingsTint.Orange.color()
-        VoiceProviderState.needsUpdate -> SettingsTint.Blue.color()
-        VoiceProviderState.offline, VoiceProviderState.unknown -> OpenCodeTheme.colors.secondaryText
-    }
-    if (prominent) {
-        Row(
-            Modifier
-                .background(color.copy(alpha = 0.14f), RoundedCornerShape(percent = 50))
-                .padding(horizontal = 10.dp, vertical = 5.dp),
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            OpenCodeIcon(symbol, contentDescription = null, size = 14.dp, tint = color)
-            Text(label, style = OpenCodeTextStyles.footnote.copy(fontWeight = FontWeight.SemiBold), color = color)
-        }
-    } else {
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-            OpenCodeIcon(symbol, contentDescription = null, size = 13.dp, tint = color)
-            Text(label, style = OpenCodeTextStyles.subheadline, color = OpenCodeTheme.colors.secondaryText)
-        }
     }
 }
