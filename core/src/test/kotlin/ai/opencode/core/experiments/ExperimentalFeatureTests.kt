@@ -53,12 +53,12 @@ class ExperimentalFeatureTests {
             ExperimentalGroup.composer.features,
         )
         assertEquals(
-            listOf(ExperimentalFeature.callTray, ExperimentalFeature.floatingCall, ExperimentalFeature.livingOrb, ExperimentalFeature.serverVoice, ExperimentalFeature.backgroundCallIntent),
+            listOf(ExperimentalFeature.callTray, ExperimentalFeature.floatingCall, ExperimentalFeature.livingOrb, ExperimentalFeature.serverVoice, ExperimentalFeature.backgroundCallIntent, ExperimentalFeature.voiceSessionDelegator),
             ExperimentalGroup.calls.features,
         )
         assertEquals(
             "Call Style writes the other two",
-            listOf(ExperimentalFeature.livingOrb, ExperimentalFeature.serverVoice, ExperimentalFeature.backgroundCallIntent),
+            listOf(ExperimentalFeature.livingOrb, ExperimentalFeature.serverVoice, ExperimentalFeature.backgroundCallIntent, ExperimentalFeature.voiceSessionDelegator),
             ExperimentalGroup.calls.toggles,
         )
         assertEquals(
