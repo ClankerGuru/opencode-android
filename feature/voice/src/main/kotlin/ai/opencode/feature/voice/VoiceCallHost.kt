@@ -40,7 +40,11 @@ class VoiceCallHost {
             launch(coordinator) { coordinator.start(apiKey, GeminiLiveSessionConfig.from(initial), gemini, audio) }
         } else when (initial.engine) {
             VoiceEngine.gptLive -> {
-                val coordinator = LiveCallCoordinator()
+                var timing = VoiceCallTiming.live
+                if (initial.unboundSpeechUsesInstructions) {
+                    timing = timing.copy(liveUnbackedClaimWait = VoiceCallTiming.sessionDelegatorUnbackedClaimWait)
+                }
+                val coordinator = LiveCallCoordinator(timing = timing)
                 launch(coordinator) { coordinator.start(apiKey, initial.liveSessionConfig(), live, audio) }
             }
             VoiceEngine.realtime, VoiceEngine.grok -> {
@@ -96,6 +100,10 @@ class VoiceCallHost {
     }
     suspend fun submitDelegatorInput(id: String, input: List<VoiceDelegator.InputItem>): Boolean = withContext(dispatcher) {
         (current as? LiveCallCoordinator)?.submitDelegatorInput(id, input) ?: false
+    }
+    suspend fun nextUserWords() {
+        val coordinator = withContext(dispatcher) { current as? LiveCallCoordinator }
+        if (coordinator != null) coordinator.nextUserWords() else VoiceCallClient.untilCancelled()
     }
     suspend fun updateDelegatorInstructions(instructions: String) = withContext(dispatcher) { (current as? LiveCallCoordinator)?.updateDelegatorInstructions(instructions); Unit }
     suspend fun end() = withContext(dispatcher) { startingAttemptID = null; pendingAtEar = null; endCurrent() }

@@ -96,7 +96,8 @@ internal fun HomeFeature.reduceSessionDetail(state: State, action: SessionFeatur
             val voiceAction = (action.action as? PresentationAction.Presented)?.action
             val delegate = (voiceAction as? VoiceFeature.Action.Delegate)?.action ?: return Reduced(state)
             return when (delegate) {
-                VoiceFeature.DelegateAction.CheckAPIKey -> Reduced(state.showingSettings())
+                // iOS opens Settings at the page (`showSettings(at:)`); the page is the drawer's to honour.
+                is VoiceFeature.DelegateAction.OpenVoiceSettings -> Reduced(state.showingSettings())
                 // The root owns the call even when it targets a pushed subagent.
                 is VoiceFeature.DelegateAction.PromptAdmitted ->
                     Reduced(state, forwardToSubagents(state, delegate.sessionID, SessionFeature.Action.VoicePromptAdmitted(delegate.sessionID)))
@@ -357,7 +358,8 @@ internal fun notifyVoiceExecutionEnded(state: State, sessionID: String): Reduced
         return Reduced(state.updatingDetail { it.copy(voice = voice.copy(replyWatch = voice.replyWatch.setSessionActive(sessionID, false))) })
     }
     val voiceWork = dependency(VoiceWorkClient)
-    val settle = Effect.run<Action> { voiceWork.noteSessionSettled(sessionID) }
+    val server = state.server
+    val settle = Effect.run<Action> { voiceWork.noteSessionSettled(server, sessionID) }
     val forward = Effect.send(Action.detail(SessionFeature.Action.voicePresented(VoiceFeature.Action.ReplyWatch(ReplyWatch.Event.SseExecutionEnded(sessionID)))))
     return Reduced(state, Effect.merge(settle, forward))
 }
@@ -369,7 +371,8 @@ internal fun notifyVoiceSnapshot(state: State, activeIDs: Set<String>): Reduced<
         return Reduced(state.updatingDetail { it.copy(voice = voice.copy(replyWatch = voice.replyWatch.copy(activeSessionIDs = activeIDs))) })
     }
     val voiceWork = dependency(VoiceWorkClient)
-    val settle = Effect.run<Action> { voiceWork.noteActiveSessions(activeIDs) }
+    val server = state.server
+    val settle = Effect.run<Action> { voiceWork.noteActiveSessions(server, activeIDs) }
     val forward = Effect.send(
         Action.detail(SessionFeature.Action.voicePresented(VoiceFeature.Action.ReplyWatch(ReplyWatch.Event.ActiveSessionsSnapshot(activeIDs, ReplyWatch.SettlementSource.snapshot)))),
     )

@@ -250,7 +250,10 @@ class VoiceSteeringInstructionsTests {
                     text.contains("react the way a friend on the phone would: quickly and naturally, to what the user just said") ||
                         text.contains("react once the way a friend on the phone would: quickly and naturally, to what the user just said"),
                 )
-                assertTrue("$engine", text.contains("It can mention the thing itself. Never use the same stock word or phrase twice in a row"))
+                // Victor (Oct 23): a rambled request needs its acknowledgement to say
+                // what was understood, as a statement, not a permission question.
+                assertTrue("$engine", text.contains("Name the specific thing you understood them to want, in your own words, so they hear how you read it; this matters most when they rambled or circled. Say it as what you're doing, never as a question or a request for permission. Never use the same stock word or phrase twice in a row"))
+                assertFalse("$engine", text.contains("It can mention the thing itself."))
                 assertTrue(
                     "$engine",
                     !text.contains("\"Checking.\"") && !text.contains("\"Opening.\"") &&
@@ -294,7 +297,24 @@ class VoiceSteeringInstructionsTests {
         // The attribution is described, never given as a sentence to repeat.
         assertFalse(VoiceHandoff.earlierRequestLead.contains("\""))
         assertFalse(VoiceHandoff.earlierRequestLead.contains("upload tests"))
-        assertEquals("This answers an earlier request; open by naming which request it was, then give the result. ", VoiceHandoff.earlierRequestLead)
+        assertEquals("This answers an earlier request, not what the user said last; open by saying it's about that earlier request and naming it, then give the result. ", VoiceHandoff.earlierRequestLead)
+        // From a call log: a wait for a session held the delegation open while
+        // the user asked six times whether it heard them.
+        assertTrue(delegator.contains("when a wait returns user_spoke, answer at once without waiting again"))
+        val wait = VoiceDelegator.tools.firstOrNull { it["name"] == JsonPrimitive("wait_for_session") }
+        val waitDescription = wait?.get("description")?.jsonPrimitive?.content ?: ""
+        assertTrue(waitDescription.contains("ending early if the user starts talking"))
+        // From a call log: steers stacked behind a question form, and the voice
+        // said a Slack draft was sent while it still waited for the user's OK.
+        assertTrue(delegator.contains("A session waiting on a permission or question takes no steering"))
+        assertTrue(delegator.contains("Never answer, grant, or dismiss a request the user didn't speak to."))
+        assertTrue(delegator.contains("A draft waiting for the user's OK hasn't been sent."))
+        assertTrue(description.contains("the result is not_sent with its pending requests"))
+        for (engine in VoiceEngine.entries) {
+            val text = VoiceInstructions.build(context, engine)
+            assertTrue("$engine", text.contains("Something is done (sent, posted, merged, deleted, approved) only when a result says it happened."))
+            assertTrue("$engine", text.contains("The user's OK on a draft (\"yes\", \"send it\") is a new request"))
+        }
     }
 
     /**
@@ -374,7 +394,7 @@ class VoiceSteeringInstructionsTests {
         for (engine in VoiceEngine.entries) {
             val text = VoiceInstructions.build(context, engine = engine)
             assertTrue(text.contains("Wait for a complete utterance."))
-            assertTrue(text.contains("If what you have is a fragment or unclear, say briefly that you didn't catch it and ask the user to finish or repeat once"))
+            assertTrue(text.contains("If a request meant for you is a fragment or unclear, say briefly that you didn't catch it and ask the user to finish or repeat once"))
             assertTrue(text.contains("never answer or delegate a speculative interpretation of a fragment"))
         }
     }

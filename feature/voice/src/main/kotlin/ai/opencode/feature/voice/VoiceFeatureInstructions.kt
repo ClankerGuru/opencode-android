@@ -61,7 +61,7 @@ internal fun retargetCall(state: VoiceFeature.State): Reduced<VoiceFeature.State
     }
     val sendsDelta = engine == VoiceEngine.gptLive || next.activeProvider == ServerVoiceProvider.geminiLive
     val target = next.target
-    var context = next.instructionsContext
+    var context = next.instructionsContext.copy(unpromptedMoveReason = if (next.unpromptedMove != null) next.moveReason else null)
     target.sessionID?.let { sessionID ->
         context = context.copy(status = if (sessionID in next.replyWatch.activeSessionIDs) "working" else "idle")
     }

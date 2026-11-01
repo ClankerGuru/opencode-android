@@ -18,6 +18,7 @@ import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.model.OpenCodeModelRef
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -75,13 +76,33 @@ class VoiceFeatureTestsScreen {
     @Test fun changingADraftCallsProjectKeepsTheConversation() = voiceTest { harness ->
         h = harness
         var voice = h.state { State(server, draftDirectory = "/project", model = null) }
+        val before = voice.placement.target
         voice = voice.copy(captions = listOf(State.Caption(id = "user-1", role = VoiceTranscriptTail.Role.user, text = "Check the tests")))
         val captured = voice.tail.capture()
         voice = voice.copy(tail = captured.tail, pendingWork = listOf(State.PendingWork(callID = "c1", capture = captured.capture)))
         voice = voice.moveDraft(directory = "/other")
         assertTrue(voice.target.directory == "/other" && voice.directoryName == "other")
+        assertNotEquals(before, voice.placement.target)
         assertEquals(1, voice.captions.size)
         assertEquals(listOf("c1"), voice.abandonedCallIDs)
+    }
+
+    /** The call's session moved folders (Move to): the same session, so the
+     *  call stays on it and only its folder follows. */
+    @Test fun aCallFollowsItsSessionToANewFolder() = voiceTest { harness ->
+        h = harness
+        var voice = h.state { State(server, session) }
+        val before = voice.placement
+        voice = voice.copy(startedTarget = voice.target)
+        voice = voice.copy(captions = listOf(State.Caption(id = "user-1", role = VoiceTranscriptTail.Role.user, text = "Check the tests")))
+        voice = voice.sessionMoved("ses_other", directory = "/elsewhere")
+        assertEquals(session.directory, voice.target.directory)
+        voice = voice.sessionMoved(session.id, directory = "/work/repo")
+        assertTrue(voice.target.sessionID == session.id && voice.target.directory == "/work/repo")
+        assertEquals(before, voice.placement)
+        assertEquals("/work/repo", voice.startedTarget?.directory)
+        assertEquals("repo", voice.directoryName)
+        assertEquals(1, voice.captions.size)
     }
 
     @Test fun aDraftCallCreatesItsSessionWithTheDraftsModel() = voiceTest {

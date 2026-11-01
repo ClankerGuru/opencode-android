@@ -44,7 +44,7 @@ class LiveCallCoordinator(
     internal var quietAppendsSending = 0
     private var apiKey = ""
     private var live: LiveClient? = null
-    private var config: LiveSessionConfig? = null
+    internal var config: LiveSessionConfig? = null
     private var nextEventNumber = 0
     private var isMuted = false
     private var muteKeepAliveTask: Job? = null
@@ -71,8 +71,20 @@ class LiveCallCoordinator(
     internal val openDelegations = mutableSetOf<String>()
     internal val delegatedAt = mutableMapOf<String, Duration>()
     internal var lastDelegatedAt: Duration? = null
+    /** When the user last said words, not just a tag ("[gasp"). */
     internal var lastUserWordsAt: Duration? = null
+    /** Delegator waits that end when the user next says words (`nextUserWords`). */
+    internal val userWordWaiters = mutableListOf<CompletableDeferred<Unit>>()
     internal var answerSpeech: AnswerSpeech? = null
+    /** The current run of the user's voice on the microphone: when it began
+     * and when it was last heard (`noteMicLevel`). */
+    internal var micVoiceStartedAt: Duration? = null
+    internal var micVoiceLastAt: Duration? = null
+    /** The user talked over the voice agent and its audio was stopped
+     * (`yieldIfUserTalksOver`): the rest of that speech is dropped until the
+     * stream goes quiet, with how long it has been quiet so far. */
+    internal var droppingAssistantSpeech = false
+    internal var droppedQuietMilliseconds = 0
     internal val orphanDelegations = mutableSetOf<String>()
     internal var lastDelegationCreatedAt: Duration? = null
     internal var unbackedClaimTask: Job? = null
@@ -119,6 +131,18 @@ class LiveCallCoordinator(
         entry.waiter = waiter
         try { waiter.await() }
         finally { if (entry.waiter === waiter) entry.waiter = null }
+    }
+    /** Returns when the user next says words (not just a tag), or once the
+     * caller is cancelled. GPT-Live takes no new turn while a delegation is
+     * open, so a delegator wait gives way to the user. */
+    suspend fun nextUserWords() {
+        val waiter = CompletableDeferred<Unit>()
+        serialized { userWordWaiters += waiter }
+        try { waiter.await() } finally { withContext(NonCancellable) { serialized { userWordWaiters.remove(waiter) } } }
+    }
+    internal fun resumeUserWordWaiters() {
+        val waiters = userWordWaiters.toList(); userWordWaiters.clear()
+        waiters.forEach { it.complete(Unit) }
     }
     suspend fun submitDelegatorInput(delegationID: String, input: List<VoiceDelegator.InputItem>): Boolean = serialized {
         val entry = serverDelegations[delegationID] ?: return@serialized false
@@ -168,6 +192,7 @@ class LiveCallCoordinator(
         if (delta?.startsWith(VoiceInstructions.retargetPrefix) == true) {
             if (!movedSinceInstructions) retargetImpl()
             movedSinceInstructions = false
+            dropHeldContext()
         }
         for (chunk in LiveContentChunker.chunks(delta ?: full)) {
             if (!running()) return@serialized
@@ -214,6 +239,7 @@ class LiveCallCoordinator(
         flushAcknowledgements()
         if (assistantAudioPlaying) noteAssistantSpeech(false)
         assistantAudioPlaying = false; speechAudioHangover = 0
+        droppingAssistantSpeech = false
         orphanDelegations += openDelegations; openDelegations.clear()
         serverDelegations.keys.toList().forEach { endServerDelegation(it, "The voice connection was replaced before that request finished.") }
     }
@@ -252,6 +278,7 @@ class LiveCallCoordinator(
         scheduleRotation(socket)
     }
     override suspend fun forwardCapture(chunk: ByteArray) {
+        if (timing.liveMicVoiceLevel > 0f && !isMuted && !finished) noteMicLevel(VoiceAudioLevels.rmsLevel(chunk))
         if (finished || active?.ready != true) return
         val started = clock.now(); uplinkSendStarted()
         try { connection?.send?.invoke(LiveCommand.AppendAudio(chunk)) }
@@ -281,6 +308,8 @@ class LiveCallCoordinator(
         const val claimLeadPrefix = "Result of the request you acknowledged with “"
         const val earlierConnectionLead = "Result of an earlier request you delegated: "
         const val speechHangoverMilliseconds = 300
+        val micVoiceGapTolerance = 250.milliseconds
+        const val droppedSpeechEndsAfterMilliseconds = 500
         const val seedHeader = "This voice call continues from an earlier connection; keep its context and carry on naturally without mentioning reconnecting. The turns that follow are what was said, for context only: never finish or repeat an earlier reply of yours, and when the user corrected you, the correction stands."
         fun endsSentence(text: String): Boolean = text.trim().lastOrNull()?.let { it in ".!?…\"”)" } ?: true
         fun hasWords(delta: String): Boolean {

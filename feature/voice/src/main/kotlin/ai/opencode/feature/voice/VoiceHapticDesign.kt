@@ -67,22 +67,38 @@ data class VoiceHapticPattern(
     companion object { const val maxCurvePoints = 16 }
 }
 
-/** Sound envelopes anchor audio haptics; scanner geometry anchors visual landings. */
+/**
+ * The voice call's haptics, designed to its sound cues and scanner timeline. Each cue's events
+ * are placed by measuring the bundled sound itself ([VoiceCueEnvelope] of the chosen pack's
+ * cue), offset by how long a buffer scheduled now takes to be heard (`audioDelay`). Events tied
+ * to the picture (a turnaround, a wavefront reaching a button) come from the scanner's own
+ * geometry, offset by [displayDelay].
+ */
 object VoiceHapticDesign {
     const val displayDelay = 0.025
     const val minimumGap = 0.06
-    private val envelopes by lazy { DotScopeSimulation.Cue.entries.associateWith { VoiceCueEnvelope(VoiceCallSynthesizer.samples(it)) } }
-    fun envelope(cue: DotScopeSimulation.Cue) = envelopes.getValue(cue)
+    private val envelopes = java.util.concurrent.ConcurrentHashMap<Pair<VoiceCallSoundPack, VoiceCallCue>, VoiceCueEnvelope>()
+    /** The envelope of [cue] in [pack] at Wisp's level, measured once. */
+    fun envelope(cue: VoiceCallCue, pack: VoiceCallSoundPack = VoiceCallSoundBank.pack): VoiceCueEnvelope =
+        envelopes.getOrPut(pack to cue) { VoiceCueEnvelope(VoiceCallSoundBank.rawSamples(cue, pack)) }
+    /** The turnaround ticks keep the old pings' notes: G4 on the right, D5 on the left. */
+    fun pitch(cue: DotScopeSimulation.Cue): Float = when (cue) {
+        DotScopeSimulation.Cue.sweepRight -> 392f
+        DotScopeSimulation.Cue.sweepLeft -> 587.33f
+        DotScopeSimulation.Cue.connected -> VoiceCallSoundBank.pack.rootHz
+        DotScopeSimulation.Cue.ended -> VoiceCallSoundBank.pack.rootHz * 2
+    }
     fun sharpness(forPitch: Float): Float {
         val low = 250f; val high = 1046.5f
         return 0.15f + 0.75f * log2(forPitch.coerceIn(low, high) / low) / log2(high / low)
     }
+    /** A crisp tick as the connecting beam turns around (under the connecting loop, when a cue scheduled then is heard), crisper on the left. */
     fun tick(cue: DotScopeSimulation.Cue, audioDelay: Double) = VoiceHapticPattern(events = listOf(
-        VoiceHapticPattern.Event(audioDelay + envelope(cue).onset, 0.5f, sharpness(VoiceCallSynthesizer.pitch(cue)))))
+        VoiceHapticPattern.Event(audioDelay, 0.5f, sharpness(pitch(cue)))))
     fun connect(audioDelay: Double, origin: Float, overshoot: Float = 0f, width: Float): VoiceHapticPattern {
-        val envelope = envelope(DotScopeSimulation.Cue.connected)
+        val envelope = envelope(VoiceCallCue.connect)
         val start = audioDelay + envelope.onset; val end = audioDelay + envelope.end
-        val events = mutableListOf(VoiceHapticPattern.Event(start, 0.6f, sharpness(VoiceCallSynthesizer.chordNotes[0])))
+        val events = mutableListOf(VoiceHapticPattern.Event(start, 0.6f, sharpness(pitch(DotScopeSimulation.Cue.connected))))
         val steps = VoiceHapticPattern.maxCurvePoints - 2
         val intensity = (0..steps).map { i -> val time = start + (end - start) * i / steps; VoiceHapticPattern.Point(time, sqrt(envelope.level(time - audioDelay))) } + VoiceHapticPattern.Point(end + 0.01, 0f)
         val sharpness = (0..6).map { i -> val p = i / 6f; VoiceHapticPattern.Point(displayDelay + DotScopeSimulation.Scan.bloomDuration * p, -0.2f + 0.45f * DotScopeSimulation.Scan.passPosition(p)) }
@@ -96,15 +112,17 @@ object VoiceHapticDesign {
         val arrival = displayDelay + DotScopeSimulation.Scan.endingArrival(drawn, origin, overshoot, width)
         return VoiceHapticPattern(events = listOf(VoiceHapticPattern.Event(arrival, 0.6f, 0.2f), VoiceHapticPattern.Event(arrival, 0.45f, 0.1f, 0.16, 0.14)))
     }
+    /** A soft rumble under the hang-up cue that fades with it and dulls as it falls, from an octave over the pack's root to its thump under it. */
     fun glide(audioDelay: Double): VoiceHapticPattern {
-        val envelope = envelope(DotScopeSimulation.Cue.ended); val start = audioDelay + envelope.onset; val end = audioDelay + envelope.end
-        val top = sharpness(VoiceCallSynthesizer.glideStart); val length = VoiceCallSynthesizer.glideDuration.toDouble()
-        val ratio = VoiceCallSynthesizer.glideEnd / VoiceCallSynthesizer.glideStart
+        val envelope = envelope(VoiceCallCue.hangUp); val start = audioDelay + envelope.onset; val end = audioDelay + envelope.end
+        val glideStart = pitch(DotScopeSimulation.Cue.ended); val glideEnd = VoiceCallSoundBank.pack.rootHz * 0.41f
+        val top = sharpness(glideStart); val length = max(0.01, end - start)
+        val ratio = glideEnd / glideStart
         val intensity = mutableListOf<VoiceHapticPattern.Point>(); val sharpness = mutableListOf<VoiceHapticPattern.Point>()
         for (i in 0..10) {
             val time = start + (end - start) * i / 10; val soundTime = time - audioDelay
             intensity.add(VoiceHapticPattern.Point(time, sqrt(envelope.level(soundTime))))
-            val pitch = VoiceCallSynthesizer.glideStart * ratio.pow(min(1.0, soundTime / length).toFloat())
+            val pitch = glideStart * ratio.pow(min(1.0, max(0.0, soundTime - envelope.onset) / length).toFloat())
             sharpness.add(VoiceHapticPattern.Point(time, 0.6f * (sharpness(pitch) - top)))
         }
         intensity.add(VoiceHapticPattern.Point(end + 0.01, 0f))
