@@ -98,10 +98,12 @@ literals that aren't symbols). `(fill)` is the filled variant. Weak matches: `st
 | `capsule` | `toggle_off` | `ms_toggle_off` | `SFSymbol.Capsule` | BackgroundWorkPanel, GlassMorphTrace, WhatsNewList |
 | `captions.bubble` | `closed_caption` | `ms_closed_caption` | `SFSymbol.CaptionsBubble` | FloatingCall |
 | `captions.bubble.fill` | `closed_caption` (fill) | `ms_closed_caption_fill` | `SFSymbol.CaptionsBubbleFill` | FloatingCall |
+| `character.cursor.ibeam` | `text_select_start` | `ms_text_select_start` | `SFSymbol.CharacterCursorIbeam` | WhatsNew/Entries |
 | `checklist` | `checklist` | `ms_checklist` | `SFSymbol.Checklist` | WhatsNewList |
 | `checkmark` | `check` | `ms_check` | `SFSymbol.Checkmark` | AppView, DraftProjects, ModelListContent, ModelPickerOverlays, ModelPickerSheet, OnboardingPlaygroundView, PastedTextViews, SessionView+ModelPicker, SettingsServers, SettingsView, ShareView, ShellOutputView, TraceTriggers, TranscriptEntryView, TuningPanelView, WhatsNewView |
 | `checkmark.circle` | `check_circle` | `ms_check_circle` | `SFSymbol.CheckmarkCircle` | LinkPreviewViews, OnboardingPlaygroundControls, WhatsNewList |
 | `checkmark.circle.fill` | `check_circle` (fill) | `ms_check_circle_fill` | `SFSymbol.CheckmarkCircleFill` | AppearanceSettingsView, RequestDockView, SettingsView, ShellOutputView, TraceTriggers |
+| `checkmark.seal` | `verified` | `ms_verified` | `SFSymbol.CheckmarkSeal` | WhatsNew/Entries |
 | `checkmark.square.fill` | `check_box` (fill) | `ms_check_box_fill` | `SFSymbol.CheckmarkSquareFill` | MarkdownBlockView, RequestDockView |
 | `chevron.backward` | `chevron_left` | `ms_chevron_left` | `SFSymbol.ChevronBackward` | AppView, BrowserView, CatchUpChrome, OnboardingPlaygroundView, SessionView, SettingsView, WhatsNewView |
 | `chevron.compact.left` | `chevron_left` | `ms_chevron_left` | `SFSymbol.ChevronCompactLeft` | TuningPanelView |
@@ -115,6 +117,7 @@ literals that aren't symbols). `(fill)` is the filled variant. Weak matches: `st
 | `circle` | `radio_button_unchecked` | `ms_radio_button_unchecked` | `SFSymbol.Circle` | ProjectIcon, RequestDockView |
 | `circle.dotted.circle` | `motion_photos_on` | `ms_motion_photos_on` | `SFSymbol.CircleDottedCircle` | WhatsNewList |
 | `circle.fill` | `circle` (fill) | `ms_circle_fill` | `SFSymbol.CircleFill` | DrawerListSessionCell, WhatsNewView |
+| `circle.hexagongrid` | `hive` | `ms_hive` | `SFSymbol.CircleHexagongrid` | WhatsNew/Entries |
 | `circle.hexagongrid.fill` | `hive` (fill) | `ms_hive_fill` | `SFSymbol.CircleHexagongridFill` | ExperimentalFeatures, ExperimentalSettingsView |
 | `clipboard` | `content_paste` | `ms_content_paste` | `SFSymbol.Clipboard` | ServerConnectView |
 | `clock` | `schedule` | `ms_schedule` | `SFSymbol.Clock` | WhatsNewList |
@@ -163,6 +166,7 @@ literals that aren't symbols). `(fill)` is the filled variant. Weak matches: `st
 | `hand.raised.fill` | `back_hand` (fill) | `ms_back_hand_fill` | `SFSymbol.HandRaisedFill` | CallTrayViews, RunErrorRow, ShellOutputView, WhatsNewList |
 | `hand.tap` | `touch_app` | `ms_touch_app` | `SFSymbol.HandTap` | WhatsNewList |
 | `hand.tap.fill` | `touch_app` (fill) | `ms_touch_app_fill` | `SFSymbol.HandTapFill` | TraceTriggers |
+| `hand.wave` | `waving_hand` | `ms_waving_hand` | `SFSymbol.HandWave` | WelcomePreviewExperiment, WhatsNew/Entries |
 | `hourglass` | `hourglass` | `ms_hourglass` | `SFSymbol.Hourglass` | WhatsNewList |
 | `info.circle` | `info` | `ms_info` | `SFSymbol.InfoCircle` | ServerTitleView, SessionView+Header, SettingsView |
 | `key` | `key` | `ms_key` | `SFSymbol.Key` | AgentFileReference, GeminiLiveClient, LinkPreview, ServerTitleView, TeamFeedback, VoiceDelegatorWorkspace, WhatsNewList |
@@ -198,6 +202,7 @@ literals that aren't symbols). `(fill)` is the filled variant. Weak matches: `st
 | `paintpalette` | `palette` | `ms_palette` | `SFSymbol.Paintpalette` | WhatsNewList |
 | `paintpalette.fill` | `palette` (fill) | `ms_palette_fill` | `SFSymbol.PaintpaletteFill` | SettingsView |
 | `paperclip` | `attach_file` | `ms_attach_file` | `SFSymbol.Paperclip` | TranscriptUserMessage |
+| `paperplane` | `send` | `ms_send` | `SFSymbol.Paperplane` | WhatsNew/Entries |
 | `pause.fill` | `pause` (fill) | `ms_pause_fill` | `SFSymbol.PauseFill` | CallTrayViews, FloatingCall, VoiceCallLogView |
 | `pencil` | `edit` | `ms_edit` | `SFSymbol.Pencil` | AppView, RunError, ServerTitleView, SessionView+Header, SettingsServers, TranscriptUserMessage |
 | `pencil.and.scribble` | `signature` | `ms_signature` | `SFSymbol.PencilAndScribble` | TraceTriggers |
@@ -207,6 +212,7 @@ literals that aren't symbols). `(fill)` is the filled variant. Weak matches: `st
 | `phone` | `call` | `ms_call` | `SFSymbol.Phone` | AgentImageGallery, AppView, ServerVoiceClient, WhatsNewList |
 | `phone.and.waveform.fill` | `phone_in_talk` (fill) | `ms_phone_in_talk_fill` | `SFSymbol.PhoneAndWaveformFill` | WhatsNewList |
 | `phone.circle.fill` | `call` (fill) | `ms_call_fill` | `SFSymbol.PhoneCircleFill` | ExperimentalFeatures |
+| `phone.connection` | `phone_in_talk` | `ms_phone_in_talk` | `SFSymbol.PhoneConnection` | WhatsNew/Entries |
 | `phone.down.fill` | `call_end` (fill) | `ms_call_end_fill` | `SFSymbol.PhoneDownFill` | CallTrayViews, FloatingCall, VoiceCallLiveActivity, VoiceView |
 | `phone.fill` | `call` (fill) | `ms_call_fill` | `SFSymbol.PhoneFill` | CallTrayViews, ExperimentalSettingsView, FloatingCall, SessionView+ComposerControls |
 | `photo` | `image` | `ms_image` | `SFSymbol.Photo` | AgentFileReference, AttachmentFileType, ExperimentalFeatures, TranscriptImageViewer, WhatsNewList |
@@ -218,6 +224,7 @@ literals that aren't symbols). `(fill)` is the filled variant. Weak matches: `st
 | `pin.fill` | `keep` (fill) | `ms_keep_fill` | `SFSymbol.PinFill` | DrawerStyle, SessionSheetView |
 | `pin.slash` | `keep_off` | `ms_keep_off` | `SFSymbol.PinSlash` | HomeView+Drawer, SessionView+Header |
 | `pip.enter` | `picture_in_picture_alt` | `ms_picture_in_picture_alt` | `SFSymbol.PipEnter` | AgentFileViewer (AVKit’s Picture in Picture button) |
+| `platter.filled.top.iphone` | `mobile_layout` | `ms_mobile_layout` | `SFSymbol.PlatterFilledTopIphone` | SessionLiveActivityExperiment, WhatsNew/Entries |
 | `play.fill` | `play_arrow` (fill) | `ms_play_arrow_fill` | `SFSymbol.PlayFill` | FileAttachmentViews, LinkPreviewViews, PlusPhotoSheet, RecentPhotoPeek, SettingsView, VoiceCallLogView |
 | `play.rectangle.on.rectangle` | `video_library` | `ms_video_library` | `SFSymbol.PlayRectangleOnRectangle` | DiagnosticsView |
 | `plus` | `add` | `ms_add` | `SFSymbol.Plus` | AppView, AttachmentPicker, FloatingCall, OpenCodeClient+Models, ServerTitleView, SessionSwitcher, ShareView, WhatsNewList |
@@ -245,6 +252,8 @@ literals that aren't symbols). `(fill)` is the filled variant. Weak matches: `st
 | `smallcircle.filled.circle` | `radio_button_checked` | `ms_radio_button_checked` | `SFSymbol.SmallcircleFilledCircle` | LinkPreviewViews |
 | `sparkles` | `auto_awesome` | `ms_auto_awesome` | `SFSymbol.Sparkles` | ModelSwitchRule, SettingsView, WhatsNewEntries, WhatsNewList |
 | `speaker.wave.1` | `volume_down` | `ms_volume_down` | `SFSymbol.SpeakerWave1` | WhatsNewList |
+| `speaker.wave.2` | `volume_up` | `ms_volume_up` | `SFSymbol.SpeakerWave2` | WhatsNew/Entries |
+| `speaker.wave.2.fill` | `volume_up` (fill) | `ms_volume_up_fill` | `SFSymbol.SpeakerWave2Fill` | SoundEffectsExperiment, WhatsNew/Entries |
 | `square` | `check_box_outline_blank` | `ms_check_box_outline_blank` | `SFSymbol.Square` | AgentImageGallery, MarkdownBlockView, ProjectIcon, RequestDockView |
 | `square.and.arrow.down` | `download` | `ms_download` | `SFSymbol.SquareAndArrowDown` | TranscriptImageViewer |
 | `square.and.arrow.up` | `share` | `ms_share` | `SFSymbol.SquareAndArrowUp` | AgentFileViewer, BrowserView, DiagnosticsView, LinkMenu, SessionSheetView, SessionView+Header, ShellOutputView, TranscriptImageViewer, VoiceCallLogView, WhatsNewList |
