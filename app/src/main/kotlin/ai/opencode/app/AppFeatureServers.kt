@@ -7,9 +7,6 @@ import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.feature.system.SessionDirectory
-import ai.opencode.feature.drawer.HomeFeature
-import ai.opencode.feature.settings.servers.ServerTitleFeature
-import ai.opencode.server.friendlyName
 import ai.opencode.feature.composer.ComposerPersistence
 import ai.opencode.feature.system.SystemIntegrationClient
 import ai.opencode.feature.system.notifications.AppIconBadgeClient
@@ -23,9 +20,7 @@ import ai.opencode.server.rememberName
 
 /*
  * Port of iOS `AppFeature+Servers.swift` and the server-list cases of `AppFeature.swift`
- * (`serverDeleted`, `forgetIdentity`, `selectServer`), including the Experimental Title Is the
- * Switch sheet's helpers (`serverTitleDelegate`, `serverTitleFailed`,
- * `cancelServerTitleConnection`, `openServerTitle`, `keepsHomeBehindSheet`).
+ * (`serverDeleted`, `forgetIdentity`, `selectServer`).
  */
 
 /** Renames a saved server in place, without reconnecting; Home takes the name too. */
@@ -39,17 +34,7 @@ internal fun renameServer(server: OpenCodeServer, name: String, state: AppFeatur
         next = next.copy(home = home.copy(connection = home.connection.copy(server = home.server.copy(name = renamed.name))))
     }
     renamed.rememberName()
-    val title = next.serverTitle ?: return next
-    var renamedTitle = title
-    if (title.current?.persistenceID == renamed.persistenceID) renamedTitle = renamedTitle.copy(current = renamed)
-    val detail = title.page as? ServerTitleFeature.Page.Detail
-    if (detail != null && detail.server.persistenceID == renamed.persistenceID) {
-        renamedTitle = renamedTitle.copy(
-            path = renamedTitle.path.dropLast(1) + ServerTitleFeature.Page.Detail(renamed),
-            nameDraft = renamed.friendlyName,
-        )
-    }
-    return next.copy(serverTitle = renamedTitle)
+    return next
 }
 
 internal fun AppFeature.selectServer(
@@ -77,95 +62,10 @@ internal fun beginNewServer(state: AppFeature.State): AppFeature.State {
     )
 }
 
-/** Leaving Home to pair. Behind the server sheet Home stays up until the new server's sessions load. */
+/** Leaving Home to pair. */
 internal fun leaveHome(state: AppFeature.State): AppFeature.State {
-    state.keepingHomeBehindSheet(switchingTo = null)?.let { return it }
     val current = state.homeServer ?: return state.withoutHome()
     return state.copy(returnServer = current).withoutHome()
-}
-
-/**
- * The server sheet over Home (iOS `keepsHomeBehindSheet(switchingTo:)`): an attempt from it keeps
- * Home until it succeeds, returning the state with Home showing the switch, or null when Home
- * doesn't stay. A call or dictation still ends Home first, as a switch from the drawer does.
- */
-internal fun AppFeature.State.keepingHomeBehindSheet(switchingTo: OpenCodeServer?): AppFeature.State? {
-    val home = home
-    if (serverTitle == null || home == null || home.hasLiveCallOrRecording) return null
-    if (switchingTo != null && switchingTo.persistenceID != home.server.persistenceID) return showingSwitch(switchingTo)
-    return this
-}
-
-/** With no Home the sheet opens on Connect; on first run, with no servers, Connect is all it shows. */
-internal fun openServerTitle(state: AppFeature.State): AppFeature.State =
-    state.copy(serverTitle = ServerTitleFeature.State.opening(state.homeServer, hasHome = state.home != null))
-
-internal fun AppFeature.serverTitleDelegate(
-    delegate: ServerTitleFeature.Delegate,
-    state: AppFeature.State,
-): Reduced<AppFeature.State, AppFeature.Action> = when (delegate) {
-    ServerTitleFeature.Delegate.Close -> cancelServerTitleConnection(state.copy(serverTitle = null))
-    is ServerTitleFeature.Delegate.Select -> {
-        val home = state.home
-        when {
-            home == null -> Reduced(state, Effect.send(AppFeature.Action.ServerTapped(delegate.server)))
-            // Already in use: there's nothing to switch to, so the sheet mustn't wait on it.
-            home.server.persistenceID == delegate.server.persistenceID ->
-                Reduced(state.copy(serverTitle = state.serverTitle?.copy(busy = false)))
-            else -> Reduced(
-                state,
-                Effect.send(AppFeature.Action.Home(HomeFeature.Action.Delegate(HomeFeature.DelegateAction.ServerSwitchTapped(delegate.server)))),
-            )
-        }
-    }
-    is ServerTitleFeature.Delegate.Reconnect ->
-        if (state.home == null) Reduced(state) else Reduced(state, Effect.send(AppFeature.Action.Home(HomeFeature.Action.RetryConnectionTapped)))
-    is ServerTitleFeature.Delegate.Pair -> Reduced(state, Effect.send(AppFeature.Action.PairingCodeScanned(delegate.text)))
-    is ServerTitleFeature.Delegate.Connect ->
-        Reduced(state.copy(editingSavedServer = null).load(delegate.server), Effect.send(AppFeature.Action.ConnectButtonTapped))
-    is ServerTitleFeature.Delegate.Rename -> Reduced(
-        state,
-        Effect.send(AppFeature.Action.Home(HomeFeature.Action.Delegate(HomeFeature.DelegateAction.ServerRenamed(delegate.server, delegate.name)))),
-    )
-    is ServerTitleFeature.Delegate.Remove -> Reduced(state, Effect.send(AppFeature.Action.ServerDeleted(delegate.server)))
-}
-
-/**
- * Shows a failed attempt in the server sheet (iOS `serverTitleFailed`). `handled` is true when
- * Home was behind the sheet: then Home and the saved server stay exactly as they were, and only a
- * successful switch replaces them.
- */
-internal data class ServerTitleFailure(val state: AppFeature.State, val handled: Boolean)
-
-internal fun serverTitleFailed(message: String, state: AppFeature.State): ServerTitleFailure {
-    val title = state.serverTitle ?: return ServerTitleFailure(state, false)
-    var next = state.copy(serverTitle = title.copy(busy = false, error = message, failureRevision = title.failureRevision + 1))
-    dependency(HapticsClient).play(Haptic.error)
-    val home = next.home ?: return ServerTitleFailure(next, false)
-    val current = home.server
-    next = next.copy(
-        home = home.copy(switchingTo = null),
-        connection = AppFeature.State.Connection.Connected,
-        connectionAttempt = null,
-        editingSavedServer = null,
-        returnServer = null,
-    ).load(current)
-    // Health may have saved the new server before its sessions failed to load.
-    if (next.savedServer.value != current) next.savedServer.set(current)
-    return ServerTitleFailure(next, true)
-}
-
-internal fun cancelServerTitleConnection(state: AppFeature.State): Reduced<AppFeature.State, AppFeature.Action> {
-    var next = state
-    val home = next.home
-    if (home != null) {
-        val current = home.server
-        next = next.copy(home = home.copy(switchingTo = null), returnServer = null).load(current)
-        // Health may have succeeded before the Home read was cancelled. Relaunch must still
-        // restore the server the person is looking at.
-        if (next.savedServer.value != current) next.savedServer.set(current)
-    }
-    return cancelConnection(next, if (next.home == null) AppFeature.State.Connection.Picking else AppFeature.State.Connection.Connected)
 }
 
 /** An empty or wrong clipboard is an ordinary mistake: say so beside Paste, not in an error report. */

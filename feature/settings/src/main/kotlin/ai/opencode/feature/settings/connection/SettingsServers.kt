@@ -11,7 +11,6 @@ import ai.opencode.feature.settings.SettingsDivider
 import ai.opencode.feature.settings.SettingsFeature.SettingsDelegate
 import ai.opencode.feature.settings.SettingsRowFrame
 import ai.opencode.feature.settings.SettingsSection
-import ai.opencode.feature.settings.servers.localizedStandardCompare
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.ServerSharedKeys
 import ai.opencode.server.friendlyName
@@ -289,4 +288,40 @@ private fun AddServerRow(send: (SettingsDelegate) -> Unit) {
             )
         }
     }
+}
+
+/**
+ * Foundation's `localizedStandardCompare`: case- and diacritic-insensitive, numbers compared by value
+ * (“Mac 2” before “Mac 10”). (Was in the removed `servers/ServerTitleFeature.kt`; the drawer's
+ * server menu keeps its own copy.)
+ */
+private fun localizedStandardCompare(a: String, b: String): Int {
+    val collator = java.text.Collator.getInstance().apply { strength = java.text.Collator.PRIMARY }
+    val left = chunks(a)
+    val right = chunks(b)
+    for (i in 0 until minOf(left.size, right.size)) {
+        val x = left[i]
+        val y = right[i]
+        val result = if (x.first().isDigit() && y.first().isDigit()) {
+            x.trimStart('0').length.compareTo(y.trimStart('0').length).takeIf { it != 0 } ?: x.trimStart('0').compareTo(y.trimStart('0'))
+        } else {
+            collator.compare(x, y)
+        }
+        if (result != 0) return result
+    }
+    return left.size.compareTo(right.size)
+}
+
+private fun chunks(text: String): List<String> {
+    val out = ArrayList<String>()
+    val current = StringBuilder()
+    for (c in text) {
+        if (current.isNotEmpty() && current.last().isDigit() != c.isDigit()) {
+            out += current.toString()
+            current.clear()
+        }
+        current.append(c)
+    }
+    if (current.isNotEmpty()) out += current.toString()
+    return out
 }
