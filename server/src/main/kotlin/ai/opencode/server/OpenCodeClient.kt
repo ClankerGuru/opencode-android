@@ -243,6 +243,14 @@ data class OpenCodeClient(
         fun markdownImageKey(server: OpenCodeServer, directory: String?, source: String): String =
             markdownImageCacheKey(server, directory, source).removePrefix("markdown:")
 
+        /**
+         * iOS `OpenCodeClient.pairNotificationPreview(server:callbackURL:ref:publicKey:)`: sends
+         * this phone's notification public key for `ref` to the saved server's HTTPS address
+         * and returns the server's. Only public keys cross; throws without an HTTPS address.
+         */
+        suspend fun pairNotificationPreview(server: OpenCodeServer, callbackURL: String, ref: String, publicKey: String): String =
+            ai.opencode.server.live.requestPairNotificationPreview(server, callbackURL, ref, publicKey)
+
         /** iOS `OpenCodeClient.assistantReply(messagesJSON:afterMessageID:acrossSteers:)`: a prompt's reply in a `/message` page. */
         fun assistantReply(messagesJSON: ByteArray, afterMessageID: String, acrossSteers: Boolean = false): String? =
             ai.opencode.server.live.assistantReply(messagesJSON, afterMessageID, acrossSteers)
