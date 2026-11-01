@@ -152,17 +152,12 @@ class WhatsNewTests {
         }
     }
 
-    /**
-     * The added IDs are one per line in WhatsNewAddedIDs.kt: a merge that kept a line twice, or
-     * kept an ID whose entry is gone, fails here.
-     */
     @Test
-    fun addedIDsAreUniqueAndEachNamesAnEntry() {
-        val ids = WhatsNewAddedIDs.addedSinceSplit
-        val repeated = ids.groupBy { it }.filter { it.value.size > 1 }.keys.sorted()
-        assertTrue("Listed more than once: $repeated", repeated.isEmpty())
+    fun splitDayAdditionsEachNameAnEntry() {
         val all = WhatsNewEntry.all.map { it.id }.toSet()
-        assertTrue("No entry with this ID: ${ids.filter { it !in all }}", ids.none { it !in all })
+        val missing = (addedOnSplitDay - all).sorted()
+        assertTrue("No entry with this ID: $missing", missing.isEmpty())
+        assertTrue(addedOnSplitDay.intersect(previousIDs).isEmpty())
     }
 
     /**
@@ -173,7 +168,7 @@ class WhatsNewTests {
     fun seenIDsCarryOverFromTheEntriesBeforeTheSplit() {
         val shared = SettingsTestShared()
         // Entries shipped after the split: new to everyone, not carried over.
-        val added = WhatsNewAddedIDs.addedSinceSplit.toSet()
+        val added = addedSinceSplit.toSet()
         val addedFeatures = WhatsNewEntry.features.filter { it.id in added }.map { it.id }
         val shipped = WhatsNewEntry.all.map { it.id }.toSet() - added
         assertTrue("Every entry keeps an ID people may already have seen: ${shipped - previousIDs}", previousIDs.containsAll(shipped))
@@ -245,8 +240,8 @@ class WhatsNewTests {
     @Test
     fun openPushesItsSettingsPageOverTheEntrysPage() = runTest {
         val pages = listOf(
-            WhatsNewEntry.SettingsDestination.Themes, WhatsNewEntry.SettingsDestination.Composer, WhatsNewEntry.SettingsDestination.Voice,
-            WhatsNewEntry.SettingsDestination.Notifications, WhatsNewEntry.SettingsDestination.Servers, WhatsNewEntry.SettingsDestination.Advanced,
+            WhatsNewEntry.SettingsDestination.Themes, WhatsNewEntry.SettingsDestination.Sessions, WhatsNewEntry.SettingsDestination.Voice,
+            WhatsNewEntry.SettingsDestination.Notifications, WhatsNewEntry.SettingsDestination.Servers, WhatsNewEntry.SettingsDestination.Experimental,
             WhatsNewEntry.SettingsDestination.Experiment("living-orb"), WhatsNewEntry.SettingsDestination.Developer,
         )
         val entryPages = mapOf("a" to SettingsPage.WhatsNewDetail("a"), "fix" to SettingsPage.WhatsNewSmallerChanges)
@@ -321,7 +316,7 @@ class WhatsNewTests {
             assertTrue(entry.title.isNotEmpty() && entry.summary.isNotEmpty())
             val text = (listOf(entry.title, entry.summary, entry.example ?: "") + entry.details).joinToString(" ")
             for (stale in listOf(
-                "Advanced settings", "Experimental settings", "Settings → Experimental", "Settings → Diagnostics",
+                "Advanced settings", "Settings → Advanced", "Settings › Advanced", "Settings → Diagnostics",
                 "Settings → Change", "Phone Reports", "Voice Mode", "Messages theme", "Rendering Theme",
                 "Transcript Rhythm",
             )) {
@@ -341,7 +336,8 @@ class WhatsNewTests {
             val destination = entry.destination
             if (destination is WhatsNewEntry.Destination.Open && destination.page is WhatsNewEntry.SettingsDestination.Experiment) {
                 val id = (destination.page as WhatsNewEntry.SettingsDestination.Experiment).id
-                assertTrue("${entry.id} opens an experiment that exists", ExperimentalFeature.entries.any { it.rawValue == id })
+                assertTrue("${entry.id} opens an experiment that exists", ExperimentalFeature.fromRawValue(id) != null)
+                assertTrue("${entry.id} opens its graduated setting's own page", ExperimentalFeature.fromRawValue(id)?.isGraduated != true)
             }
             if (destination is WhatsNewEntry.Destination.Prompt) {
                 assertTrue("${entry.id} types a prompt", destination.text.isNotEmpty())
@@ -351,6 +347,16 @@ class WhatsNewTests {
     }
 
     companion object {
+        /** The entries shipped after the split: every day after it, plus the few added on the split day itself. */
+        val addedSinceSplit: List<String>
+            get() = WhatsNewEntry.all
+                .filter { it.id in addedOnSplitDay || WhatsNewDay(it.day, emptyList()).id > "2026-10-12" }
+                .map { it.id }
+
+        val addedOnSplitDay: Set<String> = setOf(
+            "whats-new-page", "transcript-day-stamps", "catch-up-returns-to-drawer", "rich-link-previews",
+        )
+
         /**
          * Every ID What’s New listed before features and smaller changes, as of anomaly/main
          * 275b42b3. Seen state is stored by these IDs.

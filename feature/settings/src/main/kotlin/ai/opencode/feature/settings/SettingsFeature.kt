@@ -365,11 +365,11 @@ class SettingsFeature : Reducer<SettingsFeature.State, SettingsFeature.Action> {
 /** The Settings page a What's New action opens (iOS `WhatsNewSettingsPage`). */
 fun WhatsNewEntry.SettingsDestination.settingsPage(): SettingsPage = when (this) {
     WhatsNewEntry.SettingsDestination.Themes -> SettingsPage.Themes
-    WhatsNewEntry.SettingsDestination.Composer -> SettingsPage.Composer
+    WhatsNewEntry.SettingsDestination.Sessions -> SettingsPage.Composer
     WhatsNewEntry.SettingsDestination.Voice -> SettingsPage.Voice
     WhatsNewEntry.SettingsDestination.Notifications -> SettingsPage.Notifications
     WhatsNewEntry.SettingsDestination.Servers -> SettingsPage.Server
-    WhatsNewEntry.SettingsDestination.Advanced -> SettingsPage.Advanced()
+    WhatsNewEntry.SettingsDestination.Experimental -> SettingsPage.Advanced()
     is WhatsNewEntry.SettingsDestination.Experiment -> SettingsPage.Advanced(focus = id)
     WhatsNewEntry.SettingsDestination.Developer -> SettingsPage.Developer
 }

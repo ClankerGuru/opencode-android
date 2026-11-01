@@ -73,157 +73,156 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 | `OpenCode/Settings/VoiceKeySource.swift` | 53 | `feature/voice/.../VoiceRoute.kt` (`VoiceKeySource`), `feature/settings/.../VoiceKeySource.kt` (`VoiceKeyStatus`) | done | `VoiceKeySource` moved down to `:feature:voice` (`VoiceRoute.keySource` returns it) |
 | `OpenCode/Settings/VoiceProviderPage.swift` | 249 |  | todo |  |
 | `OpenCode/Settings/VoiceServerPicker.swift` | 67 | `feature/settings/.../VoiceServerPicker.kt` | sync: done | state extensions (`connectedServer`, `broker`, `voiceServerOptions`, `voiceServerSelection`, `keySource`, `voiceServerValue`), `checkVoiceServers` (`ServerVoiceClient.models`), `ServerVoiceRows`; “This iPhone” → “This Phone” |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-06-01-voice-messages.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-07-01-attachment-menu-hold.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-08-01-voice-webrtc-weak-connection.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-08-02-mute-sessions.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-08-03-pair-from-anywhere.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-08-04-drawer-peek.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-08-05-dictation-keeps-going.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-08-06-siri-shortcuts-spotlight.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-09-01-working-orb.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-09-02-shell-glyph.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-09-03-math-and-diagrams.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-09-04-always-notify.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-09-05-server-switcher.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-10-01-share-opened-files.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-10-02-call-voice.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-10-03-drawer-one-edge.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-11-01-paste-as-a-card.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-11-02-ride-out-drops.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-11-03-new-session-recent-projects.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-11-04-stop-runs-your-steer.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-01-browser-push-in.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-02-answer-from-the-bar.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-03-new-messages-divider.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-04-model-list-and-level-meter.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-05-run-error-line.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-06-transcript-keyboard-space.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-07-share-sheet-sends.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-08-app-icon-badge.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-09-drawer-keeps-keyboard.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-10-whats-new-page.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-11-catch-up-returns-to-drawer.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-12-transcript-day-stamps.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-13-rich-link-previews.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-13-01-rolling-numbers.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-13-02-grouped-steering.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-13-03-inline-tool-rows.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-13-04-mac-motion-playgrounds.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-13-05-catch-up-flicks.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-14-01-settings-grouped-by-purpose.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-14-02-send-ats-recovery.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-14-03-keyboard-menus-and-header.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-14-04-open-links-in-apps.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-14-05-session-list-quiet-hierarchy.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-14-06-queued-messages-fitted-sheet.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-14-07-control-center-sessions.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-15-01-settings-keyboard-down.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-15-02-session-list-sidebar-grey.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-15-03-voice-varied-acknowledgements.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-15-04-smoother-streaming.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-15-05-model-list-sheet.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-15-06-queued-pill-whole-title.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-16-01-plus-menu-photo-sheet.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-16-02-composer-large-text-targets.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-16-03-project-pick-haptic.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-16-04-fork-opens-copy.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-16-05-transcript-row-targets.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-16-06-image-previews.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-16-07-connection-error-details.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-16-08-outage-reconnect-delay.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-17-01-every-running-subagent.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-17-02-session-view-refined-standard.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-17-03-bottom-follow-on-load.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-17-04-drafts-stay-put.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-18-01-themes.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-18-02-return-key-sends.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-18-03-quote-replies.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-18-04-launch-bloom.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-18-05-drag-to-pin.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-19-01-call-tray-colour-blend.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-19-02-optical-insets.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-19-03-smart-dictation-audio.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-19-04-interrupted-hand.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-19-05-autocomplete-fast-scroll.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-19-06-experimental-groups.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-19-07-model-picker-standard-sheet.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-19-08-problem-reports-reach-session.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-19-09-team-scrawl-feedback.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-19-10-scrawl-faster-start.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-01-call-tray-docks-in-drawer.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-02-markdown-streams-smoothly.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-03-server-voice-experiment.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-04-return-newline-default.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-05-drawer-session-alignment.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-06-call-tray-switch-continuity.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-07-voice-delegation-visible-on-admission.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-08-inline-image-links.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-09-smooth-link-preview-arrival.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-10-subagent-capsule-press.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-11-advanced-settings-open.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-12-revert-to-here.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-13-drag-from-transcript.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-14-tuning-glass-tap-targets.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-15-new-session-project-continuity.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-16-simple-session-loading.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-17-voice-route-consistency.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-18-call-tray-edge-continuity.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-01-call-tray-keyboard-return.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-02-drawer-title-fade.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-03-call-sounds-from-the-tap.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-04-calm-wireframe-launch.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-05-request-dictation-last-line.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-06-first-run-pairing-fixes.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-07-welcome-pairing-copy.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-08-session-id-links.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-09-uikit-drawer-experiment.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-10-ipad-multiple-windows.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-11-plain-launch.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-12-breath-ping-call-sounds.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-13-smoother-session-list.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-22-01-whats-new-actions.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-22-02-project-icons-current-discovery.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-22-03-new-divider-off-page.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-22-04-catch-up-all-caught-up-row.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-23-01-session-mentions.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-23-02-gpt-live-own-key.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-23-03-pair-opens-drawer.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-23-04-voice-server-picker.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-24-01-living-orb-floats.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-24-02-new-messages-divider-on.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-24-03-composer-keyboard-morph.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-24-04-composer-photo-viewer.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-24-05-plus-menu-photo-picker.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-24-06-project-icons-lit.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-24-07-session-live-activity.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-24-08-sign-in-failed-edit-server.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-25-01-voice-app-screenshot.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-25-02-voice-background-results.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-25-03-sound-effects-experiment.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-26-01-settings-sessions-page.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-26-02-project-icons-default.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-26-03-plus-menu-over-keyboard.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-26-04-living-orb-connect-motion.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-26-05-living-orb-presets.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-26-06-send-after-a-pause.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-27-01-steadier-round-trip.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-27-02-drawer-drag-follows-finger.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-27-03-inbox-sidebar-experiment.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-28-01-first-pairing-ready-session.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-28-01-voice-provider-page.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-28-02-welcome-preview.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-29-01-composer-text-selection.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-30-01-voice-waits-for-you.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-30-02-wisp-call-sounds.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-30-03-wisp-orb.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-31-01-encrypted-notification-previews.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-31-02-move-session-folder-gone.swift` | 3 |  | todo |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-31-03-notification-plugin-setup.swift` | 3 |  | todo |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-06-01-voice-messages.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-06-01-voice-messages.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-07-01-attachment-menu-hold.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-07-01-attachment-menu-hold.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-08-01-voice-webrtc-weak-connection.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-08-01-voice-webrtc-weak-connection.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-08-02-mute-sessions.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-08-02-mute-sessions.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-08-03-pair-from-anywhere.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-08-03-pair-from-anywhere.kt` | done | Android copy: “on your phone” |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-08-04-drawer-peek.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-08-04-drawer-peek.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-08-05-dictation-keeps-going.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-08-05-dictation-keeps-going.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-08-06-siri-shortcuts-spotlight.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-08-06-siri-shortcuts-spotlight.kt` | done | Android copy: Google Assistant App Actions, app shortcuts, Quick Settings |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-09-01-working-orb.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-09-01-working-orb.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-09-02-shell-glyph.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-09-02-shell-glyph.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-09-03-math-and-diagrams.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-09-03-math-and-diagrams.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-09-04-always-notify.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-09-04-always-notify.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-09-05-server-switcher.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-09-05-server-switcher.kt` | done | Android copy: “this phone” |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-10-01-share-opened-files.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-10-01-share-opened-files.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-10-02-call-voice.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-10-02-call-voice.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-10-03-drawer-one-edge.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-10-03-drawer-one-edge.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-11-01-paste-as-a-card.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-11-01-paste-as-a-card.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-11-02-ride-out-drops.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-11-02-ride-out-drops.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-11-03-new-session-recent-projects.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-11-03-new-session-recent-projects.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-11-04-stop-runs-your-steer.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-11-04-stop-runs-your-steer.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-01-browser-push-in.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-12-01-browser-push-in.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-02-answer-from-the-bar.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-12-02-answer-from-the-bar.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-03-new-messages-divider.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-12-03-new-messages-divider.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-04-model-list-and-level-meter.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-12-04-model-list-and-level-meter.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-05-run-error-line.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-12-05-run-error-line.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-06-transcript-keyboard-space.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-12-06-transcript-keyboard-space.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-07-share-sheet-sends.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-12-07-share-sheet-sends.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-08-app-icon-badge.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-12-08-app-icon-badge.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-09-drawer-keeps-keyboard.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-12-09-drawer-keeps-keyboard.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-10-whats-new-page.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-12-10-whats-new-page.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-11-catch-up-returns-to-drawer.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-12-11-catch-up-returns-to-drawer.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-12-transcript-day-stamps.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-12-12-transcript-day-stamps.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-12-13-rich-link-previews.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-12-13-rich-link-previews.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-13-01-rolling-numbers.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-13-01-rolling-numbers.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-13-02-grouped-steering.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-13-02-grouped-steering.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-13-03-inline-tool-rows.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-13-03-inline-tool-rows.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-13-04-mac-motion-playgrounds.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-13-04-mac-motion-playgrounds.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-13-05-catch-up-flicks.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-13-05-catch-up-flicks.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-14-01-settings-grouped-by-purpose.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-14-01-settings-grouped-by-purpose.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-14-02-send-ats-recovery.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-14-02-send-ats-recovery.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-14-03-keyboard-menus-and-header.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-14-03-keyboard-menus-and-header.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-14-04-open-links-in-apps.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-14-04-open-links-in-apps.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-14-05-session-list-quiet-hierarchy.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-14-05-session-list-quiet-hierarchy.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-14-06-queued-messages-fitted-sheet.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-14-06-queued-messages-fitted-sheet.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-14-07-control-center-sessions.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-14-07-control-center-sessions.kt` | done | Android copy: Quick Settings tiles |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-15-01-settings-keyboard-down.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-15-01-settings-keyboard-down.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-15-02-session-list-sidebar-grey.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-15-02-session-list-sidebar-grey.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-15-03-voice-varied-acknowledgements.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-15-03-voice-varied-acknowledgements.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-15-04-smoother-streaming.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-15-04-smoother-streaming.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-15-05-model-list-sheet.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-15-05-model-list-sheet.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-15-06-queued-pill-whole-title.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-15-06-queued-pill-whole-title.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-16-01-plus-menu-photo-sheet.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-16-01-plus-menu-photo-sheet.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-16-02-composer-large-text-targets.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-16-02-composer-large-text-targets.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-16-03-project-pick-haptic.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-16-03-project-pick-haptic.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-16-04-fork-opens-copy.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-16-04-fork-opens-copy.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-16-05-transcript-row-targets.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-16-05-transcript-row-targets.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-16-06-image-previews.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-16-06-image-previews.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-16-07-connection-error-details.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-16-07-connection-error-details.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-16-08-outage-reconnect-delay.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-16-08-outage-reconnect-delay.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-17-01-every-running-subagent.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-17-01-every-running-subagent.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-17-02-session-view-refined-standard.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-17-02-session-view-refined-standard.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-17-03-bottom-follow-on-load.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-17-03-bottom-follow-on-load.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-17-04-drafts-stay-put.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-17-04-drafts-stay-put.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-18-01-themes.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-18-01-themes.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-18-02-return-key-sends.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-18-02-return-key-sends.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-18-03-quote-replies.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-18-03-quote-replies.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-18-04-launch-bloom.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-18-04-launch-bloom.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-18-05-drag-to-pin.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-18-05-drag-to-pin.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-19-01-call-tray-colour-blend.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-19-01-call-tray-colour-blend.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-19-02-optical-insets.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-19-02-optical-insets.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-19-03-smart-dictation-audio.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-19-03-smart-dictation-audio.kt` | done | Android copy: “your phone” |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-19-04-interrupted-hand.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-19-04-interrupted-hand.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-19-05-autocomplete-fast-scroll.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-19-05-autocomplete-fast-scroll.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-19-06-experimental-groups.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-19-06-experimental-groups.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-19-07-model-picker-standard-sheet.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-19-07-model-picker-standard-sheet.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-19-08-problem-reports-reach-session.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-19-08-problem-reports-reach-session.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-19-09-team-scrawl-feedback.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-19-09-team-scrawl-feedback.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-19-10-scrawl-faster-start.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-19-10-scrawl-faster-start.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-01-call-tray-docks-in-drawer.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-01-call-tray-docks-in-drawer.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-02-markdown-streams-smoothly.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-02-markdown-streams-smoothly.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-03-server-voice-experiment.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-03-server-voice-experiment.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-04-return-newline-default.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-04-return-newline-default.kt` | done | Android copy: Ctrl+Enter instead of ⌘Return |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-05-drawer-session-alignment.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-05-drawer-session-alignment.kt` | done | Android copy: phones and tablets |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-06-call-tray-switch-continuity.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-06-call-tray-switch-continuity.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-07-voice-delegation-visible-on-admission.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-07-voice-delegation-visible-on-admission.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-08-inline-image-links.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-08-inline-image-links.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-09-smooth-link-preview-arrival.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-09-smooth-link-preview-arrival.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-10-subagent-capsule-press.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-10-subagent-capsule-press.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-11-advanced-settings-open.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-11-advanced-settings-open.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-12-revert-to-here.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-12-revert-to-here.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-13-drag-from-transcript.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-13-drag-from-transcript.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-14-tuning-glass-tap-targets.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-14-tuning-glass-tap-targets.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-15-new-session-project-continuity.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-15-new-session-project-continuity.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-16-simple-session-loading.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-16-simple-session-loading.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-17-voice-route-consistency.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-17-voice-route-consistency.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-18-call-tray-edge-continuity.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-18-call-tray-edge-continuity.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-01-call-tray-keyboard-return.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-21-01-call-tray-keyboard-return.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-02-drawer-title-fade.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-21-02-drawer-title-fade.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-03-call-sounds-from-the-tap.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-21-03-call-sounds-from-the-tap.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-04-calm-wireframe-launch.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-21-04-calm-wireframe-launch.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-05-request-dictation-last-line.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-21-05-request-dictation-last-line.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-06-first-run-pairing-fixes.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-21-06-first-run-pairing-fixes.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-07-welcome-pairing-copy.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-21-07-welcome-pairing-copy.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-08-session-id-links.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-21-08-session-id-links.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-09-uikit-drawer-experiment.swift` | 3 | – | n/a: the UIKit drawer A/B is an iOS-only experiment (no experiment row on Android) |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-10-ipad-multiple-windows.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-21-10-ipad-multiple-windows.kt` | done | Android copy: “Multiple Windows on Tablets” |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-11-plain-launch.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-21-11-plain-launch.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-12-breath-ping-call-sounds.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-21-12-breath-ping-call-sounds.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-21-13-smoother-session-list.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-21-13-smoother-session-list.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-22-01-whats-new-actions.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-22-01-whats-new-actions.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-22-02-project-icons-current-discovery.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-22-02-project-icons-current-discovery.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-22-03-new-divider-off-page.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-22-03-new-divider-off-page.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-22-04-catch-up-all-caught-up-row.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-22-04-catch-up-all-caught-up-row.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-23-01-session-mentions.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-23-01-session-mentions.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-23-02-gpt-live-own-key.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-23-02-gpt-live-own-key.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-23-03-pair-opens-drawer.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-23-03-pair-opens-drawer.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-23-04-voice-server-picker.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-23-04-voice-server-picker.kt` | done | Android copy: “on this phone” |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-24-01-living-orb-floats.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-24-01-living-orb-floats.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-24-02-new-messages-divider-on.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-24-02-new-messages-divider-on.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-24-03-composer-keyboard-morph.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-24-03-composer-keyboard-morph.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-24-04-composer-photo-viewer.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-24-04-composer-photo-viewer.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-24-05-plus-menu-photo-picker.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-24-05-plus-menu-photo-picker.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-24-06-project-icons-lit.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-24-06-project-icons-lit.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-24-07-session-live-activity.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-24-07-session-live-activity.kt` | done | Android copy: a notification (on the Lock Screen too) for the Lock Screen and Dynamic Island |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-24-08-sign-in-failed-edit-server.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-24-08-sign-in-failed-edit-server.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-25-01-voice-app-screenshot.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-25-01-voice-app-screenshot.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-25-02-voice-background-results.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-25-02-voice-background-results.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-25-03-sound-effects-experiment.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-25-03-sound-effects-experiment.kt` | done | Android copy: “Silent and vibrate modes mute them” for the silent switch |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-26-01-settings-sessions-page.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-26-01-settings-sessions-page.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-26-02-project-icons-default.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-26-02-project-icons-default.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-26-03-plus-menu-over-keyboard.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-26-03-plus-menu-over-keyboard.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-26-04-living-orb-connect-motion.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-26-04-living-orb-connect-motion.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-26-05-living-orb-presets.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-26-05-living-orb-presets.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-26-06-send-after-a-pause.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-26-06-send-after-a-pause.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-27-01-steadier-round-trip.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-27-01-steadier-round-trip.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-27-02-drawer-drag-follows-finger.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-27-02-drawer-drag-follows-finger.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-27-03-inbox-sidebar-experiment.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-27-03-inbox-sidebar-experiment.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-28-01-first-pairing-ready-session.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-28-01-first-pairing-ready-session.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-28-01-voice-provider-page.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-28-01-voice-provider-page.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-28-02-welcome-preview.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-28-02-welcome-preview.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-29-01-composer-text-selection.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-29-01-composer-text-selection.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-30-01-voice-waits-for-you.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-30-01-voice-waits-for-you.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-30-02-wisp-call-sounds.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-30-02-wisp-call-sounds.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-30-03-wisp-orb.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-30-03-wisp-orb.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-31-01-encrypted-notification-previews.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-31-01-encrypted-notification-previews.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-31-02-move-session-folder-gone.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-31-02-move-session-folder-gone.kt` | done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-31-03-notification-plugin-setup.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-31-03-notification-plugin-setup.kt` | done |  |
 | `OpenCode/Settings/WhatsNew/WhatsNewActions.swift` | 84 | `feature/settings/.../whatsnew/WhatsNewActions.kt` | sync: done | voice availability is `:feature:voice`'s `VoiceRoutePreferences.isAvailable(server)` |
-| `OpenCode/Settings/WhatsNew/WhatsNewEntries.swift` | 154 | `feature/settings/.../whatsnew/WhatsNewEntries.kt` | sync: done |  |
+| `OpenCode/Settings/WhatsNew/WhatsNewEntries.swift` | 154 | `feature/settings/.../whatsnew/WhatsNewEntries.kt`, `feature/settings/.../whatsnew/entries/WhatsNewShippedList.kt` | done | `SettingsDestination` `Sessions`/`Experimental`/`Developer` (302b95e7, 372255a6). `object WhatsNewShipped` with one `internal val WhatsNewShipped.<name>` per file in `whatsnew/entries/` (same `<day>-<NN>-<id>` stems); iOS generates `WhatsNewEntry.all` at build time (`scripts/registries.py`), Android keeps `whatsNewShippedEntries` by hand in file-name order, newest first. Android-only entry: `entries/2026-10-25-90-session-title-first-prompt.kt` (the title fallback; iOS has it in its draft PR `feat/session-title-fallback`). Every entry is verbatim except the Android copy noted on its row; `uikit-drawer-experiment` is left out |
 | `OpenCode/Settings/WhatsNew/WhatsNewFeature.swift` | 166 | `feature/settings/.../whatsnew/WhatsNewFeature.kt` | done | `settingsPage` folds into Settings' stack; `WhatsNewAcrossHomes` is ported in `:app` (`AppFeatureWhatsNew.kt`, applied as `keepingWhatsNewAcrossHomes()`; see app.md); lab launch state n/a (no XCUITest lab env on Android) |
-| `OpenCode/Settings/WhatsNew/WhatsNewList.swift` | 131 | `feature/settings/.../whatsnew/WhatsNewList.kt` | removed in 3f425e0c: done | 118 of 119 entries; `uikit-drawer-experiment` dropped (iOS UIKit drawer A/B); `ipad-multiple-windows` → “Multiple Windows on Tablets” (iPad → tablet). iOS-only copy reworded for Android: `control-center-sessions` (Quick Settings tiles), `siri-shortcuts-spotlight` (App Actions and app shortcuts; no Spotlight detail), `return-newline-default` (Ctrl+Enter), iPhone/iPad → phone/tablets in `voice-server-picker`, `drawer-session-alignment`, `smart-dictation-audio`, `server-switcher`, `pair-from-anywhere`; every other entry verbatim. `session-title-first-prompt` is Android-first (the title fallback; iOS has it in its draft PR `feat/session-title-fallback`) |
 | `OpenCode/Settings/WhatsNew/WhatsNewView.swift` | 553 | `feature/settings/.../whatsnew/WhatsNewView.kt` | done | the entry page's bar title fades in over 0.15 s ease-out once its own title scrolls under the bar (`SettingsPageScaffold(titleVisible)`); button hint is TalkBack's click label |
 
 Also here: `HomeSettingsFeature.kt` (iOS `Drawer/HomeSettingsFeature.swift`, moved down; see drawer.md): every action but `developerModeChanged`/`motionWatchChanged`/`touchProbeChanged`/`voiceDemoModeChanged` (iOS sends them from `DiagnosticsView`; Android's `:devtools` `DevToolsFeature` owns Developer Mode and Demo Call Audio, Motion Watch and Touch Probe are iOS-only) and the Tuning mirrors of `plusMenuSheet`/`composerAutocomplete` (the composer reads the keys). Settings-owned Android extras: `SettingsPresentation.kt` is the overlay Home wraps itself in.
@@ -244,10 +243,9 @@ left to that module's port ("skipped"); "dropped" tests can't exist on Android.
 | `OnboardingPlaygroundFeatureTests.swift` | `onboarding/OnboardingPlaygroundFeatureTests.kt` | 10 | – | – (Close: Android's view dismisses, so the test checks no effect keeps running instead of counting `dismiss`) |
 | `PlaygroundFixtureTests.swift` | – | 0 | – | all 7: `PlaygroundFixtureEngine` presets/replays/session host and `TuningFeature`'s playground selection are n/a on Android (devtools.md: Session Lab and `session-lab.py` checkpoints replace the in-app fixture playgrounds) |
 | `ServerDetailsTests.swift` | `serverdetails/ServerDetailsTests.kt` | 11 | `decodesEveryMCPStatus`, `decodesCredentialAndEnvironmentAccounts`, `onlyMCPConnectIsRetriedWhenUnsent` (`:server` internal payloads / `mcpConnectionIdempotency`) | – |
-| `WhatsNewTests.swift` (`WhatsNewTests`) | `whatsnew/WhatsNewTests.kt` | 14 (3 are the Settings halves of Home tests: `homePushes…`, `readingItInSettings…`, `openPushes…`, against `SettingsFeature`, where Android keeps the page) | `tryItTypesAPrompt…`, `closingSettingsWithoutWhatsNew…`, `closingWhatsNewDropsItsSettingsPage`, `tryItTypesThePrompt…OnThisServer…`, `tryItKeepsTheOpenDrafts…`, `tryItAgain…`, `tryItTwice…`, `tryItKeepsASavedDrafts…` (`:feature:drawer`) | – |
+| `WhatsNewTests.swift` (`WhatsNewTests`) | `whatsnew/WhatsNewTests.kt` | 14 (`splitDayAdditionsEachNameAnEntry` replaces `addedIDsAreUnique…`, with `addedSinceSplit` computed from `all` as iOS 7b9c7346 does; 3 are the Settings halves of Home tests: `homePushes…`, `readingItInSettings…`, `openPushes…`, against `SettingsFeature`, where Android keeps the page) | `tryItTypesAPrompt…`, `closingSettingsWithoutWhatsNew…`, `closingWhatsNewDropsItsSettingsPage`, `tryItTypesThePrompt…OnThisServer…`, `tryItKeepsTheOpenDrafts…`, `tryItAgain…`, `tryItTwice…`, `tryItKeepsASavedDrafts…` (`:feature:drawer`) | – |
 | `WhatsNewTests.swift` (`WhatsNewTryItTests`) | `whatsnew/WhatsNewTests.kt` (`WhatsNewTryItTests`) | 3 (Settings halves of `aNewSessionWhileOffline…`, `aCallBeforeVoiceIsSetUp…`; `settingsAskedForOverWhatsNew…`) | 4 `modelList…` (`:feature:drawer`), `whatsNewSurvivesAHomeReplacement` (`:app`, ported there) | – |
 | `WhatsNewTests.swift` (`WhatsNewDotSymbolTests`) | `whatsnew/WhatsNewTests.kt` (`WhatsNewDotSymbolTests`, Robolectric) | 1 (`DotField` over the `plus` Material Symbol drawable, native graphics with the module's resources; `DotField` is `internal`, was `private`) | – | – |
-| `WhatsNewAddedIDs.swift` | `whatsnew/WhatsNewAddedIDs.kt` | data | – | `uikit-drawer-experiment` left out (its entry isn't on Android's list) |
 | `ModelVisibilityTests.swift` | `ModelVisibilityTests.kt` | 4 (Settings › Models, against `ModelVisibilityFeature`) | 6 Rules (`:server`, ported there), 5 Pickers (`:feature:session`) | – |
 | `ServerQuietStyleTests.swift` | `servers/ServerQuietStyleTests.kt` | 2 | – | `markIntroWindsBack…`, `markFrontOnIs…`: `ServerMarkGeometry` (the wireframe mark, unused on iOS) isn't ported |
 | `ConnectionHealthTests.swift` | `connection/ConnectionHealthTests.kt` | 28 | `routes`, `routesClassifyParsedAddressesNotSpellings` (`ConnectionRoute`, `reachabilityRank`, `isLoopback` live in `:server`) | – (the probe test answers through an OkHttp interceptor; its `NetworkRetry.policy == .once` check can't be observed on OkHttp's dispatcher thread) |
