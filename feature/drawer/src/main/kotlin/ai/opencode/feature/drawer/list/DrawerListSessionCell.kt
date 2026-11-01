@@ -96,7 +96,7 @@ class DrawerListRowActions(
     val menu: () -> List<DrawerRowMenuItem>,
     /** The held finger moved: start the pin drag at this list `y` (dp). */
     val beginDrag: (fingerY: Float) -> Unit,
-    val moveDrag: (fingerY: Float) -> Unit,
+    val moveDrag: (fingerY: Float, uptimeMillis: Long) -> Unit,
     /** The finger lifted at this list point (dp); [cancelled] when its stream was taken away. */
     val endDrag: (fingerX: Float, fingerY: Float, cancelled: Boolean) -> Unit,
     /** The row left the list mid-drag (iOS `Coordinator.dismantle`). */
@@ -204,6 +204,10 @@ fun DrawerListSessionCell(
             .fillMaxWidth()
             .graphicsLayer {
                 translationY = pinDrag.translation(key) * density.density
+                // The dragged row grows as it lifts (iOS `DrawerLiftedRowView.apply(lift:)`).
+                val grow = if (row.isLifted) 1f + (DrawerTunables.pinLiftScale - 1f) * pinDrag.liftProgress else 1f
+                scaleX = grow
+                scaleY = grow
                 compositingStrategy = if (masking) CompositingStrategy.Offscreen else CompositingStrategy.Auto
             }
             .drawWithContent {
@@ -254,7 +258,7 @@ fun DrawerListSessionCell(
                         pressed = { currentActions.pressed() },
                         menu = { currentActions.menu() },
                         beginDrag = { currentActions.beginDrag(it.y) },
-                        moveDrag = { currentActions.moveDrag(it.y) },
+                        moveDrag = { point, time -> currentActions.moveDrag(point.y, time) },
                         endDrag = { point, cancelled -> currentActions.endDrag(point.x, point.y, cancelled) },
                         lifted = { currentActions.lifted(it) },
                     ),

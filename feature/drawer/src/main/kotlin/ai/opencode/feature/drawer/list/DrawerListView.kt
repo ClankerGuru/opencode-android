@@ -58,11 +58,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -144,6 +147,7 @@ fun DrawerListView(
 ) {
     remember { DrawerListPerfProbe.mountStarted(); true }
     val density = LocalDensity.current
+    val windowInfo = LocalWindowInfo.current
     val scope = rememberCoroutineScope()
     val frameDuration = rememberFrameDurationSeconds()
     val currentActions by rememberUpdatedState(actions)
@@ -257,6 +261,23 @@ fun DrawerListView(
             override val width: Float get() = (listCoordinates[0]?.size?.width ?: 0) / density.density
 
             override val viewportTop: Float get() = -listState.layoutInfo.viewportStartOffset / density.density
+
+            override val height: Float get() = (listCoordinates[0]?.size?.height ?: 0) / density.density
+
+            override val headerBottom: Float
+                get() = max(listState.layoutInfo.beforeContentPadding / density.density - DrawerTunables.topGap.value, 0f)
+
+            override val footerTop: Float
+                get() = height - listState.layoutInfo.afterContentPadding / density.density
+
+            override val window: Rect
+                get() {
+                    val origin = listCoordinates[0]?.takeIf { it.isAttached }?.positionInWindow() ?: return super.window
+                    val size = windowInfo.containerSize
+                    return Rect(-origin.x, -origin.y, size.width - origin.x, size.height - origin.y).let {
+                        Rect(it.left / density.density, it.top / density.density, it.right / density.density, it.bottom / density.density)
+                    }
+                }
 
             override fun flushNow() {
                 homeState.value = store.state
@@ -440,7 +461,7 @@ private fun rowActions(
         pressed = { store.send(HomeFeature.Action.DrawerRowPressed(id)) },
         menu = { holder.model.rows[id]?.let { actions().menu(it) }.orEmpty() },
         beginDrag = { y -> beginPinDrag(id, y) },
-        moveDrag = { y -> pinDrag.updateDrag(y) },
+        moveDrag = { y, time -> pinDrag.updateDrag(y, time) },
         endDrag = { x, y, cancelled ->
             if (cancelled) {
                 pinDrag.cancelDrag(deferLiftedClear = true)

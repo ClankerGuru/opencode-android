@@ -280,11 +280,18 @@ object DrawerTunables {
     /** Project icon size. */
     val projectIconSize: Dp = 20.dp
     /** Project icon corner radius (at a 20 dp tile; scales with the tile). */
-    val projectIconCornerRadius: Dp = 5.dp
+    val projectIconCornerRadius: Dp = 5.5.dp
     /** Project icon to title. */
     val projectIconGap: Dp = 9.dp
-    /** Project icon border opacity. */
-    const val projectIconBorderOpacity: Float = 0.85f
+    /**
+     * The tile's lighting (iOS D-137 Lit Glass Edge, a0fc7375): a highlight from the top,
+     * a 0.5 dp white edge fading toward the bottom, a contact shadow.
+     */
+    const val projectIconHighlight: Float = 0.3f
+    /** Project icon edge. */
+    const val projectIconEdgeOpacity: Float = 0.6f
+    /** Project icon shadow. */
+    const val projectIconShadow: Float = 1f
     /**
      * A long title fades out over its last [titleFade] dp instead of an ellipsis, ending at
      * the row's trailing inset, or [statusGap] before a status indicator.
@@ -302,6 +309,15 @@ object DrawerTunables {
     const val revealFadeIn: Double = 0.2
     /** Pin drag spring. */
     val pinDragSpring: MotionSpring = MotionSpring(duration = 0.42, bounce = 0.0)
+    /**
+     * The dragged row (iOS `DrawerLiftedRow`): it grows by [pinLiftScale] as it lifts on
+     * [pinLiftSpring], then springs from the finger's release into its slot on [pinDropSpring].
+     */
+    val pinLiftSpring: MotionSpring = MotionSpring(duration = 0.28, bounce = 0.1)
+    /** Dragged row grow. */
+    const val pinLiftScale: Float = 1.03f
+    /** Dragged row landing. */
+    val pinDropSpring: MotionSpring = MotionSpring(duration = 0.36, bounce = 0.12)
     /** Held row. */
     val holdStyle: DrawerHoldStyle = DrawerHoldStyle.InPlace
     /**

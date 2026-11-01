@@ -67,7 +67,7 @@ class DrawerRowInteraction(
     /** The held finger moved: the drag begins at [fingerInList] (dp, the list's coordinates). */
     val beginDrag: ((fingerInList: Offset) -> Unit)? = null,
     /** The finger moved while dragging (dp, the list's coordinates). */
-    val moveDrag: (fingerInList: Offset) -> Unit = {},
+    val moveDrag: (fingerInList: Offset, uptimeMillis: Long) -> Unit = { _, _ -> },
     /** The finger lifted ([cancelled] when the stream was taken away). */
     val endDrag: (fingerInList: Offset, cancelled: Boolean) -> Unit = { _, _ -> },
     val lifted: (String?) -> Unit = {},
@@ -166,7 +166,7 @@ fun Modifier.drawerRowInteraction(
                         current.endDrag(toList(change.position), false)
                         return@awaitEachGesture
                     }
-                    current.moveDrag(toList(change.position))
+                    current.moveDrag(toList(change.position), change.uptimeMillis)
                     continue
                 }
                 // The hold owns the finger now: neither the list nor the drawer takes it.

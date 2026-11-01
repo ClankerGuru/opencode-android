@@ -37,6 +37,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import kotlin.math.ceil
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
@@ -200,8 +210,10 @@ fun DrawerListProjectTile(
 /**
  * The [side]-square project tile leading a drawer row (iOS `DrawerListProjectTile`, OC-419):
  * the project's [icon] (full-bleed, or padded on a neutral backing) or its initial on its
- * palette colour, a top sheen and a hairline inner border. An arriving icon cross-fades in
- * over 0.18 s (cut under reduce motion). Decorative: hidden from TalkBack.
+ * palette colour, lit (iOS a0fc7375/d7aea740, OC-578): a highlight from the top, a 0.5 dp
+ * white edge fading toward the bottom ([ProjectTileLighting]) and a soft contact shadow.
+ * High contrast text swaps the edge for a solid 1 dp palette border. An arriving icon
+ * cross-fades in over 0.18 s (cut under reduce motion). Decorative: hidden from TalkBack.
  */
 @Composable
 fun DrawerListProjectTile(
@@ -215,14 +227,16 @@ fun DrawerListProjectTile(
 ) {
     val dark = OpenCodeTheme.colors.isDark
     val palette = remember(project.icon?.color, dark) { ProjectAvatarPalette.resolve(project.icon?.color, dark) }
-    val radius = DrawerTunables.projectIconCornerRadius * (side / 20.dp)
+    val k = side / 20.dp
+    val radius = DrawerTunables.projectIconCornerRadius * k
     val shape = RoundedCornerShape(radius)
-    val borderWidth = if (increasedContrast) 1.dp else 0.5.dp
-    val borderColor = palette.border.copy(alpha = if (increasedContrast) 1f else DrawerTunables.projectIconBorderOpacity)
+    // Shadows read less on black, so dark mode deepens them.
+    val depth = DrawerTunables.projectIconShadow * (if (dark) 1.5f else 1f)
     Box(
         modifier
             .size(side)
             .graphicsLayer { alpha = if (muted) 0.65f else 1f }
+            .projectTileShadow(radius, k, depth)
             .clip(shape)
             .clearAndSetSemantics {},
     ) {
@@ -245,20 +259,21 @@ fun DrawerListProjectTile(
                         contentScale = if (shown.backing == ProjectIcon.Backing.FullBleed) ContentScale.Crop else ContentScale.Fit,
                         modifier = Modifier.fillMaxSize().padding(inset),
                     )
-                    TileSheen(top = 0.12f)
+                    // Images carry their own detail, so they take a softer highlight.
+                    ProjectTileLighting(radius, DrawerTunables.projectIconHighlight * 0.6f, if (increasedContrast) 0f else DrawerTunables.projectIconEdgeOpacity)
                 }
             } else {
                 Box(Modifier.fillMaxSize().background(palette.background), contentAlignment = Alignment.Center) {
                     TileInitial(project.initial, palette.foreground, side)
-                    TileSheen(top = 0.16f)
+                    ProjectTileLighting(radius, DrawerTunables.projectIconHighlight, if (increasedContrast) 0f else DrawerTunables.projectIconEdgeOpacity)
                 }
             }
         }
-        Canvas(Modifier.matchParentSize()) {
-            val width = borderWidth.toPx()
+        if (increasedContrast) Canvas(Modifier.matchParentSize()) {
+            val width = 1.dp.toPx()
             val r = max(radius.toPx() - width / 2, 0f)
             drawRoundRect(
-                color = borderColor,
+                color = palette.border,
                 topLeft = Offset(width / 2, width / 2),
                 size = Size(size.width - width, size.height - width),
                 cornerRadius = CornerRadius(r, r),
@@ -289,12 +304,92 @@ private fun TileInitial(initial: String, color: Color, side: Dp) {
 }
 
 @Composable
-private fun TileSheen(top: Float) {
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = top), Color.White.copy(alpha = 0f)))),
+private fun ProjectTileLighting(radius: Dp, highlight: Float, edgeOpacity: Float) {
+    if (highlight <= 0f && edgeOpacity <= 0f) return
+    val density = LocalDensity.current.density
+    Spacer(
+        Modifier.fillMaxSize().drawWithCache {
+            val key = ProjectTileLighting.Key(size.width / density, radius.value, density, highlight, edgeOpacity)
+            val image = ProjectTileLighting.image(key)
+            onDrawBehind {
+                if (image != null) drawImage(image, dstSize = IntSize(size.width.roundToInt(), size.height.roundToInt()))
+            }
+        },
     )
+}
+
+/**
+ * The project tile's light (iOS `ProjectTileLighting`), drawn once per size and look: white
+ * over the palette, so every tile shares it. A highlight centred just above the top edge,
+ * wider than tall, and a 0.5 dp inner edge, bright at the top and fading 85 % toward the bottom.
+ */
+object ProjectTileLighting {
+    /** [side] and [radius] in dp; [scale] is pixels per dp. */
+    data class Key(val side: Float, val radius: Float, val scale: Float, val highlight: Float, val edgeOpacity: Float)
+
+    private val cache = HashMap<Key, ImageBitmap>()
+
+    fun image(key: Key): ImageBitmap? {
+        if (key.side <= 0f || (key.highlight <= 0f && key.edgeOpacity <= 0f)) return null
+        synchronized(cache) { cache[key]?.let { return it } }
+        val side = key.side
+        val pixels = ceil(side * key.scale).toInt().coerceAtLeast(1)
+        val bitmap = android.graphics.Bitmap.createBitmap(pixels, pixels, android.graphics.Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(bitmap)
+        canvas.scale(key.scale, key.scale)
+        val white = { alpha: Float -> android.graphics.Color.argb((alpha.coerceIn(0f, 1f) * 255).roundToInt(), 255, 255, 255) }
+        canvas.clipPath(android.graphics.Path().apply { addRoundRect(0f, 0f, side, side, key.radius, key.radius, android.graphics.Path.Direction.CW) })
+        val h = key.highlight
+        if (h > 0f) {
+            val rx = side * 1.3f
+            val ry = side * 0.75f
+            val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                shader = android.graphics.RadialGradient(
+                    0f, 0f, rx, intArrayOf(white(h), white(h * 0.42f), white(0f)), floatArrayOf(0f, 0.42f, 0.72f),
+                    android.graphics.Shader.TileMode.CLAMP,
+                )
+            }
+            canvas.save()
+            canvas.translate(side / 2, -0.12f * side)
+            canvas.scale(1f, ry / rx)
+            canvas.drawCircle(0f, 0f, rx, paint)
+            canvas.restore()
+        }
+        val a = key.edgeOpacity
+        if (a > 0f) {
+            val width = 0.5f
+            val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                style = android.graphics.Paint.Style.STROKE
+                strokeWidth = width
+                shader = android.graphics.LinearGradient(0f, 0f, 0f, side, white(a), white(a * 0.15f), android.graphics.Shader.TileMode.CLAMP)
+            }
+            val r = max(key.radius - width / 2, 0f)
+            canvas.drawRoundRect(width / 2, width / 2, side - width / 2, side - width / 2, r, r, paint)
+        }
+        val image = bitmap.asImageBitmap()
+        synchronized(cache) {
+            if (cache.size > 32) cache.clear()
+            cache[key] = image
+        }
+        return image
+    }
+}
+
+/**
+ * The tile's contact shadow (iOS `contactShadow`/`ambientShadow`): 0.5 dp down with a 0.5 dp
+ * blur at 30 %, and 1.5 dp down with a 1.75 dp blur at 14 %, both × [depth], scaled with the
+ * tile ([k]). Drawn behind the clipped surface, so it spills past the tile's edge.
+ */
+private fun Modifier.projectTileShadow(radius: Dp, k: Float, depth: Float): Modifier = if (depth <= 0f) this else drawBehind {
+    val r = radius.toPx()
+    drawIntoCanvas { canvas ->
+        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.TRANSPARENT }
+        for ((dy, blur, opacity) in listOf(Triple(0.5f, 0.5f, 0.3f), Triple(1.5f, 1.75f, 0.14f))) {
+            val alpha = (opacity * depth).coerceAtMost(1f)
+            paint.setShadowLayer((blur * k).dp.toPx(), 0f, (dy * k).dp.toPx(), Color.Black.copy(alpha = alpha).toArgb())
+            canvas.nativeCanvas.drawRoundRect(0f, 0f, size.width, size.height, r, r, paint)
+        }
+    }
 }
 
 /** Writing-direction helpers for [DrawerListTitleView]. */
