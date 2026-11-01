@@ -143,12 +143,14 @@ fun ComposerMorphPhotoSheet(
     /** iOS `backFromPhotoSheet`: folds onto the menu's surface, which (and whose rows) come back as it lands. */
     fun back() {
         if (!morph.isOpening) return
-        library.clearPicks()
-        library.resetClosingPicks()
+        // The picks are dropped, but their badges stay until the sheet has folded away.
+        library.setAsidePicks()
         foldsToComposer = false
         camera.expanded = false
         landsOn = if (source == Rect.Zero) null else source
-        morph.fold(ComposerMorphTunables.animation(opening = false, reduceMotion = reduceMotion), reduceMotion = reduceMotion)
+        val back = if (detent.isExpanded) ComposerMorphTunables.photoBackExpanded else ComposerMorphTunables.photoBack
+        val animation: FiniteAnimationSpec<Float> = if (reduceMotion) tween(200, easing = Motion.EaseInOut) else back.spec()
+        morph.fold(animation, reduceMotion = reduceMotion)
     }
 
     /** iOS `closePhotoSheet` / `foldPhotoSheet`: slides down and fades out while the composer rises back. */
@@ -163,7 +165,8 @@ fun ComposerMorphPhotoSheet(
             morph.dragTo(0f)
         }
         foldsToComposer = true
-        landsOn = null
+        // The sheet scales into the + and fades, keeping its content sharp.
+        landsOn = anchors.seed.takeIf { it != Rect.Zero }
         camera.expanded = false
         val animation: FiniteAnimationSpec<Float> = if (reduceMotion) tween(200, easing = Motion.EaseInOut) else ComposerMorphTunables.photoReturn.spec()
         morph.fold(animation, reduceMotion = reduceMotion)
@@ -271,6 +274,9 @@ fun ComposerMorphPhotoSheet(
         outgoingReturns = menuOpen && !foldsToComposer,
         continuousGlass = true,
         dismissesDown = foldsToComposer,
+        keyboardStaysAsItFolds = true,
+        translatesDownward = detent.dragOriginExpanded == false,
+        seed = anchors.seed,
         retainsContent = true,
     ) {
         PlusPhotoSheetContent(
