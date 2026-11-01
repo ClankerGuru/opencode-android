@@ -140,6 +140,7 @@ literals that aren't symbols). `(fill)` is the filled variant. Weak matches: `st
 | `envelope.badge.fill` | `mark_email_unread` (fill) | `ms_mark_email_unread_fill` | `SFSymbol.EnvelopeBadgeFill` | SessionSheetView |
 | `envelope.open` | `drafts` | `ms_drafts` | `SFSymbol.EnvelopeOpen` | DrawerListSupportCells, HomeView+Drawer, SessionSheetView, SessionView+Header |
 | `exclamationmark.bubble` | `feedback` | `ms_feedback` | `SFSymbol.ExclamationmarkBubble` | SessionView+Header, WhatsNewList |
+| `exclamationmark.circle` | `error` | `ms_error` | `SFSymbol.ExclamationmarkCircle` | ServerFlowTitle (ServerMenuStatus) |
 | `exclamationmark.circle.fill` | `error` (fill) | `ms_error_fill` | `SFSymbol.ExclamationmarkCircleFill` | RequestDockView, ServerDetailsView, SettingsView, TranscriptEntryView, TranscriptUserMessage |
 | `exclamationmark.triangle` | `warning` | `ms_warning` | `SFSymbol.ExclamationmarkTriangle` | AgentFileViewer, DraftProjects, DrawerListSupportCells, FileAttachmentViews, ModelListContent, ModelPickerSheet, ModelVisibilitySettings, OnboardingPlaygroundControls, ServerDetailsView, SessionView, SessionView+ModelPicker, SettingsServers |
 | `exclamationmark.triangle.fill` | `warning` (fill) | `ms_warning_fill` | `SFSymbol.ExclamationmarkTriangleFill` | AppView, SessionView+Composer, TraceTriggers, VoiceView |
@@ -167,6 +168,7 @@ literals that aren't symbols). `(fill)` is the filled variant. Weak matches: `st
 | `hourglass` | `hourglass` | `ms_hourglass` | `SFSymbol.Hourglass` | WhatsNewList |
 | `info.circle` | `info` | `ms_info` | `SFSymbol.InfoCircle` | ServerTitleView, SessionView+Header, SettingsView |
 | `key` | `key` | `ms_key` | `SFSymbol.Key` | AgentFileReference, GeminiLiveClient, LinkPreview, ServerTitleView, TeamFeedback, VoiceDelegatorWorkspace, WhatsNewList |
+| `key.fill` | `key` (fill) | `ms_key_fill` | `SFSymbol.KeyFill` | ServerConnectionPill, DrawerServerNoteRow |
 | `keyboard` | `keyboard` | `ms_keyboard` | `SFSymbol.Keyboard` | MotionAudit, SettingsServers, TranscriptListViewController+ScrollFollow, TranscriptListViewController+Tracing, TranscriptScrollTrace, WhatsNewList |
 | `keyboard.chevron.compact.down` | `keyboard_hide` | `ms_keyboard_hide` | `SFSymbol.KeyboardChevronCompactDown` | WhatsNewList |
 | `keyboard.fill` | `keyboard` (fill) | `ms_keyboard_fill` | `SFSymbol.KeyboardFill` | SettingsView |

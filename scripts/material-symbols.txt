@@ -81,6 +81,7 @@ draw                                # hand.draw
 draw fill                           # hand.draw.fill
 edit                                # pencil
 edit_square                         # square.and.pencil
+error                               # exclamationmark.circle
 error fill                          # exclamationmark.circle.fill
 explore                             # safari
 feedback                            # exclamationmark.bubble
@@ -115,6 +116,7 @@ keep                                # pin
 keep fill                           # pin.fill
 keep_off                            # pin.slash
 key                                 # key
+key fill                            # key.fill
 keyboard                            # keyboard
 keyboard fill                       # keyboard.fill
 keyboard_arrow_down                 # chevron.down
