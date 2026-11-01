@@ -108,7 +108,7 @@ Parameterized iOS tests loop over their arguments. Each file's KDoc lists what i
 | `VoiceFeatureTests+Screen.swift` (deferred by voice) | `VoiceFeatureTestsScreenSession.kt` | 11 | rest in `:feature:voice` |
 | `VoiceFeatureTests.swift`, `VoiceSessionToolsTests.swift`, `FloatingCallModelTests.swift`, `VoiceRouteTests.swift`, `VoiceLiveTests.swift` (deferred by voice) | `VoiceFeatureTestsSession.kt`, `VoiceSessionToolsTestsSession.kt`, `FloatingCallModelTestsSession.kt`, `VoiceRouteTestsSession.kt`, `VoiceLiveTestsSession.kt` | 8 | Settings halves → settings, Home halves → drawer |
 | `RaiseToTalkTests.swift` (+`Routing`) | `RaiseToTalkTests.kt` | 11 | 24 raise-detector/audio-routing tests → `:feature:voice`, ported there |
-| `NewMessagesTests.swift` | `NewMessagesTests.kt` | 14 | 7 mark/placement → transcript; 3 Home → drawer (all ported there). Synced to f657969b: the 4 changed tests updated; the 27 new iOS tests (watermarks, catch-up, folds, covered) not yet ported |
+| `NewMessagesTests.swift` | `NewMessagesTests.kt` | 27 | 7 mark/placement → transcript; the `HomeFeature` tests → drawer (all ported there). Synced to f657969b: the 4 changed tests updated; of the 27 new iOS tests the 13 `SessionFeature` ones are here (live rows during an open read, folds while away, earlier-history recompute, background freeze, voice prompt clears), the 14 `HomeFeature` ones in drawer |
 | `BrowserTests.swift` | `BrowserTests.kt` | 17 | policy/page-prompt/`BrowserFeature` → `:feature:media`; 9 Home → drawer; 3 → voice; WebKit/UIKit probes deleted |
 | `FileAttachmentTests.swift` | `FileAttachmentTests.kt` | 7 | types/presentation/wire/staging → core, composer, server, transcript, system |
 | `ComposerPersistenceTests.swift` | `ComposerPersistenceTests.kt` | 7 | 4 Home/App → drawer; 3 `isExcludedFromBackup` checks deleted (no Android counterpart) |
@@ -131,7 +131,7 @@ Not ported here (subject is another module): `SubagentStackTests` (`HomeFeature`
 `SessionFeature` test: server decoding and transcript rows). `DiagnosticsRecorderTests.headerResolutionNotifiesObserversWhenChanged`
 (deferred here by core) is n/a: Android records no resolved header style (`devtools.md`).
 
-Total (`./gradlew :feature:session:testDebugUnitTest`): 709 tests, 0 failures.
+Total (`./gradlew :feature:session:testDebugUnitTest`): 722 tests, 0 failures.
 
 Code bugs the ported tests found (each in its own commit): `:server` `decodeTranscript` dropped
 the page's cursor/context capture (`TaskLocal` gains `currentBlocking()`, mirrored by a

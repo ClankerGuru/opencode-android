@@ -90,7 +90,7 @@ Shared support: `HomeFeatureTestSupport.kt`, `SystemIntegrationTestSupport.kt`,
 | `HomeFeatureTests+MovedSessions.swift` | `HomeFeatureTestsMovedSessions.kt` | 3 | |
 | `InboxSidebarTests.swift` | `InboxSidebarTests.kt` | 9 | all ported |
 | `HomeChildFeatureTests.swift` | `HomeChildFeatureTests.kt` | 9 of 11 | 2 → `:feature:settings` (`HomeSettingsFeature`: `settingsChecksSupportForItsScopedServer`, `modelPickerStyleIsOneSetting`), ported there |
-| `CatchUpTests.swift` | `catchup/CatchUpTests.kt`, `catchup/CatchUpPreviewStoresTests.kt` | 31 of 32 | deleted `hostedTwelveCardCatchUpOpenSwipeAndExitProfile` (UIWindow/Mach memory profile); the two preview-store tests run under Robolectric (`CatchUpPreviewStoresTests`) |
+| `CatchUpTests.swift` | `catchup/CatchUpTests.kt`, `catchup/CatchUpPreviewStoresTests.kt` | 31 of 32 (+1 NewMessages) | deleted `hostedTwelveCardCatchUpOpenSwipeAndExitProfile` (UIWindow/Mach memory profile); the two preview-store tests run under Robolectric (`CatchUpPreviewStoresTests`) |
 | `CatchUpFinishTests.swift` | `catchup/CatchUpFinishTests.kt` | 13 | – |
 | `InAppNoticeTests.swift` | `notices/InAppNoticeTests.kt` | 18 of 20 | 2 → `:feature:system` (notification presentation/content), ported there |
 | `PairedComputerOpensDrawerTests.swift` | `PairedComputerOpensDrawerTests.kt` | 7 | – |
@@ -114,7 +114,7 @@ Shared support: `HomeFeatureTestSupport.kt`, `SystemIntegrationTestSupport.kt`,
 | `WorkingOrderTests.swift` | `WorkingOrderTests.kt` | 2 | rest `:feature:session`, ported there |
 | `MultipleWindowsTests.swift` | `MultipleWindowsTests.kt` | 1 (`aFurtherWindowKeepsItsOwnSidebar`) | `:server`/`:app` |
 | `NetworkRetryTests.swift` (`EventStreamReconnectTests`) | `EventStreamReconnectTests.kt` | 6 | rest `:server`; `actionsALoopThatOwnsItsRetries…` `:feature:voice`; ported there |
-| `NewMessagesTests.swift`, `SessionSheetTests.swift`, `TraceTests.swift` | `NewMessagesTests.kt`, `SessionSheetTests.kt`, `TraceTests.kt` (`TraceUploadsTests`) | 3, 1, 2 | rest `:feature:transcript`/`:feature:session`/`:core`/`:devtools` |
+| `NewMessagesTests.swift`, `SessionSheetTests.swift`, `TraceTests.swift` | `NewMessagesTests.kt`, `SessionSheetTests.kt`, `TraceTests.kt` (`TraceUploadsTests`) | 16, 1, 2 | rest `:feature:transcript`/`:feature:session`/`:core`/`:devtools`. NewMessages synced to f657969b: 13 of the 14 new `HomeFeature` tests here (watermarks, Catch Up keep-unread, desktop reads, relaunch, LRU); `catchUpPreviewMarksWhatArrivedLikeTheOpenCard` runs under Robolectric in `catchup/CatchUpPreviewStoresTests` (the preview's real `Store`) |
 | `AppFeatureTests.swift`, `AttachmentMenuPressTests.swift`, `FloatingCallModelTests.swift` | `AppFeatureTests.kt`, `AttachmentMenuPressTests.kt`, `FloatingCallModelTests.kt` | 1, 1, 1 | Call Tray frame half of the floating-call test deleted (UIWindow hosting) |
 | `SystemIntegrationTests.swift` | `SystemIntegrationTests.kt` | 18 | rest `:feature:system`/`:app`, ported there |
 | `ShareHandoffTests.swift`, `ShareComposerTests.swift` | `ShareHandoffTests.kt` (`ShareInboxFeatureTests`), `ShareComposerTests.kt` (`ShareComposerAppTests`) | 6, 7 | rest `:feature:system`/`:feature:composer`/`:app` |
@@ -134,4 +134,4 @@ card drag ends when Catch Up closes, and `dismissCard`/`undoCard` finish its ent
 and `TestStore` follows TCA (drops cancelled effects' sends, `skipInFlightEffects`, non-exhaustive
 `finish`, effects inherit the sender's context).
 
-Total: 439 drawer tests (Gradle), all passing.
+Total: 453 drawer tests (Gradle), all passing.

@@ -19,6 +19,10 @@ import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.ImmediateClock
 import ai.opencode.core.store.TestStore
 import ai.opencode.feature.drawer.HomeSnapshotDate
+import ai.opencode.feature.drawer.makeDetail
+import ai.opencode.feature.session.from
+import ai.opencode.core.sharing.ExperimentalFeature
+import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.feature.drawer.openingCatchUpCard
 import ai.opencode.feature.drawer.persistingTranscriptCache
 import ai.opencode.feature.drawer.publishingTranscript
@@ -130,5 +134,39 @@ class CatchUpPreviewStoresTests {
         assertEquals(refreshedItems, preview.state.items)
         previews.close()
         store.finish()
+    }
+
+    /**
+     * iOS `NewMessagesTests.catchUpPreviewMarksWhatArrivedLikeTheOpenCard`: the next Catch Up card
+     * previews marked as it will open, so it doesn't jump to a divider once it's promoted. Here
+     * rather than in `NewMessagesTests` because the preview's `Store` needs the main looper, and the
+     * second card's state lands with `commit()` as it does after composition.
+     */
+    @Test
+    fun catchUpPreviewMarksWhatArrivedLikeTheOpenCard() = DependencyValues.withValues(
+        DependencyValues.testing().update { this[ExperimentalFeatures] = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.newMessagesDivider)) },
+    ) {
+        fun user(id: String) = OpenCodeTranscriptItem.UserText(id = id, text = id)
+        fun reply(id: String) = OpenCodeTranscriptItem.AssistantMarkdown(id = id, text = "Reply $id")
+        val next = session("next", 20)
+        val copy = session("copy", 10)
+        var home = HomeFeature.State(server, OpenCodeHomeSnapshot(projects = emptyList(), sessions = listOf(next, copy), activeSessionIDs = emptySet()))
+        val seen = SessionFeature.State.session(server, next, cachedItems = listOf(user("n1")))
+        home = home.copy(
+            sessionSnapshots = mapOf(next.id to checkNotNull(SessionFeature.SwitchSnapshot.from(seen))),
+            transcriptCache = mapOf(next.id to listOf(user("n1"), reply("n2")), copy.id to listOf(user("c1"), reply("c2"))),
+            unopenedSeen = mapOf(copy.id to setOf("c1")),
+        )
+        val previews = CatchUpPreviewStores()
+        try {
+            val marked = previews.store(next, home).state.newMessages?.itemID
+            val unopened = previews.store(copy, home).also { previews.commit() }.state.newMessages?.itemID
+            val opened = home.makeDetail(next, cachedItems = home.transcriptCache[next.id]).second.newMessages?.itemID
+            assertEquals("n2", opened)
+            assertEquals(opened, marked)
+            assertEquals("c2", unopened)
+        } finally {
+            previews.close()
+        }
     }
 }
