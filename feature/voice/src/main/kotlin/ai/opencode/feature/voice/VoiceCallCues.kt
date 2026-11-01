@@ -12,6 +12,7 @@ import java.io.InputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.abs
 import kotlin.math.pow
 
 /**
@@ -238,11 +239,21 @@ internal object CAFIMA4 {
         val packets = bytes.size / bytesPerPacket
         val decoded = FloatArray(packets * framesPerPacket)
         var out = 0
+        // Core Audio's decoder carries its state across packets: a header only resets it when its
+        // step index differs or its 9-bit predictor is more than 127 off (as ffmpeg's
+        // `adpcm_ima_qt` does). Resetting on every header leaves the quantised predictor's
+        // offset in quiet tails, so cues wouldn't end at rest.
+        var predictor = 0
+        var index = -1
         for (packet in 0 until packets) {
             val base = packet * bytesPerPacket
             val header = ((bytes[base].toInt() and 0xFF) shl 8) or (bytes[base + 1].toInt() and 0xFF)
-            var predictor = (header and 0xFF80).toShort().toInt()
-            var index = (header and 0x7F).coerceAtMost(88)
+            val headerPredictor = (header and 0xFF80).toShort().toInt()
+            val headerIndex = (header and 0x7F).coerceAtMost(88)
+            if (headerIndex != index || abs(headerPredictor - predictor) > 0x7F) {
+                predictor = headerPredictor
+                index = headerIndex
+            }
             for (offset in 2 until bytesPerPacket) {
                 val byte = bytes[base + offset].toInt() and 0xFF
                 for (nibble in intArrayOf(byte and 0x0F, byte ushr 4)) {

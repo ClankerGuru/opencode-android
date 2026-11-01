@@ -86,10 +86,7 @@ class VoiceHapticTests {
             assertTrue(envelope.peak >= envelope.onset)
             val length = samples.size / PCM.sampleRate
             assertTrue(envelope.end > envelope.peak && envelope.end <= length)
-            // The bundled hang-up rings to its last sample (its final 2.5 ms sit at −27 dB), so
-            // past its end `level` reads that clamped last level; only a cue that falls quiet
-            // inside its file can be checked here. The same CAF decodes the same on iOS.
-            if (envelope.end + 0.01 < length) assertTrue(envelope.level(envelope.end + 0.01) < VoiceCueEnvelope.floor)
+            assertTrue(envelope.level(envelope.end + 0.01) < VoiceCueEnvelope.floor)
         }
     }
 
