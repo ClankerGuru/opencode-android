@@ -13,6 +13,7 @@ import android.provider.Settings
 import androidx.core.net.toUri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
 
 /**
  * Port of iOS `Voice/VoiceProvider.swift` (ce694097, 9a634cb6): where a call goes (Automatic
@@ -24,8 +25,12 @@ import kotlinx.coroutines.withContext
  * What a server last said of its voice models (`GET /api/experimental/voice/models`): its
  * list, empty when it has no such route (an older OpenCode), or nothing when it didn't answer.
  */
+@Serializable
 sealed interface ServerVoiceModelsAnswer {
+    @Serializable
     data class Listed(override val models: List<ServerVoiceModel>) : ServerVoiceModelsAnswer
+
+    @Serializable
     data object NoAnswer : ServerVoiceModelsAnswer
 
     val models: List<ServerVoiceModel> get() = (this as? Listed)?.models ?: emptyList()
