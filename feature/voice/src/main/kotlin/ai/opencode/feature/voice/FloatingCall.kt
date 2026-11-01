@@ -592,9 +592,8 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screenWidth: Float, screenH
     val center = remember { FloatingCallCenter.shared }
     val scope = rememberCoroutineScope()
     val livingOrbSetting by remember { shared(experimental(ExperimentalFeature.livingOrb)).flow }.collectAsState()
-    val savedLivingOrbStyle by remember { shared(VoiceSharedKeys.livingOrbStyle).flow }.collectAsState()
     val usesLivingOrb = ExperimentalFeature.livingOrb.isActive(livingOrbSetting)
-    val orbDiameter = if (usesLivingOrb) LivingOrbTunables.size else FloatingCallTunables.orbSize
+    val orbDiameter = if (usesLivingOrb) WispOrbTunables.size.value.toFloat() else FloatingCallTunables.orbSize
 
     val phase by store.observe { it.phase }
     val isReconnecting by store.observe { it.isReconnecting }
@@ -964,7 +963,6 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screenWidth: Float, screenH
                         if (usesLivingOrb) {
                             LivingOrbView(
                                 LivingOrbConfig(
-                                    style = LivingOrbTunables.style.resolve(savedLivingOrbStyle),
                                     mood = mood,
                                     isMuted = isMuted,
                                     isSpeaking = isAssistantSpeaking,

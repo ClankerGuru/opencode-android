@@ -17,7 +17,6 @@ import ai.opencode.core.ui.AppTheme
 import ai.opencode.core.ui.AppearanceColorScheme
 import ai.opencode.core.ui.ThemeSharedKeys
 import ai.opencode.feature.voice.CallVoice
-import ai.opencode.feature.voice.LivingOrbStyle
 import ai.opencode.feature.voice.ServerVoiceClient
 import ai.opencode.feature.voice.ServerVoiceProvider
 import ai.opencode.feature.voice.ServerVoiceSupport
@@ -26,7 +25,6 @@ import ai.opencode.feature.voice.VoiceEngine
 import ai.opencode.feature.voice.VoiceFeature
 import ai.opencode.feature.voice.VoiceServerChoice
 import ai.opencode.feature.voice.VoiceSharedKeys
-import ai.opencode.feature.voice.livingOrbStyle
 import ai.opencode.server.OpenCodeServer
 
 /**
@@ -50,7 +48,6 @@ class HomeSettingsFeature : Reducer<HomeSettingsFeature.State, HomeSettingsFeatu
         data class InAppNoticeModeChanged(val mode: InAppNoticeMode) : Action
         data class ExperimentalFeatureChanged(val feature: ExperimentalFeature, val on: Boolean) : Action
         data class ModelPickerStyleChanged(val style: ModelPickerStyle) : Action
-        data class LivingOrbStyleChanged(val style: LivingOrbStyle) : Action
         data class VoiceModeEnabledChanged(val on: Boolean) : Action
         data class RaiseToTalkChanged(val on: Boolean) : Action
         data class VoiceEngineChanged(val engine: VoiceEngine) : Action
@@ -93,8 +90,6 @@ class HomeSettingsFeature : Reducer<HomeSettingsFeature.State, HomeSettingsFeatu
                 }
             }
             is Action.ModelPickerStyleChanged -> setShared(ModelPickerStyle.key, action.style)
-            is Action.LivingOrbStyleChanged ->
-                if (setShared(VoiceSharedKeys.livingOrbStyle, action.style)) haptics.play(Haptic.selection)
             is Action.VoiceModeEnabledChanged -> setShared(SharedKeys.voiceModeEnabled, action.on)
             is Action.RaiseToTalkChanged -> setShared(SharedKeys.raiseToTalk, action.on)
             is Action.VoiceEngineChanged -> {

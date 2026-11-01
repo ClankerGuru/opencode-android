@@ -131,14 +131,6 @@ enum class FloatingCallStripStyle {
     matching,
 }
 
-/** What the call is doing, as the face shows it (iOS `FloatingCallMood`). */
-@Suppress("EnumEntryName")
-enum class FloatingCallMood { connecting, live, thinking, needsInput, ended }
-
-/** Playground scenes: they stand in for the call's voices and state (iOS `FloatingCallScene`). */
-@Suppress("EnumEntryName")
-enum class FloatingCallScene { idle, listening, agentSpeaking, bothSpeaking, thinking, needsInput }
-
 /** The two voices' colours (iOS `FloatingCallPalette`). */
 object FloatingCallPalette {
     fun warm(dark: Boolean): List<Color> = if (dark) {

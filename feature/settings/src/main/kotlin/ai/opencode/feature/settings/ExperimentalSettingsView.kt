@@ -13,9 +13,6 @@ import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
 import ai.opencode.devtools.DevTools
 import ai.opencode.devtools.DevToolsView
-import ai.opencode.feature.voice.LivingOrbStyle
-import ai.opencode.feature.voice.VoiceSharedKeys
-import ai.opencode.feature.voice.livingOrbStyle
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.snap
@@ -50,7 +47,6 @@ fun ExperimentalSettingsView(store: SettingsStore, focus: ExperimentalFeature?) 
     val modelPickerStored by remember { shared(ModelPickerStyle.key).flow }.collectAsState()
     val callTray by remember { shared(ExperimentalFeature.callTray.key).flow }.collectAsState()
     val floatingCall by remember { shared(ExperimentalFeature.floatingCall.key).flow }.collectAsState()
-    val livingOrbStyle by remember { shared(VoiceSharedKeys.livingOrbStyle).flow }.collectAsState()
     // Every switch, so headers count what's on and rows redraw when a value changes.
     val enabled = ExperimentalFeature.entries.associateWith { feature ->
         remember(feature) { shared(feature.key).flow }.collectAsState().value
@@ -138,18 +134,6 @@ fun ExperimentalSettingsView(store: SettingsStore, focus: ExperimentalFeature?) 
                 modifier = Modifier.background(highlight),
             )
             toggles(ExperimentalGroup.calls, leadingDivider = true)
-            if (ExperimentalFeature.livingOrb.isActive(enabled.getValue(ExperimentalFeature.livingOrb))) {
-                SettingsDivider(inset = true)
-                SettingsMenuRow(
-                    title = "Orb Style",
-                    value = livingOrbStyle.title,
-                    selection = livingOrbStyle,
-                    options = LivingOrbStyle.entries.map { SettingsMenuOption(it, it.title) },
-                    onSelect = { send(HomeSettingsFeature.Action.LivingOrbStyleChanged(it)) },
-                    symbol = "circle.hexagongrid.fill",
-                    tint = ExperimentalGroup.calls.tint,
-                )
-            }
         }
         settingsSection(key = ExperimentalGroup.transcript, header = header(ExperimentalGroup.transcript)) {
             toggles(ExperimentalGroup.transcript, leadingDivider = false)
