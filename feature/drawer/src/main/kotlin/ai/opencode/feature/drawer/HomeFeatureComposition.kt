@@ -21,7 +21,6 @@ import ai.opencode.feature.composer.DictationFeature
 import ai.opencode.feature.drawer.catchup.CatchUpFeature
 import ai.opencode.feature.media.PageReaderClient
 import ai.opencode.feature.drawer.notices.DeliveredNotificationsClient
-import ai.opencode.feature.drawer.switcher.SessionSwitcherFeature
 import ai.opencode.devtools.traces.TraceUploadsFeature
 import ai.opencode.feature.session.SessionFeature
 import ai.opencode.feature.session.hasLiveDictation
@@ -115,13 +114,6 @@ private fun HomeFeature.fullBody(): Reducer<State, Action> =
         }
 
 private fun HomeFeature.homeReducers(): Reducer<State, Action> = combine(
-    scope(
-        state = { it.sessionSwitcher },
-        setState = { s: State, c: SessionSwitcherFeature.State -> s.copy(sessionSwitcher = c) },
-        action = { (it as? Action.SessionSwitcher)?.action },
-        embed = Action::SessionSwitcher,
-        child = SessionSwitcherFeature(),
-    ),
     scope(
         state = { it.traces },
         setState = { s: State, c: TraceUploadsFeature.State -> s.copy(traces = c) },

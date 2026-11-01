@@ -130,15 +130,6 @@ class DrawerPanRegions : DrawerPanExclusion {
     internal val claims = HashMap<Any, LayoutCoordinates>()
     internal val exclusions = HashMap<Any, LayoutCoordinates>()
 
-    /**
-     * The session switcher's strip: kept from the drawer's pan except over a text field, which
-     * the switcher refuses (iOS's drawer pan waits for the switcher's, which fails there at once).
-     */
-    internal val switcherStrips = HashMap<Any, LayoutCoordinates>()
-
-    /** Whether a point (px in the pan's coordinates) is on one of the card's text fields. */
-    internal var isOnTextField: (LayoutCoordinates, Offset) -> Boolean = { _, _ -> false }
-
     override fun updateExclusion(id: Any, coordinates: LayoutCoordinates?) {
         if (coordinates == null) exclusions.remove(id) else exclusions[id] = coordinates
     }
@@ -157,8 +148,7 @@ class DrawerPanRegions : DrawerPanExclusion {
         scrollers.values.filter { contains(it.coordinates, pan, point) }
 
     internal fun isExcluded(pan: LayoutCoordinates, point: Offset): Boolean =
-        exclusions.values.any { contains(it, pan, point) } ||
-            (switcherStrips.values.any { contains(it, pan, point) } && !isOnTextField(pan, point))
+        exclusions.values.any { contains(it, pan, point) }
 
     internal fun contains(region: LayoutCoordinates?, pan: LayoutCoordinates, point: Offset): Boolean {
         if (region == null || !region.isAttached || !pan.isAttached) return false
@@ -171,32 +161,6 @@ private fun Modifier.region(regions: DrawerPanRegions, set: (Any, LayoutCoordina
     val id = remember { Any() }
     DisposableEffect(regions) { onDispose { set(id, null) } }
     onGloballyPositioned { set(id, it) }
-}
-
-/**
- * The session switcher's gesture strip, kept from the drawer's pan while [isEnabled] except over
- * a text field (see [DrawerPanRegions.switcherStrips]). Outside a drawer it's a plain
- * `excludedFromDrawerPan`.
- */
-fun Modifier.drawerPanSwitcherStrip(isEnabled: Boolean): Modifier = composed {
-    val regions = LocalDrawerPanExclusion.current as? DrawerPanRegions
-    if (regions == null) {
-        excludedFromDrawerPan(isEnabled)
-    } else {
-        val id = remember { Any() }
-        // The strip's last layout, so enabling it again (the keyboard gone) registers it at once
-        // rather than at its next placement.
-        val placed = remember { arrayOfNulls<LayoutCoordinates>(1) }
-        DisposableEffect(regions, isEnabled) {
-            val coordinates = placed[0]
-            if (isEnabled && coordinates != null) regions.switcherStrips[id] = coordinates else regions.switcherStrips.remove(id)
-            onDispose { regions.switcherStrips.remove(id) }
-        }
-        onGloballyPositioned {
-            placed[0] = it
-            if (isEnabled) regions.switcherStrips[id] = it
-        }
-    }
 }
 
 /** The drawer (iOS `drawerView`). */

@@ -127,7 +127,7 @@ Parameterized iOS tests loop over their arguments. Each file's KDoc lists what i
 
 Not ported here (subject is another module): `SubagentStackTests` (`HomeFeature` → drawer;
 `backRulesLetTheEdgeWin…` → `:core` `BackSwipeRules`, `descendantsFollowTheFamilyTree` →
-`:server` `SessionActivity`), `SelectedTranscriptCancellationTests`, `SessionSwitcherTests`,
+`:server` `SessionActivity`), `SelectedTranscriptCancellationTests`,
 `LiveDelegationFeatureTests+Session` (all `HomeFeature` → drawer), `ModelSwitchRuleTests` (no
 `SessionFeature` test: server decoding and transcript rows). `DiagnosticsRecorderTests.headerResolutionNotifiesObserversWhenChanged`
 (deferred here by core) is n/a: Android records no resolved header style (`devtools.md`).

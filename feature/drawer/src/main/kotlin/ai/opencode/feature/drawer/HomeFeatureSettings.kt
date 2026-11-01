@@ -133,8 +133,8 @@ internal fun reducePreferences(state: State, action: HomeSettingsFeature.Action)
 internal fun HomeFeature.reduceSettingsScreen(state: State, action: PresentationAction<SettingsFeature.Action>): HomeReduced {
     val presented = (action as? PresentationAction.Presented)?.action ?: return Reduced(state)
     return when (presented) {
-        // Leave this server to pick or pair another (AppFeature).
-        SettingsFeature.Action.ServersTapped -> Reduced(state, Effect.send(Action.Delegate(DelegateAction.ServersRequested)))
+        // iOS removed `.serversRequested` with Title Is the Switch (c75d4a1e): nothing sends it.
+        SettingsFeature.Action.ServersTapped -> Reduced(state)
         is SettingsFeature.Action.Delegate -> when (val delegate = presented.action) {
             SettingsDelegate.Close -> Reduced(state.copy(settings = null))
             is SettingsDelegate.SwitchServer -> Reduced(state, Effect.send(Action.Delegate(DelegateAction.ServerSwitchTapped(delegate.server))))

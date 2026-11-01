@@ -255,6 +255,7 @@ private fun HomeFeature.snapshotRefreshed(state: State, action: Action.SnapshotR
         connection = s.connection.copy(
             connectionStatus = HomeConnectionFeature.State.ConnectionStatus.connected,
             connectionErrorMessage = null,
+            credentialsRejected = false,
             snapshotFailures = 0,
             lastKnownActivityDeadline = null,
         ),

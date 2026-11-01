@@ -77,6 +77,21 @@ class ServerSwitchingTests {
     }
 
     @Test
+    fun rejectedCredentialsOfferEditingInsteadOfTryAgain() {
+        for (count in listOf(1, 3)) {
+            val rejected = DrawerTitle.Presentation(serverCount = count, status = ConnectionStatus.disconnected, credentialsRejected = true)
+            assertTrue(
+                "Trying again can't fix a 401",
+                rejected.isDimmed && rejected.hasMenu && rejected.offersEdit && !rejected.offersTryAgain,
+            )
+            assertEquals("Sign-in failed", rejected.accessibilityValue)
+            assertEquals(if (count > 1) "Shows your servers" else "Offers to edit the server", rejected.accessibilityHint)
+        }
+        val offline = DrawerTitle.Presentation(serverCount = 1, status = ConnectionStatus.disconnected)
+        assertTrue(offline.offersTryAgain && !offline.offersEdit)
+    }
+
+    @Test
     fun aDroppedStreamLeavesTheTitleAloneUntilItFailsAgain() = runTest {
         val laptop = OpenCodeServer(url = "http://primary.test", username = "opencode", password = "a")
         val home = HomeFeature.State(laptop, snapshot).let {

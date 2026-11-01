@@ -8,8 +8,6 @@ import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
-import ai.opencode.core.experiments.ExperimentalFeature
-import ai.opencode.core.experiments.key
 import ai.opencode.feature.drawer.HomeConnectionFeature
 import ai.opencode.feature.drawer.HomeFeature
 import ai.opencode.feature.drawer.style.DrawerTunables
@@ -23,7 +21,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -33,11 +30,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -48,12 +43,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -66,15 +59,14 @@ import java.text.Collator
 // `title`). The rules (`switchableServers`, `DrawerTitle.Presentation`, copy) are in
 // `ServerSwitcher.kt`. The title shows a server only by its friendly name, never an address.
 
-/** Which of iOS `DrawerTitle.body`'s three branches shows; changing branch is a cross-fade. */
-private enum class DrawerTitleVariant { TitleSwitch, Menu, Plain }
+/** Which of iOS `DrawerTitle.body`'s branches shows; changing branch is a cross-fade. */
+private enum class DrawerTitleVariant { Menu, Plain }
 
 /**
  * The drawer's title (iOS `DrawerTitle`): the server in use by its friendly name. With several
  * servers (or one while offline) it's a pull-down listing the servers (the current one checked,
- * with its issue as a second line), Try Again while offline, and Manage Servers…. With the
- * Title Is the Switch experiment on, it's a button with a chevron disc that opens the server
- * list (`onOpenServers`) and a caption (connecting to another server, else Offline).
+ * with its issue as a second line), Try Again while offline (Edit Server… instead when the
+ * server refused the credentials), and Manage Servers….
  *
  * Dimming and the one-server menu coming and going are cross-fades of
  * [DrawerTitle.CROSS_FADE_MILLIS] (0.25 s ease-in-out), with or without reduced motion: nothing
@@ -89,7 +81,8 @@ private enum class DrawerTitleVariant { TitleSwitch, Menu, Plain }
  * @param onSwitch a server other than the current one was picked.
  * @param onRetry Try Again (iOS `.retryConnectionTapped`).
  * @param onManage Manage Servers… (iOS opens Settings focused on Servers).
- * @param onOpenServers Title Is the Switch's tap (iOS `.serversRequested`).
+ * @param credentialsRejected the server answered with a 401; trying again can't help.
+ * @param onEdit Edit Server… (iOS `.editServerRequested`), offered instead of Try Again then.
  */
 @Composable
 fun DrawerTitleView(
@@ -101,12 +94,11 @@ fun DrawerTitleView(
     onRetry: () -> Unit,
     onManage: () -> Unit,
     modifier: Modifier = Modifier,
-    onOpenServers: () -> Unit = {},
+    credentialsRejected: Boolean = false,
+    onEdit: () -> Unit = {},
 ) {
-    val titleSwitchStored by remember { shared(ExperimentalFeature.serverTitleSwitch.key).flow }.collectAsState()
-    val presentation = DrawerTitle.Presentation.of(servers, status, switchingTo)
+    val presentation = DrawerTitle.Presentation.of(servers, status, switchingTo, credentialsRejected)
     val variant = when {
-        ExperimentalFeature.serverTitleSwitch.isActive(titleSwitchStored) -> DrawerTitleVariant.TitleSwitch
         presentation.hasMenu -> DrawerTitleVariant.Menu
         else -> DrawerTitleVariant.Plain
     }
@@ -117,8 +109,7 @@ fun DrawerTitleView(
         label = "drawer-title",
     ) { shown ->
         when (shown) {
-            DrawerTitleVariant.TitleSwitch -> TitleSwitchButton(current, status, switchingTo, presentation, onOpenServers)
-            DrawerTitleVariant.Menu -> DrawerTitleMenu(current, servers, switchingTo, presentation, onSwitch, onRetry, onManage)
+            DrawerTitleVariant.Menu -> DrawerTitleMenu(current, servers, switchingTo, presentation, onSwitch, onRetry, onEdit, onManage)
             DrawerTitleVariant.Plain -> Box(
                 Modifier
                     .heightIn(min = DrawerTitle.MIN_HEIGHT.dp)
@@ -150,6 +141,7 @@ fun DrawerTitleView(
     val current by store.observe { it.server }
     val status by store.observe { it.connectionStatus }
     val switchingTo by store.observe { it.switchingTo }
+    val credentialsRejected by store.observe { it.credentialsRejected }
     val saved by remember { shared(ServerSharedKeys.savedServers).flow }.collectAsState()
     DrawerTitleView(
         current = current,
@@ -160,7 +152,8 @@ fun DrawerTitleView(
         onRetry = { store.send(HomeFeature.Action.RetryConnectionTapped) },
         onManage = onManage,
         modifier = modifier,
-        onOpenServers = { store.send(HomeFeature.Action.Delegate(HomeFeature.DelegateAction.ServersRequested)) },
+        credentialsRejected = credentialsRejected,
+        onEdit = { store.send(HomeFeature.Action.Delegate(HomeFeature.DelegateAction.EditServerRequested(current))) },
     )
 }
 
@@ -231,7 +224,7 @@ private fun DrawerTitleText(text: String, presentation: DrawerTitle.Presentation
     }
 }
 
-/** iOS `menu(_:)`: the title with a chevron that opens the servers, Try Again and Manage Servers…. */
+/** iOS `menu(_:)`: the title with a chevron that opens the servers, Try Again (or Edit Server…) and Manage Servers…. */
 @Composable
 private fun DrawerTitleMenu(
     current: OpenCodeServer,
@@ -240,6 +233,7 @@ private fun DrawerTitleMenu(
     presentation: DrawerTitle.Presentation,
     onSwitch: (OpenCodeServer) -> Unit,
     onRetry: () -> Unit,
+    onEdit: () -> Unit,
     onManage: () -> Unit,
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
@@ -312,6 +306,17 @@ private fun DrawerTitleMenu(
                 )
                 HorizontalDivider()
             }
+            if (presentation.offersEdit) {
+                DropdownMenuItem(
+                    text = { Text(DrawerTitle.EDIT_SERVER) },
+                    leadingIcon = { OpenCodeIcon(SFSymbol.Key, contentDescription = null) },
+                    onClick = {
+                        expanded = false
+                        onEdit()
+                    },
+                )
+                HorizontalDivider()
+            }
             DropdownMenuItem(
                 text = { Text(DrawerTitle.MANAGE_SERVERS) },
                 leadingIcon = { OpenCodeIcon(SFSymbol.Gearshape, contentDescription = null) },
@@ -320,63 +325,6 @@ private fun DrawerTitleMenu(
                     onManage()
                 },
             )
-        }
-    }
-}
-
-/** iOS Title Is the Switch (`ExperimentalFeature.serverTitleSwitch`): the name, a chevron disc, and a caption. */
-@Composable
-private fun TitleSwitchButton(
-    current: OpenCodeServer,
-    status: HomeConnectionFeature.State.ConnectionStatus,
-    switchingTo: OpenCodeServer?,
-    presentation: DrawerTitle.Presentation,
-    onOpenServers: () -> Unit,
-) {
-    val colors = OpenCodeTheme.colors
-    // iOS `@ScaledMetric(relativeTo: .title)`: the disc and glyph follow the font scale.
-    val fontScale = LocalDensity.current.fontScale
-    val caption = DrawerTitle.titleSwitchCaption(status, switchingTo)
-    Column(
-        Modifier
-            .heightIn(min = 48.dp)
-            .clickable(onClickLabel = DrawerTitle.TITLE_SWITCH_HINT, role = Role.Button, onClick = onOpenServers)
-            .semantics(mergeDescendants = true) {
-                contentDescription = current.friendlyName
-                stateDescription = presentation.accessibilityValue
-                onClick(DrawerTitle.TITLE_SWITCH_HINT) { onOpenServers(); true }
-            }
-            .testTag(DrawerTitle.TAG),
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            AnimatedContent(
-                targetState = current.friendlyName,
-                modifier = Modifier.weight(1f, fill = false),
-                transitionSpec = {
-                    fadeIn(tween(DrawerTitle.CROSS_FADE_MILLIS, easing = Motion.EaseInOut)) togetherWith
-                        fadeOut(tween(DrawerTitle.CROSS_FADE_MILLIS, easing = Motion.EaseInOut))
-                },
-                label = "drawer-title-switch-name",
-            ) { name ->
-                Text(name, style = DrawerTunables.titleFont.font.copy(fontWeight = FontWeight.Bold), color = colors.text)
-            }
-            Box(
-                Modifier
-                    .size((DrawerTitle.CHEVRON_DISC * fontScale).dp)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHighest, CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                OpenCodeIcon(
-                    SFSymbol.ChevronDown,
-                    contentDescription = null,
-                    size = (DrawerTitle.CHEVRON_GLYPH * fontScale * 1.4f).dp,
-                    tint = colors.secondaryText,
-                )
-            }
-        }
-        if (caption != null) {
-            Text(caption, style = OpenCodeTextStyles.caption1, color = colors.secondaryText)
         }
     }
 }

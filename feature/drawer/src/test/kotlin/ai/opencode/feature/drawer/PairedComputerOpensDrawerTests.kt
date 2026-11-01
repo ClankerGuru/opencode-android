@@ -1,11 +1,8 @@
 package ai.opencode.feature.drawer
 
-import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.core.store.TestStore
 import ai.opencode.core.testing.TestIsolationRule
 import ai.opencode.feature.drawer.catchup.CatchUpFeature
-import ai.opencode.feature.drawer.switcher.SessionSwitcherFeature
 import ai.opencode.feature.session.*
 import ai.opencode.feature.settings.SettingsFeature
 import ai.opencode.feature.voice.VoiceFeature
@@ -43,9 +40,7 @@ class PairedComputerOpensDrawerTests {
         return state.copy(connection = state.connection.copy(connectionStatus = HomeConnectionFeature.State.ConnectionStatus.connected))
     }
 
-    private fun CoroutineScope.store(state: HomeFeature.State) = TestStore(state, HomeFeature(), this) {
-        this[ExperimentalFeatures] = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.sessionSwitcher))
-    }
+    private fun CoroutineScope.store(state: HomeFeature.State) = TestStore(state, HomeFeature(), this)
 
     @Test fun opensTheDrawerAndPicksNothing() = runTest {
         val store = store(home(listOf(session("old", 10), session("recent", 30))))
@@ -98,23 +93,6 @@ class PairedComputerOpensDrawerTests {
         store.finish()
     }
 
-    /**
-     * The Session Switcher shown before the view opens the drawer drops the request, so the drawer
-     * can't open beneath it and stay after it closes.
-     */
-    @Test fun theSessionSwitcherBeforeTheDrawerOpensDropsIt() = runTest {
-        val store = store(home(listOf(session("recent", 30))))
-        store.send(HomeFeature.Action.PairedComputerOpened) { it.copy(drawerOpenRequest = it.detailGeneration) }
-        store.send(HomeFeature.Action.SessionSwitcher(SessionSwitcherFeature.Action.PresentationChanged(true))) {
-            it.copy(sessionSwitcher = it.sessionSwitcher.copy(isPresented = true), drawerOpenRequest = null)
-        }
-        store.send(HomeFeature.Action.SessionSwitcher(SessionSwitcherFeature.Action.PresentationChanged(false))) {
-            it.copy(sessionSwitcher = it.sessionSwitcher.copy(isPresented = false))
-        }
-        assertFalse(store.state.opensDrawerForPairing)
-        store.finish()
-    }
-
     /** Anything presented over Home or its draft, or any move off it, means the drawer no longer applies. */
     @Test fun anythingPresentedOrNavigatedMeansTheDrawerNoLongerApplies() {
         var base = home(listOf(session("recent", 30)))
@@ -128,7 +106,6 @@ class PairedComputerOpensDrawerTests {
             "Catch Up" to { it.withCatchUp(CatchUpFeature.Stack(queue = listOf("recent"), returnSessionID = null)) },
             "Settings" to { it.copy(settings = SettingsFeature.State(server = it.server)) },
             "What’s New" to { it.copy(settings = SettingsFeature.State.whatsNew(it.server)) },
-            "Session Switcher" to { it.copy(sessionSwitcher = it.sessionSwitcher.copy(isPresented = true)) },
             "delete confirmation" to { it.copy(pendingDeletion = it.sessions.first()) },
             "tap in flight" to {
                 it.copy(selectedTranscriptFetch = HomeFeature.SelectedTranscriptFetch(sessionID = "recent", transition = it.detailGeneration))

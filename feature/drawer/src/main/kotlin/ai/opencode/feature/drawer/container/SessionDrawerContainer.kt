@@ -520,7 +520,6 @@ fun SessionDrawerContainer(
         controller.isDark = isDark
         controller.keyboardHold = keyboardHold
         motion.keyboardHold = keyboardHold
-        panRegions.isOnTextField = keyboardHold::isOnTextField
         controller.isSheetPresented = { sheet }
         controller.isContentPushed = { pushed }
         controller.clearFocus = { focusManager.clearFocus(force = true) }

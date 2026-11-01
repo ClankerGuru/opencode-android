@@ -9,7 +9,6 @@ import ai.opencode.feature.drawer.HomeFeature.Action
 import ai.opencode.feature.drawer.HomeFeature.State
 import ai.opencode.feature.session.SessionFeature
 import ai.opencode.feature.session.InAppNotice
-import ai.opencode.feature.drawer.switcher.reduceSessionSwitcher
 import ai.opencode.server.OpenCodeServerEvent
 
 /*
@@ -41,7 +40,6 @@ internal fun HomeFeature.core(state: State, action: Action): Reduced<State, Acti
 }
 
 private fun HomeFeature.coreRoute(state: State, action: Action): Reduced<State, Action> = when (action) {
-    is Action.SessionSwitcher -> reduceSessionSwitcher(state, action.action)
     is Action.CatchUp -> reduceCatchUp(state, action.action)
     // The scoped `TraceUploadsFeature` reduces it (`HomeFeature+Composition`).
     is Action.Traces -> Reduced(state)

@@ -12,7 +12,6 @@ import ai.opencode.core.testing.TestIsolationRule
 import ai.opencode.feature.drawer.HomeFeature
 import ai.opencode.feature.drawer.catchup.CatchUpFeature
 import ai.opencode.feature.drawer.persistingSnapshot
-import ai.opencode.feature.drawer.switcher.SessionSwitcherFeature
 import ai.opencode.feature.session.SessionFeature
 import ai.opencode.feature.session.isDraft
 import ai.opencode.feature.settings.SettingsFeature
@@ -273,26 +272,6 @@ class PairingOpensDrawerAppTests {
         effects.skipInFlightEffects()
     }
 
-    /** The servers sheet opened before the view opens the drawer drops the request, so the drawer can't open beneath it. */
-    @Test
-    fun theServersSheetBeforeTheDrawerOpensDropsIt() = runTest {
-        val snapshot = recentSnapshot
-        val gates = Gates()
-        val list = GatedSnapshot(snapshot)
-        val store = pairingStore(paired = paired, gates = gates, experiments = setOf(ExperimentalFeature.serverTitleSwitch), homeSnapshot = list.read)
-        pairUntilListLoads(store, gates, opensDrawer = true)
-        list.release.complete(Unit)
-        store.receiveCase<AppFeature.Action.HomeResponse> { landHome(it, snapshot) }
-        receivePairedComputerOpened(store)
-        store.send(AppFeature.Action.Home(HomeFeature.Action.Delegate(HomeFeature.DelegateAction.ServersRequested))) {
-            it.copy(
-                serverTitle = shared.run { ServerTitleFeature.State.opening(paired) },
-                home = it.home?.copy(drawerOpenRequest = null),
-            )
-        }
-        effects.skipInFlightEffects()
-    }
-
     /** Pairs and lands Home with the drawer open asked for, not yet taken. */
     private suspend fun TestScope.landWithDrawerRequested(): TestStore<AppFeature.State, AppFeature.Action> {
         val snapshot = recentSnapshot
@@ -358,7 +337,6 @@ class PairingOpensDrawerAppTests {
             },
             "Settings" to { state -> state.home { it.copy(settings = SettingsFeature.State(server = paired)) } },
             "What’s New" to { state -> state.home { it.copy(settings = SettingsFeature.State(server = paired, root = SettingsFeature.State.Root.whatsNew)) } },
-            "Session Switcher" to { state -> state.home { it.copy(sessionSwitcher = SessionSwitcherFeature.State(isPresented = true)) } },
             "delete confirmation" to { state -> state.home { it.copy(pendingDeletion = it.sessions.first()) } },
             "subagent push" to { state -> state.home { it.copy(pendingSubagentPush = it.sessions.first()) } },
             "model picker" to { state -> state.detail { it.copy(activePicker = SessionFeature.State.ActivePicker.model) } },

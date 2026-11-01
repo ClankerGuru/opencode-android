@@ -21,8 +21,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -143,26 +141,6 @@ class DrawerKeyboardHold(
 
     override fun cardFieldFocusChanged(key: Any, focused: Boolean, clearFocus: () -> Unit) =
         fieldFocusChanged(Field(key, inDrawer = false, clearFocus), focused)
-
-    /** Where the card's text fields are laid out (the composer's), for touches that must stay theirs. */
-    private val fieldRegions = HashMap<Any, LayoutCoordinates>()
-
-    override fun cardFieldPlaced(key: Any, coordinates: LayoutCoordinates?) {
-        if (coordinates == null) fieldRegions.remove(key) else fieldRegions[key] = coordinates
-    }
-
-    /**
-     * Whether [point] (px in [root]) is on one of the card's text fields (iOS's `UITextView`
-     * ancestor walk in `SessionSwitcherController.gestureRecognizer(_:shouldReceive:)`).
-     */
-    fun isOnTextField(root: LayoutCoordinates?, point: Offset): Boolean {
-        if (root == null || !root.isAttached) return false
-        return fieldRegions.values.any { region ->
-            if (!region.isAttached) return@any false
-            val local = region.localPositionOf(root, point)
-            local.x >= 0 && local.y >= 0 && local.x < region.size.width && local.y < region.size.height
-        }
-    }
 
     /** A field in the drawer (its search) gained or lost focus. */
     fun drawerFieldFocusChanged(key: Any, focused: Boolean, clearFocus: () -> Unit) =

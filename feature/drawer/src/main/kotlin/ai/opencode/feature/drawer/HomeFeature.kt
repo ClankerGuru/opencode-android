@@ -11,7 +11,6 @@ import ai.opencode.core.store.Reducer
 import ai.opencode.feature.drawer.catchup.CatchUpFeature
 import ai.opencode.devtools.traces.TraceUploadsFeature
 import ai.opencode.feature.session.InAppNotice
-import ai.opencode.feature.drawer.switcher.SessionSwitcherFeature
 import ai.opencode.feature.composer.ComposerPersistence
 import ai.opencode.feature.composer.PromptOutbox
 import ai.opencode.feature.composer.DraftState
@@ -56,7 +55,7 @@ import kotlin.time.Duration.Companion.seconds
  *
  * The reducer body is assembled in `HomeFeatureComposition.kt`; Home's own actions route through
  * `HomeFeatureCore.kt`. Child features (`HomeConnectionFeature`, `HomeNotificationsFeature`,
- * `HomeSettingsFeature`, `SessionSwitcherFeature`, `CatchUpFeature`) are scoped there.
+ * `HomeSettingsFeature`, `CatchUpFeature`) are scoped there.
  *
  * Session screens are `:feature:session`'s [SessionFeature]: the open one presented (`ifLet`) and
  * pushed subagents identified by their `navigationID` (`forEach`); Home matches their actions after
@@ -92,7 +91,6 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
          */
         val previewRevision: Int = 0,
         val search: String = "",
-        val sessionSwitcher: SessionSwitcherFeature.State = SessionSwitcherFeature.State(),
         val transcriptCache: Map<String, List<OpenCodeTranscriptItem>> = emptyMap(),
         /** Cached transcripts being read again (`refreshCachedTranscript`). */
         val refreshingTranscripts: Set<String> = emptySet(),
@@ -415,12 +413,11 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
 
         /**
          * Home has moved toward another screen, or shows something over the session: Catch Up,
-         * Settings, What's New, the Session Switcher, a push, a pending open, or a confirmation.
+         * Settings, What's New, a push, a pending open, or a confirmation.
          */
         val presentsOverHome: Boolean
             get() = catchUp != null ||
                 isSettingsShown ||
-                sessionSwitcher.isPresented ||
                 pendingDeletion != null ||
                 selectedTranscriptFetch != null ||
                 pendingSubagentPush != null ||
@@ -571,8 +568,6 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         data object ServerBadgeTapped : DelegateAction
         /** Connects to another saved server. */
         data class ServerSwitchTapped(val server: OpenCodeServer) : DelegateAction
-        /** Leave this server to pick another. */
-        data object ServersRequested : DelegateAction
         /** Renames a saved server in place, without reconnecting (Home also takes the name). */
         data class ServerRenamed(val server: OpenCodeServer, val name: String) : DelegateAction
         /** Opens a saved server's address, credentials and headers for editing. */
@@ -586,7 +581,6 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
     }
 
     sealed interface Action {
-        data class SessionSwitcher(val action: SessionSwitcherFeature.Action) : Action
         data class CatchUp(val action: CatchUpFeature.Action) : Action
         data class Traces(val action: TraceUploadsFeature.Action) : Action
         /** The drawer's What's New row: open (`buttonTapped`) or hide (`hideTapped`). */

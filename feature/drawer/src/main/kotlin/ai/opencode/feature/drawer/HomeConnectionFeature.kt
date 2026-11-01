@@ -48,8 +48,13 @@ class HomeConnectionFeature : Reducer<HomeConnectionFeature.State, HomeConnectio
     data class State(
         val server: OpenCodeServer,
         val connectionStatus: ConnectionStatus = ConnectionStatus.connected,
-        /** Set only when the event stream is refused with a 401. */
+        /** Why the event stream last failed for good. */
         val connectionErrorMessage: String? = null,
+        /**
+         * The server refused the credentials with a 401: retrying can't help until they're edited
+         * or the server is paired again.
+         */
+        val credentialsRejected: Boolean = false,
         /** A live stream has connected in this process. */
         val hasConnected: Boolean = false,
         /** The view's task owns the event stream, so foregrounding can restart it. */
@@ -62,7 +67,6 @@ class HomeConnectionFeature : Reducer<HomeConnectionFeature.State, HomeConnectio
         @Suppress("EnumEntryName")
         enum class ConnectionStatus { reconnecting, connected, disconnected }
 
-        val credentialsRejected: Boolean get() = connectionErrorMessage != null
         val isConnected: Boolean get() = connectionStatus == ConnectionStatus.connected
     }
 
@@ -115,7 +119,10 @@ class HomeConnectionFeature : Reducer<HomeConnectionFeature.State, HomeConnectio
             val server = action.server.copy(name = state.server.name)
             PerfTimeline.streamConnected()
             Reduced(
-                state.copy(server = server, hasConnected = true, isEventStreamLive = true, connectionErrorMessage = null),
+                state.copy(
+                    server = server, hasConnected = true, isEventStreamLive = true,
+                    connectionErrorMessage = null, credentialsRejected = false,
+                ),
             )
         }
 
@@ -124,6 +131,7 @@ class HomeConnectionFeature : Reducer<HomeConnectionFeature.State, HomeConnectio
             Reduced(
                 state.copy(
                     connectionErrorMessage = action.error.message,
+                    credentialsRejected = action.error.statusCode == HomeFeature.credentialsRejectedStatus,
                     connectionStatus = State.ConnectionStatus.disconnected,
                     isEventStreamLive = false,
                 ),

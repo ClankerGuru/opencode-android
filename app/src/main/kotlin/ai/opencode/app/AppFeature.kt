@@ -716,7 +716,6 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
     }
 
     private fun homeDelegate(state: State, action: HomeFeature.DelegateAction): Reduced<State, Action> = when (action) {
-        HomeFeature.DelegateAction.ServersRequested -> serverTitleOpened(state)
         // Back to the picker: Home is rebuilt from scratch on reconnect since sessions, projects
         // and the event stream are all server-scoped.
         HomeFeature.DelegateAction.ServerBadgeTapped,

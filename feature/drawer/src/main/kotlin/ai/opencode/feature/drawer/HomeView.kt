@@ -60,7 +60,6 @@ import androidx.compose.ui.layout.positionInWindow
 import kotlin.math.max
 import ai.opencode.server.OpenCodeServer
 import androidx.compose.runtime.collectAsState
-import ai.opencode.feature.drawer.switcher.SessionSwitcherOverlay
 import ai.opencode.feature.session.SessionFeature
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
@@ -189,7 +188,6 @@ private fun HomeLayout(
     val pushed by store.observe { it.subagentStack.isNotEmpty() || it.sessionDetail?.browser?.pageID != null }
     val settingsShown by store.observe { it.isSettingsShown }
     val sheetPresented by store.observe { it.topDetail?.activePicker != null || it.topDetail?.shellOutput != null }
-    val isDrawerOpen by store.observe { it.isDrawerOpen }
     val catchUpProxy = remember { CatchUpStageProxy() }
     val currentReducedMotion by rememberUpdatedState(reducedMotion)
     val callPresentation = rememberCallPresentation()
@@ -282,14 +280,7 @@ private fun HomeLayout(
         isContentPushed = pushed,
         isSheetPresented = settingsShown || sheetPresented,
         content = {
-            SessionSwitcherOverlay(
-                store = store,
-                drawerOpen = view.isSessionDrawerPresented || isDrawerOpen,
-                usesSidebar = usesSidebar,
-                modifier = Modifier.fillMaxSize(),
-            ) {
-                HomeSessionStack(store, view, usesSidebar, containerWidth, callTray = if (usesTray) callTray else null)
-            }
+            HomeSessionStack(store, view, usesSidebar, containerWidth, callTray = if (usesTray) callTray else null)
         },
         // The drawer's panel (iOS `sessionDrawer(width:insets:)`); Home hosts the delete confirmation.
         drawer = { HomeDrawer(store, view, Modifier.fillMaxSize(), hostsDeleteConfirmation = false) },

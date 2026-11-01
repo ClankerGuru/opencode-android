@@ -26,16 +26,12 @@ fun switchableServers(current: OpenCodeServer, saved: List<OpenCodeServer>): Lis
  * saved server it's just the name; with more, a chevron opens a menu of the servers (the current
  * one checked) and Manage Servers…. No status shows while all is well. A confirmed outage dims it
  * (a reconnect usually settles in a second, so it earns nothing), and its menu, which one server
- * gains only then, offers Try Again. Dimming and the one-server menu coming and going are both
+ * gains only then, offers Try Again, or, when the server refused the credentials, editing them. Dimming and the one-server menu coming and going are both
  * cross-fades (0.25 s ease-in-out, [CROSS_FADE_MILLIS]), with or without reduced motion.
  */
 object DrawerTitle {
     /** iOS `.animation(.easeInOut(duration: 0.25), value: presentation)`. */
     const val CROSS_FADE_MILLIS = 250
-
-    /** iOS `@ScaledMetric(relativeTo: .title)` chevron disc and glyph of Title Is the Switch, in points (dp). */
-    const val CHEVRON_DISC = 22
-    const val CHEVRON_GLYPH = 10
 
     /** The title's minimum height (iOS 44 pt; Android's touch target floor is 48 dp). */
     const val MIN_HEIGHT = 44
@@ -46,7 +42,8 @@ object DrawerTitle {
     const val TRY_AGAIN = "Try Again"
     const val MANAGE_SERVERS = "Manage Servers…"
     const val OFFLINE = "Offline"
-    const val TITLE_SWITCH_HINT = "Shows your servers"
+    const val SIGN_IN_FAILED = "Sign-in failed"
+    const val EDIT_SERVER = "Edit Server…"
 
     /** "Connecting to <name>…": the title while another server is being connected to. */
     fun connecting(name: String): String = "Connecting to $name…"
@@ -54,16 +51,6 @@ object DrawerTitle {
     /** What the title (or the menu's label) reads: the server switched to while connecting, else the current one. */
     fun titleText(current: OpenCodeServer, switchingTo: OpenCodeServer?): String =
         switchingTo?.let { connecting(it.friendlyName) } ?: current.friendlyName
-
-    /**
-     * Title Is the Switch's line under the name: connecting to another server, else Offline, else
-     * nothing.
-     */
-    fun titleSwitchCaption(status: HomeConnectionFeature.State.ConnectionStatus, switchingTo: OpenCodeServer?): String? = when {
-        switchingTo != null -> connecting(switchingTo.friendlyName)
-        status == HomeConnectionFeature.State.ConnectionStatus.disconnected -> OFFLINE
-        else -> null
-    }
 
     /** What the title shows for a server count and connection status. */
     data class Presentation(
@@ -73,6 +60,8 @@ object DrawerTitle {
         val hasMenu: Boolean,
         val listsServers: Boolean,
         val offersTryAgain: Boolean,
+        /** Rejected credentials: editing the server replaces Try Again. */
+        val offersEdit: Boolean,
         /** The connection's status, never an address. */
         val issue: String?,
         val accessibilityValue: String,
@@ -82,24 +71,33 @@ object DrawerTitle {
             operator fun invoke(
                 serverCount: Int,
                 status: HomeConnectionFeature.State.ConnectionStatus,
+                credentialsRejected: Boolean = false,
                 switchingTo: String? = null,
             ): Presentation {
+                val rejected = status == HomeConnectionFeature.State.ConnectionStatus.disconnected && credentialsRejected
                 val issue = when (status) {
                     HomeConnectionFeature.State.ConnectionStatus.connected -> null
                     HomeConnectionFeature.State.ConnectionStatus.reconnecting -> "Reconnecting"
-                    HomeConnectionFeature.State.ConnectionStatus.disconnected -> OFFLINE
+                    HomeConnectionFeature.State.ConnectionStatus.disconnected -> if (rejected) SIGN_IN_FAILED else OFFLINE
                 }
                 val listsServers = serverCount > 1
-                val offersTryAgain = status == HomeConnectionFeature.State.ConnectionStatus.disconnected
-                val hasMenu = listsServers || offersTryAgain
+                val offersTryAgain = status == HomeConnectionFeature.State.ConnectionStatus.disconnected && !rejected
+                val offersEdit = rejected
+                val hasMenu = listsServers || offersTryAgain || offersEdit
                 return Presentation(
                     isDimmed = status == HomeConnectionFeature.State.ConnectionStatus.disconnected && switchingTo == null,
                     hasMenu = hasMenu,
                     listsServers = listsServers,
                     offersTryAgain = offersTryAgain,
+                    offersEdit = offersEdit,
                     issue = issue,
                     accessibilityValue = switchingTo?.let { "Connecting to $it" } ?: issue ?: "",
-                    accessibilityHint = if (listsServers) "Shows your servers" else if (hasMenu) "Offers to try again" else null,
+                    accessibilityHint = when {
+                        listsServers -> "Shows your servers"
+                        offersEdit -> "Offers to edit the server"
+                        hasMenu -> "Offers to try again"
+                        else -> null
+                    },
                 )
             }
 
@@ -108,7 +106,8 @@ object DrawerTitle {
                 servers: List<OpenCodeServer>,
                 status: HomeConnectionFeature.State.ConnectionStatus,
                 switchingTo: OpenCodeServer?,
-            ): Presentation = Presentation(servers.size, status, switchingTo?.friendlyName)
+                credentialsRejected: Boolean = false,
+            ): Presentation = Presentation(servers.size, status, credentialsRejected, switchingTo?.friendlyName)
         }
     }
 }
