@@ -148,7 +148,8 @@ literals that aren't symbols). `(fill)` is the filled variant. Weak matches: `st
 | `eye` | `visibility` | `ms_visibility` | `SFSymbol.Eye` | AppView, SettingsView, TuningPanelView |
 | `eye.slash` | `visibility_off` | `ms_visibility_off` | `SFSymbol.EyeSlash` | AppView, ExperimentalFeatures, SettingsView, TuningPanelView, WhatsNewView |
 | `film` | `movie` | `ms_movie` | `SFSymbol.Film` | AgentFileReference, AttachmentFileType |
-| `flask` | `science` | `ms_science` | `SFSymbol.Flask` | WhatsNewList |
+| `flask` | `science` | `ms_science` | `SFSymbol.Flask` | WhatsNew/Entries |
+| `flask.fill` | `science` (fill) | `ms_science_fill` | `SFSymbol.FlaskFill` | ExperimentalSettingsView (`ExperimentalSettingsRow`) |
 | `folder` | `folder` | `ms_folder` | `SFSymbol.Folder` | AttachmentPicker, DraftProjects, SystemEntities, WhatsNewList |
 | `folder.badge.plus` | `create_new_folder` | `ms_create_new_folder` | `SFSymbol.FolderBadgePlus` | DraftProjects |
 | `folder.fill` | `folder` (fill) | `ms_folder_fill` | `SFSymbol.FolderFill` | DraftProjects |
@@ -158,7 +159,7 @@ literals that aren't symbols). `(fill)` is the filled variant. Weak matches: `st
 | `gearshape.fill` | `settings` (fill) | `ms_settings_fill` | `SFSymbol.GearshapeFill` | HomeView+Drawer |
 | `gift` | `redeem` | `ms_redeem` | `SFSymbol.Gift` | WhatsNewList, WhatsNewView |
 | `globe` | `language` | `ms_language` | `SFSymbol.Globe` | InlineLinkIcons, LinkMenu, LinkPreviewViews |
-| `hammer.fill` | `construction` (fill) | `ms_construction_fill` | `SFSymbol.HammerFill` | ExperimentalSettingsView |
+| `hammer.fill` | `construction` (fill) | `ms_construction_fill` | `SFSymbol.HammerFill` | SettingsView (Developer row) |
 | `hand.draw` | `draw` | `ms_draw` | `SFSymbol.HandDraw` | WhatsNewList |
 | `hand.draw.fill` | `draw` (fill) | `ms_draw_fill` | `SFSymbol.HandDrawFill` | TraceTriggers, WhatsNewList |
 | `hand.point.up.left` | `pan_tool_alt` | `ms_pan_tool_alt` | `SFSymbol.HandPointUpLeft` | WhatsNewList |
@@ -251,9 +252,11 @@ literals that aren't symbols). `(fill)` is the filled variant. Weak matches: `st
 | `slider.horizontal.below.rectangle` | `instant_mix` | `ms_instant_mix` | `SFSymbol.SliderHorizontalBelowRectangle` | PlaygroundHostView |
 | `smallcircle.filled.circle` | `radio_button_checked` | `ms_radio_button_checked` | `SFSymbol.SmallcircleFilledCircle` | LinkPreviewViews |
 | `sparkles` | `auto_awesome` | `ms_auto_awesome` | `SFSymbol.Sparkles` | ModelSwitchRule, SettingsView, WhatsNewEntries, WhatsNewList |
+| `speaker.fill` | `volume_mute` (fill) | `ms_volume_mute_fill` | `SFSymbol.SpeakerFill` | SoundEffectsSettings |
 | `speaker.wave.1` | `volume_down` | `ms_volume_down` | `SFSymbol.SpeakerWave1` | WhatsNewList |
 | `speaker.wave.2` | `volume_up` | `ms_volume_up` | `SFSymbol.SpeakerWave2` | WhatsNew/Entries |
 | `speaker.wave.2.fill` | `volume_up` (fill) | `ms_volume_up_fill` | `SFSymbol.SpeakerWave2Fill` | SoundEffectsExperiment, WhatsNew/Entries |
+| `speaker.wave.3.fill` | `volume_up` (fill) | `ms_volume_up_fill` | `SFSymbol.SpeakerWave3Fill` | SoundEffectsSettings (Material has no three-wave speaker) |
 | `square` | `check_box_outline_blank` | `ms_check_box_outline_blank` | `SFSymbol.Square` | AgentImageGallery, MarkdownBlockView, ProjectIcon, RequestDockView |
 | `square.and.arrow.down` | `download` | `ms_download` | `SFSymbol.SquareAndArrowDown` | TranscriptImageViewer |
 | `square.and.arrow.up` | `share` | `ms_share` | `SFSymbol.SquareAndArrowUp` | AgentFileViewer, BrowserView, DiagnosticsView, LinkMenu, SessionSheetView, SessionView+Header, ShellOutputView, TranscriptImageViewer, VoiceCallLogView, WhatsNewList |

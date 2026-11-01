@@ -186,6 +186,7 @@ refresh                             # arrow.clockwise
 replay                              # arrow.counterclockwise
 schedule                            # clock
 science                             # flask
+science fill                        # flask.fill
 search                              # magnifyingglass
 select                              # app.dashed
 send mirror                         # paperplane
@@ -229,8 +230,9 @@ videocam fill                       # video.fill
 visibility                          # eye
 visibility_off                      # eye.slash
 volume_down                         # speaker.wave.1
+volume_mute fill                    # speaker.fill
 volume_up                           # speaker.wave.2
-volume_up fill                      # speaker.wave.2.fill
+volume_up fill                      # speaker.wave.2.fill, speaker.wave.3.fill
 warning                             # exclamationmark.triangle
 warning fill                        # exclamationmark.triangle.fill
 waving_hand                         # hand.wave
