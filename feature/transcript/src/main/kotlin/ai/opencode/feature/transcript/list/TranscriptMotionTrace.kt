@@ -27,7 +27,7 @@ import kotlin.math.roundToInt
  * Only frames that differ from the last one recorded are kept; `elapsed` counts the display
  * frames since the previous callback, so a hitch isn't read as a jump. The frame loop pauses once
  * the transcript and drawer have been still for 1.2 s and wakes before the next snapshot apply,
- * scroll, or drawer move. Zero cost while Motion Watch is off: every entry point returns after
+ * scroll, drawer move, or sheet. Zero cost while Motion Watch is off: every entry point returns after
  * one volatile read.
  *
  * Android mapping: `CADisplayLink` → `Choreographer.FrameCallback`; presentation layers →
@@ -96,6 +96,15 @@ object TranscriptMotionTrace {
         if (!isActive) return
         if (!running) sampleRestingBaseline()
         wake()
+    }
+
+    /**
+     * iOS `sheetWillMove()`: a sheet starts arriving or leaving over the transcript. Nothing in the
+     * list moves, so this is what wakes a paused loop to watch it.
+     */
+    fun sheetWillMove() {
+        if (!isActive) return
+        willChange()
     }
 
     /** Wakes the frame loop when scrolling, a motion, or a disclosure starts. */
@@ -227,7 +236,7 @@ object TranscriptMotionTrace {
             gesture = probe.gesture, motions = motions, phase = probe.phase, reduceMotion = probe.reduceMotion,
             browsing = probe.browsing, trailingSpace = 0.0,
             timeScale = if (abs(scale - 1.0) > 1e-4) round(scale, 100.0).takeIf { it > 0 } ?: 1.0 else 1.0,
-            session = probe.sessionID.orEmpty(), rows = probe.rows, boxes = boxes,
+            session = probe.sessionID.orEmpty(), rows = probe.rows, composerTop = probe.composerTop, boxes = boxes,
         )
     }
 
@@ -248,6 +257,12 @@ object TranscriptMotionTrace {
         val insetBottom: Double,
         val height: Double,
         val width: Double,
+        /**
+         * iOS `composerTop` (`ComposerTopEdge`): the composer's drawn top on the list's screen, so
+         * rows riding the bottom chrome in the same frame aren't a jump. Android's composer moves
+         * the rows through the list's bottom content padding, so its top is where that begins.
+         */
+        val composerTop: Double? = null,
     )
 
     /** Never NaN or infinite, which JSON can't carry. */

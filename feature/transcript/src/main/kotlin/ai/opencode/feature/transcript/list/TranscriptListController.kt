@@ -562,6 +562,8 @@ class TranscriptListController(
         if (jumpGlide != null && "jump" !in motions) motions += "jump"
         if (growths.isNotEmpty()) motions += "grow"
         if (disclosureSprings.isNotEmpty()) motions += "disclosure"
+        if (revealGlide != null) motions += "reveal"
+        if (dividerMotion != null) motions += "divider"
         val phase = when {
             !hasLaidOutContent -> "opening"
             transcriptNow() < arrivalsGlideAfter -> "settle"
@@ -582,6 +584,9 @@ class TranscriptListController(
             insetBottom = TranscriptMotionTrace.round((info.afterContentPadding / density).toDouble()),
             height = TranscriptMotionTrace.round((info.viewportSize.height / density).toDouble()),
             width = TranscriptMotionTrace.round((info.viewportSize.width / density).toDouble()),
+            composerTop = info.afterContentPadding.takeIf { it > 0 }?.let {
+                TranscriptMotionTrace.round(((info.viewportSize.height - it) / density).toDouble())
+            },
         )
     }
 
