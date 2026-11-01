@@ -88,6 +88,8 @@ class SettingsFeature : Reducer<SettingsFeature.State, SettingsFeature.Action> {
         val notificationPermission: NotificationPermission? = null,
         val isRequestingNotifications: Boolean = false,
         val notificationSetupError: String? = null,
+        /** The server half of notifications (iOS `HomeFeature.State.notifyPlugin`), read when Notifications opens. */
+        val notifyPlugin: NotifyPluginCheck? = null,
         /** What the push shows, fixed as it opens: Settings, or What's New from the drawer's row. */
         val root: Root = Root.settings,
         /** Pages pushed above the root, innermost last. */
@@ -133,6 +135,7 @@ class SettingsFeature : Reducer<SettingsFeature.State, SettingsFeature.Action> {
             val permission: NotificationPermission?,
             val isRequesting: Boolean,
             val setupError: String?,
+            val notifyPlugin: NotifyPluginCheck? = null,
         ) : Action
 
         /** Push a page (iOS `NavigationLink`). */
@@ -168,6 +171,10 @@ class SettingsFeature : Reducer<SettingsFeature.State, SettingsFeature.Action> {
         data class RemoveServer(val server: OpenCodeServer) : SettingsDelegate
         data object EnableNotificationsTapped : SettingsDelegate
         data object NotificationSettingsRequested : SettingsDelegate
+        /** Check Again, and opening Notifications (iOS `notifyPluginCheckRequested`). */
+        data object NotifyPluginCheckRequested : SettingsDelegate
+        /** Set Up with OpenCode (iOS `notifyPluginSetUpTapped`, 7969c85c). */
+        data object NotifyPluginSetUpTapped : SettingsDelegate
         /** What's New's action that leaves Settings for a session (`HomeFeature.tryWhatsNew`). */
         data class TryWhatsNew(val destination: WhatsNewEntry.Destination, val entryID: String) : SettingsDelegate
     }
@@ -268,6 +275,7 @@ class SettingsFeature : Reducer<SettingsFeature.State, SettingsFeature.Action> {
                 notificationPermission = action.permission,
                 isRequestingNotifications = action.isRequesting,
                 notificationSetupError = action.setupError,
+                notifyPlugin = action.notifyPlugin,
             ),
         )
         is Action.PagePushed -> push(state, action.page)
