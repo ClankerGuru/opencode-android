@@ -10,6 +10,7 @@ import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.OpenCodeTransport
 import ai.opencode.server.UrlErrorCode
 import ai.opencode.server.internal.WireJson
+import ai.opencode.server.model.OpenCodeMediaReference
 import ai.opencode.server.retry.NetworkRetry
 import ai.opencode.server.retry.RequestIdempotency
 import ai.opencode.server.retry.RetryPolicy
@@ -53,6 +54,22 @@ internal fun locationQuery(directory: String?): List<Pair<String, String>> =
     directory?.let { listOf("location[directory]" to it) } ?: emptyList()
 
 /** A route as the log shows it: IDs stay, a pairing code doesn't. */
+/**
+ * Advertises `X-OpenCode-Capabilities: experimental-media-uri` (merged into an existing
+ * comma-separated list); the server decides whether to answer with media references or inline
+ * data. Sent with every request that carries correlation headers, as iOS `applyCapabilities`.
+ */
+internal fun applyCapabilities(request: Request.Builder): Request.Builder {
+    val capability = OpenCodeMediaReference.CAPABILITY
+    val existing = request.build().header(CAPABILITIES_HEADER)?.trim()
+    if (existing.isNullOrEmpty()) return request.header(CAPABILITIES_HEADER, capability)
+    val values = existing.split(",").map { it.trim() }
+    if (capability in values) return request
+    return request.header(CAPABILITIES_HEADER, (values + capability).joinToString(", "))
+}
+
+internal const val CAPABILITIES_HEADER = "X-OpenCode-Capabilities"
+
 internal fun loggablePath(path: String): String = if (path.startsWith("/auth/")) "/auth/…" else path
 
 /**
@@ -230,6 +247,7 @@ private suspend fun performOnce(
         .method(method, requestBody(method, body))
         .header("Accept", "application/json")
     server.authorize(builder)
+    applyCapabilities(builder)
     correlation.identify(builder, requestID)
     val client = (if (longPoll) transport.longPoll else transport.request).withTimeout(timeout, followsRedirects)
     val response = try {

@@ -1,5 +1,6 @@
 package ai.opencode.server.model
 
+import ai.opencode.core.files.AttachmentFileType
 import ai.opencode.server.TaskLocal
 import ai.opencode.server.internal.ElementSerializer
 import ai.opencode.server.internal.obj
@@ -144,7 +145,18 @@ data class OpenCodeTranscriptFile(
     val text: String? = null,
     /** The card's summary, computed once with [text]. */
     val pasted: PastedTextSummary? = text?.let(::PastedTextSummary),
-)
+    /** A `media:<hash>` reference the chip loads through media's `MediaReferenceClient`. */
+    val mediaHash: String? = null,
+    val byteCount: Long? = null,
+    /** The server's `[media unavailable: …]` placeholder stood in for it. */
+    val isUnavailable: Boolean = false,
+) {
+    val typeLabel: String
+        get() = if (isUnavailable) "Media unavailable" else AttachmentFileType.label(name, mime)
+
+    val symbolName: String
+        get() = if (isUnavailable) "exclamationmark.triangle" else AttachmentFileType.symbolName(name, mime)
+}
 
 sealed interface OpenCodeUploadEvent {
     data class Progress(val sent: Long) : OpenCodeUploadEvent

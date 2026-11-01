@@ -55,10 +55,15 @@ data class OpenCodePendingInput(
     val source: OpenCodePromptSource? = null,
     /** Inline files that aren't images: chips, and Pasted Text cards. */
     val inlineFiles: List<OpenCodeTranscriptFile> = emptyList(),
+    /** Attached images from the inbox payload (inline base64, `media:<hash>`, or unavailable placeholder). */
+    val images: List<OpenCodeImageAttachment> = emptyList(),
 )
 
-/** Client presentation for an admitted input. Images stay client-side, keyed by prompt ID. */
-data class OpenCodeQueuedInput(val input: OpenCodePendingInput, val images: List<OpenCodeImageAttachment> = emptyList()) {
+/**
+ * Client presentation for an admitted input. Local outgoing images take precedence while in
+ * flight; otherwise inbox images are shown (iOS `init(input:images:)` with `images ?? input.images`).
+ */
+data class OpenCodeQueuedInput(val input: OpenCodePendingInput, val images: List<OpenCodeImageAttachment> = input.images) {
     val id: String get() = input.id
     val files: List<OpenCodeFileReference> get() = input.files
     val text: String get() = input.text

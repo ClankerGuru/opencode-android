@@ -106,6 +106,7 @@ internal suspend fun requestMarkdownImage(
             if (isServerRead) {
                 val correlation = NetworkRetry.correlation.current() ?: NetworkRetry.Correlation()
                 correlation.identify(builder, UUID.randomUUID().toString().uppercase())
+                applyCapabilities(builder)
             }
             val response = try {
                 transport.measuredRequest.withTimeout(60.seconds).newCall(builder.build()).awaitResponse()
@@ -195,6 +196,7 @@ private suspend fun writeUpload(url: HttpUrl, file: File, server: OpenCodeServer
     val correlation = NetworkRetry.correlation.current() ?: NetworkRetry.Correlation()
     val requestID = UUID.randomUUID().toString().uppercase()
     correlation.identify(builder, requestID)
+    applyCapabilities(builder)
     // An idle interval: a stalled body trips it, a slow but moving one doesn't.
     val client = dependency(OpenCodeTransport).request.withTimeout(120.seconds)
     val response = try {

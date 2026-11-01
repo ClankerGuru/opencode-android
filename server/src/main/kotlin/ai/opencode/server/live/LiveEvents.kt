@@ -80,6 +80,7 @@ internal fun subscribeEvents(server: OpenCodeServer): Flow<OpenCodeServerEvent> 
             val builder = Request.Builder().url(url).header("Accept", "text/event-stream")
             server.authorize(builder)
             builder.header("X-OpenCode-Op", operationID).header("X-OpenCode-Req", UUID.randomUUID().toString().uppercase())
+            applyCapabilities(builder)
             val call = dependency(OpenCodeTransport).eventStream.newCall(builder.build())
             activeCall.set(call)
             stream.record(DiagnosticsStreamName.ConnectStart)

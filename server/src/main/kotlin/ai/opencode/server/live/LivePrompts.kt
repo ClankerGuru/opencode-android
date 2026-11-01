@@ -74,7 +74,7 @@ internal fun promptBody(
     mentions: OpenCodeAutocompleteMentions? = null,
 ): PromptBody {
     val bounded = page?.bounded
-    val attachmentFiles = attachments.map { PromptBody.File(uri = it.dataURL, name = it.name) }
+    val attachmentFiles = attachments.map { PromptBody.File(uri = it.promptURI, name = it.name) }
     val mentionFiles = (mentions?.files ?: emptyList()).map { PromptBody.File(it.uri, it.name, it.description, it.mention) }
     val combinedFiles = attachmentFiles + mentionFiles
     return PromptBody(
@@ -184,5 +184,6 @@ internal fun pendingInputRows(payload: PendingInputsPayload): List<OpenCodePendi
         files = files,
         source = OpenCodePromptSource.of(source?.text, source?.metadata),
         inlineFiles = FilePayload.attachedFiles(source?.files ?: emptyList(), item.id),
+        images = FilePayload.attachedImages(source?.files ?: emptyList(), item.id),
     )
 }
