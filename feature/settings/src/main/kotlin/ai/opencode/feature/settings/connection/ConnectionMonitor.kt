@@ -147,7 +147,7 @@ class ConnectionProbeClient(
  * Port of iOS `ConnectionMonitor`: drives [ConnectionHealth] for the card on screen: feeds it
  * Home's link, runs the checks, and applies each status change at its moment on the trace. A plain
  * object (iOS `@Observable` class), view-local and short-lived; nothing here outlives Settings but
- * the last round trip per server and the machine names found. Its readable values are Compose
+ * the last averaged round trip per server and the machine names found. Its readable values are Compose
  * state; the card and the server page animate their changes (numbers roll, words replace, a
  * cross-fade under reduce motion). Used on the main thread only.
  *
@@ -318,7 +318,7 @@ class ConnectionMonitor(server: OpenCodeServer, link: ConnectionHealth.Link) {
         checks.remove(id)
         health.answer(id, answer.milliseconds, now())
         answer.version?.let { version = it }
-        lastMilliseconds[persistenceID] = answer.milliseconds
+        lastMilliseconds[persistenceID] = health.averageMilliseconds ?: answer.milliseconds
         tick()
     }
 
@@ -345,7 +345,7 @@ class ConnectionMonitor(server: OpenCodeServer, link: ConnectionHealth.Link) {
     }
 
     companion object {
-        /** The last round trip per server, so reopening Settings shows a number at once. */
+        /** The last averaged round trip per server, so reopening Settings shows a number at once. */
         private val lastMilliseconds = ConcurrentHashMap<String, Int>()
 
         /** iOS `UserDefaults` `connection-card-machine-names`: machine names found, by IP. */

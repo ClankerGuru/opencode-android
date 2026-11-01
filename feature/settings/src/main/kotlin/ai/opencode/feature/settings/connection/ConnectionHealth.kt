@@ -56,7 +56,10 @@ class ConnectionHealth(link: Link, at: Double, milliseconds: Int? = null) {
 
     data class Display(
         val status: Status,
-        /** The last measured round trip. */
+        /**
+         * The round trip shown: the rolling average of the recent answered checks
+         * ([averageMilliseconds]), so one slow answer doesn't jolt it.
+         */
         val milliseconds: Int? = null,
         /** The server being switched to. */
         val target: String? = null,
@@ -86,6 +89,8 @@ class ConnectionHealth(link: Link, at: Double, milliseconds: Int? = null) {
         const val reconnectingDelay = 0.45
         /** Resolved checks that judge the line: any drop among them is Unstable. */
         const val judged = 5
+        /** Answered checks the shown round trip averages, like a game's ping: about six seconds at the connected cadence. */
+        const val averaged = 3
 
         private fun status(of: Link): Status = when (of) {
             Link.Connected -> Status.connected
@@ -123,10 +128,18 @@ class ConnectionHealth(link: Link, at: Double, milliseconds: Int? = null) {
         private set
     private var checkDue: Double? = null
     private var nextID = 0
+    /**
+     * The last [averaged] answered round trips since the link connected, oldest first. Settings
+     * opens with the number it last showed for this server as the first, so the first check
+     * doesn't jump from it.
+     */
+    var recentMilliseconds: List<Int> = emptyList()
+        private set
 
     init {
         // Opening onto a connection shows where it is at once; there's no trace to wait for yet.
         display = Display(status(link), if (link == Link.Connected) milliseconds else null, link.target)
+        recentMilliseconds = listOfNotNull(display.milliseconds)
         if (link.isDown) _offline += OfflineSpan(Double.NEGATIVE_INFINITY)
     }
 
@@ -137,6 +150,7 @@ class ConnectionHealth(link: Link, at: Double, milliseconds: Int? = null) {
         val old = link
         link = new
         linkSince = at
+        recentMilliseconds = emptyList()
         if (old.isDown && !new.isDown && _offline.isNotEmpty()) {
             _offline[_offline.lastIndex] = _offline.last().copy(end = at)
         }
@@ -195,8 +209,14 @@ class ConnectionHealth(link: Link, at: Double, milliseconds: Int? = null) {
         _beats[index] = _beats[index].copy(outcome = Outcome.Answered(milliseconds))
         // Reconnecting holds until Home reconnects; the answer only draws its spike.
         if (link != Link.Connected) return
+        // A check that left before this connection says nothing about its round trip.
+        if (_beats[index].time >= linkSince) {
+            recentMilliseconds = (recentMilliseconds + milliseconds).takeLast(averaged)
+        }
         val shape = BeatShape(milliseconds)
-        schedule(Change(max(at, _beats[index].time + shape.spike), Display(measuredStatus(), milliseconds, null)))
+        schedule(
+            Change(max(at, _beats[index].time + shape.spike), Display(measuredStatus(), averageMilliseconds ?: milliseconds, null)),
+        )
     }
 
     /** The check [id] failed outright (no answer will come). */
@@ -245,6 +265,13 @@ class ConnectionHealth(link: Link, at: Double, milliseconds: Int? = null) {
         if (recent.isEmpty()) return Status.connected
         return if (recent[(recent.size - 1) / 2] >= slowMilliseconds) Status.slow else Status.connected
     }
+
+    /**
+     * The rolling average of [recentMilliseconds], rounded; null before any. Drops don't count:
+     * they show as Unstable, not as a number.
+     */
+    val averageMilliseconds: Int?
+        get() = if (recentMilliseconds.isEmpty()) null else Math.round(recentMilliseconds.sum().toDouble() / recentMilliseconds.size).toInt()
 
     /** When the next check should leave; null while offline or switching. */
     val nextCheck: Double?
