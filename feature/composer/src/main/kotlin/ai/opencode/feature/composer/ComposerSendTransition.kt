@@ -33,6 +33,12 @@ class ComposerSendTransition {
         val origin: Offset = bounds.topLeft,
     )
 
+    /**
+     * The send's photos (iOS `images`): copies of the composer's thumbnails flying into the
+     * bubble's image slots. The session's flight drives them alongside the words.
+     */
+    val images = SentImageFlight()
+
     /** The field's text and its visible bounds in the window (px), updated by [ComposerTextInput]. */
     var inputText: String = ""
         internal set
