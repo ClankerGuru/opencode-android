@@ -4,7 +4,9 @@ import ai.opencode.feature.transcript.NewMessagesPlacement
 import ai.opencode.feature.transcript.TranscriptEntry
 import ai.opencode.feature.transcript.rows.TranscriptTimeStamps
 import ai.opencode.server.model.OpenCodeTranscriptItem
+import ai.opencode.server.OpenCodeLiveContentEvent
 import androidx.compose.runtime.Immutable
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * What arrived while the reader was away (iOS `NewMessagesMark`): from the first row that wasn't on
@@ -32,23 +34,84 @@ data class NewMessagesMark(
 
         /**
          * The first item in [items] that isn't in [seen], or null when nothing is new. Client-side
-         * rows (`info-` notices, send failures) never count, nor do the reader's own messages:
-         * sending one reads everything above it. Messages an agent sent (`source`) are news.
+         * rows (`info-` notices, send failures) never count as new, nor do the reader's own
+         * messages, from this phone or another client: like a chat app, sending one reads
+         * everything above it. Messages an agent sent into the session (`source`) are news. Rows
+         * in [watched] streamed in while the reader watched: seen, though rows a read brings in
+         * above them may not have been. Rows minted at or before [viewedMilliseconds] (the
+         * session's read watermark) are seen too.
          */
-        fun firstUnseen(items: List<OpenCodeTranscriptItem>, seen: Set<String>): String? {
-            if (seen.isEmpty()) return null
-            // After the last row they saw: older rows paged in or a notice in an earlier turn aren't news.
-            val afterSeen = items.indexOfLast { it.id in seen }.let { if (it >= 0) it + 1 else 0 }
-            val agentPrompts = items.mapNotNull { (it as? OpenCodeTranscriptItem.UserText)?.takeIf { t -> t.source != null }?.id }.toSet()
-            fun isOwn(item: OpenCodeTranscriptItem) = TranscriptEntry.promptID(item)?.let { it !in agentPrompts } ?: false
+        fun firstUnseen(
+            items: List<OpenCodeTranscriptItem>,
+            seen: Set<String>,
+            watched: Set<String> = emptySet(),
+            viewedMilliseconds: Long? = null,
+            unread: Boolean = false,
+        ): String? {
+            val hasTimedAfterViewed = viewedMilliseconds?.let { cutoff ->
+                items.any { TranscriptTimeStamps.isAtOrBefore(cutoff, it.id) == false }
+            } ?: false
+            if (seen.isEmpty() && !unread && !hasTimedAfterViewed) return null
+            fun isSeen(item: OpenCodeTranscriptItem): Boolean {
+                if (item.id in seen) return true
+                if (viewedMilliseconds != null && TranscriptTimeStamps.isAtOrBefore(viewedMilliseconds, item.id) == true) return true
+                return false
+            }
+            // After the last row they saw: older rows paged in or a notice placed in an earlier
+            // turn aren't news.
+            val afterSeen = items.indexOfLast(::isSeen).let { if (it >= 0) it + 1 else 0 }
             val tail = items.subList(afterSeen, items.size)
-            val lastOwn = tail.indexOfLast(::isOwn)
+            val isOwn = ownPrompts(tail)
+            val lastOwn = tail.indexOfLast(isOwn)
             val start = if (lastOwn >= 0) afterSeen + lastOwn + 1 else afterSeen
             return items.subList(start, items.size).firstOrNull { item ->
-                if (item.id in seen || item.id.startsWith("info-")) return@firstOrNull false
+                if (isSeen(item) || item.id in watched || item.id.startsWith("info-")) return@firstOrNull false
                 item !is OpenCodeTranscriptItem.SendFailure && item !is OpenCodeTranscriptItem.RunRetry &&
                     item !is OpenCodeTranscriptItem.Undone
             }?.id
+        }
+
+        /**
+         * Whether a row is part of the reader's own message, from any client; a message an agent
+         * sent into the session isn't theirs.
+         */
+        fun ownPrompts(items: Iterable<OpenCodeTranscriptItem>): (OpenCodeTranscriptItem) -> Boolean {
+            val agentPrompts = items.mapNotNull { item ->
+                (item as? OpenCodeTranscriptItem.UserText)?.takeIf { it.source != null }?.id
+            }.toSet()
+            return { item -> TranscriptEntry.promptID(item)?.let { it !in agentPrompts } ?: false }
+        }
+
+        /**
+         * Counts the rows the mark's span reads (a turn rebuilt, the own-message check) while a
+         * test holds it, so the test can prove a streamed row doesn't read the transcript again
+         * (iOS's DEBUG `@TaskLocal tally`).
+         */
+        class Tally {
+            private val value = AtomicInteger(0)
+            val count: Int get() = value.get()
+            fun add(rows: Int) {
+                value.addAndGet(rows)
+            }
+        }
+
+        @Volatile
+        @PublishedApi
+        internal var tally: Tally? = null
+
+        /** Runs [block] with [tally] counting the span reads (iOS `$tally.withValue`). */
+        inline fun <T> withTally(tally: Tally, block: () -> T): T {
+            val previous = this.tally
+            this.tally = tally
+            try {
+                return block()
+            } finally {
+                this.tally = previous
+            }
+        }
+
+        fun recordSpan(rows: Int) {
+            tally?.add(rows)
         }
 
         /** Where the list draws the New divider: above the first entry holding an item from the mark onward. */
@@ -68,6 +131,46 @@ data class NewMessagesMark(
                 index--
             }
             return NewMessagesPlacement(entries[index].id, mark.generation, mark.showsDivider)
+        }
+    }
+}
+
+/**
+ * Unseen baseline kept when a settled mark starts at the top of a paged window (`earlierHistory`
+ * not exhausted), so loading an earlier page can move the divider to the true first unseen row
+ * (iOS `NewMessagesEarlierBaseline`).
+ */
+@Immutable
+data class NewMessagesEarlierBaseline(
+    val seen: Set<String>,
+    val watched: Set<String>,
+    val viewedMilliseconds: Long?,
+    val unread: Boolean,
+)
+
+/** New rows from [itemID] through [lastItemID] (of [count] rows) that start no entry of their own (iOS `NewMessagesFold`). */
+@Immutable
+data class NewMessagesFold(val itemID: String, val lastItemID: String?, val count: Int) {
+    companion object {
+        /**
+         * Live events that only add text or tool input, never changing which rows start an entry
+         * (a tool's name or status: a question answered joins the transcript), so a fold found
+         * before them still holds.
+         */
+        fun keepsShapes(events: List<OpenCodeLiveContentEvent>): Boolean = events.all {
+            when (it) {
+                is OpenCodeLiveContentEvent.StepStarted, is OpenCodeLiveContentEvent.StepStreamed,
+                is OpenCodeLiveContentEvent.StepEnded, is OpenCodeLiveContentEvent.TextStarted,
+                is OpenCodeLiveContentEvent.TextDelta, is OpenCodeLiveContentEvent.TextEnded,
+                is OpenCodeLiveContentEvent.ReasoningStarted, is OpenCodeLiveContentEvent.ReasoningDelta,
+                is OpenCodeLiveContentEvent.ReasoningEnded, is OpenCodeLiveContentEvent.ToolInputDelta,
+                is OpenCodeLiveContentEvent.ToolInputEnded,
+                -> true
+                is OpenCodeLiveContentEvent.ToolInputStarted, is OpenCodeLiveContentEvent.ToolCalled,
+                is OpenCodeLiveContentEvent.ToolProgress, is OpenCodeLiveContentEvent.ToolSucceeded,
+                is OpenCodeLiveContentEvent.ToolFailed,
+                -> false
+            }
         }
     }
 }

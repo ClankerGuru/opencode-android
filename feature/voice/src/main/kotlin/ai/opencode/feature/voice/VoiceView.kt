@@ -1401,7 +1401,7 @@ fun VoiceCallFailure(store: VoiceStoreOf, message: String, modifier: Modifier = 
             if (isMicrophoneDenied) {
                 OpenCodeSecondaryButton("Open Settings", onClick = onOpenSettings)
             } else {
-                OpenCodeSecondaryButton("Check API Key", onClick = { store.send(VoiceFeature.Action.Delegate(VoiceFeature.DelegateAction.CheckAPIKey)) })
+                OpenCodeSecondaryButton("Check API Key", onClick = { store.send(VoiceFeature.Action.FailureFixTapped(VoiceCallFix.setUpOnIPhone)) })
             }
             OpenCodePrimaryButton("Try Again", onClick = { store.send(VoiceFeature.Action.Start) })
         }

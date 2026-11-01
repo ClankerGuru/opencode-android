@@ -13,21 +13,42 @@ import kotlin.math.*
 class VoiceAudioLevels {
     private var user = 0f
     private var assistant = 0f
+    /** How bright each voice sounds, 0 dull to 1 bright ([tone]). Held through silence so the orb doesn't drop back between words. */
+    private var userTone = 0.4f
+    private var assistantTone = 0.4f
+    private var echo = VoiceEchoWindow()
     var isMuted = false
         @Synchronized get
         @Synchronized set(value) { field = value; if (value) user = 0f }
     data class Snapshot(val user: Float, val assistant: Float)
     @Synchronized fun snapshot() = Snapshot(user, assistant)
-    @Synchronized fun updateUser(pcm16: ByteArray) { user = rmsLevel(pcm16) }
-    @Synchronized fun updateAssistant(playing: FloatArray, offset: Int = 0, count: Int = playing.size - offset) {
+    /** Each voice's brightness ([tone]), for the Living Orb. */
+    @Synchronized fun tones() = Snapshot(userTone, assistantTone)
+    fun updateUser(pcm16: ByteArray) {
+        val level = rmsLevel(pcm16)
+        val tone = if (level > toneGate) tone(pcm16) else null
+        synchronized(this) {
+            user = level
+            if (tone != null) userTone = tone
+            echo.add(level, assistant)
+        }
+    }
+    /** The microphone's level while the agent plays against while it's quiet, for the call log, and resets the window. Null before both were heard. */
+    @Synchronized fun takeEchoWindow(): String? = echo.summary.also { echo = VoiceEchoWindow() }
+    fun updateAssistant(playing: FloatArray, offset: Int = 0, count: Int = playing.size - offset) {
         if (count <= 0) return
         var sum = 0f
         for (i in offset until offset + count) sum += playing[i] * playing[i]
-        assistant = level(sqrt(sum / count))
+        val level = level(sqrt(sum / count))
+        val tone = if (level > toneGate) tone(count) { playing[offset + it] } else null
+        synchronized(this) {
+            assistant = level
+            if (tone != null) assistantTone = tone
+        }
     }
     @Synchronized fun setLevels(user: Float, assistant: Float) { this.user = if (isMuted) 0f else user; this.assistant = assistant }
     @Synchronized fun clearAssistant() { assistant = 0f }
-    @Synchronized fun reset() { user = 0f; assistant = 0f; isMuted = false }
+    @Synchronized fun reset() { user = 0f; assistant = 0f; userTone = 0.4f; assistantTone = 0.4f; echo = VoiceEchoWindow(); isMuted = false }
     companion object Key : DependencyKey<VoiceAudioLevels> {
         override val liveValue by lazy { VoiceAudioLevels() }
         override val testValue get() = VoiceAudioLevels()
@@ -43,6 +64,55 @@ class VoiceAudioLevels {
             return level(sqrt(sum / count))
         }
         private fun level(rms: Float) = ((20 * log10(rms + 1e-6f) + 48) / 36).coerceIn(0f, 1f)
+        /** Below this level a chunk is too quiet to say how bright the voice is. */
+        const val toneGate = 0.12f
+        /** How bright a voice sounds, from its zero-crossing rate: about 0 for a low hum, 1 for hiss. Cheap enough for the audio thread; no FFT. */
+        inline fun tone(count: Int, sample: (Int) -> Float): Float {
+            if (count <= 1) return 0.4f
+            var crossings = 0
+            var previous = sample(0) >= 0
+            for (index in 1 until count) {
+                val positive = sample(index) >= 0
+                if (positive != previous) crossings++
+                previous = positive
+            }
+            val rate = crossings.toFloat() / (count - 1)
+            return ((rate - 0.02f) / 0.16f).coerceIn(0f, 1f)
+        }
+        fun tone(pcm16: ByteArray): Float = tone(pcm16.size / 2) { PCM.sample(pcm16, it).toFloat() }
+    }
+}
+
+/**
+ * Whether the agent's playback leaks into the microphone's level (and so into the orb's "you"):
+ * the user level sorted by whether the agent was audible at the time. Levels only, never audio.
+ */
+class VoiceEchoWindow {
+    val whilePlaying = mutableListOf<Float>()
+    val whileQuiet = mutableListOf<Float>()
+
+    fun add(user: Float, assistant: Float) {
+        if (assistant > playing && whilePlaying.size < capacity) whilePlaying.add(user)
+        if (assistant < quiet && whileQuiet.size < capacity) whileQuiet.add(user)
+    }
+
+    val summary: String?
+        get() {
+            if (whilePlaying.isEmpty()) return null
+            fun pct(values: List<Float>, p: Double): String {
+                if (values.isEmpty()) return "–"
+                val sorted = values.sorted()
+                return String.format(java.util.Locale.ROOT, "%.2f", sorted[minOf(sorted.size - 1, ((sorted.size - 1) * p).toInt())])
+            }
+            return "mic level while agent plays p50/p90 ${pct(whilePlaying, 0.5)}/${pct(whilePlaying, 0.9)} (${whilePlaying.size})" +
+                " · agent quiet p50/p90 ${pct(whileQuiet, 0.5)}/${pct(whileQuiet, 0.9)} (${whileQuiet.size})"
+        }
+
+    companion object {
+        /** Agent levels above this count as playing; below [quiet], as quiet. */
+        const val playing = 0.25f
+        const val quiet = 0.05f
+        const val capacity = 200
     }
 }
 

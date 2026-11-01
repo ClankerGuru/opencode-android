@@ -437,8 +437,12 @@ private fun QueuedAttachments(input: OpenCodeQueuedInput) {
         for (file in inline) {
             val pasted = file.pasted
             QueuedChip(
-                if (pasted != null) "${file.name} · ${pasted.length}" else file.name,
-                if (pasted == null) AttachmentFileType.symbolName(file.name, file.mime) else "doc.plaintext",
+                when {
+                    file.isUnavailable -> "${file.name} · Media unavailable"
+                    pasted != null -> "${file.name} · ${pasted.length}"
+                    else -> file.name
+                },
+                if (pasted == null) file.symbolName else "doc.plaintext",
             )
         }
     }

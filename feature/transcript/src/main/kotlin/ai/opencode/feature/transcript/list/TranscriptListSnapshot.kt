@@ -4,6 +4,7 @@ import ai.opencode.feature.transcript.NewMessagesPlacement
 import ai.opencode.feature.transcript.RowProps
 import ai.opencode.feature.transcript.TranscriptConfiguration
 import ai.opencode.feature.transcript.TranscriptEntry
+import ai.opencode.feature.transcript.user.TranscriptSendFailure
 import ai.opencode.feature.transcript.user.UserMessageRun
 import ai.opencode.server.model.OpenCodeDelivery
 import ai.opencode.server.model.OpenCodeQueuedInput
@@ -35,7 +36,7 @@ sealed interface TranscriptItemID {
 /** A message row's value (iOS `MessageRow`): a user message carries its failure and delivery note. */
 @Immutable
 sealed interface MessageRow {
-    data class Entry(val entry: TranscriptEntry, val failure: String? = null, val note: String? = null) : MessageRow
+    data class Entry(val entry: TranscriptEntry, val failure: TranscriptSendFailure? = null, val note: String? = null) : MessageRow
     data class Queued(val input: OpenCodeQueuedInput, val note: String? = null) : MessageRow
 
     /** Same family of row: a pending row promotes into a delivered one in place. */

@@ -183,7 +183,7 @@ class VoiceFeatureTestsCallLog {
                         fetched.append(sessionID to promptID)
                         "Finished the scoring loop and all tests pass."
                     },
-                    noteSessionSettled = { sessionID -> settled.append(sessionID) },
+                    noteSessionSettled = { _, sessionID -> settled.append(sessionID) },
                 )
             }
             voiceCall { copy(completeFunction = { _, _ -> }, noteProgress = { _, _ -> }, announce = { text -> announced.append(text) }) }

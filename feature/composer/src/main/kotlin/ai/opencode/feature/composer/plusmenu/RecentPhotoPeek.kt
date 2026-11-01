@@ -86,7 +86,7 @@ class RecentPhotoPeek(private val haptics: HapticsClient = dependency(HapticsCli
         if (tiles.isEmpty()) return
         highlighted = null
         isShown = true
-        haptics.play(Haptic.tap)
+        haptics.play(Haptic.lightTap)
     }
 
     /** Sliding reads only the finger's x, once it has left +. */
@@ -102,7 +102,7 @@ class RecentPhotoPeek(private val haptics: HapticsClient = dependency(HapticsCli
     /** The photo to add, if the finger let go on one. */
     override fun ended(): String? {
         val chosen = highlighted
-        if (chosen != null) haptics.play(Haptic.tap)
+        if (chosen != null) haptics.play(Haptic.lightTap)
         hide()
         return chosen
     }

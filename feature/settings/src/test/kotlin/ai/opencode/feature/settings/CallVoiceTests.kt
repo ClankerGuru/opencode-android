@@ -18,6 +18,7 @@ import ai.opencode.feature.voice.VoicePreviewClient
 import ai.opencode.feature.voice.VoicePreviewError
 import ai.opencode.feature.voice.VoiceProvider
 import ai.opencode.feature.voice.VoiceSharedKeys
+import ai.opencode.server.OpenCodeServer
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -35,6 +36,8 @@ import kotlin.time.Duration.Companion.seconds
  */
 class CallVoiceTests {
     @get:Rule val isolation = TestIsolationRule()
+
+    private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
 
     @Test fun anUnsupportedChoiceFallsBackToTheDefault() {
         assertEquals("Cedar", CallVoicePicker.rowValue(CallVoice.cedar, engine = VoiceEngine.realtime))
@@ -54,7 +57,8 @@ class CallVoiceTests {
         shared.set(SharedKeys.xaiAPIKey, null)
         shared.set(SharedKeys.verifiedVoiceKeyFingerprint, null)
 
-        val store = TestStore(VoiceSettingsFeature.State(), VoiceSettingsFeature(), this) {
+        // Gemini Live, below, runs on the server calls start from.
+        val store = TestStore(VoiceSettingsFeature.State(server = server), VoiceSettingsFeature(), this) {
             this[SharedStore] = shared.store
             this[Clock] = clock
             this[RealtimePreflightClient] = RealtimePreflightClient(verify = { _, _ -> })

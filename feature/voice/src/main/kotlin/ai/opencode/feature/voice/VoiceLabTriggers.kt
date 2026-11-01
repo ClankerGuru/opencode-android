@@ -7,8 +7,8 @@ package ai.opencode.feature.voice
  * build can deliver them as broadcasts with the same names.
  *
  * The `VoiceLabTriggers` view modifier (it sends `SessionFeature` actions: `voiceTapped`,
- * `voice(.presented(.captionsTapped))`, `raisedToEar`) moved to `:feature:session`, which
- * owns that store.
+ * `voice(.presented(.captionsTapped))`, `raisedToEar`, and for [endCall]
+ * `voice(.presented(.endPressed))`) moved to `:feature:session`, which owns that store.
  */
 enum class VoiceLabTrigger(val rawValue: String) {
     startCall("ai.opencode.lab.voice-start"),
@@ -16,6 +16,9 @@ enum class VoiceLabTrigger(val rawValue: String) {
 
     /** Raise to Talk's detector firing: the emulator has no proximity sensor. */
     raiseToEar("ai.opencode.lab.voice-raise"),
+
+    /** A hang-up from outside the call's own controls, such as the ongoing notification's End or the agent ending the call. */
+    endCall("ai.opencode.lab.voice-end"),
     ;
 
     /** iOS `notification`: `Notification.Name("OpenCodeLab." + rawValue)`. */

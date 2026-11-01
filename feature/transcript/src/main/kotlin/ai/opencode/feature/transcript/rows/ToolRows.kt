@@ -5,6 +5,7 @@ import ai.opencode.core.ui.OpenCodeIconSize
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.RollingNumber
+import ai.opencode.feature.media.TranscriptImagePreview
 import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.InlineRowMetrics
 import ai.opencode.feature.transcript.LocalTranscriptRowContext
@@ -199,7 +200,9 @@ internal fun InlineToolGroupView(entry: TranscriptEntry, key: String, tools: Lis
                 ),
         )
         if (images.isNotEmpty()) {
-            ToolImageMosaic(images) { context.send(TranscriptAction.PreviewImage(it)) }
+            ToolImageMosaic(images) { id ->
+                TranscriptImagePreview.fromAttachments(images, id, "Tool image", context.server)?.let { context.send(TranscriptAction.PreviewImage(it)) }
+            }
         }
         DisclosedBand(isExpanded) {
             Column {

@@ -261,8 +261,9 @@ private fun SessionFeature.reduceVoice(state: State, action: PresentationAction<
             if (state.session?.id != delegate.sessionID) Reduced(state)
             else Reduced(state.copy(currentModel = delegate.model, pendingModel = delegate.model))
 
-        // Home answers Check API Key (it opens Settings); support changes are the call's own.
-        VoiceFeature.DelegateAction.CheckAPIKey, is VoiceFeature.DelegateAction.ServerVoiceSupportChanged -> Reduced(state)
+        // Home answers Open Voice Settings and a delegator's new session; support changes are the call's own.
+        is VoiceFeature.DelegateAction.OpenVoiceSettings, is VoiceFeature.DelegateAction.ServerVoiceSupportChanged,
+        is VoiceFeature.DelegateAction.RequestSettled, is VoiceFeature.DelegateAction.DelegatorSessionCreated -> Reduced(state)
 
         // A call hung up from its bar stays while the scope sweeps out, then the composer returns;
         // a dismissed failure was never showing the bar.

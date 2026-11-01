@@ -207,6 +207,12 @@ data class LiveSessionConfig(
     /** The server brokering the session through `POST /api/experimental/voice/session`. */
     val serverVoice: OpenCodeServer? = null,
     val delegation: LiveDelegation = LiveDelegation.client,
+    /**
+     * OpenCode Session Delegator: sends unbound spoken updates (`delegationID == null`)
+     * via `session.instructions.append` because `gpt-live-1` rejects `commentary`
+     * without an active `delegation_id`.
+     */
+    val unboundSpeechUsesInstructions: Boolean = false,
 ) {
     fun sessionStart(eventID: String = "event_start"): RealtimeJSON = RealtimeJSONs.obj(
         "type" to RealtimeJSONs.string("session.start"),

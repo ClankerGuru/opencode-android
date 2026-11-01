@@ -10,6 +10,9 @@ import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -17,6 +20,9 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.ui.input.pointer.AwaitPointerEventScope
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.imeAnimationTarget
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -25,6 +31,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -34,6 +41,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -41,6 +49,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
@@ -54,9 +63,12 @@ import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
+import kotlin.math.roundToLong
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
@@ -102,7 +114,11 @@ object AttachmentPickerButton {
         val isEnabled: Boolean = true,
     )
 
+    /** Main's picker: [maxPhotoSelection] without the New Plus Menu. */
     const val MAX_PHOTO_SELECTION = 4
+
+    /** New Plus Menu's photo sheet takes up to 8 photos; main's picker stays at 4. */
+    fun maxPhotoSelection(plusMenu: Boolean): Int = if (plusMenu) 8 else MAX_PHOTO_SELECTION
 
     /** How long a touch rests on + before the menu opens under it. */
     val holdDuration: Duration = 250.milliseconds
@@ -117,6 +133,8 @@ object AttachmentPickerButton {
 /**
  * @param rows the rows a slide can reach, in root coordinates: none unless the menu itself is
  *   up (not while the photo card has taken its place).
+ * @param popsOnClose the + menu is showing; when it collapses back into + the glyph pops
+ *   ([PlusPop]).
  * @param glyphOffset moves the glyph's ink inside the target (the composer lines its + up with
  *   the placeholder's leading edge); the target stays put. Dp.
  */
@@ -136,6 +154,8 @@ fun AttachmentPickerButton(
     peek: AttachmentPlusPeek? = null,
     onHoldPeek: () -> Boolean = { false },
     onPeekChoose: (String) -> Unit = {},
+    /** The + menu is showing; when it collapses back into + the glyph pops. */
+    popsOnClose: Boolean = false,
 ) {
     val reduceMotion = rememberReduceMotion()
     val density = LocalDensity.current
@@ -185,6 +205,13 @@ fun AttachmentPickerButton(
         label = "dictation-circle-color",
     )
     val glyphX by animateFloatAsState(if (isDictating) 0f else glyphOffset, dictationSpec, label = "plus-glyph-x")
+    val pop = remember { PlusPop() }
+    var wasPopping by remember { mutableStateOf(popsOnClose) }
+    LaunchedEffect(popsOnClose) {
+        val was = wasPopping
+        wasPopping = popsOnClose
+        if (was && !popsOnClose && !currentIsOpen && !reduceMotion) pop.play()
+    }
     val touchAlpha by animateFloatAsState(
         if (isTouching && !showsX) 0.55f else 1f,
         // SwiftUI `.smooth(duration: 0.15)`: a critically damped spring.
@@ -328,7 +355,16 @@ fun AttachmentPickerButton(
                     }
                     .background(circleColor, CircleShape),
             )
-            Box(Modifier.offset(x = glyphX.dp), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier
+                    .offset(x = glyphX.dp)
+                    .graphicsLayer {
+                        scaleX = pop.scale.value
+                        scaleY = pop.scale.value
+                        alpha = pop.opacity.value
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
                 val glyphSize = (PlusButtonComposerTunables.PLUS_SCALE * 1.3f * fontScale).dp
                 if (isLoading && !isDictating) {
                     CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
@@ -357,6 +393,27 @@ fun AttachmentPickerButton(
 }
 
 private val SystemRed = Color(0xFFFF3B30)
+
+/**
+ * iOS `PlusPop`: the + arriving back as the + menu's glass collapses into it: hidden under the
+ * glass, then fading in from `plusPop` and springing to full size.
+ */
+@Stable
+internal class PlusPop {
+    val scale = Animatable(1f)
+    val opacity = Animatable(1f)
+
+    suspend fun play() = coroutineScope {
+        val delaySeconds = ComposerMorph.wallSeconds(PlusMenuTunables.PLUS_POP_DELAY)
+        val spring = PlusMenuTunables.plusPopSpring
+        val settle = ComposerMorph.wallSeconds(spring.duration)
+        scale.snapTo(PlusMenuTunables.PLUS_POP.toFloat())
+        opacity.snapTo(0f)
+        delay((delaySeconds * 1000).roundToLong())
+        launch { scale.animateTo(1f, MotionSpring(settle, spring.bounce).spec()) }
+        launch { opacity.animateTo(1f, tween((minOf(0.1, settle) * 1000).roundToInt(), easing = LinearEasing)) }
+    }
+}
 
 /** True on an up, false on a cancel (the gesture moved away or was consumed). */
 private suspend fun AwaitPointerEventScope.waitForUpOrCancellationCompat(): Boolean =
@@ -405,7 +462,12 @@ class AttachmentMenuPress(private val haptics: HapticsClient = dependency(Haptic
 
     /** The menu opened, by a tap, a hold, or assistive technology. */
     fun menuOpened() {
-        haptics.play(Haptic.tap)
+        haptics.play(Haptic.lightTap)
+    }
+
+    /** A row tapped (a slide-release ticks in [ended]). */
+    fun rowTapped() {
+        haptics.play(Haptic.lightTap)
     }
 
     fun began(isOpen: Boolean) {
@@ -441,7 +503,7 @@ class AttachmentMenuPress(private val haptics: HapticsClient = dependency(Haptic
         if (isMenuUp && current.leftButton) {
             val item = item(at, rows)
             if (item != null) {
-                haptics.play(Haptic.tap)
+                haptics.play(Haptic.lightTap)
                 return Outcome.Choose(item)
             }
         }
@@ -491,5 +553,85 @@ class AttachmentMenuAnchors {
 }
 
 /** Records this element's frame (root coordinates) into [anchors] (iOS `.attachmentMenuAnchor(_:in:)`). */
-fun Modifier.attachmentMenuAnchor(set: (Rect) -> Unit): Modifier =
-    onGloballyPositioned { set(Rect(it.positionInRoot(), it.size.toSize())) }
+@OptIn(ExperimentalLayoutApi::class)
+fun Modifier.attachmentMenuAnchor(set: (Rect) -> Unit): Modifier = composed {
+    val hold = LocalAttachmentMenuAnchorHold.current
+    val keyboardHeight = WindowInsets.imeAnimationTarget.getBottom(LocalDensity.current).toFloat()
+    val last = remember { arrayOfNulls<AttachmentMenuAnchorSample>(1) }
+    onGloballyPositioned {
+        val viewport = it.findRootCoordinates().size
+        val sample = AttachmentMenuAnchorSample(
+            hold = hold,
+            viewportWidth = viewport.width.toFloat(),
+            viewportHeight = viewport.height.toFloat(),
+            keyboardHeight = keyboardHeight,
+            frame = Rect(it.positionInRoot(), it.size.toSize()),
+        )
+        val old = last[0]
+        last[0] = sample
+        // iOS `onGeometryChange` acts only when the sample changes.
+        if (old == null || (!old.isEquivalent(sample) && AttachmentMenuAnchorSample.writes(old, sample))) set(sample.frame)
+    }
+}
+
+/**
+ * How the composer's anchors follow it while the photo sheet is over it. Followed, the sink moved
+ * them every frame and redrew everything that lays out against them, which cost the sheet's grow
+ * and fold frames.
+ */
+enum class AttachmentMenuAnchorHold {
+    /** Frame by frame. */
+    Follows,
+
+    /**
+     * The sheet is over them: they keep where they rest, refreshed only when the viewport changes
+     * (a rotation, a resized window, the keys' height after either), so Add and Back fold toward
+     * where the composer and + are now.
+     */
+    Resting,
+
+    /** Folding back onto them: they hold still whatever happens. */
+    Folding,
+}
+
+/** One reading of an anchor (iOS `AttachmentMenuAnchorSample`). */
+data class AttachmentMenuAnchorSample(
+    val hold: AttachmentMenuAnchorHold,
+    val viewportWidth: Float,
+    /** A window resized only in height (split screen, a freeform window) moves them too. */
+    val viewportHeight: Float = 0f,
+    /** The docked keys' height: it changes with a rotation, never as they travel. */
+    val keyboardHeight: Float = 0f,
+    val frame: Rect,
+) {
+    private val viewport: List<Float> get() = listOf(viewportWidth, viewportHeight, keyboardHeight)
+
+    /** iOS `==`: equal when nothing about it is worth writing. */
+    fun isEquivalent(other: AttachmentMenuAnchorSample): Boolean {
+        if (hold != other.hold) return false
+        return when (hold) {
+            AttachmentMenuAnchorHold.Follows -> frame == other.frame
+            AttachmentMenuAnchorHold.Resting -> viewport == other.viewport
+            AttachmentMenuAnchorHold.Folding -> true
+        }
+    }
+
+    companion object {
+        /**
+         * Whether moving from [old] to [new] writes `new.frame`: always when following, on a
+         * viewport change while resting, never while folding or as a hold begins.
+         */
+        fun writes(old: AttachmentMenuAnchorSample, new: AttachmentMenuAnchorSample): Boolean = when (new.hold) {
+            AttachmentMenuAnchorHold.Follows -> true
+            AttachmentMenuAnchorHold.Resting -> old.hold == AttachmentMenuAnchorHold.Resting && old.viewport != new.viewport
+            AttachmentMenuAnchorHold.Folding -> false
+        }
+    }
+}
+
+/**
+ * iOS `EnvironmentValues.attachmentMenuAnchorHold`: the composer is sinking under the photo
+ * sheet, resting under it or rising back from it. The host provides
+ * [ComposerMorph.attachmentMenuAnchorHold] around the composer.
+ */
+val LocalAttachmentMenuAnchorHold = compositionLocalOf { AttachmentMenuAnchorHold.Follows }

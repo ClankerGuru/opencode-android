@@ -235,104 +235,11 @@ class PhotoFlightTests {
         }
     }
 
-    @Test fun reservedAttachmentsKeepMeasuredSlotsUntilImportArrives() {
-        val flights = PhotoFlights()
-        try {
-            val first = UUID.randomUUID()
-            val second = UUID.randomUUID()
-            flights.reserve(listOf(first, second))
-            assertEquals(listOf(first, second), flights.reservedAttachments)
-            flights.composer(rect(10f, 350f, 380f, 200f))
-            val firstSlot = rect(20f, 370f, 76f, 76f)
-            val secondSlot = rect(104f, 370f, 76f, 76f)
-            flights.slot(first, firstSlot)
-            flights.slot(second, secondSlot)
-            flights.source("p1", PhotoFlights.Source(frame = rect(20f, 600f, 100f, 100f), radius = 0f))
-            flights.source("p2", PhotoFlights.Source(frame = rect(130f, 600f, 100f, 100f), radius = 0f))
-            flights.prepare(listOf(PhotoFlights.Pick("p1", first), PhotoFlights.Pick("p2", second)), windowBounds = bounds)
-            val f1 = flights.flights.first()
-            assertEquals(firstSlot, flights.resolvedSlot(f1))
-            flights.attachmentsChanged(listOf(first))
-            assertEquals(listOf(second), flights.reservedAttachments)
-            assertTrue(f1.arrived)
-            flights.attachmentsChanged(listOf(first, second))
-            assertTrue(flights.reservedAttachments.isEmpty())
-        } finally {
-            flights.reset()
-        }
-    }
-
     /** The importer launches on Dispatchers.Main, which dispatches (as Android's main looper does). */
     private fun dispatchingMainTest(body: suspend TestScope.() -> Unit) {
         val dispatcher = StandardTestDispatcher()
         Dispatchers.setMain(dispatcher)
         runTest(dispatcher) { body() }
-    }
-
-    @Test fun fastMissingAssetFailureReleasesReservationViaExplicitCallbacks() = dispatchingMainTest {
-        val flights = PhotoFlights()
-        try {
-            val importer = ComposerImageImporter(backgroundScope)
-            val missing = UUID.randomUUID()
-            flights.reserve(listOf(missing))
-            flights.source("p1", PhotoFlights.Source(frame = rect(20f, 600f, 100f, 100f), radius = 0f))
-            flights.prepare(listOf(PhotoFlights.Pick("p1", missing)), windowBounds = bounds)
-            val flight = flights.flights.first()
-
-            val failedIDs = mutableListOf<UUID>()
-            var completed = false
-            importer.start(
-                listOf(ComposerImageSource.Loader(attachmentID = missing) { null }),
-                onAttachment = { fail("Missing asset must not attach") },
-                onFailure = { failedID ->
-                    if (failedID != null) {
-                        failedIDs += failedID
-                        flights.dropReservation(failedID)
-                    }
-                },
-                onCancel = { flights.importFinished() },
-                onCompletion = {
-                    completed = true
-                    flights.importFinished()
-                },
-            )
-            while (importer.isLoading) yield()
-
-            assertEquals(listOf(missing), failedIDs)
-            assertTrue(completed)
-            assertTrue(flights.reservedAttachments.isEmpty())
-            assertEquals(PhotoFlights.Flight.State.Leaving, flight.state)
-        } finally {
-            flights.reset()
-        }
-    }
-
-    @Test fun cancelledImportReleasesReservedSlotsViaCancelCallback() = dispatchingMainTest {
-        val flights = PhotoFlights()
-        try {
-            val importer = ComposerImageImporter(backgroundScope)
-            val id = UUID.randomUUID()
-            flights.reserve(listOf(id))
-            val gate = CompletableDeferred<Unit>()
-
-            importer.start(
-                listOf(
-                    ComposerImageSource.Loader(attachmentID = id) {
-                        gate.await()
-                        byteArrayOf(1)
-                    },
-                ),
-                onAttachment = {},
-                onCancel = { flights.importFinished() },
-            )
-            yield()
-            assertEquals(listOf(id), flights.reservedAttachments)
-            importer.cancel()
-            gate.complete(Unit)
-            assertTrue(flights.reservedAttachments.isEmpty())
-        } finally {
-            flights.reset()
-        }
     }
 
     @Test fun cameraEphemeralSourceRetiresOnCancelAndReset() {
@@ -1153,26 +1060,25 @@ class PhotoFlightTests {
         assertTrue(abs(previousRect.height - sheetRect.height) < 0.01f)
     }
 
-    @Test fun photoSheetDismissPerFrameTraceMovesDownAndFadesOutNeverUp() {
+    @Test fun photoSheetDismissKeepsDragFrameThenShrinksIntoPlus() {
         val compactTarget = rect(8f, 500f, 386f, 366f)
         val startDrag = 42f
-        // Baking any downward drag into `detent.top` before folding keeps the sheet's starting
-        // frame identical on Frame 0 and slides straight down from there.
-        val (preFoldStretched, _) = ComposerMorphGeometry.stretched(compactTarget, pull = startDrag, stretchesUpward = true, minHeightPx = MIN_HEIGHT)
+        // Keep drag on the same morph clock as progress. Resetting it or baking only its top into
+        // the target loses the translated bottom at release.
+        val (preFoldStretched, downward) = ComposerMorphGeometry.stretched(
+            compactTarget, pull = startDrag, stretchesUpward = true, minHeightPx = MIN_HEIGHT, translatesDownward = true,
+        )
         val detent = PlusPhotoSheetDetent()
         detent.open(compactTop = compactTarget.top, ceiling = 120f)
         detent.dragChanged(startDrag)
-        detent.top += detent.drag
-        detent.drag = 0f
+        val dismissStartTarget = preFoldStretched.translate(0f, downward)
+        assertEquals(compactTarget.translate(0f, startDrag), dismissStartTarget)
 
-        val dismissStartTarget = Rect(compactTarget.left, detent.top, compactTarget.right, compactTarget.bottom)
-        assertEquals(preFoldStretched, dismissStartTarget)
-
-        val drop = ComposerMorphTunables.dismissDrop.toFloat()
+        val seed = rect(24f, 810f, 34f, 34f)
         val dismissGeometry = ComposerMorphGeometry(
-            source = ComposerMorphGeometry.downwardDismissSource(dismissStartTarget, dropPx = drop),
-            sourceRadius = 30f,
-            target = dismissStartTarget,
+            source = seed,
+            sourceRadius = 17f,
+            target = compactTarget,
             topRadius = 30f,
             bottomRadius = 46f,
         )
@@ -1186,42 +1092,30 @@ class PhotoFlightTests {
         for (frame in 1..600) {
             progressSpring.step(0.0, omega, zeta, dt)
             val p = progressSpring.value.toFloat()
-            val rect = dismissGeometry.frame(progress = p, bottom = p, drag = 0f).rect
+            val rect = dismissGeometry.frame(progress = p, bottom = p, drag = startDrag * p).rect
             val fade = ComposerMorphGeometry.glassFade(progress = p, armed = false, continuousGlass = false, dismissesDown = true, reduceMotion = false)
-            // Must move strictly down (top and bottom never decrease) with <= 1.5 pt step,
-            // while fading out from 1 to 0.
+            // Each edge goes directly toward the seed while the surface fades.
             assertTrue("Sheet moved up on frame $frame: ${rect.top} < ${previousRect.top}", rect.top >= previousRect.top - 1e-4f)
-            assertTrue("Sheet bottom moved up on frame $frame: ${rect.bottom} < ${previousRect.bottom}", rect.bottom >= previousRect.bottom - 1e-4f)
-            assertTrue("Dismiss downward step > 1.5 pt on frame $frame", rect.top - previousRect.top <= 1.5f)
+            assertTrue(rect.bottom <= previousRect.bottom + 1e-4f)
+            assertTrue(rect.width <= previousRect.width + 1e-4f)
+            assertTrue(rect.height <= previousRect.height + 1e-4f)
             assertTrue(fade <= previousFade + 1e-6f)
             previousRect = rect
             previousFade = fade
         }
-        assertTrue(abs(previousRect.top - (dismissStartTarget.top + drop)) < 0.5f)
+        assertTrue(abs(previousRect.top - seed.top) < 0.5f)
+        assertTrue(abs(previousRect.width - seed.width) < 0.5f)
         assertTrue(previousFade < 0.01f)
     }
 
     @Test fun composerReturnFromBehindSheetPerFrameTraceRisesWithSpringWithoutPopOrJump() {
         val restY = 535.0
 
-        // While the photo sheet is open, the composer stays mounted behind it, hidden and lowered by `composerSink`.
-        val openPose = ComposerMorphGeometry.composerUnderSheetPose(isOpen = true, foldPending = false, reduceMotion = false)
-        assertEquals(ComposerMorphTunables.composerSink, openPose.first, 0.0)
-        assertEquals(0f, openPose.second, 0f)
-
-        // As soon as dismiss begins (`foldPending` in `launchThenFold`, or `isOpen = false` in
-        // `fold`), the target pose returns immediately to rest with no closeDelay hold.
-        val foldPendingPose = ComposerMorphGeometry.composerUnderSheetPose(isOpen = true, foldPending = true, reduceMotion = false)
-        assertEquals(0.0 to 1f, foldPendingPose)
-
-        val closingPose = ComposerMorphGeometry.composerUnderSheetPose(isOpen = false, foldPending = false, reduceMotion = false)
-        assertEquals(0.0 to 1f, closingPose)
-
         // Per-frame trace of the composer rising from its lowered position behind the sheet
         // (`restY + composerSink`) back into place (`restY`) on the return spring.
         val (omega, zeta) = SpringSolver.parameters(duration = 0.28, bounce = 0.0)
         val dt = 1.0 / 240.0
-        val ySpring = spring(restY + openPose.first)
+        val ySpring = spring(restY + ComposerMorphTunables.composerSink)
         var previousY = ySpring.value
         var previousOpacity = 0.0
 

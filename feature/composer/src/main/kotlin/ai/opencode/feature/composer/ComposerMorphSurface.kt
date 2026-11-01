@@ -81,8 +81,10 @@ import kotlin.math.roundToInt
  * - **Outgoing**: what it grows out of, drawn in the glass at the source's frame, dissolving
  *   into a blur (10) and growing 12 % as the content arrives; folding back with
  *   [outgoingReturns], it returns as the content leaves.
- * - **Unified + menu** ([menuRows]): the one surface is also the + menu, grown out of [seed] on
- *   the menu's springs; its rows dissolve into the sheet and back (`MorphMenuPlacement`).
+ * - **Downward dismissal** ([dismissesDown]): the photo sheet folds straight into [seed] (or
+ *   [landsOn]), its content scaled with the glass and its glass gone below
+ *   [ComposerMorphTunables.photoGlassOut]; a clear layer takes the dismissing tap (the + menu's
+ *   own surface is `PlusMenuGlassSurface` now).
  * - **Foot**: controls riding the glass's bottom edge outside its mask (`MorphFootPlacement`).
  * - **Keyboard**: with [contentHasKeyboard], the rest stands on the IME, read from
  *   `WindowInsets.ime` every frame so it rides the IME's own animation; switching on or off
@@ -104,30 +106,32 @@ fun ComposerMorphSurface(
     openedFrom: Rect? = null,
     /** Where it folds back into when that's known as it closes, rather than the source as it moves. */
     landsOn: Rect? = null,
+    /** Its bottom corners at rest (dp), `composer.morph.bottomRadius` by default. */
+    bottomRadiusDp: Double? = null,
     /** A field in the content has the keyboard: while open, the sheet rises above it. */
     contentHasKeyboard: Boolean = false,
+    /**
+     * The keyboard stays as it folds (the photo sheet's, which never took it): its rest stays on
+     * the keyboard. Measured from the floor instead, its bottom dropped behind the keys in the
+     * fold's first frame and hadn't landed when the menu took its glass back.
+     */
+    keyboardStaysAsItFolds: Boolean = false,
     /** The photo sheet stretches its top toward the expanded detent, its bottom anchored. */
     stretchesUpward: Boolean = false,
+    /** A dismissal drag from compact carries the whole sheet rather than compressing it. */
+    translatesDownward: Boolean = false,
     /** Backdrop blur (dp) and dim overrides (iOS `backdropBlur`, `backdropDim`). */
     backdropBlur: Double? = null,
     backdropDim: Double? = null,
     /** Controls along the sheet's foot, over its content but outside its mask; they arrive and leave with the content. */
     foot: (@Composable () -> Unit)? = null,
-    /** What it grows out of, dissolving as the content arrives (ignored with [menuRows]). */
+    /** What it grows out of, dissolving as the content arrives. */
     outgoing: (@Composable () -> Unit)? = null,
     outgoingReturns: Boolean = false,
     outgoingAlignedToBottom: Boolean = false,
-    /** The + seed (root px) when this surface also owns the + menu phase. */
+    /** The + seed (root px, 34 × 34) a downward-dismissing photo sheet lands on when [landsOn] isn't given. */
     seed: Rect = Rect.Zero,
     seedRadiusDp: Double = AttachmentMenuMetrics.seedSize.value / 2.0,
-    menuShown: Boolean = false,
-    /** The menu's drag (dp, rubber-banded by the host). */
-    menuDragOffset: Float = 0f,
-    onMenuDrag: ((Float) -> Unit)? = null,
-    /** Translation and predicted end translation (dp); (0, 0) when the drag was cancelled. */
-    onMenuDragEnded: ((Float, Float) -> Unit)? = null,
-    onMenuDismiss: (() -> Unit)? = null,
-    menuRows: (@Composable () -> Unit)? = null,
     /** The photo sheet returns to a small seed or the menu, not a replacement surface: opaque throughout its fold. */
     continuousGlass: Boolean = false,
     /** Dismissing slides it down and fades it out while the composer rises back from behind it. */
@@ -154,15 +158,8 @@ fun ComposerMorphSurface(
     val progress = morph.progress.value
     val bottomProgress = morph.bottomProgress.value
     val sheetActive = morph.isOpening || morph.foldPending
-    val unified = ComposerMorphGeometry.unifiedMenuState(menuShown, morph, dismissesDown)
-    val usesDownwardDismiss = unified.usesDownwardDismiss
-    val menuProgress by animateFloatAsState(
-        unified.menuProgress,
-        if (unified.menuProgress > 0.5f) AttachmentMenuMotion.open(reduceMotion, plusMenuSheet = true)
-        else AttachmentMenuMotion.close(reduceMotion, plusMenuSheet = true),
-        label = "morph-menu-progress",
-    )
-    val keyboardUp = contentHasKeyboard && morph.isOpen
+    val usesDownwardDismiss = shown && dismissesDown && !sheetActive
+    val keyboardUp = contentHasKeyboard && (morph.isOpen || (keyboardStaysAsItFolds && shown))
     // The keyboard carries the sheet up and down on its own curve.
     val keyboardBlend by animateFloatAsState(
         if (keyboardUp) 1f else 0f,
@@ -170,12 +167,8 @@ fun ComposerMorphSurface(
         label = "morph-keyboard",
     )
     // Until its fold starts it is still open, so it keeps growing from where it opened.
-    val from = if (sheetActive) openedFrom ?: source else landsOn ?: source
+    val from = ComposerMorphGeometry.resolvedSource(shown, sheetActive, source, openedFrom, landsOn)
     val outgoingShown = sheetActive || outgoingReturns
-    val menuInteractive = unified.menuInteractive
-    val currentOnMenuDrag by rememberUpdatedState(onMenuDrag)
-    val currentOnMenuDragEnded by rememberUpdatedState(onMenuDragEnded)
-    val currentMenuInteractive by rememberUpdatedState(menuInteractive)
     // Retained content moves between its open and closed places with its state (one movable slot).
     val currentContent by rememberUpdatedState(content)
     val movableContent = remember { movableContentOf { currentContent() } }
@@ -198,8 +191,7 @@ fun ComposerMorphSurface(
             .fillMaxSize()
             .onGloballyPositioned { screen = it.boundsInRoot() },
     ) {
-        val anyShown = shown || menuShown || menuProgress > 0.001f
-        if (!anyShown || screen == Rect.Zero) {
+        if (!shown || screen == Rect.Zero) {
             SideEffect { morph.backdrop.blurPx = 0f }
             if (retained && screen != Rect.Zero) RetainedClosedContent(screen, target, movableContent)
             return@Box
@@ -209,18 +201,13 @@ fun ComposerMorphSurface(
         val rest = if (keyboardBlend <= 0f || keyboardTop == null) restFree else lerpRect(restFree, target(screen, keyboardTop), keyboardBlend)
         val origin = screen.topLeft
         val targetInSpace = rest.translate(-origin)
-        val seedInSpace = if (seed == Rect.Zero) Rect.Zero else seed.translate(-origin)
         val topRadius = (ComposerMorphTunables.topRadius * px).toFloat()
         val geometry = ComposerMorphGeometry(
-            source = if (usesDownwardDismiss) {
-                ComposerMorphGeometry.downwardDismissSource(targetInSpace, (ComposerMorphTunables.dismissDrop * px).toFloat())
-            } else {
-                from.translate(-origin)
-            },
-            sourceRadius = if (usesDownwardDismiss) topRadius else (sourceRadiusDp * px).toFloat(),
+            source = if (usesDownwardDismiss) (landsOn ?: seed).translate(-origin) else from.translate(-origin),
+            sourceRadius = ((if (usesDownwardDismiss) seedRadiusDp else sourceRadiusDp) * px).toFloat(),
             target = targetInSpace,
             topRadius = topRadius,
-            bottomRadius = (ComposerMorphTunables.bottomRadius * px).toFloat(),
+            bottomRadius = ((bottomRadiusDp ?: ComposerMorphTunables.bottomRadius) * px).toFloat(),
         )
         val minHeight = 120 * px
         val dimBase = backdropDim ?: if (dark) ComposerMorphTunables.dimDark else ComposerMorphTunables.dimLight
@@ -231,54 +218,45 @@ fun ComposerMorphSurface(
             morph.backdrop.blurPx = if (shown) (blurDp * px).toFloat() else 0f
         }
 
-        // The backdrop: everything above the sheet dims, growing with the morph.
+        // A zero-dim backdrop may draw nothing: the modal target still covers the whole session
+        // and swallows the dismissing tap.
+        Box(
+            Modifier
+                .fillMaxSize()
+                .then(
+                    if (morph.isOpen) {
+                        Modifier.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onDismiss)
+                    } else {
+                        Modifier
+                    },
+                )
+                .excludedFromDrawerPan(morph.isOpen)
+                .clearAndSetSemantics {},
+        )
+        // The backdrop: everything above the sheet dims, growing with the morph; it takes no touches.
         val strength = progress.coerceIn(0f, 1f)
-        if (shown || strength > 0.001f) {
+        if (strength > 0.001f) {
             Box(
                 Modifier
                     .fillMaxSize()
                     .background(Color.Black.copy(alpha = dim * strength))
-                    .then(
-                        if (morph.isOpen) {
-                            Modifier.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onDismiss)
-                        } else {
-                            Modifier
-                        },
-                    )
-                    .excludedFromDrawerPan(morph.isOpen)
                     .clearAndSetSemantics {},
             )
         }
 
         // MorphBody: the glass and its content, placed from one progress.
-        val hasUnifiedMenu = menuRows != null
-        val placed = if (!usesDownwardDismiss && hasUnifiedMenu) {
-            val (menuRect, menuRadius) = ComposerMorphGeometry.menuSource(
-                progress = menuProgress,
-                seed = seedInSpace,
-                seedRadius = (seedRadiusDp * px).toFloat(),
-                menu = geometry.source,
-                menuRadius = geometry.sourceRadius,
-                dragOffset = if (morph.isOpening) 0f else menuDragOffset * px,
-                reduceMotion = reduceMotion,
-            )
-            geometry.copy(source = menuRect, sourceRadius = menuRadius)
-        } else {
-            geometry
-        }
+        val placed = geometry
         // Under Reduce Motion it stands where it rests and only fades.
-        val reducedAtTarget = morph.isOpening || usesDownwardDismiss || !hasUnifiedMenu
-        val travel = if (!shown) 0f else if (reduceMotion) (if (reducedAtTarget) 1f else 0f) else progress
-        val bottomTravel = if (!shown) 0f else if (reduceMotion) (if (reducedAtTarget) 1f else 0f) else bottomProgress
+        val travel = if (!shown) 0f else if (reduceMotion) 1f else progress
+        val bottomTravel = if (!shown) 0f else if (reduceMotion) 1f else bottomProgress
         val frame = placed.frame(travel, bottomTravel, 0f)
         // A finger's drag moves the glass and its content together (or stretches the photo sheet's top).
         val pull = if (shown && !reduceMotion) morph.drag * px else 0f
-        val (stretchedRect, downward) = ComposerMorphGeometry.stretched(frame.rect, pull, stretchesUpward, minHeight)
-        val (stretchedTarget, _) = ComposerMorphGeometry.stretched(placed.target, pull, stretchesUpward, minHeight)
+        val (stretchedRect, downward) = ComposerMorphGeometry.stretched(frame.rect, pull, stretchesUpward, minHeight, translatesDownward)
+        val (stretchedTarget, _) = ComposerMorphGeometry.stretched(placed.target, pull, stretchesUpward, minHeight, translatesDownward)
         val armed = morph.phase == ComposerMorph.Phase.Armed
         val fade = ComposerMorphGeometry.glassFade(
             progress = progress,
-            menuProgress = menuProgress,
             shown = shown,
             armed = armed,
             continuousGlass = continuousGlass,
@@ -288,119 +266,40 @@ fun ComposerMorphSurface(
         val glassShape = MorphShape(frame.top, frame.bottom)
         val contentY = min(stretchedTarget.top, stretchedRect.top)
 
-        PlacedBox(stretchedRect.translate(0f, downward), Modifier.graphicsLayer { alpha = fade }.background(MaterialTheme.colorScheme.surfaceContainerHigh, glassShape))
-
-        if (menuRows != null) {
-            // MorphMenuPlacement: the one set of rows inside the unified glass, never rebuilt during the morph.
-            // Drawn under the content (iOS draws them over it): Compose can't let a sibling's touches
-            // fall through (`allowsHitTesting(false)`), and the rows only dissolve while the content
-            // arrives transparent, so the order doesn't show.
-            val menuTravel = if (shown && !reduceMotion) progress else 0f
-            val menuBottomTravel = if (shown && !reduceMotion) bottomProgress else 0f
-            val menuPlaced = if (usesDownwardDismiss) {
-                geometry
-            } else {
-                val (menuRect, menuRadius) = ComposerMorphGeometry.menuSource(
-                    progress = menuProgress,
-                    seed = seedInSpace,
-                    seedRadius = (seedRadiusDp * px).toFloat(),
-                    menu = geometry.source,
-                    menuRadius = geometry.sourceRadius,
-                    dragOffset = if (sheetActive) 0f else menuDragOffset * px,
-                    reduceMotion = reduceMotion,
-                )
-                geometry.copy(source = menuRect, sourceRadius = menuRadius)
-            }
-            val menuFrame = menuPlaced.frame(menuTravel, menuBottomTravel, 0f)
-            val (menuRectNow, menuDownward) = ComposerMorphGeometry.stretched(menuFrame.rect, pull, stretchesUpward, minHeight)
-            val clamped = menuTravel.coerceIn(0f, 1f)
-            val growth = if (shown && !reduceMotion) (1 + ComposerMorphTunables.outgoingGrowth * clamped).toFloat() else 1f
-            val restingMenu = geometry.source.translate(0f, if (sheetActive) 0f else menuDragOffset * px)
-            val menuShape = MorphShape(menuFrame.top, menuFrame.bottom)
-            PlacedBox(
-                menuRectNow.translate(0f, menuDownward),
-                Modifier
-                    .graphicsLayer {
-                        clip = true
-                        shape = menuShape
-                    }
-                    .semantics {
-                        if (menuInteractive) {
-                            testTag = "attachment-menu"
-                            // iOS's escape action: TalkBack's dismiss.
-                            dismiss { onMenuDismiss?.invoke(); true }
-                        } else {
-                            hideFromAccessibility()
-                        }
-                    }
-                    .then(if (!menuInteractive) Modifier else Modifier.pointerInput(Unit) {
-                        val tracker = VelocityTracker()
-                        var total = 0f
-                        var ended = false
-                        detectVerticalDragGestures(
-                            onDragStart = {
-                                tracker.resetTracking()
-                                total = 0f
-                                ended = false
-                            },
-                            onVerticalDrag = { change, dy ->
-                                tracker.addPosition(change.uptimeMillis, change.position)
-                                total += dy
-                                if (currentMenuInteractive && kotlin.math.abs(total) >= 10 * px) {
-                                    change.consume()
-                                    currentOnMenuDrag?.invoke(total / px)
-                                }
-                            },
-                            onDragEnd = {
-                                ended = true
-                                if (currentMenuInteractive) {
-                                    val velocity = tracker.calculateVelocity().y / px
-                                    val translation = total / px
-                                    currentOnMenuDragEnded?.invoke(translation, translation + velocity * PREDICT_SECONDS)
-                                }
-                            },
-                            onDragCancel = { if (!ended) currentOnMenuDragEnded?.invoke(0f, 0f) },
-                        )
-                    }),
-            ) {
-                val outerHeight = menuRectNow.height
-                PlacedBox(
-                    // Top-leading in the sheet, bottom-leading as it shrinks into the seed.
-                    Rect(Offset(0f, if (shown) 0f else outerHeight - restingMenu.height), restingMenu.size),
-                    Modifier
-                        .graphicsLayer {
-                            scaleX = growth
-                            scaleY = growth
-                            transformOrigin = TransformOrigin(0f, 0f)
-                            alpha = ComposerMorphGeometry.glassFade(
-                                progress = progress, menuProgress = menuProgress, shown = shown, armed = armed,
-                                continuousGlass = continuousGlass, dismissesDown = usesDownwardDismiss, reduceMotion = reduceMotion,
-                            )
-                        }
-                        .morphDissolve(
-                            reveal = { if (shown) (if (reduceMotion) progress else morph.content.value) else 0f },
-                            shown = if (shown) outgoingShown else true,
-                            fade = 1f,
-                            scales = false,
-                            blurPx = if (reduceMotion) 0f else (ComposerMorphTunables.outgoingBlur * px).toFloat(),
-                        ),
-                ) { menuRows() }
-            }
+        // Folding into the +, the glass goes once the fold is mostly done, leaving no disc on the + as its spring settles.
+        if (!usesDownwardDismiss || progress > ComposerMorphTunables.photoGlassOut) {
+            PlacedBox(stretchedRect.translate(0f, downward), Modifier.graphicsLayer { alpha = fade }.background(MaterialTheme.colorScheme.surfaceContainerHigh, glassShape))
         }
+
 
         if (shown) {
             val contentFade: Float? = if (usesDownwardDismiss) fade else if (reduceMotion) progress.coerceIn(0f, 1f) else null
-            val revealBlur = if (morph.isOpening) ComposerMorphTunables.contentBlur else ComposerMorphTunables.exitBlur
+            val revealBlur = if (usesDownwardDismiss) 0.0 else if (morph.isOpening) ComposerMorphTunables.contentBlur else ComposerMorphTunables.exitBlur
+            val lead = if (outgoing != null && outgoingShown) ComposerMorphTunables.photoContentLead.toFloat() else 1f
             val maskOffset = Offset(stretchedRect.left - stretchedTarget.left, stretchedRect.top - contentY)
             PlacedBox(
-                Rect(Offset(stretchedTarget.left, contentY + downward), stretchedTarget.size),
+                // Folding into the +, the content shrinks with the glass rather than being cut by it.
+                if (usesDownwardDismiss) Rect(stretchedRect.topLeft + Offset(0f, downward), stretchedTarget.size)
+                else Rect(Offset(stretchedTarget.left, contentY + downward), stretchedTarget.size),
                 Modifier
                     // The glass's shape, where it is now, in the content's own frame.
                     .graphicsLayer {
                         clip = true
-                        shape = MorphShape(frame.top, frame.bottom, maskOffset, stretchedRect.size)
+                        shape = if (usesDownwardDismiss) MorphShape(frame.top, frame.bottom, Offset.Zero, stretchedRect.size)
+                        else MorphShape(frame.top, frame.bottom, maskOffset, stretchedRect.size)
                     }
-                    .morphReveal({ morph.content.value }, contentFade, (revealBlur * px).toFloat())
+                    .then(
+                        if (!usesDownwardDismiss) {
+                            Modifier
+                        } else {
+                            Modifier.graphicsLayer {
+                                scaleX = stretchedRect.width / max(stretchedTarget.width, 1f)
+                                scaleY = stretchedRect.height / max(stretchedTarget.height, 1f)
+                                transformOrigin = TransformOrigin(0f, 0f)
+                            }
+                        },
+                    )
+                    .morphReveal({ morph.content.value }, contentFade, (revealBlur * px).toFloat(), lead)
                     .semantics { if (!morph.isOpening) hideFromAccessibility() },
             ) {
                 CompositionLocalProvider(LocalComposerMorphContentActive provides true) {
@@ -420,7 +319,7 @@ fun ComposerMorphSurface(
 
         if (!shown && retained) RetainedClosedContent(screen, target, movableContent)
 
-        if (shown && outgoing != null && !hasUnifiedMenu) {
+        if (shown && outgoing != null) {
             val src = placed.source
             val clamped = travel.coerceIn(0f, 1f)
             // It rides the glass's top-leading corner (or bottom edge folding into the composer), growing a little with it.
@@ -462,12 +361,26 @@ fun ComposerMorphSurface(
             val footTravel = if (reduceMotion) 1f else progress
             val footFrame = geometry.frame(footTravel, if (reduceMotion) 1f else bottomProgress, 0f)
             val footPull = if (reduceMotion) 0f else morph.drag * px
-            val (footRect, footDownward) = ComposerMorphGeometry.stretched(footFrame.rect, footPull, stretchesUpward, minHeight)
-            val footBlur = if (reduceMotion) 0f else ((if (morph.isOpen) ComposerMorphTunables.contentBlur else ComposerMorphTunables.exitBlur) * px).toFloat()
+            val (footRect, footDownward) = ComposerMorphGeometry.stretched(footFrame.rect, footPull, stretchesUpward, minHeight, translatesDownward)
+            val footBlur = if (reduceMotion || usesDownwardDismiss) 0f else ((if (morph.isOpen) ComposerMorphTunables.contentBlur else ComposerMorphTunables.exitBlur) * px).toFloat()
+            // Folding into the +, the foot keeps its resting size and scales with the glass.
+            val scalesToSource = usesDownwardDismiss
+            val footTarget = geometry.target
             PlacedBox(
-                footRect.translate(0f, footDownward),
+                if (scalesToSource) Rect(footRect.topLeft + Offset(0f, footDownward), footTarget.size) else footRect.translate(0f, footDownward),
                 Modifier
-                    .morphReveal({ morph.content.value }, null, footBlur)
+                    .then(
+                        if (!scalesToSource) {
+                            Modifier
+                        } else {
+                            Modifier.graphicsLayer {
+                                scaleX = footRect.width / max(footTarget.width, 1f)
+                                scaleY = footRect.height / max(footTarget.height, 1f)
+                                transformOrigin = TransformOrigin(0f, 0f)
+                            }
+                        },
+                    )
+                    .morphReveal({ if (usesDownwardDismiss) progress else morph.content.value }, null, footBlur)
                     .semantics { if (!morph.isOpen) hideFromAccessibility() },
                 contentAlignment = Alignment.BottomCenter,
             ) {
@@ -532,11 +445,12 @@ internal const val PREDICT_SECONDS = 0.499f
 
 /**
  * iOS `MorphReveal`: the content arriving out of a blur and leaving into one on its own clock
- * ([reveal]); under Reduce Motion (or a downward dismissal) [fade], the glass's own, instead.
+ * ([reveal]), whole by [lead] of it (`photoContentLead`; 1 follows it); under Reduce Motion (or a
+ * downward dismissal) [fade], the glass's own, instead.
  * No blur on content all but gone or all but whole: it costs a pass and shows nothing.
  */
-internal fun Modifier.morphReveal(reveal: () -> Float, fade: Float?, blurPx: Float): Modifier = graphicsLayer {
-    val showing = fade ?: reveal().coerceIn(0f, 1f)
+internal fun Modifier.morphReveal(reveal: () -> Float, fade: Float?, blurPx: Float, lead: Float = 1f): Modifier = graphicsLayer {
+    val showing = fade ?: (reveal() / max(lead, 0.01f)).coerceIn(0f, 1f)
     val radius = if (fade != null || showing < 0.02f || showing > 0.98f) 0f else (1 - showing) * blurPx
     renderEffect = if (radius > 0.25f) androidx.compose.ui.graphics.BlurEffect(radius, radius, androidx.compose.ui.graphics.TileMode.Decal) else null
     alpha = showing

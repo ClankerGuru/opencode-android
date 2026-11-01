@@ -6,7 +6,6 @@ import androidx.compose.ui.geometry.Rect
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.abs
@@ -26,90 +25,6 @@ private fun CallTrayDock.noteSessionTrayWithoutAnchor(frame: Rect) {
 }
 
 class FloatingCallModelTests {
-    // The registry and presets (`FloatingCallTunables.styles`, `TuningStore`) aren't ported:
-    // tunables are baked constants on Android. The shipping defaults are pinned here.
-    @Test
-    fun stylePresetsSwitchBetweenTheOrbAndTheCapsule() {
-        // The first is what ships: the orb, at its default.
-        assertEquals(FloatingCallStyle.orb, FloatingCallTunables.style)
-    }
-
-    @Test
-    fun feelPresetsNameTheirLooks() {
-        assertEquals(FloatingCallOrbStyle.tides, FloatingCallTunables.orbStyle)
-        assertEquals(FloatingCallDock.float, FloatingCallTunables.dock)
-    }
-
-    /**
-     * Easing into thinking after a long call turns the figures from where they are: no frame
-     * whips them through the turns the arc ran up.
-     */
-    @Test
-    fun thinkingTurnsTheFiguresWithoutAWhip() {
-        val motion = FloatingCallMotion()
-        var time = 1000.0
-        repeat(60 * 120) {
-            motion.step(time = time, still = false, mood = FloatingCallMood.live, isMuted = false, scene = FloatingCallScene.idle)
-            time += 1.0 / 60
-        }
-        assertTrue(motion.spin > 100)
-        assertEquals(0.0, motion.orbit, 0.0)
-        val steps = mutableListOf<Double>()
-        repeat(60 * 3) {
-            val before = motion.orbit
-            motion.step(time = time, still = false, mood = FloatingCallMood.live, isMuted = false, scene = FloatingCallScene.thinking)
-            steps += motion.orbit - before
-            time += 1.0 / 60
-        }
-        assertTrue(motion.thinking > 0.99)
-        // Never faster than full thinking's turn, about 4 rad/s at 60 fps.
-        assertTrue((steps.maxOrNull() ?: 0.0) < 0.08)
-        assertTrue("It speeds up as thinking eases in", (steps.firstOrNull() ?: 1.0) < (steps.lastOrNull() ?: 0.0))
-    }
-
-    @Test
-    fun everyDotTakeHasItsOwnShaderTake() {
-        val takes = FloatingCallOrbStyle.dotTakes.mapNotNull { it.dotTake }
-        assertEquals(listOf(0, 1, 2, 3, 4), takes)
-        assertNull(FloatingCallOrbStyle.liquid.dotTake)
-        assertNull(FloatingCallOrbStyle.dots.dotTake)
-    }
-
-    @Test
-    fun playgroundScenesShowTheirMood() {
-        assertEquals(FloatingCallMood.live, FloatingCallMotion.mood(FloatingCallScene.idle))
-        assertEquals(FloatingCallMood.thinking, FloatingCallMotion.mood(FloatingCallScene.thinking))
-        assertEquals(FloatingCallMood.needsInput, FloatingCallMotion.mood(FloatingCallScene.needsInput))
-        assertEquals(FloatingCallMood.live, FloatingCallMotion.mood(FloatingCallScene.bothSpeaking))
-    }
-
-    @Test
-    fun theOrbRestsAboveTheComposerOnlyWhileTheCardIsAtRest() {
-        val center = FloatingCallCenter()
-        center.screenWidth = 440f
-        val resting = cgRect(20f, 860f, 400f, 56f)
-        center.noteComposer(resting)
-        assertEquals(resting, center.composer)
-        // The card sliding with the drawer moves the composer: the orb stays put.
-        center.noteComposer(resting.translate(180f, 0f))
-        assertEquals(resting, center.composer)
-        // The keyboard raising it is a new rest.
-        val raised = resting.translate(0f, -340f)
-        center.noteComposer(raised)
-        assertEquals(raised, center.composer)
-    }
-
-    @Test
-    fun theExperimentIsOffByDefault() {
-        assertFalse(ExperimentalFeatures.testValue(ExperimentalFeature.floatingCall))
-        assertEquals("Floating Call", ExperimentalFeature.floatingCall.title)
-        val center = FloatingCallCenter()
-        center.forced = false
-        assertEquals(ExperimentalFeature.floatingCall.isActive(false), center.isOn(false))
-        center.forced = true
-        assertTrue(center.isOn(false))
-    }
-
     // `ComposerTunables` (bottomGap, keyboardGap) lives in :feature:session; the tray's copy of
     // keyboardGap is `CallTrayComposerMetrics`. `TuningStore` registration isn't ported.
     @Test

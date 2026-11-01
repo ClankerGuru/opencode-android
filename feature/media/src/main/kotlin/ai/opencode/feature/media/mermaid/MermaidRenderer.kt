@@ -15,6 +15,7 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import kotlinx.coroutines.CompletableDeferred
@@ -46,7 +47,7 @@ class MermaidDiagram(val svg: String, val width: Float, val height: Float)
 
 /** Port of iOS `MermaidRenderError`. */
 sealed class MermaidRenderError : Exception() {
-    /** Mermaid rejected the source (a syntax error): the same every time, so it's the only failure that's cached. */
+    /** Pele rejected the source (a syntax error): the same every time, so it's the only failure that's cached. */
     data object InvalidDiagram : MermaidRenderError()
     /**
      * The page went away mid-render (a timeout, or the renderer process ending under memory
@@ -59,9 +60,13 @@ sealed class MermaidRenderError : Exception() {
 }
 
 /**
- * Renders Mermaid with the bundled `assets/mermaid/mermaid.min.js` (11.17.2, MIT) in one shared
- * offscreen [WebView], one diagram at a time: SVG in the page, kept as the diagram, then drawn
+ * Renders Mermaid with the bundled `assets/mermaid/pele.global.js` (Pele 1.7.0, MIT) in one shared
+ * offscreen [WebView], one diagram at a time: Pele lays the source out and writes its SVG
+ * (theme-independent, kept by source with its natural size), the page themes it, and it's drawn
  * at whatever size a view asks for (the page scales the SVG; the web view draws into a bitmap).
+ * iOS runs Pele in JavaScriptCore to size a card synchronously on its first frame; Android has no
+ * in-process JavaScript engine, so Pele runs in the page and a size is synchronous once the source
+ * has been prepared ([naturalSize]).
  * The page is offline (a strict Content Security Policy, network loads blocked, no navigation)
  * and has no JavaScript interfaces: nothing in it can reach the app; results are read back by
  * polling the page. Main thread only. Port of iOS `MermaidRenderer`.
@@ -69,6 +74,8 @@ sealed class MermaidRenderError : Exception() {
 class MermaidRenderer private constructor() {
     /** Diagrams by source and theme. Small: SVGs of a few kilobytes. In insertion order, at most 64. */
     private val diagrams = LinkedHashMap<MermaidCacheKey, Result<MermaidDiagram>>()
+    /** Pele's SVG and natural size by source hash (theme-independent). In insertion order, at most 64. */
+    private val prepared = LinkedHashMap<String, Result<PreparedDiagram>>()
     private val running = HashMap<MermaidCacheKey, Deferred<MermaidDiagram>>()
     /** Renders (and drawings) wait for the one before them. */
     private val queue = Mutex()
@@ -100,9 +107,20 @@ class MermaidRenderer private constructor() {
     fun cachedDiagram(source: String, theme: MermaidTheme): MermaidDiagram? =
         diagrams[MermaidCacheKey(source, theme)]?.getOrNull()
 
-    /** Only a diagram Mermaid rejected; an interrupted render is tried again. */
+    /**
+     * The natural size in dp (including the 16 dp card padding), so a diagram card lays out at
+     * its final aspect height without a placeholder jump: a drawn diagram's, else Pele's for a
+     * source it has prepared (in either theme).
+     */
+    fun naturalSize(source: String, theme: MermaidTheme): Size? {
+        cachedDiagram(source, theme)?.let { return Size(it.width, it.height) }
+        return prepared[MermaidSyntax.hash(source)]?.getOrNull()?.let { Size(it.width, it.height) }
+    }
+
+    /** Only a diagram Pele rejected; an interrupted render is tried again. */
     fun cachedFailure(source: String, theme: MermaidTheme): Boolean =
-        diagrams[MermaidCacheKey(source, theme)]?.isFailure == true
+        diagrams[MermaidCacheKey(source, theme)]?.isFailure == true ||
+            prepared[MermaidSyntax.hash(source)]?.exceptionOrNull() == MermaidRenderError.InvalidDiagram
 
     fun cachedImage(key: MermaidCacheKey): Bitmap? = images.get(key.string)
 
@@ -154,44 +172,66 @@ class MermaidRenderer private constructor() {
         while (diagrams.size > 64) diagrams.remove(diagrams.keys.first())
     }
 
+    /** Pele's SVG and natural size (theme-independent). */
+    private class PreparedDiagram(val svg: String, val width: Float, val height: Float)
+
+    /** Pele's layout of [source], from the cache or the page; a rejection is cached. */
+    private suspend fun prepare(webView: WebView, source: String): PreparedDiagram {
+        val hash = MermaidSyntax.hash(source)
+        prepared[hash]?.let { return it.getOrThrow() }
+        val call = "(() => { try { return window.__renderPele(${JSONObject.quote(source)}); } " +
+            "catch (e) { return { failed: true }; } })()"
+        val job = evaluateJSON(webView, call)
+        val svg = job.optString("svg")
+        val width = job.optDouble("width", 0.0)
+        val height = job.optDouble("height", 0.0)
+        if (job.optBoolean("failed") || svg.isEmpty() || !(width > 0) || !(height > 0)) {
+            rememberPrepared(Result.failure(MermaidRenderError.InvalidDiagram), hash)
+            throw MermaidRenderError.InvalidDiagram
+        }
+        val fit = min(1.0, min(4000.0 / width, 4000.0 / height))
+        val diagram = PreparedDiagram(svg, ceil(width * fit + 32).toFloat(), ceil(height * fit + 32).toFloat())
+        rememberPrepared(Result.success(diagram), hash)
+        return diagram
+    }
+
+    private fun rememberPrepared(result: Result<PreparedDiagram>, hash: String) {
+        prepared.remove(hash)
+        prepared[hash] = result
+        while (prepared.size > 64) prepared.remove(prepared.keys.first())
+    }
+
     private suspend fun render(source: String, theme: MermaidTheme): MermaidDiagram {
         val webView = readyWebView()
+        val preparedDiagram = prepare(webView, source)
         val background = cssColor(background(theme))
-        val call = "window.__mermaidJob = null; window.renderDiagram(${JSONObject.quote(source)}, " +
-            "'${if (theme == MermaidTheme.Dark) "dark" else "default"}', '$background').then(" +
-            "function(r) { window.__mermaidJob = { ok: true, width: r.width, height: r.height, svg: r.svg }; }, " +
-            "function(e) { window.__mermaidJob = { ok: false }; }); 0"
-        // A render stuck in the page takes the page with it, which fails the call rather than
-        // leaving the queue waiting.
-        val job = withTimeoutOrNull(RENDER_TIMEOUT_MS) {
-            evaluate(webView, call)
-            var job: JSONObject? = null
-            while (job == null) {
-                if (this@MermaidRenderer.webView !== webView) return@withTimeoutOrNull null
-                job = evaluate(webView, "window.__mermaidJob")?.let { runCatching { JSONObject(it) }.getOrNull() }
-                if (job == null) delay(POLL_MS)
-            }
-            job
+        val job = evaluateJSON(
+            webView,
+            "(() => { try { return window.renderPeleSvg(${JSONObject.quote(preparedDiagram.svg)}, " +
+                "'${if (theme == MermaidTheme.Dark) "dark" else "light"}', '$background'); } " +
+                "catch (e) { return { failed: true }; } })()",
+        )
+        tidy(webView)
+        if (job.optBoolean("failed") || !(job.optDouble("width", 0.0) > 0) || !(job.optDouble("height", 0.0) > 0)) {
+            throw MermaidRenderError.InvalidResult
         }
-        if (job == null) {
-            if (this.webView === webView) {
+        return MermaidDiagram(preparedDiagram.svg, preparedDiagram.width, preparedDiagram.height)
+    }
+
+    /**
+     * Runs [script] in the page and reads its object result. A script stuck in the page takes the
+     * page with it, which fails the call (interrupted) rather than leaving the queue waiting.
+     */
+    private suspend fun evaluateJSON(webView: WebView, script: String): JSONObject {
+        val value = withTimeoutOrNull(RENDER_TIMEOUT_MS) { evaluate(webView, script) }
+        if (value == null || this.webView !== webView) {
+            if (value == null && this.webView === webView) {
                 webView.stopLoading()
                 reset()
             }
             throw MermaidRenderError.Interrupted
         }
-        if (this.webView !== webView) throw MermaidRenderError.Interrupted
-        // Only Mermaid's own rejection, from the page still in place, is the diagram's fault.
-        if (!job.optBoolean("ok")) {
-            tidy(webView)
-            throw MermaidRenderError.InvalidDiagram
-        }
-        val width = job.optDouble("width", 0.0)
-        val height = job.optDouble("height", 0.0)
-        val svg = job.optString("svg")
-        tidy(webView)
-        if (!(width > 0) || !(height > 0) || svg.isEmpty()) throw MermaidRenderError.InvalidResult
-        return MermaidDiagram(svg, ceil(width).toFloat(), ceil(height).toFloat())
+        return runCatching { JSONObject(value) }.getOrNull() ?: JSONObject()
     }
 
     /** Draws [diagram] [width] × [height] dp big at [density], on the card's colour. */
@@ -203,9 +243,10 @@ class MermaidRenderer private constructor() {
             val pixelHeight = (height * density).roundToInt().coerceAtLeast(1)
             val zoom = width / diagram.width
             val background = background(theme)
+            val themeName = if (theme == MermaidTheme.Dark) "dark" else "light"
             evaluate(
                 webView,
-                "window.showDiagram(${JSONObject.quote(diagram.svg)}, '${cssColor(background)}', $zoom); 0",
+                "window.showDiagram(${JSONObject.quote(diagram.svg)}, '$themeName', '${cssColor(background)}', $zoom); 0",
             )
             // The capture covers the diagram, so the view must too.
             resize(webView, pixelWidth, pixelHeight)
@@ -273,7 +314,7 @@ class MermaidRenderer private constructor() {
         }
         val script = withContext(Dispatchers.IO) {
             runCatching {
-                dependency(AppContext).assets.open("mermaid/mermaid.min.js").bufferedReader().use { it.readText() }
+                dependency(AppContext).assets.open("mermaid/pele.global.js").bufferedReader().use { it.readText() }
             }.getOrNull()
         } ?: throw MermaidRenderError.Unavailable
         val context = dependency(AppContext)
@@ -303,7 +344,7 @@ class MermaidRenderer private constructor() {
 
             override fun onPageFinished(view: WebView, url: String?) {
                 if (load.isCompleted) return
-                view.evaluateJavascript("$script\n;$RENDER_SCRIPT\n;0") { load.complete(Unit) }
+                view.evaluateJavascript("$script\n;$PELE_BOOTSTRAP_SCRIPT\n;$RENDER_SCRIPT\n;0") { load.complete(Unit) }
             }
 
             override fun onReceivedError(view: WebView, request: WebResourceRequest, error: android.webkit.WebResourceError) {
@@ -371,7 +412,7 @@ class MermaidRenderer private constructor() {
         private const val OFFSCREEN_X = -20_000f
 
         /**
-         * A drawn diagram, or one Mermaid rejected. Interruptions, timeouts and a page that
+         * A drawn diagram, or one Pele rejected. Interruptions, timeouts and a page that
          * wouldn't load are tried again on the next appearance.
          */
         fun caches(result: Result<MermaidDiagram>): Boolean =
@@ -389,40 +430,79 @@ class MermaidRenderer private constructor() {
             return "#%02x%02x%02x".format((argb shr 16) and 0xFF, (argb shr 8) and 0xFF, argb and 0xFF)
         }
 
+        /** Pele's entry point: the SVG and natural size of one source, or a throw. */
+        private const val PELE_BOOTSTRAP_SCRIPT = """
+var __peleCount = 0;
+function __renderPele(source) {
+  __peleCount += 1;
+  var result = pele.render(source, {
+    idPrefix: 'mermaid-diagram-' + __peleCount,
+    images: false,
+    linkSchemes: ['http', 'https', 'mailto'],
+    linkRel: 'noopener noreferrer',
+  });
+  if (!result || !result.svg || !(result.width > 0) || !(result.height > 0)) {
+    throw new Error('No diagram');
+  }
+  return { svg: result.svg, width: result.width, height: result.height };
+}
+"""
+
         private const val PAGE = """<!doctype html>
 <html><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval'; style-src 'unsafe-inline'; img-src data:; font-src data:">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<style>html, body { margin: 0; padding: 0; overflow: hidden; } #diagram { display: inline-block; padding: 16px; }</style>
+<style>
+  html, body { margin: 0; padding: 0; overflow: hidden; }
+  #diagram {
+    display: inline-block;
+    padding: 16px;
+    line-height: 0;
+    --pele-font: Roboto, "Noto Sans", sans-serif;
+    --pele-font-mono: "Roboto Mono", "Droid Sans Mono", monospace;
+    --pele-radius: 6px;
+  }
+  #diagram[data-theme="light"] {
+    --pele-bg: #f2f2f7;
+    --pele-fg: #1c1c1e;
+    --pele-muted: #636366;
+    --pele-line: #636366;
+    --pele-surface: #ffffff;
+    --pele-surface-alt: #e5e5ea;
+    --pele-border: #c7c7cc;
+    --pele-accent: #007aff;
+    --pele-critical: #ff3b30;
+    --pele-error: #ff3b30;
+  }
+  #diagram[data-theme="dark"] {
+    --pele-bg: #1c1c1e;
+    --pele-fg: #f2f2f7;
+    --pele-muted: #98989d;
+    --pele-line: #8e8e93;
+    --pele-surface: #2c2c2e;
+    --pele-surface-alt: #242426;
+    --pele-border: #48484a;
+    --pele-accent: #0a84ff;
+    --pele-critical: #ff453a;
+    --pele-error: #ff453a;
+  }
+  #diagram > svg { display: block; }
+</style>
 </head><body><div id="diagram"></div></body></html>"""
 
         /**
-         * Draws one diagram into the page at its natural size, at most 4000 px a side, and
-         * returns that size and the SVG; [showDiagram] puts a drawn SVG back, scaled, to capture.
+         * Themes one of Pele's SVGs in the page at its natural size, at most 4000 px a side, and
+         * returns that size; [showDiagram] puts it back, themed and scaled, to capture.
          */
         private const val RENDER_SCRIPT = """
 (() => {
-  let count = 0;
-  const fonts = 'Roboto, "Noto Sans", sans-serif';
-  window.renderDiagram = async (source, theme, background) => {
+  const place = (svg, theme, background) => {
     const host = document.getElementById('diagram');
-    host.innerHTML = '';
+    host.dataset.theme = theme === 'dark' ? 'dark' : 'light';
+    host.style.setProperty('--pele-bg', background);
     host.style.zoom = '';
-    // Anything a previous render left in the body (renders are serial).
-    document.querySelectorAll('body > :not(#diagram)').forEach((node) => node.remove());
     document.documentElement.style.background = background;
     document.body.style.background = background;
-    mermaid.initialize({
-      startOnLoad: false,
-      securityLevel: 'strict',
-      suppressErrorRendering: true,
-      theme,
-      darkMode: theme === 'dark',
-      fontFamily: fonts,
-      themeVariables: { background, fontFamily: fonts },
-    });
-    count += 1;
-    const { svg } = await mermaid.render('mermaid-diagram-' + count, source);
     host.innerHTML = svg;
     const element = host.querySelector('svg');
     if (!element) throw new Error('No diagram');
@@ -433,15 +513,14 @@ class MermaidRenderer private constructor() {
       element.setAttribute('height', box.height * fit);
     }
     element.style.maxWidth = 'none';
-    const rect = host.getBoundingClientRect();
-    return { width: rect.width, height: rect.height, svg: host.innerHTML };
+    return host;
   };
-  window.showDiagram = (svg, background, zoom) => {
-    const host = document.getElementById('diagram');
-    document.documentElement.style.background = background;
-    document.body.style.background = background;
-    host.innerHTML = svg;
-    host.style.zoom = String(zoom);
+  window.renderPeleSvg = (svg, theme, background) => {
+    const rect = place(svg, theme, background).getBoundingClientRect();
+    return { width: rect.width, height: rect.height };
+  };
+  window.showDiagram = (svg, theme, background, zoom) => {
+    place(svg, theme, background).style.zoom = String(zoom);
   };
 })();
 """

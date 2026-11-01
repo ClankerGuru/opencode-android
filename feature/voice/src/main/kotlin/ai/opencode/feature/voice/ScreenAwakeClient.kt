@@ -19,12 +19,20 @@ class VoiceScreenActivityRegistry {
     private fun main(body: () -> Unit) { if (Looper.myLooper() == Looper.getMainLooper()) body() else handler.post(body) }
     fun attach(activity: Activity) = main {
         if (activities.none { it.get() === activity }) activities.add(WeakReference(activity))
+        lastResumed = WeakReference(activity)
         apply()
     }
     fun detach(activity: Activity) = main {
         changed.filter { it.get() === activity }.forEach { activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); changed.remove(it) }
         activities.removeAll { it.get() == null || it.get() === activity }
     }
+    private var lastResumed: WeakReference<Activity>? = null
+
+    /** The resumed activities, for a voice screenshot (iOS's foreground-active scenes). Main thread. */
+    val resumedActivities: List<Activity> get() = activities.mapNotNull { it.get() }
+
+    /** The activity resumed last (iOS `ActiveScene.current`, the scene last touched). */
+    val lastTouched: Activity? get() = lastResumed?.get()
     fun acquire() = main { holds++; apply() }
     fun release() = main { holds = (holds - 1).coerceAtLeast(0); apply() }
     private fun apply() {

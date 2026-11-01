@@ -1,11 +1,14 @@
 package ai.opencode.feature.composer.plusmenu
 
+import ai.opencode.core.haptics.Haptic
+import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.feature.composer.AttachmentPickerButton
 import ai.opencode.feature.composer.ComposerMorph
 import ai.opencode.feature.composer.ComposerMorphTunables
 import ai.opencode.feature.composer.LocalComposerMorphContentActive
+import ai.opencode.feature.composer.PickerTunables
 import ai.opencode.feature.composer.PlusMenuTunables
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
@@ -25,6 +28,9 @@ import android.content.res.Configuration
 import android.content.res.Resources
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -82,6 +88,7 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
@@ -136,6 +143,7 @@ import kotlin.math.roundToInt
  * (`remember { PlusPhotoLibrary() }`); call [stop] when the screen goes.
  */
 class PlusPhotoLibrary(private val client: PhotoLibraryClient = dependency(PhotoLibraryClient)) {
+    private val haptics: HapticsClient = dependency(HapticsClient)
     data class ThumbnailCacheKey(val id: String, val pixelSide: Int, val modified: java.time.Instant?)
 
     var access: PhotoLibraryAccess by mutableStateOf(PhotoLibraryAccess.NotDetermined)
@@ -147,9 +155,13 @@ class PlusPhotoLibrary(private val client: PhotoLibraryClient = dependency(Photo
     var picks: List<String> by mutableStateOf(emptyList())
         private set
 
-    /** Pick count held while the sheet folds away after Add, so the Add pill stays and dissolves with the foot. */
-    var closingPickCount: Int by mutableStateOf(0)
+    /**
+     * Picks held while the sheet folds away after Add or Back, so the Add pill and the order
+     * badges stay as they were and dissolve with the sheet instead of changing on the tap.
+     */
+    var closingPicks: List<String> by mutableStateOf(emptyList())
         private set
+    val closingPickCount: Int get() = closingPicks.size
 
     /** Top visible photo ID when the user scrolled the library, so reopening the sheet in the same session returns there. */
     var savedScrollPhotoID: String? = null
@@ -206,7 +218,8 @@ class PlusPhotoLibrary(private val client: PhotoLibraryClient = dependency(Photo
         warmupTask = null
         thumbnails.clear()
         thumbnailOrder.clear()
-        client.stopCaching()
+        // Never asked: nothing was cached, and the library stays untouched.
+        if (access != PhotoLibraryAccess.NotDetermined) client.stopCaching()
     }
 
     /** iOS memory-warning purge. */
@@ -245,6 +258,9 @@ class PlusPhotoLibrary(private val client: PhotoLibraryClient = dependency(Photo
         val expected = generation
         val now = client.access()
         if (access != now) access = now
+        // Never asked: watching the library raises nothing on Android, but iOS's would raise the
+        // access alert over whatever screen is up; the sheet asks ([load]), as on iOS.
+        if (now == PhotoLibraryAccess.NotDetermined) return
         reload(expected)
         if (!currentCoroutineContext().isActive || generation != expected) return
         startWatching(expected)
@@ -266,19 +282,28 @@ class PlusPhotoLibrary(private val client: PhotoLibraryClient = dependency(Photo
     }
 
     fun toggle(id: String) {
-        closingPickCount = 0
+        resetClosingPicks()
         if (id in picks) {
             picks = picks - id
-        } else if (picks.size < AttachmentPickerButton.MAX_PHOTO_SELECTION) {
+            haptics.play(Haptic.selection)
+        } else if (picks.size < AttachmentPickerButton.maxPhotoSelection(plusMenu = true)) {
             picks = picks + id
+            haptics.play(Haptic.selection)
+        } else {
+            haptics.play(Haptic.warning)
         }
     }
 
-    fun order(id: String): Int? = picks.indexOf(id).takeIf { it >= 0 }?.plus(1)
+    /** Add answers the finger on the press; the photos land later. */
+    fun addPressed() {
+        haptics.play(Haptic.tap)
+    }
+
+    fun order(id: String): Int? = (if (picks.isEmpty()) closingPicks else picks).indexOf(id).takeIf { it >= 0 }?.plus(1)
 
     /** Picks handed over to be attached; the sheet starts over next time. */
     fun takePicks(): List<String> {
-        closingPickCount = picks.size
+        closingPicks = picks
         val taken = picks
         picks = emptyList()
         return taken
@@ -288,8 +313,14 @@ class PlusPhotoLibrary(private val client: PhotoLibraryClient = dependency(Photo
         if (picks.isNotEmpty()) picks = emptyList()
     }
 
+    /** Back: the picks are dropped, but shown until the sheet has folded away. */
+    fun setAsidePicks() {
+        closingPicks = picks
+        clearPicks()
+    }
+
     fun resetClosingPicks() {
-        if (closingPickCount != 0) closingPickCount = 0
+        if (closingPicks.isNotEmpty()) closingPicks = emptyList()
     }
 
     fun resetSavedScrollPosition() {
@@ -394,6 +425,8 @@ data class PlusPhotoSheetDetent(
     var ceiling: Float = 0f,
     var top: Float = if (isExpanded) ceiling else compactTop,
     var drag: Float = 0f,
+    /** Captured at touch-down and kept through settlement so changing detents can't switch drag geometry in the release frame. */
+    var dragOriginExpanded: Boolean? = null,
 ) {
     sealed interface Settlement {
         data class Stay(val expanded: Boolean, val top: Float, val initialVelocity: Float) : Settlement
@@ -406,10 +439,12 @@ data class PlusPhotoSheetDetent(
         this.ceiling = ceiling
         top = compactTop
         drag = 0f
+        dragOriginExpanded = null
     }
 
     /** Maps raw vertical finger translation to sheet `drag`, 1:1 between detents and rubber-banding past them. */
     fun dragChanged(translation: Float): Float {
+        if (drag == 0f) dragOriginExpanded = isExpanded
         val maxUp = max(top - ceiling, 0f)
         drag = if (translation < 0) {
             val up = -translation
@@ -610,6 +645,8 @@ fun PlusPhotoSheet(
 private fun PlusPhotoSheetGrabber(
     isExpanded: Boolean,
     onToggle: () -> Unit,
+    /** Floats on the photos' top row ([PickerTunables.PHOTO_GRABBER_OVER_GRID]) instead of its own band. */
+    over: Boolean = false,
     onDrag: ((Float) -> Unit)? = null,
     onDragEnded: ((Float, Float) -> Unit)? = null,
     onDragCancelled: (() -> Unit)? = null,
@@ -618,9 +655,11 @@ private fun PlusPhotoSheetGrabber(
     val currentOnDrag by rememberUpdatedState(onDrag)
     val currentOnDragEnded by rememberUpdatedState(onDragEnded)
     val currentOnDragCancelled by rememberUpdatedState(onDragCancelled)
+    val inset = PlusMenuTunables.GRID_INSET
     Box(
         Modifier
-            .fillMaxWidth()
+            // Over the photos it takes only its own width, so the top row keeps its taps.
+            .then(if (over) Modifier.size(width = 88.dp, height = (GRABBER_HEIGHT + inset).dp) else Modifier.fillMaxWidth())
             .heightIn(min = GRABBER_HEIGHT.dp)
             .onGloballyPositioned { coords.value = it }
             .then(
@@ -647,9 +686,10 @@ private fun PlusPhotoSheetGrabber(
     ) {
         Box(
             Modifier
-                .padding(top = 7.dp)
+                .padding(top = (if (over) 7f + inset else 7f).dp)
                 .size(width = 36.dp, height = 5.dp)
-                .background(OpenCodeTheme.colors.tertiaryText, OpenCodeShape.capsule),
+                .then(if (over) Modifier.shadow(2.dp, OpenCodeShape.capsule, ambientColor = Color.Black.copy(alpha = 0.35f), spotColor = Color.Black.copy(alpha = 0.35f)) else Modifier)
+                .background(if (over) Color.White.copy(alpha = 0.8f) else OpenCodeTheme.colors.tertiaryText, OpenCodeShape.capsule),
         )
     }
 }
@@ -789,16 +829,10 @@ fun PlusPhotoSheetContent(
     var collapseBaseline by remember { mutableStateOf<Float?>(null) }
     val footHeight = PlusPhotoSheetFootDefaults.HEIGHT + PlusPhotoSheetFootDefaults.INSET * 2
     val bottomPadding = with(LocalDensity.current) { contentBottomPadding().toDp() } + footHeight.dp
-    Column(Modifier.fillMaxSize()) {
-        if (hosted) {
-            PlusPhotoSheetGrabber(
-                isExpanded = isExpanded,
-                onToggle = onToggleExpand,
-                onDrag = onDrag,
-                onDragEnded = onDragEnded,
-                onDragCancelled = onDragCancelled,
-            )
-        }
+    // Over the grid: the photos sit `gridInset` from the glass on every side and the grabber
+    // floats on the top row. Otherwise in its own band above the grid.
+    val grabberOver = PickerTunables.PHOTO_GRABBER_OVER_GRID
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         LazyVerticalGrid(
             columns = GridCells.Fixed(3),
             state = gridState,
@@ -808,9 +842,13 @@ fun PlusPhotoSheetContent(
             // iOS `scrollDisabled(!isExpanded)`: compact, a drag moves the sheet instead.
             userScrollEnabled = !hosted || isExpanded,
             modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .padding(start = gridInset.dp, end = gridInset.dp, bottom = gridInset.dp)
+                .fillMaxSize()
+                .padding(
+                    start = gridInset.dp,
+                    end = gridInset.dp,
+                    bottom = gridInset.dp,
+                    top = if (!hosted) 0.dp else if (grabberOver) gridInset.dp else GRABBER_HEIGHT.dp,
+                )
                 .clip(gridShape)
                 .onGloballyPositioned { coordinates ->
                     gridCoords.value = coordinates
@@ -876,6 +914,7 @@ fun PlusPhotoSheetContent(
                 PlusPhotoTile(
                     photo = photo,
                     order = library.order(photo.id),
+                    canPickMore = library.picks.size < AttachmentPickerButton.maxPhotoSelection(plusMenu = true),
                     scale = density,
                     inFlight = flights.hidesPhoto(photo.id),
                     flights = flights,
@@ -888,6 +927,16 @@ fun PlusPhotoSheetContent(
             if (library.access == PhotoLibraryAccess.Denied) {
                 item(span = { GridItemSpan(maxLineSpan) }) { DeniedNotice(onOpenSettings = library::openSettings) }
             }
+        }
+        if (hosted) {
+            PlusPhotoSheetGrabber(
+                isExpanded = isExpanded,
+                onToggle = onToggleExpand,
+                over = grabberOver,
+                onDrag = onDrag,
+                onDragEnded = onDragEnded,
+                onDragCancelled = onDragCancelled,
+            )
         }
     }
 }
@@ -937,14 +986,10 @@ object PlusPhotoSheetFootDefaults {
     const val INSET = 16f
 }
 
-private enum class FootPill { Add, AllPhotos, SelectMore, None }
-
 /**
- * Back on the leading edge and the trailing All Photos / Add N Photos pill along the photo
- * sheet's foot. In compact mode with no picks, All Photos expands the sheet (or, under
- * limited access, offers Browse All Photos and Select More Photos…); picking photos turns
- * that pill into Add N Photos; expanded with no picks it hides, or shows Select More… under
- * limited access. iOS `PlusPhotoSheetFoot`.
+ * Back on the leading edge and the trailing [PlusPhotoPill] along the photo sheet's foot: All
+ * Photos with no picks (expands the sheet), Add N Photos once photos are picked; a long press
+ * offers All Photos and, under limited access, Select More Photos…. iOS `PlusPhotoSheetFoot`.
  */
 @Composable
 fun PlusPhotoSheetFoot(
@@ -955,14 +1000,7 @@ fun PlusPhotoSheetFoot(
     onAdd: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val reduceMotion = rememberReduceMotion()
     val count = if (library.picks.isEmpty()) library.closingPickCount else library.picks.size
-    val pill = when {
-        count > 0 -> FootPill.Add
-        !isExpanded -> FootPill.AllPhotos
-        library.access == PhotoLibraryAccess.Limited -> FootPill.SelectMore
-        else -> FootPill.None
-    }
     Row(
         modifier
             .fillMaxWidth()
@@ -980,83 +1018,25 @@ fun PlusPhotoSheetFoot(
             },
         )
         Spacer(Modifier.weight(1f).width(12.dp))
-        AnimatedContent(
-            targetState = pill to count,
-            transitionSpec = {
-                if (reduceMotion) {
-                    fadeIn(Motion.easeInOut(0.18)) togetherWith fadeOut(Motion.easeInOut(0.18))
-                } else {
-                    val spring = MotionSpring(0.3, 0.12)
-                    (fadeIn(spring.spec()) + scaleIn(spring.spec(), initialScale = 0.92f)) togetherWith
-                        (fadeOut(spring.spec()) + scaleOut(spring.spec(), targetScale = 0.92f))
-                }
+        PlusPhotoPill(
+            count = count,
+            isLimited = library.access == PhotoLibraryAccess.Limited,
+            onAllPhotos = onAllPhotos,
+            onSelectMore = library::manageLimitedSelection,
+            onAdd = {
+                library.addPressed()
+                onAdd()
             },
-            contentKey = { it.first },
-            label = "plus-photo-foot",
-        ) { (shown, picked) ->
-            when (shown) {
-                FootPill.Add -> {
-                    val title = if (picked == 1) "Add 1 Photo" else "Add $picked Photos"
-                    OpenCodePrimaryButton(onClick = onAdd, modifier = Modifier.heightIn(min = PlusPhotoSheetFootDefaults.HEIGHT.dp)) {
-                        Text(title, style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold), maxLines = 1)
-                    }
-                }
-                FootPill.AllPhotos -> if (library.access == PhotoLibraryAccess.Limited) {
-                    var menuOpen by remember { mutableStateOf(false) }
-                    Box {
-                        FootPillLabel("All Photos", onClick = { menuOpen = true })
-                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                            DropdownMenuItem(
-                                text = { Text("Browse All Photos") },
-                                leadingIcon = { OpenCodeIcon(SFSymbol.PhotoOnRectangle, contentDescription = null) },
-                                onClick = {
-                                    menuOpen = false
-                                    onAllPhotos()
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Select More Photos…") },
-                                leadingIcon = { OpenCodeIcon(SFSymbol.PhotoBadgePlus, contentDescription = null) },
-                                onClick = {
-                                    menuOpen = false
-                                    library.manageLimitedSelection()
-                                },
-                            )
-                        }
-                    }
-                } else {
-                    FootPillLabel("All Photos", onClick = onAllPhotos)
-                }
-                FootPill.SelectMore -> FootPillLabel("Select More…", accessibilityLabel = "Select More Photos", onClick = library::manageLimitedSelection)
-                FootPill.None -> Spacer(Modifier.size(0.dp))
-            }
-        }
+        )
     }
 }
 
-/** The glass capsule pill (iOS `pillLabel`): a tonal capsule, 48 dp tall. */
+/**
+ * “▶ 0:50” in a video's corner, on the grid and on its composer thumbnail (iOS `VideoDurationBadge`,
+ * `composer.plusMenu.videoBadge*`): a dark backdrop so it reads on light and dark frames; decorative.
+ */
 @Composable
-private fun FootPillLabel(title: String, onClick: () -> Unit, accessibilityLabel: String = title) {
-    Surface(
-        onClick = onClick,
-        shape = OpenCodeShape.capsule,
-        color = MaterialTheme.colorScheme.surfaceContainerHighest,
-        contentColor = OpenCodeTheme.colors.text,
-        tonalElevation = 2.dp,
-        shadowElevation = 2.dp,
-        modifier = Modifier
-            .heightIn(min = PlusPhotoSheetFootDefaults.HEIGHT.dp)
-            .semantics { contentDescription = accessibilityLabel },
-    ) {
-        Box(Modifier.heightIn(min = PlusPhotoSheetFootDefaults.HEIGHT.dp).padding(horizontal = PlusMenuTunables.ALL_PHOTOS_PADDING.dp), contentAlignment = Alignment.Center) {
-            Text(title, style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold), maxLines = 1)
-        }
-    }
-}
-
-/** The bottom-leading video duration pill (`composer.plusMenu.videoBadge*`). */
-@Composable
-internal fun VideoDurationBadge(duration: String, compact: Boolean = false, modifier: Modifier = Modifier) {
+fun VideoDurationBadge(duration: String, compact: Boolean = false, modifier: Modifier = Modifier) {
     Row(
         modifier
             .background(
@@ -1089,6 +1069,7 @@ private val tileDateFormatter: DateTimeFormatter =
 private fun PlusPhotoTile(
     photo: LibraryPhoto,
     order: Int?,
+    canPickMore: Boolean,
     scale: Float,
     inFlight: Boolean,
     flights: PhotoFlights,
@@ -1097,7 +1078,6 @@ private fun PlusPhotoTile(
     load: suspend (String, Float, Float, (ImageBitmap) -> Unit) -> ImageBitmap?,
     onTap: () -> Unit,
 ) {
-    val reduceMotion = rememberReduceMotion()
     // Starts from the warm cache, so a warmed tile draws on its first frame without a second composition.
     var image by remember(photo.id) { mutableStateOf(cached) }
     val resolved = image ?: cached
@@ -1130,12 +1110,21 @@ private fun PlusPhotoTile(
         animationSpec = if (inFlight) androidx.compose.animation.core.snap() else MotionSpring(0.25).spec(),
         label = "tile-in-flight",
     )
-    val badgeScale by animateFloatAsState(
-        targetValue = if (picked) 1f else 0.5f,
-        animationSpec = if (reduceMotion) androidx.compose.animation.core.snap() else MotionSpring(0.25, 0.2).spec(),
-        label = "tile-badge",
+    // iOS `PhotoSelectionButtonStyle`: press feedback changes only overlays. A press only dims
+    // (previewing the next number flashed a "1" on any tile a sheet drag started on); picked and
+    // unpicked show at once, with the selection haptic, never on a fade.
+    val interaction = remember { MutableInteractionSource() }
+    val isPressed by interaction.collectIsPressedAsState()
+    val pressDim = if (isPressed && !picked) PlusMenuTunables.SELECTION_DIM.toFloat() * 0.5f else 0f
+    val dim = if (picked) PlusMenuTunables.SELECTION_DIM.toFloat() else pressDim
+    // The limit is picked: the rest wash out, so a tap past it reads as “full”, not broken.
+    val full = !picked && !canPickMore
+    val limitDim by animateFloatAsState(
+        targetValue = if (full) PlusMenuTunables.LIMIT_DIM.toFloat() else 0f,
+        animationSpec = tween(200, easing = Motion.EaseOut),
+        label = "tile-limit",
     )
-    val dim = if (picked) 0.18f else 0f
+    val washColor = MaterialTheme.colorScheme.background
     val description = listOfNotNull(photo.formattedDuration, photo.created?.let(tileDateFormatter::format)).joinToString(", ")
     Box(
         Modifier
@@ -1151,11 +1140,17 @@ private fun PlusPhotoTile(
                 drawContent()
                 resolved?.let { drawAspectFill(it, Rect(Offset.Zero, size)) }
                 if (dim > 0f) drawRect(Color.Black.copy(alpha = dim))
+                if (limitDim > 0f) drawRect(washColor.copy(alpha = limitDim))
             }
-            .clickable(enabled = !inFlight, role = Role.Button, onClick = onTap)
+            .clickable(interactionSource = interaction, indication = null, enabled = !inFlight, role = Role.Button, onClick = onTap)
             .clearAndSetSemantics {
                 contentDescription = if (photo.isVideo) "Video" else "Photo"
-                stateDescription = description
+                stateDescription = if (full) {
+                    listOf(description, "${AttachmentPickerButton.maxPhotoSelection(plusMenu = true)} photos is the most you can add")
+                        .filter { it.isNotEmpty() }.joinToString(", ")
+                } else {
+                    description
+                }
                 selected = picked
                 role = Role.Button
                 if (!inFlight) onClick { onTap(); true }
@@ -1164,17 +1159,12 @@ private fun PlusPhotoTile(
         photo.formattedDuration?.let { duration ->
             VideoDurationBadge(duration, modifier = Modifier.align(Alignment.BottomStart).padding(PlusMenuTunables.VIDEO_BADGE_INSET.dp))
         }
-        if (picked || badgeScale > 0.51f) {
+        if (picked) {
             Box(
                 Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(6.dp)
-                    .graphicsLayer {
-                        scaleX = if (reduceMotion) 1f else badgeScale
-                        scaleY = if (reduceMotion) 1f else badgeScale
-                        this.alpha = if (picked) 1f else ((badgeScale - 0.5f) * 2f).coerceIn(0f, 1f)
-                    }
-                    .size(24.dp)
+                    .padding(PlusMenuTunables.SELECTION_BADGE_INSET.dp)
+                    .size(PlusMenuTunables.SELECTION_BADGE_SIZE.dp)
                     .background(OpenCodeTheme.colors.accent, CircleShape)
                     .border(1.5.dp, Color.White, CircleShape),
                 contentAlignment = Alignment.Center,

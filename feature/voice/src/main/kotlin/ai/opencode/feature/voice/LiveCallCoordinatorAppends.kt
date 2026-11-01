@@ -137,7 +137,20 @@ private fun LiveCallCoordinator.hold(appends: List<PendingAppend>) {
     if (finished || appends.isEmpty()) return
     val now = clock.now(); quietGate = quietGate.noteHeld(now)
     quietAppends += appends.map { if (it.enqueuedAt == null) it.copy(enqueuedAt = now) else it }
-    scheduleQuietFlush(restart = appends.any { it.answer != null })
+    // An answer's gate, or a result's behind held context, is shorter than
+    // what the flush may be sleeping out.
+    scheduleQuietFlush(restart = appends.any { it.answer != null || it.kind != LiveAppendKind.instructions })
+}
+/** A newer move's context replaces any still held: each describes a
+ * screen the call has left, and every append cuts GPT-Live off. */
+internal fun LiveCallCoordinator.dropHeldContext() {
+    val isContext: (PendingAppend) -> Boolean = { it.kind == LiveAppendKind.instructions }
+    val before = quietAppends.size + undelivered.size
+    quietAppends.removeAll(isContext); undelivered.removeAll(isContext)
+    val dropped = before - quietAppends.size - undelivered.size
+    if (dropped <= 0) return
+    callLogMarker("Dropped $dropped held context update(s) for a newer move")
+    if (quietAppends.isEmpty()) clearQuietHold()
 }
 internal fun LiveCallCoordinator.cancelLiveAnnouncements(promptIDs: List<String>) {
     val answered = promptIDs.toSet()
@@ -201,10 +214,11 @@ private fun orphanCommentaryAppends(chunks: List<String>, answer: PendingAppend.
 
 internal suspend fun LiveCallCoordinator.sendAppend(append: PendingAppend) {
     if (!running()) return
-    if (quietAppends.isNotEmpty() || quietDelay(append.answer) != null) { holdLogged(append); return }
+    val context = append.kind == LiveAppendKind.instructions
+    if (quietAppends.isNotEmpty() || quietDelay(append.answer, context) != null) { holdLogged(append); return }
     if (!acquireSendSlot()) return
     try {
-        if (quietAppends.isNotEmpty() || quietDelay(append.answer) != null) { holdLogged(append); return }
+        if (quietAppends.isNotEmpty() || quietDelay(append.answer, context) != null) { holdLogged(append); return }
         sendBatch(listOf(append))
     } finally { releaseSendSlot() }
 }
@@ -215,10 +229,23 @@ private fun LiveCallCoordinator.holdLogged(append: PendingAppend) {
             "Held notice (${ReplyWatch.milliseconds(it)}ms quiet gate, ${quietGate.holdReason(now)}): ${VoiceWorkClient.excerpt(append.content, 120)}")
     }
 }
-private fun LiveCallCoordinator.quietDelay(answer: PendingAppend.Answer? = null): Duration? {
+/**
+ * How much longer to hold appends, or null when it's quiet now. Held
+ * appends go out together, so with a delegation's answer among them (or
+ * [answer], about to join them), the answer's gate decides for all.
+ * Session context alone ([context]: the append about to join is
+ * instructions) also waits for the reply the user is owed: in Kit's
+ * Oct 24 call, four switches' context went out 1.5 s after he stopped
+ * talking and swallowed the reply.
+ */
+private fun LiveCallCoordinator.quietDelay(answer: PendingAppend.Answer? = null, context: Boolean = false, at: Duration? = null): Duration? {
     if (timing.liveAppendQuiet <= Duration.ZERO || finished) return null
-    val now = clock.now()
-    val ownAnswer = quietAppends.firstNotNullOfOrNull { it.answer } ?: answer ?: return quietGate.delay(now)
+    val now = at ?: clock.now()
+    val ownAnswer = quietAppends.firstNotNullOfOrNull { it.answer } ?: answer ?: run {
+        val contextOnly = (context || quietAppends.isNotEmpty()) && quietAppends.all { it.kind == LiveAppendKind.instructions }
+        return if (contextOnly && timing.liveContextReplyHold > Duration.ZERO) quietGate.contextDelay(now, timing.liveContextReplyHold)
+        else quietGate.delay(now)
+    }
     val wait = quietGate.answerDelay(now, ownAnswer.readyAt, isPressed(ownAnswer), timing.liveAnswerPressedHold)
     return wait?.let { limited(it, now - ownAnswer.readyAt, now) }
 }
@@ -233,8 +260,10 @@ private fun LiveCallCoordinator.scheduleQuietFlush(restart: Boolean = false) {
     val generation = ++quietFlushGeneration
     quietFlushTask = scope.launch {
         while (isActive && !finished && generation == quietFlushGeneration) {
-            val delay = quietDelay()
-            if (delay != null) { clock.sleep(delay); continue }
+            // Context waits out a reply that may start (and end) well before its
+            // limit: look again at least every quiet window.
+            val delay = quietDelay(at = clock.now())
+            if (delay != null) { clock.sleep(minOf(delay, maxOf(timing.liveAppendQuiet, 50.milliseconds))); continue }
             flushQuietAppends(); return@launch
         }
     }
@@ -282,6 +311,9 @@ private suspend fun LiveCallCoordinator.deliverAppend(original: PendingAppend): 
     if (append.answer != null) noteAnswerDelivered()
     try {
         sendAppendThrowing(append, socket.connection)
+        // The append stops whatever GPT-Live was saying that the user talked
+        // over; what it says next is about this.
+        droppingAssistantSpeech = false
         note?.let(callLogMarker)
         if (append.kind == LiveAppendKind.commentary && append.enqueuedAt != null) {
             voiceCallLog.noteCurrent(VoiceCallLog.Note.Kind.marker, "Sent held notice (after ${ReplyWatch.milliseconds(clock.now() - append.enqueuedAt)}ms): ${VoiceWorkClient.excerpt(append.content, 120)}")
@@ -300,7 +332,8 @@ private fun LiveCallCoordinator.requeue(appends: List<PendingAppend>, failedOn: 
 private suspend fun LiveCallCoordinator.deliverOrHold(appends: List<PendingAppend>) {
     if (!acquireSendSlot()) return
     try {
-        if (quietAppends.isNotEmpty() || quietDelay(appends.firstOrNull()?.answer) != null) { hold(appends); return }
+        val context = appends.all { it.kind == LiveAppendKind.instructions }
+        if (quietAppends.isNotEmpty() || quietDelay(appends.firstOrNull()?.answer, context) != null) { hold(appends); return }
         sendBatch(appends)
     } finally { releaseSendSlot() }
 }
@@ -316,10 +349,15 @@ internal fun LiveCallCoordinator.deliveryNote(append: PendingAppend): String? {
 }
 internal suspend fun LiveCallCoordinator.sendAppendThrowing(append: PendingAppend, connection: VoiceSocketConnection<LiveServerEvent, LiveCommand>) {
     if (!running()) throw CancellationException()
-    val id = nextEventID(append.kind.rawValue)
+    val wireKind = if (append.kind == LiveAppendKind.commentary && append.delegationID == null && config?.unboundSpeechUsesInstructions == true) {
+        LiveAppendKind.instructions
+    } else {
+        append.kind
+    }
+    val id = nextEventID(wireKind.rawValue)
     // Responses delegation rejects every non-null delegation ID on appends.
     val delegationID = if (delegatesToResponses) null else append.delegationID
-    val command = when (append.kind) {
+    val command = when (wireKind) {
         LiveAppendKind.instructions -> LiveCommand.AppendInstructions(id, delegationID, append.content)
         LiveAppendKind.thinking -> LiveCommand.AppendThinking(id, delegationID, append.content)
         LiveAppendKind.commentary -> LiveCommand.AppendCommentary(id, delegationID, append.content)

@@ -61,21 +61,46 @@ data class ReplyWatch(
         /** What was asked, briefly, so a reply answering several requests can name them. */
         val topic: String? = null,
         /**
-         * `ReplyWatch.userTurns` when it was sent: a result landing after the
+         * `ReplyWatch.userTurns` when it was said: a result landing after the
          * conversation went on names what it was about.
          */
         val turn: Int = 0,
+        /**
+         * `userTurns` when the delegation that sent it was made, when known;
+         * otherwise it counts from when it was sent.
+         */
+        val saidTurn: Int? = null,
         /**
          * Its own read came back (this text, empty for none) while a later
          * prompt steered into the same run hadn't: the run resolves on that one.
          */
         val ownReply: String? = null,
+        /**
+         * Set when this is work a watched prompt's session started in the
+         * background (a background subagent), watched in its own session.
+         */
+        val background: VoiceBackgroundWork? = null,
+        /**
+         * Set when watching a session's current turn without a phone-sent prompt ID
+         * (`ios_voice_watch_session`).
+         */
+        val readsLatestSessionReply: Boolean = false,
     ) {
         val id: String get() = promptID
 
         companion object {
-            operator fun invoke(sent: VoiceDelegator.SentPrompt): Prompt =
-                Prompt(promptID = sent.promptID, sessionID = sent.sessionID, title = sent.title, topic = sent.topic)
+            operator fun invoke(sent: VoiceDelegator.SentPrompt, saidTurn: Int? = null): Prompt =
+                Prompt(promptID = sent.promptID, sessionID = sent.sessionID, title = sent.title, topic = sent.topic, saidTurn = saidTurn)
+
+            /** Background work [title]'s session started for a prompt said at [saidTurn]. */
+            operator fun invoke(work: VoiceBackgroundWork, title: String, saidTurn: Int): Prompt = Prompt(
+                promptID = "background-${work.sessionID}",
+                sessionID = work.sessionID,
+                title = title,
+                topic = work.description,
+                saidTurn = saidTurn,
+                background = work,
+            )
         }
     }
 
@@ -118,6 +143,8 @@ data class ReplyWatch(
         val sessionID: String,
         val title: String,
         val outcome: Outcome,
+        /** What the background work was, for background work's result. */
+        val background: String? = null,
     ) {
         val id: String get() = promptID
     }
@@ -143,8 +170,16 @@ data class ReplyWatch(
          * while it's in its short grace (`unclaimedResultGrace`).
          */
         val heldBy: Set<String> = emptySet(),
+        /**
+         * The background work, when it's background work's result: a request
+         * reading the session that started it holds it too.
+         */
+        val background: VoiceBackgroundWork? = null,
     ) {
         val id: String get() = promptID
+
+        /** Its own session's, or background work the session started. */
+        fun isAbout(sessionID: String): Boolean = this.sessionID == sessionID || background?.parentSessionID == sessionID
 
         /** Without the prompts in [answered], unless that would leave none. */
         fun removing(answered: Set<String>): HeldNotice {
@@ -222,17 +257,35 @@ data class ReplyWatch(
 
         /** Drops held announcements that answer only these prompts. */
         data class CancelWireAnnouncements(val promptIDs: List<String>) : Effect
+
+        /**
+         * A prompt's run finished: background work it started that's still
+         * running is watched too (`sent`), so its result is spoken when it lands.
+         */
+        data class FindBackgroundWork(val sessionID: String, val promptID: String, val title: String, val turn: Int, val reply: String?) : Effect
         data class Log(val entry: LogEntry) : Effect
     }
 
     sealed interface Event {
         data class Sent(val prompts: List<Prompt>) : Event
+
+        /**
+         * Prompts one delegation sent for turns said before its latest
+         * (`heldBackTurns`): each counts from its own turn.
+         */
+        data class HeldBack(val turns: Map<String, Int>) : Event
         data class SseStepEnded(val sessionID: String) : Event
         data class SseExecutionStarted(val sessionID: String) : Event
         data class SseExecutionEnded(val sessionID: String, val source: SettlementSource = SettlementSource.sse) : Event
         data class ActiveSessionsSnapshot(val ids: Set<String>, val source: SettlementSource = SettlementSource.snapshot) : Event
         data class WaitSucceeded(val promptID: String, val reply: String?) : Event
         data class WaitFailed(val promptID: String, val error: WaitError, val sessionStillActive: Boolean? = null) : Event
+
+        /**
+         * A newer steer into the same session replaced this prompt: cancel its
+         * watch so only the latest steer's settled reply speaks.
+         */
+        data class Superseded(val promptID: String) : Event
         data object Reconnected : Event
         data class CallPhaseChanged(val phase: CallPhase) : Event
 
@@ -300,7 +353,7 @@ data class ReplyWatch(
             val running = isSessionRunning(viewing.id) || hasDirectVoiceWork
             var line = "The user is viewing session \"${viewing.title}\" (id ${viewing.id}, project ${VoiceDelegatorWorkspace.folder(viewing.directory)}, ${if (running) "working" else "idle"})."
             if (needsInput) {
-                line += " It is waiting on the user's approval or answer in the app."
+                line += " It is waiting on a pending request: the user's approval or answer goes through list_requests and answer_question or reply_permission, never send_message."
             }
             lines += line
         } else {
@@ -309,12 +362,21 @@ data class ReplyWatch(
         if (watched.isNotEmpty() || completed.isNotEmpty()) {
             lines += "Tracked session work from this call:"
             for (prompt in watched) {
+                val work = prompt.background
+                if (work != null) {
+                    lines += "- Background work “${work.description}” that \"${prompt.title}\" started (subagent session id ${prompt.sessionID}): working; its result is spoken when it lands."
+                    continue
+                }
                 val liveState = if (prompt.sessionID in activeSessionIDs) "active on server" else "finishing / checking reply"
                 lines += "- \"${prompt.title}\" (id ${prompt.sessionID}, prompt ${prompt.promptID}): working (live status: $liveState)."
             }
             for (item in completed.takeLast(4)) {
                 // An excerpt, not the reply: read_session has all of it.
                 val more = if (item.outcome.contextSummary.endsWith("…")) " (excerpt; read_session of that session has the whole reply)" else ""
+                if (item.background != null) {
+                    lines += "- Background work “${item.background}” that \"${item.title}\" started (subagent session id ${item.sessionID}): finished — ${item.outcome.contextSummary}$more"
+                    continue
+                }
                 lines += "- \"${item.title}\" (id ${item.sessionID}, prompt ${item.promptID}): finished — ${item.outcome.contextSummary}$more"
             }
         }
@@ -375,13 +437,22 @@ data class ReplyWatch(
                 val effects = mutableListOf<Effect>()
                 for (sent in event.prompts) {
                     if (watched.any { it.promptID == sent.promptID } || sent.promptID in resolvedPromptIDs) continue
-                    val prompt = sent.copy(turn = userTurns)
+                    val prompt = sent.copy(turn = minOf(sent.saidTurn ?: userTurns, userTurns))
                     watched += prompt
                     activeSessionIDs += prompt.sessionID
                     effects += Effect.Log(LogEntry.WatchStarted(prompt.promptID, prompt.sessionID, prompt.title))
                     effects += Effect.StartWait(prompt)
                 }
                 effects
+            }
+
+            is Event.HeldBack -> {
+                for (index in watched.indices) {
+                    event.turns[watched[index].promptID]?.let { turn -> watched[index] = watched[index].copy(turn = minOf(watched[index].turn, turn)) }
+                }
+                deferredNotices = deferredNotices.map { restamp(it, event.turns) }.toMutableList()
+                connectingNotices = connectingNotices.map { restamp(it, event.turns) }.toMutableList()
+                emptyList()
             }
 
             is Event.SseExecutionStarted -> {
@@ -406,6 +477,17 @@ data class ReplyWatch(
             is Event.WaitSucceeded -> waitSucceeded(event)
 
             is Event.WaitFailed -> waitFailed(event)
+
+            is Event.Superseded -> {
+                val index = watched.indexOfFirst { it.promptID == event.promptID }
+                if (index < 0) {
+                    emptyList()
+                } else {
+                    val prompt = watched.removeAt(index)
+                    resolvedPromptIDs += prompt.promptID
+                    listOf<Effect>(Effect.CancelWatch(prompt.promptID)) + resolveAnsweredRest(prompt.sessionID)
+                }
+            }
 
             Event.Reconnected ->
                 if (watched.isEmpty()) emptyList() else listOf(Effect.RefreshActiveSessions(SettlementSource.reconnect))
@@ -543,7 +625,7 @@ data class ReplyWatch(
             // A wait that read the reply still holds it through that read.
             if (pendingAnswers[requestID]?.any { it.sessionID == sessionID } == true) return emptyList()
             return release { notice ->
-                if (notice.sessionID == sessionID && requestID in notice.heldBy) {
+                if (notice.isAbout(sessionID) && requestID in notice.heldBy) {
                     notice.copy(heldBy = notice.heldBy - requestID) to true
                 } else {
                     notice to false
@@ -566,7 +648,7 @@ data class ReplyWatch(
             if (requestID !in delegatorsInFlight) return emptyList()
             val effects = mutableListOf<Effect>()
             for (index in deferredNotices.indices) {
-                if (deferredNotices[index].sessionID != sessionID) continue
+                if (!deferredNotices[index].isAbout(sessionID)) continue
                 val wasClaimed = deferredNotices[index].heldBy.isNotEmpty()
                 deferredNotices[index] = deferredNotices[index].copy(heldBy = deferredNotices[index].heldBy + requestID)
                 val key = deferredNotices[index].deferralKey
@@ -626,6 +708,7 @@ data class ReplyWatch(
                 effects += recordCompleted(prompt, outcome)
                 effects += Effect.Log(LogEntry.NoticeSuppressed(prompt.title))
             }
+            effects += findBackgroundWork(matching, outcome)
             val covered = { notice: HeldNotice -> notice.promptIDs.all { it in answered } }
             val suppressed = (connectingNotices + deferredNotices).filter(covered)
             for (key in deferredNotices.filter(covered).mapNotNull { it.deferralKey }) {
@@ -670,7 +753,7 @@ data class ReplyWatch(
 
         private fun recordCompleted(prompt: Prompt, outcome: Outcome, logged: Outcome? = null): List<Effect> {
             resolvedPromptIDs += prompt.promptID
-            completed += Completed(prompt.promptID, prompt.sessionID, prompt.title, outcome)
+            completed += Completed(prompt.promptID, prompt.sessionID, prompt.title, outcome, background = prompt.background?.description)
             if (completed.size > maxCompletedHistory) {
                 repeat(completed.size - maxCompletedHistory) { completed.removeAt(0) }
             }
@@ -708,6 +791,19 @@ data class ReplyWatch(
         }
 
         /**
+         * A run that finished may have started background work that outlives it
+         * (a background subagent): its first prompt anchors the search, so the
+         * whole run is covered. A failed run, background work's own result, and
+         * a call that's ending start nothing.
+         */
+        private fun findBackgroundWork(prompts: List<Prompt>, outcome: Outcome): List<Effect> {
+            if (outcome.isFailure || (callPhase != CallPhase.live && callPhase != CallPhase.connecting)) return emptyList()
+            val first = prompts.firstOrNull { it.background == null } ?: return emptyList()
+            val reply = (outcome as? Outcome.Replied)?.reply
+            return listOf(Effect.FindBackgroundWork(first.sessionID, first.promptID, first.title, first.turn, reply))
+        }
+
+        /**
          * Earlier prompts of a run whose own reads already landed, once its last
          * prompt left another way (a failure, or the delegator answering it).
          */
@@ -737,8 +833,9 @@ data class ReplyWatch(
                 sessionID = prompt.sessionID,
                 title = prompt.title,
                 outcome = outcome,
-                topics = prompts.map { it.topic ?: "an earlier request in “${it.title}”" },
+                topics = prompts.map { it.topic ?: untitledTopic(it.title) },
                 turn = prompts.minOfOrNull { it.turn } ?: prompt.turn,
+                background = prompt.background,
             )
             when {
                 callPhase == CallPhase.connecting -> connectingNotices += notice
@@ -746,7 +843,10 @@ data class ReplyWatch(
                     // A running request that read this run, or is waiting on it, tells
                     // the user in its answer, and this then says only the rest. One that
                     // hasn't may be about to: a short grace. Both are bounded.
-                    val held = notice.copy(deferralKey = notice.promptID, heldBy = claimers(notice.sessionID))
+                    val held = notice.copy(
+                        deferralKey = notice.promptID,
+                        heldBy = claimers(notice.sessionID) + (notice.background?.let { claimers(it.parentSessionID) } ?: emptySet()),
+                    )
                     deferredNotices += held
                     effects += Effect.ExpireDeferral(
                         key = notice.promptID,
@@ -761,7 +861,7 @@ data class ReplyWatch(
                 }
                 else -> effects += Effect.Log(LogEntry.NoticeDropped(prompt.title, callPhase))
             }
-            return effects
+            return effects + findBackgroundWork(prompts, outcome)
         }
 
         /**
@@ -775,9 +875,18 @@ data class ReplyWatch(
                 alreadyTold = told.reply
                 delegatorReplies[notice.sessionID] = told.copy(promptIDs = told.promptIDs - notice.promptIDs.toSet())
             }
-            var text = notice.outcome.notice(notice.title, answering = notice.topics, alreadyTold = alreadyTold)
-            if (userTurns > notice.turn) text = VoiceHandoff.earlierRequest(text)
+            var text = notice.outcome.notice(notice.title, answering = notice.topics, alreadyTold = alreadyTold, background = notice.background?.description)
+            if (userTurns > notice.turn) {
+                // Several topics are already named in the notice.
+                val topic = if (notice.topics.size == 1) notice.topics.first().takeIf { it != untitledTopic(notice.title) } else null
+                text = VoiceHandoff.earlierRequest(text, topic = topic)
+            }
             return Effect.Announce(notice.sessionID, notice.promptIDs, text)
+        }
+
+        private fun restamp(notice: HeldNotice, turns: Map<String, Int>): HeldNotice {
+            val turn = notice.promptIDs.mapNotNull { turns[it] }.minOrNull() ?: return notice
+            return notice.copy(turn = minOf(notice.turn, turn))
         }
 
         /** Forgets what the delegator reported once nothing of that run is left. */
@@ -805,9 +914,15 @@ data class ReplyWatch(
         val replyWait: Duration = Duration.ZERO,
         val maxHold: Duration = 5.seconds,
         val userPause: Duration = 450.milliseconds,
+        /** How long the user must be quiet before anything goes out; zero uses
+         * the brief [userPause]. */
+        val userQuietGap: Duration = Duration.ZERO,
         val assistantSpeaking: Boolean = false,
         val lastAssistantSpeechAt: Duration? = null,
         val lastUserSpeechAt: Duration? = null,
+        /** When the microphone last heard the user's voice. Transcript fragments
+         * arrive in bursts with gaps of a second or more while someone talks on. */
+        val lastUserVoiceAt: Duration? = null,
         val heldSince: Duration? = null,
         /** When the voice agent's current run of speech began. */
         val assistantSpeechRunStartedAt: Duration? = null,
@@ -848,6 +963,10 @@ data class ReplyWatch(
             return copy(lastUserSpeechAt = now, speakingDurationWhileHeld = spokenWhileHeld)
         }
 
+        /** The microphone heard the user's voice: they're still talking, though
+         * no words have been transcribed for it yet. */
+        fun noteUserVoice(now: Duration): QuietGate = copy(lastUserVoiceAt = now)
+
         fun noteHeld(now: Duration): QuietGate {
             if (heldSince != null) return this
             return copy(
@@ -872,5 +991,66 @@ data class ReplyWatch(
         const val maxCompletedHistory = 8
 
         fun milliseconds(duration: Duration): Int = maxOf(0, duration.inWholeMilliseconds.toInt())
+
+        /**
+         * The prompts of one delegation that answer a turn said before its
+         * latest, each with that turn. GPT-Live can hold a request back and hand
+         * it over with the next turn's, so one delegation carries several turns.
+         * Every prompt counts from the delegation ([now]) unless it's
+         * unambiguous: it shares two or more words with exactly one earlier turn
+         * and none with any other, and every turn after that one is another
+         * prompt's in the same way. A later turn no other prompt answers may be
+         * a correction (“Actually, Alice's instead”), so the prompt is fresh:
+         * a fresh answer led as an old one is worse than a missed lead.
+         */
+        fun heldBackTurns(prompts: List<Pair<String, String?>>, among: List<String>, now: Int): Map<String, Int> {
+            val turns = among
+            if (turns.size <= 1 || prompts.size <= 1) return emptyMap()
+            val words = turns.map(::turnWords)
+            val owned: List<Int?> = prompts.map { (_, topic) ->
+                if (topic == null) return@map null
+                val asked = turnWords(topic)
+                val shared = words.map { (asked intersect it).size }
+                val matched = shared.indices.filter { shared[it] > 0 }
+                val turn = matched.singleOrNull() ?: return@map null
+                if (shared[turn] >= 2) turn else null
+            }
+            val stamps = LinkedHashMap<String, Int>()
+            for ((index, prompt) in prompts.withIndex()) {
+                val turn = owned[index] ?: continue
+                if (turn >= turns.size - 1) continue
+                val laterAreOthers = (turn + 1 until turns.size).all { later ->
+                    owned.indices.any { it != index && owned[it] == later }
+                }
+                if (laterAreOthers) stamps[prompt.first] = now - (turns.size - 1 - turn)
+            }
+            return stamps
+        }
+
+        private val commonWords: Set<String> = setOf(
+            "the", "and", "for", "with", "this", "that", "you", "your", "what", "can", "please",
+            "ask", "tell", "session", "okay", "also", "about", "it's", "from", "have", "are", "was",
+            "actually", "instead", "just", "now", "check", "one", "other",
+        )
+
+        /** Words of three or more letters, lowercased, possessives dropped. */
+        private fun turnWords(text: String): Set<String> {
+            val words = mutableSetOf<String>()
+            val current = StringBuilder()
+            fun flush() {
+                if (current.isEmpty()) return
+                val trimmed = current.toString().trim('\'')
+                current.clear()
+                val word = if (trimmed.endsWith("'s")) trimmed.dropLast(2) else trimmed
+                if (word.length >= 3 && word !in commonWords) words += word
+            }
+            for (char in text.lowercase().replace("’", "'")) {
+                if (char.isLetter() || char.isDigit() || char == '\'') current.append(char) else flush()
+            }
+            flush()
+            return words
+        }
+
+        fun untitledTopic(title: String): String = "an earlier request in “$title”"
     }
 }

@@ -192,16 +192,18 @@ class LiveProtocolTests {
         assertTrue(VoiceDelegator.instructions.contains("always call read_session (or list_sessions) in this turn"))
     }
 
-    @Test fun quietGateHonorsReducedReplyWaitMaxHoldCapAndNeverCutsOffSpeech() {
+    @Test fun quietGateNeverCutsOffSpeechAndHasNoCap() {
         assertEquals(900.milliseconds, VoiceCallTiming.live.liveAppendQuiet)
         assertEquals(1_500.milliseconds, VoiceCallTiming.live.liveAppendReplyWait)
-        assertEquals(5.seconds, VoiceCallTiming.live.liveAppendMaxHold)
+        assertEquals("Nothing forces a held update out while the user talks", Duration.ZERO, VoiceCallTiming.live.liveAppendMaxHold)
+        assertEquals(2.seconds, VoiceCallTiming.live.liveUserQuietGap)
+        assertEquals(0.35f, VoiceCallTiming.live.liveMicVoiceLevel)
+        assertEquals(600.milliseconds, VoiceCallTiming.live.liveBargeIn)
 
         val t0 = Duration.ZERO
 
-        // 1. Assistant's 5 s response with a playback drain: time while the assistant
-        // is speaking does not count toward `maxHold`, and the full 900 ms post-speech
-        // `quietWindow` is still enforced after playback drains at 5 s.
+        // 1. Assistant's 5 s response with a playback drain: the full 900 ms
+        // post-speech `quietWindow` is still enforced after playback drains at 5 s.
         var assistantGate = VoiceCallTiming.live.quietGate
         assistantGate = assistantGate.noteAssistantSpeaking(true, t0)
         assistantGate = assistantGate.noteHeld(t0)
@@ -214,35 +216,35 @@ class LiveProtocolTests {
         assertEquals(400.milliseconds, assistantGate.delay(t0 + 5_500.milliseconds))
         assertNull(assistantGate.delay(t0 + 5_900.milliseconds))
 
-        // 2. User's continuous 6 s utterance: active user speech does not count
-        // toward `maxHold`, and `maxHold` never fires mid-utterance at 5 s.
+        // 2. User's continuous 6 s utterance holds throughout, then the 2 s
+        // quiet gap applies before releasing at 8 s.
         var userGate = VoiceCallTiming.live.quietGate
         userGate = userGate.noteUserSpoke(t0)
         userGate = userGate.noteHeld(t0)
         for (step in 1..12) {
             val at = t0 + (step * 500).milliseconds
             userGate = userGate.noteUserSpoke(at)
-            assertEquals(
-                "Continuous user speech at ${step * 500} ms must not be cut off by maxHold",
-                1_500.milliseconds, userGate.delay(at),
-            )
+            assertEquals("Continuous user speech at ${step * 500} ms holds", 2.seconds, userGate.delay(at))
         }
-        // After the 6 s utterance ends, the full 1.5 s replyWait applies before releasing at 7.5 s.
-        assertEquals(1_000.milliseconds, userGate.delay(t0 + 6_500.milliseconds))
-        assertNull(userGate.delay(t0 + 7_500.milliseconds))
+        assertEquals(1_500.milliseconds, userGate.delay(t0 + 6_500.milliseconds))
+        assertNull(userGate.delay(t0 + 8_000.milliseconds))
 
-        // 3. Repeated quiet-but-not-yet-settled pauses (> quietWindow, < replyWait)
-        // accumulate toward `maxHold` and release once the brief post-delta pause passes.
-        var cappedGate = VoiceCallTiming.live.quietGate
-        cappedGate = cappedGate.noteUserSpoke(t0)
-        cappedGate = cappedGate.noteHeld(t0)
-        for (pause in listOf(1_200, 2_400, 3_600, 4_800)) {
-            cappedGate = cappedGate.noteUserSpoke(t0 + pause.milliseconds)
+        // 3. Kit's Oct 30 dictation: transcript fragments 1.2 s apart for 20 s
+        // never release a held update (a 5 s cap used to, 1.5 s into a pause).
+        var dictation = VoiceCallTiming.live.quietGate
+        dictation = dictation.noteUserSpoke(t0)
+        dictation = dictation.noteHeld(t0)
+        for (fragment in 1..16) {
+            val at = t0 + (fragment * 1_200).milliseconds
+            assertNotNull("Held between fragments at ${fragment * 1_200} ms", dictation.delay(at - 1.milliseconds))
+            dictation = dictation.noteUserSpoke(at)
         }
-        // At 4.8 s (after 4.8 s of quiet waiting), the brief 450 ms userPause still protects the word just spoken.
-        assertEquals(450.milliseconds, cappedGate.delay(t0 + 4_800.milliseconds))
-        // Once the 450 ms pause passes at 5.25 s (and quiet hold >= 5 s), maxHold releases the notice.
-        assertNull(cappedGate.delay(t0 + 5_250.milliseconds))
+        // The microphone hears them talk on with no fragment for 2.5 s.
+        val lastFragment = t0 + 19_200.milliseconds
+        dictation = dictation.noteUserVoice(lastFragment + 2_500.milliseconds)
+        assertEquals(1_500.milliseconds, dictation.delay(lastFragment + 3_000.milliseconds))
+        assertEquals("user speaking", dictation.holdReason(lastFragment + 3_000.milliseconds))
+        assertNull("Out after 2 s of real quiet", dictation.delay(lastFragment + 4_500.milliseconds))
     }
 }
 
@@ -1096,11 +1098,11 @@ class LiveCallCoordinatorTests {
         val ms = { value: Int -> t0 + value.milliseconds }
         var gate = VoiceCallTiming.live.quietGate
         gate = gate.noteUserSpoke(t0)
-        // A reply is owed: other appends wait out the 1.5 s reply window.
-        assertEquals(1_000.milliseconds, gate.delay(ms(500)))
-        // The answer is that reply: the user's brief pause only.
-        assertEquals(250.milliseconds, gate.answerDelay(ms(200), readyAt = t0, pressed = false, pressedHold = 2.seconds))
-        assertNull(gate.answerDelay(ms(500), readyAt = t0, pressed = false, pressedHold = 2.seconds))
+        // Everything waits out the user's 2 s quiet gap, past the reply window.
+        assertEquals(1_500.milliseconds, gate.delay(ms(500)))
+        // The answer is that reply: the user's quiet gap only.
+        assertEquals(1_800.milliseconds, gate.answerDelay(ms(200), readyAt = t0, pressed = false, pressedHold = 2.seconds))
+        assertNull(gate.answerDelay(ms(2_000), readyAt = t0, pressed = false, pressedHold = 2.seconds))
 
         // The voice agent talks from 1 s: held, unless the user asked again,
         // then for at most `pressedHold` of that talk (not of the wait before it).
@@ -1112,7 +1114,7 @@ class LiveCallCoordinatorTests {
         assertNull(gate.answerDelay(ms(3_000), readyAt = t0, pressed = true, pressedHold = 2.seconds))
         // The user's own words still hold it.
         gate = gate.noteUserSpoke(ms(3_000))
-        assertEquals(350.milliseconds, gate.answerDelay(ms(3_100), readyAt = t0, pressed = true, pressedHold = 2.seconds))
+        assertEquals(1_900.milliseconds, gate.answerDelay(ms(3_100), readyAt = t0, pressed = true, pressedHold = 2.seconds))
 
         // A tag isn't the user asking again; GPT-Live rarely closes one.
         assertFalse(LiveCallCoordinator.hasWords("[gasp"))
@@ -1571,7 +1573,7 @@ class LiveCallCoordinatorTests {
         assertTrue(section.contains("It is never a note, a message, or part of a result: never call it one."))
         assertTrue(section.contains("Never say you got a note, message, or result that isn't in one, and never guess what one means."))
         assertTrue(section.contains("say \"Sorry, I didn't catch that.\""))
-        assertTrue(section.contains("no comment on it, no questions about it, no offers to act on it"))
+        assertTrue(section.contains("get no reply at all: keep listening. No greeting back, no laugh"))
         assertTrue(section.contains("the correction replaces your earlier take"))
         assertTrue(section.contains("lists only the requests you delegated and their actual results"))
         assertTrue(section.contains("No emotional probing"))

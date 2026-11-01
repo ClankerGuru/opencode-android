@@ -504,6 +504,8 @@ class VoiceModelToolsTests {
             createSession = { _, directory, _ -> OpenCodeSession(id = "ses_new", serverTitle = "New", projectID = "p", directory = directory, updatedAt = distantPast) },
             moveToBackground = { _, _ -> },
             setPendingInputDelivery = { _, _, _, _ -> },
+            // Every steer reads its target's requests first: none here.
+            familyPendingRequests = { _, _, _ -> OpenCodePendingRequests(permissions = emptyList(), forms = emptyList()) },
             sendDeliveredPrompt = { _, id, _, _ ->
                 calls.prompts.update { it + id }
                 calls.switched.update { it + "prompt $id" }

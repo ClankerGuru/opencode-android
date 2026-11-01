@@ -7,6 +7,7 @@ import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
+import ai.opencode.server.model.OpenCodePendingRequests
 import ai.opencode.server.model.OpenCodeSession
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -246,7 +247,10 @@ class VoiceReconnectReplyTests {
                     }
                 }
             }
-            this[OpenCodeClient] = OpenCodeClient.testValue.copy(sendDeliveredPrompt = { _, _, _, _ -> "msg_steer" })
+            this[OpenCodeClient] = OpenCodeClient.testValue.copy(
+                sendDeliveredPrompt = { _, _, _, _ -> "msg_steer" },
+                familyPendingRequests = { _, _, _ -> OpenCodePendingRequests(permissions = emptyList(), forms = emptyList()) },
+            )
             this[VoiceWorkClient] = testVoiceWork(awaitReply = { _, _, _ ->
                 delay(60.seconds)
                 null
@@ -290,7 +294,10 @@ class VoiceReconnectReplyTests {
             this[VoiceDelegatorClient] = VoiceDelegatorClient(isEnabled = true) { _, _, _ ->
                 throw AssertionError("The phone's delegator must not run on a Responses delegation")
             }
-            this[OpenCodeClient] = OpenCodeClient.testValue.copy(sendDeliveredPrompt = { _, _, _, _ -> "msg_steer" })
+            this[OpenCodeClient] = OpenCodeClient.testValue.copy(
+                sendDeliveredPrompt = { _, _, _, _ -> "msg_steer" },
+                familyPendingRequests = { _, _, _ -> OpenCodePendingRequests(permissions = emptyList(), forms = emptyList()) },
+            )
             this[VoiceWorkClient] = testVoiceWork(awaitReply = { _, _, _ ->
                 delay(60.seconds)
                 null

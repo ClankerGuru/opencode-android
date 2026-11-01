@@ -150,6 +150,67 @@ class MotionAuditDetectorTests {
         assertEquals(listOf("r1"), findings[4].rows)
     }
 
+    /**
+     * Bottom chrome moves as one: a reader at the end rides the composer's drawn top in the frame it
+     * moves (a new line, attachments easing in).
+     */
+    @Test
+    fun rowsRidingTheComposersDrawnTopAreNotAnOffsetJump() {
+        // Each frame: its wall time, and how far the composer's top has risen.
+        fun track(
+            frames: List<Pair<Int, Double>>,
+            listRise: List<Double>? = null,
+            measured: Boolean = true,
+            elapsed: Map<Int, Int> = emptyMap(),
+        ): List<MotionFrame> = frames.mapIndexed { index, (wall, rise) ->
+            val offset = 100 + (listRise?.get(index) ?: rise)
+            val f = frame(
+                index, wall = 1_000 + wall, offset = offset,
+                rows = listOf(row("r1", y = 700 - (offset - 100), h = 60.0, kind = "user"), row("r2", y = 780 - (offset - 100), h = 80.0, kind = "markdown")),
+                events = if (index == 0) listOf(apply(inserted = listOf("r1", "r2"), order = listOf("r1", "r2"), isInitial = true)) else emptyList(),
+            ).copy(composerTop = if (measured) 866 - rise else null)
+            f.elapsed = elapsed[index] ?: 1
+            f
+        }
+        fun frames(rises: List<Double>): List<Pair<Int, Double>> = rises.mapIndexed { i, rise -> 17 * i to rise }
+        // A new line on its spring: 22 pt over a few frames, the rows riding it.
+        val newLine = track(frames(listOf(0.0, 2.0, 6.5, 11.5, 15.5, 18.5, 20.3, 21.3, 21.8, 22.0)))
+        assertTrue(MotionAuditDetector.findings(newLine).isEmpty())
+        assertEquals(864.0, MotionFrame(newLine[1].dictionary)?.composerTop)
+        // Attachments ease in on the composer's spring, a stall merging four frames into one 64 pt step.
+        val stalled = track(listOf(0 to 0.0, 17 to 4.3, 34 to 12.0, 101 to 76.0, 118 to 86.0, 135 to 91.0, 152 to 93.0), elapsed = mapOf(3 to 4))
+        assertTrue(MotionAuditDetector.findings(stalled).isEmpty())
+        // A spring that's a frame along when it's first drawn starts with a large step from rest, and
+        // keeps gliding.
+        val fromRest = track(frames(listOf(0.0, 11.7, 25.0, 35.4, 49.4, 59.0, 67.0, 72.4, 78.7, 82.7, 86.0, 88.0, 90.4, 91.7, 93.0, 94.0, 94.7)))
+        assertTrue(MotionAuditDetector.findings(fromRest).isEmpty())
+        // Composer and rows snapping together are a jump, not a ride: the composer stopping dead after
+        // its step gives the snap away.
+        val snap = track(frames(listOf(0.0, 22.0, 22.0)))
+        assertEquals(listOf(MotionFinding.Kind.OffsetJump), MotionAuditDetector.findings(snap).map { it.kind })
+        // The trace skips ticks that draw nothing new: the next line's snap, 300 ms on, gives the first
+        // one away.
+        val snaps = track(listOf(0 to 0.0, 17 to 22.0, 300 to 44.0))
+        assertEquals(listOf(MotionFinding.Kind.OffsetJump), MotionAuditDetector.findings(snaps).map { it.kind })
+        // A stall merging frames doesn't excuse a snap: the composer stops dead.
+        val stalledSnap = track(listOf(0 to 0.0, 17 to 0.0, 67 to 22.0, 84 to 22.0), elapsed = mapOf(2 to 3))
+        assertEquals(listOf(MotionFinding.Kind.OffsetJump), MotionAuditDetector.findings(stalledSnap).map { it.kind })
+        // As does a merged step the stall can't account for.
+        val unaccounted = track(listOf(0 to 0.0, 17 to 4.3, 34 to 12.0, 101 to 76.0))
+        assertEquals(listOf(MotionFinding.Kind.OffsetJump), MotionAuditDetector.findings(unaccounted).map { it.kind })
+        val leap = track(frames(listOf(0.0, 8.0, 34.0, 51.0)))
+        assertEquals(listOf(MotionFinding.Kind.OffsetJump), MotionAuditDetector.findings(leap).map { it.kind })
+        // The rows jumping while the composer stays put is still a jump.
+        val alone = track(frames(listOf(0.0, 0.0)), listRise = listOf(0.0, 22.0))
+        assertEquals(listOf(MotionFinding.Kind.OffsetJump), MotionAuditDetector.findings(alone).map { it.kind })
+        // So is a list that moves farther than the composer did.
+        val farther = track(frames(listOf(0.0, 2.0, 6.5)), listRise = listOf(0.0, 2.0, 24.0))
+        assertEquals(listOf(MotionFinding.Kind.OffsetJump), MotionAuditDetector.findings(farther).map { it.kind })
+        // And a frame with no composer measured.
+        val unmeasured = track(frames(listOf(0.0, 2.0, 6.5)), measured = false)
+        assertEquals(listOf(MotionFinding.Kind.OffsetJump, MotionFinding.Kind.OffsetJump), MotionAuditDetector.findings(unmeasured).map { it.kind })
+    }
+
     @Test
     fun workingToReplyEndHandoffInPlaceIsNotAPopInOrPopOut() {
         val f1 = frame(
@@ -184,6 +245,123 @@ class MotionAuditDetectorTests {
         val kinds = MotionAuditDetector.findings(listOf(f1, f2)).map { it.kind }
         assertTrue(MotionFinding.Kind.Duplicate in kinds)
         assertTrue(MotionFinding.Kind.Order in kinds)
+    }
+
+    @Test
+    fun scalesLeapThresholdsForProMotion120HzAndSlowMotionAndCatchesKeyboardPops() {
+        val initial = listOf(apply(inserted = listOf("r1"), order = listOf("r1"), isInitial = true))
+        // 1. At 120 Hz (periodMs = 8.33 ms):
+        // - A 60 Hz producer (the motion loop stepping up to 18 pt every 16.67 ms) sampled at 120 Hz
+        //   must NOT false-flag in either every-tick capture (alternating hold ticks) or changed-only
+        //   trace mode (odd callbacks skipped).
+        // - A true 120 Hz producer moving on back-to-back 8.33 ms ticks passes at ~9 pt/tick and flags
+        //   `snap` when leaping > 12 pt on consecutive 120 Hz ticks.
+        fun proMotionFrame(index: Int, seq: Int? = null, y: Double): MotionFrame {
+            val f = frame(
+                index, wall = 1_000 + Math.round(index * (1_000.0 / 120.0)).toInt(), motions = listOf("arrival"),
+                rows = listOf(row("r1", y = y, h = 60.0)),
+                events = if (index == 0) initial else emptyList(),
+            )
+            f.sequence = seq ?: index
+            f.periodMs = 1_000.0 / 120.0
+            return f
+        }
+        val producer60EveryTick = listOf(300.0, 282.0, 282.0, 265.0, 265.0, 250.0, 250.0, 238.0).mapIndexed { idx, y -> proMotionFrame(idx, y = y) }
+        assertTrue(MotionAuditDetector.findings(producer60EveryTick).isEmpty())
+
+        val producer60ChangedOnly = listOf(
+            proMotionFrame(0, seq = 0, y = 300.0),
+            proMotionFrame(1, seq = 1, y = 282.0),
+            proMotionFrame(3, seq = 2, y = 265.0),
+            proMotionFrame(5, seq = 3, y = 250.0),
+            proMotionFrame(7, seq = 4, y = 238.0),
+        )
+        assertTrue(MotionAuditDetector.findings(producer60ChangedOnly).isEmpty())
+
+        assertTrue(MotionAuditDetector.findings(listOf(proMotionFrame(0, y = 300.0), proMotionFrame(1, y = 291.0), proMotionFrame(2, y = 283.0))).isEmpty())
+        assertEquals(
+            listOf(MotionFinding.Kind.Snap),
+            MotionAuditDetector.findings(listOf(proMotionFrame(0, y = 300.0), proMotionFrame(1, y = 291.0), proMotionFrame(2, y = 274.0)))
+                .filter { it.kind.isError }.map { it.kind },
+        )
+
+        // 2. At 0.25× slow motion (60 Hz), a 10 pt single-frame step exceeds the 6 pt/frame virtual budget.
+        fun slowFrame(index: Int, y: Double): MotionFrame = frame(
+            index, wall = 1_000 + index * 17, motions = listOf("follow"),
+            rows = listOf(row("r1", y = y, h = 60.0)),
+            events = if (index == 0) initial else emptyList(),
+        ).copy(timeScale = 0.25)
+        assertTrue(MotionAuditDetector.findings(listOf(slowFrame(0, y = 300.0), slowFrame(1, y = 296.0))).isEmpty())
+        assertEquals(listOf(MotionFinding.Kind.Snap), MotionAuditDetector.findings(listOf(slowFrame(0, y = 300.0), slowFrame(1, y = 288.0))).map { it.kind })
+
+        // 3. A disclosure spring across a 3-frame hitch records `hitch`, not a false `snap`.
+        val d0 = frame(0, wall = 1_000, motions = listOf("disclosure"), rows = listOf(row("r1", y = 300.0, h = 60.0)), events = initial)
+        val d1 = frame(1, wall = 1_050, motions = listOf("disclosure"), rows = listOf(row("r1", y = 255.0, h = 60.0)))
+        d1.elapsed = 3
+        val hitchFindings = MotionAuditDetector.findings(listOf(d0, d1))
+        assertEquals(listOf(MotionFinding.Kind.Hitch), hitchFindings.map { it.kind })
+        assertTrue(hitchFindings.none { it.kind.isError })
+
+        // 4. Keyboard transition: a smooth multi-frame curve passes, while a 1-frame pop that stops dead fails.
+        val kbSmooth = listOf(300.0, 278.0, 244.0, 212.0, 188.0, 173.0, 165.0, 161.0, 160.0).mapIndexed { idx, y ->
+            frame(idx, wall = 1_000 + idx * 17, offset = 400 - y, motions = listOf("keyboard"), rows = listOf(row("r1", y = y, h = 60.0)), events = if (idx == 0) initial else emptyList())
+        }
+        assertTrue(MotionAuditDetector.findings(kbSmooth).none { it.kind.isError })
+
+        val kbPop = listOf(300.0, 272.0, 272.0).mapIndexed { idx, y ->
+            frame(idx, wall = 1_000 + idx * 17, offset = 400 - y, motions = listOf("keyboard"), rows = listOf(row("r1", y = y, h = 60.0)), events = if (idx == 0) initial else emptyList())
+        }
+        assertEquals(listOf(MotionFinding.Kind.OffsetJump), MotionAuditDetector.findings(kbPop).map { it.kind })
+    }
+
+    /**
+     * The keyboard's first frame carries the composer, and the rows riding it, past the 60 pt keyboard
+     * limit (67.9 pt in iOS testKeyboardShowsAndHides, then 41.8, 40.8 … as it glides). Riding the
+     * composer and gliding on isn't a jump; the same step without the composer, or one both stop dead
+     * after, still is (p142).
+     */
+    @Test
+    fun rowsRidingTheKeyboardsFirstFrameAreNotAJump() {
+        fun keyboard(steps: List<Pair<Double, Double?>>): List<MotionFrame> {
+            // A resting frame first: the first frame that draws rows is the opening.
+            val start = steps.firstOrNull()?.first ?: 445.3
+            val open = frame(
+                0, wall = 1_000, rows = listOf(row("r1", y = start, h = 109.0)),
+                events = listOf(apply(inserted = listOf("r1"), order = listOf("r1"), isInitial = true)),
+            ).copy(composerTop = steps.firstOrNull()?.second)
+            val frames = mutableListOf(open)
+            for ((index, step) in steps.withIndex()) {
+                frames += frame(
+                    index + 1, wall = 1_017 + index * 17, offset = 2_191.4 + start - step.first, motions = listOf("keyboard"),
+                    rows = listOf(row("r1", y = step.first, h = 109.0)),
+                ).copy(composerTop = step.second)
+            }
+            return frames
+        }
+        fun errors(frames: List<MotionFrame>) = MotionAuditDetector.findings(frames).filter { it.kind.isError }.map { it.kind }
+        val rows = listOf(445.3, 377.4, 335.6, 294.8, 256.5, 223.4, 195.6, 173.3, 156.1, 142.5, 132.1, 124.8)
+        val composer = listOf(773.3, 705.4, 663.6, 622.8, 584.5, 551.4, 523.6, 501.3, 484.1, 470.5, 460.1, 452.8)
+        val glide = keyboard(rows.zip(composer))
+        assertTrue(errors(glide).isEmpty())
+        // As recorded: a 4.7 pt first tick, then the 67.9 pt frame.
+        val ticked = keyboard((listOf(450.0) + rows).zip(listOf(778.0) + composer))
+        assertTrue(errors(ticked).isEmpty())
+
+        // The same 67.9 pt step with the composer standing still is a snap.
+        val alone = keyboard(rows.take(3).map { it to 773.3 })
+        assertEquals(listOf(MotionFinding.Kind.OffsetJump), errors(alone))
+
+        // Riding the composer, but both stop dead after: a pop.
+        val pop = keyboard(listOf(445.3 to 773.3, 377.4 to 705.4, 377.4 to 705.4, 377.4 to 705.4))
+        assertEquals(listOf(MotionFinding.Kind.OffsetJump), errors(pop))
+
+        // Riding the composer up to a ceiling: a 120 pt leap is still a jump.
+        val leap = keyboard(listOf(445.3 to 773.3, 325.3 to 653.3, 300.3 to 628.3))
+        assertEquals(listOf(MotionFinding.Kind.OffsetJump), errors(leap))
+
+        // Only the first step from rest: an 80 pt leap mid-glide is a jump.
+        val midGlide = keyboard(listOf(445.3 to 773.3, 425.3 to 753.3, 345.3 to 673.3, 345.3 to 673.3, 345.3 to 673.3))
+        assertTrue(MotionFinding.Kind.OffsetJump in errors(midGlide))
     }
 }
 

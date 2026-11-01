@@ -27,6 +27,7 @@ import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.model.OpenCodeFileReference
 import ai.opencode.server.model.OpenCodeJSONValue
+import ai.opencode.server.model.OpenCodePendingRequests
 import ai.opencode.server.model.OpenCodeToolCall
 import ai.opencode.server.model.OpenCodeTranscriptItem
 import ai.opencode.server.model.OpenCodeUploadEvent
@@ -422,6 +423,7 @@ class VoiceFeatureTestsCallLog {
                     pendingInputs = { _, _ -> emptyList() },
                     isSessionActive = { _, _ -> false },
                     getSession = { _, _ -> session },
+                    familyPendingRequests = { _, _, _ -> OpenCodePendingRequests(permissions = emptyList(), forms = emptyList()) },
                 )
                 voiceWork { copy(awaitReply = { _, _, _ -> "Root cause identified." }) }
                 voiceCall { copy(completeFunction = { _, _ -> }, noteProgress = { _, _ -> }, announce = { }) }

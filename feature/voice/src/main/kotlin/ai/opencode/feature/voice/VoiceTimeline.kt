@@ -57,12 +57,24 @@ class VoiceTimeline : Reducer<VoiceFeature.State, VoiceFeature.Action> {
                 val event = action.event
                 if (event is ReplyWatch.Event.WaitSucceeded) mark("voice_delegated_reply", "promptID=${event.promptID}", excerpt = event.reply)
             }
+            is VoiceFeature.Action.SessionDelegatorAdmitted -> mark(
+                "voice_session_delegator_admitted",
+                "callID=${action.callID} session=${action.admission.sessionID} promptID=${action.admission.promptID}",
+            )
+            is VoiceFeature.Action.SessionDelegatorAdmissionFailed ->
+                mark("voice_session_delegator_failed", "callID=${action.callID} error=${action.error.message}")
+            is VoiceFeature.Action.CallRouteResolved -> action.note?.let { mark("voice_delegator_fallback", it) }
             VoiceFeature.Action.StartIfNeeded, VoiceFeature.Action.EndPressed, VoiceFeature.Action.ReconnectingShown,
             is VoiceFeature.Action.SessionRenamed, VoiceFeature.Action.CaptionsTapped, VoiceFeature.Action.CaptionsDismissed,
             is VoiceFeature.Action.CompactionObserved, is VoiceFeature.Action.DelegatorExplained, is VoiceFeature.Action.DelegatorPinned,
-            is VoiceFeature.Action.DelegatorOpenedDraft, VoiceFeature.Action.DelegatorRequestedEnd, is VoiceFeature.Action.PendingModelApplied,
-            is VoiceFeature.Action.DelegatorKeptPick, is VoiceFeature.Action.AtEarChanged, is VoiceFeature.Action.ServerVoiceSupportUpdated,
-            is VoiceFeature.Action.CallRouteResolved, is VoiceFeature.Action.CallCommand, is VoiceFeature.Action.Delegate,
+            is VoiceFeature.Action.DelegatorOpenedDraft, VoiceFeature.Action.DelegatorRequestedEnd, is VoiceFeature.Action.DelegatorSettledRequest,
+            is VoiceFeature.Action.PendingModelApplied, is VoiceFeature.Action.FloatingStage,
+            is VoiceFeature.Action.DelegatorKeptPick, is VoiceFeature.Action.SessionDelegatorAutomaticResolved,
+            is VoiceFeature.Action.SessionDelegatorTools, VoiceFeature.Action.SessionDelegatorStreamReconnected,
+            is VoiceFeature.Action.SessionDelegatorReconciledTools, is VoiceFeature.Action.SessionDelegatorSessionDeleted,
+            is VoiceFeature.Action.AtEarChanged, is VoiceFeature.Action.ServerVoiceSupportUpdated,
+            is VoiceFeature.Action.CallPlaceChanged, is VoiceFeature.Action.CallBrokerMoved, is VoiceFeature.Action.FailureFixTapped,
+            is VoiceFeature.Action.CallCommand, is VoiceFeature.Action.Delegate,
             -> Unit
         }
         return Reduced(state)

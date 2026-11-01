@@ -3,10 +3,13 @@ package ai.opencode.feature.voice
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.sharing.ExperimentalFeature
+import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Send
 import ai.opencode.core.store.cancellable
+import ai.opencode.core.tuning.DeveloperMode
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
@@ -41,6 +44,7 @@ private fun String.prefixCharacters(count: Int): String {
  * GPT-Live's spoken acknowledgement) is what the session shows.
  */
 internal fun VoiceFeature.delegateWork(state: State, callID: String, rawFraming: String?): Reduced<State, Action> {
+    if (state.usesSessionDelegator) return delegateToSessionDelegator(state, callID, rawFraming)
     if (state.usesDelegator) return delegateToDelegator(state, callID)
     val isClientDelegation = state.activeEngine == VoiceEngine.gptLive
     // One request creates a draft's session; a second one spoken while it is
@@ -161,6 +165,10 @@ internal fun VoiceFeature.delegateToDelegator(state: State, callID: String, onCa
         return Reduced(next, completeFunction(callID, VoiceHandoff.failure(VoiceHandoff.nothingNewToSend)))
     }
     // The delegator has it now; later words travel with the next request.
+    // Its prompts count from now, the delegation; one for a turn GPT-Live
+    // held back counts from that turn once it's unambiguous (`heldBackTurns`).
+    val saidTurns = capture.userWords.filter { it != VoiceTranscriptTail.omittedNote }
+    val turnNow = next.replyWatch.userTurns
     next = next.copy(
         tail = next.tail.accept(capture),
         delegatorWork = next.delegatorWork + callID,
@@ -186,6 +194,10 @@ internal fun VoiceFeature.delegateToDelegator(state: State, callID: String, onCa
     val pinnedSessionKeys = next.pinnedSessionKeys
     val pinnedOrder = VoiceDelegatorWorkspace.pins(pinnedSessionKeys, server)
     val board = dependency(VoiceSessionBoardClient)
+    val developerMode = DeveloperMode.isEnabled
+    val voiceScreenshot = dependency(VoiceScreenshotClient)
+    val voiceCallCues = dependency(VoiceCallCueClient)
+    val experimentalFeatures = dependency(ExperimentalFeatures)
     val start = VoiceDelegatorWorkspace.Start(
         server = server,
         viewing = viewing,
@@ -203,6 +215,18 @@ internal fun VoiceFeature.delegateToDelegator(state: State, callID: String, onCa
         viewingNeedsInput = next.targetNeedsInput,
         watchedPromptIDs = watchedPromptIDs,
         callLogSnapshot = { if (recorder != null && log != null) recorder.snapshot(log) else null },
+        developerMode = developerMode,
+        appState = if (developerMode) {
+            VoiceAppState(
+                next,
+                experiments = ExperimentalFeature.entries.filter { experimentalFeatures(it) }.map { it.rawValue },
+                developerMode = true,
+            )
+        } else {
+            null
+        },
+        captureScreenshot = voiceScreenshot.capture,
+        appLog = VoiceAppLog::recentLines,
         favoriteModelIDs = next.favoriteModelIDs,
     )
     val viewingText = delegatorContext(next, otherRequests = maxOf(0, next.delegatorWork.size - 1))
@@ -212,8 +236,10 @@ internal fun VoiceFeature.delegateToDelegator(state: State, callID: String, onCa
     val client = dependency(OpenCodeClient)
     val delegator = dependency(VoiceDelegatorClient)
     val voiceCall = dependency(VoiceCallClient)
+    val work = dependency(VoiceWorkClient)
     val outbox = dependency(VoiceAdmissionRecorder)
     val effect = Effect.run<Action> { rawSend ->
+        val tracked = java.util.Collections.synchronizedList(mutableListOf<VoiceDelegator.SentPrompt>())
         // Its tools send from inside their retry budget; what those actions
         // start (a session opening, its reads) runs on the default policy.
         val send = rawSend.leavingRetryScope()
@@ -227,6 +253,7 @@ internal fun VoiceFeature.delegateToDelegator(state: State, callID: String, onCa
                 switchedModel = { sessionID, model -> send(VoiceFeature.Action.DelegatorSwitchedModel(sessionID, model)) },
                 appliedPick = { sessionID, model -> send(VoiceFeature.Action.PendingModelApplied(sessionID, model)) },
                 keptPick = { sessionID, model -> send(VoiceFeature.Action.DelegatorKeptPick(sessionID, model)) },
+                settledRequest = { sessionID -> send(VoiceFeature.Action.DelegatorSettledRequest(sessionID)) },
                 endCall = { send(VoiceFeature.Action.DelegatorRequestedEnd) },
                 explained = { sessionID -> send(VoiceFeature.Action.DelegatorExplained(sessionID)) },
                 sent = { sessionID, prompt ->
@@ -235,14 +262,20 @@ internal fun VoiceFeature.delegateToDelegator(state: State, callID: String, onCa
                 answered = { sessionID, reply, promptIDs ->
                     send(VoiceFeature.Action.ReplyWatch(ReplyWatch.Event.DelegatorAnswered(sessionID = sessionID, reply = reply, promptIDs = promptIDs, requestID = callID)))
                 },
-                tracked = { prompt -> send(VoiceFeature.Action.ReplyWatch(ReplyWatch.Event.Sent(listOf(ReplyWatch.Prompt(prompt))))) },
+                tracked = { prompt ->
+                    tracked += prompt
+                    send(VoiceFeature.Action.ReplyWatch(ReplyWatch.Event.Sent(listOf(ReplyWatch.Prompt(prompt, saidTurn = turnNow)))))
+                },
                 waiting = { sessionID, isWaiting ->
                     send(VoiceFeature.Action.ReplyWatch(ReplyWatch.Event.DelegatorWaiting(sessionID = sessionID, requestID = callID, isWaiting = isWaiting)))
                 },
+                userSpoke = { voiceCall.nextUserWords() },
+                awaitIdle = work.awaitIdle,
                 // The call log only: any append mid-turn makes GPT-Live start talking
                 // from half the picture, and the delegator's answer then waits behind it.
                 note = { note -> if (recorder != null && log != null) recorder.note(log, VoiceCallLog.Note.Kind.marker, note) },
                 trace = { trace ->
+                    if (trace is VoiceDelegator.Trace.ToolStarted) voiceCallCues.toolCalled(trace.name, trace.arguments)
                     if (recorder != null && log != null) {
                         when (trace) {
                             is VoiceDelegator.Trace.RoundStarted -> recorder.span(
@@ -265,20 +298,24 @@ internal fun VoiceFeature.delegateToDelegator(state: State, callID: String, onCa
                 },
             ),
         )
-        try {
-            val outcome = if (onCall) {
-                delegator.runOnCall(delegationID = callID, rounds = voiceCall.delegatorRounds, tools = workspace.tools)
-            } else {
-                delegator.run(apiKey = apiKey, request = text, previousResponseID = previous, tools = workspace.tools)
-            }
-            if (isCancelled()) return@run
-            send(VoiceFeature.Action.DelegatorFinished(callID, Result.success(outcome)))
+        val result: Result<VoiceDelegator.Outcome> = try {
+            Result.success(
+                if (onCall) {
+                    delegator.runOnCall(delegationID = callID, rounds = voiceCall.delegatorRounds, tools = workspace.tools)
+                } else {
+                    delegator.run(apiKey = apiKey, request = text, previousResponseID = previous, tools = workspace.tools)
+                },
+            )
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
-            if (isCancelled()) return@run
-            send(VoiceFeature.Action.DelegatorFinished(callID, Result.failure(error.asClientError())))
+            Result.failure(error.asClientError())
         }
+        if (isCancelled()) return@run
+        // Before its answer releases the results held for it.
+        val heldBack = ReplyWatch.heldBackTurns(tracked.toList().map { it.promptID to it.topic }, among = saidTurns, now = turnNow)
+        if (heldBack.isNotEmpty()) send(VoiceFeature.Action.ReplyWatch(ReplyWatch.Event.HeldBack(heldBack)))
+        send(VoiceFeature.Action.DelegatorFinished(callID, result))
     }.cancellable(VoiceFeature.CancelID.WorkCall(callID), cancelInFlight = true)
     return Reduced(next, effect)
 }
@@ -353,6 +390,17 @@ internal fun runReplyWatch(effects: List<ReplyWatch.Effect>, state: State): Effe
                 send(VoiceFeature.Action.ReplyWatch(ReplyWatch.Event.DeferralExpired(key = effect.key, claimed = effect.claimed)))
             }.cancellable(VoiceFeature.CancelID.ReplyDeferral(effect.key), cancelInFlight = true)
             is ReplyWatch.Effect.CancelDeferralExpiry -> tcaEffects += Effect.cancel(VoiceFeature.CancelID.ReplyDeferral(effect.key))
+            is ReplyWatch.Effect.FindBackgroundWork -> tcaEffects += Effect.run<Action> { send ->
+                val found = try {
+                    voiceWork.backgroundWork(server, effect.sessionID, effect.promptID, effect.reply)
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (_: Exception) {
+                    return@run
+                }
+                if (found.isEmpty() || isCancelled()) return@run
+                send(VoiceFeature.Action.ReplyWatch(ReplyWatch.Event.Sent(found.map { ReplyWatch.Prompt(it, title = effect.title, saidTurn = effect.turn) })))
+            }.cancellable(VoiceFeature.CancelID.CallScope)
             is ReplyWatch.Effect.Log -> recordReplyWatchLog(effect.entry, state)
         }
     }
@@ -371,6 +419,15 @@ private fun watchPrompt(
         if (delaySeconds != null && delaySeconds > 0) clock.sleep(delaySeconds.seconds)
         if (isCancelled()) return@ownsRetries
         try {
+            if (prompt.background != null || prompt.readsLatestSessionReply) {
+                // Background work or an `ios_voice_watch_session` watch has no prompt
+                // ID sent from the phone: its result is the session's final reply.
+                if (!settledOnly) voiceWork.awaitIdle(server, prompt.sessionID)
+                val reply = voiceWork.backgroundReply(server, prompt.sessionID)
+                if (isCancelled()) return@ownsRetries
+                send(VoiceFeature.Action.ReplyWatch(ReplyWatch.Event.WaitSucceeded(promptID = prompt.promptID, reply = reply)))
+                return@ownsRetries
+            }
             var reply = if (settledOnly) {
                 voiceWork.fetchReply(server, prompt.sessionID, prompt.promptID)
             } else {

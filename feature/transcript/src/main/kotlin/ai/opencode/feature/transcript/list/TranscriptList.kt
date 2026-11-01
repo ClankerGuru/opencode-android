@@ -2,7 +2,6 @@ package ai.opencode.feature.transcript.list
 
 import ai.opencode.feature.media.AgentImageViewport
 import ai.opencode.feature.media.AgentImageVisibility
-import ai.opencode.feature.media.AgentImageMarkerView
 import ai.opencode.feature.media.LocalAgentImageViewport
 import ai.opencode.feature.media.LocalAgentImageRow
 import ai.opencode.core.dependencies.dependency
@@ -268,6 +267,14 @@ private fun TranscriptListContent(
         LocalTranscriptLayoutTuning provides layoutTuning,
         LocalTranscriptTextReveal provides textReveal,
         LocalLinkPreviewStore provides linkPreviews,
+        // A covering screen isn't composed and a stopped activity's frame clock pauses, so
+        // only the lifecycle below RESUMED is left to gate (iOS `emptyPulsePaused`).
+        LocalTranscriptTimelinePaused provides TranscriptTimelineGate.pauses(
+            listHidden = !resumed.isAtLeast(Lifecycle.State.RESUMED),
+            sceneInBackground = false,
+            covered = false,
+            drawn = true,
+        ),
     ) {
         Box(modifier.nestedScroll(controller.nestedScrollConnection)) {
             LazyColumn(
@@ -315,7 +322,20 @@ private fun TranscriptListContent(
                             pulsePaused = !controller.isShowingToReader,
                             modifier = rowModifier.fillParentMaxHeight(),
                         )
-                        TranscriptItemID.NewDivider -> NewMessagesDivider(rowModifier)
+                        TranscriptItemID.NewDivider -> NewMessagesDivider(
+                            rowModifier
+                                .graphicsLayer {
+                                    alpha = controller.dividerAlpha()
+                                    clip = true
+                                }
+                                .layout { measurable, constraints ->
+                                    // Its motion fits the row (iOS `fittedDividerHeight`); the rule stays centred.
+                                    val placeable = measurable.measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
+                                    val height = controller.fittedDividerHeight(placeable.height)
+                                    layout(placeable.width, height) { placeable.place(0, (height - placeable.height) / 2) }
+                                },
+                            glowStart = controller.dividerGlowStart,
+                        )
                         TranscriptItemID.Working -> GrowingRow(controller, item.key, rowModifier) {
                             val working = slots.workingLine
                             if (working != null) {
@@ -450,7 +470,7 @@ private class TranscriptImageViewport(private val controller: TranscriptListCont
 
     override val imageViewportIsVisible: Boolean get() = controller.isShowingToReader
 
-    override fun imageContentRevised(marker: AgentImageMarkerView) {
-        (marker.rowKey as? String)?.let(controller::imageContentRevised)
+    override fun imageContentRevised(row: Any?) {
+        (row as? String)?.let(controller::imageContentRevised)
     }
 }

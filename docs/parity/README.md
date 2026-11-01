@@ -77,14 +77,14 @@ under the same name; anything not ported anywhere is listed as deleted with its 
 | Module | iOS test files covered | iOS tests ported | Deleted with reason | JVM tests (Gradle) |
 | --- | ---: | ---: | ---: | ---: |
 | `:app` | 21 | 125 | 27 | 125 |
-| `:core` | 18 | 109 | 72 | 113 |
-| `:server` | 35 | 225 | 3 | 244 (2 opt-in live checks skipped) |
+| `:core` | 19 | 112 | 74 | 116 |
+| `:server` | 36 | 230 | 3 | 254 (2 opt-in live checks skipped) |
 | `:devtools` | 4 | 14 | 10 | 14 |
-| `:feature:media` | 15 | 175 | 14 | 180 |
-| `:feature:voice` | 30 | 444 | 16 | 511 |
+| `:feature:media` | 17 | 178 | 15 | 183 |
+| `:feature:voice` | 30 | 444 | 16 | 539 |
 | `:feature:system` | 9 | 88 | 2 | 89 |
-| `:feature:transcript` | 31 | 268 | 43 | 276 (1 env-gated metric skipped) |
-| `:feature:composer` | 26 | 229 | 18 | 230 |
+| `:feature:transcript` | 34 | 274 | 57 | 282 (1 env-gated metric skipped) |
+| `:feature:composer` | 41 | 267 | 40 | 267 |
 | `:feature:settings` | 17 | 98 | 10 | 98 |
 | `:feature:session` | 58 | 706 | 41 | 719 |
 | `:feature:drawer` | 49 | 422 | 12 | 424 |

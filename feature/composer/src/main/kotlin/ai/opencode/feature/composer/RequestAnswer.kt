@@ -48,6 +48,11 @@ class RequestDockFeature<Draft> : Reducer<RequestDockFeature.State<Draft>, Reque
         val requestLoadAttempt: LoadAttempt? = null,
         val requestFailureAwaitingReconnect: Boolean = false,
         val requestsConnectionIsAvailable: Boolean = true,
+        /**
+         * A snapshot since the screen opened or reconnected is the baseline: requests new after
+         * it arrived live (an event's reread, a later poll).
+         */
+        val requestArrivalsAreLive: Boolean = false,
         val requestErrors: Map<String, String> = emptyMap(),
         /**
          * While a pending request docks, the composer is its answer, and what was typed for
@@ -418,8 +423,10 @@ sealed interface RequestBar {
  */
 object RequestAnswering {
     /**
-     * A pending request takes the composer, except under a call (whose agent answers) and
-     * until any dictation into the message has finished.
+     * A pending request takes the composer, except under a standard call (whose bar holds the
+     * composer's place) and until any dictation into the message has finished. A floating or
+     * tray call leaves the composer ([callKeepsComposer]), so the request docks there: “Needs
+     * your input” always has the request.
      */
     fun wantsRequestDock(
         hasPendingRequests: Boolean,
@@ -429,8 +436,9 @@ object RequestAnswering {
         hasLiveDictation: Boolean,
         hasDictationHold: Boolean,
         isSendingDictation: Boolean,
+        callKeepsComposer: Boolean = false,
     ): Boolean {
-        if (!hasPendingRequests || callOwnsAudio || dictationSendPending) return false
+        if (!hasPendingRequests || (callOwnsAudio && !callKeepsComposer) || dictationSendPending) return false
         // A message still recording, or finalizing to send, goes as a message.
         return isAnsweringRequest || (!hasLiveDictation && !hasDictationHold && !isSendingDictation)
     }
@@ -440,6 +448,16 @@ object RequestAnswering {
      * message: an answer or a reason takes text.
      */
     fun takesPasteAttachments(isAnsweringRequest: Boolean): Boolean = !isAnsweringRequest
+
+    /** iOS `SessionFeature.pruneAnswerDrafts(_:to:)`: bar drafts are keyed by request or "request/field" (`answerTarget`). */
+    fun pruneAnswerDrafts(drafts: Map<String, String>, live: Set<String>): Map<String, String> {
+        fun isLive(key: String): Boolean {
+            if (key in live) return true
+            val slash = key.indexOf('/')
+            return slash >= 0 && key.substring(0, slash) in live
+        }
+        return if (drafts.keys.any { !isLive(it) }) drafts.filterKeys(::isLive) else drafts
+    }
 
     /** The draft differs from the bar's last answer only by Return's newline. */
     fun isOnlyReturn(text: String, returnKeySends: Boolean, nonSendNewlineDraft: String?, dock: RequestDockFeature.State<*>): Boolean =

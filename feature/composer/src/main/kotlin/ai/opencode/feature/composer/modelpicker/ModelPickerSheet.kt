@@ -100,7 +100,10 @@ fun ModelPickerSheet(
     // Recent as it was when the sheet opened: picks made in it land in Recent next time, so
     // rows never move under a finger.
     val recentsAtOpen = remember { state.recentModelIDs }
+    // Once per redraw, not per row: the sections walk the whole catalogue, and the current model is a search of it.
     val sections = state.modelSheetSections(recentsAtOpen, roundHalfAwayFromZero(FusedModelPickerTunables.recents).toInt())
+    val currentID = state.currentModelInfo?.id
+    val favorites = state.favoriteModelIDs
 
     ModelPickerDetentsSheet(onClose = { onEvent(ModelPickerEvent.Dismiss) }, onClosed = { onEvent(ModelPickerEvent.ModelListClosed) }) {
         @Suppress("NAME_SHADOWING") val onEvent = closingAfterHide(onEvent)
@@ -120,7 +123,7 @@ fun ModelPickerSheet(
                     for (section in sections) {
                         item(key = "header-${section.id}") { SheetSectionHeader(section.title) }
                         items(section.models, key = { "${section.id}-${it.id}" }) { model ->
-                            SheetModelRow(model, section.kind, state, onEvent)
+                            SheetModelRow(model, section.kind, state, isCurrent = model.id == currentID, isFavorite = model.id in favorites, onEvent)
                         }
                     }
                     if (state.hiddenModelCount > 0) {
@@ -153,6 +156,8 @@ private fun SheetModelRow(
     model: OpenCodeModel,
     kind: ModelPickerSection.Kind,
     state: ModelPickerState,
+    isCurrent: Boolean,
+    isFavorite: Boolean,
     onEvent: (ModelPickerEvent) -> Unit,
 ) {
     // Favorites and Recent mix providers, so their rows name the provider and carry their own identifiers.
@@ -162,8 +167,6 @@ private fun SheetModelRow(
         else -> "model-row"
     }
     val mixesProviders = kind == ModelPickerSection.Kind.Favorites || kind == ModelPickerSection.Kind.Recent
-    val isCurrent = state.currentModelInfo?.id == model.id
-    val isFavorite = model.id in state.favoriteModelIDs
     val provider = ModelProviderGroup.title(model.providerID)
     val scale = ModelLevelScale(model.variants)
     val remembered = state.rememberedLevel(model)

@@ -66,7 +66,12 @@ class FakeVoiceAudioSession(outputPorts: List<Int>) : VoiceAudioSessionControlli
     override val isInputAvailable: Boolean = true
     override val outputLatency: Double = 0.008
     override val ioBufferDuration: Double = 0.023
-    override val routeDescription: String get() = "route in: MicrophoneBuiltIn · out: ${outputPorts.joinToString(", ")}"
+    /** Runs as the engine reads the route, while it builds the graph. */
+    @Volatile var onRoute: (() -> Unit)? = null
+    override val routeDescription: String get() {
+        onRoute?.invoke()
+        return "route in: MicrophoneBuiltIn · out: ${outputPorts.joinToString(", ")}"
+    }
     override suspend fun requestRecordPermission(): Boolean = true
     override fun activate(demo: Boolean) {
         record(Event.SetActive(true))
