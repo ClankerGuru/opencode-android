@@ -24,6 +24,10 @@ Each area has one file listing **every** iOS source file it owns:
 ## Status values
 
 - `todo`: not started.
+- `sync: <old status>`: the iOS file changed after the synced commit; port the change, then
+  restore the status (see [Keeping up with iOS](#keeping-up-with-ios)).
+- `removed in <sha>: <old status>`: iOS deleted the file in that commit; delete or re-home the
+  Kotlin, then drop the row.
 - `partial: <what is missing>`: some behaviour ported; say exactly what is not.
 - `done`: every behaviour in the Swift file exists in Kotlin (logic, copy, constants, logging,
   haptics, error states). Visuals are Material equivalents, not pixel copies.
@@ -38,8 +42,27 @@ Each area has one file listing **every** iOS source file it owns:
    file, point each row at it.
 2. A type a lower module needs moves down (to `:core`, `:server` or the lowest feature that uses
    it); note the move in both areas' files. Never add an upward or cyclic module dependency.
-3. Re-run the inventory if iOS adds files: the `find OpenCode/<Area> -name '*.swift' -o -name
-   '*.metal'` list must match the table.
+3. `scripts/ios-sync.py check` must pass: every iOS source file at the synced (or target) commit
+   has a row, and every row's Lines matches iOS.
+
+## Keeping up with iOS
+
+[sync.json](sync.json) records the iOS commit these tables describe (`synced`) and, during a
+sync, the commit being caught up to (`target`). The first port was taken from iOS `062f3732`
+(2026-10-24); every Lines count in these tables matched that commit exactly.
+`scripts/ios-sync.py` (iOS checkout in `$OPENCODE_IOS`) moves it forward:
+
+1. `scripts/ios-sync.py status --to origin/main`: what changed, per area.
+2. `scripts/ios-sync.py plan --to <sha>` writes `sync/<from>-<to>.md`: every changed iOS file
+   with its diff size, the iOS commits that touched it and the Kotlin it maps to, plus the iOS
+   tests to port. Port from the net diff (`scripts/ios-sync.py diff <ios path>`), not commit by
+   commit: iOS often lands a feature and reworks it a few commits later.
+3. `scripts/ios-sync.py stale` marks the rows (`sync:`, `todo`, `removed in`) and records the
+   target. Commit the plan and the marked tables together.
+4. Port area by area, as in the first port: each commit brings a set of rows and their tests
+   back to `done`/`partial`/`n/a` and ticks them in the plan.
+5. When `scripts/ios-sync.py check` is clean with nothing waiting, `scripts/ios-sync.py advance`
+   makes the target the synced commit.
 
 ## Tests
 
