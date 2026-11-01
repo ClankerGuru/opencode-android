@@ -4,7 +4,6 @@ package ai.opencode.feature.session
 
 import ai.opencode.feature.composer.PastedTextViewer
 import ai.opencode.core.ui.ProviderIcon
-import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.experiments.key
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
@@ -21,7 +20,6 @@ import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.feature.session.header.HeaderBlurTunables
 import ai.opencode.feature.session.header.SessionHeaderStyle
 import ai.opencode.feature.session.header.titleBreathing
-import ai.opencode.feature.media.DecodedImageCache
 import ai.opencode.feature.media.LocalMediaPresenter
 import ai.opencode.feature.media.MediaPresenter
 import ai.opencode.feature.media.AgentFileViewer
@@ -46,9 +44,9 @@ import ai.opencode.feature.transcript.user.TranscriptUserMessage
 import ai.opencode.server.OpenCodePairingLink
 import ai.opencode.server.model.OpenCodeModel
 import ai.opencode.server.model.OpenCodeTranscriptItem
+import ai.opencode.feature.transcript.list.LocalTranscriptTimelinePaused
 import android.content.Context
 import android.content.Intent
-import android.graphics.BitmapFactory
 import android.text.format.DateFormat
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -523,7 +521,20 @@ object SessionTranscriptView {
             failedSends = if (state.failedSends.isEmpty()) {
                 emptyMap()
             } else {
-                buildMap { for (failed in state.failedSends) putIfAbsent(failed.id, TranscriptSendFailure(failed.reason)) }
+                val moveTo = state.missingFolderMoveTarget?.name
+                buildMap {
+                    for (failed in state.failedSends) {
+                        putIfAbsent(
+                            failed.id,
+                            TranscriptSendFailure(
+                                reason = failed.reason,
+                                moveTo = if (failed.isFolderGone) moveTo else null,
+                                // The whole session is moving: every row whose folder is gone waits.
+                                isMoving = failed.isFolderGone && state.movingFailedSendID != null,
+                            ),
+                        )
+                    }
+                }
             },
             deliveryNotes = if (state.failedSends.isEmpty()) emptyMap() else state.deliveryNotes.mapValues { it.value.label },
             queuedPillTexts = if (queuedRows.isEmpty()) {
@@ -613,7 +624,6 @@ object SessionTranscriptView {
         is TranscriptAction.NewMessagesPassed -> Action.NewMessagesPassed(action.generation)
         is TranscriptAction.NewMessagesFit -> Action.NewMessagesFit(action.generation)
         // Since You Left was removed in iOS cd6be7c6; the transcript's action goes with it.
-        TranscriptAction.SinceYouLeftTapped -> null
         TranscriptAction.ShowEarlierTapped -> Action.ShowEarlierTapped
         is TranscriptAction.CopyTextTapped -> Action.CopyTextTapped(action.text)
         is TranscriptAction.QuoteTextTapped -> Action.QuoteTextTapped(action.text)
@@ -623,7 +633,7 @@ object SessionTranscriptView {
         is TranscriptAction.SubagentTapped -> Action.SubagentTapped(action.sessionID)
         TranscriptAction.MoveToBackgroundTapped -> Action.MoveToBackgroundTapped
         // Move to needs the session's missing-folder move (iOS b629d780), not ported here yet.
-        is TranscriptAction.FailedSendMoveTapped -> null
+        is TranscriptAction.FailedSendMoveTapped -> Action.FailedSendMoveTapped(action.messageID)
         is TranscriptAction.FailedSendRetryTapped -> Action.FailedSendRetryTapped(action.messageID)
         is TranscriptAction.FailedSendEditTapped -> Action.FailedSendEditTapped(action.messageID)
         is TranscriptAction.FailedSendDeleteTapped -> Action.FailedSendDeleteTapped(action.messageID)
@@ -747,14 +757,9 @@ fun CachedImage(id: String, data: ByteArray, modifier: Modifier = Modifier) {
 }
 
 object CachedImage {
-    fun decoded(id: String, data: ByteArray): ImageBitmap? {
-        val cache = dependency(DecodedImageCache)
-        val key = "attachment:$id"
-        cache.image(key)?.let { return it.asImageBitmap() }
-        val bitmap = BitmapFactory.decodeByteArray(data, 0, data.size) ?: return null
-        cache.insert(bitmap, key)
-        return bitmap.asImageBitmap()
-    }
+    /** iOS `CachedImage.decoded(id:data:mediaHash:)`, moved down to `:feature:media` for its resolver. */
+    fun decoded(id: String, data: ByteArray, mediaHash: String? = null): ImageBitmap? =
+        ai.opencode.feature.media.CachedImage.decoded(id, data, mediaHash)?.asImageBitmap()
 }
 
 /**
@@ -856,7 +861,8 @@ fun WorkingLineRow(
 ) {
     val reduceMotion = rememberReduceMotion()
     val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
-    val active = lifecycle.isAtLeast(Lifecycle.State.RESUMED)
+    // In the list its timeline follows the list's gate (iOS `transcriptTimelineGate`).
+    val active = lifecycle.isAtLeast(Lifecycle.State.RESUMED) && !LocalTranscriptTimelinePaused.current
     val offersMove = activity.finaleStartedAt == null && !activity.needsInput && showsMoveToBackground
     // One clock throughout, so the indicator keeps its identity (and its orb its pose) when the
     // finale starts it. It ticks only during the finale, while the app is active.

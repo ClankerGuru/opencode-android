@@ -2,7 +2,6 @@ package ai.opencode.feature.transcript.rows
 
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTheme
-import ai.opencode.feature.transcript.SinceYouLeft
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -45,8 +44,6 @@ data class AgentGlyphState(
  */
 @Immutable
 data class TranscriptRowSlots(
-    /** iOS `SinceYouLeftRow(entryID:summary:onDismiss:)`. */
-    val sinceYouLeft: (@Composable (entryID: String, summary: SinceYouLeft, onDismiss: () -> Unit) -> Unit)? = null,
     /** iOS `AgentActivityGlyph(source: .subagent(...))`, scoped to the transcript. */
     val agentGlyph: (@Composable (state: AgentGlyphState, modifier: Modifier) -> Unit)? = null,
     /** iOS `ProviderIcon(providerID:)`; without one, model switches show filled sparkles. */

@@ -5,7 +5,6 @@ import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.sharing.shared
 import ai.opencode.feature.drawer.HomeFeature.State.StatusSnapshot
 import ai.opencode.feature.session.SessionFeature
-import ai.opencode.feature.transcript.isBefore
 import ai.opencode.feature.transcript.rows.TranscriptTimeStamps
 import ai.opencode.server.CachedHomeSnapshot
 import ai.opencode.server.CachedTranscriptSnapshots

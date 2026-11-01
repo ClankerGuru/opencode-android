@@ -20,7 +20,6 @@ sealed interface TranscriptAction {
     data class TranscriptBrowsingChanged(val isBrowsing: Boolean) : TranscriptAction
     data class NewMessagesPassed(val generation: Int) : TranscriptAction
     data class NewMessagesFit(val generation: Int) : TranscriptAction
-    data object SinceYouLeftTapped : TranscriptAction
     data object ShowEarlierTapped : TranscriptAction
     data class CopyTextTapped(val text: String) : TranscriptAction
     data class QuoteTextTapped(val text: String) : TranscriptAction
@@ -86,30 +85,6 @@ data class NewMessagesPlacement(val entryID: String, val generation: Int, val sh
          */
         fun isOnLastScreen(dividerMaxY: Float, offsetY: Float, topInset: Float, end: Float): Boolean =
             offsetY >= end - 1 && !isPassed(dividerMaxY, offsetY, topInset)
-    }
-}
-
-/**
- * Quiet 1–2 line summary when returning to a session with unseen turns (iOS `Session/SinceYouLeft.swift`'s
- * value type, moved down here because [TranscriptEntry] carries it; generation stays in `:feature:session`).
- */
-@Immutable
-data class SinceYouLeft(
-    val sessionID: String,
-    val lastItemID: String,
-    val text: String,
-    val phase: Phase,
-    val isFallback: Boolean = false,
-) {
-    enum class Phase { Generating, Done }
-
-    companion object {
-        const val minimumTurnCount = 2
-        const val minimumAbsenceDuration = 60.0
-        /** ~1,200 tokens at ~4 characters per token. */
-        const val maxInputCharacters = 4_800
-        const val maxTokenEstimate = 1_200
-        const val maxCachedSessions = 16
     }
 }
 

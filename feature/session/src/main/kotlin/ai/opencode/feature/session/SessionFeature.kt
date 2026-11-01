@@ -91,6 +91,8 @@ import kotlinx.serialization.Serializable
 import java.time.Instant
 import java.util.UUID
 import kotlin.time.Duration.Companion.milliseconds
+import ai.opencode.feature.transcript.list.NewMessagesFold
+import ai.opencode.feature.transcript.list.NewMessagesEarlierBaseline
 
 /**
  * The Working line's manual Move to Background action (and its TalkBack action). Off for now:

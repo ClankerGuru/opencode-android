@@ -20,6 +20,7 @@ import ai.opencode.server.model.OpenCodeJSONValue
 import ai.opencode.server.model.OpenCodeToolCall
 import ai.opencode.server.model.OpenCodeTranscriptItem
 import kotlin.time.Duration
+import ai.opencode.feature.transcript.list.NewMessagesFold
 
 // Port of iOS `SessionFeature+Stream.swift`.
 

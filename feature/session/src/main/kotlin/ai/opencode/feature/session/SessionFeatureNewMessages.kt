@@ -5,141 +5,15 @@ import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.feature.session.SessionFeature.State.EarlierHistory
 import ai.opencode.feature.transcript.TranscriptEntry
-import ai.opencode.feature.transcript.isAtOrBefore
+import ai.opencode.feature.transcript.list.NewMessagesEarlierBaseline
+import ai.opencode.feature.transcript.list.NewMessagesFold
 import ai.opencode.feature.transcript.list.NewMessagesMark
-import ai.opencode.feature.transcript.rows.TranscriptTimeStamps
-import ai.opencode.server.OpenCodeLiveContentEvent
 import ai.opencode.server.model.OpenCodeTranscriptItem
 
-// The `SessionFeature.State` members of iOS `Transcript/NewMessagesMark.swift`, with the two
-// State-side types it declares (`NewMessagesEarlierBaseline`, `NewMessagesFold`). They extend the
-// session's state, so they live in this module; `NewMessagesMark` itself (and the list's
-// `NewMessagesPlacement`) belong to `:feature:transcript`.
-//
-// Bridge: iOS's `NewMessagesMark.firstUnseen(in:seen:watched:viewedMilliseconds:unread:)`,
-// `NewMessagesMark.ownPrompts(in:)` and `NewMessagesMark.recordSpan` belong to
-// `:feature:transcript`; until that module has them, [NewMessagesUnseen] holds a port of each
-// here. (`TranscriptTimeStamps.isAtOrBefore` is in `:feature:transcript`'s SessionSeenWatermarks.kt.)
-
-/**
- * iOS `NewMessagesEarlierBaseline`: unseen baseline kept when a settled mark starts at the top of a
- * paged window (`earlierHistory != Exhausted`), so loading an earlier page can move the divider to
- * the true first unseen row.
- */
-data class NewMessagesEarlierBaseline(
-    val seen: Set<String>,
-    val watched: Set<String>,
-    val viewedMilliseconds: Long?,
-    val unread: Boolean,
-)
-
-/** iOS `NewMessagesFold`: new rows from [itemID] through [lastItemID] (of [count] rows) that start no entry of their own. */
-data class NewMessagesFold(
-    val itemID: String,
-    val lastItemID: String?,
-    val count: Int,
-) {
-    companion object {
-        /**
-         * Live events that only add text or tool input, never changing which rows start an entry (a
-         * tool's name or status: a question answered joins the transcript), so a fold found before
-         * them still holds.
-         */
-        fun keepsShapes(events: List<OpenCodeLiveContentEvent>): Boolean = events.all {
-            when (it) {
-                is OpenCodeLiveContentEvent.StepStarted, is OpenCodeLiveContentEvent.StepStreamed,
-                is OpenCodeLiveContentEvent.StepEnded, is OpenCodeLiveContentEvent.TextStarted,
-                is OpenCodeLiveContentEvent.TextDelta, is OpenCodeLiveContentEvent.TextEnded,
-                is OpenCodeLiveContentEvent.ReasoningStarted, is OpenCodeLiveContentEvent.ReasoningDelta,
-                is OpenCodeLiveContentEvent.ReasoningEnded, is OpenCodeLiveContentEvent.ToolInputDelta,
-                is OpenCodeLiveContentEvent.ToolInputEnded,
-                -> true
-                is OpenCodeLiveContentEvent.ToolInputStarted, is OpenCodeLiveContentEvent.ToolCalled,
-                is OpenCodeLiveContentEvent.ToolProgress, is OpenCodeLiveContentEvent.ToolSucceeded,
-                is OpenCodeLiveContentEvent.ToolFailed,
-                -> false
-            }
-        }
-    }
-}
-
-/** The transcript-side helpers iOS keeps on `NewMessagesMark` and `TranscriptTimeStamps` (see the file note). */
-object NewMessagesUnseen {
-    /**
-     * iOS `NewMessagesMark.firstUnseen(in:seen:watched:viewedMilliseconds:unread:)`: the first item
-     * in [items] that isn't in [seen], or null when nothing is new. Client-side rows (`info-`
-     * notices, send failures) never count as new, nor do the reader's own messages, from this phone
-     * or another client: like a chat app, sending one reads everything above it. Messages an agent
-     * sent into the session (`source`) are news. Rows in [watched] streamed in while the reader
-     * watched: seen, though rows a read brings in above them may not have been.
-     */
-    fun firstUnseen(
-        items: List<OpenCodeTranscriptItem>,
-        seen: Set<String>,
-        watched: Set<String> = emptySet(),
-        viewedMilliseconds: Long? = null,
-        unread: Boolean = false,
-    ): String? {
-        val hasTimedAfterViewed = viewedMilliseconds?.let { cutoff ->
-            items.any { TranscriptTimeStamps.isAtOrBefore(cutoff, it.id) == false }
-        } ?: false
-        if (seen.isEmpty() && !unread && !hasTimedAfterViewed) return null
-        fun isSeen(item: OpenCodeTranscriptItem): Boolean {
-            if (item.id in seen) return true
-            return viewedMilliseconds != null && TranscriptTimeStamps.isAtOrBefore(viewedMilliseconds, item.id) == true
-        }
-        // After the last row they saw: older rows paged in or a notice placed in an earlier turn
-        // aren't news.
-        val afterSeen = items.indexOfLast(::isSeen).let { if (it >= 0) it + 1 else 0 }
-        val tail = items.subList(afterSeen, items.size)
-        val isOwn = ownPrompts(tail)
-        val start = tail.indexOfLast(isOwn).let { if (it >= 0) afterSeen + it + 1 else afterSeen }
-        return items.subList(start, items.size).firstOrNull { item ->
-            if (isSeen(item) || item.id in watched || item.id.startsWith("info-")) return@firstOrNull false
-            item !is OpenCodeTranscriptItem.SendFailure && item !is OpenCodeTranscriptItem.RunRetry &&
-                item !is OpenCodeTranscriptItem.Undone
-        }?.id
-    }
-
-    /** iOS `NewMessagesMark.ownPrompts(in:)`: whether a row is part of the reader's own message, from any client; a message an agent sent into the session isn't theirs. */
-    fun ownPrompts(items: Iterable<OpenCodeTranscriptItem>): (OpenCodeTranscriptItem) -> Boolean {
-        val agentPrompts = items.mapNotNullTo(HashSet()) { item ->
-            (item as? OpenCodeTranscriptItem.UserText)?.takeIf { it.source != null }?.id
-        }
-        return { item -> TranscriptEntry.promptID(item)?.let { it !in agentPrompts } ?: false }
-    }
-
-    /**
-     * iOS `NewMessagesMark.Tally`/`recordSpan` (DEBUG): counts the rows the mark's span reads (a turn
-     * rebuilt, the own-message check) while a test holds a tally, so the test can prove a streamed
-     * row doesn't read the transcript again.
-     */
-    class Tally {
-        @Volatile var count: Int = 0
-            private set
-
-        @Synchronized fun add(rows: Int) {
-            count += rows
-        }
-    }
-
-    private val tally = ThreadLocal<Tally?>()
-
-    /** Runs [block] with [value] counting the spans read on this thread (iOS `$tally.withValue`). */
-    fun <T> withTally(value: Tally, block: () -> T): T {
-        val previous = tally.get()
-        tally.set(value)
-        try {
-            return block()
-        } finally {
-            tally.set(previous)
-        }
-    }
-
-    fun recordSpan(rows: Int) {
-        tally.get()?.add(rows)
-    }
-}
+// The `SessionFeature.State` members of iOS `Transcript/NewMessagesMark.swift`. They extend the
+// session's state, so they live in this module; `NewMessagesMark` (with `firstUnseen`,
+// `ownPrompts` and the span tally), `NewMessagesEarlierBaseline`, `NewMessagesFold` and the list's
+// `NewMessagesPlacement` belong to `:feature:transcript`.
 
 /** Rows kept above the New divider (iOS `SessionFeature.State.newMessagesContext`). */
 val SessionFeature.State.Companion.newMessagesContext: Int get() = NewMessagesMark.NEW_MESSAGES_CONTEXT
@@ -249,7 +123,7 @@ fun SessionFeature.State.updateNewMessagesMark(settles: Boolean, keptShapes: Boo
             )
         }
     if (seen == null) return settled(s)
-    val itemID = NewMessagesUnseen.firstUnseen(s.items, seen, watched, viewedMilliseconds, unread)
+    val itemID = NewMessagesMark.firstUnseen(s.items, seen, watched, viewedMilliseconds, unread)
     val index = itemID?.let { id -> s.items.indexOfLast { it.id == id } } ?: -1
     if (itemID != null && index >= 0) {
         val items = s.items
@@ -325,7 +199,7 @@ fun SessionFeature.State.recomputeNewMessagesAfterEarlierHistory(): SessionFeatu
 private fun SessionFeature.State.startsAnEntry(index: Int): Boolean {
     // Groups never cross the reader's own message: build from the turn's.
     val turn = items.subList(0, index).indexOfLast { TranscriptEntry.promptID(it) != null }.coerceAtLeast(0)
-    NewMessagesUnseen.recordSpan(items.size - turn)
+    NewMessagesMark.recordSpan(items.size - turn)
     val ids = items.subList(index, items.size).mapTo(HashSet()) { it.id }
     return TranscriptEntry.build(items.subList(turn, items.size)).any { entry -> entry.itemIDs.firstOrNull()?.let { it in ids } ?: false }
 }
@@ -349,8 +223,8 @@ fun SessionFeature.State.clearNewMessagesAfterOwnPrompt(): SessionFeature.State 
     val start = items.indexOfFirst { it.id == mark.itemID }
     if (start < 0) return this
     val suffix = items.subList(start, items.size)
-    NewMessagesUnseen.recordSpan(suffix.size)
-    val isOwn = NewMessagesUnseen.ownPrompts(suffix)
+    NewMessagesMark.recordSpan(suffix.size)
+    val isOwn = NewMessagesMark.ownPrompts(suffix)
     if (suffix.none(isOwn)) return this
     return noteOwnSend()
 }

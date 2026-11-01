@@ -10,6 +10,7 @@ import ai.opencode.feature.media.BrowserFeature
 import ai.opencode.feature.session.DrawerBadge
 import ai.opencode.feature.session.SessionFeature
 import ai.opencode.feature.session.pruneRequests
+import ai.opencode.feature.transcript.list.NewMessagesMark
 import ai.opencode.feature.drawer.catchup.CatchUpFeature
 import ai.opencode.server.ServerSharedKeys
 import ai.opencode.server.model.OpenCodeSession
@@ -457,7 +458,7 @@ fun HomeFeature.State.syncingSeenWatermark(detail: SessionFeature.State, session
         lastSeenID = detail.items.lastSeenRowID { it in seen } ?: seen.maxOrNull()
         val hasUnseen = detail.newMessagesUnread ||
             detail.newMessagesBaselineTimestamp != null ||
-            NewMessagesUnseen.firstUnseen(
+            NewMessagesMark.firstUnseen(
                 items = detail.items,
                 seen = seen,
                 watched = detail.newMessagesWatched,

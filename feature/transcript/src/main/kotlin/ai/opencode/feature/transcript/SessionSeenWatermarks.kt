@@ -9,55 +9,7 @@ import kotlinx.serialization.Serializable
 // iOS declares `SessionSeenWatermark(s)` and the `sessionSeenWatermarks` key in
 // `Core/SharedKeys.swift`, but the watermark compares item IDs through `TranscriptTimeStamps`,
 // which lives in this module; `:core` can't see it, so the type and its key live here (noted in
-// docs/parity/core.md). `isAtOrBefore`/`isBefore` are iOS `TranscriptTimeStamps` members, added as
-// extensions so `rows/TranscriptTimeStamps.kt` stays as ported.
-
-/** iOS `TranscriptTimeStamps.isAtOrBefore(_:id:)`: whether [id] carries an OpenCode timestamp minted at or before [milliseconds]. */
-fun TranscriptTimeStamps.isAtOrBefore(milliseconds: Long, id: String): Boolean? {
-    val ahead = aheadOf(milliseconds, id) ?: return null
-    return ahead == 0L || ahead > (TIME_MASK ushr 1)
-}
-
-/** iOS `TranscriptTimeStamps.isBefore(_:id:)`: whether [id] carries an OpenCode timestamp minted strictly before [milliseconds]. */
-fun TranscriptTimeStamps.isBefore(milliseconds: Long, id: String): Boolean? {
-    val ahead = aheadOf(milliseconds, id) ?: return null
-    return ahead > (TIME_MASK ushr 1)
-}
-
-private const val TIME_MASK = 0xF_FFFF_FFFFL
-
-/** How far [id]'s time is ahead of [milliseconds], modulo the 36 bits the ID keeps; null when either is missing. */
-private fun aheadOf(milliseconds: Long, id: String): Long? {
-    if (milliseconds <= 0) return null
-    val value = parsedIDValue(id) ?: return null
-    val itemMS = (value ushr 12) and TIME_MASK
-    val cutoffMS = milliseconds and TIME_MASK
-    return (itemMS - cutoffMS) and TIME_MASK
-}
-
-/** iOS `TranscriptTimeStamps.parsedValue(ofID:)`: the 48-bit prefix of an OpenCode ID's 26-character body. */
-private fun parsedIDValue(id: String): Long? {
-    val underscore = id.indexOf('_')
-    if (underscore < 0) return null
-    val bodyStart = underscore + 1
-    var bodyEnd = bodyStart
-    while (bodyEnd < id.length && id[bodyEnd] != '-') bodyEnd++
-    if (bodyEnd - bodyStart != 26) return null
-    var value = 0L
-    for (i in bodyStart until bodyStart + 12) {
-        val digit = when (val c = id[i]) {
-            in '0'..'9' -> c - '0'
-            in 'a'..'f' -> c - 'a' + 10
-            else -> return null
-        }
-        value = (value shl 4) or digit.toLong()
-    }
-    for (i in bodyStart + 12 until bodyEnd) {
-        val c = id[i]
-        if (c !in '0'..'9' && c !in 'A'..'Z' && c !in 'a'..'z') return null
-    }
-    return value
-}
+// docs/parity/core.md).
 
 /**
  * iOS `SessionSeenWatermark`: how far the reader had seen a session as they last left it: the

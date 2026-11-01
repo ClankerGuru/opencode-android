@@ -6,6 +6,7 @@ import ai.opencode.feature.session.agentactivity.AgentActivityGlyphModel
 import ai.opencode.feature.session.agentactivity.AgentActivityGlyphModels
 import ai.opencode.feature.session.agentactivity.animationKey
 import ai.opencode.feature.session.agentactivity.drawAgentActivityOrb
+import ai.opencode.feature.transcript.list.LocalTranscriptTimelinePaused
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -67,7 +68,9 @@ fun AgentActivityGlyph(
     val model = if (scope != null && key != null) remember(scope, key) { AgentActivityGlyphModels.model("$scope|$key") } else localModel
     val reduceMotion = rememberReduceMotion()
     val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
-    val active = lifecycle.isAtLeast(Lifecycle.State.RESUMED)
+    // Hosted transcript rows also hold while the list's timelines are paused (covered, off
+    // screen, not drawn), as iOS's `transcriptTimelineGate`.
+    val active = lifecycle.isAtLeast(Lifecycle.State.RESUMED) && !LocalTranscriptTimelinePaused.current
     val dark = OpenCodeTheme.colors.isDark
     val lab = AgentActivityLab.override
     val currentSource by rememberUpdatedState(source)
