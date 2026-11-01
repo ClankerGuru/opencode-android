@@ -20,6 +20,7 @@ import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.OpenCodeServerEvent
 import ai.opencode.server.OpenCodeLiveContentEvent
 import ai.opencode.server.model.OpenCodeHomeSnapshot
+import ai.opencode.server.model.OpenCodeModelCatalog
 import ai.opencode.server.model.OpenCodePendingRequests
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.OpenCodeSessionFamily
@@ -455,6 +456,78 @@ class DrawerActivityTests {
         assertNull(store.state.activeSessionParents[grandchild.id])
         assertNotEquals(busyBeforeDelete, store.state.busySessionIDs)
         assertEquals(Indicator.none, store.state.indicator(root))
+    }
+
+    @Test
+    fun archivingElsewhereDropsTheSessionFromRecentsButKeepsItOpen() = runTest {
+        val server = OpenCodeServer(url = "http://localhost:9", username = "", password = "")
+        fun listed(id: String, title: String, updated: Long) = OpenCodeSession(
+            id = id, serverTitle = title, projectID = "p", directory = "/project", updatedAt = Instant.ofEpochSecond(updated),
+        )
+        val open = listed("ses_open", "Open", 10)
+        val other = listed("ses_other", "Bench run", 20)
+        val back = listed("ses_back", "Back", 30)
+        val state = HomeFeature.State(server, OpenCodeHomeSnapshot(projects = emptyList(), sessions = listOf(other, open), activeSessionIDs = emptySet()))
+            .copy(sessionDetail = SessionFeature.State.session(server = server, session = open, cachedItems = emptyList()))
+        // The server: `back` starts archived; snapshots list what isn't.
+        val archived = java.util.concurrent.atomic.AtomicReference(setOf(back.id))
+        val store = TestStore(state, HomeFeature(), backgroundScope) {
+            this[Clock] = ImmediateClock()
+            this[DateClient] = DateClient.constant(Instant.ofEpochSecond(100))
+            this[OpenCodeClient] = OpenCodeClient.testValue.copy(
+                homeAttention = { _, _, _ -> emptySet() },
+                transcript = { _, _, _ -> emptyList() },
+                sessionFamily = { _, root -> OpenCodeSessionFamily(listOf(root), emptySet()) },
+                familyPendingRequests = { _, _, _ -> OpenCodePendingRequests(permissions = emptyList(), forms = emptyList()) },
+                pendingInputs = { _, _ -> emptyList() },
+                runningShells = { _, _ -> emptyList() },
+                viewSession = { _, _, _ -> },
+                getSession = { _, _ -> open },
+                modelCatalog = { _, _ -> OpenCodeModelCatalog(models = emptyList(), defaultModel = null) },
+                homeSnapshot = { _ ->
+                    val hidden = archived.get()
+                    OpenCodeHomeSnapshot(projects = emptyList(), sessions = listOf(back, other, open).filter { it.id !in hidden }, activeSessionIDs = emptySet())
+                },
+            )
+        }
+        store.exhaustive = false
+        suspend fun change(id: String, archive: Boolean) {
+            archived.updateAndGet { if (archive) it + id else it - id }
+            store.send(HomeFeature.Action.ServerEvent(OpenCodeServerEvent.SessionArchiveChanged(sessionID = id, isArchived = archive)))
+        }
+        suspend fun receiveSnapshot() = store.receive({ it is HomeFeature.Action.SnapshotRefreshed }, "snapshotRefreshed")
+
+        change(other.id, archive = true)
+        assertEquals("Hidden at once, before the refresh", listOf(open.id), store.state.recentSessions.map { it.id })
+        assertTrue(store.state.catchUpSessions.all { it.id != other.id })
+        receiveSnapshot()
+        assertEquals(listOf(open.id), store.state.recentSessions.map { it.id })
+
+        change(open.id, archive = true)
+        assertTrue(store.state.recentSessions.isEmpty())
+        receiveSnapshot()
+        assertTrue(store.state.recentSessions.isEmpty())
+        assertEquals("The reader stays in a session archived from another client", open.id, store.state.sessionDetail?.session?.id)
+
+        // One unarchived that this page never listed comes back with the refresh.
+        change(back.id, archive = false)
+        receiveSnapshot()
+        assertEquals(listOf(back.id), store.state.recentSessions.map { it.id })
+        assertEquals(open.id, store.state.sessionDetail?.session?.id)
+        store.skipInFlightEffects()
+    }
+
+    /**
+     * A subagent's session reaches the drawer's state (a created event, a family refresh) but
+     * lists only under its parent, not in Recents (TestFlight build 682).
+     */
+    @Test
+    fun recentsListOnlyRootSessions() {
+        val root = session("ses_root")
+        val child = session("ses_child", parent = "ses_root")
+        val state = home(listOf(child, root))
+        assertEquals(listOf("ses_root"), state.recentSessions.map { it.id })
+        assertEquals(listOf("ses_root"), state.visibleSessions.map { it.id })
     }
 }
 
