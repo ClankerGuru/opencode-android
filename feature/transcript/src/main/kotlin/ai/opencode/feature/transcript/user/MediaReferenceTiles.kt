@@ -82,6 +82,7 @@ private suspend fun loadImage(server: OpenCodeServer?, attachment: OpenCodeImage
  */
 @Composable
 internal fun UserImageAttachmentTile(
+    messageID: String?,
     images: List<OpenCodeImageAttachment>,
     attachment: OpenCodeImageAttachment,
     index: Int,
@@ -101,7 +102,9 @@ internal fun UserImageAttachmentTile(
     val isUnavailable = attachment.isUnavailable ||
         retryState.failure == MediaAttachmentFailure.Unavailable ||
         MediaReferenceResolver.isUnavailable(attachment, server)
-    val tile = Modifier.size(side).clip(shape)
+    // Every state marks the slot a sent photo lands in (iOS `SendLandingProbe.imageID`).
+    val marker = rememberSendLandingMarker(messageID?.let { SendLanding.imageID(it, index) })
+    val tile = Modifier.sendLandingMarker(marker).size(side).clip(shape)
     when {
         image != null && !isUnavailable -> {
             val dragData = MediaReferenceResolver.resolvedData(attachment)

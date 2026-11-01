@@ -270,6 +270,7 @@ internal fun SharedLocationCard(
  */
 @Composable
 internal fun UserMessageImages(
+    messageID: String?,
     images: List<OpenCodeImageAttachment>,
     isPending: Boolean,
     trailing: UserSurfaceCorners,
@@ -284,7 +285,7 @@ internal fun UserMessageImages(
             images.forEachIndexed { index, attachment ->
                 // Only the strip's trailing image meets the run's other surfaces.
                 val corners = if (index == images.size - 1) trailing else UserSurfaceCorners.round
-                UserImageAttachmentTile(images, attachment, index, side, corners, isPending, onPreview)
+                UserImageAttachmentTile(messageID, images, attachment, index, side, corners, isPending, onPreview)
             }
         }
     }
