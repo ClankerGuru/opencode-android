@@ -1,6 +1,8 @@
 package ai.opencode.feature.composer
 
 import ai.opencode.core.diagnostics.PerfFrameLatency
+import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.BackSwipeRules
 import ai.opencode.core.ui.LocalDrawerKeyboardSignals
 import ai.opencode.core.ui.OpenCodeTextStyles
@@ -8,6 +10,7 @@ import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.drawerKeyboardField
 import ai.opencode.server.model.PastedText
 import android.net.Uri
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.content.MediaType
 import androidx.compose.foundation.content.ReceiveContentListener
@@ -35,16 +38,17 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -63,6 +67,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
@@ -77,14 +82,18 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.android.awaitFrame
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 /**
  * The composer tunables the text input reads (iOS `ComposerTunables`, `Session/ComposerViews.swift`):
@@ -102,6 +111,12 @@ object ComposerTextInputTunables {
 
     /** `composer.controls.swipeUpVelocity`: swipe-up flick velocity (dp/s). */
     const val SWIPE_UP_VELOCITY = 260f
+
+    /** `composer.lines.grow`: a typed line's growth or shrink (0.28 s, no bounce). */
+    val lineGrowth: MotionSpring = MotionSpring(duration = 0.28, bounce = 0.0)
+
+    /** `composer.lines.sendShrinkSpeed`: the send shrink's ω as a multiple of the list's arrival ω. */
+    const val SEND_SHRINK_SPEED = 1.25
 }
 
 /**
@@ -150,6 +165,21 @@ object ComposerSwipeDown {
         val predictedExtra = max(0f, -(predictedEndTranslation.y - dy))
         return predictedExtra >= minimumFlickVelocity * 0.15f || -predictedEndTranslation.y >= max(PREDICTED_DISTANCE, minimumDistance)
     }
+
+    /**
+     * Whether a drag on the text belongs to the text field, so no swipe acts on it: it started
+     * on or near the selection (its handles sit at its edges), the finger rested before moving
+     * (a long press selecting), or one of the field's own gestures took it (a selection drag).
+     */
+    fun textOwnsDrag(startsOnSelection: Boolean, heldFor: Double, holdBegan: Boolean, textGestureBegan: Boolean): Boolean =
+        startsOnSelection || textGestureBegan || BackSwipeRules.yieldsToHold(heldFor, holdBegan)
+
+    /**
+     * Whether [point] is on or near one of a selection's rects; [reach] in the same units
+     * (iOS `BackSwipeRules.selectionHandleReach`, 24 dp).
+     */
+    fun selectionClaims(point: Offset, selectionRects: List<Rect>, reach: Float = BackSwipeRules.selectionHandleReach.value): Boolean =
+        selectionRects.any { rect -> rect.isFinite && rect.inflate(reach).contains(point) }
 }
 
 /**
@@ -164,14 +194,19 @@ class ComposerSwipeOwnership {
     private var yields = false
     private var focusedAtStart = false
 
-    /** [yieldsNow] is read only for a drag not seen before. */
-    fun yields(startLocation: Offset, isFocused: Boolean = false, yieldsNow: () -> Boolean): Boolean {
+    /**
+     * [yieldsNow] is read only for a drag not seen before. Once the text field claims the drag
+     * ([textClaims], a selection's handle or a long press), it stays yielded through its last
+     * callback.
+     */
+    fun yields(startLocation: Offset, isFocused: Boolean = false, textClaims: Boolean = false, yieldsNow: () -> Boolean): Boolean {
         if (start != startLocation) {
             start = startLocation
             focusedStart = startLocation
             focusedAtStart = isFocused
             yields = yieldsNow()
         }
+        if (textClaims) yields = true
         return yields
     }
 
@@ -189,113 +224,6 @@ class ComposerSwipeOwnership {
         focusedStart = null
         yields = false
         focusedAtStart = false
-    }
-}
-
-/**
- * The composer's text handed off to its bubble (iOS `ComposerSendTransition`). On iOS it
- * snapshots the field's pixels and flies them into the transcript cell (`SendLandingProbe`
- * markers). Here the field reports its laid-out text and where it sits ([ComposerTextInput]);
- * [prepare] captures the send's words, their layout and their visible rect as a [Prepared],
- * which the session screen's flight overlay draws and flies toward the bubble (it owns both
- * ends, as the transcript's list and the composer meet there). Flights overlap: each is keyed
- * by the message it lands on, and preparing the next send never touches one already in the air.
- */
-@Stable
-class ComposerSendTransition {
-    /** The next send's words as they leave the composer (window px). */
-    data class Prepared(
-        val text: String,
-        /** The words' visible rect: what iOS snapshots (`usedRect` ∩ the field's bounds). */
-        val bounds: Rect,
-        /** Whether these are the composer's own laid-out words, not words laid out again where it was. */
-        val fromComposer: Boolean,
-        /** The words as laid out, drawn with their top-left at [origin] and clipped to [bounds]. */
-        val layout: TextLayoutResult? = null,
-        val origin: Offset = bounds.topLeft,
-    )
-
-    /** The field's text and its visible bounds in the window (px), updated by [ComposerTextInput]. */
-    var inputText: String = ""
-        internal set
-    var inputBounds: Rect? = null
-        internal set
-
-    /** The field's laid-out text and the window position (px) its layout starts at. */
-    internal var textLayout: TextLayoutResult? = null
-    internal var textOrigin: Offset? = null
-
-    var prepared: Prepared? by mutableStateOf(null)
-        private set
-
-    val isPrepared: Boolean get() = prepared != null
-
-    fun prepare(reduceMotion: Boolean) {
-        cancelPrepared()
-        val visible = inputBounds
-        val layout = textLayout
-        val origin = textOrigin
-        if (reduceMotion || inputText.isEmpty() || visible == null || layout == null || origin == null || layout.lineCount == 0) return
-        var left = Float.MAX_VALUE
-        var right = 0f
-        for (line in 0 until layout.lineCount) {
-            left = min(left, layout.getLineLeft(line))
-            right = max(right, layout.getLineRight(line))
-        }
-        val used = Rect(origin.x + left, origin.y, origin.x + right, origin.y + layout.size.height)
-        val bounds = used.intersect(visible)
-        if (bounds.isEmpty) return
-        prepared = Prepared(inputText, bounds, fromComposer = true, layout = layout, origin = origin)
-    }
-
-    /**
-     * A send the composer didn't capture as it left: its words laid out as the composer lays
-     * them out, starting where the field (or the dictation bar in its place) sits. [composer]
-     * is in window px; [measure] lays out [text] at a maximum width (px).
-     */
-    fun prepare(
-        text: String,
-        composer: Rect,
-        expandedTopInsetPx: Float,
-        contentGutterPx: Float,
-        measure: (String, Float) -> TextLayoutResult,
-    ) {
-        cancelPrepared()
-        val layout = measure(text, max(composer.width - contentGutterPx * 2, 40f))
-        val width = layout.size.width.toFloat()
-        val height = layout.size.height.toFloat()
-        // The field's first line: the capsule's top when it's tall, its middle when it's one row.
-        val top = min(composer.top + expandedTopInsetPx, composer.center.y - height / 2)
-        val bounds = Rect(composer.left + contentGutterPx, top, composer.left + contentGutterPx + width, top + height)
-        prepared = Prepared(text, bounds, fromComposer = false, layout = layout, origin = bounds.topLeft)
-    }
-
-    /** The prepared send taken for its flight (the overlay now owns it); null when nothing was prepared. */
-    fun takePrepared(): Prepared? = prepared.also { prepared = null }
-
-    /** Fades a send's capture out where it is: a send that doesn't fly. Only while it's still the prepared one. */
-    fun dissolvePrepared(snapshot: Prepared?) {
-        if (prepared != null && prepared === snapshot) prepared = null
-    }
-
-    /** Drops the next send's capture; flights in the air carry on. */
-    fun cancelPrepared() {
-        prepared = null
-    }
-
-    companion object {
-        /** The label fades and settles into place over the flight's last half, finishing with it. */
-        fun chromeProgress(progress: Float): Float {
-            val t = min(1f, max(0f, (progress - 0.5f) / 0.5f))
-            return t * t * (3 - 2 * t)
-        }
-
-        fun interpolate(from: Rect, to: Rect, progress: Float) = Rect(
-            from.left + (to.left - from.left) * progress,
-            from.top + (to.top - from.top) * progress,
-            from.right + (to.right - from.right) * progress,
-            from.bottom + (to.bottom - from.bottom) * progress,
-        )
     }
 }
 
@@ -324,6 +252,22 @@ private class ComposerTextInputController {
 
     var layoutTick by mutableIntStateOf(0)
     var layout: TextLayoutResult? = null
+
+    /**
+     * iOS `beginLineGrowth`: the spring the next height change rides, and the text it was set
+     * for (a measure for any other text takes its height at once).
+     */
+    var heightSpring: MotionSpring? = null
+    var heightSpringText: String? = null
+    var heightSpringShrinks = false
+
+    /** iOS `measuredHeight` (px): the height the field last laid out to. */
+    var measuredHeight: Int? = null
+    var heightAnimation: Job? = null
+    val animatedHeight = Animatable(0f)
+
+    /** iOS `ComposerSwipePanRecognizer.textOwnership` for the drag in progress. */
+    var isSwipeYieldedToText = false
 }
 
 /**
@@ -348,12 +292,20 @@ private class ComposerTextInputController {
  *   on the unfocused field pulls it up ([ComposerSwipeDown], via [onDismissKeyboard] /
  *   [onFocusKeyboard]); neither fires while the text itself scrolls that way, nor while a hold
  *   (a held mic, [isHoldingMic]) owns the touch.
+ * - **Line growth.** A typed line's growth or shrink rides [ComposerTextInputTunables.lineGrowth]
+ *   with the text held to the field's bottom, so the caret's line stays put while the top
+ *   moves; none under reduce motion or for a Return that sends. A send's clear shrinks on
+ *   [ComposerSendTransition.shrinkOnNextClear]'s spring.
+ * - **Selecting.** A drag the text is selecting with (it starts on or near the selection, or
+ *   rests first) is never a swipe ([ComposerSwipeDown.textOwnsDrag]).
  * - **Keyboard insets.** The field only takes and drops focus; the session's composer docks
  *   above the IME with `imePadding()`/animated `WindowInsets.ime` (iOS keyboard docking).
  *
  * [isKeyboardHeld] is iOS `DrawerKeyboardHold`: under the open drawer no key, paste or drop
  * reaches the draft. [canTakeFocus] is iOS `isReachable`: never take focus under something that
- * takes its touches (the drawer, Settings).
+ * takes its touches (the drawer, Settings). [topInsetFraction] sets how much of [topInset] shows
+ * (the keyboard morph scrubs it; null follows [expanded]); [refusesFocus] keeps the field from
+ * taking focus while something else owns the composer (One Picker open).
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -382,6 +334,8 @@ fun ComposerTextInput(
     isKeyboardHeld: Boolean = false,
     isHoldingMic: Boolean = false,
     canTakeFocus: Boolean = true,
+    topInsetFraction: Float? = null,
+    refusesFocus: (() -> Boolean)? = null,
 ) {
     val state = remember { TextFieldState(text, TextRange(text.length)) }
     val controller = remember { ComposerTextInputController() }
@@ -408,6 +362,11 @@ fun ComposerTextInput(
     val drawerHold = LocalDrawerKeyboardSignals.current
     val held by rememberUpdatedState(isKeyboardHeld || drawerHold?.isHeld(fieldKey) == true)
     val holdingMic by rememberUpdatedState(isHoldingMic)
+    val currentRefusesFocus by rememberUpdatedState(refusesFocus)
+    val currentReturnKeySends by rememberUpdatedState(returnKeySends)
+    val reduceMotion = rememberReduceMotion()
+    val currentReduceMotion by rememberUpdatedState(reduceMotion)
+    val growthScope = rememberCoroutineScope()
 
     // Programmatic updates (dictation, a restored draft, Share/Quote) follow the newest text;
     // synced before the field measures so the first frame of an expand already has it.
@@ -415,6 +374,11 @@ fun ComposerTextInput(
         if (controller.externalText == null) controller.externalText = text
         if (text == controller.externalText) return@SideEffect
         controller.externalText = text
+        // A send's clear shrinks on its own spring (`sendShrinkAnimation`); any other change lands at once.
+        val shrinkOmega = sendTransition?.takeShrinkOmega()
+        controller.heightSpring = shrinkOmega?.takeIf { !reduceMotion && it > 0 }?.let { MotionSpring(duration = 2 * PI / it, bounce = 0.0) }
+        controller.heightSpringText = text
+        controller.heightSpringShrinks = true
         if (state.text.toString() == text) return@SideEffect
         val bridge = autocompleteBridge
         bridge?.beginProgrammaticTextUpdate()
@@ -480,7 +444,7 @@ fun ComposerTextInput(
     // Focus follows `isFocused`, settled after the update (iOS dispatches it to the next turn).
     LaunchedEffect(isFocused, canTakeFocus) {
         awaitFrame()
-        if (isFocused && !hasFocus && canTakeFocus) {
+        if (isFocused && !hasFocus && canTakeFocus && currentRefusesFocus?.invoke() != true) {
             focusRequester.requestFocus()
             keyboard?.show()
         } else if (!isFocused && hasFocus) {
@@ -492,7 +456,10 @@ fun ComposerTextInput(
         if (textStyle.lineHeight.isSp) textStyle.lineHeight.toPx() else textStyle.fontSize.toPx() * 1.3f
     }
     val lines = lineLimit ?: if (expanded) 6 else 1
-    val insetPx = if (expanded) with(density) { topInset.toPx() } else 0f
+    // iOS `appliedTopInset`: the keyboard morph scrubs how much of the inset shows.
+    val appliedTopInset = topInset * (topInsetFraction ?: if (expanded) 1f else 0f)
+    val insetPx = with(density) { appliedTopInset.toPx() }
+    val currentInsetPx by rememberUpdatedState(insetPx)
     val capPx = ceil(lineHeightPx * lines + insetPx)
     val capDp = with(density) { capPx.toDp() }
     // Past the cap the text scrolls; below it, nothing does (no bounce, no indicator).
@@ -541,7 +508,18 @@ fun ComposerTextInput(
     val holdTransformation = remember {
         object : InputTransformation {
             override fun TextFieldBuffer.transformInput() {
-                if (held) revertAllChanges()
+                if (held) {
+                    revertAllChanges()
+                    return
+                }
+                // iOS `lineGrowthAnimation`: a typed line's growth rides its spring, except under
+                // reduce motion and for a Return that sends (it never animates the line it adds).
+                val old = originalText.toString()
+                val new = asCharSequence().toString()
+                val returnSends = currentReturnKeySends && new == old + "\n"
+                controller.heightSpring = if (currentReduceMotion || returnSends) null else ComposerTextInputTunables.lineGrowth
+                controller.heightSpringText = new
+                controller.heightSpringShrinks = false
             }
         }
     }
@@ -562,6 +540,18 @@ fun ComposerTextInput(
         if (controller.isFocusingFromSwipe) return
         currentOnFocusKeyboard?.invoke()
         controller.isFocusingFromSwipe = true
+    }
+
+    /**
+     * iOS `ImagePasteTextView.selectionClaims`: whether [point] (in the field's viewport) is on or
+     * near the selection being made; a caret isn't a selection.
+     */
+    fun selectionClaims(point: Offset): Boolean {
+        val selection = state.selection
+        val layout = controller.layout ?: return false
+        if (selection.collapsed) return false
+        val textPoint = Offset(point.x, point.y + scroll.value - currentInsetPx)
+        return ComposerSwipeDown.selectionClaims(textPoint, selectionRects(layout, selection), reach = with(density) { BackSwipeRules.selectionHandleReach.toPx() })
     }
 
     val receiveContent = remember {
@@ -620,13 +610,47 @@ fun ComposerTextInput(
 
     Box(
         modifier
-            .heightIn(max = capDp)
             .onGloballyPositioned { coordinates ->
                 sendTransition?.let {
                     it.inputText = state.text.toString()
                     it.inputBounds = coordinates.boundsInWindow()
                 }
             }
+            // iOS `beginLineGrowth`/`holdLineGrowth`: the field's height springs to the laid-out
+            // one with the text held to its bottom; the line coming or going passes under the top.
+            .layout { measurable, constraints ->
+                val placeable = measurable.measure(constraints)
+                val target = placeable.height
+                val previous = controller.measuredHeight
+                controller.measuredHeight = target
+                val spring = controller.heightSpring?.takeIf {
+                    controller.heightSpringText == Snapshot.withoutReadObservation { state.text.toString() }
+                }
+                var height = target
+                if (previous != null && abs(target - previous) > 0) {
+                    controller.heightSpring = null
+                    val running = controller.heightAnimation?.isActive == true
+                    val from = if (running) controller.animatedHeight.value else previous.toFloat()
+                    // A send's shrink takes a field taller than one line; a typed line, any change.
+                    val oneLine = lineHeightPx + insetPx
+                    if (spring != null && (!controller.heightSpringShrinks || from - oneLine > 0.5f)) {
+                        height = from.roundToInt()
+                        controller.heightAnimation = growthScope.launch(start = CoroutineStart.UNDISPATCHED) {
+                            // A retarget keeps the running spring's velocity, as SwiftUI's does.
+                            if (!running) controller.animatedHeight.snapTo(from)
+                            controller.animatedHeight.animateTo(target.toFloat(), spring.spec(visibilityThreshold = 0.5f))
+                        }
+                    } else {
+                        controller.heightAnimation?.cancel()
+                        controller.heightAnimation = null
+                    }
+                } else if (controller.heightAnimation?.isActive == true) {
+                    height = controller.animatedHeight.value.roundToInt()
+                }
+                layout(placeable.width, height) { placeable.place(0, height - placeable.height) }
+            }
+            .clipToBounds()
+            .heightIn(max = capDp)
             .pointerInput(Unit) {
                 val gestureScope = this
                 coroutineScope { val settleScope = this; with(gestureScope) { awaitEachGesture {
@@ -640,12 +664,28 @@ fun ComposerTextInput(
                     val tracker = VelocityTracker()
                     tracker.addPosition(down.uptimeMillis, down.position)
                     var yieldedToHold = false
+                    // iOS `ComposerSwipePanRecognizer.textOwnership`: decided once the finger
+                    // first moves the decision distance, then the text's for good.
+                    val selectionAtDown = state.selection
+                    val startsOnSelection = hasFocus && selectionClaims(down.position)
+                    var textOwnership: Boolean? = if (startsOnSelection) true else null
+                    controller.isSwipeYieldedToText = startsOnSelection
+                    val decisionPx = BackSwipeRules.decisionDistance.toPx()
                     while (true) {
                         val event = awaitPointerEvent(PointerEventPass.Initial)
                         val change = event.changes.firstOrNull { it.id == down.id } ?: break
                         tracker.addPosition(change.uptimeMillis, change.position)
                         val heldFor = (change.uptimeMillis - down.uptimeMillis) / 1000.0
                         if (!yieldedToHold && BackSwipeRules.yieldsToHold(heldFor, holdBegan = holdingMic)) yieldedToHold = true
+                        // The field's own selecting (a long press, a drag that moves the selection).
+                        val textGestureBegan = state.selection != selectionAtDown && !state.selection.collapsed
+                        if (textOwnership == null && (change.position - down.position).getDistance() >= decisionPx) {
+                            textOwnership = ComposerSwipeDown.textOwnsDrag(startsOnSelection, max(0.0, heldFor), holdBegan = holdingMic, textGestureBegan = textGestureBegan)
+                        } else if (textOwnership == false && textGestureBegan) {
+                            textOwnership = true
+                        }
+                        val yieldedToText = textOwnership == true
+                        controller.isSwipeYieldedToText = yieldedToText
                         val translation = (change.position - down.position) / density.density
                         val velocity = tracker.calculateVelocity().let { Offset(it.x, it.y) / density.density }
                         val predicted = translation + velocity * 0.15f
@@ -655,6 +695,7 @@ fun ComposerTextInput(
                                 translation = translation,
                                 predictedEndTranslation = predicted,
                                 isFocused = hasFocus || (!ended && controller.isSuppressingFocusAfterSwipe),
+                                isHoldingMic = yieldedToText,
                                 isScrollingUp = controller.isScrollingUp,
                             )
                             if (dismisses) {
@@ -667,7 +708,7 @@ fun ComposerTextInput(
                                 predictedEndTranslation = predicted,
                                 velocityY = velocity.y,
                                 isFocused = hasFocus,
-                                isHoldingMic = yieldedToHold,
+                                isHoldingMic = yieldedToHold || yieldedToText,
                                 isScrollingDown = controller.isScrollingDown,
                             )
                             if (focuses) focusKeyboard()
@@ -681,6 +722,7 @@ fun ComposerTextInput(
                         controller.isFocusingFromSwipe = false
                         controller.isScrollingUp = false
                         controller.isScrollingDown = false
+                        controller.isSwipeYieldedToText = false
                     }
                 } } }
             }
@@ -690,12 +732,12 @@ fun ComposerTextInput(
             state = state,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = if (expanded) topInset else 0.dp)
+                .padding(top = appliedTopInset)
                 .onGloballyPositioned { coordinates -> sendTransition?.textOrigin = coordinates.positionInWindow() }
                 .focusRequester(focusRequester)
                 .drawerKeyboardField(fieldKey)
                 .onFocusChanged { focus ->
-                    if (focus.isFocused && controller.isSuppressingFocusAfterSwipe) {
+                    if (focus.isFocused && (controller.isSuppressingFocusAfterSwipe || currentRefusesFocus?.invoke() == true)) {
                         // The touch that just dismissed the keyboard doesn't bring it back.
                         focusManager.clearFocus()
                         return@onFocusChanged
@@ -779,4 +821,19 @@ private fun TextFieldBuffer.replaceSelection(text: String) {
     val start = selection.min
     replace(start, selection.max, text)
     selection = TextRange(start + text.length)
+}
+
+/** The selection's rects per line, in the layout's coordinates (iOS `selectionRects(for:)`). */
+private fun selectionRects(layout: TextLayoutResult, selection: TextRange): List<Rect> {
+    val length = layout.layoutInput.text.length
+    val start = selection.min.coerceIn(0, length)
+    val end = selection.max.coerceIn(0, length)
+    if (start >= end) return emptyList()
+    val firstLine = layout.getLineForOffset(start)
+    val lastLine = layout.getLineForOffset(end)
+    return (firstLine..lastLine).map { line ->
+        val left = if (line == firstLine) layout.getHorizontalPosition(start, usePrimaryDirection = true) else layout.getLineLeft(line)
+        val right = if (line == lastLine) layout.getHorizontalPosition(end, usePrimaryDirection = true) else layout.getLineRight(line)
+        Rect(min(left, right), layout.getLineTop(line), max(left, right), layout.getLineBottom(line))
+    }
 }
