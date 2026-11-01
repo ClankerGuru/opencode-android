@@ -12,6 +12,7 @@ import ai.opencode.feature.voice.VoiceCallServiceClient
 import ai.opencode.feature.voice.ScreenAwakeClient
 import ai.opencode.feature.system.liveactivity.VoiceLiveActivityClient
 import ai.opencode.feature.system.liveactivity.DictationLiveActivityClient
+import ai.opencode.feature.system.liveactivity.SessionLiveActivityClient
 import ai.opencode.core.dependencies.PasteboardClient
 import ai.opencode.core.dependencies.UuidClient
 import ai.opencode.core.dependencies.dependency
@@ -357,6 +358,8 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         val server: OpenCodeServer,
         /** A pairing: where its Home lands, and its handshake ([landPairing]). */
         val pairing: PairingArrival? = null,
+        /** Server Flow: a drawer switch, which goes back to the Home it left on failure. */
+        val switchesBack: Boolean = false,
     )
 
     /** Safe to display or copy: no full URL, credentials, or raw network payload. */
@@ -459,9 +462,11 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         data class Home(val action: HomeFeature.Action) : Action
         data class Welcome(val action: WelcomeFeature.Action) : Action
         data class HomeResponse(val attemptID: Int, val result: Result<OpenCodeHomeSnapshot>) : Action
+        /** Server Flow: the switch's server didn't answer in time. */
+        data class ServerSwitchTimedOut(val attemptID: Int) : Action
     }
 
-    internal enum class CancelID { Health, Home, Notification, SystemActions, SystemSession }
+    internal enum class CancelID { Health, Home, Notification, SystemActions, SystemSession, SwitchTimeout }
 
     private val core = Reducer<State, Action> { state, action -> reduceCore(state, action) }
 
@@ -512,8 +517,13 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
             val dictationLiveActivity = dependency(DictationLiveActivityClient)
             Reduced(state, Effect.run { dictationLiveActivity.update(null, null) })
         }
-        // iOS AppFeature+LiveActivities' third ending (a followed run's activity, which can't
-        // update once its Home is gone) waits on drawer's `HomeFeature.State.sessionActivity`.
+        // And a followed run's, which can't update once its Home is gone (iOS
+        // AppFeature+LiveActivities): Home leaving, or another server's replacing it.
+        .onChange({ state -> state.home?.takeIf { it.sessionActivity != null }?.id }) { old, _, state ->
+            if (old == null || state.home?.id == old) return@onChange Reduced(state)
+            val sessionLiveActivity = dependency(SessionLiveActivityClient)
+            Reduced(state, Effect.run { sessionLiveActivity.update(null, null) })
+        }
         .onChange({ it.keepsScreenAwake }) { _, keeps, state ->
             dependency(ScreenAwakeClient).set(keeps)
             Reduced(state)
@@ -624,6 +634,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         }
         is Action.HealthResponse -> healthResponse(state, action)
         is Action.HomeResponse -> homeResponse(state, action)
+        is Action.ServerSwitchTimedOut -> serverSwitchTimedOut(action.attemptID, state)
         is Action.Home -> home(state, action.action)
         is Action.Welcome -> Reduced(state)
     }
@@ -699,17 +710,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
     }
 
     private fun homeDelegate(state: State, action: HomeFeature.DelegateAction): Reduced<State, Action> = when (action) {
-        is HomeFeature.DelegateAction.ServerSwitchTapped -> {
-            val home = state.home
-            if (home == null || home.server.persistenceID == action.server.persistenceID) Reduced(state)
-            else {
-                // A switch that fails leaves the picker offering the way back.
-                var next = state.copy(returnServer = home.server)
-                val keepsHome = next.keepsHome(switchingTo = action.server)
-                if (keepsHome) next = next.showingSwitch(action.server)
-                selectServer(action.server, next, keepingHome = keepsHome)
-            }
-        }
+        is HomeFeature.DelegateAction.ServerSwitchTapped -> switchServer(action.server, state)
         is HomeFeature.DelegateAction.ServerRenamed -> Reduced(renameServer(action.server, action.name, state))
         is HomeFeature.DelegateAction.EditServerRequested -> Reduced(editServer(action.server, state))
         is HomeFeature.DelegateAction.ServerRemovalConfirmed -> Reduced(state, confirmRemoval(action.server, state))
@@ -986,6 +987,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         if (attempt?.id != action.attemptID || state.connection != State.Connection.Connecting) return Reduced(state)
         val server = action.result.getOrElse { error ->
             val clientError = error as? OpenCodeClientError ?: OpenCodeClientError(OpenCodeClientError.UNREACHABLE_MESSAGE)
+            if (attempt.switchesBack) return switchBack(state, after = clientError)
             // A switch kept Home up while it tried; the error needs the picker.
             return Reduced(
                 state.copy(
@@ -1035,7 +1037,9 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         if (state.connectionAttempt?.id != action.attemptID || loading == null) return Reduced(state)
         val server = loading.server
         val snapshot = action.result.getOrElse { error ->
-            val message = (error as? OpenCodeClientError)?.message ?: OpenCodeClientError.UNREACHABLE_MESSAGE
+            val clientError = error as? OpenCodeClientError ?: OpenCodeClientError(OpenCodeClientError.UNREACHABLE_MESSAGE)
+            if (state.connectionAttempt?.switchesBack == true) return switchBack(state, after = clientError)
+            val message = clientError.message
             return Reduced(
                 state.copy(
                     connectionAttempt = null,
@@ -1050,12 +1054,12 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         // An edit is saved only now; until then the original stays saved under its own identity,
         // so a failed read keeps what it had.
         var next = state
-        var forgotten: Effect<Action> = Effect.none()
+        var forgotten: Effect<Action> = Effect.cancel(CancelID.SwitchTimeout)
         next.editingSavedServer?.let { original ->
             if (original.persistenceID != server.persistenceID) {
                 val reduced = forgetIdentity(original.persistenceID, next)
                 next = reduced.state
-                forgotten = reduced.effect
+                forgotten = Effect.merge(forgotten, reduced.effect)
             }
             server.remember(original)
             next = next.copy(editingSavedServer = null)
@@ -1064,10 +1068,12 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         val previous = next.home
         val keepsSettings = previous?.isSettingsShown == true && previous.switchingTo?.persistenceID == server.persistenceID
         val pairing = next.connectionAttempt?.pairing
+        val reachability = previous?.serverReachability?.filterKeys { it != server.persistenceID }.orEmpty()
         next = next.withHome(server, snapshot)
         next = next.copy(
             home = next.home
                 ?.let { if (keepsSettings) it.keepingSettings(previous) else it }
+                ?.copy(serverReachability = reachability)
                 ?.persistingSnapshot(dependency(HomeSnapshotDate).now()),
         )
         next = next.copy(

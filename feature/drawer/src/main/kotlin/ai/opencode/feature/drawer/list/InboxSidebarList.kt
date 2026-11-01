@@ -286,10 +286,10 @@ internal fun InboxSidebarRowView(row: InboxSidebarRow, now: Instant, modifier: M
     }
 }
 
-/** The Inbox Sidebar switch as the drawer reads it (off until Settings declares the experiment). */
+/** The Inbox Sidebar switch as the drawer reads it (off by default). */
 @Composable
 internal fun rememberInboxSidebarOn(): Boolean {
-    val feature: ExperimentalFeature = InboxSidebarFeature.experiment ?: return false
+    val feature: ExperimentalFeature = InboxSidebarFeature.experiment
     val stored by remember(feature) { shared(feature.key).flow }.collectAsState()
     return feature.isActive(stored)
 }

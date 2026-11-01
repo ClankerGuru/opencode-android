@@ -105,11 +105,8 @@ class InboxSidebarFeature : Reducer<InboxSidebarFeature.State, InboxSidebarFeatu
     }
 
     companion object {
-        /**
-         * The Inbox Sidebar switch, once Settings declares it (`inbox-sidebar`, iOS
-         * `InboxSidebarExperiment.swift`); until then the drawer stays a list.
-         */
-        val experiment: ExperimentalFeature? get() = ExperimentalFeature.fromRawValue("inbox-sidebar")
+        /** The Inbox Sidebar switch (iOS `ExperimentalFeature.inboxSidebar`, off by default). */
+        val experiment: ExperimentalFeature get() = ExperimentalFeature.inboxSidebar
     }
 }
 

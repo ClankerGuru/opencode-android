@@ -5,36 +5,55 @@ import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.store.Effect
+import ai.opencode.core.store.PresentationAction
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
+import ai.opencode.feature.drawer.HomeFeature
 import ai.opencode.feature.settings.onboarding.WelcomeFeature
 
 /*
  * Port of iOS `AppFeature+Welcome.swift`.
  *
- * The welcome's pairing requests (Welcome Preview), from the first run with no saved server.
- * They run the classic screen's pairing. iOS also takes them from Show Welcome over Home
- * (`home(.welcome(.presented(.delegate)))`), which waits for drawer's `HomeFeature.welcome`.
+ * The welcome's pairing requests (Welcome Preview): from the first run, with no saved server, or
+ * from Show Welcome over Home (`home(.welcome(.presented(.delegate)))`), which stays until a
+ * pairing replaces it. Both run the classic screen's pairing.
  */
 internal val welcomeRequests = Reducer<AppFeature.State, AppFeature.Action> { state, action ->
-    val request = ((action as? AppFeature.Action.Welcome)?.action as? WelcomeFeature.Action.Delegate)?.request
-        ?: return@Reducer Reduced(state)
-    welcome(request, state)
+    when (action) {
+        is AppFeature.Action.Welcome ->
+            (action.action as? WelcomeFeature.Action.Delegate)?.let { welcome(it.request, overHome = false, state) }
+        is AppFeature.Action.Home -> {
+            val presented = (action.action as? HomeFeature.Action.Welcome)?.action as? PresentationAction.Presented
+            (presented?.action as? WelcomeFeature.Action.Delegate)?.let { welcome(it.request, overHome = true, state) }
+        }
+        else -> null
+    } ?: Reduced(state)
 }
 
-private fun welcome(request: WelcomeFeature.Request, state: AppFeature.State): Reduced<AppFeature.State, AppFeature.Action> =
+private fun welcome(
+    request: WelcomeFeature.Request,
+    overHome: Boolean,
+    state: AppFeature.State,
+): Reduced<AppFeature.State, AppFeature.Action> =
     when (request) {
-        WelcomeFeature.Request.Scan -> cancelConnection(beginPairing(state.copy(pasteError = null)))
-        WelcomeFeature.Request.EnterAddress -> cancelConnection(beginNewServer(state))
+        WelcomeFeature.Request.Scan -> {
+            val opening = beginPairing(state.copy(pasteError = null))
+            if (overHome) Reduced(opening) else cancelConnection(opening)
+        }
+        WelcomeFeature.Request.EnterAddress -> {
+            val opening = beginNewServer(state)
+            if (overHome) Reduced(opening) else cancelConnection(opening)
+        }
         is WelcomeFeature.Request.Copy -> Reduced(state, Effect.send(AppFeature.Action.CopyTextTapped(request.text)))
         WelcomeFeature.Request.Paste -> {
             val text = dependency(PasteboardClient).string().orEmpty()
             val problem = pasteProblem(text)
-            val welcome = state.welcome.copy(
-                pasteError = problem,
-                isShowingOtherWays = if (problem == null) false else state.welcome.isShowingOtherWays,
-            )
-            val next = state.copy(welcome = welcome)
+            val next = updatingWelcome(state, overHome) { welcome ->
+                welcome.copy(
+                    pasteError = problem,
+                    isShowingOtherWays = if (problem == null) false else welcome.isShowingOtherWays,
+                )
+            }
             if (problem != null) {
                 dependency(HapticsClient).play(Haptic.error)
                 Reduced(next)
@@ -42,4 +61,18 @@ private fun welcome(request: WelcomeFeature.Request, state: AppFeature.State): R
                 Reduced(next, Effect.send(AppFeature.Action.PairingCodeScanned(text)))
             }
         }
+    }
+
+/** iOS `updateWelcome(_:overHome:_:)`: the welcome over Home, or the first run's. */
+private fun updatingWelcome(
+    state: AppFeature.State,
+    overHome: Boolean,
+    update: (WelcomeFeature.State) -> WelcomeFeature.State,
+): AppFeature.State =
+    if (overHome) {
+        val home = state.home ?: return state
+        val welcome = home.welcome ?: return state
+        state.copy(home = home.copy(welcome = update(welcome)))
+    } else {
+        state.copy(welcome = update(state.welcome))
     }

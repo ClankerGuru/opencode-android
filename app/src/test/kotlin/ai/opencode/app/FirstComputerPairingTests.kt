@@ -16,6 +16,9 @@ import ai.opencode.core.testing.TestIsolationRule
 import ai.opencode.feature.drawer.HomeFeature
 import ai.opencode.feature.drawer.notices.AccessibilityAnnouncer
 import ai.opencode.feature.drawer.persistingSnapshot
+import ai.opencode.feature.session.SessionFeature
+import ai.opencode.feature.session.firstSessionStarters
+import ai.opencode.feature.session.isDraft
 import ai.opencode.feature.settings.whatsnew.WhatsNewEntry
 import ai.opencode.feature.settings.whatsnew.WhatsNewFeature
 import ai.opencode.feature.settings.whatsnew.all
@@ -32,6 +35,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -43,11 +47,14 @@ import java.time.Instant
  * fresh install starts with What’s New read. Both read `InstallHistory`, which removing
  * computers never resets.
  *
- * Skipped: `theFirstComputerOpensAReadySessionInItsLatestProject`,
- * `aFirstComputerWithOnlyItsHomeFolderOpensTheDrawer` (Home's `firstComputerPaired`,
- * `:feature:drawer`), `homeFoldersAreNotProjects`, `aStarterPromptIsTypedInForThePersonToSend`,
- * `typingRetiresTheStarterPromptsForGood` and the `starterPrompts` checks below (starter prompts,
- * `:feature:session`/`:feature:drawer`).
+ * The first computer's ready session is Home's `firstComputerPaired`. iOS re-derives the draft
+ * in its expectation; `makeDraft` draws a new session ID from the store's clients, so
+ * `theFirstComputerOpensAReadySessionInItsLatestProject` receives it non-exhaustively and checks
+ * the draft's project, starter prompts and closed drawer instead.
+ *
+ * Elsewhere: `homeFoldersAreNotProjects` (:server's `OpenCodeProject.isHomeFolder`),
+ * `aStarterPromptIsTypedInForThePersonToSend` and `typingRetiresTheStarterPromptsForGood`
+ * (`:feature:session`'s `FirstComputerPairingTests`).
  */
 class FirstComputerPairingTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -164,6 +171,28 @@ class FirstComputerPairingTests {
         set(value) = shared.run { shared(WhatsNewFeature.seenIDsKey).set(value) }
 
     @Test
+    fun theFirstComputerOpensAReadySessionInItsLatestProject() = runTest {
+        val haptics = Locked<List<Haptic>>(emptyList())
+        val announcements = Locked<List<String>>(emptyList())
+        val snapshot = snapshot
+        val gates = Gates()
+        val store = pairingStore(snapshot = snapshot, gates = gates, haptics = haptics, announcements = announcements)
+        pairAndLand(store, gates, snapshot, arrival = PairingArrival.firstComputer)
+        store.exhaustive = false
+        store.receive(AppFeature.Action.Home(HomeFeature.Action.FirstComputerPaired))
+        val detail = store.state.home?.sessionDetail
+        assertEquals("The home folder is never the project", "web", detail?.draftProject?.name)
+        assertEquals(true, detail?.isDraft)
+        assertEquals(SessionFeature.State.firstSessionStarters, detail?.starterPrompts)
+        assertNull(store.state.home?.drawerOpenRequest)
+        // The scan answers the finger; the pairing landing is the handshake.
+        assertEquals(listOf(Haptic.tap, Haptic.success), haptics.value)
+        assertEquals(listOf("Connected to ${paired.friendlyName}"), announcements.value)
+        assertEquals("Saving the computer records that this install has paired", InstallHistory.paired, history)
+        effects.skipInFlightEffects()
+    }
+
+    @Test
     fun pairingAgainAfterRemovingEveryComputerOpensTheDrawer() = runTest {
         history = InstallHistory.paired
         val snapshot = snapshot
@@ -171,24 +200,39 @@ class FirstComputerPairingTests {
         val store = pairingStore(snapshot = snapshot, gates = gates)
         pairAndLand(store, gates, snapshot, arrival = PairingArrival.newComputer)
         receivePairedComputerOpened(store)
+        assertEquals(emptyList<String>(), store.state.home?.sessionDetail?.starterPrompts)
+        effects.skipInFlightEffects()
+    }
+
+    @Test
+    fun aFirstComputerWithOnlyItsHomeFolderOpensTheDrawer() = runTest {
+        val snapshot = OpenCodeHomeSnapshot(
+            projects = listOf(project("/Users/kit")),
+            sessions = listOf(session("home", directory = "/Users/kit", updated = 30)),
+            activeSessionIDs = emptySet(),
+        )
+        val gates = Gates()
+        val store = pairingStore(snapshot = snapshot, gates = gates)
+        pairAndLand(store, gates, snapshot, arrival = PairingArrival.firstComputer)
+        store.receive(AppFeature.Action.Home(HomeFeature.Action.FirstComputerPaired)) {
+            it.copy(home = it.home?.copy(drawerOpenRequest = it.home?.detailGeneration))
+        }
+        assertEquals(emptyList<String>(), store.state.home?.sessionDetail?.starterPrompts)
         effects.skipInFlightEffects()
     }
 
     @Test
     fun aSecondComputerOpensTheDrawerAndStillShakesHands() = runTest {
         val haptics = Locked<List<Haptic>>(emptyList())
-        val announcements = Locked<List<String>>(emptyList())
         val elsewhere = OpenCodeServer(url = "http://10.0.0.9:4096", username = "opencode", password = "c")
         shared.run { shared(ServerSharedKeys.savedServers).set(listOf(elsewhere)) }
         val snapshot = snapshot
         val gates = Gates()
-        val store = pairingStore(shared.appState(), snapshot, gates, haptics, announcements)
+        val store = pairingStore(shared.appState(), snapshot, gates, haptics)
         pairAndLand(store, gates, snapshot, arrival = PairingArrival.newComputer, saved = listOf(elsewhere))
         receivePairedComputerOpened(store)
-        // The scan answers the finger; the pairing landing is the handshake.
+        assertEquals(emptyList<String>(), store.state.home?.sessionDetail?.starterPrompts)
         assertEquals(listOf(Haptic.tap, Haptic.success), haptics.value)
-        // iOS checks the announcement in the first computer's test, skipped here.
-        assertEquals(listOf("Connected to ${paired.friendlyName}"), announcements.value)
         effects.skipInFlightEffects()
     }
 

@@ -40,9 +40,8 @@ enum class PairingArrival {
  * The pairing's Home just loaded. Anything the person asked for on the way in ([asked]: a share,
  * notification or system action) wins over where the pairing would take them; the handshake
  * plays either way.
- *
- * Partial: the first computer's ready session (iOS `HomeFeature.firstComputerPaired`, starter
- * prompts) is `:feature:drawer`'s to port; until then it opens the drawer like any new computer.
+ * The install's first computer opens a ready session in its latest project
+ * (`HomeFeature.Action.FirstComputerPaired`); any other new computer opens the drawer.
  */
 internal fun landPairing(arrival: PairingArrival?, server: OpenCodeServer, asked: Boolean): Effect<AppFeature.Action> {
     if (arrival == null) return Effect.none()
@@ -50,8 +49,8 @@ internal fun landPairing(arrival: PairingArrival?, server: OpenCodeServer, asked
     dependency(AccessibilityAnnouncer).announce("Connected to ${server.friendlyName}", false)
     if (asked) return Effect.none()
     return when (arrival) {
-        PairingArrival.firstComputer, PairingArrival.newComputer ->
-            Effect.send(AppFeature.Action.Home(HomeFeature.Action.PairedComputerOpened))
+        PairingArrival.firstComputer -> Effect.send(AppFeature.Action.Home(HomeFeature.Action.FirstComputerPaired))
+        PairingArrival.newComputer -> Effect.send(AppFeature.Action.Home(HomeFeature.Action.PairedComputerOpened))
         PairingArrival.knownComputer -> Effect.none()
     }
 }

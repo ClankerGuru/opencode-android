@@ -135,7 +135,7 @@ fun AppView(store: StoreOf<AppFeature.State, AppFeature.Action>) {
                 // The app's one media root (iOS `MediaPresenter` presents over the window): the
                 // transcript image viewer and file/diagram/pasted-text viewers cover the whole Home.
                 val media = remember { Store(MediaFeature.State(), MediaFeature()) }
-                MediaView(media) { HomeView(home) }
+                MediaView(media) { HomeView(home, welcomeMark = painterResource(R.drawable.opencode_app_mark)) }
             } else if (showsWelcome) {
                 val welcome = store.rememberScope<AppFeature.State, AppFeature.Action, WelcomeFeature.State, WelcomeFeature.Action>(
                     state = { it.welcome },

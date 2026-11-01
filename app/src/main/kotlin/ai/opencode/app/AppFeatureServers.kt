@@ -117,7 +117,10 @@ internal fun cancelConnection(
 ): Reduced<AppFeature.State, AppFeature.Action> = Reduced(
     state.copy(connection = connection, connectionAttempt = null, pendingNotification = null, pendingSystemAction = null),
     Effect.cancel(
-        listOf(AppFeature.CancelID.Health, AppFeature.CancelID.Home, AppFeature.CancelID.Notification, AppFeature.CancelID.SystemSession),
+        listOf(
+            AppFeature.CancelID.Health, AppFeature.CancelID.Home, AppFeature.CancelID.Notification,
+            AppFeature.CancelID.SystemSession, AppFeature.CancelID.SwitchTimeout,
+        ),
     ),
 )
 

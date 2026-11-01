@@ -9,6 +9,8 @@ import ai.opencode.feature.drawer.HomeFeature.Action
 import ai.opencode.feature.drawer.HomeFeature.State
 import ai.opencode.feature.session.SessionFeature
 import ai.opencode.feature.session.InAppNotice
+import ai.opencode.feature.settings.HomeSettingsFeature
+import ai.opencode.feature.settings.onboarding.WelcomeFeature
 import ai.opencode.server.OpenCodeServerEvent
 
 /*
@@ -217,7 +219,10 @@ private fun HomeFeature.coreRoute(state: State, action: Action): Reduced<State, 
     // The Onboarding Playground opens inside Settings (`SettingsFeature`), which sends it there.
     is Action.Settings -> {
         val reduced = reducePreferences(state, action.action)
-        if (!action.action.switchesOffSessionLiveActivity) {
+        if (action.action == HomeSettingsFeature.Action.WelcomeOpened) {
+            // iOS `.settings(.welcomeOpened)`: Show Welcome, over Settings and Home.
+            Reduced(state.copy(welcome = WelcomeFeature.State(isPreview = true)))
+        } else if (!action.action.switchesOffSessionLiveActivity) {
             reduced
         } else {
             val stopped = stopSessionActivity(reduced.state)

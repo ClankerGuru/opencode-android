@@ -20,8 +20,8 @@ import ai.opencode.server.friendlyName
  * `SessionListContext`.
  */
 
-/** The `serverFlow` experiment, null until the settings area's flag exists (iOS `ExperimentalFeature.serverFlow`). */
-internal val serverFlowExperiment: ExperimentalFeature? get() = ExperimentalFeature.fromRawValue("server-flow")
+/** The `serverFlow` experiment (iOS `ExperimentalFeature.serverFlow`, off by default). */
+internal val serverFlowExperiment: ExperimentalFeature get() = ExperimentalFeature.serverFlow
 
 /** Why a server was last given up on, shown in the server menu. */
 enum class ServerReachability { unreachable, signInFailed }

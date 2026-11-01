@@ -223,10 +223,10 @@ fun ServerFlowTitle(
     }
 }
 
-/** The `serverFlow` experiment's switch (off by default, and off until the settings area adds the flag). */
+/** The `serverFlow` experiment's switch (off by default). */
 @Composable
 fun rememberServerFlowOn(): Boolean {
-    val feature = serverFlowExperiment ?: return false
+    val feature = serverFlowExperiment
     val stored by remember(feature) { shared(feature.key).flow }.collectAsState()
     return feature.isActive(stored)
 }
