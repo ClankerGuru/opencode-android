@@ -46,6 +46,12 @@ import ai.opencode.feature.drawer.style.DrawerSectionBreak
 import ai.opencode.feature.drawer.style.DrawerRowLayout
 import ai.opencode.feature.drawer.style.DrawerTunables
 import ai.opencode.feature.drawer.switcher.DrawerTitleView
+import ai.opencode.feature.drawer.switcher.ServerFlowTitle
+import ai.opencode.feature.drawer.switcher.drawerTitleServers
+import ai.opencode.feature.drawer.switcher.rememberServerFlowOn
+import ai.opencode.feature.drawer.motion.RunServerSwapMotion
+import ai.opencode.feature.drawer.motion.ServerSwapMotion
+import ai.opencode.server.ServerSharedKeys
 import ai.opencode.feature.voice.CallTrayComposerMetrics
 import ai.opencode.feature.voice.CallTrayDockSlot
 import ai.opencode.feature.voice.CallTrayDockTunables
@@ -187,6 +193,18 @@ fun HomeDrawer(
     val projectIconsSwitch by remember { shared(ExperimentalFeature.projectIcons.key).flow }.collectAsState()
     val showsProjectIcons = ExperimentalFeature.projectIcons.isActive(projectIconsSwitch)
     val inboxSidebarOn = rememberInboxSidebarOn()
+    // Server Flow (experimental, iOS d8a311bd): the title and the list share one swap motion.
+    val serverFlowOn = rememberServerFlowOn()
+    val serverSwap = remember { ServerSwapMotion() }
+    if (serverFlowOn) RunServerSwapMotion(serverSwap)
+    val serverSwapTarget = if (serverFlowOn) {
+        val current by store.observe { it.server }
+        val switchingTo by store.observe { it.switchingTo }
+        val saved by remember { shared(ServerSharedKeys.savedServers).flow }.collectAsState()
+        ServerSwapTarget(current, switchingTo, drawerTitleServers(current, saved))
+    } else {
+        null
+    }
 
     // iOS draws its own bottom edge only with a keyboard on screen (`customBottom`); Android always does.
     val keyboardMonitor: DrawerKeyboardMonitor = viewState.keyboardMonitor
@@ -213,6 +231,7 @@ fun HomeDrawer(
         increasedContrast = highContrast,
         alwaysShowsHeaders = DrawerTunables.sectionBreak == DrawerSectionBreak.Header,
         twoLineRows = DrawerTunables.rowLayout == DrawerRowLayout.TwoLine,
+        serverSwap = serverSwapTarget,
     )
     val actions = remember(store, viewState) {
         DrawerListActions(
@@ -255,6 +274,7 @@ fun HomeDrawer(
             actions = actions,
             contentPadding = listPadding,
             modifier = Modifier.fillMaxSize(),
+            serverSwap = if (serverFlowOn) serverSwap else null,
         )
         // The list as the drawer's pan sees it: between the title band and the controls, which
         // take their own touches (iOS: the hit view is the band, not the collection view).
@@ -288,14 +308,15 @@ fun HomeDrawer(
                     .padding(top = insetTop + DrawerHeaderTop, bottom = DrawerTunables.headerBottom),
                 contentAlignment = Alignment.CenterEnd,
             ) {
-                DrawerTitleView(
-                    store = store,
-                    onManage = viewState::manageServers,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = DrawerMetrics.textInset, end = DrawerSearchPillDefaults.size + DrawerTunables.searchGap)
-                        .drawerSearchTitleFade(viewState.search),
-                )
+                val titleModifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = DrawerMetrics.textInset, end = DrawerSearchPillDefaults.size + DrawerTunables.searchGap)
+                    .drawerSearchTitleFade(viewState.search)
+                if (serverFlowOn) {
+                    ServerFlowTitle(store = store, motion = serverSwap, onManage = viewState::manageServers, modifier = titleModifier)
+                } else {
+                    DrawerTitleView(store = store, onManage = viewState::manageServers, modifier = titleModifier)
+                }
                 DrawerSearchPill(
                     state = viewState.search,
                     text = search,

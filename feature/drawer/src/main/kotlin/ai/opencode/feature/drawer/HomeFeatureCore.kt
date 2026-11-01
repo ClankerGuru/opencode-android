@@ -77,6 +77,20 @@ private fun HomeFeature.coreRoute(state: State, action: Action): Reduced<State, 
 
     is Action.ServerEvent -> reduceServerEvent(state, action.event)
 
+    Action.ServerSwitchNoteActionTapped -> {
+        val note = state.serverSwitchNote
+        if (note == null) {
+            Reduced(state)
+        } else {
+            val delegate = if (note.reason == ServerSwitchNote.Reason.SignInFailed) {
+                HomeFeature.DelegateAction.PairServerRequested
+            } else {
+                HomeFeature.DelegateAction.ServerSwitchTapped(note.server)
+            }
+            Reduced(state.copy(serverSwitchNote = null), Effect.send(Action.Delegate(delegate)))
+        }
+    }
+
     is Action.VoiceCallCommandReceived,
     is Action.DictationCommandReceived,
     is Action.SharesReceived,

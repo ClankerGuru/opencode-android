@@ -14,6 +14,7 @@ import ai.opencode.feature.drawer.motion.DrawerShortcutInputs
 import ai.opencode.feature.drawer.motion.DrawerShortcutMotion
 import ai.opencode.feature.drawer.motion.DrawerTimeReveal
 import ai.opencode.feature.drawer.motion.DrawerTimestamp
+import ai.opencode.feature.drawer.motion.ServerSwapMotion
 import ai.opencode.feature.drawer.motion.drawerPanList
 import ai.opencode.feature.drawer.pinnedSessions
 import ai.opencode.feature.drawer.recentSessions
@@ -35,7 +36,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -139,6 +140,7 @@ fun DrawerListView(
     modifier: Modifier = Modifier,
     panRegions: DrawerPanRegions? = null,
     listState: LazyListState = rememberLazyListState(),
+    serverSwap: ServerSwapMotion? = null,
 ) {
     remember { DrawerListPerfProbe.mountStarted(); true }
     val density = LocalDensity.current
@@ -177,6 +179,13 @@ fun DrawerListView(
         }
     }
     val isSettingsShown by remember { derivedStateOf { homeState.value.isSettingsShown } }
+
+    // Server Flow: before the rows it moves, as the title may not have drawn it yet.
+    val hasApplied = remember { booleanArrayOf(false) }
+    SideEffect {
+        inputs.serverSwap?.let { serverSwap?.sync(it, animated = hasApplied[0]) }
+        hasApplied[0] = true
+    }
 
     // The shortcut rows' spring follows what the list shows.
     val shortcutInputs = DrawerShortcutInputs(
@@ -356,7 +365,8 @@ fun DrawerListView(
                 .testTag("drawer-list"),
         ) {
             val current = model
-            items(current.items, key = { it.key }, contentType = { contentType(it) }) { item ->
+            itemsIndexed(current.items, key = { _, item -> item.key }, contentType = { _, item -> contentType(item) }) { index, item ->
+                Box(Modifier.serverSwapRow(serverSwap.takeIf { inputs.serverSwap != null }, current.serverID) { index - listState.firstVisibleItemIndex }) {
                 when (item) {
                     DrawerListItem.CatchUp, DrawerListItem.WhatsNew -> DrawerListShortcutRow(
                         kind = if (item == DrawerListItem.CatchUp) DrawerListShortcutKind.CatchUp else DrawerListShortcutKind.WhatsNew,
@@ -372,8 +382,12 @@ fun DrawerListView(
                     DrawerListItem.DeletionError -> DrawerListDeletionErrorRow(current.deletionError.orEmpty())
                     is DrawerListItem.Header -> DrawerListHeaderCell(item.kind, pinDrag)
                     DrawerListItem.Empty -> DrawerListEmptyRow(current.search)
+                    is DrawerListItem.Ghost -> DrawerListGhostCell(item.index, current.reducedMotion)
+                    DrawerListItem.ServerNote -> current.serverNote?.let { note ->
+                        DrawerServerNoteRow(note, onAction = { store.send(HomeFeature.Action.ServerSwitchNoteActionTapped) })
+                    }
                     is DrawerListItem.Session -> {
-                        val row = current.rows[item.id] ?: return@items
+                        val row = current.rows[item.id] ?: return@itemsIndexed
                         val rowActions = remember(row.session.id, row.unread, row.isPinnedSection) {
                             rowActions(row, store, holder, pinDrag, liftedID, { currentActions }, ::beginPinDrag)
                         }
@@ -386,6 +400,7 @@ fun DrawerListView(
                             focusRequester = if (row.selected) selectedFocus else null,
                         )
                     }
+                }
                 }
             }
         }
@@ -490,6 +505,8 @@ private fun contentType(item: DrawerListItem): Int = when (item) {
     is DrawerListItem.Header -> 2
     is DrawerListItem.Session -> 3
     DrawerListItem.Empty -> 4
+    is DrawerListItem.Ghost -> 5
+    DrawerListItem.ServerNote -> 6
 }
 
 /** A `LazyColumn` key back to the pin drag's item (headers and rows only). */

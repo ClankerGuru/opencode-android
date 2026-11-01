@@ -46,7 +46,8 @@ internal fun HomeFeature.reduceDrawer(state: State, action: Action): HomeReduced
 
         is Action.SessionDrawerArrived -> {
             var s = state.copy(isDrawerOpen = action.isOpen)
-            if (!action.isOpen) return Reduced(s)
+            // Server Flow: a switch-back note is seen once, with the drawer.
+            if (!action.isOpen) return Reduced(s.copy(serverSwitchNote = null))
             // The reader is about to choose a session: read the likeliest ones again now, so the
             // one they open already has what's new (ahead of any read still waiting out its delay).
             val likely = s.sessionsByPriority().take(HomeFeature.prefetchCount).map { it.id }

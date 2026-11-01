@@ -135,6 +135,8 @@ data class SessionListContext(
     val elsewhere: DrawerBadge? = null,
     /** In-App Notices: what the drawer button says about another session. */
     val notice: InAppNotice? = null,
+    /** Server Flow: the server dropped; a pill above the composer says so. */
+    val connection: ServerConnectionNotice? = null,
 ) {
     companion object {
         const val globalProjectID = "global"

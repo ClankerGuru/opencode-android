@@ -81,6 +81,10 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         val inboxSidebarStatus: InboxSidebarFeature.Status = InboxSidebarFeature.Status(),
         /** The server being connected to from the drawer, while this Home stays up until that server's Home replaces it. */
         val switchingTo: OpenCodeServer? = null,
+        /** Server Flow: a switch that went back on its own, and why. */
+        val serverSwitchNote: ServerSwitchNote? = null,
+        /** Server Flow: servers last given up on, by persistence ID. */
+        val serverReachability: Map<String, ServerReachability> = emptyMap(),
         val projects: List<OpenCodeProject> = emptyList(),
         val sessions: List<OpenCodeSession> = emptyList(),
         val activeSessionIDs: Set<String> = emptySet(),
@@ -623,6 +627,8 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         /** Last-known running state is too old to show while reconnecting. */
         data object LastKnownActivityExpired : Action
         data object RetryConnectionTapped : Action
+        /** Server Flow: the note's Try Again or Pair Again. */
+        data object ServerSwitchNoteActionTapped : Action
         /** The network path came back or moved to another interface. */
         data object NetworkRerouted : Action
         data class ServerEvent(val event: OpenCodeServerEvent) : Action

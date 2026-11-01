@@ -2,6 +2,8 @@ package ai.opencode.feature.drawer.list
 
 import ai.opencode.feature.drawer.HomeFeature
 import ai.opencode.feature.drawer.HomeFeature.State.Indicator
+import ai.opencode.feature.drawer.ServerSwapTarget
+import ai.opencode.feature.drawer.ServerSwitchNote
 import ai.opencode.feature.drawer.pinnedSessions
 import ai.opencode.feature.drawer.recentSessions
 import ai.opencode.feature.drawer.statusSnapshot
@@ -30,6 +32,10 @@ sealed interface DrawerListItem {
     data class Header(val kind: DrawerSectionHeaderKind) : DrawerListItem
     data class Session(val id: String) : DrawerListItem
     data object Empty : DrawerListItem
+    /** Server Flow: a row's place while the server picked answers. */
+    data class Ghost(val index: Int) : DrawerListItem
+    /** Server Flow: a switch went back on its own. */
+    data object ServerNote : DrawerListItem
 
     /** A stable `LazyColumn` key. */
     val key: String
@@ -40,6 +46,8 @@ sealed interface DrawerListItem {
             is Header -> "header-${kind.name}"
             is Session -> "session-$id"
             Empty -> "empty"
+            is Ghost -> "ghost-$index"
+            ServerNote -> "server-note"
         }
 }
 
@@ -101,6 +109,8 @@ data class DrawerListInputs(
     val alwaysShowsHeaders: Boolean = true,
     /** iOS `DrawerTunables.rowLayout == .twoLine`: rows name their project even without icons. */
     val twoLineRows: Boolean = false,
+    /** Server Flow: the server the drawer shows, which may still be connecting. */
+    val serverSwap: ServerSwapTarget? = null,
 )
 
 data class DrawerListModel(
@@ -109,6 +119,7 @@ data class DrawerListModel(
     val headerFollows: Map<DrawerSectionHeaderKind, Boolean> = emptyMap(),
     val shortcuts: DrawerListShortcuts = DrawerListShortcuts(),
     val deletionError: String? = null,
+    val serverNote: ServerSwitchNote? = null,
     val search: String = "",
     val serverID: String = "",
     val reducedMotion: Boolean = false,
@@ -118,6 +129,7 @@ data class DrawerListModel(
 
     companion object {
         val order = listOf(DrawerListSection.top, DrawerListSection.pinned, DrawerListSection.recents)
+        const val ghostCount = 5
 
         /**
          * Home's state as the drawer shows it: shortcuts, then Pinned and Recents with their headers.
@@ -134,6 +146,27 @@ data class DrawerListModel(
             timestamp: (date: Instant, now: Instant) -> String,
             project: (OpenCodeSession, List<OpenCodeProject>) -> OpenCodeProject?,
         ): DrawerListModel {
+            var serverNote: ServerSwitchNote? = null
+            val swap = inputs.serverSwap
+            if (swap != null) {
+                if (swap.isConnecting) {
+                    // Ghost rows hold the other server's place until it answers.
+                    return DrawerListModel(
+                        sections = mapOf(
+                            DrawerListSection.top to emptyList(),
+                            DrawerListSection.pinned to emptyList(),
+                            DrawerListSection.recents to listOf(DrawerListItem.Header(DrawerSectionHeaderKind.Recents)) +
+                                (0 until ghostCount).map { DrawerListItem.Ghost(it) },
+                        ),
+                        headerFollows = mapOf(DrawerSectionHeaderKind.Recents to false),
+                        deletionError = state.deletionError,
+                        search = state.search,
+                        serverID = swap.id,
+                        reducedMotion = inputs.reducedMotion,
+                    )
+                }
+                serverNote = state.serverSwitchNote
+            }
             val status = state.statusSnapshot()
             val catchUpSessions = state.sessions.filter { status.needsCatchUp(it) }
             val catchUpCount = catchUpSessions.size
@@ -148,6 +181,7 @@ data class DrawerListModel(
             val showsShortcuts = shortcuts.catchUpMounted || shortcuts.whatsNewMounted
 
             val top = buildList {
+                if (serverNote != null && state.search.isEmpty()) add(DrawerListItem.ServerNote)
                 if (shortcuts.catchUpMounted) add(DrawerListItem.CatchUp)
                 if (shortcuts.whatsNewMounted) add(DrawerListItem.WhatsNew)
                 if (state.deletionError != null) add(DrawerListItem.DeletionError)
@@ -208,8 +242,9 @@ data class DrawerListModel(
                 headerFollows = headerFollows,
                 shortcuts = shortcuts,
                 deletionError = state.deletionError,
+                serverNote = serverNote,
                 search = state.search,
-                serverID = state.server.persistenceID,
+                serverID = swap?.id ?: state.server.persistenceID,
                 reducedMotion = inputs.reducedMotion,
             )
         }

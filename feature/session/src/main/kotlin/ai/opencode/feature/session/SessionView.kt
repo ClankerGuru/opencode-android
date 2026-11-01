@@ -137,6 +137,7 @@ import kotlin.math.roundToInt
  * @param navigationIcon the drawer button Home supplies (iOS `drawerControl`); unused while
  *   [onBack] or [onCatchUpOpen] is set.
  * @param listContext what Home knows about this session (project, pin, unread, mute, notices).
+ * @param onConnectionAction Server Flow: the connection pill was acted on.
  * @param onBack set on a subagent pushed over its parent: the header trades the drawer button for Back.
  * @param onCatchUpOpen set while the session is a catch-up card: the title leaves Catch Up for the session.
  * @param hostedCall the call its root owns, on a pushed subagent (iOS `hostedCall`): its cards and
@@ -150,6 +151,7 @@ fun SessionView(
     modifier: Modifier = Modifier,
     navigationIcon: @Composable () -> Unit = {},
     listContext: SessionListContext = SessionListContext(),
+    onConnectionAction: (ServerConnectionNotice.Action) -> Unit = {},
     onBack: (() -> Unit)? = null,
     onCatchUpOpen: (() -> Unit)? = null,
     hostedCall: VoiceStoreOf? = null,
@@ -198,6 +200,8 @@ fun SessionView(
     SideEffect {
         composerHost.backgroundWorkAnchor = backgroundWorkAnchor
         composerHost.isCatchUpCard = onCatchUpOpen != null
+        composerHost.connection = listContext.connection
+        composerHost.onConnectionAction = onConnectionAction
         composerHost.onJumpToLatest = { scrollEdgeBridge.jumpRequest += 1 }
         composerHost.isImportingAttachments = importer.isLoadingImages || importer.isLoadingFiles
         composerHost.importer = importer
@@ -246,7 +250,7 @@ fun SessionView(
                     // A draft's transcript carries on into the session it became, so the first
                     // send's bubble and Working never remount mid-flight.
                     key(identity) {
-                        SessionTranscriptView(store, scrollEdgeBridge, resolvedHeader.transcriptTop)
+                        SessionTranscriptView(store, scrollEdgeBridge, resolvedHeader.transcriptTop, holdsWorking = listContext.connection != null)
                     }
                 }
                 SessionHeaderBackdrop(

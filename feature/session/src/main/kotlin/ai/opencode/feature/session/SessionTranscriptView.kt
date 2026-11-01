@@ -156,6 +156,8 @@ fun SessionTranscriptView(
     scrollEdgeBridge: SessionScrollEdgeBridge,
     top: SessionHeaderStyle.Resolved.TranscriptTop,
     modifier: Modifier = Modifier,
+    /** Server Flow: the server dropped; Working holds still. */
+    holdsWorking: Boolean = false,
 ) {
     val context = LocalContext.current
     val host = LocalSessionComposerHost.current
@@ -173,10 +175,11 @@ fun SessionTranscriptView(
         cache = cache,
         scrollEdgeBridge = scrollEdgeBridge,
         hour24 = hour24,
+        holdsWorking = holdsWorking,
     )
-    val projection by remember(store, hour24) {
+    val projection by remember(store, hour24, holdsWorking) {
         store.states.map(::project).distinctUntilChanged()
-    }.collectAsState(remember(store, hour24) { project(store.state) })
+    }.collectAsState(remember(store, hour24, holdsWorking) { project(store.state) })
     val latestProjection by rememberUpdatedState(projection)
     val showsMoveToBackground by store.observe { it.showsMoveToBackground }
 
@@ -466,6 +469,7 @@ object SessionTranscriptView {
         scrollEdgeBridge: SessionScrollEdgeBridge,
         now: Double = AgentActivityClock.now(),
         hour24: Boolean? = null,
+        holdsWorking: Boolean = false,
     ): Projection {
         val visibleItems = cache.resolveVisibleItems(
             items = state.items,
@@ -474,7 +478,7 @@ object SessionTranscriptView {
             revertMessageID = state.session?.revertMessageID,
             compute = { state.visibleItems },
         )
-        val working = workingActivity(state, visibleItems, scrollEdgeBridge, now)
+        val working = workingActivity(state, visibleItems, scrollEdgeBridge, now, holdsWorking)
         // The finale holds the transcript as it was running, so Working leaves and the reply's
         // end arrives together, as they do without it.
         val showsWorking = working != null
@@ -661,6 +665,7 @@ object SessionTranscriptView {
         visibleItems: List<OpenCodeTranscriptItem>,
         scrollEdgeBridge: SessionScrollEdgeBridge,
         now: Double,
+        holdsWorking: Boolean = false,
     ): WorkingActivity? {
         val run = state.workingRun
         val key = state.workingOrbKey
@@ -672,6 +677,7 @@ object SessionTranscriptView {
                 needsInput = state.hasPendingRequests,
                 key = key,
                 retry = WorkingActivity.retry(visibleItems),
+                isHeld = holdsWorking,
             )
         } else {
             null
@@ -809,7 +815,7 @@ fun WorkingIndicator(activity: WorkingActivity, modifier: Modifier = Modifier) {
         AgentActivityGlyph(
             source = AgentActivitySource.Session(activity),
             size = orbSize,
-            isPaused = activity.phase == WorkingActivity.Phase.stopping,
+            isPaused = activity.phase == WorkingActivity.Phase.stopping || activity.isHeld,
             modifier = Modifier.clearAndSetSemantics {},
         )
         val style = TranscriptFonts.metaFont(FontWeight.Medium)

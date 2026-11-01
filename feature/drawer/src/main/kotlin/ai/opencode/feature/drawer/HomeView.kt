@@ -58,6 +58,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import kotlin.math.max
+import ai.opencode.feature.drawer.switcher.rememberServerFlowOn
 import ai.opencode.server.OpenCodeServer
 import androidx.compose.runtime.collectAsState
 import ai.opencode.feature.session.SessionFeature
@@ -66,6 +67,7 @@ import ai.opencode.core.store.Reducer
 import ai.opencode.core.store.Store
 import ai.opencode.feature.media.BrowserFeature
 import ai.opencode.feature.session.SessionBrowserPage
+import ai.opencode.feature.session.ServerConnectionNotice
 import ai.opencode.feature.session.SessionListContext
 import ai.opencode.feature.session.SessionPageStack
 import ai.opencode.feature.session.SessionStackPage
@@ -485,7 +487,8 @@ private fun HomeSessionStack(
         val top = it.topDetail
         top?.activePicker != null || top?.shellOutput != null
     }
-    val listContext by store.observe { it.sessionListContext(it.sessionDetail?.session) }
+    val serverFlowOn = rememberServerFlowOn()
+    val listContext by store.observe { it.sessionListContext(it.sessionDetail?.session, serverFlowOn) }
     // Pages drawn while they animate out, by their identity.
     val known = remember { HashMap<Int, StackEntry>() }
     for (entry in entries) known[entry.page.id] = entry
@@ -513,6 +516,7 @@ private fun HomeSessionStack(
                 navigationIcon = { HomeDrawerButton(store, view, usesSidebar, containerWidth) },
                 listContext = listContext,
                 onCatchUpOpen = if (catchingUp) ({ store.send(HomeFeature.Action.catchUpOpenTapped) }) else null,
+                onConnectionAction = { action -> store.send(serverConnectionAction(action, store.state.server)) },
                 callTray = callTray,
             )
         },
@@ -544,9 +548,9 @@ private fun HomeSessionStack(
 /**
  * What a session screen shows of the drawer's knowledge of it (iOS `sessionListContext(for:)`):
  * its project, pin, read and mute state, the drawer button's dot for other sessions, and the
- * In-App Notice, outside Catch Up.
+ * In-App Notice and (Server Flow) the connection pill, outside Catch Up.
  */
-internal fun HomeFeature.State.sessionListContext(session: OpenCodeSession?): SessionListContext {
+internal fun HomeFeature.State.sessionListContext(session: OpenCodeSession?, serverFlowOn: Boolean = false): SessionListContext {
     val listed = session?.let { s -> sessions.firstOrNull { it.id == s.id } }
     val isCatchUp = catchUp != null
     return SessionListContext(
@@ -556,8 +560,27 @@ internal fun HomeFeature.State.sessionListContext(session: OpenCodeSession?): Se
         isMuted = listed?.let { isMuted(it.id) } ?: false,
         elsewhere = if (isCatchUp) null else drawerBadge(excluding = session?.id),
         notice = if (isCatchUp) null else inAppNotice,
+        connection = if (isCatchUp || !serverFlowOn) null else serverConnectionNotice,
     )
 }
+
+/** iOS `HomeView.serverConnectionNotice`: what the pill says of the connection (Server Flow only). */
+internal val HomeFeature.State.serverConnectionNotice: ServerConnectionNotice?
+    get() = ServerConnectionNotice(
+        status = connectionStatus,
+        credentialsRejected = credentialsRejected,
+        errorMessage = connectionErrorMessage,
+        server = server,
+        isSwitching = switchingTo != null,
+    )
+
+/** iOS `HomeView.serverConnectionAction(_:)`: the pill's action, as Home's. */
+internal fun serverConnectionAction(action: ServerConnectionNotice.Action, server: OpenCodeServer): HomeFeature.Action =
+    when (action) {
+        ServerConnectionNotice.Action.retry -> HomeFeature.Action.RetryConnectionTapped
+        ServerConnectionNotice.Action.pairAgain -> HomeFeature.Action.Delegate(HomeFeature.DelegateAction.PairServerRequested)
+        ServerConnectionNotice.Action.editServer -> HomeFeature.Action.Delegate(HomeFeature.DelegateAction.EditServerRequested(server))
+    }
 
 /**
  * The session header's drawer button (iOS `SessionView(onOpenSessions:onNoticeTapped:)`): opens

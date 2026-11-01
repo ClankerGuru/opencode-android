@@ -145,6 +145,11 @@ data class WorkingActivity(
     val handoffDuration: Double = WorkingRun.handoff,
     /** The server will retry the run's failed step: the line counts down to it. */
     val retry: OpenCodeRunRetry? = null,
+    /**
+     * Server Flow: the server dropped, so the run's state is only last known; the orb holds
+     * still until it answers.
+     */
+    val isHeld: Boolean = false,
 ) {
     enum class Phase { running, stopping, done, failed }
 

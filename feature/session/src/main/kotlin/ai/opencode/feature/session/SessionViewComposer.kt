@@ -152,6 +152,10 @@ import kotlin.math.abs
  */
 @Stable
 class SessionComposerHost {
+    /** Server Flow: the server dropped; a pill above the composer says so (iOS `listContext.connection`). */
+    var connection: ServerConnectionNotice? by mutableStateOf(null)
+    /** iOS `onConnectionAction`: the connection pill was acted on. */
+    var onConnectionAction: (ServerConnectionNotice.Action) -> Unit by mutableStateOf({})
     /** iOS `scrollEdgeBridge.showsJumpButton`. */
     var showsJumpButton by mutableStateOf(false)
     /** iOS `scrollEdgeBridge.jumpRequest += 1`. */
@@ -824,6 +828,7 @@ private fun SessionComposerEnv.ComposerArea(modifier: Modifier) {
                     )
                 }
             }
+            ServerConnection()
             ComposerCapsule()
         }
         // Without pills, the jump button floats where their row would be, so showing it never
@@ -842,6 +847,27 @@ private fun SessionComposerEnv.ComposerArea(modifier: Modifier) {
         // A draft's recent projects stand above the composer as an overlay, so folding them, or
         // their leaving on the first send, never changes the transcript's insets.
         DraftProjectsOverlay(Modifier.align(Alignment.TopCenter))
+    }
+}
+
+/** Server Flow: iOS `ServerConnectionPill` above the capsule while the session's server is away. */
+@Composable
+private fun SessionComposerEnv.ServerConnection() {
+    val connection = host.connection
+    // The last notice stays drawn while the pill leaves.
+    var shown by remember { mutableStateOf(connection) }
+    if (connection != null) shown = connection
+    val density = LocalDensity.current.density
+    val transition = remember(density) { ServerConnectionPillTransition(density) }
+    AnimatedVisibility(
+        visible = connection != null,
+        enter = transition.enter(reducedMotion),
+        exit = transition.exit(reducedMotion),
+    ) {
+        val notice = shown ?: return@AnimatedVisibility
+        HiddenUnderComposerPanel(host.composerPanelCovers, Modifier.hiddenUnderVoiceTranscript(showsCallTranscript)) {
+            ServerConnectionPill(notice, host.onConnectionAction)
+        }
     }
 }
 
