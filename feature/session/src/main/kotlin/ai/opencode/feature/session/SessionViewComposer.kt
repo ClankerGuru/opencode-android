@@ -57,6 +57,7 @@ import ai.opencode.server.model.OpenCodeQueuedInput
 import ai.opencode.feature.voice.CallTrayController
 import ai.opencode.feature.voice.CallTrayHost
 import ai.opencode.feature.voice.VoiceCallComposer
+import ai.opencode.feature.voice.FloatingCallStageFeature
 import ai.opencode.feature.voice.VoiceFeature
 import ai.opencode.feature.voice.VoiceCallSurface
 import ai.opencode.feature.voice.VoiceStoreOf
@@ -1113,6 +1114,9 @@ private fun SessionComposerEnv.RequestPanelPresence() {
     val docks = docksRequest
     fun dismissTrayCaptions() {
         if (usesCallTray && callStore?.state?.showsCaptions == true) callStore.send(VoiceFeature.Action.CaptionsDismissed)
+        // The full sheet would cover the request: the call steps down to its card, which sits
+        // above the composer (iOS bb4c7c95).
+        if (floatsCall) callStore?.send(VoiceFeature.Action.FloatingStage(FloatingCallStageFeature.Action.RequestDocked))
     }
     LaunchedEffect(Unit) {
         if (!docks) return@LaunchedEffect

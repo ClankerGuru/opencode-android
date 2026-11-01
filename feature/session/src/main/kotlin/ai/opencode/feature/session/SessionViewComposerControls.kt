@@ -173,8 +173,9 @@ private fun SessionComposerEnv.ModelButton(enabled: Boolean) {
                 usesModelPickerSheet = usesSheet,
                 onClick = {
                     if (!enabled) return@ModelPickerChip
-                    // Put away, or a row's level menu raises the composer's keyboard over the sheet.
-                    if (usesSheet) dismissKeyboard()
+                    // Put away under any picker sheet (iOS 07b2f5f8), or a row's level menu raises the
+                    // composer's keyboard over the sheet.
+                    if (host.messageFieldFocused) dismissKeyboard()
                     store.send(Action.ModelButtonTapped)
                 },
             )
