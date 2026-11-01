@@ -14,23 +14,26 @@ import ai.opencode.feature.voice.CallVoice
 import ai.opencode.feature.voice.RealtimePreflightClient
 import ai.opencode.feature.voice.RealtimePreflightError
 import ai.opencode.feature.voice.ServerVoiceClient
-import ai.opencode.feature.voice.ServerVoiceModel
-import ai.opencode.feature.voice.ServerVoiceModels
+import ai.opencode.feature.voice.ServerVoiceModelsAnswer
 import ai.opencode.feature.voice.ServerVoiceProvider
 import ai.opencode.feature.voice.ServerVoiceSupport
-import ai.opencode.feature.voice.VoiceBroker
+import ai.opencode.feature.voice.VoiceCallSoundPack
+import ai.opencode.feature.voice.VoiceDelegatorChoice
 import ai.opencode.feature.voice.VoiceEngine
 import ai.opencode.feature.voice.VoiceKeyFingerprint
 import ai.opencode.feature.voice.VoiceKeySource
+import ai.opencode.feature.voice.VoiceModelsCache
 import ai.opencode.feature.voice.VoicePreviewClient
 import ai.opencode.feature.voice.VoicePreviewError
 import ai.opencode.feature.voice.VoiceProvider
 import ai.opencode.feature.voice.VoiceRoute
 import ai.opencode.feature.voice.VoiceServerChoice
 import ai.opencode.feature.voice.VoiceSharedKeys
+import ai.opencode.server.CachedHomeSnapshot
+import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.ServerSharedKeys
-import ai.opencode.server.friendlyName
+import ai.opencode.server.model.OpenCodeSession
 import kotlinx.coroutines.CancellationException
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -55,9 +58,9 @@ class VoiceSettingsFeature : Reducer<VoiceSettingsFeature.State, VoiceSettingsFe
     data class State(
         /** The server calls start from; the last one used when null. */
         val server: OpenCodeServer? = null,
+        /** The connected server's sessions, for the Delegator page's pick (Home's, else its own load). */
+        val sessions: List<OpenCodeSession> = emptyList(),
         val providerGroups: List<VoiceProviderGroup> = VoiceProviderGroup.defaultGroups,
-        /** Each saved server's voice models, the connected one's too, by `persistenceID`, as it last answered. */
-        val voiceModelsByServer: Map<String, List<ServerVoiceModel>> = emptyMap(),
         val isEditingKey: Boolean = false,
         val revealsKey: Boolean = false,
         val isCheckingKey: Boolean = false,
@@ -68,7 +71,13 @@ class VoiceSettingsFeature : Reducer<VoiceSettingsFeature.State, VoiceSettingsFe
         val serverVoiceSupportByServer: Map<String, ServerVoiceSupport> get() = shared(VoiceSharedKeys.serverVoiceSupportByServer).value
         val savedServer: OpenCodeServer? get() = shared(ServerSharedKeys.savedServer).value
         val savedServers: List<OpenCodeServer> get() = shared(ServerSharedKeys.savedServers).value
+        val cachedHomeSnapshots: Map<String, CachedHomeSnapshot> get() = shared(ServerSharedKeys.cachedHomeSnapshots).value
         val serverVoiceExperiment: Boolean get() = shared(ExperimentalFeature.serverVoice.key).value
+        val voiceSessionDelegatorExperiment: Boolean get() = shared(ExperimentalFeature.voiceSessionDelegator.key).value
+        val voiceDelegatorChoice: VoiceDelegatorChoice get() = shared(VoiceSharedKeys.voiceDelegatorChoice).value
+        /** Each saved server's voice models, the connected one's too, by `persistenceID`, as it last answered. */
+        val voiceModelsByServer: Map<String, ServerVoiceModelsAnswer> get() = shared(VoiceSharedKeys.voiceModelsByServer).value
+        val callSoundPack: VoiceCallSoundPack get() = shared(VoiceSharedKeys.callSoundPack).value
         val serverVoiceProvider: ServerVoiceProvider get() = shared(VoiceSharedKeys.serverVoiceProvider).value
         val voiceServer: VoiceServerChoice get() = shared(VoiceSharedKeys.voiceServerChoice).value
         val voiceModeEnabled: Boolean get() = shared(SharedKeys.voiceModeEnabled).value
@@ -80,16 +89,23 @@ class VoiceSettingsFeature : Reducer<VoiceSettingsFeature.State, VoiceSettingsFe
         val verifiedKeyFingerprint: String? get() = shared(SharedKeys.verifiedVoiceKeyFingerprint).value
 
         val activeProvider: VoiceProvider get() = voiceEngine.provider
-        val modelRowValue: String get() = voiceEngine.providerModelTitle
+        /** The model alone while Voice Provider names who runs it. */
+        val modelRowValue: String get() = if (showsProviderRow) voiceEngine.title else voiceEngine.providerModelTitle
+
+        /**
+         * Server Voice's Voice Provider row stands in for the key row. Grok always uses this
+         * phone's xAI key, so it keeps today's rows.
+         */
+        val showsProviderRow: Boolean
+            get() = ExperimentalFeature.serverVoice.isActive(serverVoiceExperiment) && voiceEngine != VoiceEngine.grok
+
         val serverVoiceSupport: ServerVoiceSupport get() = broker.support(serverVoiceSupportByServer)
 
         val route: VoiceRoute
-            get() = VoiceRoute.resolve(
-                selectedEngine = voiceEngine,
-                serverVoiceEnabled = broker.isEnabled,
-                serverVoiceProvider = serverVoiceProvider,
-                serverVoiceSupport = serverVoiceSupport,
-                hasOpenAIKey = !openAIAPIKey.orEmpty().trim().isEmpty(),
+            get() = broker.route(
+                engine = voiceEngine,
+                support = serverVoiceSupport,
+                hasOpenAIKey = hasOpenAIKey,
                 hasXAIKey = !xaiAPIKey.orEmpty().trim().isEmpty(),
             )
 
@@ -139,19 +155,25 @@ class VoiceSettingsFeature : Reducer<VoiceSettingsFeature.State, VoiceSettingsFe
         data class VoicePreviewFailed(val voice: CallVoice) : Action
         data object VoicePickerDisappeared : Action
         data class RaiseToTalkChanged(val on: Boolean) : Action
-        data class VoiceModelsLoaded(val serverID: String, val models: List<ServerVoiceModel>) : Action
+        data class CallSoundPackSelected(val pack: VoiceCallSoundPack) : Action
+        data class VoiceModelsLoaded(val serverID: String, val asked: Int, val answer: ServerVoiceModelsAnswer) : Action
+        data class VoiceDelegatorChoiceChanged(val choice: VoiceDelegatorChoice) : Action
+        data object DelegatorPageAppeared : Action
+        data class DelegatorSessionsLoaded(val sessions: List<OpenCodeSession>) : Action
     }
 
     internal sealed interface CancelID {
         data object VerifyKey : CancelID
         data object VoicePreview : CancelID
         data class VoiceModels(val serverID: String) : CancelID
+        data object DelegatorSessions : CancelID
     }
 
     private val clock by Dependency(Clock)
     private val realtimePreflight by Dependency(RealtimePreflightClient)
     private val voicePreview by Dependency(VoicePreviewClient)
     internal val serverVoice by Dependency(ServerVoiceClient)
+    private val openCodeClient by Dependency(OpenCodeClient)
 
     override fun reduce(state: State, action: Action): Reduced<State, Action> = when (action) {
         Action.Task -> {
@@ -209,7 +231,7 @@ class VoiceSettingsFeature : Reducer<VoiceSettingsFeature.State, VoiceSettingsFe
         is Action.ApiKeyEdited -> apiKeyEdited(state, action.value)
         Action.ToggleRevealKeyTapped -> Reduced(state.copy(revealsKey = !state.revealsKey))
         Action.VerifyKeyTapped ->
-            if (!state.keySource.isPhoneKey || state.activeAPIKey.isEmpty() || state.isCheckingKey) {
+            if (state.activeAPIKey.isEmpty() || state.isCheckingKey) {
                 Reduced(state)
             } else {
                 verifyCurrentKey(state, debounce = false)
@@ -227,7 +249,7 @@ class VoiceSettingsFeature : Reducer<VoiceSettingsFeature.State, VoiceSettingsFe
                 )
             }
         is Action.CallVoiceSelected -> {
-            shared(VoiceSharedKeys.callVoice).set(action.voice)
+            if (state.callVoice != action.voice) shared(VoiceSharedKeys.callVoice).set(action.voice)
             Reduced(state)
         }
         is Action.PreviewVoiceTapped -> previewVoice(state, action.voice)
@@ -241,24 +263,52 @@ class VoiceSettingsFeature : Reducer<VoiceSettingsFeature.State, VoiceSettingsFe
         )
         Action.VoicePickerDisappeared -> stopPreview(state.copy(previewError = null))
         is Action.RaiseToTalkChanged -> {
-            shared(SharedKeys.raiseToTalk).set(action.on)
+            if (state.raiseToTalk != action.on) shared(SharedKeys.raiseToTalk).set(action.on)
             Reduced(state)
         }
-        is Action.VoiceModelsLoaded ->
-            if (state.voiceModelsByServer[action.serverID] == action.models) {
+        is Action.CallSoundPackSelected -> {
+            if (state.callSoundPack != action.pack) shared(VoiceSharedKeys.callSoundPack).set(action.pack)
+            Reduced(state)
+        }
+        is Action.VoiceModelsLoaded -> {
+            VoiceModelsCache.record(action.answer, action.serverID, action.asked)
+            Reduced(state)
+        }
+        is Action.VoiceDelegatorChoiceChanged -> {
+            if (state.voiceDelegatorChoice != action.choice) shared(VoiceSharedKeys.voiceDelegatorChoice).set(action.choice)
+            Reduced(state)
+        }
+        Action.DelegatorPageAppeared -> {
+            val server = state.connectedServer
+            if (server == null) {
                 Reduced(state)
             } else {
-                Reduced(state.copy(voiceModelsByServer = state.voiceModelsByServer + (action.serverID to action.models)))
+                val client = openCodeClient
+                Reduced(
+                    state,
+                    Effect.run<Action> { send ->
+                        val snapshot = try {
+                            client.homeSnapshot(server)
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            return@run
+                        }
+                        send(Action.DelegatorSessionsLoaded(snapshot.sessions))
+                    }.cancellable(CancelID.DelegatorSessions, cancelInFlight = true),
+                )
             }
+        }
+        is Action.DelegatorSessionsLoaded -> Reduced(state.copy(sessions = action.sessions))
     }
 
     private fun apiKeyEdited(state: State, rawValue: String): Reduced<State, Action> {
-        val source = state.keySource as? VoiceKeySource.Phone ?: return Reduced(state)
+        // The selected model's provider: Your OpenAI Account edits it while a server takes calls too.
         val trimmed = rawValue.trim()
         val saved = trimmed.ifEmpty { null }
-        when (source.provider) {
-            VoiceProvider.openAI -> shared(SharedKeys.openAIAPIKey).set(saved)
-            VoiceProvider.xAI -> shared(SharedKeys.xaiAPIKey).set(saved)
+        when (state.activeProvider) {
+            VoiceProvider.openAI -> if (state.openAIAPIKey != saved) shared(SharedKeys.openAIAPIKey).set(saved)
+            VoiceProvider.xAI -> if (state.xaiAPIKey != saved) shared(SharedKeys.xaiAPIKey).set(saved)
         }
         val next = state.copy(isCheckingKey = false, keyVerificationError = null, previewError = null)
         if (saved == null) {

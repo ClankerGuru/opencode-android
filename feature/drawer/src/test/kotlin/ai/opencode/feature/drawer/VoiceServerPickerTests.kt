@@ -10,6 +10,7 @@ import ai.opencode.feature.drawer.HomeFeatureTestSupport.LockIsolated
 import ai.opencode.feature.drawer.HomeFeatureTestSupport.append
 import ai.opencode.feature.settings.HomeSettingsFeature
 import ai.opencode.feature.voice.ServerVoiceClient
+import ai.opencode.feature.voice.ServerVoiceModelsAnswer
 import ai.opencode.feature.voice.ServerVoiceSupport
 import ai.opencode.feature.voice.VoiceServerChoice
 import ai.opencode.feature.voice.VoiceSharedKeys
@@ -76,6 +77,8 @@ class VoiceServerPickerTests {
 
         store.send(HomeSettingsFeature.Action.VoiceServerChanged(VoiceServerChoice.Saved(serverID = "srv_gone")))
         store.send(HomeSettingsFeature.Action.CheckServerVoiceSupport)
+        // A stale pick falls back to Automatic, which also asks the connected server's models (iOS ce694097).
+        store.receive(HomeSettingsFeature.Action.VoiceModelsLoaded(serverID = server.persistenceID, asked = 0, answer = ServerVoiceModelsAnswer.NoAnswer))
         store.receive(HomeSettingsFeature.Action.ServerVoiceSupportLoaded(serverID = server.persistenceID, support = ServerVoiceSupport.supported))
         assertEquals(listOf(studio.persistenceID, server.persistenceID), asked.value)
         assertEquals(mapOf(studio.persistenceID to ServerVoiceSupport.supported, server.persistenceID to ServerVoiceSupport.supported), support())

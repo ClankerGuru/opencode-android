@@ -43,6 +43,12 @@ sealed interface SettingsPage {
     /** Settings › Models › one provider (`ModelVisibilityProviderView`). */
     data class ModelProvider(val providerID: String) : SettingsPage
     data object Voice : SettingsPage
+    /** Settings › Voice › Voice Provider (iOS `VoiceProviderDetailPage`, Server Voice); [opensAccount] pushes Your Account over it. */
+    data class VoiceProvider(val opensAccount: Boolean = false) : SettingsPage
+    /** Settings › Voice › Voice Provider › Your Account (iOS `VoiceProviderAccountPage`). */
+    data object VoiceAccount : SettingsPage
+    /** Settings › Voice › Delegator (iOS `VoiceDelegatorSettingsPage`, OpenCode Session Delegator). */
+    data object VoiceDelegator : SettingsPage
     /** Settings › Voice › Voice (`CallVoicePicker`). */
     data object CallVoicePicker : SettingsPage
     /** Settings › Voice › Call History (`VoiceCallLogList`, `:feature:voice`). */

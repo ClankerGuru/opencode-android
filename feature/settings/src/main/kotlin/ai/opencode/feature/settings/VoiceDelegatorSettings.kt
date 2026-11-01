@@ -1,0 +1,275 @@
+package ai.opencode.feature.settings
+
+import ai.opencode.core.experiments.ExperimentalFeature
+import ai.opencode.core.ui.OpenCodeIcon
+import ai.opencode.core.ui.OpenCodeTextStyles
+import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.core.ui.SFSymbol
+import ai.opencode.feature.voice.ServerVoiceProvider
+import ai.opencode.feature.voice.VoiceDelegatorChoice
+import ai.opencode.feature.voice.VoiceDelegatorRouteAvailability
+import ai.opencode.feature.voice.VoiceDelegatorWorkspace
+import ai.opencode.feature.voice.VoiceFeature
+import ai.opencode.server.model.OpenCodeSession
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import ai.opencode.core.store.observe
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
+
+/*
+ * Port of iOS `Settings/VoiceDelegatorSettings.swift` (OpenCode Session Delegator experiment):
+ * Settings › Voice's Delegator row and page.
+ */
+
+val VoiceSettingsFeature.State.showsDelegatorRow: Boolean
+    get() = ExperimentalFeature.voiceSessionDelegator.isActive(voiceSessionDelegatorExperiment)
+
+val VoiceSettingsFeature.State.delegatorRouteAvailability: VoiceDelegatorRouteAvailability
+    get() = VoiceDelegatorRouteAvailability.resolve(
+        route = route,
+        selectedEngine = voiceEngine,
+        isGeminiProvider = broker.isEnabled && broker.provider == ServerVoiceProvider.geminiLive,
+    )
+
+/** Root sessions on the connected server for picking a delegator session. */
+val VoiceSettingsFeature.State.delegatorSessions: List<OpenCodeSession>
+    get() {
+        val server = connectedServer
+        val source = when {
+            sessions.isNotEmpty() -> sessions
+            server != null -> cachedHomeSnapshots[server.persistenceID]?.snapshot?.sessions.orEmpty()
+            else -> emptyList()
+        }
+        val pickedID = voiceDelegatorChoice.picked?.sessionID
+        return source
+            .filter { it.parentID == null && (it.archivedMilliseconds == null || it.id == pickedID) }
+            .sortedWith(compareByDescending<OpenCodeSession> { it.updatedAt }.thenByDescending { it.id })
+    }
+
+/** Cross-server mismatch when the saved picked session belongs to another server. */
+val VoiceSettingsFeature.State.crossServerPickedSession: VoiceDelegatorChoice.Picked?
+    get() {
+        val picked = voiceDelegatorChoice.picked ?: return null
+        val server = connectedServer ?: return null
+        return if (picked.serverID != VoiceDelegatorWorkspace.serverID(server)) picked else null
+    }
+
+val VoiceSettingsFeature.State.delegatorRowValue: String
+    get() {
+        val choice = voiceDelegatorChoice
+        if (!delegatorRouteAvailability.isAvailable) {
+            return if (choice.usesOpenCodeSession) "Direct · Session unavailable" else "Direct"
+        }
+        return when (choice) {
+            VoiceDelegatorChoice.BuiltIn -> "Built-in"
+            VoiceDelegatorChoice.AutomaticSession -> "Automatic"
+            VoiceDelegatorChoice.ViewedSession -> "Viewed Session"
+            is VoiceDelegatorChoice.PickedSession -> {
+                if (crossServerPickedSession != null) return "${choice.picked.displayTitle} · Another server"
+                delegatorSessions.firstOrNull { it.id == choice.picked.sessionID }
+                    ?.let { VoiceFeature.State.usableTitle(it.title) }
+                    ?: choice.picked.displayTitle
+            }
+        }
+    }
+
+/** Settings › Voice › Delegator row. */
+@Composable
+internal fun VoiceDelegatorSettingsRow(state: VoiceSettingsFeature.State, onClick: () -> Unit) {
+    SettingsRow("Delegator", symbol = null, value = state.delegatorRowValue, onClick = onClick)
+}
+
+/**
+ * Settings › Voice › Delegator: chooses Built-in or an OpenCode Session target (Automatic
+ * “Voice”, Viewed Session, or a picked session on this server).
+ */
+@Composable
+internal fun VoiceDelegatorSettingsPage(store: SettingsStore) {
+    val voice = rememberVoiceStore(store)
+    val local by voice.observe { it }
+    @Suppress("UNUSED_VARIABLE") val revision = rememberVoiceSharedRevision()
+    val state = local
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    LaunchedEffect(voice) { voice.send(VoiceSettingsFeature.Action.DelegatorPageAppeared) }
+
+    val choice = state.voiceDelegatorChoice
+    val availability = state.delegatorRouteAvailability
+    val isAvailable = availability.isAvailable
+    val otherServerPick = state.crossServerPickedSession
+    val query = searchQuery.trim()
+    val filteredSessions = if (query.isEmpty()) {
+        state.delegatorSessions
+    } else {
+        state.delegatorSessions.filter { session ->
+            session.title.contains(query, ignoreCase = true) ||
+                lastPathComponent(session.directory).contains(query, ignoreCase = true) ||
+                session.id.contains(query, ignoreCase = true)
+        }
+    }
+
+    fun select(next: VoiceDelegatorChoice) {
+        voice.send(VoiceSettingsFeature.Action.VoiceDelegatorChoiceChanged(next))
+        store.send(SettingsFeature.Action.Settings(HomeSettingsFeature.Action.VoiceDelegatorChoiceChanged(next)))
+    }
+
+    SettingsPageScaffold(title = "Delegator", store = store) {
+        val explanation = availability.explanation
+        if (explanation != null) {
+            settingsSection(key = "unavailable") {
+                DelegatorNote(explanation, SFSymbol.InfoCircle, OpenCodeTheme.colors.secondaryText)
+            }
+        } else if (otherServerPick != null) {
+            settingsSection(key = "other-server") {
+                DelegatorNote(
+                    "“${otherServerPick.displayTitle}” is on another server. Choose a session on this server, or switch servers before starting a call.",
+                    SFSymbol.ExclamationmarkTriangle,
+                    SettingsTint.Orange.color(),
+                )
+            }
+        }
+        settingsSection(key = "mode", footer = footerText("Applies to your next call.")) {
+            ModeRow(
+                title = "Built-in",
+                subtitle = "Runs GPT-Live’s stateless delegator on OpenAI",
+                isSelected = !choice.usesOpenCodeSession || !isAvailable,
+            ) { select(VoiceDelegatorChoice.BuiltIn) }
+            SettingsDivider()
+            ModeRow(
+                title = "OpenCode Session",
+                subtitle = "Steers a session on your connected OpenCode server",
+                isSelected = choice.usesOpenCodeSession && isAvailable,
+                isEnabled = isAvailable,
+            ) { if (!choice.usesOpenCodeSession) select(VoiceDelegatorChoice.AutomaticSession) }
+        }
+        if (choice.usesOpenCodeSession && isAvailable) {
+            settingsSection(key = "target", header = "Session Target") {
+                ModeRow(
+                    title = "Automatic",
+                    subtitle = "Finds or creates a “Voice” session on this server",
+                    isSelected = choice == VoiceDelegatorChoice.AutomaticSession,
+                ) { select(VoiceDelegatorChoice.AutomaticSession) }
+                SettingsDivider()
+                ModeRow(
+                    title = "Viewed Session",
+                    subtitle = "Uses whichever session is open on your screen",
+                    isSelected = choice == VoiceDelegatorChoice.ViewedSession,
+                ) { select(VoiceDelegatorChoice.ViewedSession) }
+                if (otherServerPick != null) {
+                    SettingsDivider()
+                    ModeRow(title = otherServerPick.displayTitle, subtitle = "Picked on another server", isSelected = true) {}
+                }
+            }
+            val server = state.connectedServer
+            if (server != null) {
+                item(key = "search") {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                        placeholder = { Text("Filter sessions") },
+                        leadingIcon = { OpenCodeIcon(SFSymbol.Magnifyingglass, contentDescription = null, size = 18.dp) },
+                        singleLine = true,
+                    )
+                }
+                settingsSection(
+                    key = "sessions",
+                    header = "Pick a Session",
+                    footer = footerText("Picking an existing session keeps its current model."),
+                ) {
+                    if (filteredSessions.isEmpty()) {
+                        SettingsRowFrame {
+                            Text(
+                                if (searchQuery.isEmpty()) "No Sessions on This Server" else "No Matching Sessions",
+                                style = OpenCodeTextStyles.body,
+                                color = OpenCodeTheme.colors.secondaryText,
+                            )
+                        }
+                    } else {
+                        val serverID = VoiceDelegatorWorkspace.serverID(server)
+                        filteredSessions.forEachIndexed { index, session ->
+                            if (index > 0) SettingsDivider()
+                            val folder = lastPathComponent(session.directory)
+                            val picked = choice.picked
+                            ModeRow(
+                                title = VoiceFeature.State.usableTitle(session.title) ?: "New session",
+                                subtitle = if (folder.isEmpty() || folder == "/") null else folder,
+                                isSelected = picked?.sessionID == session.id && picked.serverID == serverID,
+                            ) { select(VoiceDelegatorChoice.PickedSession(VoiceDelegatorChoice.Picked(session, server))) }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DelegatorNote(text: String, symbol: SFSymbol, color: androidx.compose.ui.graphics.Color) {
+    SettingsRowFrame {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
+            OpenCodeIcon(symbol, contentDescription = null, size = 18.dp, tint = color)
+            Text(text, style = OpenCodeTextStyles.subheadline, color = color)
+        }
+    }
+}
+
+@Composable
+private fun ModeRow(
+    title: String,
+    subtitle: String?,
+    isSelected: Boolean,
+    isEnabled: Boolean = true,
+    onClick: () -> Unit,
+) {
+    SettingsRowFrame(
+        Modifier.semantics(mergeDescendants = true) { selected = isSelected },
+        onClick = onClick,
+        enabled = isEnabled,
+        role = Role.Button,
+    ) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                title,
+                style = OpenCodeTextStyles.body,
+                color = if (isEnabled) OpenCodeTheme.colors.text else OpenCodeTheme.colors.secondaryText,
+            )
+            if (subtitle != null) {
+                Text(subtitle, style = OpenCodeTextStyles.footnote, color = OpenCodeTheme.colors.secondaryText)
+            }
+        }
+        Spacer(Modifier.width(4.dp))
+        OpenCodeIcon(
+            SFSymbol.Checkmark,
+            contentDescription = null,
+            modifier = Modifier.alpha(if (isSelected) 1f else 0f),
+            size = 18.dp,
+            tint = OpenCodeTheme.colors.accent,
+        )
+    }
+}
+
+/** iOS `URL(fileURLWithPath:).lastPathComponent`. */
+private fun lastPathComponent(path: String): String {
+    val trimmed = path.trimEnd('/')
+    if (trimmed.isEmpty()) return if (path.isEmpty()) "" else "/"
+    return trimmed.substringAfterLast('/')
+}

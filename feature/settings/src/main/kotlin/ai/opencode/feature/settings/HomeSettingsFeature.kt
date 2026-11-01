@@ -24,9 +24,13 @@ import ai.opencode.feature.voice.CallVoice
 import ai.opencode.feature.voice.ServerVoiceClient
 import ai.opencode.feature.voice.ServerVoiceProvider
 import ai.opencode.feature.voice.ServerVoiceSupport
+import ai.opencode.feature.voice.ServerVoiceModelsAnswer
 import ai.opencode.feature.voice.VoiceBroker
+import ai.opencode.feature.voice.VoiceDelegatorChoice
 import ai.opencode.feature.voice.VoiceEngine
 import ai.opencode.feature.voice.VoiceFeature
+import ai.opencode.feature.voice.VoiceModelsCache
+import ai.opencode.feature.voice.VoiceReadiness
 import ai.opencode.feature.voice.VoiceServerChoice
 import ai.opencode.feature.voice.VoiceSharedKeys
 import ai.opencode.server.OpenCodeServer
@@ -60,11 +64,18 @@ class HomeSettingsFeature : Reducer<HomeSettingsFeature.State, HomeSettingsFeatu
         data class RaiseToTalkChanged(val on: Boolean) : Action
         data class VoiceEngineChanged(val engine: VoiceEngine) : Action
         data class ServerVoiceProviderChanged(val provider: ServerVoiceProvider) : Action
-        /** Settings › Voice › Voice Server. */
+        /** Settings › Voice › Voice Provider. */
         data class VoiceServerChanged(val choice: VoiceServerChoice) : Action
+        /** Settings › Voice › Delegator (OpenCode Session Delegator). */
+        data class VoiceDelegatorChoiceChanged(val choice: VoiceDelegatorChoice) : Action
         /** Asks the server that brokers Server Voice calls whether it offers them. */
         data object CheckServerVoiceSupport : Action
         data class ServerVoiceSupportLoaded(val serverID: String, val support: ServerVoiceSupport) : Action
+        /**
+         * The connected server's voice models, so Automatic knows before a call whether it can take
+         * one or this phone's key should.
+         */
+        data class VoiceModelsLoaded(val serverID: String, val asked: Int, val answer: ServerVoiceModelsAnswer) : Action
         data class CallVoiceChanged(val voice: CallVoice) : Action
         data class OpenAIAPIKeyChanged(val key: String?) : Action
         data class XaiAPIKeyChanged(val key: String?) : Action
@@ -118,20 +129,53 @@ class HomeSettingsFeature : Reducer<HomeSettingsFeature.State, HomeSettingsFeatu
             }
             is Action.ServerVoiceProviderChanged -> setShared(VoiceSharedKeys.serverVoiceProvider, action.provider)
             is Action.VoiceServerChanged -> setShared(VoiceSharedKeys.voiceServerChoice, action.choice)
+            is Action.VoiceDelegatorChoiceChanged -> setShared(VoiceSharedKeys.voiceDelegatorChoice, action.choice)
             Action.CheckServerVoiceSupport -> {
                 // Sent only while Server Voice is on.
-                val choice = shared(VoiceSharedKeys.voiceServerChoice).value
-                val broker = VoiceBroker(serverVoice = true, choice = choice, connected = state.server, saved = { VoiceFeature.savedServers })
-                    .server ?: return Reduced(state)
+                val choice = shared(VoiceSharedKeys.voiceServerChoice)
+                if (choice.value == VoiceServerChoice.Connected) choice.update { it.pinningConnected(state.server) }
+                val provider = shared(VoiceSharedKeys.serverVoiceProvider).value
+                val readiness = VoiceReadiness(
+                    answers = shared(VoiceSharedKeys.voiceModelsByServer).value,
+                    support = shared(VoiceSharedKeys.serverVoiceSupportByServer).value,
+                    hasPhoneKey = !shared(SharedKeys.openAIAPIKey).value.orEmpty().isBlank(),
+                    engine = shared(VoiceSharedKeys.voiceEngine).value,
+                )
+                val pick = VoiceBroker(
+                    serverVoice = true,
+                    choice = choice.value,
+                    provider = provider,
+                    connected = state.server,
+                    saved = { VoiceFeature.savedServers },
+                    readiness = readiness,
+                )
+                // iOS's Home always has a server; Android's state can be empty before one connects.
+                val home = state.server
+                val asksModels = home != null && pick.isAutomatic && provider == ServerVoiceProvider.openAI
+                val broker = pick.server
+                if (!asksModels && broker == null) return Reduced(state)
+                val epoch = home?.let { VoiceModelsCache.epoch(it.persistenceID) } ?: 0
                 val client = serverVoice
                 return Reduced(
                     state,
                     Effect.run { send ->
+                        if (asksModels && home != null) {
+                            val models = client.models(home)
+                            send(
+                                Action.VoiceModelsLoaded(
+                                    serverID = home.persistenceID,
+                                    asked = epoch,
+                                    answer = models?.let(ServerVoiceModelsAnswer::Listed) ?: ServerVoiceModelsAnswer.NoAnswer,
+                                ),
+                            )
+                        }
+                        if (broker == null) return@run
                         val support = client.checkSupport(broker)
                         send(Action.ServerVoiceSupportLoaded(serverID = broker.persistenceID, support = support))
                     },
                 )
             }
+            is Action.VoiceModelsLoaded -> VoiceModelsCache.record(action.answer, action.serverID, action.asked)
             is Action.ServerVoiceSupportLoaded -> {
                 if (action.support != ServerVoiceSupport.supported && action.support != ServerVoiceSupport.unsupported) return Reduced(state)
                 val supportByServer = shared(VoiceSharedKeys.serverVoiceSupportByServer)

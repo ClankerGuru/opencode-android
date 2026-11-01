@@ -5,6 +5,8 @@ import ai.opencode.core.sharing.SharedStore
 import ai.opencode.core.store.TestStore
 import ai.opencode.core.testing.TestIsolationRule
 import ai.opencode.feature.voice.ServerVoiceClient
+import ai.opencode.feature.voice.ServerVoiceModel
+import ai.opencode.feature.voice.ServerVoiceModelsAnswer
 import ai.opencode.feature.voice.ServerVoiceSupport
 import ai.opencode.feature.voice.VoiceSharedKeys
 import ai.opencode.server.OpenCodeServer
@@ -23,8 +25,10 @@ class HomeChildFeatureTests {
 
     private val server = OpenCodeServer(url = "https://home.example", username = "", password = "")
 
+    /** Automatic also asks the connected server's voice models, so a call knows before it starts whether the server or this phone takes it. */
     @Test fun settingsChecksSupportForItsScopedServer() = runTest {
         val shared = SettingsTestShared()
+        val gptLive = ServerVoiceModel(model = "gpt-live-1", provider = "openai", available = true)
         val store = TestStore(HomeSettingsFeature.State(server = server), HomeSettingsFeature(), this) {
             this[SharedStore] = shared.store
             this[ServerVoiceClient] = ServerVoiceClient(
@@ -32,13 +36,18 @@ class HomeChildFeatureTests {
                     assertEquals(server, requested)
                     ServerVoiceSupport.supported
                 },
-                models = { throw AssertionError("Unused") },
+                models = { requested ->
+                    assertEquals(server, requested)
+                    listOf(gptLive)
+                },
                 createSession = { _, _ -> throw AssertionError("Unused") },
             )
         }
         store.send(HomeSettingsFeature.Action.CheckServerVoiceSupport)
+        store.receive(HomeSettingsFeature.Action.VoiceModelsLoaded(server.persistenceID, 0, ServerVoiceModelsAnswer.Listed(listOf(gptLive))))
         store.receive(HomeSettingsFeature.Action.ServerVoiceSupportLoaded(server.persistenceID, ServerVoiceSupport.supported))
         assertEquals(ServerVoiceSupport.supported, shared.get(VoiceSharedKeys.serverVoiceSupportByServer)[server.persistenceID])
+        assertEquals(ServerVoiceModelsAnswer.Listed(listOf(gptLive)), shared.get(VoiceSharedKeys.voiceModelsByServer)[server.persistenceID])
         store.finish()
     }
 
@@ -49,7 +58,8 @@ class HomeChildFeatureTests {
         }
         store.send(HomeSettingsFeature.Action.ModelPickerStyleChanged(ModelPickerStyle.sheet))
         assertEquals(ModelPickerStyle.sheet, shared.get(ModelPickerStyle.key))
-        store.send(HomeSettingsFeature.Action.ModelPickerStyleChanged(ModelPickerStyle.sheet))
+        store.send(HomeSettingsFeature.Action.ModelPickerStyleChanged(ModelPickerStyle.onePicker))
+        assertEquals(ModelPickerStyle.onePicker, shared.get(ModelPickerStyle.key))
         store.send(HomeSettingsFeature.Action.ModelPickerStyleChanged(ModelPickerStyle.growFromComposer))
         assertEquals(ModelPickerStyle.growFromComposer, shared.get(ModelPickerStyle.key))
         store.finish()
