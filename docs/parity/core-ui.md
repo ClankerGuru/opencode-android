@@ -51,6 +51,7 @@ literals that aren't symbols). `(fill)` is the filled variant. Weak matches: `st
 | `app.badge` | `app_badging` | `ms_app_badging` | `SFSymbol.AppBadge` | WhatsNewList |
 | `app.dashed` | `select` | `ms_select` | `SFSymbol.AppDashed` | ExperimentalFeatures |
 | `apple.terminal` | `terminal` | `ms_terminal` | `SFSymbol.AppleTerminal` | WhatsNewList |
+| `archivebox` | `archive` | `ms_archive` | `SFSymbol.Archivebox` | InboxSidebarList |
 | `arrow.clockwise` | `refresh` | `ms_refresh` | `SFSymbol.ArrowClockwise` | FileAttachmentViews, RunError, ServerSwitcher, TranscriptEntryView, TranscriptUserMessage, WhatsNewList |
 | `arrow.counterclockwise` | `replay` | `ms_replay` | `SFSymbol.ArrowCounterclockwise` | OnboardingPlaygroundControls, TuningPanelView |
 | `arrow.down` | `arrow_downward` | `ms_arrow_downward` | `SFSymbol.ArrowDown` | ComposerViews, ShellOutputView, WhatsNewList |

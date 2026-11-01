@@ -12,6 +12,7 @@ all_inbox                           # tray.full
 all_inbox fill                      # tray.full.fill
 alternate_email                     # at
 app_badging                         # app.badge
+archive                             # archivebox
 arrow_circle_down                   # arrow.down.circle
 arrow_circle_up                     # arrow.up.circle
 arrow_circle_up fill                # arrow.up.circle.fill
