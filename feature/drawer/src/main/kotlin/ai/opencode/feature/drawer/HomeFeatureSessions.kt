@@ -96,7 +96,8 @@ internal fun HomeFeature.reduceSessionDetail(state: State, action: SessionFeatur
             val voiceAction = (action.action as? PresentationAction.Presented)?.action
             val delegate = (voiceAction as? VoiceFeature.Action.Delegate)?.action ?: return Reduced(state)
             return when (delegate) {
-                VoiceFeature.DelegateAction.CheckAPIKey -> Reduced(state.showingSettings())
+                // iOS opens Settings at the page (`showSettings(at:)`); the page is the drawer's to honour.
+                is VoiceFeature.DelegateAction.OpenVoiceSettings -> Reduced(state.showingSettings())
                 // The root owns the call even when it targets a pushed subagent.
                 is VoiceFeature.DelegateAction.PromptAdmitted ->
                     Reduced(state, forwardToSubagents(state, delegate.sessionID, SessionFeature.Action.VoicePromptAdmitted(delegate.sessionID)))

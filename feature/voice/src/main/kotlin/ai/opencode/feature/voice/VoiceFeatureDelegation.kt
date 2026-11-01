@@ -44,6 +44,7 @@ private fun String.prefixCharacters(count: Int): String {
  * GPT-Live's spoken acknowledgement) is what the session shows.
  */
 internal fun VoiceFeature.delegateWork(state: State, callID: String, rawFraming: String?): Reduced<State, Action> {
+    if (state.usesSessionDelegator) return delegateToSessionDelegator(state, callID, rawFraming)
     if (state.usesDelegator) return delegateToDelegator(state, callID)
     val isClientDelegation = state.activeEngine == VoiceEngine.gptLive
     // One request creates a draft's session; a second one spoken while it is

@@ -9,11 +9,11 @@ import java.util.UUID
 class VoiceCallLogging(private val client: VoiceCallLogClient = dependency(VoiceCallLogClient)) {
     data class State(val callLogID: UUID?, val isOnDraft: Boolean, val sessionTitle: String,
         val engine: String, val voice: String, val isAtEar: Boolean, val isMuted: Boolean,
-        val usesDelegator: Boolean, val liveAssistantItemID: String? = null, val liveAssistantText: String = "",
+        val usesDelegator: Boolean, val usesSessionDelegator: Boolean = false, val liveAssistantItemID: String? = null, val liveAssistantText: String = "",
         val moveReason: String? = null, val isTerminal: Boolean = false)
     sealed interface Event {
         data object start : Event
-        data object callRouteResolved : Event
+        data class callRouteResolved(val note: String? = null) : Event
         data class userTranscript(val itemID: String, val text: String, val final: Boolean) : Event
         data class assistantDelta(val itemID: String?) : Event
         data class assistantDone(val itemID: String?, val text: String) : Event
@@ -39,14 +39,17 @@ class VoiceCallLogging(private val client: VoiceCallLogClient = dependency(Voice
                 recorder.begin(log, if (state.isOnDraft) "New session" else state.sessionTitle, state.engine)
                 note("Voice: ${state.voice}"); if (state.isAtEar) note("Raised to ear")
             }
-            Event.callRouteResolved -> recorder.setEngine(log, state.engine)
+            is Event.callRouteResolved -> {
+                recorder.setEngine(log, state.engine)
+                event.note?.let { note(it) }
+            }
             is Event.userTranscript -> if (event.final) recorder.span(log, VoiceCallLog.Track.user, "u-${event.itemID}", event.text, end = true)
             is Event.assistantDelta -> recorder.span(log, VoiceCallLog.Track.voice, "a-${event.itemID ?: state.liveAssistantItemID ?: "live"}", state.liveAssistantText)
             is Event.assistantDone -> if (event.itemID != null) recorder.span(log, VoiceCallLog.Track.voice, "a-${event.itemID}", event.text.ifEmpty { null }, end = true) else recorder.endVoice(log, event.text.ifEmpty { null })
             Event.assistantPlaybackFinished -> recorder.endVoice(log, null)
             is Event.functionCall -> {
                 note(if (event.name == "delegate") "Delegated${event.text?.let { ": $it" } ?: ""}" else "Called ${event.name}")
-                if (event.name == "delegate" && !state.usesDelegator) recorder.span(log, VoiceCallLog.Track.delegator, "work-${event.callID}", "Session “${state.sessionTitle}” working")
+                if (event.name == "delegate" && !state.usesDelegator && !state.usesSessionDelegator) recorder.span(log, VoiceCallLog.Track.delegator, "work-${event.callID}", "Session “${state.sessionTitle}” working")
             }
             Event.serverDelegation -> note("Delegated to the delegator on the voice service")
             is Event.serviceError -> note("Error: ${event.message}")

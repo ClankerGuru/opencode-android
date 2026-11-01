@@ -29,8 +29,32 @@ object VoiceSharedKeys {
     /** Settings › Voice › Call Sounds (iOS `callSoundPack`, declared in `VoiceCallCues.swift`). */
     val callSoundPack = SharedKey.appStorage("call-sound-pack", VoiceCallSoundPack.default)
 
-    /** Settings › Voice › Voice Server. The connected server by default. */
-    val voiceServerChoice = SharedKey.appStorage<VoiceServerChoice>("voice-server", VoiceServerChoice.Connected)
+    /** Settings › Voice › Voice Provider. Automatic by default. */
+    val voiceServerChoice = SharedKey.appStorage<VoiceServerChoice>("voice-server", VoiceServerChoice.Automatic)
+
+    /** Settings › Voice › Delegator. Built-in by default. */
+    val voiceDelegatorChoice = SharedKey.appStorage<VoiceDelegatorChoice>("voice-delegator-choice", VoiceDelegatorChoice.BuiltIn)
+
+    /** Cached Automatic `"Voice"` delegator session ID per server (`srv_…` → `ses_…`). */
+    val voiceDelegatorSessionIDs = SharedKey.fileStorage<Map<String, String>>(
+        FileDirectory.Documents,
+        "voice-delegator-sessions.json",
+        emptyMap(),
+    )
+
+    /**
+     * Each saved server's last voice models answer, by `persistenceID` (iOS
+     * `voiceModelsByServer`, declared in `VoiceProvider.swift`). Settings › Voice asks; calls
+     * read it to choose automatically.
+     */
+    val voiceModelsByServer =
+        SharedKey.inMemory<Map<String, ServerVoiceModelsAnswer>>("voice-models-by-server", emptyMap())
+
+    /**
+     * How many times each server (by `persistenceID`) reconnected: an answer asked before
+     * the latest says nothing of the server now (iOS `voiceModelsEpochs`).
+     */
+    val voiceModelsEpochs = SharedKey.inMemory<Map<String, Int>>("voice-models-epochs", emptyMap())
 
     /** Phone-local voice transcripts keyed by `serverID:sessionID`. */
     val voiceTranscripts = SharedKey.fileStorage<Map<String, VoiceTranscriptRecord>>(
