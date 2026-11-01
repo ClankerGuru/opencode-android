@@ -145,17 +145,13 @@ data class OpenCodeTranscriptFile(
     val text: String? = null,
     /** The card's summary, computed once with [text]. */
     val pasted: PastedTextSummary? = text?.let(::PastedTextSummary),
-    /** A `media:<hash>` reference the chip loads through media's `MediaReferenceClient`. */
     val mediaHash: String? = null,
     val byteCount: Long? = null,
-    /** The server's `[media unavailable: …]` placeholder stood in for it. */
+    /** A `media:<hash>` reference whose bytes the server no longer has. */
     val isUnavailable: Boolean = false,
 ) {
-    val typeLabel: String
-        get() = if (isUnavailable) "Media unavailable" else AttachmentFileType.label(name, mime)
-
-    val symbolName: String
-        get() = if (isUnavailable) "exclamationmark.triangle" else AttachmentFileType.symbolName(name, mime)
+    val typeLabel: String get() = if (isUnavailable) "Media unavailable" else AttachmentFileType.label(name, mime)
+    val symbolName: String get() = if (isUnavailable) "exclamationmark.triangle" else AttachmentFileType.symbolName(name, mime)
 }
 
 sealed interface OpenCodeUploadEvent {
