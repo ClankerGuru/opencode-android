@@ -80,7 +80,7 @@ under the same name; anything not ported anywhere is listed as deleted with its 
 | `:core` | 18 | 109 | 72 | 113 |
 | `:server` | 36 | 230 | 3 | 254 (2 opt-in live checks skipped) |
 | `:devtools` | 4 | 14 | 10 | 14 |
-| `:feature:media` | 15 | 175 | 14 | 180 |
+| `:feature:media` | 16 | 177 | 14 | 182 |
 | `:feature:voice` | 30 | 444 | 16 | 511 |
 | `:feature:system` | 9 | 88 | 2 | 89 |
 | `:feature:transcript` | 31 | 268 | 43 | 276 (1 env-gated metric skipped) |
