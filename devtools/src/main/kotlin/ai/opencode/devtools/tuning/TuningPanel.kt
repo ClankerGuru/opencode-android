@@ -92,6 +92,10 @@ import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.foundation.layout.wrapContentHeight
@@ -415,6 +419,7 @@ private fun PanelForm(
     ) {
         Column(Modifier.width(width).heightIn(max = maxHeight)) {
             PanelHeader(store, state, title, changed, groups, drag)
+            SlowMotionControl(state.slowMotion) { store.send(TuningFeature.Action.SlowMotionSelected(it)) }
             HorizontalDivider()
             if (groups.isEmpty()) {
                 Text(
@@ -457,6 +462,29 @@ private fun PanelForm(
             }
             if (state.didCopy) {
                 Text("Copied", Modifier.padding(12.dp).align(Alignment.CenterHorizontally), style = MaterialTheme.typography.labelMedium)
+            }
+        }
+    }
+}
+
+/** iOS `slowMotionControl`: the speed for the whole app, its caption orange while slowed. */
+@Composable
+private fun SlowMotionControl(slowMotion: SlowMotion, select: (Double) -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            "Slow Motion",
+            Modifier.clearAndSetSemantics {},
+            style = OpenCodeTextStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
+            color = if (slowMotion.isSlowed) ChangedColor else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().semantics { contentDescription = "Slow Motion" }) {
+            SlowMotion.scales.forEachIndexed { index, scale ->
+                SegmentedButton(
+                    selected = slowMotion.scale == scale,
+                    onClick = { select(scale) },
+                    shape = SegmentedButtonDefaults.itemShape(index, SlowMotion.scales.size),
+                    icon = {},
+                ) { Text(SlowMotion.label(scale), style = OpenCodeTextStyles.caption1, maxLines = 1) }
             }
         }
     }

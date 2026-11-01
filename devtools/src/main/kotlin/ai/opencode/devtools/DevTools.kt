@@ -32,7 +32,7 @@ import java.net.URL
  * 2. [handleLaunchIntent] in `MainActivity.onCreate` (debug lab extras).
  * 3. `DevToolsOverlay { … }` around the app's root content (summon gesture, Tuning Panel,
  *    perf HUD, layout bounds).
- * 4. `DevToolsView(store)` with a `DevToolsFeature` store as Settings › Advanced › Developer.
+ * 4. `DevToolsView(store)` with a `DevToolsFeature` store as Settings › Developer.
  *
  * Who gets them: [TuningAccess] (debug builds always; other builds while Developer Mode is on).
  */
@@ -84,6 +84,13 @@ object DevTools {
         if (!TuningAccess.isAvailable) return
         if (!TuningStore.shared.isEnabled) setTuningEnabled(true)
         tuningStore.send(TuningFeature.Action.Summoned)
+    }
+
+    /** The quick toggle: `1×` ↔ the last slow speed, turning tuning on first (for the speed badge) without showing the panel. */
+    fun toggleSlowMotion() {
+        if (!TuningAccess.isAvailable) return
+        if (!TuningStore.shared.isEnabled) setTuningEnabled(true)
+        tuningStore.send(TuningFeature.Action.SlowMotionToggled)
     }
 
     /** Settings' Open Tuning Panel: shows the panel (never toggles it away) over the app, closing the overlay's Developer screen. */
