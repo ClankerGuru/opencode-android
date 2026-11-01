@@ -129,6 +129,8 @@ class TranscriptListController(
     private val removedHeights = HashMap<String, Float>()
     private val runResizedItems = HashSet<String>()
     private val revisedRows = HashMap<String, Double>()
+    /** iOS `browsingRevisedRows`: a browsing reader's rows an apply just changed (`markBrowsingRevisions`). */
+    private val browsingRevisedRows = HashMap<String, Double>()
     private val imageGrowths = HashMap<String, ai.opencode.feature.media.AgentImageRowGrowth>()
     private var readingAnchor: Pair<String, Int>? = null
     private var promotionUntil = 0.0
@@ -321,6 +323,7 @@ class TranscriptListController(
         removedHeights.clear()
         runResizedItems.clear()
         revisedRows.clear()
+        browsingRevisedRows.clear()
         imageGrowths.values.forEach { it.settle() }
         imageGrowths.clear()
         readingAnchor = null
@@ -399,6 +402,10 @@ class TranscriptListController(
             val items = holdingDivider(built.items, old.items, isInitial = previous == null || old === TranscriptListSnapshot.empty)
             if (items === built.items) built else built.copy(items = items)
         }
+        // Rows whose content this apply changed (iOS reconfigures them: `touched`). A snapshot here
+        // is only ever built from new data, so none is a repaint.
+        markBrowsingRevisions(next.rows.keys.filterTo(HashSet()) { id -> old.rows[id]?.let { it != next.rows[id] } == true }
+            .mapTo(HashSet()) { TranscriptItemID.Message(it).key }, isRepaint = false)
         if (previous != null && TranscriptItemID.Empty in old.items &&
             (TranscriptItemID.Empty !in next.items || previous.isLoading && !configuration.isLoading)
         ) {
@@ -1178,6 +1185,26 @@ class TranscriptListController(
         if (softEdges.isNotEmpty()) startMotion()
     }
 
+    /**
+     * iOS `markBrowsingRevisions`: a browsing reader's rows this apply reconfigured. One on screen
+     * at or below the reading row grows to its new height in [fittedHeight]; above it, the apply's
+     * anchor holds the view; off screen, it just lays out.
+     */
+    private fun markBrowsingRevisions(items: Set<String>, isRepaint: Boolean) {
+        if (behavior.mode != TranscriptScrollBehavior.Mode.Browsing || isRepaint || !hasLaidOutContent) return
+        val now = transcriptNow()
+        browsingRevisedRows.values.removeAll { now - it >= 1 }
+        for (item in items) if (item.startsWith("m:")) browsingRevisedRows[item] = now
+    }
+
+    /** iOS `isAboveReadingAnchor`: the row sits above the row the apply anchored the view on. */
+    private fun isAboveReadingAnchor(key: String): Boolean {
+        val anchor = readingAnchor?.first ?: return false
+        val anchorIndex = snapshot.items.indexOfFirst { it.key == anchor }
+        val index = snapshot.items.indexOfFirst { it.key == key }
+        return anchorIndex >= 0 && index in 0 until anchorIndex
+    }
+
     // MARK: Row growth (called from a row's measure pass)
 
     /**
@@ -1191,6 +1218,8 @@ class TranscriptListController(
         @Suppress("UNUSED_VARIABLE") val tick = frameTick
         val imageGrowth = imageGrowths[key.removePrefix("m:")]
         val revised = revisedRows[key]?.let { transcriptNow() - it < 1 } == true
+        // A browsing reader's row its snapshot just revised (`markBrowsingRevisions`).
+        val browsingRevised = browsingRevisedRows[key]?.let { transcriptNow() - it < 1 } == true
         val removed = removedHeights.remove(key) ?: 0f
         val runResized = runResizedItems.remove(key)
         val row = lastLayout?.visibleItemsInfo?.firstOrNull { it.key == key }
@@ -1243,7 +1272,12 @@ class TranscriptListController(
             startMotion()
             return from
         }
-        val changedRowMayGrow = revised && !reduceMotion && hasLaidOutContent && isShowingToReader &&
+        // On screen, changing from the height it was drawn at, at or below the reading row: above
+        // it, the apply's anchor holds the view; off screen, it just lays out.
+        val changedOnScreen = !entering && !runResized && settled != null && row != null && !isAboveReadingAnchor(key)
+        val browsingGrows = browsingRevised && changedOnScreen
+        if (changedOnScreen) browsingRevisedRows.remove(key)
+        val changedRowMayGrow = (revised || browsingGrows) && !reduceMotion && hasLaidOutContent && isShowingToReader &&
             !isUserGestureActive && jumpGlide == null && transcriptNow() >= promotionUntil &&
             transcriptNow() >= catchUpLandsUntil && abs(measured - from) <= lastVisibleHeight
         if (!allowsGrowth(measured - from) && !changedRowMayGrow) {
@@ -1256,7 +1290,7 @@ class TranscriptListController(
                 val entry = (snapshot.rows[key.removePrefix("m:")] as? MessageRow.Entry)?.entry
                 if (entry is TranscriptEntry.ReplyEnd) ai.opencode.feature.transcript.links.LinkPreviewMotion.grow else ai.opencode.feature.media.AgentImageTunables.grow
             } else null,
-        ).also { it.changedRow = revised }
+        ).also { it.changedRow = revised || browsingGrows }
         revisedRows.remove(key)
         imageGrowth?.beginGrowth()
         startMotion()
