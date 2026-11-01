@@ -4,6 +4,7 @@ import ai.opencode.core.files.ComposerFileStaging
 import ai.opencode.core.files.ComposerStagedFile
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
+import ai.opencode.server.ServerID
 import ai.opencode.server.OpenCodeServer
 import android.content.Context
 import android.graphics.Bitmap
@@ -101,7 +102,7 @@ class ShareModel(
      * choosing another session makes new ones.
      */
     private var messageID = ShareSendRequest.newMessageID()
-    private var newSessionID = ShareSendRequest.newSessionID()
+    private var newSessionID = ServerID.newSessionID()
 
     /** Set once a send may have reached the server, so Send Later's send can't land twice. */
     private var mayHaveReachedServer = false
@@ -119,7 +120,7 @@ class ShareModel(
         // What a failed try may have left on the server belongs to the old destination; this
         // one gets its own IDs.
         messageID = ShareSendRequest.newMessageID()
-        newSessionID = ShareSendRequest.newSessionID()
+        newSessionID = ServerID.newSessionID()
         mayHaveReachedServer = false
         mutableState.update {
             it.copy(destination = destination, phase = if (it.phase is Phase.Failed) Phase.Composing else it.phase)

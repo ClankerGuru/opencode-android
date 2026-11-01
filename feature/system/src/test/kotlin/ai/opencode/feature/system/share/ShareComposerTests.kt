@@ -8,6 +8,15 @@ import ai.opencode.core.testing.TestIsolationRule
 import ai.opencode.feature.system.SessionDirectory
 import ai.opencode.feature.system.SystemAction
 import ai.opencode.server.OpenCodeServer
+import ai.opencode.server.ServerID
+import java.io.File
+import java.net.ConnectException
+import java.nio.file.Files
+import java.time.Instant
+import java.util.UUID
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -28,13 +37,6 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
-import java.io.File
-import java.net.ConnectException
-import java.nio.file.Files
-import java.util.UUID
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
 
 // Ports of iOS `ShareComposerTests.swift`: the share sheet's composer (OC-218): the credentials
 // the app shares with it, its sends, what it hands the app. `ShareComposerAppTests` (the app
@@ -193,7 +195,6 @@ private val encoder = Json { encodeDefaults = true; explicitNulls = false }
 /**
  * `promptBodyMatchesTheApps` compares with the app's body as `:server`'s (internal)
  * `promptBody` writes it for the same message (see `LivePrompts.kt`).
- * `newIDsHaveTheServersShape` drops its `PromptOutbox.newSessionID` comparison (`:feature:composer`).
  * The two file tests stage through `ComposerFileStaging`, whose type sniffing reads Android's
  * `MimeTypeMap`: they're in [ShareSenderFrameworkTests].
  */
@@ -288,7 +289,7 @@ class ShareSenderTests {
     @Test
     fun newIDsHaveTheServersShape() {
         assertTrue(Regex("msg_[0-9a-f]{12}[0-9A-Za-z]{14}").matches(ShareSendRequest.newMessageID()))
-        assertEquals("ses_ce7a3afffffeabc00000000000", ShareSendRequest.newSessionID(atEpochMillis = 1_800_000_000_000, entropy = "abc"))
+        assertEquals("ses_ce7a3afffffeabc00000000000", ServerID.newSessionID(at = Instant.ofEpochSecond(1_800_000_000), entropy = "abc"))
     }
 }
 

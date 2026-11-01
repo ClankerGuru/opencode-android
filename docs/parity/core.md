@@ -44,7 +44,7 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 | `OpenCode/Core/RollingNumber/RollingNumberShaders.metal` | 33 | see core-ui.md | — | |
 | `OpenCode/Core/ScreenVisibility.swift` | 62 |  | todo |  |
 | `OpenCode/Core/ScrollsToTop.swift` | 31 |  | todo |  |
-| `OpenCode/Core/ServerID.swift` | 75 | see server.md | sync: — | ported into `:server` |
+| `OpenCode/Core/ServerID.swift` | 75 | see server.md | — | ported into `:server` |
 | `OpenCode/Core/ServerIDClient.swift` | 55 | see server.md | — | ported into `:server` |
 | `OpenCode/Core/SharedKeys.swift` | 821 | `core/.../sharing/SharedKeys.kt`, `server/.../ServerSharedKeys.kt`, `feature/voice/.../VoiceSharedKeys.kt` | sync: done | primitive keys in `:core`; server-typed keys + `CachedHomeSnapshot`/`CachedTranscriptSnapshots`/`TranscriptCachePersistence` in `:server`; voice-typed keys in `:feature:voice`. Same ids and defaults |
 | `OpenCode/Core/SoundEffectsClient.swift` | 135 |  | todo |  |

@@ -14,7 +14,6 @@ import java.net.SocketException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import java.util.Base64
-import java.util.UUID
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLException
 import kotlin.coroutines.resume
@@ -62,7 +61,7 @@ data class ShareSendRequest(
             override val sessionID: String get() = id
         }
 
-        /** Created with a client-made ID first (`PromptOutbox.newSessionID`'s shape), so a retried create finds the session it already made. */
+        /** Created with a client-made ID first (`ServerID.newSessionID`'s shape), so a retried create finds the session it already made. */
         data class NewSession(val id: String, override val directory: String) : Target {
             override val sessionID: String get() = id
         }
@@ -77,20 +76,6 @@ data class ShareSendRequest(
         /** A message ID in the server's ascending shape ([ServerID]). */
         fun newMessageID(): String = ServerID.Generator.live.next("msg_")
 
-        /**
-         * `PromptOutbox.newSessionID`: `ses_`, a descending time and the last 14 letters and
-         * digits of [entropy] (a message ID's random tail), so the session sorts among the
-         * server's own.
-         */
-        fun newSessionID(
-            atEpochMillis: Long = System.currentTimeMillis(),
-            entropy: String = UUID.randomUUID().toString().uppercase(),
-        ): String {
-            val time = ServerID.timePart(ServerID.milliseconds(atEpochMillis), counter = 1, descending = true)
-            val random = entropy.split("_").lastOrNull { it.isNotEmpty() } ?: entropy
-            val tail = random.filter { it.isLetterOrDigit() }.takeLast(ServerID.RANDOM_LENGTH)
-            return "ses_" + time + tail.padEnd(ServerID.RANDOM_LENGTH, '0').take(ServerID.RANDOM_LENGTH)
-        }
     }
 }
 

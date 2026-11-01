@@ -4,27 +4,13 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.time.Instant
 
-/**
+/*
  * The `:feature:composer` tests of iOS `OpenCodeTests/ShareComposerTests.swift`:
- * [SharedComposerDraft] (here because it carries composer types) and the [PromptOutbox] half of
- * `newIDsHaveTheServersShape`. The rest is `:feature:system`'s (`share/ShareComposerTests.kt`)
- * and `:feature:drawer`'s (`ShareComposerAppTests`). iOS's `append` mutates in place; Android's
- * [SharedComposerDraft.appending] returns the joined value.
+ * [SharedComposerDraft] (here because it carries composer types). The rest is `:feature:system`'s
+ * (`share/ShareComposerTests.kt`) and `:feature:drawer`'s (`ShareComposerAppTests`). iOS's
+ * `append` mutates in place; Android's [SharedComposerDraft.appending] returns the joined value.
  */
-class ShareComposerTests {
-    /**
-     * `newIDsHaveTheServersShape`'s `PromptOutbox.newSessionID` comparison: the outbox makes the
-     * same ID as `ShareSendRequest.newSessionID` (`:feature:system` checks that one against the
-     * same literal; this module can't see it).
-     */
-    @Test
-    fun newIDsHaveTheServersShape() {
-        val date = Instant.ofEpochSecond(1_800_000_000)
-        assertEquals("ses_ce7a3afffffeabc00000000000", PromptOutbox.newSessionID(at = date, entropy = "abc"))
-    }
-}
 
 /** iOS `ShareCompositionTests` (the sheet's decisions): the one that joins drafts. */
 class ShareCompositionTests {

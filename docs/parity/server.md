@@ -48,7 +48,7 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 
 | iOS file | Kotlin file(s) | Status | Notes |
 | --- | --- | --- | --- |
-| `Core/ServerID.swift` | `ServerID.kt` | sync: done | Same time/counter/base62 layout R3 audit: hex time part, shared counter, base62 random part checked; no divergence. |
+| `Core/ServerID.swift` | `ServerID.kt` | done | Same time/counter/base62 layout R3 audit: hex time part, shared counter, base62 random part checked; no divergence. Synced to f657969b: `newSessionID` moved here from `PromptOutbox`/`ShareSendRequest`, as on iOS. |
 | `Core/ServerIDClient.swift` | `ServerID.kt` (`ServerIDClient`) | done | `testValue` = `incrementing()` R3 audit: prefixes and live/test values checked; no divergence. |
 | `Core/SharedKeys.swift` (server-typed parts) | `ServerSharedKeys.kt` | sync: done | `CachedHomeSnapshot`, `CachedTranscriptSnapshots` (eviction, priority, cap-encoding; mutators return copies), `TranscriptCachePersistence` + 500 ms writer at `filesDir/support/transcript-snapshots.json` (no protected-data blocking; a refused write stays pending for the next schedule or flush, r3), keys `savedServer`, `savedServers` (keychain), `cachedHomeSnapshots`, `legacyCachedHomeSnapshot`; the transcript cache is `ServerSharedKeys.cachedTranscriptSnapshots()` (a `Shared` loaded from and written through the persistence); `remember(original)`, `rememberName()` |
 | `Core/AppLog.swift` (`logSummary` extensions) | `OpenCodeClientError.kt`, `retry/NetworkRetry.kt` | done | `OpenCodeClientError.logSummary`, `RetryVerdict.logSummary`, `RetryPause.Kind.logSummary`; `Duration.logSummary` is in `:core` |

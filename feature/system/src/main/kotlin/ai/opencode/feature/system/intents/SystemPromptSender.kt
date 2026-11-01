@@ -5,6 +5,7 @@ import ai.opencode.feature.system.ScopedID
 import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.sharing.shared
+import ai.opencode.server.ServerID
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
@@ -81,7 +82,7 @@ object SystemPromptSender {
             RetryBudget(budget).scope {
                 var sessionID = session?.first ?: ""
                 if (project != null) {
-                    sessionID = client.createSession(server, project.directory, ShareSendRequest.newSessionID()).id
+                    sessionID = client.createSession(server, project.directory, ServerID.newSessionID()).id
                 }
                 client.sendPromptConfirming(server, sessionID, trimmed, delivery)
             }
