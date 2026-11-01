@@ -329,8 +329,6 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
                     .filter { seen.add(it.lowercase()) }
             }
 
-        val alternateHosts: List<String> get() = hosts.drop(1)
-
         val title: String get() = "Pair with $host?"
 
         val message: String
@@ -719,18 +717,9 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
             }
         }
         is HomeFeature.DelegateAction.ServerRenamed -> Reduced(renameServer(action.server, action.name, state))
-        is HomeFeature.DelegateAction.EditServerRequested -> {
-            // The form opens over Home; Home stays until the edit connects.
-            val saved = state.knownServers.firstOrNull { it.persistenceID == action.server.persistenceID } ?: action.server
-            Reduced(state.copy(editingSavedServer = saved, manualEntryDraft = null, isEditingServer = true).load(saved))
-        }
-        is HomeFeature.DelegateAction.ServerRemovalConfirmed -> {
-            // The server in use isn't offered for removal; switch away first.
-            if (state.home?.server?.persistenceID == action.server.persistenceID) Reduced(state)
-            else Reduced(state, Effect.send(Action.ServerDeleted(action.server)))
-        }
-        HomeFeature.DelegateAction.PairServerRequested ->
-            Reduced(state.copy(editingSavedServer = null, isScanningPairingCode = true))
+        is HomeFeature.DelegateAction.EditServerRequested -> Reduced(editServer(action.server, state))
+        is HomeFeature.DelegateAction.ServerRemovalConfirmed -> Reduced(state, confirmRemoval(action.server, state))
+        HomeFeature.DelegateAction.PairServerRequested -> Reduced(beginPairing(state))
         HomeFeature.DelegateAction.AddServerRequested -> Reduced(beginNewServer(state))
     }
 

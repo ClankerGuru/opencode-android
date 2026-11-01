@@ -49,6 +49,17 @@ internal fun AppFeature.selectServer(
 )
 
 /** Opens the pairing scanner (iOS `beginPairing`). */
+/** The form opens over Home; Home stays until the edit connects. */
+internal fun editServer(server: OpenCodeServer, state: AppFeature.State): AppFeature.State {
+    val saved = state.knownServers.firstOrNull { it.persistenceID == server.persistenceID } ?: server
+    return state.copy(editingSavedServer = saved, manualEntryDraft = null, isEditingServer = true).load(saved)
+}
+
+/** The server in use isn't offered for removal; switch away first. */
+internal fun confirmRemoval(server: OpenCodeServer, state: AppFeature.State): Effect<AppFeature.Action> =
+    if (state.home?.server?.persistenceID == server.persistenceID) Effect.none()
+    else Effect.send(AppFeature.Action.ServerDeleted(server))
+
 internal fun beginPairing(state: AppFeature.State): AppFeature.State =
     state.copy(editingSavedServer = null, isScanningPairingCode = true)
 
