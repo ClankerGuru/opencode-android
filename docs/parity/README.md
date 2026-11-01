@@ -81,7 +81,7 @@ under the same name; anything not ported anywhere is listed as deleted with its 
 | `:server` | 35 | 225 | 3 | 244 (2 opt-in live checks skipped) |
 | `:devtools` | 4 | 14 | 10 | 14 |
 | `:feature:media` | 15 | 175 | 14 | 180 |
-| `:feature:voice` | 30 | 444 | 16 | 546 |
+| `:feature:voice` | 30 | 444 | 16 | 539 |
 | `:feature:system` | 9 | 88 | 2 | 89 |
 | `:feature:transcript` | 31 | 268 | 43 | 276 (1 env-gated metric skipped) |
 | `:feature:composer` | 26 | 229 | 18 | 230 |

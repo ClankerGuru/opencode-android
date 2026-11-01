@@ -140,41 +140,14 @@ enum class FloatingCallDock { float, edge }
 
 /**
  * iOS `FloatingCallTunables`, baked at their defaults (the tuning panel is not ported); each
- * keeps its tuning key. Lengths are points, i.e. dp. The presets (`call.float.style`,
- * `call.feel`: Tides, Twin Vortex, …) only change these values in the panel.
+ * keeps its tuning key. Lengths are points, i.e. dp. The `call.float.style` presets only change
+ * these values in the panel. iOS 19f4d63c dropped the orb faces, their looks and the Feel presets:
+ * the face is Wisp's orb ([LivingOrbView]).
  */
 object FloatingCallTunables {
     // Orb
-    /** `call.orb.style` (Orb style). */
-    val orbStyle = FloatingCallOrbStyle.tides
-    /** `call.orb.size` (Orb size, 40…84). */
+    /** `call.orb.size` (Orb size, 40…84); Wisp's orb takes `call.wispOrb.size` ([WispOrbTunables.size]). */
     const val orbSize = 58f
-    /** `call.orb.warm` (Your colour (warm) intensity). */
-    const val warm = 1.0
-    /** `call.orb.cool` (Agent colour (cool) intensity). */
-    const val cool = 1.0
-    /** `call.orb.saturation` (Aurora saturation). */
-    const val saturation = 1.15
-    /** `call.orb.goo` (Liquid gooeyness). */
-    const val goo = 0.11
-    /** `call.orb.idleSpeed` (Idle motion speed). */
-    const val idleSpeed = 0.45
-    /** `call.orb.speakingGain` (Speaking motion gain). */
-    const val speakingGain = 1.0
-    /** `call.orb.thinkingSpeed` (Thinking spin speed). */
-    const val thinkingSpeed = 1.0
-    /** `call.orb.glow` (Glow spill). */
-    const val glow = 0.55
-
-    // Dot-matrix takes
-    /** `call.dots.across` (Dots across). */
-    const val dotsAcross = 9f
-    /** `call.dots.fill` (Dot size). */
-    const val dotFill = 0.92f
-    /** `call.dots.body` (Force body). */
-    const val dotBody = 1f
-    /** `call.dots.base` (Base fill). */
-    const val dotBase = 0.4f
 
     // Placement and break-out
     /** `call.float.kind` (Shape). */
@@ -215,8 +188,6 @@ object FloatingCallTunables {
     // Panel
     /** `call.panel.buttonSize` (Button size). */
     const val buttonSize = 50f
-    /** `call.panel.strip` (Strip). */
-    val strip = FloatingCallStripStyle.scope
     /** `call.panel.stripHeight` (Strip height). */
     const val stripHeight = 44f
     /** `call.panel.width` (Panel width). */
@@ -247,16 +218,14 @@ object FloatingCallTunables {
 }
 
 /**
- * iOS `FloatingCallTunables.labStyle/labOrb/labEdge/labScenes` and `floating-call-forced`
- * (`-lab-floating-call-style capsule`, `-lab-floating-orb aurora`, `-lab-floating-edge YES`,
+ * iOS `FloatingCallTunables.labStyle/labEdge/labScenes` and `floating-call-forced`
+ * (`-lab-floating-call-style capsule`, `-lab-floating-edge YES`,
  * `-lab-floating-scenes YES`, `-floating-call-forced YES`): UI tests and captures pick a look.
  * Debug builds only, through [VoiceLabEnvironment]: `adb shell setprop
- * debug.opencode.lab_floating_call_style capsule`, `…lab_floating_orb aurora`,
- * `…lab_floating_edge 1`, `…lab_floating_scenes 1`, `…floating_call_forced 1`.
+ * debug.opencode.lab_floating_call_style capsule`, `…lab_floating_edge 1`, `…lab_floating_scenes 1`, `…floating_call_forced 1`.
  */
 data class FloatingCallLab(
     val style: FloatingCallStyle? = null,
-    val orb: FloatingCallOrbStyle? = null,
     val edge: Boolean = false,
     val scenes: Boolean = false,
 ) {
@@ -266,7 +235,6 @@ data class FloatingCallLab(
         /** Reads the properties (a `getprop` each, cached): call off the main thread. */
         fun read(): FloatingCallLab = FloatingCallLab(
             style = VoiceLabEnvironment.string("LAB_FLOATING_CALL_STYLE")?.let { raw -> FloatingCallStyle.entries.firstOrNull { it.name == raw } },
-            orb = VoiceLabEnvironment.string("LAB_FLOATING_ORB")?.let(FloatingCallOrbStyle::fromRawValue),
             edge = VoiceLabEnvironment.flag("LAB_FLOATING_EDGE"),
             scenes = VoiceLabEnvironment.flag("LAB_FLOATING_SCENES"),
         )
@@ -591,9 +559,8 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screenWidth: Float, screenH
     val haptics = remember { dependency(HapticsClient) }
     val center = remember { FloatingCallCenter.shared }
     val scope = rememberCoroutineScope()
-    val livingOrbSetting by remember { shared(experimental(ExperimentalFeature.livingOrb)).flow }.collectAsState()
-    val usesLivingOrb = ExperimentalFeature.livingOrb.isActive(livingOrbSetting)
-    val orbDiameter = if (usesLivingOrb) WispOrbTunables.size.value.toFloat() else FloatingCallTunables.orbSize
+    // The face is always Wisp's orb (iOS 19f4d63c, e4aeb212).
+    val orbDiameter = WispOrbTunables.size.value.toFloat()
 
     val phase by store.observe { it.phase }
     val isReconnecting by store.observe { it.isReconnecting }
@@ -606,8 +573,7 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screenWidth: Float, screenH
     val scopeStage by store.observe { it.scopeStage }
 
     var lab by remember { mutableStateOf(FloatingCallLab.none) }
-    val style = if (usesLivingOrb) FloatingCallStyle.orb else lab.style ?: FloatingCallTunables.style
-    val orbStyle = lab.orb ?: FloatingCallTunables.orbStyle
+    val style = lab.style ?: FloatingCallTunables.style
     val defaultDocked = lab.edge || FloatingCallTunables.dock == FloatingCallDock.edge
 
     // Whether the break-out starts from the composer's call button: a fresh call tapped there.
@@ -736,11 +702,7 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screenWidth: Float, screenH
             lab = read
             if (read.scenes) {
                 while (isActive && !store.state.phase.isTerminal) {
-                    val scenes = if (usesLivingOrb) {
-                        listOf(FloatingCallScene.idle, FloatingCallScene.listening, FloatingCallScene.thinking, FloatingCallScene.agentSpeaking)
-                    } else {
-                        FloatingCallScene.entries
-                    }
+                    val scenes = listOf(FloatingCallScene.idle, FloatingCallScene.listening, FloatingCallScene.thinking, FloatingCallScene.agentSpeaking)
                     for (scene in scenes) {
                         center.scene = scene
                         delay(2_500)
@@ -851,27 +813,6 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screenWidth: Float, screenH
                     .clearAndSetSemantics {},
             )
         }
-        // Light from the face spills onto what's behind the surface, as Siri's does.
-        if (!usesLivingOrb && FloatingCallTunables.glow > 0 && stage != FloatingCallSurfaceStage.panel && orbStyle != FloatingCallOrbStyle.dots) {
-            val colors = when {
-                // The pearls' own light, subtle like the dots.
-                orbStyle.dotTake != null -> listOf(Color(0.98f, 0.9f, 0.78f), Color(0.78f, 0.86f, 1.0f))
-                orbStyle == FloatingCallOrbStyle.aurora -> FloatingCallPalette.aurora(dark)
-                else -> FloatingCallPalette.warm(dark) + FloatingCallPalette.cool(dark)
-            }
-            Box(
-                Modifier
-                    .placeAt { frameAnim.value.let { f -> Rect(center = f.center, radius = f.height * 1.25f / 2) } }
-                    .graphicsLayer {
-                        val f = frameAnim.value
-                        val blur = f.height * 0.45f * density
-                        renderEffect = if (blur > 0) BlurEffect(blur, blur, TileMode.Decal) else null
-                        alpha = (FloatingCallTunables.glow * 0.5).toFloat() * opacity.value
-                    }
-                    .background(Brush.sweepGradient(colors + colors[0]), CircleShape)
-                    .clearAndSetSemantics {},
-            )
-        }
         val tag = tagText
         AnimatedVisibility(
             visible = tag != null && stage == FloatingCallSurfaceStage.resting && drag == null,
@@ -960,20 +901,16 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screenWidth: Float, screenH
                     dragging = drag != null,
                     orbDiameter = orbDiameter,
                     face = {
-                        if (usesLivingOrb) {
-                            LivingOrbView(
-                                LivingOrbConfig(
-                                    mood = mood,
-                                    isMuted = isMuted,
-                                    isSpeaking = isAssistantSpeaking,
-                                    scene = center.scene,
-                                ),
-                                Modifier.fillMaxSize(),
-                                isHidden = !faceAwake,
-                            )
-                        } else {
-                            FloatingCallFace(orbStyle, mood, isMuted, Modifier.fillMaxSize(), scene = center.scene, isHidden = !faceAwake)
-                        }
+                        LivingOrbView(
+                            LivingOrbConfig(
+                                mood = mood,
+                                isMuted = isMuted,
+                                isSpeaking = isAssistantSpeaking,
+                                scene = center.scene,
+                            ),
+                            Modifier.fillMaxSize(),
+                            isHidden = !faceAwake,
+                        )
                     },
                     controls = {},
                 )
@@ -1044,18 +981,7 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screenWidth: Float, screenH
                         .alpha(panelAlpha)
                         .clearAndSetSemantics {},
                 ) {
-                    when (FloatingCallTunables.strip) {
-                        FloatingCallStripStyle.scope -> DotScopeView(DotScopeMode.Panel(scopeStage), Modifier.fillMaxSize(), isHidden = !panelAwake)
-                        FloatingCallStripStyle.matching -> FloatingCallFace(
-                            style = if (orbStyle == FloatingCallOrbStyle.dots || orbStyle == FloatingCallOrbStyle.activity) FloatingCallOrbStyle.vortex else orbStyle,
-                            mood = mood,
-                            isMuted = isMuted,
-                            modifier = Modifier.fillMaxSize(),
-                            scene = center.scene,
-                            cornerFraction = 0f,
-                            isHidden = !panelAwake,
-                        )
-                    }
+                    DotScopeView(DotScopeMode.Panel(scopeStage), Modifier.fillMaxSize(), isHidden = !panelAwake)
                 }
             }
             if (panelMounted) {
