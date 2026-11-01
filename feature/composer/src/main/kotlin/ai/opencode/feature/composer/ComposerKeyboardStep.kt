@@ -2,6 +2,7 @@ package ai.opencode.feature.composer
 
 import ai.opencode.core.motion.rememberReduceMotion
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
@@ -47,6 +48,14 @@ object DockedKeyboard {
         val step = covered(begin) - covered(end)
         return if (abs(step) > 0.5f && abs(step) <= 80f) step else null
     }
+
+    /**
+     * iOS `DockedKeyboard.focusAnimation`: the keyboard's own spring
+     * ([ComposerMorphTunables.keyboard]) for what moves with it, or null (no animation) under
+     * Reduce Motion or while the card lays out without the keyboard (`excludesKeyboard`).
+     */
+    fun focusAnimation(reduceMotion: Boolean, excludesKeyboard: Boolean): FiniteAnimationSpec<Float>? =
+        if (reduceMotion || excludesKeyboard) null else ComposerMorphTunables.keyboard()
 }
 
 /**

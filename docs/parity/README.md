@@ -84,7 +84,7 @@ under the same name; anything not ported anywhere is listed as deleted with its 
 | `:feature:voice` | 30 | 444 | 16 | 511 |
 | `:feature:system` | 9 | 88 | 2 | 89 |
 | `:feature:transcript` | 31 | 268 | 43 | 276 (1 env-gated metric skipped) |
-| `:feature:composer` | 38 | 252 | 28 | 252 |
+| `:feature:composer` | 39 | 252 | 32 | 252 |
 | `:feature:settings` | 17 | 98 | 10 | 98 |
 | `:feature:session` | 58 | 706 | 41 | 719 |
 | `:feature:drawer` | 49 | 422 | 12 | 424 |
