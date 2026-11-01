@@ -69,6 +69,11 @@ class ComposerAttachmentsFeature : Reducer<ComposerAttachmentsFeature.State, Com
 
     sealed interface Action {
         data class AttachmentAdded(val attachment: OpenCodeOutgoingAttachment) : Action
+        /**
+         * One the person already confirmed (Add answered the press), landing without a haptic
+         * of its own: one haptic per Add, not one per photo.
+         */
+        data class AttachmentLanded(val attachment: OpenCodeOutgoingAttachment) : Action
         data class AttachmentRemoved(val index: Int) : Action
         data class FilesStaged(val files: List<ComposerStagedFile>) : Action
         data class FileUploadProgress(val id: UUID, val sent: Long) : Action
@@ -95,7 +100,9 @@ class ComposerAttachmentsFeature : Reducer<ComposerAttachmentsFeature.State, Com
         return when (action) {
             is Action.AttachmentRemoved -> {
                 if (action.index !in state.pendingAttachments.indices) return Reduced(state)
-                Reduced(state.copy(pendingAttachments = state.pendingAttachments.filterIndexed { i, _ -> i != action.index }))
+                val next = state.copy(pendingAttachments = state.pendingAttachments.filterIndexed { i, _ -> i != action.index })
+                haptics.play(Haptic.lightTap)
+                Reduced(next)
             }
 
             Action.LocationTapped -> {
@@ -142,6 +149,7 @@ class ComposerAttachmentsFeature : Reducer<ComposerAttachmentsFeature.State, Com
             }
 
             is Action.AttachmentAdded,
+            is Action.AttachmentLanded,
             is Action.FilesStaged,
             Action.QueuedUploadsStarted,
             is Action.FileUploadProgress,

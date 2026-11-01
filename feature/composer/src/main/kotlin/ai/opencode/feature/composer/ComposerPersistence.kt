@@ -59,6 +59,9 @@ class ComposerPersistence(
     val loadUndelivered: (serverID: String, sessionID: String?) -> List<UndeliveredPrompts.Entry> = { _, _ -> emptyList() },
     val markUndelivered: (pending: PendingPrompt, reason: String, serverID: String, sessionID: String?) -> Unit = { _, _, _, _ -> },
     val settlePrompts: (messageIDs: Set<String>) -> Unit = {},
+    /** A session's model pick and request answers saved before a relaunch ([SessionStatePersistence.kt]). */
+    val loadSessionState: (serverID: String, sessionID: String) -> PersistedSessionState? = { _, _ -> null },
+    val scheduleSessionState: (serverID: String, sessionID: String, update: PersistedSessionState.Update) -> Unit = { _, _, _ -> },
     val removeSession: (serverID: String, sessionID: String?) -> Unit = { _, _ -> },
     val removeServer: (serverID: String) -> Unit = {},
     val flush: suspend () -> Unit = {},
@@ -112,6 +115,8 @@ class ComposerPersistence(
                 loadUndelivered = writer::loadUndelivered,
                 markUndelivered = writer::markUndelivered,
                 settlePrompts = writer::settlePrompts,
+                loadSessionState = writer::loadSessionState,
+                scheduleSessionState = writer::scheduleSessionState,
                 removeSession = writer::removeSession,
                 removeServer = writer::removeServer,
                 // iOS `await writer.flush()` runs off the main actor; the write never blocks the caller's thread.

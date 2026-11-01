@@ -102,7 +102,11 @@ object AttachmentPickerButton {
         val isEnabled: Boolean = true,
     )
 
+    /** Main's picker: [maxPhotoSelection] without the New Plus Menu. */
     const val MAX_PHOTO_SELECTION = 4
+
+    /** New Plus Menu's photo sheet takes up to 8 photos; main's picker stays at 4. */
+    fun maxPhotoSelection(plusMenu: Boolean): Int = if (plusMenu) 8 else MAX_PHOTO_SELECTION
 
     /** How long a touch rests on + before the menu opens under it. */
     val holdDuration: Duration = 250.milliseconds
@@ -405,7 +409,12 @@ class AttachmentMenuPress(private val haptics: HapticsClient = dependency(Haptic
 
     /** The menu opened, by a tap, a hold, or assistive technology. */
     fun menuOpened() {
-        haptics.play(Haptic.tap)
+        haptics.play(Haptic.lightTap)
+    }
+
+    /** A row tapped (a slide-release ticks in [ended]). */
+    fun rowTapped() {
+        haptics.play(Haptic.lightTap)
     }
 
     fun began(isOpen: Boolean) {
@@ -441,7 +450,7 @@ class AttachmentMenuPress(private val haptics: HapticsClient = dependency(Haptic
         if (isMenuUp && current.leftButton) {
             val item = item(at, rows)
             if (item != null) {
-                haptics.play(Haptic.tap)
+                haptics.play(Haptic.lightTap)
                 return Outcome.Choose(item)
             }
         }
