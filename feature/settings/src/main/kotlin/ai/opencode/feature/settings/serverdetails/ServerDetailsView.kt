@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings.serverdetails
 
+import ai.opencode.core.diagnostics.HidesFromScreenshots
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.StoreOf
@@ -190,6 +191,7 @@ fun ServerDetailsPage(store: SettingsStore) {
     val state = stateOrNull ?: return
     state.tray?.let { tray -> ServerDetailsTray(state, tray, send) }
     if (state.awaitingCode) CodeAlert(instructions = state.signIn?.attempt?.instructions ?: "", send = send)
+    HidesFromScreenshots(shown = state.awaitingCode)
 }
 
 /** iOS's “Paste the Code” alert for a `code` mode sign-in. */

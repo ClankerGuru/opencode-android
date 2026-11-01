@@ -1,5 +1,6 @@
 package ai.opencode.app
 
+import ai.opencode.core.diagnostics.HidesFromScreenshots
 import ai.opencode.core.store.Store
 import ai.opencode.core.store.StoreOf
 import ai.opencode.feature.media.MediaFeature
@@ -599,6 +600,8 @@ private fun ServerFormSheet(store: StoreOf<AppFeature.State, AppFeature.Action>)
         onDismissRequest = { store.send(AppFeature.Action.CancelEditingTapped) },
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
+        // Its password and headers, out of problem reports and voice screenshots.
+        HidesFromScreenshots()
         Box(Modifier.fillMaxWidth().heightIn(min = 48.dp), contentAlignment = Alignment.Center) {
             Text(
                 if (state.editingSavedServer == null) "New Server" else "Edit Server",
@@ -813,6 +816,7 @@ private fun PairingScannerPresenter(store: StoreOf<AppFeature.State, AppFeature.
         onDismissRequest = { store.send(AppFeature.Action.ScannerDismissed) },
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
+        HidesFromScreenshots()
         PairingScannerView(
             onScanned = { store.send(AppFeature.Action.PairingCodeScanned(it)) },
             onCancel = { store.send(AppFeature.Action.ScannerDismissed) },

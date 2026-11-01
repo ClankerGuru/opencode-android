@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings.onboarding
 
+import ai.opencode.core.diagnostics.HidesFromScreenshots
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.StoreOf
@@ -720,6 +721,7 @@ private fun ApertureLayer(
         ) {
             if (cameraFeed == CameraFeed.live) {
                 QRCameraPreview(isRunning = phase == Phase.camera, modifier = Modifier.fillMaxSize(), onScanned = onScanned)
+                HidesFromScreenshots()
             } else {
                 SimulatedCameraFeed(isRunning = phase == Phase.camera && !reduceMotion, modifier = Modifier.fillMaxSize())
             }
