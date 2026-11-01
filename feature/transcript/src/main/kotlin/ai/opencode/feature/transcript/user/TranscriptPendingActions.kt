@@ -26,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -76,39 +77,68 @@ class TranscriptPendingActions(
 }
 
 /**
+ * Why a send failed, and where its session can move when its folder is gone
+ * (`SessionFeature.State.missingFolderMoveTarget`) (iOS `TranscriptSendFailure`).
+ */
+data class TranscriptSendFailure(
+    val reason: String,
+    /** The name of the project whose folder Move to takes the session to. */
+    val moveTo: String? = null,
+    /** The session's move is on its way: Move to and Retry wait for it. */
+    val isMoving: Boolean = false,
+)
+
+/**
  * A message whose send failed (`SessionFeature.FailedSend`): what its bubble and the line below
  * it offer (iOS `TranscriptFailedSend`).
  */
 @Stable
 class TranscriptFailedSend(
-    val reason: String,
+    val failure: TranscriptSendFailure,
+    val move: () -> Unit,
     val retry: () -> Unit,
     val edit: () -> Unit,
     val delete: () -> Unit,
 ) {
+    val moveTitle: String? get() = failure.moveTo?.let { "Move to $it" }
+
     /** The bubble's menu: why it failed, then what to do about it. */
     @Composable
     fun Actions(dismiss: () -> Unit) {
         Text(
-            reason,
+            failure.reason,
             Modifier.padding(horizontal = 16.dp, vertical = 8.dp).widthIn(max = 280.dp),
             style = OpenCodeTextStyles.footnote,
             color = OpenCodeTheme.colors.secondaryText,
         )
         HorizontalDivider(color = OpenCodeTheme.colors.border)
-        UserMenuItem("Retry", "arrow.clockwise", dismiss, onClick = retry)
+        val moveTitle = moveTitle
+        if (failure.isMoving) {
+            UserMenuItem(moving, "folder", dismiss, enabled = false) {}
+        } else if (moveTitle != null) {
+            UserMenuItem(moveTitle, "folder", dismiss, onClick = move)
+        }
+        UserMenuItem("Retry", "arrow.clockwise", dismiss, enabled = !failure.isMoving, onClick = retry)
         UserMenuItem("Edit", "pencil", dismiss, onClick = edit)
         UserMenuItem("Delete", "trash", dismiss, destructive = true, onClick = delete)
     }
 
     val accessibilityActions: List<CustomAccessibilityAction>
-        get() = listOf(action("Retry", retry), action("Edit", edit), action("Delete", delete))
+        get() = buildList {
+            if (!failure.isMoving) {
+                moveTitle?.let { add(action(it, move)) }
+                add(action("Retry", retry))
+            }
+            add(action("Edit", edit))
+            add(action("Delete", delete))
+        }
 
-    override fun equals(other: Any?): Boolean = other is TranscriptFailedSend && other.reason == reason
-    override fun hashCode(): Int = reason.hashCode()
+    override fun equals(other: Any?): Boolean = other is TranscriptFailedSend && other.failure == failure
+    override fun hashCode(): Int = failure.hashCode()
 
     companion object {
         const val status = "Couldn’t send"
+        const val moving = "Moving…"
     }
 }
 
@@ -126,15 +156,21 @@ internal fun UserMenuItem(
     systemImage: String,
     dismiss: () -> Unit,
     destructive: Boolean = false,
+    enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
-    val color = if (destructive) OpenCodeTheme.colors.destructive else OpenCodeTheme.colors.text
+    val color = when {
+        !enabled -> OpenCodeTheme.colors.tertiaryText
+        destructive -> OpenCodeTheme.colors.destructive
+        else -> OpenCodeTheme.colors.text
+    }
     DropdownMenuItem(
         text = { Text(title, color = color) },
         onClick = {
             dismiss()
             onClick()
         },
+        enabled = enabled,
         leadingIcon = { OpenCodeIcon(systemImage, contentDescription = null, tint = color) },
     )
 }
@@ -193,21 +229,38 @@ internal fun TranscriptFailedSendLine(failedSend: TranscriptFailedSend, modifier
                     .rowHitTarget(top = 12.dp, bottom = 12.dp, target = Modifier.clickable { menu = true })
                     .clearAndSetSemantics {
                         contentDescription = TranscriptFailedSend.status
-                        stateDescription = failedSend.reason
+                        stateDescription = failedSend.failure.reason
                         customActions = failedSend.accessibilityActions
                     },
             )
             UserMessageMenu(menu, { menu = false }) { failedSend.Actions { menu = false } }
         }
         Text("·", style = style, color = OpenCodeTheme.colors.tertiaryText, modifier = Modifier.clearAndSetSemantics { })
-        Text(
-            "Retry",
-            style = style.copy(fontWeight = FontWeight.SemiBold),
-            color = OpenCodeTheme.colors.accent,
-            maxLines = 1,
-            modifier = Modifier
-                .rowHitTarget(top = 12.dp, bottom = 12.dp, target = Modifier.clickable(onClick = failedSend.retry))
-                .semantics { },
-        )
+        // Retry can't help while the session's folder is gone: moving it can.
+        if (failedSend.failure.isMoving) {
+            Text(
+                TranscriptFailedSend.moving,
+                style = style,
+                color = OpenCodeTheme.colors.secondaryText,
+                maxLines = 1,
+                modifier = Modifier.testTag("failed-send-moving"),
+            )
+        } else {
+            val moveTitle = failedSend.moveTitle
+            Text(
+                moveTitle ?: "Retry",
+                style = style.copy(fontWeight = FontWeight.SemiBold),
+                color = OpenCodeTheme.colors.accent,
+                maxLines = 1,
+                modifier = Modifier
+                    .rowHitTarget(
+                        top = 12.dp,
+                        bottom = 12.dp,
+                        target = Modifier.clickable(onClick = if (moveTitle == null) failedSend.retry else failedSend.move),
+                    )
+                    .semantics { }
+                    .testTag(if (moveTitle == null) "failed-send-retry" else "failed-send-move"),
+            )
+        }
     }
 }

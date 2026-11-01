@@ -31,7 +31,7 @@ fun TranscriptMessageRow(
     entry: TranscriptEntry?,
     queued: OpenCodeQueuedInput?,
     /** Why this message's send failed, if it did. */
-    failure: String?,
+    failure: TranscriptSendFailure?,
     /** Why it hasn't reached the server yet, when it's taking a while. */
     deliveryNote: String?,
     props: RowProps,
@@ -72,9 +72,10 @@ fun TranscriptMessageRow(
                         onCopy = { send(TranscriptAction.CopyTextTapped(it)) },
                         onRevertToHere = if (canRevertOwnMessage) ({ send(TranscriptAction.RevertToHereTapped(id)) }) else null,
                         revealArrival = revealArrival,
-                        failedSend = failure?.let { reason ->
+                        failedSend = failure?.let { failure ->
                             TranscriptFailedSend(
-                                reason = reason,
+                                failure = failure,
+                                move = { send(TranscriptAction.FailedSendMoveTapped(id)) },
                                 retry = { send(TranscriptAction.FailedSendRetryTapped(id)) },
                                 edit = { send(TranscriptAction.FailedSendEditTapped(id)) },
                                 delete = { send(TranscriptAction.FailedSendDeleteTapped(id)) },

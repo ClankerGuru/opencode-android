@@ -14,6 +14,7 @@ import ai.opencode.server.model.OpenCodeCompaction
 import ai.opencode.server.model.OpenCodeContextReading
 import ai.opencode.server.model.OpenCodeContextUsage
 import ai.opencode.server.model.OpenCodeImageAttachment
+import ai.opencode.server.model.OpenCodeMediaReference
 import ai.opencode.server.model.OpenCodeJSONValue
 import ai.opencode.server.model.OpenCodeModelRef
 import ai.opencode.server.model.OpenCodePromptPresentation
@@ -104,12 +105,7 @@ private fun runError(error: ErrorPayload, beforeReply: Boolean = false) =
 internal fun transcriptItems(message: MessagePayload): List<OpenCodeTranscriptItem> = when (message.type) {
     "user" -> {
         val items = mutableListOf<OpenCodeTranscriptItem>()
-        val images = (message.files ?: emptyList()).mapIndexedNotNull { index, file ->
-            val mime = file.mime ?: return@mapIndexedNotNull null
-            if (!mime.startsWith("image/")) return@mapIndexedNotNull null
-            val bytes = file.data?.let(::decodeBase64) ?: return@mapIndexedNotNull null
-            OpenCodeImageAttachment("${message.id}-img-$index", bytes)
-        }
+        val images = FilePayload.attachedImages(message.files ?: emptyList(), message.id)
         if (images.isNotEmpty()) items += OpenCodeTranscriptItem.UserImages("${message.id}-images", images)
         val references = OpenCodePromptPresentation.files(message.metadata)
         val inlineFiles = FilePayload.attachedFiles(message.files ?: emptyList(), message.id)
@@ -226,7 +222,8 @@ internal fun transcriptItems(message: MessagePayload): List<OpenCodeTranscriptIt
 
 /**
  * Tool results encode screenshots as `file` blocks with data-URI sources, decoded at the
- * protocol boundary. A tool's total resident image bytes stay bounded.
+ * protocol boundary, or as `media:<hash>` references (and the server's unavailable
+ * placeholder text). A tool's total resident image bytes stay bounded.
  */
 private fun toolImages(content: List<ToolContentPayload>?, idPrefix: String): List<OpenCodeImageAttachment> {
     val maxImages = 16
@@ -235,10 +232,36 @@ private fun toolImages(content: List<ToolContentPayload>?, idPrefix: String): Li
     var totalBytes = 0
     val images = mutableListOf<OpenCodeImageAttachment>()
     for ((index, part) in (content ?: emptyList()).withIndex()) {
-        if (images.size >= maxImages || part.type != "file") continue
+        if (images.size >= maxImages) continue
+        if (part.type == "text") {
+            val placeholder = part.text?.let { OpenCodeMediaReference.unavailablePlaceholder(it) }
+            if (placeholder != null && placeholder.mime.lowercase().startsWith("image/")) {
+                images += OpenCodeImageAttachment(
+                    id = "$idPrefix-image-$index",
+                    name = placeholder.name,
+                    mime = placeholder.mime,
+                    isUnavailable = true,
+                )
+                continue
+            }
+        }
+        if (part.type != "file") continue
         val mime = part.mime ?: continue
         if (!mime.lowercase().startsWith("image/")) continue
         val uri = part.uri ?: continue
+        val hash = OpenCodeMediaReference.hash(uri)
+        if (hash != null) {
+            images += OpenCodeImageAttachment(
+                id = "$idPrefix-image-$index",
+                mediaHash = hash,
+                name = (part.name ?: "").split("/").lastOrNull { it.isNotEmpty() },
+                mime = mime,
+                byteCount = part.bytes,
+                pixelWidth = part.width,
+                pixelHeight = part.height,
+            )
+            continue
+        }
         val comma = uri.indexOf(',')
         if (comma < 0) continue
         val header = uri.substring(0, comma).lowercase()

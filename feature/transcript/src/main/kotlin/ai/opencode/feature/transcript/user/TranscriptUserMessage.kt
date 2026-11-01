@@ -60,7 +60,9 @@ data class TranscriptUserMessage(
      * Whether every attachment on this message can be restored to the composer without losing
      * inline binary files whose bytes aren't retained.
      */
-    val canRestoreToComposer: Boolean get() = files.none { it.text == null && it.path == null }
+    val canRestoreToComposer: Boolean
+        get() = images.none { it.isUnavailable } &&
+            files.none { it.isUnavailable || (it.text == null && it.path == null && it.mediaHash == null) }
 
     companion object {
         /** A user group made of exactly one prompt's text, images, and files. */

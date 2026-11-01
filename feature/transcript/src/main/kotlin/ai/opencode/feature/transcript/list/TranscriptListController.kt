@@ -5,6 +5,7 @@ import ai.opencode.core.diagnostics.PerfTimeline
 import ai.opencode.core.log.AppLog
 import ai.opencode.core.motion.MotionFrameAction
 import ai.opencode.core.motion.motionFrameLoop
+import ai.opencode.feature.transcript.NewMessagesPlacement
 import ai.opencode.feature.transcript.TranscriptAction
 import ai.opencode.feature.transcript.TranscriptConfiguration
 import ai.opencode.feature.transcript.TranscriptDisclosureState
@@ -128,6 +129,8 @@ class TranscriptListController(
     private val removedHeights = HashMap<String, Float>()
     private val runResizedItems = HashSet<String>()
     private val revisedRows = HashMap<String, Double>()
+    /** iOS `browsingRevisedRows`: a browsing reader's rows an apply just changed (`markBrowsingRevisions`). */
+    private val browsingRevisedRows = HashMap<String, Double>()
     private val imageGrowths = HashMap<String, ai.opencode.feature.media.AgentImageRowGrowth>()
     private var readingAnchor: Pair<String, Int>? = null
     private var promotionUntil = 0.0
@@ -162,6 +165,20 @@ class TranscriptListController(
     private var revealsNewMessages = false
     /** The reveal slides to the end (what's new fit, so no divider): iOS `revealsToEnd`. */
     private var revealsToEnd = false
+    /** The New divider leaving or entering on the reader's screen (iOS `dividerMotion`). */
+    private var dividerMotion: NewDividerMotion? = null
+    /**
+     * The mark whose divider the reader last saw come onto their screen, and when (iOS
+     * `dividerSighting`).
+     */
+    private var dividerSighting: DividerSighting? = null
+    /** The divider's full measured height (px), before its motion fits it. */
+    private var dividerFullHeight: Int? = null
+    /** When the divider's glow started ([transcriptNow]; null with Reduce Motion or unseen). */
+    var dividerGlowStart: Double? by mutableStateOf(null)
+        private set
+
+    private class DividerSighting(val generation: Int, val at: Double)
 
     /** Agent-sent messages glow once on arrival (iOS `TranscriptAgentMessageReveal`). */
     var agentReveal = ai.opencode.feature.transcript.user.TranscriptAgentMessageReveal()
@@ -306,6 +323,7 @@ class TranscriptListController(
         removedHeights.clear()
         runResizedItems.clear()
         revisedRows.clear()
+        browsingRevisedRows.clear()
         imageGrowths.values.forEach { it.settle() }
         imageGrowths.clear()
         readingAnchor = null
@@ -335,6 +353,9 @@ class TranscriptListController(
         pendingNewMessagesLanding = null
         revealGlide = null
         revealsToEnd = false
+        dropDividerMotion()
+        dividerSighting = null
+        dividerGlowStart = null
         trailingSpace = 0f
         heldSpaceDrain = HeldSpaceDrain()
         emptyLoadingSince = null
@@ -377,7 +398,14 @@ class TranscriptListController(
             supersededQueuedIDs = plan.supersededQueuedIDs,
             sessionLinkIDsByStableID = sessionLinkIDsByStableID,
             drawsNewDivider = { TranscriptListSnapshot.drawsNewMessagesDivider(it, fittingNewMessages, newMessagesDecision) },
-        )
+        ).let { built ->
+            val items = holdingDivider(built.items, old.items, isInitial = previous == null || old === TranscriptListSnapshot.empty)
+            if (items === built.items) built else built.copy(items = items)
+        }
+        // Rows whose content this apply changed (iOS reconfigures them: `touched`). A snapshot here
+        // is only ever built from new data, so none is a repaint.
+        markBrowsingRevisions(next.rows.keys.filterTo(HashSet()) { id -> old.rows[id]?.let { it != next.rows[id] } == true }
+            .mapTo(HashSet()) { TranscriptItemID.Message(it).key }, isRepaint = false)
         if (previous != null && TranscriptItemID.Empty in old.items &&
             (TranscriptItemID.Empty !in next.items || previous.isLoading && !configuration.isLoading)
         ) {
@@ -454,7 +482,9 @@ class TranscriptListController(
             // Its content fades separately; the layout closes on the ordinary growth curve.
             if (!sent && !promoted && allowsGrowth(0f)) {
                 for ((index, item) in old.items.withIndex()) {
-                    if (item.key in nextKeys || item == TranscriptItemID.Empty || item == TranscriptItemID.History) continue
+                    if (item.key in nextKeys || item == TranscriptItemID.Empty || item == TranscriptItemID.History ||
+                        item == TranscriptItemID.NewDivider
+                    ) continue
                     val visible = lastLayout?.visibleItemsInfo?.firstOrNull { it.key == item.key } ?: continue
                     val above = old.items.take(index).lastOrNull { it.key in nextKeys }
                     val position = above?.let(next.items::indexOf)?.plus(1) ?: 0
@@ -532,6 +562,8 @@ class TranscriptListController(
         if (jumpGlide != null && "jump" !in motions) motions += "jump"
         if (growths.isNotEmpty()) motions += "grow"
         if (disclosureSprings.isNotEmpty()) motions += "disclosure"
+        if (revealGlide != null) motions += "reveal"
+        if (dividerMotion != null) motions += "divider"
         val phase = when {
             !hasLaidOutContent -> "opening"
             transcriptNow() < arrivalsGlideAfter -> "settle"
@@ -552,6 +584,9 @@ class TranscriptListController(
             insetBottom = TranscriptMotionTrace.round((info.afterContentPadding / density).toDouble()),
             height = TranscriptMotionTrace.round((info.viewportSize.height / density).toDouble()),
             width = TranscriptMotionTrace.round((info.viewportSize.width / density).toDouble()),
+            composerTop = info.afterContentPadding.takeIf { it > 0 }?.let {
+                TranscriptMotionTrace.round(((info.viewportSize.height - it) / density).toDouble())
+            },
         )
     }
 
@@ -610,7 +645,13 @@ class TranscriptListController(
     }
 
     fun visibilityChanged() {
-        if (isShowingToReader) lastLayout?.let(::onLayout) else finishGrowths()
+        if (isShowingToReader) {
+            lastLayout?.let(::onLayout)
+        } else {
+            finishGrowths()
+            // The divider's motion can't step off screen: it lands at its end.
+            finishDividerMotion()
+        }
     }
 
     private fun captureReadingAnchor() {
@@ -710,6 +751,7 @@ class TranscriptListController(
         if (abs(width - lastContentWidth) > 0.5f) finishGrowths()
         lastVisibleHeight = visibleHeight
         lastContentWidth = width
+        noteDividerSighting()
         var viewport = viewport(info)
         readingAnchor?.let { (key, offset) ->
             readingAnchor = null
@@ -818,6 +860,7 @@ class TranscriptListController(
         stopBottomSpring()
         revealGlide = null
         revealsToEnd = false
+        reverseDividerRead()
         readingAnchor = null
         finishGrowths()
         isUserGestureActive = true
@@ -963,7 +1006,8 @@ class TranscriptListController(
         motionJob = scope.launch {
             motionFrameLoop(frameDurationSeconds = frameDuration) { tick ->
                 now = transcriptNow()
-                if (stepMotion(tick.dt, min(tick.dt, tick.rawFrameDuration * tick.scale))) {
+                val dividerDt = tick.rawFrameDuration.coerceIn(1.0 / 240.0, 1.0 / 30.0) * tick.scale
+                if (stepMotion(tick.dt, min(tick.dt, tick.rawFrameDuration * tick.scale), dividerDt)) {
                     MotionFrameAction.Continue
                 } else {
                     // Measurement can start new growth before this coroutine resumes from
@@ -976,7 +1020,7 @@ class TranscriptListController(
     }
 
     /** One frame of every transcript motion. Returns whether anything is still moving. */
-    private fun stepMotion(dt: Double, followDt: Double): Boolean {
+    private fun stepMotion(dt: Double, followDt: Double, dividerDt: Double): Boolean {
         var moved = false
         if (trailingSpace > 0) {
             val held = trailingSpace
@@ -1091,7 +1135,9 @@ class TranscriptListController(
                 moved = moved || bottomSpring != null
             }
         }
-        return moved || bottomSpring != null || growths.isNotEmpty() || disclosureSprings.isNotEmpty()
+        if (dividerMotion != null) stepDividerMotion(dividerDt)
+        return moved || bottomSpring != null || growths.isNotEmpty() || disclosureSprings.isNotEmpty() ||
+            dividerMotion != null
     }
 
     private fun stepBottomSpring(spring: BottomSpring, dt: Double) {
@@ -1120,8 +1166,13 @@ class TranscriptListController(
             BottomSpring.Step.Settled -> {
                 stopBottomSpring()
                 if (remaining > 0) state.dispatchRawDelta(remaining * density)
+                // At rest at the end (a keyboard down, rows that shrank).
+                lastLayout?.let(::checkNewMessagesPassed)
             }
-            is BottomSpring.Step.ShrunkEnd -> stopBottomSpring()
+            is BottomSpring.Step.ShrunkEnd -> {
+                stopBottomSpring()
+                lastLayout?.let(::checkNewMessagesPassed)
+            }
         }
     }
 
@@ -1139,6 +1190,26 @@ class TranscriptListController(
         if (softEdges.isNotEmpty()) startMotion()
     }
 
+    /**
+     * iOS `markBrowsingRevisions`: a browsing reader's rows this apply reconfigured. One on screen
+     * at or below the reading row grows to its new height in [fittedHeight]; above it, the apply's
+     * anchor holds the view; off screen, it just lays out.
+     */
+    private fun markBrowsingRevisions(items: Set<String>, isRepaint: Boolean) {
+        if (behavior.mode != TranscriptScrollBehavior.Mode.Browsing || isRepaint || !hasLaidOutContent) return
+        val now = transcriptNow()
+        browsingRevisedRows.values.removeAll { now - it >= 1 }
+        for (item in items) if (item.startsWith("m:")) browsingRevisedRows[item] = now
+    }
+
+    /** iOS `isAboveReadingAnchor`: the row sits above the row the apply anchored the view on. */
+    private fun isAboveReadingAnchor(key: String): Boolean {
+        val anchor = readingAnchor?.first ?: return false
+        val anchorIndex = snapshot.items.indexOfFirst { it.key == anchor }
+        val index = snapshot.items.indexOfFirst { it.key == key }
+        return anchorIndex >= 0 && index in 0 until anchorIndex
+    }
+
     // MARK: Row growth (called from a row's measure pass)
 
     /**
@@ -1152,6 +1223,8 @@ class TranscriptListController(
         @Suppress("UNUSED_VARIABLE") val tick = frameTick
         val imageGrowth = imageGrowths[key.removePrefix("m:")]
         val revised = revisedRows[key]?.let { transcriptNow() - it < 1 } == true
+        // A browsing reader's row its snapshot just revised (`markBrowsingRevisions`).
+        val browsingRevised = browsingRevisedRows[key]?.let { transcriptNow() - it < 1 } == true
         val removed = removedHeights.remove(key) ?: 0f
         val runResized = runResizedItems.remove(key)
         val row = lastLayout?.visibleItemsInfo?.firstOrNull { it.key == key }
@@ -1204,7 +1277,12 @@ class TranscriptListController(
             startMotion()
             return from
         }
-        val changedRowMayGrow = revised && !reduceMotion && hasLaidOutContent && isShowingToReader &&
+        // On screen, changing from the height it was drawn at, at or below the reading row: above
+        // it, the apply's anchor holds the view; off screen, it just lays out.
+        val changedOnScreen = !entering && !runResized && settled != null && row != null && !isAboveReadingAnchor(key)
+        val browsingGrows = browsingRevised && changedOnScreen
+        if (changedOnScreen) browsingRevisedRows.remove(key)
+        val changedRowMayGrow = (revised || browsingGrows) && !reduceMotion && hasLaidOutContent && isShowingToReader &&
             !isUserGestureActive && jumpGlide == null && transcriptNow() >= promotionUntil &&
             transcriptNow() >= catchUpLandsUntil && abs(measured - from) <= lastVisibleHeight
         if (!allowsGrowth(measured - from) && !changedRowMayGrow) {
@@ -1217,7 +1295,7 @@ class TranscriptListController(
                 val entry = (snapshot.rows[key.removePrefix("m:")] as? MessageRow.Entry)?.entry
                 if (entry is TranscriptEntry.ReplyEnd) ai.opencode.feature.transcript.links.LinkPreviewMotion.grow else ai.opencode.feature.media.AgentImageTunables.grow
             } else null,
-        ).also { it.changedRow = revised }
+        ).also { it.changedRow = revised || browsingGrows }
         revisedRows.remove(key)
         imageGrowth?.beginGrowth()
         startMotion()
@@ -1303,12 +1381,13 @@ class TranscriptListController(
         pendingNewMessagesLanding = null
         landedNewMessages = generation
         if (!mark.showsDivider) {
-            fittingNewMessages = generation
-            send(TranscriptAction.NewMessagesFit(generation))
+            hideFittingDivider()
             return false
         }
         if (behavior.mode == TranscriptScrollBehavior.Mode.Browsing) {
-            newMessagesDecision = mark.entryID to true
+            // Browsing, the reader isn't at the end, but what's new may still all fit on the
+            // last screen: judged where they are (no glide runs here, no hand holds the list).
+            decideNewMessages(shows = !newMessagesFitInPlace(info))
             return false
         }
         val dividerIndex = snapshot.items.indexOf(TranscriptItemID.NewDivider)
@@ -1316,19 +1395,19 @@ class TranscriptListController(
         val divider = info.visibleItemsInfo.firstOrNull { it.index == dividerIndex }
         val last = info.visibleItemsInfo.lastOrNull()
         val laidOut = divider != null && last?.index == snapshot.items.lastIndex
+        val dividerHeight = newDividerHeight(info)
+        val overflow = TranscriptTunables.newOverflow
         val fits = if (laidOut) {
-            (last.offset + last.size - divider.offset) / density <= viewport(info).visibleHeight
+            val below = (last.offset + last.size - divider.offset) / density
+            newMessagesFit(dividerOffset = 0f, end = below - viewport(info).visibleHeight, dividerHeight, overflow)
         } else {
-            // iOS measures every row to the end before deciding. Laid out away from the end, the
+            // iOS measures rows to the end before deciding. Laid out away from the end, the
             // divider fits when it sits no further down than the end can come up (estimated).
-            dividerDistance()?.let { it >= distanceFromBottom() - 0.5f } ?: false
+            dividerDistance()?.let { newMessagesFit(it, distanceFromBottom(), dividerHeight, overflow) } ?: false
         }
         if (fits && !laidOut && revealsNewMessages && distanceFromBottom() > 1f) {
             // iOS `revealsToEnd`: it slides up to the end with no divider.
-            fittingNewMessages = generation
-            newMessagesDecision = mark.entryID to false
-            send(TranscriptAction.NewMessagesFit(generation))
-            snapshot = snapshot.copy(items = snapshot.items - TranscriptItemID.NewDivider)
+            decideNewMessages(shows = false)
             stopBottomSpring()
             finishGrowths()
             handleBehavior(TranscriptScrollBehavior.Event.RevealBegan)
@@ -1343,13 +1422,10 @@ class TranscriptListController(
         }
         if (fits) {
             // What's new fits below it: no divider, as in a chat app.
-            fittingNewMessages = generation
-            newMessagesDecision = mark.entryID to false
-            send(TranscriptAction.NewMessagesFit(generation))
-            snapshot = snapshot.copy(items = snapshot.items - TranscriptItemID.NewDivider)
+            decideNewMessages(shows = false)
             return false
         }
-        newMessagesDecision = mark.entryID to true
+        decideNewMessages(shows = true)
         stopBottomSpring()
         finishGrowths()
         handleBehavior(TranscriptScrollBehavior.Event.RevealBegan)
@@ -1376,9 +1452,276 @@ class TranscriptListController(
         val divider = info.visibleItemsInfo.firstOrNull { it.index == dividerIndex }
         val firstIndex = info.visibleItemsInfo.firstOrNull()?.index ?: return
         val passed = if (divider != null) divider.offset + divider.size <= 0 else firstIndex > dividerIndex
-        if (!passed) return
+        if (passed) {
+            passedNewMessages = mark.generation
+            send(TranscriptAction.NewMessagesPassed(mark.generation))
+            return
+        }
+        // At rest at the end with it still on screen, everything under it is in front of the
+        // reader: it fades and closes (`NewDividerMotion`), then goes.
+        if (divider == null || isUserGestureActive || bottomSpring != null) return
+        val viewport = viewport(info)
+        val dividerMaxY = viewport.offsetY + (divider.offset + divider.size) / density
+        val end = viewport.offsetY + distanceFromBottom(viewport)
+        if (!NewMessagesPlacement.isOnLastScreen(dividerMaxY, viewport.offsetY, topInset = 0f, end = end)) return
         passedNewMessages = mark.generation
-        send(TranscriptAction.NewMessagesPassed(mark.generation))
+        AppLog.app.debug("transcript new divider read generation=${mark.generation}")
+        if (!reduceMotion && dividerIsInView) {
+            startDividerLeave(reads = mark.generation)
+        } else {
+            closeReadDivider(mark.generation)
+        }
+    }
+
+    /**
+     * iOS `closeReadDivider`: a read divider off the screen, or with Reduce Motion (its row's
+     * removal fade is the cross-fade), closes at once without moving what's under it. At the end
+     * LazyColumn brings the rows above down into its place.
+     */
+    private fun closeReadDivider(generation: Int) {
+        if (configuration.newMessages?.generation != generation || TranscriptItemID.NewDivider !in snapshot.items) {
+            send(TranscriptAction.NewMessagesPassed(generation))
+            return
+        }
+        dropDividerMotion()
+        fittingNewMessages = generation
+        pendingEntrances.remove(TranscriptItemID.NewDivider.key)
+        snapshot = snapshot.copy(items = snapshot.items - TranscriptItemID.NewDivider)
+        send(TranscriptAction.NewMessagesPassed(generation))
+    }
+
+    /** iOS `decideNewMessages(shows:)`: whether the mark's divider shows; one that doesn't goes. */
+    private fun decideNewMessages(shows: Boolean) {
+        val mark = configuration.newMessages ?: return
+        if (!mark.showsDivider) return
+        newMessagesDecision = mark.entryID to shows
+        if (!shows) hideFittingDivider()
+    }
+
+    /**
+     * iOS `hideFittingDivider`: what's new fits, so the reader sees it at the end without the
+     * divider. One that came in this same update leaves before any frame draws it; one the
+     * reader has seen on their screen leaves with motion.
+     */
+    private fun hideFittingDivider() {
+        val generation = configuration.newMessages?.generation ?: return
+        fittingNewMessages = generation
+        landedNewMessages = generation
+        pendingEntrances.remove(TranscriptItemID.NewDivider.key)
+        val inSnapshot = TranscriptItemID.NewDivider in snapshot.items
+        if (inSnapshot && !reduceMotion && hasSeenDivider(generation) && dividerIsInView) {
+            startDividerLeave()
+            dividerMotion?.held = true
+        } else if (inSnapshot) {
+            dropDividerMotion()
+            snapshot = snapshot.copy(items = snapshot.items - TranscriptItemID.NewDivider)
+        }
+        send(TranscriptAction.NewMessagesFit(generation))
+    }
+
+    /**
+     * iOS `newMessagesFitInPlace`: whether what's new fits, judged with a browsing reader left
+     * where they are. Only once its top is on their screen: further up, it's screens below them,
+     * and the divider shows them where it starts. iOS measures rows to the end; here the rows
+     * not yet laid out count at their measured or average height.
+     */
+    private fun newMessagesFitInPlace(info: LazyListLayoutInfo): Boolean {
+        val divider = dividerDistance() ?: return false
+        val viewport = viewport(info)
+        if (!newMessagesInView(divider, offsetY = 0f, visibleHeight = viewport.visibleHeight)) return false
+        return newMessagesFit(divider, distanceFromBottom(viewport), newDividerHeight(info), TranscriptTunables.newOverflow)
+    }
+
+    /** The divider's laid-out height (dp): with it gone the end comes up by this much. */
+    private fun newDividerHeight(info: LazyListLayoutInfo): Float =
+        info.visibleItemsInfo.firstOrNull { it.key == TranscriptItemID.NewDivider.key }?.let(::heightOf)
+            ?: measuredHeights[TranscriptItemID.NewDivider.key] ?: 0f
+
+    // MARK: New divider motion (iOS `+DividerMotion`)
+
+    /** The divider row's height this frame (px; iOS `fittedDividerHeight`). Called from its measure pass. */
+    fun fittedDividerHeight(measured: Int): Int {
+        // Reading the tick subscribes the row's layout to motion frames.
+        frameTick
+        dividerFullHeight = measured
+        val motion = dividerMotion ?: return measured
+        return max(1, (measured * motion.shownHeight).roundToInt())
+    }
+
+    /** The divider row's opacity this frame. Called from its draw layer. */
+    fun dividerAlpha(): Float {
+        frameTick
+        return dividerMotion?.shownAlpha?.toFloat() ?: 1f
+    }
+
+    private val laidOutDivider: LazyListItemInfo?
+        get() = lastLayout?.visibleItemsInfo?.firstOrNull { it.key == TranscriptItemID.NewDivider.key }
+
+    /** iOS `dividerIsInView`: on the reader's screen, between the header and the composer. */
+    private val dividerIsInView: Boolean
+        get() = hasLaidOutContent && isShowingToReader && laidOutDivider?.let(::isInView) == true
+
+    private fun isInView(item: LazyListItemInfo): Boolean {
+        val info = lastLayout ?: return false
+        val bottom = info.viewportEndOffset - info.afterContentPadding
+        return item.offset + item.size > density && item.offset < bottom - density
+    }
+
+    /** iOS `hasSeenDivider`: the reader saw this mark's divider come on screen a frame or more ago. */
+    private fun hasSeenDivider(generation: Int): Boolean {
+        val sighting = dividerSighting ?: return false
+        return sighting.generation == generation && transcriptNow() - sighting.at > 1.0 / 30.0
+    }
+
+    /** iOS `noteDividerSighting`: the first time a mark's divider is on the reader's screen, it glows. */
+    private fun noteDividerSighting() {
+        val generation = configuration.newMessages?.generation ?: return
+        if (dividerSighting?.generation == generation || dividerMotion?.direction == NewDividerMotion.Direction.Leaving ||
+            !dividerIsInView
+        ) return
+        val now = transcriptNow()
+        dividerSighting = DividerSighting(generation, now)
+        dividerGlowStart = if (reduceMotion) null else now
+    }
+
+    /**
+     * iOS `holdingDivider(in:oldOrder:configuration:isInitial:)`: a divider leaving the reader's
+     * screen keeps its row while its motion runs; one coming back for the landed mark enters.
+     */
+    private fun holdingDivider(items: List<TranscriptItemID>, oldOrder: List<TranscriptItemID>, isInitial: Boolean): List<TranscriptItemID> {
+        val had = TranscriptItemID.NewDivider in oldOrder
+        val has = TranscriptItemID.NewDivider in items
+        if (isInitial || !hasLaidOutContent) {
+            dividerMotion = null
+            return items
+        }
+        if (dividerMotion == null && had && !has && dividerIsInView) {
+            // With Reduce Motion its row's removal fade is the cross-fade.
+            if (reduceMotion) return items
+            startDividerLeave(wakes = false)
+            pendingEffects += { startMotion() }
+        }
+        val mark = configuration.newMessages
+        if (dividerMotion == null && !had && has && !reduceMotion && pendingNewMessagesLanding == null &&
+            mark != null && mark.generation == landedNewMessages && isShowingToReader
+        ) {
+            val index = items.indexOf(TranscriptItemID.NewDivider)
+            val below = items.getOrNull(index + 1)
+            val belowInView = below != null && lastLayout?.visibleItemsInfo?.firstOrNull { it.key == below.key }?.let(::isInView) == true
+            if (belowInView) {
+                dividerMotion = NewDividerMotion(NewDividerMotion.Direction.Entering, height = 0.0, alpha = 0.0)
+                pendingEffects += { startMotion() }
+            }
+        }
+        val motion = dividerMotion ?: return items
+        if (has) {
+            // Its mark brought it back: it turns round where it stands.
+            if (motion.held) {
+                motion.held = false
+                motion.reads = null
+                motion.turn(NewDividerMotion.Direction.Entering)
+            }
+            return items
+        }
+        val index = oldOrder.indexOf(TranscriptItemID.NewDivider)
+        val below = if (index < 0) null else oldOrder.subList(index + 1, oldOrder.size).firstOrNull { it in items }
+        val at = below?.let(items::indexOf) ?: -1
+        if (at < 0) {
+            dividerMotion = null
+            return items
+        }
+        if (!motion.held || motion.direction != NewDividerMotion.Direction.Leaving) {
+            motion.held = true
+            motion.turn(NewDividerMotion.Direction.Leaving)
+        }
+        return items.toMutableList().apply { add(at, TranscriptItemID.NewDivider) }
+    }
+
+    /** iOS `startDividerLeave(reads:)`: it fades and closes; read at rest, it answers [reads] once closed. */
+    private fun startDividerLeave(reads: Int? = null, wakes: Boolean = true) {
+        val motion = dividerMotion
+        if (motion != null) {
+            motion.turn(NewDividerMotion.Direction.Leaving)
+            if (reads != null) motion.reads = reads
+        } else {
+            dividerMotion = NewDividerMotion(NewDividerMotion.Direction.Leaving, height = 1.0, alpha = 1.0).also { it.reads = reads }
+        }
+        if (wakes) startMotion()
+    }
+
+    /** iOS `reverseDividerRead`: the reader takes the list mid-close, so it hasn't been read yet. */
+    private fun reverseDividerRead() {
+        val motion = dividerMotion ?: return
+        if (motion.direction != NewDividerMotion.Direction.Leaving || motion.reads == null || motion.held) return
+        motion.reads = null
+        motion.turn(NewDividerMotion.Direction.Entering)
+        passedNewMessages = null
+        startMotion()
+    }
+
+    private fun dropDividerMotion() {
+        if (dividerMotion == null) return
+        dividerMotion = null
+        frameTick++
+    }
+
+    /** iOS `stepDividerMotion`: [dt] is the frame clamped to 1/240…1/30 s, on the animation time scale. */
+    private fun stepDividerMotion(dt: Double) {
+        val motion = dividerMotion ?: return
+        motion.height.step(dt)
+        motion.alpha.step(dt)
+        // Gone from the screen (scrolled away, the app left), it lands.
+        val item = laidOutDivider
+        if (item == null || !isShowingToReader) {
+            finishDividerMotion()
+            return
+        }
+        resizeDivider(item)
+        if (motion.isSettled) finishDividerMotion()
+    }
+
+    private fun finishDividerMotion() {
+        val motion = dividerMotion ?: return
+        dividerMotion = null
+        when (motion.direction) {
+            NewDividerMotion.Direction.Entering -> laidOutDivider?.let(::resizeDivider) ?: frameTick++
+            NewDividerMotion.Direction.Leaving -> {
+                val reads = motion.reads
+                // Its row is gone for this mark, as one that fit is.
+                if (reads != null && configuration.newMessages?.generation == reads) fittingNewMessages = reads
+                pendingEntrances.remove(TranscriptItemID.NewDivider.key)
+                if (TranscriptItemID.NewDivider in snapshot.items) {
+                    snapshot = snapshot.copy(items = snapshot.items - TranscriptItemID.NewDivider)
+                }
+                frameTick++
+                if (reads != null) send(TranscriptAction.NewMessagesPassed(reads))
+            }
+        }
+    }
+
+    /**
+     * iOS `resizeDivider`: the divider lays out at its motion's height this frame. A follower at
+     * the end stays pinned to it (a shrinking end LazyColumn fills from above by itself); a
+     * reading row below the divider stays where it is.
+     */
+    private fun resizeDivider(item: LazyListItemInfo) {
+        val full = dividerFullHeight
+        frameTick++
+        if (full == null) return
+        val next = dividerMotion?.let { max(1, (full * it.shownHeight).roundToInt()) } ?: full
+        val delta = next - item.size
+        if (delta == 0) return
+        val pinsEnd = behavior.mode == TranscriptScrollBehavior.Mode.Following && !isUserGestureActive && distanceFromBottom() <= 1f
+        val readsBelow = !pinsEnd && lastLayout?.visibleItemsInfo
+            ?.firstOrNull { (it.key as? String)?.removePrefix("m:")?.let(snapshot.rows::get) is MessageRow.Entry && it.offset + it.size > 44 * density }
+            ?.let { it.index > item.index } == true
+        if (!pinsEnd && !readsBelow) return
+        if (delta > 0) {
+            // In this frame's measure, as the growth ride does: a plain scroll is refused at the old end.
+            state.requestScrollToItem(state.firstVisibleItemIndex, state.firstVisibleItemScrollOffset + delta)
+        } else if (readsBelow) {
+            state.dispatchRawDelta(delta.toFloat())
+        }
     }
 
     /** Exact once the divider enters view; measured row heights carry the glide until then. */
@@ -1403,6 +1746,21 @@ class TranscriptListController(
             for (i in index until first.index) distance -= measuredHeights[snapshot.items[i].key] ?: average
         }
         return distance
+    }
+
+    companion object {
+        /**
+         * iOS `newMessagesFit`: what's below the divider fits when, with the divider gone (the end
+         * comes up by its height), the reader at the end sees it all, give or take [overflow]: a
+         * reply a line or two taller than the screen reads from the end rather than making them
+         * scroll down from a divider.
+         */
+        fun newMessagesFit(dividerOffset: Float, end: Float, dividerHeight: Float, overflow: Float): Boolean =
+            dividerOffset >= end - dividerHeight - max(overflow, 0f) - 1
+
+        /** iOS `newMessagesInView`: the top of what's new is on the reader's screen, with them at [offsetY]. */
+        fun newMessagesInView(dividerOffset: Float, offsetY: Float, visibleHeight: Float): Boolean =
+            dividerOffset >= offsetY - 1 && dividerOffset < offsetY + visibleHeight
     }
 
     // MARK: Session links

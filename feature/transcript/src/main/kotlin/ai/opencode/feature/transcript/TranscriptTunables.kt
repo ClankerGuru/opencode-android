@@ -1,8 +1,10 @@
 package ai.opencode.feature.transcript
 
+import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.MotionTunables
 import ai.opencode.core.tuning.Tunable
 import ai.opencode.core.tuning.TunableChoice
+import ai.opencode.core.tuning.TunableSpring
 import ai.opencode.core.tuning.TuningPreset
 import ai.opencode.core.tuning.TuningPresets
 import ai.opencode.core.tuning.TuningStore
@@ -23,6 +25,11 @@ import androidx.compose.ui.unit.dp
  * mid-animation never causes a jump. Points port 1:1 to dp/sp.
  */
 object TranscriptTunables {
+    /** The Tuning Panel sections it registers (the key segment after the group), in order (iOS `sectionTitles`). */
+    val sectionTitles = listOf(
+        "Arrivals", "Text Reveal", "Growth", "Follow", "Promotion", "Send", "Jump", "Reveal", "Divider", "Typography", "Row", "Bubble", "Card",
+    )
+
     /** The declarations (iOS `TranscriptTunables.<name>` tunables). */
     object Knobs {
         // Arrivals
@@ -54,6 +61,8 @@ object TranscriptTunables {
         // Send
         val sendFlightOmega = Tunable("transcript.send.flightOmega", "Send flight ω", default = 14.0, range = 6.0..32.0, step = 0.5)
         val sendPillDuration = Tunable("transcript.send.pillDuration", "Queued pill flight", default = 0.45, range = 0.15..1.0, step = 0.02)
+        /** iOS `sendBubbleWaitMax` (declared with the send flights): how long a flight waits for a bubble below its words. */
+        val sendBubbleWaitMax = Tunable("transcript.send.bubbleWaitMax", "Wait for low bubble (s)", default = 0.3, range = 0.0..0.8, step = 0.02)
 
         // Jump
         val jumpDuration = Tunable("transcript.jump.duration", "Jump glide duration", default = 0.5, range = 0.15..1.2, step = 0.02)
@@ -63,8 +72,15 @@ object TranscriptTunables {
         // Reveal
         val newMinDuration = Tunable("transcript.reveal.newMinDuration", "New divider min glide", default = 0.28, range = 0.1..0.8, step = 0.02)
         val newMaxDuration = Tunable("transcript.reveal.newMaxDuration", "New divider max glide", default = 0.62, range = 0.2..1.4, step = 0.02)
+        val newOverflow = Tunable("transcript.reveal.newOverflow", "New divider: overflow before it shows (pt)", default = 120f, range = 0.0..320.0, step = 10.0)
         val agentGlowRise = Tunable("transcript.reveal.agentGlowRise", "Agent glow rise (s)", default = 0.07, range = 0.02..0.25, step = 0.01)
         val agentGlowDuration = Tunable("transcript.reveal.agentGlowDuration", "Agent glow decay (s)", default = 1.39, range = 0.4..3.0, step = 0.05)
+
+        // Divider (iOS declares these beside `NewMessagesDivider`)
+        val dividerCollapse = TunableSpring("transcript.divider.collapse", "New divider collapse", duration = 0.42, bounce = 0.0)
+        val dividerFade = TunableSpring("transcript.divider.fade", "New divider fade", duration = 0.3, bounce = 0.0)
+        val dividerGlowLift = Tunable("transcript.divider.glowLift", "New divider glow lift", default = 0.45, range = 0.0..1.0, step = 0.05)
+        val dividerGlowDuration = Tunable("transcript.divider.glowDuration", "New divider glow dim (s)", default = 1.0, range = 0.2..3.0, step = 0.05)
 
         // Row, Bubble & Card Layout
         val flowHalf = Tunable("transcript.row.flowHalf", "Reply row half-gap", default = 8f, range = 2.0..20.0, step = 1.0)
@@ -120,6 +136,7 @@ object TranscriptTunables {
     // Send
     val sendFlightOmega: Double get() = Knobs.sendFlightOmega.value
     val sendPillDuration: Double get() = Knobs.sendPillDuration.value
+    val sendBubbleWaitMax: Double get() = Knobs.sendBubbleWaitMax.value
 
     // Jump
     val jumpDuration: Double get() = Knobs.jumpDuration.value
@@ -131,6 +148,17 @@ object TranscriptTunables {
     val newMaxDuration: Double get() = Knobs.newMaxDuration.value
     val agentGlowRise: Double get() = Knobs.agentGlowRise.value
     val agentGlowDuration: Double get() = Knobs.agentGlowDuration.value
+    /** What's under the New divider may run this far past the screen and still read from the end (pt). */
+    val newOverflow: Float get() = Knobs.newOverflow.value
+
+    // Divider
+    /** The New divider's height closing (or opening) on the reader's screen. */
+    val dividerCollapse: MotionSpring get() = Knobs.dividerCollapse.spring
+    /** The New divider fading out (or in) as it closes. */
+    val dividerFade: MotionSpring get() = Knobs.dividerFade.spring
+    /** The first time a mark's divider is on screen it starts this much brighter and dims. */
+    val dividerGlowLift: Double get() = Knobs.dividerGlowLift.value
+    val dividerGlowDuration: Double get() = Knobs.dividerGlowDuration.value
 
     // Row, bubble & card layout
     val flowHalf: Float get() = Knobs.flowHalf.value
@@ -290,9 +318,14 @@ object TranscriptTunables {
             store.register(entranceRise, growthMaxFrameChange, growthSoftEdge)
             store.register(arrivalOmega, viewportOmega, maxFrameStep)
             store.register(arrivalReach)
-            store.register(promotionDuration, sendFlightOmega, sendPillDuration, jumpDuration)
+            // iOS registers `sendImageDuration` (composer `SentImageFlight`) after `jumpDuration`.
+            store.register(promotionDuration, sendFlightOmega, sendPillDuration, sendBubbleWaitMax, jumpDuration)
             store.register(promotionLabelRise, jumpReach, jumpLead)
             store.register(newMinDuration, newMaxDuration, agentGlowRise, agentGlowDuration)
+            store.register(dividerCollapse)
+            store.register(dividerFade)
+            store.register(dividerGlowLift, dividerGlowDuration)
+            store.register(newOverflow)
             store.register(typography)
             for (presets in cardPresets) store.register(presets)
             TextRevealTunables.register(store)

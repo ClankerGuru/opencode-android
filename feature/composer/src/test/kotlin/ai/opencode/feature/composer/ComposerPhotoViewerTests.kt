@@ -65,9 +65,8 @@ class ComposerPhotoViewerTests {
         assertEquals(listOf(first, second).map { ComposerPhotoViewer.mediaID(it.id) }, preview.pages.map { it.id })
         assertEquals(listOf("Image attachment 1 of 2", "Image attachment 2 of 2"), preview.pages.map { it.label })
         assertTrue("Generic labels show no title", preview.pages.all { it.displayTitle == null })
-        // iOS reads this off `pages[1].detail`; the page's detail line is media's (see the class doc).
         val size = AttachmentFileType.byteCount(second.data.size.toLong())
-        assertEquals("JPEG · 20 × 50 · $size", ComposerPhotoViewer.detail(second, preview.pages[1].image))
+        assertEquals("JPEG · 20 × 50 · $size", preview.pages[1].detail)
         assertNull(ComposerPhotoViewer.preview(listOf(first), selected = second.id))
     }
 }

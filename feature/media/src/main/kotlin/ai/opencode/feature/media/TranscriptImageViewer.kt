@@ -12,6 +12,7 @@ import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
 import ai.opencode.core.store.Store
 import ai.opencode.core.store.StoreOf
+import ai.opencode.core.store.cancellable
 import ai.opencode.core.store.collectState
 import ai.opencode.core.ui.OpenCodeIconButton
 import ai.opencode.core.ui.OpenCodeIconButtonStyle
@@ -23,6 +24,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.os.Environment
 import android.provider.MediaStore
 import android.view.accessibility.AccessibilityManager
@@ -30,8 +32,11 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -47,6 +52,7 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -68,6 +74,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
+import kotlin.math.min
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.withContext
@@ -175,6 +182,7 @@ class ImageShareClient(
  */
 val TranscriptImagePreview.Page.displayTitle: String?
     get() {
+        name?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
         val trimmed = label.trim()
         if (trimmed.isEmpty()) return null
         val lower = trimmed.lowercase()
@@ -210,22 +218,64 @@ class TranscriptImageViewerFeature : Reducer<TranscriptImageViewerFeature.State,
         val isShowingControls: Boolean = false,
         val isSaving: Boolean = false,
         val isDismissed: Boolean = false,
+        /** Pages can be taken out (a composer's pending photos). */
+        val allowsRemove: Boolean = false,
+        /** The last page was removed: the viewer goes without flying home. */
+        val isDiscarded: Boolean = false,
     ) {
         val selectedPage: TranscriptImagePreview.Page?
             get() = preview.pages.firstOrNull { it.id == selectedID } ?: preview.pages.firstOrNull()
     }
 
     sealed interface Action {
+        data object Task : Action
         data class PageSelected(val id: String) : Action
+        data class RetryPageTapped(val id: String) : Action
+        data class MediaLoaded(val pageID: String, val result: MediaReferenceLoadResult) : Action
         data object ImageTapped : Action
         data object CloseTapped : Action
         data object SaveTapped : Action
         data class SaveFinished(val saved: Boolean) : Action
         data object ShareTapped : Action
+        data object RemoveTapped : Action
+        data class Delegate(val action: DelegateAction) : Action
+
+        sealed interface DelegateAction {
+            /** The page's media is no longer wanted. */
+            data class Removed(val id: String) : DelegateAction
+        }
     }
 
+    private data class PageLoadID(val id: String)
+
     override fun reduce(state: State, action: Action): Reduced<State, Action> = when (action) {
-        is Action.PageSelected -> Reduced(state.copy(selectedID = action.id))
+        Action.Task -> loadPageIfNeeded(state.selectedID, state)
+
+        is Action.PageSelected -> loadPageIfNeeded(action.id, state.copy(selectedID = action.id))
+
+        is Action.RetryPageTapped -> loadPageIfNeeded(action.id, state, forceRetry = true)
+
+        is Action.MediaLoaded -> {
+            val index = state.preview.pages.indexOfFirst { it.id == action.pageID }
+            if (index < 0) {
+                Reduced(state)
+            } else {
+                val page = state.preview.pages[index]
+                val updated = when (val result = action.result) {
+                    is MediaReferenceLoadResult.Loaded -> {
+                        val image = CachedImage.decoded(action.pageID, result.data, page.mediaHash) ?: decodeBitmap(result.data)
+                        if (image != null) {
+                            page.copy(image = image, isUnavailable = false, loadFailed = false)
+                        } else {
+                            page.copy(loadFailed = true)
+                        }
+                    }
+                    MediaReferenceLoadResult.Unavailable -> page.copy(isUnavailable = true, loadFailed = false)
+                    is MediaReferenceLoadResult.Failed -> page.copy(loadFailed = true)
+                }
+                Reduced(state.withPage(index, updated))
+            }
+        }
 
         Action.ImageTapped -> Reduced(state.copy(isShowingControls = !state.isShowingControls))
 
@@ -264,14 +314,65 @@ class TranscriptImageViewerFeature : Reducer<TranscriptImageViewerFeature.State,
 
         Action.ShareTapped -> {
             val page = state.selectedPage
-            if (page == null) {
+            val image = page?.image
+            if (page == null || image == null) {
                 Reduced(state)
             } else {
                 val imageShare = dependency(ImageShareClient)
-                Reduced(state, Effect.run { _ -> imageShare.share(page.image, page.label) })
+                Reduced(state, Effect.run { _ -> imageShare.share(image, page.label) })
             }
         }
+
+        Action.RemoveTapped -> {
+            val index = state.preview.pages.indexOfFirst { it.id == state.selectedID }
+            if (!state.allowsRemove || state.isDiscarded || index < 0) {
+                Reduced(state)
+            } else {
+                val pages = state.preview.pages.toMutableList()
+                val removed = pages.removeAt(index)
+                val next = if (pages.isEmpty()) {
+                    state.copy(isDiscarded = true)
+                } else {
+                    state.copy(
+                        preview = TranscriptImagePreview(state.preview.id, pages, state.preview.server),
+                        selectedID = pages[min(index, pages.size - 1)].id,
+                    )
+                }
+                Reduced(next, Effect.send(Action.Delegate(Action.DelegateAction.Removed(removed.id))))
+            }
+        }
+
+        is Action.Delegate -> Reduced(state)
     }
+
+    private fun loadPageIfNeeded(id: String, state: State, forceRetry: Boolean = false): Reduced<State, Action> {
+        val index = state.preview.pages.indexOfFirst { it.id == id }
+        if (index < 0) return Reduced(state)
+        val page = state.preview.pages[index]
+        val hash = page.mediaHash
+        if (page.image != null || page.isUnavailable || (!forceRetry && page.loadFailed) || hash == null) return Reduced(state)
+        val mediaReferences = dependency(MediaReferenceClient)
+        val loading = state.withPage(index, page.copy(loadFailed = false))
+        val server = state.preview.server
+        if (server == null) {
+            val image = mediaReferences.cachedData(hash)?.let { data -> CachedImage.decoded(id, data, hash) ?: decodeBitmap(data) }
+            val resolved = if (image != null) page.copy(loadFailed = false, image = image) else page.copy(loadFailed = false, isUnavailable = true)
+            return Reduced(state.withPage(index, resolved))
+        }
+        return Reduced(
+            loading,
+            Effect.run<Action> { send ->
+                val result = mediaReferences.load(server, hash)
+                send(Action.MediaLoaded(id, result))
+            }.cancellable(PageLoadID(id), cancelInFlight = true),
+        )
+    }
+
+    private fun State.withPage(index: Int, page: TranscriptImagePreview.Page): State =
+        copy(preview = preview.copy(pages = preview.pages.toMutableList().also { it[index] = page }))
+
+    private fun decodeBitmap(data: ByteArray): Bitmap? =
+        if (data.isEmpty()) null else BitmapFactory.decodeByteArray(data, 0, data.size)
 }
 
 // MARK: - View
@@ -303,11 +404,14 @@ fun TranscriptImageViewer(
     val talkBack = rememberTalkBackEnabled()
     val pages = state.preview.pages
 
-    // iOS `init`: the status bar and the image on screen, before the flight starts.
-    DisposableEffect(viewer, state.selectedID) {
+    // iOS `init`: the status bar and the image on screen, before the flight starts; again
+    // once a `media:<hash>` page's image arrives.
+    val hasImage = state.selectedPage?.image != null
+    DisposableEffect(viewer, state.selectedID, hasImage) {
         viewer.show(sourceID = state.selectedID, image = state.selectedPage?.image)
         onDispose { }
     }
+    LaunchedEffect(store) { store.send(TranscriptImageViewerFeature.Action.Task) }
     val showing = state.isShowingControls || talkBack
     DisposableEffect(viewer, showing) {
         viewer.setStatusBarHidden(!showing)
@@ -315,6 +419,9 @@ fun TranscriptImageViewer(
     }
     LaunchedEffect(state.isDismissed) {
         if (state.isDismissed) viewer.dismiss()
+    }
+    LaunchedEffect(state.isDiscarded) {
+        if (state.isDiscarded) viewer.discard()
     }
 
     val controlsVisible = controlsAreVisible(state.isShowingControls, talkBack, viewer.chromeHidden)
@@ -330,6 +437,11 @@ fun TranscriptImageViewer(
                 if (id != store.state.selectedID) store.send(TranscriptImageViewerFeature.Action.PageSelected(id))
             }
         }
+        // A removed page hands the selection on: the pager follows it.
+        LaunchedEffect(pagerState, pages, state.selectedID) {
+            val target = pages.indexOfFirst { it.id == state.selectedID }
+            if (target >= 0 && target != pagerState.currentPage) pagerState.scrollToPage(target)
+        }
         HorizontalPager(
             state = pagerState,
             modifier = Modifier.fillMaxSize().testTag("image-gallery"),
@@ -338,15 +450,37 @@ fun TranscriptImageViewer(
         ) { index ->
             val page = pages[index]
             val selected = state.selectedID == page.id
-            ZoomableImagePage(
-                image = page.image,
-                label = page.label,
-                isSelected = selected,
-                isHidden = viewer.mediaHidden && selected,
-                onSingleTap = { store.send(TranscriptImageViewerFeature.Action.ImageTapped) },
-                onZoomChange = { zoomed -> if (store.state.selectedID == page.id) viewer.isZoomed = zoomed },
-                onFrame = { viewer.mediaFrames[page.id] = it },
+            val image = page.image
+            val tap = { store.send(TranscriptImageViewerFeature.Action.ImageTapped) }
+            val placeholder = Modifier.fillMaxSize().background(Color.Black).clickable(
+                interactionSource = null,
+                indication = null,
+                onClick = tap,
             )
+            when {
+                image != null -> ZoomableImagePage(
+                    image = image,
+                    label = page.label,
+                    isSelected = selected,
+                    isHidden = viewer.mediaHidden && selected,
+                    onSingleTap = tap,
+                    onZoomChange = { zoomed -> if (store.state.selectedID == page.id) viewer.isZoomed = zoomed },
+                    onFrame = { viewer.mediaFrames[page.id] = it },
+                )
+                page.isUnavailable -> Box(placeholder) {
+                    MediaAttachmentUnavailableView(name = page.name ?: page.displayTitle)
+                }
+                page.loadFailed -> Box(placeholder) {
+                    MediaAttachmentUnavailableView(
+                        name = page.name ?: page.displayTitle,
+                        onRetry = { store.send(TranscriptImageViewerFeature.Action.RetryPageTapped(page.id)) },
+                        isTransientFailure = true,
+                    )
+                }
+                else -> Box(placeholder, contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = Color.White)
+                }
+            }
         }
 
         val safe = WindowInsets.systemBarsIgnoringVisibility.union(WindowInsets.displayCutout)
@@ -368,23 +502,56 @@ fun TranscriptImageViewer(
                 )
             }
             val title = state.selectedPage?.displayTitle
+            val detail = state.selectedPage?.detail
             AnimatedVisibility(
-                visible = controlsVisible && title != null,
+                visible = controlsVisible && (title != null || detail != null),
                 enter = enter,
                 exit = exit,
                 modifier = Modifier.align(Alignment.TopCenter).padding(horizontal = 76.dp).padding(top = 8.dp),
             ) {
-                Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.Center) {
-                    Text(
-                        text = title.orEmpty(),
-                        style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium),
-                        color = Color.White.copy(alpha = 0.85f),
-                        maxLines = 1,
-                        overflow = TextOverflow.MiddleEllipsis,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.wrapContentHeight().testTag("image-gallery-title"),
-                    )
+                Column(
+                    Modifier.heightIn(min = 48.dp),
+                    verticalArrangement = Arrangement.spacedBy(1.dp, Alignment.CenterVertically),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    if (title != null) {
+                        Text(
+                            text = title,
+                            style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium),
+                            color = Color.White.copy(alpha = 0.85f),
+                            maxLines = 1,
+                            overflow = TextOverflow.MiddleEllipsis,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.wrapContentHeight().testTag("image-gallery-title"),
+                        )
+                    }
+                    if (detail != null) {
+                        Text(
+                            text = detail,
+                            style = OpenCodeTextStyles.caption1.copy(fontFeatureSettings = "tnum"),
+                            color = Color.White.copy(alpha = 0.6f),
+                            maxLines = 1,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.testTag("image-gallery-detail"),
+                        )
+                    }
                 }
+            }
+            AnimatedVisibility(
+                visible = controlsVisible && state.allowsRemove,
+                enter = enter,
+                exit = exit,
+                modifier = Modifier.align(Alignment.BottomStart).padding(start = 16.dp, bottom = 16.dp),
+            ) {
+                OpenCodeIconButton(
+                    symbol = SFSymbol.Trash,
+                    contentDescription = "Remove",
+                    onClick = { store.send(TranscriptImageViewerFeature.Action.RemoveTapped) },
+                    modifier = Modifier.testTag("image-gallery-remove"),
+                    style = OpenCodeIconButtonStyle.Circle,
+                    tint = MaterialTheme.colorScheme.error,
+                    enabled = !state.isDiscarded,
+                )
             }
             AnimatedVisibility(
                 visible = controlsVisible,
@@ -408,7 +575,7 @@ fun TranscriptImageViewer(
                             onClick = { store.send(TranscriptImageViewerFeature.Action.SaveTapped) },
                             modifier = Modifier.testTag("image-gallery-save"),
                             style = OpenCodeIconButtonStyle.Standard,
-                            enabled = !state.isSaving,
+                            enabled = !state.isSaving && state.selectedPage?.image != null,
                         )
                         OpenCodeIconButton(
                             symbol = SFSymbol.SquareAndArrowUp,
@@ -416,6 +583,7 @@ fun TranscriptImageViewer(
                             onClick = { store.send(TranscriptImageViewerFeature.Action.ShareTapped) },
                             modifier = Modifier.testTag("image-gallery-share"),
                             style = OpenCodeIconButtonStyle.Standard,
+                            enabled = state.selectedPage?.image != null,
                         )
                     }
                 }

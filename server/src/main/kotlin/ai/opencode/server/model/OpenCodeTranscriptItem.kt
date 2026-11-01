@@ -16,14 +16,81 @@ object Base64ByteArraySerializer : KSerializer<ByteArray> {
     override fun deserialize(decoder: Decoder): ByteArray = Base64.getDecoder().decode(decoder.decodeString())
 }
 
+/** `media:<hash>` references: content-addressed blobs the server serves instead of inline bytes. */
+object OpenCodeMediaReference {
+    const val PREFIX = "media:"
+    const val CAPABILITY = "experimental-media-uri"
+
+    data class UnavailablePlaceholder(val name: String?, val mime: String)
+
+    /** Extracts a valid 64-character lowercase hex SHA-256 from `"media:<hash>"`. */
+    fun hash(from: String?): String? {
+        val trimmed = from?.trim() ?: return null
+        if (!trimmed.startsWith(PREFIX)) return null
+        val hash = trimmed.substring(PREFIX.length)
+        return hash.takeIf(::isValidHash)
+    }
+
+    fun isValidHash(hash: String): Boolean =
+        hash.length == 64 && hash.all { it in '0'..'9' || it in 'a'..'f' }
+
+    fun uri(forHash: String): String = PREFIX + forHash
+
+    /**
+     * Parses the server's `[media unavailable: <name> (<mime>)]` or
+     * `[media unavailable: <mime>]` placeholder text.
+     */
+    fun unavailablePlaceholder(from: String, fallbackName: String? = null): UnavailablePlaceholder? {
+        val trimmed = from.trim()
+        val open = "[media unavailable: "
+        if (!trimmed.startsWith(open) || !trimmed.endsWith("]")) return null
+        if (trimmed.length < open.length + 1) return null
+        val body = trimmed.substring(open.length, trimmed.length - 1).trim()
+        if (body.isEmpty()) return null
+        val openParen = body.lastIndexOf(" (")
+        if (body.endsWith(")") && openParen >= 0) {
+            val rawName = body.substring(0, openParen).trim()
+            val mime = body.substring(openParen + 2, body.length - 1).trim()
+            if (mime.isEmpty()) return null
+            return UnavailablePlaceholder(name = rawName.ifEmpty { null } ?: fallbackName, mime = mime)
+        }
+        return UnavailablePlaceholder(name = fallbackName, mime = body)
+    }
+}
+
+/**
+ * An image in a user message or tool result: inline [data], a `media:<hash>` reference
+ * ([mediaHash], loaded through media's `MediaReferenceClient`), or the server's unavailable
+ * placeholder ([isUnavailable]).
+ */
 @Serializable
 class OpenCodeImageAttachment(
     val id: String,
-    @Serializable(with = Base64ByteArraySerializer::class) val data: ByteArray,
+    @Serializable(with = Base64ByteArraySerializer::class) val data: ByteArray = ByteArray(0),
+    val mediaHash: String? = null,
+    val name: String? = null,
+    val mime: String? = null,
+    val byteCount: Long? = null,
+    val pixelWidth: Int? = null,
+    val pixelHeight: Int? = null,
+    val isUnavailable: Boolean = false,
 ) {
-    override fun equals(other: Any?): Boolean = other is OpenCodeImageAttachment && other.id == id && other.data.contentEquals(data)
+    val aspectRatio: Double?
+        get() {
+            val width = pixelWidth ?: return null
+            val height = pixelHeight ?: return null
+            if (width <= 0 || height <= 0) return null
+            return width.toDouble() / height.toDouble()
+        }
+
+    override fun equals(other: Any?): Boolean = other is OpenCodeImageAttachment && other.id == id &&
+        other.data.contentEquals(data) && other.mediaHash == mediaHash && other.name == name && other.mime == mime &&
+        other.byteCount == byteCount && other.pixelWidth == pixelWidth && other.pixelHeight == pixelHeight &&
+        other.isUnavailable == isUnavailable
+
     override fun hashCode(): Int = 31 * id.hashCode() + data.contentHashCode()
-    override fun toString(): String = "OpenCodeImageAttachment(id=$id, ${data.size} bytes)"
+    override fun toString(): String = "OpenCodeImageAttachment(id=$id, ${data.size} bytes" +
+        (mediaHash?.let { ", media ${it.take(12)}" } ?: "") + (if (isUnavailable) ", unavailable" else "") + ")"
 }
 
 /** Inline prompt media: re-encoded images, or a PDF the selected model reads natively. */
@@ -45,6 +112,9 @@ class OpenCodeOutgoingAttachment(
     val isImage: Boolean get() = mime.startsWith("image/")
 
     val dataURL: String get() = "data:$mime;base64,${Base64.getEncoder().encodeToString(data)}"
+
+    /** What a prompt sends: the `media:<hash>` reference when re-sending one, else the inline data URL. */
+    val promptURI: String get() = mediaHash?.let(OpenCodeMediaReference::uri) ?: dataURL
 
     override fun equals(other: Any?): Boolean = other is OpenCodeOutgoingAttachment && other.id == id &&
         other.data.contentEquals(data) && other.mime == mime && other.name == name &&
@@ -180,7 +250,9 @@ enum class OpenCodeNotifyPluginStatus {
 
     companion object {
         const val PLUGIN_ID = "opencode-notify-callback"
-        /** What `opencode.json` lists to install it. */
-        const val PACKAGE_ENTRY = "github:anomalyco/opencode-ios#main::path:packages/notify-plugin"
+        /** What `opencode.json` lists to install it: the npm package. */
+        const val PACKAGE_ENTRY = "opencode-mobile-notifications"
+        /** The private-repo entry earlier builds asked for; setup replaces it. */
+        const val LEGACY_PACKAGE_ENTRY = "github:anomalyco/opencode-ios#main::path:packages/notify-plugin"
     }
 }

@@ -6,12 +6,15 @@ import ai.opencode.server.internal.bool
 import ai.opencode.server.internal.dbl
 import ai.opencode.server.internal.int
 import ai.opencode.server.internal.list
+import ai.opencode.server.internal.lng
 import ai.opencode.server.internal.obj
 import ai.opencode.server.internal.opt
 import ai.opencode.server.internal.req
 import ai.opencode.server.internal.str
 import ai.opencode.server.internal.stringMap
+import ai.opencode.server.model.OpenCodeImageAttachment
 import ai.opencode.server.model.OpenCodeJSONValue
+import ai.opencode.server.model.OpenCodeMediaReference
 import ai.opencode.server.model.OpenCodeModel
 import ai.opencode.server.model.OpenCodeModelRef
 import ai.opencode.server.model.OpenCodeProject
@@ -319,31 +322,112 @@ internal data class ShellOutputPayload(val output: String)
 @Serializable
 internal data class FilePayload(
     val data: String? = null,
+    val uri: String? = null,
     val mime: String? = null,
     val name: String? = null,
+    val bytes: Long? = null,
+    val width: Int? = null,
+    val height: Int? = null,
     val mention: OpenCodeJSONValue? = null,
     val source: Source? = null,
 ) {
     @Serializable
     data class Source(val type: String, val uri: String? = null)
 
-    /** Desktop's `attached()`: inline bytes the user attached, not a mentioned or context file. */
+    val mediaHash: String?
+        get() = OpenCodeMediaReference.hash(uri) ?: OpenCodeMediaReference.hash(source?.uri)
+
+    /** Server placeholder emitted when a referenced media blob was missing or released. */
+    val unavailablePlaceholder: OpenCodeMediaReference.UnavailablePlaceholder?
+        get() {
+            if (mediaHash != null || mime?.lowercase()?.startsWith("image/") == true) return null
+            val encoded = data ?: return null
+            if (encoded.toByteArray(Charsets.UTF_8).size > MAX_PLACEHOLDER_DATA_LENGTH) return null
+            val decoded = decodeBase64(encoded)?.let(::strictUtf8) ?: encoded
+            return OpenCodeMediaReference.unavailablePlaceholder(decoded, fallbackName = name)
+        }
+
+    /**
+     * Desktop's `attached()`: inline bytes or a media reference the user attached, not a
+     * mentioned or context file.
+     */
     val isAttached: Boolean
         get() {
             if (mention != null) return false
+            if (mediaHash != null) return true
             val source = source ?: return data != null
-            return source.type == "inline" || source.uri?.startsWith("data:") == true
+            return source.type == "inline" || source.uri?.startsWith("data:") == true ||
+                source.uri?.startsWith(OpenCodeMediaReference.PREFIX) == true
         }
 
     companion object {
         /**
+         * The server's placeholder is a short `text/plain` file, so an inline image or a big
+         * paste is never decoded just to rule it out.
+         */
+        const val MAX_PLACEHOLDER_DATA_LENGTH = 4096
+
+        /** The last non-empty `/` component, as Swift's `split(separator: "/").last` (nil when empty). */
+        private fun cleanName(name: String?): String? = (name ?: "").split("/").lastOrNull { it.isNotEmpty() }
+
+        /** Attached images: inline base64, `media:<hash>`, or the unavailable placeholder. Indices count every file. */
+        fun attachedImages(files: List<FilePayload>, messageID: String): List<OpenCodeImageAttachment> =
+            files.mapIndexedNotNull { index, file ->
+                val cleanName = cleanName(file.name)
+                val placeholder = file.unavailablePlaceholder
+                if (placeholder != null && placeholder.mime.lowercase().startsWith("image/")) {
+                    return@mapIndexedNotNull OpenCodeImageAttachment(
+                        id = "$messageID-img-$index",
+                        name = cleanName(placeholder.name) ?: cleanName,
+                        mime = placeholder.mime,
+                        isUnavailable = true,
+                    )
+                }
+                val mime = file.mime ?: return@mapIndexedNotNull null
+                if (!mime.lowercase().startsWith("image/")) return@mapIndexedNotNull null
+                val hash = file.mediaHash
+                if (hash != null) {
+                    return@mapIndexedNotNull OpenCodeImageAttachment(
+                        id = "$messageID-img-$index",
+                        mediaHash = hash,
+                        name = cleanName,
+                        mime = mime,
+                        byteCount = file.bytes,
+                        pixelWidth = file.width,
+                        pixelHeight = file.height,
+                    )
+                }
+                val data = file.data?.let(::decodeBase64) ?: return@mapIndexedNotNull null
+                OpenCodeImageAttachment(
+                    id = "$messageID-img-$index",
+                    data = data,
+                    name = cleanName,
+                    byteCount = file.bytes,
+                    pixelWidth = file.width,
+                    pixelHeight = file.height,
+                )
+            }
+
+        /**
          * Desktop's `attached()`: inline files that aren't images or @-mentions get a chip,
-         * and plain text a Pasted Text card. Indices count every file, images included.
+         * and plain text a Pasted Text card; an unavailable placeholder gets its own chip.
+         * Indices count every file, images included.
          */
         fun attachedFiles(files: List<FilePayload>, messageID: String): List<OpenCodeTranscriptFile> =
             files.mapIndexedNotNull { index, file ->
+                val placeholder = file.unavailablePlaceholder
+                if (placeholder != null) {
+                    if (placeholder.mime.lowercase().startsWith("image/")) return@mapIndexedNotNull null
+                    val cleanName = (placeholder.name ?: "").split("/").last()
+                    return@mapIndexedNotNull OpenCodeTranscriptFile(
+                        id = "$messageID-file-inline-$index",
+                        name = cleanName.ifEmpty { "File" },
+                        mime = placeholder.mime,
+                        isUnavailable = true,
+                    )
+                }
                 val mime = file.mime ?: return@mapIndexedNotNull null
-                if (mime.startsWith("image/") || !file.isAttached) return@mapIndexedNotNull null
+                if (mime.lowercase().startsWith("image/") || !file.isAttached) return@mapIndexedNotNull null
                 val name = (file.name ?: "").split("/").lastOrNull { it.isNotEmpty() } ?: ""
                 val text = file.data?.let(::decodeBase64)?.let { PastedText.text(mime, it) }
                 OpenCodeTranscriptFile(
@@ -351,6 +435,8 @@ internal data class FilePayload(
                     name = name.ifEmpty { if (text == null) "File" else PastedText.NAME },
                     mime = mime,
                     text = text,
+                    mediaHash = file.mediaHash,
+                    byteCount = file.bytes,
                 )
             }
     }
@@ -362,6 +448,10 @@ internal fun decodeBase64(text: String): ByteArray? {
     if (text.length % 4 != 0) return null
     return try { Base64.getDecoder().decode(text) } catch (_: IllegalArgumentException) { null }
 }
+
+/** Foundation's `String(data:encoding: .utf8)`: null for malformed UTF-8. */
+private fun strictUtf8(data: ByteArray): String? =
+    try { Charsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(data)).toString() } catch (_: java.nio.charset.CharacterCodingException) { null }
 
 @Serializable
 internal data class ErrorPayload(val type: String? = null, val message: String? = null, val status: Int? = null)
@@ -422,7 +512,16 @@ internal data class ToolStatePayload(
     }
 }
 
-internal data class ToolContentPayload(val type: String, val text: String? = null, val mime: String? = null, val uri: String? = null) {
+internal data class ToolContentPayload(
+    val type: String,
+    val text: String? = null,
+    val mime: String? = null,
+    val uri: String? = null,
+    val name: String? = null,
+    val bytes: Long? = null,
+    val width: Int? = null,
+    val height: Int? = null,
+) {
     companion object {
         fun decode(element: JsonElement): ToolContentPayload {
             val c = element.obj()
@@ -431,8 +530,19 @@ internal data class ToolContentPayload(val type: String, val text: String? = nul
                 "text" -> ToolContentPayload(type, text = c.opt("text") { it.str() })
                 "file" -> {
                     val mime = c.opt("mime") { it.str() }
-                    val uri = if (mime?.lowercase()?.startsWith("image/") == true) c.opt("uri") { it.str() } else null
-                    ToolContentPayload(type, mime = mime, uri = uri)
+                    if (mime?.lowercase()?.startsWith("image/") == true) {
+                        ToolContentPayload(
+                            type,
+                            mime = mime,
+                            uri = c.opt("uri") { it.str() },
+                            name = c.opt("name") { it.str() },
+                            bytes = c.opt("bytes") { it.lng() },
+                            width = c.opt("width") { it.int() },
+                            height = c.opt("height") { it.int() },
+                        )
+                    } else {
+                        ToolContentPayload(type, mime = mime)
+                    }
                 }
                 else -> ToolContentPayload(type)
             }
