@@ -53,10 +53,11 @@ class ProjectIconTests {
     @get:Rule val folder = TemporaryFolder()
 
     @Test
-    fun experimentalFlagIsOffByDefault() {
+    fun experimentalFlagIsOnByDefault() {
         assertEquals("project-icons", ExperimentalFeature.projectIcons.rawValue)
         assertEquals("Project Icons", ExperimentalFeature.projectIcons.title)
-        assertFalse(ExperimentalFeatures.testValue(ExperimentalFeature.projectIcons))
+        assertTrue(ExperimentalFeature.projectIcons.defaultEnabled)
+        assertFalse(ExperimentalFeature.projectIcons.isGraduated)
         assertTrue(ExperimentalFeatures.enabling(setOf(ExperimentalFeature.projectIcons))(ExperimentalFeature.projectIcons))
     }
 

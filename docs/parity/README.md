@@ -74,21 +74,28 @@ under the same name; anything not ported anywhere is listed as deleted with its 
 2026-10-26 by matching every iOS test name against the Kotlin test functions: 2,858 iOS tests ported,
 268 deleted, none unaccounted for.
 
+Synced to iOS f657969b (2026-11-01): iOS has 3,491 tests; 3,143 have a Kotlin test of the same
+name and 348 don't. None that were ported at 062f3732 lost their port. 90 are new iOS tests that aren't
+ported by name yet: some are UIKit drops recorded in their module's Tests row; the rest are listed
+in `sync/062f3732-f657969b.md` ("Tests not ported by name"). The first three columns'
+totals are still the 062f3732 audit (the sync updated some module rows); the JVM column is
+recounted from Gradle at the sync merge.
+
 | Module | iOS test files covered | iOS tests ported | Deleted with reason | JVM tests (Gradle) |
 | --- | ---: | ---: | ---: | ---: |
-| `:app` | 21 | 125 | 27 | 125 |
-| `:core` | 19 | 112 | 74 | 116 |
-| `:server` | 36 | 230 | 3 | 254 (2 opt-in live checks skipped) |
-| `:devtools` | 4 | 14 | 10 | 14 |
+| `:app` | 21 | 125 | 27 | 139 |
+| `:core` | 19 | 112 | 74 | 134 |
+| `:server` | 36 | 230 | 3 | 256 (2 opt-in live checks skipped) |
+| `:devtools` | 4 | 14 | 10 | 17 |
 | `:feature:media` | 17 | 178 | 15 | 183 |
-| `:feature:voice` | 30 | 444 | 16 | 539 |
-| `:feature:system` | 9 | 88 | 2 | 89 |
+| `:feature:voice` | 30 | 444 | 16 | 643 |
+| `:feature:system` | 9 | 88 | 2 | 103 |
 | `:feature:transcript` | 34 | 274 | 57 | 282 (1 env-gated metric skipped) |
-| `:feature:composer` | 41 | 267 | 40 | 267 |
-| `:feature:settings` | 17 | 98 | 10 | 98 |
-| `:feature:session` | 58 | 706 | 41 | 719 |
-| `:feature:drawer` | 49 | 422 | 12 | 424 |
-| **Total** | 173 distinct | 2,858 distinct | 268 | 3,023 |
+| `:feature:composer` | 41 | 267 | 40 | 270 |
+| `:feature:settings` | 17 | 98 | 10 | 93 |
+| `:feature:session` | 58 | 706 | 41 | 733 |
+| `:feature:drawer` | 49 | 422 | 12 | 473 |
+| **Total** | 173 distinct (at 062f3732) | 2,858 distinct (at 062f3732) | 268 (at 062f3732) | 3,326 |
 
 "Deleted" counts whole iOS tests, each charged to the module whose section records it: UIKit and
 SwiftUI layout probes, Tuning Panel and Mac playgrounds, MetricKit, Touch Probe, Team Feedback and
