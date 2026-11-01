@@ -257,20 +257,6 @@ object ComposerFileStaging {
         return ComposerStagedFile(id, fileName, data.size.toLong(), destination)
     }
 
-    /**
-     * Re-checks a staged copy on disk after copy (guarding against TOCTOU growth or non-regular
-     * replacement) and removes only the staged copy inside [directory] when it is non-regular
-     * or exceeds [maximumBytes].
-     */
-    fun verifyStagedSize(staged: ComposerStagedFile, maximumBytes: Long, directory: File = this.directory): ComposerStagedFile? {
-        val actualSize = regularFileSize(staged.url)
-        if (actualSize == null || actualSize > maximumBytes || staged.size > maximumBytes) {
-            discard(staged.url, directory)
-            return null
-        }
-        return staged.copy(size = actualSize)
-    }
-
     fun rename(staged: ComposerStagedFile, newName: String, directory: File = this.directory): ComposerStagedFile {
         val fileName = AttachmentFileType.sanitizedName(newName)
         if (fileName == staged.name) return staged
