@@ -174,7 +174,9 @@ enum class OpenCodeNotifyPluginStatus {
 
     companion object {
         const val PLUGIN_ID = "opencode-notify-callback"
-        /** What `opencode.json` lists to install it. */
-        const val PACKAGE_ENTRY = "github:anomalyco/opencode-ios#main::path:packages/notify-plugin"
+        /** What `opencode.json` lists to install it: the npm package. */
+        const val PACKAGE_ENTRY = "opencode-mobile-notifications"
+        /** The private-repo entry earlier builds asked for; setup replaces it. */
+        const val LEGACY_PACKAGE_ENTRY = "github:anomalyco/opencode-ios#main::path:packages/notify-plugin"
     }
 }
