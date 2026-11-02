@@ -44,6 +44,7 @@ import ai.opencode.feature.composer.plusmenu.RecentPhotoPeekOverlay
 import androidx.compose.runtime.rememberCoroutineScope
 import ai.opencode.feature.composer.RequestDockContext
 import ai.opencode.feature.composer.RequestReviewSheet
+import ai.opencode.feature.composer.composerKeyboardStepHold
 import ai.opencode.feature.media.LocalMediaPresenter
 import ai.opencode.core.store.Store
 import ai.opencode.core.motion.rememberReduceMotion
@@ -281,6 +282,8 @@ fun SessionView(
                         .padding(bottom = if (onCatchUpOpen == null) 0.dp else CATCH_UP_COMPOSER_CLEARANCE.dp)
                         // The readable column (iOS `readableColumn()`): 720 wide at most.
                         .widthIn(max = TranscriptMetrics.readableColumnWidth)
+                        // iOS `ComposerKeyboardStepHold`: the composer glides after a docked IME's unanimated step.
+                        .composerKeyboardStepHold()
                         .onSizeChanged { scrollEdgeBridge.composerHeight = with(density) { it.height.toDp().value } }
                         // A floating call rests above the composer.
                         .then(if (floatsCall) Modifier.floatingCallComposer() else Modifier),

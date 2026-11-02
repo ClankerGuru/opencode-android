@@ -6,6 +6,8 @@ import ai.opencode.feature.voice.VoiceFeature
 import ai.opencode.feature.voice.callTrayMic
 import ai.opencode.feature.voice.floatingCallButton
 
+import ai.opencode.feature.composer.ComposerKeyboardReveal
+import ai.opencode.feature.composer.LocalComposerKeyboardMorph
 import ai.opencode.feature.composer.MicPressCallbacks
 import ai.opencode.feature.composer.RequestBar
 import ai.opencode.core.motion.Motion
@@ -35,6 +37,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
@@ -80,16 +83,19 @@ import kotlin.math.min
 private const val SLOT = 48f
 
 /**
- * iOS `composerLeadingControls(expanded:secondaryMic:recording:fading:)`: + (the recording's ×
- * while dictating), then the expanded row's model button and the leading mic.
+ * iOS `composerLeadingControls(expanded:recording:fading:)`: + (the recording's × while
+ * dictating), then the expanded row's agent and model chips, revealed with the keyboard morph's
+ * expansion ([ComposerKeyboardReveal]). The secondary mic stays beside Send in either pose.
  */
 @Composable
-internal fun SessionComposerEnv.ComposerLeadingControls(
-    expanded: Boolean,
-    secondaryMic: ComposerControls.MicPlacement,
-    recording: Boolean,
-    rowAlpha: Float,
-) {
+internal fun SessionComposerEnv.ComposerLeadingControls(expanded: Boolean, recording: Boolean) {
+    val morph = LocalComposerKeyboardMorph.current
+    // The row's own fade into and out of the dictation bar: quick out, in after the bar has cleared.
+    val fade = if (recording) {
+        Motion.easeOut<Float>(Motion.fadeFast, reduceMotion = reducedMotion)
+    } else {
+        Motion.easeOut<Float>(Motion.fadeStandard, if (reducedMotion) 0.0 else Motion.contentDelay, reducedMotion)
+    }
     // 9 dp from the + leaves as much air after its ink as the mic leaves before the trailing circle.
     Row(
         Modifier.fillMaxWidth(),
@@ -98,23 +104,18 @@ internal fun SessionComposerEnv.ComposerLeadingControls(
     ) {
         // While dictating, the same + turns into the recording's ×.
         AttachmentButton()
-        ComposerAccessoryRow(
-            isExpanded = expanded,
-            screen = s.navigationID,
-            recording = recording,
-            modifier = Modifier.weight(1f).alpha(rowAlpha),
-            revealed = {
-                Row(horizontalArrangement = Arrangement.spacedBy(ComposerTunables.leadingSpacing.dp), verticalAlignment = Alignment.CenterVertically) {
-                    if (agentSelection) AgentButton()
-                    ModelButton(enabled = expanded && !recording)
-                }
-            },
-            trailing = {
-                if (secondaryMic == ComposerControls.MicPlacement.leading) {
-                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) { SecondaryMicButton() }
-                }
-            },
-        )
+        val chips = @Composable {
+            Row(horizontalArrangement = Arrangement.spacedBy(ComposerTunables.leadingSpacing.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (agentSelection) AgentButton()
+                ModelButton(enabled = expanded && !recording)
+            }
+        }
+        if (morph != null) {
+            ComposerKeyboardReveal(morph, recording = recording, fade = fade) { chips() }
+        } else if (expanded) {
+            chips()
+        }
+        Spacer(Modifier.weight(1f))
     }
 }
 

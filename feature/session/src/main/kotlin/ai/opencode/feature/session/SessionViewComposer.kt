@@ -35,6 +35,10 @@ import ai.opencode.feature.composer.ComposerAutocompleteState
 import ai.opencode.feature.composer.ComposerAutocompleteTextBridge
 import ai.opencode.feature.composer.ComposerFileSource
 import ai.opencode.feature.composer.ComposerImageSource
+import ai.opencode.feature.composer.ComposerKeyboardMorph
+import ai.opencode.feature.composer.LocalComposerKeyboardMorph
+import ai.opencode.feature.composer.composerKeyboardSpacing
+import ai.opencode.feature.composer.layoutProgress
 import ai.opencode.feature.composer.ComposerSwipeDown
 import ai.opencode.feature.composer.ComposerSwipeOwnership
 import ai.opencode.feature.composer.ComposerTextInput
@@ -99,6 +103,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -650,12 +655,9 @@ internal class SessionComposerEnv(
             // Answering a request, the field stays on the control row; a draft keeps its control
             // row showing, so the model is at hand.
             val sheet = photoSheet
-            // The + menu keeps the composer open only when it'll hand the keyboard back.
-            val menuKeepsOpen = host.isAttachmentMenuOpen && (sheet == null || sheet.attachmentMenuRestoresFocus)
             val expanded = !s.isAnsweringRequest && (
                 s.isDraft || messageFieldFocused || dictationActive || s.draft.isNotEmpty() ||
-                    hasComposerAttachments || s.dictationError != null || host.keepsComposerExpanded || menuKeepsOpen ||
-                    (sheet != null && ((sheet.morph.isShown && sheet.restoresFocus) || sheet.flights.isFlying))
+                    hasComposerAttachments || s.dictationError != null || panelsHoldExpanded
                 )
             // Photos still decoding already count: their slots are in the row.
             val hasReservedPhotos = sheet != null && sheet.flights.reservedAttachments.isNotEmpty()
@@ -679,6 +681,33 @@ internal class SessionComposerEnv(
                 )
             }
             return ComposerPresentation(expanded, controls)
+        }
+
+    /**
+     * The model controls live in the expanded composer: it stays expanded while their panels
+     * are drawn, the + menu that will hand the keyboard back, or New Plus Menu's photo sheet.
+     */
+    private val panelsHoldExpanded: Boolean
+        get() {
+            val sheet = photoSheet
+            // The + menu keeps the composer open only when it'll hand the keyboard back.
+            val menuKeepsOpen = host.isAttachmentMenuOpen && (sheet == null || sheet.attachmentMenuRestoresFocus)
+            return host.keepsComposerExpanded || menuKeepsOpen ||
+                (sheet != null && ((sheet.morph.isShown && sheet.restoresFocus) || sheet.flights.isFlying))
+        }
+
+    /**
+     * iOS `composerPinnedExpanded`: what holds the row open apart from focus (a draft, attachments,
+     * dictation, a panel), so [ComposerKeyboardMorph] moves it on the keyboard's curve.
+     */
+    val composerPinnedExpanded: Boolean
+        get() {
+            val held = view.heldComposerPresentation
+            if (s.dictationHold != null && held != null) return held.expanded
+            return !s.isAnsweringRequest && (
+                s.isDraft || s.draft.isNotEmpty() || hasComposerAttachments || s.isDictating ||
+                    s.isFinishingDictation || s.dictationError != null || panelsHoldExpanded
+                )
         }
 
     /** iOS `sendMessage(_:)`. */
@@ -790,14 +819,23 @@ internal class SessionComposerEnv(
 
 @Composable
 private fun SessionComposerEnv.ComposerArea(modifier: Modifier) {
+    // iOS `composerArea`: only this subtree follows the keyboard's frames. Focus (the field's, or
+    // the model search holding the keys) opens the row on the keyboard's spring.
+    ComposerKeyboardMorph(
+        focused = messageFieldFocused || host.modelPanels?.modelSearchHoldsKeyboard == true,
+        expanded = composerPresentation.expanded,
+        pinned = composerPinnedExpanded,
+        reducedMotion = reducedMotion,
+    ) {
+        ComposerAreaContent(modifier)
+    }
+}
+
+@Composable
+private fun SessionComposerEnv.ComposerAreaContent(modifier: Modifier) {
     val pillGap = ComposerTunables.pillGap
-    val focused = messageFieldFocused
     val horizontalMargin = ComposerTunables.horizontalMargin
-    val bottom by androidx.compose.animation.core.animateDpAsState(
-        (if (focused) ComposerTunables.keyboardGap else ComposerTunables.bottomGap).dp,
-        if (reducedMotion) tween(0) else MotionSpring(0.25).spec(),
-        label = "composerBottomGap",
-    )
+    val morph = LocalComposerKeyboardMorph.current
     Box(
         modifier
             .fillMaxWidth()
@@ -810,7 +848,15 @@ private fun SessionComposerEnv.ComposerArea(modifier: Modifier) {
                 layout(area.width, area.height) { area.placeRelative(0, 0) }
             }
             .padding(horizontal = horizontalMargin.dp)
-            .padding(top = 6.dp, bottom = bottom),
+            .padding(top = 6.dp)
+            // The bottom gap grows to the keyboard gap with the keys, frame by frame.
+            .composerKeyboardSpacing(
+                morph,
+                top = false,
+                innerVertical = ComposerTunables.innerVertical.dp,
+                bottomGap = ComposerTunables.bottomGap.dp,
+                keyboardGap = ComposerTunables.keyboardGap.dp,
+            ),
     ) {
         ai.opencode.feature.composer.RequestDockPrewarm()
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(pillGap.dp)) {
@@ -1499,7 +1545,11 @@ private fun SessionComposerEnv.Composer() {
         label = "composerRowFade",
     )
     val bodyLine = with(density) { OpenCodeTextStyles.body.lineHeight.toDp().value }
-    val top = if (composerExpanded && !recording) 0f else ComposerTunables.innerVertical
+    val morph = LocalComposerKeyboardMorph.current
+    // The keyboard morph moves the row frame by frame; a size animation on top would trail the keys.
+    val morphMoving by remember(morph) {
+        derivedStateOf { morph != null && (morph.keyboard.isAnimating || morph.expansion > 0f && morph.expansion < 1f) }
+    }
     Box(
         Modifier
             .fillMaxWidth()
@@ -1510,9 +1560,19 @@ private fun SessionComposerEnv.Composer() {
                     if (!recording) focus()
                 }
             }
-            .then(if (reducedMotion) Modifier else Modifier.animateContentSize(MotionSpring(0.25).spec()))
+            .then(if (reducedMotion || morphMoving) Modifier else Modifier.animateContentSize(MotionSpring(0.25).spec()))
+            // iOS `ComposerKeyboardSpacing(top: true, recording:)`: the top inset is taken back as
+            // the row opens, unless folded for dictation.
+            .composerKeyboardSpacing(
+                morph,
+                top = true,
+                innerVertical = ComposerTunables.innerVertical.dp,
+                bottomGap = ComposerTunables.bottomGap.dp,
+                keyboardGap = ComposerTunables.keyboardGap.dp,
+                fold = { fold },
+            )
             .padding(horizontal = ComposerTunables.innerHorizontal.dp)
-            .padding(top = top.dp, bottom = ComposerTunables.innerVertical.dp)
+            .padding(bottom = ComposerTunables.innerVertical.dp)
             .semantics {
                 // Answering, escape from the bar's controls dismisses as the panel's × does.
                 if (s.isAnsweringRequest) {
@@ -1533,7 +1593,8 @@ private fun SessionComposerEnv.Composer() {
             }
             Box {
                 ComposerLayout(
-                    expanded = composerExpanded,
+                    // iOS `KeyboardDrivenComposerLayout`: the row's expansion frame by frame.
+                    progress = { morph.layoutProgress(inline = bar != null) },
                     inline = bar?.let { ComposerLayoutInline(hasLeading = it is RequestBar.Answer, lineHeight = bodyLine) },
                     input = {
                         Box(
@@ -1548,7 +1609,7 @@ private fun SessionComposerEnv.Composer() {
                         if (bar != null) {
                             AnswerLeadingControls(bar, recording, rowAlpha)
                         } else {
-                            ComposerLeadingControls(composerExpanded, composerControls.secondaryMic, recording, rowAlpha)
+                            ComposerLeadingControls(composerExpanded, recording)
                         }
                     },
                     trailing = {
@@ -1567,8 +1628,9 @@ private fun SessionComposerEnv.Composer() {
                                     horizontalArrangement = Arrangement.spacedBy(ComposerTunables.trailingSpacing.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    // Collapsed mid-run: the trailing control is Stop, so dictation keeps a home beside it.
-                                    if (composerControls.secondaryMic == ComposerControls.MicPlacement.trailing) SecondaryMicButton()
+                                    // Collapsed mid-run: the trailing control is Stop, so dictation keeps a home
+                                    // beside it; expanded it stays there too, so it never jumps between groups.
+                                    if (composerControls.secondaryMic != ComposerControls.MicPlacement.none) SecondaryMicButton()
                                     TrailingButton(composerControls.trailing)
                                 }
                             }
@@ -1638,6 +1700,9 @@ private fun SessionComposerEnv.Composer() {
 @Composable
 private fun SessionComposerEnv.ComposerInput(expanded: Boolean, recording: Boolean, bar: RequestBar?) {
     val placeholder = bar?.placeholder ?: "Message"
+    // iOS `KeyboardDrivenTextInset`: how much of the expanded top inset shows, frame by frame.
+    val morph = LocalComposerKeyboardMorph.current
+    val expansion = morph.layoutProgress(inline = bar != null)
     Box(Modifier.onGloballyPositioned { coordinates ->
         val surface = view.surfaceBounds
         val bounds = coordinates.boundsInRoot()
@@ -1650,7 +1715,7 @@ private fun SessionComposerEnv.ComposerInput(expanded: Boolean, recording: Boole
                 color = OpenCodeTheme.colors.tertiaryText,
                 maxLines = 1,
                 modifier = Modifier
-                    .padding(top = if (expanded) ComposerTunables.expandedTopInset.dp else 0.dp)
+                    .padding(top = ComposerTunables.expandedTopInset.dp * expansion)
                     .clearAndSetSemantics { },
             )
         }
@@ -1664,6 +1729,7 @@ private fun SessionComposerEnv.ComposerInput(expanded: Boolean, recording: Boole
             expanded = expanded,
             textStyle = ComposerTunables.textStyle.textStyle,
             topInset = ComposerTunables.expandedTopInset.dp,
+            topInsetFraction = expansion,
             onImagePaste = { uris ->
                 // An answer or a reason takes text, never an attachment.
                 if (store.state.takesPasteAttachments) host.importer?.startImageImport(uris.map(ComposerImageSource::ItemProvider))
