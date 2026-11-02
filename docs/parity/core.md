@@ -42,6 +42,7 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 | `OpenCode/Core/Motion/SpringSolver.swift` | 222 | see core-ui.md | — | |
 | `OpenCode/Core/RollingNumber/RollingNumber.swift` | 928 | see core-ui.md | — | |
 | `OpenCode/Core/RollingNumber/RollingNumberShaders.metal` | 33 | see core-ui.md | — | |
+| `OpenCode/Core/ScreenCaptureFeedback.swift` | 245 |  | todo |  |
 | `OpenCode/Core/ScreenVisibility.swift` | 62 | `core/.../ui/ScreenVisibility.kt` (`LocalScreenCovered`) | done | `ScreenCoveredTrait` → a `CompositionLocal` the cover's host provides while Settings rests over Home; `ViewVisibilityObserver` (KVO on ancestor layers' hidden/opacity) has no Compose counterpart: pages Compose doesn't draw leave composition |
 | `OpenCode/Core/ScrollsToTop.swift` | 31 |  | n/a: Android has no status-bar tap that scrolls a list to the top, so there is nothing for a covered surface to hand on |  |
 | `OpenCode/Core/ServerID.swift` | 75 | see server.md | — | ported into `:server` |
