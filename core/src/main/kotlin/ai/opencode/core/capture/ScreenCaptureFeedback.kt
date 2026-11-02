@@ -1,0 +1,237 @@
+package ai.opencode.core.capture
+
+import ai.opencode.core.dependencies.AppContext
+import ai.opencode.core.dependencies.DependencyKey
+import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.tuning.Tunable
+import android.app.Activity
+import android.app.Application
+import android.graphics.Color
+import android.graphics.PixelFormat
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.provider.Settings
+import android.view.View
+import android.view.WindowManager
+import android.view.animation.DecelerateInterpolator
+import java.lang.ref.WeakReference
+
+/**
+ * Port of iOS `Core/ScreenCaptureFeedback.swift`: what the person sees and hears when the app
+ * captures its own screen (Voice Screenshots, Report a Problem's screenshot): a camera-style
+ * flash that decays, and the shutter. Every self-capture goes through
+ * [ScreenCaptureFeedback.capture], which captures first and flashes after, so the flash is never
+ * in the picture.
+ *
+ * iOS's `UIWindowScene` is the [Activity] whose window was captured (Android's multi-instance
+ * windows are activities).
+ */
+class ScreenCaptureFeedbackClient(
+    /** The app just captured its own screen in [Activity] (null when unknown): flash it and play the shutter. */
+    val shutter: (Activity?) -> Unit = {},
+) {
+    companion object Key : DependencyKey<ScreenCaptureFeedbackClient> {
+        override val liveValue: ScreenCaptureFeedbackClient by lazy {
+            val live = LiveScreenCaptureFeedback()
+            ScreenCaptureFeedbackClient { live.shutter(it) }
+        }
+        override val testValue: ScreenCaptureFeedbackClient get() = ScreenCaptureFeedbackClient()
+    }
+}
+
+/**
+ * The shutter outside the flash (iOS `LiveScreenCaptureFeedback.playShutterSound`): during a call
+ * the call's own engine plays it (`VoiceCallCueClient.shutter`), while dictation or media holds
+ * the audio session it stays quiet, else the app's own shutter (`ShutterSystemSound`, voice's
+ * `VoiceShutterSound` clicks). Those live in `:feature:voice`, above `:core`, so the app installs
+ * this at the root; until then a capture only flashes.
+ */
+fun interface ScreenCaptureShutterSound {
+    fun play()
+
+    companion object Key : DependencyKey<ScreenCaptureShutterSound> {
+        override val liveValue: ScreenCaptureShutterSound = ScreenCaptureShutterSound {}
+        override val testValue: ScreenCaptureShutterSound = ScreenCaptureShutterSound {}
+    }
+}
+
+object ScreenCaptureFeedback {
+    /**
+     * Runs [capture] of the app's own screen in [scene], the activity whose window it draws,
+     * then, when it succeeded, flashes that activity and plays the shutter. A refused capture
+     * shows nothing.
+     */
+    inline fun <T> capture(scene: Activity?, capture: () -> Result<T>): Result<T> {
+        val result = capture()
+        if (result.isSuccess) dependency(ScreenCaptureFeedbackClient).shutter(scene)
+        return result
+    }
+
+    /** The same for a capture that returns nothing when refused (iOS `capture(in:optional:)`). */
+    inline fun <T : Any> captureOptional(scene: Activity?, capture: () -> T?): T? {
+        val image = capture()
+        if (image != null) dependency(ScreenCaptureFeedbackClient).shutter(scene)
+        return image
+    }
+}
+
+/** Tuned on the phone (Settings → Diagnostics → Developer Mode → Tuning). */
+object ScreenFlashTunables {
+    val duration = Tunable("motion.screenshotFlash.duration", "Screenshot flash decay (s)", default = 0.32, range = 0.1..1.0, step = 0.01)
+    val opacity = Tunable("motion.screenshotFlash.opacity", "Screenshot flash peak", default = 0.85, range = 0.0..1.0, step = 0.05)
+    val reducedDuration = Tunable("motion.screenshotFlash.reducedDuration", "Reduce Motion: dim (s)", default = 0.2, range = 0.05..0.6, step = 0.01)
+    val reducedOpacity = Tunable("motion.screenshotFlash.reducedOpacity", "Reduce Motion: dim peak", default = 0.18, range = 0.0..0.6, step = 0.02)
+}
+
+/** How the flash looks under the person's accessibility settings. */
+data class ScreenFlashStyle(val tone: Tone, val peak: Double, val duration: Double) {
+    enum class Tone { white, dim }
+
+    companion object {
+        /**
+         * A white flash; with Reduce Motion (Android: Remove Animations) a softer, shorter dim;
+         * with Dim Flashing Lights none at all. Android has no Dim Flashing Lights setting, so
+         * the live flash passes `false`.
+         */
+        fun resolve(reduceMotion: Boolean, dimFlashingLights: Boolean): ScreenFlashStyle? {
+            if (dimFlashingLights) return null
+            if (reduceMotion) {
+                return ScreenFlashStyle(Tone.dim, ScreenFlashTunables.reducedOpacity.value, ScreenFlashTunables.reducedDuration.value)
+            }
+            return ScreenFlashStyle(Tone.white, ScreenFlashTunables.opacity.value, ScreenFlashTunables.duration.value)
+        }
+    }
+}
+
+/**
+ * The live flash and shutter (iOS `LiveScreenCaptureFeedback`). Runs on the main thread; a
+ * capture finishing elsewhere posts there.
+ */
+private class LiveScreenCaptureFeedback {
+    private val main = Handler(Looper.getMainLooper())
+    private val flash = ScreenFlash()
+    private val activities = ForegroundActivities()
+
+    init {
+        (dependency(AppContext).applicationContext as? Application)?.registerActivityLifecycleCallbacks(activities)
+    }
+
+    fun shutter(captured: Activity?) {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            main.post { shutter(captured) }
+            return
+        }
+        val scene = foreground(captured) ?: activities.flashScene()
+        val style = scene?.let { ScreenFlashStyle.resolve(reduceMotion = isReduceMotion(it), dimFlashingLights = false) }
+        if (scene != null && style != null) flash.play(style, scene)
+        dependency(ScreenCaptureShutterSound).play()
+    }
+
+    private fun foreground(activity: Activity?): Activity? =
+        activity?.takeIf { activities.isResumed(it) && !it.isFinishing }
+
+    private fun isReduceMotion(activity: Activity): Boolean =
+        Settings.Global.getFloat(activity.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
+}
+
+/** The app's resumed activities, for a flash whose capture didn't say where. */
+private class ForegroundActivities : Application.ActivityLifecycleCallbacks {
+    private val resumed = ArrayList<WeakReference<Activity>>()
+
+    fun isResumed(activity: Activity): Boolean = resumed.any { it.get() === activity }
+
+    /**
+     * When the capture didn't say (iOS `flashScene`): the one in use (window focus, iOS's last
+     * touched), else the only resumed one. iOS's first rule, the window floating the call, is
+     * n/a: Android's call floats inside the activity.
+     */
+    fun flashScene(): Activity? {
+        val scenes = resumed.mapNotNull { it.get() }.filter { !it.isFinishing }
+        scenes.firstOrNull { it.hasWindowFocus() }?.let { return it }
+        return scenes.singleOrNull()
+    }
+
+    override fun onActivityResumed(activity: Activity) {
+        if (!isResumed(activity)) resumed += WeakReference(activity)
+    }
+
+    override fun onActivityPaused(activity: Activity) {
+        resumed.removeAll { it.get() == null || it.get() === activity }
+    }
+
+    override fun onActivityDestroyed(activity: Activity) = onActivityPaused(activity)
+    override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = Unit
+    override fun onActivityStarted(activity: Activity) = Unit
+    override fun onActivityStopped(activity: Activity) = Unit
+    override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
+}
+
+/**
+ * A window over everything (sheets and dialogs, the keyboard) that shows the flash (iOS
+ * `ScreenFlash` + `PassthroughFlashWindow`). It never takes touches or focus (`FLAG_NOT_TOUCHABLE`,
+ * `FLAG_NOT_FOCUSABLE`, which also orders it above the IME) and is hidden from accessibility; its
+ * view's alpha carries the decay. It's added for one flash and removed when the decay ends, so
+ * between flashes it's in no activity's window list and holds no activity alive. Captures copy
+ * the activity's own window (`PixelCopy`), so the flash is never in one.
+ */
+private class ScreenFlash {
+    private var window: View? = null
+    private var host: WeakReference<Activity>? = null
+    private var generation = 0
+
+    fun play(style: ScreenFlashStyle, scene: Activity) {
+        val view = window(scene) ?: return
+        generation += 1
+        val current = generation
+        view.animate().cancel()
+        view.setBackgroundColor(if (style.tone == ScreenFlashStyle.Tone.white) Color.WHITE else Color.BLACK)
+        view.alpha = style.peak.toFloat()
+        // iOS `UIView.animate(withDuration:options: .curveEaseOut)`.
+        view.animate()
+            .alpha(0f)
+            .setDuration((style.duration * 1_000).toLong())
+            .setInterpolator(DecelerateInterpolator())
+            .withEndAction { if (generation == current) detach() }
+            .start()
+    }
+
+    private fun window(scene: Activity): View? {
+        window?.let { if (host?.get() === scene) return it }
+        detach()
+        val view = View(scene).apply {
+            alpha = 0f
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+            isClickable = false
+            isFocusable = false
+        }
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION,
+            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            PixelFormat.TRANSLUCENT,
+        ).apply {
+            title = "OpenCodeScreenFlash"
+            windowAnimations = 0
+            layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+        }
+        val added = runCatching { scene.windowManager.addView(view, params) }.isSuccess
+        if (!added) return null
+        window = view
+        host = WeakReference(scene)
+        return view
+    }
+
+    private fun detach() {
+        val view = window ?: return
+        view.animate().cancel()
+        val activity = host?.get()
+        if (activity != null && view.isAttachedToWindow) runCatching { activity.windowManager.removeViewImmediate(view) }
+        window = null
+        host = null
+    }
+}

@@ -1,5 +1,6 @@
 package ai.opencode.devtools.traces
 
+import ai.opencode.core.capture.ScreenCaptureFeedback
 import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.diagnostics.CredentialSurface
 import ai.opencode.core.diagnostics.ProblemReportBuilder
@@ -30,16 +31,28 @@ import kotlin.math.roundToInt
  * app's password fields all live inside Settings, which is a credential surface.
  */
 object WindowSnapshot {
-    @Volatile private var resumed: WeakReference<Activity>? = null
+    /** Resumed activities, last resumed last (several in multi-window). Main thread only. */
+    private val resumed = ArrayList<WeakReference<Activity>>()
 
-    /** Follows the resumed activity. Called once from `DevTools.install`. */
+    /**
+     * The window in use (iOS `keyWindow` through `ActiveScene.window`): with several windows, the
+     * one with window focus, the one last touched; otherwise the last resumed activity.
+     */
+    val keyWindow: Activity?
+        get() {
+            val activities = resumed.mapNotNull { it.get() }
+            return activities.lastOrNull { it.hasWindowFocus() } ?: activities.lastOrNull()
+        }
+
+    /** Follows the resumed activities. Called once from `DevTools.install`. */
     fun install(application: Application) {
         application.registerActivityLifecycleCallbacks(object : Application.ActivityLifecycleCallbacks {
             override fun onActivityResumed(activity: Activity) {
-                resumed = WeakReference(activity)
+                resumed.removeAll { it.get() == null || it.get() === activity }
+                resumed += WeakReference(activity)
             }
             override fun onActivityPaused(activity: Activity) {
-                if (resumed?.get() === activity) resumed = null
+                resumed.removeAll { it.get() == null || it.get() === activity }
             }
             override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = Unit
             override fun onActivityStarted(activity: Activity) = Unit
@@ -69,7 +82,7 @@ object WindowSnapshot {
     }
 
     private suspend fun capture(): Bitmap? {
-        val activity = resumed?.get() ?: return null
+        val activity = keyWindow ?: return null
         val window = activity.window ?: return null
         val view = window.decorView
         val secure = window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0
@@ -92,10 +105,15 @@ object WindowSnapshot {
     }
 }
 
-/** iOS `ProblemReportCapture`: the app window at the moment of a trace, as a JPEG. */
+/**
+ * iOS `ProblemReportCapture`: the app window at the moment of a trace, as a JPEG. A screenshot
+ * taken flashes the window and plays the shutter after it (`ScreenCaptureFeedback`).
+ */
 class ProblemReportCapture(val screenshot: suspend () -> ByteArray? = { null }) {
     companion object Key : DependencyKey<ProblemReportCapture> {
-        override val liveValue: ProblemReportCapture = ProblemReportCapture { WindowSnapshot.jpeg() }
+        override val liveValue: ProblemReportCapture = ProblemReportCapture {
+            ScreenCaptureFeedback.captureOptional(withContext(Dispatchers.Main) { WindowSnapshot.keyWindow }) { WindowSnapshot.jpeg() }
+        }
         override val testValue: ProblemReportCapture = ProblemReportCapture()
     }
 }
