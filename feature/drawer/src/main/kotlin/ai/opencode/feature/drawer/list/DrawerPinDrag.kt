@@ -154,6 +154,12 @@ class DrawerPinDrag {
 
     fun translation(key: ItemKey): Float = translations[key] ?: 0f
 
+    /** Pin, Unpin and Move outside a drag (iOS ff935bef): see [DrawerPinMove]. */
+    internal val pinMove = DrawerPinMove(this)
+
+    /** A row's opacity while a Pin or Unpin cross-fades it in under Reduce Motion. */
+    fun alpha(key: ItemKey): Float = pinMove.alphas[key] ?: 1f
+
     // ---- Drag state (iOS @ObservationIgnored) ----
 
     internal var host: DrawerPinDragHost? = null
@@ -594,6 +600,7 @@ class DrawerPinDrag {
     }
 
     fun resetAllCellsAndCleanup() {
+        pinMove.cancel()
         landingFallback?.cancel()
         landingFallback = null
         frameJob?.cancel()

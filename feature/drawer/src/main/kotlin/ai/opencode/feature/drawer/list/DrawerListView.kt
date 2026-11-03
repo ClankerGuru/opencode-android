@@ -60,6 +60,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
@@ -183,6 +184,9 @@ fun DrawerListView(
         }
     }
     val isSettingsShown by remember { derivedStateOf { homeState.value.isSettingsShown } }
+
+    // iOS `DrawerTunables.register(in:)`: the drawer's knobs join the tuning panel while it's on.
+    SideEffect { DrawerTunables.register() }
 
     // Server Flow: before the rows it moves, as the title may not have drawn it yet.
     val hasApplied = remember { booleanArrayOf(false) }
@@ -371,6 +375,20 @@ fun DrawerListView(
         shownFirstKey[0] = firstKey
     }
 
+    // iOS ff935bef (`movesPins`): Pin, Unpin and Move Up/Down outside a drag (the menu, TalkBack)
+    // move the row to its new place as the rows between make room, in one move; not on another
+    // server's Home or a changed search, and a drag lands its own.
+    val shownPins = remember { arrayOfNulls<DrawerShownPins>(1) }
+    val pins = DrawerShownPins(
+        serverID = model.serverID,
+        search = model.search,
+        pinned = model.sections[DrawerListSection.pinned].orEmpty(),
+    )
+    shownPins[0]?.let { previous ->
+        if (previous.movesPins(pins) && isDrawerVisible) pinDrag.pinMove.begin(model.reducedMotion)
+    }
+    shownPins[0] = pins
+
     Box(modifier) {
         // Beneath the rows: they move out of its way, and the lifted row (drawn in the list)
         // stays above it, as iOS's system platter floats above the zone.
@@ -380,6 +398,14 @@ fun DrawerListView(
             contentPadding = contentPadding,
             modifier = Modifier
                 .fillMaxSize()
+                // A Pin or Unpin's rows start where they showed, before the frame draws them anew.
+                .layout { measurable, constraints ->
+                    val placeable = measurable.measure(constraints)
+                    layout(placeable.width, placeable.height) {
+                        placeable.place(0, 0)
+                        pinDrag.pinMove.apply()
+                    }
+                }
                 .onGloballyPositioned { listCoordinates[0] = it }
                 .then(if (panRegions != null) Modifier.drawerPanList(panRegions) else Modifier)
                 .graphicsLayer { alpha = listAlpha.value }
@@ -528,6 +554,11 @@ private fun contentType(item: DrawerListItem): Int = when (item) {
     DrawerListItem.Empty -> 4
     is DrawerListItem.Ghost -> 5
     DrawerListItem.ServerNote -> 6
+}
+
+/** What the list showed of its pins, to tell a Pin, Unpin or Move outside a drag (iOS `movesPins`). */
+internal data class DrawerShownPins(val serverID: String, val search: String, val pinned: List<DrawerListItem>) {
+    fun movesPins(next: DrawerShownPins): Boolean = serverID == next.serverID && search == next.search && pinned != next.pinned
 }
 
 /** A `LazyColumn` key back to the pin drag's item (headers and rows only). */

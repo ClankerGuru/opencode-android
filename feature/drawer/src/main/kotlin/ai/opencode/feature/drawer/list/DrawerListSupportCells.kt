@@ -78,7 +78,7 @@ fun DrawerListHeaderCell(kind: DrawerSectionHeaderKind, pinDrag: DrawerPinDrag, 
         .fillMaxWidth()
         .graphicsLayer {
             translationY = pinDrag.translation(key) * density.density
-            alpha = if (kind == DrawerSectionHeaderKind.Pinned) pinDrag.pinnedHeaderAlpha else 1f
+            alpha = (if (kind == DrawerSectionHeaderKind.Pinned) pinDrag.pinnedHeaderAlpha else 1f) * pinDrag.alpha(key)
         }
     when (DrawerTunables.sectionBreak) {
         DrawerSectionBreak.Header -> Box(
