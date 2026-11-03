@@ -35,7 +35,16 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.lazy.LazyListLayoutInfo
+import androidx.compose.ui.graphics.GraphicsContext
+import androidx.compose.ui.graphics.drawscope.ContentDrawScope
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.node.DrawModifierNode
+import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
@@ -142,15 +151,105 @@ fun DrawerServerNoteRow(note: ServerSwitchNote, onAction: () -> Unit, modifier: 
 
 /**
  * Title Leads: a row of the server shown hangs off the title's name, the [index]th on screen
- * following the one above it ([ServerSwapMotion.row]). Off without a swap target.
+ * following the one above it ([ServerSwapMotion.row]). Off without a swap target. Under Reduce
+ * Motion the rows only fade (iOS `swapTravel`).
  */
-internal fun Modifier.serverSwapRow(motion: ServerSwapMotion?, serverID: String, index: () -> Int): Modifier {
+internal fun Modifier.serverSwapRow(motion: ServerSwapMotion?, serverID: String, reducedMotion: Boolean, index: () -> Int): Modifier {
     if (motion == null) return this
     return graphicsLayer {
         motion.frame // read so each frame redraws
         if (!motion.isMoving && motion.leaving.isEmpty()) return@graphicsLayer
         val pose = motion.row(serverID, index().coerceAtLeast(0))
-        translationY = pose.position * ServerFlowTunables.listTravel.dp.toPx()
+        translationY = if (reducedMotion) 0f else pose.position * ServerFlowTunables.listTravel.dp.toPx()
         alpha = pose.opacity
     }
 }
+
+/**
+ * iOS `DrawerListController.leavingRows`: the pictures of the rows a server switch leaves, hanging
+ * off their name as it goes. iOS snapshots each visible cell's content; a `LazyColumn` drops the
+ * old server's items at once, so each row records what it draws into a layer kept here
+ * ([serverSwapPicture]), and a switch hands the visible rows' layers to the leaving server, drawn
+ * over the list ([drawLeaving]) on that server's row chain until its name has gone.
+ */
+internal class ServerSwapPictures(private val graphics: GraphicsContext) {
+    private class Picture(val layer: GraphicsLayer, val top: Float)
+
+    private val live = HashMap<Any, GraphicsLayer>()
+    private val leaving = HashMap<String, List<Picture>>()
+
+    /** The layer the row with [key] records into. */
+    fun layer(key: Any): GraphicsLayer = live.getOrPut(key) { graphics.createGraphicsLayer() }
+
+    /** A row left the list: what it drew goes with it, unless a switch took it. */
+    fun forget(key: Any) {
+        live.remove(key)?.let(graphics::releaseGraphicsLayer)
+    }
+
+    /**
+     * iOS `swapRows(from:_:)`: before the next server's rows compose, the rows on screen (as last
+     * laid out) become [server]'s leaving pictures. Rows coming back before they left turn round
+     * as live rows.
+     */
+    fun swap(server: String, next: String, info: LazyListLayoutInfo, firstVisible: Int) {
+        for (id in listOf(server, next)) leaving.remove(id)?.forEach { graphics.releaseGraphicsLayer(it.layer) }
+        val pictures = info.visibleItemsInfo
+            .filter { it.index >= firstVisible }
+            .sortedBy { it.offset }
+            .mapNotNull { item ->
+                live.remove(item.key)?.let { Picture(it, (item.offset - info.viewportStartOffset).toFloat()) }
+            }
+        if (pictures.isNotEmpty()) leaving[server] = pictures
+    }
+
+    /** iOS `placeSwapRows()` for the leaving pictures: each on its server's chain, faded with it. */
+    fun DrawScope.drawLeaving(motion: ServerSwapMotion, travel: Float) {
+        if (leaving.isEmpty()) return
+        val still = motion.leaving.toSet()
+        val gone = leaving.keys.filter { it !in still }
+        for (id in gone) leaving.remove(id)?.forEach { graphics.releaseGraphicsLayer(it.layer) }
+        for ((id, pictures) in leaving) {
+            val poses = motion.rows(id, pictures.size)
+            pictures.forEachIndexed { index, picture ->
+                val pose = poses[index]
+                if (pose.opacity <= 0f) return@forEachIndexed
+                picture.layer.alpha = pose.opacity
+                translate(top = picture.top + pose.position * travel) { drawLayer(picture.layer) }
+            }
+        }
+    }
+
+    /** The list left the screen. */
+    fun release() {
+        live.values.forEach(graphics::releaseGraphicsLayer)
+        live.clear()
+        leaving.values.flatten().forEach { graphics.releaseGraphicsLayer(it.layer) }
+        leaving.clear()
+    }
+}
+
+/** A row records what it draws for [ServerSwapPictures], so a server switch can fly it out. */
+internal fun Modifier.serverSwapPicture(pictures: ServerSwapPictures?, key: Any): Modifier =
+    if (pictures == null) this else this then ServerSwapPictureElement(pictures, key)
+
+private data class ServerSwapPictureElement(val pictures: ServerSwapPictures, val key: Any) : ModifierNodeElement<ServerSwapPictureNode>() {
+    override fun create() = ServerSwapPictureNode(pictures, key)
+    override fun update(node: ServerSwapPictureNode) {
+        if (node.key != key || node.pictures !== pictures) node.pictures.forget(node.key)
+        node.pictures = pictures
+        node.key = key
+    }
+}
+
+private class ServerSwapPictureNode(var pictures: ServerSwapPictures, var key: Any) : Modifier.Node(), DrawModifierNode {
+    override fun ContentDrawScope.draw() {
+        val layer = pictures.layer(key)
+        layer.record { this@draw.drawContent() }
+        drawLayer(layer)
+    }
+
+    override fun onDetach() {
+        pictures.forget(key)
+    }
+}
+

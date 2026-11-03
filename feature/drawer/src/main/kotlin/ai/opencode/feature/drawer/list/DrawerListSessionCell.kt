@@ -35,8 +35,10 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -194,6 +196,25 @@ fun DrawerListSessionCell(
 
     val held = hold.isHeld || row.isLifted
     val raisedSurface = if (colors.isDark) MaterialTheme.colorScheme.surfaceContainerHigh else colors.canvas
+    // The raised surface comes down over `holdSettle` once a hold lets go (iOS `settleAfterMenu`),
+    // and a dropped row puts its surface down over `pinLandFade`, shadowless (iOS `land()`).
+    val surface = remember { Animatable(0f) }
+    val wasLifted = remember { booleanArrayOf(false) }
+    var landingSurface by remember { mutableStateOf(false) }
+    if (row.isLifted) wasLifted[0] = true
+    LaunchedEffect(held) {
+        if (held) {
+            landingSurface = false
+            surface.snapTo(1f)
+            return@LaunchedEffect
+        }
+        val landed = wasLifted[0]
+        wasLifted[0] = false
+        landingSurface = landed
+        val seconds = if (landed) DrawerTunables.pinLandFade.value else DrawerTunables.holdSettle.value
+        surface.animateTo(0f, tween((seconds * 1000).roundToInt(), easing = ai.opencode.core.motion.Motion.EaseOut))
+        landingSurface = false
+    }
     val cornerRadius = DrawerMetrics.rowCornerRadius
     val rowEdge = DrawerMetrics.rowEdge
     val rowGap = DrawerTunables.rowGap
@@ -204,8 +225,9 @@ fun DrawerListSessionCell(
             .fillMaxWidth()
             .graphicsLayer {
                 translationY = pinDrag.translation(key) * density.density
+                alpha = pinDrag.alpha(key)
                 // The dragged row grows as it lifts (iOS `DrawerLiftedRowView.apply(lift:)`).
-                val grow = if (row.isLifted) 1f + (DrawerTunables.pinLiftScale - 1f) * pinDrag.liftProgress else 1f
+                val grow = if (row.isLifted) DrawerLiftedRowView.apply(pinDrag.liftProgress).scale else 1f
                 scaleX = grow
                 scaleY = grow
                 compositingStrategy = if (masking) CompositingStrategy.Offscreen else CompositingStrategy.Auto
@@ -238,16 +260,23 @@ fun DrawerListSessionCell(
             Modifier
                 .fillMaxWidth()
                 .heightIn(min = DrawerMetrics.rowHeight)
-                // The raised row's shadow, always in the chain (only its elevation changes), so the
+                // The held row's shadow, always in the chain (only its elevation changes), so the
                 // hold that raises it mid-gesture never changes the modifiers around the touch handler.
+                // A lifted row casts its own tunable shadow instead (`drawLiftedRowSurface`).
                 .graphicsLayer {
-                    shadowElevation = if (held) 8.dp.toPx() else 0f
+                    shadowElevation = if (row.isLifted || landingSurface) 0f else 8.dp.toPx() * surface.value
                     shape = androidx.compose.foundation.shape.RoundedCornerShape(cornerRadius)
                     clip = false
                 }
                 .onGloballyPositioned { rowCoordinates[0] = it }
                 .drawBehind {
-                    if (held) drawRoundRect(raisedSurface, cornerRadius = CornerRadius(cornerRadius.toPx()))
+                    when {
+                        row.isLifted -> drawLiftedRowSurface(raisedSurface, cornerRadius.toPx(), DrawerLiftedRowView.apply(pinDrag.liftProgress))
+                        surface.value > 0f -> drawRoundRect(
+                            raisedSurface.copy(alpha = raisedSurface.alpha * surface.value.coerceIn(0f, 1f)),
+                            cornerRadius = CornerRadius(cornerRadius.toPx()),
+                        )
+                    }
                 }
                 .drawerRowInteraction(
                     interaction = DrawerRowInteraction(

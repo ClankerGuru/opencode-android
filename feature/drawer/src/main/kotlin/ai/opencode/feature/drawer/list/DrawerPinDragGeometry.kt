@@ -320,7 +320,8 @@ internal fun DrawerPinDrag.retargetSprings(keyed: List<DrawerPinDragItem> = visi
         if (spring != null) {
             if (spring.target != target.toDouble()) spring.retarget(target.toDouble())
         } else {
-            cellSprings[item.key] = makeSpring(base, target)
+            // A row the drag scrolled into view starts in its slot (iOS lays it out shifted).
+            cellSprings[item.key] = makeSpring(if (hasAutoScrolled && !hasCommittedDrop) target else base, target)
         }
     }
 }
