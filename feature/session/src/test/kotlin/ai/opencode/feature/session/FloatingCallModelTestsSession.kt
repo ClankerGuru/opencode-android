@@ -12,7 +12,7 @@ import org.junit.Test
  * `:feature:voice` (its `FloatingCallModelTests.kt` holds the tray halves).
  */
 class FloatingCallModelTestsSession {
-    /** `callTrayExperimentAndTunablesRegisterOption2Defaults`'s `ComposerTunables` defaults (no `TuningStore` on Android). */
+    /** `callTrayExperimentAndTunablesRegisterOption2Defaults`'s `ComposerTunables` defaults (baked constants here, so there's no `TuningStore` registry half). */
     @Test fun callTrayExperimentAndTunablesRegisterOption2Defaults() {
         assertEquals(0f, ComposerTunables.bottomGap)
         assertEquals(8f, ComposerTunables.keyboardGap)

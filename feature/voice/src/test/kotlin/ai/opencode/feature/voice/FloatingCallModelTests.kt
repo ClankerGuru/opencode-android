@@ -26,7 +26,9 @@ private fun CallTrayDock.noteSessionTrayWithoutAnchor(frame: Rect) {
 
 class FloatingCallModelTests {
     // `ComposerTunables` (bottomGap, keyboardGap) lives in :feature:session; the tray's copy of
-    // keyboardGap is `CallTrayComposerMetrics`. `TuningStore` registration isn't ported.
+    // keyboardGap is `CallTrayComposerMetrics`. The `TuningStore` registry half (`register(in:)`/
+    // `unregister(in:)` and its keys) can't exist here: `CallTrayTunables` are baked constants, and
+    // the Call Tray tuning panel is iOS `Tuning/` (devtools is Android-native).
     @Test
     fun callTrayExperimentAndTunablesRegisterOption2Defaults() {
         assertFalse(ExperimentalFeatures.testValue(ExperimentalFeature.callTray))
