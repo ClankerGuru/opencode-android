@@ -157,9 +157,11 @@ data class OpenCodeModel(
     }
 }
 
-/** The entry a ref names: by catalog key, else by API model ID. */
-fun List<OpenCodeModel>.model(ref: OpenCodeModelRef): OpenCodeModel? =
-    firstOrNull { it.matches(ref) } ?: firstOrNull { it.providerID == ref.providerID && it.modelID == ref.id }
+/**
+ * The entry a ref names. Refs name catalogue keys: an API ID shared by Fast/Ultrafast siblings
+ * must never select one of those modes in place of the base model.
+ */
+fun List<OpenCodeModel>.model(ref: OpenCodeModelRef): OpenCodeModel? = firstOrNull { it.matches(ref) }
 
 /** Short names shared by more than one model, so rows with those names show their provider. */
 val List<OpenCodeModel>.ambiguousShortNames: Set<String>

@@ -338,7 +338,6 @@ internal data class ComposerSnapshot(
 
     companion object {
         fun of(state: SessionFeature.State): ComposerSnapshot {
-            val model = state.currentModelInfo
             val dock = state.dockRequestID
             return ComposerSnapshot(
                 draft = state.draft,
@@ -371,7 +370,7 @@ internal data class ComposerSnapshot(
                 taskIdentity = state.taskIdentity,
                 navigationID = state.navigationID,
                 modelLabel = state.currentModelLabel,
-                modelShortName = model?.shortName ?: state.currentModelName,
+                modelShortName = state.currentModelShortName,
                 chipLevelLabel = chipLevelLabel(state),
                 backgroundAgents = state.activeSubagents.size,
                 backgroundShells = state.backgroundShells.size,

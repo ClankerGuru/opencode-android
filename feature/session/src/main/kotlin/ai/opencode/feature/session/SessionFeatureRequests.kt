@@ -65,8 +65,11 @@ internal fun SessionFeature.reduceRequests(state: State, action: Action): Reduce
         }
 
         is Action.RequestsConnectionChanged -> {
-            if (state.requestsConnectionIsAvailable == action.isAvailable) return Reduced(state)
-            var next = state.withRequestsConnectionIsAvailable(action.isAvailable)
+            // A catalogue failure can land after SSE connected. Even a repeated
+            // healthy snapshot earns one retry; the loading guard coalesces it.
+            val models = if (action.isAvailable && state.modelsLoadError != null) loadModelsIfNeeded(state) else Reduced(state)
+            if (state.requestsConnectionIsAvailable == action.isAvailable) return models
+            var next = models.state.withRequestsConnectionIsAvailable(action.isAvailable)
                 .copy(streamIsHealthy = action.isAvailable && state.streamIsHealthy)
                 .withRequestLoadError(null)
             if (!action.isAvailable) {
@@ -106,7 +109,7 @@ internal fun SessionFeature.reduceRequests(state: State, action: Action): Reduce
                 recovery += Effect.send(Action.RefreshRequested(RefreshReason.Reconnect))
             }
             val started = startPendingWork(next, attempt)
-            return Reduced(started.state, Effect.merge(listOf(started.effect) + recovery))
+            return Reduced(started.state, Effect.merge(listOf(models.effect, started.effect) + recovery))
         }
 
         is Action.RequestDock -> return reduceRequestDock(action.action, state)

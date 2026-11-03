@@ -3,6 +3,7 @@ package ai.opencode.app
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.TestStore
 import ai.opencode.core.testing.TestIsolationRule
+import ai.opencode.feature.composer.modelpicker.ModelDisplayNames
 import ai.opencode.feature.drawer.HomeFeature
 import ai.opencode.feature.session.SessionFeature
 import ai.opencode.feature.session.currentLevelScale
@@ -95,6 +96,7 @@ class NewSessionDraftTests {
             { it == detailAction(SessionFeature.Action.ModelsResponse(Result.success(OpenCodeModelCatalog(models = listOf(laptopModel), defaultModel = laptopModel)))) },
             "home.sessionDetail.presented.modelsResponse.success",
         ) { it.detail { d -> d.copy(isLoadingModels = false, models = listOf(laptopModel)) } }
+        assertEquals(ModelDisplayNames(listOf(laptopModel)), store.state.home?.sessionDetail?.modelDisplayNamesByServer?.value?.get(laptop.persistenceID))
         assertEquals("Laptop 4", store.state.home?.sessionDetail?.currentModelName)
 
         store.send(AppFeature.Action.Home(HomeFeature.Action.Delegate(HomeFeature.DelegateAction.ServerSwitchTapped(studio)))) {
@@ -136,6 +138,7 @@ class NewSessionDraftTests {
             { it == detailAction(SessionFeature.Action.ModelsResponse(Result.success(OpenCodeModelCatalog(models = listOf(studioModel), defaultModel = studioModel)))) },
             "home.sessionDetail.presented.modelsResponse.success",
         ) { it.detail { d -> d.copy(isLoadingModels = false, models = listOf(studioModel)) } }
+        assertEquals(ModelDisplayNames(listOf(studioModel)), store.state.home?.sessionDetail?.modelDisplayNamesByServer?.value?.get(studio.persistenceID))
         assertEquals("Studio 4", store.state.home?.sessionDetail?.currentModelName)
         assertNotNull(store.state.home?.sessionDetail?.currentLevelScale)
         store.finish()

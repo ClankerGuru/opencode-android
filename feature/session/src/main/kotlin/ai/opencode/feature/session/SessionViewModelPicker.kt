@@ -19,6 +19,7 @@ import ai.opencode.feature.composer.modelpicker.FusedModelPickerTunables
 import ai.opencode.feature.composer.modelpicker.FusedRowMenuOverlay
 import ai.opencode.feature.composer.modelpicker.GrowingPanel
 import ai.opencode.feature.composer.modelpicker.LevelScrubberTunables
+import ai.opencode.feature.composer.modelpicker.ModelDisplayNames
 import ai.opencode.feature.composer.modelpicker.ModelListDetent
 import ai.opencode.feature.composer.modelpicker.ModelListScrollEdge
 import ai.opencode.feature.composer.modelpicker.ModelPickerAnchors
@@ -83,6 +84,7 @@ internal fun SessionFeature.State.modelPickerState(
     favorites: Set<String> = favoriteModelIDs.value,
     recents: List<String> = recentModelIDs.value,
     variants: Map<String, String> = modelVariants.value,
+    displayNames: Map<String, ModelDisplayNames> = modelDisplayNamesByServer.value,
 ): ModelPickerState = ModelPickerState(
     models = models,
     currentModel = currentModel,
@@ -94,6 +96,7 @@ internal fun SessionFeature.State.modelPickerState(
     modelsLoadError = modelsLoadError,
     modelVisibility = modelVisibility,
     showsAllModels = showsAllModels,
+    modelDisplayNames = displayNames[server.persistenceID] ?: ModelDisplayNames(),
 )
 
 /** The `SessionFeature` action a picker event stands for; null when none does. */
@@ -138,8 +141,9 @@ internal fun rememberModelPickerState(store: StoreOf<SessionFeature.State, Sessi
     val variants by remember(store) { store.state.modelVariants.flow }.collectAsState(store.state.modelVariants.value)
     val visibility by remember(store) { store.state.modelVisibilityByServer.flow }.collectAsState(store.state.modelVisibilityByServer.value)
     val hideModels by remember(store) { store.state.hideModelsExperiment.flow }.collectAsState(store.state.hideModelsExperiment.value)
-    return remember(inputs, favorites, recents, variants, visibility, hideModels) {
-        store.state.modelPickerState(favorites, recents, variants)
+    val displayNames by remember(store) { store.state.modelDisplayNamesByServer.flow }.collectAsState(store.state.modelDisplayNamesByServer.value)
+    return remember(inputs, favorites, recents, variants, visibility, hideModels, displayNames) {
+        store.state.modelPickerState(favorites, recents, variants, displayNames)
     }
 }
 

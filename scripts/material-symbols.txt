@@ -219,6 +219,7 @@ sync                                # arrow.triangle.2.circlepath
 table                               # tablecells
 tag                                 # number
 terminal                            # apple.terminal, terminal
+text_format                         # textformat
 text_select_start                   # selection.pin.in.out, character.cursor.ibeam
 toggle_off                          # capsule
 toggle_on                           # switch.2
