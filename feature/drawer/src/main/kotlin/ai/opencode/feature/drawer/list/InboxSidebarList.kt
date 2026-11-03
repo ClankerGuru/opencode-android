@@ -256,7 +256,9 @@ internal fun InboxSidebarRowView(row: InboxSidebarRow, now: Instant, modifier: M
                 .size(8.dp)
                 .background(if (row.unread) colors.accent else Color.Transparent, CircleShape),
         )
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            // iOS: Text + Spacer(minLength: 8) + age. The title takes all the width the age
+            // leaves (a second weighted spacer would cap it at half), so the age stays trailing.
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     row.title,
@@ -265,9 +267,9 @@ internal fun InboxSidebarRowView(row: InboxSidebarRow, now: Instant, modifier: M
                     color = colors.text,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
+                    modifier = Modifier.weight(1f),
                 )
-                Spacer(Modifier.weight(1f).width(8.dp))
+                Spacer(Modifier.width(8.dp))
                 Text(age, style = OpenCodeTextStyles.footnote.copy(fontFeatureSettings = "tnum"), color = colors.secondaryText)
             }
             row.project?.let { project ->
