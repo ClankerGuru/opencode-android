@@ -7,7 +7,6 @@ import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -30,6 +30,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,11 +41,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 
 /**
@@ -382,7 +385,7 @@ fun <T> SettingsMenuRow(
                 valueLabel(Modifier.weight(1f, fill = false))
             }
         }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, modifier = Modifier.align(Alignment.TopEnd)) {
+        TrailingDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             sections.forEachIndexed { index, (header, options) ->
                 if (index > 0) HorizontalDivider()
                 if (header != null) {
@@ -417,6 +420,24 @@ fun <T> SettingsMenuRow(
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * The menu a [SettingsMenuRow] opens, hanging from the row's trailing edge where its value sits,
+ * as iOS shows a Settings picker's menu. Material's dropdown prefers its anchor's leading edge, so
+ * it's placed under the opposite layout direction (which prefers the trailing one) while its
+ * options keep the row's own.
+ */
+@Composable
+private fun TrailingDropdownMenu(expanded: Boolean, onDismissRequest: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+    val direction = LocalLayoutDirection.current
+    val trailing = if (direction == LayoutDirection.Ltr) LayoutDirection.Rtl else LayoutDirection.Ltr
+    CompositionLocalProvider(LocalLayoutDirection provides trailing) {
+        DropdownMenu(expanded = expanded, onDismissRequest = onDismissRequest) {
+            val menu = this
+            CompositionLocalProvider(LocalLayoutDirection provides direction) { menu.content() }
         }
     }
 }
