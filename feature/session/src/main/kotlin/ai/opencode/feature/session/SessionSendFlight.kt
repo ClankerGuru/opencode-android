@@ -11,6 +11,8 @@ import ai.opencode.feature.transcript.TranscriptTunables
 import ai.opencode.feature.transcript.user.SendLanding
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -23,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -47,13 +50,14 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.launch
 
 // Port of the flight half of iOS `ComposerSendTransition` (`beginLanding`, `stepLanding`,
 // `flyIntoPill`, `dissolvePrepared`, `finishLanding`) and of the list's `SendFlight`
@@ -67,18 +71,23 @@ import kotlin.math.roundToInt
 /**
  * A send's flight from the composer into its bubble (iOS `SendFlight` + `ComposerSendTransition.Flight`).
  * The flight starts once the bubble (and its photos' slots) have been laid out (iOS starts it as
- * the cell is found); its clock starts after the bubble has risen level with the words ([waits]).
+ * the cell is found), and its clock runs from the first frame; a bubble that starts below the
+ * words holds them level for a moment ([lift]) rather than the flight waiting for it.
  * [source] is null for a send of photos alone (iOS `carryRemainder`: no words fly, the row's
  * other content fades in around the photos).
  */
-private class SendFlight(val itemID: String, val source: ComposerSendTransition.Prepared?, var awaitsImages: Boolean) {
+internal class SendFlight(
+    val itemID: String,
+    val source: ComposerSendTransition.Prepared?,
+    var awaitsImages: Boolean,
+    /** Off under Reduce Motion. */
+    val lift: SendLift = SendLift(),
+) {
     /** The flight's ω, captured at its start (iOS `capturedOmega`): about 0.45 s, or the photos' clock. */
     var omega: Double = TranscriptTunables.sendFlightOmega
     var elapsed: Double = 0.0
     /** The bubble was found and the flight is under way (iOS: `sendFlights[item]` exists). */
     var started = false
-    /** The clock has begun (iOS `start != 0`). */
-    var running = false
     var waitingFrames = 0
     var progress: Float = 0f
     /** The bubble's last known place (window px); a bubble scrolled away keeps it. */
@@ -89,31 +98,33 @@ private class SendFlight(val itemID: String, val source: ComposerSendTransition.
     var landedFrame = false
     /** The photos are handing over to the row, which shows again under them. */
     var handingOff = false
-    /** iOS `waitingSince` (flight clock seconds). */
-    var waitingSince: Double? = null
+    /** This frame's lift (px): how far everything in the flight aims above the bubble. */
+    var raised = 0f
 
-    /** iOS `timeout`: `max(0.8, 8 / ω)`. */
-    val timeout: Double get() = max(0.8, 8.0 / max(1.0, omega))
+    /** iOS `timeout`: `max(0.8, 8 / ω, hold × 1.5 + 0.1)`. */
+    val timeout: Double get() = max(max(0.8, 8.0 / max(1.0, omega)), MAXIMUM_HOLD * 1.5 + 0.1)
 
     /**
-     * iOS `waits(bubbleBelowWords:timestamp:)`: a bubble that starts below the words (a time stamp
-     * laid out above it pushes it there) would pull them down toward the composer before the list
-     * carries it up. The flight holds the words, up to `sendBubbleWaitMax`, for the bubble to rise
-     * level with them, then flies with it.
+     * iOS `step(timestamp:targetTimestamp:gap:interrupted:)`: the spring's progress, critically
+     * damped, and the words' lift for this frame, given the bubble's [gap] below the words (px)
+     * and whether something else is moving the list; null once landed.
      */
-    fun waits(bubbleBelowWords: Boolean, now: Double): Boolean {
-        if (running) return false
-        val since = waitingSince ?: now.also { waitingSince = it }
-        return bubbleBelowWords && now - since < TranscriptTunables.sendBubbleWaitMax
+    fun advance(dt: Double, gap: Float? = null, interrupted: Boolean = false, softness: Float = 0f): Float? {
+        elapsed += dt
+        val p = 1 - (1 + omega * elapsed) * exp(-omega * elapsed)
+        raised = lift.step(gap, elapsed, interrupted, hold = MAXIMUM_HOLD, softness = softness)
+        if ((p >= 0.995 && !lift.isLifting) || elapsed >= timeout) return null
+        return p.toFloat()
     }
 
-    /** iOS `progress(timestamp:targetTimestamp:)`: critically damped, null once it has landed. */
-    fun advance(dt: Double): Float? {
-        elapsed += dt
-        running = true
-        val p = 1 - (1 + omega * elapsed) * exp(-omega * elapsed)
-        if (p >= 0.995 || elapsed >= timeout) return null
-        return p.toFloat()
+    companion object {
+        /**
+         * iOS `maximumHold`: a bubble that starts below the words would pull them down toward the
+         * composer before the list carries it up. For up to this long they aim no lower than they
+         * left ([SendLift]), then let go over half as long again. The spring runs from the first
+         * frame all the same, so they rise with the bubble as soon as it passes them.
+         */
+        val MAXIMUM_HOLD: Double get() = TranscriptTunables.sendBubbleWaitMax
     }
 }
 
@@ -213,7 +224,7 @@ internal class SessionSendFlights(
         // A later send to the same bubble replaces its flight.
         flights.filter { it.itemID == itemID }.forEach { flights.remove(it); images.finish(itemID) }
         landing.hide(itemID)
-        flights += SendFlight(itemID, source, awaitsImages = fliesImages)
+        flights += SendFlight(itemID, source, awaitsImages = fliesImages, lift = SendLift(enabled = !reduceMotion))
         return true
     }
 
@@ -228,14 +239,22 @@ internal class SessionSendFlights(
     }
 
     /**
-     * iOS `bubbleIsBelowWords`: the bubble's text sits below the words' top. A flight without
-     * words never waits.
+     * iOS `bubbleGap`: how far the top of the words in the bubble sits below the words' top as
+     * they left the composer (px), where last seen; null without words.
      */
-    private fun bubbleIsBelowWords(flight: SendFlight): Boolean {
-        val source = flight.source ?: return false
-        val destination = flight.destination ?: return false
+    private fun bubbleGap(flight: SendFlight): Float? {
+        val source = flight.source ?: return null
+        val destination = flight.destination ?: return null
         val vertical = TranscriptMetrics.bubbleVertical.value * flightDensity
-        return destination.top + vertical > source.bounds.top + 0.5f * flightDensity
+        return destination.top + vertical - source.bounds.top
+    }
+
+    /** Set when the keyboard moves mid-flight (iOS `sendFlightsInterrupted`); cleared every frame. */
+    private var interrupted = false
+
+    /** The keyboard moved: every flight's words let go of their hold. */
+    fun interrupt() {
+        if (flights.isNotEmpty()) interrupted = true
     }
 
     /** iOS `flyIntoPill`'s target before the pill has appeared: trailing the row above the composer. */
@@ -287,6 +306,8 @@ internal class SessionSendFlights(
         clock += dt
         val landed = mutableListOf<SendFlight>()
         val markers = imageMarkers()
+        val listMoving = interrupted || landing.isUserScrolling()
+        val softness = (TranscriptTunables.sendLiftSoftness * flightDensity).toFloat()
         for (flight in flights) {
             val marker = landing.marker(flight.itemID)
             if (marker != null && marker.bounds.width > 0f) flight.destination = marker.bounds
@@ -294,13 +315,10 @@ internal class SessionSendFlights(
                 if (!begin(flight, markers)) landed += flight
                 continue
             }
-            if (flight.waits(bubbleIsBelowWords(flight), clock)) {
-                if (flight.fliesImages) images.step(flight.itemID, markers, progress = 0f)
-                continue
-            }
-            val progress = flight.advance(dt)
+            val progress = flight.advance(dt, bubbleGap(flight), listMoving, softness)
             if (progress == null) {
                 flight.progress = 1f
+                flight.raised = 0f
                 if (flight.fliesImages) images.step(flight.itemID, markers, progress = 1f)
                 // Commit one fully landed frame before removing the copies (iOS `landedFrame`).
                 val isLanded = images.isLanded(flight.itemID)
@@ -317,8 +335,9 @@ internal class SessionSendFlights(
                 continue
             }
             flight.progress = progress
-            if (flight.fliesImages) images.step(flight.itemID, markers, progress)
+            if (flight.fliesImages) images.step(flight.itemID, markers, progress, lift = flight.raised)
         }
+        interrupted = false
         landed.forEach(::finish)
         frame += 1
     }
@@ -451,13 +470,16 @@ internal class SessionSendFlights(
                 continue
             }
             val from = source.bounds
+            // Everything in the flight (words, bubble, attachments, label) aims [SendLift] higher together.
+            val lift = if (flight.started) flight.raised else 0f
+            val aim = destination.translate(0f, -lift)
             // The words shrink into the bubble's text as the bubble grows out of them.
-            val text = Rect(destination.left + gutter, destination.top + vertical, destination.right - gutter, destination.bottom - vertical)
+            val text = Rect(aim.left + gutter, aim.top + vertical, aim.right - gutter, aim.bottom - vertical)
             scope.drawWords(source, ComposerSendTransition.interpolate(from, text, p), 1 - p, origin)
             val bubble = landing.marker(flight.itemID)
             if (bubble != null) {
                 val landingRect = ComposerSendTransition.interpolate(
-                    Rect(from.left - gutter, from.top - vertical, from.right + gutter, from.bottom + vertical), destination, p,
+                    Rect(from.left - gutter, from.top - vertical, from.right + gutter, from.bottom + vertical), aim, p,
                 )
                 bubble.layer.alpha = p
                 scope.withTransform({
@@ -471,8 +493,8 @@ internal class SessionSendFlights(
                 val band = destination.top - surfaces.bounds.top
                 surfaces.layer.alpha = p
                 // The photos' copies own their slots (iOS `maskImages`): one visible owner per image.
-                scope.withoutImageSlots(flight, origin) {
-                    withTransform({ translate(surfaces.bounds.left - origin.x, surfaces.bounds.top - origin.y) }) {
+                scope.withoutImageSlots(flight, origin, lift) {
+                    withTransform({ translate(surfaces.bounds.left - origin.x, surfaces.bounds.top - origin.y - lift) }) {
                         clipRect(0f, 0f, surfaces.bounds.width, band) { drawLayer(surfaces.layer) }
                     }
                 }
@@ -483,7 +505,7 @@ internal class SessionSendFlights(
                 val chrome = ComposerSendTransition.chromeProgress(p)
                 val rise = TranscriptTunables.promotionLabelRise * density * (1 - chrome)
                 label.layer.alpha = chrome
-                scope.withTransform({ translate(label.bounds.left - origin.x, label.bounds.top - origin.y - rise) }) { drawLayer(label.layer) }
+                scope.withTransform({ translate(label.bounds.left - origin.x, label.bounds.top - origin.y - rise - lift) }) { drawLayer(label.layer) }
             }
         }
     }
@@ -504,15 +526,15 @@ internal class SessionSendFlights(
         }
     }
 
-    /** Draws [block] everywhere but [flight]'s photo slots while its copies fly (iOS `maskImages`' even-odd mask). */
-    private fun DrawScope.withoutImageSlots(flight: SendFlight, origin: Offset, block: DrawScope.() -> Unit) {
+    /** Draws [block] everywhere but [flight]'s photo slots (raised by [lift] px) while its copies fly (iOS `maskImages`' even-odd mask). */
+    private fun DrawScope.withoutImageSlots(flight: SendFlight, origin: Offset, lift: Float = 0f, block: DrawScope.() -> Unit) {
         if (!flight.fliesImages) return block()
         val slots = images.tiles.filter { tile -> landing.marker(SendLanding.imageID(flight.itemID, tile.index)) != null }
         if (slots.isEmpty()) return block()
         val path = Path()
         for (tile in slots) {
             val slot = landing.marker(SendLanding.imageID(flight.itemID, tile.index))?.bounds ?: continue
-            path.addRect(slot.translate(-origin))
+            path.addRect(slot.translate(-origin).translate(0f, -lift))
         }
         clipPath(path, ClipOp.Difference) { block() }
     }
@@ -600,6 +622,11 @@ internal fun SessionSendFlightOverlay(host: SessionComposerHost, bridge: Session
         if (prepared == null && imagesToken == null) return@LaunchedEffect
         delay(UNCLAIMED_CAPTURE_MILLIS)
         flights.dissolveIfStill(prepared, imagesToken)
+    }
+    // iOS `sendFlightsInterrupted`: the keyboard moving mid-flight lets the words go.
+    val ime = WindowInsets.ime
+    LaunchedEffect(flights, ime, density) {
+        snapshotFlow { ime.getBottom(density) }.drop(1).collect { flights.interrupt() }
     }
     LaunchedEffect(flights, flights.isFlying) {
         if (!flights.isFlying) return@LaunchedEffect

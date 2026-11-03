@@ -90,6 +90,27 @@ class SentImageFlightTests {
         assertFalse(rig.images.isSending)
     }
 
+    /** iOS checks the copy's mask in its own coordinates; here [SentImageFlight.Tile.clip] is in root px, so it moves with the copy. */
+    @Test fun liftedPhotosKeepTheirClipWithThem() {
+        val rig = Rig(1)
+        rig.images.prepare(rig.attachments, reduceMotion = false, window = rig.window, decode = rig.decode)
+        val copy = rig.images.tiles.first()
+        assertTrue(rig.images.begin("message", rig::marker))
+        val band: (String) -> Rect? = { id -> rig.marker(id)?.let { Rect(it.left - 20f, it.top, it.right + 20f, it.bottom) } }
+        fun clip(lift: Float): Rect {
+            rig.images.step("message", rig::marker, progress = 1f, clips = band, lift = lift)
+            return copy.clip!!
+        }
+        val level = clip(lift = 0f)
+        val levelY = copy.frame.top
+        val lifted = clip(lift = 30f)
+        // The photo aims 30 pt higher, and its clip goes with it: nothing cut off.
+        assertTrue(abs((levelY - copy.frame.top) - 30f) < 0.01f)
+        assertTrue(abs((level.top - lifted.top) - 30f) < 0.01f)
+        assertTrue(abs(lifted.height - level.height) < 0.01f)
+        rig.images.finish("message")
+    }
+
     @Test fun endpointFollowsLateSlotResize() {
         val rig = Rig(1)
         rig.images.prepare(rig.attachments, reduceMotion = false, window = rig.window, decode = rig.decode)

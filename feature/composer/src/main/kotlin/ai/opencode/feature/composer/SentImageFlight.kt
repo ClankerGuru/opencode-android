@@ -182,26 +182,30 @@ class SentImageFlight {
      * One frame at the send clock's [progress]. Every photo shares the bubble's progress: a
      * second rect spring would lag the bubble, especially while the list scrolls. The
      * endpoints follow the visible slot ([markers]) as the composer and follower move; [clips]
-     * gives a slot's scroll band so a copy can't hang over the transcript gutter.
+     * gives a slot's scroll band so a copy can't hang over the transcript gutter. [lift] (px)
+     * raises every photo's aim with the words the text flight holds level (iOS `SendLift`).
      */
-    fun step(itemID: String, markers: (String) -> Rect?, progress: Float, clips: (String) -> Rect? = { null }) {
+    fun step(itemID: String, markers: (String) -> Rect?, progress: Float, clips: (String) -> Rect? = { null }, lift: Float = 0f) {
         val flight = flights[itemID] ?: return
         flight.progress = progress.coerceIn(0f, 1f)
         val p = flight.progress
         for (tile in flight.tiles) {
             val id = imageID(itemID, tile.index)
             markers(id)?.let { tile.destination = it; tile.destinationClip = clips(id) }
-            tile.frame = if (flight.reducesMotion || flight.handoffStarted != null) {
+            val settled = flight.reducesMotion || flight.handoffStarted != null
+            tile.frame = if (settled) {
                 tile.destination
             } else {
-                ComposerSendTransition.interpolate(tile.origin, tile.destination, p)
+                ComposerSendTransition.interpolate(tile.origin, tile.destination.translate(0f, -lift), p)
             }
             tile.cornerRadius = if (flight.reducesMotion) CARD_CORNER_RADIUS else tile.radius + (CARD_CORNER_RADIUS - tile.radius) * p
             tile.alpha = if (flight.reducesMotion) progress else 1f
             // Four photos live in a horizontal strip: meet its clipping band as well as the frame.
+            // A lifted photo's band goes up with it, so nothing is cut off.
             val clipProgress = if (flight.reducesMotion) 1f else max(0f, (p - 0.8f) / 0.2f)
             tile.clip = tile.destinationClip?.let { band ->
-                ComposerSendTransition.interpolate(union(tile.frame, band), band, clipProgress)
+                val lifted = if (settled) band else band.translate(0f, -lift)
+                ComposerSendTransition.interpolate(union(tile.frame, lifted), lifted, clipProgress)
             }
         }
         frameTick++

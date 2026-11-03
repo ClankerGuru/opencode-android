@@ -62,8 +62,10 @@ object TranscriptTunables {
         // Send
         val sendFlightOmega = Tunable("transcript.send.flightOmega", "Send flight ω", default = 14.0, range = 6.0..32.0, step = 0.5)
         val sendPillDuration = Tunable("transcript.send.pillDuration", "Queued pill flight", default = 0.45, range = 0.15..1.0, step = 0.02)
-        /** iOS `sendBubbleWaitMax` (declared with the send flights): how long a flight waits for a bubble below its words. */
-        val sendBubbleWaitMax = Tunable("transcript.send.bubbleWaitMax", "Wait for low bubble (s)", default = 0.3, range = 0.0..0.8, step = 0.02)
+        /** iOS `sendBubbleWaitMax` (declared with the send flights): how long a send's words hold level over a bubble below them. */
+        val sendBubbleWaitMax = Tunable("transcript.send.bubbleWaitMax", "Hold over low bubble (s)", default = 0.3, range = 0.0..0.8, step = 0.02)
+        /** iOS `sendLiftSoftness` (dp): how far either side of level the words' lift rounds off. */
+        val sendLiftSoftness = Tunable("transcript.send.liftSoftness", "Lift softness (pt)", default = 24.0, range = 0.0..40.0, step = 1.0)
 
         // Jump
         val jumpDuration = Tunable("transcript.jump.duration", "Jump glide duration", default = 0.5, range = 0.15..1.2, step = 0.02)
@@ -138,6 +140,7 @@ object TranscriptTunables {
     val sendFlightOmega: Double get() = Knobs.sendFlightOmega.value
     val sendPillDuration: Double get() = Knobs.sendPillDuration.value
     val sendBubbleWaitMax: Double get() = Knobs.sendBubbleWaitMax.value
+    val sendLiftSoftness: Double get() = Knobs.sendLiftSoftness.value
     /** iOS `sendImageDuration` (the knob is `:feature:media`'s [SendImageTunables], which the composer reads too). */
     val sendImageDuration: Double get() = SendImageTunables.duration
 
@@ -321,7 +324,7 @@ object TranscriptTunables {
             store.register(entranceRise, growthMaxFrameChange, growthSoftEdge)
             store.register(arrivalOmega, viewportOmega, maxFrameStep)
             store.register(arrivalReach)
-            store.register(promotionDuration, sendFlightOmega, sendPillDuration, sendBubbleWaitMax, jumpDuration, SendImageTunables.sendImageDuration)
+            store.register(promotionDuration, sendFlightOmega, sendPillDuration, sendBubbleWaitMax, sendLiftSoftness, jumpDuration, SendImageTunables.sendImageDuration)
             store.register(promotionLabelRise, jumpReach, jumpLead)
             store.register(newMinDuration, newMaxDuration, agentGlowRise, agentGlowDuration)
             store.register(dividerCollapse)

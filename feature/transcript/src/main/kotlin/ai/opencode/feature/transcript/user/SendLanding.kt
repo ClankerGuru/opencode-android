@@ -104,6 +104,12 @@ class SendLanding {
     var isAwaitingSend: () -> Boolean = { false }
 
     /**
+     * Whether the reader is moving the list (a drag, a borrowed drag, their fling; iOS
+     * `isUserScrolling`). Set by the list; a flight's words stop holding level when it is.
+     */
+    var isUserScrolling: () -> Boolean = { false }
+
+    /**
      * Where a new last row's bottom will rest once the follower brings it in (window px): the
      * list's visible area above its bottom padding. A flight whose bubble is still below the
      * screen aims here at once (iOS lays the off-screen bubble out at the end, `moveOffset`),

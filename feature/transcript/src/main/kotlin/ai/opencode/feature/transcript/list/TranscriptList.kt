@@ -183,6 +183,17 @@ private fun TranscriptListContent(
     LaunchedEffect(listState) {
         snapshotFlow { listState.isScrollInProgress }.collect(controller::scrollInProgressChanged)
     }
+    // iOS `isUserScrolling` read by the send flights: a reader moving the list lets a send's words go.
+    val sendLanding = controller.sendLanding
+    if (sendLanding != null) {
+        DisposableEffect(sendLanding, controller) {
+            val scrolling = { controller.isUserGestureActive || controller.isBorrowedDragActive }
+            sendLanding.isUserScrolling = scrolling
+            onDispose {
+                if (sendLanding.isUserScrolling === scrolling) sendLanding.isUserScrolling = { false }
+            }
+        }
+    }
     // iOS `scrollEdgeBridge.onBorrowedDrag`: drags on the controls over the list scroll it.
     if (borrowedDrag != null) {
         DisposableEffect(borrowedDrag, controller) {
