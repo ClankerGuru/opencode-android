@@ -45,7 +45,6 @@ import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -103,13 +102,25 @@ internal fun InboxSidebarList(
         }
     }
     val listState = rememberLazyListState()
-    // iOS's List shows a new top row when it's scrolled to the top. LazyColumn keeps its first
-    // visible row anchored by key instead, which tucked the archive error above the viewport,
-    // under the header. Capture "at the top" as the error arrives (before the list remeasures)
-    // and scroll to it; scrollToItem drops the key anchor.
-    val atTop by remember { derivedStateOf { listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0 } }
-    val revealError = remember(archiveError != null) { archiveError != null && atTop }
-    LaunchedEffect(revealError) { if (revealError) listState.scrollToItem(0) }
+    // As in DrawerListView: a list resting at its top stays there when a row arrives above the
+    // first one (the archive error, Catch Up, a session that just got busy), as iOS's List keeps
+    // its zero offset; LazyColumn would keep the old first row anchored by key and leave the new
+    // ones scrolled under the header.
+    val restsAtTop = remember { booleanArrayOf(true) }
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0 }
+            .collect { restsAtTop[0] = it }
+    }
+    val firstKey = when {
+        archiveError != null -> "inbox-error"
+        catchUpCount > 0 -> "inbox-catch-up"
+        else -> rows.firstOrNull()?.id
+    }
+    val shownFirstKey = remember { arrayOfNulls<String>(1) }
+    if (shownFirstKey[0] != firstKey) {
+        if (shownFirstKey[0] != null && restsAtTop[0]) listState.requestScrollToItem(0, 0)
+        shownFirstKey[0] = firstKey
+    }
     val density = LocalDensity.current
     // The header's edge follows how far rows have scrolled beneath the title.
     LaunchedEffect(listState, headerScroll) {
