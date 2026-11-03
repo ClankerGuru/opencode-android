@@ -107,7 +107,7 @@ private fun ThemeSection(
     val isDark = OpenCodeTheme.colors.isDark
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(OpenCodeSpacing.s12)) {
         AppTheme.entries.forEach { option ->
-            val variant = ThemePalette.definition(option).variant(isDark)
+            val variant = rememberThemeDefinition(option).variant(isDark)
             Column(
                 Modifier
                     .clickable(role = Role.RadioButton, onClickLabel = option.title) { onTheme(option) }

@@ -10,7 +10,7 @@ import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.ThemeDefinition
-import ai.opencode.core.ui.ThemePalette
+import ai.opencode.core.ui.rememberThemeDefinition
 import ai.opencode.core.ui.ThemeSharedKeys
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
@@ -124,7 +124,7 @@ fun AppearanceSettingsView(store: SettingsStore) {
             ) {
                 val swatch = @Composable {
                     ThemeSwatchTile(
-                        ThemePalette.definition(appTheme),
+                        rememberThemeDefinition(appTheme),
                         isDark = isDark,
                         size = ThemeSwatchTile.Size.Compact,
                         cardBackground = OpenCodeTheme.colors.groupedCard,
@@ -165,7 +165,7 @@ fun ThemesSettingsView(store: SettingsStore) {
     val isDark = scheme.resolveIsDark(isSystemInDarkTheme())
     val reduceMotion = rememberReduceMotion()
     val colors = OpenCodeTheme.colors
-    val canvas = ThemePalette.definition(appTheme).variant(isDark).canvas.color
+    val canvas = rememberThemeDefinition(appTheme).variant(isDark).canvas.color
     val density = LocalDensity.current
     /** The pinned preview header's height (px), content plus its 14 pt bottom inset. */
     var headerHeight by remember { mutableIntStateOf(0) }
@@ -201,7 +201,7 @@ fun ThemesSettingsView(store: SettingsStore) {
                         if (index > 0) SettingsDivider(inset = true)
                         ThemeOptionRow(
                             theme = theme,
-                            definition = ThemePalette.definition(theme),
+                            definition = rememberThemeDefinition(theme),
                             isDark = isDark,
                             isSelected = appTheme == theme,
                             onClick = { store.send(SettingsFeature.Action.Settings(HomeSettingsFeature.Action.AppThemeChanged(theme))) },
@@ -481,7 +481,7 @@ private const val PreviewMaxFontScale = 19f / 17f
 /** The palette-drawn stand-in for [LocalAppearanceTranscriptPreview] when no host provides rows. */
 @Composable
 private fun ImitationTranscriptPreview(theme: AppTheme, isDark: Boolean) {
-    val v = ThemePalette.definition(theme).variant(isDark)
+    val v = rememberThemeDefinition(theme).variant(isDark)
     val mono = FontFamily.Monospace
     Column(
         Modifier
