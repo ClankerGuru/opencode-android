@@ -9,7 +9,10 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.GraphicsContext
+import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
@@ -60,8 +63,36 @@ class SendLanding {
         val isFollowing: Boolean = flies,
     )
 
+    /**
+     * A pending row leaving for the queued pill (iOS `flyIntoQueuedPill`): its last drawing and
+     * where it sat (window px). The host draws it shrinking into the pill, then [release]s it.
+     */
+    class PillDeparture internal constructor(
+        /** Its message's ID: a send still flying into it lands first (iOS `finishSendFlight`). */
+        val itemID: String?,
+        val layer: GraphicsLayer,
+        val bounds: Rect,
+        private val onRelease: () -> Unit,
+    ) {
+        private var released = false
+
+        /** Done drawing it: frees the layer. */
+        fun release() {
+            if (released) return
+            released = true
+            onRelease()
+        }
+    }
+
     private val markers = HashMap<String, Marker>()
     private val hidden = mutableStateMapOf<String, Boolean>()
+
+    /**
+     * The session's queued-pill host (iOS `flyIntoQueuedPill`'s window snapshot): draws a pending
+     * row shrinking into the pill above the composer, aiming at the pill's frame or, until it has
+     * appeared, just inside the list's bottom padding ([listEnd]). Null: the row leaves in place.
+     */
+    var onQueuedPill: ((PillDeparture) -> Unit)? = null
 
     /**
      * The session's flight host: lands [Send]. Returns true when the message will fly into its
@@ -167,6 +198,56 @@ internal fun rememberSendLandingMarker(key: String?): SendLanding.Marker? {
         onDispose { landing.unregister(key, marker) }
     }
     return marker
+}
+
+/**
+ * A pending row's drawing, kept for its flight into the queued pill (iOS snapshots the cell's
+ * content as it leaves, `flyIntoQueuedPill`). The row records into it as it draws; when the list
+ * hands it to the pill ([depart]) the layer goes with it and the row draws nothing where it was.
+ */
+@Stable
+internal class QueuedPillSource(private val graphics: GraphicsContext, val itemID: String?) {
+    private var layer: GraphicsLayer? = null
+
+    /** Where the row sits (window px, unclipped). */
+    var bounds: Rect = Rect.Zero
+        private set
+
+    fun moved(coordinates: androidx.compose.ui.layout.LayoutCoordinates) {
+        bounds = Rect(coordinates.positionInWindow(), coordinates.size.toSize())
+    }
+
+    fun draw(scope: ContentDrawScope) {
+        val recording = layer ?: graphics.createGraphicsLayer().also { layer = it }
+        with(scope) {
+            recording.record { this@with.drawContent() }
+            drawLayer(recording)
+        }
+    }
+
+    /** Hands the last drawing to [landing]'s pill host; false when there's none (nothing drawn yet, no host). */
+    fun depart(landing: SendLanding): Boolean {
+        val host = landing.onQueuedPill ?: return false
+        val recorded = layer?.takeIf { bounds.width > 0f && bounds.height > 0f } ?: return false
+        layer = null
+        host(
+            SendLanding.PillDeparture(itemID, recorded, bounds) { graphics.releaseGraphicsLayer(recorded) },
+        )
+        return true
+    }
+
+    fun dispose() {
+        layer?.let(graphics::releaseGraphicsLayer)
+        layer = null
+    }
+}
+
+/** Records [source]'s row as it draws, and draws nothing in place while [departing] (its copy flies into the pill). */
+internal fun Modifier.queuedPillSource(source: QueuedPillSource?, departing: () -> Boolean): Modifier {
+    if (source == null) return this
+    return this
+        .onGloballyPositioned { if (!departing()) source.moved(it) }
+        .drawWithContent { if (!departing()) source.draw(this) }
 }
 
 /** Reports where a frame-only [marker] sits (window px, unclipped). */

@@ -34,6 +34,8 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -120,6 +122,11 @@ private class FadingSend(val source: ComposerSendTransition.Prepared, val pill: 
     val progress = Animatable(0f)
 }
 
+/** A pending row's copy shrinking into the queued pill (iOS `flyIntoQueuedPill`). */
+private class PillFlight(val departure: SendLanding.PillDeparture, val pill: Rect) {
+    val progress = Animatable(0f)
+}
+
 /**
  * The session's send flights (iOS `scrollEdgeBridge.sendTransition`'s window snapshots). A plain
  * object: it owns per-frame motion, and the reducer never hears of it.
@@ -132,6 +139,7 @@ internal class SessionSendFlights(
 ) {
     private val flights = mutableStateListOf<SendFlight>()
     private val fading = mutableStateListOf<FadingSend>()
+    private val pillFlights = mutableStateListOf<PillFlight>()
 
     /** Bumped every flight frame so the overlay redraws. */
     var frame by mutableIntStateOf(0)
@@ -251,6 +259,29 @@ internal class SessionSendFlights(
         }
     }
 
+    /**
+     * iOS `flyIntoQueuedPill`: a pending row that went into the queued pill shrinks into it from
+     * where it sat, aiming just inside the list's bottom padding until the pill has appeared.
+     */
+    fun flyIntoQueuedPill(departure: SendLanding.PillDeparture, queuedPillFrame: Rect?, density: Float) {
+        // Mid-flight from the composer, it lands first.
+        departure.itemID?.let { id -> flights.filter { it.itemID == id }.forEach(::finish) }
+        val pill = queuedPillFrame ?: landing.listEnd?.let { end ->
+            Rect(end.right - (20 + 110) * density, end.bottom + 5 * density, end.right - 20 * density, end.bottom + (5 + 34) * density)
+        }
+        if (pill == null) return departure.release()
+        val flight = PillFlight(departure, pill)
+        pillFlights += flight
+        scope.launch {
+            try {
+                flight.progress.animateTo(1f, MotionSpring(TranscriptTunables.sendPillDuration).spec())
+            } finally {
+                pillFlights -= flight
+                departure.release()
+            }
+        }
+    }
+
     /** One frame of every flight (iOS `stepSendFlights`). */
     fun step(dt: Double) {
         clock += dt
@@ -366,6 +397,8 @@ internal class SessionSendFlights(
         transition.cancel()
         flights.clear()
         fading.clear()
+        pillFlights.forEach { it.departure.release() }
+        pillFlights.clear()
         landing.showAll()
     }
 
@@ -385,6 +418,18 @@ internal class SessionSendFlights(
                 val s = 1 + (scale - 1) * p
                 val size = Size(from.width * s, from.height * s)
                 scope.drawWords(send.source, Rect(center - Offset(size.width / 2, size.height / 2), size), 1 - p, origin)
+            }
+        }
+        for (flight in pillFlights) {
+            val p = flight.progress.value
+            val from = flight.departure.bounds
+            val scale = max(0.2f, min(1f, flight.pill.height / max(from.height, 1f)))
+            val s = 1 + (scale - 1) * p
+            val center = lerp(from.center, flight.pill.center, p)
+            val layer = flight.departure.layer
+            layer.alpha = 1 - p
+            scope.translate(center.x - origin.x - from.width * s / 2, center.y - origin.y - from.height * s / 2) {
+                scale(s, s, pivot = Offset.Zero) { drawLayer(layer) }
             }
         }
         val gutter = TranscriptMetrics.contentGutter.value * density
@@ -514,6 +559,7 @@ internal fun SessionSendFlightOverlay(host: SessionComposerHost, bridge: Session
 
     SideEffect {
         bridge.sendLanding.isAwaitingSend = { host.sendTransition.isPrepared }
+        bridge.sendLanding.onQueuedPill = { departure -> flights.flyIntoQueuedPill(departure, host.queuedPillFrame, density.density) }
         bridge.sendLanding.onSend = { send ->
             val coordinates = flights.coordinates
             val composer = host.attachmentAnchors.composer.takeIf { it != Rect.Zero }?.let { root ->
@@ -542,6 +588,7 @@ internal fun SessionSendFlightOverlay(host: SessionComposerHost, bridge: Session
     DisposableEffect(flights) {
         onDispose {
             bridge.sendLanding.onSend = null
+            bridge.sendLanding.onQueuedPill = null
             bridge.sendLanding.isAwaitingSend = { false }
             flights.cancel()
         }
