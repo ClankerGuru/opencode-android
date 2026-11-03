@@ -79,6 +79,22 @@ class TranscriptLayoutTests {
         assertEquals(0f, edge.drawn(1.0 + GrowthSoftEdge.LEAVE_DURATION + 0.001), 0.001f)
         assertTrue(edge.isIdle(1.0 + GrowthSoftEdge.LEAVE_DURATION + 0.001))
     }
+
+    /**
+     * iOS 79bfa45f: a promotion that takes the growth over (the row stands below where its edge
+     * began, still short of its content) eases the edge away instead of dropping it in one frame.
+     */
+    @Test
+    fun aPromotionThatTakesTheGrowthOverEasesItsEdgeAway() {
+        val edge = GrowthSoftEdge()
+        edge.update(28f, measured = 34f, now = 0.0, maxFade = 28f)
+        edge.update(31f, measured = 34f, now = 0.0, maxFade = 28f)
+        assertEquals(3f, edge.drawn(0.0), 0.01f)
+        edge.update(27f, measured = 40f, now = 1.0, maxFade = 28f)
+        assertTrue(edge.isLeaving)
+        assertEquals(3f, edge.drawn(1.0), 0.01f)
+        assertEquals(0f, edge.drawn(1.0 + GrowthSoftEdge.LEAVE_DURATION + 0.001), 0.001f)
+    }
 }
 
 class JustifiedImageRowsTests {
