@@ -8,6 +8,7 @@ import ai.opencode.core.store.onChange
 import ai.opencode.core.store.PresentationAction
 import ai.opencode.feature.session.SessionFeature
 import ai.opencode.feature.media.BrowserFeature
+import ai.opencode.feature.voice.VoiceCallLogClient
 import ai.opencode.feature.voice.VoiceCallServiceClient
 import ai.opencode.feature.voice.ScreenAwakeClient
 import ai.opencode.feature.system.liveactivity.VoiceLiveActivityClient
@@ -499,7 +500,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
 
     /**
      * Leaving Home cancels a call or a recording without Home seeing it end, so their ongoing
-     * notifications are ended here (iOS `.onChange` of `voiceCallActivity`/`dictationActivity`).
+     * notifications are ended, and the call's log saved, here (iOS `.onChange` of `voiceCallActivity`/`dictationActivity`).
      * Android's call notification is voice's foreground service, keyed by the call's presence ID.
      * Then the screen stays on during a call, set at once rather than from an effect so a quick
      * on-then-off can't land out of order (watched from here so leaving Home mid-call lets the
@@ -523,6 +524,13 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
             if (old == null || state.home?.id == old) return@onChange Reduced(state)
             val sessionLiveActivity = dependency(SessionLiveActivityClient)
             Reduced(state, Effect.run { sessionLiveActivity.update(null, null) })
+        }
+        // A call that goes with its Home never reaches a terminal phase, so its log is saved
+        // here (saving one already saved does nothing; iOS AppFeature+LiveActivities).
+        .onChange({ it.home?.sessionDetail?.voice?.callLogID }) { old, _, state ->
+            if (old == null || state.home?.sessionDetail?.voice?.callLogID == old) return@onChange Reduced(state)
+            val voiceCallLog = dependency(VoiceCallLogClient)
+            Reduced(state, Effect.run { voiceCallLog.finish(old) })
         }
         .onChange({ it.keepsScreenAwake }) { _, keeps, state ->
             dependency(ScreenAwakeClient).set(keeps)

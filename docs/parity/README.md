@@ -83,12 +83,12 @@ recounted from Gradle at the sync merge.
 
 | Module | iOS test files covered | iOS tests ported | Deleted with reason | JVM tests (Gradle) |
 | --- | ---: | ---: | ---: | ---: |
-| `:app` | 21 | 125 | 27 | 139 |
+| `:app` | 22 | 126 | 27 | 140 |
 | `:core` | 19 | 112 | 74 | 134 |
 | `:server` | 36 | 230 | 3 | 256 (2 opt-in live checks skipped) |
 | `:devtools` | 4 | 14 | 10 | 17 |
 | `:feature:media` | 17 | 178 | 15 | 183 |
-| `:feature:voice` | 32 | 481 | 16 | 680 |
+| `:feature:voice` | 33 | 491 | 16 | 690 |
 | `:feature:system` | 9 | 88 | 2 | 103 |
 | `:feature:transcript` | 34 | 274 | 57 | 282 (1 env-gated metric skipped) |
 | `:feature:composer` | 41 | 267 | 40 | 270 |

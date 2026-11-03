@@ -8,6 +8,7 @@ import ai.opencode.devtools.DevTools
 import ai.opencode.feature.session.AgentActivityLedger
 import ai.opencode.feature.transcript.markdown.withMarkdownStream
 import ai.opencode.server.EventBatcherHooks
+import ai.opencode.server.retry.AppPhase
 import ai.opencode.server.retry.AppPhases
 import android.app.Application
 import ai.opencode.core.dependencies.dependency
@@ -16,6 +17,7 @@ import ai.opencode.feature.settings.AppVersion
 import ai.opencode.feature.system.liveactivity.DictationLiveActivityClient
 import ai.opencode.feature.system.liveactivity.SessionLiveActivityClient
 import ai.opencode.feature.system.liveactivity.VoiceLiveActivityClient
+import ai.opencode.feature.voice.VoiceCallLogClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -71,5 +73,16 @@ class OpenCodeApplication : Application() {
         launchScope.launch { voiceActivity.endAll() }
         launchScope.launch { dictationActivity.endAll() }
         launchScope.launch { sessionActivity.endAll() }
+        // A call log a previous process left in progress (killed, updated) is saved as
+        // interrupted, off the main thread (iOS `OpenCodeApp.init`), and an open call's log is
+        // written as the app leaves the foreground (iOS `scenePhase == .background`). Resolved
+        // after AppDependencies so the recorder gets the installed uploader.
+        val voiceCallLog = dependency(VoiceCallLogClient)
+        launchScope.launch(Dispatchers.IO) { voiceCallLog.recoverInterrupted() }
+        launchScope.launch {
+            AppPhases.phases().collect { phase ->
+                if (phase == AppPhase.Background) launch(Dispatchers.IO) { voiceCallLog.persistOpenCalls() }
+            }
+        }
     }
 }
