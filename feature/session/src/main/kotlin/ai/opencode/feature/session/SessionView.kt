@@ -603,11 +603,11 @@ private fun SessionAttachmentMenu(
     )
     if (usesPlusMenuSheet) {
         // iOS `PlusMenuGlassSurface(isOpen:handsOff:…)`: the photo sheet takes the menu's surface
-        // while it's shown and gives it back once it has folded away.
+        // while it's shown and gives it back as Back's fold lands (`photoSheetMenuTakesBack`).
         PlusMenuGlassSurface(
             anchors = host.attachmentAnchors,
-            isOpen = phase == AttachmentMenuPhase.Menu && !sheet.morph.isShown,
-            handsOff = sheet.morph.isShown,
+            isOpen = phase == AttachmentMenuPhase.Menu && (!sheet.morph.isShown || sheet.menuTakesBack),
+            handsOff = sheet.morph.isShown && !sheet.menuTakesBack,
             items = items,
             highlighted = press.highlighted,
             onChoose = chooseTapped,

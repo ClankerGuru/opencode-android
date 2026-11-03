@@ -32,6 +32,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FiniteAnimationSpec
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -90,6 +91,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import java.util.UUID
 import kotlin.math.max
+import kotlin.math.roundToInt
+import kotlin.time.Duration.Companion.milliseconds
 
 // Port of iOS `Session/SessionView+PhotoSheet.swift`. Default: iOS picks photos in the system
 // PhotosPicker the + menu morphs into; Android launches the system Photo Picker (no library
@@ -128,6 +131,12 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
         private set
     /** Back from the sheet hands the keyboard back under the menu (iOS `photoSheetKeepsMenu`). */
     var keepsMenu = false
+    /**
+     * iOS `photoSheetMenuTakesBack`: the menu takes its glass back as the back fold lands
+     * ([handMenuBackOnLanding]), not at the morph's longer generic settle.
+     */
+    var menuTakesBack by mutableStateOf(false)
+        private set
     /** iOS `photoSheetRestoresFocus`: the keyboard comes back as the sheet folds onto the composer. */
     var restoresFocus by mutableStateOf(false)
         private set
@@ -206,12 +215,13 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
         scope.launch { top.snapTo(to) }
     }
 
-    /** iOS `openPhotoSheet()`: the menu's surface grows into the sheet, the keyboard going down. */
+    /** iOS `openPhotoSheet()`: the menu's surface grows into the sheet, resting on the keyboard when it's up. */
     fun openPhotoSheet() {
         val host = env.host ?: return
         val menu = host.attachmentAnchors.menu
         if (menu == Rect.Zero) return
         library.resetClosingPicks()
+        menuTakesBack = false
         if (usesPlusMenuSheet) flights.cancelAll()
         val compactTop = modelSheetTop(host.attachmentAnchors.composer)
         if (!morph.isOpening) source = menu
@@ -230,7 +240,8 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
             open,
             contentDelay = ComposerMorphTunables.photoContentDelay,
             prepare = {},
-            launch = { if (hadKeyboard) host.dismissComposerKeyboard() },
+            // The keyboard stays up: the sheet rests on it (iOS d82670c2).
+            launch = {},
             opened = {},
         )
     }
@@ -278,20 +289,42 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
     /** iOS `backFromPhotoSheet()`: the sheet folds onto the menu, which comes back with the keyboard if it was up. */
     fun backFromPhotoSheet() {
         if (!morph.isOpening) return
-        library.clearPicks()
-        library.resetClosingPicks()
+        // The picks are dropped, but their badges stay until the sheet has folded away.
+        library.setAsidePicks()
         val restores = restoresFocus
         restoresFocus = false
         attachmentMenuRestoresFocus = restores
         foldsToComposer = false
         camera.expanded = false
-        val animation = ComposerMorphTunables.animation(opening = false, reduceMotion = reducedMotion)
+        val back = if (detent.isExpanded) ComposerMorphTunables.photoBackExpanded else ComposerMorphTunables.photoBack
+        val animation: FiniteAnimationSpec<Float> = if (reducedMotion) tween(200, easing = Motion.EaseInOut) else back.spec()
         landsOn = source.takeIf { it != Rect.Zero }
-        if (!restores) {
-            morph.fold(animation, reduceMotion = reducedMotion)
-            return
+        // The hand-back is timed from just before the fold starts, on the next turn (iOS `Task`),
+        // after the fold has taken the morph's generation.
+        morph.launchThenFold(
+            animation,
+            reducedMotion,
+            launch = { if (restores) raiseMessageKeyboard() },
+            edge = {
+                scope.launch { handMenuBackOnLanding(back.duration) }
+                null
+            },
+        )
+    }
+
+    /**
+     * iOS `handMenuBackOnLanding(seconds:)`: the menu takes its glass back as the fold lands, not at
+     * the morph's longer generic settle; until then the menu stays handed off and the card sat
+     * under the returning keyboard. One frame: the menu draws as the sheet goes.
+     */
+    private fun handMenuBackOnLanding(duration: Double) {
+        val seconds = if (reducedMotion) 0.22 else duration * 1.6
+        val delay = (ComposerMorph.wallSeconds(seconds) * 1000).roundToInt().milliseconds
+        morph.after(delay) {
+            if (morph.phase != ComposerMorph.Phase.Closing || foldsToComposer) return@after
+            menuTakesBack = true
+            morph.reset()
         }
-        morph.launchThenFold(animation, reducedMotion, launch = { raiseMessageKeyboard() }, edge = { null })
     }
 
     /** iOS `raiseMessageKeyboard()`: the message field takes the keyboard back with the menu still up. */
@@ -372,8 +405,10 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
 
     /** iOS `photoSheet.isShown`'s `onChange` to false: folded away, the menu's place is its own again. */
     fun sheetFolded() {
+        library.clearPicks()
         library.resetClosingPicks()
         keepsMenu = false
+        menuTakesBack = false
         foldsToComposer = false
         if (detent.isExpanded) detent = detent.copy(isExpanded = false)
     }
@@ -567,13 +602,13 @@ fun SessionPlusPhotoSheet(state: SessionPhotoSheetState, modifier: Modifier = Mo
     LaunchedEffect(shown) { if (!shown) state.sheetFolded() }
 
     val px = density.density
-    fun rest(screen: Rect): Rect {
+    fun rest(screen: Rect, keyboardTop: Float? = null): Rect {
         val column = if (screen.width / px > 600) anchors?.composer?.takeIf { it != Rect.Zero } else null
         return ComposerMorphGeometry.sheet(
             top = state.top.value * px,
             column = column,
             screen = screen,
-            keyboardTop = null,
+            keyboardTop = keyboardTop,
             ceiling = (state.env.headerHeight + ModelPickerTunables.headerGap.toFloat()) * px,
             density = px,
         )
@@ -591,13 +626,17 @@ fun SessionPlusPhotoSheet(state: SessionPhotoSheetState, modifier: Modifier = Mo
             morph = morph,
             source = source,
             sourceRadiusDp = AttachmentMenuMetrics.cornerRadius.value.toDouble(),
-            target = { s, _ -> rest(s) },
+            target = { s, keyboardTop -> rest(s, keyboardTop) },
             onDismiss = { state.closePhotoSheet() },
             modifier = Modifier.semantics { if (state.camera.expanded) invisibleToUser() },
             openedFrom = state.source.takeIf { it != Rect.Zero },
             landsOn = landsOn,
             stretchesUpward = true,
             backdropDim = ComposerMorphTunables.photoBackdropDim,
+            // It rests on the keyboard when it's up, and stays on it as it folds back onto the menu
+            // instead of dropping behind the keys (iOS d82670c2).
+            contentHasKeyboard = true,
+            keyboardStaysAsItFolds = true,
             retainsContent = true,
         ) {
             PhotoSheetBody(state)

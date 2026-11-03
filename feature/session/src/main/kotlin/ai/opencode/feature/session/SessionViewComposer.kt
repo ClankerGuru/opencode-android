@@ -1846,6 +1846,9 @@ private fun SessionComposerEnv.onDraftEdited(new: String, recording: Boolean) {
     val old = store.state.draft
     if (new == old) return
     store.send(Action.Binding(BindingAction.Draft(new)))
+    // The photo sheet rests on the keyboard over the field: typing folds it away so the text shows
+    // where it lands (iOS d82670c2).
+    if (photoSheet?.morph?.isOpen == true) photoSheet.closePhotoSheet()
     val state = store.state
     if (!returnKeySends || state.nonSendNewlineDraft == new || new != old + "\n") return
     if (state.isAnsweringRequest) store.send(Action.ReturnKeyTapped) else sendMessage(Action.ReturnKeyTapped)
