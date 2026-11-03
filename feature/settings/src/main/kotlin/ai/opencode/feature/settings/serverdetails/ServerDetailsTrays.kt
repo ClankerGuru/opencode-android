@@ -57,9 +57,13 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.PageTransitions
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
 import androidx.compose.animation.AnimatedContent
@@ -68,11 +72,6 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.VisibilityThreshold
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
 import kotlinx.coroutines.launch
 
 /**
@@ -150,26 +149,23 @@ private fun MCPServersTray(
     var detail by rememberSaveable { mutableStateOf<String?>(null) }
     BackHandler(enabled = detail != null) { detail = null }
     val reduceMotion = rememberReduceMotion()
-    // The push slides in from the right over the list, which moves a third of the way left; back
-    // reverses it (Settings' push spring); Reduce Motion cross-fades.
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    val slidePx = with(LocalDensity.current) { PageTransitions.SlideDistance.roundToPx() }
+    // Android divergence: the server's page comes and goes on Material's shared axis, as Settings'
+    // pages do (iOS pushes it full width over a list that moves a third of the way left).
     AnimatedContent(
         targetState = detail,
         transitionSpec = {
-            if (reduceMotion) {
-                fadeIn(Motion.reducedFadeSpec()) togetherWith fadeOut(Motion.reducedFadeSpec())
+            val pushing = targetState != null
+            if (pushing) {
+                PageTransitions.forward(slidePx, rtl, reduceMotion)
             } else {
-                val pushing = targetState != null
-                val spring = MotionSpring(0.42).spec(IntOffset.VisibilityThreshold)
-                if (pushing) {
-                    slideInHorizontally(spring) { it } togetherWith slideOutHorizontally(spring) { -it * 3 / 10 }
-                } else {
-                    slideInHorizontally(spring) { -it * 3 / 10 } togetherWith slideOutHorizontally(spring) { it }
-                }.apply { targetContentZIndex = if (pushing) 1f else 0f }
+                PageTransitions.backward(slidePx, rtl, reduceMotion)
             }.using(
-                // The sheet keeps its height through the push (iOS's tray sits at its detent):
-                // it grows at once for a taller page and shrinks only after the 0.42 s slide.
+                // The sheet keeps its height through the move (iOS's tray sits at its detent):
+                // it grows at once for a taller page and shrinks only once the move is done.
                 SizeTransform(clip = true) { initial, target ->
-                    if (target.height >= initial.height) snap() else snap(delayMillis = 420)
+                    if (target.height >= initial.height) snap() else snap(delayMillis = Motion.millis(PageTransitions.DURATION_SECONDS))
                 },
             )
         },

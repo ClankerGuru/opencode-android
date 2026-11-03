@@ -22,7 +22,9 @@ import ai.opencode.feature.settings.whatsnew.WhatsNewDetailPage
 import ai.opencode.feature.settings.whatsnew.WhatsNewListPage
 import ai.opencode.feature.settings.whatsnew.WhatsNewSmallerListPage
 import ai.opencode.core.motion.Motion
-import androidx.compose.animation.Crossfade
+import ai.opencode.core.motion.PageTransitions
+import ai.opencode.core.motion.rememberReduceMotion
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
@@ -51,8 +53,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -82,15 +87,23 @@ fun SettingsView(store: SettingsStore, modifier: Modifier = Modifier) {
         listOf<SettingsRoute>(SettingsRoute.Root) + path.mapIndexed { index, page -> SettingsRoute.Page(index, page) }
     }
     Box(modifier.fillMaxSize()) {
+        // Android divergence: pages move on Material's shared axis (and the back gesture previews
+        // the pop) instead of Navigation 3's default 0.7 s cross-fade or iOS's push.
+        val reduceMotion = rememberReduceMotion()
+        val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+        val slidePx = with(LocalDensity.current) { PageTransitions.SlideDistance.roundToPx() }
         NavDisplay(
             backStack = backStack,
             onBack = { store.send(SettingsFeature.Action.BackTapped) },
+            transitionSpec = { PageTransitions.forward(slidePx, rtl, reduceMotion) },
+            popTransitionSpec = { PageTransitions.backward(slidePx, rtl, reduceMotion) },
+            predictivePopTransitionSpec = { PageTransitions.predictiveBack(slidePx, rtl, reduceMotion) },
             entryProvider = { route ->
                 when (route) {
                     SettingsRoute.Root -> NavEntry(route) {
-                        // Settings asked for while What’s New is the page up cross-fades to
-                        // Settings' root (iOS `SettingsPresentation.fade`, 0.3 s ease-in-out).
-                        Crossfade(root, animationSpec = tween(300, easing = Motion.EaseInOut), label = "settings-root") { shown ->
+                        // Settings asked for while What’s New is the page up switches Settings'
+                        // root (iOS cross-fades, `SettingsPresentation.fade`; Android fades through).
+                        AnimatedContent(root, transitionSpec = { PageTransitions.fadeThrough(reduceMotion) }, label = "settings-root") { shown ->
                             when (shown) {
                                 SettingsFeature.State.Root.settings -> SettingsRootPage(store)
                                 SettingsFeature.State.Root.whatsNew -> WhatsNewListPage(store)
