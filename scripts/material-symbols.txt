@@ -172,7 +172,7 @@ pending fill                        # ellipsis.circle.fill
 person fill                         # person.fill
 phone_in_talk                       # phone.connection
 phone_in_talk fill                  # phone.and.waveform.fill
-photo_camera                        # camera
+photo_camera                        # camera, camera.shutter.button
 photo_camera fill                   # camera.fill
 photo_library                       # photo.on.rectangle, photo.on.rectangle.angled
 picture_in_picture_alt              # pip.enter
