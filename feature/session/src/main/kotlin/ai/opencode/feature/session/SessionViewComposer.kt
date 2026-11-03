@@ -52,6 +52,8 @@ import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.experiments.ExperimentalCallStyle
 import ai.opencode.core.experiments.ModelPickerStyle
 import ai.opencode.feature.composer.QueuedMessagesSheet
+import ai.opencode.feature.composer.ComposerSendTransition
+import ai.opencode.feature.composer.LocalComposerKeyboardMorph
 import ai.opencode.server.model.OpenCodeProject
 import ai.opencode.server.model.OpenCodeQueuedInput
 import ai.opencode.feature.voice.CallTrayController
@@ -136,6 +138,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import ai.opencode.feature.transcript.TranscriptTunables
 
 // Port of iOS `Session/SessionView+Composer.swift`: the composer area (pills, banners, the composer's
 // surface, the dictation bar) and its presentation rules. The controls live in
@@ -346,7 +349,6 @@ internal data class ComposerSnapshot(
 
     companion object {
         fun of(state: SessionFeature.State): ComposerSnapshot {
-            val model = state.currentModelInfo
             val dock = state.dockRequestID
             return ComposerSnapshot(
                 draft = state.draft,
@@ -379,7 +381,7 @@ internal data class ComposerSnapshot(
                 taskIdentity = state.taskIdentity,
                 navigationID = state.navigationID,
                 modelLabel = state.currentModelLabel,
-                modelShortName = model?.shortName ?: state.currentModelName,
+                modelShortName = state.currentModelShortName,
                 chipLevelLabel = chipLevelLabel(state),
                 backgroundAgents = state.activeSubagents.size,
                 backgroundShells = state.backgroundShells.size,
@@ -702,9 +704,16 @@ internal class SessionComposerEnv(
         if (flies) host.sendTransition.prepare(reduceMotion = reducedMotion)
         // The list lands it: on its bubble, its dim steering row, or the pill.
         val generation = state.sendGeneration
+        // A multiline draft's clear shrinks the composer on the flight's spring (iOS
+        // `sendShrinkAnimation`; the field takes it only when it's taller than one line).
+        host.sendTransition.shrinkOnNextClear(ComposerSendTransition.sendShrinkOmega(TranscriptTunables.arrivalOmega))
         store.send(action)
-        // Nothing went (a failed upload): the capture mustn't linger.
-        if (flies && store.state.sendGeneration == generation) host.sendTransition.cancelPrepared()
+        // Nothing went (a failed upload): the capture and the shrink mustn't linger (iOS scopes
+        // the shrink to the send's own transaction).
+        if (store.state.sendGeneration == generation) {
+            host.sendTransition.cancelShrink()
+            if (flies) host.sendTransition.cancelPrepared()
+        }
     }
 
     /** iOS `showsDraftProjects`: a draft lists its recent projects above the composer until its first send leaves. */
@@ -1642,6 +1651,9 @@ private fun SessionComposerEnv.Composer() {
 @Composable
 private fun SessionComposerEnv.ComposerInput(expanded: Boolean, recording: Boolean, bar: RequestBar?) {
     val placeholder = bar?.placeholder ?: "Message"
+    // iOS `KeyboardDrivenTextInset`: the keyboard morph scrubs the expanded top inset (none
+    // inline); without a mounted morph the field follows [expanded].
+    val topInsetFraction = LocalComposerKeyboardMorph.current?.let { morph -> if (bar != null) 0f else morph.expansion }
     Box(Modifier.onGloballyPositioned { coordinates ->
         val surface = view.surfaceBounds
         val bounds = coordinates.boundsInRoot()
@@ -1654,7 +1666,7 @@ private fun SessionComposerEnv.ComposerInput(expanded: Boolean, recording: Boole
                 color = OpenCodeTheme.colors.tertiaryText,
                 maxLines = 1,
                 modifier = Modifier
-                    .padding(top = if (expanded) ComposerTunables.expandedTopInset.dp else 0.dp)
+                    .padding(top = ComposerTunables.expandedTopInset.dp * (topInsetFraction ?: if (expanded) 1f else 0f))
                     .clearAndSetSemantics { },
             )
         }
@@ -1668,6 +1680,7 @@ private fun SessionComposerEnv.ComposerInput(expanded: Boolean, recording: Boole
             expanded = expanded,
             textStyle = ComposerTunables.textStyle.textStyle,
             topInset = ComposerTunables.expandedTopInset.dp,
+            topInsetFraction = topInsetFraction,
             onImagePaste = { uris ->
                 // An answer or a reason takes text, never an attachment.
                 if (store.state.takesPasteAttachments) host.importer?.startImageImport(uris.map(ComposerImageSource::ItemProvider))
@@ -1691,6 +1704,8 @@ private fun SessionComposerEnv.ComposerInput(expanded: Boolean, recording: Boole
             accessibilityLabel = bar?.fieldLabel ?: "Message",
             isHoldingMic = s.dictationHold != null,
             sendTransition = host.sendTransition,
+            // One Picker in the keyboard's place keeps the field from taking it back.
+            refusesFocus = { host.modelPanels?.onePicker?.isOpen == true },
         )
     }
 }

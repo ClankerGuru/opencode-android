@@ -1,6 +1,7 @@
 package ai.opencode.feature.session
 
 import ai.opencode.core.sound.SoundEffectsClient
+import ai.opencode.feature.composer.modelpicker.ModelDisplayNames
 import ai.opencode.feature.composer.RequestDockFeature
 import ai.opencode.feature.composer.UndeliveredPrompts
 import ai.opencode.feature.composer.PromptOutbox
@@ -329,6 +330,7 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         val hideModelsExperiment: Shared<Boolean> = shared(ExperimentalFeature.hideModels.key),
         val recentModelIDs: Shared<List<String>> = shared(SharedKeys.recentModelIDs),
         val modelVariants: Shared<Map<String, String>> = shared(SharedKeys.modelVariants),
+        val modelDisplayNamesByServer: Shared<Map<String, ModelDisplayNames>> = shared(ModelDisplayNames.modelDisplayNamesByServer),
         val voiceModeEnabled: Shared<Boolean> = shared(SharedKeys.voiceModeEnabled),
         val openAIAPIKey: Shared<String?> = shared(SharedKeys.openAIAPIKey),
         val xaiAPIKey: Shared<String?> = shared(SharedKeys.xaiAPIKey),
@@ -1259,11 +1261,3 @@ data class SessionTimers(
         override val testValue = SessionTimers(watchdog = false, runEndCheck = false, requestRetry = false)
     }
 }
-
-/** Case-insensitive multi-field filter used by the picker sheets (iOS `Array.filtered(by:fields:)`). */
-fun <T> List<T>.filtered(query: String, fields: (T) -> List<String>): List<T> {
-    val trimmed = query.trim()
-    if (trimmed.isEmpty()) return this
-    return filter { element -> fields(element).any { it.contains(trimmed, ignoreCase = true) } }
-}
-

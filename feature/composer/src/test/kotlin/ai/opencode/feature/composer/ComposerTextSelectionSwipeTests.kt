@@ -2,6 +2,7 @@ package ai.opencode.feature.composer
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.text.TextRange
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -11,9 +12,10 @@ import org.junit.Test
  * composer always actually brings it up or down because of our swipe action.” A drag the text
  * field is selecting with is never the composer's swipe.
  *
- * `onlyAFocusedNonEmptySelectionClaims` hosts a `UITextView` in a window; the field's half of it
- * (`selectionClaims` on the focused field's selection) lives in the composable, so it isn't
- * ported. iOS `CGRect.null`/`.infinite` → non-finite [Rect]s.
+ * `onlyAFocusedNonEmptySelectionClaims` hosts a `UITextView` in a window on iOS; here it checks
+ * the rule the composable's field applies (`ComposerSwipeDown.selectionClaims` with its focus and
+ * selection), with the selected word's rect standing in for UIKit's `selectionRects`.
+ * iOS `CGRect.null`/`.infinite` → non-finite [Rect]s.
  */
 class ComposerTextSelectionSwipeTests {
     @Test
@@ -38,6 +40,17 @@ class ComposerTextSelectionSwipeTests {
             "Degenerate rects claim nothing",
             ComposerSwipeDown.selectionClaims(Offset.Zero, selectionRects = listOf(Rect(inf, inf, inf, inf), Rect(-inf, -inf, inf, inf))),
         )
+    }
+
+    @Test
+    fun onlyAFocusedNonEmptySelectionClaims() {
+        // "Select a word in this draft": "word" (7..<11) laid out at its rect.
+        val rect = Rect(70f, 4f, 112f, 26f)
+        val word = TextRange(7, 11)
+        val point = rect.center
+        assertFalse("Unfocused: the selection isn't shown", ComposerSwipeDown.selectionClaims(point, isFocused = false, selection = word, selectionRects = { listOf(rect) }))
+        assertTrue(ComposerSwipeDown.selectionClaims(point, isFocused = true, selection = word, selectionRects = { listOf(rect) }))
+        assertFalse("A caret isn't a selection", ComposerSwipeDown.selectionClaims(point, isFocused = true, selection = TextRange(7), selectionRects = { listOf(rect) }))
     }
 
     /**

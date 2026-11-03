@@ -1,38 +1,32 @@
 package ai.opencode.feature.settings.onboarding
 
 import ai.opencode.core.motion.rememberReduceMotion
-import ai.opencode.core.tuning.TunableSpring
-import ai.opencode.core.tuning.TuningContext
-import ai.opencode.core.tuning.TuningStore
-import ai.opencode.core.ui.OpenCodeFonts
-import androidx.compose.animation.core.Animatable
+import ai.opencode.core.tuning.AnimationTimeScale
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableDoubleStateOf
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
@@ -40,49 +34,22 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.launch
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.currentStateAsState
 import kotlin.math.max
 import kotlin.math.min
-
-/** The welcome's knobs (iOS `WelcomeTunables`); the story's own are with the story, not ported yet. */
-object WelcomeTunables {
-    val devices = TunableSpring("welcome.motion.devices", "Devices settle", duration = 0.8, bounce = 0.12)
-    val intro = TunableSpring("welcome.motion.intro", "Copy entrance", duration = 0.6, bounce = 0.0)
-    val step = TunableSpring("welcome.motion.step", "Next step", duration = 0.55, bounce = 0.0)
-
-    fun register() {
-        val store = TuningStore.shared
-        for (spring in listOf(devices, intro, step)) store.register(spring)
-    }
-}
-
-/** iOS `TuningContext.welcome`. */
-val TuningContext.Companion.welcome: TuningContext get() = TuningContext("welcome", label = "Welcome")
-
-/** The desktop's logical screen (iOS `WelcomeDesktop.size`). */
-internal object WelcomeDesktop {
-    val size = Size(720f, 450f)
-}
-
-/** The phone's logical screen (iOS `WelcomePhone.size`). */
-internal object WelcomePhone {
-    val size = Size(440f, 956f)
-}
 
 /**
  * Where the laptop and phone sit (iOS `WelcomeSceneLayout`): the phone stands in front of the
@@ -152,28 +119,50 @@ private fun hex(value: Long, alpha: Float = 1f): Color = Color(0xFF000000 or val
 
 /**
  * The welcome's illustration (iOS `WelcomeScene`): the laptop running OpenCode and the phone
- * steering it. iOS tells `WelcomeStory` on a loop (dictation, the reply streaming, the screenshot
- * flying back); that story isn't ported yet, so this draws its resting frame: the devices settle
- * in on the iOS springs, and the pairing step cross-fades both screens to Settings › Pairing and
- * the camera finding its code.
+ * steering it, telling [WelcomeStory] on a loop: someone dictates a task on the phone, the laptop
+ * explores, opens its browser, edits and takes a screenshot that flies back to the phone, then
+ * ships it. The pairing step cross-fades both screens to Settings › Pairing and the camera
+ * finding its code. The clock pauses under Reduce Motion (the story's still frame), while pairing,
+ * and while the app isn't in front.
  */
 @Composable
 fun WelcomeScene(layout: WelcomeSceneLayout, pairing: Boolean, modifier: Modifier = Modifier) {
     val reduced = rememberReduceMotion()
-    val laptopIn = remember { Animatable(if (reduced) 1f else 0f) }
-    val phoneIn = remember { Animatable(if (reduced) 1f else 0f) }
-    LaunchedEffect(Unit) {
-        if (reduced) return@LaunchedEffect
-        coroutineScope {
-            launch { laptopIn.animateTo(1f, WelcomeTunables.devices.animation(reduceMotion = false, delaySeconds = 0.36)) }
-            launch { phoneIn.animateTo(1f, WelcomeTunables.devices.animation(reduceMotion = false, delaySeconds = 0.56)) }
-        }
+    val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
+    val paused = reduced || pairing || !lifecycle.isAtLeast(Lifecycle.State.RESUMED)
+    val appeared = remember { AnimationTimeScale.shared.now() }
+    var now by remember { mutableDoubleStateOf(appeared) }
+    // When the story's time 0 is, pushed back to replay from the start.
+    var storyStart by remember { mutableDoubleStateOf(appeared + WelcomeTunables.lead.value) }
+    val voice = remember { WelcomeVoice() }
+    val targets = remember { WelcomeTargets() }
+    LaunchedEffect(paused) {
+        if (paused) return@LaunchedEffect
+        while (true) withFrameNanos { now = AnimationTimeScale.shared.now() }
+    }
+    var wasPairing by remember { mutableStateOf(pairing) }
+    LaunchedEffect(pairing) {
+        // Back from pairing replays the story from its empty start.
+        if (wasPairing && !pairing) storyStart = AnimationTimeScale.shared.now() + 0.35
+        wasPairing = pairing
     }
     val pairingProgress by animateFloatAsState(
         if (pairing) 1f else 0f,
         animationSpec = WelcomeTunables.step.animation(reduced),
         label = "welcome-pairing",
     )
+
+    val story = WelcomeStory.tuned
+    val wall = now - appeared
+    val devices = WelcomeTunables.devices.spring
+    val laptopIn = if (reduced) 1.0 else WelcomeStory.progress(wall - 0.36, devices)
+    val phoneIn = if (reduced) 1.0 else WelcomeStory.progress(wall - 0.56, devices)
+    val focusOn = if (reduced) 1.0 else WelcomeStory.progress(wall - 1.1, WelcomeTunables.focus.spring)
+    val t = if (reduced) story.still else storyTime(now - storyStart, story.loop)
+    val frame = story.frame(t, focusOn = focusOn, reduced = reduced)
+    // The dictation bar's scope listens to the story's voice, as it would the mic.
+    SideEffect { voice.play(frame.voice) }
+
     val label = if (pairing) {
         "OpenCode’s pairing code on a laptop, and a phone’s camera scanning it"
     } else {
@@ -182,13 +171,54 @@ fun WelcomeScene(layout: WelcomeSceneLayout, pairing: Boolean, modifier: Modifie
     Box(
         modifier
             .size(layout.size.width.dp, layout.size.height.dp)
+            .onGloballyPositioned { targets.scene = it }
             .semantics {
                 contentDescription = label
                 role = Role.Image
             },
     ) {
-        Laptop(layout, pairingProgress, Modifier.welcomeSettle(laptopIn.value, 26.dp, reduced))
-        Phone(layout, pairingProgress, Modifier.welcomeSettle(phoneIn.value, 54.dp, reduced))
+        val lights = if (!reduced && !pairing) targets else null
+        Laptop(layout, frame, wall, pairingProgress, reduced, lights, Modifier.welcomeSettle(laptopIn.toFloat(), 26.dp, reduced))
+        Phone(layout, frame, wall, pairingProgress, reduced, voice, lights, Modifier.welcomeSettle(phoneIn.toFloat(), 54.dp, reduced))
+        if (lights != null) WelcomeCarriers(frame, HashMap(lights.rects), layout)
+    }
+}
+
+/** Story time for [elapsed] seconds since time 0: negative before the first loop, then wrapping (iOS `WelcomeScene.storyTime`). */
+internal fun storyTime(elapsed: Double, loop: Double): Double {
+    if (elapsed <= 0 || loop <= 0) return elapsed
+    return elapsed % loop
+}
+
+/**
+ * The story's voice, with its own level meter (iOS `WelcomeVoice`): the phone's dictation scope
+ * listens to it, never to the live dictation meter, which lives in the composer.
+ */
+@Stable
+internal class WelcomeVoice {
+    val levels = WelcomeLevels()
+
+    fun play(level: Double) {
+        levels.set(level.toFloat())
+    }
+}
+
+/** A dictation level meter: the latest level and a short history the scope draws (iOS `DictationLevels`). */
+@Stable
+internal class WelcomeLevels {
+    var level by mutableFloatStateOf(0f)
+        private set
+    val history = mutableStateListOf<Float>().apply { repeat(HISTORY) { add(0f) } }
+
+    fun set(level: Float) {
+        val clamped = level.coerceIn(0f, 1f)
+        this.level = clamped
+        history.removeAt(0)
+        history.add(clamped)
+    }
+
+    private companion object {
+        const val HISTORY = 48
     }
 }
 
@@ -212,9 +242,9 @@ private fun Placed(rect: Rect, modifier: Modifier = Modifier, content: @Composab
     ) { content() }
 }
 
-/** [content] laid out at `logical` size and scaled by [scale] from the top-left (iOS `.scaleEffect(_, anchor: .topLeading)`). */
+/** [content] laid out at `logical` size (dp) and scaled by [scale] from the top-left (iOS `.scaleEffect(_, anchor: .topLeading)`). */
 @Composable
-private fun ScaledScreen(logical: Size, scale: Float, content: @Composable () -> Unit) {
+internal fun WelcomeScaled(logical: Size, scale: Float, content: @Composable () -> Unit) {
     Layout(
         content = {
             Box(
@@ -237,7 +267,7 @@ private fun ScaledScreen(logical: Size, scale: Float, content: @Composable () ->
 }
 
 @Composable
-private fun Laptop(layout: WelcomeSceneLayout, pairing: Float, modifier: Modifier) {
+private fun Laptop(layout: WelcomeSceneLayout, frame: WelcomeFrame, wall: Double, pairing: Float, reduced: Boolean, targets: WelcomeTargets?, modifier: Modifier) {
     val lid = layout.lid
     val screen = layout.laptopScreen
     val base = layout.base
@@ -261,7 +291,8 @@ private fun Laptop(layout: WelcomeSceneLayout, pairing: Float, modifier: Modifie
         }
         Placed(screen) {
             Box(Modifier.fillMaxSize().clip(screenShape).border(0.5.dp, Color.White.copy(alpha = 0.06f), screenShape)) {
-                ScaledScreen(WelcomeDesktop.size, layout.laptopScale) { DesktopScreen(pairing) }
+                WelcomeScaled(WelcomeDesktop.size, layout.laptopScale) { WelcomeDesktop(frame, wall, pairing, reduced, targets) }
+                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = frame.laptopDim.toFloat())))
             }
             // The camera notch.
             Box(
@@ -311,7 +342,7 @@ private fun Laptop(layout: WelcomeSceneLayout, pairing: Float, modifier: Modifie
 }
 
 @Composable
-private fun Phone(layout: WelcomeSceneLayout, pairing: Float, modifier: Modifier) {
+private fun Phone(layout: WelcomeSceneLayout, frame: WelcomeFrame, wall: Double, pairing: Float, reduced: Boolean, voice: WelcomeVoice, targets: WelcomeTargets?, modifier: Modifier) {
     val phone = layout.phone
     val screen = layout.phoneScreen
     val corner = phone.width * 0.174f
@@ -336,161 +367,9 @@ private fun Phone(layout: WelcomeSceneLayout, pairing: Float, modifier: Modifier
         }
         Placed(screen) {
             Box(Modifier.fillMaxSize().clip(innerShape).border(0.5.dp, Color.White.copy(alpha = 0.06f), innerShape)) {
-                ScaledScreen(WelcomePhone.size, layout.phoneScale) { PhoneScreen(pairing) }
+                WelcomeScaled(WelcomePhone.size, layout.phoneScale) { WelcomePhone(frame, pairing, reduced, voice, wall, targets) }
+                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = frame.phoneDim.toFloat())))
             }
         }
-    }
-}
-
-// MARK: Screens (the story's resting frame; iOS `WelcomeDesktop`, `WelcomePhone`)
-
-private val deskBackground = hex(0x0B0B0C)
-private val deskText = hex(0xEDEDED)
-private val deskDim = hex(0x8A8A8A)
-
-/** One of two screens sharing a place: it fades and sharpens in as the other leaves. */
-private fun Modifier.screenSwap(shown: Float, grows: Float = 0f): Modifier = graphicsLayer {
-    alpha = shown
-    val scale = 1f + grows * (1 - shown)
-    scaleX = scale
-    scaleY = scale
-}
-
-@Composable
-private fun DesktopScreen(pairing: Float) {
-    Box(Modifier.fillMaxSize().background(deskBackground)) {
-        DesktopSession(Modifier.screenSwap(1 - pairing))
-        DesktopPairing(Modifier.screenSwap(pairing, grows = -0.04f))
-    }
-}
-
-/** OpenCode on the laptop, the task done: the prompt, its tools, and the push. */
-@Composable
-private fun DesktopSession(modifier: Modifier) {
-    Column(modifier.fillMaxSize().padding(horizontal = 56.dp, vertical = 36.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Hero section", color = deskText, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.weight(1f))
-            Text("···", color = deskDim, fontSize = 15.sp)
-        }
-        Box(Modifier.align(Alignment.End).background(hex(0x1C1C1F), RoundedCornerShape(14.dp)).padding(horizontal = 14.dp, vertical = 10.dp)) {
-            Text("Make the hero bolder and send me a screenshot", color = deskText, fontSize = 14.sp)
-        }
-        DeskToolRow("Explored", "1 read, 1 search")
-        DeskToolRow("Browser", "localhost:3000")
-        DeskToolRow("Edit", "Hero.tsx", added = "+6", removed = "−1")
-        DeskToolRow("Screenshot", "opencode.png")
-        DeskToolRow("Running commands", "git push", monospaced = true)
-        Spacer(Modifier.weight(1f))
-        Box(Modifier.fillMaxWidth().height(64.dp).background(hex(0x161618), RoundedCornerShape(16.dp)).padding(16.dp)) {
-            Text("Big Pickle", color = deskDim, fontSize = 13.sp, modifier = Modifier.align(Alignment.BottomStart))
-        }
-    }
-}
-
-@Composable
-private fun DeskToolRow(title: String, detail: String, added: String? = null, removed: String? = null, monospaced: Boolean = false) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(6.dp).background(deskDim, RoundedCornerShape(50)))
-        Text(title, color = deskText, fontSize = 13.sp)
-        Text(detail, color = deskDim, fontSize = 13.sp, fontFamily = if (monospaced) OpenCodeFonts.berkeleyMono else null)
-        if (added != null) Text(added, color = hex(0x3FB950), fontSize = 13.sp)
-        if (removed != null) Text(removed, color = hex(0xF0605A), fontSize = 13.sp)
-    }
-}
-
-/** Settings › Pairing on the laptop, with its code. */
-@Composable
-private fun DesktopPairing(modifier: Modifier) {
-    Row(modifier.fillMaxSize()) {
-        Column(Modifier.width(170.dp).fillMaxSize().background(hex(0x111113)).padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            for (title in listOf("General", "Models", "Providers", "Pairing")) {
-                Text(title, color = if (title == "Pairing") deskText else deskDim, fontSize = 13.sp)
-            }
-        }
-        Column(Modifier.weight(1f).padding(28.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Pairing", color = deskText, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-            Text("Connect another device to this machine’s OpenCode server.", color = deskDim, fontSize = 12.sp)
-            Spacer(Modifier.height(10.dp))
-            Column(
-                Modifier.fillMaxWidth().background(hex(0x161618), RoundedCornerShape(12.dp)).padding(18.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text("Pair a device", color = deskText, fontSize = 15.sp, fontWeight = FontWeight.Medium)
-                Text("Scan the code with the OpenCode app on another device, or copy the link.", color = deskDim, fontSize = 11.sp)
-                MockCode(Modifier.size(150.dp))
-                Text("Copy link", color = deskText, fontSize = 12.sp)
-                Text("Expires in 4:52 · New code", color = deskDim, fontSize = 11.sp)
-            }
-        }
-    }
-}
-
-/** A drawn stand-in for a pairing code: fixed modules, not a readable code. */
-@Composable
-private fun MockCode(modifier: Modifier) {
-    Canvas(modifier.background(Color.White, RoundedCornerShape(8.dp)).padding(10.dp)) {
-        val cells = 21
-        val cell = size.minDimension / cells
-        fun finder(x: Int, y: Int) {
-            drawRect(Color.Black, Offset(x * cell, y * cell), Size(7 * cell, 7 * cell))
-            drawRect(Color.White, Offset((x + 1) * cell, (y + 1) * cell), Size(5 * cell, 5 * cell))
-            drawRect(Color.Black, Offset((x + 2) * cell, (y + 2) * cell), Size(3 * cell, 3 * cell))
-        }
-        finder(0, 0)
-        finder(cells - 7, 0)
-        finder(0, cells - 7)
-        for (y in 0 until cells) for (x in 0 until cells) {
-            val inFinder = (x < 8 && y < 8) || (x >= cells - 8 && y < 8) || (x < 8 && y >= cells - 8)
-            if (!inFinder && ((x * 7 + y * 13 + x * y) % 5 < 2)) {
-                drawRect(Color.Black, Offset(x * cell, y * cell), Size(cell, cell))
-            }
-        }
-    }
-}
-
-@Composable
-private fun PhoneScreen(pairing: Float) {
-    Box(Modifier.fillMaxSize().background(Color.Black)) {
-        PhoneSession(Modifier.screenSwap(1 - pairing))
-        PhoneViewfinder(Modifier.screenSwap(pairing, grows = 0.04f))
-    }
-}
-
-/** The app on the phone: the screenshot came back under the reply. */
-@Composable
-private fun PhoneSession(modifier: Modifier) {
-    Column(modifier.fillMaxSize().padding(horizontal = 28.dp, vertical = 30.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-        Text("9:41", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 24.dp))
-        Spacer(Modifier.height(40.dp))
-        Box(Modifier.align(Alignment.End).background(hex(0x1C1C1F), RoundedCornerShape(26.dp)).padding(horizontal = 24.dp, vertical = 18.dp)) {
-            Text("Make the hero bolder and send me a screenshot", color = Color.White, fontSize = 24.sp)
-        }
-        Text("Done. The hero is bolder and pushed; here it is.", color = Color.White, fontSize = 24.sp)
-        Box(Modifier.fillMaxWidth().height(240.dp).background(Brush.verticalGradient(listOf(hex(0x2A2A30), hex(0x16161A))), RoundedCornerShape(22.dp)))
-        Spacer(Modifier.weight(1f))
-        Box(Modifier.fillMaxWidth().height(96.dp).background(hex(0x1C1C1F), RoundedCornerShape(48.dp)).padding(horizontal = 32.dp), contentAlignment = Alignment.CenterStart) {
-            Text("Message", color = deskDim, fontSize = 24.sp)
-        }
-    }
-}
-
-/** The pairing step: the camera finds the laptop's code (iOS `WelcomeViewfinderCorners`). */
-@Composable
-private fun PhoneViewfinder(modifier: Modifier) {
-    Box(modifier.fillMaxSize().background(hex(0x101012)), contentAlignment = Alignment.Center) {
-        MockCode(Modifier.size(200.dp).alpha(0.9f))
-        Canvas(Modifier.size(280.dp)) {
-            val length = size.minDimension * 0.18f
-            val stroke = Stroke(width = 8.dp.toPx(), cap = StrokeCap.Round)
-            val w = size.width
-            val h = size.height
-            for ((corner, dx, dy) in listOf(Triple(Offset(0f, 0f), 1f, 1f), Triple(Offset(w, 0f), -1f, 1f), Triple(Offset(0f, h), 1f, -1f), Triple(Offset(w, h), -1f, -1f))) {
-                drawLine(Color.White, corner, corner + Offset(dx * length, 0f), stroke.width, stroke.cap)
-                drawLine(Color.White, corner, corner + Offset(0f, dy * length), stroke.width, stroke.cap)
-            }
-        }
-        Box(Modifier.wrapContentSize())
     }
 }

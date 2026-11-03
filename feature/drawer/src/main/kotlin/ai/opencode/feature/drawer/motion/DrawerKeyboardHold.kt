@@ -25,6 +25,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -92,6 +95,9 @@ class DrawerKeyboardHold(
 
     /** Keys brought back while the card moves: the follower raises them with it, or [giveBack] shows them. */
     private var keysComingBack = false
+
+    /** How far the drawer was open at the last [follow] (iOS `lastFollow`), for [didBecomeActive]. */
+    private var lastProgress: Float? = null
 
     /** The field let go of its focus before the card came back. */
     var onLetGo: () -> Unit = {}
@@ -219,6 +225,7 @@ class DrawerKeyboardHold(
      */
     fun follow(progress: Float) {
         val held = heldField ?: return
+        lastProgress = progress
         val follower = follower ?: return
         if (!followsCard || keysAway || focused?.key != held.key) return
         if (progress <= 0f && !follower.isActive && !keysComingBack) return
@@ -258,6 +265,26 @@ class DrawerKeyboardHold(
             ime?.show()
         }
         end()
+    }
+
+    /**
+     * Back from the background (iOS `didBecomeActiveNotification`): the system has the keys
+     * again (it took back any insets control and may show the focused field's keys), so they go
+     * back where the hold had them: down beside the open drawer, or with the card at its last
+     * [follow] mid-move. iOS re-frames the keys' window here (5308241f); the Android IME has no
+     * window of ours to re-frame, only its shown state.
+     */
+    fun didBecomeActive() {
+        val held = heldField ?: return
+        if (focused?.key != held.key) return
+        if (keysAway) {
+            ime?.hide()
+            return
+        }
+        val progress = lastProgress ?: return
+        if (progress <= 0f || !canFollow) return
+        keysComingBack = true
+        follow(progress)
     }
 
     /** The IME's insets couldn't be driven: the keys go where the hold wants them at once. */
@@ -392,6 +419,7 @@ class DrawerKeyboardHold(
         heldField = null
         keysAway = false
         keysComingBack = false
+        lastProgress = null
         monitor?.isHoldingKeyboard = false
     }
 
@@ -542,6 +570,14 @@ fun rememberDrawerKeyboardHold(monitor: DrawerKeyboardMonitor? = null): DrawerKe
                 hold.imeVisibilityChanged(visible)
                 monitor?.isImeVisible = visible
             }
+    }
+    // Back from the background the keys go back where the hold had them (iOS observes
+    // `didBecomeActiveNotification`).
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(hold, lifecycle) {
+        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) hold.didBecomeActive() }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
     }
     DisposableEffect(hold) { onDispose { hold.release() } }
     return hold

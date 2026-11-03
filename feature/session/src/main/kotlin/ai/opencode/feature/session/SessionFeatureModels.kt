@@ -1,5 +1,6 @@
 package ai.opencode.feature.session
 
+import ai.opencode.feature.composer.modelpicker.ModelDisplayNames
 import ai.opencode.feature.composer.modelpicker.ModelPickerSection
 import ai.opencode.feature.composer.modelpicker.ModelPickerState
 import ai.opencode.feature.composer.RequestDockFeature
@@ -16,8 +17,11 @@ import ai.opencode.feature.composer.modelpicker.ModelLevelScale
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.model.OpenCodeModel
 import ai.opencode.server.model.OpenCodeModelRef
+import ai.opencode.server.model.model
 import ai.opencode.server.model.OpenCodeProject
 import ai.opencode.server.model.OpenCodeTranscriptItem
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 
 // Port of iOS `SessionFeature+Models.swift`: models, projects, the family, shells, and the Session
 // sheet.
@@ -40,6 +44,12 @@ internal fun SessionFeature.reduceModelsAndFamily(state: State, action: Action):
     is Action.ModelsResponse -> {
         val catalog = action.result.getOrNull()
         if (catalog != null) {
+            val serverID = state.server.persistenceID
+            val remembered = state.modelDisplayNamesByServer.value[serverID]
+            val names = (remembered ?: ModelDisplayNames()).remember(catalog.models)
+            if (names.entries.isNotEmpty() && remembered != names) {
+                state.modelDisplayNamesByServer.update { it + (serverID to names) }
+            }
             var next = state.copy(isLoadingModels = false, modelsLoadError = null)
             // A momentarily empty answer never replaces a list already shown.
             if ((catalog.models.isNotEmpty() || next.models.isEmpty()) && next.models != catalog.models) {
@@ -450,8 +460,11 @@ private fun SessionFeature.fetchModels(state: State): Effect<Action> {
     val client = openCodeClient
     return Effect.run<Action> { send ->
         try {
-            send(Action.ModelsResponse(Result.success(client.modelCatalog(server, directory))))
+            val catalog = client.modelCatalog(server, directory)
+            if (!currentCoroutineContext().isActive) return@run
+            send(Action.ModelsResponse(Result.success(catalog)))
         } catch (error: OpenCodeClientError) {
+            if (!currentCoroutineContext().isActive) return@run
             send(Action.ModelsResponse(Result.failure(error)))
         }
     }.cancellable(CancelID.Models, cancelInFlight = true)
@@ -473,7 +486,20 @@ val State.modelPicker: ModelPickerState
         modelsLoadError = modelsLoadError,
         modelVisibility = modelVisibility,
         showsAllModels = showsAllModels,
+        modelDisplayNames = modelDisplayNamesByServer.value[server.persistenceID] ?: ModelDisplayNames(),
     )
+
+/** iOS `currentModelName`: resolve a label without borrowing another provider's capabilities. */
+val State.currentModelName: String get() = modelPicker.currentModelName
+
+/** iOS `currentModelInfo`: only the live catalogue can supply availability and capabilities. */
+val State.currentModelInfo: OpenCodeModel? get() = currentModel?.let { models.model(it) }
+
+/** iOS `currentModelLabel`: "Claude Haiku 5.5 · High", the model and its reasoning variant, if any. */
+val State.currentModelLabel: String get() = modelPicker.currentModelLabel
+
+/** iOS `currentModelShortName`: compact name for the composer chip (`"Opus 5.5"` for `"Claude Opus 5.5"`). */
+val State.currentModelShortName: String get() = modelPicker.currentModelShortName
 
 /** iOS `currentLevelScale`: the current model's levels, when it has any to choose between. */
 val State.currentLevelScale: ModelLevelScale? get() = modelPicker.currentLevelScale

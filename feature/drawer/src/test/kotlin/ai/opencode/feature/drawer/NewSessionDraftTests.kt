@@ -3,6 +3,7 @@ package ai.opencode.feature.drawer
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.store.TestStore
 import ai.opencode.feature.composer.DictationFeature
+import ai.opencode.feature.composer.modelpicker.ModelDisplayNames
 import ai.opencode.feature.system.liveactivity.DictationActivityAttributes
 import ai.opencode.feature.voice.VoiceFeature
 import ai.opencode.core.testing.TestIsolationRule
@@ -114,7 +115,7 @@ class NewSessionDraftTests {
         val home = HomeFeature.State(server, OpenCodeHomeSnapshot(projects = listOf(projects[0], projects[1]), sessions = listOf(prior), activeSessionIDs = emptySet()))
         val initialIdentity = home.sessionDetail?.taskIdentity
         assertEquals(SessionFeature.State.TaskIdentity(serverID = server.persistenceID, visit = 1, sessionID = null), initialIdentity)
-        assertEquals("cirrus-4", home.sessionDetail?.currentModelName)
+        assertEquals("Cirrus 4", home.sessionDetail?.currentModelName)
         assertNull(home.sessionDetail?.currentLevelScale)
 
         val store = TestStore(home, HomeFeature(), this) {
@@ -127,6 +128,7 @@ class NewSessionDraftTests {
                 { it == HomeFeature.Action.detail(SessionFeature.Action.ModelsResponse(Result.success(catalog))) },
                 "modelsResponse.success",
             ) { it.detail { d -> d.copy(isLoadingModels = false, models = listOf(model)) } }
+            assertEquals(ModelDisplayNames(listOf(model)), store.state.sessionDetail?.modelDisplayNamesByServer?.value?.get(server.persistenceID))
             assertEquals("Cirrus 4", store.state.sessionDetail?.currentModelName)
             assertNotNull(store.state.sessionDetail?.currentLevelScale)
         }
@@ -225,6 +227,7 @@ class NewSessionDraftTests {
         assertEquals(1, store.state.sessionDetail?.runWorkGeneration)
         store.receive({ it == HomeFeature.Action.detail(SessionFeature.Action.ModelsResponse(Result.success(catalog))) }, "modelsResponse")
         assertEquals(listOf(model), store.state.sessionDetail?.models)
+        assertEquals(ModelDisplayNames(listOf(model)), store.state.sessionDetail?.modelDisplayNamesByServer?.value?.get(server.persistenceID))
         assertEquals("Cirrus 4", store.state.sessionDetail?.currentModelName)
         assertNotNull(store.state.sessionDetail?.currentLevelScale)
 

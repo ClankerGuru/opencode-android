@@ -120,6 +120,54 @@ object ComposerTextInputTunables {
 }
 
 /**
+ * iOS `ImagePasteTextView`'s line growth (`lineGrowthAnimation`, `beginLineGrowth`,
+ * `holdLineGrowth`, `sendShrinkAnimation`) as the plain rules [ComposerTextInput]'s layout follows.
+ * Heights and offsets are px; a hold is iOS `contentOffset.y`, how far the text (laid out at the
+ * target height) sits above the field's top while the field's height springs.
+ *
+ * iOS 60dddffa also holds no line mid-composition (`markedTextRange == nil`): there, setting
+ * `contentOffset` committed an IME's marked text where the line wrapped (#190). Android has no such
+ * hazard (the hold is a placement in a layout modifier, which never touches the IME's composing
+ * region), and Android keyboards compose every Latin word (Gboard's suggestions), so gating on the
+ * composing region would stop ordinary typing's line growth, which iOS keeps.
+ */
+object ComposerLineGrowth {
+    /**
+     * iOS `lineGrowthAnimation`: the spring a reader's edit from [old] to [new] rides; none under
+     * reduce motion, and none for a Return that sends (it never animates the line it adds).
+     */
+    fun typedLineSpring(old: String, new: String, returnKeySends: Boolean, reduceMotion: Boolean): MotionSpring? =
+        if (reduceMotion || (returnKeySends && new == old + "\n")) null else ComposerTextInputTunables.lineGrowth
+
+    /**
+     * iOS `sendShrinkAnimation`: a send's clear rides a critical spring of ω [omega]
+     * ([ComposerSendTransition.sendShrinkOmega]); under reduce motion (or with no send) it lands at once.
+     */
+    fun sendShrinkSpring(omega: Double?, reduceMotion: Boolean): MotionSpring? =
+        omega?.takeIf { !reduceMotion && it > 0 }?.let { MotionSpring(duration = 2 * PI / it, bounce = 0.0) }
+
+    /**
+     * Whether a height change from [from] rides [spring]: a typed line's, any change; a send's
+     * shrink ([shrinks]), only a field taller than one line ([oneLine]).
+     */
+    fun rides(spring: MotionSpring?, shrinks: Boolean, from: Float, oneLine: Float): Boolean =
+        spring != null && (!shrinks || from - oneLine > 0.5f)
+
+    /**
+     * iOS `holdLineGrowth`: while the field is [height] tall on its way to [target], the text is
+     * held to the field's bottom (`target - height` above its top), so the caret's line stays put.
+     * Growing for a word wrapped off an earlier line holds no further than keeps the caret's line
+     * ([caretLineTop], from the text's top, after the field's top inset) in view: the lines below
+     * pass under the bottom edge instead. A shrink holds to the bottom.
+     */
+    fun holdOffset(target: Float, height: Float, caretLineTop: Float?): Float {
+        val y = target - height
+        if (y <= 0f || caretLineTop == null || !caretLineTop.isFinite()) return y
+        return max(0f, min(y, caretLineTop))
+    }
+}
+
+/**
  * Rules for a downward swipe on the focused composer dismissing the keyboard, and an upward
  * swipe on the unfocused composer pulling it up (iOS `ComposerSwipeDown`). Distances in dp
  * (iOS pt), velocities in dp/s; `translation.y > 0` is downward.
@@ -180,6 +228,19 @@ object ComposerSwipeDown {
      */
     fun selectionClaims(point: Offset, selectionRects: List<Rect>, reach: Float = BackSwipeRules.selectionHandleReach.value): Boolean =
         selectionRects.any { rect -> rect.isFinite && rect.inflate(reach).contains(point) }
+
+    /**
+     * iOS `ImagePasteTextView.selectionClaims`: only a focused field's non-empty [selection]
+     * claims a touch. An unfocused field shows no selection, and a caret isn't one; its rects
+     * are only measured when it could claim.
+     */
+    fun selectionClaims(
+        point: Offset,
+        isFocused: Boolean,
+        selection: TextRange,
+        selectionRects: () -> List<Rect>,
+        reach: Float = BackSwipeRules.selectionHandleReach.value,
+    ): Boolean = isFocused && !selection.collapsed && selectionClaims(point, selectionRects(), reach)
 }
 
 /**
@@ -375,8 +436,7 @@ fun ComposerTextInput(
         if (text == controller.externalText) return@SideEffect
         controller.externalText = text
         // A send's clear shrinks on its own spring (`sendShrinkAnimation`); any other change lands at once.
-        val shrinkOmega = sendTransition?.takeShrinkOmega()
-        controller.heightSpring = shrinkOmega?.takeIf { !reduceMotion && it > 0 }?.let { MotionSpring(duration = 2 * PI / it, bounce = 0.0) }
+        controller.heightSpring = ComposerLineGrowth.sendShrinkSpring(sendTransition?.takeShrinkOmega(), reduceMotion)
         controller.heightSpringText = text
         controller.heightSpringShrinks = true
         if (state.text.toString() == text) return@SideEffect
@@ -384,6 +444,10 @@ fun ComposerTextInput(
         bridge?.beginProgrammaticTextUpdate()
         try {
             val caret = bridge?.caretUTF16Offset
+            // iOS `finishCompositionIfNeeded` (60dddffa): an open composition (an IME's composing
+            // region, voice typing) must finish before the text changes under it (a send's clear),
+            // or it lands in a stale range. A programmatic `edit` commits the composing region where
+            // it is and restarts the IME's input, so the words it held don't come back.
             state.edit {
                 replace(0, length, text)
                 if (bridge != null && bridge.isEnabled && caret != null && caret in 0..text.length) {
@@ -516,8 +580,7 @@ fun ComposerTextInput(
                 // reduce motion and for a Return that sends (it never animates the line it adds).
                 val old = originalText.toString()
                 val new = asCharSequence().toString()
-                val returnSends = currentReturnKeySends && new == old + "\n"
-                controller.heightSpring = if (currentReduceMotion || returnSends) null else ComposerTextInputTunables.lineGrowth
+                controller.heightSpring = ComposerLineGrowth.typedLineSpring(old, new, currentReturnKeySends, currentReduceMotion)
                 controller.heightSpringText = new
                 controller.heightSpringShrinks = false
             }
@@ -546,12 +609,17 @@ fun ComposerTextInput(
      * iOS `ImagePasteTextView.selectionClaims`: whether [point] (in the field's viewport) is on or
      * near the selection being made; a caret isn't a selection.
      */
-    fun selectionClaims(point: Offset): Boolean {
+    fun selectionClaims(point: Offset, isFocused: Boolean): Boolean {
         val selection = state.selection
         val layout = controller.layout ?: return false
-        if (selection.collapsed) return false
         val textPoint = Offset(point.x, point.y + scroll.value - currentInsetPx)
-        return ComposerSwipeDown.selectionClaims(textPoint, selectionRects(layout, selection), reach = with(density) { BackSwipeRules.selectionHandleReach.toPx() })
+        return ComposerSwipeDown.selectionClaims(
+            textPoint,
+            isFocused = isFocused,
+            selection = selection,
+            selectionRects = { selectionRects(layout, selection) },
+            reach = with(density) { BackSwipeRules.selectionHandleReach.toPx() },
+        )
     }
 
     val receiveContent = remember {
@@ -633,7 +701,7 @@ fun ComposerTextInput(
                     val from = if (running) controller.animatedHeight.value else previous.toFloat()
                     // A send's shrink takes a field taller than one line; a typed line, any change.
                     val oneLine = lineHeightPx + insetPx
-                    if (spring != null && (!controller.heightSpringShrinks || from - oneLine > 0.5f)) {
+                    if (spring != null && ComposerLineGrowth.rides(spring, controller.heightSpringShrinks, from, oneLine)) {
                         height = from.roundToInt()
                         controller.heightAnimation = growthScope.launch(start = CoroutineStart.UNDISPATCHED) {
                             // A retarget keeps the running spring's velocity, as SwiftUI's does.
@@ -647,7 +715,22 @@ fun ComposerTextInput(
                 } else if (controller.heightAnimation?.isActive == true) {
                     height = controller.animatedHeight.value.roundToInt()
                 }
-                layout(placeable.width, height) { placeable.place(0, height - placeable.height) }
+                val caretLineTop = if (height < target) {
+                    Snapshot.withoutReadObservation {
+                        val layout = controller.layout
+                        val end = state.selection.end
+                        if (layout == null || end > layout.layoutInput.text.length) {
+                            null
+                        } else {
+                            // From the visible text's top: a scrolled field's offset moves the line up.
+                            runCatching { layout.getLineTop(layout.getLineForOffset(end)) - scroll.value }.getOrNull()
+                        }
+                    }
+                } else {
+                    null
+                }
+                val hold = ComposerLineGrowth.holdOffset(target.toFloat(), height.toFloat(), caretLineTop)
+                layout(placeable.width, height) { placeable.place(0, -hold.roundToInt()) }
             }
             .clipToBounds()
             .heightIn(max = capDp)
@@ -667,7 +750,7 @@ fun ComposerTextInput(
                     // iOS `ComposerSwipePanRecognizer.textOwnership`: decided once the finger
                     // first moves the decision distance, then the text's for good.
                     val selectionAtDown = state.selection
-                    val startsOnSelection = hasFocus && selectionClaims(down.position)
+                    val startsOnSelection = selectionClaims(down.position, isFocused = hasFocus)
                     var textOwnership: Boolean? = if (startsOnSelection) true else null
                     controller.isSwipeYieldedToText = startsOnSelection
                     val decisionPx = BackSwipeRules.decisionDistance.toPx()

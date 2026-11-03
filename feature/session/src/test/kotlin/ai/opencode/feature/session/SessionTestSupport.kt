@@ -9,6 +9,8 @@ import ai.opencode.core.sharing.SharedStore
 import ai.opencode.core.store.Reducer
 import ai.opencode.core.store.TestStore
 import ai.opencode.server.OpenCodeServer
+import ai.opencode.feature.composer.modelpicker.ModelDisplayNames
+import ai.opencode.server.model.OpenCodeModel
 import ai.opencode.server.model.OpenCodeModelRef
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.OpenCodeTranscriptItem
@@ -73,6 +75,13 @@ internal object SessionTestSupport {
         }
         fun update(block: (T) -> T) = synchronized(this) { current = block(current) }
     }
+
+    /**
+     * iOS `$0.$modelDisplayNamesByServer.withLock { $0[server.persistenceID] = .init(models: …) }`
+     * inside a receive. `Shared` compares by reference, so the port checks the write after it.
+     */
+    fun SessionFeature.State.assertRemembersModelNames(models: List<OpenCodeModel>) =
+        org.junit.Assert.assertEquals(ModelDisplayNames(models), modelDisplayNamesByServer.value[server.persistenceID])
 
     fun <T> LockIsolated<List<T>>.append(value: T) = update { it + value }
     fun LockIsolated<Int>.increment(): Int = withValue { (it + 1) to (it + 1) }

@@ -12,6 +12,7 @@ import ai.opencode.feature.session.SessionFeatureTestsSendingSupport.sentID
 import ai.opencode.feature.session.SessionTestSupport.LockIsolated
 import ai.opencode.feature.session.SessionTestSupport.append
 import ai.opencode.feature.session.SessionTestSupport.distantPast
+import ai.opencode.feature.session.SessionTestSupport.assertRemembersModelNames
 import ai.opencode.feature.session.SessionTestSupport.receive
 import ai.opencode.feature.session.SessionTestSupport.sessionTest
 import ai.opencode.feature.session.SessionTestSupport.testServer
@@ -533,6 +534,7 @@ class SessionFeatureTestsModelPicks {
         store.receive(Action.ModelsResponse::class) {
             it.copy(isLoadingModels = false, models = listOf(defaultModel), currentModel = defaultModel.ref)
         }
+        store.state.assertRemembersModelNames(listOf(defaultModel))
         assertEquals(listOf<String?>("/tmp/demo"), directories.value)
         assertEquals("Example Model", store.state.currentModelName)
     }
@@ -557,6 +559,7 @@ class SessionFeatureTestsModelPicks {
         // The listed models stay up (no spinner) while the server is asked again.
         store.send(Action.ModelButtonTapped) { it.copy(activePicker = SessionFeature.State.ActivePicker.model) }
         store.receive(Action.ModelsResponse::class) { it.copy(models = listOf(tiny, added)) }
+        store.state.assertRemembersModelNames(listOf(tiny, added))
 
         // A momentarily empty answer keeps what is listed.
         store.send(Action.ModelButtonTapped)
@@ -585,6 +588,7 @@ class SessionFeatureTestsModelPicks {
         // Opening refreshes the list behind the picker; the answer replaces it.
         store.send(Action.ModelButtonTapped) { it.copy(activePicker = SessionFeature.State.ActivePicker.model) }
         store.receive(Action.ModelsResponse::class)
+        store.state.assertRemembersModelNames(catalog.models)
 
         fun rows() = store.withDependencies { store.state.favoriteModels + store.state.unfavoriteModels }
         assertEquals(listOf("example/model-a-fast", "example/model-a"), rows().map { it.id })

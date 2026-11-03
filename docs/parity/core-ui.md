@@ -96,7 +96,7 @@ literals that aren't symbols). `(fill)` is the filled variant. Weak matches: `st
 | `camera` | `photo_camera` | `ms_photo_camera` | `SFSymbol.Camera` | AttachmentCameraView, AttachmentPicker, OnboardingPlaygroundView, PlusPhotoSheet, ServerConnectView |
 | `camera.fill` | `photo_camera` (fill) | `ms_photo_camera_fill` | `SFSymbol.CameraFill` | PairingScanner |
 | `camera.metering.unknown` | `center_focus_weak` | `ms_center_focus_weak` | `SFSymbol.CameraMeteringUnknown` | PairingScanner |
-| `camera.shutter.button` | `photo_camera` (no shutter glyph in Material Symbols) | `ms_photo_camera` | `SFSymbol.CameraShutterButton` | What’s New (`screenshot-shutter`) |
+| `camera.shutter.button` | `photo_camera` | `ms_photo_camera` | `SFSymbol.CameraShutterButton` | WhatsNewList |
 | `camera.viewfinder` | `center_focus_strong` | `ms_center_focus_strong` | `SFSymbol.CameraViewfinder` | AttachmentMenu |
 | `capsule` | `toggle_off` | `ms_toggle_off` | `SFSymbol.Capsule` | BackgroundWorkPanel, GlassMorphTrace, WhatsNewList |
 | `captions.bubble` | `closed_caption` | `ms_closed_caption` | `SFSymbol.CaptionsBubble` | FloatingCall |
@@ -288,6 +288,7 @@ literals that aren't symbols). `(fill)` is the filled variant. Weak matches: `st
 | `text.line.last.and.arrowtriangle.forward` | `vertical_align_bottom` | `ms_vertical_align_bottom` | `SFSymbol.TextLineLastAndArrowtriangleForward` | WhatsNewList |
 | `text.quote` | `format_quote` | `ms_format_quote` | `SFSymbol.TextQuote` | WhatsNewList |
 | `text.word.spacing` | `wrap_text` | `ms_wrap_text` | `SFSymbol.TextWordSpacing` | AgentFileViewer, PastedTextViews |
+| `textformat` | `text_format` | `ms_text_format` | `SFSymbol.Textformat` | WhatsNewList |
 | `textformat.size` | `format_size` | `ms_format_size` | `SFSymbol.TextformatSize` | WhatsNewList |
 | `tortoise.fill` | `slow_motion_video` | `ms_slow_motion_video` | `SFSymbol.TortoiseFill` | ConnectionCard |
 | `trash` | `delete` | `ms_delete` | `SFSymbol.Trash` | AppView, DiagnosticsView, HomeView+Drawer, QueuedMessagesSheet, ServerTitleView, SessionView+Header, SettingsServers, TranscriptUserMessage, VoiceCallLogView |
