@@ -38,9 +38,18 @@ data class FloatingCallRestArea(
     val composerTop: Float?,
     /** The resting orb's (or capsule's) size. */
     val size: Size,
+    /**
+     * The top of a keyboard the composer doesn't ride (the drawer's search, a sheet's field), in
+     * this screen's coordinates: the orb rests above it.
+     */
+    val keyboardTop: Float? = null,
 ) {
     /** The bottom of the space the orb may rest in. */
-    val bottom: Float get() = composerTop ?: (screen.height - 34 - CallTrayComposerMetrics.barHeight)
+    val bottom: Float
+        get() {
+            val composer = composerTop ?: (screen.height - 34 - CallTrayComposerMetrics.barHeight)
+            return keyboardTop?.let { min(composer, it) } ?: composer
+        }
 
     val bounds: Rect
         get() {
@@ -80,7 +89,10 @@ internal fun Rect.union(other: Rect): Rect =
  * a lift outlives the layout pass that started it, so it reads its bounds here every frame: a
  * rotation or resize mid-flight moves them along.
  */
-class FloatingCallLayout(var screen: Size = Size.Zero, var safeArea: FloatingCallEdgeInsets = FloatingCallEdgeInsets())
+class FloatingCallLayout(var screen: Size = Size.Zero, var safeArea: FloatingCallEdgeInsets = FloatingCallEdgeInsets()) {
+    /** The window's keyboard top, while one is up ([FloatingCallRestArea.keyboardTop]). */
+    var keyboardTop: Float? = null
+}
 
 /**
  * What a touch on the resting orb was, judged when the finger lifts (iOS `FloatingCallTouch`): the

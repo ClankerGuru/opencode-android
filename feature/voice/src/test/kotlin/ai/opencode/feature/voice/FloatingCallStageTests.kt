@@ -101,21 +101,81 @@ class FloatingCallStageTests {
     }
 
     /**
-     * A pending request docks in the composer, which the sheet covers: the call steps down to
-     * the card above it. The orb and the card already leave it showing, and a drag in progress
-     * is the user's.
+     * A pending request docks in the composer, which the card and the sheet cover: the call
+     * shrinks back to the orb. The orb already leaves it showing, and a drag in progress is the
+     * user's.
      */
-    @Test fun aRequestDockingStepsTheSheetDownToTheCard() = runTest {
+    @Test fun aRequestDockingShrinksTheCallToTheOrb() = runTest {
         val log = VoiceFeatureTestSupport.HapticsRecorder()
         val store = store(FloatingCallStageFeature.State(stage = FloatingCallStage.full), log)
-        store.send(FloatingCallStageFeature.Action.RequestDocked) { it.copy(stage = FloatingCallStage.card) }
+        store.send(FloatingCallStageFeature.Action.RequestDocked) { it.copy(stage = FloatingCallStage.orb) }
         store.send(FloatingCallStageFeature.Action.RequestDocked)
-        store.send(FloatingCallStageFeature.Action.MinimizeTapped) { it.copy(stage = FloatingCallStage.orb) }
-        store.send(FloatingCallStageFeature.Action.RequestDocked)
+        store.send(FloatingCallStageFeature.Action.Requested(FloatingCallStage.card)) { it.copy(stage = FloatingCallStage.card) }
+        store.send(FloatingCallStageFeature.Action.RequestDocked) { it.copy(stage = FloatingCallStage.orb) }
         store.send(FloatingCallStageFeature.Action.Requested(FloatingCallStage.full)) { it.copy(stage = FloatingCallStage.full) }
         store.send(FloatingCallStageFeature.Action.DragBegan) { it.copy(dragTarget = FloatingCallStage.full) }
         store.send(FloatingCallStageFeature.Action.RequestDocked)
         assertTrue(log.log.isEmpty())
+    }
+
+    /**
+     * A keyboard rising (a field the card doesn't cover, a sheet's search) would bury Mute and
+     * End at the screen's foot: the call shrinks to the orb, quietly, but never under a finger
+     * mid-drag.
+     */
+    @Test fun aKeyboardRisingShrinksTheCallToTheOrb() = runTest {
+        val log = VoiceFeatureTestSupport.HapticsRecorder()
+        val store = store(FloatingCallStageFeature.State(stage = FloatingCallStage.card), log)
+        store.send(FloatingCallStageFeature.Action.KeyboardRose) { it.copy(stage = FloatingCallStage.orb) }
+        store.send(FloatingCallStageFeature.Action.KeyboardRose)
+        store.send(FloatingCallStageFeature.Action.Requested(FloatingCallStage.full)) { it.copy(stage = FloatingCallStage.full) }
+        store.send(FloatingCallStageFeature.Action.KeyboardRose) { it.copy(stage = FloatingCallStage.orb) }
+        store.send(FloatingCallStageFeature.Action.Requested(FloatingCallStage.card)) { it.copy(stage = FloatingCallStage.card) }
+        store.send(FloatingCallStageFeature.Action.DragBegan) { it.copy(dragTarget = FloatingCallStage.card) }
+        store.send(FloatingCallStageFeature.Action.KeyboardRose)
+        assertTrue(log.log.isEmpty())
+    }
+
+    /**
+     * The sheet always covers the composer; the card only where it stands over the composer's
+     * span, so on a wide screen the composer beside it stays. Unmeasured, it's taken to cover.
+     */
+    @Test fun theCardCoversTheComposerOnlyWhereItOverlapsIt() {
+        val phone = Rect(Offset(12f, 860f), Size(416f, 60f))
+        val card = Rect(Offset(12f, 384f), Size(416f, 560f))
+        assertFalse(FloatingCallStage.orb.covers(composer = phone, card = card))
+        assertTrue(FloatingCallStage.card.covers(composer = phone, card = card))
+        assertTrue(FloatingCallStage.full.covers(composer = phone, card = card))
+        // A tablet in landscape: a centred column, the card at the trailing edge past it.
+        val column = Rect(Offset(300f, 950f), Size(560f, 60f))
+        val trailing = Rect(Offset(1366f - 12f - 416f, 500f), Size(416f, 560f))
+        assertFalse(FloatingCallStage.card.covers(composer = column, card = trailing))
+        assertTrue(FloatingCallStage.full.covers(composer = column, card = trailing))
+        val leading = Rect(Offset(12f, 500f), Size(416f, 560f))
+        assertTrue(FloatingCallStage.card.covers(composer = column, card = leading))
+        assertTrue(FloatingCallStage.card.covers(composer = null, card = trailing))
+        assertTrue(FloatingCallStage.card.covers(composer = column, card = null))
+    }
+
+    /**
+     * Beside a tablet's sidebar the composer's column sits off the screen's centre: the overlap
+     * check still gets it (the orb's rest keeps only a centred composer), so a card at the far
+     * edge leaves it showing.
+     */
+    @Test fun anOffCentreComposerColumnStillCountsForTheCover() {
+        val center = FloatingCallCenter()
+        center.screenWidth = 1180f
+        val column = Rect(Offset(200f, 760f), Size(520f, 60f))
+        center.noteComposer(column)
+        center.noteComposerColumn(column)
+        assertNull(center.composer)
+        assertEquals(column, center.composerColumn)
+        val trailing = Rect(Offset(1180f - 12f - 416f, 240f), Size(416f, 560f))
+        assertFalse(FloatingCallStage.card.covers(composer = center.composerColumn, card = trailing))
+        val leading = Rect(Offset(12f, 240f), Size(416f, 560f))
+        assertTrue(FloatingCallStage.card.covers(composer = center.composerColumn, card = leading))
+        center.noteComposerColumn(Rect.Zero)
+        assertEquals(column, center.composerColumn)
     }
 
     @Test fun theCallKeepsItsStage() = runTest {

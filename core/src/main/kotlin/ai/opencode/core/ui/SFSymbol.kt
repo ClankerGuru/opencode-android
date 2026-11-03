@@ -69,6 +69,7 @@ enum class SFSymbol(val sfName: String, @DrawableRes val drawable: Int) {
     Camera("camera", R.drawable.ms_photo_camera),
     CameraFill("camera.fill", R.drawable.ms_photo_camera_fill),
     CameraMeteringUnknown("camera.metering.unknown", R.drawable.ms_center_focus_weak),
+    CameraShutterButton("camera.shutter.button", R.drawable.ms_photo_camera),
     CameraViewfinder("camera.viewfinder", R.drawable.ms_center_focus_strong),
     Capsule("capsule", R.drawable.ms_toggle_off),
     CaptionsBubble("captions.bubble", R.drawable.ms_closed_caption),

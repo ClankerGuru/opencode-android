@@ -27,6 +27,7 @@ import ai.opencode.feature.voice.DotScopeRenderer
 import ai.opencode.feature.voice.LocalDotScopeCovered
 import ai.opencode.feature.voice.VoiceStoreOf
 import ai.opencode.feature.voice.floatingCallComposer
+import ai.opencode.feature.voice.floatingCallComposerColumn
 import ai.opencode.feature.session.header.HeaderBlurTunables
 import ai.opencode.feature.session.header.SessionHeaderBackdrop
 import ai.opencode.feature.session.header.SessionHeaderStyle
@@ -52,6 +53,7 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.runtime.collectAsState
 import kotlinx.coroutines.CompletableDeferred
+import ai.opencode.core.experiments.ExperimentalCallStyle
 import ai.opencode.core.experiments.key
 import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.feature.composer.LocationClientError
@@ -191,6 +193,8 @@ fun SessionView(
     SessionCallTasks(store, callStore, hasCall = ownsCall || hostedCall != null)
     val isCovered by store.observe { it.isCovered }
     val floatsCall = rememberFloatsCall(callTray)
+    // iOS `floatingCallCoverage(sessionLifecycle)`: what the Living Orb's card covers gives way.
+    SessionFloatingCallCoverage(store, callStore, floatsCall, rememberCallPresentation(callTray) == ExperimentalCallStyle.tray, composerHost, photoSheet)
 
     val work by store.observe(BackgroundWorkModel::from)
     val agentScope by store.observe { "${it.server.persistenceID}|${it.session?.id ?: "draft"}" }
@@ -283,7 +287,9 @@ fun SessionView(
                         .widthIn(max = TranscriptMetrics.readableColumnWidth)
                         .onSizeChanged { scrollEdgeBridge.composerHeight = with(density) { it.height.toDp().value } }
                         // A floating call rests above the composer.
-                        .then(if (floatsCall) Modifier.floatingCallComposer() else Modifier),
+                        .then(if (floatsCall) Modifier.floatingCallComposer() else Modifier)
+                        // The column itself, not the pane: whether the call's card covers it.
+                        .then(if (floatsCall && !isCovered) Modifier.floatingCallComposerColumn() else Modifier),
                 ) {
                     SessionCallCards(callStore)
                     SessionComposer(store, callStore = callStore, callTray = callTray)

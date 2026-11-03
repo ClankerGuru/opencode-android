@@ -88,12 +88,12 @@ recounted from Gradle at the sync merge.
 | `:server` | 36 | 230 | 3 | 256 (2 opt-in live checks skipped) |
 | `:devtools` | 4 | 14 | 10 | 17 |
 | `:feature:media` | 17 | 178 | 15 | 183 |
-| `:feature:voice` | 33 | 491 | 16 | 690 |
+| `:feature:voice` | 33 | 495 | 16 | 694 |
 | `:feature:system` | 9 | 88 | 2 | 103 |
 | `:feature:transcript` | 34 | 274 | 57 | 282 (1 env-gated metric skipped) |
 | `:feature:composer` | 41 | 267 | 40 | 270 |
 | `:feature:settings` | 17 | 98 | 10 | 93 |
-| `:feature:session` | 58 | 706 | 41 | 733 |
+| `:feature:session` | 59 | 707 | 41 | 734 |
 | `:feature:drawer` | 49 | 422 | 12 | 473 |
 | **Total** | 173 distinct (at 062f3732) | 2,858 distinct (at 062f3732) | 268 (at 062f3732) | 3,326 |
 

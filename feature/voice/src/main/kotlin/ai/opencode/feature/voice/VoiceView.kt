@@ -424,6 +424,8 @@ internal fun voiceSurfaceAnimation(expanding: Boolean): MotionSpring =
  *   the surface and the panel show, which only draws, so nothing is laid out again mid-fold.
  * @param panelShown the panel is up: the surface is the full surface.
  * @param controlsTakeTouches the composer is open for typing: its controls take the touches.
+ * @param panelHidden something over the composer (the Living Orb's card) hides the panel from
+ *   TalkBack too.
  */
 @Composable
 fun VoiceCallSurface(
@@ -435,6 +437,7 @@ fun VoiceCallSurface(
     panelShown: Boolean = false,
     expansion: ComposerExpansion? = null,
     @Suppress("UNUSED_PARAMETER") controlsTakeTouches: Boolean = false,
+    panelHidden: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val panelExtentValue = { if (store == null) panelExtent() else 0f }
@@ -610,7 +613,8 @@ fun VoiceCallSurface(
                             shape = BottomRevealShape(min(panelRevealValue(), extent()), 28f)
                             clip = true
                         }
-                        .then(if (panelIsShown) Modifier else Modifier.blocksTouches()),
+                        .then(if (panelIsShown) Modifier else Modifier.blocksTouches())
+                        .then(if (panelHidden) Modifier.clearAndSetSemantics {} else Modifier),
                 ) { panel() }
             }
             if (activeExpansion != null && showsExpansion) {
@@ -751,13 +755,24 @@ fun Modifier.hiddenUnderVoiceTranscript(isHidden: Boolean): Modifier = this then
  */
 fun Modifier.hiddenUnderComposerPanel(isHidden: Boolean): Modifier = this then HiddenElement(isHidden, HiddenKind.composerPanel)
 
-private enum class HiddenKind { voiceTranscript, composerPanel }
+/**
+ * The composer itself, while the Living Orb's card stands over the screen's foot (iOS
+ * `hiddenUnderFloatingCall`): it fades on the composer panel's curves and stops taking touches.
+ */
+fun Modifier.hiddenUnderFloatingCall(isHidden: Boolean): Modifier = this then HiddenElement(isHidden, HiddenKind.floatingCall)
+
+@Suppress("EnumEntryName")
+private enum class HiddenKind { voiceTranscript, composerPanel, floatingCall }
 
 private data class HiddenElement(val isHidden: Boolean, val kind: HiddenKind) : ModifierNodeElement<HiddenNode>() {
     override fun create() = HiddenNode(isHidden, kind)
     override fun update(node: HiddenNode) = node.update(isHidden, kind)
     override fun InspectorInfo.inspectableProperties() {
-        name = if (kind == HiddenKind.voiceTranscript) "hiddenUnderVoiceTranscript" else "hiddenUnderComposerPanel"
+        name = when (kind) {
+            HiddenKind.voiceTranscript -> "hiddenUnderVoiceTranscript"
+            HiddenKind.composerPanel -> "hiddenUnderComposerPanel"
+            HiddenKind.floatingCall -> "hiddenUnderFloatingCall"
+        }
         properties["isHidden"] = isHidden
     }
 }
@@ -782,7 +797,7 @@ private class HiddenNode(var isHidden: Boolean, var kind: HiddenKind) :
         return when (kind) {
             // Opening, the surface reaches the pill row within a few frames, so what's there fades
             // out about as fast; closing, the surface passes back below it 0.15 s into its fold.
-            HiddenKind.composerPanel -> if (hiding) tween(140, easing = Motion.EaseOut) else tween(200, delayMillis = 150, easing = Motion.EaseInOut)
+            HiddenKind.composerPanel, HiddenKind.floatingCall -> if (hiding) tween(140, easing = Motion.EaseOut) else tween(200, delayMillis = 150, easing = Motion.EaseInOut)
             HiddenKind.voiceTranscript -> voiceSurfaceAnimation(expanding = hiding).spec()
         }
     }

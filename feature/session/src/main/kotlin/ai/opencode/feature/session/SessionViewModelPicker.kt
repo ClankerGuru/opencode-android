@@ -443,7 +443,7 @@ internal class SessionModelPanels(
     fun restoreFocusAfterModelList(screen: SessionFeature.State.TaskIdentity): Boolean {
         val state = store.state
         if (state.taskIdentity != screen || !sceneActive || modelList.isOpen || levelPanel.isShown ||
-            host.isAttachmentMenuOpen || host.callHoldsComposer || state.isAnsweringRequest ||
+            host.isAttachmentMenuOpen || host.callHoldsComposer || host.floatingCallCovers || state.isAnsweringRequest ||
             state.dictationHold != null || state.isDictating || state.isPreparingDictation
         ) return false
         host.focusComposer()

@@ -171,6 +171,29 @@ class FloatingOrbTests {
     private fun area(layout: FloatingCallLayout): FloatingCallRestArea =
         FloatingCallRestArea(layout.screen, layout.safeArea, composerTop = layout.screen.height - 100, size = orb)
 
+    /**
+     * A keyboard the composer doesn't ride (the drawer's search) would hide the orb resting
+     * above the composer: it rests above the keyboard, and back down once the keyboard has gone.
+     * The composer's own keyboard, which raises the composer above it, changes nothing.
+     */
+    @Test fun theOrbRestsAboveAKeyboardTheComposerDoesntRide() {
+        val gap = FloatingCallTunables.composerGap.value.toFloat()
+        var area = FloatingCallRestArea(portrait.first, portrait.second, composerTop = 850f, size = orb)
+        val rested = area.frame(FloatingCallPlace())
+        assertEquals(850f - gap, rested.bottom)
+        area = area.copy(keyboardTop = 620f)
+        val raised = area.frame(FloatingCallPlace())
+        assertEquals(620f - gap, raised.bottom)
+        assertEquals(rested.center.x, raised.center.x)
+        // Dragged low, it still clears the keyboard.
+        assertTrue(area.frame(FloatingCallPlace(x = 100f, y = 900f)).bottom <= 620f - gap)
+        // Raised by its keyboard, the composer already sits above it.
+        area = area.copy(composerTop = 560f)
+        assertEquals(560f - gap, area.frame(FloatingCallPlace()).bottom)
+        area = area.copy(composerTop = 850f, keyboardTop = null)
+        assertEquals(rested, area.frame(FloatingCallPlace()))
+    }
+
     /** Turned to landscape mid-throw, the orb carries on inside the new screen, not from where it was on the old one, and rests in its keep-outs. */
     @Test fun aRotationMidDriftKeepsTheOrbOnTheNewScreen() {
         val layout = FloatingCallLayout(portrait.first, portrait.second)

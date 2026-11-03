@@ -96,6 +96,7 @@ literals that aren't symbols). `(fill)` is the filled variant. Weak matches: `st
 | `camera` | `photo_camera` | `ms_photo_camera` | `SFSymbol.Camera` | AttachmentCameraView, AttachmentPicker, OnboardingPlaygroundView, PlusPhotoSheet, ServerConnectView |
 | `camera.fill` | `photo_camera` (fill) | `ms_photo_camera_fill` | `SFSymbol.CameraFill` | PairingScanner |
 | `camera.metering.unknown` | `center_focus_weak` | `ms_center_focus_weak` | `SFSymbol.CameraMeteringUnknown` | PairingScanner |
+| `camera.shutter.button` | `photo_camera` (no shutter glyph in Material Symbols) | `ms_photo_camera` | `SFSymbol.CameraShutterButton` | What’s New (`screenshot-shutter`) |
 | `camera.viewfinder` | `center_focus_strong` | `ms_center_focus_strong` | `SFSymbol.CameraViewfinder` | AttachmentMenu |
 | `capsule` | `toggle_off` | `ms_toggle_off` | `SFSymbol.Capsule` | BackgroundWorkPanel, GlassMorphTrace, WhatsNewList |
 | `captions.bubble` | `closed_caption` | `ms_closed_caption` | `SFSymbol.CaptionsBubble` | FloatingCall |

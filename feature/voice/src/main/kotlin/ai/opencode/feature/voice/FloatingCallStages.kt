@@ -40,6 +40,11 @@ object FloatingCallStageTunables {
     val cardHeight = Tunable("call.stage.cardHeight", "Card height", default = 440.0, range = 300.0..620.0, step = 2.0)
     val fullTop = Tunable("call.stage.fullTop", "Full sheet top", default = 70.0, range = 44.0..160.0, step = 1.0)
     val margin = Tunable("call.stage.margin", "Card side margin", default = 12.0, range = 0.0..32.0, step = 1.0)
+
+    /** The card takes over the screen's foot, the composer and its pills hidden under it, instead of standing above them (Kit, Nov 1). */
+    val covers = Tunable("call.stage.covers", "Card covers the composer", default = true)
+    val coverHeight = Tunable("call.stage.coverHeight", "Covering card height", default = 560.0, range = 300.0..720.0, step = 2.0)
+    val coverInset = Tunable("call.stage.coverInset", "Covering card bottom margin", default = 12.0, range = 0.0..40.0, step = 1.0)
     val cardRadius = Tunable("call.stage.cardRadius", "Card corner radius", default = 36.0, range = 12.0..56.0, step = 1.0)
     val fullRadius = Tunable("call.stage.fullRadius", "Sheet corner radius", default = 38.0, range = 12.0..56.0, step = 1.0)
     val cardBloomY = Tunable("call.stage.cardBloomY", "Card bloom centre", default = 166.0, range = 100.0..260.0, step = 1.0)
@@ -73,6 +78,8 @@ object FloatingCallStageTunables {
 
     fun register(store: TuningStore = TuningStore.shared) {
         store.register(feels)
+        store.register(covers)
+        store.register(coverHeight, coverInset)
         store.register(cardWidth, cardHeight, fullTop, margin, cardRadius, fullRadius)
         store.register(cardBloomY, cardBloomRadius, fullBloomY, fullBloomRadius)
         store.register(cardFill, sheetFill, dim, rubberBand, flickSpeed, projection)
@@ -391,7 +398,7 @@ data class FloatingCallStageGeometry(
     val screen: Size,
     /** The orb at rest. */
     val rest: Rect,
-    /** The card's bottom: the orb's usual rest bottom, above the composer. */
+    /** The card's bottom: near the screen's foot, over the composer, or the orb's usual rest bottom above it. */
     val low: Double,
     val trailing: Boolean = true,
     val card: Size = Size(FloatingCallStageTunables.cardWidth.value.toFloat(), FloatingCallStageTunables.cardHeight.value.toFloat()),

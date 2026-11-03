@@ -5,6 +5,7 @@ import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
+import androidx.compose.ui.geometry.Rect
 
 /**
  * How far the floating call has grown (iOS `FloatingCallStage`, One Shape): the orb, a card
@@ -16,6 +17,21 @@ enum class FloatingCallStage {
 
     /** One stage down, or null at the orb. */
     val previous: FloatingCallStage? get() = entries.getOrNull(ordinal - 1)
+
+    /**
+     * Whether the call grown this far covers the composer (`call.stage.covers`): the sheet
+     * always, the card when it stands over the composer's span (on a wide screen it can stand
+     * beside it). Either frame unknown, it's taken to cover. Frames are in window dp.
+     */
+    fun covers(composer: Rect?, card: Rect?): Boolean = when (this) {
+        orb -> false
+        full -> true
+        FloatingCallStage.card -> if (composer == null || card == null || composer.width <= 0 || card.width <= 0) {
+            true
+        } else {
+            card.left < composer.right && card.right > composer.left
+        }
+    }
 }
 
 /**
@@ -51,10 +67,16 @@ class FloatingCallStageFeature : Reducer<FloatingCallStageFeature.State, Floatin
         data class Requested(val stage: FloatingCallStage) : Action
 
         /**
-         * A pending request docked in the composer: the full sheet steps down to the card,
-         * above the composer, so the request shows.
+         * A pending request docked in the composer: the card or sheet, which cover the
+         * composer, shrink back to the orb so the request shows.
          */
         data object RequestDocked : Action
+
+        /**
+         * A keyboard rose in the call's window: the card and sheet, standing at the screen's
+         * foot, shrink back to the orb, which rides above it, so Mute and End are never under it.
+         */
+        data object KeyboardRose : Action
     }
 
     override fun reduce(state: State, action: Action): Reduced<State, Action> {
@@ -84,9 +106,9 @@ class FloatingCallStageFeature : Reducer<FloatingCallStageFeature.State, Floatin
                 Reduced(cleared.copy(stage = action.stage))
             }
             is Action.Requested -> Reduced(state.copy(dragTarget = null, stage = action.stage))
-            Action.RequestDocked -> {
-                if (state.stage != FloatingCallStage.full || state.dragTarget != null) return Reduced(state)
-                Reduced(state.copy(stage = FloatingCallStage.card))
+            Action.RequestDocked, Action.KeyboardRose -> {
+                if (state.stage == FloatingCallStage.orb || state.dragTarget != null) return Reduced(state)
+                Reduced(state.copy(stage = FloatingCallStage.orb))
             }
         }
     }

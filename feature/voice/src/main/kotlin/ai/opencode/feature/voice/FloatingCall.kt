@@ -47,6 +47,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
@@ -248,6 +249,16 @@ class FloatingCallCenter(readsLabHooks: Boolean = false) {
      */
     var composer by mutableStateOf<Rect?>(null)
 
+    /** The card's frame as last laid out, in window dp: whether it covers the composer ([FloatingCallStage.covers]). */
+    var card by mutableStateOf<Rect?>(null)
+
+    /**
+     * The composer's readable column wherever it sits (beside a wide screen's sidebar too), for
+     * whether the card covers it. Unlike [composer] it keeps off-centre frames.
+     */
+    var composerColumn by mutableStateOf<Rect?>(null)
+        private set
+
     /** The playground's Start Floating Call turns the experiment on for its run. */
     var forced by mutableStateOf(false)
 
@@ -298,6 +309,11 @@ class FloatingCallCenter(readsLabHooks: Boolean = false) {
         if (composer != frame) composer = frame
     }
 
+    fun noteComposerColumn(frame: Rect) {
+        if (frame.width <= 0 || composerColumn == frame) return
+        composerColumn = frame
+    }
+
     fun requestPanel(open: Boolean) {
         panelRequest = Request(open, panelRequest.count + 1)
     }
@@ -315,8 +331,15 @@ fun Modifier.floatingCallComposer(): Modifier = this then FloatingCallFrameEleme
 /** Reports this element (the composer's call button circle) as [FloatingCallCenter.callButton]. */
 fun Modifier.floatingCallButton(): Modifier = this then FloatingCallFrameElement(FloatingCallFrameKind.callButton)
 
+/**
+ * Reports this element (the composer's readable column, not the pane) to
+ * [FloatingCallCenter.noteComposerColumn]: whether the call's card covers it. Apply it only while
+ * the call floats and the screen shows (iOS `onGeometryChange` gated on `floatsCall`, `!isCovered`).
+ */
+fun Modifier.floatingCallComposerColumn(): Modifier = this then FloatingCallFrameElement(FloatingCallFrameKind.composerColumn)
+
 @Suppress("EnumEntryName")
-private enum class FloatingCallFrameKind { composer, callButton }
+private enum class FloatingCallFrameKind { composer, callButton, composerColumn }
 
 private data class FloatingCallFrameElement(val kind: FloatingCallFrameKind) : ModifierNodeElement<FloatingCallFrameNode>() {
     override fun create() = FloatingCallFrameNode(kind)
@@ -334,6 +357,7 @@ private class FloatingCallFrameNode(var kind: FloatingCallFrameKind) : Modifier.
         when (kind) {
             FloatingCallFrameKind.composer -> center.noteComposer(frame)
             FloatingCallFrameKind.callButton -> center.callButton = frame
+            FloatingCallFrameKind.composerColumn -> center.noteComposerColumn(frame)
         }
     }
 }
@@ -418,6 +442,30 @@ fun FloatingCallWindow(
             if (store != null) FloatingCallOverlay(store)
         }
     }
+}
+
+/**
+ * The card and the sheet, grown from the orb where it rests, on its side of the screen (iOS
+ * `stageGeometry`). Covering (`call.stage.covers`), the card stands at the screen's foot with the
+ * same margin as its sides, over the composer and its pills, so the keyboard never squeezes it;
+ * otherwise it stands above the composer.
+ */
+internal fun floatingCallStageGeometry(area: FloatingCallRestArea, rest: Rect): FloatingCallStageGeometry {
+    val covers = FloatingCallStageTunables.covers.value
+    return FloatingCallStageGeometry(
+        screen = area.screen,
+        rest = rest,
+        low = if (covers) {
+            area.screen.height - FloatingCallStageTunables.coverInset.value
+        } else {
+            (area.bottom - FloatingCallTunables.composerGap.value.toFloat()).toDouble()
+        },
+        trailing = rest.center.x > area.screen.width / 2,
+        card = Size(
+            FloatingCallStageTunables.cardWidth.value.toFloat(),
+            (if (covers) FloatingCallStageTunables.coverHeight.value else FloatingCallStageTunables.cardHeight.value).toFloat(),
+        ),
+    )
 }
 
 /**
@@ -507,21 +555,13 @@ private class FloatingCallSurfaceModel(
         }
 
     /** Where the orb may be on the screen as it is when called (iOS `liveRestArea`), for motion that outlives a body. */
-    fun liveRestArea(): FloatingCallRestArea = FloatingCallRestArea(layout.screen, layout.safeArea, center.composer?.top, restSize)
+    fun liveRestArea(): FloatingCallRestArea = FloatingCallRestArea(layout.screen, layout.safeArea, center.composer?.top, restSize, layout.keyboardTop)
 
     val restFrame: Rect get() = liveRestArea().frame(place)
 
     fun restingFrame(area: FloatingCallRestArea = liveRestArea()): Rect = float.position?.let { area.frame(centeredAt = it) } ?: area.frame(place)
 
-    fun stageGeometry(area: FloatingCallRestArea = liveRestArea()): FloatingCallStageGeometry {
-        val rest = area.frame(place)
-        return FloatingCallStageGeometry(
-            screen = area.screen,
-            rest = rest,
-            low = (area.bottom - FloatingCallTunables.composerGap.value.toFloat()).toDouble(),
-            trailing = rest.center.x > area.screen.width / 2,
-        )
-    }
+    fun stageGeometry(area: FloatingCallRestArea = liveRestArea()): FloatingCallStageGeometry = floatingCallStageGeometry(area, area.frame(place))
 
     fun send(action: FloatingCallStageFeature.Action) {
         store.send(VoiceFeature.Action.FloatingStage(action))
@@ -612,6 +652,28 @@ private class FloatingCallSurfaceModel(
         bloomMounted = true
         if (next != FloatingCallStage.orb) dismissKeyboard()
         motion.animate(next, reduceMotion = reduceMotion)
+    }
+
+    /**
+     * A keyboard rising in this window (a field the card doesn't cover, a sheet's search) would
+     * bury Mute and End at the screen's foot: the card or sheet shrinks to the orb, which rides
+     * above it (iOS `keyboardRose`).
+     */
+    fun keyboardRose() {
+        if (store.state.floatingStage.stage == FloatingCallStage.orb || motion.isDragging || store.state.phase.isTerminal) return
+        send(FloatingCallStageFeature.Action.KeyboardRose)
+    }
+
+    /**
+     * A keyboard the composer doesn't ride (the drawer's search, a sheet's field) would hide the
+     * orb resting above the composer: it rests above the keyboard instead, and back down as it
+     * goes (iOS `keyboardMoved`). [top] is in this overlay's space, null with no keyboard.
+     */
+    fun keyboardMoved(top: Float?) {
+        if (layout.keyboardTop == top) return
+        layout.keyboardTop = top
+        val area = liveRestArea()
+        float.clamp(into = area.reach.union(area.bounds))
     }
 
     /**
@@ -993,14 +1055,13 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screen: Size, safeArea: Flo
     val float = model.float
     val style = model.style
     val restSize = model.restSize
-    val restArea = FloatingCallRestArea(screen, safeArea, composerTop, restSize)
+    // The window's keyboard top while one is up, in this overlay's space (it fills the window
+    // edge to edge): iOS reads the scene's keyboard notifications, Android its IME insets.
+    val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current) / density
+    val keyboardTop = if (imeBottom > 0f && imeBottom < screen.height) screen.height - imeBottom else null
+    val restArea = FloatingCallRestArea(screen, safeArea, composerTop, restSize, keyboardTop)
     val restFrame = restArea.frame(model.place)
-    val geometry = FloatingCallStageGeometry(
-        screen = screen,
-        rest = restFrame,
-        low = (restArea.bottom - FloatingCallTunables.composerGap.value.toFloat()).toDouble(),
-        trailing = restFrame.center.x > screen.width / 2,
-    )
+    val geometry = floatingCallStageGeometry(restArea, restFrame)
     val shaping = motion.isActive
     val lifting = !shaping && connect.frame != null
     val restingFrame = float.position?.let { restArea.frame(centeredAt = it) } ?: restFrame
@@ -1016,6 +1077,7 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screen: Size, safeArea: Flo
     SideEffect {
         model.dim = dim
         if (window != null && window.touchArea != touchArea) window.touchArea = touchArea
+        if (center.card != geometry.cardFrame) center.card = geometry.cardFrame
     }
 
     // iOS onAppear: laidOut(), appeared(); a new screen or safe area lays out again.
@@ -1036,6 +1098,8 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screen: Size, safeArea: Flo
     OnChange(connected) { if (it && !store.state.phase.isTerminal) connect.connected(reduceMotion = reduceMotion) }
     OnChange(unpromptedMove) { if (it != null) model.sessionMoved(store.state.sessionTitle) }
     OnChange(stage) { model.grow(it) }
+    OnChange(keyboardTop != null) { if (it) model.keyboardRose() }
+    OnChange(keyboardTop) { model.keyboardMoved(it) }
     val panelRequest = center.panelRequest
     OnChange(panelRequest.count) { count ->
         if (count != model.lastPanelRequest) {

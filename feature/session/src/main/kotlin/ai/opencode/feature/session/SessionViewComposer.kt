@@ -57,10 +57,9 @@ import ai.opencode.server.model.OpenCodeQueuedInput
 import ai.opencode.feature.voice.CallTrayController
 import ai.opencode.feature.voice.CallTrayHost
 import ai.opencode.feature.voice.VoiceCallComposer
-import ai.opencode.feature.voice.FloatingCallStageFeature
-import ai.opencode.feature.voice.VoiceFeature
 import ai.opencode.feature.voice.VoiceCallSurface
 import ai.opencode.feature.voice.VoiceStoreOf
+import ai.opencode.feature.voice.hiddenUnderFloatingCall
 import ai.opencode.feature.voice.hiddenUnderVoiceTranscript
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
@@ -179,8 +178,13 @@ class SessionComposerHost {
     internal var modelPanels: SessionModelPanels? by mutableStateOf(null)
     /** Composer Autocomplete's suggestions are open (iOS `autocompleteController.isOpen`), set by the composer. */
     internal var autocompleteCovers by mutableStateOf(false)
-    /** iOS `composerPanelCovers`: a panel grown out of the composer (model list, level panel, suggestions) stands over what sits above it. */
-    val composerPanelCovers: Boolean get() = modelPanels?.covers == true || autocompleteCovers
+    /**
+     * iOS `floatingCallCovers`: the Living Orb's card or sheet covers the composer, set by
+     * `SessionFloatingCallCoverage`. The composer and its pills hide under it.
+     */
+    internal var floatingCallCovers by mutableStateOf(false)
+    /** iOS `composerPanelCovers`: a panel grown out of the composer (model list, level panel, suggestions), or the Living Orb's card, stands over what sits above it. */
+    val composerPanelCovers: Boolean get() = modelPanels?.covers == true || autocompleteCovers || floatingCallCovers
     /** The model list or level panel is shown: the composer stays expanded under it. */
     val keepsComposerExpanded: Boolean get() = modelPanels?.keepsComposerExpanded == true
     /** A panel or overlay owns downward drags now (iOS `composerSwipeYields`' panels). */
@@ -230,7 +234,11 @@ class SessionComposerHost {
     internal var dismissAction: () -> Unit = {}
 
     /** iOS `focusComposer()`. */
-    fun focusComposer() = focusAction()
+    fun focusComposer() {
+        // Under the Living Orb's card the field is hidden: it waits for the orb.
+        if (floatingCallCovers) return
+        focusAction()
+    }
 
     /** iOS `dismissComposerKeyboard()`. */
     fun dismissComposerKeyboard() = dismissAction()
@@ -1112,18 +1120,11 @@ private fun SessionComposerEnv.activeRequestPanelHeight(cap: Float?): Float {
 private fun SessionComposerEnv.RequestPanelPresence() {
     val current by rememberUpdatedState(this)
     val docks = docksRequest
-    fun dismissTrayCaptions() {
-        if (usesCallTray && callStore?.state?.showsCaptions == true) callStore.send(VoiceFeature.Action.CaptionsDismissed)
-        // The full sheet would cover the request: the call steps down to its card, which sits
-        // above the composer (iOS bb4c7c95).
-        if (floatsCall) callStore?.send(VoiceFeature.Action.FloatingStage(FloatingCallStageFeature.Action.RequestDocked))
-    }
     LaunchedEffect(Unit) {
         if (!docks) return@LaunchedEffect
         view.requestPanelIdentity = s.taskIdentity
         view.requestRoomHeld = true
         view.requestPanelReveal.snapTo(1f)
-        dismissTrayCaptions()
     }
     var lastDocks by remember { mutableStateOf(docks) }
     LaunchedEffect(docks) {
@@ -1137,7 +1138,7 @@ private fun SessionComposerEnv.RequestPanelPresence() {
         view.requestPanelIdentity = s.taskIdentity
         view.requestPanelLingers = false
         view.requestRoomHeld = true
-        dismissTrayCaptions()
+        // The call's captions and card make way in `SessionFloatingCallCoverage`.
         host.closeAttachmentMenu()
         // The surface grows back over the panel from where a fold left it.
         if (reducedMotion || view.requestPanelShown.value <= 0.5f) {
@@ -1223,6 +1224,8 @@ private fun SessionComposerEnv.ComposerSurface(
             store = call,
             modifier = Modifier
                 .fillMaxWidth()
+                // Under the Living Orb's card it hides, out of reach and out of TalkBack.
+                .hiddenUnderFloatingCall(host.floatingCallCovers)
                 // iOS `.onDrop(of: TranscriptComposerDrop.acceptedTypes, isTargeted:)`: anywhere on the composer.
                 .then(if (call == null) Modifier.dragAndDropTarget(shouldStartDragAndDrop = { true }, target = dropTarget) else Modifier)
                 .onGloballyPositioned {
@@ -1236,6 +1239,7 @@ private fun SessionComposerEnv.ComposerSurface(
             panelReveal = panelReveal,
             panelShown = panelShown,
             controlsTakeTouches = composerPresentation.expanded,
+            panelHidden = host.floatingCallCovers,
         ) {
             // The composer and the call trade places inside the one surface.
             AnimatedContent(
