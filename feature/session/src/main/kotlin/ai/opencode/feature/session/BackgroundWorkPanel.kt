@@ -96,11 +96,14 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.node.GlobalPositionAwareModifierNode
+import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -164,10 +167,42 @@ class BackgroundWorkAnchor {
 @Composable
 fun rememberBackgroundWorkAnchor(): BackgroundWorkAnchor = remember { BackgroundWorkAnchor() }
 
-/** Marks the capsule the background-work panel anchors to. */
-fun Modifier.backgroundActivityAnchor(anchor: BackgroundWorkAnchor): Modifier = onGloballyPositioned {
-    anchor.coordinates = it
-    anchor.bounds = it.boundsInRoot()
+/**
+ * Marks the capsule the background-work panel anchors to. Like iOS's anchor preference, the mark
+ * goes when its place does (the work ending takes the pill row's place away): the panel never
+ * keeps a capsule, or its touch target, where the place last was.
+ */
+fun Modifier.backgroundActivityAnchor(anchor: BackgroundWorkAnchor): Modifier = this then BackgroundActivityAnchorElement(anchor)
+
+private data class BackgroundActivityAnchorElement(val anchor: BackgroundWorkAnchor) : ModifierNodeElement<BackgroundActivityAnchorNode>() {
+    override fun create() = BackgroundActivityAnchorNode(anchor)
+
+    override fun update(node: BackgroundActivityAnchorNode) {
+        if (node.anchor === anchor) return
+        node.release()
+        node.anchor = anchor
+    }
+}
+
+private class BackgroundActivityAnchorNode(var anchor: BackgroundWorkAnchor) : Modifier.Node(), GlobalPositionAwareModifierNode {
+    private var marked: LayoutCoordinates? = null
+
+    override fun onGloballyPositioned(coordinates: LayoutCoordinates) {
+        marked = coordinates
+        anchor.coordinates = coordinates
+        anchor.bounds = coordinates.boundsInRoot()
+    }
+
+    override fun onDetach() = release()
+
+    /** Clears the mark unless another place has taken it since. */
+    fun release() {
+        val mine = marked ?: return
+        marked = null
+        if (anchor.coordinates !== mine) return
+        anchor.coordinates = null
+        anchor.bounds = null
+    }
 }
 
 /** The open panel covers the composer pills beside and above the capsule. */
@@ -804,7 +839,9 @@ fun BackgroundWorkPresentation(
                         .fillMaxSize()
                         .graphicsLayer { alpha = 1f - progress.value }
                         .then(
-                            if (stage == BackgroundWorkStage.closed && !hidden) {
+                            // iOS draws the capsule's button only while its glass is up (`capsuleShown`):
+                            // a capsule fading with the work, or gone, takes no touch.
+                            if (stage == BackgroundWorkStage.closed && !hidden && capsuleShown) {
                                 Modifier
                                     .clickable(onClickLabel = "Shows running subagents and shells") {
                                         onToggle()
