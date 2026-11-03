@@ -366,10 +366,10 @@ fun DrawerListView(
     if (shownServer != model.serverID || shownItems != model.items) {
         val switched = shownServer != model.serverID
         val ghosted = shownItems.any { it is DrawerListItem.Ghost }
-        if (switched && swapsRows) {
+        if (switched && swapsRows && serverSwap != null) {
             // Before the next server's rows compose: the rows on screen are still the old ones.
             Snapshot.withoutReadObservation {
-                swapPictures.swap(server = shownServer, next = model.serverID, info = listState.layoutInfo, firstVisible = listState.firstVisibleItemIndex)
+                swapPictures.swap(server = shownServer, next = model.serverID, info = listState.layoutInfo, firstVisible = listState.firstVisibleItemIndex, motion = serverSwap)
             }
         } else if ((switched || (ghosted && swapsRows)) && !model.reducedMotion) {
             listFades[0] += 1

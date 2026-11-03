@@ -28,6 +28,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -186,6 +188,9 @@ internal class ServerSwapPictures(private val graphics: GraphicsContext) {
     private val rows = HashMap<Any, ServerSwapPictureNode>()
     private val leaving = HashMap<String, List<Picture>>()
 
+    /** Bumped when pictures start leaving, so the overlay draws them on the switch's own frame. */
+    private var version by mutableIntStateOf(0)
+
     internal fun createLayer(): GraphicsLayer = graphics.createGraphicsLayer()
 
     internal fun releaseLayer(layer: GraphicsLayer) = graphics.releaseGraphicsLayer(layer)
@@ -203,7 +208,7 @@ internal class ServerSwapPictures(private val graphics: GraphicsContext) {
      * laid out) become [server]'s leaving pictures. Rows coming back before they left turn round
      * as live rows.
      */
-    fun swap(server: String, next: String, info: LazyListLayoutInfo, firstVisible: Int) {
+    fun swap(server: String, next: String, info: LazyListLayoutInfo, firstVisible: Int, motion: ServerSwapMotion) {
         for (id in listOf(server, next)) leaving.remove(id)?.forEach { releaseLayer(it.layer) }
         val pictures = info.visibleItemsInfo
             .filter { it.index >= firstVisible }
@@ -211,11 +216,17 @@ internal class ServerSwapPictures(private val graphics: GraphicsContext) {
             .mapNotNull { item ->
                 rows[item.key]?.handOver()?.let { Picture(it, (item.offset - info.viewportStartOffset).toFloat()) }
             }
-        if (pictures.isNotEmpty()) leaving[server] = pictures
+        if (pictures.isEmpty()) return
+        leaving[server] = pictures
+        // Their chain starts where they are (iOS adds the snapshots at rest, then the exit moves
+        // them), not where the name has got to by the first step.
+        motion.rows(server, pictures.size)
+        version += 1
     }
 
     /** iOS `placeSwapRows()` for the leaving pictures: each on its server's chain, faded with it. */
     fun DrawScope.drawLeaving(motion: ServerSwapMotion, travel: Float) {
+        version
         if (leaving.isEmpty()) return
         val still = motion.leaving.toSet()
         val gone = leaving.keys.filter { it !in still }
