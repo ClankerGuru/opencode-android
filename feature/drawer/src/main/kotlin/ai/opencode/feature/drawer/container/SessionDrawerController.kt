@@ -556,9 +556,12 @@ class SessionDrawerController internal constructor(
                 val start = if (animated) PRERENDER_ALPHA else 0f
                 chromeAlpha.floatValue = start + (1f - start) * p
                 chromeScale.floatValue = 1f
-                stackOffset.floatValue = startOffset * (1f - p)
+                // Android's modal drawer covers a card that never moved: the stack starts in place,
+                // and only a drawer that was open fades out over it.
+                val modal = sidebarShown == null
+                stackOffset.floatValue = if (modal) 0f else startOffset * (1f - p)
                 drawerScale.floatValue = startScale + (closedScale - startScale) * p
-                drawerAlpha.floatValue = 1f - p
+                drawerAlpha.floatValue = if (modal && startProgress <= 0f) 0f else 1f - p
                 dimAlpha.floatValue = startDim + (endDim - startDim) * p
                 outgoingAlpha.floatValue = if (snapshot == null) 0f else 1f - easeOut(t, 0.2)
             },
@@ -746,7 +749,8 @@ class SessionDrawerController internal constructor(
                 maskProgress.floatValue = p
                 cardRadius.floatValue = stackRadius + (displayCornerRadius - stackRadius) * p
                 borderAlpha.floatValue = 1f - p
-                cardTx.floatValue = target * p
+                // Android's modal drawer opens over the card, so the card grows in place beneath it.
+                cardTx.floatValue = if (sidebarShown == null) 0f else target * p
                 cardTy.floatValue = 0f
                 cardScale.floatValue = 1f
                 val startAlpha = if (wasShowingCard) 1f else PRERENDER_ALPHA

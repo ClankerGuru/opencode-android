@@ -409,6 +409,7 @@ fun DrawerListSessionCell(
 private fun SelectionMark(selection: DrawerSelectionStyle?, cornerRadius: Dp) {
     if (selection == null) return
     val colors = OpenCodeTheme.colors
+    val indicator = MaterialTheme.colorScheme.secondaryContainer
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     Spacer(
         Modifier
@@ -416,7 +417,9 @@ private fun SelectionMark(selection: DrawerSelectionStyle?, cornerRadius: Dp) {
             .drawBehind {
                 val radius = CornerRadius(cornerRadius.toPx())
                 when (selection) {
-                    DrawerSelectionStyle.Fill -> drawRoundRect(colors.text.copy(alpha = DrawerTunables.selectionOpacity), cornerRadius = radius)
+                    // Android: the shipped mark is Material's navigation drawer indicator, a
+                    // secondary-container capsule, where iOS fills the row with a faint grey.
+                    DrawerSelectionStyle.Fill -> drawRoundRect(indicator, cornerRadius = CornerRadius(size.height / 2))
                     DrawerSelectionStyle.Tint -> drawRoundRect(colors.accent, cornerRadius = radius)
                     DrawerSelectionStyle.Outline -> {
                         val inset = 0.5.dp.toPx()

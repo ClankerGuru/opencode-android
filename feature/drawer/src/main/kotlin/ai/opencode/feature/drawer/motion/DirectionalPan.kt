@@ -245,7 +245,9 @@ fun Modifier.drawerDirectionalPan(
                 val presented = isDrawerPresented()
                 val cardSwipe = isCardSwipe()
                 val point = down.position
-                val onExposedCard = regions.contains(regions.card, pan, point)
+                // Android's modal drawer lies over the card: a touch on the open drawer is the drawer's.
+                val onExposedCard = regions.contains(regions.card, pan, point) &&
+                    !(presented && regions.contains(regions.drawer, pan, point))
                 // Controls that own a sideways drag (the + menu, the held mic) keep it.
                 if (!presented && onExposedCard && regions.isExcluded(pan, point)) {
                     return@awaitEachGesture

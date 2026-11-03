@@ -2,7 +2,6 @@
 
 package ai.opencode.feature.drawer.container
 
-import ai.opencode.feature.drawer.list.rememberInboxSidebarOn
 import ai.opencode.core.motion.rememberFrameDurationSeconds
 import ai.opencode.core.ui.LocalDrawerKeyboardSignals
 import ai.opencode.core.ui.LocalDrawerPanExclusion
@@ -12,6 +11,7 @@ import ai.opencode.feature.drawer.catchup.CatchUpStack
 import ai.opencode.feature.drawer.catchup.CatchUpStage
 import ai.opencode.feature.drawer.catchup.CatchUpStageProxy
 import ai.opencode.feature.drawer.catchup.rememberCatchUpStackController
+import ai.opencode.feature.drawer.list.rememberInboxSidebarOn
 import ai.opencode.feature.drawer.motion.DrawerCorner
 import ai.opencode.feature.drawer.motion.DrawerDepth
 import ai.opencode.feature.drawer.motion.DrawerDim
@@ -34,18 +34,20 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.systemBarsIgnoringVisibility
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.remember
@@ -91,7 +93,9 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
@@ -230,7 +234,12 @@ fun SessionDrawerContainer(
     val drawerEverShown = remember { booleanArrayOf(false) }
     if (drawerShows) drawerEverShown[0] = true
     val drawerComposed = drawerShows || drawerEverShown[0]
-    val scrimColor = DrawerScrim.color(isDark, colors.highContrast)
+    // Android: the phone's drawer is a Material modal drawer. It slides in over the session,
+    // which stays put under a scrim, instead of the session sliding aside as iOS's card does.
+    val modal = sidebarShown == null
+    val scrimColor = if (modal) MaterialTheme.colorScheme.scrim.copy(alpha = MODAL_SCRIM_ALPHA) else DrawerScrim.color(isDark, colors.highContrast)
+    // A Catch Up morph poses the drawer itself (its scale is set); it isn't following the motion then.
+    val drawerPosed by remember(controller) { derivedStateOf { !controller.drawerScale.floatValue.isNaN() } }
     val chromeBackground = if (isDark) Color(0.04f, 0.04f, 0.04f, 1f) else colors.userBubble
     val borderColor = CatchUpMetrics.borderColor(isDark, colors.border)
     val borderWidthPx = if (isDark) with(density) { 1.dp.toPx() } else 1f
@@ -273,7 +282,7 @@ fun SessionDrawerContainer(
                 }
             },
     ) {
-        // The drawer (or sidebar), under the card; it recedes the more shut it is.
+        // The modal drawer, over the card; or the sidebar, beside it.
         if (drawerComposed) {
             val hiddenFromAccessibility = !drawerShows || catchUp != null ||
                 if (sidebarShown != null) !controller.isSidebarVisible else motion.isDrawerHiddenFromAccessibility.value
@@ -282,12 +291,26 @@ fun SessionDrawerContainer(
                     .width(width)
                     .fillMaxHeight()
                     .align(Alignment.CenterStart)
+                    .zIndex(if (modal && (catchUp == null || drawerPosed)) 1f else 0f)
                     .drawerPanDrawer(panRegions)
                     .graphicsLayer {
                         val override = controller.drawerScale.floatValue
-                        val scale = if (!override.isNaN()) override else DrawerDepth.scale(motion.progress, motion.reducedMotion || !motion.recedes)
-                        scaleX = scale
-                        scaleY = scale
+                        if (modal) {
+                            if (override.isNaN()) {
+                                // The drawer's trailing edge rides the finger, as the card's leading edge did.
+                                val shown = min(motion.offset, width.value)
+                                translationX = (shown - width.value).dp.toPx() * if (rtl) -1 else 1
+                            } else {
+                                scaleX = override
+                                scaleY = override
+                            }
+                            shape = ModalDrawerShape
+                            clip = true
+                        } else {
+                            val scale = if (!override.isNaN()) override else DrawerDepth.scale(motion.progress, motion.reducedMotion || !motion.recedes)
+                            scaleX = scale
+                            scaleY = scale
+                        }
                         alpha = if (drawerShows) controller.drawerAlpha.floatValue else 0f
                     }
                     .then(if (hiddenFromAccessibility) Modifier.clearAndSetSemantics {} else Modifier),
@@ -303,18 +326,6 @@ fun SessionDrawerContainer(
                             .background(colors.border),
                     )
                 }
-            }
-            if (sidebarShown == null && drawerShows) {
-                // Full size, outside the scaled drawer: the receding list never shows a bright strip.
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .drawBehind {
-                            val override = controller.dimAlpha.floatValue
-                            val alpha = if (!override.isNaN()) override else DrawerDim.alpha(motion.progress, DrawerDim.maximum(isDark))
-                            if (alpha > 0f) drawRect(DrawerDim.color, alpha = alpha)
-                        },
-                )
             }
         }
 
@@ -407,7 +418,7 @@ fun SessionDrawerContainer(
                             alpha = controller.cardAlpha.floatValue
                             shape = MaskShape(controller.currentMask(), controller.cardRadius.floatValue.dp.toPx())
                             clip = true
-                        } else {
+                        } else if (!modal) {
                             val offset = motion.offset
                             translationX = offset.dp.toPx() * if (rtl) -1 else 1
                             val radius = DrawerCorner.radius(motion.isCardMoving, offset, displayRadius.value)
@@ -620,3 +631,9 @@ internal fun SessionDrawerController.currentMask(): Rect? {
     val end = cardMaskEnd ?: return null
     return lerp(start, end, maskProgress.floatValue)
 }
+
+/** Material's modal drawer scrim (the `scrim` role at 32%). */
+private const val MODAL_SCRIM_ALPHA = 0.32f
+
+/** Material's modal drawer: its trailing corners round (the large shape, 16 dp). */
+private val ModalDrawerShape = RoundedCornerShape(topEnd = 16.dp, bottomEnd = 16.dp)

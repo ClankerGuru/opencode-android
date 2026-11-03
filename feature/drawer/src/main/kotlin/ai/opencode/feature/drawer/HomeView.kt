@@ -156,8 +156,9 @@ fun HomeView(
                 // An iPad-wide window lists the sessions in a sidebar beside the session; anything
                 // narrower slides the phone's drawer under it.
                 val usesSidebar = maxWidth >= SidebarMetrics.minimumWindowWidth
-                // Three quarters of a phone; on a wider window, no wider than a sidebar.
-                val drawerWidth = if (usesSidebar) SidebarMetrics.width else min(maxWidth * 0.75f, 400.dp)
+                // Android: Material's modal drawer width (at most 360 dp, leaving 56 dp of the session
+                // beside it to tap shut), where iOS takes three quarters of the phone.
+                val drawerWidth = if (usesSidebar) SidebarMetrics.width else min(maxWidth - 56.dp, 360.dp)
                 val containerWidth = maxWidth
                 SideEffect { view.usesSidebar = usesSidebar }
                 if (hasDetail) HomeLayout(store, view, usesSidebar, drawerWidth, containerWidth, reducedMotion)
