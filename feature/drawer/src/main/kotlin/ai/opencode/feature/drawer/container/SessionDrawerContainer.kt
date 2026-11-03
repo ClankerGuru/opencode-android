@@ -29,6 +29,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.ime
@@ -418,7 +419,14 @@ fun SessionDrawerContainer(
                     Modifier
                         .fillMaxSize()
                         .graphicsLayer { alpha = controller.contentAlpha.floatValue }
-                        .then(if (contentHidden) Modifier.clearAndSetSemantics {} else Modifier),
+                        .then(if (contentHidden) Modifier.clearAndSetSemantics {} else Modifier)
+                        // Consumes nothing; it's here to be inserted with this slot. Catch Up's
+                        // stack consumes the system bars around the moved session, and a session
+                        // moved back here kept reading those consumed insets (its header under the
+                        // status bar, its composer on the gesture bar) because nothing on its new
+                        // path changed. A consumed-insets provider arriving above it makes its
+                        // inset paddings read again.
+                        .consumeWindowInsets(PaddingValues()),
                 ) {
                     cardContent()
                 }

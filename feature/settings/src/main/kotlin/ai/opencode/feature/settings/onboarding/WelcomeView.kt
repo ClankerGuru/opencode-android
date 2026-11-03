@@ -15,6 +15,7 @@ import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.openCodeTapTarget
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -118,6 +119,9 @@ fun WelcomeView(
     Column(
         Modifier
             .fillMaxSize()
+            // iOS `.background(Color(.systemBackground).ignoresSafeArea())`: Show Welcome lays
+            // it over Settings and Home, which must not show through.
+            .background(OpenCodeTheme.colors.canvas)
             .statusBarsPadding()
             .navigationBarsPadding(),
     ) {

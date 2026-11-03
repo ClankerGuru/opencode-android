@@ -4,6 +4,8 @@ plugins {
 
 android {
     namespace = "ai.opencode.feature.composer"
+    // Robolectric resolves the Material Symbol drawables (ComposerFileChipTests measures the chip).
+    testOptions.unitTests.isIncludeAndroidResources = true
 }
 
 // Feature dependencies mirror iOS type references; the graph is acyclic:

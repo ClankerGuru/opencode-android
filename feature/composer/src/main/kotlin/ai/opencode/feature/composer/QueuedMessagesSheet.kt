@@ -9,6 +9,8 @@ import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.sfSymbol
+import ai.opencode.feature.media.CachedImage
+import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeQueuedInput
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
@@ -72,7 +74,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -97,6 +98,8 @@ fun QueuedMessagesSheet(
     onCancel: (String) -> Unit,
     onClose: () -> Unit,
     displayText: (String) -> String = { it },
+    /** iOS `server`: where a `media:<hash>` thumbnail loads from. */
+    server: OpenCodeServer? = null,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val reduceMotion = rememberReduceMotion()
@@ -150,6 +153,7 @@ fun QueuedMessagesSheet(
                                 onSendNow = { onSendNow(input.id) },
                                 onCopy = { onCopy(input.text) },
                                 onCancel = { onCancel(input.id) },
+                                server = server,
                             )
                             // Hairlines only between messages.
                             if (index < messages.lastIndex) HorizontalDivider(Modifier.padding(start = 50.dp))
@@ -193,6 +197,7 @@ fun QueuedMessageRow(
     onSendNow: () -> Unit,
     onCopy: () -> Unit,
     onCancel: () -> Unit,
+    server: OpenCodeServer? = null,
 ) {
     val reduceMotion = rememberReduceMotion()
     var expanded by remember { mutableStateOf(false) }
@@ -300,7 +305,7 @@ fun QueuedMessageRow(
                 }
                 val body = @Composable { modifier: Modifier ->
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = modifier.clearAndSetSemantics {}) {
-                        QueuedAttachments(input)
+                        QueuedAttachments(input, server)
                         if (text.isNotEmpty()) {
                             Text(
                                 text,
@@ -412,7 +417,7 @@ private fun QueuedRowActions(onCancel: () -> Unit, onSendNow: () -> Unit, modifi
 
 /** Image thumbnails and file or Pasted Text chips above the text. */
 @Composable
-private fun QueuedAttachments(input: OpenCodeQueuedInput) {
+private fun QueuedAttachments(input: OpenCodeQueuedInput, server: OpenCodeServer?) {
     val files = input.files
     val inline = input.input.inlineFiles
     if (input.images.isEmpty() && files.isEmpty() && inline.isEmpty()) return
@@ -420,10 +425,16 @@ private fun QueuedAttachments(input: OpenCodeQueuedInput) {
         if (input.images.isNotEmpty()) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 for (image in input.images) {
-                    AsyncImage(
-                        model = image.data,
-                        contentDescription = null,
-                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                    // iOS `CachedImage(..., compact: true)`: a `media:<hash>` photo loads from the
+                    // server, and one it no longer has shows the unavailable glyph.
+                    CachedImage(
+                        id = image.id,
+                        data = image.data,
+                        mediaHash = image.mediaHash,
+                        name = image.name,
+                        isUnavailable = image.isUnavailable,
+                        server = server,
+                        compact = true,
                         modifier = Modifier
                             .size(40.dp)
                             .clip(RoundedCornerShape(10.dp))

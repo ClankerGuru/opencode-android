@@ -404,7 +404,8 @@ class ProjectIconLoader(
 
         /** The process-wide loader behind [ProjectIconClient.liveValue]. */
         internal val shared: ProjectIconLoader by lazy {
-            val context = AppContext.liveValue
+            // The installed root's context: AppContext's own liveValue only throws.
+            val context = dependency(AppContext)
             val transport = dependency(OpenCodeTransport)
             val client = transport.request.newBuilder()
                 .connectTimeout(10, TimeUnit.SECONDS)

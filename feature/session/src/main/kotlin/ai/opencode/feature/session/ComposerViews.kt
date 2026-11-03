@@ -12,7 +12,19 @@ import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.RollingNumber
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.openCodeTapTarget
+import ai.opencode.feature.composer.ComposerTextInputTunables
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.snap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -118,6 +130,20 @@ object ComposerTunables {
     const val expandedTopInset = 16f
     const val expandedRowGap = 12f
     const val pillGap = 10f
+    /** New Plus Menu: the attachment tiles sit this far from the surface's top and leading edges (f0670c5d). */
+    const val attachmentInset = 19f
+    /** New Plus Menu's Send while the composer is empty (iOS `emptySendOpacity`). */
+    const val emptySendOpacity = 0.3f
+    /** New Plus Menu's Send crossfade between empty and ready, in seconds (iOS `sendFade`). */
+    const val sendFade = 0.15
+    /** New Plus Menu: the attachment row's height change as the location card arrives or leaves. */
+    val attachmentResize = MotionSpring(0.4, 0.0)
+
+    /** New Plus Menu's tile corners: concentric with the composer's, [attachmentInset] in. */
+    val attachmentRadius: Float get() = max(cornerRadius - attachmentInset, 6f)
+
+    /** iOS `attachmentRadius(plusMenu:)`: off, the row keeps main's 22. */
+    fun attachmentRadius(plusMenu: Boolean): Float = if (plusMenu) attachmentRadius else 22f
 
     const val plusOffset = 28f
     /** Nudges the + glyph's ink inside its target (OC-477). */
@@ -135,10 +161,6 @@ object ComposerTunables {
     const val micScale = 17f
     const val trailingSpacing = 4f
     const val leadingSpacing = 9f
-    const val rowRevealIn = 0.22
-    const val rowRevealOut = 0.14
-    const val rowRevealDelay = 0.04
-    const val rowRevealBlur = 4f
     const val swipeUpDistance = 18f
     const val swipeUpVelocity = 260f
 
@@ -165,10 +187,10 @@ object ComposerLayoutMetrics {
     val expandedRowGap: Float get() = ComposerTunables.expandedRowGap
     val configuredRowHeight: Float get() = max(32f, ComposerTunables.barHeight - 2 * ComposerTunables.innerVertical)
 
-    fun inputX(expanded: Boolean, inline: ComposerLayoutInline?): Float {
+    fun inputX(progress: Float, inline: ComposerLayoutInline?): Float {
         // On the request panel's edge: titles 12 dp after the marks, or the panel's 20 dp edge.
         if (inline != null) return if (inline.hasLeading) 48f else 14f
-        return if (expanded) expandedTextInset else collapsedTextInset
+        return collapsedTextInset + (expandedTextInset - collapsedTextInset) * progress
     }
 
     /** Above and below the inline field's lines, so one line centres on the controls. */
@@ -180,12 +202,16 @@ object ComposerLayoutMetrics {
  * their placement changes, so keyboard focus never moves to a replacement field. Provides
  * [ComposerFoldTop] where the control row starts, so a folded [ComposerFoldLayout] keeps only it.
  *
+ * [progress] is the row's expansion, 0 collapsed … 1 expanded, read frame by frame from the
+ * keyboard morph (iOS `KeyboardDrivenComposerLayout`); the field insets its first line by
+ * `expandedTopInset` × progress itself (`topInsetFraction`), so its lines are measured without it.
+ *
  * Android: control slots are measured at least 48 dp tall (touch targets) and centre on the
  * 44 dp visual row, overhanging it by 2 dp each side, as iOS's targets do past its glass.
  */
 @Composable
 fun ComposerLayout(
-    expanded: Boolean,
+    progress: () -> Float,
     inline: ComposerLayoutInline?,
     input: @Composable () -> Unit,
     leading: @Composable () -> Unit,
@@ -193,16 +219,20 @@ fun ComposerLayout(
     modifier: Modifier = Modifier,
 ) {
     Layout(contents = listOf(input, leading, trailing), modifier = modifier) { (inputs, leadings, trailings), constraints ->
+        val p = if (inline != null) 0f else progress().coerceIn(0f, 1f)
+        val expanded = p > 0f
         val width = if (constraints.hasBoundedWidth) constraints.maxWidth else 320.dp.roundToPx()
         val px = { v: Float -> v.dp.toPx() }
         val trailingPlaceable = trailings.map { it.measure(Constraints()) }
         val trailingWidth = trailingPlaceable.maxOfOrNull { it.width } ?: 0
-        val inputX = px(ComposerLayoutMetrics.inputX(expanded, inline))
+        val inputX = px(ComposerLayoutMetrics.inputX(p, inline))
         val collapsedRightPad = px(ComposerLayoutMetrics.collapsedTextInset) + px(4f)
-        val inputWidth = when {
-            inline != null -> width - inputX - px(4f) - trailingWidth
-            expanded -> width - 2 * px(ComposerLayoutMetrics.expandedTextInset)
-            else -> width - collapsedRightPad - trailingWidth
+        val collapsedWidth = width - collapsedRightPad - trailingWidth
+        val expandedWidth = width - inputX - px(ComposerLayoutMetrics.expandedTextInset)
+        val inputWidth = if (inline != null) {
+            width - inputX - px(4f) - trailingWidth
+        } else {
+            collapsedWidth + (expandedWidth - collapsedWidth) * p
         }.roundToInt().coerceAtLeast(0)
         val inputPlaceable = inputs.map { it.measure(Constraints(minWidth = inputWidth, maxWidth = inputWidth)) }
         val inputHeight = inputPlaceable.maxOfOrNull { it.height } ?: 0
@@ -212,31 +242,31 @@ fun ComposerLayout(
         val targetHeight = max(48.dp.roundToPx(), controls.roundToInt())
         val leadingWidth = if (inline == null) max(px(44f), width - trailingWidth - px(4f)).roundToInt() else 48.dp.roundToPx()
         val leadingPlaceable = leadings.map { it.measure(Constraints(maxWidth = leadingWidth, maxHeight = targetHeight)) }
-        val trailingPlaced = trailingPlaceable
-        val height = when {
-            inline != null -> max(controls, inputHeight + 2 * inlinePad)
-            expanded -> inputHeight + px(ComposerLayoutMetrics.expandedRowGap) + controls
-            else -> max(inputHeight.toFloat(), controls)
+        // The field's lines, without the top inset it adds itself as the row opens.
+        val topInset = ComposerTextInputTunables.expandedTopInset.toPx()
+        val lines = if (inline != null) inputHeight.toFloat() else inputHeight - topInset * p
+        val height = if (inline != null) {
+            max(controls, inputHeight + 2 * inlinePad)
+        } else {
+            val collapsed = max(lines, controls)
+            val open = lines + topInset + px(ComposerLayoutMetrics.expandedRowGap) + controls
+            collapsed + (open - collapsed) * p
         }.roundToInt()
         // Folded for dictation, the composer keeps only the control row.
-        val foldTop: Int? = when {
-            inline != null -> (height - controls).roundToInt()
-            expanded -> (inputHeight + px(ComposerLayoutMetrics.expandedRowGap)).roundToInt()
-            else -> null
-        }
-        val lines: Map<androidx.compose.ui.layout.AlignmentLine, Int> = if (foldTop != null) mapOf(ComposerFoldTop to foldTop) else emptyMap()
-        layout(width, height, lines) {
+        val foldTop: Int? = if (expanded || inline != null) (height - controls).roundToInt() else null
+        val alignment: Map<androidx.compose.ui.layout.AlignmentLine, Int> = if (foldTop != null) mapOf(ComposerFoldTop to foldTop) else emptyMap()
+        layout(width, height, alignment) {
             val controlsY = height - controls / 2
-            val inputY = when {
-                inline != null -> height - inlinePad - inputHeight
-                expanded -> 0f
-                else -> height / 2f - inputHeight / 2f
+            val inputY = if (inline != null) {
+                height - inlinePad - inputHeight
+            } else {
+                (controls - lines) / 2 * (1 - p)
             }
             inputPlaceable.forEach { it.place(inputX.roundToInt(), inputY.roundToInt()) }
             // The leading row ends 4 dp short of the trailing control: a mic at either end sits in
             // the slot the dictation bar's ■ takes, so tapping it changes nothing's place.
             leadingPlaceable.forEach { it.place(0, (controlsY - it.height / 2f).roundToInt()) }
-            trailingPlaced.forEach { it.place(width - it.width, (controlsY - it.height / 2f).roundToInt()) }
+            trailingPlaceable.forEach { it.place(width - it.width, (controlsY - it.height / 2f).roundToInt()) }
         }
     }
 }
@@ -402,7 +432,9 @@ data class ComposerControls(
             canSend: Boolean,
             expanded: Boolean,
             canCall: Boolean = false,
+            /** New Plus Menu: an empty composer keeps a dimmed Send in its place instead of the mic. */
             keepsSendVisible: Boolean = false,
+            /** New Plus Menu: a call owns the audio, so the tray has the call controls. */
             isInCall: Boolean = false,
         ): ComposerControls {
             val dictation = if (isDictating || isFinishing) DictationControls(isFinishing) else null
@@ -469,53 +501,6 @@ fun ComposerHidden(
         Modifier.alpha(alpha.value)
     }
     Box(modifier.then(folded)) { content() }
-}
-
-/**
- * iOS `ComposerAccessoryRow`: the expanded composer's bottom accessory row (model chip and the
- * leading secondary mic). Mounted through the collapse so it fades and blurs out riding the edge,
- * then unmounted so collapsed controls leave TalkBack. A new [screen] resets it without motion.
- */
-@Composable
-fun ComposerAccessoryRow(
-    isExpanded: Boolean,
-    screen: Int,
-    recording: Boolean,
-    modifier: Modifier = Modifier,
-    revealed: @Composable () -> Unit,
-    trailing: @Composable () -> Unit,
-) {
-    val reduceMotion = rememberReduceMotion()
-    // Keyed by the screen: switching sessions resets the gate (iOS `reset(to:)`).
-    val progress = remember(screen) { Animatable(if (isExpanded) 1f else 0f) }
-    var mounted by remember(screen) { mutableStateOf(isExpanded) }
-    LaunchedEffect(isExpanded, screen) {
-        if (isExpanded) {
-            mounted = true
-            progress.animateTo(
-                1f,
-                Motion.easeOut(ComposerTunables.rowRevealIn, if (reduceMotion) 0.0 else ComposerTunables.rowRevealDelay, reduceMotion),
-            )
-        } else {
-            progress.animateTo(0f, Motion.easeOut(ComposerTunables.rowRevealOut, reduceMotion = reduceMotion))
-            mounted = false
-        }
-    }
-    if (!mounted) return
-    val rowAlpha by androidx.compose.animation.core.animateFloatAsState(
-        if (recording) 0f else 1f,
-        Motion.easeOut(if (recording) Motion.fadeFast else Motion.fadeStandard, reduceMotion = reduceMotion),
-        label = "accessoryRowFade",
-    )
-    val interactive = isExpanded && !recording
-    val gate = if (interactive) Modifier else Modifier.clearAndSetSemantics { }.blockTouches()
-    Row(modifier.alpha(rowAlpha).then(gate), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.motionBlurReveal(progress.value, maxBlur = ComposerTunables.rowRevealBlur.dp, reduceMotion = reduceMotion)) { revealed() }
-        Box(
-            Modifier.weight(1f).motionBlurReveal(progress.value, maxBlur = ComposerTunables.rowRevealBlur.dp, reduceMotion = reduceMotion),
-            contentAlignment = Alignment.CenterEnd,
-        ) { trailing() }
-    }
 }
 
 /** Swallows every touch aimed at this element (iOS `.allowsHitTesting(false)` over controls). */
@@ -806,3 +791,60 @@ fun ComposerBanner(
 }
 
 // endregion
+
+/**
+ * iOS `HorizontalScrollEdgeFade`: fades a horizontal list's leading and trailing edges, each only
+ * while content runs past it, instead of clipping hard.
+ */
+@Composable
+fun Modifier.horizontalScrollEdgeFade(state: LazyListState, width: Dp = 20.dp, isEnabled: Boolean = true): Modifier {
+    if (!isEnabled) return this
+    val fade = tween<Float>(150, easing = FastOutSlowInEasing)
+    val leading by animateFloatAsState(if (state.canScrollBackward) 1f else 0f, fade, label = "edgeFadeLeading")
+    val trailing by animateFloatAsState(if (state.canScrollForward) 1f else 0f, fade, label = "edgeFadeTrailing")
+    return graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+        .drawWithContent {
+            drawContent()
+            val edge = width.toPx().coerceAtMost(size.width / 2)
+            if (leading > 0f) {
+                drawRect(
+                    Brush.horizontalGradient(0f to Color.Black.copy(alpha = 1f - leading), 1f to Color.Black, startX = 0f, endX = edge),
+                    size = Size(edge, size.height),
+                    blendMode = BlendMode.DstIn,
+                )
+            }
+            if (trailing > 0f) {
+                drawRect(
+                    Brush.horizontalGradient(0f to Color.Black, 1f to Color.Black.copy(alpha = 1f - trailing), startX = size.width - edge, endX = size.width),
+                    topLeft = Offset(size.width - edge, 0f),
+                    size = Size(edge, size.height),
+                    blendMode = BlendMode.DstIn,
+                )
+            }
+        }
+}
+
+/**
+ * iOS `ComposerSendLabel`: New Plus Menu's one fixed Send. The enabled disc and arrow are composited
+ * before dimming, so the arrow stays its colour as the empty button fades to [ComposerTunables.emptySendOpacity].
+ */
+@Composable
+fun ComposerSendLabel(enabled: Boolean, showsProgress: Boolean, visualOffsetX: Float, modifier: Modifier = Modifier) {
+    val reduceMotion = rememberReduceMotion()
+    val alpha by animateFloatAsState(
+        if (enabled) 1f else ComposerTunables.emptySendOpacity,
+        if (reduceMotion) snap() else tween((ComposerTunables.sendFade * 1000).toInt(), easing = FastOutSlowInEasing),
+        label = "sendLabelAlpha",
+    )
+    ComposerControlLabel(
+        systemImage = "arrow.up",
+        showsProgress = showsProgress,
+        foreground = OpenCodeTheme.colors.sendButtonForeground,
+        background = OpenCodeTheme.colors.sendButtonBackground,
+        visualOffsetX = visualOffsetX,
+        modifier = modifier.graphicsLayer {
+            this.alpha = alpha
+            compositingStrategy = CompositingStrategy.ModulateAlpha
+        },
+    )
+}

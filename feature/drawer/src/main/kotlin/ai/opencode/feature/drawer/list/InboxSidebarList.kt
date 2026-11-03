@@ -102,6 +102,25 @@ internal fun InboxSidebarList(
         }
     }
     val listState = rememberLazyListState()
+    // As in DrawerListView: a list resting at its top stays there when a row arrives above the
+    // first one (the archive error, Catch Up, a session that just got busy), as iOS's List keeps
+    // its zero offset; LazyColumn would keep the old first row anchored by key and leave the new
+    // ones scrolled under the header.
+    val restsAtTop = remember { booleanArrayOf(true) }
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0 }
+            .collect { restsAtTop[0] = it }
+    }
+    val firstKey = when {
+        archiveError != null -> "inbox-error"
+        catchUpCount > 0 -> "inbox-catch-up"
+        else -> rows.firstOrNull()?.id
+    }
+    val shownFirstKey = remember { arrayOfNulls<String>(1) }
+    if (shownFirstKey[0] != firstKey) {
+        if (shownFirstKey[0] != null && restsAtTop[0]) listState.requestScrollToItem(0, 0)
+        shownFirstKey[0] = firstKey
+    }
     val density = LocalDensity.current
     // The header's edge follows how far rows have scrolled beneath the title.
     LaunchedEffect(listState, headerScroll) {
@@ -205,11 +224,20 @@ private fun InboxSidebarSwipeRow(
         },
         onDismiss = { value ->
             when (value) {
-                SwipeToDismissBoxValue.StartToEnd -> onMarkRead()
-                SwipeToDismissBoxValue.EndToStart -> onArchive()
+                SwipeToDismissBoxValue.StartToEnd -> {
+                    onMarkRead()
+                    scope.launch { swipe.reset() }
+                }
+                // Settle before archiving. The row leaves at once, which cancels an animated
+                // reset, and the swipe state is saveable per row key: if the archive fails the row
+                // returns still dismissed, and SwipeToDismissBox calls onDismiss again for it, so
+                // a failing archive retried forever, buzzing an error haptic each time.
+                SwipeToDismissBoxValue.EndToStart -> scope.launch {
+                    swipe.snapTo(SwipeToDismissBoxValue.Settled)
+                    onArchive()
+                }
                 SwipeToDismissBoxValue.Settled -> Unit
             }
-            scope.launch { swipe.reset() }
         },
     ) {
         Box(
@@ -256,7 +284,9 @@ internal fun InboxSidebarRowView(row: InboxSidebarRow, now: Instant, modifier: M
                 .size(8.dp)
                 .background(if (row.unread) colors.accent else Color.Transparent, CircleShape),
         )
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            // iOS: Text + Spacer(minLength: 8) + age. The title takes all the width the age
+            // leaves (a second weighted spacer would cap it at half), so the age stays trailing.
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     row.title,
@@ -265,9 +295,9 @@ internal fun InboxSidebarRowView(row: InboxSidebarRow, now: Instant, modifier: M
                     color = colors.text,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
+                    modifier = Modifier.weight(1f),
                 )
-                Spacer(Modifier.weight(1f).width(8.dp))
+                Spacer(Modifier.width(8.dp))
                 Text(age, style = OpenCodeTextStyles.footnote.copy(fontFeatureSettings = "tnum"), color = colors.secondaryText)
             }
             row.project?.let { project ->
