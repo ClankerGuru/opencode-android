@@ -44,6 +44,8 @@ class FloatingCallStageFeature : Reducer<FloatingCallStageFeature.State, Floatin
         val stage: FloatingCallStage = FloatingCallStage.orb,
         /** The stage a drag in progress would settle on if let go now. */
         val dragTarget: FloatingCallStage? = null,
+        /** A call row's request (a screen or link) is up above the composer: the orb stays an orb, so nothing grows over it. */
+        val isHeld: Boolean = false,
     )
 
     sealed interface Action {
@@ -83,7 +85,7 @@ class FloatingCallStageFeature : Reducer<FloatingCallStageFeature.State, Floatin
         val haptics = dependency(HapticsClient)
         return when (action) {
             Action.OrbTapped -> {
-                if (state.stage != FloatingCallStage.orb || state.dragTarget != null) return Reduced(state)
+                if (state.stage != FloatingCallStage.orb || state.dragTarget != null || state.isHeld) return Reduced(state)
                 haptics.play(Haptic.tap)
                 Reduced(state.copy(stage = FloatingCallStage.card))
             }
@@ -92,7 +94,7 @@ class FloatingCallStageFeature : Reducer<FloatingCallStageFeature.State, Floatin
                 val previous = state.stage.previous ?: return Reduced(state)
                 Reduced(state.copy(dragTarget = null, stage = previous))
             }
-            Action.DragBegan -> Reduced(state.copy(dragTarget = state.stage))
+            Action.DragBegan -> if (state.isHeld) Reduced(state) else Reduced(state.copy(dragTarget = state.stage))
             is Action.DragCrossed -> {
                 val target = state.dragTarget
                 if (target == null || target == action.stage) return Reduced(state)
@@ -101,11 +103,14 @@ class FloatingCallStageFeature : Reducer<FloatingCallStageFeature.State, Floatin
             }
             is Action.DragEnded -> {
                 val cleared = state.copy(dragTarget = null)
-                if (action.stage == state.stage) return Reduced(cleared)
+                if (action.stage == state.stage || (state.isHeld && action.stage != FloatingCallStage.orb)) return Reduced(cleared)
                 haptics.play(Haptic.snap)
                 Reduced(cleared.copy(stage = action.stage))
             }
-            is Action.Requested -> Reduced(state.copy(dragTarget = null, stage = action.stage))
+            is Action.Requested -> {
+                if (state.isHeld && action.stage != FloatingCallStage.orb) return Reduced(state)
+                Reduced(state.copy(dragTarget = null, stage = action.stage))
+            }
             Action.RequestDocked, Action.KeyboardRose -> {
                 if (state.stage == FloatingCallStage.orb || state.dragTarget != null) return Reduced(state)
                 Reduced(state.copy(stage = FloatingCallStage.orb))

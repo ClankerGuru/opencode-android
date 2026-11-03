@@ -2,6 +2,8 @@ package ai.opencode.feature.voice
 
 import ai.opencode.core.dependencies.*
 import ai.opencode.core.log.AppLog
+import ai.opencode.core.sharing.ExperimentalFeature
+import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
 import android.Manifest
@@ -13,16 +15,16 @@ import android.media.audiofx.*
 import android.os.Handler
 import android.os.Looper
 import android.os.Process
-import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.receiveAsFlow
-import kotlinx.coroutines.sync.withLock
 import java.io.File
 import java.util.UUID
 import kotlin.math.*
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.sync.withLock
 
 object VoiceAudioRoute {
     val externalOutputPorts = setOf(AudioDeviceInfo.TYPE_WIRED_HEADSET, AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
@@ -199,6 +201,8 @@ class VoiceAudioEngine(
     @Volatile private var externalControl = externalControl
     private val id = dependency(UuidClient).next()
     private val holder = owner.holder(session::deactivate)
+    /** Audio in Calls: the music player, attached only while that experiment is on. */
+    @Volatile private var callAudio: CallAudioPlayer? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val control = kotlinx.coroutines.sync.Mutex()
     private val lock = Any()
@@ -291,6 +295,10 @@ class VoiceAudioEngine(
                 holder.withActive { if (!externalOwner) startHardwareThreads() }
                 currentCoroutineContext().ensureActive()
                 startQualityReports()
+                // Audio in Calls: an agent's track plays on this call's route until it stops.
+                if (dependency(ExperimentalFeatures)(ExperimentalFeature.audioInCalls)) {
+                    callAudio = CallAudioPlayer.shared.also { it.attach(id, demo) }
+                }
             }
             // One ordered queue, so the loop has let go before the connect cue plays.
             val commands = Channel<CueCommand>(Channel.UNLIMITED)
@@ -307,7 +315,7 @@ class VoiceAudioEngine(
         }
         } catch (error: Throwable) {
             withContext(NonCancellable + Dispatchers.IO) {
-                running = false; alive = false; releaseHardware(); session.unobserve(id)
+                running = false; alive = false; callAudio?.detach(id); releaseHardware(); session.unobserve(id)
                 sounds.endCallClock(id, false); sounds.cancelPendingStart()
                 holder.release(); capture.close(); events.close(); scope.cancel()
             }
@@ -418,6 +426,7 @@ class VoiceAudioEngine(
             while (isActive) {
                 clock.sleep(VoiceAudioQuality.window); reportQuality()
                 levels.takeEchoWindow()?.let { note(VoiceCallLog.Note.Kind.audio, it) }
+                callAudio?.takeLeakWindow()?.let { note(VoiceCallLog.Note.Kind.audio, it) }
             }
         }
     }
@@ -640,6 +649,7 @@ class VoiceAudioEngine(
             synchronized(lock) { cueJobs.toList() }.forEach { it.cancel() }
             val loop = loopSamples; stopLoopTrack(); loopSamples = loop
             externalControl?.interrupted(true)
+            callAudio?.interrupted(id, true)
             note(VoiceCallLog.Note.Kind.audio, "⚠︎ Audio interrupted (another app or call took it)")
             levels.reset(); events.trySend(VoiceAudioEvent.interrupted)
         } else {
@@ -653,6 +663,7 @@ class VoiceAudioEngine(
         holder.activate { session.activate(demo); session.route(atEar, demo) }
         cancelSpeakerRamp()
         holder.withActive { record?.startRecording(); synchronized(trackLock) { track?.play() }; externalControl?.interrupted(false) }
+        callAudio?.interrupted(id, false)
         interrupted = false
         loopSamples?.let { startLoop(it) }
         events.trySend(VoiceAudioEvent.resumed)
@@ -669,6 +680,7 @@ class VoiceAudioEngine(
             val playingCues = synchronized(lock) { cueJobs.toList().also { cueJobs.clear(); lastCues.fill(null) } }
             playingCues.forEach { it.cancelAndJoin() }
             stopCues()
+            callAudio?.detach(id)
             reportQuality(); releaseHardware(); session.unobserve(id); externalControl?.stop()
             capture.close(); events.close()
             renderedGaps.counter?.let { sounds.recordPlayback(VoiceCallSounds.PlaybackTelemetry(scheduledBuffers, underruns, it.gaps, (it.gapSamples / PCM.sampleRate * 1000).roundToInt())) }

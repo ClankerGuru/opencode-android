@@ -59,8 +59,10 @@ import ai.opencode.feature.transcript.TranscriptTunables
 import ai.opencode.feature.voice.CallTrayController
 import ai.opencode.feature.voice.CallTrayHost
 import ai.opencode.feature.voice.VoiceCallComposer
+import ai.opencode.feature.voice.VoiceCallRowsCard
 import ai.opencode.feature.voice.VoiceCallSurface
 import ai.opencode.feature.voice.VoiceStoreOf
+import ai.opencode.feature.voice.holdsClientToolCard
 import ai.opencode.feature.voice.hiddenUnderFloatingCall
 import ai.opencode.feature.voice.hiddenUnderVoiceTranscript
 import ai.opencode.server.model.OpenCodeProject
@@ -463,6 +465,8 @@ fun SessionComposer(
         .collectAsState(callStore?.state?.phase?.showsCard ?: false)
     val callShowsCaptions by remember(callStore) { callStore?.let { call -> call.states.map { it.showsCaptions } } ?: flowOf(false) }
         .collectAsState(callStore?.state?.showsCaptions ?: false)
+    val holdsClientToolCard by remember(callStore) { callStore?.let { call -> call.states.map { it.holdsClientToolCard } } ?: flowOf(false) }
+        .collectAsState(callStore?.state?.holdsClientToolCard ?: false)
 
     val env = SessionComposerEnv(
         store = store,
@@ -492,6 +496,7 @@ fun SessionComposer(
         voiceStore = if (floatsCall || usesCallTray || callShowsCard) null else callStore,
         floatsCall = floatsCall,
         callShowsCaptions = callShowsCaptions,
+        holdsClientToolCard = holdsClientToolCard,
         callTray = if (usesCallTray) callTray else null,
         callOwnsAudio = callStore != null && !callShowsCard,
         photoSheet = LocalSessionPhotoSheet.current?.takeIf { it.usesPlusMenuSheet },
@@ -622,6 +627,8 @@ internal class SessionComposerEnv(
     val floatsCall: Boolean = false,
     /** The call shows its transcript (iOS `callStore?.showsCaptions`). */
     val callShowsCaptions: Boolean = false,
+    /** iOS `holdsClientToolCard`: an agent's screen request or link waits on the user. */
+    val holdsClientToolCard: Boolean = false,
     /** iOS `usesCallTray ? callTray : nil`: Home's Call Tray motion while the call style is the tray. */
     val callTray: CallTrayController? = null,
     /** iOS `callOwnsAudio`: the screen's call (its own or its root's) owns audio. */
@@ -791,7 +798,7 @@ internal class SessionComposerEnv(
     }
 
     /** iOS `showsDraftProjects`: a draft lists its recent projects above the composer until its first send leaves. */
-    val showsDraftProjects: Boolean get() = s.canChooseProject && !host.isCatchUpCard
+    val showsDraftProjects: Boolean get() = s.canChooseProject && !host.isCatchUpCard && !holdsClientToolCard
 
     /** iOS `showsStarterPrompts`: the first computer's starter prompts stand above the projects until composing. */
     val showsStarterPrompts: Boolean get() = s.starterPrompts.isNotEmpty() && !isComposingDraft
@@ -957,6 +964,12 @@ private fun SessionComposerEnv.ComposerAreaContent(modifier: Modifier) {
                 }
             }
             ServerConnection()
+            // iOS `callRows`: none while the call bar's captions cover it, or a docked request's panel holds the glass.
+            VoiceCallRowsCard(
+                store = callStore,
+                hidden = (voiceStore != null && callShowsCaptions) || docksRequest,
+                reduceMotion = reducedMotion,
+            )
             // iOS `.handsGlassOver(to: photoSheet, …, sinksUnderSheet: true, pulledDown:)` and its
             // `attachmentMenuAnchorHold`: under the New Plus Menu's photo sheet the composer sinks
             // and fades, rising back with the sheet's pull; the + menu's anchors hold while it folds.
@@ -987,7 +1000,7 @@ private fun SessionComposerEnv.ComposerAreaContent(modifier: Modifier) {
                     .offset(y = -(48 + pillGap).dp),
             ) {
                 // The call's open transcript covers where it would float.
-                JumpToLatestPill(isShown = host.showsJumpButton && !showsCallTranscript, onClick = host.onJumpToLatest)
+                JumpToLatestPill(isShown = host.showsJumpButton && !showsCallTranscript && !holdsClientToolCard, onClick = host.onJumpToLatest)
             }
         }
         // A draft's recent projects stand above the composer as an overlay, so folding them, or
@@ -1074,7 +1087,7 @@ private fun SessionComposerEnv.ComposerPills() {
     val fontScale = LocalDensity.current.fontScale
     // iOS `ViewThatFits`: the row unless large text makes it overflow.
     val stacks = fontScale >= 1.8f
-    val showsJump = host.showsJumpButton
+    val showsJump = host.showsJumpButton && !holdsClientToolCard
     if (!stacks) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             if (hasActivity) BackgroundActivity()

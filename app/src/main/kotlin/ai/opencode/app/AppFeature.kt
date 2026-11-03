@@ -1,48 +1,49 @@
 package ai.opencode.app
 
-import ai.opencode.core.sharing.installHistory
-import ai.opencode.core.sound.SoundEffectsClient
-import ai.opencode.core.sharing.ExperimentalFeatures
-import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.core.store.onChange
-import ai.opencode.core.store.PresentationAction
-import ai.opencode.feature.session.SessionFeature
-import ai.opencode.feature.media.BrowserFeature
-import ai.opencode.feature.voice.VoiceCallLogClient
-import ai.opencode.feature.voice.VoiceCallServiceClient
-import ai.opencode.feature.voice.ScreenAwakeClient
-import ai.opencode.feature.system.liveactivity.VoiceLiveActivityClient
-import ai.opencode.feature.system.liveactivity.DictationLiveActivityClient
-import ai.opencode.feature.system.liveactivity.SessionLiveActivityClient
 import ai.opencode.core.dependencies.PasteboardClient
 import ai.opencode.core.dependencies.UuidClient
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.log.AppLog
+import ai.opencode.core.sharing.ExperimentalFeature
+import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.core.sharing.Shared
 import ai.opencode.core.sharing.SharedKeys
+import ai.opencode.core.sharing.installHistory
 import ai.opencode.core.sharing.shared
+import ai.opencode.core.sound.SoundEffectsClient
 import ai.opencode.core.store.Effect
+import ai.opencode.core.store.PresentationAction
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
 import ai.opencode.core.store.cancellable
 import ai.opencode.core.store.combine
 import ai.opencode.core.store.ifLet
+import ai.opencode.core.store.onChange
 import ai.opencode.core.store.scope
-import ai.opencode.feature.settings.onboarding.WelcomeFeature
 import ai.opencode.core.ui.ThisDevice
 import ai.opencode.feature.drawer.HomeConnectionFeature
 import ai.opencode.feature.drawer.HomeFeature
 import ai.opencode.feature.drawer.HomeSnapshotDate
 import ai.opencode.feature.drawer.keepingSettings
 import ai.opencode.feature.drawer.persistingSnapshot
+import ai.opencode.feature.media.BrowserFeature
+import ai.opencode.feature.session.SessionFeature
+import ai.opencode.feature.settings.onboarding.WelcomeFeature
 import ai.opencode.feature.system.NotificationDestination
 import ai.opencode.feature.system.SessionDirectory
 import ai.opencode.feature.system.SystemAction
 import ai.opencode.feature.system.SystemIntegrationClient
+import ai.opencode.feature.system.clienttools.ClientToolsFeature
+import ai.opencode.feature.system.liveactivity.DictationLiveActivityClient
+import ai.opencode.feature.system.liveactivity.SessionLiveActivityClient
+import ai.opencode.feature.system.liveactivity.VoiceLiveActivityClient
 import ai.opencode.feature.system.share.ReceivedShare
 import ai.opencode.feature.system.share.ShareInboxClient
+import ai.opencode.feature.voice.ScreenAwakeClient
+import ai.opencode.feature.voice.VoiceCallLogClient
+import ai.opencode.feature.voice.VoiceCallServiceClient
 import ai.opencode.server.CachedHomeSnapshot
 import ai.opencode.server.ConnectionFailureDetail
 import ai.opencode.server.OpenCodeClient
@@ -85,6 +86,12 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         val pasteError: String? = null,
         /** The first-run welcome, with no saved server (Welcome Preview). */
         val welcome: WelcomeFeature.State = WelcomeFeature.State(),
+        /** The phone's client tools' socket (Share Screen with Agents and the other call tools). */
+        val clientTools: ClientToolsFeature.State = ClientToolsFeature.State(),
+        /** Its second socket, for a call's delegator session in another directory. */
+        val delegatorClientTools: ClientToolsFeature.State = ClientToolsFeature.State(slot = ClientToolsFeature.State.Slot.Delegator),
+        /** Where that delegator session lives, once read. */
+        val voiceDelegatorLocation: ClientToolsLocation? = null,
         val connection: Connection = Connection.Idle,
         val connectionGeneration: Int = 0,
         val connectionAttempt: ConnectionAttempt? = null,
@@ -462,6 +469,9 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         data class CopyTextTapped(val text: String) : Action
         data class Home(val action: HomeFeature.Action) : Action
         data class Welcome(val action: WelcomeFeature.Action) : Action
+        data class ClientTools(val action: ClientToolsFeature.Action) : Action
+        data class DelegatorClientTools(val action: ClientToolsFeature.Action) : Action
+        data class VoiceDelegatorLocated(val location: ClientToolsLocation) : Action
         data class HomeResponse(val attemptID: Int, val result: Result<OpenCodeHomeSnapshot>) : Action
         /** Server Flow: the switch's server didn't answer in time. */
         data class ServerSwitchTimedOut(val attemptID: Int) : Action
@@ -506,7 +516,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
      * on-then-off can't land out of order (watched from here so leaving Home mid-call lets the
      * screen sleep again too).
      */
-    private val liveBody: Reducer<State, Action> = welcomeBody
+    private val liveBody: Reducer<State, Action> = sharingScreenWithAgents(welcomeBody)
         .onChange({ it.home?.sessionDetail?.voice?.callPresenceID }) { old, _, state ->
             if (old == null || state.home != null) return@onChange Reduced(state)
             val service = dependency(VoiceCallServiceClient)
@@ -644,7 +654,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         is Action.HomeResponse -> homeResponse(state, action)
         is Action.ServerSwitchTimedOut -> serverSwitchTimedOut(action.attemptID, state)
         is Action.Home -> home(state, action.action)
-        is Action.Welcome -> Reduced(state)
+        is Action.Welcome, is Action.ClientTools, is Action.DelegatorClientTools, is Action.VoiceDelegatorLocated -> Reduced(state)
     }
 
     /**

@@ -58,6 +58,7 @@ import ai.opencode.feature.voice.LocalDotScopeCovered
 import ai.opencode.feature.voice.VoiceStoreOf
 import ai.opencode.feature.voice.floatingCallComposer
 import ai.opencode.feature.voice.floatingCallComposerColumn
+import ai.opencode.feature.voice.holdsClientToolCard
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.OpenCodeShell
 import androidx.activity.compose.BackHandler
@@ -131,6 +132,8 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 
 // Port of iOS `Session/SessionView.swift`: the session screen scaffold. The transcript runs
 // full-bleed under the header and the composer; the header's backdrop and controls sit over its
@@ -203,6 +206,19 @@ fun SessionView(
     val floatsCall = rememberFloatsCall(callTray)
     // iOS `floatingCallCoverage(sessionLifecycle)`: what the Living Orb's card covers gives way.
     SessionFloatingCallCoverage(store, callStore, floatsCall, rememberCallPresentation(callTray) == ExperimentalCallStyle.tray, composerHost, photoSheet)
+    // iOS `clearOverClientToolCard()`: an agent's screen request or link came up, so the keyboard
+    // and the composer's panels would stand over its card.
+    val holdsClientToolCard by remember(callStore) { callStore?.let { call -> call.states.map { it.holdsClientToolCard } } ?: flowOf(false) }
+        .collectAsState(false)
+    LaunchedEffect(holdsClientToolCard) {
+        if (!holdsClientToolCard) return@LaunchedEffect
+        composerHost.dismissComposerKeyboard()
+        // Closing the + menu mustn't bring the keyboard back.
+        photoSheet.attachmentMenuRestoresFocus = false
+        showsBackgroundWork = false
+        if (photoSheet.attachmentMenu != AttachmentMenuPhase.Closed) photoSheet.closeAttachmentMenu()
+        composerHost.modelPanels?.closeModelPanels()
+    }
 
     val work by store.observe(BackgroundWorkModel::from)
     val agentScope by store.observe { "${it.server.persistenceID}|${it.session?.id ?: "draft"}" }

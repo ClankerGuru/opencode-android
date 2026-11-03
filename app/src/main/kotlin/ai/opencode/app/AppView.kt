@@ -1,16 +1,11 @@
 package ai.opencode.app
 
-import androidx.compose.runtime.collectAsState
-import ai.opencode.feature.settings.onboarding.WelcomeView
-import ai.opencode.feature.settings.onboarding.WelcomeFeature
-import ai.opencode.core.sharing.shared
-import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.core.experiments.key
 import ai.opencode.core.diagnostics.HidesFromScreenshots
+import ai.opencode.core.experiments.key
+import ai.opencode.core.sharing.ExperimentalFeature
+import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.Store
 import ai.opencode.core.store.StoreOf
-import ai.opencode.feature.media.MediaFeature
-import ai.opencode.feature.media.MediaView
 import ai.opencode.core.store.observe
 import ai.opencode.core.store.rememberScope
 import ai.opencode.core.ui.OpenCodeAppTheme
@@ -25,12 +20,18 @@ import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.ThisDevice
 import ai.opencode.feature.drawer.HomeFeature
 import ai.opencode.feature.drawer.HomeView
+import ai.opencode.feature.media.MediaFeature
+import ai.opencode.feature.media.MediaView
+import ai.opencode.feature.settings.onboarding.WelcomeFeature
+import ai.opencode.feature.settings.onboarding.WelcomeView
 import ai.opencode.feature.settings.servers.PairingScannerView
-import ai.opencode.server.friendlyName
-import androidx.compose.foundation.background
+import ai.opencode.feature.system.clienttools.ClientToolsFeature
 import ai.opencode.feature.transcript.TranscriptMediaProviders
 import ai.opencode.server.OpenCodeServer
+import ai.opencode.server.clienttools.ClientTool
+import ai.opencode.server.friendlyName
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -69,6 +70,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -91,8 +93,6 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -103,7 +103,21 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.delay
+
+/** The phone's client tools whose experiments are on (iOS `AppView.clientTools`). */
+private fun clientTools(shareScreen: Boolean, openLinks: Boolean, audio: Boolean): Set<ClientTool> {
+    val tools = mutableSetOf<ClientTool>()
+    if (ExperimentalFeature.shareScreenWithAgents.isActive(shareScreen)) tools.add(ClientTool.voiceRequestScreen)
+    if (ExperimentalFeature.openLinksFromCalls.isActive(openLinks)) tools.add(ClientTool.voiceOpenURL)
+    if (ExperimentalFeature.audioInCalls.isActive(audio)) {
+        tools.add(ClientTool.voicePlayAudio)
+        tools.add(ClientTool.voiceAudioControl)
+    }
+    return tools
+}
 
 /**
  * Port of iOS `AppView` (`OpenCode/App/AppView.swift`): Home when a server is connected, else
@@ -123,6 +137,13 @@ fun AppView(store: StoreOf<AppFeature.State, AppFeature.Action>) {
     val hasSavedServers by store.observe { it.savedServers.value.isNotEmpty() }
     val welcomePreview by remember { shared(ExperimentalFeature.welcomePreview.key).flow }.collectAsState()
     val showsWelcome = !hasSavedServers && ExperimentalFeature.welcomePreview.isActive(welcomePreview)
+    val shareScreenWithAgents by remember { shared(ExperimentalFeature.shareScreenWithAgents.key).flow }.collectAsState()
+    val openLinksFromCalls by remember { shared(ExperimentalFeature.openLinksFromCalls.key).flow }.collectAsState()
+    val audioInCalls by remember { shared(ExperimentalFeature.audioInCalls.key).flow }.collectAsState()
+    val clientTools = clientTools(shareScreenWithAgents, openLinksFromCalls, audioInCalls)
+    LaunchedEffect(store, clientTools) {
+        store.send(AppFeature.Action.ClientTools(ClientToolsFeature.Action.ToolsChanged(clientTools)))
+    }
     OpenCodeAppTheme {
         // Media's file viewer renders Markdown files with the transcript's renderer.
         TranscriptMediaProviders {

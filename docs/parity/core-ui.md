@@ -205,6 +205,7 @@ and `ellipsis` (every overflow menu) is the vertical `more_vert`, as on other An
 | `mic.fill` | `mic` (fill) | `ms_mic_fill` | `SFSymbol.MicFill` | DictationLiveActivity, DictationViews, FloatingCall, VoiceCallLiveActivity, VoiceView, WhatsNewList |
 | `mic.slash` | `mic_off` | `ms_mic_off` | `SFSymbol.MicSlash` | CallTrayViews |
 | `mic.slash.fill` | `mic_off` (fill) | `ms_mic_off_fill` | `SFSymbol.MicSlashFill` | FloatingCall, VoiceCallLiveActivity, VoiceView |
+| `music.note` | `music_note` | `ms_music_note` | `SFSymbol.MusicNote` | Audio in Calls (Experimental), VoiceCallRows |
 | `minus.circle.fill` | `do_not_disturb_on` (fill) | `ms_do_not_disturb_on_fill` | `SFSymbol.MinusCircleFill` | AppView |
 | `moon.zzz` | `bedtime` | `ms_bedtime` | `SFSymbol.MoonZzz` | ServerTitleView |
 | `network` | `public` | `ms_public` | `SFSymbol.Network` | AppLog, MetricKitClient, ServerTitleView, WhatsNewList |

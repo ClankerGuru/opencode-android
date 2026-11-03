@@ -928,7 +928,9 @@ private class FloatingCallSurfaceModel(
     }
 
     private fun beginDrag(location: Offset, translation: Offset, geometry: FloatingCallStageGeometry) {
-        dragMode = if (abs(translation.y) > abs(translation.x)) FloatingCallDragMode.stage else FloatingCallDragMode.ignored
+        // Held at the orb by a call row's request: a drag only moves it.
+        val vertical = abs(translation.y) > abs(translation.x)
+        dragMode = if (vertical && !store.state.floatingStage.isHeld) FloatingCallDragMode.stage else FloatingCallDragMode.ignored
         hideTag()
         if (dragMode != FloatingCallDragMode.stage) return
         bloomMounted = true
@@ -944,8 +946,10 @@ private class FloatingCallSurfaceModel(
         dragNearest = null
         if (mode != FloatingCallDragMode.stage) return
         val settled = stageGeometry().settle(motion.progress, velocityY.toDouble())
-        send(FloatingCallStageFeature.Action.DragEnded(settled.stage))
-        motion.endDrag(settled.stage, settled.velocity, reduceMotion)
+        // A request that came up mid-drag holds it at the orb.
+        val stage = if (store.state.floatingStage.isHeld) FloatingCallStage.orb else settled.stage
+        send(FloatingCallStageFeature.Action.DragEnded(stage))
+        motion.endDrag(stage, settled.velocity, reduceMotion)
     }
 
     companion object {
@@ -960,7 +964,7 @@ private fun floatingCallMood(state: VoiceFeature.State): FloatingCallMood = when
     VoiceFeature.State.Phase.Ended, VoiceFeature.State.Phase.Dropped, is VoiceFeature.State.Phase.Failed -> FloatingCallMood.ended
     else -> when {
         state.isReconnecting -> FloatingCallMood.connecting
-        state.targetNeedsInput -> FloatingCallMood.needsInput
+        state.targetNeedsInput || state.holdsClientToolCard -> FloatingCallMood.needsInput
         state.isWorking -> FloatingCallMood.thinking
         else -> FloatingCallMood.live
     }

@@ -104,12 +104,16 @@ class ExperimentalFeatureTests {
             listOf(
                 ExperimentalFeature.callTray, ExperimentalFeature.livingOrb, ExperimentalFeature.serverVoice,
                 ExperimentalFeature.backgroundCallIntent, ExperimentalFeature.voiceSessionDelegator,
+                ExperimentalFeature.shareScreenWithAgents, ExperimentalFeature.openLinksFromCalls, ExperimentalFeature.audioInCalls,
             ),
             ExperimentalGroup.calls.features,
         )
         assertEquals(
             "Call Style writes the other two",
-            listOf(ExperimentalFeature.serverVoice, ExperimentalFeature.backgroundCallIntent, ExperimentalFeature.voiceSessionDelegator),
+            listOf(
+                ExperimentalFeature.serverVoice, ExperimentalFeature.backgroundCallIntent, ExperimentalFeature.voiceSessionDelegator,
+                ExperimentalFeature.shareScreenWithAgents, ExperimentalFeature.openLinksFromCalls, ExperimentalFeature.audioInCalls,
+            ),
             ExperimentalGroup.calls.toggles,
         )
         assertEquals(listOf(ExperimentalFeature.imageLinkPreviews, ExperimentalFeature.inAppBrowser), ExperimentalGroup.transcript.features)

@@ -74,6 +74,12 @@ enum class ExperimentalFeature(
         "voice-session-delegator", "OpenCode Session Delegator", ExperimentalGroup.calls, "Delegate calls to an OpenCode session",
         "bubble.left.and.bubble.right", order = 190,
     ),
+    shareScreenWithAgents(
+        "share-screen-with-agents", "Share Screen with Agents", ExperimentalGroup.calls, "Agents may ask to see it",
+        "rectangle.on.rectangle", order = 200,
+    ),
+    openLinksFromCalls("open-links-from-calls", "Open Links from Calls", ExperimentalGroup.calls, "Agents may open links", "arrow.up.forward.app", order = 210),
+    audioInCalls("audio-in-calls", "Audio in Calls", ExperimentalGroup.calls, "Agents can play music on calls", "music.note", order = 220),
 
     // Removed on iOS; kept only until the modules that still read them port the removal.
 

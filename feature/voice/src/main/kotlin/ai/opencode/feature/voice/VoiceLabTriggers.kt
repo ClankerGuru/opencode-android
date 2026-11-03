@@ -19,6 +19,16 @@ enum class VoiceLabTrigger(val rawValue: String) {
 
     /** A hang-up from outside the call's own controls, such as the ongoing notification's End or the agent ending the call. */
     endCall("ai.opencode.lab.voice-end"),
+
+    /** An agent's `android_voice_play_audio` (Audio in Calls), with the lab's silent player. */
+    playAudio("ai.opencode.lab.voice-play-audio"),
+
+    /**
+     * Android only: an agent's `android_voice_request_screen` and `android_voice_open_url`, so the
+     * emulator can show their cards (session-lab has no client MCP socket).
+     */
+    requestScreen("ai.opencode.lab.voice-request-screen"),
+    openLink("ai.opencode.lab.voice-open-link"),
     ;
 
     /** iOS `notification`: `Notification.Name("OpenCodeLab." + rawValue)`. */

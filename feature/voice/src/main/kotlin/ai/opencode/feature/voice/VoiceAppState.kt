@@ -7,6 +7,7 @@ import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.diagnostics.CredentialSurface
 import ai.opencode.core.diagnostics.DiagnosticsRecorder
 import ai.opencode.core.diagnostics.ProblemReportDevice
+import ai.opencode.core.diagnostics.ScreenshotPolicy
 import ai.opencode.core.log.AppLog
 import ai.opencode.server.friendlyName
 import ai.opencode.server.model.OpenCodeOutgoingAttachment
@@ -18,15 +19,15 @@ import android.os.Handler
 import android.os.Looper
 import android.view.PixelCopy
 import android.view.WindowManager
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.time.Instant
 import java.util.UUID
 import kotlin.coroutines.resume
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 
 /**
  * Port of iOS `VoiceAppState`: what the app showed when the voice delegator took a screenshot
@@ -279,7 +280,15 @@ object VoiceAppLog {
  * delegator's `capture_app_screenshot`: the call's activity window, never the device screen,
  * another app, or another of the app's windows.
  */
-class VoiceScreenshotClient(val capture: suspend () -> Result) {
+class VoiceScreenshotClient(
+    /**
+     * The same window for an agent the person shared it with (`voice_request_screen`), under
+     * problem reports' stricter rule: Settings and What's New are refused too. First, so the
+     * trailing lambda stays [capture].
+     */
+    val captureShared: suspend () -> Result = { Result.Failed(Failure.noWindow) },
+    val capture: suspend () -> Result,
+) {
     data class Capture(
         val jpeg: ByteArray,
         val screen: String?,
@@ -315,16 +324,17 @@ class VoiceScreenshotClient(val capture: suspend () -> Result) {
             val registry = dependency(VoiceScreenActivityRegistry)
             // iOS `ScreenCaptureFeedback.capture(in: VoiceScreenshot.scene())`: a taken picture
             // flashes the activity it drew and plays the shutter; a refused one shows nothing.
-            VoiceScreenshotClient {
+            suspend fun capture(policy: ScreenshotPolicy): Result {
                 val scene = VoiceScreenshot.scene(registry)
                 var failed: Result? = null
-                ScreenCaptureFeedback.captureOptional(scene) {
-                    when (val result = VoiceScreenshot.capture(registry)) {
+                return ScreenCaptureFeedback.captureOptional(scene) {
+                    when (val result = VoiceScreenshot.capture(registry, policy)) {
                         is Result.Taken -> result
                         is Result.Failed -> { failed = result; null }
                     }
                 } ?: failed ?: Result.Failed(Failure.noWindow)
             }
+            VoiceScreenshotClient(captureShared = { capture(ScreenshotPolicy.problemReport) }) { capture(ScreenshotPolicy.voice) }
         }
         override val testValue = VoiceScreenshotClient { Result.Failed(Failure.noWindow) }
     }
@@ -359,10 +369,10 @@ object VoiceScreenshot {
         return if (indices.size == 1) indices[0] to null else null to VoiceScreenshotClient.Failure.severalWindows
     }
 
-    suspend fun capture(registry: VoiceScreenActivityRegistry): VoiceScreenshotClient.Result {
+    suspend fun capture(registry: VoiceScreenActivityRegistry, policy: ScreenshotPolicy = ScreenshotPolicy.voice): VoiceScreenshotClient.Result {
         val (activity, failure) = pickedScene(registry)
         if (failure != null || activity == null) return VoiceScreenshotClient.Result.Failed(failure ?: VoiceScreenshotClient.Failure.noWindow)
-        return capture(activity)
+        return capture(activity, policy)
     }
 
     /** The activity [capture] draws, for its flash (`ScreenCaptureFeedback`); null when it would refuse. */
@@ -381,13 +391,16 @@ object VoiceScreenshot {
         return activities[index] to null
     }
 
-    /** One window's picture, refused while a credential shows (`ScreenshotPolicy.voice`). */
-    private suspend fun capture(activity: Activity): VoiceScreenshotClient.Result {
+    /**
+     * One window's picture, refused while a surface [policy] skips shows: the credential sheets
+     * always, Settings and What's New only under `.problemReport` (a shared screen).
+     */
+    private suspend fun capture(activity: Activity, policy: ScreenshotPolicy): VoiceScreenshotClient.Result {
         val window = activity.window ?: return VoiceScreenshotClient.Result.Failed(VoiceScreenshotClient.Failure.noWindow)
         val view = window.decorView
         if (view.width <= 0 || view.height <= 0) return VoiceScreenshotClient.Result.Failed(VoiceScreenshotClient.Failure.noWindow)
         val secure = window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0
-        if (CredentialSurface.visible > 0 || secure) return VoiceScreenshotClient.Result.Failed(VoiceScreenshotClient.Failure.credentials)
+        if (policy.markedSurfaces(CredentialSurface.marks) > 0 || secure) return VoiceScreenshotClient.Result.Failed(VoiceScreenshotClient.Failure.credentials)
         val full = withContext(Dispatchers.Main) {
             val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
             val copied = suspendCancellableCoroutine { continuation ->

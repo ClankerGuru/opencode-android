@@ -94,6 +94,12 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
         val showsCaptions: Boolean = false,
         /** How far the floating call (Living Orb) has grown: orb, card or sheet. */
         val floatingStage: FloatingCallStageFeature.State = FloatingCallStageFeature.State(),
+        /** An agent asking to see the screen (Share Screen with Agents). */
+        val screenRequest: VoiceScreenRequestFeature.State = VoiceScreenRequestFeature.State(),
+        /** An agent asking to open a link on the phone (Open Links from Calls). */
+        val openLink: VoiceOpenLinkFeature.State = VoiceOpenLinkFeature.State(),
+        /** Music or a clip an agent plays on the call (Audio in Calls). */
+        val callAudio: VoiceCallAudioFeature.State = VoiceCallAudioFeature.State(),
         /** Another app or call took the audio; the bar shows a pause glyph until it's back. */
         val isAudioInterrupted: Boolean = false,
         /** The call is moving to a new connection and it has taken over a second. */
@@ -661,6 +667,9 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
         data object CaptionsTapped : Action
         data object CaptionsDismissed : Action
         data class FloatingStage(val action: FloatingCallStageFeature.Action) : Action
+        data class ScreenRequest(val action: VoiceScreenRequestFeature.Action) : Action
+        data class OpenLink(val action: VoiceOpenLinkFeature.Action) : Action
+        data class CallAudio(val action: VoiceCallAudioFeature.Action) : Action
         data class ServerVoiceSupportUpdated(val support: ServerVoiceSupport) : Action
         data class CallRouteResolved(
             val route: VoiceRoute,
@@ -769,11 +778,14 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
 
     private val timeline = VoiceTimeline()
     private val floatingStage = FloatingCallStageFeature()
+    private val screenRequest = VoiceScreenRequestFeature()
+    private val openLink = VoiceOpenLinkFeature()
+    private val callAudio = VoiceCallAudioFeature()
 
     override fun reduce(state: State, action: Action): Reduced<State, Action> {
         // VoiceTimeline sees the state the action arrives to.
         timeline.reduce(state, action)
-        val scoped = scopeFloatingStage(state, action)
+        val scoped = scopeChildren(state, action)
         val reduced = reduceCall(scoped.state, action)
         val core = Reduced(reduced.state, Effect.merge(scoped.effect, reduced.effect))
         val logged = logCall(core.state, action)
@@ -781,11 +793,27 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
         return Reduced(logged, Effect.merge(core.effect, presence))
     }
 
-    /** iOS `Scope(state: \.floatingStage, action: \.floatingStage)`. */
-    private fun scopeFloatingStage(state: State, action: Action): Reduced<State, Action> {
-        if (action !is Action.FloatingStage) return Reduced(state)
-        val child = floatingStage.reduce(state.floatingStage, action.action)
-        return Reduced(state.copy(floatingStage = child.state), child.effect.map { Action.FloatingStage(it) })
+    /** iOS's child `Scope`s: the floating stage, the screen request, the open link, the call audio. */
+    private fun scopeChildren(state: State, action: Action): Reduced<State, Action> {
+        when (action) {
+            is Action.FloatingStage -> {
+                val child = floatingStage.reduce(state.floatingStage, action.action)
+                return Reduced(state.copy(floatingStage = child.state), child.effect.map { Action.FloatingStage(it) })
+            }
+            is Action.ScreenRequest -> {
+                val child = screenRequest.reduce(state.screenRequest, action.action)
+                return Reduced(state.copy(screenRequest = child.state), child.effect.map { Action.ScreenRequest(it) })
+            }
+            is Action.OpenLink -> {
+                val child = openLink.reduce(state.openLink, action.action)
+                return Reduced(state.copy(openLink = child.state), child.effect.map { Action.OpenLink(it) })
+            }
+            is Action.CallAudio -> {
+                val child = callAudio.reduce(state.callAudio, action.action)
+                return Reduced(state.copy(callAudio = child.state), child.effect.map { Action.CallAudio(it) })
+            }
+            else -> return Reduced(state)
+        }
     }
 
     private fun reduceCall(state: State, action: Action): Reduced<State, Action> {
@@ -1087,8 +1115,37 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
                 }
             }
 
-            is Action.FloatingStage, is Action.Delegate -> Reduced(state)
+            is Action.ScreenRequest -> {
+                val requested = action.action is VoiceScreenRequestFeature.Action.Requested
+                // The voice model is no longer told about a shared screen (`noteProgress` is
+                // gone with the voice cleanup): the agent that asked has the picture.
+                if (action.action is VoiceScreenRequestFeature.Action.Delegate) return Reduced(state)
+                Reduced(holdForClientToolCard(state, requested))
+            }
+
+            is Action.OpenLink -> {
+                val requested = action.action is VoiceOpenLinkFeature.Action.Requested
+                Reduced(holdForClientToolCard(state, requested))
+            }
+
+            // The track's row says what plays.
+            is Action.CallAudio, is Action.FloatingStage, is Action.Delegate -> Reduced(state)
         }
+    }
+
+    /**
+     * Nothing of the call's covers a client tool's card: on a request, captions close and the
+     * floating call goes back to the orb, held there until the card goes.
+     */
+    private fun holdForClientToolCard(state: State, requested: Boolean): State {
+        val holds = state.holdsClientToolCard
+        var stage = state.floatingStage
+        var showsCaptions = state.showsCaptions
+        if (requested && holds) {
+            showsCaptions = false
+            stage = stage.copy(dragTarget = null, stage = FloatingCallStage.orb)
+        }
+        return state.copy(showsCaptions = showsCaptions, floatingStage = stage.copy(isHeld = holds))
     }
 
     private fun reduceCallEvent(state: State, event: VoiceCallEvent): Reduced<State, Action> {
@@ -1311,7 +1368,25 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
             ),
             runReplyWatch(watchEffects, next),
         )
-        return Reduced(next, if (phase == State.Phase.Ended) Effect.merge(cancel, Effect.send(Action.Delegate(DelegateAction.Ended))) else cancel)
+        // Refused in this pass, so the reply leaves before the socket closes.
+        val screen = screenRequest.endCall(next.screenRequest)
+        val link = openLink.endCall(next.openLink)
+        val audio = callAudio.endCall(next.callAudio)
+        next = next.copy(
+            screenRequest = screen.state,
+            openLink = link.state,
+            callAudio = audio.state,
+            floatingStage = next.floatingStage.copy(isHeld = false),
+        )
+        val children = Effect.merge(
+            screen.effect.map { Action.ScreenRequest(it) },
+            link.effect.map { Action.OpenLink(it) },
+            audio.effect.map { Action.CallAudio(it) },
+        )
+        if (phase == State.Phase.Ended) {
+            return Reduced(next, Effect.merge(cancel, children, Effect.send(Action.Delegate(DelegateAction.Ended))))
+        }
+        return Reduced(next, Effect.merge(cancel, children))
     }
 
     internal fun completeFunction(callID: String, output: String): Effect<Action> {

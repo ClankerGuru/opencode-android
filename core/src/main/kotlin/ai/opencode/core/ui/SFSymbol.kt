@@ -176,6 +176,7 @@ enum class SFSymbol(val sfName: String, @DrawableRes val drawable: Int) {
     MicFill("mic.fill", R.drawable.ms_mic_fill),
     MicSlash("mic.slash", R.drawable.ms_mic_off),
     MicSlashFill("mic.slash.fill", R.drawable.ms_mic_off_fill),
+    MusicNote("music.note", R.drawable.ms_music_note),
     MinusCircleFill("minus.circle.fill", R.drawable.ms_do_not_disturb_on_fill),
     MoonZzz("moon.zzz", R.drawable.ms_bedtime),
     Network("network", R.drawable.ms_public),

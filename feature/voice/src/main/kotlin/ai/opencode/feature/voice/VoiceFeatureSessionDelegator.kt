@@ -34,6 +34,27 @@ val State.hasActiveSessionDelegatorTurn: Boolean
 fun State.tracksSessionDelegatorTools(sessionID: String): Boolean =
     usesSessionDelegator && !phase.isTerminal && sessionDelegator.tracksTools(sessionID)
 
+/**
+ * The session this call's delegator steers, or will on its first turn, when it isn't the call's
+ * own: the phone's client tools open a socket in its directory too (iOS `sessionDelegatorElsewhereID`).
+ */
+val State.sessionDelegatorElsewhereID: String?
+    get() {
+        if (!usesSessionDelegator || phase.isTerminal) return null
+        val serverScopeKey = VoiceDelegatorWorkspace.serverID(target.server)
+        var id = sessionDelegator.activeSessionID
+        if (id == null) {
+            val choice = voiceDelegatorChoice
+            if (choice == VoiceDelegatorChoice.AutomaticSession) {
+                id = voiceDelegatorSessionIDs[serverScopeKey]
+            } else if (choice is VoiceDelegatorChoice.PickedSession && choice.picked.serverID == serverScopeKey) {
+                id = choice.picked.sessionID
+            }
+        }
+        if (id == null || id == target.sessionID || id in sessionDelegator.deletedSessionIDs) return null
+        return id
+    }
+
 private fun State.withDelegator(change: (VoiceSessionDelegator.State) -> VoiceSessionDelegator.State): State =
     copy(sessionDelegator = change(sessionDelegator))
 

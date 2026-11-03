@@ -150,6 +150,7 @@ mic_off fill                        # mic.slash.fill
 mobile_layout                       # platter.filled.top.iphone
 monitor_heart                       # waveform.path.ecg
 more_vert                           # ellipsis (Android overflow)
+music_note                          # music.note
 motion_photos_on                    # circle.dotted.circle
 move_to_inbox                       # tray.and.arrow.down
 movie                               # film
