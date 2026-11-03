@@ -13,6 +13,8 @@ import ai.opencode.feature.transcript.TranscriptEntry
 import ai.opencode.feature.transcript.TranscriptRowIdentityPlan
 import ai.opencode.feature.transcript.TranscriptTunables
 import ai.opencode.server.model.OpenCodeQueuedInput
+import androidx.compose.foundation.MutatePriority
+import androidx.compose.foundation.gestures.FlingBehavior
 import androidx.compose.foundation.lazy.LazyListItemInfo
 import androidx.compose.foundation.lazy.LazyListLayoutInfo
 import androidx.compose.foundation.lazy.LazyListState
@@ -25,13 +27,14 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.unit.Velocity
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
 import kotlin.math.abs
-import kotlin.math.roundToInt
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.launch
 
 /**
  * The transcript list's engine: a plain object (iOS `TranscriptListViewController` minus UIKit),
@@ -486,22 +489,27 @@ class TranscriptListController(
                 it.key in oldKeys && it is TranscriptItemID.Message && old.rows[it.stableID] is MessageRow.Entry
             }
             val tailInserted = next.items.drop(lastKept + 1).filter { it.key !in oldKeys }
+            // iOS `joinOnScreen`: rows a settlement adds just above a row on screen (a reply's tool
+            // row above its text, already streaming at the end) grow in like rows at the end.
+            // Landed, everything above them jumped at once.
+            val inserted = next.items.filter { it.key !in oldKeys }
+            val arriving = if (inserted.size > tailInserted.size && joinsOnScreen(inserted, next.items, oldKeys)) inserted else tailInserted
             // Working handed off to the reply's copy button in its own row: the reply end that
             // replaces it is already drawn there, so it doesn't fade in (iOS `handoff`). Without
             // this the copy button blinked out and faded back in as Working left.
             val handoff = if (previous.workingHandsOffToCopy && !configuration.isRunning) {
-                tailInserted.filter { (next.rows[(it as? TranscriptItemID.Message)?.stableID] as? MessageRow.Entry)?.entry is TranscriptEntry.ReplyEnd }.toSet()
+                arriving.filter { (next.rows[(it as? TranscriptItemID.Message)?.stableID] as? MessageRow.Entry)?.entry is TranscriptEntry.ReplyEnd }.toSet()
             } else {
                 emptySet()
             }
             val fades = old.items.count { it.key !in nextKeys } <= RowEntrance.MAXIMUM_ROWS &&
                 next.items.count { it.key !in oldKeys } <= RowEntrance.MAXIMUM_ROWS
             if (fades != fadesRemovals) fadesRemovals = fades
-            if (tailInserted.size > RowEntrance.MAXIMUM_ROWS) {
+            if (arriving.size > RowEntrance.MAXIMUM_ROWS) {
                 landArrivals()
             } else {
                 val t = transcriptNow()
-                for (item in tailInserted) {
+                for (item in arriving) {
                     // An agent-sent message glows as it arrives in front of the reader, once.
                     when (val row = next.rows[(item as? TranscriptItemID.Message)?.stableID]) {
                         is MessageRow.Entry -> ai.opencode.feature.transcript.user.TranscriptUserMessage.from(row.entry)
@@ -515,7 +523,7 @@ class TranscriptListController(
                         if (item !in handoff) pendingEntrances[item.key] = t to RowEntranceStyle.Arrival
                     }
                 }
-                if (tailInserted.isNotEmpty()) pendingEffects += { startMotion() }
+                if (arriving.isNotEmpty()) pendingEffects += { startMotion() }
             }
             if (behavior.mode == TranscriptScrollBehavior.Mode.Following && isUserGestureActive && tailInserted.isNotEmpty()) {
                 contentArrivedDuringDrag = true
@@ -693,6 +701,7 @@ class TranscriptListController(
         if (isShowingToReader) {
             lastLayout?.let(::onLayout)
         } else {
+            cancelBorrowedDrag()
             finishGrowths()
             // The divider's motion can't step off screen: it lands at its end.
             finishDividerMotion()
@@ -925,7 +934,103 @@ class TranscriptListController(
         if (!scrolling && isUserGestureActive) settleUserScroll()
     }
 
+    // MARK: Borrowed drags (iOS `TranscriptListViewController+BorrowedDrag`)
+
+    /** The list's own fling, for a borrowed drag's release (set by the composable). */
+    var flingBehavior: FlingBehavior? = null
+
+    private sealed interface BorrowedStep {
+        data class Move(val by: Float) : BorrowedStep
+        data class Fling(val velocity: Float) : BorrowedStep
+    }
+
+    private class BorrowedDragRun {
+        val steps = Channel<BorrowedStep>(Channel.UNLIMITED)
+        var released = false
+        var job: Job? = null
+    }
+
+    private var borrowed: BorrowedDragRun? = null
+
+    /** A borrowed drag the list moved on from (a jump, a touch on the list): ignored to its end. */
+    private var borrowedHeld = false
+
+    /** iOS `borrowedDrag.isActive`. */
+    val isBorrowedDragActive: Boolean get() = borrowed != null
+
+    /**
+     * iOS `handleBorrowedDrag`: a drag passed from a control over the list scrolls it, holding its
+     * scroll for the whole drag and fling, so the follow logic reads it as the reader's own.
+     */
+    fun handleBorrowedDrag(event: TranscriptBorrowedDrag.Event) {
+        when (event) {
+            is TranscriptBorrowedDrag.Event.Moved -> {
+                if (borrowedHeld) return
+                var run = borrowed
+                if (run == null) {
+                    run = startBorrowedDrag()
+                    if (run == null) return
+                }
+                // The finger moving down shows earlier rows: the list scrolls back.
+                run.steps.trySend(BorrowedStep.Move(-event.dy))
+            }
+            is TranscriptBorrowedDrag.Event.Ended -> {
+                borrowedHeld = false
+                val run = borrowed ?: return
+                run.released = true
+                run.steps.trySend(BorrowedStep.Fling(-event.velocity))
+                run.steps.close()
+            }
+        }
+    }
+
+    private fun startBorrowedDrag(): BorrowedDragRun? {
+        // A drag on the list itself owns it (iOS ignores borrowed drags while the list tracks).
+        if (isUserGestureActive) {
+            borrowedHeld = true
+            return null
+        }
+        dragBegan()
+        val run = BorrowedDragRun()
+        borrowed = run
+        run.job = scope.launch {
+            var finished = false
+            try {
+                state.scroll(MutatePriority.UserInput) {
+                    for (step in run.steps) {
+                        when (step) {
+                            is BorrowedStep.Move -> scrollBy(step.by)
+                            is BorrowedStep.Fling -> {
+                                val fling = flingBehavior
+                                if (fling != null && step.velocity != 0f) {
+                                    with(fling) { performFling(step.velocity) }
+                                }
+                            }
+                        }
+                    }
+                }
+                finished = true
+            } finally {
+                if (borrowed === run) borrowed = null
+                // Taken mid-drag (a touch on the list, a jump): the rest of this drag is ignored.
+                if (!finished && !run.released) borrowedHeld = true
+            }
+            if (isUserGestureActive) settleUserScroll()
+        }
+        return run
+    }
+
+    /** iOS `cancelBorrowedDrag`: the list moved on (a jump, scroll to top, off screen). */
+    fun cancelBorrowedDrag() {
+        val run = borrowed ?: return
+        borrowed = null
+        if (!run.released) borrowedHeld = true
+        run.steps.close()
+        run.job?.cancel()
+    }
+
     fun scrollToTop(): Boolean {
+        cancelBorrowedDrag()
         stopBottomSpring()
         revealGlide = null
         revealsToEnd = false
@@ -974,6 +1079,7 @@ class TranscriptListController(
 
     /** Jump to latest, tapped or by sending while browsing (iOS `jumpToLatest`). */
     fun jumpToLatest(event: TranscriptScrollBehavior.Event = TranscriptScrollBehavior.Event.JumpToLatestTapped, fromBrowsing: Boolean = false) {
+        cancelBorrowedDrag()
         revealGlide = null
         revealsToEnd = false
         isUserGestureActive = false
@@ -1345,6 +1451,25 @@ class TranscriptListController(
         imageGrowth?.beginGrowth()
         startMotion()
         return from
+    }
+
+    /** iOS `joinOnScreen(_:in:)`: every inserted row joins just above a row on screen. */
+    private fun joinsOnScreen(inserted: List<TranscriptItemID>, items: List<TranscriptItemID>, oldKeys: Set<String>): Boolean {
+        if (inserted.isEmpty()) return false
+        val visible = HashSet<Any>()
+        for (row in lastLayout?.visibleItemsInfo.orEmpty()) visible += row.key
+        for (item in inserted) {
+            val index = items.indexOf(item)
+            var below: TranscriptItemID? = null
+            for (i in index + 1 until items.size) {
+                if (items[i].key in oldKeys) {
+                    below = items[i]
+                    break
+                }
+            }
+            if (below == null || below.key !in visible) return false
+        }
+        return true
     }
 
     private fun allowsGrowth(delta: Float): Boolean {

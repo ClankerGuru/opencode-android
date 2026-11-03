@@ -2,36 +2,36 @@
 
 package ai.opencode.feature.session
 
-import ai.opencode.core.motion.transitionBlur
-
-import ai.opencode.feature.composer.PastedTextViewer
-import ai.opencode.core.ui.ProviderIcon
 import ai.opencode.core.experiments.key
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
+import ai.opencode.core.motion.transitionBlur
 import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.core.ui.ProviderIcon
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.feature.composer.PastedTextViewer
+import ai.opencode.feature.media.AgentFileViewer
+import ai.opencode.feature.media.LinkMenuAction
+import ai.opencode.feature.media.LocalMediaPresenter
+import ai.opencode.feature.media.MediaPresenter
+import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.feature.session.header.HeaderBlurTunables
 import ai.opencode.feature.session.header.SessionHeaderStyle
 import ai.opencode.feature.session.header.titleBreathing
-import ai.opencode.feature.media.LocalMediaPresenter
-import ai.opencode.feature.media.MediaPresenter
-import ai.opencode.feature.media.AgentFileViewer
+import ai.opencode.feature.transcript.NewMessagesPlacement
 import ai.opencode.feature.transcript.TranscriptAction
 import ai.opencode.feature.transcript.TranscriptConfiguration
 import ai.opencode.feature.transcript.TranscriptEntry
-import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.TranscriptTunables
-import ai.opencode.feature.media.LinkMenuAction
-import ai.opencode.feature.transcript.NewMessagesPlacement
+import ai.opencode.feature.transcript.list.LocalTranscriptTimelinePaused
 import ai.opencode.feature.transcript.list.NewMessagesMark
 import ai.opencode.feature.transcript.list.TranscriptList
 import ai.opencode.feature.transcript.list.TranscriptSlots
@@ -46,7 +46,6 @@ import ai.opencode.feature.transcript.user.TranscriptUserMessage
 import ai.opencode.server.OpenCodePairingLink
 import ai.opencode.server.model.OpenCodeModel
 import ai.opencode.server.model.OpenCodeTranscriptItem
-import ai.opencode.feature.transcript.list.LocalTranscriptTimelinePaused
 import android.content.Context
 import android.content.Intent
 import android.text.format.DateFormat
@@ -85,6 +84,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
@@ -96,13 +96,18 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -112,24 +117,19 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.currentStateAsState
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 import java.time.Instant
 import java.time.ZoneId
 import java.util.Locale
 import kotlin.math.roundToLong
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
 // Port of iOS `Session/SessionTranscriptView.swift`: the transcript host below the header and
 // above the composer, and the session-owned pieces the transcript draws (the title, the Working
@@ -215,6 +215,8 @@ fun SessionTranscriptView(
     }
     // The reader's drag takes the list: the keyboard goes (iOS `scrollViewWillBeginDragging`
     // calls `dismissKeyboard`), once per gesture. Programmatic scrolls and flings don't count.
+    // A drag borrowed from a pill over the list dismisses the keyboard too (iOS: it begins the list's drag).
+    SideEffect { scrollEdgeBridge.borrowedDrag.onBegan = { host?.dismissComposerKeyboard() } }
     val dismissOnDrag = remember(host) {
         object : NestedScrollConnection {
             var dismissed = false
@@ -258,6 +260,7 @@ fun SessionTranscriptView(
                 imageLinkPreviews = ExperimentalFeature.imageLinkPreviews.isActive(imageLinkPreviewsSetting),
             ),
             onScrolledUnderHeader = { scrollEdgeBridge.scrolled(underHeader = it, revealDistance = top.revealDistance) },
+            borrowedDrag = scrollEdgeBridge.borrowedDrag,
         )
     }
 

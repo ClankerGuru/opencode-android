@@ -234,7 +234,7 @@ turn_right mirror                   # arrow.turn.up.right
 undo mirror                         # arrow.uturn.backward
 unfold_more                         # chevron.up.chevron.down
 verified                            # checkmark.seal
-vertical_align_bottom               # text.line.last.and.arrowtriangle.forward
+vertical_align_bottom               # text.line.last.and.arrowtriangle.forward, arrow.down.to.line
 vertical_align_top                  # text.line.first.and.arrowtriangle.forward
 vertical_split                      # rectangle.split.2x1
 video_library                       # play.rectangle.on.rectangle

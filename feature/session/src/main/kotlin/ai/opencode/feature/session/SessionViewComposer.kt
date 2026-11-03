@@ -56,30 +56,37 @@ import ai.opencode.feature.composer.sentImageDeparture
 import ai.opencode.feature.media.SendImageTunables
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.transcript.TranscriptTunables
+import ai.opencode.feature.transcript.list.TranscriptBorrowedDrag
+import ai.opencode.feature.transcript.list.passesDragsToTranscript
 import ai.opencode.feature.voice.CallTrayController
 import ai.opencode.feature.voice.CallTrayHost
 import ai.opencode.feature.voice.VoiceCallComposer
 import ai.opencode.feature.voice.VoiceCallRowsCard
 import ai.opencode.feature.voice.VoiceCallSurface
 import ai.opencode.feature.voice.VoiceStoreOf
-import ai.opencode.feature.voice.holdsClientToolCard
 import ai.opencode.feature.voice.hiddenUnderFloatingCall
 import ai.opencode.feature.voice.hiddenUnderVoiceTranscript
+import ai.opencode.feature.voice.holdsClientToolCard
 import ai.opencode.server.model.OpenCodeProject
 import ai.opencode.server.model.OpenCodeQueuedInput
 import ai.opencode.server.model.PastedText
 import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.border
@@ -182,6 +189,8 @@ class SessionComposerHost {
     var showsJumpButton by mutableStateOf(false)
     /** iOS `scrollEdgeBridge.jumpRequest += 1`. */
     var onJumpToLatest: () -> Unit by mutableStateOf({})
+    /** iOS `passesDragsToTranscript(scrollEdgeBridge)`: the transcript a pill's drag scrolls. */
+    var borrowedDrag: TranscriptBorrowedDrag? by mutableStateOf(null)
     /** Where [BackgroundWorkPresentation] draws the capsule (iOS `backgroundActivityAnchor()`). */
     var backgroundWorkAnchor: BackgroundWorkAnchor? by mutableStateOf(null)
     /** Catch Up's card: no project list, no swipe-up focus, its own side clearance. */
@@ -954,7 +963,15 @@ private fun SessionComposerEnv.ComposerAreaContent(modifier: Modifier) {
     ) {
         ai.opencode.feature.composer.RequestDockPrewarm()
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(pillGap.dp)) {
-            HiddenUnderComposerPanel(host.composerPanelCovers, Modifier.hiddenUnderVoiceTranscript(showsCallTranscript)) { ComposerPills() }
+            // iOS 812b9ab5: the pill row joining or leaving moves the composer's top, and the transcript
+            // riding it, on the row's own curve; at once, Working jumped a row's height in one frame.
+            AnimatedVisibility(
+                visible = s.hasBackgroundWork || s.queuedMessages.isNotEmpty(),
+                enter = if (reducedMotion) EnterTransition.None else expandVertically(MotionSpring(PILL_ROW_SECONDS).spec(IntSize.VisibilityThreshold), Alignment.Bottom, clip = false),
+                exit = if (reducedMotion) ExitTransition.None else shrinkVertically(MotionSpring(PILL_ROW_SECONDS).spec(IntSize.VisibilityThreshold), Alignment.Bottom, clip = false),
+            ) {
+                HiddenUnderComposerPanel(host.composerPanelCovers, Modifier.hiddenUnderVoiceTranscript(showsCallTranscript)) { ComposerPills() }
+            }
             val error = s.settledRequestLoadError
             if (error != null) {
                 HiddenUnderComposerPanel(host.composerPanelCovers, Modifier.hiddenUnderVoiceTranscript(showsCallTranscript)) {
@@ -1007,7 +1024,8 @@ private fun SessionComposerEnv.ComposerAreaContent(modifier: Modifier) {
                     .offset(y = -(48 + pillGap + host.orbClearance).dp),
             ) {
                 // The call's open transcript covers where it would float.
-                JumpToLatestPill(isShown = host.showsJumpButton && !showsCallTranscript && !holdsClientToolCard, onClick = host.onJumpToLatest)
+                val jumpShown = host.showsJumpButton && !showsCallTranscript && !holdsClientToolCard
+                JumpToLatestPill(isShown = jumpShown, onClick = host.onJumpToLatest, modifier = Modifier.passesDragsToTranscript(host.borrowedDrag, isEnabled = jumpShown))
             }
         }
         // A draft's recent projects stand above the composer as an overlay, so folding them, or
@@ -1103,7 +1121,7 @@ private fun SessionComposerEnv.ComposerPills() {
             // Beside the queued pill the jump slot carries its own gap, so the queued pill slides over as it closes.
             Row(verticalAlignment = Alignment.CenterVertically) {
                 QueuedActivity(hasQueued)
-                JumpToLatestPill(isShown = showsJump, onClick = host.onJumpToLatest, collapsesSlot = hasQueued)
+                JumpToLatestPill(isShown = showsJump, onClick = host.onJumpToLatest, collapsesSlot = hasQueued, modifier = Modifier.passesDragsToTranscript(host.borrowedDrag, isEnabled = showsJump))
             }
         }
     } else {
@@ -1112,7 +1130,7 @@ private fun SessionComposerEnv.ComposerPills() {
             if (hasQueued || showsJump) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     QueuedActivity(hasQueued)
-                    JumpToLatestPill(isShown = showsJump, onClick = host.onJumpToLatest, collapsesSlot = hasQueued)
+                    JumpToLatestPill(isShown = showsJump, onClick = host.onJumpToLatest, collapsesSlot = hasQueued, modifier = Modifier.passesDragsToTranscript(host.borrowedDrag, isEnabled = showsJump))
                 }
             }
         }
@@ -1148,6 +1166,7 @@ private fun SessionComposerEnv.QueuedActivity(hasQueued: Boolean) {
             modifier = Modifier
                 // A queued send's words shrink into it (iOS `scrollEdgeBridge.queuedPillFrame`).
                 .onGloballyPositioned { host.queuedPillFrame = it.boundsInWindow() }
+                .passesDragsToTranscript(host.borrowedDrag)
                 .coveredByBackgroundWork()
                 .semantics {
                     contentDescription = if (count == 1) "1 queued message" else "$count queued messages"
@@ -1941,3 +1960,6 @@ private fun SessionComposerEnv.onDraftEdited(new: String, recording: Boolean) {
 }
 
 // endregion
+
+/** iOS `.snappy(duration: 0.35)`, without its overshoot: a bounce here bounced the transcript. */
+private const val PILL_ROW_SECONDS = 0.35

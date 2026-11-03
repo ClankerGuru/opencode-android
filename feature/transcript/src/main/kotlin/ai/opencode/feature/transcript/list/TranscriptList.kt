@@ -1,18 +1,15 @@
 package ai.opencode.feature.transcript.list
 
-import ai.opencode.feature.media.AgentImageViewport
-import ai.opencode.feature.media.AgentImageVisibility
-import ai.opencode.feature.media.LocalAgentImageViewport
-import ai.opencode.feature.media.LocalAgentImageRow
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.diagnostics.PerfTimeline
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.boundsInWindow
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.feature.media.AgentImageViewport
+import ai.opencode.feature.media.AgentImageVisibility
 import ai.opencode.feature.media.LinkPreviewStore
+import ai.opencode.feature.media.LocalAgentImageRow
+import ai.opencode.feature.media.LocalAgentImageViewport
 import ai.opencode.feature.media.LocalLinkPreviewRevision
 import ai.opencode.feature.media.LocalLinkPreviewStore
 import ai.opencode.feature.media.TranscriptMetrics
@@ -35,14 +32,15 @@ import ai.opencode.feature.transcript.user.UserMessageRun
 import ai.opencode.feature.transcript.user.queuedPillSource
 import ai.opencode.server.model.OpenCodeQueuedInput
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.ScrollableDefaults
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
@@ -69,6 +67,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -76,15 +75,17 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalGraphicsContext
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -119,10 +120,11 @@ fun TranscriptList(
     slots: TranscriptSlots = TranscriptSlots(),
     layoutTuning: TranscriptLayoutTuning = LocalTranscriptLayoutTuning.current,
     onScrolledUnderHeader: (Float) -> Unit = {},
+    borrowedDrag: TranscriptBorrowedDrag? = null,
 ) {
     // A new session is a new list (iOS resets the controller; the draft becoming its session keeps it).
     key(configuration.sessionID ?: "draft", configuration.historyGeneration) {
-        TranscriptListContent(configuration, send, modifier, contentPadding, jumpRequest, onShowsJumpButtonChanged, slots, layoutTuning, onScrolledUnderHeader)
+        TranscriptListContent(configuration, send, modifier, contentPadding, jumpRequest, onShowsJumpButtonChanged, slots, layoutTuning, onScrolledUnderHeader, borrowedDrag)
     }
 }
 
@@ -138,6 +140,7 @@ private fun TranscriptListContent(
     slots: TranscriptSlots,
     layoutTuning: TranscriptLayoutTuning,
     onScrolledUnderHeader: (Float) -> Unit,
+    borrowedDrag: TranscriptBorrowedDrag?,
 ) {
     val scope = rememberCoroutineScope()
     val initialIndex = remember { (configuration.entries.size + configuration.queuedInputs.size + 2).coerceAtLeast(0) }
@@ -164,6 +167,7 @@ private fun TranscriptListContent(
     controller.reduceMotion = reduceMotion
     controller.isShowingToReader = resumed.isAtLeast(Lifecycle.State.RESUMED)
     controller.sendLanding = ai.opencode.feature.transcript.user.LocalSendLanding.current
+    controller.flingBehavior = ScrollableDefaults.flingBehavior()
     // Applied in composition so this frame draws the new rows with their stable keys.
     controller.update(configuration)
     controller.obstructionChanged(contentPadding.calculateBottomPadding().value, WindowInsets.ime.getBottom(density) / density.density)
@@ -178,6 +182,17 @@ private fun TranscriptListContent(
     }
     LaunchedEffect(listState) {
         snapshotFlow { listState.isScrollInProgress }.collect(controller::scrollInProgressChanged)
+    }
+    // iOS `scrollEdgeBridge.onBorrowedDrag`: drags on the controls over the list scroll it.
+    if (borrowedDrag != null) {
+        DisposableEffect(borrowedDrag, controller) {
+            val handler: (TranscriptBorrowedDrag.Event) -> Unit = controller::handleBorrowedDrag
+            borrowedDrag.onEvent = handler
+            onDispose {
+                if (borrowedDrag.onEvent === handler) borrowedDrag.onEvent = null
+                controller.cancelBorrowedDrag()
+            }
+        }
     }
     // iOS `viewWillAppear`/`viewDidDisappear` + the token's `deinit`: one list per session here.
     // iOS `TranscriptMotionTrace.shared.attach(self)` / `detach(self)` (Motion Watch).

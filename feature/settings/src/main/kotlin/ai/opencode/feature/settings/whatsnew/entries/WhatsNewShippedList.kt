@@ -13,6 +13,7 @@ internal val whatsNewShippedEntries: List<WhatsNewEntry> by lazy {
     listOf(
         WhatsNewShipped.modelDisplayNames,
         WhatsNewShipped.foldQuestions,
+        WhatsNewShipped.steadierFollowing,
         WhatsNewShipped.openLinksFromCalls,
         WhatsNewShipped.audioInCalls,
         WhatsNewShipped.shareScreenWithAgents,

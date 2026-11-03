@@ -257,6 +257,7 @@ fun SessionView(
         composerHost.connection = listContext.connection
         composerHost.onConnectionAction = onConnectionAction
         composerHost.onJumpToLatest = { scrollEdgeBridge.jumpRequest += 1 }
+        composerHost.borrowedDrag = scrollEdgeBridge.borrowedDrag
         composerHost.isImportingAttachments = importer.isLoadingImages || importer.isLoadingFiles
         composerHost.importer = importer
         composerHost.modelPickerAnchors = modelPickerAnchors
@@ -290,6 +291,7 @@ fun SessionView(
             isCovered = composerHost.composerPanelCovers,
             inCall = work.inCall,
             showsCallTranscript = work.showsCallTranscript,
+            transcript = scrollEdgeBridge.borrowedDrag,
             // The capsule draws above the + menu's dismiss area: tapping it closes the menu.
             // iOS: typing ends, and the capsule draws above the menu's dismiss area: tapping it closes the menu.
             onToggle = {

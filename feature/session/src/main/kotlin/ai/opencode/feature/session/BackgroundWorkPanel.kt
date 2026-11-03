@@ -19,6 +19,8 @@ import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.RollingNumber
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.feature.transcript.list.TranscriptBorrowedDrag
+import ai.opencode.feature.transcript.list.passesDragsToTranscript
 import ai.opencode.feature.voice.VoiceLabEnvironment
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.OpenCodeShell
@@ -441,6 +443,7 @@ fun BackgroundWorkPresentation(
     isCovered: Boolean = false,
     inCall: Boolean = false,
     showsCallTranscript: Boolean = false,
+    transcript: TranscriptBorrowedDrag? = null,
     onToggle: () -> Unit = {},
     content: @Composable () -> Unit,
 ) {
@@ -841,6 +844,8 @@ fun BackgroundWorkPresentation(
                             // a capsule fading with the work, or gone, takes no touch.
                             if (stage == BackgroundWorkStage.closed && !hidden && capsuleShown) {
                                 Modifier
+                                    // iOS `CapsuleDragsTranscript`: a vertical drag on the capsule scrolls the transcript.
+                                    .passesDragsToTranscript(transcript)
                                     .clickable(onClickLabel = "Shows running subagents and shells") {
                                         onToggle()
                                         onPresentedChange(!isPresented)

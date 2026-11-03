@@ -12,10 +12,12 @@ import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -56,6 +58,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
@@ -250,17 +253,21 @@ fun ServerConnectionPill(
 class ServerConnectionPillTransition(private val density: Float) {
     fun enter(reducedMotion: Boolean): EnterTransition {
         val ms = (ServerFlowTunables.enter * 1000).roundToInt()
-        if (reducedMotion) return fadeIn(tween(ms, easing = LinearOutSlowInEasing))
+        // The pill's room grows on the enter spring in either mode (iOS 812b9ab5): the composer's top,
+        // and the transcript riding it, move with the pill instead of jumping its height in one frame.
+        val room = expandVertically(MotionSpring(ServerFlowTunables.enter).spec(IntSize.VisibilityThreshold), Alignment.Bottom, clip = false)
+        if (reducedMotion) return room + fadeIn(tween(ms, easing = LinearOutSlowInEasing))
         val spring = MotionSpring(ServerFlowTunables.enter)
-        return fadeIn(spring.spec()) +
+        return room + fadeIn(spring.spec()) +
             scaleIn(spring.spec(), initialScale = ServerFlowTunables.scale, transformOrigin = TransformOrigin(0.5f, 1f)) +
             slideInVertically(spring.spec(IntOffset.VisibilityThreshold)) { (ServerFlowTunables.rise * density).roundToInt() }
     }
 
     fun exit(reducedMotion: Boolean): ExitTransition {
         val ms = (ServerFlowTunables.leave * 1000).roundToInt()
-        if (reducedMotion) return fadeOut(tween(ms, easing = FastOutLinearInEasing))
-        return fadeOut(tween(ms, easing = FastOutLinearInEasing)) +
+        val room = shrinkVertically(MotionSpring(ServerFlowTunables.enter).spec(IntSize.VisibilityThreshold), Alignment.Bottom, clip = false)
+        if (reducedMotion) return room + fadeOut(tween(ms, easing = FastOutLinearInEasing))
+        return room + fadeOut(tween(ms, easing = FastOutLinearInEasing)) +
             scaleOut(tween(ms, easing = FastOutLinearInEasing), targetScale = ServerFlowTunables.scale, transformOrigin = TransformOrigin(0.5f, 1f))
     }
 }

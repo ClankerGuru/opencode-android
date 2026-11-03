@@ -290,6 +290,7 @@ and `ellipsis` (every overflow menu) is the vertical `more_vert`, as on other An
 | `text.bubble` | `chat` | `ms_chat` | `SFSymbol.TextBubble` | AppShortcuts, BrowserView, PlaygroundHostView, SessionView+Composer, WhatsNewList |
 | `text.line.first.and.arrowtriangle.forward` | `vertical_align_top` | `ms_vertical_align_top` | `SFSymbol.TextLineFirstAndArrowtriangleForward` | ExperimentalFeatures |
 | `text.line.last.and.arrowtriangle.forward` | `vertical_align_bottom` | `ms_vertical_align_bottom` | `SFSymbol.TextLineLastAndArrowtriangleForward` | WhatsNewList |
+| `arrow.down.to.line` | `vertical_align_bottom` | `ms_vertical_align_bottom` | `SFSymbol.ArrowDownToLine` | What’s New (steadier following) |
 | `text.quote` | `format_quote` | `ms_format_quote` | `SFSymbol.TextQuote` | WhatsNewList |
 | `text.word.spacing` | `wrap_text` | `ms_wrap_text` | `SFSymbol.TextWordSpacing` | AgentFileViewer, PastedTextViews |
 | `textformat` | `text_format` | `ms_text_format` | `SFSymbol.Textformat` | WhatsNewList |
