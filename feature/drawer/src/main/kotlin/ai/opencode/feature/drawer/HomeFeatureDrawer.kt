@@ -1,34 +1,38 @@
 package ai.opencode.feature.drawer
 
-import ai.opencode.core.diagnostics.LabMarks
-import ai.opencode.feature.composer.SharedDraftTarget
-import ai.opencode.feature.composer.SharedComposerDraft
-import ai.opencode.feature.composer.DraftState
-import ai.opencode.feature.composer.ComposerPersistence
-import ai.opencode.feature.session.*
-import ai.opencode.feature.system.share.ShareInboxClient
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.diagnostics.LabMarks
 import ai.opencode.core.diagnostics.PerfTimeline
+import ai.opencode.core.experiments.key
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.log.AppLog
+import ai.opencode.core.sharing.ExperimentalFeature
+import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.cancellable
+import ai.opencode.feature.composer.ComposerPersistence
+import ai.opencode.feature.composer.DraftState
+import ai.opencode.feature.composer.SharedComposerDraft
+import ai.opencode.feature.composer.SharedDraftTarget
 import ai.opencode.feature.drawer.HomeFeature.Action
 import ai.opencode.feature.drawer.HomeFeature.State
 import ai.opencode.feature.media.BrowserFeature
+import ai.opencode.feature.session.*
 import ai.opencode.feature.settings.SettingsFeature
+import ai.opencode.feature.system.SystemAction
+import ai.opencode.feature.system.share.ShareInboxClient
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.OpenCodeTranscriptItem
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
-import kotlin.time.Duration.Companion.seconds
 
 /*
  * Port of iOS `HomeFeature+Drawer.swift`: the drawer's own actions — opening sessions and drafts,
@@ -40,6 +44,24 @@ internal fun HomeFeature.reduceDrawer(state: State, action: Action): HomeReduced
     val haptics = dependency(HapticsClient)
     when (action) {
         Action.SettingsTapped -> return Reduced(state.showingSettings())
+
+        Action.DrawerCallTapped -> {
+            if (!state.drawerShowsCallButton) return Reduced(state)
+            if (state.connectionStatus == HomeConnectionFeature.State.ConnectionStatus.disconnected) return Reduced(state)
+            // The screen on top's own call button: dictation yields first, and a pushed subagent
+            // asks the root, which owns the call. No haptic here: the call's start plays it. The
+            // drawer stays open under the orb.
+            val detail = state.sessionDetail
+            if (detail != null && (detail.session != null || detail.draftProject != null)) {
+                var s = state
+                if (detail.voice?.phase?.isTerminal == true) s = s.updatingDetail { it.copy(voice = null) }
+                val top = s.subagentStack.lastOrNull()
+                if (top != null) return Reduced(s, Effect.send(Action.SubagentStack(top.navigationID, SessionFeature.Action.VoiceTapped)))
+                return Reduced(s, Effect.send(Action.detail(SessionFeature.Action.VoiceTapped)))
+            }
+            // Nothing behind it to call: Start Voice Call's Last Viewed path.
+            return openSystemDestination(state, SystemAction.Destination.LastViewed, startsCall = true)
+        }
 
         Action.ManageServersTapped ->
             return Reduced(if (state.settings != null) state else state.presentingSettings(SettingsFeature.State.focusingServers(state.server)))
@@ -507,3 +529,27 @@ internal fun dropPin(state: State, id: String, pinnedIndex: Int?): State {
     val targetKey = if (clamped < otherIDs.size) state.sessionKey(otherIDs[clamped]) else null
     return insertingPinKey(state, key, targetKey)
 }
+
+/**
+ * The drawer offers a call (iOS `drawerOffersCall`): under Living Orb (the other styles' call
+ * lives in the composer, under the drawer), with Voice set up, and with something to call: the
+ * session or project draft behind the drawer, or the session Start Voice Call's Last Viewed path
+ * would open. A draft with no project and no session to fall back on offers none, rather than
+ * opening a project picker behind the drawer.
+ */
+val HomeFeature.State.drawerOffersCall: Boolean
+    get() {
+        if (!ExperimentalFeature.livingOrb.isActive(shared(ExperimentalFeature.livingOrb.key).value)) return false
+        val detail = sessionDetail ?: return lastViewedOrNewestSession != null
+        if (!detail.isVoiceAvailable) return false
+        return detail.session != null || detail.draftProject != null || lastViewedOrNewestSession != null
+    }
+
+/** The drawer's call button: offered, and never while a call is live (the orb is the call then). */
+val HomeFeature.State.drawerShowsCallButton: Boolean
+    get() = drawerOffersCall && (sessionDetail?.voice?.phase?.isTerminal ?: true)
+
+/** The session Start Voice Call's Last Viewed path opens: the last one viewed on this server, else the newest unarchived root session. */
+val HomeFeature.State.lastViewedOrNewestSession: OpenCodeSession?
+    get() = lastViewedSessionIDs[server.persistenceID]?.let { id -> sessions.firstOrNull { it.id == id } }
+        ?: sessions.filter { it.parentID == null && !it.isArchived }.maxByOrNull { it.updatedAt }

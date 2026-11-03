@@ -681,6 +681,9 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         /** Opens a draft whose prompt asks OpenCode to install the plugin. */
         data object NotifyPluginSetUpTapped : Action
         data object SettingsTapped : Action
+
+        /** The drawer's call button: a call on the session behind the drawer. */
+        data object DrawerCallTapped : Action
         /** Manage Servers… in the drawer's title menu: Settings arrives showing the server page. */
         data object ManageServersTapped : Action
         /** The drawer visually reached the other edge: its haptic. */

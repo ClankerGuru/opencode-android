@@ -166,6 +166,7 @@ private fun HomeFeature.coreRoute(state: State, action: Action): Reduced<State, 
     Action.PairedComputerOpened,
     Action.FirstComputerPaired,
     Action.DrawerOpenRequestHandled,
+    Action.DrawerCallTapped,
     -> reduceDrawer(state, action)
 
     is Action.InAppNoticeExpired ->

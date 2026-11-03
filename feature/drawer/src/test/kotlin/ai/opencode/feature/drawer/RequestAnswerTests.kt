@@ -4,6 +4,7 @@ import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.ImmediateClock
 import ai.opencode.core.dependencies.UuidClient
+import ai.opencode.core.experiments.ExperimentalCallStyle
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.testing.TestIsolationRule
 import ai.opencode.feature.drawer.HomeFeatureTestSupport.detail
@@ -60,6 +61,7 @@ class RequestAnswerTests {
 
     @Test
     fun switchingIntoASnapshotDuringACallEndsTheRestoredAnswer() = homeTest { h ->
+        h.callStyle(ExperimentalCallStyle.standard)
         val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
         val target = OpenCodeSession(id = "ses_target", serverTitle = "Target", projectID = "proj", directory = "/tmp/target", updatedAt = Instant.ofEpochSecond(20))
         val targetShell = OpenCodePermissionRequest(
@@ -118,7 +120,7 @@ class RequestAnswerTests {
             }
         }
         assertEquals(true, store.state.sessionDetail?.callOwnsAudio)
-        assertEquals(false, store.state.sessionDetail?.wantsRequestDock)
+        assertEquals(false, store.withDependencies { store.state.sessionDetail?.wantsRequestDock })
         assertEquals(false, store.state.sessionDetail?.isAnsweringRequest)
         assertNull(store.state.sessionDetail?.parkedComposer)
 
@@ -127,7 +129,7 @@ class RequestAnswerTests {
             state.copy(sessionDetail = detail.withPermissions(emptyList()).withRequestArrivalsAreLive(true).copy(voice = detail.voice?.copy(targetNeedsInput = false)))
         }
         assertEquals(false, store.state.sessionDetail?.isAnsweringRequest)
-        assertEquals(false, store.state.sessionDetail?.wantsRequestDock)
+        assertEquals(false, store.withDependencies { store.state.sessionDetail?.wantsRequestDock })
 
         val recordKey = "${server.id}:${target.id}"
         store.send(voice(VoiceFeature.Action.EndTapped)) { state ->
@@ -143,7 +145,7 @@ class RequestAnswerTests {
             state.copy(sessionDetail = state.sessionDetail?.copy(voice = null))
         }
         assertEquals(false, store.state.sessionDetail?.callOwnsAudio)
-        assertEquals(false, store.state.sessionDetail?.wantsRequestDock)
+        assertEquals(false, store.withDependencies { store.state.sessionDetail?.wantsRequestDock })
         assertEquals(false, store.state.sessionDetail?.isAnsweringRequest)
         assertNull(store.state.sessionDetail?.parkedComposer)
     }

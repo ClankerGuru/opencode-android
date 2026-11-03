@@ -207,9 +207,7 @@ internal fun HomeFeature.openSystemDestination(
     var s = state.copy(settings = null)
     val session: OpenCodeSession? = when (destination) {
         is SystemAction.Destination.Session -> s.sessions.firstOrNull { it.id == destination.id } ?: return Reduced(s)
-        SystemAction.Destination.LastViewed ->
-            s.lastViewedSessionIDs[s.server.persistenceID]?.let { id -> s.sessions.firstOrNull { it.id == id } }
-                ?: s.sessions.filter { it.parentID == null && !it.isArchived }.maxByOrNull { it.updatedAt }
+        SystemAction.Destination.LastViewed -> s.lastViewedOrNewestSession
         is SystemAction.Destination.Draft -> null
     }
 

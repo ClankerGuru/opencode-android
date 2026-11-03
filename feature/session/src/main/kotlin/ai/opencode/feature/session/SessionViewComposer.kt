@@ -186,6 +186,12 @@ class SessionComposerHost {
     var backgroundWorkAnchor: BackgroundWorkAnchor? by mutableStateOf(null)
     /** Catch Up's card: no project list, no swipe-up focus, its own side clearance. */
     var isCatchUpCard by mutableStateOf(false)
+
+    /**
+     * The resting orb's room above the composer (iOS `orbClearance`), in dp: what stands above
+     * the composer's top (the jump button, a draft's projects) stands above the orb too.
+     */
+    var orbClearance by mutableFloatStateOf(0f)
     /** iOS `toggleAttachmentMenu` (VIEW-PICKERS); null opens nothing. */
     var onPlusTapped: (() -> Unit)? by mutableStateOf(null)
     /** The attachment menu is open (iOS `attachmentMenu != .closed`): + shows open, the composer stays expanded. */
@@ -997,7 +1003,8 @@ private fun SessionComposerEnv.ComposerAreaContent(modifier: Modifier) {
                 host.composerPanelCovers,
                 Modifier
                     .align(Alignment.TopEnd)
-                    .offset(y = -(48 + pillGap).dp),
+                    // Above a resting orb too, which stands where the pills would.
+                    .offset(y = -(48 + pillGap + host.orbClearance).dp),
             ) {
                 // The call's open transcript covers where it would float.
                 JumpToLatestPill(isShown = host.showsJumpButton && !showsCallTranscript && !holdsClientToolCard, onClick = host.onJumpToLatest)
@@ -1048,7 +1055,8 @@ private fun SessionComposerEnv.DraftProjectsOverlay(modifier: Modifier) {
             .fillMaxWidth()
             .height(0.dp)
             .wrapContentHeight(Alignment.Bottom, unbounded = true)
-            .offset(y = -ComposerTunables.pillGap.dp),
+            // A stack's spacing above whatever comes first, and the resting orb's room: it stands over the area's top.
+            .offset(y = -(ComposerTunables.pillGap + host.orbClearance).dp),
         contentAlignment = Alignment.BottomCenter,
     ) {
         AnimatedVisibility(visible = showsDraftProjects, enter = enter, exit = exit) {

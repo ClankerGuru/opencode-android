@@ -4,6 +4,7 @@ import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.TestClock
 import ai.opencode.core.dependencies.UuidClient
+import ai.opencode.core.experiments.ExperimentalCallStyle
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.store.PresentationAction
 import ai.opencode.core.store.TestStore
@@ -52,6 +53,7 @@ import ai.opencode.server.model.OpenCodeSessionFamily
 import ai.opencode.server.model.OpenCodeShell
 import ai.opencode.server.model.OpenCodeTranscriptItem
 import java.util.UUID
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.suspendCancellableCoroutine
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -61,7 +63,6 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
-import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Port of iOS `SubagentStackTests`: opening a subagent pushes it over its parent; going back pops
@@ -429,6 +430,7 @@ class SubagentStackTests {
 
     @Test
     fun startingACallFromAPushedSubagentSyncsTheTopScreensVoiceInvariants() = homeTest { h ->
+        h.callStyle(ExperimentalCallStyle.standard)
         val childModel = OpenCodeModelRef(id = "gpt-5.4", providerID = "openai", variant = "high")
         val childURL = "https://docs.example.com/subagent"
         h.setShared(SharedKeys.voiceModeEnabled, true)
@@ -467,6 +469,7 @@ class SubagentStackTests {
 
     @Test
     fun switchingToARestoredSessionDuringACallSyncsPendingRequestsAndEndsAnswering() = homeTest { h ->
+        h.callStyle(ExperimentalCallStyle.standard)
         val otherModel = OpenCodeModelRef(id = "claude-sonnet-4", providerID = "anthropic", variant = "high")
         val state = h.home().let { home ->
             h.state {

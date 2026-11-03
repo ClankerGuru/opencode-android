@@ -16,6 +16,7 @@ internal val whatsNewShippedEntries: List<WhatsNewEntry> by lazy {
         WhatsNewShipped.openLinksFromCalls,
         WhatsNewShipped.audioInCalls,
         WhatsNewShipped.shareScreenWithAgents,
+        WhatsNewShipped.livingOrbDefault,
         WhatsNewShipped.voiceSaysWhatsRunning,
         WhatsNewShipped.screenshotShutter,
         WhatsNewShipped.callCardTakesOver,

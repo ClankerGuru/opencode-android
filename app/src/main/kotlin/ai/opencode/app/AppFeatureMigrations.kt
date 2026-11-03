@@ -22,13 +22,21 @@ import ai.opencode.server.OpenCodeServer
  * wrote iOS's `living-orb-presets.json`, so only the style key goes.
  */
 
+/**
+ * iOS `AppFeature.migrateBeforeLaunch()`: moves that must land before the first state reads its
+ * settings. [OpenCodeApplication] runs them before any window makes its store, whose state (a
+ * restored session included) reads shared switches as it's made.
+ */
+internal fun migrateBeforeLaunch() {
+    ExperimentalCallStyle.migrateToLivingOrbDefault(dependency(SharedStore))
+}
+
 /** Runs every launch migration, in iOS's order. */
 internal fun migrateSettingsIfNeeded(savedServers: List<OpenCodeServer>) {
     val store = dependency(SharedStore)
     recordInstallHistory(store, savedServers)
     ModelPickerStyle.migrateLegacySwitches(store)
     ExperimentalFeature.removeRetiredSwitches(store)
-    ExperimentalCallStyle.migrateFloatingCall(store)
     removeRetiredOrbStyles(store)
 }
 

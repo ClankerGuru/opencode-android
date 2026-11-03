@@ -149,9 +149,66 @@ class FloatingOrbTests {
         val raised = resting.translate(0f, -340f)
         center.noteComposer(raised)
         assertEquals(raised, center.composer)
+        // Beside a tablet's sidebar the composer stands off-centre and stays.
+        val column = Rect(Offset(400f, 1100f), Size(600f, 56f))
+        center.screenWidth = 1180f
+        center.noteComposer(column)
+        assertEquals(raised, center.composer)
+        center.noteComposer(column, besideSidebar = true)
+        assertEquals(column, center.composer)
     }
 
-    @Test fun theExperimentIsOffByDefault() {
+    /** The transcript ends above wherever the orb actually rests over the composer's column, and makes no room beside it or well above it. */
+    @Test fun theTranscriptMakesRoomForTheOrbWhereItRests() {
+        val composer = Rect(Offset(0f, 800f), Size(440f, 60f))
+        val gap = 12f
+        val size = 56f
+        val rest = Rect(Offset(360f, 800f - gap - size), Size(size, size))
+        assertEquals("At rest: its size and the gap", size + gap, FloatingCallRestArea.clearance(rest, composer, gap), 0.001f)
+        val nudged = rest.translate(0f, -30f)
+        assertEquals("Nudged up: all of it", size + gap + 30f, FloatingCallRestArea.clearance(nudged, composer, gap), 0.001f)
+        val keyboard = composer.translate(0f, -300f)
+        assertEquals("Over a keyboard", size + gap, FloatingCallRestArea.clearance(rest.translate(0f, -300f), keyboard, gap), 0.001f)
+        assertEquals("Dragged up over the transcript", 0f, FloatingCallRestArea.clearance(rest.translate(0f, -400f), composer, gap), 0.001f)
+        val wide = Rect(Offset(300f, 800f), Size(600f, 60f))
+        assertEquals("Beside the column", 0f, FloatingCallRestArea.clearance(rest.translate(600f, 0f), wide, gap), 0.001f)
+        assertEquals(0f, FloatingCallRestArea.clearance(Rect.Zero, composer, gap), 0.001f)
+    }
+
+    /**
+     * The session works the orb's rest out from its own composer in the same pass, so the room
+     * holds as the keyboard rises or falls and the composer grows, rather than reading a rest the
+     * window hasn't moved yet (it swung 68 → 0 → 68).
+     */
+    @Test fun theRoomHoldsAsTheComposerMoves() {
+        val center = FloatingCallCenter()
+        val gap = FloatingCallTunables.composerGap.value.toFloat()
+        val size = 56f
+        center.orbLayout = FloatingCallOrbLayout(
+            screen = Size(440f, 956f),
+            safeArea = FloatingCallEdgeInsets(top = 62f, leading = 0f, bottom = 34f, trailing = 0f),
+            size = Size(size, size),
+        )
+        fun room(composerTop: Float, height: Float = 60f): Float {
+            val composer = Rect(Offset(0f, composerTop), Size(440f, height))
+            val orb = center.restingOrb(composerTop) ?: return -1f
+            return FloatingCallRestArea.clearance(orb, composer, gap)
+        }
+        // At rest, the keyboard rising, the composer growing, the keyboard falling.
+        for ((top, height) in listOf(862f to 60f, 520f to 60f, 440f to 140f, 862f to 60f)) {
+            assertEquals("Composer top $top", size + gap, room(top, height), 0.001f)
+        }
+        // Dragged just above the composer, it holds there as the composer rises into it, and the room follows the orb.
+        center.place = FloatingCallPlace(x = 380f, y = 862f - gap - size / 2 - 10f)
+        assertEquals(size + gap + 10f, room(862f), 0.001f)
+        assertEquals("Pushed up by the keyboard: it rests on the composer", size + gap, room(520f), 0.001f)
+        // No call window: no room.
+        center.orbLayout = null
+        assertNull(center.restingOrb(862f))
+    }
+
+    @Test fun theExperimentIsOnByDefaultButOffInTests() {
+        assertTrue(ExperimentalFeature.livingOrb.defaultEnabled)
         assertFalse(ExperimentalFeatures.testValue(ExperimentalFeature.livingOrb))
         assertEquals("Living Orb", ExperimentalFeature.livingOrb.title)
         val center = FloatingCallCenter()

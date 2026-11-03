@@ -3,26 +3,30 @@ package ai.opencode.feature.session
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.DependencyValues
 import ai.opencode.core.dependencies.asContextElement
+import ai.opencode.core.experiments.ExperimentalCallStyle
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
+import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.SharedStore
+import ai.opencode.core.sharing.experimental
+import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.Reducer
 import ai.opencode.core.store.TestStore
-import ai.opencode.server.OpenCodeServer
 import ai.opencode.feature.composer.modelpicker.ModelDisplayNames
+import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeModel
 import ai.opencode.server.model.OpenCodeModelRef
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.OpenCodeTranscriptItem
+import java.time.Instant
+import kotlin.reflect.KClass
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
-import java.time.Instant
-import kotlin.reflect.KClass
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.seconds
 
 /**
  * Shared setup for the ports of the iOS session tests (`SessionFeatureTests` and its
@@ -115,6 +119,15 @@ internal object SessionTestSupport {
 
         /** Builds a value that reads shared keys (a `SessionFeature.State`) in this world. */
         fun <R> state(block: () -> R): R = DependencyValues.withValues(values, block)
+
+        /**
+         * iOS `@Test(.callStyle(x))`: this test's shared store holds one call style. Living Orb is
+         * the default; tests about the Standard call view name it.
+         */
+        fun callStyle(style: ExperimentalCallStyle) = state {
+            shared(experimental(ExperimentalFeature.livingOrb)).set(style.livingOrb)
+            shared(experimental(ExperimentalFeature.callTray)).set(style.callTray)
+        }
 
         /** iOS `makeState(...)` (`SessionFeatureTests`). */
         fun makeState(

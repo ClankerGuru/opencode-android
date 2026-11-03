@@ -54,6 +54,9 @@ import ai.opencode.feature.session.header.SessionHeaderStyle
 import ai.opencode.feature.system.notifications.SessionNotificationsClient
 import ai.opencode.feature.voice.CallTrayController
 import ai.opencode.feature.voice.DotScopeRenderer
+import ai.opencode.feature.voice.FloatingCallCenter
+import ai.opencode.feature.voice.FloatingCallRestArea
+import ai.opencode.feature.voice.FloatingCallTunables
 import ai.opencode.feature.voice.LocalDotScopeCovered
 import ai.opencode.feature.voice.VoiceStoreOf
 import ai.opencode.feature.voice.floatingCallComposer
@@ -66,6 +69,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -114,7 +118,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -220,6 +227,25 @@ fun SessionView(
         composerHost.modelPanels?.closeModelPanels()
     }
 
+    // iOS `orbClearance`: the room a resting orb takes above the composer, so it covers none of
+    // the transcript's end. Beside the composer's column or dragged well up it makes none; only
+    // the screen showing makes room.
+    val floatingCallCenter = remember { FloatingCallCenter.shared }
+    val callLive by remember(callStore) { callStore?.let { call -> call.states.map { !it.phase.isTerminal } } ?: flowOf(false) }
+        .collectAsState(false)
+    var orbComposer by remember { mutableStateOf(Rect.Zero) }
+    val orbRoom = if (!floatsCall || isCovered || !callLive) 0f else {
+        val orb = floatingCallCenter.restingOrb(composerTop = orbComposer.top)
+        if (orb == null) 0f else FloatingCallRestArea.clearance(orb, orbComposer, FloatingCallTunables.composerGap.value.toFloat())
+    }
+    val orbReducedMotion = rememberReduceMotion()
+    val orbClearance by animateFloatAsState(
+        orbRoom,
+        if (orbReducedMotion) Motion.easeInOut(0.2) else FloatingCallTunables.follow.spec(),
+        label = "orbClearance",
+    )
+    SideEffect { composerHost.orbClearance = orbClearance }
+
     val work by store.observe(BackgroundWorkModel::from)
     val agentScope by store.observe { "${it.server.persistenceID}|${it.session?.id ?: "draft"}" }
     val errorMessage by store.observe { it.errorMessage }
@@ -314,6 +340,19 @@ fun SessionView(
                         // iOS `ComposerKeyboardStepHold`: the composer glides after a docked IME's unanimated step.
                         .composerKeyboardStepHold()
                         .onSizeChanged { scrollEdgeBridge.composerHeight = with(density) { it.height.toDp().value } }
+                        // The resting orb's room: the transcript's end rises above it.
+                        .padding(top = orbClearance.dp)
+                        // The composer without that room, for where the orb rests.
+                        .then(
+                            if (floatsCall) {
+                                Modifier.onGloballyPositioned {
+                                    val b = it.boundsInWindow()
+                                    val d = density.density
+                                    val frame = Rect(b.left / d, b.top / d, b.right / d, b.bottom / d)
+                                    if (orbComposer != frame) orbComposer = frame
+                                }
+                            } else Modifier,
+                        )
                         // A floating call rests above the composer.
                         .then(if (floatsCall) Modifier.floatingCallComposer() else Modifier)
                         // The column itself, not the pane: whether the call's card covers it.

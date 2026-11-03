@@ -48,7 +48,7 @@ enum class ExperimentalFeature(
     agentSelection("agent-selection", "Agent Selection", ExperimentalGroup.composer, "Choose Build, Plan, or your own", "person.crop.circle", order = 30),
     hideModels("hide-models", "Hide Unused Models", ExperimentalGroup.composer, "Choose models the picker lists", "eye.slash", order = 40),
     callTray("call-tray", "Call Tray", ExperimentalGroup.calls, "Call scope beneath the composer", "rectangle.bottomhalf.inset.filled", order = 50),
-    livingOrb("living-orb", "Living Orb", ExperimentalGroup.calls, "Keep calls in a floating orb", "circle.hexagongrid.fill", order = 60),
+    livingOrb("living-orb", "Living Orb", ExperimentalGroup.calls, "Keep calls in a floating orb", "circle.hexagongrid.fill", order = 60, defaultEnabled = true),
     newMessagesDivider(
         "new-messages-divider", "New Messages Divider", ExperimentalGroup.transcript, "Mark long unread replies",
         "text.line.first.and.arrowtriangle.forward", order = 70, defaultEnabled = true, isGraduated = true,

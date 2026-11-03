@@ -2,8 +2,8 @@ package ai.opencode.feature.session
 
 import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.DependencyValues
-import android.content.ContextWrapper
 import ai.opencode.core.dependencies.UuidClient
+import ai.opencode.core.experiments.ExperimentalCallStyle
 import ai.opencode.core.files.ComposerStagedFile
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.feature.composer.ComposerAttachmentsFeature
@@ -33,7 +33,11 @@ import ai.opencode.server.model.OpenCodePendingRequests
 import ai.opencode.server.model.OpenCodePermissionRequest
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.OpenCodeUploadEvent
+import android.content.ContextWrapper
 import androidx.compose.ui.geometry.Offset
+import java.io.File
+import java.time.Instant
+import java.util.UUID
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.serialization.json.Json
@@ -43,9 +47,6 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.io.File
-import java.time.Instant
-import java.util.UUID
 
 /**
  * Port of iOS `RequestAnswerTests.swift`.
@@ -260,10 +261,11 @@ class RequestAnswerTests {
     }
 
     @Test fun aCallKeepsTheComposerAndItsAgentAnswers() = sessionTest { h ->
+        h.callStyle(ExperimentalCallStyle.standard)
         val base = h.state(draft = "Half a message", forms = listOf(slack), answering = false)
         val initial = h.state { base.copy(voice = VoiceFeature.State(base.server, session)) }
-        assertFalse(initial.wantsRequestDock)
-        assertNull(initial.requestBar)
+        assertFalse(h.state { initial.wantsRequestDock })
+        assertNull(h.state { initial.requestBar })
     }
 
     // region The parked message is a composer of its own

@@ -1,10 +1,6 @@
 package ai.opencode.feature.drawer
 
-import ai.opencode.feature.drawer.list.rememberInboxSidebarOn
-import ai.opencode.feature.drawer.list.InboxSidebarList
 import ai.opencode.core.dependencies.dependency
-import ai.opencode.feature.system.SessionWindowTarget
-import ai.opencode.feature.system.WindowsClient
 import ai.opencode.core.experiments.ExperimentalFeature
 import ai.opencode.core.experiments.key
 import ai.opencode.core.motion.rememberReduceMotion
@@ -25,14 +21,17 @@ import ai.opencode.feature.drawer.list.DrawerListRow
 import ai.opencode.feature.drawer.list.DrawerListView
 import ai.opencode.feature.drawer.list.DrawerPinDrag
 import ai.opencode.feature.drawer.list.DrawerRowMenuItem
-import ai.opencode.feature.settings.whatsnew.WhatsNewFeature
-import ai.opencode.feature.drawer.motion.DrawerControlsTraceView
+import ai.opencode.feature.drawer.list.InboxSidebarList
+import ai.opencode.feature.drawer.list.rememberInboxSidebarOn
 import ai.opencode.feature.drawer.motion.DrawerControlsTrace
+import ai.opencode.feature.drawer.motion.DrawerControlsTraceView
 import ai.opencode.feature.drawer.motion.DrawerKeyboardMonitor
 import ai.opencode.feature.drawer.motion.DrawerRevealTrace
 import ai.opencode.feature.drawer.motion.DrawerSearchPill
 import ai.opencode.feature.drawer.motion.DrawerSearchPillDefaults
 import ai.opencode.feature.drawer.motion.DrawerTimeReveal
+import ai.opencode.feature.drawer.motion.RunServerSwapMotion
+import ai.opencode.feature.drawer.motion.ServerSwapMotion
 import ai.opencode.feature.drawer.motion.drawerControlsTraceProbe
 import ai.opencode.feature.drawer.motion.drawerPanList
 import ai.opencode.feature.drawer.motion.drawerSearchFocusFade
@@ -42,32 +41,38 @@ import ai.opencode.feature.drawer.style.DrawerEdgeStyle
 import ai.opencode.feature.drawer.style.DrawerFooterBackdrop
 import ai.opencode.feature.drawer.style.DrawerHeaderBackdrop
 import ai.opencode.feature.drawer.style.DrawerMetrics
-import ai.opencode.feature.drawer.style.DrawerSectionBreak
 import ai.opencode.feature.drawer.style.DrawerRowLayout
+import ai.opencode.feature.drawer.style.DrawerSectionBreak
 import ai.opencode.feature.drawer.style.DrawerTunables
 import ai.opencode.feature.drawer.switcher.DrawerTitleView
 import ai.opencode.feature.drawer.switcher.ServerFlowTitle
 import ai.opencode.feature.drawer.switcher.drawerTitleServers
 import ai.opencode.feature.drawer.switcher.rememberServerFlowOn
-import ai.opencode.feature.drawer.motion.RunServerSwapMotion
-import ai.opencode.feature.drawer.motion.ServerSwapMotion
-import ai.opencode.server.ServerSharedKeys
+import ai.opencode.feature.session.ComposerTunables
+import ai.opencode.feature.settings.whatsnew.WhatsNewFeature
+import ai.opencode.feature.system.SessionWindowTarget
+import ai.opencode.feature.system.WindowsClient
 import ai.opencode.feature.voice.CallTrayComposerMetrics
 import ai.opencode.feature.voice.CallTrayDockSlot
 import ai.opencode.feature.voice.CallTrayDockTunables
 import ai.opencode.feature.voice.CallTrayTunables
+import ai.opencode.feature.voice.FloatingCallCenter
+import ai.opencode.feature.voice.floatingCallDrawerButton
+import ai.opencode.server.ServerSharedKeys
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -78,6 +83,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.union
 import androidx.compose.material3.AlertDialog
@@ -88,6 +94,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -362,13 +369,16 @@ fun HomeDrawer(
             ) {
                 DrawerNewSessionButton(enabled = !disconnected, onClick = viewState::startNewSessionFromDrawer)
                 Spacer(Modifier.weight(1f))
-                OpenCodeIconButton(
-                    symbol = SFSymbol.GearshapeFill,
-                    contentDescription = "Settings",
-                    onClick = viewState::openSettings,
-                    size = DrawerTunables.footerHeight,
-                    modifier = Modifier.testTag("drawer-settings"),
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    DrawerCallSlot(store, disconnected, reducedMotion)
+                    OpenCodeIconButton(
+                        symbol = SFSymbol.GearshapeFill,
+                        contentDescription = "Settings",
+                        onClick = viewState::openSettings,
+                        size = DrawerTunables.footerHeight,
+                        modifier = Modifier.testTag("drawer-settings"),
+                    )
+                }
             }
             AnimatedVisibility(
                 visible = carriesCallTray,
@@ -524,5 +534,49 @@ private fun DrawerNewSessionButton(enabled: Boolean, onClick: () -> Unit) {
 private fun Modifier.swallowingTouches(): Modifier = pointerInput(Unit) {
     awaitPointerEventScope {
         while (true) awaitPointerEvent()
+    }
+}
+
+/**
+ * The drawer's call button (iOS `DrawerCallButton`), left of Settings while the drawer offers a
+ * call ([drawerOffersCall]): a call on the session behind the drawer. Its slot stays while a call
+ * is live, so a call ending with the drawer open lands back in it; the button itself shows only
+ * with no call ([drawerShowsCallButton]).
+ */
+@Composable
+private fun DrawerCallSlot(store: StoreOf<HomeFeature.State, HomeFeature.Action>, disconnected: Boolean, reducedMotion: Boolean) {
+    val center = remember { FloatingCallCenter.shared }
+    val isDrawerOpen by store.observe { it.isDrawerOpen }
+    val offersCall by store.observe { it.drawerOffersCall }
+    val showsCall by store.observe { it.drawerShowsCallButton }
+    SideEffect { center.isDrawerOpen = isDrawerOpen }
+    DisposableEffect(center) {
+        onDispose {
+            center.isDrawerOpen = false
+            center.drawerCallButton = null
+        }
+    }
+    if (!offersCall) return
+    Box(Modifier.size(DrawerTunables.footerHeight), contentAlignment = Alignment.Center) {
+        // The circle a floating call breaks out of and lands back in, as the composer's call button's.
+        Box(Modifier.size(ComposerTunables.buttonDiameter.dp).floatingCallDrawerButton())
+        AnimatedVisibility(
+            visible = showsCall,
+            enter = if (reducedMotion) EnterTransition.None else fadeIn(CallTrayTunables.close.spec()),
+            exit = if (reducedMotion) ExitTransition.None else fadeOut(CallTrayTunables.close.spec()),
+        ) {
+            OpenCodeIconButton(
+                symbol = SFSymbol.Waveform,
+                contentDescription = "Start Voice Call",
+                onClick = {
+                    // The orb breaks out of this button, not the composer's under the drawer.
+                    center.breakoutFrom = center.drawerCallButton
+                    store.send(HomeFeature.Action.DrawerCallTapped)
+                },
+                size = DrawerTunables.footerHeight,
+                enabled = !disconnected,
+                modifier = Modifier.testTag("drawer-call"),
+            )
+        }
     }
 }

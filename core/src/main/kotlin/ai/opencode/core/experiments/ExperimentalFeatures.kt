@@ -54,8 +54,9 @@ enum class ExperimentalGroup {
 
 /**
  * Settings' one Call Style choice, stored as the two call experiments so saved switches carry
- * over. Living Orb is the floating call: it replaced the old Floating Call switch
- * ([migrateFloatingCall]). Living Orb wins when both are on.
+ * over. Living Orb is the floating call and the default (`livingOrb` is on until switched off);
+ * it replaced the old Floating Call switch. [migrateToLivingOrbDefault] moves earlier installs to
+ * it once. Living Orb wins when both are on.
  */
 enum class ExperimentalCallStyle {
     standard, floating, tray;
@@ -94,17 +95,40 @@ enum class ExperimentalCallStyle {
         fun of(callTray: Boolean, livingOrb: Boolean): ExperimentalCallStyle =
             if (livingOrb) floating else if (callTray) tray else standard
 
+        /** iOS `defaultStyle`: the style with neither switch set, Living Orb. */
+        val defaultStyle: ExperimentalCallStyle
+            get() = of(
+                callTray = ExperimentalFeature.callTray.defaultEnabled,
+                livingOrb = ExperimentalFeature.livingOrb.defaultEnabled,
+            )
+
+        /** Marks the one-time move to Living Orb as done. */
+        const val LIVING_ORB_MIGRATION_KEY = "call-style-migrated-orb-default"
+
         /**
-         * Moves a saved Floating Call switch to Living Orb once, then removes it. Call Tray won
-         * over Floating Call, so a saved tray stays the tray.
+         * Living Orb became the default (iOS, Nov 1): once per install, before anything reads a
+         * call-style switch (`migrateBeforeLaunch`). A saved switch can't tell a choice from an
+         * untouched default, so a Tray in use stays the Tray (a saved Floating Call switch it
+         * overrode included) and everyone else takes Living Orb. A choice made after that sticks.
+         *
+         * Android divergence: iOS's lab `OPENCODE_LAB_EXPERIMENTS_OFF` (UI suites starting Living
+         * Orb off) is n/a; Android has no lab experiment overrides.
          */
-        fun migrateFloatingCall(store: SharedStore) {
-            val legacy = SharedKey.appStorage(LEGACY_FLOATING_KEY, false)
-            if (!store.contains(legacy)) return
-            val livingOrb = store.reference(experimental(ExperimentalFeature.livingOrb))
-            val tray = store.reference(experimental(ExperimentalFeature.callTray))
-            if (store.reference(legacy).value && !tray.value) livingOrb.set(true)
-            store.remove(legacy)
+        fun migrateToLivingOrbDefault(store: SharedStore) {
+            val marker = store.reference(SharedKey.appStorage(LIVING_ORB_MIGRATION_KEY, false))
+            if (marker.value) return
+            marker.set(true)
+            val livingOrbKey = experimental(ExperimentalFeature.livingOrb)
+            val trayKey = experimental(ExperimentalFeature.callTray)
+            store.remove(SharedKey.appStorage(LEGACY_FLOATING_KEY, false))
+            val trayInUse = store.contains(trayKey) && store.reference(trayKey).value
+            val orbSaved = store.contains(livingOrbKey) && store.reference(livingOrbKey).value
+            if (trayInUse && !orbSaved) {
+                store.reference(livingOrbKey).set(false)
+            } else {
+                // Unset, it reads the default: Living Orb.
+                store.remove(livingOrbKey)
+            }
         }
     }
 }

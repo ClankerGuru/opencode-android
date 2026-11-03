@@ -23,6 +23,9 @@ import kotlin.math.min
 /** Where the orb's centre rests: null [x] is the trailing side, null [y] just above the composer, following it as the keyboard raises it. */
 data class FloatingCallPlace(val x: Float? = null, val y: Float? = null)
 
+/** The floating call's screen, safe area and resting size, for working out where its orb rests from outside its overlay (iOS `FloatingCallOrbLayout`). */
+data class FloatingCallOrbLayout(val screen: Size, val safeArea: FloatingCallEdgeInsets, val size: Size)
+
 /** The screen's safe area in dp, by side (SwiftUI `EdgeInsets`). */
 data class FloatingCallEdgeInsets(val top: Float = 0f, val leading: Float = 0f, val bottom: Float = 0f, val trailing: Float = 0f)
 
@@ -61,6 +64,21 @@ data class FloatingCallRestArea(
             val top = min(minY, maxY)
             return Rect(minX, top, minX + max(0f, maxX - minX), top + max(0f, maxY - minY))
         }
+
+    companion object {
+        /**
+         * How far a session raises its transcript's end so the orb resting at [orb] covers none
+         * of it: from the orb's top down to the composer's (`size + composerGap` at its rest).
+         * None when the orb stands beside the composer's column (a wide pane) or well up over the
+         * transcript, dragged there, where it rests over the text by choice.
+         */
+        fun clearance(orb: Rect, composer: Rect, gap: Float): Float {
+            if (orb.width <= 0f || composer.width <= 0f) return 0f
+            if (orb.right <= composer.left || orb.left >= composer.right) return 0f
+            if (orb.bottom <= composer.top - gap - orb.height) return 0f
+            return max(0f, composer.top - orb.top)
+        }
+    }
 
     val reach: Rect
         get() {

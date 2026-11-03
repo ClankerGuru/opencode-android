@@ -4,6 +4,7 @@ import ai.opencode.core.dependencies.DependencyValues
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.sharing.SharedKey
 import ai.opencode.core.sharing.SharedKeys
+import ai.opencode.core.sharing.InMemorySharedBytes
 import ai.opencode.core.sharing.SharedStore
 import ai.opencode.core.sharing.experimental
 import ai.opencode.core.sharing.shared
@@ -60,8 +61,10 @@ class ExperimentalFeatureTests {
             assertTrue(ExperimentalFeatures.liveValue(ExperimentalFeature.newMessagesDivider))
             assertTrue(shared(experimental(ExperimentalFeature.newMessagesDivider)).value)
             assertTrue(ExperimentalFeatures.liveValue(ExperimentalFeature.projectIcons))
+            assertTrue(ExperimentalFeatures.liveValue(ExperimentalFeature.livingOrb))
+            val onByDefault = setOf(ExperimentalFeature.newMessagesDivider, ExperimentalFeature.projectIcons, ExperimentalFeature.livingOrb)
             for (feature in ExperimentalFeature.allCases) {
-                if (feature == ExperimentalFeature.newMessagesDivider || feature == ExperimentalFeature.projectIcons) continue
+                if (feature in onByDefault) continue
                 assertFalse("$feature stays off", ExperimentalFeatures.liveValue(feature))
             }
         }
@@ -218,35 +221,57 @@ class ExperimentalFeatureTests {
     }
 
     @Test
-    fun theOldFloatingCallSwitchMovesToLivingOrbOnce() {
-        data class Migrated(val livingOrb: Boolean, val tray: Boolean, val leftover: Boolean)
-        fun migrated(setup: (SharedStore) -> Unit): Migrated = withFreshStorage {
-            val defaults = dependency(SharedStore)
-            setup(defaults)
-            ExperimentalCallStyle.migrateFloatingCall(defaults)
-            Migrated(
-                defaults.bool("experimental-living-orb"), defaults.bool("experimental-call-tray"),
-                defaults.has(ExperimentalCallStyle.LEGACY_FLOATING_KEY),
-            )
+    fun livingOrbIsTheDefaultCallStyle() {
+        assertTrue(ExperimentalFeature.livingOrb.defaultEnabled)
+        assertFalse("Call Style stays in Settings › Experimental › Calls", ExperimentalFeature.livingOrb.isGraduated)
+        assertFalse(ExperimentalFeature.callTray.defaultEnabled)
+        assertEquals(ExperimentalCallStyle.floating, ExperimentalCallStyle.defaultStyle)
+        assertFalse("Reducer tests still start every experiment off", ExperimentalFeatures.testValue(ExperimentalFeature.livingOrb))
+    }
+
+    /**
+     * Living Orb became the default (Nov 1): every install moves to it once, except a Tray in
+     * use. Saved switches can't tell a choice from a default an earlier read wrote, so Standard
+     * moves too. Each phase opens its own [SharedStore] over the same bytes, as each launch does.
+     */
+    @Test
+    fun livingOrbBecomesTheDefaultOnceExceptForATrayInUse() {
+        val orb = "experimental-living-orb"
+        val tray = "experimental-call-tray"
+        val legacy = ExperimentalCallStyle.LEGACY_FLOATING_KEY
+        fun style(setup: (SharedStore) -> Unit): Pair<ExperimentalCallStyle, Boolean> {
+            val bytes = InMemorySharedBytes()
+            setup(SharedStore(bytes))
+            ExperimentalCallStyle.migrateToLivingOrbDefault(SharedStore(bytes))
+            val after = SharedStore(bytes)
+            val livingOrb = after.reference(experimental(ExperimentalFeature.livingOrb)).value
+            val callTray = after.reference(experimental(ExperimentalFeature.callTray)).value
+            return ExperimentalCallStyle.of(callTray = callTray, livingOrb = livingOrb) to after.has(legacy)
         }
-        assertEquals(Migrated(false, false, false), migrated { })
-        assertEquals(Migrated(true, false, false), migrated { it.save(ExperimentalCallStyle.LEGACY_FLOATING_KEY, true) })
-        assertEquals(Migrated(false, false, false), migrated { it.save(ExperimentalCallStyle.LEGACY_FLOATING_KEY, false) })
+        assertEquals("Never chose: Living Orb", ExperimentalCallStyle.floating to false, style { })
+        assertEquals("A written default or Standard: Living Orb", ExperimentalCallStyle.floating to false, style { it.save(orb, false) })
+        assertEquals(ExperimentalCallStyle.floating to false, style { it.save(orb, false); it.save(tray, false) })
+        assertEquals("A Tray in use stays", ExperimentalCallStyle.tray to false, style { it.save(tray, true) })
+        assertEquals(ExperimentalCallStyle.tray to false, style { it.save(tray, true); it.save(orb, false) })
+        assertEquals("Living Orb won over the tray", ExperimentalCallStyle.floating to false, style { it.save(tray, true); it.save(orb, true) })
+        assertEquals(ExperimentalCallStyle.floating to false, style { it.save(orb, true) })
+        assertEquals("Floating Call moves to Living Orb", ExperimentalCallStyle.floating to false, style { it.save(legacy, true) })
+        assertEquals(ExperimentalCallStyle.floating to false, style { it.save(legacy, false) })
         assertEquals(
             "Call Tray won over Floating Call, so the tray stays",
-            Migrated(false, true, false),
-            migrated {
-                it.save(ExperimentalCallStyle.LEGACY_FLOATING_KEY, true)
-                it.save("experimental-call-tray", true)
-            },
+            ExperimentalCallStyle.tray to false,
+            style { it.save(legacy, true); it.save(tray, true) },
         )
+
+        // Once: a choice made afterwards sticks.
+        val bytes = InMemorySharedBytes()
+        ExperimentalCallStyle.migrateToLivingOrbDefault(SharedStore(bytes))
+        SharedStore(bytes).let { it.save(orb, false); it.save(tray, false) }
+        ExperimentalCallStyle.migrateToLivingOrbDefault(SharedStore(bytes))
         assertEquals(
-            "Living Orb already on stays on",
-            Migrated(true, false, false),
-            migrated {
-                it.save(ExperimentalCallStyle.LEGACY_FLOATING_KEY, false)
-                it.save("experimental-living-orb", true)
-            },
+            "Standard chosen after the move stays",
+            false,
+            SharedStore(bytes).reference(SharedKey.appStorage<Boolean?>(orb, null)).value,
         )
     }
 

@@ -113,7 +113,7 @@ fun ExperimentalSettingsView(store: SettingsStore, focus: ExperimentalFeature?) 
         }
         settingsSection(
             key = ExperimentalGroup.calls,
-            header = header(ExperimentalGroup.calls, if (callStyle != ExperimentalCallStyle.standard) 1 else 0),
+            header = header(ExperimentalGroup.calls, if (callStyle != ExperimentalCallStyle.defaultStyle) 1 else 0),
         ) {
             val highlight by animateColorAsState(
                 if (highlighted == ExperimentalFeature.callTray) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) else Color.Transparent,
@@ -199,7 +199,7 @@ fun ExperimentalSettingsRow(onClick: () -> Unit) {
     val toggles = ExperimentalGroup.entries.flatMap { it.toggles }
     val enabled = toggles.map { feature -> remember(feature) { shared(feature.key).flow }.collectAsState().value }
     val styled = (if (ModelPickerStyle.active(modelPickerStored) != ModelPickerStyle.today) 1 else 0) +
-        (if (ExperimentalCallStyle.of(callTray = callTray, livingOrb = livingOrb) != ExperimentalCallStyle.standard) 1 else 0)
+        (if (ExperimentalCallStyle.of(callTray = callTray, livingOrb = livingOrb) != ExperimentalCallStyle.defaultStyle) 1 else 0)
     val on = styled + enabled.count { it }
     SettingsRow("Experimental", "flask.fill", SettingsTint.Gray, value = if (on == 0) null else "$on On", onClick = onClick)
 }

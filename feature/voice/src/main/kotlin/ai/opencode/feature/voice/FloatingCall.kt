@@ -238,10 +238,28 @@ class FloatingCallCenter(readsLabHooks: Boolean = false) {
     var callButton: Rect? = null
 
     /**
-     * Where the call button was when it was tapped: the break-out starts there. Taken once; a
-     * call started any other way starts at [callButton] while it's fresh, else at its rest.
+     * Where the call button was when it was tapped (the composer's or the drawer's): the
+     * break-out starts there. Taken once; a call started any other way starts at
+     * [landingButton] while it's fresh, else at its rest.
      */
     var breakoutFrom: Rect? = null
+
+    /** The drawer's call button circle, where it stands or comes back to, while the drawer offers a call; null otherwise. */
+    var drawerCallButton: Rect? = null
+
+    /** The phone's drawer is open over the session: its composer is out of sight. */
+    var isDrawerOpen: Boolean = false
+
+    /**
+     * Where a call ending now lands: with the drawer open its call button (or nowhere, so the
+     * call fades where it rests), never the composer's button hidden under the drawer; otherwise
+     * the composer's.
+     */
+    val landingButton: Rect?
+        get() = (if (isDrawerOpen) drawerCallButton else callButton)?.takeIf { it.width > 0f }
+
+    /** The floating call's screen, safe area and resting size while its overlay shows one, for [restingOrb]. */
+    var orbLayout by mutableStateOf<FloatingCallOrbLayout?>(null)
 
     /**
      * The composer and what stands above it (pills, the jump button), as last laid out with the
@@ -269,8 +287,8 @@ class FloatingCallCenter(readsLabHooks: Boolean = false) {
     var panelRequest by mutableStateOf(Request(false, 0))
         private set
 
-    /** Where the orb rests for this run, once dragged. */
-    var place: FloatingCallPlace? = null
+    /** Where the orb rests for this run, once dragged. The session makes room for it while it rests on the composer (`orbClearance`). */
+    var place by mutableStateOf<FloatingCallPlace?>(null)
 
     /** The overlay's width, to tell a composer at rest from one sliding with the drawer. */
     var screenWidth: Float = 0f
@@ -303,15 +321,30 @@ class FloatingCallCenter(readsLabHooks: Boolean = false) {
     /** Living Orb's stored switch, or the lab's forced flag (iOS 64ff3ed7 merged Floating Call into Living Orb). */
     fun isOn(stored: Boolean): Boolean = forced || ExperimentalFeature.livingOrb.isActive(stored)
 
-    /** Kept only while the card rests shut: the composer slides with the drawer, and the orb stays where it was. */
-    fun noteComposer(frame: Rect) {
-        if (frame.width <= 0 || !(screenWidth == 0f || abs(frame.center.x - screenWidth / 2) < 2)) return
+    /**
+     * Kept only while the card rests shut: the composer slides with the drawer, and the orb stays
+     * where it was. Beside a wide screen's sidebar the composer stands off-centre and doesn't
+     * slide: kept there too.
+     */
+    fun noteComposer(frame: Rect, besideSidebar: Boolean = false) {
+        if (frame.width <= 0 || !(besideSidebar || screenWidth == 0f || abs(frame.center.x - screenWidth / 2) < 2)) return
         if (composer != frame) composer = frame
     }
 
     fun noteComposerColumn(frame: Rect) {
         if (frame.width <= 0 || composerColumn == frame) return
         composerColumn = frame
+    }
+
+    /**
+     * Where the orb rests (or comes back to from the card) over a composer whose top is
+     * [composerTop], in window dp: worked out from the composer as it's laid out, so the
+     * session's room for it never reads a rest the overlay hasn't caught up to.
+     */
+    fun restingOrb(composerTop: Float): Rect? {
+        val layout = orbLayout ?: return null
+        val area = FloatingCallRestArea(layout.screen, layout.safeArea, composerTop, layout.size)
+        return area.frame(place ?: FloatingCallPlace())
     }
 
     fun requestPanel(open: Boolean) {
@@ -332,6 +365,12 @@ fun Modifier.floatingCallComposer(): Modifier = this then FloatingCallFrameEleme
 fun Modifier.floatingCallButton(): Modifier = this then FloatingCallFrameElement(FloatingCallFrameKind.callButton)
 
 /**
+ * Reports this element (the drawer's call button circle) as [FloatingCallCenter.drawerCallButton],
+ * cleared when it leaves. Apply it only while the drawer offers a call.
+ */
+fun Modifier.floatingCallDrawerButton(): Modifier = this then FloatingCallFrameElement(FloatingCallFrameKind.drawerCallButton)
+
+/**
  * Reports this element (the composer's readable column, not the pane) to
  * [FloatingCallCenter.noteComposerColumn]: whether the call's card covers it. Apply it only while
  * the call floats and the screen shows (iOS `onGeometryChange` gated on `floatsCall`, `!isCovered`).
@@ -339,7 +378,7 @@ fun Modifier.floatingCallButton(): Modifier = this then FloatingCallFrameElement
 fun Modifier.floatingCallComposerColumn(): Modifier = this then FloatingCallFrameElement(FloatingCallFrameKind.composerColumn)
 
 @Suppress("EnumEntryName")
-private enum class FloatingCallFrameKind { composer, callButton, composerColumn }
+private enum class FloatingCallFrameKind { composer, callButton, composerColumn, drawerCallButton }
 
 private data class FloatingCallFrameElement(val kind: FloatingCallFrameKind) : ModifierNodeElement<FloatingCallFrameNode>() {
     override fun create() = FloatingCallFrameNode(kind)
@@ -358,7 +397,12 @@ private class FloatingCallFrameNode(var kind: FloatingCallFrameKind) : Modifier.
             FloatingCallFrameKind.composer -> center.noteComposer(frame)
             FloatingCallFrameKind.callButton -> center.callButton = frame
             FloatingCallFrameKind.composerColumn -> center.noteComposerColumn(frame)
+            FloatingCallFrameKind.drawerCallButton -> center.drawerCallButton = frame
         }
+    }
+
+    override fun onDetach() {
+        if (kind == FloatingCallFrameKind.drawerCallButton) FloatingCallCenter.shared.drawerCallButton = null
     }
 }
 
@@ -609,7 +653,7 @@ private class FloatingCallSurfaceModel(
         val state = store.state
         val fresh = state.phase == VoiceFeature.State.Phase.Connecting && state.connectedAt == null
         // A call just started always starts as the call button, however it was started.
-        val from = center.breakoutFrom ?: if (fresh) center.callButton else null
+        val from = center.breakoutFrom ?: if (fresh) center.landingButton else null
         center.breakoutFrom = null
         if (!fresh || reduceMotion || from == null || from.width <= 0f) {
             // Carried over, or Reduce Motion: it appears where it rests, and the bigger field mounts now.
@@ -690,15 +734,17 @@ private class FloatingCallSurfaceModel(
         val velocity: List<Double>? = if (shaping) null else flight?.velocity ?: listOf(drifting.x.toDouble(), drifting.y.toDouble(), 0.0, 0.0)
         settleFloat()
         val rest = restFrame
-        val button = center.callButton?.takeIf { it.width > 0f }
+        val button = center.landingButton
         val center = center
-        val target: (() -> Rect?)? = if (button != null) ({ center.callButton }) else null
+        val target: (() -> Rect?)? = if (button != null) ({ center.landingButton }) else null
         if (!reduceMotion && button != null) center.isLanding = true
+        // Into the drawer's button it fades as it lands: the drawer covers where it rests.
+        val fades = button == null || center.isDrawerOpen
         motion.land(
             rect = button ?: Rect(rest.left + rest.width * 0.25f, rest.top + rest.height * 0.25f, rest.right - rest.width * 0.25f, rest.bottom - rest.height * 0.25f),
             current = current,
             velocity = velocity,
-            fades = button == null,
+            fades = fades,
             target = target,
             geometry = geometry,
             reduceMotion = reduceMotion,
@@ -742,7 +788,7 @@ private class FloatingCallSurfaceModel(
         val area = liveRestArea()
         val next = FloatingCallPlace(point.x, if (point.y >= area.bounds.bottom - 0.5f) null else point.y)
         if (place != next) place = next
-        center.place = next
+        if (center.place != next) center.place = next
     }
 
     /** 1 once the shape has all but reached the call button it lands in. */
@@ -1082,6 +1128,8 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screen: Size, safeArea: Flo
         model.dim = dim
         if (window != null && window.touchArea != touchArea) window.touchArea = touchArea
         if (center.card != geometry.cardFrame) center.card = geometry.cardFrame
+        val orbLayout = FloatingCallOrbLayout(screen, safeArea, restSize)
+        if (center.orbLayout != orbLayout) center.orbLayout = orbLayout
     }
 
     // iOS onAppear: laidOut(), appeared(); a new screen or safe area lays out again.
@@ -1091,7 +1139,10 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screen: Size, safeArea: Flo
     }
     OnChange(screen to safeArea) { (size, insets) -> model.laidOut(size, insets) }
     DisposableEffect(model) {
-        onDispose { model.disappeared() }
+        onDispose {
+            if (center.orbLayout != null) center.orbLayout = null
+            model.disappeared()
+        }
     }
     motion.link.Drive()
     connect.link.Drive()

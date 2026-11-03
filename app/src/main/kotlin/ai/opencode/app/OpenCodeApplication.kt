@@ -57,6 +57,8 @@ class OpenCodeApplication : Application() {
         // Voice's admitted sends, log uploads, diagnostics sinks and screen hold (installed
         // before anything resolves their keys).
         AppDependencies.install(this)
+        // Before any window's store reads a call-style switch (iOS `migrateBeforeLaunch`).
+        migrateBeforeLaunch()
         // Open in New Window (tablet multi-instance windows).
         SceneWindows.install()
         // The haptics diagnostics trace's `dictating=`/`call=` (iOS reads the audio session owner).

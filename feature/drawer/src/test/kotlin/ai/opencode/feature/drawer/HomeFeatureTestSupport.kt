@@ -2,8 +2,11 @@ package ai.opencode.feature.drawer
 
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.DependencyValues
+import ai.opencode.core.experiments.ExperimentalCallStyle
+import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.SharedKey
 import ai.opencode.core.sharing.SharedStore
+import ai.opencode.core.sharing.experimental
 import ai.opencode.core.store.TestStore
 import ai.opencode.feature.composer.ComposerPersistence
 import ai.opencode.feature.composer.PromptOutbox
@@ -15,16 +18,16 @@ import ai.opencode.server.model.OpenCodeHomeSnapshot
 import ai.opencode.server.model.OpenCodeModelRef
 import ai.opencode.server.model.OpenCodeProject
 import ai.opencode.server.model.OpenCodeSession
+import java.time.Instant
+import kotlin.reflect.KClass
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
-import java.time.Instant
-import kotlin.reflect.KClass
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.seconds
 
 /**
  * Shared setup for the ports of iOS `HomeFeatureTests.swift` (`SessionSwitchTests`,
@@ -130,6 +133,15 @@ internal object HomeFeatureTestSupport {
         fun <T> shared(key: SharedKey<T>): T = state { ai.opencode.core.sharing.shared(key).value }
 
         fun <T> setShared(key: SharedKey<T>, value: T) = state { ai.opencode.core.sharing.shared(key).set(value) }
+
+        /**
+         * iOS `@Test(.callStyle(x))`: this test's shared store holds one call style. Living Orb is
+         * the default; tests about the Standard call view name it.
+         */
+        fun callStyle(style: ExperimentalCallStyle) {
+            setShared(experimental(ExperimentalFeature.livingOrb), style.livingOrb)
+            setShared(experimental(ExperimentalFeature.callTray), style.callTray)
+        }
 
         private val stores = ArrayList<TestStore<*, *>>()
 
