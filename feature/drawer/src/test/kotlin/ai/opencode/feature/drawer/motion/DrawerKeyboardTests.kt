@@ -128,6 +128,30 @@ class DrawerKeyboardHoldTests {
         }
     }
 
+    /**
+     * iOS: back from the background UIKit set the keyboard window's frame under the slide, so
+     * closing left the keys aside, the keyboard up with none of it on screen. Android: back
+     * from the background the system has the IME again; resting open the keys stay down beside
+     * the drawer, and closing gives them back on screen.
+     */
+    @Test
+    fun keysReframedUnderTheSlideComeBackToTheScreen() = runTest {
+        val harness = Harness(this)
+        harness.controller.setPresented(true, animated = false)
+        assertTrue(harness.keysAway)
+        assertEquals(1, harness.hides)
+
+        harness.hold.didBecomeActive()
+        assertTrue("Back from the background the keys are still beside the drawer", harness.keysAway)
+        assertEquals("and the system doesn't bring them up over it", 2, harness.hides)
+        assertTrue(harness.field.isFocused)
+
+        harness.controller.setPresented(false, animated = false)
+        assertFalse("Closed, the keys are on screen", harness.keysAway)
+        assertEquals(1, harness.shows)
+        assertTrue(harness.field.isFocused)
+    }
+
     @Test
     fun keysLeavingWithAnotherSessionSlideOffAndReturnOnceTheyAreGone() = runTest {
         val harness = Harness(this)

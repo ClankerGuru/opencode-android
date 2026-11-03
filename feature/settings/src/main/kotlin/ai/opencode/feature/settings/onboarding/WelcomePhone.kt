@@ -1,0 +1,480 @@
+package ai.opencode.feature.settings.onboarding
+
+import ai.opencode.core.ui.OpenCodeIcon
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import kotlin.math.ceil
+import kotlin.math.max
+import kotlin.math.min
+
+private fun body(weight: FontWeight = FontWeight.Normal) = TextStyle(fontSize = 17.sp, lineHeight = 22.sp, fontWeight = weight)
+
+private val phoneText = Color.White
+private val phoneSecondary = WelcomeInk.label2
+private val phoneTertiary = WelcomeInk.label3
+/** The app's dark tonal surfaces standing in for iOS glass. */
+private val phoneSurface = WelcomeInk.hex(0x232326)
+private val phoneSurfaceHigh = WelcomeInk.hex(0x2C2C30)
+
+/**
+ * The phone's screen: this app's session in dark mode, at a logical 440 × 956 scaled into the
+ * phone (iOS `WelcomePhone`). iOS feeds its own transcript rows and `DictationScopeBar` the story;
+ * those live in modules above Settings here, so the rows, header and composer are drawn from the
+ * app's metrics (Material surfaces where iOS has glass). Pairing cross-fades to the scanner.
+ */
+@Composable
+internal fun WelcomePhone(frame: WelcomeFrame, pairing: Float, reduced: Boolean, voice: WelcomeVoice, wall: Double, targets: WelcomeTargets?) {
+    Box(Modifier.requiredSize(WelcomePhone.size.width.dp, WelcomePhone.size.height.dp).background(Color.Black)) {
+        Box(Modifier.fillMaxSize().alpha(1 - pairing).welcomeBlur(if (reduced) 0f else 3f * pairing)) {
+            Box(Modifier.fillMaxSize().alpha(frame.transcript.toFloat()).welcomeBlur(if (reduced || frame.loopBlur < 0.05) 0f else frame.loopBlur.toFloat())) {
+                PhoneTranscript(frame, reduced, wall, targets)
+            }
+            PhoneHeader(frame)
+            PhoneComposer(frame, reduced, voice, targets)
+        }
+        PhoneScanner(
+            Modifier
+                .graphicsLayer {
+                    alpha = pairing
+                    val scale = if (reduced) 1f else 1.04f - 0.04f * pairing
+                    scaleX = scale
+                    scaleY = scale
+                }
+                .welcomeBlur(if (reduced) 0f else 6f * (1 - pairing)),
+        )
+        PhoneStatusBar()
+        Box(
+            Modifier
+                .offset(x = ((WelcomePhone.size.width - 140) / 2).dp, y = (WelcomePhone.size.height - 13).dp)
+                .size(140.dp, 5.dp)
+                .background(Color.White.copy(alpha = 0.85f), CircleShape),
+        )
+    }
+}
+
+internal object WelcomePhone {
+    /** The phone's logical screen (iPhone 17 Pro Max). */
+    val size = Size(440f, 956f)
+
+    /** The composer's bottom edge, above the home indicator. */
+    const val COMPOSER_BOTTOM = 922f
+    const val HEADER_TOP = 69f
+
+    /** Where the transcript's rows start and end. */
+    const val COLUMN_TOP = 122f
+    const val COLUMN_BOTTOM = 858f
+
+    /** The transcript's gutter and half flow gap (iOS `TranscriptMetrics.contentGutter`, `flowHalf`). */
+    const val GUTTER = 16f
+    const val FLOW_HALF = 8f
+
+    /** The screenshot tile's corners (iOS `JustifiedImageRows.cornerRadius`). */
+    const val TILE_RADIUS = 14f
+
+    /** The session header's circles (iOS `HeaderBlurTunables.buttonSize`). */
+    const val BUTTON = 44f
+
+    /** The composer's metrics (iOS `ComposerTunables`, `DictationBarPose.slot`). */
+    const val MARGIN = 20f
+    const val INNER = 6f
+    const val INNER_VERTICAL = 6f
+    const val TEXT_LEADING = 52f
+    const val EXPANDED_TEXT_LEADING = 10f
+    const val CORNER = 26f
+    const val SLOT = 48f
+
+    /** The agent's calls so far: reads, the browser, the edit, the screenshot (iOS `tools`). */
+    fun tools(count: Int): List<String> = listOf("read", "grep", "browser", "edit", "browser").take(max(1, count))
+
+    /** The reply's first `words` words, whole (iOS `reply(words:)`). */
+    fun reply(words: Double): String {
+        val count = min(WelcomeStory.REPLY_WORDS.size, max(1, ceil(words).toInt()))
+        return WelcomeStory.REPLY_WORDS.take(count).joinToString(" ").replace("`", "")
+    }
+}
+
+@Composable
+private fun PhoneStatusBar() {
+    Box(Modifier.fillMaxWidth()) {
+        Text("9:41", style = TextStyle(fontSize = 16.5.sp, fontWeight = FontWeight.SemiBold), color = Color.White, modifier = Modifier.offset(y = 19.dp).width(146.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        Box(
+            Modifier
+                .offset(x = ((WelcomePhone.size.width - 120) / 2).dp, y = 12.dp)
+                .size(120.dp, 34.dp)
+                .background(Color.Black, CircleShape)
+                .border(0.5.dp, Color.White.copy(alpha = 0.08f), CircleShape),
+        )
+        Row(
+            Modifier.offset(y = 20.dp).width((WelcomePhone.size.width - 30).dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.End),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // Signal bars and a full battery, drawn (no Material Symbol matches the system glyphs).
+            Canvas(Modifier.size(18.dp, 12.dp)) {
+                val bar = size.width / 5.5f
+                for (index in 0 until 4) {
+                    val h = size.height * (0.4f + 0.2f * index)
+                    drawRoundRect(Color.White, Offset(index * bar * 1.5f, size.height - h), Size(bar, h), androidx.compose.ui.geometry.CornerRadius(bar / 3))
+                }
+            }
+            OpenCodeIcon("wifi", null, size = 17.dp, tint = Color.White)
+            Canvas(Modifier.size(27.dp, 13.dp)) {
+                val body = Size(size.width - 2.5.dp.toPx(), size.height)
+                drawRoundRect(Color.White.copy(alpha = 0.4f), Offset.Zero, body, androidx.compose.ui.geometry.CornerRadius(4.dp.toPx()), style = Stroke(1.dp.toPx()))
+                val inset = 2.dp.toPx()
+                drawRoundRect(Color.White, Offset(inset, inset), Size(body.width - 2 * inset, body.height - 2 * inset), androidx.compose.ui.geometry.CornerRadius(2.5.dp.toPx()))
+                drawRoundRect(Color.White.copy(alpha = 0.4f), Offset(body.width + 1.dp.toPx(), size.height * 0.33f), Size(1.5.dp.toPx(), size.height * 0.34f), androidx.compose.ui.geometry.CornerRadius(1.dp.toPx()))
+            }
+        }
+    }
+}
+
+/** The session header's parts: the drawer and More circles and the title capsule (iOS `header`; Material surfaces for glass). */
+@Composable
+private fun PhoneHeader(frame: WelcomeFrame) {
+    val size = WelcomePhone.BUTTON
+    Box(Modifier.offset(y = WelcomePhone.HEADER_TOP.dp).fillMaxWidth().height(size.dp), contentAlignment = Alignment.Center) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(size.dp).background(phoneSurface, CircleShape), contentAlignment = Alignment.Center) {
+                OpenCodeIcon("line.3.horizontal", null, size = 20.dp, tint = phoneText)
+            }
+            Spacer(Modifier.weight(1f))
+            Box(Modifier.size(size.dp).background(phoneSurface, CircleShape), contentAlignment = Alignment.Center) {
+                OpenCodeIcon("ellipsis", null, size = 20.dp, tint = phoneText)
+            }
+        }
+        Column(
+            Modifier
+                .heightIn(min = size.dp)
+                .widthIn(max = 260.dp)
+                .background(phoneSurface, CircleShape)
+                .padding(horizontal = 18.dp, vertical = 3.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            WelcomeStack(
+                labels = listOf("New Session", WelcomeStory.TITLE),
+                weights = if (frame.named) listOf(0.0, 1.0) else listOf(1.0, 0.0),
+                style = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
+                color = phoneText,
+                alignment = Alignment.Center,
+            )
+            Text(WelcomeStory.PROJECT, style = TextStyle(fontSize = 12.sp), color = phoneText.copy(alpha = 0.75f), maxLines = 1)
+        }
+    }
+}
+
+@Composable
+private fun PhoneTranscript(frame: WelcomeFrame, reduced: Boolean, wall: Double, targets: WelcomeTargets?) {
+    val height = WelcomePhone.COLUMN_BOTTOM - WelcomePhone.COLUMN_TOP
+    Box(
+        Modifier
+            .offset(y = WelcomePhone.COLUMN_TOP.dp)
+            .requiredSize(WelcomePhone.size.width.dp, height.dp)
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+            .drawWithContent {
+                drawContent()
+                // Rows scroll under the header like the app's edge.
+                val fade = 24.dp.toPx()
+                drawRect(
+                    Brush.verticalGradient(0f to Color.Transparent, 1f to Color.Black, startY = -fade, endY = -fade + (size.height + fade) * 0.06f),
+                    blendMode = BlendMode.DstIn,
+                )
+            },
+    ) {
+        WelcomeColumn(Modifier.fillMaxSize(), liftDrop = WelcomePhone.COMPOSER_BOTTOM - 74 - WelcomePhone.COLUMN_BOTTOM) {
+            UserBubble(WelcomeStory.PROMPT, Modifier.alpha((frame.prompt * 3).clamped01().toFloat()).welcomeRow(frame.prompt, lift = if (reduced) 0.0 else 1 - frame.prompt))
+            ToolGroup(WelcomePhone.tools(frame.toolCount), Modifier.welcomeShow(frame.tools, dy = 4f, reduced = reduced).welcomeRow(if (frame.toolCount > 0) frame.tools else 0.0))
+            Box(
+                Modifier
+                    .padding(start = WelcomePhone.GUTTER.dp, end = WelcomePhone.GUTTER.dp, bottom = WelcomePhone.FLOW_HALF.dp)
+                    .welcomeRow(frame.screenshotSlot),
+            ) {
+                WelcomeScreenshot.Image(
+                    Modifier
+                        .fillMaxWidth(0.72f)
+                        .aspectRatio(WelcomeSitePage.size.width / WelcomeSitePage.size.height)
+                        .welcomeTarget(WelcomeTarget.PhoneShot, targets)
+                        .alpha(frame.screenshot.toFloat())
+                        .clip(RoundedCornerShape(WelcomePhone.TILE_RADIUS.dp)),
+                )
+            }
+            Text(
+                WelcomePhone.reply(frame.replyWords),
+                style = body(),
+                color = phoneText,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = WelcomePhone.GUTTER.dp, vertical = WelcomePhone.FLOW_HALF.dp)
+                    .welcomeShow(frame.reply, dy = 4f, blur = 0f, reduced = reduced)
+                    .welcomeRow(if (frame.replyWords > 0) frame.reply else 0.0),
+            )
+            Working(frame.working, wall, reduced)
+            UserBubble(WelcomeStory.SHIP_IT, Modifier.alpha((frame.ship * 3).clamped01().toFloat()).welcomeRow(frame.ship, lift = if (reduced) 0.0 else 1 - frame.ship))
+            Working(frame.working2, wall, reduced)
+        }
+    }
+}
+
+/** A message the person sent: the transcript's bubble on the right. */
+@Composable
+private fun UserBubble(text: String, modifier: Modifier) {
+    Box(modifier.fillMaxWidth().padding(horizontal = WelcomePhone.GUTTER.dp, vertical = WelcomePhone.FLOW_HALF.dp), contentAlignment = Alignment.CenterEnd) {
+        Text(
+            text,
+            style = body(),
+            color = phoneText,
+            modifier = Modifier
+                .widthIn(max = 320.dp)
+                .background(phoneSurfaceHigh, RoundedCornerShape(20.dp))
+                .padding(horizontal = 14.dp, vertical = 9.dp),
+        )
+    }
+}
+
+/** The agent's calls, as the transcript's collapsed tool group reads them. */
+@Composable
+private fun ToolGroup(tools: List<String>, modifier: Modifier) {
+    val label = buildList {
+        val reads = tools.count { it == "read" || it == "grep" }
+        if (reads > 0) add(if (tools.contains("grep")) "Explored 1 read, 1 search" else "Explored 1 read")
+        if (tools.contains("browser")) add("Browser")
+        if (tools.contains("edit")) add("Edit")
+    }.joinToString(" · ")
+    Row(
+        modifier.fillMaxWidth().padding(horizontal = WelcomePhone.GUTTER.dp, vertical = WelcomePhone.FLOW_HALF.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        OpenCodeIcon("hammer.fill", null, size = 16.dp, tint = phoneSecondary)
+        Text(label, style = TextStyle(fontSize = 15.sp), color = phoneSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/** The transcript's working indicator. */
+@Composable
+private fun Working(open: Double, wall: Double, reduced: Boolean) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = WelcomePhone.GUTTER.dp, vertical = WelcomePhone.FLOW_HALF.dp)
+            .alpha((open * 1.5).clamped01().toFloat())
+            .welcomeRow(open),
+    ) {
+        WelcomeWorkingDots(wall, dot = 4f, gap = 2.5f, color = phoneSecondary, reduced = reduced)
+    }
+}
+
+/**
+ * The composer (iOS `composer`): idle it's + · Message · mic, with Stop while the agent works;
+ * dictating, the + turns into the recording's ×, a scope of the story's voice takes the row, and the
+ * words heard so far show over it.
+ */
+@Composable
+private fun PhoneComposer(frame: WelcomeFrame, reduced: Boolean, voice: WelcomeVoice, targets: WelcomeTargets?) {
+    val shipping = frame.utterance == 1
+    val words = if (shipping) WelcomeStory.SHIP_WORDS else WelcomeStory.PROMPT_WORDS
+    val line = 34 * frame.lines
+    val running = (max(frame.working, frame.working2).clamped01() * (1 - frame.dictation)).toFloat()
+    val dictation = frame.dictation.toFloat()
+    val width = WelcomePhone.size.width - 2 * WelcomePhone.MARGIN
+    Box(Modifier.fillMaxWidth().height(WelcomePhone.COMPOSER_BOTTOM.dp), contentAlignment = Alignment.BottomCenter) {
+        Column(
+            Modifier
+                .width(width.dp)
+                .background(phoneSurface, RoundedCornerShape(WelcomePhone.CORNER.dp))
+                .padding(horizontal = WelcomePhone.INNER.dp, vertical = WelcomePhone.INNER_VERTICAL.dp),
+        ) {
+            Box(Modifier.fillMaxWidth().height(line.dp).alpha((frame.draft * frame.lines).toFloat()).clip(androidx.compose.ui.graphics.RectangleShape), contentAlignment = Alignment.BottomStart) {
+                Text(
+                    WelcomeStreamedText.attributed(words, frame.heard, phoneText, fade = 1.4),
+                    style = body(),
+                    maxLines = 1,
+                    softWrap = false,
+                    modifier = Modifier.padding(start = WelcomePhone.EXPANDED_TEXT_LEADING.dp),
+                )
+            }
+            Box(Modifier.fillMaxWidth().height(WelcomePhone.SLOT.dp)) {
+                Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+                    // The +, turned into the recording's × on its fill.
+                    Box(Modifier.size(WelcomePhone.SLOT.dp), contentAlignment = Alignment.Center) {
+                        Box(
+                            Modifier
+                                .size(34.dp)
+                                .background(Color.White.copy(alpha = 0.12f * dictation), CircleShape)
+                                .graphicsLayer { rotationZ = 45 * dictation },
+                            contentAlignment = Alignment.Center,
+                        ) { OpenCodeIcon("plus", null, size = 22.dp, tint = phoneText) }
+                    }
+                    Text(
+                        "Message",
+                        style = body(),
+                        color = phoneTertiary,
+                        modifier = Modifier.padding(start = (WelcomePhone.TEXT_LEADING - WelcomePhone.INNER - WelcomePhone.SLOT).coerceAtLeast(0f).dp).alpha(1 - dictation),
+                    )
+                    Spacer(Modifier.weight(1f))
+                    Box(Modifier.size(WelcomePhone.SLOT.dp).alpha(1 - dictation), contentAlignment = Alignment.Center) {
+                        OpenCodeIcon("mic", null, size = 24.dp, tint = phoneSecondary)
+                    }
+                    Box(
+                        Modifier
+                            .size((WelcomePhone.SLOT * running).dp, WelcomePhone.SLOT.dp)
+                            .graphicsLayer {
+                                alpha = running
+                                val scale = if (reduced) 1f else 0.7f + 0.3f * running
+                                scaleX = scale
+                                scaleY = scale
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Box(Modifier.requiredSize(34.dp).background(Color.White, CircleShape), contentAlignment = Alignment.Center) {
+                            Box(Modifier.size(11.dp).background(Color.Black, RoundedCornerShape(2.dp)))
+                        }
+                    }
+                }
+                if (dictation > 0.001f) {
+                    WelcomeScope(
+                        voice,
+                        Modifier
+                            .fillMaxSize()
+                            .padding(start = (WelcomePhone.SLOT + 8).dp, end = 12.dp)
+                            .graphicsLayer {
+                                alpha = dictation
+                                val scale = if (reduced) 1f else 0.96f + 0.04f * dictation
+                                scaleX = scale
+                                scaleY = scale
+                            },
+                    )
+                }
+                Box(
+                    Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = 5.dp)
+                        .size(34.dp)
+                        .welcomeTarget(WelcomeTarget.PhoneSend, targets),
+                )
+            }
+        }
+    }
+}
+
+/** The dictation bar's scope, listening to the story's voice as it would the mic (iOS `DictationScopeBar`'s scope). */
+@Composable
+private fun WelcomeScope(voice: WelcomeVoice, modifier: Modifier) {
+    Canvas(modifier) {
+        val history = voice.levels.history
+        val bar = 3.dp.toPx()
+        val gap = 2.dp.toPx()
+        val count = min(history.size, ((size.width + gap) / (bar + gap)).toInt())
+        val mid = size.height / 2
+        for (index in 0 until count) {
+            val level = history[history.size - count + index]
+            val h = max(bar, size.height * 0.6f * level)
+            val x = size.width - (count - index) * (bar + gap) + gap
+            drawLine(Color.White, Offset(x + bar / 2, mid - h / 2), Offset(x + bar / 2, mid + h / 2), bar, StrokeCap.Round)
+        }
+    }
+}
+
+/** The pairing step: the camera finds the laptop's code (iOS `scanner`). */
+@Composable
+private fun PhoneScanner(modifier: Modifier) {
+    Box(
+        modifier
+            .fillMaxSize()
+            .drawWithContent {
+                drawRect(
+                    Brush.radialGradient(
+                        listOf(WelcomeInk.hex(0x1A1A1C), WelcomeInk.hex(0x050505)),
+                        center = Offset(size.width * 0.5f, size.height * 0.45f),
+                        radius = 520.dp.toPx(),
+                    ),
+                )
+                drawContent()
+            },
+    ) {
+        Box(Modifier.offset(16.dp, WelcomePhone.HEADER_TOP.dp).size(WelcomePhone.BUTTON.dp).background(phoneSurface, CircleShape), contentAlignment = Alignment.Center) {
+            OpenCodeIcon("xmark", null, size = 18.dp, tint = phoneText)
+        }
+        Box(Modifier.offset(90.dp, 330.dp).size(260.dp), contentAlignment = Alignment.Center) {
+            Canvas(Modifier.fillMaxSize()) {
+                drawPath(WelcomeViewfinderCorners.path(Rect(Offset.Zero, size), 24.dp.toPx()), Color.White, style = Stroke(4.dp.toPx(), cap = StrokeCap.Round))
+            }
+            Box(
+                Modifier
+                    .size(172.dp)
+                    .graphicsLayer {
+                        alpha = 0.7f
+                        rotationX = 10f
+                        rotationZ = -4f
+                        cameraDistance = 6f * density
+                    }
+                    .background(WelcomeInk.hex(0x141414), RoundedCornerShape(10.dp))
+                    .padding(12.dp),
+            ) { WelcomeQRCode(Modifier.fillMaxSize()) }
+        }
+    }
+}
+
+/** A camera viewfinder's four rounded corners (iOS `WelcomeViewfinderCorners`). */
+internal object WelcomeViewfinderCorners {
+    fun path(rect: Rect, radius: Float): Path {
+        val arm = rect.width * 0.22f
+        val path = Path()
+        for (corner in 0 until 4) {
+            val flipX = corner % 2 == 1
+            val flipY = corner >= 2
+            val x = if (flipX) rect.right else rect.left
+            val y = if (flipY) rect.bottom else rect.top
+            val dx = if (flipX) -1f else 1f
+            val dy = if (flipY) -1f else 1f
+            path.moveTo(x, y + dy * arm)
+            path.lineTo(x, y + dy * radius)
+            path.quadraticTo(x, y, x + dx * radius, y)
+            path.lineTo(x + dx * arm, y)
+        }
+        return path
+    }
+}
