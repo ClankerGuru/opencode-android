@@ -36,6 +36,7 @@ import ai.opencode.feature.composer.AttachmentMenuOverlay
 import ai.opencode.feature.composer.AttachmentMenuPhase
 import ai.opencode.feature.composer.AttachmentMenuPress
 import ai.opencode.feature.composer.ComposerAutocompleteAction
+import ai.opencode.feature.composer.ComposerPhotoViewer
 import ai.opencode.feature.composer.LocationPermissionPrompt
 import ai.opencode.feature.composer.PastedTextViewer
 import ai.opencode.feature.composer.modelpicker.ModelPickerAnchors
@@ -48,6 +49,8 @@ import ai.opencode.feature.composer.SentImageFlight
 import ai.opencode.feature.composer.SentImageFlightOverlay
 import ai.opencode.feature.composer.composerKeyboardStepHold
 import ai.opencode.feature.media.LocalMediaPresenter
+import ai.opencode.feature.media.MediaPresenter
+import ai.opencode.feature.media.TranscriptImageViewer
 import ai.opencode.core.store.Store
 import ai.opencode.core.motion.rememberReduceMotion
 import androidx.activity.compose.BackHandler
@@ -691,6 +694,7 @@ private fun SessionPendingAttachments(store: StoreOf<State, Action>, sendImages:
     val presenter = LocalMediaPresenter.current
     val reducedMotion = rememberReduceMotion()
     val context = LocalContext.current
+    val host = LocalSessionComposerHost.current
     PendingAttachmentsRow(
         attachments = attachments,
         files = files,
@@ -720,7 +724,45 @@ private fun SessionPendingAttachments(store: StoreOf<State, Action>, sendImages:
         onOpenLocation = { store.send(Action.LinkTapped(it)) },
         flights = LocalSessionPhotoSheet.current?.takeIf { it.usesPlusMenuSheet }?.flights,
         sendImages = sendImages,
+        onOpenPhoto = { id -> presentComposerPhoto(store, id, presenter, host, reducedMotion, context) },
     )
+}
+
+/**
+ * iOS `presentComposerPhoto(_:)`: a pending photo full screen, paging through the composer's
+ * photos, with Remove handing it back (the row reflows on `AttachmentRemoval`'s spring). The
+ * keyboard steps aside while it's up and comes back after, if the composer is still this one.
+ */
+private fun presentComposerPhoto(
+    store: StoreOf<State, Action>,
+    id: String,
+    presenter: MediaPresenter?,
+    host: SessionComposerHost?,
+    reducedMotion: Boolean,
+    context: android.content.Context,
+) {
+    presenter ?: return
+    val preview = ComposerPhotoViewer.preview(store.state.pendingAttachments, selected = id) ?: return
+    val restoresFocus = host?.messageFieldFocused == true
+    if (restoresFocus) host?.dismissComposerKeyboard()
+    val viewerStore = ComposerPhotoViewer.store(preview) { removed ->
+        val index = store.state.pendingAttachments.indexOfFirst { it.id == removed }
+        if (index >= 0) store.send(Action.attachmentRemoved(index))
+    }
+    val identity = store.state.taskIdentity
+    val presented = presenter.present(
+        sourceID = preview.id,
+        isMedia = true,
+        reducesMotion = reducedMotion,
+        flightAccessories = { mediaID -> ComposerPhotoViewer.flightAccessories(mediaID, store.state.pendingAttachments, context) },
+        onDismiss = {
+            viewerStore.close()
+            if (restoresFocus && store.state.taskIdentity == identity && !store.state.hasPendingRequests) host?.focusComposer()
+        },
+    ) { viewer ->
+        TranscriptImageViewer(viewerStore, viewer)
+    }
+    if (!presented) viewerStore.close()
 }
 
 /** The system share sheet with [text] (iOS `ShareLink`). */

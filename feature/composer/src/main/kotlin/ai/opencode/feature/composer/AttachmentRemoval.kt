@@ -4,7 +4,10 @@ import ai.opencode.core.motion.MotionSpring
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 
 /**
@@ -39,5 +42,20 @@ object AttachmentRemoval {
             scaleY = scale
             alpha = 1f - p
         }
+    }
+
+    /**
+     * [attachmentRemovalExit] on a retained drawing (the departing attachment's last frame, which
+     * plays the exit where it sat while the row reflows without it).
+     */
+    fun GraphicsLayer.attachmentRemovalExit(exit: Float, reduceMotion: Boolean, density: Density) {
+        val p = exit.coerceIn(0f, 1f)
+        alpha = 1f - p
+        if (reduceMotion) return
+        val scale = 1f + (SCALE - 1f) * p
+        scaleX = scale
+        scaleY = scale
+        val radius = with(density) { (BLUR * p).dp.toPx() }
+        renderEffect = if (radius > 0f) BlurEffect(radius, radius) else null
     }
 }
