@@ -12,6 +12,7 @@ import ai.opencode.feature.settings.whatsnew.WhatsNewShipped
 internal val whatsNewShippedEntries: List<WhatsNewEntry> by lazy {
     listOf(
         WhatsNewShipped.modelDisplayNames,
+        WhatsNewShipped.foldQuestions,
         WhatsNewShipped.voiceSaysWhatsRunning,
         WhatsNewShipped.screenshotShutter,
         WhatsNewShipped.callCardTakesOver,

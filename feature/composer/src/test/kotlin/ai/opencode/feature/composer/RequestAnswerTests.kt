@@ -1,18 +1,24 @@
 package ai.opencode.feature.composer
 
 import ai.opencode.core.store.TestStore
+import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.model.OpenCodeFormRequest
 import ai.opencode.server.model.OpenCodeFormValue
 import ai.opencode.server.model.OpenCodePermissionRequest
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
  * Port of iOS `RequestAnswerTests.swift` (D-31 B: a pending request's panel grows out of the
  * composer, and the composer's row is your own answer). Only `RequestDockFeature`'s own suite
- * lives here: the rest drive `SessionFeature`/`HomeFeature` (`:feature:session`, drawer) or
- * probe UIKit text views (see docs/parity/composer.md "Tests").
+ * lives here, with the fold's pure rules (`RequestCollapse`, `RequestPanelGesture`,
+ * `RequestErrorLine`): the rest drive `SessionFeature`/`HomeFeature` (`:feature:session`, drawer)
+ * or probe UIKit text views (see docs/parity/composer.md "Tests").
  */
 class RequestAnswerTests {
     private val json = Json { ignoreUnknownKeys = true }
@@ -62,5 +68,70 @@ class RequestAnswerTests {
             )
         }
         store.finish()
+    }
+
+    @Test fun aDockedQuestionFoldsToItsBarAndBackExhaustively() = runTest {
+        val twoQuestions = twoQuestions
+        val store = TestStore(
+            RequestDockFeature.State<Unit>(
+                permissionRequests = listOf(shell),
+                formRequests = listOf(twoQuestions),
+                formAnswers = mapOf(twoQuestions.id to twoQuestions.defaultAnswers),
+            ),
+            RequestDockFeature(),
+            this,
+        )
+        store.send(RequestDockFeature.Action.CollapseChanged(requestID = twoQuestions.id, collapsed = true)) {
+            it.copy(collapsedRequestIDs = setOf(twoQuestions.id))
+        }
+        // Already folded, a permission (its Allow would hide), or gone: nothing.
+        store.send(RequestDockFeature.Action.CollapseChanged(requestID = twoQuestions.id, collapsed = true))
+        store.send(RequestDockFeature.Action.CollapseChanged(requestID = shell.id, collapsed = true))
+        store.send(RequestDockFeature.Action.CollapseChanged(requestID = "frm_gone", collapsed = true))
+        store.send(RequestDockFeature.Action.CollapseChanged(requestID = twoQuestions.id, collapsed = false)) {
+            it.copy(collapsedRequestIDs = emptySet())
+        }
+        store.finish()
+    }
+
+    @Test fun aFailedSendsReasonFitsItsOneLine() {
+        assertEquals("HTTP 500", RequestErrorLine.brief("The server returned HTTP 500."))
+        assertEquals("Request timed out", RequestErrorLine.brief("Request timed out."))
+        assertNull(RequestErrorLine.detail("Couldn’t send answer", OpenCodeClientError.UNREACHABLE_MESSAGE))
+    }
+
+    @Test fun thePanelGestureResets() {
+        val gesture = RequestPanelGesture()
+        gesture.isTracking = true
+        assertTrue(gesture.isTracking)
+        assertTrue(gesture.takeFollows())
+        // A still finger keeps holding; only the drag's end or a reset lets go.
+        gesture.reset()
+        assertFalse(gesture.isTracking)
+        gesture.settling(1f)
+        assertTrue(gesture.takeFollows())
+        gesture.reset()
+        assertFalse(gesture.takeFollows())
+        gesture.presented = 0.5f
+        assertTrue(gesture.isMidway)
+        gesture.presented = 1f
+        assertFalse(gesture.isMidway)
+    }
+
+    @Test fun theFoldFollowsTheFingerAndSettlesPastItsThreshold() {
+        assertEquals(0.25f, RequestCollapse.progress(start = 0f, translation = 50f, travel = 200f))
+        assertEquals(1f, RequestCollapse.progress(start = 1f, translation = 40f, travel = 200f))
+        assertEquals(0f, RequestCollapse.progress(start = 1f, translation = -300f, travel = 200f))
+        // Open: past 30% folds, short of it snaps back; a flick goes its way.
+        assertTrue(RequestCollapse.settlesCollapsed(progress = 0.35f, velocity = 0f, startedCollapsed = false, threshold = 0.3f, flick = 700f))
+        assertFalse(RequestCollapse.settlesCollapsed(progress = 0.2f, velocity = 0f, startedCollapsed = false, threshold = 0.3f, flick = 700f))
+        assertTrue(RequestCollapse.settlesCollapsed(progress = 0.1f, velocity = 900f, startedCollapsed = false, threshold = 0.3f, flick = 700f))
+        assertFalse(RequestCollapse.settlesCollapsed(progress = 0.5f, velocity = -900f, startedCollapsed = false, threshold = 0.3f, flick = 700f))
+        // Folded: dragged up past 30% opens.
+        assertFalse(RequestCollapse.settlesCollapsed(progress = 0.6f, velocity = 0f, startedCollapsed = true, threshold = 0.3f, flick = 700f))
+        assertTrue(RequestCollapse.settlesCollapsed(progress = 0.8f, velocity = 0f, startedCollapsed = true, threshold = 0.3f, flick = 700f))
+        // The settle carries on at the finger's speed, in distances per second.
+        assertEquals(4f, RequestCollapse.settleVelocity(400f, from = 0.5f, to = 1f, travel = 200f))
+        assertEquals(1, RequestCollapse.remaining(twoQuestions, mapOf("q0" to OpenCodeFormValue.Str("Native"))))
     }
 }

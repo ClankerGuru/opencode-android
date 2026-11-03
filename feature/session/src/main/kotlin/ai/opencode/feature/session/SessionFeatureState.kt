@@ -201,6 +201,7 @@ fun SessionFeature.SwitchSnapshot.Companion.from(state: State): SessionFeature.S
         forms = state.formRequests,
         formAnswers = state.formAnswers,
         questionPageIndices = state.questionPageIndices,
+        collapsedRequests = state.requestDock.collapsedRequestIDs,
         answerDrafts = state.answerDraftsIncludingBar,
         hasLoadedRequests = state.hasLoadedPendingRequests,
         completedRequests = state.completedRequestIDs,
@@ -238,6 +239,7 @@ fun SessionFeature.SwitchSnapshot.restore(state: State): State {
             formRequests = forms,
             formAnswers = forms.associate { form -> form.id to (formAnswers[form.id] ?: form.defaultAnswers) },
             questionPageIndices = questionPageIndices,
+            collapsedRequestIDs = collapsedRequests,
             answerDrafts = if (next.isAnsweringRequest) it.answerDrafts else answerDrafts,
             completedRequestIDs = completedRequests,
             // The pin comes back only while its request is still waiting.
@@ -264,6 +266,7 @@ fun SessionFeature.SwitchSnapshot.pruneRequests(
         forms = forms,
         formAnswers = SessionFeature.prune(formAnswers, live),
         questionPageIndices = SessionFeature.prune(questionPageIndices, live),
+        collapsedRequests = collapsedRequests.intersect(live),
         answerDrafts = SessionFeature.pruneAnswerDrafts(answerDrafts, live),
         selectedRequest = selectedRequest?.takeIf { it in live },
     )

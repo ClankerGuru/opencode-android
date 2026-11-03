@@ -34,6 +34,8 @@ data class OpenCodeClientError(
     val connectionFailures: List<ConnectionFailureDetail> = emptyList(),
     /** The iOS `URLError` code equivalent of the transport exception (see [UrlErrorCode]). */
     val urlErrorCode: Int? = null,
+    /** The request this answered was already settled, or is gone, on the server: trying again can't help. */
+    val requestSettled: Boolean = false,
 ) : Exception(message) {
 
     /**

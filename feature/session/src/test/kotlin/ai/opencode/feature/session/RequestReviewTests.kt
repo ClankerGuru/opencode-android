@@ -328,7 +328,7 @@ class RequestReviewTests {
         firstRefreshStarted.await()
 
         store.send(Action.formCancelTapped(plainGlobal.id, message = " Skip token ")) { it.withRespondingRequestIDs(setOf(plainGlobal.id)) }
-        store.receive(Action.requestResponseFinished("global", plainGlobal.id, null)) {
+        store.receive(Action.requestResponseFinished("global", plainGlobal.id, null, dismissal = true)) {
             it.withRespondingRequestIDs(emptySet())
                 .withCompletedRequestIDs(setOf(mcpForm.id, plainGlobal.id))
                 .withFormRequests(emptyList())
@@ -464,7 +464,7 @@ class RequestReviewTests {
             },
         )
         store.send(Action.formCancelTapped(request.id, message = " Draft it instead ")) { it.withRespondingRequestIDs(setOf(request.id)) }
-        store.receive(Action.requestResponseFinished(session.id, request.id, null)) {
+        store.receive(Action.requestResponseFinished(session.id, request.id, null, dismissal = true)) {
             it.withRespondingRequestIDs(emptySet())
                 .withCompletedRequestIDs(setOf(request.id))
                 .withFormRequests(emptyList())

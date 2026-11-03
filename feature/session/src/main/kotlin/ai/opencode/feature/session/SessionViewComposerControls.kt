@@ -344,7 +344,11 @@ internal fun SessionComposerEnv.AnswerTrailingControls(bar: RequestBar) {
             is RequestBar.Answer, is RequestBar.Choose -> {
                 val ready = bar.isReady
                 val control = ComposerTrailingControl.Send(enabled = ready)
-                val enabled = ready && !responding
+                // The last send didn't reach the server: Send becomes Retry.
+                val retries = bar.isLast && s.requestRetries
+                // Settled on the server already: nothing more can send (× clears it).
+                val settled = s.requestSettled
+                val enabled = ready && !responding && !settled
                 ComposerHidden(foldsComposerControls) {
                     Box(
                         Modifier
@@ -359,7 +363,7 @@ internal fun SessionComposerEnv.AnswerTrailingControls(bar: RequestBar) {
                             }
                             .openCodeTapTarget(accessibility = false)
                             .semantics(mergeDescendants = true) {
-                                contentDescription = if (bar.isLast) "Send" else "Next"
+                                contentDescription = if (retries) "Retry" else if (bar.isLast) "Send" else "Next"
                                 // iOS `accessibilityHint` on a disabled control: TalkBack reads no click
                                 // label there, so the reason is its state.
                                 if (!ready) stateDescription = "Choose an answer or type your own"
@@ -368,7 +372,7 @@ internal fun SessionComposerEnv.AnswerTrailingControls(bar: RequestBar) {
                         contentAlignment = Alignment.Center,
                     ) {
                         ComposerControlLabel(
-                            systemImage = if (bar.isLast) "arrow.up" else "chevron.right",
+                            systemImage = if (retries) "arrow.clockwise" else if (bar.isLast) "arrow.up" else "chevron.right",
                             showsProgress = responding,
                             foreground = control.foreground(),
                             background = if (ready) control.background() else OpenCodeTheme.colors.variant.surfaceStrong.color,

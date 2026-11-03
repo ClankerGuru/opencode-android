@@ -1,20 +1,12 @@
 package ai.opencode.feature.session
 
-import androidx.activity.compose.LocalActivity
-import androidx.compose.foundation.draganddrop.dragAndDropTarget
-import androidx.compose.foundation.border
-import androidx.compose.ui.draganddrop.DragAndDropEvent
-import androidx.compose.ui.draganddrop.DragAndDropTarget
-import androidx.compose.ui.draganddrop.toAndroidDragEvent
-import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.tween
-import androidx.compose.ui.draw.alpha
-import ai.opencode.feature.composer.DictationLatency
-import ai.opencode.feature.composer.DictationDrag
-import ai.opencode.feature.composer.RequestBar
+import ai.opencode.core.experiments.ExperimentalCallStyle
+import ai.opencode.core.experiments.ModelPickerStyle
+import ai.opencode.core.experiments.key
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
+import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
@@ -22,7 +14,6 @@ import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
-import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.composer.AttachmentMenuAnchorHold
 import ai.opencode.feature.composer.AttachmentMenuAnchors
 import ai.opencode.feature.composer.AttachmentMenuItem
@@ -37,36 +28,34 @@ import ai.opencode.feature.composer.ComposerAutocompleteTextBridge
 import ai.opencode.feature.composer.ComposerFileSource
 import ai.opencode.feature.composer.ComposerImageSource
 import ai.opencode.feature.composer.ComposerKeyboardMorph
-import ai.opencode.feature.composer.LocalAttachmentMenuAnchorHold
-import ai.opencode.feature.composer.LocalComposerKeyboardMorph
-import ai.opencode.feature.composer.attachmentMenuAnchorHold
-import ai.opencode.feature.composer.handsGlassOver
-import ai.opencode.feature.composer.composerKeyboardSpacing
-import ai.opencode.feature.composer.sentImageDeparture
 import ai.opencode.feature.composer.ComposerSendTransition
-import ai.opencode.feature.media.SendImageTunables
-import ai.opencode.feature.transcript.TranscriptTunables
-import ai.opencode.feature.composer.layoutProgress
 import ai.opencode.feature.composer.ComposerSwipeDown
 import ai.opencode.feature.composer.ComposerSwipeOwnership
 import ai.opencode.feature.composer.ComposerTextInput
+import ai.opencode.feature.composer.DictationDrag
+import ai.opencode.feature.composer.DictationFeature
+import ai.opencode.feature.composer.DictationLatency
+import ai.opencode.feature.composer.LocalAttachmentMenuAnchorHold
+import ai.opencode.feature.composer.LocalComposerKeyboardMorph
+import ai.opencode.feature.composer.QueuedMessagesSheet
+import ai.opencode.feature.composer.RequestBar
 import ai.opencode.feature.composer.RequestDockContext
 import ai.opencode.feature.composer.RequestDockView
 import ai.opencode.feature.composer.RequestPanelFit
+import ai.opencode.feature.composer.RequestPanelGesture
 import ai.opencode.feature.composer.RequestPanelReveal
 import ai.opencode.feature.composer.SyncComposerAutocomplete
+import ai.opencode.feature.composer.attachmentMenuAnchorHold
 import ai.opencode.feature.composer.autocompleteComposerAnchor
-import ai.opencode.feature.composer.requestPanelCap
-import ai.opencode.server.model.PastedText
-import ai.opencode.feature.composer.DictationFeature
-import ai.opencode.core.experiments.key
-import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.core.experiments.ExperimentalCallStyle
-import ai.opencode.core.experiments.ModelPickerStyle
-import ai.opencode.feature.composer.QueuedMessagesSheet
+import ai.opencode.feature.composer.composerKeyboardSpacing
+import ai.opencode.feature.composer.handsGlassOver
+import ai.opencode.feature.composer.layoutProgress
 import ai.opencode.feature.composer.plusmenu.PhotoFlightTunables
-import ai.opencode.server.model.OpenCodeProject
-import ai.opencode.server.model.OpenCodeQueuedInput
+import ai.opencode.feature.composer.requestPanelCap
+import ai.opencode.feature.composer.sentImageDeparture
+import ai.opencode.feature.media.SendImageTunables
+import ai.opencode.feature.session.SessionFeature.Action
+import ai.opencode.feature.transcript.TranscriptTunables
 import ai.opencode.feature.voice.CallTrayController
 import ai.opencode.feature.voice.CallTrayHost
 import ai.opencode.feature.voice.VoiceCallComposer
@@ -74,19 +63,25 @@ import ai.opencode.feature.voice.VoiceCallSurface
 import ai.opencode.feature.voice.VoiceStoreOf
 import ai.opencode.feature.voice.hiddenUnderFloatingCall
 import ai.opencode.feature.voice.hiddenUnderVoiceTranscript
+import ai.opencode.server.model.OpenCodeProject
+import ai.opencode.server.model.OpenCodeQueuedInput
+import ai.opencode.server.model.PastedText
+import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.togetherWith
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.map
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.border
+import androidx.compose.foundation.draganddrop.dragAndDropTarget
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -110,6 +105,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.compositionLocalOf
@@ -123,7 +119,12 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draganddrop.DragAndDropEvent
+import androidx.compose.ui.draganddrop.DragAndDropTarget
+import androidx.compose.ui.draganddrop.toAndroidDragEvent
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -131,30 +132,30 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.layout.layout
-import androidx.compose.ui.unit.constrainHeight
-import androidx.compose.ui.unit.offset
-import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.runtime.SideEffect
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import androidx.compose.ui.unit.offset
 import kotlin.math.abs
 import kotlin.math.max
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 
 // Port of iOS `Session/SessionView+Composer.swift`: the composer area (pills, banners, the composer's
 // surface, the dictation bar) and its presentation rules. The controls live in
@@ -299,6 +300,10 @@ internal class SessionComposerViewState {
     var requestPanelRoomPx = 0
     /** iOS `requestPanelHeight`'s model value: the panel's measured height (dp). */
     var requestPanelHeight by mutableFloatStateOf(0f)
+    /** The docked question's fold under a finger or settling, which the surface follows frame by frame. */
+    val requestPanelGesture = RequestPanelGesture()
+    /** iOS `requestPanelBottom`: the docked panel's bottom edge (root px; NaN without one). */
+    var requestPanelBottom = Float.NaN
     /** iOS `requestPanelHeight` as drawn: animated as iOS's `withAnimation` changes it (dp). */
     val requestPanelShown = androidx.compose.animation.core.Animatable(0f)
     /** How much of the panel's height the surface reveals (1 docked or lingering, folding to 0 as it leaves). */
@@ -337,6 +342,10 @@ internal data class ComposerSnapshot(
     val dictationError: String?,
     val isAnsweringRequest: Boolean,
     val requestBar: RequestBar?,
+    /** The docked request's last send didn't reach the server: Send reads Retry. */
+    val requestRetries: Boolean,
+    /** The docked request was settled on the server already: nothing more can send. */
+    val requestSettled: Boolean,
     val takesPasteAttachments: Boolean,
     val hasSessionOrProject: Boolean,
     val isInterrupting: Boolean,
@@ -386,6 +395,8 @@ internal data class ComposerSnapshot(
                 dictationError = state.dictationError,
                 isAnsweringRequest = state.isAnsweringRequest,
                 requestBar = state.requestBar,
+                requestRetries = state.requestDock.dockReplyFailed,
+                requestSettled = state.dockRequestID?.let { it in state.requestDock.settledRequestIDs } ?: false,
                 takesPasteAttachments = state.takesPasteAttachments,
                 hasSessionOrProject = state.session != null || state.draftProject != null,
                 isInterrupting = state.isInterrupting,
@@ -798,7 +809,17 @@ internal class SessionComposerEnv(
 
     /** iOS `composerSwipeYields(from:)`: a touch another control owns. */
     fun composerSwipeYields(start: Offset?): Boolean {
-        if (Companion.composerSwipeYields(dictationHold = s.dictationHold, attachmentMenuOpen = host.isAttachmentMenuOpen, panelsShown = host.swipeYields)) return true
+        val panelBottom = if (s.isAnsweringRequest && !view.requestPanelBottom.isNaN()) view.requestPanelBottom else null
+        if (
+            Companion.composerSwipeYields(
+                dictationHold = s.dictationHold,
+                attachmentMenuOpen = host.isAttachmentMenuOpen,
+                panelsShown = host.swipeYields,
+                requestPanelTracking = view.requestPanelGesture.isTracking,
+                requestPanelBottom = panelBottom,
+                start = start,
+            )
+        ) return true
         // The call's bar shares the surface: its drags never raise or dismiss the keyboard.
         if (voiceStore != null) return true
         if (start == null) return false
@@ -862,7 +883,16 @@ internal class SessionComposerEnv(
             dictationHold: DictationFeature.Hold? = null,
             attachmentMenuOpen: Boolean = false,
             panelsShown: Boolean = false,
-        ): Boolean = dictationHold != null || attachmentMenuOpen || panelsShown
+            requestPanelTracking: Boolean = false,
+            requestPanelBottom: Float? = null,
+            start: Offset? = null,
+        ): Boolean {
+            if (dictationHold != null || attachmentMenuOpen || panelsShown) return true
+            // A docked question's fold has the finger, or the touch began on its panel (whose
+            // drags fold it or scroll its list).
+            if (requestPanelTracking) return true
+            return requestPanelBottom != null && start != null && start.y < requestPanelBottom
+        }
     }
 }
 
@@ -1296,6 +1326,8 @@ private fun SessionComposerEnv.requestPanelLeft() {
 
 /** iOS `resetRequestPanel()`: another screen in place keeps nothing of the last one's panel. */
 private fun SessionComposerEnv.resetRequestPanel() {
+    view.requestPanelGesture.reset()
+    view.requestPanelBottom = Float.NaN
     view.requestPanelLeaveJob?.cancel()
     view.requestPanelLeaveJob = null
     val docks = docksRequest
@@ -1486,6 +1518,7 @@ private fun SessionComposerEnv.RequestPanelContent(isShown: Boolean, cap: Float?
         Modifier
             .fillMaxWidth()
             .requestPanelCap(cap?.dp)
+            .onGloballyPositioned { current.view.requestPanelBottom = it.boundsInRoot().bottom }
             .onSizeChanged { size ->
                 // A leaving panel keeps its height while the surface folds over it.
                 val env = current
@@ -1493,6 +1526,13 @@ private fun SessionComposerEnv.RequestPanelContent(isShown: Boolean, cap: Float?
                 if (!isShown || env.store.state.dockRequestID == null || height <= 0f) return@onSizeChanged
                 env.view.requestPanelIdentity = env.s.taskIdentity
                 if (height == env.view.requestPanelHeight) return@onSizeChanged
+                // A question folding, under a finger or springing to rest: the surface follows its
+                // height frame by frame.
+                if (env.view.requestPanelGesture.takeFollows()) {
+                    env.view.requestPanelHeight = height
+                    env.scope.launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) { env.view.requestPanelShown.snapTo(height) }
+                    return@onSizeChanged
+                }
                 val eases = env.view.requestPanelEasing.eases(height, currentCap, keyboardUp = env.messageFieldFocused)
                 val wasZero = env.view.requestPanelHeight == 0f
                 val requestID = env.store.state.dockRequestID
@@ -1523,6 +1563,7 @@ private fun SessionComposerEnv.RequestPanelContent(isShown: Boolean, cap: Float?
             context = context,
             isKeyboardUp = messageFieldFocused,
             send = { store.send(Action.RequestDock(it)) },
+            gesture = view.requestPanelGesture,
         )
     }
 }

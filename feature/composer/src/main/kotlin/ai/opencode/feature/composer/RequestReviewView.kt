@@ -149,8 +149,8 @@ fun RequestReviewView(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 dock.requestErrors[id]?.let { error ->
-                    val failed = id in dock.failedReplyIDs
-                    RequestErrorLine(if (failed) "Couldn’t send answer" else error, detail = if (failed) error else null)
+                    val title = dock.replyFailureTitle(id, isForm = true)
+                    RequestErrorLine(title ?: error, detail = if (title != null) error else null)
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     OpenCodeSecondaryButton(

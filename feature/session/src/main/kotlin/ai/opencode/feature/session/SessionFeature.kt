@@ -794,14 +794,16 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
 
             fun permissionReplyTapped(id: String, reply: OpenCodePermissionReply, message: String? = null): Action =
                 RequestDock(RequestDockFeature.Action.PermissionReplyTapped(id, reply, message))
-            fun requestResponseFinished(sessionID: String, requestID: String, error: OpenCodeClientError?): Action =
-                RequestDock(RequestDockFeature.Action.ResponseFinished(sessionID, requestID, error))
+            fun requestResponseFinished(sessionID: String, requestID: String, error: OpenCodeClientError?, dismissal: Boolean = false): Action =
+                RequestDock(RequestDockFeature.Action.ResponseFinished(sessionID, requestID, error, dismissal))
             fun reviewRequestSelected(id: String): Action = RequestDock(RequestDockFeature.Action.ReviewRequestSelected(id))
             fun requestSheetTapped(id: String): Action = RequestDock(RequestDockFeature.Action.SheetTapped(id))
             val refreshRequestsTapped: Action get() = RequestDock(RequestDockFeature.Action.RefreshTapped)
             val requestsAutoRetry: Action get() = RequestDock(RequestDockFeature.Action.AutoRetry)
             fun questionPageChanged(requestID: String, index: Int): Action =
                 RequestDock(RequestDockFeature.Action.QuestionPageChanged(requestID, index))
+            fun requestCollapseChanged(requestID: String, collapsed: Boolean): Action =
+                RequestDock(RequestDockFeature.Action.CollapseChanged(requestID, collapsed))
             fun formValueChanged(formID: String, key: String, value: OpenCodeFormValue?): Action =
                 RequestDock(RequestDockFeature.Action.FormValueChanged(formID, key, value))
             fun formSubmitTapped(id: String): Action = RequestDock(RequestDockFeature.Action.FormSubmitTapped(id))
@@ -892,6 +894,8 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         val forms: List<ai.opencode.server.model.OpenCodeFormRequest>,
         val formAnswers: Map<String, Map<String, OpenCodeFormValue>>,
         val questionPageIndices: Map<String, Int>,
+        /** Docked questions left dragged down to their bar. */
+        val collapsedRequests: Set<String> = emptySet(),
         val hasLoadedRequests: Boolean,
         val completedRequests: Set<String>,
         /** The docked request the reader pinned (`selectedRequestID`). */

@@ -33,6 +33,7 @@ import ai.opencode.server.model.OpenCodePendingRequests
 import ai.opencode.server.model.OpenCodePermissionRequest
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.OpenCodeUploadEvent
+import androidx.compose.ui.geometry.Offset
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.serialization.json.Json
@@ -52,8 +53,12 @@ import java.util.UUID
  * D-31 B: a pending request's panel grows out of the composer, and the
  * composer's row is your own answer.
  *
- * Not ported here (:feature:drawer, `HomeFeature`): `switchingIntoASnapshotDuringACallEndsTheRestoredAnswer`.
- * Not ported here (:feature:composer, `RequestDockFeature` alone): `requestDockFeatureReducesSelectionPagingAndAnswerEditsExhaustively`.
+ * Not ported here (:feature:drawer, `HomeFeature`): `switchingIntoASnapshotDuringACallEndsTheRestoredAnswer`,
+ * `aSubagentsFoldedQuestionStaysFoldedWhenOpened`.
+ * Not ported here (:feature:composer, `RequestDockFeature` and the fold's pure rules alone):
+ * `requestDockFeatureReducesSelectionPagingAndAnswerEditsExhaustively`,
+ * `aDockedQuestionFoldsToItsBarAndBackExhaustively`, `aFailedSendsReasonFitsItsOneLine`,
+ * `thePanelGestureResets`, `theFoldFollowsTheFingerAndSettlesPastItsThreshold`.
  * UIKit-only probes (text view layout and scroll offsets, `UIColor` trait resolution, a frame-by-frame
  * hosting-controller trace): `inlineRequestBarMultilineDictationKeepsTopAscendersAndPinsToTheEndWithoutStep`,
  * `disabledQuestionBarTrailingControlHasReadableLightContrast`,
@@ -652,6 +657,139 @@ class RequestAnswerTests {
         // Without a request, it's the composer.
         val plain = h.state { h.state(draft = "", answering = false).restoreDraft(DraftState(text = "From Catch Up")) }
         assertEquals("From Catch Up", plain.draft)
+    }
+
+    // endregion
+
+    // region The fold (p229)
+
+    @Test fun aFoldedQuestionStaysFoldedAcrossASwitchUntilItSettles() = sessionTest { h ->
+        val twoQuestions = twoQuestions
+        val left = h.state { h.state(forms = listOf(twoQuestions)).updateRequestDock { it.copy(collapsedRequestIDs = setOf(twoQuestions.id)) } }
+        val saved = h.state { requireNotNull(SessionFeature.SwitchSnapshot.from(left)) }
+        assertEquals(setOf(twoQuestions.id), saved.collapsedRequests)
+        var screen = h.state { saved.restore(h.state(answering = false)) }
+        assertEquals(setOf(twoQuestions.id), screen.requestDock.collapsedRequestIDs)
+
+        // Answered elsewhere, its fold goes with it, in the snapshot and on screen.
+        val pruned = saved.pruneRequests { it.id == twoQuestions.id }
+        assertTrue(pruned.collapsedRequests.isEmpty())
+        screen = h.state { screen.pruneRequests(removing = { id, _ -> id == twoQuestions.id }) }
+        assertTrue(screen.requestDock.collapsedRequestIDs.isEmpty())
+    }
+
+    @Test fun aFailedAnswerTurnsSendIntoRetryAndTheBarSendsItAgain() = sessionTest { h ->
+        val attempts = LockIsolated(0)
+        val slack = slack
+        val store = h.store(h.state(forms = listOf(slack))) {
+            this[OpenCodeClient] = this[OpenCodeClient].copy(
+                replyForm = { _, _, _, _ ->
+                    val attempt = attempts.withValue { Pair(it + 1, it + 1) }
+                    if (attempt == 1) throw OpenCodeClientError(message = OpenCodeClientError.UNREACHABLE_MESSAGE)
+                },
+                familyPendingRequests = { _, _, _ ->
+                    OpenCodePendingRequests(permissions = emptyList(), forms = if (attempts.value < 2) listOf(slack) else emptyList())
+                },
+            )
+        }
+        store.exhaustive = false
+        store.send(Action.formValueChanged(slack.id, "q0", OpenCodeFormValue.Str("Draft it instead")))
+        store.send(Action.requestCollapseChanged(slack.id, collapsed = true))
+        store.send(Action.SendTapped)
+        store.receive(requestResponseFinished, "requestResponseFinished")
+        assertTrue(store.state.requestDock.dockReplyFailed)
+        assertEquals(OpenCodeClientError.UNREACHABLE_MESSAGE, store.state.requestErrors[slack.id])
+        // Still docked, unfolded to show the error, the answer kept and the bar ready.
+        assertTrue(store.state.isAnsweringRequest)
+        assertTrue(store.state.requestDock.collapsedRequestIDs.isEmpty())
+        assertEquals(true, store.state.requestBar?.isReady)
+
+        store.send(Action.SendTapped)
+        assertFalse(store.state.requestDock.dockReplyFailed)
+        store.receive(requestResponseFinished, "requestResponseFinished")
+        assertEquals(2, attempts.value)
+        assertTrue(store.state.formRequests.isEmpty())
+        assertTrue(store.state.requestDock.collapsedRequestIDs.isEmpty())
+        assertFalse(store.state.isAnsweringRequest)
+    }
+
+    @Test fun aFailedDismissalReadsAsOneAndLeavesSendAlone() = sessionTest { h ->
+        val slack = slack
+        val store = h.store(h.state(forms = listOf(slack))) {
+            this[OpenCodeClient] = this[OpenCodeClient].copy(
+                cancelForm = { _, _, _, _ -> throw OpenCodeClientError(message = OpenCodeClientError.UNREACHABLE_MESSAGE) },
+                familyPendingRequests = { _, _, _ -> OpenCodePendingRequests(permissions = emptyList(), forms = listOf(slack)) },
+            )
+        }
+        store.exhaustive = false
+        store.send(Action.formValueChanged(slack.id, "q0", OpenCodeFormValue.Str("Draft it instead")))
+        store.send(Action.requestCollapseChanged(slack.id, collapsed = true))
+        store.send(Action.requestDismissTapped)
+        store.receive(requestResponseFinished, "requestResponseFinished")
+        assertEquals(setOf(slack.id), store.state.requestDock.failedDismissalIDs)
+        assertTrue(store.state.failedReplyIDs.isEmpty())
+        assertFalse(store.state.requestDock.dockReplyFailed)
+        assertEquals("Couldn’t dismiss request", store.state.requestDock.replyFailureTitle(slack.id, isForm = true))
+        // Folded, it opens to show the line.
+        assertTrue(store.state.requestDock.collapsedRequestIDs.isEmpty())
+        store.receive(Action.PendingRequestsResponse::class)
+        assertEquals(listOf(slack.id), store.state.formRequests.map { it.id })
+    }
+
+    @Test fun anAnswerTheServerHadAlreadySettledStaysUntilDismissedLocally() = sessionTest { h ->
+        val slack = slack
+        val sends = LockIsolated(0)
+        val dismissals = LockIsolated(0)
+        val initial = h.state { h.state(forms = listOf(slack)).copy(familySessions = listOf(session)) }
+        val store = h.store(initial) {
+            this[OpenCodeClient] = this[OpenCodeClient].copy(
+                replyForm = { _, _, _, _ ->
+                    sends.withValue { Pair(it + 1, Unit) }
+                    throw OpenCodeClientError(message = "Already answered elsewhere", statusCode = 409, requestSettled = true)
+                },
+                cancelForm = { _, _, _, _ -> dismissals.withValue { Pair(it + 1, Unit) } },
+                familyPendingRequests = { _, _, _ -> empty },
+            )
+        }
+        store.exhaustive = false
+        store.send(Action.formValueChanged(slack.id, "q0", OpenCodeFormValue.Str("Draft it instead")))
+        store.send(Action.SendTapped)
+        store.receive(requestResponseFinished, "requestResponseFinished")
+        assertEquals(setOf(slack.id), store.state.requestDock.settledRequestIDs)
+        assertFalse(store.state.requestDock.dockReplyFailed)
+        assertEquals("Couldn’t send answer", store.state.requestDock.replyFailureTitle(slack.id, isForm = true))
+        // The refresh no longer lists it, but it stays with its error and words.
+        store.receive(Action.PendingRequestsResponse::class)
+        assertEquals(listOf(slack.id), store.state.formRequests.map { it.id })
+        assertEquals("Already answered elsewhere", store.state.requestErrors[slack.id])
+        assertEquals(OpenCodeFormValue.Str("Draft it instead"), store.state.formAnswers[slack.id]?.get("q0"))
+        // An edit keeps the error, and nothing sends again.
+        store.send(Action.formValueChanged(slack.id, "q0", OpenCodeFormValue.Str("Bring Slack forward")))
+        assertEquals("Already answered elsewhere", store.state.requestErrors[slack.id])
+        store.send(Action.SendTapped)
+        assertEquals(1, sends.value)
+        // × clears it here, with no DELETE.
+        store.send(Action.requestDismissTapped)
+        assertTrue(store.state.formRequests.isEmpty())
+        assertTrue(store.state.requestDock.settledRequestIDs.isEmpty())
+        assertEquals(0, dismissals.value)
+    }
+
+    @Test fun aFoldedFormsValidationErrorUnfoldsIt() = sessionTest { h ->
+        val required = form("frm_required", fields = """[{"key":"answer","type":"string","title":"Name","required":true}]""")
+        val store = h.store(h.state(forms = listOf(required)))
+        store.exhaustive = false
+        store.send(Action.requestCollapseChanged(required.id, collapsed = true))
+        store.send(Action.formSubmitTapped(required.id))
+        assertNotNull(store.state.requestErrors[required.id])
+        assertTrue(store.state.requestDock.collapsedRequestIDs.isEmpty())
+    }
+
+    @Test fun theKeyboardsSwipeYieldsToTheDockedPanel() {
+        assertTrue(SessionComposerEnv.composerSwipeYields(requestPanelTracking = true))
+        assertTrue(SessionComposerEnv.composerSwipeYields(requestPanelBottom = 600f, start = Offset(100f, 500f)))
+        assertFalse(SessionComposerEnv.composerSwipeYields(requestPanelBottom = 600f, start = Offset(100f, 700f)))
+        assertFalse(SessionComposerEnv.composerSwipeYields(start = Offset(100f, 500f)))
     }
 
     // endregion

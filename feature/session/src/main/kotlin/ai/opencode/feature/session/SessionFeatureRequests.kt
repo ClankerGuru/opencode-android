@@ -171,6 +171,7 @@ private fun SessionFeature.pendingRequestsFailed(error: OpenCodeClientError, sta
 private fun SessionFeature.reduceRequestDock(action: RequestDockFeature.Action, state: State): Reduced<State, Action> = when (action) {
     is RequestDockFeature.Action.ReviewRequestSelected,
     is RequestDockFeature.Action.QuestionPageChanged,
+    is RequestDockFeature.Action.CollapseChanged,
     is RequestDockFeature.Action.FormValueChanged,
     -> Reduced(state)
 
@@ -216,6 +217,7 @@ private fun SessionFeature.reduceRequestDock(action: RequestDockFeature.Action, 
     is RequestDockFeature.Action.ResponseFinished -> {
         val settled = RequestReplies.responseFinished(
             state.requestDock, action.sessionID, action.requestID, action.error, state.familySessions.map { it.id }.toSet(),
+            dismissal = action.dismissal,
         )
         if (settled == null) {
             Reduced(state)

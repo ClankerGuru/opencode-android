@@ -1227,6 +1227,7 @@ fun HomeFeature.State.remembering(detail: SessionFeature.State): HomeFeature.Sta
                 forms = snapshot.forms,
                 formAnswers = snapshot.formAnswers,
                 questionPageIndices = snapshot.questionPageIndices,
+                collapsedRequests = snapshot.collapsedRequests,
                 answerDrafts = snapshot.answerDrafts,
                 hasLoadedRequests = snapshot.hasLoadedRequests,
                 completedRequests = snapshot.completedRequests,
@@ -1281,6 +1282,9 @@ fun HomeFeature.State.pushingSubagent(session: OpenCodeSession): HomeFeature.Sta
         detail = detail.withPermissionRequests(parent.permissionRequests.filter { it.sessionID in members })
             .withFormRequests(forms)
             .withFormAnswers(parent.formAnswers.filterKeys { it in formIDs })
+            // A question folded or paged in the parent stays so in its subagent.
+            .withQuestionPageIndices(parent.questionPageIndices.filterKeys { it in formIDs })
+            .updateRequestDock { it.copy(collapsedRequestIDs = parent.requestDock.collapsedRequestIDs.intersect(formIDs)) }
             .copy(hasLoadedPendingRequests = parent.hasLoadedPendingRequests)
     }
     detail = detail.copy(

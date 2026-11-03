@@ -223,7 +223,7 @@ class ComposerFeature : Reducer<ComposerFeature.State, ComposerFeature.Action> {
                 RequestReplies.sendRequestBar(dock, state.draft, state.draft.ifBlank { null }, server, state.directory)
             RequestDockFeature.Action.CustomMarkTapped -> Reduced(RequestReplies.customMarkTapped(dock, state.draft))
             is RequestDockFeature.Action.ResponseFinished -> {
-                val settled = RequestReplies.responseFinished(dock, action.sessionID, action.requestID, action.error, state.familySessionIDs + setOfNotNull(state.sessionID))
+                val settled = RequestReplies.responseFinished(dock, action.sessionID, action.requestID, action.error, state.familySessionIDs + setOfNotNull(state.sessionID), action.dismissal)
                     ?: return Reduced(state)
                 val next = handOver(state.copy(requestDock = settled.state))
                 return Reduced(next, refreshRequests(next))
