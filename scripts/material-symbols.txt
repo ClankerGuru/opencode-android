@@ -17,6 +17,7 @@ arrow_circle_down                   # arrow.down.circle
 arrow_circle_down fill              # arrow.down.circle.fill
 arrow_circle_up                     # arrow.up.circle
 arrow_circle_up fill                # arrow.up.circle.fill
+arrow_back mirror                   # chevron.backward (Android back arrow)
 arrow_downward                      # arrow.down
 arrow_forward mirror                # arrow.right
 arrow_outward mirror                # arrow.up.right
@@ -54,7 +55,7 @@ check_box_outline_blank             # square
 check_circle                        # checkmark.circle
 check_circle fill                   # checkmark.circle.fill
 checklist                           # checklist
-chevron_left mirror                 # chevron.backward, chevron.compact.left, chevron.left
+chevron_left mirror                 # chevron.compact.left, chevron.left
 chevron_right mirror                # chevron.compact.right, chevron.right
 circle fill                         # circle.fill
 close                               # xmark
@@ -148,7 +149,7 @@ mic_off                             # mic.slash
 mic_off fill                        # mic.slash.fill
 mobile_layout                       # platter.filled.top.iphone
 monitor_heart                       # waveform.path.ecg
-more_horiz                          # ellipsis
+more_vert                           # ellipsis (Android overflow)
 motion_photos_on                    # circle.dotted.circle
 move_to_inbox                       # tray.and.arrow.down
 movie                               # film

@@ -42,6 +42,8 @@ Every SF Symbol name used in `OpenCode/`, `OpenCodeShare/`, `OpenCodeWidgets/` a
 literals that aren't symbols). `(fill)` is the filled variant. Weak matches: `star.slash` →
 `star_half` (Material has no "unfavourite" star), `capsule` → `toggle_off`, `macmini`/`macstudio`
 → `desktop_mac`, `tortoise.fill` → `slow_motion_video`, `arrow.triangle.pull` → `merge_type`.
+Android divergence: `chevron.backward` (every Back button) is the Android back arrow `arrow_back`,
+and `ellipsis` (every overflow menu) is the vertical `more_vert`, as on other Android apps.
 
 | SF Symbol | Material Symbol (Rounded) | Drawable | Kotlin | iOS files |
 | --- | --- | --- | --- | --- |
@@ -108,7 +110,7 @@ literals that aren't symbols). `(fill)` is the filled variant. Weak matches: `st
 | `checkmark.circle.fill` | `check_circle` (fill) | `ms_check_circle_fill` | `SFSymbol.CheckmarkCircleFill` | AppearanceSettingsView, RequestDockView, SettingsView, ShellOutputView, TraceTriggers |
 | `checkmark.seal` | `verified` | `ms_verified` | `SFSymbol.CheckmarkSeal` | WhatsNew/Entries |
 | `checkmark.square.fill` | `check_box` (fill) | `ms_check_box_fill` | `SFSymbol.CheckmarkSquareFill` | MarkdownBlockView, RequestDockView |
-| `chevron.backward` | `chevron_left` | `ms_chevron_left` | `SFSymbol.ChevronBackward` | AppView, BrowserView, CatchUpChrome, OnboardingPlaygroundView, SessionView, SettingsView, WhatsNewView |
+| `chevron.backward` | `arrow_back` | `ms_arrow_back` | `SFSymbol.ChevronBackward` | AppView, BrowserView, CatchUpChrome, OnboardingPlaygroundView, SessionView, SettingsView, WhatsNewView |
 | `chevron.compact.left` | `chevron_left` | `ms_chevron_left` | `SFSymbol.ChevronCompactLeft` | TuningPanelView |
 | `chevron.compact.right` | `chevron_right` | `ms_chevron_right` | `SFSymbol.ChevronCompactRight` | TuningPanelView |
 | `chevron.down` | `keyboard_arrow_down` | `ms_keyboard_arrow_down` | `SFSymbol.ChevronDown` | AgentPicker, FloatingCall, LinkPreviewViews, ModelPickerOverlays, OnboardingPlaygroundControls, RequestDockView, ServerSwitcher, SessionView+ComposerControls, ShareView, TranscriptUserMessage |
@@ -139,7 +141,7 @@ literals that aren't symbols). `(fill)` is the filled variant. Weak matches: `st
 | `doc.text.magnifyingglass` | `plagiarism` | `ms_plagiarism` | `SFSymbol.DocTextMagnifyingglass` | TranscriptEntryView |
 | `doc.zipper` | `folder_zip` | `ms_folder_zip` | `SFSymbol.DocZipper` | AttachmentFileType |
 | `dot.radiowaves.left.and.right` | `sensors` | `ms_sensors` | `SFSymbol.DotRadiowavesLeftAndRight` | SettingsView |
-| `ellipsis` | `more_horiz` | `ms_more_horiz` | `SFSymbol.Ellipsis` | OnboardingPlaygroundView, SessionSwitcher, SessionView+Header, SettingsView, TuningPanelView, VoiceCallLiveActivity, VoiceCallLogView |
+| `ellipsis` | `more_vert` | `ms_more_vert` | `SFSymbol.Ellipsis` | OnboardingPlaygroundView, SessionSwitcher, SessionView+Header, SettingsView, TuningPanelView, VoiceCallLiveActivity, VoiceCallLogView |
 | `ellipsis.circle` | `pending` | `ms_pending` | `SFSymbol.EllipsisCircle` | SettingsServers |
 | `ellipsis.circle.fill` | `pending` (fill) | `ms_pending_fill` | `SFSymbol.EllipsisCircleFill` | SessionRunLiveActivity |
 | `envelope.badge` | `mark_email_unread` | `ms_mark_email_unread` | `SFSymbol.EnvelopeBadge` | HomeView+Drawer, SessionView+Header |

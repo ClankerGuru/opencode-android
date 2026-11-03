@@ -109,6 +109,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.platform.testTag
@@ -785,6 +786,7 @@ fun SyncingSessionTitle(
     isLastKnown: Boolean,
     modifier: Modifier = Modifier,
     animates: Boolean = true,
+    style: TextStyle = HeaderBlurTunables.titleFont.textStyle.copy(fontWeight = FontWeight.Bold),
 ) {
     val reducedMotion = rememberReduceMotion()
     val colors = OpenCodeTheme.colors
@@ -806,7 +808,7 @@ fun SyncingSessionTitle(
     ) { shown ->
         Text(
             shown,
-            style = HeaderBlurTunables.titleFont.textStyle.copy(fontWeight = FontWeight.Bold),
+            style = style,
             color = color,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
