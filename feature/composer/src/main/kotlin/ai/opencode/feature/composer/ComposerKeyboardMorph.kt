@@ -1,5 +1,6 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.tuning.Tunable
 import ai.opencode.core.ui.LocalDrawerKeyboardSignals
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FiniteAnimationSpec
@@ -46,14 +47,14 @@ import kotlin.math.roundToInt
 
 /** iOS `ComposerTunables.keyboard*` (Composer › Keyboard), declared beside the morph as on iOS. */
 object ComposerKeyboardTunables {
-    /** `composer.keyboard.chipTravel`: how far (dp) the row's controls rise as they reveal. */
-    const val KEYBOARD_CHIP_TRAVEL = 6f
+    /** iOS `ComposerTunables.keyboardChipTravel`: how far (dp) the row's controls rise as they reveal. */
+    val keyboardChipTravel = Tunable("composer.keyboard.chipTravel", "Model reveal travel", default = 6f, range = 0.0..16.0, step = 0.5)
 
-    /** `composer.keyboard.chipBlur`: the controls' blur (dp) at the start of their reveal. */
-    const val KEYBOARD_CHIP_BLUR = 3f
+    /** iOS `ComposerTunables.keyboardChipBlur`: the controls' blur (dp) at the start of their reveal. */
+    val keyboardChipBlur = Tunable("composer.keyboard.chipBlur", "Model reveal blur", default = 3f, range = 0.0..4.0, step = 0.25)
 
-    /** `composer.keyboard.fade`: Reduce Motion's fade for the controls, in seconds. */
-    const val KEYBOARD_FADE = 0.18
+    /** iOS `ComposerTunables.keyboardFade`: Reduce Motion's fade for the controls, in seconds. */
+    val keyboardFade = Tunable("composer.keyboard.fade", "Reduced motion fade", default = 0.18, range = 0.1..0.3, step = 0.01)
 }
 
 /**
@@ -288,7 +289,7 @@ fun ComposerKeyboardReveal(
         seenExpanded[0] = pose.expanded
         fadingOut = pose.reducedMotion && !pose.expanded
         if (fadingOut) {
-            delay((ComposerKeyboardTunables.KEYBOARD_FADE * 1000).toLong())
+            delay((ComposerKeyboardTunables.keyboardFade.value * 1000).toLong())
             fadingOut = false
         }
     }
@@ -304,7 +305,7 @@ fun ComposerKeyboardReveal(
         if (pose.reducedMotion) {
             reducedAlpha.animateTo(
                 if (pose.layoutExpanded) 1f else 0f,
-                tween((ComposerKeyboardTunables.KEYBOARD_FADE * 1000).roundToInt()),
+                tween((ComposerKeyboardTunables.keyboardFade.value * 1000).roundToInt()),
             )
         }
     }
@@ -319,13 +320,13 @@ fun ComposerKeyboardReveal(
         }
     }
     val reduced = pose.reducedMotion
-    val blurPx = with(LocalDensity.current) { ComposerKeyboardTunables.KEYBOARD_CHIP_BLUR.dp.toPx() }
+    val blurPx = with(LocalDensity.current) { ComposerKeyboardTunables.keyboardChipBlur.value.dp.toPx() }
     Box(
         modifier
             .graphicsLayer {
                 val progress = if (reduced) reducedAlpha.value else morph.expansion
                 alpha = progress * recordingAlpha.value
-                translationY = if (reduced) 0f else (1 - progress) * ComposerKeyboardTunables.KEYBOARD_CHIP_TRAVEL.dp.toPx()
+                translationY = if (reduced) 0f else (1 - progress) * ComposerKeyboardTunables.keyboardChipTravel.value.dp.toPx()
             }
             .morphBlur {
                 if (reduced) 0f else (1 - morph.expansion) * blurPx
