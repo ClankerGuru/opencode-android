@@ -748,13 +748,21 @@ val State.transcriptIdentity: TranscriptIdentity
 
 /**
  * Decodes image bytes once and caches the result (iOS `CachedImage`); decoding in a list row
- * would otherwise run on every recomposition. Fills its bounds, cropping.
+ * would otherwise run on every recomposition. Fills its bounds, cropping. A `media:<hash>`
+ * reference loads from [server]; the view moved down to `:feature:media`, which the composer's
+ * queued messages share.
  */
 @Composable
-fun CachedImage(id: String, data: ByteArray, modifier: Modifier = Modifier) {
-    val image = remember(id, data) { CachedImage.decoded(id, data) } ?: return
-    Image(image, contentDescription = null, modifier = modifier, contentScale = ContentScale.Crop)
-}
+fun CachedImage(
+    id: String,
+    data: ByteArray,
+    modifier: Modifier = Modifier,
+    mediaHash: String? = null,
+    name: String? = null,
+    isUnavailable: Boolean = false,
+    server: ai.opencode.server.OpenCodeServer? = null,
+    compact: Boolean = false,
+) = ai.opencode.feature.media.CachedImage(id, data, modifier, mediaHash, name, isUnavailable, server, compact)
 
 object CachedImage {
     /** iOS `CachedImage.decoded(id:data:mediaHash:)`, moved down to `:feature:media` for its resolver. */

@@ -551,6 +551,7 @@ fun SessionComposer(
             onClose = { view.showsQueuedMessages = false },
             // A call's delegation shows the voice agent's words, as the transcript does.
             displayText = { ai.opencode.feature.transcript.user.VoiceHandoff.parse(it)?.displayText ?: it },
+            server = store.state.server,
         )
     }
 }

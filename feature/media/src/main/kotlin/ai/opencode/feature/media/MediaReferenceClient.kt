@@ -19,6 +19,7 @@ import android.content.ComponentCallbacks2
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -26,11 +27,20 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -44,6 +54,8 @@ import androidx.compose.ui.unit.dp
 import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** What a `media:<hash>` load gave (iOS `MediaReferenceLoadResult`). */
 sealed interface MediaReferenceLoadResult {
@@ -325,6 +337,58 @@ data class MediaAttachmentRetryState(val failure: MediaAttachmentFailure? = null
     fun beginLoad(): MediaAttachmentRetryState = copy(failure = null)
 
     fun retry(): MediaAttachmentRetryState = copy(failure = null, attempt = attempt + 1)
+}
+
+/**
+ * iOS `CachedImage` (the view, in its `SessionTranscriptView.swift`): an attachment's image,
+ * decoded once and cached, filling its bounds and cropping. A `media:<hash>` reference with no
+ * bytes in memory loads from [server] behind a spinner; one the server no longer has shows
+ * [MediaAttachmentUnavailableView] (with Retry after a transient failure). Lives here, beside
+ * [CachedImage.decoded], so the composer's queued messages and the session share it.
+ */
+@Composable
+fun CachedImage(
+    id: String,
+    data: ByteArray,
+    modifier: Modifier = Modifier,
+    mediaHash: String? = null,
+    name: String? = null,
+    isUnavailable: Boolean = false,
+    server: OpenCodeServer? = null,
+    compact: Boolean = false,
+) {
+    var loadedImage by remember(id, mediaHash) { mutableStateOf<Bitmap?>(null) }
+    var retryState by remember(id, mediaHash) { mutableStateOf(MediaAttachmentRetryState()) }
+    val attachment = remember(id, data, mediaHash, name, isUnavailable) {
+        OpenCodeImageAttachment(id = id, data = data, mediaHash = mediaHash, name = name, isUnavailable = isUnavailable)
+    }
+    val resolvedUnavailable = isUnavailable ||
+        retryState.failure == MediaAttachmentFailure.Unavailable ||
+        MediaReferenceResolver.isUnavailable(attachment, server)
+    val decoded = loadedImage ?: remember(id, data, mediaHash) { CachedImage.decoded(id, data, mediaHash) }
+    when {
+        resolvedUnavailable -> MediaAttachmentUnavailableView(name, modifier, compact = compact)
+        decoded != null -> Image(decoded.asImageBitmap(), contentDescription = null, modifier = modifier, contentScale = ContentScale.Crop)
+        retryState.isTransientFailure -> MediaAttachmentUnavailableView(
+            name,
+            modifier,
+            compact = compact,
+            onRetry = { retryState = retryState.retry() },
+            isTransientFailure = true,
+        )
+        mediaHash != null && server != null -> {
+            Box(modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = OpenCodeTheme.colors.secondaryText)
+            }
+            LaunchedEffect("${server.persistenceID}|$mediaHash#${retryState.attempt}") {
+                retryState = retryState.beginLoad()
+                when (val result = withContext(Dispatchers.Default) { MediaReferenceResolver.loadImage(server, attachment) }) {
+                    is MediaImageResult.Success -> loadedImage = result.image
+                    is MediaImageResult.Failure -> retryState = retryState.copy(failure = result.failure)
+                }
+            }
+        }
+    }
 }
 
 /**
