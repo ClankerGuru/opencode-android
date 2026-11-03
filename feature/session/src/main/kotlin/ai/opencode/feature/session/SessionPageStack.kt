@@ -2,21 +2,25 @@ package ai.opencode.feature.session
 
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionFrameAction
+import ai.opencode.core.motion.PageTransitions
 import ai.opencode.core.motion.SpringSolver
 import ai.opencode.core.motion.motionFrameLoop
 import ai.opencode.core.motion.rememberFrameDurationSeconds
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.BackSwipeRules
 import ai.opencode.core.ui.OpenCodeTheme
+import androidx.activity.BackEventCompat
 import androidx.activity.OnBackPressedDispatcher
 import androidx.activity.OnBackPressedDispatcherOwner
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.activity.compose.PredictiveBackHandler
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -33,8 +37,6 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -81,10 +83,12 @@ class SessionStackPage(
 
 /**
  * Subagent (and browser) screens pushed over the session, like a navigation stack (iOS
- * `SessionPageStack`): a push slides the new screen in from the trailing edge over its parent,
- * which parallaxes and dims beneath; going back follows the finger (an in-app rightward pan from
- * anywhere under [BackSwipeRules], or the system's predictive back) and settles on the drawer's
- * spring ([Motion.drawerSlide]).
+ * `SessionPageStack`). Android divergence: pushes and pops are Material's shared axis X
+ * ([PageTransitions]: a 30 dp slide with a fade through, 0.3 s) instead of iOS's full-width slide
+ * over a parallaxing, dimmed parent; going back (an in-app rightward pan from anywhere under
+ * [BackSwipeRules], or the system's predictive back) is Android's back preview: the page shrinks,
+ * leans toward the swipe and rounds its corners over the screen beneath, then fades away on commit
+ * or springs back on cancel ([Motion.drawerSlide]).
  *
  * Covered screens stay composed (each under its own [androidx.compose.runtime.saveable.SaveableStateHolder]
  * entry), only invisible once a transition lands, so their transcript keeps its scroll position and
@@ -92,8 +96,7 @@ class SessionStackPage(
  * TalkBack and their own back handlers are parked on an inert dispatcher, so only the top screen
  * handles system back.
  *
- * Under Reduce Motion pushes and pops cross-fade (0.25 s) instead of sliding, with no parallax,
- * dim or shadow.
+ * Under Reduce Motion pushes and pops cross-fade (0.25 s) instead of sliding.
  *
  * @param pages the screens over the root, bottom first. New ids push (the last with the push
  *   motion), missing ids pop (the top with the pop motion), and pages that stay take the new
@@ -145,7 +148,7 @@ fun SessionPageStack(
         try {
             progress.collect { event ->
                 if (!began) {
-                    began = motion.dragBegan()
+                    began = motion.dragBegan(leanSign = if (event.swipeEdge == BackEventCompat.EDGE_LEFT) 1f else -1f)
                     if (!began) return@collect
                 }
                 motion.dragChanged(event.progress * motion.width)
@@ -199,36 +202,39 @@ fun SessionPageStack(
                             val width = max(motion.width, 1f)
                             val progress = min(max(motion.offset / width, 0f), 1f)
                             val direction = if (rtl) -1f else 1f
+                            val slide = PageTransitions.SlideDistance.toPx() * direction
+                            val transition = motion.transition
+                            val sharedAxis = !motion.reducedMotion && transition != StackTransition.Back
+                            scaleX = 1f
+                            scaleY = 1f
+                            shape = RectangleShape
+                            clip = false
                             when {
                                 !visible -> {
                                     alpha = 0f
                                     translationX = 0f
-                                    shadowElevation = 0f
+                                }
+                                isTop && transition == StackTransition.Back -> {
+                                    // Android's back preview: the page shrinks, leans toward the
+                                    // swipe and rounds its corners; a commit fades it away.
+                                    val scale = 1f - (1f - PageTransitions.BACK_PREVIEW_SCALE) * progress
+                                    scaleX = scale
+                                    scaleY = scale
+                                    translationX = PageTransitions.BackPreviewShift.toPx() * progress * motion.leanSign
+                                    shape = RoundedCornerShape(PageTransitions.BackPreviewCorner * progress)
+                                    clip = true
+                                    alpha = motion.commitAlpha(progress)
                                 }
                                 isTop -> {
-                                    alpha = motion.topAlpha
-                                    translationX = motion.offset.dp.toPx() * direction
-                                    val shadow = count > 1 && !motion.reducedMotion && !motion.atRest
-                                    shadowElevation = if (shadow) SHADOW_RADIUS.dp.toPx() else 0f
-                                    shape = RectangleShape
-                                    val shadowColor = Color.Black.copy(alpha = if (shadow) 1 - progress else 0f)
-                                    ambientShadowColor = shadowColor
-                                    spotShadowColor = shadowColor
+                                    val incoming = transition == StackTransition.Push
+                                    alpha = if (sharedAxis) sharedAxisAlpha(progress, incoming) else motion.topAlpha
+                                    translationX = if (sharedAxis) slide * progress else 0f
                                 }
                                 else -> {
-                                    alpha = 1f
-                                    shadowElevation = 0f
-                                    translationX = if (motion.reducedMotion) 0f
-                                    else -width.dp.toPx() * PARALLAX * (1 - progress) * direction
+                                    val incoming = transition == StackTransition.Pop
+                                    alpha = if (sharedAxis) sharedAxisAlpha(1f - progress, incoming) else 1f
+                                    translationX = if (sharedAxis) -slide * (1f - progress) else 0f
                                 }
-                            }
-                        }
-                        .drawWithContent {
-                            drawContent()
-                            if (isBeneath && motion.dimShown && !motion.reducedMotion) {
-                                val width = max(motion.width, 1f)
-                                val progress = min(max(motion.offset / width, 0f), 1f)
-                                drawRect(Color.Black, alpha = DIM_ALPHA * (1 - progress))
                             }
                         }
                         .then(if (page != null) Modifier.background(canvas) else Modifier)
@@ -249,14 +255,19 @@ fun SessionPageStack(
     }
 }
 
-/** iOS `SessionPageStack.parallax` (`SettingsPresentation.parallax`). */
-private const val PARALLAX = 0.3f
+/**
+ * Material shared axis's fade: the outgoing page fades out over the first part of the move, the
+ * incoming one fades in over the rest. [distance] is how far the page is from where it rests (0
+ * there, 1 fully away).
+ */
+private fun sharedAxisAlpha(distance: Float, incoming: Boolean): Float {
+    val split = PageTransitions.FADE_SPLIT
+    val alpha = if (incoming) (1f - distance - split) / (1f - split) else 1f - distance / split
+    return alpha.coerceIn(0f, 1f)
+}
 
-/** iOS `SessionPageStack.dimAlpha` (`SettingsPresentation.dim`). */
-private const val DIM_ALPHA = 0.12f
-
-/** The pushed page's shadow radius (iOS 10 pt; its opacity, 0.18, fades with the slide). */
-private const val SHADOW_RADIUS = 10f
+/** What moves the top page: a push, a pop, or a back gesture (drag, then its settle). */
+internal enum class StackTransition { Push, Pop, Back }
 
 /** iOS `UIView.animate(withDuration: 0.25)`: Reduce Motion's push/pop cross-fade. */
 private const val REDUCED_FADE_SECONDS = 0.25
@@ -300,7 +311,7 @@ private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.backPan(
                 BackSwipeRules.Decision.Begin -> {}
             }
             change.consume()
-            if (!motion.dragBegan()) return@awaitEachGesture
+            if (!motion.dragBegan(leanSign = direction)) return@awaitEachGesture
             motion.dragChanged(dx.toDp().value)
             break
         }
@@ -354,9 +365,16 @@ internal class SessionPageStackMotion(
     var beneathShown by mutableStateOf(false)
         private set
 
-    /** The dim over the screen beneath (a pop or a drag back; a push has none). */
-    var dimShown by mutableStateOf(false)
+    /** What the running move is (it picks the look: shared axis or the back preview). */
+    var transition by mutableStateOf(StackTransition.Pop)
         private set
+
+    /** Which way the back preview leans on screen: +1 right, -1 left (toward the swipe). */
+    var leanSign by mutableFloatStateOf(1f)
+        private set
+
+    /** The progress a committed back gesture fades away from; negative while not committing. */
+    private var commitFrom by mutableFloatStateOf(-1f)
 
     /** The top page's opacity: Reduce Motion's cross-fade. */
     var topAlpha by mutableFloatStateOf(1f)
@@ -386,6 +404,13 @@ internal class SessionPageStackMotion(
     private var fading = false
     private var dragging = false
     private var dragStart = 0f
+
+    /** The top page's opacity in the back preview: 1, fading to 0 once the back commits. */
+    fun commitAlpha(progress: Float): Float {
+        if (commitFrom < 0f) return 1f
+        val left = max(1f - commitFrom, 0.001f)
+        return (1f - (progress - commitFrom) / left).coerceIn(0f, 1f)
+    }
 
     /** iOS `pan.isActive`, minus `isEnabled` (the composable's `enabled`). */
     fun panActive(): Boolean = canGoBack && !isPopping && pages.lastOrNull()?.yieldsBackSwipe?.invoke() != true
@@ -436,6 +461,7 @@ internal class SessionPageStackMotion(
         clearFocus()
         pages = pages + item
         onTopChanged()
+        transition = StackTransition.Push
         atRest = false
         beneathShown = true
         if (!animated) {
@@ -451,7 +477,7 @@ internal class SessionPageStackMotion(
             return
         }
         offset = width
-        animate(to = 0f) { settleAtRest() }
+        slide(to = 0f) { settleAtRest() }
     }
 
     /** Takes pages off until [depth] remain; only the top one animates. */
@@ -469,6 +495,7 @@ internal class SessionPageStackMotion(
         val top = pages.last()
         val finish = takeOff(top, completion)
         if (!animated) return finish()
+        transition = StackTransition.Pop
         revealBeneath()
         isPopping = true
         if (reducedMotion) {
@@ -476,7 +503,7 @@ internal class SessionPageStackMotion(
             fade(to = 0f)
             return
         }
-        animate(to = width, then = finish)
+        slide(to = width, then = finish)
     }
 
     /** Removes [top] once it has left, and rests on the page beneath. */
@@ -490,7 +517,7 @@ internal class SessionPageStackMotion(
         completion()
     }
 
-    /** Moves the top page toward [to] on the drawer's spring, then lands. */
+    /** Settles a back gesture toward [to] on the drawer's spring (keeping its velocity), then lands. */
     private fun animate(to: Float, velocity: Float = 0f, then: () -> Unit) {
         stopMotion()
         landing = then
@@ -500,6 +527,32 @@ internal class SessionPageStackMotion(
                 val settled = spring.step(tick.dt)
                 offset = spring.position
                 if (settled) {
+                    job = null
+                    land()
+                    MotionFrameAction.Stop
+                } else {
+                    MotionFrameAction.Continue
+                }
+            }
+        }
+    }
+
+    /**
+     * A push or pop: moves the top page toward [to] over Material's 0.3 s on FastOutSlowIn (it
+     * follows Developer Mode slow motion), then lands.
+     */
+    private fun slide(to: Float, then: () -> Unit) {
+        stopMotion()
+        landing = then
+        val from = offset
+        val seconds = Motion.millis(PageTransitions.DURATION_SECONDS) / 1000.0
+        var elapsed = 0.0
+        job = scope.launch {
+            motionFrameLoop(frameDurationSeconds = frameDuration) { tick ->
+                elapsed += tick.dt
+                val t = if (seconds > 0) min(elapsed / seconds, 1.0).toFloat() else 1f
+                offset = from + (to - from) * FastOutSlowInEasing.transform(t)
+                if (t >= 1f) {
                     job = null
                     land()
                     MotionFrameAction.Stop
@@ -565,12 +618,18 @@ internal class SessionPageStackMotion(
 
     // The back drag (in-app pan or predictive back)
 
-    /** The drag begins; false when it may not (nothing to go back from, or a pop is running). */
-    fun dragBegan(): Boolean {
+    /**
+     * The drag begins; false when it may not (nothing to go back from, or a pop is running).
+     * [leanSign] is which way the preview leans on screen (+1 right, -1 left).
+     */
+    fun dragBegan(leanSign: Float): Boolean {
         if (width <= 0 || !canGoBack || isPopping) return false
         // Caught mid-push: the drag takes the page from where it is.
         stopMotion()
         landing = null
+        transition = StackTransition.Back
+        this.leanSign = leanSign
+        commitFrom = -1f
         dragging = true
         dragStart = offset
         atRest = false
@@ -598,6 +657,7 @@ internal class SessionPageStackMotion(
             poppedIDs.add(top.id)
             val finish = takeOff(top) { onPopped(pages.size) }
             if (reducedMotion) return finish()
+            commitFrom = if (width > 0) min(max(offset / width, 0f), 1f) else 0f
             isPopping = true
             animate(to = width, velocity = velocity, then = finish)
         } else {
@@ -609,12 +669,11 @@ internal class SessionPageStackMotion(
         }
     }
 
-    /** The screen beneath the top shows, under the dim (for a pop or a drag back). */
+    /** The screen beneath the top shows (for a pop or a drag back). */
     private fun revealBeneath() {
         if (pages.isEmpty()) return
         atRest = false
         beneathShown = true
-        dimShown = true
     }
 
     /**
@@ -623,7 +682,7 @@ internal class SessionPageStackMotion(
      */
     private fun settleAtRest() {
         beneathShown = false
-        dimShown = false
+        commitFrom = -1f
         topAlpha = 1f
         atRest = true
     }
