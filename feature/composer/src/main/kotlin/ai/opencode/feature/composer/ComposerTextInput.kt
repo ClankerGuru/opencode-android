@@ -326,8 +326,8 @@ private class ComposerTextInputController {
     var heightSpringText: String? = null
     var heightSpringShrinks = false
 
-    /** iOS `measuredHeight` (px): the height the field last laid out to. */
-    var measuredHeight: Int? = null
+    /** iOS `measuredHeight` (px): the height the field's lines last laid out to, without the top inset. */
+    var measuredHeight: Float? = null
     var heightAnimation: Job? = null
     val animatedHeight = Animatable(0f)
 
@@ -762,26 +762,31 @@ fun ComposerTextInput(
             .layout { measurable, constraints ->
                 val placeable = measurable.measure(constraints)
                 val target = placeable.height
+                // The spring rides the lines alone: the top inset is the keyboard morph's, scrubbed
+                // frame by frame (a send that folds the row inline with the keys down), so it moves
+                // on that curve without counting as a new height that would land the spring at once.
+                val inset = insetPx
+                val lines = target - inset
                 val previous = controller.measuredHeight
-                controller.measuredHeight = target
+                controller.measuredHeight = lines
                 val spring = controller.heightSpring?.takeIf {
                     controller.heightSpringText == Snapshot.withoutReadObservation { state.text.toString() }
                 }
                 var height = target
-                if (previous != null && abs(target - previous) > 0) {
+                // Within a pixel is the inset's rounding, not a line.
+                if (previous != null && abs(lines - previous) > 1f) {
                     controller.heightSpring = null
                     val running = controller.heightAnimation?.isActive == true
-                    val from = if (running) controller.animatedHeight.value else previous.toFloat()
+                    val from = if (running) controller.animatedHeight.value else previous
                     // A send's shrink takes a field taller than one line; a typed line, any change.
-                    val oneLine = lineHeightPx + insetPx
-                    if (spring != null && ComposerLineGrowth.rides(spring, controller.heightSpringShrinks, from, oneLine)) {
-                        height = from.roundToInt()
+                    if (spring != null && ComposerLineGrowth.rides(spring, controller.heightSpringShrinks, from, lineHeightPx)) {
+                        height = (from + inset).roundToInt()
                         val shrinks = controller.heightSpringShrinks
                         controller.heightAnimation = growthScope.launch(start = CoroutineStart.UNDISPATCHED) {
                             try {
                                 // A retarget keeps the running spring's velocity, as SwiftUI's does.
                                 if (!running) controller.animatedHeight.snapTo(from)
-                                controller.animatedHeight.animateTo(target.toFloat(), spring.spec(visibilityThreshold = 0.5f))
+                                controller.animatedHeight.animateTo(lines, spring.spec(visibilityThreshold = 0.5f))
                             } finally {
                                 if (shrinks) sendTransition?.endShrink()
                             }
@@ -791,7 +796,7 @@ fun ComposerTextInput(
                         controller.heightAnimation = null
                     }
                 } else if (controller.heightAnimation?.isActive == true) {
-                    height = controller.animatedHeight.value.roundToInt()
+                    height = (controller.animatedHeight.value + inset).roundToInt()
                 }
                 sendTransition?.let { transition ->
                     transition.inputIsMultiline = height - (lineHeightPx + insetPx) > 0.5f
