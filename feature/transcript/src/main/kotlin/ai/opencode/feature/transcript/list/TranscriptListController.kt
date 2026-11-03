@@ -277,6 +277,34 @@ class TranscriptListController(
     /** The session's send flights (iOS `scrollEdgeBridge.sendTransition`); null: sends arrive as rows. */
     var sendLanding: ai.opencode.feature.transcript.user.SendLanding? = null
 
+    /** Pending rows' drawings, by stable ID, kept for their flight into the queued pill. */
+    private val pillSources = HashMap<String, ai.opencode.feature.transcript.user.QueuedPillSource>()
+
+    /** Rows whose copy is flying into the queued pill (iOS `demotedCells`): they draw nothing in place. */
+    private val departingToPill = androidx.compose.runtime.mutableStateMapOf<String, Boolean>()
+
+    fun isDepartingToPill(stableID: String): Boolean = departingToPill[stableID] == true
+
+    internal fun registerPillSource(stableID: String, source: ai.opencode.feature.transcript.user.QueuedPillSource) {
+        pillSources[stableID] = source
+    }
+
+    internal fun unregisterPillSource(stableID: String, source: ai.opencode.feature.transcript.user.QueuedPillSource) {
+        if (pillSources[stableID] !== source) return
+        pillSources.remove(stableID)
+        departingToPill.remove(stableID)
+    }
+
+    /**
+     * iOS `flyIntoQueuedPill`: the row's last drawing goes to the session, which shrinks it into
+     * the pill; the row (fading out of the list) draws nothing where it was.
+     */
+    private fun flyIntoQueuedPill(stableID: String) {
+        val landing = sendLanding ?: return
+        val source = pillSources[stableID] ?: return
+        if (source.depart(landing)) departingToPill[stableID] = true
+    }
+
     /**
      * iOS `scheduleSendLanding` / `landSentMessage`'s list half: hands the send to [sendLanding]
      * with its row, its words and whether it flies. A send flying into its bubble enters with the
@@ -291,20 +319,23 @@ class TranscriptListController(
                 ?: queuedStableIDs[id]
         }
         val row = stableID?.let { snapshot.rows[it] }
-        val rowText = when (row) {
-            is MessageRow.Entry -> ai.opencode.feature.transcript.user.TranscriptUserMessage.from(row.entry)?.displayText
-            is MessageRow.Queued -> ai.opencode.feature.transcript.user.TranscriptUserMessage.from(row.input)?.displayText
+        val message = when (row) {
+            is MessageRow.Entry -> ai.opencode.feature.transcript.user.TranscriptUserMessage.from(row.entry)
+            is MessageRow.Queued -> ai.opencode.feature.transcript.user.TranscriptUserMessage.from(row.input)
             null -> null
         }
-        val text = rowText?.takeIf { it.isNotEmpty() } ?: itemID?.let { configuration.queuedPillTexts[it] }?.takeIf { it.isNotEmpty() }
+        val text = message?.displayText?.takeIf { it.isNotEmpty() } ?: itemID?.let { configuration.queuedPillTexts[it] }?.takeIf { it.isNotEmpty() }
         val isQueued = itemID != null && configuration.queuedPillTexts.containsKey(itemID)
         val flying = landing.send(
             ai.opencode.feature.transcript.user.SendLanding.Send(
-                itemID = itemID,
+                // iOS `landingID`: an image-only prompt ends in a synthetic item; the landing
+                // markers belong to the grouped user message.
+                itemID = message?.id ?: itemID,
                 hasRow = stableID != null,
                 flies = flies,
                 isQueued = isQueued,
                 text = text,
+                isFollowing = behavior.mode == TranscriptScrollBehavior.Mode.Following,
             ),
         )
         if (!flying || stableID == null) return
@@ -419,9 +450,23 @@ class TranscriptListController(
         }
         // Rows new at the end grow in and fade in (iOS `enteringItems`, `RowEntrance`); more than
         // four is a refresh or a catch-up, which lands.
+        if (departingToPill.isNotEmpty()) {
+            // Back in the list (out of the pill again): it draws where it is.
+            next.items.forEach { if (it is TranscriptItemID.Message) departingToPill.remove(it.stableID) }
+        }
         if (previous != null && hasLaidOutContent) {
             val oldKeys = old.items.map { it.key }.toSet()
             val nextKeys = next.items.map { it.key }.toSet()
+            if (!reduceMotion && configuration.queuedPillTexts.isNotEmpty()) {
+                // iOS `leavingPending` → `flyIntoQueuedPill`: a pending row that went into the
+                // queued pill shrinks into it.
+                for (item in old.items) {
+                    if (item !is TranscriptItemID.Message || item.key in nextKeys) continue
+                    val row = old.rows[item.stableID] as? MessageRow.Queued ?: continue
+                    if (row.input.isCompaction || row.note != null || row.input.id !in configuration.queuedPillTexts) continue
+                    pendingEffects += { flyIntoQueuedPill(item.stableID) }
+                }
+            }
             val sent = previous.sendGeneration != configuration.sendGeneration
             val promoted = next.items.any { item ->
                 item is TranscriptItemID.Message && old.rows[item.stableID] is MessageRow.Queued &&

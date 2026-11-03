@@ -1,7 +1,12 @@
 package ai.opencode.feature.composer
 
 import ai.opencode.core.files.AttachmentFileType
+import ai.opencode.core.haptics.HapticsClient
+import ai.opencode.core.store.TestStore
 import ai.opencode.core.testing.TestIsolationRule
+import ai.opencode.feature.media.TranscriptImagePreview
+import ai.opencode.feature.media.TranscriptImageViewerFeature
+import ai.opencode.feature.media.TranscriptImageViewerFeature.Action
 import ai.opencode.feature.media.displayTitle
 import ai.opencode.server.model.OpenCodeOutgoingAttachment
 import ai.opencode.server.model.PastedText
@@ -11,6 +16,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -18,14 +24,11 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import kotlinx.coroutines.test.runTest
 import java.io.ByteArrayOutputStream
 import java.util.UUID
 
-/**
- * iOS `ComposerPhotoViewerTests`. `removeHandsThePhotoBackAndPagesOnThenDiscardsTheLast` and
- * `transcriptViewersCannotRemove` test the viewer's Remove, which `:feature:media`'s
- * `TranscriptImageViewerFeature` doesn't have yet; they wait on it (see the Tests row).
- */
+/** iOS `ComposerPhotoViewerTests`. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -68,5 +71,49 @@ class ComposerPhotoViewerTests {
         val size = AttachmentFileType.byteCount(second.data.size.toLong())
         assertEquals("JPEG · 20 × 50 · $size", preview.pages[1].detail)
         assertNull(ComposerPhotoViewer.preview(listOf(first), selected = second.id))
+    }
+
+    @Test fun removeHandsThePhotoBackAndPagesOnThenDiscardsTheLast() = runTest {
+        val photos = listOf(photo(1), photo(2), photo(3))
+        val preview = ComposerPhotoViewer.preview(photos, selected = photos[1].id)!!
+        val removed = mutableListOf<String>()
+        val haptics = mutableListOf<String>()
+        val store = TestStore(
+            TranscriptImageViewerFeature.State(preview, isShowingControls = true, allowsRemove = true),
+            ComposerPhotoViewerFeature { id -> removed += id },
+            this,
+        ) {
+            this[HapticsClient] = HapticsClient(play = { haptics += it.name })
+        }
+        val ids = photos.map { ComposerPhotoViewer.mediaID(it.id) }
+
+        // The middle photo goes; the next one takes its place.
+        store.send(Action.RemoveTapped) {
+            it.copy(preview = TranscriptImagePreview(ids[1], listOf(preview.pages[0], preview.pages[2])), selectedID = ids[2])
+        }
+        store.receive(Action.Delegate(Action.DelegateAction.Removed(ids[1])))
+        store.finish()
+        assertEquals(listOf(photos[1].id), removed)
+
+        // The last page steps back to the one before it.
+        store.send(Action.RemoveTapped) {
+            it.copy(preview = TranscriptImagePreview(ids[1], listOf(preview.pages[0])), selectedID = ids[0])
+        }
+        store.receive(Action.Delegate(Action.DelegateAction.Removed(ids[2])))
+
+        // The only photo left: the viewer goes without flying home.
+        store.send(Action.RemoveTapped) { it.copy(isDiscarded = true) }
+        store.receive(Action.Delegate(Action.DelegateAction.Removed(ids[0])))
+        store.send(Action.RemoveTapped)
+        store.finish()
+        assertEquals(listOf(photos[1].id, photos[2].id, photos[0].id), removed)
+        assertTrue(haptics.isEmpty())
+    }
+
+    @Test fun transcriptViewersCannotRemove() = runTest {
+        val preview = TranscriptImagePreview("img-1", Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888), "shot.png")
+        val store = TestStore(TranscriptImageViewerFeature.State(preview), TranscriptImageViewerFeature(), this)
+        assertFalse(store.state.allowsRemove)
+        store.send(Action.RemoveTapped)
     }
 }

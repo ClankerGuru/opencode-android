@@ -9,6 +9,7 @@ import ai.opencode.core.tuning.TuningPreset
 import ai.opencode.core.tuning.TuningPresets
 import ai.opencode.core.tuning.TuningStore
 import ai.opencode.feature.media.AgentImageTunables
+import ai.opencode.feature.media.SendImageTunables
 import ai.opencode.feature.transcript.markdown.ui.SessionLinkTunables
 import ai.opencode.feature.transcript.markdown.ui.TextRevealTunables
 import androidx.compose.runtime.Immutable
@@ -137,6 +138,8 @@ object TranscriptTunables {
     val sendFlightOmega: Double get() = Knobs.sendFlightOmega.value
     val sendPillDuration: Double get() = Knobs.sendPillDuration.value
     val sendBubbleWaitMax: Double get() = Knobs.sendBubbleWaitMax.value
+    /** iOS `sendImageDuration` (the knob is `:feature:media`'s [SendImageTunables], which the composer reads too). */
+    val sendImageDuration: Double get() = SendImageTunables.duration
 
     // Jump
     val jumpDuration: Double get() = Knobs.jumpDuration.value
@@ -318,8 +321,7 @@ object TranscriptTunables {
             store.register(entranceRise, growthMaxFrameChange, growthSoftEdge)
             store.register(arrivalOmega, viewportOmega, maxFrameStep)
             store.register(arrivalReach)
-            // iOS registers `sendImageDuration` (composer `SentImageFlight`) after `jumpDuration`.
-            store.register(promotionDuration, sendFlightOmega, sendPillDuration, sendBubbleWaitMax, jumpDuration)
+            store.register(promotionDuration, sendFlightOmega, sendPillDuration, sendBubbleWaitMax, jumpDuration, SendImageTunables.sendImageDuration)
             store.register(promotionLabelRise, jumpReach, jumpLead)
             store.register(newMinDuration, newMaxDuration, agentGlowRise, agentGlowDuration)
             store.register(dividerCollapse)

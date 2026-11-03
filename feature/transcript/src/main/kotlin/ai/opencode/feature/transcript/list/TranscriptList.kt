@@ -28,8 +28,12 @@ import ai.opencode.feature.transcript.markdown.ui.LocalLinkPreviewRow
 import ai.opencode.feature.transcript.markdown.ui.LocalTranscriptTextReveal
 import ai.opencode.feature.transcript.markdown.ui.TranscriptTextReveal
 import ai.opencode.feature.transcript.rows.NewMessagesDivider
+import ai.opencode.feature.transcript.user.LocalSendLanding
+import ai.opencode.feature.transcript.user.QueuedPillSource
 import ai.opencode.feature.transcript.user.TranscriptMessageRow
 import ai.opencode.feature.transcript.user.UserMessageRun
+import ai.opencode.feature.transcript.user.queuedPillSource
+import ai.opencode.server.model.OpenCodeQueuedInput
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -75,6 +79,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalGraphicsContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
@@ -348,7 +353,11 @@ private fun TranscriptListContent(
                             val row = snapshot.rows[item.stableID] ?: return@items
                             val props = snapshot.props[item.stableID] ?: RowProps()
                             val run = snapshot.runs[item.stableID] ?: UserMessageRun.alone
-                            GrowingRow(controller, item.key, rowModifier) {
+                            // A pending row keeps its drawing for a flight into the queued pill (iOS `flyIntoQueuedPill`).
+                            val pending = (row as? MessageRow.Queued)?.input?.takeUnless { it.isCompaction }
+                            val pillSource = if (pending != null) rememberQueuedPillSource(controller, item.stableID, pending) else null
+                            val stableID = item.stableID
+                            GrowingRow(controller, item.key, rowModifier.queuedPillSource(pillSource) { controller.isDepartingToPill(stableID) }) {
                                 CompositionLocalProvider(
                                     LocalAgentImageRow provides item.stableID,
                                     ai.opencode.feature.media.LocalAgentImageRowGrowth provides controller.imageGrowth(item.stableID),
@@ -395,6 +404,24 @@ private fun TranscriptListContent(
             }
         }
     }
+}
+
+/** [pending]'s drawing for its flight into the queued pill, while the session hosts flights ([LocalSendLanding]). */
+@Composable
+private fun rememberQueuedPillSource(controller: TranscriptListController, stableID: String, pending: OpenCodeQueuedInput): QueuedPillSource? {
+    if (LocalSendLanding.current == null) return null
+    val graphics = LocalGraphicsContext.current
+    val source = remember(controller, stableID, graphics) {
+        QueuedPillSource(graphics, ai.opencode.feature.transcript.user.TranscriptUserMessage.from(pending)?.id)
+    }
+    DisposableEffect(source) {
+        controller.registerPillSource(stableID, source)
+        onDispose {
+            controller.unregisterPillSource(stableID, source)
+            source.dispose()
+        }
+    }
+    return source
 }
 
 /**

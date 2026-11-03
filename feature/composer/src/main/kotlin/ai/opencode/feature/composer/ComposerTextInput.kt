@@ -356,7 +356,8 @@ private class ComposerTextInputController {
  * - **Line growth.** A typed line's growth or shrink rides [ComposerTextInputTunables.lineGrowth]
  *   with the text held to the field's bottom, so the caret's line stays put while the top
  *   moves; none under reduce motion or for a Return that sends. A send's clear shrinks on
- *   [ComposerSendTransition.shrinkOnNextClear]'s spring.
+ *   [ComposerSendTransition.shrinkOnNextClear]'s spring, the one animation the composer around
+ *   it follows ([ComposerSendTransition.isShrinking]).
  * - **Selecting.** A drag the text is selecting with (it starts on or near the selection, or
  *   rests first) is never a swipe ([ComposerSwipeDown.textOwnsDrag]).
  * - **Keyboard insets.** The field only takes and drops focus; the session's composer docks
@@ -703,10 +704,15 @@ fun ComposerTextInput(
                     val oneLine = lineHeightPx + insetPx
                     if (spring != null && ComposerLineGrowth.rides(spring, controller.heightSpringShrinks, from, oneLine)) {
                         height = from.roundToInt()
+                        val shrinks = controller.heightSpringShrinks
                         controller.heightAnimation = growthScope.launch(start = CoroutineStart.UNDISPATCHED) {
-                            // A retarget keeps the running spring's velocity, as SwiftUI's does.
-                            if (!running) controller.animatedHeight.snapTo(from)
-                            controller.animatedHeight.animateTo(target.toFloat(), spring.spec(visibilityThreshold = 0.5f))
+                            try {
+                                // A retarget keeps the running spring's velocity, as SwiftUI's does.
+                                if (!running) controller.animatedHeight.snapTo(from)
+                                controller.animatedHeight.animateTo(target.toFloat(), spring.spec(visibilityThreshold = 0.5f))
+                            } finally {
+                                if (shrinks) sendTransition?.endShrink()
+                            }
                         }
                     } else {
                         controller.heightAnimation?.cancel()
@@ -714,6 +720,12 @@ fun ComposerTextInput(
                     }
                 } else if (controller.heightAnimation?.isActive == true) {
                     height = controller.animatedHeight.value.roundToInt()
+                }
+                sendTransition?.let { transition ->
+                    transition.inputIsMultiline = height - (lineHeightPx + insetPx) > 0.5f
+                    // A send's clear that rode no spring leaves the composer to resize as usual.
+                    val shrinking = Snapshot.withoutReadObservation { transition.isShrinking }
+                    if (shrinking && controller.heightAnimation?.isActive != true) transition.endShrink()
                 }
                 val caretLineTop = if (height < target) {
                     Snapshot.withoutReadObservation {
