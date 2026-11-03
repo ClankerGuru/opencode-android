@@ -1555,7 +1555,12 @@ private fun Modifier.composerSwipes(envNow: () -> SessionComposerEnv, density: F
                     val predicted = translation + Offset(velocity.x, velocity.y) / density * 0.5f
                     val focused = env.messageFieldFocused
                     val beganFocused = ownership.beganFocused(start, focused)
-                    val yields = ownership.yields(start, focused) { env.composerSwipeYields(start) || change.isConsumed }
+                    // iOS 573770b6: a touch the field's selecting owns (a handle, a drag from the
+                    // selection, a rest first) stays the text's, even just outside the field.
+                    val input = env.host.sendTransition.input
+                    val yields = ownership.yields(start, focused, textClaims = input?.isSwipeYieldedToText == true) {
+                        env.composerSwipeYields(start) || input?.selectionClaims(start) == true || change.isConsumed
+                    }
                     if (beganFocused) {
                         if (ComposerSwipeDown.shouldDismissKeyboard(translation, predicted, isFocused = focused, isHoldingMic = yields)) {
                             acted = true

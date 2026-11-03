@@ -21,6 +21,23 @@ import kotlin.math.min
  * by the message it lands on, and preparing the next send never touches one already in the air.
  */
 @Stable
+/**
+ * The composer field's side of a swipe on the composer around it (iOS `ImagePasteTextView`'s
+ * `isSwipeYieldedToText` and `selectionClaims(_:)`): a drag that's selecting belongs to the text,
+ * so no capsule swipe acts on it.
+ */
+interface ComposerSwipeInput {
+    /**
+     * iOS `isSwipeYieldedToText`: the touch on the field is selecting
+     * ([ComposerSwipeDown.textOwnsDrag]). Asked before the field has seen the finger move the
+     * decision distance, it decides from the hold so far, for good.
+     */
+    val isSwipeYieldedToText: Boolean
+
+    /** iOS `selectionClaims(_:)`: whether [rootPoint] (root px) is on or near the selection being made. */
+    fun selectionClaims(rootPoint: Offset): Boolean
+}
+
 class ComposerSendTransition {
     /** The next send's words as they leave the composer (window px). */
     data class Prepared(
@@ -44,6 +61,13 @@ class ComposerSendTransition {
     var inputText: String = ""
         internal set
     var inputBounds: Rect? = null
+        internal set
+
+    /**
+     * iOS `sendTransition.input` as the session's capsule swipe reads it (573770b6): the field
+     * mounted now, set by [ComposerTextInput] while it's composed.
+     */
+    var input: ComposerSwipeInput? = null
         internal set
 
     /** The field's laid-out text and the window position (px) its layout starts at. */

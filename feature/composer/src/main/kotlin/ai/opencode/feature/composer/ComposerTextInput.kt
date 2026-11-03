@@ -36,6 +36,7 @@ import androidx.compose.foundation.text.input.placeCursorAtEnd
 import androidx.compose.foundation.text.input.then
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -66,9 +67,12 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
@@ -329,6 +333,53 @@ private class ComposerTextInputController {
 
     /** iOS `ComposerSwipePanRecognizer.textOwnership` for the drag in progress. */
     var isSwipeYieldedToText = false
+
+    /**
+     * iOS `ComposerSwipePanRecognizer`'s touch: nil ownership until decided (the finger first
+     * moves the decision distance, or the capsule asks first), then for good.
+     */
+    var swipeTextOwnership: Boolean? = null
+    var swipeDownUptime: Long? = null
+    var swipeLatestUptime = 0L
+    var swipeStartsOnSelection = false
+    var swipeSelectionAtDown: TextRange? = null
+
+    /** The coordinates the field's swipe handler reads touches in (its viewport). */
+    var swipeCoordinates: LayoutCoordinates? = null
+
+    /**
+     * iOS `yieldsToText()`: whether the text owns the touch; asked before the field has seen the
+     * move (the capsule's handler, on the same event), it decides from the hold so far.
+     */
+    fun yieldsToText(holdBegan: Boolean, textGestureBegan: Boolean): Boolean {
+        swipeTextOwnership?.let { return it }
+        val down = swipeDownUptime ?: return false
+        val owns = ComposerSwipeDown.textOwnsDrag(
+            startsOnSelection = swipeStartsOnSelection,
+            heldFor = max(0.0, (swipeLatestUptime - down) / 1000.0),
+            holdBegan = holdBegan,
+            textGestureBegan = textGestureBegan,
+        )
+        swipeTextOwnership = owns
+        isSwipeYieldedToText = owns
+        return owns
+    }
+
+    fun endSwipeTouch() {
+        swipeTextOwnership = null
+        swipeDownUptime = null
+        swipeStartsOnSelection = false
+        swipeSelectionAtDown = null
+        isSwipeYieldedToText = false
+    }
+}
+
+/** The mounted field's [ComposerSwipeInput], refreshed every composition. */
+private class ComposerFieldSwipeInput : ComposerSwipeInput {
+    var yieldsToText: () -> Boolean = { false }
+    var claims: (Offset) -> Boolean = { false }
+    override val isSwipeYieldedToText: Boolean get() = yieldsToText()
+    override fun selectionClaims(rootPoint: Offset): Boolean = claims(rootPoint)
 }
 
 /**
@@ -623,6 +674,27 @@ fun ComposerTextInput(
         )
     }
 
+    // iOS `sendTransition.input` (573770b6): the capsule's swipe asks the field whether a touch is
+    // the text's, even one that starts just outside it, where a selection's handle hangs.
+    val swipeInput = remember { ComposerFieldSwipeInput() }
+    SideEffect {
+        swipeInput.yieldsToText = {
+            controller.yieldsToText(
+                holdBegan = holdingMic,
+                textGestureBegan = state.selection != controller.swipeSelectionAtDown && !state.selection.collapsed,
+            )
+        }
+        swipeInput.claims = { rootPoint ->
+            val coordinates = controller.swipeCoordinates?.takeIf { it.isAttached }
+            coordinates != null &&
+                selectionClaims(coordinates.localPositionOf(coordinates.findRootCoordinates(), rootPoint), isFocused = hasFocus)
+        }
+        sendTransition?.input = swipeInput
+    }
+    DisposableEffect(sendTransition, swipeInput) {
+        onDispose { if (sendTransition?.input === swipeInput) sendTransition.input = null }
+    }
+
     val receiveContent = remember {
         object : ReceiveContentListener {
             override fun onDragEnter() {
@@ -746,6 +818,7 @@ fun ComposerTextInput(
             }
             .clipToBounds()
             .heightIn(max = capDp)
+            .onPlaced { controller.swipeCoordinates = it }
             .pointerInput(Unit) {
                 val gestureScope = this
                 coroutineScope { val settleScope = this; with(gestureScope) { awaitEachGesture {
@@ -763,23 +836,29 @@ fun ComposerTextInput(
                     // first moves the decision distance, then the text's for good.
                     val selectionAtDown = state.selection
                     val startsOnSelection = selectionClaims(down.position, isFocused = hasFocus)
-                    var textOwnership: Boolean? = if (startsOnSelection) true else null
+                    controller.swipeSelectionAtDown = selectionAtDown
+                    controller.swipeStartsOnSelection = startsOnSelection
+                    controller.swipeDownUptime = down.uptimeMillis
+                    controller.swipeLatestUptime = down.uptimeMillis
+                    controller.swipeTextOwnership = if (startsOnSelection) true else null
                     controller.isSwipeYieldedToText = startsOnSelection
                     val decisionPx = BackSwipeRules.decisionDistance.toPx()
                     while (true) {
                         val event = awaitPointerEvent(PointerEventPass.Initial)
                         val change = event.changes.firstOrNull { it.id == down.id } ?: break
                         tracker.addPosition(change.uptimeMillis, change.position)
+                        controller.swipeLatestUptime = change.uptimeMillis
                         val heldFor = (change.uptimeMillis - down.uptimeMillis) / 1000.0
                         if (!yieldedToHold && BackSwipeRules.yieldsToHold(heldFor, holdBegan = holdingMic)) yieldedToHold = true
                         // The field's own selecting (a long press, a drag that moves the selection).
                         val textGestureBegan = state.selection != selectionAtDown && !state.selection.collapsed
+                        val textOwnership = controller.swipeTextOwnership
                         if (textOwnership == null && (change.position - down.position).getDistance() >= decisionPx) {
-                            textOwnership = ComposerSwipeDown.textOwnsDrag(startsOnSelection, max(0.0, heldFor), holdBegan = holdingMic, textGestureBegan = textGestureBegan)
+                            controller.yieldsToText(holdBegan = holdingMic, textGestureBegan = textGestureBegan)
                         } else if (textOwnership == false && textGestureBegan) {
-                            textOwnership = true
+                            controller.swipeTextOwnership = true
                         }
-                        val yieldedToText = textOwnership == true
+                        val yieldedToText = controller.swipeTextOwnership == true
                         controller.isSwipeYieldedToText = yieldedToText
                         val translation = (change.position - down.position) / density.density
                         val velocity = tracker.calculateVelocity().let { Offset(it.x, it.y) / density.density }
@@ -817,7 +896,7 @@ fun ComposerTextInput(
                         controller.isFocusingFromSwipe = false
                         controller.isScrollingUp = false
                         controller.isScrollingDown = false
-                        controller.isSwipeYieldedToText = false
+                        controller.endSwipeTouch()
                     }
                 } } }
             }
