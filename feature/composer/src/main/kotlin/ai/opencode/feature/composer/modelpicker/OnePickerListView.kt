@@ -14,8 +14,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,6 +35,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -48,6 +49,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -308,7 +310,6 @@ private fun OnePickerRowCell(item: OnePickerRowItem, actions: OnePickerListActio
     val colors = OpenCodeTheme.colors
     val reduceMotion = rememberReduceMotion()
     val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
     val bounce = remember { Animatable(1f) }
     var holds by remember { mutableIntStateOf(0) }
     LaunchedEffect(holds) {
@@ -317,11 +318,8 @@ private fun OnePickerRowCell(item: OnePickerRowItem, actions: OnePickerListActio
         bounce.animateTo(1f, OnePickerTunables.arcSpring.spec())
     }
     val toggleFavorite = { actions.onToggleFavorite(item.model) }
-    val highlight = when {
-        pressed -> colors.text.copy(alpha = if (colors.isDark) 0.14f else 0.10f)
-        item.isCurrent -> colors.text.copy(alpha = if (colors.highContrast) 0.16f else if (colors.isDark) 0.10f else 0.07f)
-        else -> null
-    }
+    // Android divergence: a ripple in the row's rounded inset answers the press (iOS tints it).
+    val highlight = if (item.isCurrent) colors.text.copy(alpha = if (colors.highContrast) 0.16f else if (colors.isDark) 0.10f else 0.07f) else null
     val panelColor = OnePickerSurfaceDefaults.color
 
     FavoriteSwipeBox(
@@ -344,9 +342,16 @@ private fun OnePickerRowCell(item: OnePickerRowItem, actions: OnePickerListActio
                         .matchParentSize()
                         .padding(horizontal = 12.dp, vertical = 1.dp)
                         .background(highlight, RoundedCornerShape(16.dp))
-                        .let { if (item.isCurrent && !pressed && colors.highContrast) it.border(1.dp, colors.secondaryText, RoundedCornerShape(16.dp)) else it },
+                        .let { if (colors.highContrast) it.border(1.dp, colors.secondaryText, RoundedCornerShape(16.dp)) else it },
                 )
             }
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .padding(horizontal = 12.dp, vertical = 1.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .indication(interaction, ripple()),
+            )
             Row(Modifier.matchParentSize(), verticalAlignment = Alignment.CenterVertically) {
                 CompositionLocalProvider(LocalViewConfiguration provides rowHoldConfiguration(LocalViewConfiguration.current)) {
                     Row(

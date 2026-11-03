@@ -1,26 +1,25 @@
 package ai.opencode.feature.session
 
-import ai.opencode.core.motion.transitionBlur
-
+import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.diagnostics.LabMarks
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticEffect
 import ai.opencode.core.haptics.HapticsClient
-import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.log.AppLog
-import ai.opencode.core.tuning.InternalBuild
-import ai.opencode.feature.voice.VoiceLabEnvironment
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionFrameAction
 import ai.opencode.core.motion.motionFrameLoop
 import ai.opencode.core.motion.rememberFrameDurationSeconds
 import ai.opencode.core.motion.rememberReduceMotion
+import ai.opencode.core.motion.transitionBlur
+import ai.opencode.core.tuning.InternalBuild
 import ai.opencode.core.ui.OpenCodeFonts
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.RollingNumber
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.feature.voice.VoiceLabEnvironment
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.OpenCodeShell
 import androidx.activity.compose.BackHandler
@@ -36,11 +35,10 @@ import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -54,7 +52,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -75,13 +73,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -91,8 +87,9 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -123,15 +120,15 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import java.time.Duration
 import java.time.Instant
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 // Port of iOS `Session/BackgroundWorkPanel.swift`. iOS reads `SessionFeature` state inside the
 // presentation; here every view takes immutable values and action lambdas so `SessionView` can
@@ -1055,27 +1052,20 @@ private fun BackgroundWorkRow(
     isLive: Boolean = true,
     leading: @Composable () -> Unit,
 ) {
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    // iOS `Color.primary.opacity(0.08)`.
-    val highlight = OpenCodeTheme.colors.text.copy(alpha = 0.08f)
     Row(
         modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp)
-            // A pressed row lifts a soft highlight inset from the panel's edges.
-            .drawBehind {
-                if (pressed) {
-                    val inset = 8.dp.toPx()
-                    drawRoundRect(highlight, Offset(inset, 0f), Size(size.width - 2 * inset, size.height), CornerRadius(16.dp.toPx()))
-                }
-            }
-            .clickable(interactionSource = interaction, indication = null, onClickLabel = accessibilityHint, onClick = onTap)
+            // Android divergence: a ripple inset from the panel's edges answers the press (iOS
+            // lifts a soft highlight there).
+            .padding(horizontal = 8.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClickLabel = accessibilityHint, onClick = onTap)
             .semantics(mergeDescendants = true) {
                 contentDescription = title
                 onClick(label = accessibilityHint) { onTap(); true }
             }
-            .padding(horizontal = 20.dp),
+            .padding(horizontal = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

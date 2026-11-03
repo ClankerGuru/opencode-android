@@ -39,8 +39,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -287,8 +285,6 @@ fun LinkPreviewButton(preview: LinkPreview, label: @Composable () -> Unit) {
     val send = LocalTranscriptRowContext.current.send
     val haptics = remember { dependency(HapticsClient) }
     var menu by remember { mutableStateOf(false) }
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
     val url = preview.url
     val actions = remember(url) { MarkdownLinks.menuActions(url) }
     val open = { send(TranscriptAction.LinkTapped(url)) }
@@ -299,8 +295,9 @@ fun LinkPreviewButton(preview: LinkPreview, label: @Composable () -> Unit) {
                 haptics.play(Haptic.tap)
                 menu = true
             })
-            .clickable(interactionSource = interaction, indication = null, onClick = open)
-            .graphicsLayer { alpha = if (pressed) 0.6f else 1f }
+            // Android divergence: a ripple answers the press (iOS dims the card to 60 %).
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = open)
             .clearAndSetSemantics {
                 contentDescription = preview.accessibilityLabel
                 testTag = "link-preview-card"

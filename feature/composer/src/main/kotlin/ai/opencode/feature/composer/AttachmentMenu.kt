@@ -1,10 +1,9 @@
 package ai.opencode.feature.composer
 
-import ai.opencode.core.motion.transitionBlur
-
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
+import ai.opencode.core.motion.transitionBlur
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
@@ -23,8 +22,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -324,17 +321,17 @@ fun AttachmentMenuRows(
                     val reveal = if (staggeredEntrance) {
                         Modifier.menuRowEntranceReveal(entranceProgress, max(count - 1 - index, 0), count, entranceBlur, entranceScale)
                     } else Modifier
-                    val interaction = remember { MutableInteractionSource() }
-                    val pressed by interaction.collectIsPressedAsState()
+                    // Android divergence: a ripple answers a tap (iOS lights the row while pressed);
+                    // the press-and-slide highlight stays.
                     Box(
                         reveal
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(AttachmentMenuRowHighlightRadius))
-                            .clickable(interactionSource = interaction, indication = null, role = Role.Button) {
+                            .clickable(role = Role.Button) {
                                 if (item == AttachmentMenuItem.Paste) onPaste() else onChoose(item)
                             }
                             .semantics { testTag = "attachment-menu-${item.name.lowercase()}" },
-                    ) { label(pressed || highlighted == item) }
+                    ) { label(highlighted == item) }
                 }
             }
         }

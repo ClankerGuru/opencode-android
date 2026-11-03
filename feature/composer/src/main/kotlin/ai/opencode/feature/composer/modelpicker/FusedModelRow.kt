@@ -20,7 +20,6 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -31,29 +30,29 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import kotlin.math.min
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.platform.ViewConfiguration
@@ -79,6 +78,7 @@ import androidx.compose.ui.unit.sp
 import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.roundToInt
 
 // Port of iOS `Composer/ModelPicker/FusedModelRow.swift` (split out of ModelPickerOverlays in 17a991b1).
@@ -147,10 +147,11 @@ internal fun FusedModelRow(
     val isFlying = anchors.flight?.modelID == model.id && !reduceMotion
     val modalOverlayOpen = anchors.isOverlayActive
     val favTitle = if (isFavorite) "Remove from Favorites" else "Add to Favorites"
-    // iOS `FusedRowButtonStyle`: no highlight, the label at 0.6 while pressed; the press's start
-    // is where the list stood, so a hold that rode a scroll doesn't count.
+    // iOS `FusedRowButtonStyle` dims the label to 0.6 while pressed; Android divergence: a ripple
+    // answers the press. The press's start is where the list stood, so a hold that rode a scroll
+    // doesn't count.
     val interactions = remember { MutableInteractionSource() }
-    val pressed by interactions.collectIsPressedAsState()
+    val rowShape = RoundedCornerShape(max(8.0, FusedModelPickerTunables.radius - FusedModelPickerTunables.padding).dp)
     var pressScrollStart by remember { mutableFloatStateOf(0f) }
     LaunchedEffect(interactions) {
         interactions.interactions.collect { if (it is PressInteraction.Press) pressScrollStart = anchors.listScrollTravel }
@@ -177,7 +178,7 @@ internal fun FusedModelRow(
             .heightIn(min = FusedModelPickerTunables.rowHeight.dp)
             .background(
                 if (isCurrent && FusedModelPickerTunables.current == 1) OpenCodeTheme.colors.text.copy(alpha = 0.09f) else Color.Transparent,
-                RoundedCornerShape(max(8.0, FusedModelPickerTunables.radius - FusedModelPickerTunables.padding).dp),
+                rowShape,
             ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -186,9 +187,10 @@ internal fun FusedModelRow(
                 Modifier
                     .weight(1f)
                     .heightIn(min = FusedModelPickerTunables.rowHeight.dp)
+                    .clip(rowShape)
                     .combinedClickable(
                         interactionSource = interactions,
-                        indication = null,
+                        indication = ripple(),
                         enabled = !modalOverlayOpen,
                         hapticFeedbackEnabled = false,
                         role = Role.Button,
@@ -207,7 +209,6 @@ internal fun FusedModelRow(
                             anchors.openRowMenu(model, rowFrame, reduceMotion)
                         },
                     )
-                    .graphicsLayer { this.alpha = if (pressed) 0.6f else 1f }
                     .padding(start = 12.dp, end = 8.dp)
                     .clearAndSetSemantics {
                         if (modalOverlayOpen) invisibleToUser()
