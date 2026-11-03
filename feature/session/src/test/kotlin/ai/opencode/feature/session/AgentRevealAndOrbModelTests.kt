@@ -15,14 +15,8 @@ import ai.opencode.feature.session.agentactivity.GyroSpringKey
 import ai.opencode.server.OpenCodeLiveContentEvent
 import ai.opencode.server.OpenCodeServerEvent
 import ai.opencode.server.model.OpenCodeJSONValue
+import ai.opencode.server.model.OpenCodeRunError
 import ai.opencode.server.model.OpenCodeTranscriptItem
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotSame
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertSame
-import org.junit.Assert.assertTrue
-import org.junit.Test
 import java.util.UUID
 import kotlin.math.abs
 import kotlin.math.exp
@@ -32,6 +26,13 @@ import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.math.sign
 import kotlin.math.sin
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotSame
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
+import org.junit.Test
 
 /**
  * The status-orb half of iOS `AgentRevealAndOrbModelTests.swift` (ActivityGyro, AgentActivityOrb,
@@ -419,6 +420,13 @@ class AgentRevealAndOrbModelTests {
             WorkingRun.Outcome.done,
             WorkingRun.outcome(listOf(OpenCodeTranscriptItem.Info(id = "m0-error", text = "Run failed: ProviderError"), OpenCodeTranscriptItem.UserText(id = "m1", text = "Again"), reply)),
         )
+        // Timeline motion audit (compaction-error f986): a later run in the same
+        // turn answered after the error. Read as Failed, its finale hid the
+        // earlier error row for 0.9 s and flashed Failed over a good reply.
+        val error = OpenCodeTranscriptItem.RunError(id = "m2-error", error = OpenCodeRunError(type = "unknown", message = "Overloaded"))
+        val later = OpenCodeTranscriptItem.AssistantMarkdown(id = "m3-text-0", text = "")
+        assertEquals(WorkingRun.Outcome.done, WorkingRun.outcome(listOf(OpenCodeTranscriptItem.UserText(id = "m1", text = "Hi"), reply, error, later)))
+        assertEquals(WorkingRun.Outcome.failed, WorkingRun.outcome(listOf(OpenCodeTranscriptItem.UserText(id = "m1", text = "Hi"), reply, error)))
         // A send the server never answered: nothing to flash for.
         assertNull(WorkingRun.outcome(listOf(OpenCodeTranscriptItem.UserText(id = "m0", text = "Hi"), reply, OpenCodeTranscriptItem.UserText(id = "m1", text = "Again"))))
     }

@@ -149,7 +149,8 @@ object RequestCollapseFade {
  * Lays the open panel out whole and reports a height between it and its [bar]'s ([progress] 0
  * to 1), both top-aligned so the header stays in place as it folds (iOS `RequestCollapseLayout`).
  * The progress is read in layout, so a drag or settle moves no composition. Clipped to its
- * height only: content that overhangs the sides (× and Back) still draws. The side the fold rests
+ * height, and at the sides only at the glass's edges ([RequestDockMetrics.edge]), where × and
+ * the scrolling bands reach (iOS `RequestCollapseClip(overhang:)`). The side the fold rests
  * on ([collapsed]) is placed on top, so only it takes touches.
  */
 @Composable
@@ -164,7 +165,8 @@ internal fun RequestCollapseLayout(
     Layout(
         contents = listOf(open, bar),
         modifier = modifier.drawWithContent {
-            clipRect(left = -OVERHANG, top = 0f, right = size.width + OVERHANG, bottom = size.height) {
+            val overhang = RequestDockMetrics.edge.toPx()
+            clipRect(left = -overhang, top = 0f, right = size.width + overhang, bottom = size.height) {
                 this@drawWithContent.drawContent()
             }
         },
@@ -338,6 +340,3 @@ internal class RequestFold(initial: Float) {
         }
     }
 }
-
-/** How far past its sides the fold's clip lets content draw. */
-private const val OVERHANG = 400f
