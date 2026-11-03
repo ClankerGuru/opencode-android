@@ -296,6 +296,11 @@ fun DrawerListView(
                 listState.requestScrollToItem(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset)
             }
 
+            override fun scrollBy(delta: Float) {
+                // Synchronous: the layout info the next read sees is already scrolled.
+                listState.dispatchRawDelta(delta * density.density)
+            }
+
             override val scope: CoroutineScope get() = scope
             override val frameDurationSeconds: Double get() = frameDuration
         }
