@@ -36,12 +36,17 @@ import ai.opencode.feature.voice.VoiceRoutePreferences
  * page and the drawer for the session, then opens where the feature is.
  */
 
-/** Settings opened with Home's current connection and notification state already in it. */
+/**
+ * Settings opened with Home's current connection and notification state already in it, and
+ * Home's sessions for Voice's Delegator pick (iOS `VoiceSettingsView(server: home.server,
+ * sessions: home.sessions)`), so that page doesn't wait on its own load.
+ */
 internal fun State.presentingSettings(settings: SettingsFeature.State): State {
     val home = settingsHome
     val notifications = settingsNotifications
     return copy(
         settings = settings.copy(
+            voice = settings.voice.copy(server = home.server ?: settings.voice.server, sessions = sessions),
             server = home.server,
             connectionStatus = home.connectionStatus,
             switchingTo = home.switchingTo,
