@@ -402,6 +402,8 @@ data class ComposerControls(
             canSend: Boolean,
             expanded: Boolean,
             canCall: Boolean = false,
+            keepsSendVisible: Boolean = false,
+            isInCall: Boolean = false,
         ): ComposerControls {
             val dictation = if (isDictating || isFinishing) DictationControls(isFinishing) else null
             // Empty and idle: the call button holds Send's place and dictation sits beside it.
@@ -409,7 +411,11 @@ data class ComposerControls(
             val trailing: ComposerTrailingControl = when {
                 canSend -> ComposerTrailingControl.Send(enabled = true)
                 isRunning -> ComposerTrailingControl.Stop
+                // The tray owns call controls. Keep the composer's Send slot available for typing
+                // instead of choosing a Call button the tray then hides.
+                isInCall && dictation == null -> ComposerTrailingControl.Send(enabled = false)
                 canCall && dictation == null -> ComposerTrailingControl.Call
+                keepsSendVisible && dictation == null -> ComposerTrailingControl.Send(enabled = false)
                 else -> ComposerTrailingControl.Mic
             }
             val secondaryMic = when {
