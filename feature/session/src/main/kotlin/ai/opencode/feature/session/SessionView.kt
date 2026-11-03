@@ -44,6 +44,8 @@ import ai.opencode.feature.composer.plusmenu.RecentPhotoPeekOverlay
 import androidx.compose.runtime.rememberCoroutineScope
 import ai.opencode.feature.composer.RequestDockContext
 import ai.opencode.feature.composer.RequestReviewSheet
+import ai.opencode.feature.composer.SentImageFlight
+import ai.opencode.feature.composer.SentImageFlightOverlay
 import ai.opencode.feature.composer.composerKeyboardStepHold
 import ai.opencode.feature.media.LocalMediaPresenter
 import ai.opencode.core.store.Store
@@ -208,7 +210,7 @@ fun SessionView(
         composerHost.importer = importer
         composerHost.modelPickerAnchors = modelPickerAnchors
         composerHost.headerHeight = headerHeight
-        if (composerHost.pendingAttachmentsRow == null) composerHost.pendingAttachmentsRow = { SessionPendingAttachments(store) }
+        if (composerHost.pendingAttachmentsRow == null) composerHost.pendingAttachmentsRow = { SessionPendingAttachments(store, composerHost.sendTransition.images) }
     }
     SessionPermissionPrompts(isCovered)
     SessionPhotoSheetEnvironment(photoSheet, store, composerHost, importer, headerHeight, usesPlusMenuSheet, rootOffset)
@@ -293,6 +295,8 @@ fun SessionView(
                 }
                 // A send's words fly from the field into its bubble, over both.
                 SessionSendFlightOverlay(composerHost, scrollEdgeBridge, Modifier.matchParentSize())
+                // Its photos fly into their slots above the words (iOS installs the copies in the window).
+                SentImageFlightOverlay(composerHost.sendTransition.images, Modifier.matchParentSize())
                 RequestPanelRoomProbe(composerHost, Modifier.matchParentSize())
                 SessionModelPickerOverlays(store, modelPickerAnchors, headerHeight, composerHost.attachmentAnchors.composer)
             }
@@ -678,7 +682,7 @@ private fun SessionMediaHost(content: @Composable () -> Unit) = content()
 
 /** What the composer holds, above its field (iOS `pendingAttachmentsRow`). */
 @Composable
-private fun SessionPendingAttachments(store: StoreOf<State, Action>) {
+private fun SessionPendingAttachments(store: StoreOf<State, Action>, sendImages: SentImageFlight) {
     val attachments by store.observe { it.pendingAttachments }
     val files by store.observe { it.pendingFiles }
     val canRetry by store.observe { it.supportsFileUploads }
@@ -715,6 +719,7 @@ private fun SessionPendingAttachments(store: StoreOf<State, Action>) {
         },
         onOpenLocation = { store.send(Action.LinkTapped(it)) },
         flights = LocalSessionPhotoSheet.current?.takeIf { it.usesPlusMenuSheet }?.flights,
+        sendImages = sendImages,
     )
 }
 

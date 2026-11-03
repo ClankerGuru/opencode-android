@@ -291,20 +291,23 @@ class TranscriptListController(
                 ?: queuedStableIDs[id]
         }
         val row = stableID?.let { snapshot.rows[it] }
-        val rowText = when (row) {
-            is MessageRow.Entry -> ai.opencode.feature.transcript.user.TranscriptUserMessage.from(row.entry)?.displayText
-            is MessageRow.Queued -> ai.opencode.feature.transcript.user.TranscriptUserMessage.from(row.input)?.displayText
+        val message = when (row) {
+            is MessageRow.Entry -> ai.opencode.feature.transcript.user.TranscriptUserMessage.from(row.entry)
+            is MessageRow.Queued -> ai.opencode.feature.transcript.user.TranscriptUserMessage.from(row.input)
             null -> null
         }
-        val text = rowText?.takeIf { it.isNotEmpty() } ?: itemID?.let { configuration.queuedPillTexts[it] }?.takeIf { it.isNotEmpty() }
+        val text = message?.displayText?.takeIf { it.isNotEmpty() } ?: itemID?.let { configuration.queuedPillTexts[it] }?.takeIf { it.isNotEmpty() }
         val isQueued = itemID != null && configuration.queuedPillTexts.containsKey(itemID)
         val flying = landing.send(
             ai.opencode.feature.transcript.user.SendLanding.Send(
-                itemID = itemID,
+                // iOS `landingID`: an image-only prompt ends in a synthetic item; the landing
+                // markers belong to the grouped user message.
+                itemID = message?.id ?: itemID,
                 hasRow = stableID != null,
                 flies = flies,
                 isQueued = isQueued,
                 text = text,
+                isFollowing = behavior.mode == TranscriptScrollBehavior.Mode.Following,
             ),
         )
         if (!flying || stableID == null) return

@@ -1,5 +1,6 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.server.model.OpenCodeOutgoingAttachment
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,10 +53,18 @@ class ComposerSendTransition {
     var prepared: Prepared? by mutableStateOf(null)
         private set
 
-    val isPrepared: Boolean get() = prepared != null
+    /** iOS `isPrepared`: the next send's words or its photos wait for the list. */
+    val isPrepared: Boolean get() = prepared != null || images.preparedToken != null
 
-    fun prepare(reduceMotion: Boolean) {
+    /**
+     * Captures the next send as it leaves the composer (iOS `prepare(reduceMotion:attachments:)`):
+     * its image [attachments]' thumbnails (the New Plus Menu's sends, even under Reduce Motion,
+     * where they fade in place), and its words unless motion is reduced. [window] is the root's
+     * bounds (px), so a thumbnail scrolled out of the strip doesn't fly.
+     */
+    fun prepare(reduceMotion: Boolean, attachments: List<OpenCodeOutgoingAttachment> = emptyList(), window: Rect = Rect.Zero) {
         cancelPrepared()
+        if (attachments.isNotEmpty()) images.prepare(attachments, reduceMotion, window)
         val visible = inputBounds
         val layout = textLayout
         val origin = textOrigin
@@ -97,14 +106,32 @@ class ComposerSendTransition {
     /** The prepared send taken for its flight (the overlay now owns it); null when nothing was prepared. */
     fun takePrepared(): Prepared? = prepared.also { prepared = null }
 
-    /** Fades a send's capture out where it is: a send that doesn't fly. Only while it's still the prepared one. */
+    /**
+     * Fades a send's capture out where it is: a send that doesn't fly. Only while it's still the
+     * prepared one; its photos fade with it (iOS `dissolvePrepared`).
+     */
     fun dissolvePrepared(snapshot: Prepared?) {
-        if (prepared != null && prepared === snapshot) prepared = null
+        if (prepared != null && prepared === snapshot) {
+            images.dissolvePrepared(images.preparedToken)
+            prepared = null
+        }
     }
 
-    /** Drops the next send's capture; flights in the air carry on. */
+    /** Fades the next send's photos where they are (a send going to the queued pill, iOS `flyIntoPill`). */
+    fun dissolvePreparedImages() {
+        images.dissolvePrepared(images.preparedToken)
+    }
+
+    /** Drops the next send's capture, its photos included; flights in the air carry on. */
     fun cancelPrepared() {
+        images.cancelPrepared()
         prepared = null
+    }
+
+    /** Everything, flights included (the screen is going away; iOS `cancel()`). */
+    fun cancel() {
+        images.cancel()
+        cancelPrepared()
     }
 
     /** The send's clear's critical-spring ω, until the field takes it ([shrinkOnNextClear]). */

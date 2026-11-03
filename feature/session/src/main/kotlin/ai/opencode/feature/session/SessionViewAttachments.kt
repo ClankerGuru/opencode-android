@@ -24,7 +24,9 @@ import ai.opencode.feature.composer.ComposerImageSource
 import ai.opencode.feature.composer.ComposerLocationAttachment
 import ai.opencode.feature.composer.ComposerPickers
 import ai.opencode.feature.composer.PastedTextCard
+import ai.opencode.feature.composer.SentImageFlight
 import ai.opencode.feature.composer.SharedLocation
+import ai.opencode.feature.composer.sentImageSource
 import ai.opencode.feature.media.FileAttachmentCard
 import ai.opencode.server.model.OpenCodeOutgoingAttachment
 import ai.opencode.server.model.PastedText
@@ -476,6 +478,8 @@ fun PendingAttachmentsRow(
      * importer is still decoding.
      */
     flights: PhotoFlights? = null,
+    /** iOS `SentImageSource`: each thumbnail reports where a send's copy of it leaves from. */
+    sendImages: SentImageFlight? = null,
 ) {
     val reduceMotion = rememberReduceMotion()
     LazyRow(
@@ -506,6 +510,7 @@ fun PendingAttachmentsRow(
                             index,
                             Modifier
                                 .then(if (flights != null && id != null) Modifier.onGloballyPositioned { flights.slot(id, it.boundsOnScreen()) } else Modifier)
+                                .then(if (sendImages != null) Modifier.sentImageSource(sendImages, attachment.id) else Modifier)
                                 // The image waits for its flight to land (~0.3 s).
                                 .alpha(if (arriving) 0f else 1f),
                         )

@@ -53,6 +53,11 @@ class SendLanding {
         val isQueued: Boolean,
         /** The words it shows (its bubble's, or the queued pill's), for a send the composer didn't capture. */
         val text: String?,
+        /**
+         * The list follows the end as it lands (iOS `behavior.mode == .following`): a send's photos
+         * fly even when its words fade (a send under a jump's glide).
+         */
+        val isFollowing: Boolean = flies,
     )
 
     private val markers = HashMap<String, Marker>()

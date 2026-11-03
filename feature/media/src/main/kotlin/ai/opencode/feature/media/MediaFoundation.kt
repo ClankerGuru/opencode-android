@@ -3,6 +3,7 @@ package ai.opencode.feature.media
 import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.tuning.Tunable
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeImageAttachment
 import android.content.ComponentCallbacks2
@@ -51,6 +52,19 @@ object TranscriptMetrics {
 
     /** iOS `MinimumHitRect.side` (44 pt) → Android's 48 dp minimum target. */
     val minimumHitSide: Dp = 48.dp
+}
+
+/**
+ * iOS `TranscriptTunables.sendImageDuration` (declared in `Composer/SentImageFlight.swift`): how
+ * long a sent photo takes to fly from the composer into its slot, the 99.5% time of a critical
+ * spring. Lives here because the composer's `SentImageFlight` and the session's flight read it
+ * and `:feature:transcript` (which registers it, after `jumpDuration`) sits above the composer.
+ */
+object SendImageTunables {
+    val sendImageDuration = Tunable("transcript.send.imageDuration", "Image send duration", default = 0.55, range = 0.25..1.2, step = 0.01)
+
+    /** The flight's 99.5% time, seconds; ω = 7.43 / this. */
+    val duration: Double get() = sendImageDuration.value
 }
 
 /**

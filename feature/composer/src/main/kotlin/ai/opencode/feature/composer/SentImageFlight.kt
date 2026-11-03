@@ -3,6 +3,7 @@ package ai.opencode.feature.composer
 import ai.opencode.core.motion.Motion
 import ai.opencode.feature.composer.plusmenu.PhotoFlights
 import ai.opencode.feature.composer.plusmenu.drawAspectFill
+import ai.opencode.feature.media.SendImageTunables
 import ai.opencode.server.model.OpenCodeOutgoingAttachment
 import android.graphics.BitmapFactory
 import androidx.compose.animation.core.Animatable
@@ -21,6 +22,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.ImageBitmap
@@ -28,6 +30,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -147,6 +150,14 @@ class SentImageFlight {
     }
 
     /**
+     * Whether any prepared copy's landing slot under [itemID] has been laid out yet: Compose
+     * reports a new row's slots a frame after it arrives, where iOS lays the cell out on demand,
+     * so the session's flight waits for them before it [begin]s.
+     */
+    fun hasDestination(itemID: String, markers: (String) -> Rect?): Boolean =
+        prepared.any { markers(imageID(itemID, it.index)) != null }
+
+    /**
      * Starts at the current slot. [markers] gives a landing slot's frame in root pixels by
      * [imageID]; a copy without one is dropped, and with none the send has no image flight.
      */
@@ -260,8 +271,8 @@ class SentImageFlight {
         /** iOS `SendLandingProbe.imageID`: a sent message's per-image landing marker. */
         fun imageID(messageID: String, index: Int): String = "$messageID#image-$index"
 
-        /** iOS `TranscriptTunables.sendImageDuration` (“transcript.send.imageDuration”), seconds. */
-        const val SEND_IMAGE_DURATION = 0.55
+        /** iOS `TranscriptTunables.sendImageDuration` (“transcript.send.imageDuration”), seconds: the live knob. */
+        val sendImageDuration: Double get() = SendImageTunables.duration
 
         /** iOS `TranscriptMetrics.cardCornerRadius`, dp. */
         val CARD_CORNER_RADIUS: Float = FileAttachmentMetrics.cardCornerRadius.value
@@ -317,17 +328,21 @@ fun SentImageFlightOverlay(flight: SentImageFlight, modifier: Modifier = Modifie
         dissolve.snapTo(1f)
     }
     if (!flight.isSending && flight.dissolvingTiles.isEmpty()) return
-    Canvas(modifier.fillMaxSize()) {
+    // The copies' frames are root px; the overlay may sit anywhere under the root.
+    var origin by remember { mutableStateOf(Offset.Zero) }
+    Canvas(modifier.fillMaxSize().onGloballyPositioned { origin = it.positionInRoot() }) {
         @Suppress("UNUSED_EXPRESSION")
         flight.frameTick
         val fading = dissolve.value
-        for ((tile, alpha) in flight.dissolvingTiles.map { it to it.alpha * fading } + flight.tiles.map { it to it.alpha }) {
-            val frame = tile.frame
-            val radius = tile.cornerRadius * density
-            val clip = tile.clip ?: Rect(-1e6f, -1e6f, 1e6f, 1e6f)
-            clipRect(clip.left, clip.top, clip.right, clip.bottom) {
-                val path = Path().apply { addRoundRect(RoundRect(frame, CornerRadius(radius))) }
-                clipPath(path) { drawAspectFill(tile.image, frame, alpha = alpha) }
+        translate(-origin.x, -origin.y) {
+            for ((tile, alpha) in flight.dissolvingTiles.map { it to it.alpha * fading } + flight.tiles.map { it to it.alpha }) {
+                val frame = tile.frame
+                val radius = tile.cornerRadius * density
+                val clip = tile.clip ?: Rect(-1e6f, -1e6f, 1e6f, 1e6f)
+                clipRect(clip.left, clip.top, clip.right, clip.bottom) {
+                    val path = Path().apply { addRoundRect(RoundRect(frame, CornerRadius(radius))) }
+                    clipPath(path) { drawAspectFill(tile.image, frame, alpha = alpha) }
+                }
             }
         }
     }

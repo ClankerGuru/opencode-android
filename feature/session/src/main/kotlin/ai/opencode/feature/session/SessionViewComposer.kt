@@ -38,6 +38,10 @@ import ai.opencode.feature.composer.ComposerImageSource
 import ai.opencode.feature.composer.ComposerKeyboardMorph
 import ai.opencode.feature.composer.LocalComposerKeyboardMorph
 import ai.opencode.feature.composer.composerKeyboardSpacing
+import ai.opencode.feature.composer.sentImageDeparture
+import ai.opencode.feature.composer.ComposerSendTransition
+import ai.opencode.feature.media.SendImageTunables
+import ai.opencode.feature.transcript.TranscriptTunables
 import ai.opencode.feature.composer.layoutProgress
 import ai.opencode.feature.composer.ComposerSwipeDown
 import ai.opencode.feature.composer.ComposerSwipeOwnership
@@ -132,11 +136,13 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -463,6 +469,7 @@ fun SessionComposer(
         callTray = if (usesCallTray) callTray else null,
         callOwnsAudio = callStore != null && !callShowsCard,
         photoSheet = LocalSessionPhotoSheet.current?.takeIf { it.usesPlusMenuSheet },
+        windowSize = LocalWindowInfo.current.containerSize,
     )
 
     // iOS `attachComposerAutocomplete`: the controller follows the reducer's state and the composer's size.
@@ -594,6 +601,8 @@ internal class SessionComposerEnv(
     val callOwnsAudio: Boolean = false,
     /** The New Plus Menu's sheet and flights (iOS `usesPlusMenuSheet ? photoSheet…`), else null. */
     val photoSheet: SessionPhotoSheetState? = null,
+    /** The window's size (px): a sent photo's copy flies only from a thumbnail on screen. */
+    val windowSize: IntSize = IntSize.Zero,
 ) {
     /** iOS `usesCallTray` (`callPresentation == .tray`). */
     val usesCallTray: Boolean get() = callTray != null
@@ -720,9 +729,26 @@ internal class SessionComposerEnv(
         if (!state.canSendPrompt || state.hasPendingRequests) return
         // A send that waits for uploads lands later; the flight would capture now.
         val flies = !state.isUploadingFiles && (state.session != null || state.draftProject != null)
-        if (flies) host.sendTransition.prepare(reduceMotion = reducedMotion)
+        val transition = host.sendTransition
+        if (flies) {
+            transition.prepare(
+                reduceMotion = reducedMotion,
+                attachments = if (photoSheet != null) state.pendingAttachments else emptyList(),
+                window = Rect(0f, 0f, windowSize.width.toFloat(), windowSize.height.toFloat()),
+            )
+        }
         // The list lands it: on its bubble, its dim steering row, or the pill.
         val generation = state.sendGeneration
+        transition.shrinkOnNextClear(
+            if (transition.images.isActive) {
+                // The field clears under the same critical spring as the photos' copies
+                // (iOS `sendImageDuration` is the 99.5% time: ω = 7.43 / duration).
+                7.43 / SendImageTunables.duration
+            } else {
+                // A multiline draft's clear shrinks the composer on the flight's spring.
+                ComposerSendTransition.sendShrinkOmega(TranscriptTunables.arrivalOmega)
+            },
+        )
         store.send(action)
         // Nothing went (a failed upload): the capture mustn't linger.
         if (flies && store.state.sendGeneration == generation) host.sendTransition.cancelPrepared()
@@ -1588,7 +1614,9 @@ private fun SessionComposerEnv.Composer() {
                     Modifier
                         .composerFolds()
                         .alpha(rowAlpha)
-                        .then(if (recording) Modifier.clearAndSetSemantics { }.blockTouches() else Modifier),
+                        .then(if (recording) Modifier.clearAndSetSemantics { }.blockTouches() else Modifier)
+                        // iOS `SentImageDeparture`: the sent photos leave as their copies take off.
+                        .sentImageDeparture(host.sendTransition.images),
                 ) { row() }
             }
             Box {
