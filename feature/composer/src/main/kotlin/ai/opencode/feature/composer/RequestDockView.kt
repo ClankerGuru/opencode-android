@@ -1,5 +1,7 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.motion.transitionBlurEffect
+
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
@@ -70,8 +72,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.BlurEffect
-import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
@@ -269,7 +269,7 @@ fun RequestDockView(
                     this.alpha = alpha
                     translationY = rise.dp.toPx()
                     val radius = blur.dp.toPx()
-                    renderEffect = if (radius > 0.01f) BlurEffect(radius, radius, TileMode.Decal) else null
+                    renderEffect = transitionBlurEffect(radius)
                 }
                 .testTag(if (leaving) "request-dock-leaving" else "request-dock")
                 .semantics {

@@ -27,7 +27,7 @@ import androidx.core.content.ContextCompat
 /**
  * The app's theme: wraps [MaterialExpressiveTheme] with a [ColorScheme] built from the iOS
  * theme ([OpenCodeColors.toColorScheme]), iOS-scaled [OpenCodeTypography], [OpenCodeShapes]
- * and the iOS-timed [OpenCodeMotionScheme], and provides [OpenCodeColors] for the colours
+ * and the Material 3 Expressive [OpenCodeMotionScheme], and provides [OpenCodeColors] for the colours
  * Material has no role for. The System theme uses the wallpaper's dynamic colour instead
  * ([DynamicSystemTheme]); the curated themes keep their fixed palettes.
  *

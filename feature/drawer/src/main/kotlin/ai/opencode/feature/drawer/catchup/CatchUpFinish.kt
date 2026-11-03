@@ -1,5 +1,7 @@
 package ai.opencode.feature.drawer.catchup
 
+import ai.opencode.core.motion.transitionBlurEffect
+
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
@@ -35,14 +37,12 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathMeasure
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
@@ -356,7 +356,7 @@ fun DrawerCatchUpFinishedLabel(
                     val frame = frameState.value
                     alpha = frame.oldTitleOpacity.toFloat().coerceIn(0f, 1f)
                     translationY = frame.oldTitleOffset.toFloat().dp.toPx()
-                    renderEffect = blurEffect(frame.oldTitleBlur.toFloat().dp.toPx())
+                    renderEffect = transitionBlurEffect(frame.oldTitleBlur.toFloat().dp.toPx())
                 },
             )
             Text(
@@ -367,7 +367,7 @@ fun DrawerCatchUpFinishedLabel(
                     val frame = frameState.value
                     alpha = frame.newTitleOpacity.toFloat().coerceIn(0f, 1f)
                     translationY = frame.newTitleOffset.toFloat().dp.toPx()
-                    renderEffect = blurEffect(frame.newTitleBlur.toFloat().dp.toPx())
+                    renderEffect = transitionBlurEffect(frame.newTitleBlur.toFloat().dp.toPx())
                 },
             )
         }
@@ -386,7 +386,7 @@ fun DrawerCatchUpFinishedLabel(
                     scaleY = scale
                     transformOrigin = TransformOrigin(1f, 0.5f)
                     alpha = frame.countOpacity.toFloat().coerceIn(0f, 1f)
-                    renderEffect = blurEffect(frame.countBlur.toFloat().dp.toPx())
+                    renderEffect = transitionBlurEffect(frame.countBlur.toFloat().dp.toPx())
                 },
             )
             CatchUpFinishCheck(
@@ -399,9 +399,6 @@ fun DrawerCatchUpFinishedLabel(
         }
     }
 }
-
-private fun blurEffect(radiusPx: Float) =
-    if (radiusPx > 0.01f) BlurEffect(radiusPx, radiusPx, TileMode.Decal) else null
 
 /** The trailing checkmark the 0 becomes, drawn by trimming (iOS `CatchUpFinishCheckShape`). */
 @Composable

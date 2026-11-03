@@ -1,5 +1,7 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.motion.transitionBlur
+
 import ai.opencode.core.tuning.Tunable
 import ai.opencode.core.ui.LocalDrawerKeyboardSignals
 import androidx.compose.animation.core.Animatable
@@ -340,7 +342,7 @@ fun ComposerKeyboardReveal(
                 alpha = progress * recordingAlpha.value
                 translationY = if (reduced) 0f else (1 - progress) * ComposerKeyboardTunables.keyboardChipTravel.value.dp.toPx()
             }
-            .morphBlur {
+            .transitionBlur {
                 if (reduced) 0f else (1 - morph.expansion) * blurPx
             }
             .then(gate),

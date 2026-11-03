@@ -1,5 +1,7 @@
 package ai.opencode.feature.voice
 
+import ai.opencode.core.motion.transitionBlurEffect
+
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import ai.opencode.core.motion.Motion
@@ -48,9 +50,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layoutId
@@ -339,7 +339,7 @@ fun Modifier.callTrayMic(controller: CallTrayController?, reducedMotion: Boolean
     scaleX = look.scale
     scaleY = look.scale
     alpha = look.opacity
-    renderEffect = if (blur > 0f) BlurEffect(blur * density, blur * density, TileMode.Decal) else null
+    renderEffect = transitionBlurEffect(blur * density)
 }
 
 /**
@@ -512,7 +512,7 @@ private fun CallTraySeed(g: CallTrayController.Geometry, isDark: Boolean, modifi
                 shadowElevation = CallTrayTunables.liftShadow * shadowFactor * density
                 ambientShadowColor = Color.Black.copy(alpha = (0.32f * shadowFactor).coerceIn(0f, 1f))
                 spotShadowColor = Color.Black.copy(alpha = (0.32f * shadowFactor).coerceIn(0f, 1f))
-                renderEffect = if (outerBlur > 0f) BlurEffect(outerBlur * density, outerBlur * density, TileMode.Decal) else null
+                renderEffect = transitionBlurEffect(outerBlur * density)
             }
             .background(look.disc.copy(alpha = look.discAlpha.coerceIn(0f, 1f)), CircleShape)
             .clearAndSetSemantics {},
@@ -520,7 +520,7 @@ private fun CallTraySeed(g: CallTrayController.Geometry, isDark: Boolean, modifi
     ) {
         Box(
             Modifier.graphicsLayer {
-                renderEffect = if (glyphBlur > 0f) BlurEffect(glyphBlur * density, glyphBlur * density, TileMode.Decal) else null
+                renderEffect = transitionBlurEffect(glyphBlur * density)
             },
             contentAlignment = Alignment.Center,
         ) {

@@ -1,5 +1,7 @@
 package ai.opencode.feature.voice
 
+import ai.opencode.core.motion.transitionBlurEffect
+
 import androidx.compose.runtime.getValue
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
@@ -14,8 +16,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.BlurEffect
-import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -213,7 +213,7 @@ fun Modifier.callTrayPart(look: CallTrayController.PartLook, reducedMotion: Bool
     scaleY = look.scale
     translationX = look.offsetX * density
     alpha = look.opacity
-    renderEffect = if (blur > 0f) BlurEffect(blur * density, blur * density, TileMode.Decal) else null
+    renderEffect = transitionBlurEffect(blur * density)
 }
 
 /**

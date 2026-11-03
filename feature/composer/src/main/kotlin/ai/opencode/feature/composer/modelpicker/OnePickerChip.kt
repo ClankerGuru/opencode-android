@@ -1,5 +1,7 @@
 package ai.opencode.feature.composer.modelpicker
 
+import ai.opencode.core.motion.transitionBlur
+
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeIcon
@@ -223,6 +225,6 @@ private fun <T> OnePickerChipRoll(
                 else -> 2.5f
             }
         }
-        Box(Modifier.layerBlur { blur }) { content(value) }
+        Box(Modifier.transitionBlur { blur }) { content(value) }
     }
 }

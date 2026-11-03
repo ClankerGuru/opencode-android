@@ -1,5 +1,7 @@
 package ai.opencode.feature.composer.modelpicker
 
+import ai.opencode.core.motion.transitionBlur
+
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeIconSize
@@ -335,7 +337,7 @@ fun FusedRowMenuOverlay(
                     this.alpha = alpha
                 }
                 // iOS `.blur(radius: (1 − alpha) × 4)` as it pops and folds.
-                .layerBlur { if (reduceMotion) 0f else (1 - anchors.rowMenuAlpha.value) * 4f }
+                .transitionBlur { if (reduceMotion) 0f else (1 - anchors.rowMenuAlpha.value) * 4f }
                 .semantics {
                     paneTitle = "${menu.model.shortName} options"
                     if (menu.isClosing) invisibleToUser()

@@ -1,10 +1,11 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.motion.transitionBlurEffect
+
 import ai.opencode.core.motion.MotionSpring
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
-import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.unit.Density
@@ -56,6 +57,6 @@ object AttachmentRemoval {
         scaleX = scale
         scaleY = scale
         val radius = with(density) { (BLUR * p).dp.toPx() }
-        renderEffect = if (radius > 0f) BlurEffect(radius, radius) else null
+        renderEffect = transitionBlurEffect(radius)
     }
 }

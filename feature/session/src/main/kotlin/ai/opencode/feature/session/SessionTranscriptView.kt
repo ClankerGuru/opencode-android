@@ -2,6 +2,8 @@
 
 package ai.opencode.feature.session
 
+import ai.opencode.core.motion.transitionBlur
+
 import ai.opencode.feature.composer.PastedTextViewer
 import ai.opencode.core.ui.ProviderIcon
 import ai.opencode.core.experiments.key
@@ -94,7 +96,6 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.asImageBitmap
@@ -915,7 +916,7 @@ private fun WorkingLine(activity: WorkingActivity, pose: WorkingHandoffPose, off
             Modifier
                 .offset(x = ReplyCopyGlyph.leading)
                 .alpha(pose.copyOpacity.toFloat())
-                .blur(pose.copyBlur.dp)
+                .transitionBlur(pose.copyBlur.dp)
                 .graphicsLayer {
                     scaleX = pose.copyScale.toFloat()
                     scaleY = pose.copyScale.toFloat()
@@ -929,7 +930,7 @@ private fun WorkingLine(activity: WorkingActivity, pose: WorkingHandoffPose, off
             Modifier
                 .align(Alignment.CenterStart)
                 .offset(x = COPY_CENTRE * (1 - scale))
-                .blur(pose.indicatorBlur.dp)
+                .transitionBlur(pose.indicatorBlur.dp)
                 .graphicsLayer {
                     scaleX = scale
                     scaleY = scale

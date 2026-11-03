@@ -11,7 +11,7 @@ import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.openCodeTapTarget
 import ai.opencode.feature.composer.PickerTunables
 import ai.opencode.feature.composer.PlusMenuTunables
-import ai.opencode.feature.composer.morphBlur
+import ai.opencode.core.motion.transitionBlur
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -215,7 +215,7 @@ private fun Modifier.prefixSwap(progress: () -> Float, incoming: Boolean, reduce
         scaleX = scale
         scaleY = scale
         alpha = visibility
-    }.then(if (reduceMotion) Modifier else Modifier.morphBlur { (1f - PhotoPillLabelMath.prefixVisibility(progress(), incoming)) * blurPx })
+    }.then(if (reduceMotion) Modifier else Modifier.transitionBlur { (1f - PhotoPillLabelMath.prefixVisibility(progress(), incoming)) * blurPx })
 
 /** The pill label's progress math (iOS `PhotoPillPrefixSwap` / `PhotoPillSuffixReveal`). */
 internal object PhotoPillLabelMath {

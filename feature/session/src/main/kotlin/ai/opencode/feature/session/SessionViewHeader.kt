@@ -1,5 +1,7 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.motion.transitionBlur
+
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
@@ -63,7 +65,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
@@ -258,7 +259,7 @@ private fun Modifier.steppingAside(aside: Boolean, reducedMotion: Boolean): Modi
     val progress by animateFloatAsState(if (aside) 1f else 0f, spec, label = "steppingAside")
     this
         .alpha(1 - progress)
-        .blur(if (reducedMotion) 0.dp else (6 * progress).dp)
+        .transitionBlur(if (reducedMotion) 0.dp else (6 * progress).dp)
         .then(if (aside) Modifier.clearAndSetSemantics {} else Modifier)
 }
 

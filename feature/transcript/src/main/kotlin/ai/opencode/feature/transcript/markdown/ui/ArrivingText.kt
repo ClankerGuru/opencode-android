@@ -1,5 +1,7 @@
 package ai.opencode.feature.transcript.markdown.ui
 
+import ai.opencode.core.motion.TransitionBlur
+
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
@@ -136,13 +138,13 @@ internal fun ArrivingText(
             focus = revealStyle == StreamTextRevealStyle.Focus,
             feather = TextRevealTunables.feather.value,
             // Points → px; Reduce Motion drops the blur (iOS `StreamSweepOverlay`).
-            blurRadius = if (reduceMotion) 0f else with(density) { TextRevealTunables.blurRadius.value.toFloat().dp.toPx() },
-            blurPoints = if (reduceMotion) 0.0 else TextRevealTunables.blurRadius.value,
+            blurRadius = if (reduceMotion || !TransitionBlur.enabled) 0f else with(density) { TextRevealTunables.blurRadius.value.toFloat().dp.toPx() },
+            blurPoints = if (reduceMotion || !TransitionBlur.enabled) 0.0 else TextRevealTunables.blurRadius.value,
             lift = TextRevealTunables.phosphorLift.value,
         )
     }
     // Focus's blur steps share a few layers, one per step (iOS: `ctx.drawLayer` per step).
-    val blurLayers = if (sweep?.focus == true) List(SweepParameters.STEPS) { rememberGraphicsLayer() } else null
+    val blurLayers = if (sweep?.focus == true && sweep.blurPoints > 0) List(SweepParameters.STEPS) { rememberGraphicsLayer() } else null
     var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
     var pressed by remember { mutableStateOf<String?>(null) }
     // Web, pairing and session links hold to media's link menu (iOS `linkMenu(for:)`: the

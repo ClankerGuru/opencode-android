@@ -14,8 +14,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
-import androidx.compose.ui.graphics.BlurEffect
-import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -44,15 +42,6 @@ fun rememberReduceTransparency(): Boolean {
         onDispose { windowManager.removeCrossWindowBlurEnabledListener(listener) }
     }
     return reduce
-}
-
-/**
- * A real Gaussian blur of [radiusPx] on this layer (SwiftUI `.blur(radius:)`), off when it
- * would show nothing. Decal edges fade out like SwiftUI's non-opaque blur.
- */
-internal fun Modifier.morphBlur(radiusPx: () -> Float): Modifier = graphicsLayer {
-    val r = radiusPx()
-    renderEffect = if (r > 0.25f) BlurEffect(r, r, TileMode.Decal) else null
 }
 
 /**

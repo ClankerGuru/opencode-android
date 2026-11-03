@@ -189,12 +189,3 @@ internal fun DrawScope.drawBlurredSource(source: BlurSource?, blurLayer: Graphic
     translate(source.origin.x - selfOrigin.x, source.origin.y - selfOrigin.y) { drawLayer(blurLayer) }
     return true
 }
-
-/**
- * A real gaussian blur of this node's own drawing (SwiftUI `.blur(radius:)`), skipped at a radius
- * under half a pixel.
- */
-internal fun Modifier.layerBlur(radius: () -> Float): Modifier = graphicsLayer {
-    val r = radius() * density
-    renderEffect = if (r >= 0.5f) BlurEffect(r, r, TileMode.Decal) else null
-}

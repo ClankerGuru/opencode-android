@@ -1,5 +1,7 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.motion.transitionBlurEffect
+
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.excludedFromDrawerPan
 import androidx.compose.animation.core.animateFloatAsState
@@ -452,7 +454,7 @@ internal const val PREDICT_SECONDS = 0.499f
 internal fun Modifier.morphReveal(reveal: () -> Float, fade: Float?, blurPx: Float, lead: Float = 1f): Modifier = graphicsLayer {
     val showing = fade ?: (reveal() / max(lead, 0.01f)).coerceIn(0f, 1f)
     val radius = if (fade != null || showing < 0.02f || showing > 0.98f) 0f else (1 - showing) * blurPx
-    renderEffect = if (radius > 0.25f) androidx.compose.ui.graphics.BlurEffect(radius, radius, androidx.compose.ui.graphics.TileMode.Decal) else null
+    renderEffect = transitionBlurEffect(radius)
     alpha = showing
 }
 
@@ -470,7 +472,7 @@ internal fun Modifier.morphDissolve(reveal: () -> Float, shown: Boolean, fade: F
     scaleX = scale
     scaleY = scale
     transformOrigin = TransformOrigin(0.5f, 1f)
-    renderEffect = if (radius > 0.25f) androidx.compose.ui.graphics.BlurEffect(radius, radius, androidx.compose.ui.graphics.TileMode.Decal) else null
+    renderEffect = transitionBlurEffect(radius)
     alpha = ComposerMorphGeometry.outgoingOpacity(r, shown, fade)
 }
 

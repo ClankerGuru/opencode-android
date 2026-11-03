@@ -1,5 +1,7 @@
 package ai.opencode.feature.system.share
 
+import ai.opencode.core.motion.transitionBlur
+
 import ai.opencode.core.files.AttachmentFileType
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
@@ -94,7 +96,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
@@ -807,7 +808,7 @@ private fun MessageBar(state: ShareModel.State, actions: ShareActions, reduceMot
                             alpha = fieldAlpha
                             translationY = with(density) { fieldLift.toPx() }
                         }
-                        .blur(fieldBlur)
+                        .transitionBlur(fieldBlur)
                         .then(if (phase == ShareModel.Phase.Sent) Modifier.semantics { hideFromAccessibility() } else Modifier),
                     decorationBox = { inner ->
                         Box {

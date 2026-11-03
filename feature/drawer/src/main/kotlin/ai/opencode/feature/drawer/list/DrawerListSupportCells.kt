@@ -1,5 +1,7 @@
 package ai.opencode.feature.drawer.list
 
+import ai.opencode.core.motion.transitionBlurEffect
+
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
@@ -36,8 +38,6 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.BlurEffect
-import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -319,7 +319,7 @@ private fun Collapse(
                 transformOrigin = TransformOrigin(0.5f, 0f)
                 alpha = if (p <= 0.02f) 0f else p
                 val radius = if (reducedMotion || p >= 0.98f) 0f else (1 - p) * maxBlur.toPx()
-                renderEffect = if (radius > 0.01f) BlurEffect(radius, radius, TileMode.Decal) else null
+                renderEffect = transitionBlurEffect(radius)
             }
             .then(if (wantsOpen) Modifier else Modifier.blockingTouches()),
     ) {

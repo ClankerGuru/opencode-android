@@ -1,5 +1,7 @@
 package ai.opencode.feature.composer.plusmenu
 
+import ai.opencode.core.motion.transitionBlurEffect
+
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
@@ -12,8 +14,6 @@ import ai.opencode.feature.composer.progressiveBlurEffect
 import ai.opencode.feature.composer.rememberReduceTransparency
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.composed
-import androidx.compose.ui.graphics.BlurEffect
-import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
@@ -284,7 +284,7 @@ fun RecentPhotoPeekOverlay(
                         alpha = clamped
                         // Out of a blur (iOS `PeekArrival`: (1 − shown) × 10).
                         val blur = if (reduceMotion || clamped > 0.98f || clamped < 0.02f) 0f else (1 - clamped) * 10f * density
-                        renderEffect = if (blur > 0.25f) BlurEffect(blur, blur, TileMode.Decal) else null
+                        renderEffect = transitionBlurEffect(blur)
                     },
             )
         }

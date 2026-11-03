@@ -35,11 +35,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -420,8 +418,6 @@ private fun CaptionLine(line: CaptionReveal.Line, now: () -> Double, reduceMotio
                     modifier = if (settled) Modifier else Modifier.graphicsLayer {
                         val eased = CaptionWordRenderer.eased(at, now())
                         alpha = eased
-                        val radius = if (eased < 1f) CaptionWordRenderer.blur(eased, reduceMotion) else 0f
-                        renderEffect = if (radius > 0.05f) BlurEffect(radius * density, radius * density, TileMode.Decal) else null
                     },
                 )
             }

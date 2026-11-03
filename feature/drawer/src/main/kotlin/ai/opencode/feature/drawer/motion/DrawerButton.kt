@@ -1,5 +1,7 @@
 package ai.opencode.feature.drawer.motion
 
+import ai.opencode.core.motion.transitionBlur
+
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
@@ -50,7 +52,6 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -628,7 +629,7 @@ fun Modifier.steppingAside(aside: Boolean, reducedMotion: Boolean): Modifier = c
         else -> MotionSpring(0.35, 0.0).animation(reduceMotion = false, delaySeconds = 0.12)
     }
     val progress by animateFloatAsState(if (aside) 1f else 0f, spec, label = "stepping-aside")
-    val blurred = if (!reducedMotion && progress > 0.001f) Modifier.blur((6 * progress).dp) else Modifier
+    val blurred = if (!reducedMotion && progress > 0.001f) Modifier.transitionBlur((6 * progress).dp) else Modifier
     this
         .then(blurred)
         .graphicsLayer { alpha = 1 - progress }

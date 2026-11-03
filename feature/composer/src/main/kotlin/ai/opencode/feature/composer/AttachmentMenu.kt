@@ -1,5 +1,7 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.motion.transitionBlur
+
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
@@ -397,7 +399,7 @@ fun Modifier.menuRowEntranceReveal(progress: Float, bottomIndex: Int, totalCount
             translationY = if (blur > 0) lift.dp.toPx() else 0f
             alpha = eased
         }
-        .then(if (radius > 0f) Modifier.blur(radius.dp) else Modifier)
+        .then(if (radius > 0f) Modifier.transitionBlur(radius.dp) else Modifier)
 }
 
 // endregion
@@ -900,7 +902,7 @@ private fun MenuRowsSlot(
             Modifier
                 .requiredSize(with(density) { frames.menu.width.toDp() }, with(density) { frames.menu.height.toDp() })
                 .graphicsLayer { alpha = rowsAlpha * cardFade * handoffFade }
-                .then(if (handoffBlur > 0f) Modifier.blur(handoffBlur.dp) else Modifier),
+                .then(if (handoffBlur > 0f) Modifier.transitionBlur(handoffBlur.dp) else Modifier),
             contentAlignment = Alignment.BottomStart,
         ) {
             AttachmentMenuRows(

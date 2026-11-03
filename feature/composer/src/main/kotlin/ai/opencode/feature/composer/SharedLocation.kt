@@ -1,5 +1,7 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.motion.transitionBlur
+
 import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.dependencies.dependency
@@ -652,7 +654,7 @@ fun ComposerLocationAttachment(
                 transformOrigin = TransformOrigin(0f, 1f)
                 alpha = metrics.opacity
             }
-            .then(if (metrics.blur > 0f) Modifier.blur(metrics.blur.dp) else Modifier),
+            .then(if (metrics.blur > 0f) Modifier.transitionBlur(metrics.blur.dp) else Modifier),
         contentAlignment = Alignment.TopEnd,
     ) {
         val progress = resolved.value
@@ -669,7 +671,7 @@ fun ComposerLocationAttachment(
                     isHidden = activeLocation != null,
                     modifier = Modifier
                         .alpha(maxOf(0f, 1f - progress * 2.2f))
-                        .then(if (!reduceMotion && progress > 0f) Modifier.blur(Motion.blurSubtle * progress.coerceIn(0f, 1f)) else Modifier),
+                        .then(if (!reduceMotion && progress > 0f) Modifier.transitionBlur(Motion.blurSubtle * progress.coerceIn(0f, 1f)) else Modifier),
                 )
             }
             if (activeLocation != null) {

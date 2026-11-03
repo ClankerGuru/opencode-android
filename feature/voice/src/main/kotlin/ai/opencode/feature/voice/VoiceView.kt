@@ -1,5 +1,7 @@
 package ai.opencode.feature.voice
 
+import ai.opencode.core.motion.transitionBlurEffect
+
 import ai.opencode.core.ui.excludedFromDrawerPan
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -65,14 +67,12 @@ import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.ShaderBrush
-import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEvent
@@ -399,7 +399,7 @@ private fun Modifier.reachFade(
     val shown = if (showsAbove) t else 1 - t
     // No blur on content all but gone or all but whole: it costs a full pass and shows nothing.
     val radius = if (blurs && shown > 0.04f && shown < 0.98f) (1 - shown) * ComposerExpansion.revealBlur else 0f
-    renderEffect = if (radius > 0f) BlurEffect(radius * density, radius * density, TileMode.Decal) else null
+    renderEffect = transitionBlurEffect(radius * density)
     alpha = max(shown, minimum)
 }
 

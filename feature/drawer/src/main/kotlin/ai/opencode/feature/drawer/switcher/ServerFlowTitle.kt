@@ -1,5 +1,7 @@
 package ai.opencode.feature.drawer.switcher
 
+import ai.opencode.core.motion.transitionBlur
+
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.experiments.key
 import ai.opencode.core.motion.rememberReduceMotion
@@ -335,7 +337,7 @@ private fun Names(shown: OpenCodeServer, presentation: DrawerTitle.Presentation,
                     .wrapContentWidth(Alignment.Start, unbounded = true)
                     .offset(y = (pose.position * travel).dp)
                     .alpha(pose.opacity)
-                    .then(if (blur > 0f) Modifier.blur((abs(pose.position) * blur).dp) else Modifier),
+                    .then(if (blur > 0f) Modifier.transitionBlur((abs(pose.position) * blur).dp) else Modifier),
             )
         }
         if (names.isEmpty()) Name(shown.friendlyName, presentation, limit = limit)

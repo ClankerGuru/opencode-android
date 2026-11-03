@@ -1,5 +1,7 @@
 package ai.opencode.feature.settings.onboarding
 
+import ai.opencode.core.motion.transitionBlurEffect
+
 import ai.opencode.core.diagnostics.HidesFromScreenshots
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
@@ -74,7 +76,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
@@ -264,7 +265,7 @@ private fun Entrance(isActive: Boolean, index: Int, modifier: Modifier = Modifie
             scaleX = scale
             scaleY = scale
             val blur = (OnboardingTunables.pageBlur.toFloat() * travel * away).dp.toPx()
-            renderEffect = if (blur > 0.25f) BlurEffect(blur, blur, TileMode.Decal) else null
+            renderEffect = transitionBlurEffect(blur)
         },
         contentAlignment = Alignment.Center,
     ) { content() }
@@ -706,7 +707,7 @@ private fun ApertureLayer(
                     scaleX = scale
                     scaleY = scale
                     val blur = if (reduceMotion) 0f else (4f * (1f - s)).dp.toPx()
-                    renderEffect = if (blur > 0.25f) BlurEffect(blur, blur, TileMode.Decal) else null
+                    renderEffect = transitionBlurEffect(blur)
                 }
                 .clip(shape)
                 .background(Color.Black)
@@ -741,7 +742,7 @@ private fun ApertureLayer(
                         scaleX = scale
                         scaleY = scale
                         val blur = if (reduceMotion) 0f else (3f * (1f - w)).dp.toPx()
-                        renderEffect = if (blur > 0.25f) BlurEffect(blur, blur, TileMode.Decal) else null
+                        renderEffect = transitionBlurEffect(blur)
                     },
             )
         }

@@ -1,5 +1,7 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.motion.transitionBlur
+
 import ai.opencode.core.diagnostics.LabMarks
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticEffect
@@ -76,7 +78,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.composed
-import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
@@ -347,7 +348,7 @@ private fun Opening(isOpen: Boolean, content: @Composable () -> Unit) {
 /** Blurs 3 dp while arriving or leaving (iOS `BlurFade`), never at rest. */
 private fun Modifier.blurringWith(scope: AnimatedVisibilityScope): Modifier = composed {
     val blur by scope.transition.animateFloat(label = "blur") { if (it == EnterExitState.Visible) 0f else 3f }
-    if (blur > 0.01f) blur(blur.dp, BlurredEdgeTreatment.Unbounded) else this
+    transitionBlur(blur.dp)
 }
 
 /**

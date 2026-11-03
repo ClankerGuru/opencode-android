@@ -1,5 +1,7 @@
 package ai.opencode.feature.composer.modelpicker
 
+import ai.opencode.core.motion.transitionBlur
+
 import ai.opencode.core.ui.excludedFromDrawerPan
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeIcon
@@ -312,6 +314,6 @@ private fun ChipRoll(
             transitionSpec = { FusedModelPickerTunables.animation(roll, reduceMotion) },
             label = "$label-blur",
         ) { phase -> if (phase == EnterExitState.Visible || reduceMotion) 0f else FusedModelPickerTunables.chipBlur.toFloat() }
-        Box(Modifier.layerBlur { blur }) { content(text) }
+        Box(Modifier.transitionBlur { blur }) { content(text) }
     }
 }

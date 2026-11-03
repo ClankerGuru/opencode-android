@@ -1,5 +1,7 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.motion.transitionBlur
+
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import androidx.compose.foundation.Canvas
@@ -39,7 +41,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
@@ -393,7 +394,7 @@ fun ComposerAutocompletePanel(
                         transformOrigin = TransformOrigin(0.5f, 1f)
                         alpha = frame.contentAlpha.toFloat()
                     }
-                    .then(if (frame.contentBlur > 0.01) Modifier.blur(frame.contentBlur.dp) else Modifier),
+                    .then(if (frame.contentBlur > 0.01) Modifier.transitionBlur(frame.contentBlur.dp) else Modifier),
             ) {
                 AutocompleteListWindow(controller, frame, params, scale, onSelectRow)
             }
@@ -517,7 +518,7 @@ private fun AutocompleteRowSlot(
             .offset(slotRect.minX.dp, slotRect.minY.dp)
             .requiredSize(slotRect.width.dp, slotRect.height.dp)
             .clip(RoundedCornerShape(row.cornerRadius.dp))
-            .then(if (row.blur > 0.01) Modifier.blur(row.blur.dp) else Modifier)
+            .then(if (row.blur > 0.01) Modifier.transitionBlur(row.blur.dp) else Modifier)
             .alpha(row.alpha.toFloat())
             .clearAndSetSemantics {
                 contentDescription = label
