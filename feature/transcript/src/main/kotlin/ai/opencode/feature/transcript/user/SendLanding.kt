@@ -209,6 +209,14 @@ internal fun rememberSendLandingMarker(key: String?): SendLanding.Marker? {
 internal class QueuedPillSource(private val graphics: GraphicsContext, val itemID: String?) {
     private var layer: GraphicsLayer? = null
 
+    /**
+     * What the row draws in place: [layer], until it departs. The list's fading copy of a removed
+     * row replays the row's last drawing, which holds this node, so hiding it on [depart] hides
+     * that copy too (iOS hides the cell's content, `contentView.alpha = 0`); otherwise the copy
+     * flying into the pill would also fade where the row was.
+     */
+    private var inPlace: GraphicsLayer? = null
+
     /** Where the row sits (window px, unclipped). */
     var bounds: Rect = Rect.Zero
         private set
@@ -219,9 +227,12 @@ internal class QueuedPillSource(private val graphics: GraphicsContext, val itemI
 
     fun draw(scope: ContentDrawScope) {
         val recording = layer ?: graphics.createGraphicsLayer().also { layer = it }
+        val shown = inPlace ?: graphics.createGraphicsLayer().also { inPlace = it }
         with(scope) {
             recording.record { this@with.drawContent() }
-            drawLayer(recording)
+            shown.alpha = 1f
+            shown.record { drawLayer(recording) }
+            drawLayer(shown)
         }
     }
 
@@ -230,6 +241,7 @@ internal class QueuedPillSource(private val graphics: GraphicsContext, val itemI
         val host = landing.onQueuedPill ?: return false
         val recorded = layer?.takeIf { bounds.width > 0f && bounds.height > 0f } ?: return false
         layer = null
+        inPlace?.alpha = 0f
         host(
             SendLanding.PillDeparture(itemID, recorded, bounds) { graphics.releaseGraphicsLayer(recorded) },
         )
@@ -239,6 +251,8 @@ internal class QueuedPillSource(private val graphics: GraphicsContext, val itemI
     fun dispose() {
         layer?.let(graphics::releaseGraphicsLayer)
         layer = null
+        inPlace?.let(graphics::releaseGraphicsLayer)
+        inPlace = null
     }
 }
 
