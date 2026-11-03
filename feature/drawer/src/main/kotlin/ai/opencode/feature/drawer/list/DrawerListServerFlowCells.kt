@@ -45,6 +45,7 @@ import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.node.DrawModifierNode
 import androidx.compose.ui.node.ModifierNodeElement
+import androidx.compose.ui.node.invalidateDraw
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
@@ -168,22 +169,33 @@ internal fun Modifier.serverSwapRow(motion: ServerSwapMotion?, serverID: String,
 /**
  * iOS `DrawerListController.leavingRows`: the pictures of the rows a server switch leaves, hanging
  * off their name as it goes. iOS snapshots each visible cell's content; a `LazyColumn` drops the
- * old server's items at once, so each row records what it draws into a layer kept here
- * ([serverSwapPicture]), and a switch hands the visible rows' layers to the leaving server, drawn
+ * old server's items at once, so each row records what it draws into a layer of its own
+ * ([serverSwapPicture]), and a switch takes the visible rows' layers for the leaving server, drawn
  * over the list ([drawLeaving]) on that server's row chain until its name has gone.
+ *
+ * A taken layer is the leaving server's alone, as iOS's snapshot views are: its row records itself
+ * into a new one before it draws again, and again whenever it comes back from the list's reuse
+ * pool. Otherwise a row the next server shows under the same key (a section header, or the same
+ * session on both servers) kept drawing the taken picture, fading out with the old server and
+ * blank once it was released.
  */
 internal class ServerSwapPictures(private val graphics: GraphicsContext) {
     private class Picture(val layer: GraphicsLayer, val top: Float)
 
-    private val live = HashMap<Any, GraphicsLayer>()
+    /** The row drawing each key now. */
+    private val rows = HashMap<Any, ServerSwapPictureNode>()
     private val leaving = HashMap<String, List<Picture>>()
 
-    /** The layer the row with [key] records into. */
-    fun layer(key: Any): GraphicsLayer = live.getOrPut(key) { graphics.createGraphicsLayer() }
+    internal fun createLayer(): GraphicsLayer = graphics.createGraphicsLayer()
 
-    /** A row left the list: what it drew goes with it, unless a switch took it. */
-    fun forget(key: Any) {
-        live.remove(key)?.let(graphics::releaseGraphicsLayer)
+    internal fun releaseLayer(layer: GraphicsLayer) = graphics.releaseGraphicsLayer(layer)
+
+    internal fun attach(row: ServerSwapPictureNode) {
+        rows[row.key] = row
+    }
+
+    internal fun detach(row: ServerSwapPictureNode) {
+        if (rows[row.key] === row) rows.remove(row.key)
     }
 
     /**
@@ -192,12 +204,12 @@ internal class ServerSwapPictures(private val graphics: GraphicsContext) {
      * as live rows.
      */
     fun swap(server: String, next: String, info: LazyListLayoutInfo, firstVisible: Int) {
-        for (id in listOf(server, next)) leaving.remove(id)?.forEach { graphics.releaseGraphicsLayer(it.layer) }
+        for (id in listOf(server, next)) leaving.remove(id)?.forEach { releaseLayer(it.layer) }
         val pictures = info.visibleItemsInfo
             .filter { it.index >= firstVisible }
             .sortedBy { it.offset }
             .mapNotNull { item ->
-                live.remove(item.key)?.let { Picture(it, (item.offset - info.viewportStartOffset).toFloat()) }
+                rows[item.key]?.handOver()?.let { Picture(it, (item.offset - info.viewportStartOffset).toFloat()) }
             }
         if (pictures.isNotEmpty()) leaving[server] = pictures
     }
@@ -207,7 +219,7 @@ internal class ServerSwapPictures(private val graphics: GraphicsContext) {
         if (leaving.isEmpty()) return
         val still = motion.leaving.toSet()
         val gone = leaving.keys.filter { it !in still }
-        for (id in gone) leaving.remove(id)?.forEach { graphics.releaseGraphicsLayer(it.layer) }
+        for (id in gone) leaving.remove(id)?.forEach { releaseLayer(it.layer) }
         for ((id, pictures) in leaving) {
             val poses = motion.rows(id, pictures.size)
             pictures.forEachIndexed { index, picture ->
@@ -219,12 +231,11 @@ internal class ServerSwapPictures(private val graphics: GraphicsContext) {
         }
     }
 
-    /** The list left the screen. */
+    /** The list left the screen (its rows release their own layers as they go). */
     fun release() {
-        live.values.forEach(graphics::releaseGraphicsLayer)
-        live.clear()
-        leaving.values.flatten().forEach { graphics.releaseGraphicsLayer(it.layer) }
+        leaving.values.flatten().forEach { releaseLayer(it.layer) }
         leaving.clear()
+        rows.clear()
     }
 }
 
@@ -234,22 +245,51 @@ internal fun Modifier.serverSwapPicture(pictures: ServerSwapPictures?, key: Any)
 
 private data class ServerSwapPictureElement(val pictures: ServerSwapPictures, val key: Any) : ModifierNodeElement<ServerSwapPictureNode>() {
     override fun create() = ServerSwapPictureNode(pictures, key)
-    override fun update(node: ServerSwapPictureNode) {
-        if (node.key != key || node.pictures !== pictures) node.pictures.forget(node.key)
-        node.pictures = pictures
-        node.key = key
-    }
+    override fun update(node: ServerSwapPictureNode) = node.update(pictures, key)
 }
 
-private class ServerSwapPictureNode(var pictures: ServerSwapPictures, var key: Any) : Modifier.Node(), DrawModifierNode {
+internal class ServerSwapPictureNode(var pictures: ServerSwapPictures, var key: Any) : Modifier.Node(), DrawModifierNode {
+    private var layer: GraphicsLayer? = null
+
+    /** What this row last drew, for the leaving server; the row records itself anew before it draws again. */
+    fun handOver(): GraphicsLayer? {
+        val taken = layer ?: return null
+        layer = null
+        invalidateDraw()
+        return taken
+    }
+
+    fun update(pictures: ServerSwapPictures, key: Any) {
+        if (pictures === this.pictures && key == this.key) return
+        if (isAttached) this.pictures.detach(this)
+        if (pictures !== this.pictures) dropLayer()
+        this.pictures = pictures
+        this.key = key
+        if (isAttached) {
+            pictures.attach(this)
+            invalidateDraw()
+        }
+    }
+
     override fun ContentDrawScope.draw() {
-        val layer = pictures.layer(key)
+        val layer = layer ?: pictures.createLayer().also { layer = it }
         layer.record { this@draw.drawContent() }
         drawLayer(layer)
     }
 
+    override fun onAttach() {
+        pictures.attach(this)
+        // Back from the reuse pool: what the list kept of it may draw a picture a switch took since.
+        invalidateDraw()
+    }
+
     override fun onDetach() {
-        pictures.forget(key)
+        pictures.detach(this)
+        dropLayer()
+    }
+
+    private fun dropLayer() {
+        layer?.let(pictures::releaseLayer)
+        layer = null
     }
 }
-
