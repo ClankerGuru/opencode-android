@@ -1686,6 +1686,8 @@ private fun SessionComposerEnv.ComposerInput(expanded: Boolean, recording: Boole
             accessibilityLabel = bar?.fieldLabel ?: "Message",
             isHoldingMic = s.dictationHold != null,
             sendTransition = host.sendTransition,
+            // One Picker in the keyboard's place keeps the field from taking it back.
+            refusesFocus = { host.modelPanels?.onePicker?.isOpen == true },
         )
     }
 }

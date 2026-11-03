@@ -272,6 +272,8 @@ fun SessionView(
                     onHeaderHeight = { headerHeight = it.roundToInt().toFloat() },
                     modifier = Modifier.align(Alignment.TopCenter).windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility),
                 )
+                // One Picker's surface grows out of the composer, over the transcript and under the composer.
+                SessionOnePickerBackdrop(composerHost, Modifier.matchParentSize())
                 Column(
                     Modifier
                         .align(Alignment.BottomCenter)
@@ -286,7 +288,7 @@ fun SessionView(
                         .then(if (floatsCall) Modifier.floatingCallComposer() else Modifier),
                 ) {
                     SessionCallCards(callStore)
-                    SessionComposer(store, callStore = callStore, callTray = callTray)
+                    SessionComposer(store, Modifier.modelPanelsComposer(composerHost), callStore = callStore, callTray = callTray)
                 }
                 // A send's words fly from the field into its bubble, over both.
                 SessionSendFlightOverlay(composerHost, scrollEdgeBridge, Modifier.matchParentSize())

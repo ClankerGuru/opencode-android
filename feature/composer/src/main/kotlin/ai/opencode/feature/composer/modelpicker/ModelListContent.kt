@@ -561,17 +561,23 @@ internal fun FavoriteSwipeBox(
     tint: Color = FavoriteYellow,
     /** The Favorite action's glyph (the Sheet and composer lists `star.fill`, Today's `star`). */
     favoriteSymbol: SFSymbol = SFSymbol.StarFill,
+    /** The row's own fill, drawn over the action while it rests. */
+    containerColor: Color = BottomSheetDefaults.ContainerColor,
+    /** One Picker's rows also swipe from the leading edge (iOS's leading and trailing actions). */
+    swipesFromStart: Boolean = false,
+    modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val swipe = rememberSwipeToDismissBoxState()
     SwipeToDismissBox(
         state = swipe,
-        enableDismissFromStartToEnd = false,
+        modifier = modifier,
+        enableDismissFromStartToEnd = swipesFromStart,
         backgroundContent = {
             Row(
                 Modifier.fillMaxSize().background(tint).padding(horizontal = 20.dp),
-                horizontalArrangement = Arrangement.End,
+                horizontalArrangement = if (swipe.dismissDirection == SwipeToDismissBoxValue.StartToEnd) Arrangement.Start else Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 OpenCodeIcon(if (isFavorite) SFSymbol.StarSlash else favoriteSymbol, null, size = 20.dp, tint = Color.White)
@@ -580,11 +586,11 @@ internal fun FavoriteSwipeBox(
             }
         },
         onDismiss = { value ->
-            if (value == SwipeToDismissBoxValue.EndToStart) onToggle()
+            if (value != SwipeToDismissBoxValue.Settled) onToggle()
             scope.launch { swipe.reset() }
         },
     ) {
-        Box(Modifier.background(BottomSheetDefaults.ContainerColor)) { content() }
+        Box(Modifier.background(containerColor)) { content() }
     }
 }
 
