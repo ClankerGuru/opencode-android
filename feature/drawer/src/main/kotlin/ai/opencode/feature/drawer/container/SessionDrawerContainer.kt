@@ -16,6 +16,7 @@ import ai.opencode.feature.drawer.motion.DrawerCorner
 import ai.opencode.feature.drawer.motion.DrawerDepth
 import ai.opencode.feature.drawer.motion.DrawerDim
 import ai.opencode.feature.drawer.motion.DrawerKeyboardHold
+import ai.opencode.feature.drawer.motion.DrawerMotionTunables
 import ai.opencode.feature.drawer.motion.DrawerPanEvent
 import ai.opencode.feature.drawer.motion.DrawerPanRegions
 import ai.opencode.feature.drawer.motion.DrawerRevealPhase
@@ -25,6 +26,7 @@ import ai.opencode.feature.drawer.motion.drawerPanDrawer
 import ai.opencode.feature.drawer.motion.rememberDisplayCornerRadius
 import ai.opencode.feature.drawer.motion.rememberDrawerMotionState
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -89,6 +91,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.roundToInt
 
 /**
@@ -513,7 +516,26 @@ fun SessionDrawerContainer(
         // Back: Catch Up exits; an open drawer closes (a pushed subagent's own back sits beneath).
         // Under Settings neither does: Back closes Settings, not what waits beneath it.
         BackHandler(enabled = !sheet && catchUp != null) { currentCatchUp?.onExit?.invoke() }
-        BackHandler(enabled = !sheet && catchUp == null && motion.isPresented) { controller.closeDrawer() }
+        // Android only: predictive back pulls the card part of the way shut with the gesture
+        // (DrawerMotionTunables.BACK_PREVIEW_TRAVEL); the commit closes it from there, a cancel
+        // springs it open again. A button or TalkBack back closes it at once, as before.
+        PredictiveBackHandler(enabled = !sheet && catchUp == null && motion.isPresented) { progress ->
+            var began = false
+            try {
+                progress.collect { event ->
+                    if (!began) {
+                        controller.panBegan()
+                        motion.beginDrag()
+                        began = true
+                    }
+                    motion.drag(-event.progress * motion.width * DrawerMotionTunables.BACK_PREVIEW_TRAVEL)
+                }
+                if (began) motion.endBackDrag() else controller.closeDrawer()
+            } catch (cancelled: CancellationException) {
+                if (began) motion.cancelDrag()
+                throw cancelled
+            }
+        }
     }
 
     DisposableEffect(controller) { onDispose { controller.dispose() } }

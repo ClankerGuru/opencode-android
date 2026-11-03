@@ -10,6 +10,8 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.graphics.Bitmap
+import android.window.BackEvent
+import android.window.OnBackAnimationCallback
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
 import androidx.compose.animation.core.animate
@@ -524,6 +526,16 @@ data class MediaDismissDrag(val screenHeight: Float) {
     }
 }
 
+/**
+ * Android only: how far a predictive back gesture pulls the media at full progress, as
+ * fractions of the pull-down's range ([MediaDismissDrag.range]) and of the screen's width.
+ * At full progress the media is at about 88% of its size, as Android's own back preview.
+ */
+internal object MediaBackPreview {
+    const val DOWN = 0.3f
+    const val SIDEWAYS = 0.04f
+}
+
 /** The viewer's springs (iOS `UIView.animate(springDuration:bounce:)` values). */
 internal object MediaMotion {
     /** Fly in, content open, content dismiss (0.4 s, critically damped). */
@@ -864,6 +876,63 @@ internal class MediaViewerController(
             }
         }
     }
+
+    // region Predictive back (Android only)
+
+    /** Whether a predictive back gesture is previewing the dismissal (see [backBegan]). */
+    private var backPreviewing = false
+
+    /**
+     * A predictive back gesture began: it drives the same drag as a pull down, a little way
+     * ([backProgressed]). Returns false when nothing previews (a zoomed image, already leaving);
+     * the commit still closes.
+     */
+    fun backBegan(): Boolean {
+        if (isLeaving) return false
+        if (isMedia && state.isZoomed) return false
+        dragBegan(bounds.center)
+        backPreviewing = true
+        return true
+    }
+
+    /** [progress] 0..1 from the platform; [fromRightEdge] shifts the media toward the left. */
+    fun backProgressed(progress: Float, fromRightEdge: Boolean) {
+        if (!backPreviewing) return
+        val side = if (fromRightEdge) -1f else 1f
+        dragChanged(
+            Offset(
+                x = side * progress * bounds.width * MediaBackPreview.SIDEWAYS,
+                y = progress * drag.range * MediaBackPreview.DOWN,
+            ),
+        )
+    }
+
+    /** The gesture (or a button) committed: the media goes away from wherever it is. */
+    fun backCommitted() {
+        if (backPreviewing && style == Style.Photos && state.image != null) trace.end("drag")
+        backPreviewing = false
+        close()
+    }
+
+    /** The gesture was abandoned: the media springs back to rest. */
+    fun backCancelled() {
+        if (!backPreviewing) return
+        backPreviewing = false
+        when (style) {
+            Style.Photos -> {
+                if (state.image != null) {
+                    trace.end("drag")
+                    springBack(Velocity.Zero)
+                } else {
+                    contentSpringBack()
+                }
+            }
+            Style.Fade -> fadeEnded(distance = 0f, velocity = 0f)
+            Style.Zoom -> zoomSpringBack(Velocity.Zero)
+        }
+    }
+
+    // endregion
 
     private fun toDp(px: Float): Float = px / density.density
 
@@ -1310,7 +1379,14 @@ internal fun MediaViewerHost(
         controller.open()
     }
     DisposableEffect(controller) { onDispose { controller.disposed() } }
-    MediaBackHandler(enabled = !controller.isLeaving) { state.dismiss() }
+    // Back previews the dismissal as a short pull down; the commit puts the media away.
+    MediaPredictiveBackHandler(
+        enabled = !controller.isLeaving,
+        onStarted = { controller.backBegan() },
+        onProgressed = { progress, fromRightEdge -> controller.backProgressed(progress, fromRightEdge) },
+        onCancelled = { controller.backCancelled() },
+        onInvoked = { controller.backCommitted() },
+    )
     StatusBarEffect(controller)
 
     val dark = MediaPresenter.isDarkRoom(isMedia)
@@ -1548,6 +1624,48 @@ internal fun MediaBackHandler(enabled: Boolean, onBack: () -> Unit) {
     DisposableEffect(activity, enabled) {
         if (!enabled) return@DisposableEffect onDispose { }
         val callback = OnBackInvokedCallback { currentOnBack() }
+        activity.onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_OVERLAY, callback)
+        onDispose { activity.onBackInvokedDispatcher.unregisterOnBackInvokedCallback(callback) }
+    }
+}
+
+/**
+ * [MediaBackHandler] that also hears the back gesture's progress (Android only), so the viewer
+ * previews its dismissal while the swipe is held. A button or TalkBack back calls only
+ * [onInvoked].
+ */
+@Composable
+internal fun MediaPredictiveBackHandler(
+    enabled: Boolean,
+    onStarted: () -> Unit,
+    onProgressed: (progress: Float, fromRightEdge: Boolean) -> Unit,
+    onCancelled: () -> Unit,
+    onInvoked: () -> Unit,
+) {
+    val activity = LocalContext.current.findActivity() ?: return
+    val currentOnStarted by rememberUpdatedState(onStarted)
+    val currentOnProgressed by rememberUpdatedState(onProgressed)
+    val currentOnCancelled by rememberUpdatedState(onCancelled)
+    val currentOnInvoked by rememberUpdatedState(onInvoked)
+    DisposableEffect(activity, enabled) {
+        if (!enabled) return@DisposableEffect onDispose { }
+        val callback = object : OnBackAnimationCallback {
+            override fun onBackStarted(backEvent: BackEvent) {
+                currentOnStarted()
+            }
+
+            override fun onBackProgressed(backEvent: BackEvent) {
+                currentOnProgressed(backEvent.progress, backEvent.swipeEdge == BackEvent.EDGE_RIGHT)
+            }
+
+            override fun onBackCancelled() {
+                currentOnCancelled()
+            }
+
+            override fun onBackInvoked() {
+                currentOnInvoked()
+            }
+        }
         activity.onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_OVERLAY, callback)
         onDispose { activity.onBackInvokedDispatcher.unregisterOnBackInvokedCallback(callback) }
     }

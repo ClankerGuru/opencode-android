@@ -76,6 +76,12 @@ object DrawerMotionTunables {
     const val SHORTCUT_SCALE = 0.96f
     /** Shortcut exit delay after a page close (iOS `drawer.shortcuts.closeDelay`, 0.12 s). */
     const val SHORTCUT_CLOSE_DELAY = 0.12
+    /**
+     * Android only: how much of the drawer's width the card travels back toward shut while a
+     * predictive back gesture is held (at full progress). The commit then closes it the rest
+     * of the way; a cancel springs it open again.
+     */
+    const val BACK_PREVIEW_TRAVEL = 0.25f
 }
 
 /** Inputs driving the drawer's Catch Up and What’s New shortcut presence (iOS `DrawerShortcutInputs`). */
@@ -625,6 +631,16 @@ class DrawerMotionState(
         if (consumeIgnoredEnd()) return
         isDragging = false
         settle(if (isPresented) width else 0f, animated = true)
+    }
+
+    /**
+     * A predictive back gesture committed: the card closes from wherever the gesture left it,
+     * however far that was (Android only; a finger pan decides with [endDrag]).
+     */
+    fun endBackDrag() {
+        if (consumeIgnoredEnd()) return
+        isDragging = false
+        close()
     }
 
     /**
