@@ -2,7 +2,6 @@ package ai.opencode.feature.settings.connection
 
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.ui.OpenCodeIcon
-import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.feature.settings.ConnectionStatus
@@ -11,6 +10,7 @@ import ai.opencode.feature.settings.SettingsDivider
 import ai.opencode.feature.settings.SettingsFeature.SettingsDelegate
 import ai.opencode.feature.settings.SettingsRowFrame
 import ai.opencode.feature.settings.SettingsSection
+import ai.opencode.feature.settings.SettingsText
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.ServerSharedKeys
 import ai.opencode.server.friendlyName
@@ -200,14 +200,14 @@ private fun SettingsServerRow(
             Column(Modifier.weight(1f)) {
                 Text(
                     name,
-                    style = OpenCodeTextStyles.body,
+                    style = SettingsText.title,
                     color = OpenCodeTheme.colors.text,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     server.host,
-                    style = OpenCodeTextStyles.footnote,
+                    style = SettingsText.summary,
                     color = OpenCodeTheme.colors.secondaryText,
                     maxLines = 1,
                     overflow = TextOverflow.MiddleEllipsis,
@@ -267,7 +267,7 @@ private fun AddServerRow(send: (SettingsDelegate) -> Unit) {
     var menuShown by remember { mutableStateOf(false) }
     Box {
         SettingsRowFrame(onClick = { menuShown = true }) {
-            Text("Add Server", style = OpenCodeTextStyles.body, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+            Text("Add Server", style = SettingsText.title, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
         }
         DropdownMenu(expanded = menuShown, onDismissRequest = { menuShown = false }) {
             DropdownMenuItem(

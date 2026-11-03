@@ -23,10 +23,12 @@ import ai.opencode.feature.settings.SettingsPageScaffold
 import ai.opencode.feature.settings.SettingsRowFrame
 import ai.opencode.feature.settings.SettingsSection
 import ai.opencode.feature.settings.SettingsStore
+import ai.opencode.feature.settings.SettingsText
 import ai.opencode.feature.settings.SettingsValueRow
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.friendlyName
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -40,7 +42,6 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -72,11 +73,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -587,11 +588,11 @@ fun ServerPage(store: SettingsStore) {
                     contentDescription = "Address"
                     stateDescription = monitor.server.host
                 }) {
-                    Text("Address", style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text)
+                    Text("Address", style = SettingsText.title, color = OpenCodeTheme.colors.text)
                     SelectionContainer(Modifier.weight(1f)) {
                         Text(
                             monitor.server.host,
-                            style = OpenCodeTextStyles.body.copy(fontFamily = FontFamily.Monospace),
+                            style = SettingsText.title.copy(fontFamily = FontFamily.Monospace),
                             color = OpenCodeTheme.colors.secondaryText,
                             maxLines = 1,
                             overflow = TextOverflow.MiddleEllipsis,
@@ -681,10 +682,10 @@ private fun StatusRow(presentation: ConnectionStatusPresentation) {
         contentDescription = "Status"
         stateDescription = presentation.spokenStatus
     }) {
-        Text("Status", style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
+        Text("Status", style = SettingsText.title, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
             OpenCodeIcon(presentation.symbol, contentDescription = null, size = 18.dp, tint = color)
-            val body = OpenCodeTextStyles.body.copy(fontFeatureSettings = "tnum")
+            val body = SettingsText.title.copy(fontFeatureSettings = "tnum")
             val milliseconds = presentation.milliseconds
             if (milliseconds != null) {
                 RollingNumber(

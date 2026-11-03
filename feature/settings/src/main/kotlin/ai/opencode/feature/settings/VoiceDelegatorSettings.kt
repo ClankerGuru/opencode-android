@@ -199,7 +199,7 @@ internal fun VoiceDelegatorSettingsPage(store: SettingsStore) {
                         SettingsRowFrame {
                             Text(
                                 if (searchQuery.isEmpty()) "No Sessions on This Server" else "No Matching Sessions",
-                                style = OpenCodeTextStyles.body,
+                                style = SettingsText.title,
                                 color = OpenCodeTheme.colors.secondaryText,
                             )
                         }
@@ -249,11 +249,11 @@ private fun ModeRow(
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
                 title,
-                style = OpenCodeTextStyles.body,
+                style = SettingsText.title,
                 color = if (isEnabled) OpenCodeTheme.colors.text else OpenCodeTheme.colors.secondaryText,
             )
             if (subtitle != null) {
-                Text(subtitle, style = OpenCodeTextStyles.footnote, color = OpenCodeTheme.colors.secondaryText)
+                Text(subtitle, style = SettingsText.summary, color = OpenCodeTheme.colors.secondaryText)
             }
         }
         Spacer(Modifier.width(4.dp))

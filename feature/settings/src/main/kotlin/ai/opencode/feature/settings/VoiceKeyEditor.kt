@@ -58,7 +58,7 @@ internal fun VoiceKeyEditor(state: VoiceSettingsFeature.State, voice: VoiceStore
                 singleLine = true,
                 visualTransformation = if (state.revealsKey) VisualTransformation.None else PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false),
-                textStyle = if (state.revealsKey) OpenCodeTextStyles.subheadline.copy(fontFamily = FontFamily.Monospace) else OpenCodeTextStyles.body,
+                textStyle = if (state.revealsKey) OpenCodeTextStyles.subheadline.copy(fontFamily = FontFamily.Monospace) else SettingsText.title,
                 trailingIcon = {
                     Box(
                         Modifier

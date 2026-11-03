@@ -231,9 +231,8 @@ fun ModelVisibilitySettingsView(store: SettingsStore) {
                             store.send(SettingsFeature.Action.PagePushed(SettingsPage.ModelProvider(provider.id)))
                         }) {
                             ProviderIcon(provider.id, Modifier.size(20.dp), provider.canonicalID, tint = OpenCodeTheme.colors.secondaryText)
-                            Text(provider.title, style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
-                            Text(state.summary(provider, visibility), style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.secondaryText)
-                            SettingsChevron()
+                            Text(provider.title, style = SettingsText.title, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
+                            Text(state.summary(provider, visibility), style = SettingsText.title, color = OpenCodeTheme.colors.secondaryText)
                         }
                     }
                 }

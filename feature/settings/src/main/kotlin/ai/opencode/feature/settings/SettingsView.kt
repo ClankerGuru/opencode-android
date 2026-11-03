@@ -1,8 +1,10 @@
 package ai.opencode.feature.settings
 
-import ai.opencode.feature.system.notifications.NotificationPermission
-import ai.opencode.core.experiments.key
 import ai.opencode.core.experiments.ExperimentalFeature
+import ai.opencode.core.experiments.key
+import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.PageTransitions
+import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.PresentationAction
@@ -21,9 +23,7 @@ import ai.opencode.feature.settings.serverdetails.ServerDetailsPage
 import ai.opencode.feature.settings.whatsnew.WhatsNewDetailPage
 import ai.opencode.feature.settings.whatsnew.WhatsNewListPage
 import ai.opencode.feature.settings.whatsnew.WhatsNewSmallerListPage
-import ai.opencode.core.motion.Motion
-import ai.opencode.core.motion.PageTransitions
-import ai.opencode.core.motion.rememberReduceMotion
+import ai.opencode.feature.system.notifications.NotificationPermission
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -39,11 +39,14 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LargeFlexibleTopAppBar
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -57,6 +60,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -168,10 +172,16 @@ private fun OnboardingPlaygroundPresentation(store: SettingsStore) {
 }
 
 /**
- * One Settings page's chrome (iOS `List` + inline `navigationTitle` + Back): a centred title, a
- * Back control (“Back” closes Settings at the root, pops otherwise) and an inset-grouped list.
+ * One Settings page's chrome (iOS `List` + inline `navigationTitle` + Back): a Back control
+ * (“Back” closes Settings at the root, pops otherwise) and a list of grouped rows.
+ *
+ * Android divergence: the bar is Material 3 Expressive's large flexible top app bar, whose
+ * start-aligned title collapses into the bar as the list scrolls, and the page sets text in
+ * Material's own type scale ([SettingsText.typography]) rather than iOS's 17 pt body. A page
+ * that draws its own title ([titleVisible] false, as What's New's entry page does) keeps the
+ * small bar, its title fading in over 0.15 s once the page's title scrolls under it.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SettingsPageScaffold(
     title: String,
@@ -179,48 +189,70 @@ fun SettingsPageScaffold(
     modifier: Modifier = Modifier,
     /** False hides the bar's title (fading over 0.15 s, ease-out), as What's New's entry page does until its own title scrolls under the bar. */
     titleVisible: Boolean = true,
+    /** Whether the page draws its own title, so the bar stays small (What's New's entry page). */
+    drawsOwnTitle: Boolean = false,
     listState: LazyListState = rememberLazyListState(),
     actions: @Composable RowScope.() -> Unit = {},
     bottomBar: @Composable () -> Unit = {},
     content: LazyListScope.() -> Unit,
 ) {
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
-    Scaffold(
-        modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        containerColor = OpenCodeTheme.colors.groupedCanvas,
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                    val alpha by animateFloatAsState(if (titleVisible) 1f else 0f, tween(150, easing = Motion.EaseOut), label = "settings-title")
-                    Text(
-                        title,
-                        style = OpenCodeTextStyles.headline,
-                        modifier = Modifier
-                            .graphicsLayer { this.alpha = alpha }
-                            .then(if (titleVisible) Modifier else Modifier.clearAndSetSemantics {}),
+    val canvas = OpenCodeTheme.colors.groupedCanvas
+    val barColors = TopAppBarDefaults.topAppBarColors(containerColor = canvas, scrolledContainerColor = canvas)
+    val scrollBehavior = if (drawsOwnTitle) {
+        TopAppBarDefaults.pinnedScrollBehavior()
+    } else {
+        TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    }
+    val back: @Composable () -> Unit = {
+        IconButton(onClick = { store.send(SettingsFeature.Action.BackTapped) }) {
+            OpenCodeIcon(SFSymbol.ChevronBackward, contentDescription = "Back")
+        }
+    }
+    MaterialTheme(
+        colorScheme = MaterialTheme.colorScheme,
+        motionScheme = MaterialTheme.motionScheme,
+        shapes = MaterialTheme.shapes,
+        typography = SettingsText.typography,
+    ) {
+        Scaffold(
+            modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+            containerColor = canvas,
+            topBar = {
+                if (drawsOwnTitle) {
+                    TopAppBar(
+                        title = {
+                            val alpha by animateFloatAsState(if (titleVisible) 1f else 0f, tween(150, easing = Motion.EaseOut), label = "settings-title")
+                            Text(
+                                title,
+                                modifier = Modifier
+                                    .graphicsLayer { this.alpha = alpha }
+                                    .then(if (titleVisible) Modifier else Modifier.clearAndSetSemantics {}),
+                            )
+                        },
+                        navigationIcon = back,
+                        actions = actions,
+                        scrollBehavior = scrollBehavior,
+                        colors = barColors,
                     )
-                },
-                navigationIcon = {
-                    IconButton(onClick = { store.send(SettingsFeature.Action.BackTapped) }) {
-                        OpenCodeIcon(SFSymbol.ChevronBackward, contentDescription = "Back")
-                    }
-                },
-                actions = actions,
-                scrollBehavior = scrollBehavior,
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = OpenCodeTheme.colors.groupedCanvas,
-                    scrolledContainerColor = OpenCodeTheme.colors.groupedCanvas,
-                ),
+                } else {
+                    LargeFlexibleTopAppBar(
+                        title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        navigationIcon = back,
+                        actions = actions,
+                        scrollBehavior = scrollBehavior,
+                        colors = barColors,
+                    )
+                }
+            },
+            bottomBar = bottomBar,
+        ) { padding ->
+            LazyColumn(
+                state = listState,
+                contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 24.dp),
+                modifier = Modifier.fillMaxSize(),
+                content = content,
             )
-        },
-        bottomBar = bottomBar,
-    ) { padding ->
-        LazyColumn(
-            state = listState,
-            contentPadding = PaddingValues(top = padding.calculateTopPadding() + 4.dp, bottom = padding.calculateBottomPadding() + 24.dp),
-            modifier = Modifier.fillMaxSize(),
-            content = content,
-        )
+        }
     }
 }
 

@@ -1,12 +1,11 @@
 package ai.opencode.feature.settings
 
-import ai.opencode.feature.system.notifications.NotificationPermission
 import ai.opencode.core.experiments.InAppNoticeMode
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.observe
-import ai.opencode.server.model.OpenCodeNotifyPluginStatus
-import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.feature.system.notifications.NotificationPermission
+import ai.opencode.server.model.OpenCodeNotifyPluginStatus
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
@@ -61,8 +60,8 @@ fun NotificationSettingsView(store: SettingsStore) {
             ),
         ) {
             SettingsRowFrame(Modifier.semantics(mergeDescendants = true) {}) {
-                Text("Allow Notifications", style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
-                Text(if (enabled) "On" else "Off", style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.secondaryText)
+                Text("Allow Notifications", style = SettingsText.title, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
+                Text(if (enabled) "On" else "Off", style = SettingsText.title, color = OpenCodeTheme.colors.secondaryText)
             }
             if (!enabled) {
                 SettingsDivider()
@@ -77,7 +76,7 @@ fun NotificationSettingsView(store: SettingsStore) {
             setupError?.let { error ->
                 SettingsDivider()
                 SettingsRowFrame {
-                    Text(error, style = OpenCodeTextStyles.footnote, color = OpenCodeTheme.colors.destructive)
+                    Text(error, style = SettingsText.summary, color = OpenCodeTheme.colors.destructive)
                 }
             }
         }
@@ -96,7 +95,7 @@ fun NotificationSettingsView(store: SettingsStore) {
             ),
         ) {
             SettingsRowFrame(Modifier.semantics(mergeDescendants = true) {}) {
-                Text("Notify Plugin", style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
+                Text("Notify Plugin", style = SettingsText.title, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
                 when (val check = notifyPlugin) {
                     NotifyPluginCheck.Checking, null -> CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                     is NotifyPluginCheck.Checked -> Text(
@@ -105,11 +104,11 @@ fun NotificationSettingsView(store: SettingsStore) {
                             OpenCodeNotifyPluginStatus.Inactive -> "Not running"
                             OpenCodeNotifyPluginStatus.Missing -> "Not installed"
                         },
-                        style = OpenCodeTextStyles.body,
+                        style = SettingsText.title,
                         color = OpenCodeTheme.colors.secondaryText,
                     )
                     NotifyPluginCheck.Failed ->
-                        Text("Couldn’t check status", style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.secondaryText)
+                        Text("Couldn’t check status", style = SettingsText.title, color = OpenCodeTheme.colors.secondaryText)
                 }
             }
             if (canSetUp) {

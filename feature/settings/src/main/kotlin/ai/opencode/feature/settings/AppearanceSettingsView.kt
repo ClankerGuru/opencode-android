@@ -133,20 +133,19 @@ fun AppearanceSettingsView(store: SettingsStore) {
                 if (isAccessibilitySize()) {
                     // iOS stacks the label over the swatch and value at the accessibility sizes.
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("Theme", style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text)
+                        Text("Theme", style = SettingsText.title, color = OpenCodeTheme.colors.text)
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             swatch()
-                            Text(appTheme.title, style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.secondaryText)
+                            Text(appTheme.title, style = SettingsText.title, color = OpenCodeTheme.colors.secondaryText)
                         }
                     }
                 } else {
-                    Text("Theme", style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
+                    Text("Theme", style = SettingsText.title, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         swatch()
-                        Text(appTheme.title, style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.secondaryText, maxLines = 1)
+                        Text(appTheme.title, style = SettingsText.title, color = OpenCodeTheme.colors.secondaryText, maxLines = 1)
                     }
                 }
-                SettingsChevron()
             }
         }
     }
@@ -372,7 +371,7 @@ private fun ThemeOptionRow(
         ThemeSwatchTile(definition, isDark, ThemeSwatchTile.Size.Regular, cardBackground = OpenCodeTheme.colors.groupedCard)
         Text(
             theme.title,
-            style = OpenCodeTextStyles.body.copy(fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal),
+            style = SettingsText.title.copy(fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal),
             color = OpenCodeTheme.colors.text,
             maxLines = if (isAccessibilitySize()) Int.MAX_VALUE else 1,
             modifier = Modifier.weight(1f),
@@ -496,7 +495,7 @@ private fun ImitationTranscriptPreview(theme: AppTheme, isDark: Boolean) {
             ) {
                 Text(
                     "Help me improve the session screen. Show me what you find and explain the changes.",
-                    style = OpenCodeTextStyles.body,
+                    style = SettingsText.title,
                     color = v.text.color,
                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                 )
@@ -511,7 +510,7 @@ private fun ImitationTranscriptPreview(theme: AppTheme, isDark: Boolean) {
                 }
                 append(". The transcript and composer share the available height, so the keyboard is a useful stress test.")
             },
-            style = OpenCodeTextStyles.body,
+            style = SettingsText.title,
             color = v.bodyText.color,
         )
         Spacer(Modifier.height(10.dp))
@@ -545,7 +544,7 @@ private fun ImitationTranscriptPreview(theme: AppTheme, isDark: Boolean) {
                     }
                     append("\n}")
                 },
-                style = OpenCodeTextStyles.footnote.copy(fontFamily = mono),
+                style = SettingsText.summary.copy(fontFamily = mono),
                 color = v.text.color,
                 softWrap = false,
             )

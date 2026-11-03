@@ -1,5 +1,9 @@
 package ai.opencode.feature.settings.serverdetails
 
+import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.PageTransitions
+import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeIconButton
 import ai.opencode.core.ui.OpenCodeIconButtonStyle
@@ -8,13 +12,17 @@ import ai.opencode.core.ui.OpenCodeSecondaryButton
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
-import ai.opencode.feature.settings.SettingsChevron
 import ai.opencode.feature.settings.SettingsDivider
+import ai.opencode.feature.settings.SettingsText
 import ai.opencode.feature.settings.SettingsTint
 import ai.opencode.server.model.OpenCodeAccount
 import ai.opencode.server.model.OpenCodeAutocompleteSkill
 import ai.opencode.server.model.OpenCodeMCPServer
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.VisibilityThreshold
+import androidx.compose.animation.core.snap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -52,26 +60,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import ai.opencode.core.motion.Motion
-import ai.opencode.core.motion.PageTransitions
-import ai.opencode.core.motion.MotionSpring
-import ai.opencode.core.motion.rememberReduceMotion
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.animation.core.snap
-import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.core.VisibilityThreshold
 import kotlinx.coroutines.launch
 
 /**
@@ -235,7 +235,7 @@ private fun MCPServerRow(mcp: OpenCodeMCPServer, onOpen: () -> Unit, action: () 
     ) {
         StatusRingTile(brand, mcp.status)
         Column(Modifier.weight(1f).semantics(mergeDescendants = true) {}, verticalArrangement = Arrangement.spacedBy(1.dp)) {
-            Text(brand.name, style = OpenCodeTextStyles.body.copy(fontWeight = FontWeight.SemiBold), color = OpenCodeTheme.colors.text)
+            Text(brand.name, style = SettingsText.title.copy(fontWeight = FontWeight.SemiBold), color = OpenCodeTheme.colors.text)
             Text(mcp.status.title, style = OpenCodeTextStyles.subheadline, color = mcp.status.tintColor())
         }
         if (mcp.status == OpenCodeMCPServer.Status.Pending) {
@@ -245,7 +245,6 @@ private fun MCPServerRow(mcp: OpenCodeMCPServer, onOpen: () -> Unit, action: () 
         } else {
             CapsuleAction(actionTitle(mcp.status), actionKind(mcp.status), action)
         }
-        SettingsChevron()
     }
 }
 
@@ -319,7 +318,7 @@ private fun MCPServerTray(
                 is OpenCodeMCPServer.Status.NeedsAuth -> Text(
                     // iOS says “in Safari”; Android opens the default browser.
                     "Its tools work once you sign in. Sign In opens ${brand.name} in your browser.",
-                    style = OpenCodeTextStyles.body,
+                    style = SettingsText.title,
                     color = OpenCodeTheme.colors.secondaryText,
                 )
                 else -> Unit
@@ -390,7 +389,7 @@ private fun AccountRow(account: OpenCodeAccount) {
     ) {
         BrandTile(ServerBrand.account(account), size = 36.dp, round = true)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-            Text(account.provider, style = OpenCodeTextStyles.body.copy(fontWeight = FontWeight.SemiBold), color = OpenCodeTheme.colors.text)
+            Text(account.provider, style = SettingsText.title.copy(fontWeight = FontWeight.SemiBold), color = OpenCodeTheme.colors.text)
             account.subtitle?.let {
                 Text(it, style = OpenCodeTextStyles.subheadline, color = OpenCodeTheme.colors.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
@@ -460,7 +459,7 @@ private fun SkillsTray(skills: List<OpenCodeAutocompleteSkill>, close: () -> Uni
                     ) {
                         Text(
                             skill.name,
-                            style = OpenCodeTextStyles.body.copy(fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Medium),
+                            style = SettingsText.title.copy(fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Medium),
                             color = OpenCodeTheme.colors.text,
                         )
                         val description = skill.description

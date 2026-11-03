@@ -1,18 +1,17 @@
 package ai.opencode.feature.settings.whatsnew
 
+import ai.opencode.core.experiments.ExperimentalFeature
+import ai.opencode.core.experiments.key
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.observe
-import ai.opencode.core.experiments.ExperimentalFeature
-import ai.opencode.core.experiments.key
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodePrimaryButton
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.sfSymbol
-import ai.opencode.feature.settings.SettingsChevron
 import ai.opencode.feature.settings.SettingsDivider
 import ai.opencode.feature.settings.SettingsFeature
 import ai.opencode.feature.settings.SettingsPage
@@ -20,6 +19,7 @@ import ai.opencode.feature.settings.SettingsPageScaffold
 import ai.opencode.feature.settings.SettingsRow
 import ai.opencode.feature.settings.SettingsRowFrame
 import ai.opencode.feature.settings.SettingsStore
+import ai.opencode.feature.settings.SettingsText
 import ai.opencode.feature.settings.SettingsTint
 import ai.opencode.feature.settings.isAccessibilitySize
 import ai.opencode.feature.settings.settingsSection
@@ -74,8 +74,8 @@ import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.onClick
@@ -90,8 +90,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.currentStateAsState
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.text.NumberFormat
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -100,6 +98,8 @@ import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Port of iOS `Settings/WhatsNew/WhatsNewView.swift`.
@@ -234,7 +234,7 @@ private fun WhatsNewFeatureRow(entry: WhatsNewEntry, isNew: Boolean, onClick: ()
     ) {
         WhatsNewTile(entry)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(entry.title, style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text)
+            Text(entry.title, style = SettingsText.title, color = OpenCodeTheme.colors.text)
             Text(
                 entry.summary,
                 style = OpenCodeTextStyles.subheadline,
@@ -246,7 +246,6 @@ private fun WhatsNewFeatureRow(entry: WhatsNewEntry, isNew: Boolean, onClick: ()
         if (isNew) {
             Box(Modifier.size(8.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary))
         }
-        SettingsChevron()
     }
 }
 
@@ -295,6 +294,7 @@ fun WhatsNewDetailPage(store: SettingsStore, entryID: String) {
     SettingsPageScaffold(
         title = current?.title.orEmpty(),
         titleVisible = showsTitle,
+        drawsOwnTitle = true,
         store = store,
         listState = listState,
         bottomBar = { if (current != null) WhatsNewTryBar(store, current) },
@@ -325,7 +325,7 @@ fun WhatsNewDetailPage(store: SettingsStore, entryID: String) {
                     color = OpenCodeTheme.colors.text,
                     modifier = Modifier.semantics { heading() },
                 )
-                Text(current.summary, style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text)
+                Text(current.summary, style = SettingsText.title, color = OpenCodeTheme.colors.text)
             }
         }
         if (current.details.isNotEmpty()) {
@@ -469,10 +469,9 @@ private fun WhatsNewSmallerRow(entry: WhatsNewEntry, onClick: (() -> Unit)?) {
             OpenCodeIcon(entry.symbol, contentDescription = null, size = 22.dp, tint = OpenCodeTheme.colors.secondaryText)
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(entry.title, style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text)
-            Text(entry.summary, style = OpenCodeTextStyles.footnote, color = OpenCodeTheme.colors.secondaryText)
+            Text(entry.title, style = SettingsText.title, color = OpenCodeTheme.colors.text)
+            Text(entry.summary, style = SettingsText.summary, color = OpenCodeTheme.colors.secondaryText)
         }
-        if (onClick != null) SettingsChevron()
     }
 }
 

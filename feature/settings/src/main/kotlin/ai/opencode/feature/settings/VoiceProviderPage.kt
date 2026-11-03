@@ -73,12 +73,11 @@ internal fun VoiceProviderSettingsRow(state: VoiceSettingsFeature.State, onClick
         ) {
             VoiceProviderTile(active, size = VoiceProviderTunables.rowTile.value)
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text("Voice Provider", style = OpenCodeTextStyles.footnote, color = OpenCodeTheme.colors.secondaryText)
+                Text("Voice Provider", style = SettingsText.summary, color = OpenCodeTheme.colors.secondaryText)
                 Text(active.name, style = OpenCodeTextStyles.headline, color = OpenCodeTheme.colors.text)
                 VoiceProviderStatus(active.state)
             }
         }
-        SettingsChevron()
     }
 }
 
@@ -163,9 +162,8 @@ internal fun VoiceProviderDetailPage(store: SettingsStore, opensAccount: Boolean
                 if (rows++ > 0) SettingsDivider()
                 VoiceProviderListRow(catalog.account, showsStatus = catalog.account.isReady, onClick = openAccount) {
                     if (!catalog.account.isReady) {
-                        Text("Set Up", style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.secondaryText)
+                        Text("Set Up", style = SettingsText.title, color = OpenCodeTheme.colors.secondaryText)
                     }
-                    SettingsChevron()
                 }
             }
             if (catalog.unavailable.isNotEmpty()) {
@@ -174,7 +172,7 @@ internal fun VoiceProviderDetailPage(store: SettingsStore, opensAccount: Boolean
                     Text(
                         "${catalog.unavailable.size} Not Available",
                         modifier = Modifier.weight(1f).padding(start = VoiceProviderTunables.listTile.value.dp + 12.dp),
-                        style = OpenCodeTextStyles.body,
+                        style = SettingsText.title,
                         color = OpenCodeTheme.colors.secondaryText,
                     )
                     OpenCodeIcon(
@@ -290,7 +288,7 @@ private fun VoiceProviderListRow(
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
                     option.title,
-                    style = OpenCodeTextStyles.body,
+                    style = SettingsText.title,
                     color = if (isAvailable) OpenCodeTheme.colors.text else OpenCodeTheme.colors.secondaryText,
                 )
                 if (isAvailable) {

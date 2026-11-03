@@ -34,6 +34,7 @@ enum class SFSymbol(val sfName: String, @DrawableRes val drawable: Int) {
     ArrowLeftAndRightTextVertical("arrow.left.and.right.text.vertical", R.drawable.ms_arrow_range),
     ArrowLeftArrowRight("arrow.left.arrow.right", R.drawable.ms_swap_horiz),
     ArrowRight("arrow.right", R.drawable.ms_arrow_forward),
+    ArrowtriangleDownFill("arrowtriangle.down.fill", R.drawable.ms_arrow_drop_down),
     ArrowTriangle2Circlepath("arrow.triangle.2.circlepath", R.drawable.ms_sync),
     ArrowTriangleBranch("arrow.triangle.branch", R.drawable.ms_call_split),
     ArrowTriangleMerge("arrow.triangle.merge", R.drawable.ms_merge),

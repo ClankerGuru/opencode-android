@@ -119,6 +119,7 @@ and `ellipsis` (every overflow menu) is the vertical `more_vert`, as on other An
 | `chevron.right` | `chevron_right` | `ms_chevron_right` | `SFSymbol.ChevronRight` | BackgroundWorkPanel, BrowserView, FileAttachmentViews, ServerDetailsView, ServerTitleView, SessionSheetView, SessionView+ComposerControls, SessionView+Header, SettingsView, TranscriptEntryView, TuningPanelView |
 | `chevron.up` | `keyboard_arrow_up` | `ms_keyboard_arrow_up` | `SFSymbol.ChevronUp` | DictationViews, LinkPreviewViews, OnboardingPlaygroundView, TranscriptUserMessage |
 | `chevron.up.chevron.down` | `unfold_more` | `ms_unfold_more` | `SFSymbol.ChevronUpChevronDown` | AttachmentMenu, ModelPickerOverlays, ModelPickerSheet, SessionView+ModelPicker, SettingsRows, SettingsView, TuningPanelView |
+| `arrowtriangle.down.fill` | `arrow_drop_down` | `ms_arrow_drop_down` | `SFSymbol.ArrowtriangleDownFill` | SettingsRows (Android: Settings menu rows end in Material's dropdown arrow instead of iOS's up-and-down chevron) |
 | `circle` | `radio_button_unchecked` | `ms_radio_button_unchecked` | `SFSymbol.Circle` | ProjectIcon, RequestDockView |
 | `circle.dotted.circle` | `motion_photos_on` | `ms_motion_photos_on` | `SFSymbol.CircleDottedCircle` | WhatsNewList |
 | `circle.fill` | `circle` (fill) | `ms_circle_fill` | `SFSymbol.CircleFill` | DrawerListSessionCell, WhatsNewView |

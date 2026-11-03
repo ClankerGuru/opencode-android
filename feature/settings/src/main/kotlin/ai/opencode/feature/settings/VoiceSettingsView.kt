@@ -277,7 +277,7 @@ private fun KeyRow(state: VoiceSettingsFeature.State, reduceMotion: Boolean, onT
         },
         onClick = onTap,
     ) {
-        val title = @Composable { Text(state.keyRowTitle, style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text) }
+        val title = @Composable { Text(state.keyRowTitle, style = SettingsText.title, color = OpenCodeTheme.colors.text) }
         if (stacked) {
             // iOS at accessibility sizes: the status goes under the title.
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -298,19 +298,19 @@ private fun KeyStatusAccessory(state: VoiceSettingsFeature.State, rotation: Floa
         when (val status = state.keyStatus) {
             VoiceKeyStatus.Verified -> {
                 OpenCodeIcon(SFSymbol.CheckmarkCircleFill, contentDescription = null, size = 18.dp, tint = SettingsTint.Green.color())
-                Text("Verified", style = OpenCodeTextStyles.body, color = secondary)
+                Text("Verified", style = SettingsText.title, color = secondary)
             }
             VoiceKeyStatus.Checking -> {
                 CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                Text("Checking…", style = OpenCodeTextStyles.body, color = secondary)
+                Text("Checking…", style = SettingsText.title, color = secondary)
             }
-            VoiceKeyStatus.Saved -> Text("Saved", style = OpenCodeTextStyles.body, color = secondary)
+            VoiceKeyStatus.Saved -> Text("Saved", style = SettingsText.title, color = secondary)
             is VoiceKeyStatus.Invalid -> {
                 OpenCodeIcon(SFSymbol.ExclamationmarkCircleFill, contentDescription = null, size = 18.dp, tint = SettingsTint.Orange.color())
-                Text("Saved", style = OpenCodeTextStyles.body, color = secondary)
+                Text("Saved", style = SettingsText.title, color = secondary)
             }
-            VoiceKeyStatus.Missing -> Text("Missing", style = OpenCodeTextStyles.body, color = secondary)
-            is VoiceKeyStatus.OnServer -> Text(status.providerName, style = OpenCodeTextStyles.body, color = secondary)
+            VoiceKeyStatus.Missing -> Text("Missing", style = SettingsText.title, color = secondary)
+            is VoiceKeyStatus.OnServer -> Text(status.providerName, style = SettingsText.title, color = secondary)
         }
         OpenCodeIcon(
             SFSymbol.ChevronRight,
@@ -401,8 +401,8 @@ private fun VoiceRow(
             role = Role.RadioButton,
         ) {
             Column(Modifier.weight(1f)) {
-                Text(voice.title, style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text)
-                voice.accent?.let { Text(it, style = OpenCodeTextStyles.footnote, color = OpenCodeTheme.colors.secondaryText) }
+                Text(voice.title, style = SettingsText.title, color = OpenCodeTheme.colors.text)
+                voice.accent?.let { Text(it, style = SettingsText.summary, color = OpenCodeTheme.colors.secondaryText) }
             }
             OpenCodeIcon(
                 SFSymbol.Checkmark,
