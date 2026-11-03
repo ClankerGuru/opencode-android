@@ -621,7 +621,8 @@ class PhotoFlights {
 
         /** The thumbnails' size, corners and spacing in dp (`SessionView.attachmentThumbnail`). */
         const val SLOT_SIDE = 76f
-        const val SLOT_RADIUS = 22f
+        /** iOS `ComposerTunables.attachmentRadius`: the composer's 28 corner, 19 (`attachmentInset`) in. */
+        const val SLOT_RADIUS = 9f
         const val SLOT_SPACING = 8f
 
         /** iOS `AnimationTimeScale.shared.now()`: geometry time follows Developer Mode slow motion. */

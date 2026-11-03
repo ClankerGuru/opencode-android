@@ -41,6 +41,7 @@ import ai.opencode.feature.composer.LocationPermissionPrompt
 import ai.opencode.feature.composer.PastedTextViewer
 import ai.opencode.feature.composer.modelpicker.ModelPickerAnchors
 import ai.opencode.feature.composer.plusmenu.PhotoFlightCanvas
+import ai.opencode.feature.composer.plusmenu.PlusMenuGlassSurface
 import ai.opencode.feature.composer.plusmenu.RecentPhotoPeekOverlay
 import androidx.compose.runtime.rememberCoroutineScope
 import ai.opencode.feature.composer.RequestDockContext
@@ -213,7 +214,7 @@ fun SessionView(
         composerHost.importer = importer
         composerHost.modelPickerAnchors = modelPickerAnchors
         composerHost.headerHeight = headerHeight
-        if (composerHost.pendingAttachmentsRow == null) composerHost.pendingAttachmentsRow = { SessionPendingAttachments(store, composerHost.sendTransition.images) }
+        if (composerHost.pendingAttachmentsRow == null) composerHost.pendingAttachmentsRow = { expanded -> SessionPendingAttachments(store, composerHost.sendTransition.images, expanded) }
     }
     SessionPermissionPrompts(isCovered)
     SessionPhotoSheetEnvironment(photoSheet, store, composerHost, importer, headerHeight, usesPlusMenuSheet, rootOffset)
@@ -549,7 +550,6 @@ private fun SessionAttachmentMenu(
         }
     }
 
-    val sheetActive = sheet.morph.isOpening || sheet.morph.foldPending
     SideEffect {
         host.attachmentPress = press
         host.isAttachmentMenuOpen = phase != AttachmentMenuPhase.Closed
@@ -571,6 +571,18 @@ private fun SessionAttachmentMenu(
         keepingLocationRowWhileMenuCloses = keepingLocationRow,
         clipboardHasImages = clipboardHasImages,
     )
+    val chooseTapped = { item: AttachmentMenuItem ->
+        tapped += 1
+        choose(item)
+    }
+    // iOS `pasteAttachments`: the keyboard comes back as the menu closes.
+    val paste = {
+        if (phase == AttachmentMenuPhase.Menu) {
+            sheet.attachmentMenuRestoresFocus = true
+            importer.pasteClipboardImages()
+            sheet.closeAttachmentMenu()
+        }
+    }
     AttachmentMenuOverlay(
         phase = phase,
         onPhaseChange = { next -> if (next == AttachmentMenuPhase.Closed) sheet.closeAttachmentMenu() else sheet.attachmentMenu = next },
@@ -578,26 +590,31 @@ private fun SessionAttachmentMenu(
         press = press,
         items = items,
         includesVideos = supportsFileUploads,
-        onChoose = { item ->
-            tapped += 1
-            choose(item)
-        },
-        // iOS `pasteAttachments`: the keyboard comes back as the menu closes.
-        onPaste = {
-            if (phase == AttachmentMenuPhase.Menu) {
-                sheet.attachmentMenuRestoresFocus = true
-                importer.pasteClipboardImages()
-                sheet.closeAttachmentMenu()
-            }
-        },
+        onChoose = chooseTapped,
+        onPaste = paste,
         modifier = Modifier.fillMaxSize(),
-        // Android draws the menu in this overlay and the photo sheet in its own morph
-        // (`SessionPlusPhotoSheet`), which grows out of the menu's resting frame.
-        overComposer = false,
-        handedOff = usesPlusMenuSheet && sheetActive,
+        // iOS `overComposer: usesPlusMenuSheet`: the New Plus Menu's rows are measured and
+        // anchored here and drawn by `PlusMenuGlassSurface`, over the composer.
+        overComposer = usesPlusMenuSheet,
+        handedOff = false,
         identity = taskIdentity,
     )
-    if (usesPlusMenuSheet) SessionPlusPhotoSheet(sheet)
+    if (usesPlusMenuSheet) {
+        // iOS `PlusMenuGlassSurface(isOpen:handsOff:…)`: the photo sheet takes the menu's surface
+        // while it's shown and gives it back once it has folded away.
+        PlusMenuGlassSurface(
+            anchors = host.attachmentAnchors,
+            isOpen = phase == AttachmentMenuPhase.Menu && !sheet.morph.isShown,
+            handsOff = sheet.morph.isShown,
+            items = items,
+            highlighted = press.highlighted,
+            onChoose = chooseTapped,
+            onPaste = paste,
+            onDismiss = { sheet.closeAttachmentMenu() },
+            modifier = Modifier.fillMaxSize(),
+        )
+        SessionPlusPhotoSheet(sheet)
+    }
     if (showsPhotoPicker) {
         SessionPhotoSheet(
             store = store,
@@ -685,7 +702,7 @@ private fun SessionMediaHost(content: @Composable () -> Unit) = content()
 
 /** What the composer holds, above its field (iOS `pendingAttachmentsRow`). */
 @Composable
-private fun SessionPendingAttachments(store: StoreOf<State, Action>, sendImages: SentImageFlight) {
+private fun SessionPendingAttachments(store: StoreOf<State, Action>, sendImages: SentImageFlight, composerExpanded: Boolean) {
     val attachments by store.observe { it.pendingAttachments }
     val files by store.observe { it.pendingFiles }
     val canRetry by store.observe { it.supportsFileUploads }
@@ -725,6 +742,8 @@ private fun SessionPendingAttachments(store: StoreOf<State, Action>, sendImages:
         flights = LocalSessionPhotoSheet.current?.takeIf { it.usesPlusMenuSheet }?.flights,
         sendImages = sendImages,
         onOpenPhoto = { id -> presentComposerPhoto(store, id, presenter, host, reducedMotion, context) },
+        composerExpanded = composerExpanded,
+        server = store.state.server,
     )
 }
 

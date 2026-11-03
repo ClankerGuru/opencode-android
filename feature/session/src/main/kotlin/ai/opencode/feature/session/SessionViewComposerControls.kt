@@ -21,6 +21,7 @@ import ai.opencode.core.ui.excludedFromDrawerPan
 import ai.opencode.core.ui.openCodeTapTarget
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.core.experiments.ModelPickerStyle
+import ai.opencode.feature.composer.AttachmentMenuPhase
 import ai.opencode.feature.composer.AttachmentPickerButton
 import ai.opencode.feature.composer.ComposerAgentChip
 import ai.opencode.core.store.observe
@@ -212,6 +213,8 @@ private fun SessionComposerEnv.AttachmentButton() {
         peek = photoSheet?.recentPeek,
         onHoldPeek = { photoSheet?.showRecentPhotos() == true },
         onPeekChoose = { id -> photoSheet?.addLibraryPhotos(listOf(id)) },
+        // iOS `popsOnClose`: the New Plus Menu collapses back into + and the glyph pops.
+        popsOnClose = photoSheet != null && photoSheet.attachmentMenu == AttachmentMenuPhase.Menu && !photoSheet.morph.isShown,
         // Sliding from + to the rows must not open the drawer; loading, or as the recording's ×, it takes no slide.
         modifier = Modifier.excludedFromDrawerPan(!host.isImportingAttachments && hold == null),
     )
@@ -437,7 +440,16 @@ internal fun SessionComposerEnv.TrailingButton(control: ComposerTrailingControl)
         steers -> "Steer message"
         else -> control.accessibilityLabel
     }
+    // iOS `persistentSend`: New Plus Menu's Send stays put, dimmed while there's nothing to send.
+    val persistentSend = LocalSessionPhotoSheet.current?.usesPlusMenuSheet == true && control is ComposerTrailingControl.Send
     val label: @Composable () -> Unit = {
+        if (persistentSend) {
+            ComposerSendLabel(
+                enabled = control == ComposerTrailingControl.Send(enabled = true),
+                showsProgress = s.isWaitingForUploads,
+                visualOffsetX = visualOffset,
+            )
+        } else {
         ComposerControlLabel(
             systemImage = if (control == ComposerTrailingControl.Call && (floatsCall || usesCallTray)) "phone.fill" else control.symbolName,
             showsProgress = s.isWaitingForUploads || (control == ComposerTrailingControl.Stop && s.isInterrupting),
@@ -452,6 +464,7 @@ internal fun SessionComposerEnv.TrailingButton(control: ComposerTrailingControl)
             // The mic's stand and base weigh its mass low: lifted, its optical centre sits on the end-cap's centre (OC-477).
             glyphRise = if (control == ComposerTrailingControl.Mic) ComposerTunables.micInkRise else 0f,
         )
+        }
     }
     val semantics = Modifier.semantics(mergeDescendants = true) {
         contentDescription = accessibilityLabel

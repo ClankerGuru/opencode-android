@@ -14,6 +14,17 @@ import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.openCodeTapTarget
 import ai.opencode.feature.composer.ComposerTextInputTunables
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.snap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -119,6 +130,20 @@ object ComposerTunables {
     const val expandedTopInset = 16f
     const val expandedRowGap = 12f
     const val pillGap = 10f
+    /** New Plus Menu: the attachment tiles sit this far from the surface's top and leading edges (f0670c5d). */
+    const val attachmentInset = 19f
+    /** New Plus Menu's Send while the composer is empty (iOS `emptySendOpacity`). */
+    const val emptySendOpacity = 0.3f
+    /** New Plus Menu's Send crossfade between empty and ready, in seconds (iOS `sendFade`). */
+    const val sendFade = 0.15
+    /** New Plus Menu: the attachment row's height change as the location card arrives or leaves. */
+    val attachmentResize = MotionSpring(0.4, 0.0)
+
+    /** New Plus Menu's tile corners: concentric with the composer's, [attachmentInset] in. */
+    val attachmentRadius: Float get() = max(cornerRadius - attachmentInset, 6f)
+
+    /** iOS `attachmentRadius(plusMenu:)`: off, the row keeps main's 22. */
+    fun attachmentRadius(plusMenu: Boolean): Float = if (plusMenu) attachmentRadius else 22f
 
     const val plusOffset = 28f
     /** Nudges the + glyph's ink inside its target (OC-477). */
@@ -407,6 +432,10 @@ data class ComposerControls(
             canSend: Boolean,
             expanded: Boolean,
             canCall: Boolean = false,
+            /** New Plus Menu: an empty composer keeps a dimmed Send in its place instead of the mic. */
+            keepsSendVisible: Boolean = false,
+            /** New Plus Menu: a call owns the audio, so the tray has the call controls. */
+            isInCall: Boolean = false,
         ): ComposerControls {
             val dictation = if (isDictating || isFinishing) DictationControls(isFinishing) else null
             // Empty and idle: the call button holds Send's place and dictation sits beside it.
@@ -414,7 +443,11 @@ data class ComposerControls(
             val trailing: ComposerTrailingControl = when {
                 canSend -> ComposerTrailingControl.Send(enabled = true)
                 isRunning -> ComposerTrailingControl.Stop
+                // The tray owns call controls. Keep the composer's Send slot available for typing
+                // instead of choosing a Call button the tray then hides.
+                isInCall && dictation == null -> ComposerTrailingControl.Send(enabled = false)
                 canCall && dictation == null -> ComposerTrailingControl.Call
+                keepsSendVisible && dictation == null -> ComposerTrailingControl.Send(enabled = false)
                 else -> ComposerTrailingControl.Mic
             }
             val secondaryMic = when {
@@ -758,3 +791,60 @@ fun ComposerBanner(
 }
 
 // endregion
+
+/**
+ * iOS `HorizontalScrollEdgeFade`: fades a horizontal list's leading and trailing edges, each only
+ * while content runs past it, instead of clipping hard.
+ */
+@Composable
+fun Modifier.horizontalScrollEdgeFade(state: LazyListState, width: Dp = 20.dp, isEnabled: Boolean = true): Modifier {
+    if (!isEnabled) return this
+    val fade = tween<Float>(150, easing = FastOutSlowInEasing)
+    val leading by animateFloatAsState(if (state.canScrollBackward) 1f else 0f, fade, label = "edgeFadeLeading")
+    val trailing by animateFloatAsState(if (state.canScrollForward) 1f else 0f, fade, label = "edgeFadeTrailing")
+    return graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+        .drawWithContent {
+            drawContent()
+            val edge = width.toPx().coerceAtMost(size.width / 2)
+            if (leading > 0f) {
+                drawRect(
+                    Brush.horizontalGradient(0f to Color.Black.copy(alpha = 1f - leading), 1f to Color.Black, startX = 0f, endX = edge),
+                    size = Size(edge, size.height),
+                    blendMode = BlendMode.DstIn,
+                )
+            }
+            if (trailing > 0f) {
+                drawRect(
+                    Brush.horizontalGradient(0f to Color.Black, 1f to Color.Black.copy(alpha = 1f - trailing), startX = size.width - edge, endX = size.width),
+                    topLeft = Offset(size.width - edge, 0f),
+                    size = Size(edge, size.height),
+                    blendMode = BlendMode.DstIn,
+                )
+            }
+        }
+}
+
+/**
+ * iOS `ComposerSendLabel`: New Plus Menu's one fixed Send. The enabled disc and arrow are composited
+ * before dimming, so the arrow stays its colour as the empty button fades to [ComposerTunables.emptySendOpacity].
+ */
+@Composable
+fun ComposerSendLabel(enabled: Boolean, showsProgress: Boolean, visualOffsetX: Float, modifier: Modifier = Modifier) {
+    val reduceMotion = rememberReduceMotion()
+    val alpha by animateFloatAsState(
+        if (enabled) 1f else ComposerTunables.emptySendOpacity,
+        if (reduceMotion) snap() else tween((ComposerTunables.sendFade * 1000).toInt(), easing = FastOutSlowInEasing),
+        label = "sendLabelAlpha",
+    )
+    ComposerControlLabel(
+        systemImage = "arrow.up",
+        showsProgress = showsProgress,
+        foreground = OpenCodeTheme.colors.sendButtonForeground,
+        background = OpenCodeTheme.colors.sendButtonBackground,
+        visualOffsetX = visualOffsetX,
+        modifier = modifier.graphicsLayer {
+            this.alpha = alpha
+            compositingStrategy = CompositingStrategy.ModulateAlpha
+        },
+    )
+}

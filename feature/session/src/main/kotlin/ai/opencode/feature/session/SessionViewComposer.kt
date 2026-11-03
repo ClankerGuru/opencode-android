@@ -23,6 +23,7 @@ import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.feature.session.SessionFeature.Action
+import ai.opencode.feature.composer.AttachmentMenuAnchorHold
 import ai.opencode.feature.composer.AttachmentMenuAnchors
 import ai.opencode.feature.composer.AttachmentMenuItem
 import ai.opencode.feature.composer.AttachmentMenuPress
@@ -36,7 +37,10 @@ import ai.opencode.feature.composer.ComposerAutocompleteTextBridge
 import ai.opencode.feature.composer.ComposerFileSource
 import ai.opencode.feature.composer.ComposerImageSource
 import ai.opencode.feature.composer.ComposerKeyboardMorph
+import ai.opencode.feature.composer.LocalAttachmentMenuAnchorHold
 import ai.opencode.feature.composer.LocalComposerKeyboardMorph
+import ai.opencode.feature.composer.attachmentMenuAnchorHold
+import ai.opencode.feature.composer.handsGlassOver
 import ai.opencode.feature.composer.composerKeyboardSpacing
 import ai.opencode.feature.composer.sentImageDeparture
 import ai.opencode.feature.composer.ComposerSendTransition
@@ -60,6 +64,7 @@ import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.experiments.ExperimentalCallStyle
 import ai.opencode.core.experiments.ModelPickerStyle
 import ai.opencode.feature.composer.QueuedMessagesSheet
+import ai.opencode.feature.composer.plusmenu.PhotoFlightTunables
 import ai.opencode.server.model.OpenCodeProject
 import ai.opencode.server.model.OpenCodeQueuedInput
 import ai.opencode.feature.voice.CallTrayController
@@ -77,6 +82,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -102,6 +108,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
@@ -148,6 +155,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.math.max
 
 // Port of iOS `Session/SessionView+Composer.swift`: the composer area (pills, banners, the composer's
 // surface, the dictation bar) and its presentation rules. The controls live in
@@ -183,7 +191,7 @@ class SessionComposerHost {
     /** iOS `imageImporter.isLoading || fileImporter.isLoading`. */
     var isImportingAttachments by mutableStateOf(false)
     /** iOS `pendingAttachmentsRow` (VIEW-PICKERS): shown above the field when the composer has attachments. */
-    var pendingAttachmentsRow: (@Composable () -> Unit)? by mutableStateOf(null)
+    var pendingAttachmentsRow: (@Composable (composerExpanded: Boolean) -> Unit)? by mutableStateOf(null)
     /** Model Picker › Grow from Composer: the chip's level stack and label flight (iOS `modelPickerAnchors`). */
     var modelPickerAnchors: ai.opencode.feature.composer.modelpicker.ModelPickerAnchors? by mutableStateOf(null)
     /** Grow from Composer's panels (iOS `modelList`, `modelSheet`, `levelPanel`), set by `SessionModelPickerOverlays`. */
@@ -677,7 +685,9 @@ internal class SessionComposerEnv(
                 isRunning = s.isRunning,
                 canSend = canSend || (hasReservedPhotos && !s.hasFailedFiles),
                 expanded = expanded,
-                canCall = (showsVoiceControl || (usesCallTray && (callOwnsAudio || holdsCallTrayButton))) && !s.hasPromptContent,
+                canCall = (showsVoiceControl || (usesCallTray && (callOwnsAudio || holdsCallTrayButton))) && !s.hasPromptContent && !hasReservedPhotos,
+                keepsSendVisible = sheet != null,
+                isInCall = sheet != null && callOwnsAudio,
             )
             // With the Call Tray, the mic stays in its slot and animates out and back in with
             // `CallTrayController.composerMicLook`.
@@ -903,7 +913,25 @@ private fun SessionComposerEnv.ComposerAreaContent(modifier: Modifier) {
                 }
             }
             ServerConnection()
-            ComposerCapsule()
+            // iOS `.handsGlassOver(to: photoSheet, …, sinksUnderSheet: true, pulledDown:)` and its
+            // `attachmentMenuAnchorHold`: under the New Plus Menu's photo sheet the composer sinks
+            // and fades, rising back with the sheet's pull; the + menu's anchors hold while it folds.
+            val sheet = photoSheet
+            CompositionLocalProvider(
+                LocalAttachmentMenuAnchorHold provides (sheet?.morph?.attachmentMenuAnchorHold(reducedMotion) ?: AttachmentMenuAnchorHold.Follows),
+            ) {
+                Box(
+                    if (sheet == null) Modifier else Modifier.handsGlassOver(
+                        sheet.morph,
+                        reduceMotion = reducedMotion,
+                        returnsImmediately = true,
+                        sinksUnderSheet = true,
+                        pulledDown = { max(0f, sheet.top.value + sheet.morph.drag - sheet.detent.compactTop) },
+                    ),
+                ) {
+                    ComposerCapsule()
+                }
+            }
         }
         // Without pills, the jump button floats where their row would be, so showing it never
         // changes the transcript's insets.
@@ -1577,6 +1605,20 @@ private fun SessionComposerEnv.Composer() {
     val morphMoving by remember(morph) {
         derivedStateOf { morph != null && (morph.keyboard.isAnimating || morph.expansion > 0f && morph.expansion < 1f) }
     }
+    // iOS `opensNonLocationAttachments`: reserved photos held for their first frame
+    // (`PhotoFlights.holdsReservedRow`) mount the row collapsed and open it on the next frame, so
+    // its spring starts on a drawn frame rather than inside the stall the mount causes.
+    val flights = photoSheet?.flights
+    val holdsRow = flights?.holdsReservedRow == true && !s.hasNonLocationAttachments &&
+        !s.wantsLocationAttachment && !reducedMotion
+    val rowReveal = remember { Animatable(1f) }
+    val heldByFlights = flights?.holdsReservedRow == true
+    LaunchedEffect(flights, heldByFlights) { if (heldByFlights) flights?.revealHeldRow() }
+    LaunchedEffect(holdsRow) {
+        if (holdsRow) rowReveal.snapTo(0f)
+        else if (rowReveal.value < 1f) rowReveal.animateTo(1f, PhotoFlightTunables.row.spec())
+    }
+    val attachmentReveal = if (holdsRow) 0f else rowReveal.value
     Box(
         Modifier
             .fillMaxWidth()
@@ -1587,7 +1629,10 @@ private fun SessionComposerEnv.Composer() {
                     if (!recording) focus()
                 }
             }
-            .then(if (reducedMotion || morphMoving) Modifier else Modifier.animateContentSize(MotionSpring(0.25).spec()))
+            .then(
+                if (reducedMotion || morphMoving || holdsRow || rowReveal.isRunning) Modifier
+                else Modifier.animateContentSize(MotionSpring(0.25).spec()),
+            )
             // iOS `ComposerKeyboardSpacing(top: true, recording:)`: the top inset is taken back as
             // the row opens, unless folded for dictation.
             .composerKeyboardSpacing(
@@ -1607,7 +1652,7 @@ private fun SessionComposerEnv.Composer() {
                 }
             },
     ) {
-        ComposerFoldLayout(foldProgress = fold) {
+        ComposerFoldLayout(foldProgress = fold, attachmentRevealProgress = attachmentReveal) {
             val row = host.pendingAttachmentsRow
             // Reserved photo slots (the New Plus Menu's picks still decoding) count too.
             if (row != null && hasComposerAttachments) {
@@ -1618,7 +1663,7 @@ private fun SessionComposerEnv.Composer() {
                         .then(if (recording) Modifier.clearAndSetSemantics { }.blockTouches() else Modifier)
                         // iOS `SentImageDeparture`: the sent photos leave as their copies take off.
                         .sentImageDeparture(host.sendTransition.images),
-                ) { row() }
+                ) { row(composerExpanded) }
             }
             Box {
                 ComposerLayout(

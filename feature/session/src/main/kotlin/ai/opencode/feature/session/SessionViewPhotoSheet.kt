@@ -444,9 +444,16 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
             return
         }
         importer.imageImporter.cancel()
-        // Reserve the 76×76 slots now, so the composer grows with the folding sheet.
-        if (usesPlusMenuSheet) flights.reserve(picks.map { it.attachment }, batch)
         if (morph.isOpening) closePhotoSheet()
+        if (usesPlusMenuSheet) {
+            // Reserve the 76×76 slots now, so the composer grows with the folding sheet instead
+            // of jumping once the JPEGs are encoded. A row that isn't showing yet mounts collapsed
+            // and opens on the next frame (the composer's row effect calls `revealHeldRow()`).
+            val state = env.store?.state
+            val holdsRow = flies && state != null && state.pendingAttachments.isEmpty() &&
+                state.pendingFiles.isEmpty() && flights.reservedAttachments.isEmpty()
+            flights.reserve(picks.map { it.attachment }, batch, holdingRow = holdsRow)
+        }
         if (flies) flights.launch(picks, batch, restingComposer = rest)
         val library = library
         startImageImport(picks.map { pick -> ComposerImageSource.Loader(pick.attachment) { library.imageData(pick.photo) } }, batch)
