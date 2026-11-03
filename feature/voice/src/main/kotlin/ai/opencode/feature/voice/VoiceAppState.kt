@@ -1,5 +1,6 @@
 package ai.opencode.feature.voice
 
+import ai.opencode.core.capture.ScreenCaptureFeedback
 import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.dependencies.dependency
@@ -312,7 +313,18 @@ class VoiceScreenshotClient(val capture: suspend () -> Result) {
     companion object Key : DependencyKey<VoiceScreenshotClient> {
         override val liveValue by lazy {
             val registry = dependency(VoiceScreenActivityRegistry)
-            VoiceScreenshotClient { VoiceScreenshot.capture(registry) }
+            // iOS `ScreenCaptureFeedback.capture(in: VoiceScreenshot.scene())`: a taken picture
+            // flashes the activity it drew and plays the shutter; a refused one shows nothing.
+            VoiceScreenshotClient {
+                val scene = VoiceScreenshot.scene(registry)
+                var failed: Result? = null
+                ScreenCaptureFeedback.captureOptional(scene) {
+                    when (val result = VoiceScreenshot.capture(registry)) {
+                        is Result.Taken -> result
+                        is Result.Failed -> { failed = result; null }
+                    }
+                } ?: failed ?: Result.Failed(Failure.noWindow)
+            }
         }
         override val testValue = VoiceScreenshotClient { Result.Failed(Failure.noWindow) }
     }
@@ -348,16 +360,25 @@ object VoiceScreenshot {
     }
 
     suspend fun capture(registry: VoiceScreenActivityRegistry): VoiceScreenshotClient.Result {
+        val (activity, failure) = pickedScene(registry)
+        if (failure != null || activity == null) return VoiceScreenshotClient.Result.Failed(failure ?: VoiceScreenshotClient.Failure.noWindow)
+        return capture(activity)
+    }
+
+    /** The activity [capture] draws, for its flash (`ScreenCaptureFeedback`); null when it would refuse. */
+    suspend fun scene(registry: VoiceScreenActivityRegistry): Activity? = pickedScene(registry).first
+
+    private suspend fun pickedScene(registry: VoiceScreenActivityRegistry): Pair<Activity?, VoiceScreenshotClient.Failure?> {
         val activities = withContext(Dispatchers.Main) { registry.resumedActivities }
         // Drawing in the background touches the GPU (iOS gets killed for it); no resumed activity is the background.
-        if (activities.isEmpty()) return VoiceScreenshotClient.Result.Failed(VoiceScreenshotClient.Failure.background)
+        if (activities.isEmpty()) return null to VoiceScreenshotClient.Failure.background
         val (index, failure) = pickScene(
             activities.map { activity ->
                 SceneCandidate(isForegroundActive = !activity.isFinishing, hasCall = false, isTouched = activity === registry.lastTouched)
             },
         )
-        if (failure != null || index == null) return VoiceScreenshotClient.Result.Failed(failure ?: VoiceScreenshotClient.Failure.noWindow)
-        return capture(activities[index])
+        if (failure != null || index == null) return null to (failure ?: VoiceScreenshotClient.Failure.noWindow)
+        return activities[index] to null
     }
 
     /** One window's picture, refused while a credential shows (`ScreenshotPolicy.voice`). */

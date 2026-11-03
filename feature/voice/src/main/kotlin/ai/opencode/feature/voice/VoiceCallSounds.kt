@@ -206,6 +206,27 @@ class VoiceCallSounds(
         val raw = VoiceCallSoundBank.samples(cue)
         if (raw.isNotEmpty()) play(raw)
     }
+
+    /**
+     * The app captured its own screen. While a call owns the audio (tapped, connecting or live)
+     * the shutter never goes to the system: it plays as a tool cue on the call's engine once live
+     * (echo-cancelled, never over the agent's speech) and not before. Returns whether a call owns it.
+     */
+    fun shutter(): Boolean {
+        val now = clock.now()
+        var play: ((FloatArray) -> Unit)? = null
+        val owned = synchronized(lock) {
+            val owned = callID != null || recentTap(now) != null
+            if (callID != null && stage == DotScopeSimulation.Stage.live) play = toolHandler
+            owned
+        }
+        play?.let { handler ->
+            val raw = VoiceShutterSound.samples()
+            if (raw.isNotEmpty()) handler(raw)
+        }
+        return owned
+    }
+
     fun noteConnected(id: UUID) {
         val now = clock.now()
         synchronized(lock) {

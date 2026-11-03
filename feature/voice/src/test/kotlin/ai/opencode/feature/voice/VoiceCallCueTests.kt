@@ -4,6 +4,7 @@ import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.testing.TestIsolationRule
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -80,7 +81,8 @@ class VoiceCallCueTests {
     }
 
     @Test fun toolsPickTheirCueAsWispDoes() {
-        assertEquals(VoiceCallCue.toolLook, VoiceCallCue.tool("capture_app_screenshot"))
+        // The screenshot plays the shutter as it captures instead.
+        assertNull(VoiceCallCue.tool("capture_app_screenshot"))
         assertEquals(VoiceCallCue.toolLook, VoiceCallCue.tool("read_session"))
         assertEquals(VoiceCallCue.toolOpen, VoiceCallCue.tool("open_session"))
         assertEquals(VoiceCallCue.toolOpen, VoiceCallCue.tool("create_session"))
@@ -133,7 +135,7 @@ class VoiceCallCueTests {
 
         sounds.noteConnected(id)
         assertEquals("The loop lets go on connect", listOf(true, false), synchronized(loop) { loop.toList() })
-        sounds.toolCalled("capture_app_screenshot", null)
+        sounds.toolCalled("read_session", null)
         sounds.toolCalled("open_session", null)
         sounds.toolCalled("ios_voice_say", null)
         assertEquals(listOf(VoiceCallSoundBank.samples(VoiceCallCue.toolLook).size), synchronized(played) { played.toList() })
@@ -141,5 +143,44 @@ class VoiceCallCueTests {
         sounds.endCallClock(id, playEndCue = false)
         sounds.toolCalled("send_message", null)
         assertEquals("Not after the call", 1, synchronized(played) { played.size })
+    }
+
+    @Test fun shutterIsSoftShortAndClean() {
+        val samples = VoiceShutterSound.raw
+        assertTrue(samples.size / PCM.sampleRate < 0.2)
+        assertTrue("A tool cue's level", abs(peak(samples) - VoiceShutterSound.peak) < 0.001f)
+        assertTrue("Starts and ends at rest", abs(samples.first()) < 0.002f && abs(samples.last()) < 0.002f)
+        assertTrue(VoiceShutterSound.samples(VoiceCallSoundPack.silent).isEmpty())
+    }
+
+    /**
+     * A call owns the shutter from its tap: it never reaches the system's player, and it plays on
+     * the call's engine only once live.
+     */
+    @Test fun shutterPlaysOnTheCallOnlyWhileLive() = runTest {
+        val quiet = object : VoiceHapticPlaying {
+            override val isCallActive = true
+            override fun prepare() {}
+            override fun play(pattern: VoiceHapticPattern, at: Duration, kind: VoiceHapticEngine.Kind) = true
+            override fun cancel(kind: VoiceHapticEngine.Kind) {}
+            override fun endCall() {}
+            override suspend fun finish() {}
+        }
+        val sounds = VoiceCallSounds(clock = Clock.liveValue, haptics = quiet, scope = backgroundScope)
+        assertFalse("No call: the app’s UI sound plays it", sounds.shutter())
+
+        val played = mutableListOf<Int>()
+        val id = UUID.randomUUID()
+        sounds.startCallClock(id, playTool = { raw -> synchronized(played) { played.add(raw.size) } }) {}
+        assertTrue("Connecting: the call owns the audio", sounds.shutter())
+        assertTrue("Quiet until live", synchronized(played) { played.isEmpty() })
+
+        sounds.noteConnected(id)
+        assertTrue(sounds.shutter())
+        assertEquals(listOf(VoiceShutterSound.samples().size), synchronized(played) { played.toList() })
+
+        sounds.endCallClock(id, playEndCue = false)
+        assertFalse("After the call: the app’s UI sound plays it", sounds.shutter())
+        assertEquals(1, synchronized(played) { played.size })
     }
 }

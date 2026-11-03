@@ -88,7 +88,7 @@ recounted from Gradle at the sync merge.
 | `:server` | 36 | 230 | 3 | 256 (2 opt-in live checks skipped) |
 | `:devtools` | 4 | 14 | 10 | 17 |
 | `:feature:media` | 17 | 178 | 15 | 183 |
-| `:feature:voice` | 33 | 496 | 16 | 695 |
+| `:feature:voice` | 34 | 499 | 16 | 698 |
 | `:feature:system` | 9 | 88 | 2 | 103 |
 | `:feature:transcript` | 34 | 274 | 57 | 282 (1 env-gated metric skipped) |
 | `:feature:composer` | 41 | 267 | 40 | 270 |

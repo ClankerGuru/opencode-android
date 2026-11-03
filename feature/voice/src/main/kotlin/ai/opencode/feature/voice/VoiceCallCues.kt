@@ -12,8 +12,11 @@ import java.io.InputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.exp
 import kotlin.math.pow
+import kotlin.math.sin
 
 /**
  * The call's sounds, ported from Wisp (`wisp-audio` cues, wisp b55d486): each pack's cues are
@@ -34,7 +37,7 @@ enum class VoiceCallCue(val rawValue: String) {
     @SerialName("connect") connect("connect"),
     /** The call ended. */
     @SerialName("hang_up") hangUp("hang_up"),
-    /** The agent looked at something: a screenshot, a session, the web. */
+    /** The agent looked at something: a session, the web. */
     @SerialName("tool_look") toolLook("tool_look"),
     /** The agent opened something. */
     @SerialName("tool_open") toolOpen("tool_open"),
@@ -64,7 +67,8 @@ enum class VoiceCallCue(val rawValue: String) {
             return null
         }
 
-        private val lookTools = setOf("capture_app_screenshot", "read_session", "search_sessions", "websearch", "webfetch")
+        /** `capture_app_screenshot` plays the shutter as it captures ([VoiceShutterSound]), not Look. */
+        private val lookTools = setOf("read_session", "search_sessions", "websearch", "webfetch")
         private val openTools = setOf("open_session", "ios_voice_open_session", "create_session", "new_session_draft")
         private val steerTools = setOf(
             "send_message", "steer_queued", "interrupt_session", "wait_for_session", "pin_session", "unpin_session",
@@ -305,11 +309,73 @@ data class VoiceToolCueThrottle(var last: Double? = null) {
 /** Plays a tool cue on the live call when the agent calls a tool. */
 class VoiceCallCueClient(
     val toolCalled: (name: String, code: String?) -> Unit = { _, _ -> },
+    /**
+     * The app captured its own screen: whether a call owns the audio, in which case the shutter
+     * played (or stayed quiet) on the call's own engine.
+     */
+    val shutter: () -> Boolean = { false },
 ) {
     companion object Key : DependencyKey<VoiceCallCueClient> {
         override val liveValue: VoiceCallCueClient by lazy {
-            VoiceCallCueClient(toolCalled = { name, code -> VoiceCallSounds.shared.toolCalled(name, code) })
+            VoiceCallCueClient(
+                toolCalled = { name, code -> VoiceCallSounds.shared.toolCalled(name, code) },
+                shutter = { VoiceCallSounds.shared.shutter() },
+            )
         }
         override val testValue: VoiceCallCueClient get() = VoiceCallCueClient()
+    }
+}
+
+/**
+ * The call's screenshot shutter: two soft clicks, the blades opening and closing, at a tool cue's
+ * level. Synthesized rather than bundled (Wisp has no shutter); it plays on the call's engine so
+ * echo cancellation keeps it out of the microphone.
+ */
+object VoiceShutterSound {
+    const val peak: Float = 0.05f
+    const val length = 0.14
+
+    /** Each click's start (s) and relative strength. */
+    val clicks: List<Pair<Double, Float>> = listOf(0.004 to 1f, 0.068 to 0.7f)
+
+    val raw: FloatArray by lazy { render() }
+
+    /** The shutter at [CallSoundTunables.level]; none for Silent. */
+    fun samples(pack: VoiceCallSoundPack = VoiceCallSoundBank.pack): FloatArray {
+        if (pack == VoiceCallSoundPack.silent) return FloatArray(0)
+        val db = CallSoundTunables.level.value
+        if (db == 0.0) return raw
+        val gain = 10.0.pow(db / 20).toFloat()
+        return FloatArray(raw.size) { (raw[it] * gain).coerceIn(-1f, 1f) }
+    }
+
+    private fun render(): FloatArray {
+        val rate = PCM.sampleRate
+        val out = FloatArray((length * rate).toInt())
+        // iOS's `UInt32` linear congruential noise: Int arithmetic wraps the same way.
+        var seed = 0x5EED_1108
+        fun noise(): Float {
+            seed = seed * 1_664_525 + 1_013_904_223
+            return (seed ushr 8).toFloat() / (1 shl 23).toFloat() - 1
+        }
+        for ((at, gain) in clicks) {
+            val start = (at * rate).toInt()
+            var previousIn = 0f
+            var previousOut = 0f
+            for (n in 0 until minOf((0.03 * rate).toInt(), out.size - start)) {
+                val t = n / rate
+                // A 0.4 ms rise so it doesn't pop, then a 4 ms decay.
+                val envelope = ((1 - exp(-t / 0.0004)) * exp(-t / 0.004)).toFloat()
+                val x = noise()
+                // One-pole high-pass: the click's air, without a thump.
+                val high = x - previousIn + 0.92f * previousOut
+                previousIn = x
+                previousOut = high
+                val body = (sin(2 * PI * 1_900 * t) * exp(-t / 0.006)).toFloat()
+                out[start + n] += gain * envelope * (0.7f * high + 0.5f * body)
+            }
+        }
+        val loudest = out.maxOfOrNull { abs(it) } ?: 1f
+        return FloatArray(out.size) { out[it] / loudest * peak }
     }
 }
