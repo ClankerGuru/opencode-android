@@ -19,6 +19,7 @@ import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
@@ -63,6 +64,35 @@ class WireRequestTests {
                 json("""{"id":"msg_1","text":"hello","delivery":"steer","metadata":{"notification":{"callbackURL":"$callback"}}}"""),
                 request.json(),
             )
+        }
+    }
+
+    @Test
+    fun aSendToAFolderThatIsGoneSaysSo() = runTest {
+        val body = """{"_tag":"LocationNotFoundError","location":{"directory":"/work/linked"},"message":"Location not found: /work/linked"}"""
+        withFixture(WireFixture { Reply.Json(404, body) }) { fixture ->
+            val error = expectClientError {
+                OpenCodeClient.liveValue.sendPrompt(fixture.server, "ses_1", "hello", emptyList(), emptyList(), "msg_1", OpenCodeDelivery.Steer)
+            }
+            assertTrue(error.isLocationMissing)
+            assertEquals(404, error.statusCode)
+            assertEquals(OpenCodeClientError.FOLDER_GONE_MESSAGE, error.message)
+        }
+        // A bare 404 (a missing route or message) isn't a missing folder.
+        assertFalse(OpenCodeClientError.isLocationMissing(status = 404, body = ByteArray(0)))
+        assertFalse(OpenCodeClientError.isLocationMissing(status = 404, body = """{"_tag":"NotFoundError"}""".encodeToByteArray()))
+        assertFalse(OpenCodeClientError.isLocationMissing(status = 400, body = """{"_tag":"LocationNotFoundError"}""".encodeToByteArray()))
+    }
+
+    @Test
+    fun movingASessionPostsItsNewFolderOnce() = runTest {
+        withFixture(WireFixture { Reply.status(204) }) { fixture ->
+            OpenCodeClient.liveValue.moveSession(fixture.server, "ses_1", "/work/repo")
+
+            val request = fixture.requests.first()
+            assertEquals(1, fixture.requests.size)
+            assertEquals("POST /api/session/ses_1/move", request.route)
+            assertEquals(json("""{"directory":"/work/repo"}"""), request.json())
         }
     }
 
