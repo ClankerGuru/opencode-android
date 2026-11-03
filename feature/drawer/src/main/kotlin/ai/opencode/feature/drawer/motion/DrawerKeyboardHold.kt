@@ -82,8 +82,37 @@ class DrawerKeyboardHold(
 
     var ime: Ime? = null
 
+    /**
+     * Drives the IME's insets with the card ([ImeFollower] on a device). Nothing it asked for may
+     * outlive the hold: while the app controls the IME's insets the system ignores the IME's own
+     * show requests, so a controller (or a request still waiting for one) left behind would keep
+     * the keys from every field in the app.
+     */
+    interface Follower {
+        /** Control was asked for and not yet given back. */
+        val isActive: Boolean
+
+        /** The system refused or took back the control before it was given back. */
+        var onRefused: () -> Unit
+
+        /** Shows [shownFraction] of the keys (0 down, 1 up), asking for control on the first call. */
+        fun follow(shownFraction: Float)
+
+        /** The card rests mid-hold: the keys end up [shown] or down once control arrives. */
+        fun finish(shown: Boolean)
+
+        /**
+         * Gives control back now: a controller finishes with the keys [shown] or down, a request
+         * still waiting is withdrawn. Returns whether a controller placed the keys.
+         */
+        fun release(shown: Boolean): Boolean
+
+        /** Gives up control where the keys are. */
+        fun cancel()
+    }
+
     /** Drives the IME's insets with the card ([follow]); `null` keeps the keys still (iOS's fallback). */
-    var follower: ImeFollower? = null
+    var follower: Follower? = null
         set(value) {
             field?.cancel()
             field = value
@@ -95,9 +124,6 @@ class DrawerKeyboardHold(
 
     /** Keys brought back while the card moves: the follower raises them with it, or [giveBack] shows them. */
     private var keysComingBack = false
-
-    /** How far the drawer was open at the last [follow] (iOS `lastFollow`), for [didBecomeActive]. */
-    private var lastProgress: Float? = null
 
     /** The field let go of its focus before the card came back. */
     var onLetGo: () -> Unit = {}
@@ -155,6 +181,8 @@ class DrawerKeyboardHold(
     private fun fieldFocusChanged(changed: Field, isFocused: Boolean) {
         if (isFocused) {
             focused = changed
+            // Nothing is held: no control of the IME is ours any more, so this field's keys come up.
+            if (!isHolding) follower?.takeIf { it.isActive }?.release(shown = true)
             checkActiveResponder(changed)
             return
         }
@@ -169,6 +197,10 @@ class DrawerKeyboardHold(
         if (visible) {
             isKeyboardVisible = true
             focused?.let(::checkActiveResponder)
+            // The system brought the held field's keys back over the open drawer (back from the
+            // background it restores the focused field's IME after ON_RESUME): down they go again.
+            val held = heldField
+            if (held != null && keysAway && focused?.key == held.key && follower?.isActive != true) ime?.hide()
         } else {
             isKeyboardVisible = false
             if (!isDrawerSearching && !isDrawerFieldFocused) {
@@ -225,7 +257,6 @@ class DrawerKeyboardHold(
      */
     fun follow(progress: Float) {
         val held = heldField ?: return
-        lastProgress = progress
         val follower = follower ?: return
         if (!followsCard || keysAway || focused?.key != held.key) return
         if (progress <= 0f && !follower.isActive && !keysComingBack) return
@@ -239,8 +270,9 @@ class DrawerKeyboardHold(
         if (keysAway || focused?.key != held.key) return
         keysAway = true
         keysComingBack = false
-        val follower = follower
-        if (follower != null && follower.isActive) follower.finish(shown = false) else ime?.hide()
+        // At rest there is nothing left to follow: control goes back with the keys down.
+        val placed = follower?.takeIf { it.isActive }?.release(shown = false) == true
+        if (!placed) ime?.hide()
     }
 
     /** The card moves again, or the drawer commits to closing: the keys come back up. */
@@ -258,33 +290,24 @@ class DrawerKeyboardHold(
         val held = heldField ?: return
         if (focused?.key != held.key) return letGo()
         bringKeysBack()
-        val follower = follower
-        if (follower != null && follower.isActive) {
-            follower.finish(shown = true)
-        } else if (keysComingBack) {
-            ime?.show()
-        }
+        val following = follower?.isActive == true
+        val placed = follower?.takeIf { it.isActive }?.release(shown = true) == true
+        if (!placed && (following || keysComingBack)) ime?.show()
         end()
     }
 
     /**
      * Back from the background (iOS `didBecomeActiveNotification`): the system has the keys
-     * again (it took back any insets control and may show the focused field's keys), so they go
-     * back where the hold had them: down beside the open drawer, or with the card at its last
-     * [follow] mid-move. iOS re-frames the keys' window here (5308241f); the Android IME has no
-     * window of ours to re-frame, only its shown state.
+     * again and may bring the held field's up over the open drawer, so keys the hold sent down
+     * go down again (and [imeVisibilityChanged] catches the system restoring them after this).
+     * Only a hold whose keys rest under the card acts: mid-move the card's next frame follows
+     * it anyway, and nothing held leaves the keys to the system. iOS re-frames the keys' window
+     * here (5308241f); the Android IME has no window of ours to re-frame, only its shown state.
      */
     fun didBecomeActive() {
         val held = heldField ?: return
-        if (focused?.key != held.key) return
-        if (keysAway) {
-            ime?.hide()
-            return
-        }
-        val progress = lastProgress ?: return
-        if (progress <= 0f || !canFollow) return
-        keysComingBack = true
-        follow(progress)
+        if (focused?.key != held.key || !keysAway) return
+        ime?.hide()
     }
 
     /** The IME's insets couldn't be driven: the keys go where the hold wants them at once. */
@@ -306,12 +329,17 @@ class DrawerKeyboardHold(
     fun letGo(leavingCard: Boolean = false, now: Boolean = false) {
         val held = heldField ?: return
         val resigning = focused?.key == held.key
-        // Keys the card was carrying go down with the focus it gives up.
-        follower?.finish(shown = !resigning)
+        // Keys the card was carrying go down with the focus it gives up, and control of them
+        // goes back to the system now, a request still waiting included (see [Follower]).
+        follower?.release(shown = !resigning)
         end()
         if (resigning && leavingCard) leave()
         val resign = {
-            if (focused?.key == held.key) held.clearFocus()
+            if (focused?.key == held.key) {
+                held.clearFocus()
+                // A field that left without reporting it isn't the focused one any more.
+                if (focused?.key == held.key) focused = null
+            }
             onLetGo()
         }
         if (now) resign() else scope.launch { resign() }
@@ -331,7 +359,7 @@ class DrawerKeyboardHold(
             isExcludingKeyboard = false
             excludeKeyboard(false)
         }
-        follower?.finish(shown = !keysAway)
+        follower?.release(shown = !keysAway)
         end()
     }
 
@@ -419,7 +447,6 @@ class DrawerKeyboardHold(
         heldField = null
         keysAway = false
         keysComingBack = false
-        lastProgress = null
         monitor?.isHoldingKeyboard = false
     }
 
@@ -437,21 +464,24 @@ class DrawerKeyboardHold(
  * frame, finished shown or hidden when the card rests. Asking for control while the keys are
  * down brings them up from hidden, so they rise with a closing card.
  */
-class ImeFollower(private val view: View) {
+class ImeFollower(private val view: View) : DrawerKeyboardHold.Follower {
     private var controller: WindowInsetsAnimationController? = null
     private var cancellation: CancellationSignal? = null
     private var requested = false
     private var fraction = 1f
     private var pendingFinish: Boolean? = null
 
+    /** Where keys go if control arrives for a request already given back. */
+    private var orphanShown = true
+
     /** The system refused or took back the control before it finished (another inset change, focus lost). */
-    var onRefused: () -> Unit = {}
+    override var onRefused: () -> Unit = {}
 
     /** Control was asked for and not yet finished. */
-    val isActive: Boolean get() = requested
+    override val isActive: Boolean get() = requested
 
     /** Shows [shownFraction] of the keys (0 down, 1 up). Asks for control on the first call. */
-    fun follow(shownFraction: Float) {
+    override fun follow(shownFraction: Float) {
         fraction = shownFraction
         pendingFinish = null
         controller?.let {
@@ -468,7 +498,7 @@ class ImeFollower(private val view: View) {
     }
 
     /** The card rests: the keys stay up ([shown]) or go down, and the system has them again. */
-    fun finish(shown: Boolean) {
+    override fun finish(shown: Boolean) {
         if (!requested) return
         val current = controller
         if (current == null) {
@@ -478,11 +508,28 @@ class ImeFollower(private val view: View) {
         end(current, shown)
     }
 
-    /** Gives up control where the keys are. */
-    fun cancel() {
+    /**
+     * Gives control back now. A request still waiting is withdrawn rather than left to finish
+     * when (if ever) control arrives: while it waits, the system hands it the next show of the
+     * IME's, whichever field asked for the keys.
+     */
+    override fun release(shown: Boolean): Boolean {
         val current = controller
-        if (current != null) end(current, fraction >= 0.5f) else cancellation?.cancel()
+        if (current != null) {
+            end(current, shown)
+            return true
+        }
+        if (requested) {
+            orphanShown = shown
+            cancellation?.cancel()
+        }
         reset()
+        return false
+    }
+
+    /** Gives up control where the keys are. */
+    override fun cancel() {
+        release(shown = fraction >= 0.5f)
     }
 
     private fun apply(controller: WindowInsetsAnimationController) {
@@ -512,7 +559,8 @@ class ImeFollower(private val view: View) {
     private val listener = object : WindowInsetsAnimationControlListener {
         override fun onReady(controller: WindowInsetsAnimationController, types: Int) {
             if (!requested) {
-                controller.finish(fraction >= 0.5f)
+                // Given back before it came: the system has the keys at once.
+                controller.finish(orphanShown)
                 return
             }
             this@ImeFollower.controller = controller
