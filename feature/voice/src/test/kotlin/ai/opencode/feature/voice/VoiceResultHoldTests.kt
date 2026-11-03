@@ -109,23 +109,43 @@ class VoiceResultHoldTests {
     }
 
     /**
-     * A newer request in flight doesn't hold an earlier result back: it
-     * speaks as soon as nobody is talking, and the answer follows when ready.
+     * Watched-session announcements wait behind an active foreground delegation
+     * up to the 15 s silence cap, while `ios_voice_say` (`sessionID == null`)
+     * still speaks at the next quiet moment.
      */
-    @Test fun aNewerRequestInFlightDoesNotHoldAnEarlierResult() = runTest {
-        val call = idleCall()
+    @Test fun watchedSessionAnnouncementWaitsForActiveForegroundDelegationUpToSilenceCap() = runTest {
+        val call = idleCall(answerSpeakingHold = 1.seconds)
         val result = "The session “Upload” finished the work you started there. Its reply: Done — fixed the retry loop."
         call.userSays("Wait, check the docs instead", from = 1_000, to = 1_600)
         call.delegates("del_docs", at = 1_600)
         call.advance(50)
         call.coordinator.announce(result, sessionID = "ses_upload")
-        call.advance(249)
-        assertTrue(call.spoken().isEmpty())
-        call.advance(1)
-        call.waitFor { result in call.spoken() }
-        assertEquals("Not held while the newer request runs", listOf(result), call.spoken())
+        call.coordinator.announce("Say briefly that you're checking docs.")
+        call.advance(250)
+        call.waitFor { call.spoken() == listOf("Say briefly that you're checking docs.") }
+        call.advance(5_000)
+        assertFalse("Watched-session notice stays held behind the active foreground delegation", result in call.spoken())
+
         call.coordinator.completeFunction(callID = "del_docs", output = "[COMPLETE] The docs are up to date.")
-        call.waitFor { call.spoken().any { it.contains("The docs are up to date.") } }
+        call.waitFor { "The docs are up to date." in call.spoken() }
+        assertEquals(
+            "Foreground answer speaks ahead of the background notice",
+            listOf("Say briefly that you're checking docs.", "The docs are up to date."),
+            call.spoken(),
+        )
+        call.advance(1_050)
+        call.waitFor { result in call.spoken() }
+        assertEquals(result, call.spoken().last())
+
+        // A silent multi-minute delegation still releases urgent background news at the 15 s silence cap.
+        call.userSays("Run the full build", from = 8_000, to = 8_400)
+        call.delegates("del_long", at = 8_400)
+        val secondNotice = "The session “Deploy” finished: Canary is live."
+        call.coordinator.announce(secondNotice, sessionID = "ses_deploy")
+        call.advance(14_999)
+        assertFalse(secondNotice in call.spoken())
+        call.advance(1)
+        call.waitFor { secondNotice in call.spoken() }
         call.coordinator.end()
     }
 

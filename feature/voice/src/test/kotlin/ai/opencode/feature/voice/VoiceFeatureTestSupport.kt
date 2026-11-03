@@ -186,11 +186,11 @@ internal object VoiceFeatureTestSupport {
     fun VoiceCallClient.copy(
         start: suspend (String, RealtimeSessionConfig) -> Flow<VoiceCallEvent> = this.start,
         completeFunction: suspend (String, String) -> Unit = this.completeFunction,
-        noteProgress: suspend (String, String) -> Unit = this.noteProgress,
-        announce: suspend (String) -> Unit = this.announce,
-        announceSession: (suspend (String, List<String>, String) -> Unit)? = this.announceSession,
+        noteProgressActivity: suspend (String, String?) -> Unit = this.noteProgressActivity,
+        stopProgressLine: suspend (String) -> Unit = this.stopProgressLine,
+        announce: suspend (String?, List<String>, String) -> Unit = this.announce,
         cancelPendingAnnouncements: suspend (List<String>) -> Unit = this.cancelPendingAnnouncements,
-        abandonDelegation: suspend (String) -> Unit = this.abandonDelegation,
+        closeDelegation: suspend (String, VoiceDelegationCloseReason) -> Unit = this.closeDelegation,
         retarget: suspend () -> Unit = this.retarget,
         setMuted: suspend (Boolean) -> Unit = this.setMuted,
         setAtEar: suspend (Boolean) -> Unit = this.setAtEar,
@@ -200,7 +200,7 @@ internal object VoiceFeatureTestSupport {
         submitDelegatorInput: suspend (String, List<VoiceDelegator.InputItem>) -> Boolean = this.submitDelegatorInput,
         updateDelegatorInstructions: suspend (String) -> Unit = this.updateDelegatorInstructions,
     ) = VoiceCallClient(
-        start, completeFunction, noteProgress, announce, announceSession, cancelPendingAnnouncements, abandonDelegation,
+        start, completeFunction, noteProgressActivity, stopProgressLine, announce, cancelPendingAnnouncements, closeDelegation,
         retarget, setMuted, setAtEar, updateInstructions, end, delegatorRound, submitDelegatorInput, updateDelegatorInstructions,
     )
 
@@ -213,6 +213,7 @@ internal object VoiceFeatureTestSupport {
         fetchRunReply: suspend (OpenCodeServer, String, String) -> String? = this.fetchRunReply,
         backgroundWork: suspend (OpenCodeServer, String, String, String?) -> List<VoiceBackgroundWork> = this.backgroundWork,
         backgroundReply: suspend (OpenCodeServer, String) -> String? = this.backgroundReply,
+        relayedBackgroundReply: suspend (OpenCodeServer, String, String) -> String? = this.relayedBackgroundReply,
         checkSessionActive: suspend (OpenCodeServer, String) -> Boolean? = this.checkSessionActive,
         activeSessionIDs: suspend (OpenCodeServer) -> Set<String> = this.activeSessionIDs,
         noteSessionSettled: suspend (OpenCodeServer, String) -> Unit = this.noteSessionSettled,
@@ -226,6 +227,7 @@ internal object VoiceFeatureTestSupport {
         fetchRunReply = fetchRunReply,
         backgroundWork = backgroundWork,
         backgroundReply = backgroundReply,
+        relayedBackgroundReply = relayedBackgroundReply,
         checkSessionActive = checkSessionActive,
         activeSessionIDs = activeSessionIDs,
         noteSessionSettled = noteSessionSettled,

@@ -24,6 +24,8 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -318,5 +320,144 @@ class VoiceReconnectReplyTests {
         assertEquals(listOf("msg_steer"), store.state.replyWatch.watched.map { it.promptID })
         assertTrue(store.state.delegatorWork.isEmpty())
         effects.cancel()
+    }
+
+    @Test fun postReconnectOutboundDrainRespectsQuietGateAndAnswerProtection() = runTest {
+        val call = idleCall()
+        call.userSays("Check the build.", from = 200, to = 500)
+        call.delegates("del_build", at = 500)
+        call.advance(500)
+
+        call.userSays("Hold on", from = 1_000, to = 1_100)
+        call.advance(30)
+        call.socket.finish(NetworkConnectionLost())
+        // The reconnect backoff runs on the test clock here (iOS sleeps it in real time), so its
+        // 10ms come off the first wait below: the drain still opens 150ms after the user's words.
+        call.retryDelayPasses()
+        call.waitFor { call.harness.sockets.size == 2 }
+        val second = call.harness.sockets[1]
+        val secondSpoken = { second.spoken() }
+
+        val notice = "The session “Upload” finished the work you started there. Its reply: All tests pass."
+        call.coordinator.announce(notice, sessionID = "ses_upload")
+        call.coordinator.completeFunction(callID = "del_build", output = "[COMPLETE] The build succeeded.")
+        second.yieldEvent(LiveServerEvent.SessionStarted(id = "live_2", expiresAt = null))
+        call.until { call.coordinator.serialized { call.coordinator.active?.attached == true } }
+
+        call.advance(109)
+        assertTrue("Reconnect drain waits out the user's speech pause", secondSpoken().isEmpty())
+        call.advance(1)
+        call.waitFor { secondSpoken().size == 1 }
+        assertTrue("The answer goes ahead of an earlier queued notice", secondSpoken().firstOrNull()?.contains("The build succeeded.") == true)
+
+        call.advance(399)
+        assertEquals("Answer protection holds the queued notice after reconnect", 1, secondSpoken().size)
+        call.advance(1)
+        call.waitFor { secondSpoken().size == 2 }
+        assertEquals(notice, secondSpoken().lastOrNull())
+        call.coordinator.end()
+    }
+
+    @Test fun standbyRotationWaitsForOpenAndServerDelegations() = runTest {
+        val harness = LiveHarness(
+            this,
+            VoiceCallTiming(
+                rotateAfter = 0.05,
+                forceRotateAfter = 30.0,
+                retryDelays = listOf(0.01),
+                liveDelegationSettle = Duration.ZERO,
+                liveTranscriptSettle = 20.milliseconds,
+                liveAcknowledgementWait = Duration.ZERO,
+            ),
+        )
+        val events = EventIterator(
+            harness.start(delegation = LiveDelegation.responses(VoiceDelegator.responsesDelegation(context = "Viewing “OPENCODE IOS”."))),
+            backgroundScope,
+        )
+        val first = harness.nextOpened()
+        first.yieldEvent(LiveServerEvent.SessionStarted(id = "live_1", expiresAt = null))
+        assertEquals(VoiceCallEvent.Connected, events.next())
+
+        first.yieldEvent(LiveServerEvent.DelegationCreated(id = "del_srv_1", target = "responses", offsetMilliseconds = 200))
+        assertEquals(VoiceCallEvent.ServerDelegation(callID = "del_srv_1"), events.next())
+
+        val standbyWhileBusy = harness.nextOpened()
+        standbyWhileBusy.yieldEvent(LiveServerEvent.SessionStarted(id = "live_2", expiresAt = null))
+        delay(30)
+        assertFalse("Voluntary standby rotation must not kill an open Server Voice delegation", first.closed)
+
+        // Finishing the delegation discards the stale standby and opens a fresh one that swaps cleanly.
+        harness.coordinator.completeFunction(callID = "del_srv_1", output = "")
+        val freshStandby = harness.nextOpened()
+        assertTrue(standbyWhileBusy.closed)
+        freshStandby.yieldEvent(LiveServerEvent.SessionStarted(id = "live_3", expiresAt = null))
+        waitUntil(2.seconds) { first.closed }
+        assertTrue(first.closed)
+        assertEquals(listOf("voice_rotation_swapped"), harness.voiceEvents)
+        harness.coordinator.end()
+    }
+
+    @Test fun reconnectDetachesOpenDelegationWithAnswerPriorityAndSeedsUnreadResults() = runTest {
+        val harness = LiveHarness(
+            this,
+            VoiceCallTiming(
+                rotateAfter = 3_000.0,
+                forceRotateAfter = 3_500.0,
+                retryDelays = listOf(0.12),
+                liveDelegationSettle = Duration.ZERO,
+                liveTranscriptSettle = 20.milliseconds,
+                liveAcknowledgementWait = Duration.ZERO,
+            ),
+        )
+        val events = EventIterator(harness.start(unboundSpeechUsesInstructions = true), backgroundScope)
+        val first = harness.nextOpened()
+        first.yieldEvent(LiveServerEvent.SessionStarted(id = "live_1", expiresAt = null))
+        assertEquals(VoiceCallEvent.Connected, events.next())
+
+        first.yieldEvent(LiveServerEvent.InputTranscriptDelta(delta = "Add chin-ups and squats", startMilliseconds = 100, endMilliseconds = 400))
+        events.next()
+        first.yieldEvent(LiveServerEvent.DelegationCreated(id = "del_gym", target = "client", offsetMilliseconds = 400))
+        assertEquals(VoiceCallEvent.FunctionCall(callID = "del_gym", name = "delegate", arguments = RealtimeJSONs.obj()), events.next())
+
+        // Drop the active socket; during the 120ms reconnect backoff a watched notice AND the detached delegation finish.
+        first.finish(NetworkConnectionLost())
+        assertEquals(VoiceCallEvent.Reconnecting, events.next())
+        harness.coordinator.announce("The session “Build” finished: CI is green.", sessionID = "ses_build")
+        harness.coordinator.completeFunction(callID = "del_gym", output = "[COMPLETE] Added chin-ups and squats to today's workout.")
+
+        val second = harness.nextOpened()
+        val developerSeed = second.config.input.firstOrNull { it.role == LiveInputMessage.Role.developer }?.text
+            ?: throw AssertionError("Expected a developer seed")
+        assertTrue(developerSeed.contains("Unread results that arrived while reconnecting"))
+        assertTrue(developerSeed.contains("Added chin-ups and squats to today's workout."))
+        assertTrue(developerSeed.contains("“Build” finished: CI is green."))
+
+        second.yieldEvent(LiveServerEvent.SessionStarted(id = "live_2", expiresAt = null))
+        assertEquals(VoiceCallEvent.Reconnected, events.next())
+        val instructions = { second.commands.mapNotNull { (it as? LiveCommand.AppendInstructions)?.content } }
+        waitUntil(2.seconds) { instructions().size >= 2 }
+        val spoken = instructions()
+        assertEquals(2, spoken.size)
+        // Detached delegation answer speaks first (answer priority) with the explicit speak directive, ahead of the earlier announcement.
+        assertTrue(spoken[0].startsWith(LiveCallCoordinator.spokenDirectiveLead))
+        assertTrue(spoken[0].contains("Added chin-ups and squats to today's workout."))
+        assertTrue(spoken[1].startsWith(LiveCallCoordinator.spokenDirectiveLead))
+        assertTrue(spoken[1].contains("CI is green."))
+
+        // A subsequent reconnect marks those now-delivered outcomes as already-spoken silent memory ("never repeat").
+        second.finish(NetworkConnectionLost())
+        assertEquals(VoiceCallEvent.Reconnecting, events.next())
+        val third = harness.nextOpened()
+        val silentMemorySeed = third.config.input.firstOrNull { it.role == LiveInputMessage.Role.developer }?.text
+            ?: throw AssertionError("Expected a developer seed")
+        assertTrue(
+            silentMemorySeed.contains(
+                "Already-spoken outcomes from earlier on this call, oldest first (silent memory only — the user already heard these, so never repeat or re-announce them unless asked).",
+            ),
+        )
+        assertTrue(silentMemorySeed.contains("your own earlier replies are unverified unless backed by an outcome listed below"))
+        assertTrue(silentMemorySeed.contains("- Added chin-ups and squats to today's workout."))
+        assertFalse(silentMemorySeed.contains("Unread results that arrived while reconnecting"))
+        harness.coordinator.end()
     }
 }

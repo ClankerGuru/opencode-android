@@ -52,12 +52,19 @@ private fun VoiceSessionDelegator.State.withCreatingViewedDraft(): VoiceSessionD
     copy(creatingViewedDraft = turns.any { it.createsViewedDraft && it.promptID == null })
 
 internal fun VoiceFeature.delegateToSessionDelegator(state: State, callID: String, rawFraming: String?): Reduced<State, Action> {
-    val captured = state.tail.capture()
+    val isVerify = callID.startsWith("client_verify_")
+    val captured = if (isVerify) VoiceTranscriptTail.Captured(state.tail, VoiceTranscriptTail.Capture.empty) else state.tail.capture()
     var next = state.copy(tail = captured.tail)
     val capture = captured.capture
-    val promisedClaim = if (callID.startsWith("client_claim_")) VoiceHandoff.framing(rawFraming) else null
+    val promisedClaim = if (isVerify) {
+        rawFraming?.trim()
+    } else if (callID.startsWith("client_claim_")) {
+        VoiceHandoff.framing(rawFraming)
+    } else {
+        null
+    }
     val request = capture.userText.trim()
-    if (request.isEmpty() && promisedClaim == null) {
+    if (request.isEmpty() && promisedClaim.isNullOrEmpty()) {
         next = next.copy(tail = next.tail.release(capture))
         return Reduced(next, completeFunction(callID, VoiceHandoff.failure(VoiceHandoff.nothingNewToSend)))
     }
@@ -153,7 +160,7 @@ private fun VoiceFeature.startPendingSessionDelegatorAdmissions(
         }
         if (blockedByEarlierAdmission) continue
 
-        if (coalesceReleasedIntoFirstWaiting && !coalesced) {
+        if (coalesceReleasedIntoFirstWaiting && !coalesced && !turns[index].callID.startsWith("client_verify_")) {
             coalesced = true
             val previousCapture = turns[index].capture
             val merged = next.tail.release(previousCapture).capture()
@@ -211,10 +218,7 @@ private fun VoiceFeature.startSessionDelegatorAdmission(state: State, index: Int
         needsInput = next.targetNeedsInput,
         draftDirectory = next.target.directory,
     )
-    val compactions = next.compactions
-    val explained = next.handoffs.mapNotNullTo(LinkedHashSet()) { (sessionID, handoff) ->
-        if (secondsBetween(handoff.lastDelegationAt, now) <= VoiceHandoff.headerLapse && handoff.compactionID == compactions[sessionID]) sessionID else null
-    }
+    val explained = next.explainedSessionIDs(at = now)
     val recorder = dependency(VoiceCallLogClient).recorder
     val log = next.callLogID
     if (recorder != null && log != null) {
@@ -340,12 +344,7 @@ internal fun VoiceFeature.reduceSessionDelegatorAdmitted(
     next = next.copy(tail = next.tail.accept(next.sessionDelegator.turns[index].capture))
         .withDelegator { it.copy(lastContextBySession = it.lastContextBySession + (admission.sessionID to admission.contextLine)) }
     if (admission.explained) {
-        next = next.copy(
-            handoffs = next.handoffs + (admission.sessionID to State.Handoff(
-                lastDelegationAt = dependency(DateClient).now(),
-                compactionID = next.compactions[admission.sessionID],
-            )),
-        )
+        next = next.recordHandoff(admission.sessionID, at = dependency(DateClient).now())
     }
 
     val alreadyReportedAutomatic = next.sessionDelegator.turns[index].reportedCreatedAutomatic
@@ -368,7 +367,7 @@ internal fun VoiceFeature.reduceSessionDelegatorAdmitted(
         next = next.copy(delegatorWork = next.delegatorWork.filter { it != supersededID })
         next.stepWatch(ReplyWatch.Event.Superseded(promptID = oldPromptID)).let { (s, e) -> next = s; watchEffects += e }
         next.stepWatch(ReplyWatch.Event.DelegatorFinished(requestID = supersededID, spoken = null)).let { (s, e) -> next = s; watchEffects += e }
-        effects += Effect.run<Action> { voiceCall.abandonDelegation(supersededID) }
+        effects += Effect.run<Action> { voiceCall.closeDelegation(supersededID, VoiceDelegationCloseReason.superseded) }
     }
 
     val supersededByLaterTurn = (index + 1 until next.sessionDelegator.turns.size).any { later ->
@@ -379,7 +378,7 @@ internal fun VoiceFeature.reduceSessionDelegatorAdmitted(
         next = next.withTurn(index) { it.copy(superseded = true) }
         next = next.copy(delegatorWork = next.delegatorWork.filter { it != callID })
         next.stepWatch(ReplyWatch.Event.DelegatorFinished(requestID = callID, spoken = null)).let { (s, e) -> next = s; watchEffects += e }
-        effects += Effect.run<Action> { voiceCall.abandonDelegation(callID) }
+        effects += Effect.run<Action> { voiceCall.closeDelegation(callID, VoiceDelegationCloseReason.superseded) }
     } else {
         next.stepWatch(ReplyWatch.Event.DelegatorWaiting(sessionID = admission.sessionID, requestID = callID, isWaiting = true))
             .let { (s, e) -> next = s; watchEffects += e }
@@ -390,6 +389,10 @@ internal fun VoiceFeature.reduceSessionDelegatorAdmitted(
             saidTurn = next.sessionDelegator.turns[index].saidTurn,
         )
         next.stepWatch(ReplyWatch.Event.Sent(listOf(prompt))).let { (s, e) -> next = s; watchEffects += e }
+        // A follow-up steered into a run already working says what it's doing.
+        next.sessionDelegator.progressCaption(admission.sessionID)?.let { caption ->
+            effects += noteProgressActivity(callID, caption)
+        }
     }
 
     val createdDraft = admission.createdViewedDraft
@@ -461,7 +464,12 @@ internal fun VoiceFeature.reduceSessionDelegatorAdmissionFailed(
     AppLog.voice.error("Session delegator admission failed: status=${error.statusCode ?: 0}")
     val (watched, watchEffects) = next.stepWatch(ReplyWatch.Event.DelegatorFinished(requestID = callID, spoken = null))
     next = watched
-    val failEffect = answerThenRelease(callID, VoiceHandoff.failure(error.message), watchEffects, next)
+    val failEffect = answerThenRelease(
+        callID,
+        if (callID.startsWith("client_verify_")) "" else VoiceHandoff.failure(error.message),
+        watchEffects,
+        next,
+    )
     return Reduced(next, Effect.merge(failEffect, nextAdmissions.effect))
 }
 
@@ -517,7 +525,7 @@ internal fun VoiceFeature.settleSessionDelegatorTurns(
         next = next.copy(delegatorWork = next.delegatorWork.filter { it != turn.callID })
 
         if (next.sessionDelegator.turns.none { it.sessionID == sessionID && it.promptID != null }) {
-            next = next.withDelegator { it.clearRunningTools() }
+            next = next.withDelegator { it.clearRunningTools(sessionID) }
         }
         if (next.sessionDelegator.turns.none { it.sessionID == sessionID } && next.sessionDelegator.activeSessionID == sessionID) {
             next = next.withDelegator { it.copy(activeSessionID = it.turns.lastOrNull()?.sessionID) }
@@ -531,10 +539,10 @@ internal fun VoiceFeature.settleSessionDelegatorTurns(
             }
         }
 
-        val output: String
-        val rawReply: String?
-        val suppressionSpoken: String
-        val abandonOnly: Boolean
+        var output: String
+        var rawReply: String?
+        var suppressionSpoken: String
+        var abandonOnly: Boolean
         when (outcome) {
             is ReplyWatch.Outcome.Replied -> {
                 val spoken = VoiceSessionDelegator.spokenReply(outcome.reply)
@@ -567,6 +575,14 @@ internal fun VoiceFeature.settleSessionDelegatorTurns(
                 abandonOnly = false
             }
         }
+        if (turn.callID.startsWith("client_verify_") && (rawReply == null || !VoiceActionClaim.correctsVoice(output))) {
+            output = ""
+            rawReply = null
+            suppressionSpoken = "VERIFIED"
+            abandonOnly = false
+            next = next.copy(replyWatch = next.replyWatch.removeCompleted(setOf(promptID)))
+            remainingWatchEffects.removeAll { it is ReplyWatch.Effect.FindBackgroundWork && it.promptID == promptID }
+        }
 
         val releaseEffects = mutableListOf<ReplyWatch.Effect>()
         next.stepWatch(
@@ -592,7 +608,7 @@ internal fun VoiceFeature.settleSessionDelegatorTurns(
             val callID = turn.callID
             completionEffects += Effect.merge(
                 runReplyWatch(releaseEffects, next),
-                Effect.run<Action> { voiceCall.abandonDelegation(callID) },
+                Effect.run<Action> { voiceCall.closeDelegation(callID, VoiceDelegationCloseReason.coveredByInterimSpeech) },
                 ending,
             )
         } else {
@@ -610,6 +626,7 @@ internal fun VoiceFeature.reduceSessionDelegatorTools(
     events: List<OpenCodeLiveContentEvent>,
 ): Reduced<State, Action> {
     if (!state.tracksSessionDelegatorTools(sessionID)) return Reduced(state)
+    val captionBefore = state.sessionDelegator.progressCaption(sessionID)
     var next = state
     val effects = mutableListOf<Effect<Action>>()
     val recorder = dependency(VoiceCallLogClient).recorder
@@ -620,13 +637,13 @@ internal fun VoiceFeature.reduceSessionDelegatorTools(
             is OpenCodeLiveContentEvent.ToolInputStarted -> {
                 next = next.withDelegator { it.copy(toolNames = it.toolNames + (event.toolID to event.name)) }
                 val label = VoiceSessionDelegator.toolCaption(event.name, null)
-                next = upsertRunningTool(next, event.toolID, event.name, label)
+                next = upsertRunningTool(next, event.toolID, event.name, label, sessionID)
             }
 
             is OpenCodeLiveContentEvent.ToolCalled -> {
                 val name = next.sessionDelegator.toolNames[event.toolID] ?: "tool"
                 val label = VoiceSessionDelegator.toolCaption(name, event.input)
-                next = upsertRunningTool(next, event.toolID, name, label)
+                next = upsertRunningTool(next, event.toolID, name, label, sessionID)
                 if (recorder != null && log != null) {
                     recorder.span(log, VoiceCallLog.Track.tool, spanID = event.toolID, label = name)
                     if (label != null) recorder.note(log, VoiceCallLog.Note.Kind.marker, label)
@@ -666,6 +683,11 @@ internal fun VoiceFeature.reduceSessionDelegatorTools(
 
             else -> Unit
         }
+    }
+    val caption = next.sessionDelegator.progressCaption(sessionID)
+    val progressCallID = next.sessionDelegator.progressCallID(sessionID)
+    if (caption != captionBefore && progressCallID != null) {
+        effects += noteProgressActivity(progressCallID, caption)
     }
     return Reduced(next, if (effects.isEmpty()) Effect.none() else Effect.merge(effects))
 }
@@ -717,8 +739,9 @@ internal fun VoiceFeature.reduceSessionDelegatorSessionDeleted(state: State, ses
         shared(VoiceSharedKeys.voiceDelegatorSessionIDs).update { it - serverScopeKey }
     }
     if (next.sessionDelegator.activeSessionID == sessionID) {
-        next = next.withDelegator { it.copy(activeSessionID = null).clearRunningTools() }
+        next = next.withDelegator { it.copy(activeSessionID = null) }
     }
+    next = next.withDelegator { it.clearRunningTools(sessionID) }
 
     val affected = next.sessionDelegator.turns.filter { it.sessionID == sessionID }
     if (affected.isEmpty()) return Reduced(next)
@@ -747,7 +770,7 @@ internal fun VoiceFeature.reduceSessionDelegatorSessionDeleted(state: State, ses
             next.stepWatch(ReplyWatch.Event.DelegatorFinished(requestID = turn.callID, spoken = null))
                 .let { (s, e) -> next = s; watchEffects += e }
             val callID = turn.callID
-            effects += Effect.run<Action> { voiceCall.abandonDelegation(callID) }
+            effects += Effect.run<Action> { voiceCall.closeDelegation(callID, VoiceDelegationCloseReason.superseded) }
         } else {
             val promptIDs = listOfNotNull(turn.promptID)
             val release = watchEffects.toMutableList()
@@ -828,14 +851,20 @@ private fun VoiceFeature.applyPhoneToolEffect(
             val turns = next.sessionDelegator.turns
             val activeIndex = turns.indexOfLast { it.promptID != null && !it.superseded }.takeIf { it >= 0 }
                 ?: turns.indices.lastOrNull()
-            if (activeIndex != null) next = next.withTurn(activeIndex) { it.copy(didSayInterim = true) }
+            var spokeFor: String? = null
+            if (activeIndex != null) {
+                next = next.withTurn(activeIndex) { it.copy(didSayInterim = true) }
+                spokeFor = next.sessionDelegator.turns[activeIndex].callID
+            }
             val instruction = VoiceSessionDelegator.interimSpeechInstruction(effect.text)
             val voiceCall = dependency(VoiceCallClient)
             Reduced(
                 next,
                 Effect.run<Action> {
                     if (isCancelled()) return@run
-                    voiceCall.announce.invoke(instruction)
+                    // The delegator gave its own status: no "still working" line on top.
+                    if (spokeFor != null) voiceCall.stopProgressLine(spokeFor)
+                    voiceCall.announce(instruction)
                 }.cancellable(CancelID.CallScope),
             )
         }
@@ -875,13 +904,26 @@ private fun reconcileDelegatorToolsFromREST(server: OpenCodeServer, sessionID: S
     }.cancellable(CancelID.CallScope)
 }
 
-private fun upsertRunningTool(state: State, id: String, name: String, label: String?): State = state.withDelegator { delegator ->
+/**
+ * Tells the call what a delegation's work is running, for its spoken
+ * "still working" line.
+ */
+private fun noteProgressActivity(callID: String, caption: String?): Effect<Action> {
+    val activity = caption?.let { VoiceProgressLine.activity(caption = it) }
+    val voiceCall = dependency(VoiceCallClient)
+    return Effect.run<Action> {
+        if (isCancelled()) return@run
+        voiceCall.noteProgressActivity(callID, activity)
+    }.cancellable(CancelID.CallScope)
+}
+
+private fun upsertRunningTool(state: State, id: String, name: String, label: String?, sessionID: String): State = state.withDelegator { delegator ->
     val index = delegator.runningTools.indexOfFirst { it.id == id }
     if (index >= 0) {
         delegator.copy(
             runningTools = delegator.runningTools.toMutableList().also { it[index] = it[index].copy(name = name, label = label) },
         )
     } else {
-        delegator.copy(runningTools = delegator.runningTools + VoiceSessionDelegator.State.RunningTool(id = id, name = name, label = label))
+        delegator.copy(runningTools = delegator.runningTools + VoiceSessionDelegator.State.RunningTool(id = id, name = name, label = label, sessionID = sessionID))
     }
 }

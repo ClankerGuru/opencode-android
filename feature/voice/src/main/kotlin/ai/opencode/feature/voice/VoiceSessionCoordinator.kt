@@ -128,14 +128,14 @@ abstract class VoiceSessionCoordinator<E, C, A>(
     internal abstract suspend fun forwardCapture(chunk: ByteArray)
     internal abstract suspend fun handleAudio(event: VoiceAudioEvent)
     protected abstract suspend fun completeFunctionImpl(callID: String, output: String)
-    protected abstract suspend fun abandonDelegationImpl(callID: String)
+    protected abstract suspend fun closeDelegationImpl(callID: String, reason: VoiceDelegationCloseReason)
     protected abstract suspend fun setMutedImpl(muted: Boolean)
     protected open suspend fun retargetImpl() {}
     protected open fun finishing() {}
     abstract suspend fun updateInstructions(full: String, delta: String? = null)
 
     suspend fun completeFunction(callID: String, output: String) = serialized { if (!finished) completeFunctionImpl(callID, output) }
-    suspend fun abandonDelegation(callID: String) = serialized { if (!finished) abandonDelegationImpl(callID) }
+    suspend fun closeDelegation(callID: String, reason: VoiceDelegationCloseReason) = serialized { if (!finished) closeDelegationImpl(callID, reason) }
     suspend fun setMuted(muted: Boolean) = serialized { if (!finished) setMutedImpl(muted) }
     suspend fun retarget() = serialized { if (!finished) retargetImpl() }
     override suspend fun setAtEar(atEar: Boolean) = serialized {

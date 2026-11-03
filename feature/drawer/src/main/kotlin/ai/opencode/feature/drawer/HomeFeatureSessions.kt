@@ -391,7 +391,8 @@ internal fun notifyVoiceContentBatch(state: State, sessionID: String, events: Li
 /** A run ended: the call's reply watch settles it, or just hears it stopped (iOS `notifyVoiceExecutionEnded`). */
 internal fun notifyVoiceExecutionEnded(state: State, sessionID: String): Reduced<State, Action> {
     val voice = state.sessionDetail?.voice ?: return Reduced(state)
-    if (!voice.replyWatch.isWatching(sessionID)) {
+    val relays = voice.usesSessionDelegator && voice.replyWatch.awaitsParentRelay(sessionID)
+    if (!voice.replyWatch.isWatching(sessionID) && !relays) {
         return Reduced(state.updatingDetail { it.copy(voice = voice.copy(replyWatch = voice.replyWatch.setSessionActive(sessionID, false))) })
     }
     val voiceWork = dependency(VoiceWorkClient)

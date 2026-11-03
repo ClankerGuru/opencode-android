@@ -287,7 +287,7 @@ class VoiceSharedWaitTests {
                 recentMessages = { _, _, _ -> emptyList() },
             )
             this[VoiceCallClient] = speechVoiceCall(
-                announceSession = { _, _, _ -> issues.update { it + "nothing settled, so nothing is said" } },
+                announce = { _, _, _ -> issues.update { it + "nothing settled, so nothing is said" } },
                 cancelPendingAnnouncements = {},
             )
         }

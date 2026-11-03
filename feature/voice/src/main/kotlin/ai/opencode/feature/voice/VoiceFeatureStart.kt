@@ -45,25 +45,20 @@ internal fun VoiceFeature.startCall(state: VoiceFeature.State): Reduced<VoiceFea
     val selectedEngine = next.resolvedEngine
     val openAIKey = next.callAPIKey(VoiceEngine.gptLive)?.trim() ?: ""
     val xaiKey = next.callAPIKey(VoiceEngine.grok)?.trim() ?: ""
-    val saved = if (serverVoiceOn) VoiceFeature.savedServers else emptyList()
-    val readiness = VoiceReadiness(
-        answers = next.voiceModelsByServer,
-        support = next.serverVoiceSupportByServer,
-        hasPhoneKey = openAIKey.isNotEmpty(),
-        engine = selectedEngine,
-    )
     if (serverVoiceOn && next.voiceServer == VoiceServerChoice.Connected) {
         shared(VoiceSharedKeys.voiceServerChoice).update { it.pinningConnected(target.server) }
     }
-    val choice = next.voiceServer
-    val storedProvider = next.serverVoiceProvider
-    val broker = VoiceBroker(
+    val saved = if (serverVoiceOn) VoiceFeature.savedServers else emptyList()
+    val (broker, readiness) = VoiceBroker.resolve(
         serverVoice = serverVoiceOn,
-        choice = choice,
-        provider = storedProvider,
+        choice = next.voiceServer,
+        provider = next.serverVoiceProvider,
         connected = target.server,
         saved = { saved },
-        readiness = readiness,
+        answers = next.voiceModelsByServer,
+        support = next.serverVoiceSupportByServer,
+        hasOpenAIKey = openAIKey.isNotEmpty(),
+        engine = selectedEngine,
     )
     val serverVoiceEnabled = broker.isEnabled
     // Only the broker moves; the call's session, context and tools stay on its own server.

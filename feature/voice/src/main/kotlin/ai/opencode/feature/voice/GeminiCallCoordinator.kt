@@ -119,10 +119,22 @@ class GeminiCallCoordinator(
         } catch (error: CancellationException) { throw error }
         catch (_: Exception) { deliverContext(context, true) }
     }
-    override suspend fun abandonDelegationImpl(callID: String) {
-        val wasOpen = openCalls.remove(callID) != null
+    override suspend fun closeDelegationImpl(callID: String, reason: VoiceDelegationCloseReason) {
+        val activeName = openCalls.remove(callID)
         val wasOrphan = orphanCalls.remove(callID) != null
-        if (wasOpen || wasOrphan) discardStandbyAndRescheduleRotation()
+        val socket = active
+        if (activeName != null && socket != null && socket.ready) {
+            socket.connection.sendControlIfPossible(
+                GeminiLiveCommand.ToolResponse(listOf(GeminiLiveFunctionResponse(
+                    id = callID,
+                    name = activeName,
+                    response = RealtimeJSONs.obj("status" to RealtimeJSONs.string(reason.rawValue)),
+                    scheduling = "SILENT",
+                ))),
+                "gemini.tool_response",
+            )
+        }
+        if (activeName != null || wasOrphan) discardStandbyAndRescheduleRotation()
     }
     suspend fun announce(text: String) = serialized { if (!finished) deliverContext(text, true) }
     override suspend fun setMutedImpl(muted: Boolean) { audio?.setMuted?.invoke(muted); if (muted) flushUserTurnIfNeeded() }

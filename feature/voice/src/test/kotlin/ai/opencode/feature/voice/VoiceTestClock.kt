@@ -131,9 +131,17 @@ class VoiceClockedCall private constructor(
     }
 
     companion object {
-        suspend fun start(test: TestScope, timing: VoiceCallTiming): VoiceClockedCall {
+        suspend fun start(
+            test: TestScope,
+            timing: VoiceCallTiming,
+            delegation: LiveDelegation = LiveDelegation.client,
+            unboundSpeechUsesInstructions: Boolean = false,
+        ): VoiceClockedCall {
             val harness = LiveHarness(test, timing)
-            val events = ClockedEvents(harness.start(), test.backgroundScope)
+            val events = ClockedEvents(
+                harness.start(delegation = delegation, unboundSpeechUsesInstructions = unboundSpeechUsesInstructions),
+                test.backgroundScope,
+            )
             val socket = harness.nextOpened()
             socket.yieldEvent(LiveServerEvent.SessionStarted(id = "live_1", expiresAt = null))
             assertEquals(VoiceCallEvent.Connected, events.next())
@@ -148,6 +156,8 @@ class VoiceClockedCall private constructor(
             test: TestScope,
             resultMaxHold: Duration = 1.seconds,
             answerSpeakingHold: Duration = 4.seconds,
+            progress: VoiceProgressLine.Timing = VoiceProgressLine.Timing(),
+            delegation: LiveDelegation = LiveDelegation.client,
         ): VoiceClockedCall = start(
             test,
             VoiceCallTiming(
@@ -163,7 +173,9 @@ class VoiceClockedCall private constructor(
                 liveResultMaxHold = resultMaxHold,
                 liveAnswerSpeakingHold = answerSpeakingHold,
                 liveAnswerStartWait = 400.milliseconds,
+                liveProgress = progress,
             ),
+            delegation,
         )
     }
 }
@@ -175,7 +187,9 @@ suspend fun TestScope.clockedCall(timing: VoiceCallTiming): VoiceClockedCall = V
 suspend fun TestScope.idleCall(
     resultMaxHold: Duration = 1.seconds,
     answerSpeakingHold: Duration = 4.seconds,
-): VoiceClockedCall = VoiceClockedCall.idle(this, resultMaxHold, answerSpeakingHold)
+    progress: VoiceProgressLine.Timing = VoiceProgressLine.Timing(),
+    delegation: LiveDelegation = LiveDelegation.client,
+): VoiceClockedCall = VoiceClockedCall.idle(this, resultMaxHold, answerSpeakingHold, progress, delegation)
 
 /**
  * A clocked call's events, like iOS's iterator over `call.events`, read

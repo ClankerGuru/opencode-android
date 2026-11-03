@@ -87,17 +87,10 @@ data class VoiceBackgroundWork(
 )
 
 /**
- * How long a result waits at most for the delegator request that read
- * its session (or is waiting on it) to answer. Past it, the result speaks
- * anyway; the delegator's answer may then repeat part of it.
+ * How long a deferred result waits at most from arrival before speaking
+ * anyway, whether claimed or held behind another foreground turn.
  */
 val ReplyWatch.Companion.claimedResultLimit: Duration get() = 20.seconds
-
-/**
- * How long a result no request has claimed waits while one runs, in case
- * its read is about to land. Then it speaks.
- */
-val ReplyWatch.Companion.unclaimedResultGrace: Duration get() = 2.seconds
 
 fun ReplyWatch.Outcome.notice(title: String): String = when (this) {
     is ReplyWatch.Outcome.Replied -> {
@@ -376,6 +369,13 @@ class VoiceWorkClient(
     val backgroundWork: suspend (server: OpenCodeServer, sessionID: String, promptID: String, reply: String?) -> List<VoiceBackgroundWork> = { _, _, _, _ -> emptyList() },
     /** Background work's result: the final reply of the session doing it. */
     val backgroundReply: suspend (server: OpenCodeServer, sessionID: String) -> String? = { _, _ -> null },
+    /**
+     * Session-delegator background work's result: what `parentSessionID` said
+     * when `<subagent>` reported `childSessionID`'s completion, or null when a
+     * user delegation turn in that run covers it (or the parent stayed silent).
+     */
+    val relayedBackgroundReply: suspend (server: OpenCodeServer, parentSessionID: String, childSessionID: String) -> String? =
+        { _, _, _ -> null },
     /** Tri-state active check: `true` if running, `false` if confirmed idle, `null` if unreachable. */
     val checkSessionActive: suspend (server: OpenCodeServer, sessionID: String) -> Boolean? = { server, sessionID ->
         try {
@@ -473,6 +473,33 @@ class VoiceWorkClient(
                 backgroundReply = { server, sessionID ->
                     replyAfterPrompt(dependency(OpenCodeClient).transcript(server, sessionID, 40), afterPromptID = null)
                 },
+                relayedBackgroundReply = relayed@{ server, parentSessionID, childSessionID ->
+                    val client = dependency(OpenCodeClient)
+                    val clock = dependency(Clock)
+                    val delays = listOf(150.milliseconds, 400.milliseconds)
+                    for (attempt in 0..delays.size) {
+                        coordinator.waitForIdleOrSettlement(server, parentSessionID, client)
+                        var messages: List<OpenCodeRunMessage> = emptyList()
+                        var cursor: String? = null
+                        for (page in 0 until backgroundSearchPages) {
+                            val read = client.runMessages(server, parentSessionID, cursor)
+                            messages = read.messages + messages
+                            if (messages.any { it.completedChildID == childSessionID }) break
+                            cursor = read.next ?: break
+                        }
+                        when (val outcome = subagentRelayOutcome(messages, childSessionID)) {
+                            is SubagentRelayOutcome.Replied -> return@relayed outcome.reply
+                            SubagentRelayOutcome.CoveredOrSilent -> return@relayed null
+                            SubagentRelayOutcome.Pending -> {
+                                if (attempt >= delays.size || !currentCoroutineContext().isActive) {
+                                    throw OpenCodeClientError("Waiting for Voice session to relay background work.")
+                                }
+                                clock.sleep(delays[attempt])
+                            }
+                        }
+                    }
+                    throw OpenCodeClientError("Waiting for Voice session to relay background work.")
+                },
                 noteSessionSettled = { server, sessionID -> coordinator.noteSessionSettled(server, sessionID) },
                 noteActiveSessions = { server, activeIDs -> coordinator.noteActiveSessions(server, activeIDs) },
                 recentMessages = { server, sessionID, limit ->
@@ -529,10 +556,49 @@ class VoiceWorkClient(
         }
 
         /** Text the read reply carries: its opening, since a long reply is cut. */
-        private fun isRead(text: String, reply: String?): Boolean {
+        fun isRead(text: String, reply: String?): Boolean {
             if (reply == null) return false
             return reply.contains(text.take(200))
         }
+
+        sealed interface SubagentRelayOutcome {
+            data object Pending : SubagentRelayOutcome
+            data object CoveredOrSilent : SubagentRelayOutcome
+            data class Replied(val reply: String) : SubagentRelayOutcome
+        }
+
+        /**
+         * What a session-delegator parent session said about a completed background
+         * subagent (`<subagent>` synthetic): [SubagentRelayOutcome.Pending] until `<subagent>` arrives
+         * and the parent's run after it settles (or is covered), [SubagentRelayOutcome.CoveredOrSilent]
+         * when a user turn or combined subagent reply covers it or it settled silent.
+         */
+        fun subagentRelayOutcome(messages: List<OpenCodeRunMessage>, childSessionID: String): SubagentRelayOutcome {
+            val anchor = messages.indexOfLast { it.completedChildID == childSessionID }
+            if (anchor < 0) return SubagentRelayOutcome.Pending
+            val runStart = messages.subList(0, anchor).indexOfLast { it.type == "idle" }.let { if (it < 0) 0 else it + 1 }
+            val before = messages.subList(runStart, anchor)
+            val launchedHere = before.any { message -> message.launches.any { it.sessionID == childSessionID } }
+            if (!launchedHere && before.any { it.type == "user" }) return SubagentRelayOutcome.CoveredOrSilent
+            var reply: String? = null
+            var settled = false
+            for (message in messages.subList(anchor + 1, messages.size)) {
+                if (message.type == "idle") {
+                    settled = true
+                    break
+                }
+                if (message.type == "user" || message.completedChildID != null) {
+                    return reply?.let(SubagentRelayOutcome::Replied) ?: SubagentRelayOutcome.CoveredOrSilent
+                }
+                if (message.type != "assistant" || message.text.isEmpty()) continue
+                reply = bounded(message.text, readMore = message.id)
+            }
+            if (!settled) return SubagentRelayOutcome.Pending
+            return reply?.let(SubagentRelayOutcome::Replied) ?: SubagentRelayOutcome.CoveredOrSilent
+        }
+
+        fun relayedSubagentReply(messages: List<OpenCodeRunMessage>, childSessionID: String): String? =
+            (subagentRelayOutcome(messages, childSessionID) as? SubagentRelayOutcome.Replied)?.reply
 
         /** How much of a session's final reply the delegator reads. */
         const val replyReadLimit = 6_000

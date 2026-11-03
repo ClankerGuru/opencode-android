@@ -65,7 +65,8 @@ class VoiceCallHost {
         }
     }
     suspend fun completeFunction(callID: String, output: String) = withContext(dispatcher) { coordinator?.completeFunction(callID, output); Unit }
-    suspend fun noteProgress(callID: String, text: String) = withContext(dispatcher) { (current as? LiveCallCoordinator)?.noteProgress(callID, text); Unit }
+    suspend fun noteProgressActivity(callID: String, activity: String?) = withContext(dispatcher) { (current as? LiveCallCoordinator)?.noteProgressActivity(callID, activity); Unit }
+    suspend fun stopProgressLine(callID: String) = withContext(dispatcher) { (current as? LiveCallCoordinator)?.stopProgressLine(callID); Unit }
     suspend fun announce(text: String, sessionID: String? = null, promptIDs: List<String> = emptyList()) = withContext(dispatcher) {
         when (val coordinator = current) {
             is LiveCallCoordinator -> coordinator.announce(text, sessionID, promptIDs)
@@ -74,7 +75,7 @@ class VoiceCallHost {
         }
     }
     suspend fun cancelPendingAnnouncements(promptIDs: List<String>) = withContext(dispatcher) { (current as? LiveCallCoordinator)?.cancelPendingAnnouncements(promptIDs); Unit }
-    suspend fun abandonDelegation(callID: String) = withContext(dispatcher) { coordinator?.abandonDelegation(callID); Unit }
+    suspend fun closeDelegation(callID: String, reason: VoiceDelegationCloseReason) = withContext(dispatcher) { coordinator?.closeDelegation(callID, reason); Unit }
     suspend fun retarget() = withContext(dispatcher) { coordinator?.retarget(); Unit }
     suspend fun setMuted(muted: Boolean) = withContext(dispatcher) { coordinator?.setMuted(muted); Unit }
     suspend fun setAtEar(atEar: Boolean) = withContext(dispatcher) {

@@ -36,7 +36,8 @@ object VoiceSessionDelegator {
 
     val activeCallBlock = """
         [Voice call active]
-        Kit is on a live voice call on his phone. Reply in 1–3 plain spoken sentences with no Markdown, code blocks, or raw IDs; write long output to files or subagents and give a spoken summary first.
+        The user is on a live voice call on their phone. Reply in 1–3 plain spoken sentences with no Markdown, code blocks, or raw IDs; write long output to files or subagents and give a spoken summary first.
+        When walking through a list one item at a time, end with a single line naming the next item ("Next is X; keep, drop, or note?").
     """.trimIndent()
 
     data class State(
@@ -67,7 +68,13 @@ object VoiceSessionDelegator {
             val reconnectedMidTurn: Boolean = false,
         )
 
-        data class RunningTool(val id: String, val name: String, val label: String?)
+        data class RunningTool(
+            val id: String,
+            val name: String,
+            val label: String?,
+            /** The delegator session it runs in. */
+            val sessionID: String = "",
+        )
 
         val hasActiveTurns: Boolean get() = turns.isNotEmpty()
         val inFlightCallIDs: List<String> get() = turns.map { it.callID }
@@ -79,7 +86,27 @@ object VoiceSessionDelegator {
                 sessionID in provisionalSessionIDs ||
                 turns.any { it.sessionID == sessionID }
 
+        /** The newest running tool's caption in one session. */
+        fun progressCaption(sessionID: String): String? =
+            runningTools.asReversed().filter { it.sessionID == sessionID }.firstNotNullOfOrNull { it.label }
+
         fun clearRunningTools(): State = copy(runningTools = emptyList(), toolNames = emptyMap())
+
+        /**
+         * The delegation a session's tools work for: its admitted turn that
+         * will speak (a superseded one never does).
+         */
+        fun progressCallID(sessionID: String): String? =
+            turns.lastOrNull { it.sessionID == sessionID && it.promptID != null && !it.superseded }?.callID
+
+        /** One session's turns settled or it went away: only its tools stop. */
+        fun clearRunningTools(sessionID: String): State {
+            val ids = runningTools.filter { it.sessionID == sessionID }.map { it.id }.toSet()
+            return copy(
+                runningTools = runningTools.filterNot { it.sessionID == sessionID },
+                toolNames = toolNames - ids,
+            )
+        }
 
         fun resetForCallStart(): State = State()
 
@@ -150,12 +177,12 @@ object VoiceSessionDelegator {
             line.isEmpty() -> null
             line == VoiceTranscriptTail.omittedNote -> line
             line.startsWith("user (updated utterance): ") ->
-                "Kit (updated utterance): " + line.removePrefix("user (updated utterance): ")
-            line.startsWith("user: ") -> "Kit: " + line.removePrefix("user: ")
+                "User (updated utterance): " + line.removePrefix("user (updated utterance): ")
+            line.startsWith("user: ") -> "User: " + line.removePrefix("user: ")
             line.startsWith("assistant (updated utterance): ") ->
                 "Voice (updated utterance): " + line.removePrefix("assistant (updated utterance): ")
             line.startsWith("assistant: ") -> "Voice: " + line.removePrefix("assistant: ")
-            else -> "Kit: $line"
+            else -> "User: $line"
         }
     }
 
@@ -169,6 +196,11 @@ object VoiceSessionDelegator {
         val sections = mutableListOf<String>()
         if (includeActiveCallHeader) sections += activeCallBlock
         if (!contextLine.isNullOrEmpty()) sections += contextLine
+        val outcomeCheck = promisedClaim?.trim()
+        if (outcomeCheck != null && outcomeCheck.startsWith("[Outcome check]")) {
+            sections += outcomeCheck
+            return sections.joinToString("\n\n")
+        }
         val delta = mutableListOf("[Voice delta]")
         for (line in deltaLines) {
             val trimmed = line.trim()

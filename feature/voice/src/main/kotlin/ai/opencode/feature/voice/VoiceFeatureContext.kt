@@ -40,6 +40,19 @@ fun VoiceFeature.State.adoptDraftSession(session: OpenCodeSession): VoiceFeature
     )
 }
 
+/** Whether this call explained itself to the session recently, with no compaction since (D4a). */
+fun VoiceFeature.State.isSessionExplained(sessionID: String, at: Instant): Boolean {
+    val handoff = handoffs[sessionID] ?: return false
+    return secondsBetween(handoff.lastDelegationAt, at) <= VoiceHandoff.headerLapse &&
+        handoff.compactionID == compactions[sessionID]
+}
+
+fun VoiceFeature.State.explainedSessionIDs(at: Instant): Set<String> =
+    handoffs.keys.filterTo(LinkedHashSet()) { isSessionExplained(it, at) }
+
+fun VoiceFeature.State.recordHandoff(sessionID: String, at: Instant): VoiceFeature.State =
+    copy(handoffs = handoffs + (sessionID to VoiceFeature.State.Handoff(lastDelegationAt = at, compactionID = compactions[sessionID])))
+
 /**
  * How long optional context (a session's recent messages) may hold back
  * a call's start or its instructions after a move.

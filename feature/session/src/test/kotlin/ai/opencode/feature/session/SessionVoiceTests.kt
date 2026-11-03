@@ -120,8 +120,7 @@ class SessionVoiceTests {
             this[VoiceCallClient] = VoiceCallClient(
                 start = { _, _ -> emptyFlow() },
                 completeFunction = { callID, output -> harness.completed.update { it + (callID to output) } },
-                noteProgress = { _, _ -> },
-                abandonDelegation = { },
+                closeDelegation = { _, _ -> },
                 setMuted = { },
                 updateInstructions = { _, _ -> },
                 end = { harness.callEnds.increment() },
@@ -330,8 +329,7 @@ class SessionVoiceTests {
             this[VoiceCallClient] = VoiceCallClient(
                 start = { _, _ -> emptyFlow() },
                 completeFunction = { _, _ -> },
-                noteProgress = { _, _ -> },
-                abandonDelegation = { },
+                closeDelegation = { _, _ -> },
                 setMuted = { },
                 updateInstructions = { _, _ -> },
                 end = {},

@@ -68,4 +68,42 @@ class VoiceContextHoldTests {
         assertEquals("Sent a quiet window after the reply, not at the limit", listOf("${VoiceInstructions.retargetPrefix} Attached to OPENCODE IOS."), context())
         call.coordinator.end()
     }
+
+    @Test fun announcementDoesNotForceFlushHeldContextDuringUserReplyHold() = runTest {
+        val timing = VoiceCallTiming(
+            rotateAfter = 3_000.0,
+            forceRotateAfter = 3_500.0,
+            retryDelays = listOf(0.01),
+            liveDelegationSettle = Duration.ZERO,
+            liveTranscriptSettle = 40.milliseconds,
+            liveAcknowledgementWait = Duration.ZERO,
+        ).copy(
+            liveAppendQuiet = 200.milliseconds,
+            liveAppendReplyWait = 300.milliseconds,
+            liveContextReplyHold = 8.seconds,
+        )
+        val call = clockedCall(timing)
+        val socket = call.socket
+        val context: () -> List<String> = {
+            socket.commands.mapNotNull { (it as? LiveCommand.AppendInstructions)?.content }
+        }
+
+        call.userSays("What's left on the checklist?", from = 1_000, to = 1_600)
+        call.coordinator.retarget()
+        call.coordinator.updateInstructions(full = "Full.", delta = "${VoiceInstructions.retargetPrefix} Attached to SEER.")
+        call.advance(400)
+        assertTrue(context().isEmpty())
+
+        // An announcement arrives past `liveAppendReplyWait` (300 ms) while `.context` is still inside its 8 s reply hold.
+        call.coordinator.announce("The session “Upload” finished: All green.", sessionID = "ses_upload")
+        call.waitFor { call.spoken() == listOf("The session “Upload” finished: All green.") }
+        assertTrue("An announcement must never force-flush held context ahead of liveContextReplyHold", context().isEmpty())
+
+        // Context flushes only once its 8 s reply hold expires (7,600 ms remaining).
+        call.advance(7_599)
+        assertTrue(context().isEmpty())
+        call.advance(1)
+        call.waitFor { context() == listOf("${VoiceInstructions.retargetPrefix} Attached to SEER.") }
+        call.coordinator.end()
+    }
 }

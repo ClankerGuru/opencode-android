@@ -301,7 +301,7 @@ class VoiceTurnStampTests {
             )
             this[VoiceCallClient] = speechVoiceCall(
                 completeFunction = { _, _ -> answered.set(true) },
-                announce = { text -> announced.update { it + text } },
+                announce = { _, _, text -> announced.update { it + text } },
                 cancelPendingAnnouncements = {},
             )
         }

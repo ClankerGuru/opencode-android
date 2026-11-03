@@ -8,6 +8,7 @@ import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.experimental
+import ai.opencode.core.testing.eventually
 import ai.opencode.feature.voice.VoiceFeatureTestSupport.copy
 import ai.opencode.feature.voice.VoiceSessionDelegatorTestSupport.liveDelegatorState
 import ai.opencode.feature.voice.VoiceSessionDelegatorTestSupport.mockServerID
@@ -284,7 +285,7 @@ class VoiceSessionDelegatorTests {
             })
             this[VoiceCallClient] = testVoiceCall(
                 completeFunction = { callID, output -> completed.update { it + (callID to output) } },
-            ).copy(announce = { text -> announced.update { it + text } })
+            ).copy(announce = { _, _, text -> announced.update { it + text } })
         }
         store.exhaustive = false
 
@@ -310,7 +311,7 @@ class VoiceSessionDelegatorTests {
         assertTrue(firstPrompt.text.contains("[Voice call active]"))
         // Android names the device "Phone" where iOS says "iPhone" (docs/parity/voice.md).
         assertTrue(firstPrompt.text, firstPrompt.text.contains("[Phone context] Viewing session \"Session View\" (ses_view)"))
-        assertTrue(firstPrompt.text, firstPrompt.text.contains("[Voice delta]\nKit: Check the failing tests.\nVoice: Checking now."))
+        assertTrue(firstPrompt.text, firstPrompt.text.contains("[Voice delta]\nUser: Check the failing tests.\nVoice: Checking now."))
         assertEquals(1, completed.value.size)
         assertEquals("del_1", completed.value[0].first)
         assertEquals("[COMPLETE] Two unit tests failed in VoiceTests.swift.", completed.value[0].second)
@@ -330,7 +331,7 @@ class VoiceSessionDelegatorTests {
         assertFalse(secondPrompt.text.contains("[Voice call active]"))
         assertFalse(secondPrompt.text.contains("[Phone context]"))
         assertFalse(secondPrompt.text.contains("Check the failing tests."))
-        assertEquals("[Voice delta]\nKit: Fix them and re-run.", secondPrompt.text)
+        assertEquals("[Voice delta]\nUser: Fix them and re-run.", secondPrompt.text)
         assertEquals(2, completed.value.size)
         assertEquals("[COMPLETE] Re-ran them; both pass now.", completed.value[1].second)
 
@@ -361,7 +362,7 @@ class VoiceSessionDelegatorTests {
         val thirdPrompt = sentPrompts.value[2]
         assertFalse(thirdPrompt.text.contains("[Voice call active]"))
         assertTrue(thirdPrompt.text, thirdPrompt.text.contains("[Phone context] Viewing session \"Session View\" (ses_view) · needs input"))
-        assertTrue(thirdPrompt.text.contains("Kit: What needs my input?"))
+        assertTrue(thirdPrompt.text.contains("User: What needs my input?"))
         movedStore.finish()
         movedEffects.skipInFlightEffects()
     }
@@ -384,6 +385,7 @@ class VoiceSessionDelegatorTests {
         val waitGate2 = CompletableDeferred<String?>()
         val abandoned = Locked(listOf<String>())
         val completed = Locked(listOf<Pair<String, String>>())
+        val activities = Locked(listOf<List<String?>>())
         val msgCounter = Locked(0)
 
         val effects = detachedScope(coroutineContext)
@@ -401,12 +403,21 @@ class VoiceSessionDelegatorTests {
             })
             this[VoiceCallClient] = testVoiceCall(
                 completeFunction = { id, out -> completed.update { it + (id to out) } },
-            ).copy(abandonDelegation = { id -> abandoned.update { it + id } })
+                noteProgressActivity = { id, activity -> activities.update { it + listOf(listOf(id, activity)) } },
+            ).copy(closeDelegation = { id, _ -> abandoned.update { it + id } })
         }
         store.exhaustive = false
 
         store.send(functionCall("del_1"))
         store.receive(::isAdmitted, 5.seconds)
+        store.send(
+            VoiceFeature.Action.SessionDelegatorTools(
+                sessionID = "ses_home",
+                events = listOf(OpenCodeLiveContentEvent.ToolInputStarted(messageID = "m1", toolID = "t_shell", name = "shell")),
+            ),
+        )
+        assertTrue(eventually { activities.value.size == 1 })
+        assertEquals(listOf(listOf("del_1", "running a command")), activities.value)
 
         // User steers again mid-turn before del_1 finishes.
         store.send(userTranscript("u2", "Actually only run VoiceTests."))
@@ -414,6 +425,20 @@ class VoiceSessionDelegatorTests {
         store.receive(::isAdmitted, 5.seconds)
 
         assertEquals("Earlier delegation is abandoned as soon as the newer steer is admitted", listOf("del_1"), abandoned.value)
+        // The follow-up says what the run it joined is doing; the superseded
+        // turn hears nothing more.
+        assertTrue(eventually { activities.value.size == 2 })
+        store.send(
+            VoiceFeature.Action.SessionDelegatorTools(
+                sessionID = "ses_home",
+                events = listOf(OpenCodeLiveContentEvent.ToolInputStarted(messageID = "m2", toolID = "t_grep", name = "grep")),
+            ),
+        )
+        assertTrue(eventually { activities.value.size == 3 })
+        assertEquals(
+            listOf(listOf("del_1", "running a command"), listOf("del_2", "running a command"), listOf("del_2", "searching the code")),
+            activities.value,
+        )
         assertEquals(true, store.state.sessionDelegator.turns.firstOrNull { it.callID == "del_1" }?.superseded)
         assertEquals(false, store.state.sessionDelegator.turns.firstOrNull { it.callID == "del_2" }?.superseded)
 
@@ -460,10 +485,10 @@ class VoiceSessionDelegatorTests {
             delegatorWork = listOf("del_1"),
         )
 
-        val progressAppends = Locked(listOf<String>())
+        val activities = Locked(listOf<List<String?>>())
         val effects = detachedScope(coroutineContext)
         val store = store(shared, state, effects, now = 0) {
-            this[VoiceCallClient] = testVoiceCall(noteProgress = { _, text -> progressAppends.update { it + text } })
+            this[VoiceCallClient] = testVoiceCall(noteProgressActivity = { callID, activity -> activities.update { it + listOf(listOf(callID, activity)) } })
         }
 
         store.send(
@@ -482,13 +507,15 @@ class VoiceSessionDelegatorTests {
             it.copy(
                 sessionDelegator = it.sessionDelegator.copy(
                     toolNames = it.sessionDelegator.toolNames + ("t1" to "read"),
-                    runningTools = listOf(VoiceSessionDelegator.State.RunningTool(id = "t1", name = "read", label = "Reading VoiceFeature.swift")),
+                    runningTools = listOf(VoiceSessionDelegator.State.RunningTool(id = "t1", name = "read", label = "Reading VoiceFeature.swift", sessionID = session.id)),
                 ),
             )
         }
         assertEquals("Reading VoiceFeature.swift", store.state.statusText)
         assertEquals("Reading VoiceFeature.swift", store.state.captionTargets.lastOrNull()?.text)
-        assertTrue("Tool progress stays on the phone UI and call log so GPT-Live never speaks prematurely", progressAppends.value.isEmpty())
+        store.finish()
+        // The spoken "still working" line, if one comes due, says what's running.
+        assertEquals(listOf(listOf("del_1", "reading files")), activities.value)
 
         store.send(
             VoiceFeature.Action.SessionDelegatorTools(
@@ -500,6 +527,7 @@ class VoiceSessionDelegatorTests {
         }
         assertEquals("Working", store.state.statusText)
         store.finish()
+        assertEquals(listOf(listOf("del_1", "reading files"), listOf("del_1", null)), activities.value)
         effects.skipInFlightEffects()
     }
 
@@ -700,7 +728,7 @@ class VoiceSessionDelegatorTests {
                     target
                 },
             )
-            this[VoiceCallClient] = testVoiceCall().copy(announce = { text -> announced.update { it + text } })
+            this[VoiceCallClient] = testVoiceCall().copy(announce = { _, _, text -> announced.update { it + text } })
         }
 
         val expectedCalls = listOf(

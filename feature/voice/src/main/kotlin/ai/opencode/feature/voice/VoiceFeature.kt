@@ -422,11 +422,7 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
                 pendingModel = null,
                 target = next.target.copy(sessionID = session.id, directory = session.directory),
             )
-            val previous = next.transcriptKey?.let { next.transcripts[it] }
-            // Records written since the call connected are its own.
-            val isEarlierCall = previous?.let { record -> next.connectedAt?.let { record.endedAt < it } ?: true } ?: false
-            val earlier = previous?.takeIf { isEarlierCall }
-            return next.copy(previousCallTail = earlier?.tail ?: emptyList(), previousEndedAt = earlier?.endedAt)
+            return next.copy(previousCallTail = emptyList(), previousEndedAt = null)
         }
 
         /**
@@ -568,12 +564,13 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
             /** A call on [session], picking up the tail an earlier call left there (iOS `init(server:session:)`). */
             operator fun invoke(server: OpenCodeServer, session: OpenCodeSession): State {
                 val previous = shared(VoiceSharedKeys.voiceTranscripts).value["${server.id}:${session.id}"]
+                val previousLines = VoiceTranscriptRecord.continuityLines(previous?.tail ?: emptyList())
                 return State(
                     target = VoiceWorkTarget(server = server, sessionID = session.id, directory = session.directory),
                     sessionTitle = usableTitle(session.title) ?: "New session",
-                    tail = VoiceTranscriptTail(lines = previous?.tail ?: emptyList()),
-                    previousCallTail = previous?.tail ?: emptyList(),
-                    previousEndedAt = previous?.endedAt,
+                    tail = VoiceTranscriptTail(lines = previousLines),
+                    previousCallTail = previousLines,
+                    previousEndedAt = if (previousLines.isEmpty()) null else previous?.endedAt,
                 )
             }
 
@@ -955,12 +952,7 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
                 val sessionID = workTarget.sessionID ?: return Reduced(next)
                 if (work.explainsHeader) {
                     // Recorded on admission too, for a draft whose session this request created.
-                    next = next.copy(
-                        handoffs = next.handoffs + (sessionID to State.Handoff(
-                            lastDelegationAt = next.handoffs[sessionID]?.lastDelegationAt ?: dependency(DateClient).now(),
-                            compactionID = next.compactions[sessionID],
-                        )),
-                    )
+                    next = next.recordHandoff(sessionID, next.handoffs[sessionID]?.lastDelegationAt ?: dependency(DateClient).now())
                 }
                 Reduced(
                     next,
@@ -974,8 +966,12 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
                 val superseded = state.pendingWork.firstOrNull { it.callID == action.callID }?.superseded ?: false
                 val next = state.copy(pendingWork = state.pendingWork.filter { it.callID != action.callID })
                 val trimmed = action.reply?.trim() ?: ""
+                if (action.callID.startsWith("client_verify_")) {
+                    val output = if (VoiceActionClaim.correctsVoice(trimmed)) VoiceHandoff.completion(trimmed) else ""
+                    return Reduced(next, completeFunction(action.callID, output))
+                }
                 if (trimmed.isEmpty() && superseded) {
-                    return Reduced(next, Effect.run { voiceCall.abandonDelegation(action.callID) })
+                    return Reduced(next, Effect.run { voiceCall.closeDelegation(action.callID, VoiceDelegationCloseReason.superseded) })
                 }
                 Reduced(next, completeFunction(action.callID, VoiceHandoff.completion(trimmed)))
             }
@@ -1020,14 +1016,7 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
                 Reduced(next, Effect.send(Action.Delegate(DelegateAction.PickWaiting(action.sessionID, action.model))))
             }
 
-            is Action.DelegatorExplained -> Reduced(
-                state.copy(
-                    handoffs = state.handoffs + (action.sessionID to State.Handoff(
-                        lastDelegationAt = dependency(DateClient).now(),
-                        compactionID = state.compactions[action.sessionID],
-                    )),
-                ),
-            )
+            is Action.DelegatorExplained -> Reduced(state.recordHandoff(action.sessionID, dependency(DateClient).now()))
 
             is Action.DelegatorFinished -> reduceDelegatorFinished(state, action)
 
@@ -1047,7 +1036,7 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
                     }
                     next = next.copy(pendingWork = remaining)
                 }
-                Reduced(next, completeFunction(action.callID, VoiceHandoff.failure(action.message)))
+                Reduced(next, completeFunction(action.callID, if (action.callID.startsWith("client_verify_")) "" else VoiceHandoff.failure(action.message)))
             }
 
             Action.MuteTapped -> {
@@ -1177,7 +1166,7 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
 
             is VoiceCallEvent.FunctionCall -> when (event.name) {
                 "delegate" -> delegateWork(
-                    state.copy(replyWatch = state.replyWatch.noteUserActed()),
+                    if (event.callID.startsWith("client_verify_")) state else state.copy(replyWatch = state.replyWatch.noteUserActed()),
                     callID = event.callID,
                     rawFraming = event.arguments["text"]?.stringValue,
                 )
@@ -1231,15 +1220,20 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
         // From a call that has since ended (its work was dropped then).
         if (callID !in state.delegatorWork) return Reduced(state)
         var next = state.copy(delegatorWork = state.delegatorWork.filter { it != callID })
+        val isVerify = callID.startsWith("client_verify_")
         val outcome = action.result.getOrNull()
         if (outcome != null) {
             if (outcome.responseID != null) next = next.copy(delegatorResponseID = outcome.responseID)
             val prompts = outcome.unanswered.map { ReplyWatch.Prompt(it) }
+            val speaks = !outcome.spoken && (!isVerify || VoiceActionClaim.correctsVoice(outcome.reply))
             // What it read counts as told only now its answer is spoken (never
             // when `interrupted`), and results held for it go out after it.
             val (sentWatch, sentEffects) = next.replyWatch.transition(ReplyWatch.Event.Sent(prompts))
             val (finishedWatch, finishedEffects) = sentWatch.transition(
-                ReplyWatch.Event.DelegatorFinished(requestID = callID, spoken = if (outcome.interrupted == null) outcome.reply else null),
+                ReplyWatch.Event.DelegatorFinished(
+                    requestID = callID,
+                    spoken = if (outcome.interrupted == null) (if (isVerify) "VERIFIED" else outcome.reply) else null,
+                ),
             )
             next = next.copy(replyWatch = finishedWatch)
             var ending: Effect<Action> = Effect.none()
@@ -1255,7 +1249,7 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
                 Effect.merge(
                     answerThenRelease(
                         callID = callID,
-                        output = if (outcome.spoken) "" else VoiceHandoff.completion(outcome.reply),
+                        output = if (speaks) VoiceHandoff.completion(outcome.reply) else "",
                         watchEffects = sentEffects + finishedEffects,
                         state = next,
                     ),
@@ -1266,7 +1260,10 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
         val message = action.result.exceptionOrNull()?.clientMessage ?: ""
         val (watch, effects) = next.replyWatch.transition(ReplyWatch.Event.DelegatorFinished(requestID = callID, spoken = null))
         next = next.copy(replyWatch = watch)
-        return Reduced(next, answerThenRelease(callID = callID, output = VoiceHandoff.failure(message), watchEffects = effects, state = next))
+        return Reduced(
+            next,
+            answerThenRelease(callID = callID, output = if (isVerify) "" else VoiceHandoff.failure(message), watchEffects = effects, state = next),
+        )
     }
 
     private fun upsertCaption(state: State, id: String, role: VoiceTranscriptTail.Role, text: String): State {

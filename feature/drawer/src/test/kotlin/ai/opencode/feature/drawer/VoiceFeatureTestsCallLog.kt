@@ -87,8 +87,8 @@ class VoiceFeatureTestsCallLog {
             this[DateClient] = DateClient { Instant.EPOCH }
             this[VoiceCallClient] = VoiceCallClient.testValue.let { inert ->
                 VoiceCallClient(
-                    start = inert.start, completeFunction = inert.completeFunction, noteProgress = inert.noteProgress,
-                    abandonDelegation = inert.abandonDelegation, setMuted = inert.setMuted, end = inert.end,
+                    start = inert.start, completeFunction = inert.completeFunction,
+                    closeDelegation = inert.closeDelegation, setMuted = inert.setMuted, end = inert.end,
                     updateInstructions = { full, _ -> instructions += full },
                 )
             }
@@ -118,8 +118,8 @@ class VoiceFeatureTestsCallLog {
             this[DateClient] = DateClient { Instant.EPOCH }
             this[VoiceCallClient] = VoiceCallClient.testValue.let { inert ->
                 VoiceCallClient(
-                    start = inert.start, completeFunction = inert.completeFunction, noteProgress = inert.noteProgress,
-                    abandonDelegation = inert.abandonDelegation, setMuted = inert.setMuted, end = inert.end,
+                    start = inert.start, completeFunction = inert.completeFunction,
+                    closeDelegation = inert.closeDelegation, setMuted = inert.setMuted, end = inert.end,
                     updateInstructions = { full, _ -> instructions += full },
                 )
             }
@@ -186,7 +186,7 @@ class VoiceFeatureTestsCallLog {
                     noteSessionSettled = { _, sessionID -> settled.append(sessionID) },
                 )
             }
-            voiceCall { copy(completeFunction = { _, _ -> }, noteProgress = { _, _ -> }, announce = { text -> announced.append(text) }) }
+            voiceCall { copy(completeFunction = { _, _ -> }, announce = { _, _, text -> announced.append(text) }) }
         }
         store.exhaustive = false
 
@@ -240,7 +240,7 @@ class VoiceFeatureTestsCallLog {
                     "Completed while the phone was reconnecting."
                 })
             }
-            voiceCall { copy(announce = { text -> announced.append(text) }) }
+            voiceCall { copy(announce = { _, _, text -> announced.append(text) }) }
         }
         store.exhaustive = false
 

@@ -201,6 +201,25 @@ class VoiceBroker(
         }
     }
 
+    companion object {
+        /** The broker and the readiness it was resolved with (iOS `resolve(…)` returning a tuple). */
+        fun resolve(
+            serverVoice: Boolean,
+            choice: VoiceServerChoice,
+            provider: ServerVoiceProvider = ServerVoiceProvider.openAI,
+            connected: OpenCodeServer?,
+            saved: () -> List<OpenCodeServer>,
+            answers: Map<String, ServerVoiceModelsAnswer>,
+            support: Map<String, ServerVoiceSupport>,
+            hasOpenAIKey: Boolean,
+            engine: VoiceEngine,
+        ): Pair<VoiceBroker, VoiceReadiness> {
+            val readiness = VoiceReadiness(answers = answers, support = support, hasPhoneKey = hasOpenAIKey, engine = engine)
+            val broker = VoiceBroker(serverVoice, choice, provider, connected, saved, readiness)
+            return broker to readiness
+        }
+    }
+
     /** What's known of whether the broker offers `POST /api/experimental/voice/session`. */
     fun support(supportByServer: Map<String, ServerVoiceSupport>): ServerVoiceSupport =
         server?.let { supportByServer[it.persistenceID] } ?: ServerVoiceSupport.unknown

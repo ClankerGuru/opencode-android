@@ -25,13 +25,16 @@ data class VoiceRoutePreferences(
 ) {
     fun route(server: OpenCodeServer): VoiceRoute {
         val hasOpenAIKey = !(openAIKey.value ?: "").trim().isEmpty()
-        val broker = VoiceBroker(
+        val (broker, _) = VoiceBroker.resolve(
             serverVoice = ExperimentalFeature.serverVoice.isActive(serverVoice.value),
             choice = voiceServer.value,
             provider = provider.value,
             connected = server,
             saved = { VoiceFeature.savedServers },
-            readiness = VoiceReadiness(answers = voiceModels.value, support = support.value, hasPhoneKey = hasOpenAIKey, engine = engine.value),
+            answers = voiceModels.value,
+            support = support.value,
+            hasOpenAIKey = hasOpenAIKey,
+            engine = engine.value,
         )
         return broker.route(
             engine = engine.value,

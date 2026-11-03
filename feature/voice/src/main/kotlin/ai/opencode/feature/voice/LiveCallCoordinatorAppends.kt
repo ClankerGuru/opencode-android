@@ -3,46 +3,88 @@ package ai.opencode.feature.voice
 import kotlinx.coroutines.*
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
-import ai.opencode.feature.voice.LiveCallCoordinator.PendingAppend
 import ai.opencode.feature.voice.LiveCallCoordinator.AnswerSpeech
 import java.util.Locale
 
-internal suspend fun LiveCallCoordinator.noteLiveProgress(callID: String, text: String) {
-    val delegationID = when {
-        callID.isEmpty() -> null
-        callID in openDelegations -> callID
-        callID in orphanDelegations || callID in clientDelegations -> null
-        else -> return
-    }
-    for (chunk in LiveContentChunker.chunks(text)) {
-        if (!running()) return
-        sendAppend(PendingAppend(LiveAppendKind.thinking, delegationID, chunk, origin = callID.ifEmpty { null }))
-    }
-}
-
+/** A result nobody is waiting on in this turn: it speaks as soon as it
+ * won't cut anyone off (within `liveResultMaxHold` of the voice agent's
+ * speech, when that's set; never of the user's). */
 internal suspend fun LiveCallCoordinator.announceLive(text: String, sessionID: String?, promptIDs: List<String>) {
     if (!running()) return
-    val id = nextEventID("ann")
+    val announcementID = nextEventID("ann")
     val now = clock.now()
-    heldAnnouncements += LiveContentChunker.chunks(text).map {
-        PendingAppend(LiveAppendKind.commentary, null, it, sessionID, id, promptIDs, now)
+    val role = LiveOutboundRole.Announcement(announcementID, sessionID, promptIDs, now)
+    val items = LiveContentChunker.chunks(text).map {
+        PendingAppend(role, LiveAppendKind.commentary, null, it, enqueuedAt = now)
     }
-    val delay = announcementDelay(now)
-    if (delay != null) {
+    if (items.isEmpty()) return
+    channelDelay(role, now)?.let { delay ->
+        hold(items)
         voiceCallLog.noteCurrent(VoiceCallLog.Note.Kind.marker,
             "Held notice so it doesn't cut off speech (${ReplyWatch.milliseconds(delay)}ms, ${quietGate.holdReason(now)}): ${VoiceWorkClient.excerpt(text, 120)}")
-        scheduleAnnouncementFlush()
-    } else flushAnnouncements()
+        return
+    }
+    if (outbound.hasEligibleItems(active?.id)) { hold(items); return }
+    if (!acquireSendSlot()) return
+    try {
+        if (outbound.hasEligibleItems(active?.id) || channelDelay(role, clock.now(), holdingSlot = true) != null) { hold(items); return }
+        sendBatch(items)
+    } finally { releaseSendSlot() }
 }
 
-internal fun LiveCallCoordinator.announcementDelay(now: Duration): Duration? {
-    val oldest = heldAnnouncements.firstOrNull()?.enqueuedAt ?: return null
-    if (finished || timing.liveAppendQuiet <= Duration.ZERO) return null
-    var wait = if (quietAppends.isNotEmpty() || quietAppendsSending > 0 || pendingDelegationTasks.isNotEmpty() || acknowledgements.isNotEmpty()) 200.milliseconds else Duration.ZERO
-    quietGate.delay(now)?.let { wait = maxOf(wait, it) }
-    return limited(wait, now - oldest, now)
+/** Unified channel-free policy across answers, announcements, session
+ * context, wire closures, and ephemeral progress lines. Null when [role]
+ * may go on the wire immediately. */
+internal fun LiveCallCoordinator.channelDelay(role: LiveOutboundRole, now: Duration, holdingSlot: Boolean = false): Duration? {
+    if (finished) return null
+    when (role) {
+        LiveOutboundRole.Progress -> {
+            var wait = Duration.ZERO
+            val socket = active
+            val busy = !outbound.isEmpty || outboundFlushTask != null ||
+                pendingDelegationTasks.isNotEmpty() || acknowledgements.isNotEmpty() ||
+                (sendSlotTaken && !holdingSlot) ||
+                socket?.ready != true || !socket.attached
+            if (busy) wait = LiveCallCoordinator.progressRetry
+            quietGate.delay(now)?.let { wait = maxOf(wait, it) }
+            answerProtection(now)?.let { wait = maxOf(wait, it) }
+            return wait.takeIf { it > Duration.ZERO }
+        }
+        is LiveOutboundRole.Answer -> {
+            if (timing.liveAppendQuiet <= Duration.ZERO) return null
+            val answer = LiveOutboundItem.Answer(role.readyAt, role.delegatedAt)
+            val wait = quietGate.answerDelay(now, role.readyAt, isPressed(answer), timing.liveAnswerPressedHold)
+            val heldSince = minOf(role.readyAt, outbound.oldestResultAt ?: role.readyAt)
+            return wait?.let { limited(it, now - heldSince, now) }
+        }
+        is LiveOutboundRole.Announcement -> {
+            if (timing.liveAppendQuiet <= Duration.ZERO) return null
+            var wait = if (pendingDelegationTasks.isNotEmpty() || acknowledgements.isNotEmpty()) 200.milliseconds else Duration.ZERO
+            quietGate.delay(now)?.let { wait = maxOf(wait, it) }
+            val oldest = outbound.oldestAnnouncementAt?.let { minOf(it, role.enqueuedAt) } ?: role.enqueuedAt
+            var result = limited(wait, now - oldest, now) ?: Duration.ZERO
+            if (role.sessionID != null && hasActiveDelegations) {
+                val delegationHold = maxOf(Duration.ZERO, LiveCallCoordinator.activeDelegationAnnouncementCap - (now - oldest))
+                result = maxOf(result, delegationHold)
+            }
+            return result.takeIf { it > Duration.ZERO }
+        }
+        LiveOutboundRole.Context -> {
+            if (timing.liveAppendQuiet <= Duration.ZERO) return null
+            outbound.items.firstOrNull { it.isAnswer }?.let { return channelDelay(it.role, now, holdingSlot) }
+            var wait = if (timing.liveContextReplyHold > Duration.ZERO) {
+                quietGate.contextDelay(now, timing.liveContextReplyHold) ?: Duration.ZERO
+            } else {
+                quietGate.delay(now) ?: Duration.ZERO
+            }
+            answerProtection(now)?.let { wait = maxOf(wait, it) }
+            return wait.takeIf { it > Duration.ZERO }
+        }
+    }
 }
 
+/** [wait], bounded by `liveResultMaxHold` (zero: none) except for user
+ * speech and `answerProtection`, which always hold on their own clocks. */
 private fun LiveCallCoordinator.limited(wait: Duration, heldFor: Duration, now: Duration): Duration? {
     var result = wait
     if (timing.liveResultMaxHold > Duration.ZERO) result = minOf(result, maxOf(Duration.ZERO, timing.liveResultMaxHold - heldFor))
@@ -50,7 +92,11 @@ private fun LiveCallCoordinator.limited(wait: Duration, heldFor: Duration, now: 
     answerProtection(now)?.let { result = maxOf(result, it) }
     return result.takeIf { it > Duration.ZERO }
 }
-private fun LiveCallCoordinator.answerProtection(now: Duration): Duration? {
+/** How long a delegation's answer still holds what would cut it off: its
+ * start (`liveAnswerStartWait`), then its speech and the short pauses in
+ * it, until `liveAnswerSpeakingHold` after it was sent. Null when there's
+ * none to protect. */
+internal fun LiveCallCoordinator.answerProtection(now: Duration): Duration? {
     val left = when (val answer = answerSpeech) {
         is AnswerSpeech.Awaiting -> return answerStartDelay(now)
         is AnswerSpeech.Speaking -> {
@@ -69,6 +115,9 @@ private fun LiveCallCoordinator.answerStartDelay(now: Duration): Duration? {
 internal fun LiveCallCoordinator.noteAnswerDelivered() {
     answerSpeech = if (timing.liveAnswerStartWait > Duration.ZERO) AnswerSpeech.Awaiting(clock.now()) else null
 }
+/** The voice agent started or stopped speaking, or ([frame]) a frame of its
+ * speech arrived. Speech arriving while an answer is awaited is that
+ * answer, even when it follows earlier speech without a break. */
 internal fun LiveCallCoordinator.noteAssistantSpeech(speaking: Boolean, frame: Boolean = false) {
     val now = clock.now()
     val changed = speaking != quietGate.assistantSpeaking
@@ -85,31 +134,12 @@ internal fun LiveCallCoordinator.noteAssistantSpeech(speaking: Boolean, frame: B
         else -> Unit
     }
 }
-private fun LiveCallCoordinator.scheduleAnnouncementFlush(first: Duration = Duration.ZERO) {
-    if (finished || announcementFlushTask != null) return
-    announcementFlushTask = scope.launch {
-        if (first > Duration.ZERO) clock.sleep(first)
-        while (isActive && !finished) {
-            val delay = announcementDelay(clock.now())
-            if (delay != null) { clock.sleep(delay); continue }
-            flushAnnouncements(); return@launch
-        }
-    }
-}
-private suspend fun LiveCallCoordinator.flushAnnouncements() {
-    announcementFlushTask = null
-    if (quietAppends.isNotEmpty()) flushQuietAppends(force = true)
-    if (!acquireSendSlot()) return
-    try {
-        if (quietAppends.isNotEmpty()) { scheduleAnnouncementFlush(200.milliseconds); return }
-        if (announcementDelay(clock.now()) != null) { scheduleAnnouncementFlush(); return }
-        val held = heldAnnouncements.toList(); heldAnnouncements.clear()
-        sendBatch(held)
-    } finally { releaseSendSlot() }
-}
+
+/** Appends still waiting for the channel (iOS `pendingAppendCount`, DEBUG). */
+internal val LiveCallCoordinator.pendingAppendCount: Int get() = outbound.count
 
 /** FIFO, cancellation-aware batch slot. End turns every queued caller away. */
-private suspend fun LiveCallCoordinator.acquireSendSlot(): Boolean {
+internal suspend fun LiveCallCoordinator.acquireSendSlot(): Boolean {
     if (!running()) return false
     if (!sendSlotTaken) { sendSlotTaken = true; return true }
     val waiter = CompletableDeferred<Boolean>()
@@ -125,7 +155,7 @@ private suspend fun LiveCallCoordinator.acquireSendSlot(): Boolean {
         throw error
     } finally { sendSlotWaiters.remove(waiter) }
 }
-private fun LiveCallCoordinator.releaseSendSlot() {
+internal fun LiveCallCoordinator.releaseSendSlot() {
     if (sendSlotWaiters.isEmpty()) sendSlotTaken = false
     else sendSlotWaiters.removeFirst().complete(true)
 }
@@ -133,209 +163,294 @@ internal fun LiveCallCoordinator.rejectSendSlotWaiters() {
     val waiters = sendSlotWaiters.toList(); sendSlotWaiters.clear()
     waiters.forEach { it.complete(false) }
 }
-private fun LiveCallCoordinator.hold(appends: List<PendingAppend>) {
-    if (finished || appends.isEmpty()) return
-    val now = clock.now(); quietGate = quietGate.noteHeld(now)
-    quietAppends += appends.map { if (it.enqueuedAt == null) it.copy(enqueuedAt = now) else it }
-    // An answer's gate, or a result's behind held context, is shorter than
-    // what the flush may be sleeping out.
-    scheduleQuietFlush(restart = appends.any { it.answer != null || it.kind != LiveAppendKind.instructions })
+
+/** Enqueues appends for the next quiet moment and schedules the single
+ * outbound flush task (`restart` wakes earlier when a shorter-hold item
+ * joins behind context). */
+internal fun LiveCallCoordinator.hold(appends: List<PendingAppend>) {
+    if (appends.isEmpty()) return
+    val now = clock.now()
+    quietGate = quietGate.noteHeld(now)
+    outbound.enqueue(appends, now)
+    scheduleOutboundFlush(restart = appends.any { it.role != LiveOutboundRole.Context })
+}
+internal fun LiveCallCoordinator.cancelLiveAnnouncements(promptIDs: List<String>) {
+    val removed = outbound.cancelAnnouncements(promptIDs.toSet())
+    if (removed > 0) {
+        voiceCallLog.noteCurrent(VoiceCallLog.Note.Kind.marker, "Suppressed held notice for ${promptIDs.joinToString(", ")} (answered by delegator)")
+    }
+    if (outbound.isEmpty) clearOutboundHold()
+}
+@Suppress("UNUSED_PARAMETER")
+internal suspend fun LiveCallCoordinator.closeLiveDelegation(callID: String, reason: VoiceDelegationCloseReason) {
+    stopLiveProgressLine(callID)
+    pendingDelegationTasks.remove(callID)?.cancel()
+    acknowledgements.remove(callID)?.deadline?.cancel()
+    delegationOffsets.remove(callID)
+    serverDelegationSettledAt.remove(callID)
+    val removed = delegations.remove(callID)
+    val removedServer = serverDelegationIDs.remove(callID)
+    endServerDelegation(callID, "The request was dropped.")
+    if (removed != null || removedServer) finishDelegationRelease()
+}
+private suspend fun LiveCallCoordinator.finishDelegationRelease() {
+    discardStandbyAndRescheduleRotation()
+    if (!hasActiveDelegations && !outbound.isEmpty) scheduleOutboundFlush(restart = true)
 }
 /** A newer move's context replaces any still held: each describes a
  * screen the call has left, and every append cuts GPT-Live off. */
 internal fun LiveCallCoordinator.dropHeldContext() {
-    val isContext: (PendingAppend) -> Boolean = { it.kind == LiveAppendKind.instructions }
-    val before = quietAppends.size + undelivered.size
-    quietAppends.removeAll(isContext); undelivered.removeAll(isContext)
-    val dropped = before - quietAppends.size - undelivered.size
+    val dropped = outbound.dropContext()
     if (dropped <= 0) return
     callLogMarker("Dropped $dropped held context update(s) for a newer move")
-    if (quietAppends.isEmpty()) clearQuietHold()
-}
-internal fun LiveCallCoordinator.cancelLiveAnnouncements(promptIDs: List<String>) {
-    val answered = promptIDs.toSet()
-    val remove: (PendingAppend) -> Boolean = { it.kind == LiveAppendKind.commentary && it.delegationID == null && it.promptIDs.isNotEmpty() && it.promptIDs.all(answered::contains) }
-    val before = quietAppends.size + heldAnnouncements.size + undelivered.size
-    quietAppends.removeAll(remove); heldAnnouncements.removeAll(remove); undelivered.removeAll(remove)
-    if (quietAppends.size + heldAnnouncements.size + undelivered.size < before) {
-        voiceCallLog.noteCurrent(VoiceCallLog.Note.Kind.marker, "Suppressed held notice for ${promptIDs.joinToString(", ")} (answered by delegator)")
-    }
-    if (quietAppends.isEmpty()) clearQuietHold()
-}
-internal suspend fun LiveCallCoordinator.abandonLiveDelegation(callID: String) {
-    pendingDelegationTasks.remove(callID)?.cancel()
-    acknowledgements.remove(callID)?.deadline?.cancel()
-    delegationOffsets.remove(callID); delegatedAt.remove(callID)
-    val wasOpen = openDelegations.remove(callID)
-    val wasOrphan = orphanDelegations.remove(callID)
-    val wasClient = clientDelegations.remove(callID) != null
-    serverDelegationIDs.remove(callID); endServerDelegation(callID, "The request was dropped.")
-    if (wasOpen || wasOrphan || wasClient) discardStandbyAndRescheduleRotation()
+    if (outbound.isEmpty) clearOutboundHold()
 }
 internal suspend fun LiveCallCoordinator.completeLiveFunction(callID: String, output: String) {
     if (!running()) return
+    stopLiveProgressLine(callID)
     if (serverDelegationIDs.remove(callID)) {
-        endServerDelegation(callID, "The request finished."); delegatedAt.remove(callID)
-        for (item in orphanCommentaryAppends(LiveContentChunker.commentaryChunks(output), lead = "")) sendAppend(item)
+        endServerDelegation(callID, "The request finished.")
+        val settledAt = serverDelegationSettledAt.remove(callID)
+        val chunks = LiveContentChunker.commentaryChunks(output)
+        if (chunks.isNotEmpty()) {
+            val role = LiveOutboundRole.Answer(clock.now(), settledAt)
+            sendAnswerBatch(orphanCommentaryAppends(chunks, role, lead = ""))
+        }
+        finishDelegationRelease()
         return
     }
-    val isOrphan = orphanDelegations.remove(callID)
-    val isKnown = openDelegations.remove(callID)
-    val claim = clientDelegations.remove(callID)
-    val answer = PendingAppend.Answer(clock.now(), delegatedAt.remove(callID))
-    val stale: (PendingAppend) -> Boolean = { it.kind == LiveAppendKind.thinking && it.origin == callID }
-    quietAppends.removeAll(stale); undelivered.removeAll(stale)
-    if (quietAppends.isEmpty()) clearQuietHold()
-    val chunks = LiveContentChunker.commentaryChunks(output)
-    if (chunks.isEmpty()) return
-    if (claim != null) {
-        deliverOrHold(orphanCommentaryAppends(chunks, answer, "${LiveCallCoordinator.claimLeadPrefix}$claim”: "))
+    val record = delegations.remove(callID)
+    val role = LiveOutboundRole.Answer(clock.now(), record?.delegatedAt)
+    val verify = callID.startsWith("client_verify_")
+    val text = if (verify && !VoiceActionClaim.correctsVoice(output)) "" else output
+    val chunks = LiveContentChunker.commentaryChunks(text)
+    if (chunks.isEmpty()) {
+        if (record != null) finishDelegationRelease()
         return
     }
-    if (isOrphan || !isKnown || active?.ready != true || active?.attached != true) {
-        deliverOrHold(orphanCommentaryAppends(chunks, answer)); return
+    if (verify || record?.claim != null) {
+        val lead = record?.claim?.let { "${LiveCallCoordinator.claimLeadPrefix}$it”: " } ?: LiveCallCoordinator.verifyLead
+        sendAnswerBatch(orphanCommentaryAppends(chunks, role, lead))
+        finishDelegationRelease()
+        return
     }
-    val socketID = active?.id
-    val appends = chunks.map { PendingAppend(LiveAppendKind.commentary, callID, it, answer = answer, socketID = socketID) }
-    if (quietAppends.isNotEmpty() || quietDelay(answer) != null) { hold(appends); return }
-    if (!acquireSendSlot()) return
-    var sessionChanged = false
+    val socket = active
+    if (socket == null || !socket.ready || record?.socketID != socket.id) {
+        sendAnswerBatch(orphanCommentaryAppends(chunks, role))
+        if (record != null) finishDelegationRelease()
+        return
+    }
+    val socketID = socket.id
+    val appends = chunks.map { PendingAppend(role, LiveAppendKind.commentary, callID, it, socketID = socketID) }
+    if (!socket.attached || outbound.hasAnswers(socketID) || channelDelay(role, clock.now()) != null) {
+        hold(appends)
+    } else {
+        when (sendAnswer(appends, socketID)) {
+            AnswerSend.sent, AnswerSend.dropped -> Unit
+            AnswerSend.held -> hold(appends)
+            AnswerSend.sessionChanged -> sendAnswerBatch(orphanCommentaryAppends(chunks, role))
+        }
+    }
+    finishDelegationRelease()
+}
+
+private enum class AnswerSend { sent, held, sessionChanged, dropped }
+
+private suspend fun LiveCallCoordinator.sendAnswer(appends: List<PendingAppend>, socketID: Int?): AnswerSend {
+    val role = appends.firstOrNull()?.role ?: return AnswerSend.dropped
+    if (!acquireSendSlot()) return AnswerSend.dropped
     try {
         val socket = active
-        if (socket?.id != socketID || socket?.ready != true || !socket.attached) sessionChanged = true
-        else if (quietAppends.isNotEmpty() || quietDelay(answer) != null) hold(appends)
-        else sendBatch(appends) { rest -> orphanCommentaryAppends(rest.map { it.content }, rest.firstOrNull()?.answer) }
+        if (socket == null || socket.id != socketID || !socket.ready || !socket.attached) return AnswerSend.sessionChanged
+        if (outbound.hasAnswers(socketID) || channelDelay(role, clock.now(), holdingSlot = true) != null) return AnswerSend.held
+        sendBatch(appends) { rest -> orphanCommentaryAppends(rest.map { it.content }, role) }
+        return AnswerSend.sent
     } finally { releaseSendSlot() }
-    if (sessionChanged) deliverOrHold(orphanCommentaryAppends(chunks, answer))
 }
-private fun orphanCommentaryAppends(chunks: List<String>, answer: PendingAppend.Answer? = null, lead: String = LiveCallCoordinator.earlierConnectionLead): List<PendingAppend> =
-    chunks.flatMapIndexed { index, chunk -> LiveContentChunker.chunks(if (index == 0) lead + chunk else chunk)
-        .map { PendingAppend(LiveAppendKind.commentary, null, it, answer = answer) } }
+private suspend fun LiveCallCoordinator.sendAnswerBatch(appends: List<PendingAppend>) {
+    val role = appends.firstOrNull()?.role ?: return
+    if (outbound.hasAnswers(active?.id) || channelDelay(role, clock.now()) != null) { holdLogged(appends); return }
+    if (!acquireSendSlot()) return
+    try {
+        if (outbound.hasAnswers(active?.id) || channelDelay(role, clock.now(), holdingSlot = true) != null) { holdLogged(appends); return }
+        sendBatch(appends)
+    } finally { releaseSendSlot() }
+}
+private fun orphanCommentaryAppends(
+    remainingChunks: List<String>,
+    role: LiveOutboundRole,
+    lead: String = LiveCallCoordinator.earlierConnectionLead,
+): List<PendingAppend> = remainingChunks.flatMapIndexed { offset, chunk ->
+    LiveContentChunker.chunks(if (offset == 0) lead + chunk else chunk)
+        .map { PendingAppend(role, LiveAppendKind.commentary, null, it) }
+}
 
 internal suspend fun LiveCallCoordinator.sendAppend(append: PendingAppend) {
     if (!running()) return
-    val context = append.kind == LiveAppendKind.instructions
-    if (quietAppends.isNotEmpty() || quietDelay(append.answer, context) != null) { holdLogged(append); return }
+    if (outbound.hasEligibleItems(active?.id) || channelDelay(append.role, clock.now()) != null) { holdLogged(listOf(append)); return }
     if (!acquireSendSlot()) return
     try {
-        if (quietAppends.isNotEmpty() || quietDelay(append.answer, context) != null) { holdLogged(append); return }
+        if (outbound.hasEligibleItems(active?.id) || channelDelay(append.role, clock.now(), holdingSlot = true) != null) {
+            holdLogged(listOf(append)); return
+        }
         sendBatch(listOf(append))
     } finally { releaseSendSlot() }
 }
-private fun LiveCallCoordinator.holdLogged(append: PendingAppend) {
-    val now = clock.now(); hold(listOf(append))
-    if (append.kind == LiveAppendKind.commentary) quietDelay()?.let {
+private fun LiveCallCoordinator.holdLogged(appends: List<PendingAppend>) {
+    val first = appends.firstOrNull() ?: return
+    val now = clock.now()
+    hold(appends)
+    if (first.kind == LiveAppendKind.commentary) channelDelay(first.role, now)?.let {
         voiceCallLog.noteCurrent(VoiceCallLog.Note.Kind.marker,
-            "Held notice (${ReplyWatch.milliseconds(it)}ms quiet gate, ${quietGate.holdReason(now)}): ${VoiceWorkClient.excerpt(append.content, 120)}")
+            "Held notice (${ReplyWatch.milliseconds(it)}ms quiet gate, ${quietGate.holdReason(now)}): ${VoiceWorkClient.excerpt(first.content, 120)}")
     }
 }
-/**
- * How much longer to hold appends, or null when it's quiet now. Held
- * appends go out together, so with a delegation's answer among them (or
- * [answer], about to join them), the answer's gate decides for all.
- * Session context alone ([context]: the append about to join is
- * instructions) also waits for the reply the user is owed: in Kit's
- * Oct 24 call, four switches' context went out 1.5 s after he stopped
- * talking and swallowed the reply.
- */
-private fun LiveCallCoordinator.quietDelay(answer: PendingAppend.Answer? = null, context: Boolean = false, at: Duration? = null): Duration? {
-    if (timing.liveAppendQuiet <= Duration.ZERO || finished) return null
-    val now = at ?: clock.now()
-    val ownAnswer = quietAppends.firstNotNullOfOrNull { it.answer } ?: answer ?: run {
-        val contextOnly = (context || quietAppends.isNotEmpty()) && quietAppends.all { it.kind == LiveAppendKind.instructions }
-        return if (contextOnly && timing.liveContextReplyHold > Duration.ZERO) quietGate.contextDelay(now, timing.liveContextReplyHold)
-        else quietGate.delay(now)
-    }
-    val wait = quietGate.answerDelay(now, ownAnswer.readyAt, isPressed(ownAnswer), timing.liveAnswerPressedHold)
-    return wait?.let { limited(it, now - ownAnswer.readyAt, now) }
-}
-private fun LiveCallCoordinator.isPressed(answer: PendingAppend.Answer): Boolean {
+private fun LiveCallCoordinator.isPressed(answer: LiveOutboundItem.Answer): Boolean {
     val delegated = answer.delegatedAt ?: return false
     val words = lastUserWordsAt ?: return false
     if (words - delegated <= timing.liveAnswerPressedAfter) return false
     return lastDelegatedAt?.let { it <= words } ?: true
 }
-private fun LiveCallCoordinator.scheduleQuietFlush(restart: Boolean = false) {
-    if (finished || (quietFlushTask != null && !restart)) return
-    val generation = ++quietFlushGeneration
-    quietFlushTask = scope.launch {
-        while (isActive && !finished && generation == quietFlushGeneration) {
-            // Context waits out a reply that may start (and end) well before its
-            // limit: look again at least every quiet window.
-            val delay = quietDelay(at = clock.now())
-            if (delay != null) { clock.sleep(minOf(delay, maxOf(timing.liveAppendQuiet, 50.milliseconds))); continue }
-            flushQuietAppends(); return@launch
+
+internal fun LiveCallCoordinator.scheduleOutboundFlush(restart: Boolean = false) {
+    if (outboundFlushTask != null && !restart) return
+    val generation = ++outboundFlushGeneration
+    outboundFlushTask = scope.launch {
+        while (isActive) {
+            val step = outboundFlushStep(generation) ?: return@launch
+            clock.sleep(step)
         }
     }
 }
-private fun LiveCallCoordinator.clearQuietHold() {
-    quietGate = quietGate.clearHold(); quietFlushTask = null; quietFlushGeneration++
+private fun LiveCallCoordinator.clearOutboundHold() {
+    quietGate = quietGate.clearHold(); outboundFlushTask = null; outboundFlushGeneration++
 }
-private suspend fun LiveCallCoordinator.flushQuietAppends(force: Boolean = false) {
-    quietFlushTask = null; quietFlushGeneration++; quietAppendsSending++
-    try {
-        if (!acquireSendSlot()) return
-        try {
-            if (quietAppends.isEmpty()) return
-            val now = clock.now()
-            val blocked = if (force) quietGate.userSpeechHold(now) != null || answerProtection(now) != null else quietDelay() != null
-            if (blocked) { scheduleQuietFlush(); return }
-            quietGate = quietGate.clearHold()
-            val held = quietAppends.toList(); quietAppends.clear()
-            sendBatch(held)
-        } finally { releaseSendSlot() }
-    } finally { quietAppendsSending-- }
-}
-/** A suspended send never lets a later batch interleave. Failure preserves the
- * failed chunk and everything after it, in order, for the replacement session. */
-private suspend fun LiveCallCoordinator.sendBatch(appends: List<PendingAppend>, rewrite: (List<PendingAppend>) -> List<PendingAppend> = { rest -> rest.map { it.copy(delegationID = null) } }) {
-    val startedOn = active?.id
-    for (index in appends.indices) {
-        if (!running()) return
-        if (startedOn != null && active?.id != startedOn) { requeue(rewrite(appends.drop(index)), startedOn); return }
-        val failedOn = deliverAppend(appends[index])
-        if (failedOn != null) { if (!finished) requeue(rewrite(appends.drop(index)), failedOn); return }
+private fun LiveCallCoordinator.nextOutboundDelay(socketID: Int, now: Duration, holdingSlot: Boolean = false): Duration? {
+    val roles = outbound.candidateRoles(socketID)
+    if (roles.isEmpty()) return null
+    var minimum: Duration? = null
+    for (role in roles) {
+        val delay = channelDelay(role, now, holdingSlot) ?: return null
+        minimum = minimum?.let { minOf(it, delay) } ?: delay
     }
+    return minimum
 }
-/** Null means sent or safely queued; a socket ID means the batch must requeue. */
-private suspend fun LiveCallCoordinator.deliverAppend(original: PendingAppend): Int? {
-    if (!running()) return null
-    val append = if (original.socketID != null && original.socketID != active?.id) original.copy(delegationID = null) else original
-    val socket = active?.takeIf { it.ready && it.attached }
-    if (socket == null) {
-        undelivered += if (active?.ready != true) append.copy(delegationID = null) else append
-        if (append.kind == LiveAppendKind.commentary) voiceCallLog.noteCurrent(VoiceCallLog.Note.Kind.marker, "Queued notice for voice reconnect: ${VoiceWorkClient.excerpt(append.content, 120)}")
+/** One wake of the flush task: how long to sleep before the next, or null
+ * when it's done (flushed, or nothing it can send). */
+private suspend fun LiveCallCoordinator.outboundFlushStep(generation: Int): Duration? {
+    if (generation != outboundFlushGeneration || finished) return null
+    val socket = active
+    if (socket == null || !socket.ready || !socket.attached) { outboundFlushTask = null; return null }
+    if (!outbound.hasEligibleItems(socket.id)) {
+        outboundFlushTask = null
+        if (outbound.isEmpty) quietGate = quietGate.clearHold()
         return null
     }
+    val now = clock.now()
+    nextOutboundDelay(socket.id, now)?.let { delay ->
+        // Context waits out a reply that may start (and end) well before its
+        // limit: look again at least every quiet window.
+        return if (timing.liveAppendQuiet > Duration.ZERO) minOf(delay, maxOf(timing.liveAppendQuiet, 50.milliseconds)) else delay
+    }
+    flushOutbound()
+    return null
+}
+private suspend fun LiveCallCoordinator.flushOutbound() {
+    outboundFlushTask = null; outboundFlushGeneration++
+    if (!acquireSendSlot()) return
+    try {
+        val socket = active
+        if (finished || socket == null || !socket.ready || !socket.attached) return
+        if (!outbound.hasEligibleItems(socket.id)) {
+            if (outbound.isEmpty) quietGate = quietGate.clearHold()
+            return
+        }
+        val now = clock.now()
+        if (nextOutboundDelay(socket.id, now, holdingSlot = true) != null) { scheduleOutboundFlush(); return }
+        // Popped from a copy, as iOS pops from a value: readiness reads the
+        // queue as it stood.
+        val next = outbound.copy()
+        val batch = next.popReadyBatch(socket.id) { role -> channelDelay(role, now, holdingSlot = true) == null }
+        outbound = next
+        if (outbound.isEmpty) quietGate = quietGate.clearHold()
+        val drained = sendBatch(batch)
+        if (drained > 0) callLogMarker("Sent $drained undelivered append${if (drained == 1) "" else "s"} to the voice agent on the new session")
+        val current = active
+        if (!finished && current != null && current.ready && current.attached && outbound.hasEligibleItems(current.id)) scheduleOutboundFlush()
+    } finally { releaseSendSlot() }
+}
+/** A suspended send never lets a later batch interleave. Failure preserves the
+ * failed chunk and everything after it, in order, for the replacement session.
+ * Returns how many appends from an earlier socket went out. */
+private suspend fun LiveCallCoordinator.sendBatch(
+    appends: List<PendingAppend>,
+    rewrite: (List<PendingAppend>) -> List<PendingAppend> = { rest -> rest.map { it.copy(delegationID = null) } },
+): Int {
+    val startedOn = active?.id
+    var drainedFromEarlier = 0
+    for (index in appends.indices) {
+        if (finished) return drainedFromEarlier
+        if (startedOn != null && active?.id != startedOn) {
+            requeue(rewrite(appends.drop(index)), startedOn)
+            return drainedFromEarlier
+        }
+        when (val delivery = deliverAppend(appends[index])) {
+            Delivery.Sent -> if (appends[index].fromEarlierSocket) drainedFromEarlier++
+            Delivery.Queued -> Unit
+            is Delivery.Failed -> {
+                if (finished) return drainedFromEarlier
+                requeue(rewrite(appends.drop(index)), delivery.socketID)
+                return drainedFromEarlier
+            }
+        }
+    }
+    return drainedFromEarlier
+}
+
+private sealed interface Delivery {
+    data object Sent : Delivery
+    data object Queued : Delivery
+    data class Failed(val socketID: Int) : Delivery
+}
+
+private suspend fun LiveCallCoordinator.deliverAppend(original: PendingAppend): Delivery {
+    if (finished) return Delivery.Queued
+    var append = original
+    if (append.socketID != null && append.socketID != active?.id) append = append.copy(delegationID = null)
+    val socket = active
+    if (socket == null || !socket.ready || !socket.attached) {
+        var fallback = append
+        val sameReadySocket = socket?.ready == true && fallback.socketID != null && fallback.socketID == socket.id
+        if (!sameReadySocket) fallback = fallback.copy(delegationID = null, fromEarlierSocket = true)
+        outbound.enqueue(listOf(fallback), clock.now())
+        if (append.kind == LiveAppendKind.commentary) {
+            voiceCallLog.noteCurrent(VoiceCallLog.Note.Kind.marker, "Queued notice for voice reconnect: ${VoiceWorkClient.excerpt(append.content, 120)}")
+        }
+        return Delivery.Queued
+    }
     val note = deliveryNote(append)
-    if (append.answer != null) noteAnswerDelivered()
+    if (append.isAnswer) noteAnswerDelivered()
     try {
         sendAppendThrowing(append, socket.connection)
         // The append stops whatever GPT-Live was saying that the user talked
         // over; what it says next is about this.
         droppingAssistantSpeech = false
         note?.let(callLogMarker)
-        if (append.kind == LiveAppendKind.commentary && append.enqueuedAt != null) {
-            voiceCallLog.noteCurrent(VoiceCallLog.Note.Kind.marker, "Sent held notice (after ${ReplyWatch.milliseconds(clock.now() - append.enqueuedAt)}ms): ${VoiceWorkClient.excerpt(append.content, 120)}")
+        val enqueuedAt = append.enqueuedAt
+        if (append.kind == LiveAppendKind.commentary && enqueuedAt != null) {
+            voiceCallLog.noteCurrent(VoiceCallLog.Note.Kind.marker,
+                "Sent held notice (after ${ReplyWatch.milliseconds(clock.now() - enqueuedAt)}ms): ${VoiceWorkClient.excerpt(append.content, 120)}")
             voiceCallLog.noteCurrent(VoiceCallLog.Note.Kind.injected, append.content)
         }
-        return null
+        return Delivery.Sent
     } catch (error: CancellationException) { throw error }
-    catch (_: Exception) { return socket.id }
+    catch (_: Exception) { return Delivery.Failed(socket.id) }
 }
 private fun LiveCallCoordinator.requeue(appends: List<PendingAppend>, failedOn: Int) {
     if (finished || appends.isEmpty()) return
+    outbound.requeueFront(appends.map { it.copy(fromEarlierSocket = true, afterSocketID = failedOn) })
     val current = active
-    if (current == null || current.id == failedOn || !current.ready || !current.attached) { undelivered += appends; return }
-    scope.launch { deliverOrHold(appends) }
-}
-private suspend fun LiveCallCoordinator.deliverOrHold(appends: List<PendingAppend>) {
-    if (!acquireSendSlot()) return
-    try {
-        val context = appends.all { it.kind == LiveAppendKind.instructions }
-        if (quietAppends.isNotEmpty() || quietDelay(appends.firstOrNull()?.answer, context) != null) { hold(appends); return }
-        sendBatch(appends)
-    } finally { releaseSendSlot() }
+    if (current != null && current.id != failedOn && current.ready && current.attached) scheduleOutboundFlush(restart = true)
 }
 internal fun LiveCallCoordinator.deliveryNote(append: PendingAppend): String? {
     if (append.kind == LiveAppendKind.commentary && append.enqueuedAt != null) return null
@@ -347,13 +462,43 @@ internal fun LiveCallCoordinator.deliveryNote(append: PendingAppend): String? {
     if (assistantAudioPlaying) text += " · while its audio played"
     return text
 }
+
+/** An unbound result or notice as a directive GPT-Live speaks when it
+ * arrives as `session.instructions.append`: its delegation leads and
+ * `[COMPLETE]` dropped, prefixed with [LiveCallCoordinator.spokenDirectiveLead]
+ * unless it already tells the voice agent what to say. */
+fun LiveCallCoordinator.Companion.spokenDirectiveContent(raw: String): String {
+    var cleaned = raw.trim()
+    for (lead in listOf(earlierConnectionLead, verifyLead)) {
+        if (cleaned.startsWith(lead)) cleaned = cleaned.substring(lead.length).trim()
+    }
+    if (cleaned.startsWith(claimLeadPrefix)) {
+        val end = cleaned.indexOf("”: ")
+        if (end >= 0) cleaned = cleaned.substring(end + "”: ".length).trim()
+    }
+    cleaned = cleaned.replace(": [COMPLETE] ", ": ").replace(": [COMPLETE]", ": ").trim()
+    if (cleaned.startsWith("[COMPLETE]")) cleaned = cleaned.removePrefix("[COMPLETE]").trim()
+    if (cleaned.isEmpty()) return ""
+    if (cleaned.startsWith(spokenDirectiveLead) || cleaned.startsWith("Say ") || cleaned.startsWith("Briefly tell ")) return cleaned
+    return spokenDirectiveLead + cleaned
+}
+
 internal suspend fun LiveCallCoordinator.sendAppendThrowing(append: PendingAppend, connection: VoiceSocketConnection<LiveServerEvent, LiveCommand>) {
     if (!running()) throw CancellationException()
-    val wireKind = if (append.kind == LiveAppendKind.commentary && append.delegationID == null && config?.unboundSpeechUsesInstructions == true) {
-        LiveAppendKind.instructions
-    } else {
-        append.kind
+    if (append.instructionIntent == LiveInstructionIntent.spokenDirective && append.delegationID == null &&
+        config?.unboundSpeechUsesInstructions == true
+    ) {
+        val directive = LiveCallCoordinator.spokenDirectiveContent(append.content)
+        if (directive.isEmpty()) return
+        for (chunk in LiveContentChunker.chunks(directive)) {
+            val eventID = nextEventID(LiveAppendKind.instructions.rawValue)
+            connection.sendControl(LiveCommand.AppendInstructions(eventID, null, chunk), "live.append")
+        }
+        lastCommentarySentAt = clock.now()
+        if (append.origin == null) results = results.record(append.content)
+        return
     }
+    val wireKind = append.kind
     val id = nextEventID(wireKind.rawValue)
     // Responses delegation rejects every non-null delegation ID on appends.
     val delegationID = if (delegatesToResponses) null else append.delegationID
@@ -363,7 +508,9 @@ internal suspend fun LiveCallCoordinator.sendAppendThrowing(append: PendingAppen
         LiveAppendKind.commentary -> LiveCommand.AppendCommentary(id, delegationID, append.content)
     }
     connection.sendControl(command, "live.append")
-    if (append.kind == LiveAppendKind.commentary) results = results.record(append.content)
+    if (append.kind != LiveAppendKind.commentary) return
+    lastCommentarySentAt = clock.now()
+    if (append.origin == null) results = results.record(append.content)
 }
 internal suspend fun LiveCallCoordinator.sendAppendIfPossible(append: PendingAppend, connection: VoiceSocketConnection<LiveServerEvent, LiveCommand>): Boolean =
     try { sendAppendThrowing(append, connection); true }

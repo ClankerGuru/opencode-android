@@ -40,14 +40,11 @@ internal fun retargetCall(state: VoiceFeature.State): Reduced<VoiceFeature.State
             Effect.merge(
                 abandoned.map { callID ->
                     if (engine == VoiceEngine.gptLive) {
-                        Effect.run<VoiceFeature.Action> {
-                            voiceCall.noteProgress(callID, abandonedMessage)
-                            voiceCall.abandonDelegation(callID)
-                        }
+                        Effect.run<VoiceFeature.Action> { voiceCall.closeDelegation(callID, VoiceDelegationCloseReason.movedSession) }
                     } else {
                         Effect.run {
                             voiceCall.completeFunction(callID, VoiceHandoff.failure(abandonedMessage))
-                            voiceCall.abandonDelegation(callID)
+                            voiceCall.closeDelegation(callID, VoiceDelegationCloseReason.movedSession)
                         }
                     }
                 },

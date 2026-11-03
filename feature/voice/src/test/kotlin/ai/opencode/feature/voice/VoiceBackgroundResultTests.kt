@@ -14,11 +14,16 @@ import ai.opencode.server.model.OpenCodeRunMessage
 import ai.opencode.server.model.OpenCodeRunMessagesPage
 import ai.opencode.server.model.OpenCodeSession
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.time.Duration.Companion.seconds
 import java.time.Instant
 
 /**
@@ -93,7 +98,7 @@ class VoiceBackgroundResultTests {
                 backgroundReply = { _, sessionID -> if (sessionID == child) report else null },
             )
             this[VoiceCallClient] = speechVoiceCall(
-                announceSession = { _, promptIDs, text -> announced.update { it + Announcement(promptIDs, text) } },
+                announce = { _, promptIDs, text -> announced.update { it + Announcement(promptIDs, text) } },
             )
         }
 
@@ -290,7 +295,7 @@ class VoiceBackgroundResultTests {
                 runMessages = { _, _, cursor -> pages[cursor] ?: OpenCodeRunMessagesPage(messages = emptyList(), next = null) },
             )
             this[VoiceCallClient] = speechVoiceCall(
-                announceSession = { _, promptIDs, text -> announced.update { it + Announcement(promptIDs, text) } },
+                announce = { _, promptIDs, text -> announced.update { it + Announcement(promptIDs, text) } },
             )
         }
         store.send(VoiceFeature.Action.ReplyWatch(ReplyWatch.Event.Sent(listOf(eye)))) { it.stepping(ReplyWatch.Event.Sent(listOf(eye))) }
@@ -322,8 +327,255 @@ class VoiceBackgroundResultTests {
         watch.step(ReplyWatch.Event.DelegatorWaiting(sessionID = home, requestID = "r1", isWaiting = true))
         val effects = watch.step(ReplyWatch.Event.WaitSucceeded(promptID = "background-$child", reply = report))
         assertEquals(setOf("r1"), watch.deferredNotices.firstOrNull()?.heldBy)
-        assertTrue(effects.contains(ReplyWatch.Effect.ExpireDeferral(key = "background-$child", after = ReplyWatch.claimedResultLimit, claimed = true)))
+        assertTrue(effects.contains(ReplyWatch.Effect.ExpireDeferral(key = "background-$child", after = ReplyWatch.claimedResultLimit)))
         assertFalse("Background work's own result follows nothing", effects.any { it is ReplyWatch.Effect.FindBackgroundWork })
+    }
+
+    /** iOS `VoiceFeature.State(server:session:)` live under the session delegator, the user having acted. */
+    private fun sessionDelegatorVoice(shared: SpeechTestShared, userActed: Boolean): VoiceFeature.State = shared.run {
+        VoiceFeature.State(server, homeSession)
+            .withPhase(VoiceFeature.State.Phase.Live)
+            .copy(usesSessionDelegator = true)
+            .let { it.copy(replyWatch = it.replyWatch.copy(callPhase = ReplyWatch.CallPhase.live)) }
+            .let { if (userActed) it.copy(replyWatch = it.replyWatch.noteUserActed()) else it }
+    }
+
+    /**
+     * Incident 4 (Nov 1): under the session delegator, the parent Voice session
+     * receives `<subagent>` and relays a call-aware correction ("The check-in is
+     * already done"), so the phone must never announce the child subagent's raw
+     * text ("Avianca B8OE4C") or double-deliver when a user turn covers the run.
+     */
+    @Test fun sessionDelegatorRelaysParentSubagentCorrectionWithoutRawChildOrDoubleDelivery() = runBlocking<Unit> {
+        val voiceSessionID = "ses_voice"
+        val inboxChild = "ses_inbox"
+        val rawChildStale = "The top priority is checking in online for Avianca B8OE4C before tonight's 11 PM flight."
+        val correctedRelay = "Inbox isn't at zero, because eight handled emails need your OK. **The check-in is already done.**"
+        val work = VoiceBackgroundWork(sessionID = inboxChild, parentSessionID = voiceSessionID, description = "Inbox zero pass")
+        val background = ReplyWatch.Prompt(work, title = "Voice", saidTurn = 0)
+
+        val rawBackgroundReads = Locked(0)
+        val announced = Locked(listOf<Announcement>())
+
+        val parentUnsolicitedMessages = listOf(
+            user("msg_1"),
+            assistant("a1", "The inbox-zero pass is running now.", launching = inboxChild),
+            OpenCodeRunMessage(id = "idle_1", type = "idle"),
+            completion("syn_inbox", of = inboxChild),
+            assistant("a2", correctedRelay),
+            OpenCodeRunMessage(id = "idle_2", type = "idle"),
+        )
+
+        fun relayStore(shared: SpeechTestShared, state: VoiceFeature.State, effects: kotlinx.coroutines.CoroutineScope, messages: List<OpenCodeRunMessage>, expectedSession: String?) =
+            TestStore(state, VoiceFeature(), effects) {
+                this[SharedStore] = shared.store
+                this[Clock] = ImmediateClock()
+                this[DateClient] = epoch
+                this[VoiceWorkClient] = VoiceWorkClient.testValue.copy(
+                    awaitIdle = { _, _ -> },
+                    backgroundReply = { _, _ ->
+                        rawBackgroundReads.update { it + 1 }
+                        rawChildStale
+                    },
+                    relayedBackgroundReply = VoiceWorkClient.live(VoiceWorkCoordinator()).relayedBackgroundReply,
+                )
+                this[OpenCodeClient] = OpenCodeClient.testValue.copy(
+                    waitForIdle = { _, _ -> },
+                    runMessages = { _, sessionID, _ ->
+                        if (expectedSession != null) assertEquals(expectedSession, sessionID)
+                        OpenCodeRunMessagesPage(messages = messages, next = null)
+                    },
+                )
+                this[VoiceCallClient] = speechVoiceCall(
+                    announce = { _, promptIDs, text -> announced.update { it + Announcement(promptIDs, text) } },
+                )
+            }
+
+        val shared = SpeechTestShared()
+        val effects = detachedScope(coroutineContext)
+        val store = relayStore(shared, sessionDelegatorVoice(shared, userActed = true), effects, parentUnsolicitedMessages, voiceSessionID)
+
+        val cleanedRelay = "Inbox isn't at zero, because eight handled emails need your OK. The check-in is already done."
+        store.send(VoiceFeature.Action.ReplyWatch(ReplyWatch.Event.Sent(listOf(background)))) { it.stepping(ReplyWatch.Event.Sent(listOf(background))) }
+        store.receive(VoiceFeature.Action.ReplyWatch(ReplyWatch.Event.WaitSucceeded(promptID = background.promptID, reply = cleanedRelay)), timeout = 5.seconds) {
+            it.stepping(ReplyWatch.Event.WaitSucceeded(promptID = background.promptID, reply = cleanedRelay))
+        }
+        store.finish(timeout = 5.seconds)
+        effects.skipInFlightEffects()
+
+        assertEquals("Session delegator never fetches the child subagent's raw text", 0, rawBackgroundReads.value)
+        assertEquals(1, announced.value.size)
+        assertTrue(announced.value.first().text.contains("The check-in is already done."))
+        assertFalse(announced.value.first().text.contains("Avianca B8OE4C"))
+
+        // Now test the double-delivery overlap (`L92 -> L94 -> L96`): `<subagent>`
+        // lands in the same Voice-session run as a `[Voice delta]` user delegation,
+        // whose own `completeFunction` speaks the combined reply. ReplyWatch must
+        // supersede the background watch with zero `announce` calls.
+        announced.update { emptyList() }
+        val parentCoveredMessages = listOf(
+            OpenCodeRunMessage(id = "idle_prev", type = "idle"),
+            completion("syn_inbox", of = inboxChild),
+            assistant("a_empty", ""),
+            user("msg_2"),
+            assistant("a_combined", "Carbon's enum plan is in and sent to Blood."),
+            OpenCodeRunMessage(id = "idle_end", type = "idle"),
+        )
+        val coveredShared = SpeechTestShared()
+        val coveredEffects = detachedScope(coroutineContext)
+        val coveredStore = relayStore(coveredShared, sessionDelegatorVoice(coveredShared, userActed = false), coveredEffects, parentCoveredMessages, null)
+
+        coveredStore.send(VoiceFeature.Action.ReplyWatch(ReplyWatch.Event.Sent(listOf(background)))) { it.stepping(ReplyWatch.Event.Sent(listOf(background))) }
+        coveredStore.receive(VoiceFeature.Action.ReplyWatch(ReplyWatch.Event.Superseded(promptID = background.promptID)), timeout = 5.seconds) {
+            it.stepping(ReplyWatch.Event.Superseded(promptID = background.promptID))
+        }
+        coveredStore.finish(timeout = 5.seconds)
+        coveredEffects.skipInFlightEffects()
+
+        assertEquals(0, rawBackgroundReads.value)
+        assertTrue("A `<subagent>` run covered by a user delegation turn must not announce twice", announced.value.isEmpty())
+
+        // Multi-synthetic run (`L163 -> L164 -> L165 -> L168`) and combined reply.
+        val multiMessages = listOf(
+            OpenCodeRunMessage(id = "idle_0", type = "idle"),
+            completion("s_seer", of = "ses_seer"),
+            assistant("a_seer", "The Seer audit found 3,000 lines; I'll park the duplicate."),
+            completion("s_part", of = "ses_part"),
+            assistant("a_tool", ""),
+            assistant("a_part", "I've started Carbon on that review now."),
+            OpenCodeRunMessage(id = "idle_1", type = "idle"),
+        )
+        assertEquals(
+            "The Seer audit found 3,000 lines; I'll park the duplicate.",
+            VoiceWorkClient.relayedSubagentReply(multiMessages, childSessionID = "ses_seer"),
+        )
+        assertEquals("I've started Carbon on that review now.", VoiceWorkClient.relayedSubagentReply(multiMessages, childSessionID = "ses_part"))
+
+        val combinedMessages = listOf(
+            OpenCodeRunMessage(id = "idle_0", type = "idle"),
+            completion("s_1", of = "ses_1"),
+            completion("s_2", of = "ses_2"),
+            assistant("a_both", "Both audits finished."),
+            OpenCodeRunMessage(id = "idle_1", type = "idle"),
+        )
+        assertNull(VoiceWorkClient.relayedSubagentReply(combinedMessages, childSessionID = "ses_1"))
+        assertEquals("Both audits finished.", VoiceWorkClient.relayedSubagentReply(combinedMessages, childSessionID = "ses_2"))
+    }
+
+    /**
+     * Sol finding 5: if `<subagent>` arrives after the initial 150/400 ms poll
+     * window, or the parent Voice run after `<subagent>` has not yet settled to
+     * `"idle"`, ReplyWatch must keep retrying rather than dropping via `.superseded`.
+     */
+    @Test fun sessionDelegatorBackgroundWatchRetriesUntilSyntheticArrivesAndParentSettles() = runBlocking<Unit> {
+        val voiceSessionID = "ses_voice"
+        val inboxChild = "ses_inbox"
+        val relayed = "The inbox check finished cleanly."
+        val work = VoiceBackgroundWork(sessionID = inboxChild, parentSessionID = voiceSessionID, description = "Inbox check")
+        val background = ReplyWatch.Prompt(work, title = "Voice", saidTurn = 0)
+
+        val beforeSynthetic = listOf(
+            user("msg_1"),
+            assistant("a1", "Running inbox check.", launching = inboxChild),
+            OpenCodeRunMessage(id = "idle_1", type = "idle"),
+        )
+        val unsettledAfterSynthetic = beforeSynthetic + listOf(
+            completion("syn_inbox", of = inboxChild),
+            assistant("a_mid", "Looking at the result…"),
+        )
+        val settledRelay = beforeSynthetic + listOf(
+            completion("syn_inbox", of = inboxChild),
+            assistant("a2", relayed),
+            OpenCodeRunMessage(id = "idle_2", type = "idle"),
+        )
+
+        val pageReads = Locked(0)
+        val announced = Locked(listOf<String>())
+        val shared = SpeechTestShared()
+        val effects = detachedScope(coroutineContext)
+        val store = TestStore(sessionDelegatorVoice(shared, userActed = true), VoiceFeature(), effects) {
+            this[SharedStore] = shared.store
+            this[Clock] = ImmediateClock()
+            this[DateClient] = epoch
+            this[VoiceWorkClient] = VoiceWorkClient.testValue.copy(
+                awaitIdle = { _, _ -> },
+                checkSessionActive = { _, _ -> false },
+                relayedBackgroundReply = VoiceWorkClient.live(VoiceWorkCoordinator()).relayedBackgroundReply,
+            )
+            this[OpenCodeClient] = OpenCodeClient.testValue.copy(
+                waitForIdle = { _, _ -> },
+                runMessages = { _, _, _ ->
+                    val n = pageReads.withValue { (it + 1) to (it + 1) }
+                    // First 3 reads (initial + 150ms + 400ms): no `<subagent>` yet.
+                    // Next 3 reads (`fetchSettledReply` pass): `<subagent>` arrived, no `"idle"` yet.
+                    // Afterwards: `"idle"` settled with final relay.
+                    when {
+                        n <= 3 -> OpenCodeRunMessagesPage(messages = beforeSynthetic, next = null)
+                        n <= 6 -> OpenCodeRunMessagesPage(messages = unsettledAfterSynthetic, next = null)
+                        else -> OpenCodeRunMessagesPage(messages = settledRelay, next = null)
+                    }
+                },
+            )
+            this[VoiceCallClient] = speechVoiceCall(announce = { _, _, text -> announced.update { it + text } })
+        }
+
+        val retryError = ReplyWatch.WaitError.Retryable("Waiting for Voice session to relay background work.")
+        store.send(VoiceFeature.Action.ReplyWatch(ReplyWatch.Event.Sent(listOf(background)))) { it.stepping(ReplyWatch.Event.Sent(listOf(background))) }
+        store.receive(
+            VoiceFeature.Action.ReplyWatch(ReplyWatch.Event.WaitFailed(promptID = background.promptID, error = retryError, sessionStillActive = false)),
+            timeout = 5.seconds,
+        ) {
+            it.stepping(ReplyWatch.Event.WaitFailed(promptID = background.promptID, error = retryError, sessionStillActive = false))
+        }
+        store.receive(
+            VoiceFeature.Action.ReplyWatch(ReplyWatch.Event.WaitFailed(promptID = background.promptID, error = retryError, sessionStillActive = null)),
+            timeout = 5.seconds,
+        ) {
+            it.stepping(ReplyWatch.Event.WaitFailed(promptID = background.promptID, error = retryError, sessionStillActive = null))
+        }
+        store.receive(VoiceFeature.Action.ReplyWatch(ReplyWatch.Event.WaitSucceeded(promptID = background.promptID, reply = relayed)), timeout = 5.seconds) {
+            it.stepping(ReplyWatch.Event.WaitSucceeded(promptID = background.promptID, reply = relayed))
+        }
+        store.finish(timeout = 5.seconds)
+        effects.skipInFlightEffects()
+
+        assertEquals(1, announced.value.size)
+        assertTrue(announced.value.first().contains(relayed))
+    }
+}
+
+/**
+ * From a call log: GPT-Live took no new turn while the delegator's 90 s wait
+ * held its delegation open. A wait gives way to the user's words, not to a
+ * tag or a cancelled wait.
+ */
+class VoiceWaitYieldTests {
+    @Test fun theUsersNextWordsEndADelegatorWait() = runTest {
+        val harness = LiveHarness(this)
+        val events = EventIterator(harness.start(), backgroundScope)
+        val socket = harness.nextOpened()
+        socket.yieldEvent(LiveServerEvent.SessionStarted(id = "live_1", expiresAt = null))
+        assertEquals(VoiceCallEvent.Connected, events.next())
+
+        var heard = false
+        val wait = launch {
+            harness.coordinator.nextUserWords()
+            heard = true
+        }
+        delay(50)
+        socket.yieldEvent(LiveServerEvent.InputTranscriptDelta(delta = "[gasp", startMilliseconds = 1_000, endMilliseconds = 1_100))
+        delay(100)
+        assertFalse("A tag isn't the user talking", heard)
+        socket.yieldEvent(LiveServerEvent.InputTranscriptDelta(delta = "Hello?", startMilliseconds = 1_200, endMilliseconds = 1_500))
+        wait.join()
+        assertTrue(heard)
+
+        val cancelled = launch { harness.coordinator.nextUserWords() }
+        delay(50)
+        cancelled.cancel()
+        cancelled.join()
+        assertTrue(harness.coordinator.userWordWaiters.isEmpty())
+        harness.coordinator.end()
     }
 }
 

@@ -95,7 +95,6 @@ class VoiceFeatureTests {
         val keys = LockIsolated(listOf<String>())
         val completed = LockIsolated(listOf<String>())
         val announced = LockIsolated(listOf<String>())
-        val notes = LockIsolated(listOf<String>())
         val store = h.store(home) {
             this[Clock] = ImmediateClock()
             this[ai.opencode.feature.voice.VoiceDelegatorClient] = delegator { key, input, previous ->
@@ -129,8 +128,7 @@ class VoiceFeatureTests {
             voiceCall {
                 copy(
                     completeFunction = { _, output -> completed.append(output) },
-                    announce = { text -> announced.append(text) },
-                    noteProgress = { _, text -> notes.append(text) },
+                    announce = { _, _, text -> announced.append(text) },
                 )
             }
         }
@@ -162,10 +160,6 @@ class VoiceFeatureTests {
         // not the spoken acknowledgement.
         assertNull(delegation.framing)
         assertEquals("Fix add so it adds.", delegation.displayText)
-        // The voice agent was told each step, then got the answer and, later, the reply.
-        // The delegator's tool steps stay out of the voice model: an append
-        // mid-turn makes it start talking before the answer is in.
-        assertFalse(notes.value.any { it.contains("Opened “Math bug”") || it.contains("Sent to “Math bug”") })
         assertTrue(completed.value.size == 1 && completed.value[0].contains("started the fix"))
         assertTrue(announced.value.size == 1 && announced.value[0].contains("Fixed add"))
         assertEquals("resp_3", store.state.sessionDetail?.voice?.delegatorResponseID)
@@ -215,7 +209,7 @@ class VoiceFeatureTests {
             this[OpenCodeClient] = OpenCodeClient.testValue.openingScreens { id -> if (id == math.id) math else session }.copy(
                 homeSnapshot = { _ -> OpenCodeHomeSnapshot(projects = listOf(other, ios), sessions = listOf(session, math), activeSessionIDs = emptySet()) },
             )
-            voiceCall { copy(completeFunction = { _, _ -> }, noteProgress = { _, _ -> }) }
+            voiceCall { copy(completeFunction = { _, _ -> }) }
         }
         store.exhaustive = false
 
@@ -268,7 +262,7 @@ class VoiceFeatureTests {
                     recentMessages = { _, _, _ -> emptyList() },
                 )
             }
-            voiceCall { copy(completeFunction = { _, output -> completed.append(output) }, noteProgress = { _, _ -> }, updateInstructions = { _, _ -> }) }
+            voiceCall { copy(completeFunction = { _, output -> completed.append(output) }, updateInstructions = { _, _ -> }) }
             this[OpenCodeClient] = OpenCodeClient.testValue.openingScreens { id -> if (id == b.id) b else a }
         }
         store.exhaustive = false

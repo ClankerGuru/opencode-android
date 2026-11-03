@@ -30,7 +30,6 @@ import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.OpenCodeTranscriptItem
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -85,18 +84,12 @@ class VoiceLiveTests {
         }
 
         val updatedInstructions = LockIsolated(listOf<Pair<String, String?>>())
-        val progress = LockIsolated(listOf<Pair<String, String>>())
         val completed = LockIsolated(listOf<Pair<String, String>>())
 
         val store = h.store(home) {
             voiceCall {
                 copy(
                     updateInstructions = { full, delta -> updatedInstructions.append(full to delta) },
-                    noteProgress = { callID, text ->
-                        kotlinx.coroutines.yield()
-                        if (!kotlinx.coroutines.currentCoroutineContext().isActive) return@copy
-                        progress.append(callID to text)
-                    },
                     completeFunction = { callID, output -> completed.append(callID to output) },
                 )
             }
@@ -124,7 +117,6 @@ class VoiceLiveTests {
         }
         assertEquals("ses_created", store.state.sessionDetail?.voice?.target?.sessionID)
         assertEquals("New session", store.state.sessionDetail?.voice?.sessionTitle)
-        assertTrue(progress.value.toString(), progress.value.any { it.first == "del_draft" && it.second == "Running in session \"New session\": Start the build." })
         assertEquals(updatedInstructions.value.toString(), 1, updatedInstructions.value.size)
         assertEquals(false, updatedInstructions.value.first().first.contains("has not started yet"))
         assertTrue(updatedInstructions.value.first().first.contains("You are attached to the coding session \"New session\" in the project folder \"project\"."))
@@ -163,7 +155,6 @@ class VoiceLiveTests {
         assertEquals(true, delta?.contains("\"Other session\""))
         assertTrue("Real retarget sends a short delta, not the full startup prompt", (delta?.length ?: 0) < 500)
         assertEquals(true, delta?.contains("the call and conversation continue"))
-        assertFalse(progress.value.any { it.second.contains("The call moved to another session") })
         assertEquals(listOf("del_draft"), store.state.sessionDetail?.voice?.pendingWork?.map { it.callID })
         assertTrue(completed.value.isEmpty())
     }

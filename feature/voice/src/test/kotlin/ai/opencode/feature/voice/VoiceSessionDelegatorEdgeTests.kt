@@ -24,6 +24,10 @@ import ai.opencode.server.model.PromptContext
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertFalse
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.JsonObject
 import org.junit.Assert.assertEquals
@@ -179,7 +183,7 @@ class VoiceSessionDelegatorEdgeTests {
                 },
             )
             this[VoiceCallClient] = testVoiceCall(end = { endedCalls.update { it + 1 } })
-                .copy(announce = { text -> announced.update { it + text } })
+                .copy(announce = { _, _, text -> announced.update { it + text } })
         }
 
         val expectedPostAnchorCalls = listOf(
@@ -279,7 +283,7 @@ class VoiceSessionDelegatorEdgeTests {
         // Release Turn 1's stalled send: Turn 1 admits, accepts its capture, and immediately kicks off Turn 2's admission.
         val expectedContext = """[Phone context] Viewing session "Session View" (ses_view)"""
         val expectedPrompt1 = VoiceSessionDelegator.formatPrompt(
-            deltaLines = listOf("Kit: First request."),
+            deltaLines = listOf("User: First request."),
             promisedClaim = null,
             contextLine = expectedContext,
             includeActiveCallHeader = true,
@@ -315,7 +319,7 @@ class VoiceSessionDelegatorEdgeTests {
 
         // Release Turn 2's send: Turn 2 admits with ONLY its delta (no repeated header/context) and settles cleanly.
         val expectedPrompt2 = VoiceSessionDelegator.formatPrompt(
-            deltaLines = listOf("Kit: Second request."),
+            deltaLines = listOf("User: Second request."),
             promisedClaim = null,
             contextLine = null,
             includeActiveCallHeader = false,
@@ -523,7 +527,7 @@ class VoiceSessionDelegatorEdgeTests {
 
         val expectedContext = """[Phone context] Viewing session "Session View" (ses_view)"""
         val expectedPrompt = VoiceSessionDelegator.formatPrompt(
-            deltaLines = listOf("Kit: Second call."),
+            deltaLines = listOf("User: Second call."),
             promisedClaim = null,
             contextLine = expectedContext,
             includeActiveCallHeader = true,
@@ -583,5 +587,187 @@ class VoiceSessionDelegatorEdgeTests {
         assertEquals(listOf("ses_auto_cached"), sendCalls.value)
         assertEquals("[COMPLETE] Ready on cached Voice session.", completed.value.firstOrNull()?.second)
         call2Effects.skipInFlightEffects()
+    }
+
+    @Test fun watchSessionPromptDoesNotBlockTurnPromptSettlement() {
+        val watch = Watch()
+        watch.step(ReplyWatch.Event.CallPhaseChanged(ReplyWatch.CallPhase.live))
+        watch.step(ReplyWatch.Event.DelegatorStarted(requestID = "del_turn"))
+        watch.step(ReplyWatch.Event.DelegatorWaiting(sessionID = "ses_shared", requestID = "del_turn", isWaiting = true))
+
+        val watchOnly = ReplyWatch.Prompt(promptID = "watch-tool_1", sessionID = "ses_shared", title = "Voice", topic = "Build")
+            .copy(readsLatestSessionReply = true)
+        val turnPrompt = ReplyWatch.Prompt(promptID = "msg_turn", sessionID = "ses_shared", title = "Voice")
+        watch.step(ReplyWatch.Event.Sent(listOf(watchOnly, turnPrompt)))
+
+        watch.step(ReplyWatch.Event.WaitSucceeded(promptID = "msg_turn", reply = "Turn reply arrived."))
+        assertTrue(
+            "An open ios_voice_watch_session prompt must not block a turn prompt on the same session",
+            "msg_turn" in watch.value.resolvedPromptIDs,
+        )
+        assertFalse("watch-tool_1" in watch.value.resolvedPromptIDs)
+        assertEquals(listOf("watch-tool_1"), watch.value.watched.map { it.promptID })
+        assertEquals(ReplyWatch.Outcome.Replied("Turn reply arrived."), watch.value.deferredNotices.firstOrNull()?.outcome)
+    }
+
+    /** iOS: a turn in `ses_voice` waiting on [promptID], the call in [phase]. */
+    private fun waitingTurnState(
+        shared: VoiceTestShared,
+        phase: VoiceFeature.State.Phase,
+        userText: String,
+        callID: String,
+        promptID: String,
+        didSayInterim: Boolean = false,
+    ): VoiceFeature.State {
+        val base = shared.read { VoiceFeature.State(server, VoiceSessionDelegatorTestSupport.session) }
+            .withPhase(phase)
+            .copy(usesSessionDelegator = true)
+        val recorded = base.tail.record(VoiceTranscriptTail.Role.user, userText, id = "u1").tail
+        val captured = recorded.capture()
+        val state = base.copy(
+            tail = captured.tail.accept(captured.capture),
+            sessionDelegator = base.sessionDelegator.copy(
+                activeSessionID = "ses_voice",
+                turns = listOf(
+                    VoiceSessionDelegator.State.Turn(
+                        callID = callID,
+                        capture = captured.capture,
+                        sessionID = "ses_voice",
+                        title = "Voice",
+                        promptID = promptID,
+                        saidTurn = 1,
+                        didSayInterim = didSayInterim,
+                    ),
+                ),
+            ),
+            delegatorWork = listOf(callID),
+        )
+        return state
+            .stepping(ReplyWatch.Event.DelegatorStarted(requestID = callID))
+            .stepping(ReplyWatch.Event.DelegatorWaiting(sessionID = "ses_voice", requestID = callID, isWaiting = true))
+            .stepping(ReplyWatch.Event.Sent(listOf(ReplyWatch.Prompt(promptID = promptID, sessionID = "ses_voice", title = "Voice"))))
+    }
+
+    @Test fun endingCallStillSettlesActiveSessionDelegatorTurn() = runBlocking {
+        val shared = preserveSettings()
+        val completed = Locked(listOf<Pair<String, String>>())
+        val state = waitingTurnState(
+            shared,
+            VoiceFeature.State.Phase.EndingAfterGoodbye(spoken = false),
+            userText = "Check status before we hang up",
+            callID = "del_goodbye",
+            promptID = "msg_goodbye",
+        )
+        val effects = detachedScope(coroutineContext)
+        val store = store(shared, state, effects, now = 1_700_000_000) {
+            this[VoiceCallClient] = testVoiceCall(
+                completeFunction = { id, out -> completed.update { it + (id to out) } },
+                cancelPendingAnnouncements = { },
+            )
+        }
+
+        store.send(VoiceFeature.Action.ReplyWatch(ReplyWatch.Event.WaitSucceeded(promptID = "msg_goodbye", reply = "All green, bye!"))) {
+            it.stepping(ReplyWatch.Event.WaitSucceeded(promptID = "msg_goodbye", reply = "All green, bye!"))
+                .copy(
+                    sessionDelegator = it.sessionDelegator.copy(turns = emptyList(), activeSessionID = null),
+                    delegatorWork = emptyList(),
+                )
+                .stepping(
+                    ReplyWatch.Event.DelegatorAnswered(
+                        sessionID = "ses_voice",
+                        reply = "All green, bye!",
+                        promptIDs = listOf("msg_goodbye"),
+                        requestID = "del_goodbye",
+                    ),
+                )
+                .stepping(ReplyWatch.Event.DelegatorFinished(requestID = "del_goodbye", spoken = "All green, bye!"))
+        }
+        store.finish(timeout = 5.seconds)
+
+        assertEquals(1, completed.value.size)
+        assertEquals("del_goodbye", completed.value.firstOrNull()?.first)
+        assertEquals("[COMPLETE] All green, bye!", completed.value.firstOrNull()?.second)
+    }
+
+    @Test fun supersededDelegationClosesLocallyWithoutWireAppendOnLive() = runTest(timeout = 1.minutes) {
+        val harness = LiveHarness(
+            this,
+            VoiceCallTiming(
+                rotateAfter = 3_000.0,
+                forceRotateAfter = 3_500.0,
+                retryDelays = listOf(0.01),
+                liveDelegationSettle = Duration.ZERO,
+                liveTranscriptSettle = 5.seconds,
+                liveAcknowledgementWait = Duration.ZERO,
+                liveAppendQuiet = Duration.ZERO,
+            ),
+        )
+        val events = EventIterator(harness.start(unboundSpeechUsesInstructions = true), backgroundScope)
+        val socket = harness.nextOpened()
+        socket.yieldEvent(LiveServerEvent.SessionStarted(id = "live_close", expiresAt = null))
+        assertEquals(VoiceCallEvent.Connected, events.next())
+
+        socket.yieldEvent(LiveServerEvent.InputTranscriptDelta(delta = "Run all tests", startMilliseconds = 0, endMilliseconds = 400))
+        assertEquals(VoiceCallEvent.UserTranscript(itemID = "live-u-1", text = "Run all tests", final = true), events.next())
+        socket.yieldEvent(LiveServerEvent.DelegationCreated(id = "del_first", target = "client", offsetMilliseconds = 400))
+        assertEquals(
+            VoiceCallEvent.FunctionCall(callID = "del_first", name = "delegate", arguments = JsonObject(emptyMap())),
+            events.next(),
+        )
+
+        harness.coordinator.closeDelegation(callID = "del_first", reason = VoiceDelegationCloseReason.superseded)
+
+        assertFalse(
+            "Closing a superseded GPT-Live delegation must never send thinking/commentary/instructions frames that provoke speech",
+            socket.commands.any {
+                it is LiveCommand.AppendThinking || it is LiveCommand.AppendCommentary || it is LiveCommand.AppendInstructions
+            },
+        )
+
+        harness.coordinator.end()
+    }
+
+    @Test fun interimSpokenTurnClosesDelegationOnWire() = runBlocking {
+        val shared = preserveSettings()
+        val closed = Locked(listOf<Pair<String, VoiceDelegationCloseReason>>())
+        val completed = Locked(listOf<Pair<String, String>>())
+        val state = waitingTurnState(
+            shared,
+            VoiceFeature.State.Phase.Live,
+            userText = "Check the deploy",
+            callID = "del_interim",
+            promptID = "msg_interim",
+            didSayInterim = true,
+        )
+        val effects = detachedScope(coroutineContext)
+        val store = store(shared, state, effects, now = 1_700_000_000) {
+            this[VoiceCallClient] = testVoiceCall(
+                completeFunction = { id, out -> completed.update { it + (id to out) } },
+                cancelPendingAnnouncements = { },
+            ).copy(closeDelegation = { id, reason -> closed.update { it + (id to reason) } })
+        }
+
+        store.send(VoiceFeature.Action.ReplyWatch(ReplyWatch.Event.WaitSucceeded(promptID = "msg_interim", reply = ""))) {
+            it.stepping(ReplyWatch.Event.WaitSucceeded(promptID = "msg_interim", reply = ""))
+                .copy(
+                    sessionDelegator = it.sessionDelegator.copy(turns = emptyList(), activeSessionID = null),
+                    delegatorWork = emptyList(),
+                )
+                .stepping(
+                    ReplyWatch.Event.DelegatorAnswered(
+                        sessionID = "ses_voice",
+                        reply = null,
+                        promptIDs = listOf("msg_interim"),
+                        requestID = "del_interim",
+                    ),
+                )
+                .stepping(ReplyWatch.Event.DelegatorFinished(requestID = "del_interim", spoken = "Done."))
+        }
+        store.finish(timeout = 5.seconds)
+
+        assertTrue(completed.value.isEmpty())
+        assertEquals(1, closed.value.size)
+        assertEquals("del_interim", closed.value.firstOrNull()?.first)
+        assertEquals(VoiceDelegationCloseReason.coveredByInterimSpeech, closed.value.firstOrNull()?.second)
     }
 }

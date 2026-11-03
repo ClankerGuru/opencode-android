@@ -99,8 +99,7 @@ class VoiceFeatureTestsScreenSession {
     ) = VoiceCallClient(
         start = start,
         completeFunction = completeFunction,
-        noteProgress = { _, _ -> },
-        abandonDelegation = { },
+        closeDelegation = { _, _ -> },
         setMuted = { },
         updateInstructions = { _, _ -> },
         end = {},

@@ -88,6 +88,12 @@ data class ReplyWatch(
     ) {
         val id: String get() = promptID
 
+        /**
+         * Watched turns not sent as phone-steered prompts in the session's run:
+         * they settle on their own without blocking or absorbing turn prompts.
+         */
+        val isIndependentWatch: Boolean get() = readsLatestSessionReply || background != null
+
         companion object {
             operator fun invoke(sent: VoiceDelegator.SentPrompt, saidTurn: Int? = null): Prompt =
                 Prompt(promptID = sent.promptID, sessionID = sent.sessionID, title = sent.title, topic = sent.topic, saidTurn = saidTurn)
@@ -167,7 +173,7 @@ data class ReplyWatch(
         /**
          * The running delegator requests that read its session or are waiting
          * on it: it waits for their answer, up to `claimedResultLimit`. Empty
-         * while it's in its short grace (`unclaimedResultGrace`).
+         * while held only behind other foreground delegator turns.
          */
         val heldBy: Set<String> = emptySet(),
         /**
@@ -250,9 +256,8 @@ data class ReplyWatch(
         /**
          * A result held for a delegator request goes out after this long anyway
          * (`deferralExpired`), or the timer is cancelled once it's released.
-         * [claimed]: the limit for a held result, not its grace.
          */
-        data class ExpireDeferral(val key: String, val after: Duration, val claimed: Boolean = false) : Effect
+        data class ExpireDeferral(val key: String, val after: Duration) : Effect
         data class CancelDeferralExpiry(val key: String) : Effect
 
         /** Drops held announcements that answer only these prompts. */
@@ -313,11 +318,8 @@ data class ReplyWatch(
         /** A delegator request began or ended a `wait_for_session` on a session. */
         data class DelegatorWaiting(val sessionID: String, val requestID: String, val isWaiting: Boolean) : Event
 
-        /**
-         * A held result's grace or limit ran out: it speaks now. A grace timer
-         * that fires after a request claimed the result is stale.
-         */
-        data class DeferralExpired(val key: String, val claimed: Boolean = false) : Event
+        /** A held result's deadline (`claimedResultLimit` from arrival) ran out: it speaks now. */
+        data class DeferralExpired(val key: String) : Event
     }
 
     /** What a delegator request read for a session, applied once it answers. */
@@ -330,6 +332,8 @@ data class ReplyWatch(
     fun noteUserActed(): ReplyWatch = copy(userTurns = userTurns + 1)
 
     fun isWatching(sessionID: String): Boolean = watched.any { it.sessionID == sessionID }
+
+    fun awaitsParentRelay(sessionID: String): Boolean = watched.any { it.background?.parentSessionID == sessionID }
 
     fun hasSettledWatch(activeSessionIDs: Set<String>): Boolean =
         watched.any { it.sessionID !in activeSessionIDs && !it.isFetchingSettledReply }
@@ -388,6 +392,8 @@ data class ReplyWatch(
 
     fun setSessionActive(sessionID: String, isActive: Boolean): ReplyWatch =
         copy(activeSessionIDs = if (isActive) activeSessionIDs + sessionID else activeSessionIDs - sessionID)
+
+    fun removeCompleted(promptIDs: Set<String>): ReplyWatch = copy(completed = completed.filterNot { it.promptID in promptIDs })
 
     /** The next state and its effects (iOS `transition(_:)`; `step(_:)` is its mutating form). */
     fun transition(event: Event): Pair<ReplyWatch, List<Effect>> {
@@ -462,7 +468,11 @@ data class ReplyWatch(
 
             is Event.SseExecutionEnded -> {
                 activeSessionIDs -= event.sessionID
-                fetchSettled(event.source) { it.sessionID == event.sessionID }
+                val settled = fetchSettled(event.source) { it.sessionID == event.sessionID }
+                val relayed = watched.filter {
+                    it.background?.parentSessionID == event.sessionID && it.isFetchingSettledReply && it.failures > 0
+                }.map { Effect.FetchSettledReply(it, event.source) }
+                settled + relayed
             }
 
             is Event.SseStepEnded -> watched
@@ -536,12 +546,17 @@ data class ReplyWatch(
 
             is Event.DeferralExpired -> {
                 val index = deferredNotices.indexOfFirst { it.deferralKey == event.key }
-                if (index < 0 || !(event.claimed || deferredNotices[index].heldBy.isEmpty())) {
+                if (index < 0) {
                     emptyList()
                 } else {
-                    val effect = announcement(deferredNotices.removeAt(index))
-                    pruneDelegatorReplies()
-                    listOf(effect)
+                    val notice = deferredNotices.removeAt(index)
+                    if (callPhase == CallPhase.ending || callPhase == CallPhase.ended) {
+                        listOf(Effect.Log(LogEntry.NoticeDropped(notice.title, callPhase)))
+                    } else {
+                        val effect = announcement(notice)
+                        pruneDelegatorReplies()
+                        listOf(effect)
+                    }
                 }
             }
         }
@@ -549,13 +564,19 @@ data class ReplyWatch(
         private fun waitSucceeded(event: Event.WaitSucceeded): List<Effect> {
             val index = watched.indexOfFirst { it.promptID == event.promptID }
             if (index < 0) return emptyList()
-            watched[index] = watched[index].copy(ownReply = event.reply?.trim() ?: "")
+            val trimmed = event.reply?.trim() ?: ""
+            if (watched[index].isIndependentWatch) {
+                val prompt = watched.removeAt(index)
+                if (watched.none { it.sessionID == prompt.sessionID }) activeSessionIDs -= prompt.sessionID
+                return resolve(prompt, if (trimmed.isEmpty()) Outcome.FinishedWithoutText else Outcome.Replied(trimmed))
+            }
+            watched[index] = watched[index].copy(ownReply = trimmed)
             // A read lands once the session is idle, so every prompt sent there
             // settled into this run, and each one's own read lands too. The run
             // resolves, as one notice, once they all have: its reply comes after
             // its last prompt, with any earlier text that doesn't repeat it.
             val sessionID = watched[index].sessionID
-            if (!watched.all { it.sessionID != sessionID || it.ownReply != null }) return emptyList()
+            if (!watched.all { it.sessionID != sessionID || it.isIndependentWatch || it.ownReply != null }) return emptyList()
             return resolveRun(sessionID)
         }
 
@@ -640,23 +661,16 @@ data class ReplyWatch(
 
         /**
          * A request read this session or began waiting on it: its held results
-         * wait for that request now. A result in its grace trades the grace for
-         * the rest of the longer limit: claimed within the grace, it is spoken at
-         * most `claimedResultLimit` after it arrived.
+         * wait for that request now, keeping the single `claimedResultLimit`
+         * deadline started when each notice arrived.
          */
         private fun claim(sessionID: String, requestID: String): List<Effect> {
             if (requestID !in delegatorsInFlight) return emptyList()
-            val effects = mutableListOf<Effect>()
             for (index in deferredNotices.indices) {
                 if (!deferredNotices[index].isAbout(sessionID)) continue
-                val wasClaimed = deferredNotices[index].heldBy.isNotEmpty()
                 deferredNotices[index] = deferredNotices[index].copy(heldBy = deferredNotices[index].heldBy + requestID)
-                val key = deferredNotices[index].deferralKey
-                if (!wasClaimed && key != null) {
-                    effects += Effect.ExpireDeferral(key, after = claimedResultLimit - unclaimedResultGrace, claimed = true)
-                }
             }
-            return effects
+            return emptyList()
         }
 
         /**
@@ -673,7 +687,11 @@ data class ReplyWatch(
                     continue
                 }
                 notice.deferralKey?.let { effects += Effect.CancelDeferralExpiry(it) }
-                effects += announcement(notice)
+                if (callPhase == CallPhase.ending || callPhase == CallPhase.ended) {
+                    effects += Effect.Log(LogEntry.NoticeDropped(notice.title, callPhase))
+                } else {
+                    effects += announcement(notice)
+                }
             }
             deferredNotices = kept
             pruneDelegatorReplies()
@@ -709,7 +727,12 @@ data class ReplyWatch(
                 effects += Effect.Log(LogEntry.NoticeSuppressed(prompt.title))
             }
             effects += findBackgroundWork(matching, outcome)
-            val covered = { notice: HeldNotice -> notice.promptIDs.all { it in answered } }
+            val covered = covered@{ notice: HeldNotice ->
+                if (notice.promptIDs.all { it in answered }) return@covered true
+                val outcomeText = (notice.outcome as? Outcome.Replied)?.reply
+                notice.background?.parentSessionID == sessionID && outcomeText != null &&
+                    (VoiceWorkClient.isRead(outcomeText, answer.reply) || VoiceWorkClient.isRead(outcomeText, spoken))
+            }
             val suppressed = (connectingNotices + deferredNotices).filter(covered)
             for (key in deferredNotices.filter(covered).mapNotNull { it.deferralKey }) {
                 effects += Effect.CancelDeferralExpiry(key)
@@ -770,10 +793,10 @@ data class ReplyWatch(
          * its last prompt, keeping any earlier text the final reply doesn't repeat.
          */
         private fun resolveRun(sessionID: String): List<Effect> {
-            val run = watched.filter { it.sessionID == sessionID }
+            val run = watched.filter { it.sessionID == sessionID && !it.isIndependentWatch }
             if (run.isEmpty()) return emptyList()
-            watched.removeAll { it.sessionID == sessionID }
-            activeSessionIDs -= sessionID
+            watched.removeAll { it.sessionID == sessionID && !it.isIndependentWatch }
+            if (watched.none { it.sessionID == sessionID }) activeSessionIDs -= sessionID
             // Prompts after the run's last text got no reply: an earlier prompt's
             // reply, written before they arrived, never answers them.
             val lastAnswered = run.indexOfLast { it.ownReply?.isEmpty() == false }
@@ -808,7 +831,7 @@ data class ReplyWatch(
          * prompt left another way (a failure, or the delegator answering it).
          */
         private fun resolveAnsweredRest(sessionID: String): List<Effect> {
-            val rest = watched.filter { it.sessionID == sessionID }
+            val rest = watched.filter { it.sessionID == sessionID && !it.isIndependentWatch }
             if (rest.isEmpty() || !rest.all { it.ownReply != null }) return emptyList()
             return resolveRun(sessionID)
         }
@@ -839,20 +862,17 @@ data class ReplyWatch(
             )
             when {
                 callPhase == CallPhase.connecting -> connectingNotices += notice
-                callPhase == CallPhase.live && delegatorsInFlight.isNotEmpty() -> {
+                (callPhase == CallPhase.live || callPhase == CallPhase.ending) && delegatorsInFlight.isNotEmpty() -> {
                     // A running request that read this run, or is waiting on it, tells
-                    // the user in its answer, and this then says only the rest. One that
-                    // hasn't may be about to: a short grace. Both are bounded.
+                    // the user in its answer, and this then says only the rest. Unclaimed
+                    // notices from other sessions also wait while a foreground request is
+                    // running, releasing as soon as none is left (capped at `claimedResultLimit`).
                     val held = notice.copy(
                         deferralKey = notice.promptID,
                         heldBy = claimers(notice.sessionID) + (notice.background?.let { claimers(it.parentSessionID) } ?: emptySet()),
                     )
                     deferredNotices += held
-                    effects += Effect.ExpireDeferral(
-                        key = notice.promptID,
-                        after = if (held.heldBy.isEmpty()) unclaimedResultGrace else claimedResultLimit,
-                        claimed = held.heldBy.isNotEmpty(),
-                    )
+                    effects += Effect.ExpireDeferral(key = notice.promptID, after = claimedResultLimit)
                 }
                 callPhase == CallPhase.live -> {
                     // Spoken now: the call holds it only so it doesn't cut off speech.

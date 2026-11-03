@@ -143,7 +143,7 @@ class VoiceFeatureTestsDelegation {
         events.finish()
         store.receive(Action.CallEnded::class) { it.withPhase(State.Phase.Ended) }
         store.receiveEnded()
-        assertEquals(listOf("user: fix the failing test", "assistant: On it."), store.transcripts()["${server.id}:ses_voice"]?.tail)
+        assertEquals(listOf("user: fix the failing test"), store.transcripts()["${server.id}:ses_voice"]?.tail)
         store.finish()
     }
 
@@ -289,7 +289,7 @@ class VoiceFeatureTestsDelegation {
             voiceCall {
                 copy(
                     completeFunction = { callID, output -> completed.append(callID to output) },
-                    abandonDelegation = { callID -> abandoned.append(callID) },
+                    closeDelegation = { callID, _ -> abandoned.append(callID) },
                 )
             }
             voiceWork {
@@ -335,7 +335,7 @@ class VoiceFeatureTestsDelegation {
             voiceCall {
                 copy(
                     completeFunction = { callID, output -> completed.append(callID to output) },
-                    abandonDelegation = { callID -> abandoned.append(callID) },
+                    closeDelegation = { callID, _ -> abandoned.append(callID) },
                 )
             }
             voiceWork {

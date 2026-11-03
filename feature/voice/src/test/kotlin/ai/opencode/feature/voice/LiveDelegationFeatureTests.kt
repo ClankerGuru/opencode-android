@@ -9,9 +9,7 @@ import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeSession
 import java.time.Instant
-import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
@@ -51,17 +49,11 @@ class LiveDelegationFeatureTests {
         val events = CallEvents()
         val releaseReply = Gate<String>()
         val submitted = mutableListOf<String>()
-        val progress = mutableListOf<Pair<String, String>>()
         val completed = mutableListOf<Pair<String, String>>()
         val shared = VoiceTestShared()
         val store = liveStore(shared) {
             this[VoiceCallClient] = testVoiceCall(
                 start = { _, _ -> events.flow },
-                noteProgress = { callID, text ->
-                    yield()
-                    if (!currentCoroutineContext().isActive) return@testVoiceCall
-                    progress += callID to text
-                },
                 completeFunction = { callID, output -> completed += callID to output },
             )
             this[VoiceWorkClient] = testVoiceWork(
@@ -100,8 +92,6 @@ class LiveDelegationFeatureTests {
             parsed.transcriptDelta,
         )
         assertTrue(parsed.context?.contains("Session \"Voice lab\" in project \"project\".") == true)
-        assertEquals("item_del_1", progress.firstOrNull()?.first)
-        assertTrue(progress.firstOrNull()?.second?.contains("Running in session \"Voice lab\"") == true)
 
         // Conversation continues non-blocking while the OpenCode session is still working!
         events.yieldEvent(VoiceCallEvent.UserTranscript(itemID = "live-u-3", text = "While that runs, how are we doing?", final = true))
@@ -216,12 +206,10 @@ class LiveDelegationFeatureTests {
         val enteredFirstSubmit = Gate<Unit>()
         val pendingReplies = mutableMapOf<String, Gate<String>>()
         val submitted = mutableListOf<String>()
-        val progress = mutableListOf<Pair<String, String>>()
         val shared = VoiceTestShared()
         val store = liveStore(shared) {
             this[VoiceCallClient] = testVoiceCall(
                 start = { _, _ -> events.flow },
-                noteProgress = { callID, text -> progress += callID to text },
             )
             this[VoiceWorkClient] = testVoiceWork(
                 submit = { _, text ->
@@ -259,7 +247,6 @@ class LiveDelegationFeatureTests {
         delay(30)
         assertEquals("Late words never send a second steer prompt", 1, submitted.size)
         assertEquals("msg_1", store.state.pendingWork.firstOrNull()?.promptID)
-        assertFalse("No late-words note to the voice agent", progress.any { it.second.contains("User finished saying") })
 
         // 3. A correction: the voice agent delegates again, and that delegation
         // carries everything said since the first one.

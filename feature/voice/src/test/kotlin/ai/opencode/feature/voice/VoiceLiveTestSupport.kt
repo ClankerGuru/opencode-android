@@ -219,10 +219,14 @@ class LiveHarness(
 
     /** iOS `coordinator.pendingAppendCount` (DEBUG-only there; internal state here). */
     suspend fun pendingAppendCount(): Int = coordinator.serialized {
-        coordinator.quietAppends.size + coordinator.heldAnnouncements.size + coordinator.undelivered.size
+        coordinator.pendingAppendCount
     }
 
-    suspend fun start(instructions: String = "Be brief.", delegation: LiveDelegation = LiveDelegation.client): Flow<VoiceCallEvent> {
+    suspend fun start(
+        instructions: String = "Be brief.",
+        delegation: LiveDelegation = LiveDelegation.client,
+        unboundSpeechUsesInstructions: Boolean = false,
+    ): Flow<VoiceCallEvent> {
         val live = LiveClient { _, config ->
             if (sockets.isNotEmpty() && failingConnects > 0) {
                 failingConnects -= 1
@@ -267,7 +271,11 @@ class LiveHarness(
         })
         return coordinator.start(
             apiKey = "test",
-            config = LiveSessionConfig(instructions = instructions, delegation = delegation),
+            config = LiveSessionConfig(
+                instructions = instructions,
+                delegation = delegation,
+                unboundSpeechUsesInstructions = unboundSpeechUsesInstructions,
+            ),
             live = live,
             audio = audio,
         )
@@ -346,7 +354,7 @@ fun TestScope.voiceTestStore(
 fun testVoiceCall(
     start: suspend (String, RealtimeSessionConfig) -> Flow<VoiceCallEvent> = { _, _ -> kotlinx.coroutines.flow.emptyFlow() },
     completeFunction: suspend (String, String) -> Unit = { _, _ -> },
-    noteProgress: suspend (String, String) -> Unit = { _, _ -> },
+    noteProgressActivity: suspend (String, String?) -> Unit = { _, _ -> },
     cancelPendingAnnouncements: suspend (List<String>) -> Unit = { },
     retarget: suspend () -> Unit = { },
     setAtEar: suspend (Boolean) -> Unit = { },
@@ -358,7 +366,7 @@ fun testVoiceCall(
 ) = VoiceCallClient(
     start = start,
     completeFunction = completeFunction,
-    noteProgress = noteProgress,
+    noteProgressActivity = noteProgressActivity,
     cancelPendingAnnouncements = cancelPendingAnnouncements,
     retarget = retarget,
     setMuted = { },

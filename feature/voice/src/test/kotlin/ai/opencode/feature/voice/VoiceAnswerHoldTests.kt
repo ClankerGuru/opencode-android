@@ -204,12 +204,12 @@ class VoiceAnswerHoldTests {
      */
     @Test fun anAnswerWaitingForTheSlotHoldsForTheUserWhoStartedTalking() = runTest {
         val call = idleCall(resultMaxHold = 200.milliseconds, answerSpeakingHold = 1.seconds)
-        asked(call)
-        call.advance(500)
         call.socket.stallFirstCommentary = true
         // Stalls inside the send, so it isn't awaited.
         launch { call.coordinator.announce(result, sessionID = "ses_upload") }
         call.waitFor { call.socket.commentaryEntered == 1 }
+        asked(call)
+        call.advance(500)
         val answering = launch { answers(call) }
         call.until { call.coordinator.serialized { call.coordinator.sendSlotWaiters.size } == 1 }
         assertTrue(call.spoken().isEmpty())
@@ -370,8 +370,6 @@ class VoiceAnswerHoldTests {
         call.userSays("[gasp", from = 171_700, to = 171_800)
         call.agentSpeaks("Let me look into that, and meanwhile here's a long aside", from = 172_000, to = 175_000)
         call.advance(100)
-        // A held progress note says less than the answer that follows it.
-        call.coordinator.noteProgress(callID = "del_rules", text = "Reading GAME ENGINE.")
         answers(call)
         call.advance(700)
         assertTrue("Held while the voice agent speaks", call.spoken().isEmpty())
@@ -381,10 +379,6 @@ class VoiceAnswerHoldTests {
         call.advance(1)
         call.waitFor { call.spoken().isNotEmpty() }
         assertEquals(listOf(answer), call.spoken())
-        assertFalse(
-            "The progress note went stale behind its answer and was dropped",
-            call.socket.commands.any { it is LiveCommand.AppendThinking },
-        )
         call.coordinator.end()
     }
 }

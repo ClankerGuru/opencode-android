@@ -141,11 +141,11 @@ class LiveCallCoordinatorTests {
      */
     private suspend fun TestScope.answerWaitingForTheSlot(): Pair<VoiceClockedCall, Job> {
         val call = idleCall(resultMaxHold = 200.milliseconds, answerSpeakingHold = 1.seconds)
-        askedForTheRules(call)
         call.socket.stallFirstCommentary = true
         // Stalls inside the send, so it isn't awaited.
         launch { call.coordinator.announce("The session “Upload” finished the work you started there. Its reply: All tests pass.", sessionID = "ses_upload") }
         call.waitFor { call.socket.commentaryEntered == 1 }
+        askedForTheRules(call)
         val answering = launch { call.coordinator.completeFunction(callID = "del_rules", output = "[COMPLETE] $rulesAnswer") }
         call.until { call.coordinator.serialized { call.coordinator.sendSlotWaiters.size } == 1 }
         assertTrue(call.spoken().isEmpty())
@@ -399,11 +399,9 @@ class LiveCallCoordinatorTests {
         socket.yieldEvent(LiveServerEvent.DelegationCreated(id = "item_del_1", target = "client", offsetMilliseconds = 700))
         assertEquals(VoiceCallEvent.FunctionCall(callID = "item_del_1", name = "delegate", arguments = obj()), events.next())
 
-        // Progress and completion use session.thinking.append and session.commentary.append with the delegation ID.
-        harness.coordinator.noteProgress(callID = "item_del_1", text = "Running upload tests.")
+        // Completion uses session.commentary.append with the delegation ID.
         harness.coordinator.completeFunction(callID = "item_del_1", output = "[COMPLETE] The upload test passed.")
 
-        assertTrue(socket.commands.any { it is LiveCommand.AppendThinking && it.delegationID == "item_del_1" && it.content == "Running upload tests." })
         assertTrue(socket.commands.any { it is LiveCommand.AppendCommentary && it.delegationID == "item_del_1" && it.content == "The upload test passed." })
 
         // Overlapping full-duplex speech: user audio and transcript deltas stream
@@ -474,23 +472,24 @@ class LiveCallCoordinatorTests {
         assertTrue(second.config.input.contains(LiveInputMessage(LiveInputMessage.Role.user, "Why is the upload test flaky?")))
 
         second.yieldEvent(LiveServerEvent.SessionStarted(id = "live_2", expiresAt = null))
-        waitUntil { first.closed }
-        assertTrue(first.closed)
-        assertEquals(listOf("voice_rotation_swapped"), harness.voiceEvents)
+        delay(30)
+        assertFalse("Voluntary standby rotation waits while a delegation is open", first.closed)
 
-        // Result for `item_del_1` (created on `first`) arrives after the swap: sent as session-wide commentary (`delegation_id: null`).
+        first.yieldEvent(LiveServerEvent.SessionClosed(reason = LiveCloseReason.Expired, usageSeconds = 7_200))
+        waitUntil { first.closed }
+        assertEquals(listOf("voice_session_expired", "voice_standby_promoted"), harness.voiceEvents)
+
+        // Result for `item_del_1` (created on `first`) arrives after the promotion: sent unbound (`delegation_id: null`).
         harness.coordinator.completeFunction(callID = "item_del_1", output = "[COMPLETE] It races the progress callback.")
         assertTrue(second.commands.any {
             it is LiveCommand.AppendCommentary && it.delegationID == null && it.content.contains("It races the progress callback.")
         })
 
-        // Now simulate `session.closed` with reason `expired`: reconnects to a third socket.
-        second.yieldEvent(LiveServerEvent.SessionClosed(reason = LiveCloseReason.Expired, usageSeconds = 7_200))
-        assertEquals(VoiceCallEvent.Reconnecting, events.next())
+        // With no delegations open, the next standby rotates voluntarily at a turn boundary.
         val third = harness.nextOpened()
         third.yieldEvent(LiveServerEvent.SessionStarted(id = "live_3", expiresAt = null))
-        assertEquals(VoiceCallEvent.Reconnected, events.next())
-        assertEquals(listOf("voice_rotation_swapped", "voice_session_expired", "voice_socket_reconnected"), harness.voiceEvents)
+        waitUntil { second.closed }
+        assertEquals(listOf("voice_session_expired", "voice_standby_promoted", "voice_rotation_swapped"), harness.voiceEvents)
 
         harness.coordinator.end()
     }
@@ -958,7 +957,7 @@ class LiveCallCoordinatorTests {
         assertEquals(VoiceCallEvent.UserTranscript(itemID = "live-u-1", text = "Check the upload test", final = true), events.next())
         socket.yieldEvent(LiveServerEvent.DelegationCreated(id = "del_a", target = "client", offsetMilliseconds = 600))
         awaitAcknowledgement(harness, "del_a")
-        harness.coordinator.abandonDelegation(callID = "del_a")
+        harness.coordinator.closeDelegation(callID = "del_a", reason = VoiceDelegationCloseReason.superseded)
         advance(150)
         // Past its deadline: had it survived, it would come before this.
         socket.yieldEvent(LiveServerEvent.OutputTranscriptDelta(delta = "Okay.", startMilliseconds = 2_000, endMilliseconds = 2_200))
