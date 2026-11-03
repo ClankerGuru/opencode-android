@@ -45,6 +45,7 @@ import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -102,6 +103,13 @@ internal fun InboxSidebarList(
         }
     }
     val listState = rememberLazyListState()
+    // iOS's List shows a new top row when it's scrolled to the top. LazyColumn keeps its first
+    // visible row anchored by key instead, which tucked the archive error above the viewport,
+    // under the header. Capture "at the top" as the error arrives (before the list remeasures)
+    // and scroll to it; scrollToItem drops the key anchor.
+    val atTop by remember { derivedStateOf { listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0 } }
+    val revealError = remember(archiveError != null) { archiveError != null && atTop }
+    LaunchedEffect(revealError) { if (revealError) listState.scrollToItem(0) }
     val density = LocalDensity.current
     // The header's edge follows how far rows have scrolled beneath the title.
     LaunchedEffect(listState, headerScroll) {
@@ -205,11 +213,20 @@ private fun InboxSidebarSwipeRow(
         },
         onDismiss = { value ->
             when (value) {
-                SwipeToDismissBoxValue.StartToEnd -> onMarkRead()
-                SwipeToDismissBoxValue.EndToStart -> onArchive()
+                SwipeToDismissBoxValue.StartToEnd -> {
+                    onMarkRead()
+                    scope.launch { swipe.reset() }
+                }
+                // Settle before archiving. The row leaves at once, which cancels an animated
+                // reset, and the swipe state is saveable per row key: if the archive fails the row
+                // returns still dismissed, and SwipeToDismissBox calls onDismiss again for it, so
+                // a failing archive retried forever, buzzing an error haptic each time.
+                SwipeToDismissBoxValue.EndToStart -> scope.launch {
+                    swipe.snapTo(SwipeToDismissBoxValue.Settled)
+                    onArchive()
+                }
                 SwipeToDismissBoxValue.Settled -> Unit
             }
-            scope.launch { swipe.reset() }
         },
     ) {
         Box(
