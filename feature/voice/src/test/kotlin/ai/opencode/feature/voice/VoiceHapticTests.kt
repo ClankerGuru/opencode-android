@@ -649,4 +649,19 @@ class VoiceHangUpEngineTests {
             engine.endCall()
         }
     }
+
+    /** Android only: a Galaxy S24 took ~20 ms per waveform step, so 1 ms steps stretched the 0.8 s connect into 17 s. */
+    @Test fun aWaveformPlaysInStepsTheVibratorCanKeepUpWith() {
+        val connect = IntArray(842) { i -> if (i in 39..829) (40 + (i % 200)).coerceAtMost(255) else 0 }
+        val (timings, levels) = VoiceHapticEngine.waveformSteps(connect)
+        assertTrue("${timings.size} steps", timings.size <= 34)
+        assertTrue(timings.all { it >= 1 } && timings.dropLast(1).all { it % 25 == 0L })
+        assertTrue(timings.sum() in 830L..850L)
+        assertEquals(0, levels.first())
+
+        val tick = IntArray(561).also { for (i in 2 until 12) it[i] = 128; it[5] = 200 }
+        val (tickTimings, tickLevels) = VoiceHapticEngine.waveformSteps(tick)
+        assertEquals(listOf(25L), tickTimings.toList())
+        assertEquals(listOf(200), tickLevels.toList())
+    }
 }
