@@ -2,15 +2,17 @@
 
 package ai.opencode.feature.session
 
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.stateDescription
 import ai.opencode.core.dependencies.dependency
-import ai.opencode.core.motion.Motion
+import ai.opencode.core.experiments.ExperimentalCallStyle
+import ai.opencode.core.experiments.key
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticEffect
+import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.rememberReduceMotion
+import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.PresentationAction
+import ai.opencode.core.store.Store
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
 import ai.opencode.core.store.scope
@@ -20,54 +22,47 @@ import ai.opencode.core.ui.OpenCodeSecondaryButton
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.ProviderIcon
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.feature.composer.AttachmentMenuDismissArea
+import ai.opencode.feature.composer.AttachmentMenuItem
+import ai.opencode.feature.composer.AttachmentMenuOverlay
+import ai.opencode.feature.composer.AttachmentMenuPhase
+import ai.opencode.feature.composer.AttachmentMenuPress
+import ai.opencode.feature.composer.AttachmentMenuSheet
+import ai.opencode.feature.composer.ComposerAutocompleteAction
+import ai.opencode.feature.composer.ComposerPhotoViewer
+import ai.opencode.feature.composer.LocationClientError
+import ai.opencode.feature.composer.LocationPermissionPrompt
+import ai.opencode.feature.composer.PastedTextViewer
+import ai.opencode.feature.composer.RequestDockContext
+import ai.opencode.feature.composer.RequestReviewSheet
+import ai.opencode.feature.composer.SentImageFlight
+import ai.opencode.feature.composer.SentImageFlightOverlay
+import ai.opencode.feature.composer.composerKeyboardStepHold
+import ai.opencode.feature.composer.modelpicker.ModelPickerAnchors
+import ai.opencode.feature.composer.plusmenu.PhotoFlightCanvas
+import ai.opencode.feature.composer.plusmenu.PlusMenuGlassSurface
+import ai.opencode.feature.composer.plusmenu.RecentPhotoPeekOverlay
+import ai.opencode.feature.media.LocalMediaPresenter
+import ai.opencode.feature.media.MediaPresenter
+import ai.opencode.feature.media.TranscriptImageViewer
+import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.State
+import ai.opencode.feature.session.header.HeaderBlurTunables
+import ai.opencode.feature.session.header.SessionHeaderBackdrop
+import ai.opencode.feature.session.header.SessionHeaderStyle
+import ai.opencode.feature.system.notifications.SessionNotificationsClient
 import ai.opencode.feature.voice.CallTrayController
 import ai.opencode.feature.voice.DotScopeRenderer
 import ai.opencode.feature.voice.LocalDotScopeCovered
 import ai.opencode.feature.voice.VoiceStoreOf
 import ai.opencode.feature.voice.floatingCallComposer
 import ai.opencode.feature.voice.floatingCallComposerColumn
-import ai.opencode.feature.session.header.HeaderBlurTunables
-import ai.opencode.feature.session.header.SessionHeaderBackdrop
-import ai.opencode.feature.session.header.SessionHeaderStyle
-import ai.opencode.feature.composer.AttachmentMenuDismissArea
-import ai.opencode.feature.composer.AttachmentMenuItem
-import ai.opencode.feature.composer.AttachmentMenuOverlay
-import ai.opencode.feature.composer.AttachmentMenuPhase
-import ai.opencode.feature.composer.AttachmentMenuPress
-import ai.opencode.feature.composer.ComposerAutocompleteAction
-import ai.opencode.feature.composer.ComposerPhotoViewer
-import ai.opencode.feature.composer.LocationPermissionPrompt
-import ai.opencode.feature.composer.PastedTextViewer
-import ai.opencode.feature.composer.modelpicker.ModelPickerAnchors
-import ai.opencode.feature.composer.plusmenu.PhotoFlightCanvas
-import ai.opencode.feature.composer.plusmenu.PlusMenuGlassSurface
-import ai.opencode.feature.composer.plusmenu.RecentPhotoPeekOverlay
-import androidx.compose.runtime.rememberCoroutineScope
-import ai.opencode.feature.composer.RequestDockContext
-import ai.opencode.feature.composer.RequestReviewSheet
-import ai.opencode.feature.composer.SentImageFlight
-import ai.opencode.feature.composer.SentImageFlightOverlay
-import ai.opencode.feature.composer.composerKeyboardStepHold
-import ai.opencode.feature.media.LocalMediaPresenter
-import ai.opencode.feature.media.MediaPresenter
-import ai.opencode.feature.media.TranscriptImageViewer
-import ai.opencode.core.store.Store
-import ai.opencode.core.motion.rememberReduceMotion
-import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.runtime.collectAsState
-import kotlinx.coroutines.CompletableDeferred
-import ai.opencode.core.experiments.ExperimentalCallStyle
-import ai.opencode.core.experiments.key
-import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.feature.composer.LocationClientError
-import ai.opencode.feature.media.TranscriptMetrics
-import ai.opencode.feature.system.notifications.SessionNotificationsClient
-import ai.opencode.server.model.OpenCodeShell
 import ai.opencode.server.model.OpenCodeSession
+import ai.opencode.server.model.OpenCodeShell
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.tween
@@ -84,15 +79,15 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.widthIn
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -103,15 +98,17 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -121,15 +118,19 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.currentStateAsState
-import kotlinx.coroutines.flow.drop
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.flow.drop
 
 // Port of iOS `Session/SessionView.swift`: the session screen scaffold. The transcript runs
 // full-bleed under the header and the composer; the header's backdrop and controls sit over its
@@ -562,7 +563,8 @@ private fun SessionAttachmentMenu(
         host.attachmentPress = press
         host.isAttachmentMenuOpen = phase != AttachmentMenuPhase.Closed
         host.onPlusTapped = ::toggle
-        host.attachmentMenuRows = if (phase == AttachmentMenuPhase.Menu && !sheet.morph.isOpening) host.attachmentAnchors.rows else emptyMap()
+        // Android: the sheet's rows aren't under the finger on +, so a slide from + chooses nothing.
+        host.attachmentMenuRows = if (usesPlusMenuSheet && phase == AttachmentMenuPhase.Menu && !sheet.morph.isOpening) host.attachmentAnchors.rows else emptyMap()
         // A slide from + chose it; the press already answered with its haptic.
         host.onAttachmentChoose = ::choose
         host.closeAttachmentMenu = { if (sheet.attachmentMenu != AttachmentMenuPhase.Closed) sheet.closeAttachmentMenu() }
@@ -591,22 +593,33 @@ private fun SessionAttachmentMenu(
             sheet.closeAttachmentMenu()
         }
     }
-    AttachmentMenuOverlay(
-        phase = phase,
-        onPhaseChange = { next -> if (next == AttachmentMenuPhase.Closed) sheet.closeAttachmentMenu() else sheet.attachmentMenu = next },
-        anchors = host.attachmentAnchors,
-        press = press,
-        items = items,
-        includesVideos = supportsFileUploads,
-        onChoose = chooseTapped,
-        onPaste = paste,
-        modifier = Modifier.fillMaxSize(),
-        // iOS `overComposer: usesPlusMenuSheet`: the New Plus Menu's rows are measured and
-        // anchored here and drawn by `PlusMenuGlassSurface`, over the composer.
-        overComposer = usesPlusMenuSheet,
-        handedOff = false,
-        identity = taskIdentity,
-    )
+    if (!usesPlusMenuSheet) {
+        // Android divergence: the + menu is a Material bottom sheet, not iOS's panel morphing out of +.
+        AttachmentMenuSheet(
+            isOpen = phase == AttachmentMenuPhase.Menu,
+            items = items,
+            onChoose = chooseTapped,
+            onPaste = paste,
+            onDismiss = { sheet.closeAttachmentMenu() },
+        )
+    } else {
+        AttachmentMenuOverlay(
+            phase = phase,
+            onPhaseChange = { next -> if (next == AttachmentMenuPhase.Closed) sheet.closeAttachmentMenu() else sheet.attachmentMenu = next },
+            anchors = host.attachmentAnchors,
+            press = press,
+            items = items,
+            includesVideos = supportsFileUploads,
+            onChoose = chooseTapped,
+            onPaste = paste,
+            modifier = Modifier.fillMaxSize(),
+            // iOS `overComposer: usesPlusMenuSheet`: the New Plus Menu's rows are measured and
+            // anchored here and drawn by `PlusMenuGlassSurface`, over the composer.
+            overComposer = usesPlusMenuSheet,
+            handedOff = false,
+            identity = taskIdentity,
+        )
+    }
     if (usesPlusMenuSheet) {
         // iOS `PlusMenuGlassSurface(isOpen:handsOff:…)`: the photo sheet takes the menu's surface
         // while it's shown and gives it back as Back's fold lands (`photoSheetMenuTakesBack`).
