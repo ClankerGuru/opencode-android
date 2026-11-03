@@ -31,6 +31,8 @@ import ai.opencode.feature.composer.SelectionMarkWidth
 import ai.opencode.feature.composer.micPressGesture
 import ai.opencode.feature.composer.modelpicker.FusedModelChip
 import ai.opencode.feature.composer.modelpicker.ModelPickerChip
+import ai.opencode.feature.composer.modelpicker.OnePickerChip
+import ai.opencode.feature.composer.modelpicker.OnePickerController
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -144,7 +146,8 @@ private fun SessionComposerEnv.AgentButton() {
 /**
  * The model control (iOS `modelButton`): Model Picker › Today and › Sheet show composer's
  * [ModelPickerChip]; › Grow from Composer its [FusedModelChip] (tap opens the list, a vertical
- * drag raises the level stack, a sideways drag scrubs the level).
+ * drag raises the level stack, a sideways drag scrubs the level); › One Picker its [OnePickerChip]
+ * (tap grows One Picker out of the composer).
  */
 @Composable
 private fun SessionComposerEnv.ModelButton(enabled: Boolean) {
@@ -167,6 +170,24 @@ private fun SessionComposerEnv.ModelButton(enabled: Boolean) {
                     }
                 },
                 isEnabled = enabled && host.modelPanels?.modelList?.isOpen != true,
+            )
+        } else if (modelPickerStyle == ModelPickerStyle.onePicker) {
+            val panels = host.modelPanels
+            val unmounted = remember { OnePickerController() }
+            OnePickerChip(
+                state = picker,
+                controller = panels?.onePicker ?: unmounted,
+                onEvent = { event -> modelPickerAction(event)?.let(store::send) },
+                // iOS `openOnePicker()`: the picker grows out of the composer in the keyboard's place.
+                onOpen = {
+                    if (panels != null && panels.canPresentOnePickerMorph) {
+                        panels.openOnePicker()
+                    } else {
+                        dismissKeyboard()
+                        store.send(Action.ModelButtonTapped)
+                    }
+                },
+                isEnabled = enabled && panels?.onePicker?.isOpen != true,
             )
         } else {
             val usesSheet = modelPickerStyle == ModelPickerStyle.sheet

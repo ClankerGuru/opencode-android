@@ -357,7 +357,6 @@ internal data class ComposerSnapshot(
 
     companion object {
         fun of(state: SessionFeature.State): ComposerSnapshot {
-            val model = state.currentModelInfo
             val dock = state.dockRequestID
             return ComposerSnapshot(
                 draft = state.draft,
@@ -390,7 +389,7 @@ internal data class ComposerSnapshot(
                 taskIdentity = state.taskIdentity,
                 navigationID = state.navigationID,
                 modelLabel = state.currentModelLabel,
-                modelShortName = model?.shortName ?: state.currentModelName,
+                modelShortName = state.currentModelShortName,
                 chipLevelLabel = chipLevelLabel(state),
                 backgroundAgents = state.activeSubagents.size,
                 backgroundShells = state.backgroundShells.size,
@@ -761,8 +760,12 @@ internal class SessionComposerEnv(
             },
         )
         store.send(action)
-        // Nothing went (a failed upload): the capture mustn't linger.
-        if (flies && store.state.sendGeneration == generation) host.sendTransition.cancelPrepared()
+        // Nothing went (a failed upload): the capture and the shrink mustn't linger (iOS scopes
+        // the shrink to the send's own transaction).
+        if (store.state.sendGeneration == generation) {
+            host.sendTransition.cancelShrink()
+            if (flies) host.sendTransition.cancelPrepared()
+        }
     }
 
     /** iOS `showsDraftProjects`: a draft lists its recent projects above the composer until its first send leaves. */
@@ -1774,9 +1777,9 @@ private fun SessionComposerEnv.Composer() {
 @Composable
 private fun SessionComposerEnv.ComposerInput(expanded: Boolean, recording: Boolean, bar: RequestBar?) {
     val placeholder = bar?.placeholder ?: "Message"
-    // iOS `KeyboardDrivenTextInset`: how much of the expanded top inset shows, frame by frame.
-    val morph = LocalComposerKeyboardMorph.current
-    val expansion = morph.layoutProgress(inline = bar != null)
+    // iOS `KeyboardDrivenTextInset`: the keyboard morph scrubs the expanded top inset (none
+    // inline); without a mounted morph the field follows [expanded].
+    val topInsetFraction = LocalComposerKeyboardMorph.current?.layoutProgress(inline = bar != null)
     Box(Modifier.onGloballyPositioned { coordinates ->
         val surface = view.surfaceBounds
         val bounds = coordinates.boundsInRoot()
@@ -1789,7 +1792,7 @@ private fun SessionComposerEnv.ComposerInput(expanded: Boolean, recording: Boole
                 color = OpenCodeTheme.colors.tertiaryText,
                 maxLines = 1,
                 modifier = Modifier
-                    .padding(top = ComposerTunables.expandedTopInset.dp * expansion)
+                    .padding(top = ComposerTunables.expandedTopInset.dp * (topInsetFraction ?: if (expanded) 1f else 0f))
                     .clearAndSetSemantics { },
             )
         }
@@ -1803,7 +1806,7 @@ private fun SessionComposerEnv.ComposerInput(expanded: Boolean, recording: Boole
             expanded = expanded,
             textStyle = ComposerTunables.textStyle.textStyle,
             topInset = ComposerTunables.expandedTopInset.dp,
-            topInsetFraction = expansion,
+            topInsetFraction = topInsetFraction,
             onImagePaste = { uris ->
                 // An answer or a reason takes text, never an attachment.
                 if (store.state.takesPasteAttachments) host.importer?.startImageImport(uris.map(ComposerImageSource::ItemProvider))
@@ -1827,6 +1830,8 @@ private fun SessionComposerEnv.ComposerInput(expanded: Boolean, recording: Boole
             accessibilityLabel = bar?.fieldLabel ?: "Message",
             isHoldingMic = s.dictationHold != null,
             sendTransition = host.sendTransition,
+            // One Picker in the keyboard's place keeps the field from taking it back.
+            refusesFocus = { host.modelPanels?.onePicker?.isOpen == true },
         )
     }
 }

@@ -19,6 +19,7 @@ import ai.opencode.feature.session.SessionTestSupport.Harness
 import ai.opencode.feature.session.SessionTestSupport.LockIsolated
 import ai.opencode.feature.session.SessionTestSupport.append
 import ai.opencode.feature.session.SessionTestSupport.date
+import ai.opencode.feature.session.SessionTestSupport.assertRemembersModelNames
 import ai.opencode.feature.session.SessionTestSupport.receive
 import ai.opencode.feature.session.SessionTestSupport.sessionTest
 import ai.opencode.feature.session.SessionTestSupport.testServer
@@ -578,10 +579,11 @@ class SessionFeatureTestsSending {
         }
 
         // The persisted model remains identifiable while its friendly name loads.
-        assertEquals("ling-3.0-tiny-free", store.state.currentModelName)
+        assertEquals("Ling 3.0 Tiny Free", store.state.currentModelName)
 
         store.send(Action.ModelButtonTapped) { it.copy(activePicker = State.ActivePicker.model, isLoadingModels = true) }
         store.receive(Action.ModelsResponse::class) { it.copy(isLoadingModels = false, models = listOf(fast)) }
+        store.state.assertRemembersModelNames(listOf(fast))
         assertEquals(listOf("catalog /tmp/demo"), calls.value)
         calls.setValue(emptyList())
         store.send(Action.ModelPicked(fast)) { it.copy(currentModel = fast.ref, pendingModel = fast.ref, activePicker = null) }

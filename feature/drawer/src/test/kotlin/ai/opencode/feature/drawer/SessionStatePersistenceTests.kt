@@ -4,6 +4,7 @@ import ai.opencode.core.dependencies.DependencyValues
 import ai.opencode.core.testing.TestIsolationRule
 import ai.opencode.feature.composer.ComposerPersistence
 import ai.opencode.feature.composer.PersistedSessionState
+import ai.opencode.feature.composer.modelpicker.ModelDisplayNames
 import ai.opencode.feature.drawer.HomeFeatureTestSupport.homeTest
 import ai.opencode.feature.session.SessionFeature
 import ai.opencode.server.OpenCodeServer
@@ -63,6 +64,7 @@ class SessionStatePersistenceTests {
         store.send(SessionFeature.Action.ModelsResponse(Result.success(OpenCodeModelCatalog(listOf(sessionModel), sessionModel)))) {
             it.copy(models = listOf(sessionModel), pendingModel = null, currentModel = sessionModel.ref)
         }
+        assertEquals(ModelDisplayNames(listOf(sessionModel)), store.state.modelDisplayNamesByServer.value[server.persistenceID])
         assertNull(persistence.loadSessionState(server.persistenceID, session.id))
     }
 }

@@ -414,7 +414,7 @@ fun ModelPickerDetentsSheet(
 }
 
 /** The enclosing [ModelPickerDetentsSheet]'s slide-down, run before an event that closes it. */
-private val LocalModelSheetHideThen = staticCompositionLocalOf<((() -> Unit) -> Unit)?> { null }
+internal val LocalModelSheetHideThen = staticCompositionLocalOf<((() -> Unit) -> Unit)?> { null }
 
 /**
  * [onEvent] with the events that close the sheet (a pick, Cancel, Done) sent once it has slid

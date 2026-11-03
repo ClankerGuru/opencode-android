@@ -150,7 +150,12 @@ class ComposerSendTransition {
         pendingShrinkOmega = omega
     }
 
-    internal fun takeShrinkOmega(): Double? = pendingShrinkOmega.also { pendingShrinkOmega = null }
+    fun takeShrinkOmega(): Double? = pendingShrinkOmega.also { pendingShrinkOmega = null }
+
+    /** Drops a [shrinkOnNextClear] nothing took: the send didn't go, so no clear follows. */
+    fun cancelShrink() {
+        pendingShrinkOmega = null
+    }
 
     companion object {
         /** The label fades and settles into place over the flight's last half, finishing with it. */
