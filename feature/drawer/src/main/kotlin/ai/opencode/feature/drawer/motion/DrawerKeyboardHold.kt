@@ -545,6 +545,7 @@ class ImeFollower(private val view: View) : DrawerKeyboardHold.Follower {
             fraction = if (shown) 1f else 0f
             apply(controller)
             controller.finish(shown)
+            resyncInsets()
         }
         reset()
     }
@@ -570,13 +571,30 @@ class ImeFollower(private val view: View) : DrawerKeyboardHold.Follower {
 
         override fun onFinished(controller: WindowInsetsAnimationController) {
             if (this@ImeFollower.controller === controller) reset()
+            resyncInsets()
         }
 
         override fun onCancelled(controller: WindowInsetsAnimationController?) {
             val wasActive = requested
             if (controller == null || this@ImeFollower.controller === controller || this@ImeFollower.controller == null) reset()
+            resyncInsets()
             if (wasActive) onRefused()
         }
+    }
+
+    /**
+     * Compose moves `WindowInsets.imeAnimationSource` to the resting insets only when an animation
+     * with a duration ends, or on an insets dispatch outside any animation. A controlled animation
+     * has no duration (-1), and its last dispatch lands while it still runs, so after a hold the
+     * source kept the keys' height while the keys and the target were down: the composer's
+     * keyboard morph (`source != target`) saw the keyboard animating for good, kept its hidden
+     * model chips mounted over the field, and their touch gate swallowed every tap on it, until
+     * the IME's own next animation. A dispatch asked for now runs in the next frame's traversal,
+     * after the end is delivered; a second, a frame later, covers an end delivered late.
+     */
+    private fun resyncInsets() {
+        view.requestApplyInsets()
+        view.postOnAnimation { view.requestApplyInsets() }
     }
 }
 

@@ -27,6 +27,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -116,11 +118,17 @@ class ComposerKeyboardProgress internal constructor(
             return next
         }
 
-    /** Riding the keyboard's own animation (iOS `isAnimating`), not resting or following a finger. */
+    /**
+     * Riding the keyboard's own animation (iOS `isAnimating`), not resting or following a finger.
+     * Resting on the target is never animating: Compose can leave the source behind after an
+     * animation the app controlled (the drawer's keyboard hold), and the row's controls would
+     * stay mounted over the field, their touch gate swallowing its taps, for good.
+     */
     val isAnimating: Boolean
         get() {
             val density = density.value
-            return !excluded.value && source.getBottom(density) != target.getBottom(density)
+            val target = target.getBottom(density)
+            return !excluded.value && source.getBottom(density) != target && ime.getBottom(density) != target
         }
 }
 
@@ -310,10 +318,14 @@ fun ComposerKeyboardReveal(
         }
     }
     val interactive = pose.expanded && nearlyOpen && !recording
-    val gate = if (interactive) {
-        Modifier
-    } else {
-        Modifier.clearAndSetSemantics { }.pointerInput(Unit) {
+    // iOS `.allowsHitTesting(pose.expanded && progress > 0.95 && !recording)`. Shut, the field has
+    // the controls' place, so they let its touches through (still drawn while they fade out under
+    // Reduce Motion). Visible on their way in or out they keep their place, as the model picker's
+    // flights read their frames, and only swallow touches.
+    val gate = when {
+        interactive -> Modifier
+        !open -> Modifier.clearAndSetSemantics { }.passesTouchesThrough()
+        else -> Modifier.clearAndSetSemantics { }.pointerInput(Unit) {
             awaitPointerEventScope {
                 while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
             }
@@ -336,3 +348,27 @@ fun ComposerKeyboardReveal(
         if (mounted) content()
     }
 }
+
+/** Far enough that no touch on any screen lands on what's moved there; exact as a float. */
+private const val PASS_THROUGH_OFFSET = 1 shl 15
+
+/**
+ * iOS `.allowsHitTesting(false)`: what's inside draws where it is but takes no touches, so they
+ * reach whatever lies under it, even in a sibling subtree. Compose hit-tests by placement, and a
+ * child it hits ends the search among its siblings whether or not it handles the touch, so the
+ * content is placed far off and drawn back in place.
+ *
+ * Why not drop the content's pointer modifiers instead: Compose has no hit-test opt-out, and a
+ * disabled `clickable` is still a pointer node that's hit. The row's controls are other modules'
+ * components (the model chips' drag and scrub `pointerInput`s and taps, the agent chip's menu
+ * anchor, Material buttons inside them), each of which would need its own way to leave its pointer
+ * nodes out of the chain. Used only while the row is shut (expansion 0), where nothing reads the
+ * controls' frames: they're mounted then only while the keys still settle or, under Reduce Motion
+ * (no flights), fade out.
+ */
+internal fun Modifier.passesTouchesThrough(): Modifier = this
+    .drawWithContent { translate(left = PASS_THROUGH_OFFSET.toFloat()) { this@drawWithContent.drawContent() } }
+    .layout { measurable, constraints ->
+        val placeable = measurable.measure(constraints)
+        layout(placeable.width, placeable.height) { placeable.place(-PASS_THROUGH_OFFSET, 0) }
+    }
