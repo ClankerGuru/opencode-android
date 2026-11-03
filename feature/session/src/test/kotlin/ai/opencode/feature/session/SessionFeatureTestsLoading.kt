@@ -24,6 +24,7 @@ import ai.opencode.feature.session.SessionTestSupport.append
 import ai.opencode.feature.session.SessionTestSupport.date
 import ai.opencode.feature.session.SessionTestSupport.distantPast
 import ai.opencode.feature.session.SessionTestSupport.increment
+import ai.opencode.feature.session.SessionTestSupport.assertRemembersModelNames
 import ai.opencode.feature.session.SessionTestSupport.receive
 import ai.opencode.feature.session.SessionTestSupport.sessionTest
 import ai.opencode.feature.session.SessionTestSupport.settle
@@ -863,6 +864,7 @@ class SessionFeatureTestsLoading {
         store.receive(Action.ModelsResponse(Result.success(catalog))) {
             it.copy(isLoadingModels = false, models = listOf(model))
         }
+        store.state.assertRemembersModelNames(listOf(model))
         store.receive(Action.PendingInputsRequested(sessionID = session.id))
         assertNull(store.state.errorMessage)
         assertFalse(store.state.isTranscriptLoading)

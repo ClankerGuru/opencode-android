@@ -139,8 +139,9 @@ data class ModelPickerSection(val kind: Kind, val models: List<OpenCodeModel>) {
  * `SessionFeature.State` (and its `Store`) with the picker's derived values; `SessionFeature`
  * sits above this module, so the session area builds this value from its state and the pickers
  * read it. Every property here is the iOS computed property of the same name
- * (`SessionFeature+State.swift` `currentModelName`, `currentModelLabel`, `pickerModels`,
- * `hiddenModelCount`, `filteredModels`, and `ModelPickerSections.swift`'s extension).
+ * (`ModelPickerSections.swift`'s extension: `currentModelName`, `currentModelInfo`,
+ * `currentModelLabel`; and `SessionFeature+State.swift`'s `pickerModels`, `hiddenModelCount`,
+ * `filteredModels`).
  */
 data class ModelPickerState(
     val models: List<OpenCodeModel> = emptyList(),
@@ -155,15 +156,22 @@ data class ModelPickerState(
     /** `modelVisibility`: this server's visibility while Hide Unused Models is on; null lists the whole catalog. */
     val modelVisibility: ModelVisibility? = null,
     val showsAllModels: Boolean = false,
+    /** This server's remembered labels (`modelDisplayNamesByServer[server.persistenceID]`). */
+    val modelDisplayNames: ModelDisplayNames = ModelDisplayNames(),
 ) {
-    /** The current model by its display name, never its slug once the catalog has it. */
+    /** Resolve a label without borrowing another provider's capabilities. */
     val currentModelName: String
         get() {
             val ref = currentModel ?: return "Model"
-            return models.model(ref)?.name ?: ref.id
+            val model = currentModelInfo
+            if (model != null && ModelDisplayNames.usable(model.name, model.key, model.modelID)) return model.name
+            return modelDisplayNames.name(ref)
+                ?: ModelDisplayNames(models).unambiguousName(ref)
+                ?: modelDisplayNames.unambiguousName(ref)
+                ?: ModelDisplayNames.prettify(ref.id)
         }
 
-    /** The current model's catalog entry. */
+    /** Only the live catalogue can supply availability and capabilities. */
     val currentModelInfo: OpenCodeModel? get() = currentModel?.let { models.model(it) }
 
     /** "Claude Haiku 5.5 · High": the model and its reasoning variant, if any. */
@@ -234,7 +242,14 @@ data class ModelPickerState(
     val currentLevel: String? get() = currentModel?.variant?.takeIf { it != "default" }
 
     /** Compact name for the composer chip (`"Opus 5.5"` for `"Claude Opus 5.5"`). */
-    val currentModelShortName: String get() = currentModelInfo?.shortName ?: currentModelName
+    val currentModelShortName: String
+        get() {
+            val ref = currentModel ?: return currentModelName
+            return OpenCodeModel(
+                modelID = ref.id, providerID = ref.providerID, name = currentModelName,
+                canonicalProviderID = currentModelInfo?.canonicalProviderID,
+            ).shortName
+        }
 
     /** The level word shown on the chip (`"High"`, `"Default"`, or null when the current model has no adjustable variants). */
     val currentChipLevelLabel: String?
@@ -312,4 +327,11 @@ sealed interface ModelPickerEvent {
 
     /** `store.activePicker = nil` (Done, Cancel, swiped away). */
     data object Dismiss : ModelPickerEvent
+}
+
+/** Case-insensitive multi-field filter used by the picker sheets (iOS `Array.filtered(by:fields:)`). */
+fun <T> List<T>.filtered(query: String, fields: (T) -> List<String>): List<T> {
+    val trimmed = query.trim()
+    if (trimmed.isEmpty()) return this
+    return filter { element -> fields(element).any { it.contains(trimmed, ignoreCase = true) } }
 }

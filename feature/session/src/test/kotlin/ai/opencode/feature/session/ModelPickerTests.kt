@@ -14,6 +14,7 @@ import ai.opencode.feature.session.SessionTestSupport.Harness
 import ai.opencode.feature.session.SessionTestSupport.HapticsRecorder
 import ai.opencode.feature.session.SessionTestSupport.LockIsolated
 import ai.opencode.feature.session.SessionTestSupport.increment
+import ai.opencode.feature.session.SessionTestSupport.assertRemembersModelNames
 import ai.opencode.feature.session.SessionTestSupport.receive
 import ai.opencode.feature.session.SessionTestSupport.sessionTest
 import ai.opencode.feature.session.SessionTestSupport.testServer
@@ -102,6 +103,7 @@ class ModelPickerTests {
         val store = h.catalogStore(initial, OpenCodeModelCatalog(models = listOf(cirrusZen, basalt), defaultModel = null))
         store.send(Action.ModelListOpened)
         store.receive(Action.ModelsResponse::class) { it.copy(models = listOf(cirrusZen, basalt)) }
+        store.state.assertRemembersModelNames(listOf(cirrusZen, basalt))
         assertNull(store.state.activePicker)
     }
 
@@ -117,6 +119,7 @@ class ModelPickerTests {
         val store = h.catalogStore(typed, OpenCodeModelCatalog(models = listOf(cirrusZen, basalt), defaultModel = null))
         store.send(Action.ModelListOpened)
         store.receive(Action.ModelsResponse::class) { it.copy(models = listOf(cirrusZen, basalt)) }
+        store.state.assertRemembersModelNames(listOf(cirrusZen, basalt))
         assertEquals("bas", store.state.modelFilter, "A query typed before the refresh lands is kept")
         store.send(Action.ModelListClosed) { it.copy(modelFilter = "") }
     }
@@ -169,6 +172,7 @@ class ModelPickerTests {
         assertEquals("Cirrus 4 · High", store.state.currentModelLabel)
         store.send(Action.ModelButtonTapped) { it.copy(activePicker = State.ActivePicker.model, modelFilter = "") }
         store.receive(Action.ModelsResponse::class)
+        store.state.assertRemembersModelNames(listOf(cirrusZen, cirrusRouter, mini, basalt))
         assertEquals(
             listOf(basalt.id, cirrusZen.id, cirrusRouter.id, mini.id),
             (store.state.favoriteModels + store.state.unfavoriteModels).map { it.id },
@@ -224,6 +228,7 @@ class ModelPickerTests {
         store.receive(Action.ModelsResponse::class) {
             it.copy(isLoadingModels = false, models = listOf(cirrusZen, basalt), currentModel = cirrusZen.ref)
         }
+        store.state.assertRemembersModelNames(listOf(cirrusZen, basalt))
         assertEquals(2, attempts.value)
         assertTrue(firstCancelled.value)
     }
@@ -254,6 +259,7 @@ class ModelPickerTests {
         store.receive(Action.ModelsResponse::class) {
             it.copy(isLoadingModels = false, models = listOf(cirrusZen), currentModel = cirrusZen.ref)
         }
+        store.state.assertRemembersModelNames(listOf(cirrusZen))
     }
 
     // MARK: - Fused + Stack Model Picker (OC-397)

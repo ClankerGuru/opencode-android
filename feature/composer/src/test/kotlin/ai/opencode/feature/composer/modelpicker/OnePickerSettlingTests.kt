@@ -1,9 +1,11 @@
 package ai.opencode.feature.composer.modelpicker
 
 import ai.opencode.core.testing.TestIsolationRule
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -16,9 +18,11 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * Port of iOS `OnePickerSettlingTests`. Not ported: `cancelledPullDownSettlesThroughTheLatestCallbacks`
- * (UIKit `OnePickerListView` pan) and `focusRestoreRefusedWhileTheSessionSheetLeavesWaitsForItsDismiss`
- * (a `UITextView` in a window).
+ * Port of iOS `OnePickerSettlingTests`. `cancelledPullDownSettlesThroughTheLatestCallbacks` drives
+ * the Compose list's [OnePickerPullDown] (its nested-scroll pull) in place of the UIKit
+ * coordinator. Not ported: `focusRestoreRefusedWhileTheSessionSheetLeavesWaitsForItsDismiss`
+ * (UIKit refuses `becomeFirstResponder` while a sheet leaves; a Compose `FocusRequester` isn't
+ * refused by a leaving sheet, so session has no `MessageFieldFocusHandback` to test).
  */
 class OnePickerSettlingTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -140,6 +144,28 @@ class OnePickerSettlingTests {
      * sheet) used to hold Closing and the frame loop forever; landing only the bottom left `top`
      * at the old destination, a tall strip of empty glass that then popped out.
      */
+    @Test
+    fun cancelledPullDownSettlesThroughTheLatestCallbacks() {
+        val log = mutableListOf<String>()
+        fun refreshed(tag: String) = OnePickerListActions().apply {
+            onBeginSheetDrag = { log += "$tag begin" }
+            onUpdateSheetDrag = { dy -> log += "$tag update ${dy.toInt()}" }
+            onEndSheetDrag = { dy, vy -> log += "$tag end ${dy.toInt()} ${vy.toInt()}" }
+        }
+        val pull = OnePickerPullDown(LazyListState(), density = { 1f }, actions = refreshed("old"))
+        // Recomposition hands the remembered pull the new callbacks; nothing else changed.
+        pull.actions = refreshed("new")
+
+        pull.startedAtTop = true
+        // The list at its top overscrolls by 5: the sheet pull begins, anchored there.
+        pull.connection.onPostScroll(Offset.Zero, Offset(0f, 5f), NestedScrollSource.UserInput)
+        // The gesture is torn down twice; it settles once.
+        pull.cancel()
+        pull.cancel()
+
+        assertEquals(listOf("new begin", "new update 0", "new end 0 0"), log)
+    }
+
     @Test
     fun closePinnedToComposerRestingOffTargetLandsBothEdgesOnIt() {
         val source = rect(20, 790, 362, 56)

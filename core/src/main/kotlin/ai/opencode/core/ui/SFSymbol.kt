@@ -260,6 +260,7 @@ enum class SFSymbol(val sfName: String, @DrawableRes val drawable: Int) {
     TextLineLastAndArrowtriangleForward("text.line.last.and.arrowtriangle.forward", R.drawable.ms_vertical_align_bottom),
     TextQuote("text.quote", R.drawable.ms_format_quote),
     TextWordSpacing("text.word.spacing", R.drawable.ms_wrap_text),
+    Textformat("textformat", R.drawable.ms_text_format),
     TextformatSize("textformat.size", R.drawable.ms_format_size),
     TortoiseFill("tortoise.fill", R.drawable.ms_slow_motion_video),
     Trash("trash", R.drawable.ms_delete),

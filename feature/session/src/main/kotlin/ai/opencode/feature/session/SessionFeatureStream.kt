@@ -219,14 +219,19 @@ private fun SessionFeature.eventStreamConnected(
         lastProjectedMessageID = null,
         shells = retune.state.shells.map { if (it.isListed) it else it.copy(isListed = true) },
     )
+    // A failed first read used to leave the chip on its slug until the picker was opened. Retry
+    // after contact returns, even if a transcript refresh is already in flight. Keep any
+    // last-known display names.
+    val models = if (s.modelsLoadError != null) loadModelsIfNeeded(s) else Reduced(s)
+    s = models.state
     // A resume read that beat the socket handshake is already the REST hydration for this epoch.
     // Do not cancel it and start the same bytes again; subsequent events are buffered against
     // that in-flight read.
     val watched = watchdog(s)
-    if (watched.state.refresh != null) return Reduced(watched.state, Effect.merge(retune.effect, watched.effect))
+    if (watched.state.refresh != null) return Reduced(watched.state, Effect.merge(models.effect, retune.effect, watched.effect))
     return Reduced(
         watched.state,
-        Effect.merge(Effect.send(Action.RefreshRequested(RefreshReason.Reconnect)), retune.effect, watched.effect),
+        Effect.merge(models.effect, Effect.send(Action.RefreshRequested(RefreshReason.Reconnect)), retune.effect, watched.effect),
     )
 }
 
@@ -519,20 +524,25 @@ private fun SessionFeature.visibilityChanged(state: SessionFeature.State, visibl
             ),
         )
     }
+    val models = if (s.modelsLoadError != null) loadModelsIfNeeded(s) else Reduced(s)
+    s = models.state
     if (!s.hasRenderedFirstContentFrame) {
         if (s.initialTranscriptIsFresh && s.newMessagesBaseline != null) s = s.updateNewMessagesMark(settles = true)
         val opens = s.session != null && s.cacheableItems.isEmpty() && !s.initialTranscriptIsFresh &&
             !s.initialTranscriptRequestIsExternal && !s.inheritsLiveWork && s.refresh == null && s.loadError == null
-        return Reduced(s, if (opens) Effect.send(Action.RefreshRequested(RefreshReason.Open)) else Effect.none())
+        return Reduced(s, Effect.merge(models.effect, if (opens) Effect.send(Action.RefreshRequested(RefreshReason.Open)) else Effect.none()))
     }
     // A message's read started while away doesn't read the page: the return still needs one, after it.
     val refresh = s.refresh
     if (refresh != null && !s.initialTranscriptIsFresh && refresh.reason.messageID == null) {
         val began = beginResync(s, refreshID = refresh.id)
         val background = refreshBackgroundWork(began.state, RefreshReason.Resume)
-        return Reduced(background.state, Effect.merge(began.effect, background.effect))
+        return Reduced(background.state, Effect.merge(models.effect, began.effect, background.effect))
     }
-    return Reduced(s, Effect.send(Action.RefreshRequested(if (isForegroundResume) RefreshReason.Resume else RefreshReason.Open)))
+    return Reduced(
+        s,
+        Effect.merge(models.effect, Effect.send(Action.RefreshRequested(if (isForegroundResume) RefreshReason.Resume else RefreshReason.Open))),
+    )
 }
 
 private fun SessionFeature.resyncDelayElapsed(state: SessionFeature.State, refreshID: Int): Reduced<SessionFeature.State, Action> {

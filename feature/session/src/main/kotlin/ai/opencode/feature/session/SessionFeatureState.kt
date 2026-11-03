@@ -1,5 +1,6 @@
 package ai.opencode.feature.session
 
+import ai.opencode.feature.composer.modelpicker.filtered
 import ai.opencode.feature.composer.RequestDockFeature
 import ai.opencode.feature.composer.UndoSnapshot
 import ai.opencode.feature.composer.DraftState
@@ -1043,24 +1044,6 @@ fun State.adoptDictation(carried: DictationFeature.Carried): State {
 // endregion
 
 // region Models and projects
-
-/** The current model by its display name, never its slug once the catalog has it. */
-val State.currentModelName: String
-    get() {
-        val current = currentModel ?: return "Model"
-        return models.model(current)?.name ?: current.id
-    }
-
-/** The current model's catalog entry. */
-val State.currentModelInfo: OpenCodeModel? get() = currentModel?.let { models.model(it) }
-
-/** "Claude Haiku 5.5 · High": the model and its reasoning variant, if any. */
-val State.currentModelLabel: String
-    get() {
-        val variant = currentModel?.variant
-        if (variant == null || variant == "default") return currentModelName
-        return "$currentModelName · ${ModelVariant.label(variant)}"
-    }
 
 val State.filteredModels: List<OpenCodeModel> get() = ModelSearch.rank(pickerModels, modelFilter, favoriteModelIDs.value)
 
