@@ -78,7 +78,7 @@ Wire models the client decodes or encodes, needed below the feature modules: `Op
 ## Tests
 
 Ported from iOS `OpenCodeTests/` into `server/src/test` (JVM, same suite and method names). Shared
-fixtures: `server/src/testFixtures` (`WireFixture`, `ServerTestIsolation`); the network block is
+fixtures: `server/src/testFixtures` (`WireFixture`, `ServerTestIsolation`, and `WireDecoders`, which hands other modules' tests the internal `decodeRunMessages`/`decodeStreamFrame` that iOS tests call on `OpenCodeClient`); the network block is
 `TestNetworkBlock` behind `OpenCodeTransport.testValue`. iOS `WireFixture` gained `cachePolicy` (f657969b) for the media session; n/a here (OkHttp has no per-request cache policy; `MediaReferenceTests` checks the pool has no cache).
 
 | iOS file | Kotlin | Ported | Left elsewhere / deleted (reason) |

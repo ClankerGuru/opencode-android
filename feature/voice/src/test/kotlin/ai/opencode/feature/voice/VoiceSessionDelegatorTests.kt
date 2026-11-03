@@ -20,6 +20,7 @@ import ai.opencode.feature.voice.VoiceSessionDelegatorTestSupport.store
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeLiveContentEvent
+import ai.opencode.server.OpenCodeServerEvent
 import ai.opencode.server.ServerIDClient
 import ai.opencode.server.model.OpenCodeDelivery
 import ai.opencode.server.model.OpenCodeDirectoryListing
@@ -30,6 +31,7 @@ import ai.opencode.server.model.OpenCodeRunMessage
 import ai.opencode.server.model.OpenCodeRunMessagesPage
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.PromptContext
+import ai.opencode.server.testing.WireDecoders
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.emptyFlow
@@ -201,8 +203,57 @@ class VoiceSessionDelegatorTests {
         }
     }
 
-    // iOS `sseIgnoresSupersededExecutionInterruptionsAndDecodesRunMessageToolCalls` tests the
-    // `:server` live decoders (`decodeStreamFrame`, `decodeRunMessages`, internal there): skipped (owner :server).
+    /** Reaches `:server`'s internal decoders through its test fixture [WireDecoders]. */
+    @Test fun sseIgnoresSupersededExecutionInterruptionsAndDecodesRunMessageToolCalls() {
+        val supersededFrame = """{"type":"session.execution.interrupted","data":{"sessionID":"ses_voice","reason":"superseded"}}"""
+        assertNull(WireDecoders.decodeStreamFrame(supersededFrame))
+
+        val cancelledFrame = """{"type":"session.execution.interrupted","data":{"sessionID":"ses_voice","reason":"cancelled"}}"""
+        assertEquals(OpenCodeServerEvent.ExecutionEnded(sessionID = "ses_voice"), WireDecoders.decodeStreamFrame(cancelledFrame))
+
+        val missingReasonFrame = """{"type":"session.execution.interrupted","data":{"sessionID":"ses_voice"}}"""
+        assertEquals(OpenCodeServerEvent.ExecutionEnded(sessionID = "ses_voice"), WireDecoders.decodeStreamFrame(missingReasonFrame))
+
+        val pageData = """
+            {
+              "data": [
+                {
+                  "id": "msg_asst_1",
+                  "type": "assistant",
+                  "content": [
+                    {
+                      "id": "call_open_1",
+                      "type": "tool",
+                      "name": "ios_voice_open_session",
+                      "state": { "input": { "session_id": "ses_target" } }
+                    },
+                    {
+                      "type": "text",
+                      "text": "Opened the target session."
+                    }
+                  ]
+                },
+                {
+                  "id": "msg_user_1",
+                  "type": "user",
+                  "text": "Open target"
+                }
+              ]
+            }
+        """.trimIndent().toByteArray()
+        val page = WireDecoders.decodeRunMessages(pageData)
+        assertEquals(listOf("msg_user_1", "msg_asst_1"), page.messages.map { it.id })
+        assertEquals(
+            listOf(
+                OpenCodeRunMessage.ToolCall(
+                    id = "call_open_1",
+                    name = "ios_voice_open_session",
+                    input = OpenCodeJSONValue.Object(mapOf("session_id" to OpenCodeJSONValue.Str("ses_target"))),
+                ),
+            ),
+            page.messages[1].toolCalls,
+        )
+    }
 
     @Test fun spokenReplyCollapsesCodeBlocksAndStripsMarkdownWhilePreservingIdentifiers() {
         val markdown = """

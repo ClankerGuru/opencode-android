@@ -252,6 +252,7 @@ left to that module's port ("skipped"); "dropped" tests can't exist on Android.
 | `SoundEffectsTests.swift` | `SoundEffectsTests.kt` | 1 (`settingsPrepareTheSoundsAndSampleTheVolume`) | live gate and playback (`:core`, ported there); session, Home and Catch Up reducers (`:feature:session`, `:feature:drawer`, ported there) | – |
 | `TranscriptCoverPauseTests.swift` | `TranscriptCoverPauseTests.kt` | 1 (`settingsCoverFollowsThePresentationNotTheShownFlag`) | the list pause (`:feature:transcript`, ported there) and drawer stack tests (`:feature:drawer`, n/a) | `settingsPresentationCoversOnceLandedAndUncoversOnClose` drives a hosted SwiftUI window (no Compose UI test harness in `:feature:settings`) |
 | `CallVoiceTests.swift` | `CallVoiceTests.kt` | 3 (`CallVoicePicker.rowValue` half of `anUnsupportedChoice…`, `keyRowSwitches…`, `previewRequiresAKey…`) | rest (`:feature:voice`) | – |
+| `VoiceProviderTests.swift` | `VoiceProviderTestsSettings.kt` | 2 (`aLegacyConnectedPinBecomesTheConnectedServersOwn`, `theRowNamesTheProviderItsPlaceAndItsState`; “This Phone” for iOS's “This iPhone”) | rest (`:feature:voice` `VoiceProviderTests.kt`); `aReconnectForgets…` (`:feature:drawer`) | – |
 | `VoiceServerPickerTests.swift` | `VoiceServerPickerTests.kt` | 7 (4 `VoiceSettingsFeature` with the provider catalog and `aPickBrokersAndAStaleOneChoosesAutomatically`, `homeSavesTheChoice…`, Settings halves of `everyEntryPointRoutes…`, `thisIPhoneUsesThePhonesOwnKey`) | rest (`:feature:voice`); `SessionFeature.State` checks (`:feature:session`) | – |
 | `VoiceRouteTests.swift` | `VoiceRouteTests.kt` | 2 (Settings/`VoiceRoutePreferences` halves of `inactiveGemini…`, `grokSuppresses…`) | rest (`:feature:voice`); `SessionFeature.State` checks (`:feature:session`) | – |
 | `VoiceRoutingBaselineTests.swift` | `VoiceRoutingBaselineTests.kt` | 1 | – | – |
@@ -260,4 +261,4 @@ left to that module's port ("skipped"); "dropped" tests can't exist on Android.
 
 Production bugs the ported tests found: none (every ported test passed against the existing port).
 
-Total: 93 settings tests, all passing. Robolectric (test-only, `isIncludeAndroidResources`) runs only `WhatsNewDotSymbolTests`.
+Total: 95 settings tests, all passing. Robolectric (test-only, `isIncludeAndroidResources`) runs only `WhatsNewDotSymbolTests`.

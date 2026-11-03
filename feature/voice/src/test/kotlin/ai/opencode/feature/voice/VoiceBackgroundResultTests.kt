@@ -13,6 +13,7 @@ import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeRunMessage
 import ai.opencode.server.model.OpenCodeRunMessagesPage
 import ai.opencode.server.model.OpenCodeSession
+import ai.opencode.server.testing.WireDecoders
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -36,8 +37,8 @@ import java.time.Instant
  * watched run starts in the background is watched too, and its result is
  * spoken once, at the next opening.
  *
- * `runMessagesDecodeLaunchesAndCompletions` is skipped here (owner `:server`): it tests
- * `OpenCodeClient.decodeRunMessages`, which is internal to `:server`.
+ * `runMessagesDecodeLaunchesAndCompletions` reaches `:server`'s internal decoder (iOS
+ * `OpenCodeClient.decodeRunMessages`) through its test fixture [WireDecoders].
  */
 class VoiceBackgroundResultTests {
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
@@ -319,6 +320,31 @@ class VoiceBackgroundResultTests {
      * A request that reads the session that started the work holds its
      * result like that session's own, so its answer goes first.
      */
+    @Test fun runMessagesDecodeLaunchesAndCompletions() {
+        val json = """
+        {"data":[
+          {"id":"s1","type":"synthetic","text":"<subagent …>","description":"Eye tracking research","metadata":{"source":"subagent","childID":"ses_eye","agent":"General","state":"completed"}},
+          {"id":"a1","type":"assistant","content":[
+            {"type":"reasoning","text":"Background it."},
+            {"type":"tool","id":"t1","name":"subagent","state":{"status":"completed","input":{"background":true,"description":"Eye tracking research","prompt":"…"},"metadata":{"sessionID":"ses_eye","status":"running"},"content":[{"type":"text","text":"working"}]}},
+            {"type":"tool","id":"t2","name":"subagent","state":{"status":"completed","input":{"description":"Inline"},"metadata":{"sessionID":"ses_inline"}}},
+            {"type":"text","text":"I've started it."}
+          ]},
+          {"id":"msg_eye","type":"user","text":"Research eye tracking"}
+        ],"cursor":{"next":"older"}}
+        """.trimIndent().toByteArray()
+        val page = WireDecoders.decodeRunMessages(json)
+        assertEquals("older", page.next)
+        assertEquals(
+            listOf(
+                OpenCodeRunMessage(id = "msg_eye", type = "user", text = "Research eye tracking"),
+                OpenCodeRunMessage(id = "a1", type = "assistant", text = "I've started it.", launches = listOf(OpenCodeRunMessage.Launch(sessionID = "ses_eye", description = "Eye tracking research"))),
+                OpenCodeRunMessage(id = "s1", type = "synthetic", completedChildID = "ses_eye"),
+            ),
+            page.messages,
+        )
+    }
+
     @Test fun aReadOfTheParentSessionHoldsTheResult() {
         val work = VoiceBackgroundWork(sessionID = child, parentSessionID = home, description = "Eye tracking research")
         val watch = Watch()
