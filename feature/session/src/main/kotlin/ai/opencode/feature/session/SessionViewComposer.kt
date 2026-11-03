@@ -1800,6 +1800,14 @@ private fun SessionComposerEnv.ComposerInput(expanded: Boolean, recording: Boole
         val bounds = coordinates.boundsInRoot()
         view.textFieldBounds = if (surface == Rect.Zero) Rect.Zero else bounds
     }) {
+        // iOS hides the placeholder while sent images fly out (at once) and fades it back after;
+        // a draft change shows or hides it at once.
+        val imagesSending = host.sendTransition.images.isSending
+        val placeholderAlpha by animateFloatAsState(
+            if (imagesSending) 0f else 1f,
+            if (imagesSending) snap() else Motion.reducedFadeSpec(),
+            label = "composer-placeholder",
+        )
         if (s.draft.isEmpty()) {
             Text(
                 placeholder,
@@ -1808,6 +1816,7 @@ private fun SessionComposerEnv.ComposerInput(expanded: Boolean, recording: Boole
                 maxLines = 1,
                 modifier = Modifier
                     .padding(top = ComposerTunables.expandedTopInset.dp * (topInsetFraction ?: if (expanded) 1f else 0f))
+                    .alpha(placeholderAlpha)
                     .clearAndSetSemantics { },
             )
         }
