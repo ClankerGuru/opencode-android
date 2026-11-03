@@ -148,6 +148,7 @@ class ComposerSendTransition {
      */
     fun shrinkOnNextClear(omega: Double) {
         pendingShrinkOmega = omega
+        if (inputIsMultiline) isShrinking = true
     }
 
     fun takeShrinkOmega(): Double? = pendingShrinkOmega.also { pendingShrinkOmega = null }
@@ -155,6 +156,26 @@ class ComposerSendTransition {
     /** Drops a [shrinkOnNextClear] nothing took: the send didn't go, so no clear follows. */
     fun cancelShrink() {
         pendingShrinkOmega = null
+        isShrinking = false
+    }
+
+    /** Whether the field stands taller than one line (its layout keeps this current). */
+    internal var inputIsMultiline = false
+
+    /**
+     * Whether a send's clear is shrinking the field, from [shrinkOnNextClear] until the field's
+     * spring lands. iOS animates the field and the composer around it in the send's one
+     * transaction, so the controls ride the composer's bottom edge; here the field's height
+     * spring is that one animation, and the composer hugs it rather than chasing it with its
+     * own resize spring (two springs in series lag: the controls would rise off the bottom
+     * edge, and the composer would land after the list's glide).
+     */
+    var isShrinking: Boolean by mutableStateOf(false)
+        private set
+
+    /** The field's shrink landed (or never rode: a one-line field, reduce motion). */
+    internal fun endShrink() {
+        isShrinking = false
     }
 
     companion object {

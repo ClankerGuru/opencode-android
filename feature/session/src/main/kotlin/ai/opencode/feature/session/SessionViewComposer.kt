@@ -749,16 +749,19 @@ internal class SessionComposerEnv(
         }
         // The list lands it: on its bubble, its dim steering row, or the pill.
         val generation = state.sendGeneration
-        transition.shrinkOnNextClear(
-            if (transition.images.isActive) {
-                // The field clears under the same critical spring as the photos' copies
-                // (iOS `sendImageDuration` is the 99.5% time: ω = 7.43 / duration).
-                7.43 / SendImageTunables.duration
-            } else {
-                // A multiline draft's clear shrinks the composer on the flight's spring.
-                ComposerSendTransition.sendShrinkOmega(TranscriptTunables.arrivalOmega)
-            },
-        )
+        // Only a send that clears text: an attachment-only send leaves no clear to take the spring.
+        if (state.draft.isNotEmpty()) {
+            transition.shrinkOnNextClear(
+                if (transition.images.isActive) {
+                    // The field clears under the same critical spring as the photos' copies
+                    // (iOS `sendImageDuration` is the 99.5% time: ω = 7.43 / duration).
+                    7.43 / SendImageTunables.duration
+                } else {
+                    // A multiline draft's clear shrinks the composer on the flight's spring.
+                    ComposerSendTransition.sendShrinkOmega(TranscriptTunables.arrivalOmega)
+                },
+            )
+        }
         store.send(action)
         // Nothing went (a failed upload): the capture and the shrink mustn't linger (iOS scopes
         // the shrink to the send's own transaction).
@@ -1632,8 +1635,11 @@ private fun SessionComposerEnv.Composer() {
                     if (!recording) focus()
                 }
             }
+            // A send's shrink is the field's one spring (iOS animates both in the send's one
+            // transaction): the card hugs it, so the controls ride its bottom edge. Its own resize
+            // spring would chase the field's, lifting the controls off that edge.
             .then(
-                if (reducedMotion || morphMoving || holdsRow || rowReveal.isRunning) Modifier
+                if (reducedMotion || morphMoving || holdsRow || rowReveal.isRunning || host.sendTransition.isShrinking) Modifier
                 else Modifier.animateContentSize(MotionSpring(0.25).spec()),
             )
             // iOS `ComposerKeyboardSpacing(top: true, recording:)`: the top inset is taken back as
