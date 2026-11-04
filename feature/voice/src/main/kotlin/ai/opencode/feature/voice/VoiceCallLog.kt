@@ -386,7 +386,7 @@ class VoiceCallLogRecorder(
         }
         // Oldest go first, decoded only once there are too many.
         val count = dir.listFiles()?.count { it.extension == "json" } ?: 0
-        if (count > keep) for (old in savedLogs().drop(keep)) delete(old.id)
+        if (count > keep) for (old in savedLogs().drop(keep)) deleteSaved(old.id)
         true
     }
     /** Disk I/O: callers must invoke off the main thread (the reducer uses an effect). */
@@ -401,7 +401,17 @@ class VoiceCallLogRecorder(
         directory?.listFiles()?.filter { it.extension == "json" }?.mapNotNull { runCatching { VoiceCallLog.json.decodeFromString<VoiceCallLog>(it.readText()) }.getOrNull() }
             ?.sortedByDescending { it.startedAt } ?: emptyList()
     }
-    fun delete(id: UUID) { synchronized(diskLock) { directory?.let { File(it, "$id.json").delete() } } }
+    /**
+     * Runs on [liveQueue], after any save a hang-up queued: a log deleted just after its call
+     * ended would otherwise be written back by that save. Blocks; call it off the main thread.
+     */
+    fun delete(id: UUID) {
+        if (directory == null) return
+        liveQueue.submit { deleteSaved(id) }.get()
+    }
+    private fun deleteSaved(id: UUID) {
+        synchronized(diskLock) { directory?.let { File(it, "$id.json").delete() } }
+    }
     fun deleteAll() { list().forEach { delete(it.id) } }
     companion object {
         const val keep = 40
