@@ -23,6 +23,7 @@ import ai.opencode.feature.transcript.TranscriptRowContext
 import ai.opencode.feature.transcript.links.LinkPreviewArrivals
 import ai.opencode.feature.transcript.markdown.ui.LocalLinkPreviewRow
 import ai.opencode.feature.transcript.markdown.ui.LocalTranscriptTextReveal
+import ai.opencode.feature.transcript.markdown.ui.SharedTextContextMenus
 import ai.opencode.feature.transcript.markdown.ui.TranscriptTextReveal
 import ai.opencode.feature.transcript.rows.NewMessagesDivider
 import ai.opencode.feature.transcript.user.LocalSendLanding
@@ -308,105 +309,107 @@ private fun TranscriptListContent(
         ),
     ) {
         Box(modifier.nestedScroll(controller.nestedScrollConnection)) {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize().testTag("transcript-list")
-                    .semantics { customActions = listOf(CustomAccessibilityAction("Scroll to top", controller::scrollToTop)) }
-                    .graphicsLayer { alpha = controller.handoffProgress() }
-                    .then(if (controller.emptyHandoff != null) Modifier.clearAndSetSemantics { } else Modifier)
-                    .onGloballyPositioned {
-                        motionCoordinates[0] = it
-                        val bounds = it.boundsInWindow()
-                        imageViewport.bounds = bounds
-                        imageVisibility.setNeedsUpdate()
-                        controller.sendLanding?.listEnd = bounds.copy(bottom = bounds.bottom - with(density) { listPadding.calculateBottomPadding().toPx() })
-                    },
-                contentPadding = listPadding,
-            ) {
-                items(snapshot.items, key = { it.key }, contentType = { it.contentType }) { item ->
-                    // Centred at the readable width on a wider window (iOS `readableColumn`).
-                    val rowModifier = Modifier
-                        .animateItem(
-                            fadeInSpec = null,
-                            placementSpec = controller.placementSpring?.spec(),
-                            // Working handing off to the reply's end has already become it (iOS `handsOff`): no fade.
-                            fadeOutSpec = if (item == TranscriptItemID.Empty || !controller.fadesRemovals ||
-                                (item == TranscriptItemID.Working && configuration.workingHandsOffToCopy)
-                            ) null else androidx.compose.animation.core.tween((RowEntrance.EXIT_DURATION * 1000).toInt(), easing = androidx.compose.animation.core.CubicBezierEasing(0f, 0f, 0.58f, 1f)) /* iOS .curveEaseOut */,
-                        )
-                        .fillMaxWidth()
-                        .wrapContentWidth()
-                        .widthIn(max = TranscriptMetrics.readableColumnWidth)
-                        .fillMaxWidth()
-                        .padding(horizontal = gutter)
-                    when (item) {
-                        TranscriptItemID.History -> TranscriptHistoryStatusView(
-                            isLoading = configuration.isLoadingEarlier,
-                            error = configuration.earlierHistoryError,
-                            retry = { currentSend(TranscriptAction.ShowEarlierTapped) },
-                            modifier = rowModifier,
-                        )
-                        TranscriptItemID.Empty -> TranscriptEmptyView(
-                            isLoading = configuration.isLoading,
-                            showsEmptyState = configuration.showsEmptyState,
-                            loadingSince = controller.emptyLoadingSince,
-                            pulsePaused = !controller.isShowingToReader,
-                            modifier = rowModifier.fillParentMaxHeight(),
-                        )
-                        TranscriptItemID.NewDivider -> NewMessagesDivider(
-                            rowModifier
-                                .graphicsLayer {
-                                    alpha = controller.dividerAlpha()
-                                    clip = true
+            SharedTextContextMenus {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize().testTag("transcript-list")
+                        .semantics { customActions = listOf(CustomAccessibilityAction("Scroll to top", controller::scrollToTop)) }
+                        .graphicsLayer { alpha = controller.handoffProgress() }
+                        .then(if (controller.emptyHandoff != null) Modifier.clearAndSetSemantics { } else Modifier)
+                        .onGloballyPositioned {
+                            motionCoordinates[0] = it
+                            val bounds = it.boundsInWindow()
+                            imageViewport.bounds = bounds
+                            imageVisibility.setNeedsUpdate()
+                            controller.sendLanding?.listEnd = bounds.copy(bottom = bounds.bottom - with(density) { listPadding.calculateBottomPadding().toPx() })
+                        },
+                    contentPadding = listPadding,
+                ) {
+                    items(snapshot.items, key = { it.key }, contentType = { it.contentType }) { item ->
+                        // Centred at the readable width on a wider window (iOS `readableColumn`).
+                        val rowModifier = Modifier
+                            .animateItem(
+                                fadeInSpec = null,
+                                placementSpec = controller.placementSpring?.spec(),
+                                // Working handing off to the reply's end has already become it (iOS `handsOff`): no fade.
+                                fadeOutSpec = if (item == TranscriptItemID.Empty || !controller.fadesRemovals ||
+                                    (item == TranscriptItemID.Working && configuration.workingHandsOffToCopy)
+                                ) null else androidx.compose.animation.core.tween((RowEntrance.EXIT_DURATION * 1000).toInt(), easing = androidx.compose.animation.core.CubicBezierEasing(0f, 0f, 0.58f, 1f)) /* iOS .curveEaseOut */,
+                            )
+                            .fillMaxWidth()
+                            .wrapContentWidth()
+                            .widthIn(max = TranscriptMetrics.readableColumnWidth)
+                            .fillMaxWidth()
+                            .padding(horizontal = gutter)
+                        when (item) {
+                            TranscriptItemID.History -> TranscriptHistoryStatusView(
+                                isLoading = configuration.isLoadingEarlier,
+                                error = configuration.earlierHistoryError,
+                                retry = { currentSend(TranscriptAction.ShowEarlierTapped) },
+                                modifier = rowModifier,
+                            )
+                            TranscriptItemID.Empty -> TranscriptEmptyView(
+                                isLoading = configuration.isLoading,
+                                showsEmptyState = configuration.showsEmptyState,
+                                loadingSince = controller.emptyLoadingSince,
+                                pulsePaused = !controller.isShowingToReader,
+                                modifier = rowModifier.fillParentMaxHeight(),
+                            )
+                            TranscriptItemID.NewDivider -> NewMessagesDivider(
+                                rowModifier
+                                    .graphicsLayer {
+                                        alpha = controller.dividerAlpha()
+                                        clip = true
+                                    }
+                                    .layout { measurable, constraints ->
+                                        // Its motion fits the row (iOS `fittedDividerHeight`); the rule stays centred.
+                                        val placeable = measurable.measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
+                                        val height = controller.fittedDividerHeight(placeable.height)
+                                        layout(placeable.width, height) { placeable.place(0, (height - placeable.height) / 2) }
+                                    },
+                                glowStart = controller.dividerGlowStart,
+                            )
+                            TranscriptItemID.Working -> GrowingRow(controller, item.key, rowModifier) {
+                                val working = slots.workingLine
+                                if (working != null) {
+                                    working()
+                                } else {
+                                    WorkingLineFallback(Modifier.padding(vertical = TranscriptMetrics.flowHalf))
                                 }
-                                .layout { measurable, constraints ->
-                                    // Its motion fits the row (iOS `fittedDividerHeight`); the rule stays centred.
-                                    val placeable = measurable.measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
-                                    val height = controller.fittedDividerHeight(placeable.height)
-                                    layout(placeable.width, height) { placeable.place(0, (height - placeable.height) / 2) }
-                                },
-                            glowStart = controller.dividerGlowStart,
-                        )
-                        TranscriptItemID.Working -> GrowingRow(controller, item.key, rowModifier) {
-                            val working = slots.workingLine
-                            if (working != null) {
-                                working()
-                            } else {
-                                WorkingLineFallback(Modifier.padding(vertical = TranscriptMetrics.flowHalf))
                             }
-                        }
-                        is TranscriptItemID.Message -> {
-                            val row = snapshot.rows[item.stableID] ?: return@items
-                            val props = snapshot.props[item.stableID] ?: RowProps()
-                            val run = snapshot.runs[item.stableID] ?: UserMessageRun.alone
-                            // A pending row keeps its drawing for a flight into the queued pill (iOS `flyIntoQueuedPill`).
-                            val pending = (row as? MessageRow.Queued)?.input?.takeUnless { it.isCompaction }
-                            val pillSource = if (pending != null) rememberQueuedPillSource(controller, item.stableID, pending) else null
-                            val stableID = item.stableID
-                            GrowingRow(controller, item.key, rowModifier.queuedPillSource(pillSource) { controller.isDepartingToPill(stableID) }) {
-                                CompositionLocalProvider(
-                                    LocalAgentImageRow provides item.stableID,
-                                    ai.opencode.feature.media.LocalAgentImageRowGrowth provides controller.imageGrowth(item.stableID),
-                                    LocalLinkPreviewRevision provides (linkRevisions[item.stableID] ?: 0),
-                                    LocalLinkPreviewRow provides item.stableID,
-                                ) {
-                                    if (row is MessageRow.Queued && row.input.isCompaction) {
-                                        TranscriptQueuedInputView(row.input, Modifier.padding(vertical = TranscriptMetrics.sectionHalf))
-                                    } else {
-                                        // Keep one call site: a pending row's remembered presentation
-                                        // changes in place while animateItem moves that same row.
-                                        val entry = row as? MessageRow.Entry
-                                        val queued = row as? MessageRow.Queued
-                                        TranscriptMessageRow(
-                                            rowID = item.stableID,
-                                            entry = entry?.entry,
-                                            queued = queued?.input,
-                                            failure = entry?.failure,
-                                            deliveryNote = entry?.note ?: queued?.note,
-                                            props = props,
-                                            run = run,
-                                            revealArrival = (entry?.entry?.userMessageID ?: queued?.input?.id)?.let(controller.agentReveal::arrival),
-                                        )
+                            is TranscriptItemID.Message -> {
+                                val row = snapshot.rows[item.stableID] ?: return@items
+                                val props = snapshot.props[item.stableID] ?: RowProps()
+                                val run = snapshot.runs[item.stableID] ?: UserMessageRun.alone
+                                // A pending row keeps its drawing for a flight into the queued pill (iOS `flyIntoQueuedPill`).
+                                val pending = (row as? MessageRow.Queued)?.input?.takeUnless { it.isCompaction }
+                                val pillSource = if (pending != null) rememberQueuedPillSource(controller, item.stableID, pending) else null
+                                val stableID = item.stableID
+                                GrowingRow(controller, item.key, rowModifier.queuedPillSource(pillSource) { controller.isDepartingToPill(stableID) }) {
+                                    CompositionLocalProvider(
+                                        LocalAgentImageRow provides item.stableID,
+                                        ai.opencode.feature.media.LocalAgentImageRowGrowth provides controller.imageGrowth(item.stableID),
+                                        LocalLinkPreviewRevision provides (linkRevisions[item.stableID] ?: 0),
+                                        LocalLinkPreviewRow provides item.stableID,
+                                    ) {
+                                        if (row is MessageRow.Queued && row.input.isCompaction) {
+                                            TranscriptQueuedInputView(row.input, Modifier.padding(vertical = TranscriptMetrics.sectionHalf))
+                                        } else {
+                                            // Keep one call site: a pending row's remembered presentation
+                                            // changes in place while animateItem moves that same row.
+                                            val entry = row as? MessageRow.Entry
+                                            val queued = row as? MessageRow.Queued
+                                            TranscriptMessageRow(
+                                                rowID = item.stableID,
+                                                entry = entry?.entry,
+                                                queued = queued?.input,
+                                                failure = entry?.failure,
+                                                deliveryNote = entry?.note ?: queued?.note,
+                                                props = props,
+                                                run = run,
+                                                revealArrival = (entry?.entry?.userMessageID ?: queued?.input?.id)?.let(controller.agentReveal::arrival),
+                                            )
+                                        }
                                     }
                                 }
                             }

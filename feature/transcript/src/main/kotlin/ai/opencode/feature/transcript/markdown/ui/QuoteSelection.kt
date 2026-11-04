@@ -3,11 +3,15 @@ package ai.opencode.feature.transcript.markdown.ui
 import ai.opencode.feature.transcript.markdown.MarkdownQuote
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.contextmenu.builder.item
 import androidx.compose.foundation.text.contextmenu.data.TextContextMenuItem
 import androidx.compose.foundation.text.contextmenu.data.TextContextMenuKeys
 import androidx.compose.foundation.text.contextmenu.modifier.appendTextContextMenuComponents
 import androidx.compose.foundation.text.contextmenu.modifier.filterTextContextMenuComponents
+import androidx.compose.foundation.text.contextmenu.provider.LocalTextContextMenuDropdownProvider
+import androidx.compose.foundation.text.contextmenu.provider.LocalTextContextMenuToolbarProvider
+import androidx.compose.foundation.text.contextmenu.provider.TextContextMenuProvider
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -15,12 +19,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.Clipboard
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
 
 /** A block whose text can be quoted (iOS `QuoteSelectionBlockSource`). */
 class QuoteSelectionBlockSource private constructor(
@@ -144,3 +150,34 @@ fun QuoteSelectionContainer(kind: OpenCodeMarkdownBlock.Kind, modifier: Modifier
 }
 
 private object QuoteMenuKey
+
+/**
+ * One selection toolbar and one dropdown for every [SelectionContainer] in [content]
+ * (Android-only: iOS's text views share the system's edit menu).
+ *
+ * A SelectionContainer with no menu providers above it sets up its own: a toolbar that watches
+ * snapshot state, a dropdown host, and a position callback that runs on every frame it moves.
+ * The transcript has one container per Markdown block, so a fling paid for that on each block
+ * that scrolled in and on every frame each one moved. Here one empty container sets them up
+ * once and [content] reuses them. The toolbar places itself from the selection's own bounds,
+ * so where the empty container sits doesn't matter.
+ *
+ * Emits the empty container beside [content], so call it inside a Box. Only for content that
+ * shows its text in this window: the toolbar belongs to this window, not to a dialog's.
+ */
+@Composable
+fun SharedTextContextMenus(content: @Composable () -> Unit) {
+    val shared = remember { arrayOfNulls<TextContextMenuProvider>(2) }
+    // Nothing in it is selectable, and it never takes focus.
+    SelectionContainer(Modifier.size(0.dp).focusProperties { canFocus = false }) {
+        // Read in the same pass, before content composes, so no block ever sets up its own.
+        shared[0] = LocalTextContextMenuToolbarProvider.current
+        shared[1] = LocalTextContextMenuDropdownProvider.current
+    }
+    CompositionLocalProvider(
+        LocalTextContextMenuToolbarProvider provides shared[0],
+        LocalTextContextMenuDropdownProvider provides shared[1],
+    ) {
+        content()
+    }
+}
