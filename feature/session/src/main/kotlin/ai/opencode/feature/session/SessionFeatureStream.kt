@@ -211,11 +211,11 @@ private fun SessionFeature.eventStreamConnected(
     // A new socket epoch invalidates delta accumulators, not rendered parts: unfinished
     // text/tools are still absent from REST. Keep their row protection until reconciliation can
     // echo them or the run ends. Shell events are ephemeral: an exit may have been missed. The
-    // reconnect's re-list replaces every listed shell.
+    // reconnect's re-list replaces every listed shell. A text row streamed before the gap keeps its
+    // words: a text delta leaves a row it has no accumulator for until its text ends.
     s = retune.state.copy(
         streamSupportsProjection = false,
         liveText = emptyMap(),
-        gappedLiveText = retune.state.gappedLiveText + retune.state.liveText.keys,
         lastProjectedMessageID = null,
         shells = retune.state.shells.map { if (it.isListed) it else it.copy(isListed = true) },
     )
@@ -674,7 +674,6 @@ internal fun Throwable.asClientError(): ai.opencode.server.OpenCodeClientError =
 internal class LiveProjection(state: SessionFeature.State) {
     val items: MutableList<OpenCodeTranscriptItem> = ArrayList(state.items)
     val liveText: MutableMap<String, String> = LinkedHashMap(state.liveText)
-    val gappedLiveText: MutableSet<String> = HashSet(state.gappedLiveText)
     private val shellToolStatuses = HashMap(state.shellToolStatuses)
     private val subagentToolSessionIDs = HashSet(state.subagentToolSessionIDs)
     private var shellsChanged = false
@@ -697,7 +696,6 @@ internal class LiveProjection(state: SessionFeature.State) {
         var next = state
         if (itemsChanged) next = next.copy(items = items.toList())
         if (liveText != state.liveText) next = next.copy(liveText = liveText.toMap())
-        if (gappedLiveText != state.gappedLiveText) next = next.copy(gappedLiveText = gappedLiveText.toSet())
         if (shellsChanged) next = next.copy(shellToolStatuses = shellToolStatuses.toMap())
         if (subagentsChanged) next = next.copy(subagentToolSessionIDs = subagentToolSessionIDs.toSet())
         return next
@@ -712,23 +710,27 @@ private fun SessionFeature.applyLiveEvent(event: OpenCodeLiveContentEvent, proje
     when (event) {
         is OpenCodeLiveContentEvent.TextStarted -> {
             val id = "${event.messageID}-text-${event.ordinal}"
-            if (id !in projection.gappedLiveText) projection.liveText[id] = projection.liveText[id] ?: ""
+            projection.liveText[id] = projection.liveText[id] ?: ""
             null
         }
         is OpenCodeLiveContentEvent.TextDelta -> {
             val id = "${event.messageID}-text-${event.ordinal}"
-            // Missed deltas aren't replayed: the text shown stays until the part's end has it all.
-            if (id in projection.gappedLiveText) {
+            // A row with no accumulator streamed before a gap (a reconnect, or a stream that shed
+            // this part's deltas): the deltas it missed are gone, so appending would lose text from
+            // its middle and starting from "" would shrink it to its tail. It stays as it is until
+            // its text ends with the whole text.
+            val accumulated = projection.liveText[id]
+                ?: if (projection.items.none { it.id == id }) "" else null
+            if (accumulated == null) {
                 null
             } else {
-                val text = (projection.liveText[id] ?: "") + event.delta
+                val text = accumulated + event.delta
                 projection.liveText[id] = text
                 projection.upsertText(upsertLiveTextChange(id, text, streaming = true, items = projection.items), id)
             }
         }
         is OpenCodeLiveContentEvent.TextEnded -> {
             val id = "${event.messageID}-text-${event.ordinal}"
-            projection.gappedLiveText.remove(id)
             val insertedID = projection.upsertText(upsertLiveTextChange(id, event.text, items = projection.items), id)
             projection.liveText.remove(id)
             insertedID

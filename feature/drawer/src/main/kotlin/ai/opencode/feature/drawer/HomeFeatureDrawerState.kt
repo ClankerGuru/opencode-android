@@ -617,6 +617,20 @@ val HomeFeature.State.viewing: Viewing
         return Viewing(detail.session?.id, detail.familyRootID)
     }
 
+/**
+ * Every session with a screen, the open one and each pushed subagent: the event stream keeps all
+ * of their deltas under load ([ai.opencode.server.EventStreamFocusClient]).
+ */
+val HomeFeature.State.streamFocusSessionIDs: Set<String>
+    get() {
+        val ids = LinkedHashSet<String>()
+        sessionDetail?.session?.id?.let(ids::add)
+        for (screen in subagentStack) {
+            screen.session?.id?.let(ids::add)
+        }
+        return ids
+    }
+
 /** The sessions whose delivered notifications go when they're on screen. */
 val HomeFeature.State.viewedNotificationThreads: Set<String> get() = viewing.threads
 

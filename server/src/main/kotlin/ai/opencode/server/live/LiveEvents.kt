@@ -7,9 +7,10 @@ import ai.opencode.core.diagnostics.DiagnosticsFailurePhase
 import ai.opencode.core.diagnostics.DiagnosticsRecorder
 import ai.opencode.core.diagnostics.DiagnosticsStreamName
 import ai.opencode.core.diagnostics.DiagnosticsStreamProgress
-import ai.opencode.core.log.AppLog
 import ai.opencode.server.EventBatcher
 import ai.opencode.server.EventBatcherHooks
+import ai.opencode.server.EventEmission
+import ai.opencode.server.EventStreamFocusClient
 import ai.opencode.server.EventStreamOverflow
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeLiveContentEvent
@@ -28,6 +29,7 @@ import ai.opencode.server.model.utf8Length
 import ai.opencode.server.retry.NetworkRetry
 import ai.opencode.server.retry.ServerContact
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -35,6 +37,9 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
@@ -43,32 +48,44 @@ import okhttp3.Call
 import okhttp3.Request
 
 private const val MAX_FRAME_BYTES = 16 * 1024 * 1024
-private const val EVENT_BUFFER = 128
 
 /**
  * Long-lived SSE subscription to `/api/event`. The flow throws on disconnect (an
  * [OpenCodeClientError], or [EventStreamOverflow] when the collector fell 128 events behind);
  * the caller owns the reconnect-and-rehydrate loop.
  */
-internal fun subscribeEvents(server: OpenCodeServer): Flow<OpenCodeServerEvent> = callbackFlow {
+internal fun subscribeEvents(server: OpenCodeServer): Flow<OpenCodeServerEvent> = flow {
+    // The events sent and not yet taken by the collector. `callbackFlow` doesn't expose its
+    // buffer's fill level, which iOS reads from each `yield`'s result; the batcher sheds deltas
+    // for sessions off screen once half the buffer is waiting.
+    val waiting = AtomicInteger(0)
+    emitAll(eventSource(server, waiting).onEach { waiting.decrementAndGet() })
+}
+
+private fun eventSource(server: OpenCodeServer, waiting: AtomicInteger): Flow<OpenCodeServerEvent> = callbackFlow {
     val batches = EventBatcher(
         scope = this,
         emit = { event ->
+            val queued = waiting.incrementAndGet()
             val result = trySend(event)
             when {
-                result.isSuccess -> true
-                result.isClosed -> false
+                result.isSuccess -> EventEmission.Enqueued(remaining = EventBatcher.BUFFER_CAPACITY - queued)
+                result.isClosed -> {
+                    waiting.decrementAndGet()
+                    EventEmission.Terminated
+                }
                 else -> {
+                    waiting.decrementAndGet()
                     // A missing delta makes the rest of this connection incomplete: finish so the
                     // subscriber reconnects and hydrates from REST rather than hiding a gap.
-                    AppLog.stream.notice { "Event buffer overflow: dropped=1" }
                     close(EventStreamOverflow())
-                    false
+                    EventEmission.Dropped
                 }
             }
         },
         hooks = dependency(EventBatcherHooks),
         clock = dependency(Clock),
+        isFocused = dependency(EventStreamFocusClient).contains,
     )
     val selfViewReceipts = dependency(SelfViewReceipts)
     val activeCall = AtomicReference<Call?>(null)
@@ -137,7 +154,7 @@ internal fun subscribeEvents(server: OpenCodeServer): Flow<OpenCodeServerEvent> 
         }
     }
     awaitClose { activeCall.get()?.cancel() }
-}.buffer(EVENT_BUFFER)
+}.buffer(EventBatcher.BUFFER_CAPACITY)
 
 /** The event stream's diagnostics marks (iOS `DiagnosticsRecorder.stream`): line counts and timings only. */
 private class StreamDiagnostics(private val operationID: String) {

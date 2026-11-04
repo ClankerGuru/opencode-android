@@ -73,6 +73,11 @@ import ai.opencode.feature.composer.restorePersistedPick
  * they've reduced, as iOS's `HomeFeature` does on `.sessionDetail(.presented(…))`.
  */
 class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
+    /**
+     * This window's key for [ai.opencode.server.EventStreamFocusClient] (iOS `sceneWindow.id`):
+     * each window's store builds its own Home reducer.
+     */
+    internal val streamFocusOwner: java.util.UUID = java.util.UUID.randomUUID()
 
     /**
      * Mirrors of iOS `@Shared` keys ([pinnedSessionKeys], [lastViewedSessionIDs], [sessionReadDates],

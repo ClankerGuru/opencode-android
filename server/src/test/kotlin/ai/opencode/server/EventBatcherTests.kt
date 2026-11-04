@@ -23,11 +23,11 @@ class EventBatcherTests {
                 emit = { event ->
                     val result = channel.trySend(event)
                     when {
-                        result.isSuccess -> true
-                        result.isClosed -> false
+                        result.isSuccess -> EventEmission.Enqueued(remaining = 0)
+                        result.isClosed -> EventEmission.Terminated
                         else -> {
                             channel.close(EventStreamOverflow())
-                            false
+                            EventEmission.Dropped
                         }
                     }
                 },

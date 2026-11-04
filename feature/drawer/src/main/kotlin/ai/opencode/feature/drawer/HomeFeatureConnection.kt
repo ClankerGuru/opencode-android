@@ -1,5 +1,6 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.server.EventStreamFocusClient
 import ai.opencode.feature.session.*
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.dependency
@@ -45,6 +46,8 @@ internal fun HomeFeature.reduceConnection(state: State, action: Action): HomeRed
     Action.Task -> {
         LabMarks.mark("home_task_started")
         val s = if (state.isConnected) state.initializingInbox() else state
+        // A restored session was open before any change could publish it.
+        dependency(EventStreamFocusClient).publish(streamFocusOwner, s.streamFocusSessionIDs)
         val load = if (s.isConnected) Reduced(s, Effect.merge(refreshAttention(s), resolveActiveAncestry(s))) else refreshSnapshot(s)
         // The call's and the recording's ongoing-notification buttons.
         val voiceLiveActivity = dependency(VoiceLiveActivityClient)

@@ -1,5 +1,6 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.server.EventStreamFocusClient
 import ai.opencode.feature.session.*
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.dependency
@@ -448,6 +449,11 @@ private fun Reducer<State, Action>.homeChildrenObservers(feature: HomeFeature): 
             val next = new.ledger
             if (next == old.ledger) return@onChange Reduced(state)
             Reduced(state, feature.publishAppBadge(state, next))
+        }
+        // The stream sheds other sessions' deltas under load, never these.
+        .onChange({ it.streamFocusSessionIDs }) { _, new, state ->
+            dependency(EventStreamFocusClient).publish(feature.streamFocusOwner, new)
+            Reduced(state)
         }
         // The share sheet offers what the drawer does, kept current for a share sheet opened over the app.
         .onChange({ it.shareTargetsPublication }) { old, _, state ->

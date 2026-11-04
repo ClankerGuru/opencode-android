@@ -77,8 +77,6 @@ class SessionFeatureTestsResume {
             it.withRequestsConnectionIsAvailable(false)
                 .copy(streamIsHealthy = false, liveText = emptyMap(), refresh = null)
                 .withRequestFailureAwaitingReconnect(true)
-                // Android keeps the gapped part's text until it ends (State.gappedLiveText).
-                .copy(gappedLiveText = setOf("msg_reply-text-0"))
         }
         store.send(
             Action.RefreshResponse(
@@ -97,6 +95,56 @@ class SessionFeatureTestsResume {
         assertEquals(1, reads.value)
         assertEquals(listOf<OpenCodeTranscriptItem>(complete), store.state.items)
         assertTrue(store.state.liveText.isEmpty())
+    }
+
+    /**
+     * A reconnect mid-reply loses the deltas sent during the gap (`/api/event` has no resume). The
+     * row keeps what it showed rather than restarting from the first post-gap delta, and the part's
+     * end brings the whole text once.
+     */
+    @Test
+    fun reconnectMidReplyKeepsTheRowUntilItsTextEnds() = sessionTest { h ->
+        val session = testSession(id = "ses_gap", title = "Gap")
+        val id = "msg_reply-text-0"
+        val shown = assistant(id, "The first half of a long")
+        val whole = assistant(id, "The first half of a long reply, and its end.")
+        val ended = OpenCodeLiveContentEvent.TextEnded(messageID = "msg_reply", ordinal = 0, text = "The first half of a long reply, and its end.")
+        val state = h.makeState(session = session, cachedItems = listOf(shown)).copy(
+            streamIsHealthy = true,
+            streamSupportsProjection = true,
+            isExternallyActive = true,
+            liveText = mapOf(id to "The first half of a long"),
+            projectedMessageIDs = setOf("msg_reply"),
+            lastProjectedMessageID = "msg_reply",
+            // The reconnect's REST read is in flight (REST omits the unfinished part).
+            nextRefreshID = 1,
+            refresh = State.Refresh(id = 1, reason = RefreshReason.Reconnect),
+        )
+        val store = h.store(state)
+
+        store.send(Action.EventStreamConnected(testServer)) {
+            it.copy(streamSupportsProjection = false, liveText = emptyMap(), lastProjectedMessageID = null)
+        }
+        // " reply, and" was sent during the gap; the first delta after it must neither replace the
+        // row nor append past the hole.
+        store.send(
+            Action.ContentBatch(session.id, listOf(OpenCodeLiveContentEvent.TextDelta(messageID = "msg_reply", ordinal = 0, delta = " its"))),
+        ) {
+            it.copy(streamSupportsProjection = true, lastProjectedMessageID = "msg_reply")
+        }
+        store.send(
+            Action.ContentBatch(
+                session.id,
+                listOf(OpenCodeLiveContentEvent.TextDelta(messageID = "msg_reply", ordinal = 0, delta = " end."), ended),
+            ),
+        ) {
+            it.copy(items = listOf(whole), refresh = it.refresh?.copy(racedEvents = listOf(ended)))
+        }
+        store.receive(Action.RefreshRequested(RefreshReason.Settlement(messageID = "msg_reply"))) {
+            it.copy(refresh = it.refresh?.copy(followup = RefreshReason.Settlement(messageID = "msg_reply")))
+        }
+        assertEquals(listOf<OpenCodeTranscriptItem>(whole), store.state.items.filter { it.id == id })
+        store.finish()
     }
 
     @Test

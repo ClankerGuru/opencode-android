@@ -32,6 +32,7 @@ import kotlinx.coroutines.selects.select
 import java.time.Duration as JavaDuration
 import java.time.Instant
 import java.util.UUID
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
@@ -215,6 +216,8 @@ class HomeConnectionFeature : Reducer<HomeConnectionFeature.State, HomeConnectio
             val schedule = RetrySchedule(RetryPolicy.stream, clock, networkPath.retryEnvironment)
             val overflowSchedule = RetrySchedule(RetryPolicy.streamOverflow, clock, networkPath.retryEnvironment)
             var nextAddressIndex = 0
+            // Read only after an overflow, so a clean stream never reads the clock.
+            var overflowReconnectedAt: Duration? = null
             val operationID = UUID.randomUUID().toString().uppercase()
             val log = AppLog.stream
             while (currentCoroutineContext().isActive) {
@@ -259,8 +262,11 @@ class HomeConnectionFeature : Reducer<HomeConnectionFeature.State, HomeConnectio
                     }
                     if (!currentCoroutineContext().isActive) return@run
                     // A connection that ends without local data loss can clear the overload
-                    // history. Merely receiving `.connected` cannot.
-                    if (connected && !overflowed) overflowSchedule.reset()
+                    // history, as can one that kept up for a quiet stretch before it fell behind:
+                    // that overflow is a new burst, not the last one still draining. Merely
+                    // receiving `.connected` cannot.
+                    val sinceOverflowReconnect = overflowReconnectedAt?.let { clock.now() - it } ?: Duration.ZERO
+                    if (connected && (!overflowed || sinceOverflowReconnect >= overflowQuietStretch)) overflowSchedule.reset()
                     send(Action.ConnectionLost)
                     if (overflowed) {
                         nextAddressIndex = index
@@ -271,6 +277,7 @@ class HomeConnectionFeature : Reducer<HomeConnectionFeature.State, HomeConnectio
                     val pause = overflowSchedule.next(RetryVerdict.Transient(retryAfter = null)) ?: return@run
                     log.notice { "Reconnecting after overflow: ${pause.kind.logSummary}" }
                     if (!pause.run()) return@run
+                    overflowReconnectedAt = clock.now()
                     continue
                 }
                 nextAddressIndex = 0
@@ -292,9 +299,12 @@ class HomeConnectionFeature : Reducer<HomeConnectionFeature.State, HomeConnectio
         }.cancellable(HomeFeature.CancelID.LastKnownActivity, cancelInFlight = true)
     }
 
-    private companion object {
+    companion object {
+        /** How long a connection keeps up before its overflow restarts the overflow backoff from its first, shortest wait. */
+        val overflowQuietStretch: Duration = 30.seconds
+
         /** Returns at the next reroute, or once a request reaches the server again, whichever comes first. */
-        suspend fun nextReconnectCue(networkPath: NetworkPathClient, server: String) = coroutineScope {
+        private suspend fun nextReconnectCue(networkPath: NetworkPathClient, server: String) = coroutineScope {
             val reroute = async { nextReroute(networkPath) }
             val answered = async { networkPath.serverAnswered(server) }
             select {
@@ -305,7 +315,7 @@ class HomeConnectionFeature : Reducer<HomeConnectionFeature.State, HomeConnectio
         }
 
         /** Returns at the next reroute; never, if the path reports none. */
-        suspend fun nextReroute(networkPath: NetworkPathClient) {
+        private suspend fun nextReroute(networkPath: NetworkPathClient) {
             if (networkPath.reroutes().firstOrNull() != null) return
             awaitCancellation()
         }
@@ -314,7 +324,7 @@ class HomeConnectionFeature : Reducer<HomeConnectionFeature.State, HomeConnectio
          * iOS `OpenCodeClient.logDescription`: an exception's type and its cause's, never its
          * message (which can carry the URL). Same rule as `:server`'s internal helper.
          */
-        fun logDescription(error: Throwable): String {
+        private fun logDescription(error: Throwable): String {
             var description = error::class.java.simpleName
             error.cause?.let { description += " (${it::class.java.simpleName})" }
             return description
