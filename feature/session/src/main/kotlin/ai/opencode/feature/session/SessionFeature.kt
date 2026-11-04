@@ -11,7 +11,6 @@ import ai.opencode.core.dependencies.BackgroundTaskClient
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.Dependency
-import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.dependencies.PasteboardClient
 import ai.opencode.core.dependencies.UuidClient
 import ai.opencode.core.dependencies.dependency
@@ -19,14 +18,9 @@ import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.sharing.Shared
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
-import ai.opencode.core.store.Effect
 import ai.opencode.core.store.PresentationAction
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
-import ai.opencode.core.store.cancellable
-import ai.opencode.core.store.combine
-import ai.opencode.core.store.ifLet
-import ai.opencode.core.store.onChange
 import ai.opencode.core.store.scope
 import ai.opencode.feature.media.BrowserFeature
 import ai.opencode.feature.composer.ComposerAttachmentsFeature
@@ -39,7 +33,6 @@ import ai.opencode.feature.composer.DictationFeature
 import ai.opencode.core.experiments.key
 import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.ExperimentalFeatures
-import ai.opencode.core.diagnostics.LabMarks
 import ai.opencode.feature.media.LinkMenuAction
 import ai.opencode.feature.media.LinkProbe
 import ai.opencode.feature.transcript.markdown.MarkdownStreamClient
@@ -57,7 +50,6 @@ import ai.opencode.feature.composer.LocationClientError
 import ai.opencode.feature.media.UniversalLinkClient
 import ai.opencode.feature.voice.VoiceFeature
 import ai.opencode.feature.voice.VoiceServerChoice
-import ai.opencode.feature.media.VoiceViewingPage
 import ai.opencode.feature.voice.ServerVoiceProvider
 import ai.opencode.feature.media.MediaReferenceClient
 import ai.opencode.feature.voice.ServerVoiceModelsAnswer
@@ -91,10 +83,8 @@ import ai.opencode.server.model.OpenCodeToolCall
 import ai.opencode.server.model.OpenCodeTranscriptItem
 import ai.opencode.server.model.OpenCodeTranscriptPage
 import ai.opencode.server.retry.NetworkPathClient
-import kotlinx.serialization.Serializable
 import java.time.Instant
 import java.util.UUID
-import kotlin.time.Duration.Companion.milliseconds
 import ai.opencode.feature.transcript.list.NewMessagesFold
 import ai.opencode.feature.transcript.list.NewMessagesEarlierBaseline
 
@@ -112,12 +102,12 @@ object MoveToBackground {
  * new session's draft) — its transcript, composer, run, requests, call and sheets.
  *
  * Layout mirrors iOS: this file keeps [State]'s stored properties (and the nested types of
- * `+State`), [Action], dependencies and the body; each area's reducer lives in
- * `SessionFeature<Area>.kt` as `internal fun SessionFeature.reduceX(state, action): Reduced?`
- * (null: the action passes to the next step, iOS's `passes = true`). Helpers that mutate state and
+ * `+State` and `+ActionSupport`), [Action], dependencies and `reduce`; the body's composition is in
+ * `SessionFeatureComposition.kt`; each area's reducer lives in `SessionFeature<Area>.kt` as
+ * `internal fun SessionFeature.reduceX(state, action): Reduced?` (null: the action passes to the next step, iOS's `passes = true`). Helpers that mutate state and
  * return an effect (iOS `func x(_ state: inout State) -> Effect<Action>`) return
  * `Reduced<State, Action>`; pure state mutations (iOS `mutating func`) are
- * `fun State.x(): State` extensions in `SessionFeatureState.kt`.
+ * `fun State.x(): State` extensions in `SessionFeatureState*.kt`.
  *
  * Writes to [State.draft] go through [withDraft], which keeps iOS's `didSet` (an edit drops
  * [State.nonSendNewlineDraft]).
@@ -1021,248 +1011,10 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
 
     // region Body
 
-    /** iOS `reduceCore`: the ordered core steps; the first that takes the action wins. */
-    internal fun reduceCore(state: State, action: Action): Reduced<State, Action> {
-        for (step in coreSteps) {
-            step(this, state, action)?.let { return it }
-        }
-        return Reduced(state)
-    }
-
-    private object ShellOutputSlot
-    private object FolderBrowserSlot
-    private object VoiceSlot
-
-    /** Double optional for the call's viewing page (iOS `VoiceViewingPage??`). */
-    private data class ViewingBox(val page: VoiceViewingPage?)
-
-    private val coreReducers: Reducer<State, Action> by lazy {
-        Reducer<State, Action> { state, action -> reduceCore(state, action) }
-            .onChange({ state -> if (state.offersManualMoveToBackground) state.foregroundWork else null }) { _, _, state ->
-                scheduleBackgroundHint(state)
-            }
-            // One place cancels superseded run-state work: Stop's retries and reads, the read
-            // after a run's end, and Send Now's wake.
-            .onChange({ it.runWorkGeneration }) { old, _, state ->
-                Reduced(
-                    state,
-                    Effect.cancel(
-                        listOf(CancelID.Interrupt(old), CancelID.InterruptSettle(old), CancelID.RunEndCheck(old), CancelID.StrandedSteer(old)),
-                    ),
-                )
-            }
-            // In the action that starts or ends a run, so the transcript's first frame after it
-            // already has Starting Up or the finale.
-            .onChange({ it.workingRunSignal }) { old, new, state ->
-                val finale = state.workingRun.finale
-                val updated = state.updateWorkingRun(old)
-                val next = updated.workingRun.finale
-                val event: String? = if (new.isRunning != old.isRunning) {
-                    when {
-                        new.isRunning -> "start"
-                        next != null && next != finale -> if (next.kind == WorkingRun.Finale.Kind.pending) "pending" else "finale"
-                        else -> "end"
-                    }
-                } else if (next != null && next != finale && finale?.kind == WorkingRun.Finale.Kind.pending) {
-                    "finale"
-                } else {
-                    null
-                }
-                if (event != null) LabMarks.mark("working_run:$event", sessionID = new.sessionID)
-                Reduced(updated)
-            }
-    }
-
-    private val streamChain: Reducer<State, Action> by lazy {
-        coreReducers
-            // A queued send's message started with its pick still waiting.
-            .onChange({ it.queuedPickDue }) { _, _, state -> applyDueModelPick(state) }
-            .onChange({ it.queuedAgentPickDue }) { _, _, state -> applyDueAgentPick(state) }
-    }
-
-    private val coreChain: Reducer<State, Action> by lazy {
-        var reducer: Reducer<State, Action> = streamChain
-        reducer = ifLet(
-            id = ShellOutputSlot,
-            parent = reducer,
-            state = { it.shellOutput },
-            setState = { s, c -> s.copy(shellOutput = c) },
-            action = { (it as? Action.ShellOutput)?.action },
-            embed = Action::ShellOutput,
-            child = ShellOutputFeature(),
-        )
-        // Plain optional: `sessionSheet` runs header `…` menu actions and confirmations while the
-        // sheet is closed and keeps in-flight fork/export work alive across sheet dismissal.
-        reducer = ifLet(
-            parent = reducer,
-            state = { it.sessionSheet },
-            setState = { s, c -> s.copy(sessionSheet = c) },
-            action = { (it as? Action.SessionSheet)?.action },
-            embed = Action::SessionSheet,
-            child = SessionSheetFeature(),
-        )
-        reducer = ifLet(
-            id = FolderBrowserSlot,
-            parent = reducer,
-            state = { it.folderBrowser },
-            setState = { s, c -> s.copy(folderBrowser = c) },
-            action = { (it as? Action.FolderBrowser)?.action },
-            embed = Action::FolderBrowser,
-            child = FolderBrowserFeature(),
-        )
-        ifLet(
-            id = VoiceSlot,
-            parent = reducer,
-            state = { it.voice },
-            setState = { s, c -> s.copy(voice = c) },
-            action = { (it as? Action.Voice)?.action },
-            embed = Action::Voice,
-            child = VoiceFeature(),
-        )
-    }
-
-    private val sessionReducers: Reducer<State, Action> by lazy {
-        val core = coreChain
-        combine(
-            bindingReducer,
-            scope(
-                state = State::browser,
-                setState = { s, c -> s.copy(browser = c) },
-                action = { (it as? Action.Browser)?.action },
-                embed = Action::Browser,
-                child = BrowserFeature(),
-            ),
-            scope(
-                state = State::dictation,
-                setState = { s, c -> s.copy(dictation = c) },
-                action = { (it as? Action.Dictation)?.action },
-                embed = Action::Dictation,
-                child = DictationFeature,
-            ),
-            scope(
-                state = State::requestDock,
-                setState = { s, c -> s.copy(requestDock = c) },
-                action = { (it as? Action.RequestDock)?.action },
-                embed = Action::RequestDock,
-                child = RequestDockFeature<DraftState>(),
-            ),
-            scope(
-                state = State::composerAttachments,
-                setState = { s, c -> s.copy(composerAttachments = c) },
-                action = { (it as? Action.ComposerAttachments)?.action },
-                embed = Action::ComposerAttachments,
-                child = ComposerAttachmentsFeature(),
-            ),
-            Reducer { state, action ->
-                when {
-                    action is Action.ShellOutput && state.shellOutput == null -> Reduced(state)
-                    action is Action.SessionSheet && state.sessionSheet == null -> Reduced(state)
-                    action is Action.FolderBrowser && state.folderBrowser == null -> Reduced(state)
-                    action is Action.Voice && state.voice == null -> Reduced(state)
-                    else -> core.reduce(state, action)
-                }
-            },
-        )
-    }
-
-    private val fullBody: Reducer<State, Action> by lazy {
-        sessionReducers
-            // A pending request takes the composer as its answer and gives it back as it was
-            // (D-31 B); paging or switching requests moves the bar's words.
-            .onChange({ it.answerContext }) { old, _, state -> reconcileAnswering(old, state) }
-            .onChange({ it.composingRetiresStarterPrompts }) { _, _, state ->
-                Reduced(if (state.composingRetiresStarterPrompts) state.copy(starterPrompts = emptyList()) else state)
-            }
-            .onChange({ it.persistedComposerWatch }) { old, _, state -> reconcilePersistedComposer(old, state) }
-            .onChange({ it.persistedSessionWatch }) { old, _, state -> reconcilePersistedSession(old, state) }
-            // Each admission and answer of a voice prompt re-reads the pinned session and retunes
-            // the watchdog, as a typed send and its reply do.
-            .onChange({ it.voice?.admittedPromptIDs ?: emptyList() }) { _, _, state ->
-                val session = state.session
-                if (session == null || state.voice?.target?.sessionID != session.id) return@onChange Reduced(state)
-                val watched = watchdog(state)
-                Reduced(watched.state, Effect.merge(Effect.send(Action.RefreshRequested(RefreshReason.RunState)), watched.effect))
-            }
-            // The call mirrors whether the family is blocked on a native approval the call cannot settle.
-            .onChange({ state ->
-                val voice = state.voice
-                if (voice == null || voice.target.sessionID != state.session?.id) null else state.hasPendingRequests
-            }) { _, _, state ->
-                val needsInput = state.hasPendingRequests
-                Reduced(state.copy(voice = state.voice?.copy(targetNeedsInput = needsInput)))
-            }
-            // A compaction in the call's session drops the delegation header from its context, so
-            // the next delegation explains itself again (D4a).
-            .onChange({ it.voiceCompaction }) { _, _, state ->
-                val mark = state.voiceCompaction ?: return@onChange Reduced(state)
-                Reduced(state, Effect.send(Action.voicePresented(VoiceFeature.Action.CompactionObserved(mark))))
-            }
-            // The call hears which page is open over the session. Debounced, so a burst of
-            // navigation sends one update; scrolling sends none.
-            .onChange({ state ->
-                val voice = state.voice
-                if (voice == null || voice.target.sessionID != state.session?.id) null else ViewingBox(state.browser.viewing)
-            }) { _, _, state ->
-                // Nothing to say when the call already knows (a call starting with no page).
-                val voice = state.voice ?: return@onChange Reduced(state, Effect.cancel(CancelID.VoiceViewing))
-                if (voice.viewing == state.browser.viewing) return@onChange Reduced(state)
-                val page = state.browser.viewing
-                val clock = clock
-                Reduced(
-                    state,
-                    Effect.run<Action> { send ->
-                        clock.sleep(600.milliseconds)
-                        send(Action.voicePresented(VoiceFeature.Action.ViewingChanged(page)))
-                    }.cancellable(CancelID.VoiceViewing, cancelInFlight = true),
-                )
-            }
-            // A call on a draft creates its session with the draft's model; on a session, its next
-            // delegation applies a pick still waiting.
-            .onChange({ it.sendModel }) { _, _, state ->
-                val synced = state.syncVoiceModel()
-                Reduced(synced.copy(sessionSheet = synced.sessionSheet?.copy(pendingModel = synced.pendingModel)))
-            }
-            // When the attached session gets a generated or edited title, tell the voice model.
-            .onChange({ VoiceSessionName(it.voice?.target?.sessionID, it.voice?.sessionTitle) }) { old, _, state ->
-                val sessionID = state.voice?.target?.sessionID
-                val title = state.voice?.sessionTitle
-                if (sessionID == null || old.sessionID != sessionID || title == null || old.title == title) {
-                    Reduced(state)
-                } else {
-                    Reduced(state, Effect.send(Action.voicePresented(VoiceFeature.Action.SessionRenamed(title))))
-                }
-            }
-    }
-
     /** iOS `builtBody`: content batches and family run changes skip the full body's hooks (the stream fast path). */
-    private val builtBody: Reducer<State, Action> by lazy {
-        val full = fullBody
-        val stream = streamChain
-        Reducer { state, action ->
-            when (action) {
-                is Action.ContentBatch, is Action.FamilyRunStateChanged -> stream.reduce(state, action)
-                else -> full.reduce(state, action)
-            }
-        }
-    }
+    private val builtBody: Reducer<State, Action> by lazy { composedBody() }
 
     override fun reduce(state: State, action: Action): Reduced<State, Action> = builtBody.reduce(state, action)
 
     // endregion
-}
-
-/**
- * Background timers `SessionFeature` starts on its own. Live sessions run all three; reducer
- * tests opt into the ones they exercise so unrelated tests do not inherit background loops.
- */
-@Serializable
-data class SessionTimers(
-    val watchdog: Boolean = true,
-    val runEndCheck: Boolean = true,
-    val requestRetry: Boolean = true,
-) {
-    companion object Key : DependencyKey<SessionTimers> {
-        override val liveValue = SessionTimers()
-        override val testValue = SessionTimers(watchdog = false, runEndCheck = false, requestRetry = false)
-    }
 }

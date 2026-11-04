@@ -8,7 +8,6 @@ import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticEffect
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.rememberReduceMotion
-import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.PresentationAction
 import ai.opencode.core.store.StoreOf
@@ -47,8 +46,6 @@ import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.feature.session.header.HeaderBlurTunables
 import ai.opencode.feature.session.header.SessionHeaderBackdrop
 import ai.opencode.feature.session.header.SessionHeaderStyle
-import ai.opencode.feature.system.notifications.SessionNotificationsClient
-import ai.opencode.feature.voice.DotScopeRenderer
 import ai.opencode.feature.voice.FloatingCallCenter
 import ai.opencode.feature.voice.FloatingCallRestArea
 import ai.opencode.feature.voice.FloatingCallTunables
@@ -62,15 +59,7 @@ import ai.opencode.server.model.OpenCodeShell
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -89,7 +78,6 @@ import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -106,14 +94,11 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
@@ -125,14 +110,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.lifecycle.compose.currentStateAsState
-import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 
@@ -140,7 +119,8 @@ import kotlinx.coroutines.flow.map
 // full-bleed under the header and the composer; the header's backdrop and controls sit over its
 // top, the composer (`SessionComposer`, SessionView+Composer's port) over its bottom, and the
 // background-work capsule and panel over both. Sheets follow `activePicker`; lifecycle changes
-// reach the reducer as actions (no side effects here).
+// reach the reducer as actions (no side effects here), from `SessionLifecycle`
+// (`SessionViewLifecycle.kt`). The drawer glyph and swap transitions are in `SessionViewChrome.kt`.
 //
 // iOS's per-view gesture state (the model list, the plus menu's photo sheet, dictation holds, the
 // request panel's room) belongs to the composer and picker views on Android, each in its own file.
@@ -394,80 +374,6 @@ private data class BackgroundWorkModel(
             inCall = state.voice != null,
             showsCallTranscript = state.voice?.showsCaptions == true,
         )
-    }
-}
-
-/**
- * iOS `.task(id: taskIdentity)`, `onAppear`/`onDisappear` and `onChange(of: scenePhase)`: the
- * screen's visit starts its task, visibility and the scene's phase reach the reducer, and the
- * New Messages Divider and Since You Left settings tell an open session when they change.
- *
- * Android's lifecycle maps to scene phases: RESUMED is active, STARTED inactive, CREATED
- * (stopped) background.
- */
-@Composable
-private fun SessionLifecycle(store: StoreOf<State, Action>) {
-    val taskIdentity by store.observe { it.taskIdentity }
-    // Keyed by visit and session: the drawer swaps the screen in place, a draft opened from another
-    // draft starts a fresh task, and a draft becoming its own session continues the one it started.
-    LaunchedEffect(taskIdentity) { store.send(Action.Task) }
-    // A held mic's bar shows its scope at once.
-    LaunchedEffect(Unit) { DotScopeRenderer.prepare() }
-
-    val lifecycleOwner = LocalLifecycleOwner.current
-    val currentStore by rememberUpdatedState(store)
-    // A configuration change (dark mode, font size, rotation) recreates the activity; the reader
-    // never left, as an iOS appearance change never leaves the scene, so it isn't a leave.
-    val activity = androidx.activity.compose.LocalActivity.current
-    val changingConfigurations = { activity?.isChangingConfigurations == true }
-    DisposableEffect(lifecycleOwner, store) {
-        val lifecycle = lifecycleOwner.lifecycle
-        // Recreated by a configuration change, the screen comes back before its activity resumes:
-        // that's not a leave either, and ON_RESUME follows.
-        val resumed = lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
-        if (resumed || !currentStore.state.isVisible) currentStore.send(Action.VisibilityChanged(resumed))
-        var catchingUp = true
-        val observer = LifecycleEventObserver { _, event ->
-            // `addObserver` replays the events up to the current state: the appearance above covers them.
-            if (catchingUp || changingConfigurations()) return@LifecycleEventObserver
-            val active = when (event) {
-                Lifecycle.Event.ON_RESUME -> true
-                Lifecycle.Event.ON_PAUSE, Lifecycle.Event.ON_STOP, Lifecycle.Event.ON_START -> false
-                else -> return@LifecycleEventObserver
-            }
-            currentStore.send(Action.SceneActiveChanged(active))
-            currentStore.send(Action.VisibilityChanged(active))
-            if (event == Lifecycle.Event.ON_STOP) currentStore.send(Action.SceneEnteredBackground)
-        }
-        lifecycle.addObserver(observer)
-        catchingUp = false
-        onDispose {
-            lifecycle.removeObserver(observer)
-            if (currentStore.state.isVisible && !changingConfigurations()) currentStore.send(Action.VisibilityChanged(false))
-        }
-    }
-
-    // iOS `markVisibleSession`: notifications learn which session is on screen, so its own don't
-    // show. Told again as the scene, the cover or the session changes; told it left on disappear.
-    val notifications = remember { dependency(SessionNotificationsClient) }
-    val lifecycleState by lifecycleOwner.lifecycle.currentStateAsState()
-    val sceneActive = lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
-    val sessionID by store.observe { it.session?.id }
-    val isVisible by store.observe { it.isVisible }
-    val isCovered by store.observe { it.isCovered }
-    val latestSessionID by rememberUpdatedState(sessionID)
-    LaunchedEffect(notifications, sceneActive, isVisible, isCovered, sessionID) {
-        notifications.setVisibleSession(sceneActive && isVisible && !isCovered, sessionID)
-    }
-    DisposableEffect(notifications) {
-        onDispose { notifications.setVisibleSession(false, latestSessionID) }
-    }
-
-    // Switched off in Settings, an open session's divider goes at once.
-    LaunchedEffect(store) {
-        shared(ExperimentalFeature.newMessagesDivider.key).flow.drop(1).collect {
-            store.send(Action.NewMessagesDividerChanged(it))
-        }
     }
 }
 
@@ -995,56 +901,4 @@ private fun LocationErrorAlert(store: StoreOf<State, Action>) {
             null
         },
     )
-}
-
-/**
- * The drawer button's glyph: a long stroke over a short one, drawn at whole pixels so it reads at
- * full strength beside the Material Symbols around it. Scales with the body text up to 22 dp.
- */
-@Composable
-fun DrawerGlyph(modifier: Modifier = Modifier) {
-    val density = LocalDensity.current
-    val width = min(18f * density.fontScale, 22f)
-    val color = LocalContentColor.current
-    with(density) {
-        fun pixels(points: Float): Float = (points * this.density).roundToInt().toFloat()
-        val stroke = pixels(2.5f)
-        val gap = pixels(width * 0.3f)
-        val long = pixels(width)
-        val short = pixels(width * 0.6f)
-        Canvas(modifier.size(long.toDp(), (stroke * 2 + gap).toDp()).clearAndSetSemantics {}) {
-            val radius = CornerRadius(stroke / 2, stroke / 2)
-            drawRoundRect(color, Offset.Zero, Size(long, stroke), radius)
-            drawRoundRect(color, Offset(0f, stroke + gap), Size(short, stroke), radius)
-        }
-    }
-}
-
-/**
- * What the composer's row swaps as a request takes it or gives it back (the placeholder, the mark
- * and +, the trailing controls): the outgoing leaves a beat before the incoming arrives, so two
- * never read at once. iOS blur-replaces; Android fades with a slight scale. Reduce Motion fades.
- */
-object RequestBarSwap {
-    fun enter(reducedMotion: Boolean): EnterTransition {
-        val spec = tween<Float>(durationMillis = if (reducedMotion) 160 else 240, delayMillis = 100, easing = Motion.EaseOut)
-        return if (reducedMotion) fadeIn(spec) else fadeIn(spec) + scaleIn(spec, initialScale = 0.96f)
-    }
-
-    fun exit(reducedMotion: Boolean): ExitTransition {
-        val spec = tween<Float>(durationMillis = 120, easing = EaseIn)
-        return if (reducedMotion) fadeOut(spec) else fadeOut(spec) + scaleOut(spec, targetScale = 0.96f)
-    }
-
-    /** SwiftUI `.easeIn`. */
-    private val EaseIn = androidx.compose.animation.core.CubicBezierEasing(0.42f, 0f, 1f, 1f)
-}
-
-/** The composer and the call trade places on one surface: iOS blur-replaces; a cross-fade under Reduce Motion. */
-object ComposerSwap {
-    fun enter(reducedMotion: Boolean): EnterTransition =
-        if (reducedMotion) fadeIn(Motion.reducedFadeSpec()) else fadeIn(Motion.settle.spec()) + scaleIn(Motion.settle.spec(), initialScale = 0.96f)
-
-    fun exit(reducedMotion: Boolean): ExitTransition =
-        if (reducedMotion) fadeOut(Motion.reducedFadeSpec()) else fadeOut(Motion.settle.spec()) + scaleOut(Motion.settle.spec(), targetScale = 0.96f)
 }
