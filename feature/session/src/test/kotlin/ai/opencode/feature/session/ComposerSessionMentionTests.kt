@@ -4,8 +4,6 @@ import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.ImmediateClock
 import ai.opencode.core.dependencies.TestClock
 import ai.opencode.core.dependencies.UuidClient
-import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.feature.composer.AutocompleteItem
 import ai.opencode.feature.composer.AutocompleteTrigger
 import ai.opencode.feature.composer.ComposerAutocompleteAction
@@ -300,7 +298,6 @@ class ComposerSessionMentionTests {
             }.withDraft("Ask @Drawer Polish first").ac { a -> a.copy(chips = listOf(sessionChip)) }
 
             val firstStore = h.store(initialState) {
-                this[ExperimentalFeatures] = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.composerAutocomplete))
                 this[UuidClient] = UuidClient.incrementing()
                 this[Clock] = ImmediateClock()
                 this[ComposerPersistence] = firstPersistence
@@ -342,7 +339,6 @@ class ComposerSessionMentionTests {
                     )
                 },
             ) {
-                this[ExperimentalFeatures] = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.composerAutocomplete))
                 this[UuidClient] = UuidClient.incrementing()
                 this[Clock] = ImmediateClock()
                 this[ComposerPersistence] = secondPersistence

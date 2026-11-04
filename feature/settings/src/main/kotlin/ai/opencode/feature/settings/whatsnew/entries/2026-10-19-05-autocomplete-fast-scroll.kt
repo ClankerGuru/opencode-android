@@ -2,8 +2,6 @@ package ai.opencode.feature.settings.whatsnew.entries
 
 import ai.opencode.feature.settings.whatsnew.WhatsNewEntry
 import ai.opencode.feature.settings.whatsnew.WhatsNewEntry.Companion.smaller
-import ai.opencode.feature.settings.whatsnew.WhatsNewEntry.Destination
-import ai.opencode.feature.settings.whatsnew.WhatsNewEntry.SettingsDestination
 import ai.opencode.feature.settings.whatsnew.WhatsNewShipped
 
 internal val WhatsNewShipped.autocompleteFastScroll: WhatsNewEntry
@@ -13,5 +11,4 @@ internal val WhatsNewShipped.autocompleteFastScroll: WhatsNewEntry
         title = "Snappier Autocomplete",
         symbol = "at",
         summary = "With the Composer Autocomplete experiment on, suggestions keep up as you type, and dragging the list scrolls it without picking a row.",
-        tryIt = Destination.Open(SettingsDestination.Experiment("composer-autocomplete")),
     )

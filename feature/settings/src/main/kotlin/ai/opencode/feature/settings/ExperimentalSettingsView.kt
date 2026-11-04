@@ -36,7 +36,7 @@ import kotlinx.coroutines.delay
 /**
  * Port of iOS `Settings/ExperimentalSettingsView.swift`: Settings › Experimental, the experimental
  * switches in open groups (Composer, Calls, Transcript, Drawer). Sound Effects' volume and send
- * rows and Welcome Preview's Show Welcome sit under the drawer's switches while they're on.
+ * rows sit under the drawer's switches while it's on.
  * Opened for one experiment (What’s New), it scrolls to that row and briefly highlights it
  * (1.2 s, then a 0.6 s ease-out).
  */
@@ -149,12 +149,6 @@ fun ExperimentalSettingsView(store: SettingsStore, focus: ExperimentalFeature?) 
                 SettingsDivider(inset = true)
                 SoundEffectsSettingsRows(send)
             }
-            if (ExperimentalFeature.welcomePreview.isActive(enabled.getValue(ExperimentalFeature.welcomePreview))) {
-                SettingsDivider(inset = true)
-                SettingsRow("Show Welcome", "hand.wave", SettingsTint.Indigo, showsChevron = false) {
-                    send(HomeSettingsFeature.Action.WelcomeOpened)
-                }
-            }
         }
     }
 }
@@ -235,13 +229,29 @@ fun DeveloperSettingsView(store: SettingsStore) {
 /**
  * Port of iOS `PlaygroundsSettingsView` (`Settings/SettingsView.swift`). The Transcript, Session
  * List and Composer playgrounds are iOS Tuning tools (`:devtools` on Android); Onboarding ports here.
+ * Welcome Preview's switch and its Show Welcome row live here, out of Experimental (iOS p217).
  */
 @Composable
 fun PlaygroundsSettingsView(store: SettingsStore) {
+    val welcomePreview by remember { shared(ExperimentalFeature.welcomePreview.key).flow }.collectAsState()
+    val send = { action: HomeSettingsFeature.Action -> store.send(SettingsFeature.Action.Settings(action)) }
     SettingsPageScaffold(title = "Playgrounds", store = store) {
         settingsSection(key = "playgrounds", footer = footerText("Try visual changes with built-in examples and no server.")) {
             SettingsRow("Onboarding", "dot.radiowaves.left.and.right", SettingsTint.Indigo, showsChevron = false) {
-                store.send(SettingsFeature.Action.Settings(HomeSettingsFeature.Action.OnboardingPlaygroundOpened))
+                send(HomeSettingsFeature.Action.OnboardingPlaygroundOpened)
+            }
+        }
+        settingsSection(key = "welcome-preview", footer = footerText("The first-run welcome, shown before any server is paired.")) {
+            ExperimentalFeatureToggle(
+                feature = ExperimentalFeature.welcomePreview,
+                enabled = welcomePreview,
+                onChange = { send(HomeSettingsFeature.Action.ExperimentalFeatureChanged(ExperimentalFeature.welcomePreview, it)) },
+            )
+            if (ExperimentalFeature.welcomePreview.isActive(welcomePreview)) {
+                SettingsDivider(inset = true)
+                SettingsRow("Show Welcome", "hand.wave", SettingsTint.Indigo, showsChevron = false) {
+                    send(HomeSettingsFeature.Action.WelcomeOpened)
+                }
             }
         }
     }

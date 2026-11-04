@@ -60,9 +60,8 @@ class ExperimentalFeatureTests {
         withFreshStorage {
             assertTrue(ExperimentalFeatures.liveValue(ExperimentalFeature.newMessagesDivider))
             assertTrue(shared(experimental(ExperimentalFeature.newMessagesDivider)).value)
-            assertTrue(ExperimentalFeatures.liveValue(ExperimentalFeature.projectIcons))
             assertTrue(ExperimentalFeatures.liveValue(ExperimentalFeature.livingOrb))
-            val onByDefault = setOf(ExperimentalFeature.newMessagesDivider, ExperimentalFeature.projectIcons, ExperimentalFeature.livingOrb)
+            val onByDefault = setOf(ExperimentalFeature.newMessagesDivider, ExperimentalFeature.livingOrb)
             for (feature in ExperimentalFeature.allCases) {
                 if (feature in onByDefault) continue
                 assertFalse("$feature stays off", ExperimentalFeatures.liveValue(feature))
@@ -75,10 +74,15 @@ class ExperimentalFeatureTests {
         assertFalse("tests opt in", ExperimentalFeatures.testValue(ExperimentalFeature.newMessagesDivider))
     }
 
+    /** The divider moved to Settings › Sessions, Welcome Preview to Developer › Playgrounds; neither is in the pane. */
     @Test
-    fun onlyTheDividerHasGraduatedOutOfExperimental() {
-        assertEquals(listOf(ExperimentalFeature.newMessagesDivider), ExperimentalFeature.allCases.filter { it.isGraduated })
+    fun theDividerAndWelcomePreviewLeftExperimental() {
+        assertEquals(
+            listOf(ExperimentalFeature.newMessagesDivider, ExperimentalFeature.welcomePreview),
+            ExperimentalFeature.allCases.filter { it.isGraduated },
+        )
         assertFalse(ExperimentalGroup.entries.flatMap { it.features }.contains(ExperimentalFeature.newMessagesDivider))
+        assertFalse(ExperimentalGroup.entries.flatMap { it.features }.contains(ExperimentalFeature.welcomePreview))
     }
 
     @Test
@@ -100,7 +104,7 @@ class ExperimentalFeatureTests {
             ExperimentalGroup.entries.flatMap { it.features }.toSet(),
         )
         assertEquals(
-            listOf(ExperimentalFeature.composerAutocomplete, ExperimentalFeature.plusMenuSheet, ExperimentalFeature.agentSelection, ExperimentalFeature.hideModels),
+            listOf(ExperimentalFeature.agentSelection, ExperimentalFeature.hideModels),
             ExperimentalGroup.composer.features,
         )
         assertEquals(
@@ -122,26 +126,34 @@ class ExperimentalFeatureTests {
         assertEquals(listOf(ExperimentalFeature.imageLinkPreviews, ExperimentalFeature.inAppBrowser), ExperimentalGroup.transcript.features)
         assertEquals(
             listOf(
-                ExperimentalFeature.inboxSidebar, ExperimentalFeature.projectIcons, ExperimentalFeature.serverDetails, ExperimentalFeature.serverFlow,
-                ExperimentalFeature.welcomePreview, ExperimentalFeature.sessionLiveActivity, ExperimentalFeature.soundEffects,
+                ExperimentalFeature.inboxSidebar, ExperimentalFeature.serverDetails,
+                ExperimentalFeature.sessionLiveActivity, ExperimentalFeature.soundEffects,
             ),
             ExperimentalGroup.drawer.features,
         )
         assertEquals(listOf("Composer", "Calls", "Transcript", "Drawer"), ExperimentalGroup.entries.map { it.title })
     }
 
+    /** Removed experiments and ones now always on (p217) leave no switch behind, whatever was saved. */
     @Test
     fun removedExperimentsLeaveNoSwitchBehind() {
+        val retired = listOf(
+            "session-switcher", "server-title-switch",
+            "composer-autocomplete", "server-flow", "plus-menu-sheet", "project-icons",
+        )
         withFreshStorage {
             val defaults = dependency(SharedStore)
-            defaults.save("experimental-session-switcher", true)
-            defaults.save("experimental-server-title-switch", true)
+            for ((index, name) in retired.withIndex()) {
+                defaults.save("experimental-$name", index % 2 == 0)
+            }
             defaults.save("experimental-in-app-browser", true)
-            assertNull(ExperimentalFeature.fromRawValue("session-switcher"))
-            assertNull(ExperimentalFeature.fromRawValue("server-title-switch"))
+            for (name in retired) {
+                assertNull(name, ExperimentalFeature.fromRawValue(name))
+            }
             ExperimentalFeature.removeRetiredSwitches(defaults)
-            assertFalse(defaults.has("experimental-session-switcher"))
-            assertFalse(defaults.has("experimental-server-title-switch"))
+            for (name in retired) {
+                assertFalse(name, defaults.has("experimental-$name"))
+            }
             assertTrue("Live experiments keep their switch", defaults.bool("experimental-in-app-browser"))
         }
     }

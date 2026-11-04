@@ -3,11 +3,11 @@ package ai.opencode.feature.drawer.switcher
 import ai.opencode.feature.drawer.HomeConnectionFeature
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.friendlyName
+import java.text.Collator
 
-// Port of iOS `OpenCode/Drawer/ServerSwitcher.swift`, the rules half. The composable
-// (`DrawerTitle(...)`, its pull-down menu and the Title Is the Switch button) lives in
-// `switcher/ServerSwitcherView.kt` and reads everything it shows from [DrawerTitle.Presentation]
-// and the texts below. `OpenCodeServer.friendlyName` was moved down to `:server`
+// Port of iOS `OpenCode/Drawer/ServerSwitcher.swift`: the rules the drawer's title
+// (`switcher/ServerFlowTitle.kt`) reads everything it shows from, [DrawerTitle.Presentation] and
+// the texts below. `OpenCodeServer.friendlyName` was moved down to `:server`
 // (`OpenCodeServerFriendlyName.kt`): the title shows a server only by it, never by an address.
 
 /**
@@ -22,19 +22,52 @@ fun switchableServers(current: OpenCodeServer, saved: List<OpenCodeServer>): Lis
 }
 
 /**
- * The drawer's title: always the server in use by its friendly name, never an address. With one
- * saved server it's just the name; with more, a chevron opens a menu of the servers (the current
- * one checked) and Manage Servers…. No status shows while all is well. A confirmed outage dims it
- * (a reconnect usually settles in a second, so it earns nothing), and its menu, which one server
- * gains only then, offers Try Again, or, when the server refused the credentials, editing them. Dimming and the one-server menu coming and going are both
- * cross-fades (0.25 s ease-in-out, [CROSS_FADE_MILLIS]), with or without reduced motion.
+ * The menu's servers: [switchableServers] in a steady order, so the menu never moves as servers
+ * are used (iOS sorts by `friendlyName.localizedStandardCompare`: case-insensitive, numbers by
+ * value).
+ */
+fun drawerTitleServers(current: OpenCodeServer, saved: List<OpenCodeServer>): List<OpenCodeServer> =
+    switchableServers(current, saved).sortedWith { a, b -> localizedStandardCompare(a.friendlyName, b.friendlyName) }
+
+/** Finder-like ordering (iOS `localizedStandardCompare`): runs of digits compare by value, text by the locale's collator. */
+internal fun localizedStandardCompare(a: String, b: String): Int {
+    val collator = Collator.getInstance().apply { strength = Collator.SECONDARY }
+    val left = chunks(a)
+    val right = chunks(b)
+    for (i in 0 until minOf(left.size, right.size)) {
+        val x = left[i]
+        val y = right[i]
+        val result = if (x[0].isDigit() && y[0].isDigit()) {
+            val byValue = x.trimStart('0').length.compareTo(y.trimStart('0').length)
+            if (byValue != 0) byValue else x.trimStart('0').compareTo(y.trimStart('0'))
+        } else {
+            collator.compare(x, y)
+        }
+        if (result != 0) return result
+    }
+    return left.size.compareTo(right.size)
+}
+
+private fun chunks(text: String): List<String> {
+    if (text.isEmpty()) return emptyList()
+    val out = ArrayList<String>()
+    var start = 0
+    for (i in 1..text.length) {
+        if (i == text.length || text[i].isDigit() != text[start].isDigit()) {
+            out += text.substring(start, i)
+            start = i
+        }
+    }
+    return out
+}
+
+/**
+ * The drawer's title (`ServerFlowTitle`): always the server in use by its friendly name, never an
+ * address. No status shows while all is well; a confirmed outage dims it.
  */
 object DrawerTitle {
     /** iOS `.animation(.easeInOut(duration: 0.25), value: presentation)`. */
     const val CROSS_FADE_MILLIS = 250
-
-    /** The title's minimum height (iOS 44 pt; Android's touch target floor is 48 dp). */
-    const val MIN_HEIGHT = 44
 
     /** The test tag / iOS accessibility identifier. */
     const val TAG = "drawer-title"
@@ -44,13 +77,6 @@ object DrawerTitle {
     const val OFFLINE = "Offline"
     const val SIGN_IN_FAILED = "Sign-in failed"
     const val EDIT_SERVER = "Edit Server…"
-
-    /** "Connecting to <name>…": the title while another server is being connected to. */
-    fun connecting(name: String): String = "Connecting to $name…"
-
-    /** What the title (or the menu's label) reads: the server switched to while connecting, else the current one. */
-    fun titleText(current: OpenCodeServer, switchingTo: OpenCodeServer?): String =
-        switchingTo?.let { connecting(it.friendlyName) } ?: current.friendlyName
 
     /** What the title shows for a server count and connection status. */
     data class Presentation(

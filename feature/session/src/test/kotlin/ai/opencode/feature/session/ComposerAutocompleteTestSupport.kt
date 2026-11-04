@@ -3,8 +3,6 @@ package ai.opencode.feature.session
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.DependencyValues
 import ai.opencode.core.dependencies.UuidClient
-import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.core.store.TestStore
 import ai.opencode.feature.composer.AutocompleteItem
 import ai.opencode.feature.composer.ComposerAutocompleteChip
@@ -90,7 +88,6 @@ internal object ComposerAutocompleteTestSupport {
             },
         )
         val store = store(initial) {
-            this[ExperimentalFeatures] = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.composerAutocomplete))
             this[UuidClient] = UuidClient.incrementing()
             this[DateClient] = DateClient.constant(Instant.ofEpochSecond(2_000))
             this[UndeliveredPrompts] = UndeliveredPrompts()

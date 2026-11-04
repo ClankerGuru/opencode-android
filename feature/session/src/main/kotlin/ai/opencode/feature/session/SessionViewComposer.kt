@@ -466,8 +466,6 @@ fun SessionComposer(
     val modelPickerStyle by remember { shared(ModelPickerStyle.key).flow }.collectAsState(shared(ModelPickerStyle.key).value)
     val agentSelection by remember { shared(ExperimentalFeature.agentSelection.key).flow }
         .collectAsState(false)
-    val autocompleteSetting by remember { shared(ExperimentalFeature.composerAutocomplete.key).flow }.collectAsState(false)
-    val usesAutocomplete = ExperimentalFeature.composerAutocomplete.isActive(autocompleteSetting)
     val autocomplete by store.observe { it.autocomplete }
     val reducedMotion = rememberReduceMotion()
     val focusManager = LocalFocusManager.current
@@ -492,7 +490,6 @@ fun SessionComposer(
         returnKeySends = returnKeySends,
         modelPickerStyle = ModelPickerStyle.active(modelPickerStyle),
         agentSelection = ExperimentalFeature.agentSelection.isActive(agentSelection),
-        usesAutocomplete = usesAutocomplete,
         autocomplete = autocomplete,
         focus = {
             // The field follows `messageFieldFocused` (iOS `focusComposer()`); the keyboard comes up even if it already had focus.
@@ -514,7 +511,7 @@ fun SessionComposer(
         holdsClientToolCard = holdsClientToolCard,
         callTray = if (usesCallTray) callTray else null,
         callOwnsAudio = callStore != null && !callShowsCard,
-        photoSheet = LocalSessionPhotoSheet.current?.takeIf { it.usesPlusMenuSheet },
+        photoSheet = LocalSessionPhotoSheet.current,
         windowSize = LocalWindowInfo.current.containerSize,
     )
 
@@ -522,7 +519,7 @@ fun SessionComposer(
     AutocompleteMotionDriver(view.autocompleteController)
     SyncComposerAutocomplete(
         state = autocomplete,
-        isEnabled = usesAutocomplete,
+        isEnabled = true,
         controller = view.autocompleteController,
         bridge = view.autocompleteBridge,
         composerWidth = view.surfaceSize.width.toDouble(),
@@ -535,7 +532,7 @@ fun SessionComposer(
     host.backgroundWorkAnchor?.motion = { view.requestPanelShown.value * 1000f + view.requestPanelReveal.value }
     host.dismissAction = env.dismissKeyboard
     SideEffect {
-        host.autocompleteCovers = usesAutocomplete && view.autocompleteController.isOpen
+        host.autocompleteCovers = view.autocompleteController.isOpen
         host.callHoldsComposer = env.voiceStore != null
     }
     // A request docking, a call taking the composer's place, or dictation taking the composer
@@ -629,7 +626,6 @@ internal class SessionComposerEnv(
     val returnKeySends: Boolean,
     val modelPickerStyle: ModelPickerStyle,
     val agentSelection: Boolean,
-    val usesAutocomplete: Boolean,
     val autocomplete: ComposerAutocompleteState,
     val focus: () -> Unit,
     val dismissKeyboard: () -> Unit,
@@ -648,7 +644,7 @@ internal class SessionComposerEnv(
     val callTray: CallTrayController? = null,
     /** iOS `callOwnsAudio`: the screen's call (its own or its root's) owns audio. */
     val callOwnsAudio: Boolean = false,
-    /** The New Plus Menu's sheet and flights (iOS `usesPlusMenuSheet ? photoSheet…`), else null. */
+    /** The New Plus Menu's sheet and flights (iOS `photoSheet…`), null outside a session screen. */
     val photoSheet: SessionPhotoSheetState? = null,
     /** The window's size (px): a sent photo's copy flies only from a thumbnail on screen. */
     val windowSize: IntSize = IntSize.Zero,
@@ -1193,9 +1189,9 @@ private fun SessionComposerEnv.QueuedActivity(hasQueued: Boolean) {
 private fun SessionComposerEnv.ComposerCapsule() {
     RequestPanelPresence()
     val showsRequestPanel = holdsRequestPanelRoom || lingersRequestPanel
-    // With Composer Autocomplete on (and no panel or call), the suggestions grow there instead.
-    val showsAutocomplete = usesAutocomplete && !showsRequestPanel && voiceStore == null
-    val photoSheet = LocalSessionPhotoSheet.current?.takeIf { it.usesPlusMenuSheet }
+    // With no panel or call, Composer Autocomplete's suggestions grow there instead.
+    val showsAutocomplete = !showsRequestPanel && voiceStore == null
+    val photoSheet = LocalSessionPhotoSheet.current
     val cap = requestPanelCap()
     val activeHeight = { activeRequestPanelHeight(cap) }
     val room = { if (voiceStore == null && showsRequestPanel) activeHeight() else 0f }
@@ -1470,7 +1466,7 @@ private fun SessionComposerEnv.ComposerSurface(
                     .border(2.dp, accent, RoundedCornerShape(ComposerTunables.cornerRadius.dp)),
             )
         }
-        if (usesAutocomplete && view.autocompleteController.currentFrame.flights.isNotEmpty()) {
+        if (view.autocompleteController.currentFrame.flights.isNotEmpty()) {
             AutocompleteFlightOverlay(view.autocompleteController, Modifier.matchParentSize())
         }
         // Above the surface, so its edge never crosses the hold circle.
@@ -1930,7 +1926,7 @@ private fun SessionComposerEnv.ComposerInput(expanded: Boolean, recording: Boole
             onNonSendNewline = { text -> if (!recording) store.send(Action.NonSendNewlineInserted(text)) },
             onDropTargetedChange = { view.isImageDropTargeted = it },
             returnKeySends = returnKeySends,
-            autocompleteBridge = if (usesAutocomplete) view.autocompleteBridge else null,
+            autocompleteBridge = view.autocompleteBridge,
             lineLimit = if (bar == null) null else 4,
             accessibilityLabel = bar?.fieldLabel ?: "Message",
             isHoldingMic = s.dictationHold != null,

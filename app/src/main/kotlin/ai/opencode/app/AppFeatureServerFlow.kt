@@ -3,8 +3,6 @@ package ai.opencode.app
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.log.AppLog
-import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.cancellable
@@ -19,32 +17,26 @@ import kotlin.time.Duration.Companion.seconds
 /*
  * Port of iOS `AppFeature+ServerFlow.swift` (d8a311bd).
  *
- * Server Flow (experimental `serverFlow`): a switch from the drawer keeps the Home it left, and
- * goes back to it on its own when the server fails or doesn't answer in
- * [ServerFlowTunables.timeout], leaving a note. Off, a switch is today's: Home stays up until the
- * other server's loads, and a failure leaves for the picker.
+ * Server Flow (graduated in iOS p217, 569e6f30): a switch from the drawer keeps the Home it left,
+ * and goes back to it on its own when the server fails or doesn't answer in
+ * [ServerFlowTunables.timeout], leaving a note.
  */
 
 internal fun AppFeature.switchServer(server: OpenCodeServer, state: AppFeature.State): Reduced<AppFeature.State, AppFeature.Action> {
     val home = state.home ?: return Reduced(state)
-    val flows = dependency(ExperimentalFeatures)(ExperimentalFeature.serverFlow)
-    var next = state
-    if (flows) {
-        next = next.copy(home = home.copy(serverSwitchNote = null))
-        // Picking the server in use while another connects turns back.
-        if (home.server.persistenceID == server.persistenceID) {
-            return if (home.switchingTo == null) Reduced(next) else switchBack(next, reason = null)
-        }
-        if (home.switchingTo?.persistenceID == server.persistenceID) return Reduced(next)
+    var next = state.copy(home = home.copy(serverSwitchNote = null))
+    // Picking the server in use while another connects turns back.
+    if (home.server.persistenceID == server.persistenceID) {
+        return if (home.switchingTo == null) Reduced(next) else switchBack(next, reason = null)
     }
-    if (home.server.persistenceID == server.persistenceID) return Reduced(next)
+    if (home.switchingTo?.persistenceID == server.persistenceID) return Reduced(next)
     // A switch that fails leaves the picker offering the way back.
     next = next.copy(returnServer = home.server)
     val keepsHome = next.keepsHome(switchingTo = server)
     if (keepsHome) next = next.showingSwitch(server)
     val connecting = selectServer(server, next, keepingHome = keepsHome)
     val attempt = connecting.state.connectionAttempt
-    if (!flows || !keepsHome || attempt == null) return connecting
+    if (!keepsHome || attempt == null) return connecting
     val clock = dependency(Clock)
     val seconds = ServerFlowTunables.timeout
     return Reduced(

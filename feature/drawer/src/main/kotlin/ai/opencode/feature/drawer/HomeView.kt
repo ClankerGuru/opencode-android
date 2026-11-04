@@ -61,7 +61,6 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import kotlin.math.max
-import ai.opencode.feature.drawer.switcher.rememberServerFlowOn
 import ai.opencode.server.OpenCodeServer
 import androidx.compose.runtime.collectAsState
 import ai.opencode.feature.session.SessionFeature
@@ -487,8 +486,7 @@ private fun HomeSessionStack(
         val top = it.topDetail
         top?.activePicker != null || top?.shellOutput != null
     }
-    val serverFlowOn = rememberServerFlowOn()
-    val listContext by store.observe { it.sessionListContext(it.sessionDetail?.session, serverFlowOn) }
+    val listContext by store.observe { it.sessionListContext(it.sessionDetail?.session) }
     // Pages drawn while they animate out, by their identity.
     val known = remember { HashMap<Int, StackEntry>() }
     for (entry in entries) known[entry.page.id] = entry
@@ -548,9 +546,9 @@ private fun HomeSessionStack(
 /**
  * What a session screen shows of the drawer's knowledge of it (iOS `sessionListContext(for:)`):
  * its project, pin, read and mute state, the drawer button's dot for other sessions, and the
- * In-App Notice and (Server Flow) the connection pill, outside Catch Up.
+ * In-App Notice and the connection pill, outside Catch Up.
  */
-internal fun HomeFeature.State.sessionListContext(session: OpenCodeSession?, serverFlowOn: Boolean = false): SessionListContext {
+internal fun HomeFeature.State.sessionListContext(session: OpenCodeSession?): SessionListContext {
     val listed = session?.let { s -> sessions.firstOrNull { it.id == s.id } }
     val isCatchUp = catchUp != null
     return SessionListContext(
@@ -560,11 +558,11 @@ internal fun HomeFeature.State.sessionListContext(session: OpenCodeSession?, ser
         isMuted = listed?.let { isMuted(it.id) } ?: false,
         elsewhere = if (isCatchUp) null else drawerBadge(excluding = session?.id),
         notice = if (isCatchUp) null else inAppNotice,
-        connection = if (isCatchUp || !serverFlowOn) null else serverConnectionNotice,
+        connection = if (isCatchUp) null else serverConnectionNotice,
     )
 }
 
-/** iOS `HomeView.serverConnectionNotice`: what the pill says of the connection (Server Flow only). */
+/** iOS `HomeView.serverConnectionNotice`: what the pill says of the connection. */
 internal val HomeFeature.State.serverConnectionNotice: ServerConnectionNotice?
     get() = ServerConnectionNotice(
         status = connectionStatus,

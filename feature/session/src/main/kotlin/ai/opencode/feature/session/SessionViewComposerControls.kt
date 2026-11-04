@@ -218,7 +218,7 @@ private fun SessionComposerEnv.AttachmentButton() {
     val hold = s.dictationHold
     val pose = hold?.let { dictationPose(it) }
     // New Plus Menu: a hold on + peeks at the newest photos (iOS `peek`, `showRecentPhotos`, `addLibraryPhotos`).
-    val photoSheet = LocalSessionPhotoSheet.current?.takeIf { it.usesPlusMenuSheet }
+    val photoSheet = LocalSessionPhotoSheet.current
     AttachmentPickerButton(
         isLoading = host.isImportingAttachments,
         isOpen = host.isAttachmentMenuOpen,
@@ -466,7 +466,7 @@ internal fun SessionComposerEnv.TrailingButton(control: ComposerTrailingControl)
         else -> control.accessibilityLabel
     }
     // iOS `persistentSend`: New Plus Menu's Send stays put, dimmed while there's nothing to send.
-    val persistentSend = LocalSessionPhotoSheet.current?.usesPlusMenuSheet == true && control is ComposerTrailingControl.Send
+    val persistentSend = control is ComposerTrailingControl.Send
     val label: @Composable () -> Unit = {
         if (persistentSend) {
             ComposerSendLabel(

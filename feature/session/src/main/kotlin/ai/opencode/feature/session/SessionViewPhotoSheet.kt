@@ -27,9 +27,6 @@ import ai.opencode.feature.composer.plusmenu.PlusPhotoSheetDetent
 import ai.opencode.feature.composer.plusmenu.PlusPhotoSheetFoot
 import ai.opencode.feature.composer.plusmenu.RecentPhotoPeek
 import android.graphics.BitmapFactory
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.tween
@@ -57,7 +54,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
@@ -94,11 +90,9 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.milliseconds
 
-// Port of iOS `Session/SessionView+PhotoSheet.swift`. Default: iOS picks photos in the system
-// PhotosPicker the + menu morphs into; Android launches the system Photo Picker (no library
-// permission, the newest photos first, up to four picks) through the screen's importer
-// ([SessionPhotoSheet]). Under the New Plus Menu experiment the menu's surface grows into the
-// composer's photo sheet (`PlusPhotoSheet` inside `ComposerMorphSurface`, [SessionPlusPhotoSheet]):
+// Port of iOS `Session/SessionView+PhotoSheet.swift`. The New Plus Menu (graduated in iOS p217):
+// the menu's surface grows into the composer's photo sheet (`PlusPhotoSheet` inside
+// `ComposerMorphSurface`, [SessionPlusPhotoSheet]):
 // the camera first, then the newest photos, Back and Add along its foot, two detents, and the
 // picks flying into the composer's thumbnails (`PhotoFlights`). A hold on + shows the newest photos
 // over the composer (`RecentPhotoPeek`).
@@ -147,9 +141,18 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
     val camera = PlusCameraPresentation()
     val recentPeek = RecentPhotoPeek()
 
-    /** iOS `usesPlusMenuSheet`. */
-    var usesPlusMenuSheet by mutableStateOf(false)
-        internal set
+    /**
+     * iOS `usesPlusMenuSheet`: the New Plus Menu (OC-354, graduated in iOS p217) grows out of the
+     * composer and into the photo sheet. Always on; the branches that read this are inert as on iOS.
+     */
+    val usesPlusMenuSheet: Boolean get() = true
+
+    /**
+     * iOS `plusMenuRests`: no menu, sheet, camera or recent-photo peek up, so nothing in the
+     * + menu's overlay is there to read.
+     */
+    val plusMenuRests: Boolean
+        get() = attachmentMenu == AttachmentMenuPhase.Closed && !morph.isShown && !recentPeek.isShown && !camera.expanded
 
     internal var env = Env()
 
@@ -530,52 +533,6 @@ fun rememberSessionPhotoSheetState(): SessionPhotoSheetState {
 /** The screen's New Plus Menu state, for the composer's + (the hold peek) and its attachment row (flight slots). */
 internal val LocalSessionPhotoSheet = staticCompositionLocalOf<SessionPhotoSheetState?> { null }
 
-/**
- * The photo picker, composed by `SessionView` while the + menu's Photos was chosen. It opens the
- * system Photo Picker once (it survives rotation without reopening), attaches what was picked,
- * and calls [onDismiss] when the picker closes, picked or not. Images and videos when the server
- * takes uploads, images only otherwise.
- *
- * @param importer the screen's importer ([rememberSessionAttachmentImporter] in `SessionView`), so
- *   an import keeps going after the picker is gone. The default lives only as long as this sheet.
- * @param onDismiss the picker closed: the + menu's Photos state goes back to closed.
- * @param onAdded `focusComposer`: the keyboard comes back once something attached (iOS
- *   `attachmentMenuRestoresFocus`).
- */
-@Composable
-fun SessionPhotoSheet(
-    store: StoreOf<SessionFeature.State, SessionFeature.Action>,
-    importer: SessionAttachmentImporter = rememberSessionAttachmentImporter(store),
-    onDismiss: () -> Unit = {},
-    onAdded: (() -> Unit)? = null,
-) {
-    val supportsFileUploads by store.observe { it.supportsFileUploads }
-    val currentOnDismiss by rememberUpdatedState(onDismiss)
-    val currentOnAdded by rememberUpdatedState(onAdded)
-    val launcher = rememberLauncherForActivityResult(
-        ActivityResultContracts.PickMultipleVisualMedia(maxItems = AttachmentPickerButton.MAX_PHOTO_SELECTION),
-    ) { uris ->
-        if (uris.isNotEmpty()) importer.importPickedMedia(uris, currentOnAdded)
-        currentOnDismiss()
-    }
-    var launched by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        if (launched) return@LaunchedEffect
-        launched = true
-        val media = if (supportsFileUploads) {
-            ActivityResultContracts.PickVisualMedia.ImageAndVideo
-        } else {
-            ActivityResultContracts.PickVisualMedia.ImageOnly
-        }
-        try {
-            launcher.launch(PickVisualMediaRequest(media))
-        } catch (_: android.content.ActivityNotFoundException) {
-            importer.attachmentError = "This image couldn’t be loaded. Try another photo."
-            currentOnDismiss()
-        }
-    }
-}
-
 /** iOS `PlusPhotoSheetContent.grabberHeight`. */
 private const val GRABBER_HEIGHT = 22f
 
@@ -796,7 +753,6 @@ internal fun SessionPhotoSheetEnvironment(
     host: SessionComposerHost,
     importer: SessionAttachmentImporter,
     headerHeight: Float,
-    usesPlusMenuSheet: Boolean,
     rootOffset: Offset,
 ) {
     val density = LocalDensity.current
@@ -815,25 +771,13 @@ internal fun SessionPhotoSheetEnvironment(
             navigationBottomPx = navigation,
             rootOffset = rootOffset,
         )
-        state.usesPlusMenuSheet = usesPlusMenuSheet
-    }
-    // iOS `onChange(of: usesPlusMenuSheet)`: switched off, the sheet goes and the library stops.
-    var wasOn by remember { mutableStateOf(usesPlusMenuSheet) }
-    LaunchedEffect(usesPlusMenuSheet) {
-        if (wasOn && !usesPlusMenuSheet) {
-            state.closePhotoSheet(restoresFocus = false)
-            state.resetPhotoSheet()
-            state.library.stop()
-        }
-        wasOn = usesPlusMenuSheet
     }
     // iOS `scenePhase != .active` and `onDisappear`: no flight survives an inactive or gone screen.
     val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
     val lifecycleState by lifecycle.currentStateAsState()
     val resumed = lifecycleState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
-    LaunchedEffect(resumed, usesPlusMenuSheet) { if (!resumed && usesPlusMenuSheet) state.flights.reset() }
-    DisposableEffect(state) { onDispose { if (state.usesPlusMenuSheet) state.flights.reset() } }
-    if (!usesPlusMenuSheet) return
+    LaunchedEffect(resumed) { if (!resumed) state.flights.reset() }
+    DisposableEffect(state) { onDispose { state.flights.reset() } }
     // iOS `.onGeometryChange` on the composer: `photoFlights.composer(frame)`.
     val composer = host.attachmentAnchors.composer
     LaunchedEffect(composer, rootOffset) { if (composer != Rect.Zero) state.flights.composer(composer.translate(rootOffset)) }

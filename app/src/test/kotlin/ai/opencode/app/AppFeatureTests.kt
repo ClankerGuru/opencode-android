@@ -861,7 +861,7 @@ class AppFeatureTests {
             manualEntryDraft = draftServer,
             home = home(studio, snapshot),
         )
-        val switchingStore = store(switchingInitial, gatedClient)
+        val switchingStore = store(switchingInitial, gatedClient) { this[Clock] = TestClock() }
         switchingStore.exhaustive = false
 
         switchingStore.send(AppFeature.Action.Home(HomeFeature.Action.Delegate(HomeFeature.DelegateAction.ServerSwitchTapped(targetServer)))) {
@@ -869,13 +869,13 @@ class AppFeatureTests {
                 returnServer = studio,
                 connection = AppFeature.State.Connection.Connecting,
                 connectionGeneration = 1,
-                connectionAttempt = AppFeature.ConnectionAttempt(id = 1, server = targetServer),
+                connectionAttempt = AppFeature.ConnectionAttempt(id = 1, server = targetServer, switchesBack = true),
                 home = it.home?.copy(switchingTo = targetServer),
             )
         }
         switchingStore.send(AppFeature.Action.PairingURLOpened(brokenTap)) { it.copy(pairingError = expectedInvalidMessage) }
         assertEquals(AppFeature.State.Connection.Connecting, switchingStore.state.connection)
-        assertEquals(AppFeature.ConnectionAttempt(id = 1, server = targetServer), switchingStore.state.connectionAttempt)
+        assertEquals(AppFeature.ConnectionAttempt(id = 1, server = targetServer, switchesBack = true), switchingStore.state.connectionAttempt)
         assertEquals(targetServer, switchingStore.state.home?.switchingTo)
         assertEquals(draftServer, switchingStore.state.manualEntryDraft)
         switchingStore.send(AppFeature.Action.PairingErrorDismissed) { it.copy(pairingError = null) }

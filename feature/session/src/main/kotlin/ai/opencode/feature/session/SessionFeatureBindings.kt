@@ -1,6 +1,5 @@
 package ai.opencode.feature.session
 
-import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.feature.composer.DraftState
 import ai.opencode.feature.composer.ComposerCommandOutcome
 import ai.opencode.feature.composer.ComposerAutocompleteOutcome
@@ -364,7 +363,6 @@ internal fun SessionFeature.autocompleteEnvironment(): ComposerAutocompleteEnvir
     clock = clock,
     uuid = uuid,
     haptics = haptics,
-    isEnabled = experimentalFeatures(ExperimentalFeature.composerAutocomplete),
     cancelCatalogID = SessionFeature.CancelID.AutocompleteCatalog,
     cancelCommandsID = SessionFeature.CancelID.AutocompleteCommands,
     cancelFilesID = SessionFeature.CancelID.AutocompleteFiles,

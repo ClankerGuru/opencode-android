@@ -21,10 +21,9 @@ import java.util.UUID
  * The slice of iOS `SessionFeature` the autocomplete tests drive: a draft binding and the
  * `.autocomplete` actions, each run through [ComposerAutocompleteReducer] exactly as the
  * session store hosts it (`SessionFeatureBindings.kt`: `draftChanged` on a draft edit,
- * `reduce` on an autocomplete action, the edited draft written back). [isEnabled] is iOS's
- * `experimentalFeatures(.composerAutocomplete)`.
+ * `reduce` on an autocomplete action, the edited draft written back).
  */
-class ComposerAutocompleteTestHost(private val isEnabled: Boolean = true) :
+class ComposerAutocompleteTestHost :
     Reducer<ComposerAutocompleteTestHost.State, ComposerAutocompleteTestHost.Action> {
 
     data class State(
@@ -70,7 +69,6 @@ class ComposerAutocompleteTestHost(private val isEnabled: Boolean = true) :
         clock = dependency(Clock),
         uuid = dependency(UuidClient),
         haptics = dependency(HapticsClient),
-        isEnabled = isEnabled,
         cancelCatalogID = CancelID.Catalog,
         cancelCommandsID = CancelID.Commands,
         cancelFilesID = CancelID.Files,

@@ -34,7 +34,7 @@ enum class ExperimentalFeature(
     val defaultEnabled: Boolean = false,
     /**
      * Graduated: its switch left Experimental for a regular Settings page (New Messages Divider →
-     * Settings › Sessions). It keeps its `experimental-…` key, so a saved choice carries over.
+     * Settings › Sessions, Welcome Preview → Developer › Playgrounds). It keeps its `experimental-…` key, so a saved choice carries over.
      */
     val isGraduated: Boolean = false,
     /**
@@ -43,8 +43,6 @@ enum class ExperimentalFeature(
      */
     val isRetired: Boolean = false,
 ) {
-    composerAutocomplete("composer-autocomplete", "Composer Autocomplete", ExperimentalGroup.composer, "Grow composer for @ and /", "at", order = 10),
-    plusMenuSheet("plus-menu-sheet", "New Plus Menu", ExperimentalGroup.composer, "Photos grow from the + menu", "plus.circle", order = 20),
     agentSelection("agent-selection", "Agent Selection", ExperimentalGroup.composer, "Choose Build, Plan, or your own", "person.crop.circle", order = 30),
     hideModels("hide-models", "Hide Unused Models", ExperimentalGroup.composer, "Choose models the picker lists", "eye.slash", order = 40),
     callTray("call-tray", "Call Tray", ExperimentalGroup.calls, "Call scope beneath the composer", "rectangle.bottomhalf.inset.filled", order = 50),
@@ -55,10 +53,8 @@ enum class ExperimentalFeature(
     ),
     imageLinkPreviews("image-link-previews", "Image Link Previews", ExperimentalGroup.transcript, "Load linked images in replies", "photo", order = 80),
     inboxSidebar("inbox-sidebar", "Inbox Sidebar", ExperimentalGroup.drawer, "Sessions as an inbox", "tray", order = 90),
-    projectIcons("project-icons", "Project Icons", ExperimentalGroup.drawer, "Project icons beside session titles", "app.dashed", order = 100, defaultEnabled = true),
     serverDetails("server-details", "Server Details", ExperimentalGroup.drawer, "MCP servers, skills, and accounts", "server.rack", order = 110),
-    serverFlow("server-flow", "Server Flow", ExperimentalGroup.drawer, "Swap servers at once, with status", "arrow.left.arrow.right", order = 120),
-    welcomePreview("welcome-preview", "Welcome Preview", ExperimentalGroup.drawer, "The new first-run welcome", "hand.wave", order = 130),
+    welcomePreview("welcome-preview", "Welcome Preview", ExperimentalGroup.drawer, "The new first-run welcome", "hand.wave", order = 130, isGraduated = true),
     sessionLiveActivity(
         "session-live-activity", "Session Live Activity", ExperimentalGroup.drawer, "Follow runs on the Lock Screen",
         "platter.filled.top.iphone", order = 140,
@@ -114,10 +110,15 @@ enum class ExperimentalFeature(
         fun fromRawValue(rawValue: String): ExperimentalFeature? = allCases.firstOrNull { it.rawValue == rawValue }
 
         /**
-         * Switches of removed experiments (Session Switcher, Title Is the Switch). Nothing reads
-         * them; they're cleared at launch.
+         * Switches of removed experiments (Session Switcher, Title Is the Switch) and of ones now
+         * always on (Composer Autocomplete, Server Flow, New Plus Menu, Project Icons). Nothing
+         * reads them; they're cleared at launch.
          */
-        val retiredKeys = listOf("experimental-session-switcher", "experimental-server-title-switch")
+        val retiredKeys = listOf(
+            "experimental-session-switcher", "experimental-server-title-switch",
+            "experimental-composer-autocomplete", "experimental-server-flow",
+            "experimental-plus-menu-sheet", "experimental-project-icons",
+        )
 
         fun removeRetiredSwitches(store: SharedStore) {
             for (key in retiredKeys) store.remove(SharedKey.appStorage(key, false))

@@ -3,7 +3,6 @@ package ai.opencode.feature.session
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.ImmediateClock
 import ai.opencode.core.dependencies.TestClock
-import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.feature.composer.AutocompleteItem
 import ai.opencode.feature.composer.AutocompleteTrigger
 import ai.opencode.feature.composer.ComposerAutocompleteAction
@@ -41,7 +40,6 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.awaitCancellation
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
@@ -73,22 +71,6 @@ class ComposerAutocompleteTests {
     private fun SessionFeature.State.ac(transform: (ComposerAutocompleteState) -> ComposerAutocompleteState) = copy(autocomplete = transform(autocomplete))
 
     private val visibleAgents = sampleAgents.filter { !it.hidden && it.mode != "primary" }
-
-    @Test fun experimentalFlagOffLeavesDraftChangesUntouched() = sessionTest { h ->
-        val clock = TestClock()
-        val store = h.makeStore(
-            configureState = { it.copy(models = listOf(OpenCodeModel(modelID = "claude", providerID = "anthropic", name = "Claude"))) },
-            configureDependencies = {
-                this[Clock] = clock
-                this[ExperimentalFeatures] = ExperimentalFeatures.testValue
-            },
-        )
-
-        store.send(draft("@kit")) { it.withDraft("@kit") }
-        assertNull(store.state.autocomplete.activeTrigger)
-        assertFalse(store.state.autocomplete.isOpen)
-        store.finish()
-    }
 
     @Test fun typingAtLoadsCatalogFiltersAndCancelsStaleFileSearches() = sessionTest { h ->
         val clock = TestClock()

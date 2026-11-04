@@ -89,32 +89,6 @@ object ComposerAutocompleteTunables {
     /** iOS `ComposerTunables.cornerRadius` (`composer.size.cornerRadius`), the glass the highlight sits concentric in. */
     const val composerCornerRadius = 28.0
 
-    /** Every iOS tunable key, for parity with `ComposerAutocompleteTunables.allKeys`. */
-    val allKeys: Set<String> = setOf(
-        "composer.autocomplete.order",
-        "composer.autocomplete.open.duration", "composer.autocomplete.open.bounce",
-        "composer.autocomplete.close.duration", "composer.autocomplete.close.bounce",
-        "composer.autocomplete.widthLead", "composer.autocomplete.blur", "composer.autocomplete.scale",
-        "composer.autocomplete.contentDelay",
-        "composer.autocomplete.contentIn.duration", "composer.autocomplete.contentIn.bounce",
-        "composer.autocomplete.contentOut.duration", "composer.autocomplete.contentOut.bounce",
-        "composer.autocomplete.reflow.duration", "composer.autocomplete.reflow.bounce",
-        "composer.autocomplete.resize.duration", "composer.autocomplete.resize.bounce",
-        "composer.autocomplete.rowIn.duration", "composer.autocomplete.rowIn.bounce",
-        "composer.autocomplete.rowOut.duration", "composer.autocomplete.rowOut.bounce",
-        "composer.autocomplete.rowBlur", "composer.autocomplete.rowScale", "composer.autocomplete.exitMode",
-        "composer.autocomplete.coalesce",
-        "composer.autocomplete.highlight.duration", "composer.autocomplete.highlight.bounce",
-        "composer.autocomplete.keysInstant",
-        "composer.autocomplete.flight.duration", "composer.autocomplete.flight.bounce",
-        "composer.autocomplete.flightArc",
-        "composer.autocomplete.commandAction", "composer.autocomplete.runDelay",
-        "composer.autocomplete.rowHeight", "composer.autocomplete.iconSize", "composer.autocomplete.maxRows",
-        "composer.autocomplete.padding", "composer.autocomplete.rowInset",
-        "composer.autocomplete.edgeFade",
-        "composer.autocomplete.reduceFade",
-    )
-
     /** An iOS `TuningPreset`: a name and the parameters it sets (everything else resets to default). */
     data class Preset(val name: String, val apply: (AutocompleteParameters) -> AutocompleteParameters)
 

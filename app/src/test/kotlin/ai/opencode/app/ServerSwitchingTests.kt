@@ -1,11 +1,12 @@
 package ai.opencode.app
 
+import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.DependencyValues
+import ai.opencode.core.dependencies.TestClock
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.TestStore
 import ai.opencode.core.testing.TestIsolationRule
 import ai.opencode.feature.drawer.HomeFeature
-import ai.opencode.server.CachedHomeSnapshot
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
@@ -20,7 +21,6 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
-import java.time.Instant
 
 /**
  * Port of iOS `ServerSwitchingTests.swift`, the `AppFeature` part: renaming, re-pairing,
@@ -53,7 +53,6 @@ class ServerSwitchingTests {
 
     private val savedServer get() = shared.run { shared(ServerSharedKeys.savedServer).value }
     private val savedServers get() = shared.run { shared(ServerSharedKeys.savedServers).value }
-    private val cachedHomeSnapshots get() = shared.run { shared(ServerSharedKeys.cachedHomeSnapshots).value }
     private fun save(server: OpenCodeServer?) = shared.run { shared(ServerSharedKeys.savedServer).set(server) }
     private fun saveAll(servers: List<OpenCodeServer>) = shared.run { shared(ServerSharedKeys.savedServers).set(servers) }
 
@@ -116,52 +115,6 @@ class ServerSwitchingTests {
     // MARK: Switching
 
     @Test
-    fun switchingFromHomeConnectsToTheOtherServerAndOffersTheWayBack() = runTest {
-        val laptop = OpenCodeServer(url = "http://192.168.1.20:4096", username = "opencode", password = "a")
-        val studio = OpenCodeServer(url = "http://10.0.0.4:4096", username = "opencode", password = "b", name = "Studio")
-        val state = connected(laptop)
-        saveAll(listOf(laptop, studio))
-        val gate = GatedHome()
-        val store = store(state) { this[OpenCodeClient] = gate.client() }
-
-        // The server in use is already there.
-        store.send(delegate(HomeFeature.DelegateAction.ServerSwitchTapped(laptop)))
-
-        // Home stays up, marking the server it's switching to, until Studio's sessions load.
-        store.send(delegate(HomeFeature.DelegateAction.ServerSwitchTapped(studio))) {
-            it.copy(
-                returnServer = laptop,
-                home = it.home?.copy(switchingTo = studio),
-                serverURL = studio.url,
-                password = studio.password,
-                serverName = "Studio",
-                connection = AppFeature.State.Connection.Connecting,
-                connectionGeneration = 1,
-                connectionAttempt = AppFeature.ConnectionAttempt(id = 1, server = studio),
-            )
-        }
-        store.receiveCase<AppFeature.Action.HealthResponse> { it.copy(connection = AppFeature.State.Connection.LoadingHome(studio)) }
-        assertEquals(studio, savedServer)
-        assertEquals(listOf(studio, laptop), savedServers)
-        gate.yield(snapshot)
-        gate.finish()
-        store.receiveCase<AppFeature.Action.HomeResponse> {
-            it.copy(
-                connection = AppFeature.State.Connection.Connected,
-                connectionAttempt = null,
-                returnServer = null,
-                home = home(studio),
-            )
-        }
-        assertEquals(
-            CachedHomeSnapshot(serverID = studio.persistenceID, snapshot = snapshot, capturedAt = Instant.EPOCH),
-            cachedHomeSnapshots[studio.persistenceID],
-        )
-        store.finish()
-    }
-
-    /** A switch made from Settings' server page stays in Settings: the new server's Home opens with Settings shown. */
-    @Test
     fun aSwitchFromSettingsStaysInSettings() = runTest {
         val laptop = OpenCodeServer(url = "http://192.168.1.20:4096", username = "opencode", password = "a")
         val studio = OpenCodeServer(url = "http://10.0.0.4:4096", username = "opencode", password = "b", name = "Studio")
@@ -170,7 +123,10 @@ class ServerSwitchingTests {
             home = shared.run { home(laptop).showingSettings() },
         )
         saveAll(listOf(laptop, studio))
-        val store = store(state) { this[OpenCodeClient] = OpenCodeClient.testValue.copy(health = {}, homeSnapshot = { snapshot }) }
+        val store = store(state) {
+            this[Clock] = TestClock()
+            this[OpenCodeClient] = OpenCodeClient.testValue.copy(health = {}, homeSnapshot = { snapshot })
+        }
         store.exhaustive = false
         store.send(delegate(HomeFeature.DelegateAction.ServerSwitchTapped(studio))) { it.copy(home = it.home?.copy(switchingTo = studio)) }
         assertEquals("Settings stays up while the switch connects", true, store.state.home?.isSettingsShown)
@@ -179,22 +135,6 @@ class ServerSwitchingTests {
         assertEquals(studio.persistenceID, store.state.home?.server?.persistenceID)
         assertNull(store.state.home?.switchingTo)
         assertEquals("and on the new server's Home", true, store.state.home?.isSettingsShown)
-        effects.skipInFlightEffects()
-    }
-
-    @Test
-    fun aSwitchThatFailsLeavesHomeForThePickerAndItsWayBack() = runTest {
-        val laptop = OpenCodeServer(url = "http://192.168.1.20:4096", username = "opencode", password = "a")
-        val studio = OpenCodeServer(url = "http://10.0.0.4:4096", username = "opencode", password = "b")
-        val state = connected(laptop)
-        saveAll(listOf(laptop, studio))
-        val store = store(state) { this[OpenCodeClient] = OpenCodeClient.testValue.copy(health = { throw OpenCodeClientError("Offline") }) }
-        store.exhaustive = false
-        store.send(delegate(HomeFeature.DelegateAction.ServerSwitchTapped(studio)))
-        store.receiveCase<AppFeature.Action.HealthResponse>()
-        assertNull(store.state.home)
-        assertEquals(laptop, store.state.returnServer)
-        assertEquals("Offline", store.state.errorMessage)
         effects.skipInFlightEffects()
     }
 

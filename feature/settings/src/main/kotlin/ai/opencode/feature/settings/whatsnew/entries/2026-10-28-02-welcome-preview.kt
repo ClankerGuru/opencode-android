@@ -2,8 +2,6 @@ package ai.opencode.feature.settings.whatsnew.entries
 
 import ai.opencode.feature.settings.whatsnew.WhatsNewEntry
 import ai.opencode.feature.settings.whatsnew.WhatsNewEntry.Companion.smaller
-import ai.opencode.feature.settings.whatsnew.WhatsNewEntry.Destination
-import ai.opencode.feature.settings.whatsnew.WhatsNewEntry.SettingsDestination
 import ai.opencode.feature.settings.whatsnew.WhatsNewShipped
 
 internal val WhatsNewShipped.welcomePreview: WhatsNewEntry
@@ -13,5 +11,4 @@ internal val WhatsNewShipped.welcomePreview: WhatsNewEntry
         title = "Welcome Preview",
         symbol = "hand.wave",
         summary = "A new first-run welcome shows OpenCode working on a laptop while a phone steers it, then pairs in one step. Turn on Welcome Preview in Settings › Experimental › Drawer and tap Show Welcome to see it; closing it brings you back.",
-        tryIt = Destination.Open(SettingsDestination.Experiment("welcome-preview")),
     )

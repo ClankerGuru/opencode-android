@@ -67,10 +67,9 @@ class ComposerAutocompleteTests {
 
     private fun TestScope.makeStore(
         initial: ComposerAutocompleteTestHost.State = state(),
-        isEnabled: Boolean = true,
         clock: Clock = TestClock(),
         client: OpenCodeClient.() -> OpenCodeClient = { this },
-    ) = TestStore(initial, ComposerAutocompleteTestHost(isEnabled), this) {
+    ) = TestStore(initial, ComposerAutocompleteTestHost(), this) {
         this[UuidClient] = UuidClient.incrementing()
         this[Clock] = clock
         this[OpenCodeClient] = OpenCodeClient.testValue.client()
@@ -105,15 +104,6 @@ class ComposerAutocompleteTests {
         )
         assertNull("Slash after words is not a command trigger", AutocompleteTrigger.detect("Check /rev"))
         assertNull("Space after a token with no matches dismisses trigger detection", AutocompleteTrigger.detect("@zzzznotamatch "))
-    }
-
-    @Test fun experimentalFlagOffLeavesDraftChangesUntouched() = runTest {
-        val store = makeStore(isEnabled = false)
-
-        store.send(Action.Draft("@kit")) { it.copy(draft = "@kit") }
-        assertNull(store.state.autocomplete.activeTrigger)
-        assertFalse(store.state.autocomplete.isOpen)
-        store.finish()
     }
 
     @Test fun typingAtLoadsCatalogFiltersAndCancelsStaleFileSearches() = runTest {

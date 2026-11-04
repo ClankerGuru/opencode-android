@@ -1,7 +1,6 @@
 package ai.opencode.feature.drawer
 
 import ai.opencode.core.dependencies.dependency
-import ai.opencode.core.experiments.ExperimentalFeature
 import ai.opencode.core.experiments.key
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.sharing.shared
@@ -44,10 +43,8 @@ import ai.opencode.feature.drawer.style.DrawerMetrics
 import ai.opencode.feature.drawer.style.DrawerRowLayout
 import ai.opencode.feature.drawer.style.DrawerSectionBreak
 import ai.opencode.feature.drawer.style.DrawerTunables
-import ai.opencode.feature.drawer.switcher.DrawerTitleView
 import ai.opencode.feature.drawer.switcher.ServerFlowTitle
 import ai.opencode.feature.drawer.switcher.drawerTitleServers
-import ai.opencode.feature.drawer.switcher.rememberServerFlowOn
 import ai.opencode.feature.session.ComposerTunables
 import ai.opencode.feature.settings.whatsnew.WhatsNewFeature
 import ai.opencode.feature.system.SessionWindowTarget
@@ -197,21 +194,14 @@ fun HomeDrawer(
     val selectedSessionID by store.observe { viewState.drawerSelectedSessionID(it) }
     val disconnected by store.observe { it.connectionStatus == HomeConnectionFeature.State.ConnectionStatus.disconnected }
     val search by store.observe { it.search }
-    val projectIconsSwitch by remember { shared(ExperimentalFeature.projectIcons.key).flow }.collectAsState()
-    val showsProjectIcons = ExperimentalFeature.projectIcons.isActive(projectIconsSwitch)
     val inboxSidebarOn = rememberInboxSidebarOn()
-    // Server Flow (experimental, iOS d8a311bd): the title and the list share one swap motion.
-    val serverFlowOn = rememberServerFlowOn()
+    // Server Flow (iOS d8a311bd, graduated in p217): the title and the list share one swap motion.
     val serverSwap = remember { ServerSwapMotion() }
-    if (serverFlowOn) RunServerSwapMotion(serverSwap)
-    val serverSwapTarget = if (serverFlowOn) {
-        val current by store.observe { it.server }
-        val switchingTo by store.observe { it.switchingTo }
-        val saved by remember { shared(ServerSharedKeys.savedServers).flow }.collectAsState()
-        ServerSwapTarget(current, switchingTo, drawerTitleServers(current, saved))
-    } else {
-        null
-    }
+    RunServerSwapMotion(serverSwap)
+    val current by store.observe { it.server }
+    val switchingTo by store.observe { it.switchingTo }
+    val saved by remember { shared(ServerSharedKeys.savedServers).flow }.collectAsState()
+    val serverSwapTarget = ServerSwapTarget(current, switchingTo, drawerTitleServers(current, saved))
 
     // iOS draws its own bottom edge only with a keyboard on screen (`customBottom`); Android always does.
     val keyboardMonitor: DrawerKeyboardMonitor = viewState.keyboardMonitor
@@ -233,7 +223,7 @@ fun HomeDrawer(
 
     val inputs = DrawerListInputs(
         selectedSessionID = selectedSessionID,
-        showsProjectIcons = showsProjectIcons,
+        showsProjectIcons = true,
         reducedMotion = reducedMotion,
         increasedContrast = highContrast,
         alwaysShowsHeaders = DrawerTunables.sectionBreak == DrawerSectionBreak.Header,
@@ -281,7 +271,7 @@ fun HomeDrawer(
             actions = actions,
             contentPadding = listPadding,
             modifier = Modifier.fillMaxSize(),
-            serverSwap = if (serverFlowOn) serverSwap else null,
+            serverSwap = serverSwap,
         )
         // The list as the drawer's pan sees it: between the title band and the controls, which
         // take their own touches (iOS: the hit view is the band, not the collection view).
@@ -319,11 +309,7 @@ fun HomeDrawer(
                     .fillMaxWidth()
                     .padding(start = DrawerMetrics.textInset, end = DrawerSearchPillDefaults.size + DrawerTunables.searchGap)
                     .drawerSearchTitleFade(viewState.search)
-                if (serverFlowOn) {
-                    ServerFlowTitle(store = store, motion = serverSwap, onManage = viewState::manageServers, modifier = titleModifier)
-                } else {
-                    DrawerTitleView(store = store, onManage = viewState::manageServers, modifier = titleModifier)
-                }
+                ServerFlowTitle(store = store, motion = serverSwap, onManage = viewState::manageServers, modifier = titleModifier)
                 DrawerSearchPill(
                     state = viewState.search,
                     text = search,

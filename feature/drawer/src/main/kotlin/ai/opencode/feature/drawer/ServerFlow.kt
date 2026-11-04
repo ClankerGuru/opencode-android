@@ -1,13 +1,12 @@
 package ai.opencode.feature.drawer
 
-import ai.opencode.core.experiments.ExperimentalFeature
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.feature.session.ServerConnectionNotice
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.friendlyName
 
 /*
- * Server Flow (experimental `serverFlow`, iOS `OpenCode/Drawer/ServerFlow.swift`, d8a311bd):
+ * Server Flow (OC-582, iOS `OpenCode/Drawer/ServerFlow.swift`, d8a311bd, graduated in p217):
  * what the drawer and a session show of the servers' connections. Picking a server swaps the
  * drawer to it at once with Title Leads' motion: its name rolls in, ghost rows follow it like a
  * chain, and an underline shimmers under the name until the server answers. One that fails, or
@@ -19,9 +18,6 @@ import ai.opencode.server.friendlyName
  * (`ServerConnectionPill.kt`), which reads the pill's palette and carries the notice in
  * `SessionListContext`.
  */
-
-/** The `serverFlow` experiment (iOS `ExperimentalFeature.serverFlow`, off by default). */
-internal val serverFlowExperiment: ExperimentalFeature get() = ExperimentalFeature.serverFlow
 
 /** Why a server was last given up on, shown in the server menu. */
 enum class ServerReachability { unreachable, signInFailed }

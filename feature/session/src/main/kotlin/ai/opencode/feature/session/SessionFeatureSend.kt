@@ -356,7 +356,7 @@ internal fun SessionFeature.sendComposer(
     next = next.withDictationError(null)
     val savedDraft = next.draftState
     val sentChips = next.autocomplete.chips
-    val autocompleteResolution = if (experimentalFeatures(ExperimentalFeature.composerAutocomplete) && sentChips.isNotEmpty()) {
+    val autocompleteResolution = if (sentChips.isNotEmpty()) {
         ComposerAutocompleteDraftResolution.resolve(draft = rawDraft, sentPromptText = text, chips = sentChips)
     } else {
         null
@@ -424,7 +424,7 @@ internal fun SessionFeature.sendComposer(
         files = files,
         delivery = delivery,
         mentions = mentions,
-        chips = if (experimentalFeatures(ExperimentalFeature.composerAutocomplete)) sentChips else emptyList(),
+        chips = sentChips,
         isRetry = false,
         state = next,
     )

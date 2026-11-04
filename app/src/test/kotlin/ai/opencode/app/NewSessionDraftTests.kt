@@ -1,5 +1,7 @@
 package ai.opencode.app
 
+import ai.opencode.core.dependencies.Clock
+import ai.opencode.core.dependencies.TestClock
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.TestStore
 import ai.opencode.core.testing.TestIsolationRule
@@ -83,6 +85,7 @@ class NewSessionDraftTests {
         val gate = GatedHome()
         val effects = detachedScope(coroutineContext)
         val store: TestStore<AppFeature.State, AppFeature.Action> = shared.appStore(app, effects) {
+            this[Clock] = TestClock()
             this[OpenCodeClient] = noSends(gate.client()).copy(
                 modelCatalog = { server, _ ->
                     val model = if (server.persistenceID == studio.persistenceID) studioModel else laptopModel
@@ -108,7 +111,7 @@ class NewSessionDraftTests {
                 serverName = "Studio",
                 connection = AppFeature.State.Connection.Connecting,
                 connectionGeneration = 1,
-                connectionAttempt = AppFeature.ConnectionAttempt(id = 1, server = studio),
+                connectionAttempt = AppFeature.ConnectionAttempt(id = 1, server = studio, switchesBack = true),
             )
         }
         store.receiveCase<AppFeature.Action.HealthResponse> { it.copy(connection = AppFeature.State.Connection.LoadingHome(studio)) }

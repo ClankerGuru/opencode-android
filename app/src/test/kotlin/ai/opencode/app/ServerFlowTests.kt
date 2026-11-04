@@ -3,8 +3,6 @@ package ai.opencode.app
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.DependencyValues
 import ai.opencode.core.dependencies.TestClock
-import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.TestStore
 import ai.opencode.core.testing.TestIsolationRule
@@ -23,8 +21,6 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import java.time.Instant
@@ -32,7 +28,7 @@ import kotlin.time.Duration.Companion.seconds
 
 /**
  * Port of iOS `ServerFlowTests.swift`, the `AppFeature` part (d8a311bd): switching servers from
- * the drawer at once and going back on its own (experimental `serverFlow`). The note, menu, pill
+ * the drawer at once and going back on its own (Server Flow, graduated in iOS p217). The note, menu, pill
  * and ghost-row tests are Home's (`:feature:drawer` `ServerFlowTests`).
  *
  * iOS asserts shared values inside state closures; a `Shared` here is a reference (equal across
@@ -64,13 +60,11 @@ class ServerFlowTests {
     private fun TestScope.store(
         state: AppFeature.State,
         clock: TestClock = TestClock(),
-        flow: Boolean = true,
         client: (OpenCodeClient) -> OpenCodeClient,
     ): TestStore<AppFeature.State, AppFeature.Action> {
         effects = detachedScope(coroutineContext)
         return shared.appStore(state, effects) {
             this[Clock] = clock
-            this[ExperimentalFeatures] = ExperimentalFeatures.enabling(if (flow) setOf(ExperimentalFeature.serverFlow) else emptySet())
             this[OpenCodeClient] = client(OpenCodeClient.testValue)
         }
     }
@@ -219,17 +213,5 @@ class ServerFlowTests {
         store.receive(delegate(HomeFeature.DelegateAction.ServerSwitchTapped(studio)), update = { switching(it, attempt = 2) })
         store.receiveCase<AppFeature.Action.HealthResponse> { switchedBack(it, ServerSwitchNote.Reason.Unreachable) }
         store.finish()
-    }
-
-    @Test
-    fun offAFailedSwitchStillLeavesForThePicker() = runTest {
-        val store = store(connectedState(), flow = false) { it.copy(health = { throw OpenCodeClientError("Offline") }) }
-        store.exhaustive = false
-        store.send(delegate(HomeFeature.DelegateAction.ServerSwitchTapped(studio)))
-        assertFalse(checkNotNull(store.state.connectionAttempt).switchesBack)
-        store.receiveCase<AppFeature.Action.HealthResponse>()
-        assertNull(store.state.home)
-        assertEquals(laptop, store.state.returnServer)
-        effects.skipInFlightEffects()
     }
 }

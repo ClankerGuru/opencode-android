@@ -27,7 +27,6 @@ import ai.opencode.feature.composer.AttachmentMenuItem
 import ai.opencode.feature.composer.AttachmentMenuOverlay
 import ai.opencode.feature.composer.AttachmentMenuPhase
 import ai.opencode.feature.composer.AttachmentMenuPress
-import ai.opencode.feature.composer.AttachmentMenuSheet
 import ai.opencode.feature.composer.ComposerAutocompleteAction
 import ai.opencode.feature.composer.ComposerPhotoViewer
 import ai.opencode.feature.composer.LocationClientError
@@ -186,10 +185,8 @@ fun SessionView(
     val modelPickerAnchors = remember { ModelPickerAnchors(anchorScope) }
     val colors = OpenCodeTheme.colors
     val density = LocalDensity.current
-    // The New Plus Menu (iOS `usesPlusMenuSheet`): the + menu grows into the photo sheet, and a hold on + peeks.
+    // The New Plus Menu (graduated in iOS p217): the + menu grows into the photo sheet, and a hold on + peeks.
     val photoSheet = rememberSessionPhotoSheetState()
-    val plusSheetSetting by remember { shared(ExperimentalFeature.plusMenuSheet.key).flow }.collectAsState(false)
-    val usesPlusMenuSheet = ExperimentalFeature.plusMenuSheet.isActive(plusSheetSetting)
     var rootOffset by remember { mutableStateOf(Offset.Zero) }
 
     // The header controls' laid-out height (dp); the backdrop follows it.
@@ -265,7 +262,7 @@ fun SessionView(
         if (composerHost.pendingAttachmentsRow == null) composerHost.pendingAttachmentsRow = { expanded -> SessionPendingAttachments(store, composerHost.sendTransition.images, expanded) }
     }
     SessionPermissionPrompts(isCovered)
-    SessionPhotoSheetEnvironment(photoSheet, store, composerHost, importer, headerHeight, usesPlusMenuSheet, rootOffset)
+    SessionPhotoSheetEnvironment(photoSheet, store, composerHost, importer, headerHeight, rootOffset)
 
     SessionMediaHost {
     CompositionLocalProvider(
@@ -371,11 +368,9 @@ fun SessionView(
                 SessionModelPickerOverlays(store, modelPickerAnchors, headerHeight, composerHost.attachmentAnchors.composer)
             }
         }
-        SessionAttachmentMenu(store, composerHost, importer, photoSheet, usesPlusMenuSheet)
-        if (usesPlusMenuSheet) {
-            RecentPhotoPeekOverlay(photoSheet.recentPeek, photoSheet.library, photoSheet.flights, Modifier.matchParentSize())
-            PhotoFlightCanvas(photoSheet.flights, Modifier.matchParentSize())
-        }
+        SessionAttachmentMenu(store, composerHost, importer, photoSheet)
+        RecentPhotoPeekOverlay(photoSheet.recentPeek, photoSheet.library, photoSheet.flights, Modifier.matchParentSize())
+        PhotoFlightCanvas(photoSheet.flights, Modifier.matchParentSize())
         }
         SessionSheets(store, listContext)
         LocationErrorAlert(store)
@@ -489,8 +484,7 @@ private fun SessionLifecycle(store: StoreOf<State, Action>) {
 
 /**
  * The + menu (iOS `attachmentMenuOverlay`, `toggleAttachmentMenu` and `chooseAttachment`) and what
- * it opens: Photos (the system Photo Picker, or with the New Plus Menu experiment the composer's
- * photo sheet), Files (the system document picker) and Location (one at a time). The menu is
+ * it opens: Photos (the composer's photo sheet, growing out of the menu), Files (the system document picker) and Location (one at a time). The menu is
  * :feature:composer's [AttachmentMenuOverlay], growing out of the + ([AttachmentPickerButton] in
  * the composer's row, which also chooses a row by sliding to it); it keeps the field's focus, and
  * choosing a picker gives the keyboard up, which returns once something is attached if the field
@@ -506,12 +500,9 @@ private fun SessionAttachmentMenu(
     host: SessionComposerHost,
     importer: SessionAttachmentImporter,
     sheet: SessionPhotoSheetState,
-    usesPlusMenuSheet: Boolean,
 ) {
     val phase = sheet.attachmentMenu
     var keepingLocationRow by remember { mutableStateOf(false) }
-    var showsPhotoPicker by remember { mutableStateOf(false) }
-    var pickerRestoresFocus by remember { mutableStateOf(false) }
     var showsCamera by remember { mutableStateOf(false) }
     var clipboardHasImages by remember { mutableStateOf(false) }
     val pasteboard = remember { dependency(ai.opencode.core.dependencies.PasteboardClient) }
@@ -585,16 +576,7 @@ private fun SessionAttachmentMenu(
     fun choose(item: AttachmentMenuItem) {
         if (phase != AttachmentMenuPhase.Menu || sheet.morph.isOpening) return
         when (item) {
-            AttachmentMenuItem.Photos -> {
-                if (usesPlusMenuSheet) return sheet.openPhotoSheet()
-                // Choosing the photo picker gives it the room the keyboard had.
-                // The keyboard comes back once something is attached, not as the menu goes.
-                pickerRestoresFocus = sheet.attachmentMenuRestoresFocus
-                sheet.attachmentMenuRestoresFocus = false
-                host.dismissComposerKeyboard()
-                sheet.attachmentMenu = AttachmentMenuPhase.Closed
-                showsPhotoPicker = true
-            }
+            AttachmentMenuItem.Photos -> sheet.openPhotoSheet()
             AttachmentMenuItem.Files -> {
                 sheet.attachmentMenuRestoresFocus = false
                 sheet.closeAttachmentMenu()
@@ -620,8 +602,7 @@ private fun SessionAttachmentMenu(
         host.attachmentPress = press
         host.isAttachmentMenuOpen = phase != AttachmentMenuPhase.Closed
         host.onPlusTapped = ::toggle
-        // Android: the sheet's rows aren't under the finger on +, so a slide from + chooses nothing.
-        host.attachmentMenuRows = if (usesPlusMenuSheet && phase == AttachmentMenuPhase.Menu && !sheet.morph.isOpening) host.attachmentAnchors.rows else emptyMap()
+        host.attachmentMenuRows = if (phase == AttachmentMenuPhase.Menu && !sheet.morph.isOpening) host.attachmentAnchors.rows else emptyMap()
         // A slide from + chose it; the press already answered with its haptic.
         host.onAttachmentChoose = ::choose
         host.closeAttachmentMenu = { if (sheet.attachmentMenu != AttachmentMenuPhase.Closed) sheet.closeAttachmentMenu() }
@@ -650,36 +631,27 @@ private fun SessionAttachmentMenu(
             sheet.closeAttachmentMenu()
         }
     }
-    if (!usesPlusMenuSheet) {
-        // Android divergence: the + menu is a Material bottom sheet, not iOS's panel morphing out of +.
-        AttachmentMenuSheet(
-            isOpen = phase == AttachmentMenuPhase.Menu,
-            items = items,
-            onChoose = chooseTapped,
-            onPaste = paste,
-            onDismiss = { sheet.closeAttachmentMenu() },
-        )
-    } else {
-        AttachmentMenuOverlay(
-            phase = phase,
-            onPhaseChange = { next -> if (next == AttachmentMenuPhase.Closed) sheet.closeAttachmentMenu() else sheet.attachmentMenu = next },
-            anchors = host.attachmentAnchors,
-            press = press,
-            items = items,
-            includesVideos = supportsFileUploads,
-            onChoose = chooseTapped,
-            onPaste = paste,
-            modifier = Modifier.fillMaxSize(),
-            // iOS `overComposer: usesPlusMenuSheet`: the New Plus Menu's rows are measured and
-            // anchored here and drawn by `PlusMenuGlassSurface`, over the composer.
-            overComposer = usesPlusMenuSheet,
-            handedOff = false,
-            identity = taskIdentity,
-        )
-    }
-    if (usesPlusMenuSheet) {
-        // iOS `PlusMenuGlassSurface(isOpen:handsOff:…)`: the photo sheet takes the menu's surface
-        // while it's shown and gives it back as Back's fold lands (`photoSheetMenuTakesBack`).
+    AttachmentMenuOverlay(
+        phase = phase,
+        onPhaseChange = { next -> if (next == AttachmentMenuPhase.Closed) sheet.closeAttachmentMenu() else sheet.attachmentMenu = next },
+        anchors = host.attachmentAnchors,
+        press = press,
+        items = items,
+        includesVideos = supportsFileUploads,
+        onChoose = chooseTapped,
+        onPaste = paste,
+        modifier = Modifier.fillMaxSize(),
+        // iOS `overComposer: usesPlusMenuSheet`: the New Plus Menu's rows are measured and
+        // anchored here and drawn by `PlusMenuGlassSurface`, over the composer.
+        overComposer = true,
+        handedOff = false,
+        identity = taskIdentity,
+    )
+    // iOS `PlusMenuGlassSurface(isOpen:handsOff:…)`: the photo sheet takes the menu's surface
+    // while it's shown and gives it back as Back's fold lands (`photoSheetMenuTakesBack`).
+    // At rest its full-screen layers would still take TalkBack's touch over the header and
+    // transcript beneath them (iOS `.accessibilityHidden(plusMenuRests)`).
+    Box(Modifier.fillMaxSize().then(if (sheet.plusMenuRests) Modifier.clearAndSetSemantics {} else Modifier)) {
         PlusMenuGlassSurface(
             anchors = host.attachmentAnchors,
             isOpen = phase == AttachmentMenuPhase.Menu && (!sheet.morph.isShown || sheet.menuTakesBack),
@@ -691,16 +663,8 @@ private fun SessionAttachmentMenu(
             onDismiss = { sheet.closeAttachmentMenu() },
             modifier = Modifier.fillMaxSize(),
         )
-        SessionPlusPhotoSheet(sheet)
     }
-    if (showsPhotoPicker) {
-        SessionPhotoSheet(
-            store = store,
-            importer = importer,
-            onDismiss = { showsPhotoPicker = false },
-            onAdded = if (pickerRestoresFocus) host::focusComposer else null,
-        )
-    }
+    SessionPlusPhotoSheet(sheet)
     if (showsCamera) {
         SessionAttachmentCamera(importer, onDismiss = { showsCamera = false }, onAdded = host::focusComposer)
     }
@@ -713,10 +677,9 @@ private fun SessionAttachmentMenu(
 @Composable
 private fun SessionComposerDismissArea(store: StoreOf<State, Action>, host: SessionComposerHost) {
     val autocompleteOpen by store.observe { it.autocomplete.isOpen }
-    val autocompleteSetting by remember { shared(ExperimentalFeature.composerAutocomplete.key).flow }.collectAsState(false)
     when {
         host.isAttachmentMenuOpen -> AttachmentMenuDismissArea(onDismiss = host.closeAttachmentMenu)
-        ExperimentalFeature.composerAutocomplete.isActive(autocompleteSetting) && autocompleteOpen ->
+        autocompleteOpen ->
             AttachmentMenuDismissArea(onDismiss = { store.send(Action.Autocomplete(ComposerAutocompleteAction.Dismissed)) })
     }
 }
@@ -817,7 +780,7 @@ private fun SessionPendingAttachments(store: StoreOf<State, Action>, sendImages:
             }
         },
         onOpenLocation = { store.send(Action.LinkTapped(it)) },
-        flights = LocalSessionPhotoSheet.current?.takeIf { it.usesPlusMenuSheet }?.flights,
+        flights = LocalSessionPhotoSheet.current?.flights,
         sendImages = sendImages,
         onOpenPhoto = { id -> presentComposerPhoto(store, id, presenter, host, reducedMotion, context) },
         composerExpanded = composerExpanded,

@@ -1,8 +1,6 @@
 package ai.opencode.feature.drawer.icons
 
 import ai.opencode.core.dependencies.DateClient
-import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.TestStore
 import ai.opencode.core.testing.TestIsolationRule
@@ -19,11 +17,9 @@ import ai.opencode.server.model.OpenCodeSession
 import kotlinx.coroutines.test.runTest
 import okhttp3.Headers
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -34,9 +30,6 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Port of iOS `ProjectIconTests.swift`, for what `:feature:drawer` owns and the JVM can run.
- *
- * `experimentalFlagIsOffByDefault` checks `:core`'s `ExperimentalFeature.projectIcons` from here
- * (no `:core` port covered it).
  *
  * Other modules:
  * - `derivesDisplayNameAndDisambiguatedInitials`, `decodesProjectIconSchemaAndFollowsDesktopPrecedence`
@@ -51,15 +44,6 @@ import java.util.concurrent.atomic.AtomicInteger
 class ProjectIconTests {
     @get:Rule val isolation = TestIsolationRule()
     @get:Rule val folder = TemporaryFolder()
-
-    @Test
-    fun experimentalFlagIsOnByDefault() {
-        assertEquals("project-icons", ExperimentalFeature.projectIcons.rawValue)
-        assertEquals("Project Icons", ExperimentalFeature.projectIcons.title)
-        assertTrue(ExperimentalFeature.projectIcons.defaultEnabled)
-        assertFalse(ExperimentalFeature.projectIcons.isGraduated)
-        assertTrue(ExperimentalFeatures.enabling(setOf(ExperimentalFeature.projectIcons))(ExperimentalFeature.projectIcons))
-    }
 
     @Test
     fun homeFeatureAppliesProjectUpdatedEvent() = runTest {

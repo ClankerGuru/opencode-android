@@ -14,7 +14,6 @@ import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.feature.drawer.HomeConnectionFeature
 import ai.opencode.feature.drawer.HomeFeature
-import ai.opencode.feature.drawer.serverFlowExperiment
 import ai.opencode.feature.drawer.ServerMenuStatus
 import ai.opencode.feature.drawer.ServerReachability
 import ai.opencode.feature.drawer.ServerSwapTarget
@@ -223,14 +222,6 @@ fun ServerFlowTitle(
             )
         }
     }
-}
-
-/** The `serverFlow` experiment's switch (off by default). */
-@Composable
-fun rememberServerFlowOn(): Boolean {
-    val feature = serverFlowExperiment
-    val stored by remember(feature) { shared(feature.key).flow }.collectAsState()
-    return feature.isActive(stored)
 }
 
 /**
