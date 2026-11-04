@@ -46,13 +46,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.movableContentOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -97,6 +100,7 @@ import androidx.compose.ui.zIndex
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
 
 /**
  * Port of `OpenCode/Drawer/SessionDrawerContainer.swift`: the frame-locked drawer and Catch Up
@@ -227,7 +231,14 @@ fun SessionDrawerContainer(
     // place across visits, as iOS keeps its hosted drawer.
     val drawerEverShown = remember { booleanArrayOf(false) }
     if (drawerShows) drawerEverShown[0] = true
-    val drawerComposed = drawerShows || drawerEverShown[0]
+    // Android: composed hidden once the app has settled after launch, so the first open doesn't
+    // build every visible row in the frames the drawer starts moving in.
+    var drawerPrewarmed by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(DRAWER_PREWARM_DELAY_MS)
+        drawerPrewarmed = true
+    }
+    val drawerComposed = drawerShows || drawerEverShown[0] || drawerPrewarmed
     // Android: the phone's drawer is a Material modal drawer. It slides in over the session,
     // which stays put under a scrim, instead of the session sliding aside as iOS's card does.
     val modal = sidebarShown == null
@@ -626,6 +637,9 @@ internal fun SessionDrawerController.currentMask(): Rect? {
 
 /** Material's modal drawer scrim (the `scrim` role at 32%). */
 private const val MODAL_SCRIM_ALPHA = 0.32f
+
+/** How long after the container first composes the hidden drawer is built (ms). */
+private const val DRAWER_PREWARM_DELAY_MS = 1500L
 
 /** Material's modal drawer: its trailing corners round (the large shape, 16 dp). */
 private val ModalDrawerShape = RoundedCornerShape(topEnd = 16.dp, bottomEnd = 16.dp)
