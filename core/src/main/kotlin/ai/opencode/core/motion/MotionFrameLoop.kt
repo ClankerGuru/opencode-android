@@ -1,13 +1,14 @@
 package ai.opencode.core.motion
 
 import ai.opencode.core.tuning.AnimationTimeScale
+import android.content.ContentResolver
+import android.content.Context
 import android.provider.Settings
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -89,17 +90,38 @@ fun rememberFrameDurationSeconds(): Double {
  */
 @Composable
 fun rememberReduceMotion(): Boolean {
-    val resolver = LocalContext.current.contentResolver
-    fun read() = Settings.Global.getFloat(resolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
-    var reduce by remember { mutableStateOf(read()) }
-    DisposableEffect(resolver) {
+    val context = LocalContext.current
+    val reduce = remember(context) { ReduceMotionSetting.state(context) }
+    return reduce.value
+}
+
+/**
+ * The Remove animations setting for the whole app, read once and kept current by one observer.
+ * Rows call [rememberReduceMotion] as they scroll in; an observer of their own would cost two
+ * calls into the system's settings service per row (register, then unregister on the way out).
+ * Main thread only, like composition.
+ */
+private object ReduceMotionSetting {
+    private var resolver: ContentResolver? = null
+    private var state: MutableState<Boolean>? = null
+
+    fun state(context: Context): State<Boolean> {
+        val appResolver = (context.applicationContext ?: context).contentResolver
+        val current = state
+        // A new application (each Robolectric test has its own) gets its own observer.
+        if (current != null && resolver === appResolver) return current
+        val created = mutableStateOf(read(appResolver))
         val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
             override fun onChange(selfChange: Boolean) {
-                reduce = read()
+                created.value = read(appResolver)
             }
         }
-        resolver.registerContentObserver(Settings.Global.getUriFor(Settings.Global.ANIMATOR_DURATION_SCALE), false, observer)
-        onDispose { resolver.unregisterContentObserver(observer) }
+        appResolver.registerContentObserver(Settings.Global.getUriFor(Settings.Global.ANIMATOR_DURATION_SCALE), false, observer)
+        resolver = appResolver
+        state = created
+        return created
     }
-    return reduce
+
+    private fun read(resolver: ContentResolver): Boolean =
+        Settings.Global.getFloat(resolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
 }
