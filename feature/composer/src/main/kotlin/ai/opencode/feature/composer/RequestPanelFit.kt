@@ -1,26 +1,16 @@
 package ai.opencode.feature.composer
 
 import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.gestures.rememberScrollableState
 import androidx.compose.foundation.gestures.scrollable
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.drawscope.clipRect
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.Measurable
 import androidx.compose.ui.layout.ParentDataModifier
@@ -310,61 +300,5 @@ private class RequestPanelScroll {
     var overflow = 0
 }
 
-/**
- * Scrolls what's taller than [cap], sized to what it holds; its edges fade only where there's
- * more, so nothing slides under a hard edge. In a panel short of room it gives up height,
- * down to [floor], in [priority] order (iOS `FadingScroll`). It reaches the panel's edges,
- * so bands inside run full width; content pads itself to [RequestDockMetrics.edge].
- */
-@Composable
-internal fun FadingScroll(
-    cap: Dp,
-    floor: Dp,
-    priority: Double,
-    identifier: String,
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit,
-) {
-    val scroll = rememberScrollState()
-    val fade = 20.dp
-    Box(
-        modifier
-            .requestPanelPart(cap, floor, priority)
-            .heightIn(max = cap)
-            .bleedHorizontally(RequestDockMetrics.edge)
-            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-            .drawWithContent {
-                drawContent()
-                // A question that fits never fades, even mid-transition.
-                val scrolls = scroll.maxValue > 1
-                val top = scrolls && scroll.value > 1
-                val bottom = scrolls && scroll.maxValue - scroll.value > 1
-                if (!top && !bottom || size.height <= 0f) return@drawWithContent
-                val edge = min(fade.toPx() / size.height, 0.5f)
-                drawRect(
-                    Brush.verticalGradient(
-                        0f to (if (top) Color.Transparent else Color.Black),
-                        edge to Color.Black,
-                        1f - edge to Color.Black,
-                        1f to (if (bottom) Color.Transparent else Color.Black),
-                    ),
-                    blendMode = BlendMode.DstIn,
-                )
-            }
-            .verticalScroll(scroll)
-            .testTag(identifier),
-    ) { content() }
-}
-
-/** iOS `.padding(.horizontal, -edge)`: reaches [edge] past each side of what it's given. */
-internal fun Modifier.bleedHorizontally(edge: Dp): Modifier = layout { measurable, constraints ->
-    val extra = (edge * 2).roundToPx()
-    val widened = if (constraints.hasBoundedWidth) {
-        constraints.copy(minWidth = constraints.minWidth + extra, maxWidth = constraints.maxWidth + extra)
-    } else constraints
-    val placeable = measurable.measure(widened)
-    val width = (placeable.width - extra).coerceIn(constraints.minWidth, constraints.maxWidth)
-    layout(width, placeable.height) { placeable.place(-edge.roundToPx(), 0) }
-}
 
 /** Bounds only the vertical extent; the sides stay open for content placed past them. */

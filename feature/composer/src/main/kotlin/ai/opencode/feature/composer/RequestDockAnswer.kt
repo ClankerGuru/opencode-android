@@ -12,7 +12,7 @@ import ai.opencode.server.model.OpenCodeToolCall
 import ai.opencode.server.model.OpenCodeTranscriptItem
 import ai.opencode.server.model.TranscriptNoticeKind
 
-/** Answer reading and writing the dock shares with its tests (iOS `RequestDockAnswer`, `RequestDockView.swift`). */
+/** Answer reading and writing the dock shares with its tests (iOS `RequestDockAnswer`, `RequestDockAnswer.swift`). */
 object RequestDockAnswer {
     /**
      * A subagent's request names it, as the drawer does; a global or MCP form names its
