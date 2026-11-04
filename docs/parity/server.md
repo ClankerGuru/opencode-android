@@ -127,4 +127,4 @@ another host read as interrupted; OkHttp's 5-per-host cap queued family fan-out;
 queries encoded `/` as `%2F`; transport failures recorded no failure phase
 (`DiagnosticsNetworkPhases`, found by the core `DiagnosticsRecorderTests`).
 
-Total: 260 `:server` tests (`./gradlew :server:testDebugUnitTest`; 2 skipped: opt-in live checks), all passing.
+Total: 272 `:server` tests (`./gradlew :server:testDebugUnitTest`; 2 skipped: opt-in live checks), all passing.
