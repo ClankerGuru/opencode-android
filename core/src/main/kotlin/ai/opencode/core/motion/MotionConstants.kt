@@ -150,7 +150,7 @@ object Motion {
         else tween(durationMillis = millis(seconds), delayMillis = millis(delaySeconds), easing = EaseInOut)
 
     /** Seconds → milliseconds, stretched by Developer Mode slow motion ([AnimationTimeScale]). */
-    internal fun millis(seconds: Double): Int = (seconds * 1000 / AnimationTimeScale.shared.observedScale).roundToInt()
+    fun millis(seconds: Double): Int = (seconds * 1000 / AnimationTimeScale.shared.observedScale).roundToInt()
 }
 
 /** Delays any finite spec (Compose's `spring` has no delay parameter; SwiftUI's `.delay`). */

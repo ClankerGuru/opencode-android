@@ -64,13 +64,12 @@ internal fun holdsImages(block: OpenCodeMarkdownBlock, imageLinks: List<String> 
 }
 
 /**
- * The message's image-link plan when the off-by-default Image Link Previews experiment is on and
- * this surface previews images (iOS `MarkdownBlocksView`: `imagePreviews && imageLinkPreviews ?
- * ImageLinkPolicy.plan(blocks, growing:) : [:]`); empty otherwise.
+ * The message's image-link plan when this surface previews images (iOS `MarkdownBlocksView`:
+ * `imagePreviews ? ImageLinkPolicy.plan(blocks, growing:) : [:]`); empty otherwise.
  */
 @Composable
 fun rememberImageLinkPlan(blocks: List<OpenCodeMarkdownBlock>, isGrowing: Boolean): Map<Int, List<String>> {
-    val enabled = LocalTranscriptLayoutTuning.current.imageLinkPreviews && LocalTranscriptRowContext.current.imagePreviews
+    val enabled = LocalTranscriptRowContext.current.imagePreviews
     return remember(blocks, isGrowing, enabled) {
         if (enabled) ImageLinkPolicy.plan(blocks.linkTextBlocks(), isGrowing) else emptyMap()
     }

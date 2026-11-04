@@ -78,7 +78,7 @@ class VoiceRouteTests {
         shared.set(SharedKeys.xaiAPIKey, null)
         shared.set(experimental(ExperimentalFeature.serverVoice), false)
         shared.set(VoiceSharedKeys.serverVoiceProvider, ServerVoiceProvider.openAI)
-        shared.set(VoiceSharedKeys.voiceServerChoice, VoiceServerChoice.Connected)
+        shared.set(VoiceSharedKeys.voiceServerChoice, VoiceServerChoice.Automatic)
         shared.set(VoiceSharedKeys.serverVoiceSupportByServer, emptyMap())
         shared.set(VoiceSharedKeys.voiceTranscripts, emptyMap())
         return shared
@@ -139,6 +139,8 @@ class VoiceRouteTests {
                     activeEngine = route.engine,
                     activeProvider = route.provider,
                     activeVoice = activeVoice,
+                    diagnosesFailure = engine != VoiceEngine.grok,
+                    callPlace = if (engine != VoiceEngine.grok) VoiceCallPlace("Localhost", VoiceProviderOption.Brand.gemini) else null,
                     // Android: the call's ongoing notification, started with the call.
                     callPresenceID = logID,
                 )
@@ -229,6 +231,8 @@ class VoiceRouteTests {
                 startedTarget = state.target,
                 activeRoute = if (probing) VoiceRoute.serverOpenAI(VoiceRoute.OpenAI.gptLive) else VoiceRoute.PhoneKey(VoiceEngine.gptLive),
                 activeVoice = CallVoice.marin,
+                diagnosesFailure = probing,
+                callPlace = if (probing) VoiceCallPlace("Localhost", VoiceProviderOption.Brand.openAI) else null,
                 // Android: the call's ongoing notification, started with the call.
                 callPresenceID = UUID(0, 0),
             )

@@ -195,7 +195,14 @@ class TranscriptBenchmarkTests {
         // 4. The chrome doesn't change on a streaming delta (iOS: registers no observation on `items`).
         fun chrome(d: SessionFeature.State) = listOf(d.errorMessage, d.isTranscriptLoading, d.hasBackgroundWork, d.backgroundShells, d.canChooseProject)
         val chromeBefore = chrome(store.state.sessionDetail!!)
-        store.send(detail(SessionFeature.Action.ContentBatch(openSession.id, listOf(OpenCodeLiveContentEvent.TextDelta("msg_a1", 0, " more text")))))
+        store.send(
+            detail(
+                SessionFeature.Action.ContentBatch(
+                    openSession.id,
+                    listOf(OpenCodeLiveContentEvent.TextStarted("msg_a1", 0), OpenCodeLiveContentEvent.TextDelta("msg_a1", 0, " more text")),
+                ),
+            ),
+        )
         assertEquals(chromeBefore, chrome(store.state.sessionDetail!!))
 
         // 5. The projection cache's tail fast path matches a cold build.

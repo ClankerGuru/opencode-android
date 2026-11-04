@@ -1,0 +1,177 @@
+package ai.opencode.feature.system.clienttools
+
+import ai.opencode.core.dependencies.Clock
+import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.log.AppLog
+import ai.opencode.core.store.Effect
+import ai.opencode.core.store.Reduced
+import ai.opencode.core.store.Reducer
+import ai.opencode.core.store.cancellable
+import ai.opencode.server.clienttools.ClientTool
+import ai.opencode.server.clienttools.ClientToolCall
+import ai.opencode.server.clienttools.ClientToolResult
+import ai.opencode.server.clienttools.ClientToolsClient
+import ai.opencode.server.clienttools.ClientToolsEvent
+import ai.opencode.server.clienttools.ClientToolsTarget
+import java.util.UUID
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+
+/**
+ * The phone's tools (Share Screen with Agents, Open Links from Calls, Audio in Calls; all
+ * experimental): keeps one client MCP socket to a server and directory, so agents there get the
+ * tools that are on (`android_voice_request_screen`, `android_voice_open_url`,
+ * `android_voice_play_audio`, `android_voice_audio_control`). Reconnects with backoff; `AppFeature`
+ * runs one per [State.Slot], sets each target and hands each call to the call on screen.
+ */
+class ClientToolsFeature : Reducer<ClientToolsFeature.State, ClientToolsFeature.Action> {
+    data class State(
+        /** The tools whose experiments are on. */
+        val tools: Set<ClientTool> = emptySet(),
+        val target: ClientToolsTarget? = null,
+        val status: Status = Status.Idle,
+        /** Closes since the server last finished a handshake: the backoff step. */
+        val failures: Int = 0,
+        /** The socket calls are arriving on; its going clears what they showed. */
+        val connection: UUID? = null,
+        val slot: Slot = Slot.Session,
+    ) {
+        val isEnabled: Boolean get() = tools.isNotEmpty()
+
+        enum class Slot(val rawValue: String) {
+            /** The open session's directory, or on a call the call's (`AppFeature.clientToolsTarget`). */
+            Session("session"),
+
+            /** The directory of the session a call's delegator steers, when it's another (`AppFeature.delegatorClientToolsTarget`). */
+            Delegator("delegator"),
+        }
+
+        enum class Status {
+            Idle,
+            Connecting,
+            Attached,
+
+            /** Closed; trying again after the backoff. */
+            Waiting,
+        }
+    }
+
+    sealed interface Action {
+        data class ToolsChanged(val tools: Set<ClientTool>) : Action
+        data class TargetChanged(val target: ClientToolsTarget?) : Action
+        data class Socket(val event: ClientToolsEvent) : Action
+        data object RetryElapsed : Action
+
+        /** Answers a call nobody on the phone can take. */
+        data class Refuse(val call: ClientToolCall, val message: String) : Action
+        data class Delegate(val delegate: DelegateAction) : Action
+    }
+
+    sealed interface DelegateAction {
+        /** `AppFeature` hands it to the call, or sends [Action.Refuse]. */
+        data class ToolCalled(val call: ClientToolCall) : DelegateAction
+
+        /** The socket closed or was torn down: its unanswered calls are refused by the client, and anything showing them goes. */
+        data class Disconnected(val connection: UUID) : DelegateAction
+    }
+
+    data class CancelID(val slot: State.Slot)
+
+    override fun reduce(state: State, action: Action): Reduced<State, Action> {
+        when (action) {
+            is Action.ToolsChanged -> return Reduced(state.copy(tools = action.tools))
+
+            is Action.TargetChanged -> {
+                if (action.target == state.target) return Reduced(state)
+                val changed = state.copy(target = action.target, failures = 0)
+                val dropped = dropConnection(changed)
+                if (action.target == null) {
+                    AppLog.network.info { "client tools (${state.slot.rawValue}): disconnected" }
+                    return Reduced(
+                        dropped.state.copy(status = State.Status.Idle),
+                        Effect.merge(dropped.effect, Effect.cancel(CancelID(state.slot))),
+                    )
+                }
+                val connected = connect(dropped.state)
+                return Reduced(connected.state, Effect.merge(dropped.effect, connected.effect))
+            }
+
+            is Action.Socket -> return socket(state, action.event)
+
+            Action.RetryElapsed -> {
+                if (state.target == null) return Reduced(state)
+                return connect(state)
+            }
+
+            is Action.Refuse -> {
+                AppLog.network.info { "client tools: ${action.call.tool.rawValue} refused" }
+                val clientTools = dependency(ClientToolsClient)
+                val call = action.call
+                val message = action.message
+                return Reduced(state, Effect.run { clientTools.reply(call, ClientToolResult.failure(message)) })
+            }
+
+            is Action.Delegate -> return Reduced(state)
+        }
+    }
+
+    private fun socket(state: State, event: ClientToolsEvent): Reduced<State, Action> {
+        when (event) {
+            is ClientToolsEvent.Attached -> {
+                AppLog.network.info { "client tools (${state.slot.rawValue}): attached" }
+                return Reduced(state.copy(status = State.Status.Attached, failures = 0, connection = event.connection))
+            }
+
+            is ClientToolsEvent.Call -> {
+                AppLog.network.info { "client tools: ${event.call.tool.rawValue} called" }
+                return Reduced(
+                    state.copy(connection = event.call.connection),
+                    Effect.send(Action.Delegate(DelegateAction.ToolCalled(event.call))),
+                )
+            }
+
+            is ClientToolsEvent.Closed -> {
+                val connection = if (state.connection == event.connection) null else state.connection
+                val disconnected: Effect<Action> = Effect.send(Action.Delegate(DelegateAction.Disconnected(event.connection)))
+                if (state.target == null) return Reduced(state.copy(connection = connection), disconnected)
+                val delay = backoff(state.failures)
+                AppLog.network.notice {
+                    "client tools (${state.slot.rawValue}): closed (${event.reason}), retry in ${delay.inWholeMilliseconds} ms"
+                }
+                val clock = dependency(Clock)
+                val retry = Effect.run<Action> { send ->
+                    clock.sleep(delay)
+                    send(Action.RetryElapsed)
+                }.cancellable(CancelID(state.slot), cancelInFlight = true)
+                return Reduced(
+                    state.copy(connection = connection, failures = state.failures + 1, status = State.Status.Waiting),
+                    Effect.merge(disconnected, retry),
+                )
+            }
+        }
+    }
+
+    /** Tearing the socket down: whatever its calls showed goes now, before the client refuses them as the socket closes. */
+    private fun dropConnection(state: State): Reduced<State, Action> {
+        val connection = state.connection ?: return Reduced(state)
+        return Reduced(state.copy(connection = null), Effect.send(Action.Delegate(DelegateAction.Disconnected(connection))))
+    }
+
+    private fun connect(state: State): Reduced<State, Action> {
+        val target = state.target ?: return Reduced(state)
+        val clientTools = dependency(ClientToolsClient)
+        val effect = Effect.run<Action> { send ->
+            clientTools.connect(target).collect { event -> send(Action.Socket(event)) }
+        }.cancellable(CancelID(state.slot), cancelInFlight = true)
+        return Reduced(state.copy(status = State.Status.Connecting), effect)
+    }
+
+    companion object {
+        /** 0.5 s doubling to 10 s, as OpenCode's own client MCP helper. */
+        fun backoff(failures: Int): Duration {
+            val step = minOf(failures, 5)
+            val millis = minOf(500L * (1L shl step), 10_000L)
+            return millis.milliseconds
+        }
+    }
+}

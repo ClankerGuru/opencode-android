@@ -35,7 +35,7 @@ object InternalBuild {
 
 /**
  * Port of iOS `TuningAccess`: who gets tuning and the other developer tools. Debug builds always;
- * any other build only while Settings › Advanced › Developer › Developer Mode is on.
+ * any other build only while Settings › Developer › Developer Mode is on.
  */
 object TuningAccess {
     /** Debug lab runs set this (intent extra `tuning-as-release`) to check the gate. Ignored outside debug builds. */

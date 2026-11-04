@@ -4,6 +4,8 @@ import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.sharing.SharedKeys
+import ai.opencode.feature.transcript.SessionSeenWatermarks
+import ai.opencode.feature.transcript.sessionSeenWatermarks
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.PresentationAction
 import ai.opencode.core.store.Reduced
@@ -11,7 +13,6 @@ import ai.opencode.core.store.Reducer
 import ai.opencode.feature.drawer.catchup.CatchUpFeature
 import ai.opencode.devtools.traces.TraceUploadsFeature
 import ai.opencode.feature.session.InAppNotice
-import ai.opencode.feature.drawer.switcher.SessionSwitcherFeature
 import ai.opencode.feature.composer.ComposerPersistence
 import ai.opencode.feature.composer.PromptOutbox
 import ai.opencode.feature.composer.DraftState
@@ -24,13 +25,21 @@ import ai.opencode.feature.session.*
 import ai.opencode.feature.system.liveactivity.DictationActivityAttributes
 import ai.opencode.feature.system.liveactivity.VoiceCallActivityAttributes
 import ai.opencode.feature.voice.VoiceFeature
+import ai.opencode.feature.voice.VoiceSettingsPage
 import ai.opencode.feature.system.SystemAction
 import ai.opencode.feature.system.liveactivity.DictationCommand
 import ai.opencode.feature.system.liveactivity.VoiceCallCommand
 import ai.opencode.feature.system.notifications.NotificationPermission
 import ai.opencode.feature.system.share.ReceivedShare
 import ai.opencode.feature.settings.HomeSettingsFeature
+import ai.opencode.feature.system.liveactivity.SessionLiveActivity
+import ai.opencode.core.sharing.ExperimentalFeatures
+import ai.opencode.core.sharing.ExperimentalFeature
+import ai.opencode.feature.voice.VoiceSharedKeys
+import ai.opencode.feature.voice.VoiceEngine
 import ai.opencode.feature.settings.SettingsFeature
+import ai.opencode.feature.settings.SettingsPage
+import ai.opencode.feature.settings.onboarding.WelcomeFeature
 import ai.opencode.feature.settings.whatsnew.WhatsNewFeature
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
@@ -47,6 +56,7 @@ import ai.opencode.server.model.learningFirstPrompt
 import java.time.Instant
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
+import ai.opencode.feature.composer.restorePersistedPick
 
 /**
  * Port of iOS `HomeFeature` (`OpenCode/Drawer/HomeFeature.swift` and its `HomeFeature+*.swift`
@@ -56,13 +66,18 @@ import kotlin.time.Duration.Companion.seconds
  *
  * The reducer body is assembled in `HomeFeatureComposition.kt`; Home's own actions route through
  * `HomeFeatureCore.kt`. Child features (`HomeConnectionFeature`, `HomeNotificationsFeature`,
- * `HomeSettingsFeature`, `SessionSwitcherFeature`, `CatchUpFeature`) are scoped there.
+ * `HomeSettingsFeature`, `CatchUpFeature`) are scoped there.
  *
  * Session screens are `:feature:session`'s [SessionFeature]: the open one presented (`ifLet`) and
  * pushed subagents identified by their `navigationID` (`forEach`); Home matches their actions after
  * they've reduced, as iOS's `HomeFeature` does on `.sessionDetail(.presented(…))`.
  */
 class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
+    /**
+     * This window's key for [ai.opencode.server.EventStreamFocusClient] (iOS `sceneWindow.id`):
+     * each window's store builds its own Home reducer.
+     */
+    internal val streamFocusOwner: java.util.UUID = java.util.UUID.randomUUID()
 
     /**
      * Mirrors of iOS `@Shared` keys ([pinnedSessionKeys], [lastViewedSessionIDs], [sessionReadDates],
@@ -76,8 +91,14 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
     data class State(
         val connection: HomeConnectionFeature.State,
         val notificationState: HomeNotificationsFeature.Status = HomeNotificationsFeature.Status(),
+        /** The Inbox Sidebar's archives in flight and its last archive error. */
+        val inboxSidebarStatus: InboxSidebarFeature.Status = InboxSidebarFeature.Status(),
         /** The server being connected to from the drawer, while this Home stays up until that server's Home replaces it. */
         val switchingTo: OpenCodeServer? = null,
+        /** Server Flow: a switch that went back on its own, and why. */
+        val serverSwitchNote: ServerSwitchNote? = null,
+        /** Server Flow: servers last given up on, by persistence ID. */
+        val serverReachability: Map<String, ServerReachability> = emptyMap(),
         val projects: List<OpenCodeProject> = emptyList(),
         val sessions: List<OpenCodeSession> = emptyList(),
         val activeSessionIDs: Set<String> = emptySet(),
@@ -92,7 +113,8 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
          */
         val previewRevision: Int = 0,
         val search: String = "",
-        val sessionSwitcher: SessionSwitcherFeature.State = SessionSwitcherFeature.State(),
+        /** Older pages and the server's search results (`HomeFeatureSessionPages.kt`). */
+        val sessionPages: SessionPages = SessionPages(),
         val transcriptCache: Map<String, List<OpenCodeTranscriptItem>> = emptyMap(),
         /** Cached transcripts being read again (`refreshCachedTranscript`). */
         val refreshingTranscripts: Set<String> = emptySet(),
@@ -103,6 +125,12 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         val dirtyCachedTranscriptIDs: List<String> = emptyList(),
         /** When each cached transcript was last read, so a session already fresh isn't read again. */
         val transcriptReadAt: Map<String, Instant> = emptyMap(),
+        /**
+         * The copy a session would have opened with before a background read replaced it, for
+         * sessions not opened yet this run: opening compares with it whether the read or the tap
+         * came first.
+         */
+        val unopenedSeen: Map<String, Set<String>> = emptyMap(),
         /** An uncached session's transcript being read for the tap that opened it (`CancelID.selectedTranscript`). */
         val selectedTranscriptFetch: SelectedTranscriptFetch? = null,
         /** Last-known chrome for the last few visited sessions, scoped to this server. */
@@ -119,8 +147,12 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         val lastViewedSessionIDs: Map<String, String> = emptyMap(),
         /** Mirror of `SharedKeys.sessionReadDates`. */
         val sessionReadDates: Map<String, Instant> = emptyMap(),
+        /** Mirror of `SharedKeys.sessionSeenWatermarks` (`:feature:transcript`). */
+        val sessionSeenWatermarks: SessionSeenWatermarks = SessionSeenWatermarks(),
         /** Mirror of `SharedKeys.manuallyUnreadSessionKeys`. */
         val manuallyUnreadSessionKeys: Set<String> = emptySet(),
+        /** How a session read from the drawer stood before the read, for the New divider when it opens. */
+        val pendingOpenReadState: Map<String, PendingOpenReadState> = emptyMap(),
         /** Mirror of `SharedKeys.mutedSessionKeys`. */
         val mutedSessionKeys: Set<String> = emptySet(),
         /** Mirror of `SharedKeys.sidebarShown`: beside a wide window's sidebar, whether it shows. */
@@ -149,6 +181,18 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
          * effects end when it closes. What's New from the drawer's row is this with `root = whatsNew`.
          */
         val settings: SettingsFeature.State? = null,
+        /**
+         * The Voice page Settings opens at, when a call asked for it (iOS `settingsVoicePage`); the
+         * cog and What's New open Settings' root.
+         */
+        val settingsVoicePage: VoiceSettingsPage? = null,
+        /**
+         * Settings › Experimental › Show Welcome (Welcome Preview): the first-run welcome over the
+         * paired app, closed back to it with nothing unpaired (iOS `@Presents var welcome`).
+         */
+        val welcome: WelcomeFeature.State? = null,
+        /** The run the Session Live Activity follows (Experimental), from an accepted send until it settles or another send takes over. */
+        val sessionActivity: SessionLiveActivity.Tracked? = null,
         val sessionDetail: SessionFeature.State? = null,
         /** A subagent waiting for its parent to open under it (`sessionTapped`). */
         val pendingSubagentPush: OpenCodeSession? = null,
@@ -203,6 +247,11 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         val pushedDetailCount: Int = 0,
         /** Why the next screen change happens, when the action that asks for it isn't the one that makes it. */
         val nextMoveReason: String? = null,
+        /**
+         * App refreshes this from the shared open-session operation before Home handles an action
+         * (iOS `voiceNavigationToolID`). A queued navigation cannot outlive its authorization.
+         */
+        val voiceNavigationToolID: String? = null,
     ) {
         enum class NoticeReadiness { unsettled, listed, settled }
 
@@ -248,15 +297,18 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
                 return Indicator.none
             }
 
-            /** Idle with something new, or waiting on the reader. Muted sessions never do, even while waiting. */
+            /** Idle with something new, or waiting on the reader. Muted and archived sessions never do. */
             fun needsCatchUp(session: OpenCodeSession): Boolean {
-                if (isMuted(session.id)) return false
+                if (session.isArchived || isMuted(session.id)) return false
                 return when (indicator(session)) {
                     Indicator.attention, Indicator.unread -> true
                     Indicator.running, Indicator.none -> false
                 }
             }
         }
+
+        /** iOS `PendingOpenReadState`: the server read and unread state a drawer read replaced. */
+        data class PendingOpenReadState(val viewedMilliseconds: Long?, val wasUnread: Boolean)
 
         /** What the reader views (iOS `Viewing`): equal when the threads are. */
         data class Viewing(val sessionID: String? = null, val rootID: String? = null) {
@@ -415,12 +467,12 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
 
         /**
          * Home has moved toward another screen, or shows something over the session: Catch Up,
-         * Settings, What's New, the Session Switcher, a push, a pending open, or a confirmation.
+         * Settings, What's New, a push, a pending open, or a confirmation.
          */
         val presentsOverHome: Boolean
             get() = catchUp != null ||
                 isSettingsShown ||
-                sessionSwitcher.isPresented ||
+                welcome != null ||
                 pendingDeletion != null ||
                 selectedTranscriptFetch != null ||
                 pendingSubagentPush != null ||
@@ -434,10 +486,25 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
          * Settings pushed as Settings, never as What's New (a call needing Voice set up, the cog):
          * already up with What's New as its page, it cross-fades to Settings' root.
          */
-        fun showingSettings(): State {
-            val shown = settings ?: return presentingSettings(SettingsFeature.State(server = server))
-            if (shown.root != SettingsFeature.State.Root.whatsNew) return this
-            return copy(settings = SettingsFeature().reduce(shown, SettingsFeature.Action.ShowSettingsRoot).state)
+        fun showingSettings(voicePage: VoiceSettingsPage? = null): State {
+            val next = copy(settingsVoicePage = voicePage)
+            val shown = settings ?: return next.presentingSettings(SettingsFeature.State(server = server, path = voiceSettingsPath(voicePage)))
+            if (shown.root != SettingsFeature.State.Root.whatsNew) return next
+            val root = SettingsFeature().reduce(shown, SettingsFeature.Action.ShowSettingsRoot).state
+            return next.copy(settings = root.copy(path = voiceSettingsPath(voicePage)))
+        }
+
+        /**
+         * The pages a call's card opens Settings at (iOS `SettingsView`'s `voicePage` and
+         * `VoiceSettingsView`'s `opensPage`, which push on appearing): Voice, then Voice Provider
+         * (with Your Account over it) when Server Voice's provider row stands in for the key row.
+         */
+        private fun voiceSettingsPath(voicePage: VoiceSettingsPage?): List<SettingsPage> {
+            voicePage ?: return emptyList()
+            val showsProviderRow = dependency(ExperimentalFeatures)(ExperimentalFeature.serverVoice) &&
+                shared(VoiceSharedKeys.voiceEngine).value != VoiceEngine.grok
+            if (!showsProviderRow || voicePage == VoiceSettingsPage.voice) return listOf(SettingsPage.Voice)
+            return listOf(SettingsPage.Voice, SettingsPage.VoiceProvider(opensAccount = voicePage == VoiceSettingsPage.account))
         }
 
         /** A reconnect, a server's first connection, or a return to the app: the next list and attention read set the baseline quietly. */
@@ -514,9 +581,11 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
                     sessions = snapshot.sessions,
                     activeSessionIDs = snapshot.activeSessionIDs,
                     activeSessionParents = snapshot.activeSessionParents ?: emptyMap(),
+                    sessionPages = SessionPages(older = SessionPageCursor(next = snapshot.nextCursor)),
                     pinnedSessionKeys = shared(SharedKeys.pinnedSessionKeys).value,
                     lastViewedSessionIDs = shared(SharedKeys.lastViewedSessionIDs).value,
                     sessionReadDates = shared(SharedKeys.sessionReadDates).value,
+                    sessionSeenWatermarks = shared(SharedKeys.sessionSeenWatermarks).value,
                     manuallyUnreadSessionKeys = shared(SharedKeys.manuallyUnreadSessionKeys).value,
                     mutedSessionKeys = shared(SharedKeys.mutedSessionKeys).value,
                     isSidebarShown = shared(SharedKeys.sidebarShown).value,
@@ -567,12 +636,8 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
 
     /** What Home asks its parent (`AppFeature`) to do; iOS handles these cases in `AppFeature`. */
     sealed interface DelegateAction {
-        /** Returns to the server picker. */
-        data object ServerBadgeTapped : DelegateAction
         /** Connects to another saved server. */
         data class ServerSwitchTapped(val server: OpenCodeServer) : DelegateAction
-        /** Leave this server to pick another. */
-        data object ServersRequested : DelegateAction
         /** Renames a saved server in place, without reconnecting (Home also takes the name). */
         data class ServerRenamed(val server: OpenCodeServer, val name: String) : DelegateAction
         /** Opens a saved server's address, credentials and headers for editing. */
@@ -586,15 +651,18 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
     }
 
     sealed interface Action {
-        data class SessionSwitcher(val action: SessionSwitcherFeature.Action) : Action
         data class CatchUp(val action: CatchUpFeature.Action) : Action
         data class Traces(val action: TraceUploadsFeature.Action) : Action
+        data class InboxSidebar(val action: InboxSidebarFeature.Action) : Action
+        data class SessionPages(val action: SessionPagesAction) : Action
         /** The drawer's What's New row: open (`buttonTapped`) or hide (`hideTapped`). */
         data class WhatsNew(val action: WhatsNewFeature.Action) : Action
         /** Preferences (`:feature:settings`' `HomeSettingsFeature`); Home's own sender is the sidebar toggle. */
         data class Settings(val action: HomeSettingsFeature.Action) : Action
         /** The presented Settings ([State.settings]); its delegates are handled in `HomeFeatureSettings.kt`. */
         data class SettingsScreen(val action: PresentationAction<SettingsFeature.Action>) : Action
+        /** Show Welcome over Home ([State.welcome]); its pairing requests go to the app. */
+        data class Welcome(val action: PresentationAction<WelcomeFeature.Action>) : Action
         /** iOS `.binding(.set(\.search, …))`. */
         data class SearchChanged(val text: String) : Action
         /** iOS `.binding(.set(\.isSettingsShown, …))`: the view popped (or pushed) Settings. */
@@ -610,6 +678,8 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         /** Last-known running state is too old to show while reconnecting. */
         data object LastKnownActivityExpired : Action
         data object RetryConnectionTapped : Action
+        /** Server Flow: the note's Try Again or Pair Again. */
+        data object ServerSwitchNoteActionTapped : Action
         /** The network path came back or moved to another interface. */
         data object NetworkRerouted : Action
         data class ServerEvent(val event: OpenCodeServerEvent) : Action
@@ -625,6 +695,9 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         /** Opens a draft whose prompt asks OpenCode to install the plugin. */
         data object NotifyPluginSetUpTapped : Action
         data object SettingsTapped : Action
+
+        /** The drawer's call button: a call on the session behind the drawer. */
+        data object DrawerCallTapped : Action
         /** Manage Servers… in the drawer's title menu: Settings arrives showing the server page. */
         data object ManageServersTapped : Action
         /** The drawer visually reached the other edge: its haptic. */
@@ -632,6 +705,10 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         data object NewSessionTapped : Action
         /** A computer paired for the first time: open the drawer on its sessions. */
         data object PairedComputerOpened : Action
+        /** The install's first computer paired: a ready session in its latest project, with starter prompts. */
+        data object FirstComputerPaired : Action
+        /** The background wait found the followed run's session idle and read its last items. */
+        data class SessionActivitySettled(val sessionID: String, val items: List<OpenCodeTranscriptItem>) : Action
         /** The view opened the drawer `drawerOpenRequest` asked for. */
         data object DrawerOpenRequestHandled : Action
         data class SessionTapped(val sessionID: String) : Action
@@ -730,10 +807,13 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         data object NetworkPath : CancelID
         data object InAppNotice : CancelID
         data object LiveUpdatesAfterLeaving : CancelID
+        data object SessionActivityWait : CancelID
         data class CachedTranscript(val sessionID: String) : CancelID
         data object LinkedSessionOpen : CancelID
         data class DeleteSession(val sessionID: String) : CancelID
         data class ViewReceipt(val sessionID: String) : CancelID
+        data object SessionSearch : CancelID
+        data object OlderSessions : CancelID
     }
 
     /** The assembled body (`HomeFeatureComposition.kt`). */
@@ -744,11 +824,14 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
     companion object {
         /** Asks the user's own OpenCode to install the plugin; they review it before sending. */
         val notifyPluginSetUpPrompt: String =
-            "Set up OpenCode iOS notifications on this server. Add \"${OpenCodeNotifyPluginStatus.PACKAGE_ENTRY}\" " +
-                "to the \"plugins\" array of my global OpenCode config (~/.config/opencode/opencode.json or opencode.jsonc, " +
-                "whichever exists), keeping every other entry and any comments. Don't restart the server: OpenCode reloads " +
-                "config changes on its own. Then confirm a plugin with ID \"${OpenCodeNotifyPluginStatus.PLUGIN_ID}\" is " +
-                "active (GET /api/plugin) and tell me if anything went wrong."
+            "Set up OpenCode iOS notifications on this server. Run `opencode plugin add " +
+                "${OpenCodeNotifyPluginStatus.PACKAGE_ENTRY}`, which installs the plugin and adds it to my global OpenCode " +
+                "config. If that command isn't available, add \"${OpenCodeNotifyPluginStatus.PACKAGE_ENTRY}\" to the \"plugins\" " +
+                "array of ~/.config/opencode/opencode.json (or opencode.jsonc, whichever exists), keeping every other entry " +
+                "and any comments. If the config lists \"${OpenCodeNotifyPluginStatus.LEGACY_PACKAGE_ENTRY}\", remove that entry. " +
+                "Don't restart the server: OpenCode reloads config changes on its own. Then confirm a plugin with ID " +
+                "\"${OpenCodeNotifyPluginStatus.PLUGIN_ID}\" is active (`opencode api get /api/plugin`). If it's listed but not " +
+                "active, tell me why (the server log says) before changing anything else. Tell me if anything went wrong."
 
         /** Mark All as Read receipts in flight at once. */
         const val receiptConcurrency = CatchUpFeature.receiptConcurrency
@@ -893,6 +976,7 @@ fun HomeFeature.State.makeDetail(
     var detail = SessionFeature.State.session(
         server = server,
         session = session,
+        projects = projects,
         cachedItems = cachedItems,
         initialTranscriptRequestIsExternal = externalTranscript,
         isRunning = session.id in s.activeSessionIDs,
@@ -901,7 +985,10 @@ fun HomeFeature.State.makeDetail(
     )
     detail = s.seedingSessionSnapshot(detail)
     detail = detail.copy(streamIsHealthy = s.isEventStreamLive)
-    detail = detail.noteOpening(seen = s.sessionSnapshots[session.id]?.seenItemIDs, leftAt = s.sessionSnapshots[session.id]?.leftAt)
+    val pending = s.pendingOpenReadState[session.id]
+    if (pending != null) s = s.copy(pendingOpenReadState = s.pendingOpenReadState - session.id)
+    detail = s.applyingOpening(session, pending, detail)
+    if (session.id in s.unopenedSeen) s = s.copy(unopenedSeen = s.unopenedSeen - session.id)
     val pick = s.waitingPicks[session.id]
     if (pick != null) {
         s = s.copy(waitingPicks = s.waitingPicks - session.id)
@@ -1001,7 +1088,7 @@ private fun HomeFeature.State.beginningDetailTransition(
     targetIsDraft: Boolean = false,
 ): Pair<HomeFeature.State, DetailTransition> {
     // Another session replaces the root: whatever was pushed over it goes.
-    var s = poppingSubagents(toDepth = 0).rememberingSession().syncingOutgoingDetailDraft(targetIsDraft)
+    var s = poppingSubagents(toDepth = 0, reason = nextMoveReason).rememberingSession().syncingOutgoingDetailDraft(targetIsDraft)
     val reason = s.nextMoveReason ?: defaultReason
     // Keeping the identity keeps a live call's or recording's effects alive.
     val activeVoice = s.sessionDetail?.voice?.takeIf { !it.phase.isTerminal }
@@ -1074,6 +1161,19 @@ private fun HomeFeature.State.syncingOutgoingDetailDraft(targetIsDraft: Boolean 
 }
 
 /**
+ * iOS `restorePersistedPick(into:)`: a relaunch brings back the session's waiting model pick,
+ * unless the server's list (once loaded) no longer offers it.
+ */
+internal fun HomeFeature.State.restoringPersistedPick(detail: SessionFeature.State): SessionFeature.State =
+    dependency(ComposerPersistence).restorePersistedPick(
+        serverID = server.persistenceID,
+        session = detail.session,
+        pendingModel = detail.pendingModel,
+        hasSnapshot = detail.session?.let { sessionSnapshots[it.id] } != null,
+        models = detail.models,
+    )?.let { pick -> detail.copy(currentModel = pick, pendingModel = pick) } ?: detail
+
+/**
  * A parked or persisted composer comes back with its session (iOS `restorePersistedDraft(into:)`),
  * and a draft whose send already created its session becomes that session.
  */
@@ -1086,6 +1186,7 @@ private fun HomeFeature.State.restoringPersistedDraft(
     val persistence = dependency(ComposerPersistence)
     var s = this
     var next = detail
+    next = restoringPersistedPick(next)
     if (next.session == null) {
         val entry = persistence.loadOutbox(server.persistenceID, null).firstOrNull()
         if (entry != null) {
@@ -1134,6 +1235,7 @@ fun HomeFeature.State.remembering(detail: SessionFeature.State): HomeFeature.Sta
     if (sessions.none { it.id == id } && snapshot.session.parentID == null) return this
     val snapshots = sessionSnapshots.toMutableMap()
     snapshots[id] = snapshot
+    val watermarked = syncingSeenWatermark(detail, id)
     val rootID = detail.familyRootID
     if (rootID != null && rootID != id) {
         snapshots[rootID]?.let { root ->
@@ -1144,6 +1246,8 @@ fun HomeFeature.State.remembering(detail: SessionFeature.State): HomeFeature.Sta
                 forms = snapshot.forms,
                 formAnswers = snapshot.formAnswers,
                 questionPageIndices = snapshot.questionPageIndices,
+                collapsedRequests = snapshot.collapsedRequests,
+                answerDrafts = snapshot.answerDrafts,
                 hasLoadedRequests = snapshot.hasLoadedRequests,
                 completedRequests = snapshot.completedRequests,
                 selectedRequest = snapshot.selectedRequest,
@@ -1152,7 +1256,7 @@ fun HomeFeature.State.remembering(detail: SessionFeature.State): HomeFeature.Sta
     }
     val order = (sessionSnapshotOrder - id + id).toMutableList()
     while (order.size > HomeFeature.transcriptMemoryLimit) snapshots.remove(order.removeAt(0))
-    return copy(sessionSnapshots = snapshots, sessionSnapshotOrder = order)
+    return watermarked.copy(sessionSnapshots = snapshots, sessionSnapshotOrder = order)
 }
 
 /**
@@ -1160,7 +1264,7 @@ fun HomeFeature.State.remembering(detail: SessionFeature.State): HomeFeature.Sta
  * parent already knows (its transcript, its own subagents, their requests), so nothing new is
  * read to show it.
  */
-fun HomeFeature.State.pushingSubagent(session: OpenCodeSession): HomeFeature.State {
+fun HomeFeature.State.pushingSubagent(session: OpenCodeSession, reason: String? = null): HomeFeature.State {
     val parent = topDetail ?: return this
     if (parent.session?.id == session.id) return this
     val pushedCount = pushedDetailCount + 1
@@ -1168,13 +1272,15 @@ fun HomeFeature.State.pushingSubagent(session: OpenCodeSession): HomeFeature.Sta
     var detail = SessionFeature.State.session(
         server = server,
         session = session,
+        projects = projects,
         cachedItems = parent.familyTranscriptCache[session.id] ?: s.cachedTranscriptItems(session),
         isRunning = session.id in s.activeSessionIDs || session.id in parent.activeFamilySessionIDs,
         navigationID = -pushedCount,
     )
     detail = s.seedingSessionSnapshot(detail)
     detail = detail.copy(streamIsHealthy = s.isEventStreamLive || parent.streamIsHealthy)
-    detail = detail.noteOpening(seen = s.sessionSnapshots[session.id]?.seenItemIDs, leftAt = s.sessionSnapshots[session.id]?.leftAt)
+    detail = s.applyingOpening(session, detail = detail)
+    if (session.id in s.unopenedSeen) s = s.copy(unopenedSeen = s.unopenedSeen - session.id)
     val pick = s.waitingPicks[session.id]
     if (pick != null) {
         s = s.copy(waitingPicks = s.waitingPicks - session.id)
@@ -1195,6 +1301,9 @@ fun HomeFeature.State.pushingSubagent(session: OpenCodeSession): HomeFeature.Sta
         detail = detail.withPermissionRequests(parent.permissionRequests.filter { it.sessionID in members })
             .withFormRequests(forms)
             .withFormAnswers(parent.formAnswers.filterKeys { it in formIDs })
+            // A question folded or paged in the parent stays so in its subagent.
+            .withQuestionPageIndices(parent.questionPageIndices.filterKeys { it in formIDs })
+            .updateRequestDock { it.copy(collapsedRequestIDs = parent.requestDock.collapsedRequestIDs.intersect(formIDs)) }
             .copy(hasLoadedPendingRequests = parent.hasLoadedPendingRequests)
     }
     detail = detail.copy(
@@ -1208,7 +1317,7 @@ fun HomeFeature.State.pushingSubagent(session: OpenCodeSession): HomeFeature.Sta
     if (detail.wantsRequestDock && !detail.isAnsweringRequest) detail = detail.beginAnswering()
     val (restored, withDraft) = s.restoringPersistedDraft(detail)
     s = restored.copy(subagentStack = restored.subagentStack + withDraft)
-    return s.markingTopScreen().absorbingSharedDrafts().retargetingCallToTop(reason = "you opened a subagent")
+    return s.markingTopScreen().absorbingSharedDrafts().retargetingCallToTop(reason = reason ?: "you opened a subagent")
 }
 
 /** Only the screen on top of the stack plays a request's arrival. */
@@ -1224,7 +1333,7 @@ private fun HomeFeature.State.markingTopScreen(): HomeFeature.State {
  * items, their transcripts stay with the parent for the next push, and a recording there ends
  * with its words.
  */
-fun HomeFeature.State.poppingSubagents(toDepth: Int): HomeFeature.State {
+fun HomeFeature.State.poppingSubagents(toDepth: Int, reason: String? = null): HomeFeature.State {
     val targetDepth = maxOf(toDepth, 0)
     if (subagentStack.size <= targetDepth) return this
     var s = copy(
@@ -1253,26 +1362,7 @@ fun HomeFeature.State.poppingSubagents(toDepth: Int): HomeFeature.State {
             s.updatingDetail { it.copy(familyTranscriptCache = it.familyTranscriptCache + (sessionID to items)) }
         }
     }
-    return s.markingTopScreen().retargetingCallToTop(reason = "you went back")
-}
-
-fun HomeFeature.State.pushingPendingSubagent(): HomeFeature.State {
-    val child = pendingSubagentPush ?: return this
-    if (child.parentID != sessionDetail?.session?.id) return this
-    return copy(pendingSubagentPush = null).pushingSubagent(child)
-}
-
-/** The call follows the screen on top, as it follows a drawer switch (iOS `retargetCallToTop(reason:)`). */
-fun HomeFeature.State.retargetingCallToTop(reason: String): HomeFeature.State {
-    val voice = sessionDetail?.voice ?: return this
-    if (voice.phase.isTerminal) return this
-    val topScreen = topDetail ?: return this
-    val top = topScreen.session ?: return this
-    if (voice.target.sessionID == top.id) return this
-    return updatingDetail { detail ->
-        val moved = detail.voice?.retarget(top, reason = reason)?.copy(viewing = topScreen.browser.viewing)
-        detail.copy(voice = moved).reconcileInvariants(targetScreen = topScreen)
-    }
+    return s.markingTopScreen().retargetingCallToTop(reason = reason ?: "you went back")
 }
 
 /** Shared by the selected detail and Catch Up's inert next-card preview. */

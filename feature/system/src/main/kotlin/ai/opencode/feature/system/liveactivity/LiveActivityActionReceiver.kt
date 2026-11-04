@@ -18,7 +18,7 @@ import kotlinx.coroutines.launch
  * Live Update swiped away (iOS `activityStateUpdates` reporting `.dismissed`).
  */
 class LiveActivityActionReceiver : BroadcastReceiver() {
-    enum class Kind { VoiceCall, Dictation }
+    enum class Kind { VoiceCall, Dictation, SessionRun }
 
     data class Dismissal(val kind: Kind, val activityID: String)
 

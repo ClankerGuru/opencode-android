@@ -145,6 +145,11 @@ data class WorkingActivity(
     val handoffDuration: Double = WorkingRun.handoff,
     /** The server will retry the run's failed step: the line counts down to it. */
     val retry: OpenCodeRunRetry? = null,
+    /**
+     * Server Flow: the server dropped, so the run's state is only last known; the orb holds
+     * still until it answers.
+     */
+    val isHeld: Boolean = false,
 ) {
     enum class Phase { running, stopping, done, failed }
 
@@ -391,7 +396,8 @@ data class WorkingRun(
         /**
          * How the last turn ended: Failed when it carries a run error, unless the run was stopped
          * (a neutral end); Done when the server answered; null when it didn't (a send that failed
-         * or never reached it).
+         * or never reached it). An answer after an error (a later run in the same turn) is Done:
+         * the error was an earlier run's.
          */
         fun outcome(items: List<OpenCodeTranscriptItem>): Outcome? {
             var answered = false
@@ -399,8 +405,12 @@ data class WorkingRun(
                 when (item) {
                     is OpenCodeTranscriptItem.UserText, is OpenCodeTranscriptItem.UserImages, is OpenCodeTranscriptItem.UserFiles ->
                         return if (answered) Outcome.done else null
-                    is OpenCodeTranscriptItem.RunError -> return if (item.error.isStop) Outcome.interrupted else Outcome.failed
+                    is OpenCodeTranscriptItem.RunError -> {
+                        if (answered) return Outcome.done
+                        return if (item.error.isStop) Outcome.interrupted else Outcome.failed
+                    }
                     is OpenCodeTranscriptItem.Info -> if (item.id.endsWith("-error")) {
+                        if (answered) return Outcome.done
                         // A transcript cached before run errors had their own row.
                         return if (item.text == STOPPED_RUN_TEXT || item.text.startsWith("Run failed: aborted")) Outcome.interrupted else Outcome.failed
                     }

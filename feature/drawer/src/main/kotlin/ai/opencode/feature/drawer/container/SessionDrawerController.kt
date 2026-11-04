@@ -126,18 +126,6 @@ class SessionDrawerController internal constructor(
     var onCommitted: () -> Unit = {}
     var onTouchDown: () -> Unit = {}
     var onPresentationChanged: (Boolean) -> Unit = {}
-    var onDrawerProgress: (Float, Boolean) -> Unit = { _, _ -> }
-
-    /** See `SessionDrawerContainer`'s `dismissesKeyboardOnOpen`. */
-    var dismissesKeyboardOnOpen: Boolean = false
-        set(value) {
-            val old = field
-            field = value
-            motion.dismissesKeyboardOnOpen = value
-            if (!value || old || !isContentSuspended) return
-            keyboardHold?.letGo(leavingCard = true)
-            clearFocus()
-        }
 
     /**
      * The session the card shows, or is about to show once a session chosen in the drawer has
@@ -210,7 +198,7 @@ class SessionDrawerController internal constructor(
         if (!isContentSuspended) sessionWhenSuspended = contentSessionID
         isContentSuspended = true
         val hold = keyboardHold
-        if (dismissesKeyboardOnOpen || hold == null || !hold.isHolding) clearFocus()
+        if (hold == null || !hold.isHolding) clearFocus()
     }
 
     /**
@@ -220,7 +208,7 @@ class SessionDrawerController internal constructor(
      */
     private fun contentBecameInteractive() {
         isContentSuspended = false
-        val restores = !dismissesKeyboardOnOpen && DrawerKeyboard.restoresFocus(
+        val restores = DrawerKeyboard.restoresFocus(
             openedOn = sessionWhenSuspended,
             closedOn = contentSessionID,
             sheetPresented = isSheetPresented(),
@@ -255,8 +243,6 @@ class SessionDrawerController internal constructor(
 
     /** Mode changes place the drawer without a haptic or an arrival (iOS sets `isPresented`/`restsOpen` directly). */
     private var quiet = false
-    /** `apply(offset:)` places the card without moving it (Catch Up's return). */
-    private var placesWithoutMoving = false
 
     private inline fun quietly(block: () -> Unit) {
         val was = quiet
@@ -274,9 +260,6 @@ class SessionDrawerController internal constructor(
             onCommitted = { if (!quiet) onCommitted() },
             onTouchDown = { onTouchDown() },
             onPresentationChanged = { onPresentationChanged(it) },
-            onProgress = { progress ->
-                if (!quiet || placesWithoutMoving) onDrawerProgress(if (sidebarShown == null) progress else 0f, !placesWithoutMoving)
-            },
             onSuspendContent = ::suspendContent,
             onContentInteractive = { contentBecameInteractive() },
         )
@@ -480,9 +463,7 @@ class SessionDrawerController internal constructor(
             startProgress = motion.progress
             val wasPresented = motion.isPresented
             if (wasPresented) onPresentationChanged(false)
-            // Catch Up takes over from the drawer; that is not a close to feel. Nothing docked in
-            // the drawer stays over it.
-            onDrawerProgress(0f, false)
+            // Catch Up takes over from the drawer; that is not a close to feel.
             quietly {
                 if (wasPresented) motion.setPresented(false, animated = false) else if (motion.offset > 0f) motion.settle(0f, animated = false)
             }
@@ -556,9 +537,12 @@ class SessionDrawerController internal constructor(
                 val start = if (animated) PRERENDER_ALPHA else 0f
                 chromeAlpha.floatValue = start + (1f - start) * p
                 chromeScale.floatValue = 1f
-                stackOffset.floatValue = startOffset * (1f - p)
+                // Android's modal drawer covers a card that never moved: the stack starts in place,
+                // and only a drawer that was open fades out over it.
+                val modal = sidebarShown == null
+                stackOffset.floatValue = if (modal) 0f else startOffset * (1f - p)
                 drawerScale.floatValue = startScale + (closedScale - startScale) * p
-                drawerAlpha.floatValue = 1f - p
+                drawerAlpha.floatValue = if (modal && startProgress <= 0f) 0f else 1f - p
                 dimAlpha.floatValue = startDim + (endDim - startDim) * p
                 outgoingAlpha.floatValue = if (snapshot == null) 0f else 1f - easeOut(t, 0.2)
             },
@@ -746,7 +730,8 @@ class SessionDrawerController internal constructor(
                 maskProgress.floatValue = p
                 cardRadius.floatValue = stackRadius + (displayCornerRadius - stackRadius) * p
                 borderAlpha.floatValue = 1f - p
-                cardTx.floatValue = target * p
+                // Android's modal drawer opens over the card, so the card grows in place beneath it.
+                cardTx.floatValue = if (sidebarShown == null) 0f else target * p
                 cardTy.floatValue = 0f
                 cardScale.floatValue = 1f
                 val startAlpha = if (wasShowingCard) 1f else PRERENDER_ALPHA
@@ -772,12 +757,6 @@ class SessionDrawerController internal constructor(
                 // Cut short by Catch Up opening again or the drawer becoming a sidebar: that owns
                 // the card now, and the drawer never arrived.
                 if (catchUp == null && sidebarShown == null) {
-                    placesWithoutMoving = true
-                    try {
-                        onDrawerProgress(1f, false)
-                    } finally {
-                        placesWithoutMoving = false
-                    }
                     onArrived(true)
                 }
             },

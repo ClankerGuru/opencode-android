@@ -2,10 +2,9 @@ package ai.opencode.feature.session
 
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.feature.voice.FloatingCallCenter
-import ai.opencode.feature.voice.VoiceFeature
-import ai.opencode.feature.voice.callTrayMic
 import ai.opencode.feature.voice.floatingCallButton
-
+import ai.opencode.feature.composer.ComposerKeyboardReveal
+import ai.opencode.feature.composer.LocalComposerKeyboardMorph
 import ai.opencode.feature.composer.MicPressCallbacks
 import ai.opencode.feature.composer.RequestBar
 import ai.opencode.core.motion.Motion
@@ -18,7 +17,7 @@ import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.excludedFromDrawerPan
 import ai.opencode.core.ui.openCodeTapTarget
 import ai.opencode.feature.session.SessionFeature.Action
-import ai.opencode.core.experiments.ModelPickerStyle
+import ai.opencode.feature.composer.AttachmentMenuPhase
 import ai.opencode.feature.composer.AttachmentPickerButton
 import ai.opencode.feature.composer.ComposerAgentChip
 import ai.opencode.core.store.observe
@@ -26,8 +25,9 @@ import ai.opencode.feature.composer.RequestDockMetrics
 import ai.opencode.feature.composer.SelectionMark
 import ai.opencode.feature.composer.SelectionMarkWidth
 import ai.opencode.feature.composer.micPressGesture
-import ai.opencode.feature.composer.modelpicker.FusedModelChip
 import ai.opencode.feature.composer.modelpicker.ModelPickerChip
+import ai.opencode.feature.composer.modelpicker.OnePickerChip
+import ai.opencode.feature.composer.modelpicker.OnePickerController
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -35,6 +35,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
@@ -80,16 +81,19 @@ import kotlin.math.min
 private const val SLOT = 48f
 
 /**
- * iOS `composerLeadingControls(expanded:secondaryMic:recording:fading:)`: + (the recording's ×
- * while dictating), then the expanded row's model button and the leading mic.
+ * iOS `composerLeadingControls(expanded:recording:fading:)`: + (the recording's × while
+ * dictating), then the expanded row's agent and model chips, revealed with the keyboard morph's
+ * expansion ([ComposerKeyboardReveal]). The secondary mic stays beside Send in either pose.
  */
 @Composable
-internal fun SessionComposerEnv.ComposerLeadingControls(
-    expanded: Boolean,
-    secondaryMic: ComposerControls.MicPlacement,
-    recording: Boolean,
-    rowAlpha: Float,
-) {
+internal fun SessionComposerEnv.ComposerLeadingControls(expanded: Boolean, recording: Boolean) {
+    val morph = LocalComposerKeyboardMorph.current
+    // The row's own fade into and out of the dictation bar: quick out, in after the bar has cleared.
+    val fade = if (recording) {
+        Motion.easeOut<Float>(Motion.fadeFast, reduceMotion = reducedMotion)
+    } else {
+        Motion.easeOut<Float>(Motion.fadeStandard, if (reducedMotion) 0.0 else Motion.contentDelay, reducedMotion)
+    }
     // 9 dp from the + leaves as much air after its ink as the mic leaves before the trailing circle.
     Row(
         Modifier.fillMaxWidth(),
@@ -98,23 +102,18 @@ internal fun SessionComposerEnv.ComposerLeadingControls(
     ) {
         // While dictating, the same + turns into the recording's ×.
         AttachmentButton()
-        ComposerAccessoryRow(
-            isExpanded = expanded,
-            screen = s.navigationID,
-            recording = recording,
-            modifier = Modifier.weight(1f).alpha(rowAlpha),
-            revealed = {
-                Row(horizontalArrangement = Arrangement.spacedBy(ComposerTunables.leadingSpacing.dp), verticalAlignment = Alignment.CenterVertically) {
-                    if (agentSelection) AgentButton()
-                    ModelButton(enabled = expanded && !recording)
-                }
-            },
-            trailing = {
-                if (secondaryMic == ComposerControls.MicPlacement.leading) {
-                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) { SecondaryMicButton() }
-                }
-            },
-        )
+        val chips = @Composable {
+            Row(horizontalArrangement = Arrangement.spacedBy(ComposerTunables.leadingSpacing.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (agentSelection) AgentButton()
+                ModelButton(enabled = expanded && !recording)
+            }
+        }
+        if (morph != null) {
+            ComposerKeyboardReveal(morph, recording = recording, fade = fade) { chips() }
+        } else if (expanded) {
+            chips()
+        }
+        Spacer(Modifier.weight(1f))
     }
 }
 
@@ -140,41 +139,40 @@ private fun SessionComposerEnv.AgentButton() {
 }
 
 /**
- * The model control (iOS `modelButton`): Model Picker › Today and › Sheet show composer's
- * [ModelPickerChip]; › Grow from Composer its [FusedModelChip] (tap opens the list, a vertical
- * drag raises the level stack, a sideways drag scrubs the level).
+ * The model control (iOS `modelButton`): composer's [ModelPickerChip] (tap opens the model
+ * picker sheet); with One Picker on, its [OnePickerChip] (tap grows One Picker out of the
+ * composer).
  */
 @Composable
 private fun SessionComposerEnv.ModelButton(enabled: Boolean) {
     val picker = rememberModelPickerState(store)
-    val anchors = host.modelPickerAnchors
     ComposerHidden(foldsComposerControls) {
-        if (modelPickerStyle == ModelPickerStyle.growFromComposer && anchors != null) {
-            FusedModelChip(
+        if (usesOnePicker) {
+            val panels = host.modelPanels
+            val unmounted = remember { OnePickerController() }
+            OnePickerChip(
                 state = picker,
-                anchors = anchors,
-                composerTop = host.attachmentAnchors.composer.top,
-                onEvent = { store.send(modelPickerAction(it)) },
-                // iOS `openModelList`: the list grows out of the composer as the sheet it morphs into.
-                onOpenList = {
-                    if (host.modelPanels != null) {
-                        host.openModelList()
+                controller = panels?.onePicker ?: unmounted,
+                onEvent = { event -> modelPickerAction(event)?.let(store::send) },
+                // iOS `openOnePicker()`: the picker grows out of the composer in the keyboard's place.
+                onOpen = {
+                    if (panels != null && panels.canPresentOnePickerMorph) {
+                        panels.openOnePicker()
                     } else {
                         dismissKeyboard()
                         store.send(Action.ModelButtonTapped)
                     }
                 },
-                isEnabled = enabled && host.modelPanels?.modelList?.isOpen != true,
+                isEnabled = enabled && panels?.onePicker?.isOpen != true,
             )
         } else {
-            val usesSheet = modelPickerStyle == ModelPickerStyle.sheet
             ModelPickerChip(
                 state = picker,
-                usesModelPickerSheet = usesSheet,
                 onClick = {
                     if (!enabled) return@ModelPickerChip
-                    // Put away, or a row's level menu raises the composer's keyboard over the sheet.
-                    if (usesSheet) dismissKeyboard()
+                    // Put away under any picker sheet (iOS 07b2f5f8), or a row's level menu raises the
+                    // composer's keyboard over the sheet.
+                    if (host.messageFieldFocused) dismissKeyboard()
                     store.send(Action.ModelButtonTapped)
                 },
             )
@@ -194,7 +192,7 @@ private fun SessionComposerEnv.AttachmentButton() {
     val hold = s.dictationHold
     val pose = hold?.let { dictationPose(it) }
     // New Plus Menu: a hold on + peeks at the newest photos (iOS `peek`, `showRecentPhotos`, `addLibraryPhotos`).
-    val photoSheet = LocalSessionPhotoSheet.current?.takeIf { it.usesPlusMenuSheet }
+    val photoSheet = LocalSessionPhotoSheet.current
     AttachmentPickerButton(
         isLoading = host.isImportingAttachments,
         isOpen = host.isAttachmentMenuOpen,
@@ -210,6 +208,8 @@ private fun SessionComposerEnv.AttachmentButton() {
         peek = photoSheet?.recentPeek,
         onHoldPeek = { photoSheet?.showRecentPhotos() == true },
         onPeekChoose = { id -> photoSheet?.addLibraryPhotos(listOf(id)) },
+        // iOS `popsOnClose`: the New Plus Menu collapses back into + and the glyph pops.
+        popsOnClose = photoSheet != null && photoSheet.attachmentMenu == AttachmentMenuPhase.Menu && !photoSheet.morph.isShown,
         // Sliding from + to the rows must not open the drawer; loading, or as the recording's ×, it takes no slide.
         modifier = Modifier.excludedFromDrawerPan(!host.isImportingAttachments && hold == null),
     )
@@ -318,7 +318,11 @@ internal fun SessionComposerEnv.AnswerTrailingControls(bar: RequestBar) {
             is RequestBar.Answer, is RequestBar.Choose -> {
                 val ready = bar.isReady
                 val control = ComposerTrailingControl.Send(enabled = ready)
-                val enabled = ready && !responding
+                // The last send didn't reach the server: Send becomes Retry.
+                val retries = bar.isLast && s.requestRetries
+                // Settled on the server already: nothing more can send (× clears it).
+                val settled = s.requestSettled
+                val enabled = ready && !responding && !settled
                 ComposerHidden(foldsComposerControls) {
                     Box(
                         Modifier
@@ -333,7 +337,7 @@ internal fun SessionComposerEnv.AnswerTrailingControls(bar: RequestBar) {
                             }
                             .openCodeTapTarget(accessibility = false)
                             .semantics(mergeDescendants = true) {
-                                contentDescription = if (bar.isLast) "Send" else "Next"
+                                contentDescription = if (retries) "Retry" else if (bar.isLast) "Send" else "Next"
                                 // iOS `accessibilityHint` on a disabled control: TalkBack reads no click
                                 // label there, so the reason is its state.
                                 if (!ready) stateDescription = "Choose an answer or type your own"
@@ -342,7 +346,7 @@ internal fun SessionComposerEnv.AnswerTrailingControls(bar: RequestBar) {
                         contentAlignment = Alignment.Center,
                     ) {
                         ComposerControlLabel(
-                            systemImage = if (bar.isLast) "arrow.up" else "chevron.right",
+                            systemImage = if (retries) "arrow.clockwise" else if (bar.isLast) "arrow.up" else "chevron.right",
                             showsProgress = responding,
                             foreground = control.foreground(),
                             background = if (ready) control.background() else OpenCodeTheme.colors.variant.surfaceStrong.color,
@@ -357,19 +361,14 @@ internal fun SessionComposerEnv.AnswerTrailingControls(bar: RequestBar) {
 /** iOS `secondaryMicButton`: dictation beside the call or Stop. */
 @Composable
 internal fun SessionComposerEnv.SecondaryMicButton() {
-    // With the Call Tray, the mic scales, blurs and fades out as a call starts, and takes no touch.
-    val tray = callTray
-    val activeCallTray = if (tray != null && !s.isCovered && (callOwnsAudio || tray.holdsCallButton)) tray else null
-    val hidesForCallTray = activeCallTray?.isMicFolded == true
-    ComposerHidden(foldsHeldMic || hidesForCallTray) {
-        HoldToDictate(label = "Dictate message", isCallTrayActive = activeCallTray != null) {
+    ComposerHidden(foldsHeldMic) {
+        HoldToDictate(label = "Dictate message") {
             ComposerControlLabel(
                 systemImage = ComposerTunables.micSymbol,
                 showsProgress = false,
                 foreground = OpenCodeTheme.colors.secondaryText,
                 background = Color.Transparent,
                 glyphSize = 22.dp,
-                modifier = Modifier.callTrayMic(activeCallTray, reducedMotion),
             )
         }
     }
@@ -381,7 +380,7 @@ internal fun SessionComposerEnv.SecondaryMicButton() {
  * it lifts. TalkBack's activation locks a recording (or, dictating, puts the words in).
  */
 @Composable
-private fun SessionComposerEnv.HoldToDictate(label: String, isCallTrayActive: Boolean = false, content: @Composable () -> Unit) {
+private fun SessionComposerEnv.HoldToDictate(label: String, content: @Composable () -> Unit) {
     val callbacks = MicPressCallbacks(
         onBegan = { beginDictationHold() },
         onDrag = { view.dictationDrag = it },
@@ -393,8 +392,7 @@ private fun SessionComposerEnv.HoldToDictate(label: String, isCallTrayActive: Bo
     Box(
         Modifier
             // :feature:composer's press: recording starts at the first touch; tap vs hold is decided at the lift.
-            // iOS `allowsHitTesting(activeCallTray == nil)`: the call owns the mic's place.
-            .micPressGesture(isEnabled = s.dictationHold?.isLocked != true && !isCallTrayActive, callbacks = callbacks)
+            .micPressGesture(isEnabled = s.dictationHold?.isLocked != true, callbacks = callbacks)
             // Sliding left to cancel must not open the drawer. Once a recording is locked hands-free
             // the mic's place is free for swipes again.
             .excludedFromDrawerPan(s.dictationHold?.isLocked != true)
@@ -435,9 +433,18 @@ internal fun SessionComposerEnv.TrailingButton(control: ComposerTrailingControl)
         steers -> "Steer message"
         else -> control.accessibilityLabel
     }
+    // iOS `persistentSend`: New Plus Menu's Send stays put, dimmed while there's nothing to send.
+    val persistentSend = control is ComposerTrailingControl.Send
     val label: @Composable () -> Unit = {
+        if (persistentSend) {
+            ComposerSendLabel(
+                enabled = control == ComposerTrailingControl.Send(enabled = true),
+                showsProgress = s.isWaitingForUploads,
+                visualOffsetX = visualOffset,
+            )
+        } else {
         ComposerControlLabel(
-            systemImage = if (control == ComposerTrailingControl.Call && (floatsCall || usesCallTray)) "phone.fill" else control.symbolName,
+            systemImage = control.symbolName,
             showsProgress = s.isWaitingForUploads || (control == ComposerTrailingControl.Stop && s.isInterrupting),
             foreground = control.foreground(),
             background = control.background(),
@@ -450,6 +457,7 @@ internal fun SessionComposerEnv.TrailingButton(control: ComposerTrailingControl)
             // The mic's stand and base weigh its mass low: lifted, its optical centre sits on the end-cap's centre (OC-477).
             glyphRise = if (control == ComposerTrailingControl.Mic) ComposerTunables.micInkRise else 0f,
         )
+        }
     }
     val semantics = Modifier.semantics(mergeDescendants = true) {
         contentDescription = accessibilityLabel
@@ -461,70 +469,54 @@ internal fun SessionComposerEnv.TrailingButton(control: ComposerTrailingControl)
         }
     }
     val hidden = if (control == ComposerTrailingControl.Mic) foldsHeldMic else foldsComposerControls
-    // The Call Tray's own disc sits exactly here until the button is home, so the button comes
-    // back at full opacity in the frame the disc leaves, never fading up after it (OC-473).
-    ComposerHidden(control == ComposerTrailingControl.Call && holdsCallTrayButton, fadesOnReveal = false) {
-        ComposerHidden(hidden) {
-            when {
-                steers -> DeliveryMenu(
-                    onSend = { sendMessage(if (it == ai.opencode.server.model.OpenCodeDelivery.Queue) Action.QueueTapped else Action.SendTapped) },
-                    enabled = !disabled,
-                    // iOS `accessibilityHint` “Steers at the next step. Touch and hold to queue after this response.”
-                    clickLabel = "Steers at the next step",
-                    longClickLabel = "Queue after this response",
-                ) { menuModifier ->
-                    Box(menuModifier.openCodeTapTarget(accessibility = false).then(semantics), contentAlignment = Alignment.Center) { label() }
-                }
-                control == ComposerTrailingControl.Mic -> HoldToDictate(label = "Dictate message") { label() }
-                control == ComposerTrailingControl.Stop -> ComposerStopButton(
-                    holdStartsCall = holdingStopStartsCall,
-                    onStop = { store.send(Action.InterruptTapped) },
-                    onHold = { store.send(Action.StopLongPressed) },
-                    modifier = semantics,
-                ) { label() }
-                control == ComposerTrailingControl.Call -> Box(
-                    Modifier
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            // iOS `UndimmedWhilePressed(isOn: usesCallTray)`: the tray's disc lifts out of
-                            // this circle, so the press shows nothing over it.
-                            indication = if (usesCallTray) null else ripple(bounded = false, radius = 22.dp),
-                            role = Role.Button,
-                        ) {
-                            // Only ever starts a call; End is the call bar's.
-                            if (floatsCall) {
-                                val center = dependency(FloatingCallCenter)
-                                center.breakoutFrom = center.callButton
-                            }
-                            if (!hasCall) {
-                                val startsCall = s.canStartCallFromTap
-                                store.send(Action.VoiceTapped)
-                                // The tray's button lifts on the tap's own frame.
-                                val phase = store.state.voice?.phase ?: callStore?.state?.phase ?: if (store.state.callsFromRoot) VoiceFeature.State.Phase.Connecting else null
-                                if (usesCallTray && startsCall && phase != null && !phase.isTerminal && !phase.showsCard) {
-                                    callTray?.beginFromTap(reducedMotion)
-                                }
-                            }
-                        }
-                        .openCodeTapTarget(accessibility = false)
-                        // Where a floating call breaks out of: the circle, in window space.
-                        .then(if (floatsCall) Modifier.floatingCallButton() else Modifier)
-                        .then(semantics),
-                    contentAlignment = Alignment.Center,
-                ) { label() }
-                else -> Box(
-                    Modifier
-                        .clickable(
-                            enabled = !disabled,
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = ripple(bounded = false, radius = 22.dp),
-                            role = Role.Button,
-                        ) { sendMessage() }
-                        .openCodeTapTarget(accessibility = false)
-                        .then(semantics),
-                    contentAlignment = Alignment.Center,
-                ) { label() }
+    ComposerHidden(hidden) {
+        when {
+            steers -> DeliveryMenu(
+                onSend = { sendMessage(if (it == ai.opencode.server.model.OpenCodeDelivery.Queue) Action.QueueTapped else Action.SendTapped) },
+                enabled = !disabled,
+                // iOS `accessibilityHint` “Steers at the next step. Touch and hold to queue after this response.”
+                clickLabel = "Steers at the next step",
+                longClickLabel = "Queue after this response",
+            ) { menuModifier ->
+                Box(menuModifier.openCodeTapTarget(accessibility = false).then(semantics), contentAlignment = Alignment.Center) { label() }
             }
+            control == ComposerTrailingControl.Mic -> HoldToDictate(label = "Dictate message") { label() }
+            control == ComposerTrailingControl.Stop -> ComposerStopButton(
+                holdStartsCall = holdingStopStartsCall,
+                onStop = { store.send(Action.InterruptTapped) },
+                onHold = { store.send(Action.StopLongPressed) },
+                modifier = semantics,
+            ) { label() }
+            control == ComposerTrailingControl.Call -> Box(
+                Modifier
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = ripple(bounded = false, radius = 22.dp),
+                        role = Role.Button,
+                    ) {
+                        // Only ever starts a call; End is the floating call's.
+                        val center = dependency(FloatingCallCenter)
+                        center.breakoutFrom = center.callButton
+                        if (!hasCall) store.send(Action.VoiceTapped)
+                    }
+                    .openCodeTapTarget(accessibility = false)
+                    // Where a floating call breaks out of: the circle, in window space.
+                    .floatingCallButton()
+                    .then(semantics),
+                contentAlignment = Alignment.Center,
+            ) { label() }
+            else -> Box(
+                Modifier
+                    .clickable(
+                        enabled = !disabled,
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = ripple(bounded = false, radius = 22.dp),
+                        role = Role.Button,
+                    ) { sendMessage() }
+                    .openCodeTapTarget(accessibility = false)
+                    .then(semantics),
+                contentAlignment = Alignment.Center,
+            ) { label() }
         }
     }
 }

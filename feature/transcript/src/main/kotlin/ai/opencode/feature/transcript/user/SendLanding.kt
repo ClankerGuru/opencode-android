@@ -9,7 +9,10 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.GraphicsContext
+import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
@@ -53,10 +56,43 @@ class SendLanding {
         val isQueued: Boolean,
         /** The words it shows (its bubble's, or the queued pill's), for a send the composer didn't capture. */
         val text: String?,
+        /**
+         * The list follows the end as it lands (iOS `behavior.mode == .following`): a send's photos
+         * fly even when its words fade (a send under a jump's glide).
+         */
+        val isFollowing: Boolean = flies,
     )
+
+    /**
+     * A pending row leaving for the queued pill (iOS `flyIntoQueuedPill`): its last drawing and
+     * where it sat (window px). The host draws it shrinking into the pill, then [release]s it.
+     */
+    class PillDeparture internal constructor(
+        /** Its message's ID: a send still flying into it lands first (iOS `finishSendFlight`). */
+        val itemID: String?,
+        val layer: GraphicsLayer,
+        val bounds: Rect,
+        private val onRelease: () -> Unit,
+    ) {
+        private var released = false
+
+        /** Done drawing it: frees the layer. */
+        fun release() {
+            if (released) return
+            released = true
+            onRelease()
+        }
+    }
 
     private val markers = HashMap<String, Marker>()
     private val hidden = mutableStateMapOf<String, Boolean>()
+
+    /**
+     * The session's queued-pill host (iOS `flyIntoQueuedPill`'s window snapshot): draws a pending
+     * row shrinking into the pill above the composer, aiming at the pill's frame or, until it has
+     * appeared, just inside the list's bottom padding ([listEnd]). Null: the row leaves in place.
+     */
+    var onQueuedPill: ((PillDeparture) -> Unit)? = null
 
     /**
      * The session's flight host: lands [Send]. Returns true when the message will fly into its
@@ -66,6 +102,12 @@ class SendLanding {
 
     /** Whether the host holds a send's words waiting for the list (iOS `sendTransition.isPrepared`). */
     var isAwaitingSend: () -> Boolean = { false }
+
+    /**
+     * Whether the reader is moving the list (a drag, a borrowed drag, their fling; iOS
+     * `isUserScrolling`). Set by the list; a flight's words stop holding level when it is.
+     */
+    var isUserScrolling: () -> Boolean = { false }
 
     /**
      * Where a new last row's bottom will rest once the follower brings it in (window px): the
@@ -115,6 +157,12 @@ class SendLanding {
 
         /** Marks a pending label above a message (iOS `SendLandingProbe.labelSuffix`). */
         const val LABEL_SUFFIX = "#label"
+
+        /**
+         * iOS `SendLandingProbe.imageID`: a sent message's image slot, by its index among the
+         * message's images (the wire order), for the composer's `SentImageFlight` to land on.
+         */
+        fun imageID(messageID: String, index: Int): String = "$messageID#image-$index"
     }
 }
 
@@ -139,6 +187,92 @@ internal fun rememberSendLandingProbe(itemID: String?, suffix: String = ""): Sen
     }
     return probe
 }
+
+/**
+ * A frame-only marker for [key] while a [LocalSendLanding] is provided (iOS `SendLandingProbe`
+ * on a sent image's slot): it reports where it sits and never records, since the message's
+ * surfaces marker already draws the slot for the flight.
+ */
+@Composable
+internal fun rememberSendLandingMarker(key: String?): SendLanding.Marker? {
+    val landing = LocalSendLanding.current
+    if (landing == null || key == null) return null
+    val layer = rememberGraphicsLayer()
+    val marker = remember(landing, key, layer) { SendLanding.Marker(layer) }
+    DisposableEffect(landing, key, marker) {
+        landing.register(key, marker)
+        onDispose { landing.unregister(key, marker) }
+    }
+    return marker
+}
+
+/**
+ * A pending row's drawing, kept for its flight into the queued pill (iOS snapshots the cell's
+ * content as it leaves, `flyIntoQueuedPill`). The row records into it as it draws; when the list
+ * hands it to the pill ([depart]) the layer goes with it and the row draws nothing where it was.
+ */
+@Stable
+internal class QueuedPillSource(private val graphics: GraphicsContext, val itemID: String?) {
+    private var layer: GraphicsLayer? = null
+
+    /**
+     * What the row draws in place: [layer], until it departs. The list's fading copy of a removed
+     * row replays the row's last drawing, which holds this node, so hiding it on [depart] hides
+     * that copy too (iOS hides the cell's content, `contentView.alpha = 0`); otherwise the copy
+     * flying into the pill would also fade where the row was.
+     */
+    private var inPlace: GraphicsLayer? = null
+
+    /** Where the row sits (window px, unclipped). */
+    var bounds: Rect = Rect.Zero
+        private set
+
+    fun moved(coordinates: androidx.compose.ui.layout.LayoutCoordinates) {
+        bounds = Rect(coordinates.positionInWindow(), coordinates.size.toSize())
+    }
+
+    fun draw(scope: ContentDrawScope) {
+        val recording = layer ?: graphics.createGraphicsLayer().also { layer = it }
+        val shown = inPlace ?: graphics.createGraphicsLayer().also { inPlace = it }
+        with(scope) {
+            recording.record { this@with.drawContent() }
+            shown.alpha = 1f
+            shown.record { drawLayer(recording) }
+            drawLayer(shown)
+        }
+    }
+
+    /** Hands the last drawing to [landing]'s pill host; false when there's none (nothing drawn yet, no host). */
+    fun depart(landing: SendLanding): Boolean {
+        val host = landing.onQueuedPill ?: return false
+        val recorded = layer?.takeIf { bounds.width > 0f && bounds.height > 0f } ?: return false
+        layer = null
+        inPlace?.alpha = 0f
+        host(
+            SendLanding.PillDeparture(itemID, recorded, bounds) { graphics.releaseGraphicsLayer(recorded) },
+        )
+        return true
+    }
+
+    fun dispose() {
+        layer?.let(graphics::releaseGraphicsLayer)
+        layer = null
+        inPlace?.let(graphics::releaseGraphicsLayer)
+        inPlace = null
+    }
+}
+
+/** Records [source]'s row as it draws, and draws nothing in place while [departing] (its copy flies into the pill). */
+internal fun Modifier.queuedPillSource(source: QueuedPillSource?, departing: () -> Boolean): Modifier {
+    if (source == null) return this
+    return this
+        .onGloballyPositioned { if (!departing()) source.moved(it) }
+        .drawWithContent { if (!departing()) source.draw(this) }
+}
+
+/** Reports where a frame-only [marker] sits (window px, unclipped). */
+internal fun Modifier.sendLandingMarker(marker: SendLanding.Marker?): Modifier =
+    if (marker == null) this else onGloballyPositioned { marker.bounds = Rect(it.positionInWindow(), it.size.toSize()) }
 
 /**
  * Reports where this part of [probe]'s message sits, and records its drawing instead of

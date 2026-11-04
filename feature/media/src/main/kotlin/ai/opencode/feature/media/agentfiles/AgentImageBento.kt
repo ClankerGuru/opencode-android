@@ -391,6 +391,9 @@ private class BentoCache {
  * and steps. The plain properties read the live value (the default while tuning is off).
  */
 object AgentImageTunables {
+    /** The Tuning Panel sections it registers (the key segment after the group), in order. */
+    val sectionTitles = listOf("Images")
+
     /** The row opens to the bento's height on a critically damped spring (bounce 0: a row never grows past its content). */
     val growTunable = Tunable("transcript.images.grow", "Image grow spring", default = 0.5, range = 0.2..1.2, step = 0.02)
     val gutterTunable = Tunable("transcript.images.gutter", "Bento gutter (pt)", default = 4.dp, range = 0.0..12.0, step = 0.5)

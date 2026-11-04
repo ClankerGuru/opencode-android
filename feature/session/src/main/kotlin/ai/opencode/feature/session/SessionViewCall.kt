@@ -1,39 +1,36 @@
 package ai.opencode.feature.session
 
 import ai.opencode.core.dependencies.dependency
-import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
-import ai.opencode.core.experiments.ExperimentalCallStyle
 import ai.opencode.core.experiments.key
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.State
-import ai.opencode.feature.voice.CallTrayController
-import ai.opencode.feature.voice.FloatingCallCenter
 import ai.opencode.feature.voice.LiveSocketWarmer
 import ai.opencode.feature.voice.LiveSocketWarmerClient
 import ai.opencode.feature.voice.RaiseToEarClient
 import ai.opencode.feature.voice.VoiceCallEnded
 import ai.opencode.feature.voice.VoiceCallFailure
+import ai.opencode.feature.voice.VoiceConnectingCaption
 import ai.opencode.feature.voice.VoiceFeature
 import ai.opencode.feature.voice.VoiceLabDemo
 import ai.opencode.feature.voice.VoiceStoreOf
-import android.content.ActivityNotFoundException
-import android.content.Intent
-import android.provider.Settings
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.currentStateAsState
@@ -45,9 +42,8 @@ import kotlin.time.Duration.Companion.seconds
 // The call's part of iOS `SessionView`: which store is the screen's call (`callStore`), its
 // presentation (`callPresentation`/`voiceStore`), the failed and ended cards above the composer,
 // and the screen's `.task`s that start it once, listen for Raise to Talk and keep a GPT-Live socket
-// warm. The bar itself is :feature:voice's `VoiceCallComposer` on `VoiceCallSurface`, swapped into
-// the composer's place by `SessionComposer`; in the Call Tray style the composer stays and the
-// tray splits out beneath it instead (`CallTrayHost`, with Home's `CallTrayController`).
+// warm. The call floats over the screen (Living Orb, :feature:voice's `FloatingCallOverlay`) and
+// the composer stays a composer.
 
 /**
  * iOS `callStore`: the call on this screen, its own (`store.scope(\.voice, action: \.voice.presented)`)
@@ -56,32 +52,6 @@ import kotlin.time.Duration.Companion.seconds
 @Composable
 internal fun StoreOf<State, Action>.rememberCallStore(hostedCall: VoiceStoreOf?): VoiceStoreOf? =
     rememberOptionalScope<VoiceFeature.State, VoiceFeature.Action>({ it.voice }, { Action.voicePresented(it) }) ?: hostedCall
-
-/**
- * iOS `callPresentation`: Settings' Call Style, from the call experiments. The Call Tray applies
- * only when Home hands the screen its [CallTrayController] ([callTray]); Living Orb outranks it,
- * and it outranks Floating Call (`ExperimentalCallStyle.of`).
- */
-@Composable
-internal fun rememberCallPresentation(callTray: CallTrayController?): ExperimentalCallStyle {
-    val center = remember { dependency(FloatingCallCenter) }
-    val tray by remember { shared(ExperimentalFeature.callTray.key).flow }.collectAsState(shared(ExperimentalFeature.callTray.key).value)
-    val floating by remember { shared(ExperimentalFeature.floatingCall.key).flow }.collectAsState(shared(ExperimentalFeature.floatingCall.key).value)
-    val livingOrb by remember { shared(ExperimentalFeature.livingOrb.key).flow }.collectAsState(shared(ExperimentalFeature.livingOrb.key).value)
-    return ExperimentalCallStyle.of(
-        callTray = callTray != null && ExperimentalFeature.callTray.isActive(tray),
-        floatingCall = center.isOn(floating),
-        livingOrb = ExperimentalFeature.livingOrb.isActive(livingOrb),
-    )
-}
-
-/**
- * iOS `floatsCall` (`callPresentation == .floating`): Floating Call or Living Orb is on, so the call
- * floats over the screen (Home hosts `FloatingCallOverlay`) and the composer stays a composer.
- */
-@Composable
-internal fun rememberFloatsCall(callTray: CallTrayController?): Boolean =
-    rememberCallPresentation(callTray) == ExperimentalCallStyle.floating
 
 /**
  * The screen's call tasks (iOS `sessionScaffold`'s `.task`s and the composer area's `.task(id: hasCall)`):
@@ -134,30 +104,30 @@ internal fun SessionCallTasks(store: StoreOf<State, Action>, callStore: VoiceSto
 
 /**
  * iOS `safeAreaInset`'s cards above the composer: a call that couldn't connect
- * ([VoiceCallFailure]: Check API Key or Open Settings, and Try Again) or whose connection was lost
- * ([VoiceCallEnded]: Close and Rejoin).
+ * ([VoiceCallFailure]: the provider's failure card, or Check API Key/Open Settings and Try Again),
+ * whose connection was lost ([VoiceCallEnded]: Close and Rejoin), or that is connecting through a
+ * server ([VoiceConnectingCaption]: “Connecting via My Mac…”, fading in and out).
  */
 @Composable
 internal fun SessionCallCards(callStore: VoiceStoreOf?) {
     val call = callStore ?: return
     val phase by call.observe { it.phase }
-    val context = LocalContext.current
+    val place by call.observe { it.callPlace }
+    val statusText by call.observe { it.statusText }
     when (val current = phase) {
         is VoiceFeature.State.Phase.Failed -> VoiceCallFailure(
             store = call,
             message = current.message,
-            onOpenSettings = {
-                // The microphone was denied: the app's page in system settings (iOS `openSettingsURLString`).
-                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:${context.packageName}".toUri())
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                try {
-                    context.startActivity(intent)
-                } catch (_: ActivityNotFoundException) {
-                }
-            },
             modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 6.dp),
         )
         VoiceFeature.State.Phase.Dropped -> VoiceCallEnded(call, Modifier.padding(start = 12.dp, end = 12.dp, bottom = 6.dp))
         else -> Unit
+    }
+    val connecting = place?.takeIf { phase == VoiceFeature.State.Phase.Connecting }?.let { it to statusText }
+    // The caption fades out as it last read (iOS's removal transition), not as the next phase.
+    var shown by remember { mutableStateOf(connecting) }
+    if (connecting != null && connecting != shown) shown = connecting
+    AnimatedVisibility(visible = connecting != null, enter = fadeIn(), exit = fadeOut()) {
+        shown?.let { (place, text) -> VoiceConnectingCaption(place, text) }
     }
 }

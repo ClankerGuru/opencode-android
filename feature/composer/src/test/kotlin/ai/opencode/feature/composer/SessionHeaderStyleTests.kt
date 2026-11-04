@@ -8,7 +8,7 @@ import org.junit.Test
 /**
  * The `:feature:composer` test of iOS `OpenCodeTests/SessionHeaderStyleTests.swift`
  * ([ComposerSwipeDown]); the rest is `:feature:session`'s. Its
- * `VoiceCallSurface.usesInteractiveGlass` asserts are dropped: Liquid Glass interactivity has no
+ * `ComposerSurface.usesInteractiveGlass` asserts are dropped: Liquid Glass interactivity has no
  * Android counterpart (the composer is an M3 surface). iOS `CGSize(width:height:)` → [Offset].
  */
 class SessionHeaderStyleTests {

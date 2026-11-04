@@ -198,8 +198,13 @@ class GrowthSoftEdge {
         val next = minOf(maxFade, measured - height, height - from, width + room)
         width = max(0f, next)
         fadeHeight = height
-        // Nothing new on show yet: a hard edge at what was already there.
-        fade = if (next > 0.5f) next else 0f
+        if (next > 0.5f) {
+            fade = next
+        } else {
+            // Nothing new on show yet: a hard edge at what was already there. An edge still
+            // showing (a promotion took the growth over) eases out.
+            leave(height, now, onScreen)
+        }
     }
 
     private fun leave(height: Float, now: Double, onScreen: Boolean) {

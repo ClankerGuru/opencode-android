@@ -10,6 +10,8 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.graphics.Bitmap
+import android.window.BackEvent
+import android.window.OnBackAnimationCallback
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
 import androidx.compose.animation.core.animate
@@ -51,6 +53,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
@@ -370,7 +373,15 @@ class MediaViewerState(sourceID: String?) {
 
     val mediaFrame: Rect? get() = sourceID?.let { mediaFrames[it] }
 
+    /** The badges drawn on each source's corners, by media ID, carried by the flight. */
+    var flightAccessories: (String) -> List<MediaFlightAccessory> = { emptyList() }
+        internal set
+
     var dismiss: () -> Unit = {}
+        internal set
+
+    /** Puts the media away without flying it home, for media that's gone (a composer photo removed from the viewer). */
+    var discard: () -> Unit = {}
         internal set
     internal var onShow: () -> Unit = {}
 
@@ -393,6 +404,20 @@ class MediaViewerState(sourceID: String?) {
 val LocalMediaViewer = staticCompositionLocalOf<MediaViewerState?> { null }
 
 /**
+ * A badge on a thumbnail's corner (a composer photo's ×, a video's duration). It rides the
+ * flight pinned to that corner at its own size (the bitmap's pixels), fading out as the image
+ * flies in and back in as it flies home (iOS `MediaFlightAccessory`).
+ */
+class MediaFlightAccessory(
+    val image: Bitmap,
+    val corner: Corner,
+    /** From the thumbnail's corner to the image's matching corner, in px. */
+    val offset: Offset = Offset.Zero,
+) {
+    enum class Corner { TopTrailing, BottomLeading }
+}
+
+/**
  * Full-screen media and files (iOS `MediaPresenter`). Media opens the Photos way: it flies out
  * of what was tapped, follows a drag down while shrinking, rounding toward the thumbnail's
  * corners and letting the session show through, and flies back on release (or springs back
@@ -411,6 +436,8 @@ class MediaPresenter internal constructor() {
         val isMedia: Boolean,
         val reducesMotion: Boolean,
         val screenName: String,
+        val flightAccessories: ((String) -> List<MediaFlightAccessory>)?,
+        val onDismiss: (() -> Unit)?,
         val content: @Composable (MediaViewerState) -> Unit,
     )
 
@@ -420,17 +447,31 @@ class MediaPresenter internal constructor() {
 
     val isPresenting: Boolean get() = presentation != null || imageViewerIsUp()
 
-    /** Presents [content] full screen; ignored while a viewer is up. */
+    /**
+     * Presents [content] full screen; ignored while a viewer is up. [flightAccessories] are the
+     * source's corner badges the flight carries; [onDismiss] runs once the viewer is gone and
+     * its source shows again.
+     */
     fun present(
         sourceID: String?,
         isMedia: Boolean,
         reducesMotion: Boolean,
         screenName: String? = null,
+        flightAccessories: ((String) -> List<MediaFlightAccessory>)? = null,
+        onDismiss: (() -> Unit)? = null,
         content: @Composable (MediaViewerState) -> Unit,
     ): Boolean {
         // One viewer at a time.
         if (isPresenting) return false
-        presentation = Presentation(sourceID, isMedia, reducesMotion, screenName ?: if (isMedia) "Media Viewer" else "File Viewer", content)
+        presentation = Presentation(
+            sourceID,
+            isMedia,
+            reducesMotion,
+            screenName ?: if (isMedia) "Media Viewer" else "File Viewer",
+            flightAccessories,
+            onDismiss,
+            content,
+        )
         return true
     }
 
@@ -485,6 +526,16 @@ data class MediaDismissDrag(val screenHeight: Float) {
     }
 }
 
+/**
+ * Android only: how far a predictive back gesture pulls the media at full progress, as
+ * fractions of the pull-down's range ([MediaDismissDrag.range]) and of the screen's width.
+ * At full progress the media is at about 88% of its size, as Android's own back preview.
+ */
+internal object MediaBackPreview {
+    const val DOWN = 0.3f
+    const val SIDEWAYS = 0.04f
+}
+
 /** The viewer's springs (iOS `UIView.animate(springDuration:bounce:)` values). */
 internal object MediaMotion {
     /** Fly in, content open, content dismiss (0.4 s, critically damped). */
@@ -508,7 +559,7 @@ internal data class HostTransform(val scale: Float = 1f, val tx: Float = 0f, val
     }
 }
 
-/** The image in flight, above the content, which hides its own copy. */
+/** The image in flight, under the content's chrome; the content hides its own copy meanwhile. */
 internal class Flight(image: Bitmap, frame: Rect) {
     var image: Bitmap by mutableStateOf(image)
     var frame: Rect by mutableStateOf(frame)
@@ -516,6 +567,12 @@ internal class Flight(image: Bitmap, frame: Rect) {
     var corners: MediaCorners by mutableStateOf(MediaCorners.All)
     var alpha by mutableFloatStateOf(1f)
     var scale by mutableFloatStateOf(1f)
+}
+
+/** The source's corner badges riding the flight ([MediaFlightAccessory]), pinned to [frame]. */
+internal class FlightAccessories(val badges: List<MediaFlightAccessory>, frame: Rect, alpha: Float) {
+    var frame: Rect by mutableStateOf(frame)
+    var alpha by mutableFloatStateOf(alpha)
 }
 
 /**
@@ -558,6 +615,8 @@ internal class MediaViewerController(
     /** Fade style: the whole viewer's opacity. */
     var viewAlpha by mutableFloatStateOf(1f)
     var flight: Flight? by mutableStateOf(null)
+    /** The source's badges, riding the flight. */
+    var accessories: FlightAccessories? by mutableStateOf(null)
     /** Light over the dark room; the session's own once it shows through. */
     var statusBarLight by mutableStateOf(isMedia && reducesMotion)
     var isLeaving by mutableStateOf(false)
@@ -585,6 +644,7 @@ internal class MediaViewerController(
 
     init {
         state.dismiss = { close() }
+        state.discard = { close(home = false) }
         when (style) {
             Style.Photos -> {
                 // The image flies in first; the content shows it once it lands.
@@ -662,6 +722,21 @@ internal class MediaViewerController(
         if (generation != flightGeneration || isLeaving) return
         state.mediaHidden = false
         flight = null
+        dropAccessories()
+    }
+
+    /** The source's badges over the flight at [frame], each pinned to its corner at its own size, so they follow the flight's frame. */
+    private fun pinAccessories(frame: Rect, alpha: Float): FlightAccessories? {
+        dropAccessories()
+        if (flight == null) return null
+        val id = state.sourceID ?: return null
+        val badges = state.flightAccessories(id)
+        if (badges.isEmpty()) return null
+        return FlightAccessories(badges, frame, alpha).also { accessories = it }
+    }
+
+    private fun dropAccessories() {
+        accessories = null
     }
 
     private fun catchBackdrop() {
@@ -674,7 +749,7 @@ internal class MediaViewerController(
         hideSource()
         hostAlpha = 1f
         updateStatusBarLight(true)
-        setChromeHidden(false)
+        setChromeHidden(false, flightDuration = MediaMotion.open.duration)
         backdropJob = scope.launch {
             animate(backdropAlpha, 1f, animationSpec = tween(millis(MediaMotion.backdropIn), easing = Motion.EaseOut)) { v, _ -> backdropAlpha = v }
         }
@@ -686,6 +761,7 @@ internal class MediaViewerController(
             val flight = flightView(image, from)
             flight.radius = radius
             flight.corners = corners
+            val badges = pinAccessories(flight.frame, alpha = 1f)
             flightGeneration += 1
             val generation = flightGeneration
             trace.begin("open", scope, density, source = from to radius, rest = rest, state = state, sample = ::traceSample)
@@ -693,6 +769,8 @@ internal class MediaViewerController(
                 spring(MediaMotion.open) { p ->
                     flight.frame = lerp(from, rest, p)
                     flight.radius = radius + (0f - radius) * p
+                    badges?.frame = flight.frame
+                    badges?.alpha = 1 - p
                 }
                 trace.end("open")
                 land(generation)
@@ -799,6 +877,63 @@ internal class MediaViewerController(
         }
     }
 
+    // region Predictive back (Android only)
+
+    /** Whether a predictive back gesture is previewing the dismissal (see [backBegan]). */
+    private var backPreviewing = false
+
+    /**
+     * A predictive back gesture began: it drives the same drag as a pull down, a little way
+     * ([backProgressed]). Returns false when nothing previews (a zoomed image, already leaving);
+     * the commit still closes.
+     */
+    fun backBegan(): Boolean {
+        if (isLeaving) return false
+        if (isMedia && state.isZoomed) return false
+        dragBegan(bounds.center)
+        backPreviewing = true
+        return true
+    }
+
+    /** [progress] 0..1 from the platform; [fromRightEdge] shifts the media toward the left. */
+    fun backProgressed(progress: Float, fromRightEdge: Boolean) {
+        if (!backPreviewing) return
+        val side = if (fromRightEdge) -1f else 1f
+        dragChanged(
+            Offset(
+                x = side * progress * bounds.width * MediaBackPreview.SIDEWAYS,
+                y = progress * drag.range * MediaBackPreview.DOWN,
+            ),
+        )
+    }
+
+    /** The gesture (or a button) committed: the media goes away from wherever it is. */
+    fun backCommitted() {
+        if (backPreviewing && style == Style.Photos && state.image != null) trace.end("drag")
+        backPreviewing = false
+        close()
+    }
+
+    /** The gesture was abandoned: the media springs back to rest. */
+    fun backCancelled() {
+        if (!backPreviewing) return
+        backPreviewing = false
+        when (style) {
+            Style.Photos -> {
+                if (state.image != null) {
+                    trace.end("drag")
+                    springBack(Velocity.Zero)
+                } else {
+                    contentSpringBack()
+                }
+            }
+            Style.Fade -> fadeEnded(distance = 0f, velocity = 0f)
+            Style.Zoom -> zoomSpringBack(Velocity.Zero)
+        }
+    }
+
+    // endregion
+
     private fun toDp(px: Float): Float = px / density.density
 
     /** An image is dragged as the flight: it shrinks about the finger, so the spot it holds stays under it, and rounds toward the thumbnail. */
@@ -807,6 +942,7 @@ internal class MediaViewerController(
         val rest = restingFrame
         flightGeneration += 1
         val flight = flightView(image, rest)
+        dropAccessories()
         catchBackdrop()
         state.mediaHidden = true
         flight.corners = shape(source).second
@@ -957,15 +1093,16 @@ internal class MediaViewerController(
         return Rect(map(rect.topLeft), map(rect.bottomRight))
     }
 
-    private fun setChromeHidden(hidden: Boolean) {
+    /** [flightDuration]: the chrome changes on the flight's own spring, so nothing arrives or lingers after the image. */
+    private fun setChromeHidden(hidden: Boolean, flightDuration: Double? = null) {
         if (state.chromeHidden == hidden) return
-        state.chromeFadeSeconds = if (hidden) 0.15 else 0.25
+        state.chromeFadeSeconds = flightDuration ?: if (hidden) 0.15 else 0.25
         state.chromeHidden = hidden
     }
 
-    private fun close() {
+    private fun close(home: Boolean = true) {
         when (style) {
-            Style.Photos -> flyOut(Velocity.Zero)
+            Style.Photos -> flyOut(Velocity.Zero, home)
             Style.Zoom -> zoomOut()
             Style.Fade -> fadeOut()
         }
@@ -980,19 +1117,20 @@ internal class MediaViewerController(
         return min(max((velocity.x * dx + velocity.y * dy) / length, 0f), 8f)
     }
 
-    private fun flyOut(velocity: Velocity) {
+    private fun flyOut(velocity: Velocity, home: Boolean = true) {
         if (isLeaving) return
         isLeaving = true
         flightGeneration += 1
-        setChromeHidden(true)
+        setChromeHidden(true, flightDuration = MediaMotion.home.duration)
         updateStatusBarLight(false)
         catchBackdrop()
-        val source = source
+        val source = if (home) source else null
         val target = source?.let(::sourceFrame)
         val backdrop = backdropAlpha
         val image = state.image
         if (image != null) {
             val flight = flightView(image, restingFrame)
+            dropAccessories()
             state.mediaHidden = true
             val (radius, corners) = shape(source)
             flight.corners = corners
@@ -1001,13 +1139,16 @@ internal class MediaViewerController(
             val fromRadius = flight.radius
             if (target != null) {
                 val speed = springVelocity(velocity, from, target)
+                val badges = pinAccessories(flight.frame, alpha = 0f)
                 flightJob = scope.launch {
                     spring(MediaMotion.home, speed) { p ->
                         flight.frame = lerp(from, target, p)
                         flight.radius = fromRadius + (radius - fromRadius) * p
+                        badges?.frame = flight.frame
+                        badges?.alpha = p
                         backdropAlpha = backdrop * (1 - p)
                     }
-                    finish()
+                    finishHome()
                 }
             } else {
                 // Nowhere to land: carry on the way it was thrown and fade.
@@ -1019,7 +1160,7 @@ internal class MediaViewerController(
                         flight.alpha = 1 - p
                         backdropAlpha = backdrop * (1 - p)
                     }
-                    finish()
+                    finishHome()
                 }
             }
         } else {
@@ -1037,7 +1178,7 @@ internal class MediaViewerController(
                     hostAlpha = alpha * (1 - p)
                     backdropAlpha = backdrop * (1 - p)
                 }
-                finish()
+                finishHome()
             }
         }
     }
@@ -1138,6 +1279,17 @@ internal class MediaViewerController(
 
     // MARK: Lifecycle
 
+    /**
+     * The thumbnail comes back under the landed flight. A thumbnail redraws on its next frame,
+     * so the flight stays two frames longer: never a frame with neither on screen.
+     */
+    private suspend fun finishHome() {
+        trace.end("close")
+        MediaZoomSources.shared.hide(null)
+        repeat(2) { withFrameNanos { } }
+        finish()
+    }
+
     private fun finish() {
         if (finished) return
         finished = true
@@ -1190,7 +1342,7 @@ internal class MediaViewerController(
 
 /**
  * The presented viewer (iOS `MediaViewerController`'s view): a black backdrop (hidden for
- * documents), the content, and the flight drawn above it, over the whole window. It takes
+ * documents), the flight, and the content with its chrome above it, over the whole window. It takes
  * every touch while up, hides the content below from TalkBack (the host does), dismisses on
  * back, and runs the dark room's status bar.
  */
@@ -1201,12 +1353,15 @@ internal fun MediaViewerHost(
     reducesMotion: Boolean,
     screenName: String,
     onDismissed: () -> Unit,
+    flightAccessories: ((String) -> List<MediaFlightAccessory>)? = null,
     content: @Composable (MediaViewerState) -> Unit,
 ) {
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
     val currentDismissed by rememberUpdatedState(onDismissed)
-    val state = remember { MediaViewerState(sourceID) }
+    val state = remember {
+        MediaViewerState(sourceID).also { state -> flightAccessories?.let { state.flightAccessories = it } }
+    }
     val controller = remember {
         MediaViewerController(state, isMedia, reducesMotion, scope, density) { currentDismissed() }
     }
@@ -1224,7 +1379,14 @@ internal fun MediaViewerHost(
         controller.open()
     }
     DisposableEffect(controller) { onDispose { controller.disposed() } }
-    MediaBackHandler(enabled = !controller.isLeaving) { state.dismiss() }
+    // Back previews the dismissal as a short pull down; the commit puts the media away.
+    MediaPredictiveBackHandler(
+        enabled = !controller.isLeaving,
+        onStarted = { controller.backBegan() },
+        onProgressed = { progress, fromRightEdge -> controller.backProgressed(progress, fromRightEdge) },
+        onCancelled = { controller.backCancelled() },
+        onInvoked = { controller.backCommitted() },
+    )
     StatusBarEffect(controller)
 
     val dark = MediaPresenter.isDarkRoom(isMedia)
@@ -1290,24 +1452,50 @@ internal fun MediaViewerHost(
                 CompositionLocalProvider(LocalMediaViewer provides state) { content(state) }
             }
         }
+        // The flight flies under the content's chrome, which hides its own copy meanwhile.
+        FlightLayer(controller)
         if (dark) {
             val appearance = rememberAppAppearance()
             OpenCodeTheme(theme = appearance.theme, appearance = AppearanceColorScheme.Dark, content = themed)
         } else {
             OpenCodeAppTheme(content = themed)
         }
-        FlightLayer(controller)
     }
 }
 
-/** The image in flight, drawn above the content in the host's coordinates (only the draw phase reads its frames). */
+/**
+ * The image in flight, and the source's badges riding it, drawn under the content's chrome in
+ * the host's coordinates (only the draw phase reads their frames).
+ */
 @Composable
 private fun FlightLayer(controller: MediaViewerController) {
     val flight = controller.flight ?: return
     val bitmap: ImageBitmap = remember(flight.image) { flight.image.asImageBitmap() }
+    val accessories = controller.accessories
+    val badges = remember(accessories) { accessories?.badges?.map { it to it.image.asImageBitmap() }.orEmpty() }
     Canvas(Modifier.fillMaxSize()) {
+        drawFlight(flight, bitmap)
+        if (accessories != null && accessories.alpha > 0f) {
+            val frame = accessories.frame
+            for ((badge, image) in badges) {
+                val x = when (badge.corner) {
+                    MediaFlightAccessory.Corner.TopTrailing -> frame.right - image.width + badge.offset.x
+                    MediaFlightAccessory.Corner.BottomLeading -> frame.left + badge.offset.x
+                }
+                val y = when (badge.corner) {
+                    MediaFlightAccessory.Corner.TopTrailing -> frame.top + badge.offset.y
+                    MediaFlightAccessory.Corner.BottomLeading -> frame.bottom - image.height + badge.offset.y
+                }
+                drawImage(image, topLeft = Offset(x, y), alpha = accessories.alpha.coerceIn(0f, 1f))
+            }
+        }
+    }
+}
+
+private fun DrawScope.drawFlight(flight: Flight, bitmap: ImageBitmap) {
+    run {
         val frame = flight.frame
-        if (frame.width <= 0f || frame.height <= 0f || flight.alpha <= 0f) return@Canvas
+        if (frame.width <= 0f || frame.height <= 0f || flight.alpha <= 0f) return
         withTransform({ scale(flight.scale, flight.scale, pivot = frame.center) }) {
             val path = Path().apply { addRoundRect(flight.corners.roundRect(frame, flight.radius)) }
             clipPath(path) {
@@ -1436,6 +1624,48 @@ internal fun MediaBackHandler(enabled: Boolean, onBack: () -> Unit) {
     DisposableEffect(activity, enabled) {
         if (!enabled) return@DisposableEffect onDispose { }
         val callback = OnBackInvokedCallback { currentOnBack() }
+        activity.onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_OVERLAY, callback)
+        onDispose { activity.onBackInvokedDispatcher.unregisterOnBackInvokedCallback(callback) }
+    }
+}
+
+/**
+ * [MediaBackHandler] that also hears the back gesture's progress (Android only), so the viewer
+ * previews its dismissal while the swipe is held. A button or TalkBack back calls only
+ * [onInvoked].
+ */
+@Composable
+internal fun MediaPredictiveBackHandler(
+    enabled: Boolean,
+    onStarted: () -> Unit,
+    onProgressed: (progress: Float, fromRightEdge: Boolean) -> Unit,
+    onCancelled: () -> Unit,
+    onInvoked: () -> Unit,
+) {
+    val activity = LocalContext.current.findActivity() ?: return
+    val currentOnStarted by rememberUpdatedState(onStarted)
+    val currentOnProgressed by rememberUpdatedState(onProgressed)
+    val currentOnCancelled by rememberUpdatedState(onCancelled)
+    val currentOnInvoked by rememberUpdatedState(onInvoked)
+    DisposableEffect(activity, enabled) {
+        if (!enabled) return@DisposableEffect onDispose { }
+        val callback = object : OnBackAnimationCallback {
+            override fun onBackStarted(backEvent: BackEvent) {
+                currentOnStarted()
+            }
+
+            override fun onBackProgressed(backEvent: BackEvent) {
+                currentOnProgressed(backEvent.progress, backEvent.swipeEdge == BackEvent.EDGE_RIGHT)
+            }
+
+            override fun onBackCancelled() {
+                currentOnCancelled()
+            }
+
+            override fun onBackInvoked() {
+                currentOnInvoked()
+            }
+        }
         activity.onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_OVERLAY, callback)
         onDispose { activity.onBackInvokedDispatcher.unregisterOnBackInvokedCallback(callback) }
     }

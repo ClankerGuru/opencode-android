@@ -250,7 +250,12 @@ class VoiceSteeringInstructionsTests {
                     text.contains("react the way a friend on the phone would: quickly and naturally, to what the user just said") ||
                         text.contains("react once the way a friend on the phone would: quickly and naturally, to what the user just said"),
                 )
-                assertTrue("$engine", text.contains("It can mention the thing itself. Never use the same stock word or phrase twice in a row"))
+                // Victor (Oct 23): a rambled request needs its acknowledgement to say
+                // what was understood, as a statement, not a permission question.
+                assertTrue("$engine", text.contains("Name the specific thing you understood them to want, in your own words, so they hear how you read it; this matters most when they rambled or circled. Say it as asking, not as done: \"On it, asking for the check-in\", never \"I'm checking you in now\" or \"Done\". Only a result decides what happened. Never use the same stock word or phrase twice in a row"))
+                // Nov 1 call: "Done… added those rules" before any tool ran; an invented deadline.
+                assertTrue("$engine", text.contains("A result's own words set the claim. \"Asked\", \"started\" or \"will\" stays that; never upgrade it to \"done\", and never add a date, deadline or urgency the result didn't say."))
+                assertFalse("$engine", text.contains("It can mention the thing itself."))
                 assertTrue(
                     "$engine",
                     !text.contains("\"Checking.\"") && !text.contains("\"Opening.\"") &&
@@ -261,6 +266,9 @@ class VoiceSteeringInstructionsTests {
         }
         val live = VoiceInstructions.build(context, engine = VoiceEngine.gptLive)
         assertTrue(live.contains("When the user is mid-thought or it's a quick follow-up, a simple yeah or nothing at all is fine."))
+        // Kit's Nov 1 call: a long ask ending "Are you listening or no" got
+        // "Listening. I've got that." and nothing about the ask.
+        assertTrue(live.contains("After a long turn, even one that ends by asking whether you're there, name what they asked for; a stock line that names nothing doesn't cover it."))
         assertTrue(live.contains("- Say it once, without saying how the request will be framed or passed on"))
         // One place for what's said around a delegation.
         assertEquals(2, live.split("What you say around a delegation:").size)
@@ -285,6 +293,7 @@ class VoiceSteeringInstructionsTests {
             }
         }
         val delegator = VoiceDelegator.instructions
+        assertTrue(delegator.contains("If a session says it will do something or hasn't yet, your reply says it's started, not done."))
         assertTrue(delegator.contains("keeping the user's exact intent, audience, and destination: a note for themselves stays a private note (never feedback for a team or a message to anyone)"))
         assertTrue(delegator.contains("never \"relay\" or \"pass along\", and never implying you contacted people you didn't"))
         val send = VoiceDelegator.tools.firstOrNull { it["name"] == JsonPrimitive("send_message") }
@@ -294,7 +303,24 @@ class VoiceSteeringInstructionsTests {
         // The attribution is described, never given as a sentence to repeat.
         assertFalse(VoiceHandoff.earlierRequestLead.contains("\""))
         assertFalse(VoiceHandoff.earlierRequestLead.contains("upload tests"))
-        assertEquals("This answers an earlier request; open by naming which request it was, then give the result. ", VoiceHandoff.earlierRequestLead)
+        assertEquals("This answers an earlier request, not what the user said last; open by saying it's about that earlier request and naming it, then give the result. ", VoiceHandoff.earlierRequestLead)
+        // From a call log: a wait for a session held the delegation open while
+        // the user asked six times whether it heard them.
+        assertTrue(delegator.contains("when a wait returns user_spoke, answer at once without waiting again"))
+        val wait = VoiceDelegator.tools.firstOrNull { it["name"] == JsonPrimitive("wait_for_session") }
+        val waitDescription = wait?.get("description")?.jsonPrimitive?.content ?: ""
+        assertTrue(waitDescription.contains("ending early if the user starts talking"))
+        // From a call log: steers stacked behind a question form, and the voice
+        // said a Slack draft was sent while it still waited for the user's OK.
+        assertTrue(delegator.contains("A session waiting on a permission or question takes no steering"))
+        assertTrue(delegator.contains("Never answer, grant, or dismiss a request the user didn't speak to."))
+        assertTrue(delegator.contains("A draft waiting for the user's OK hasn't been sent."))
+        assertTrue(description.contains("the result is not_sent with its pending requests"))
+        for (engine in VoiceEngine.entries) {
+            val text = VoiceInstructions.build(context, engine)
+            assertTrue("$engine", text.contains("Something is done (sent, posted, merged, deleted, approved) only when a result says it happened."))
+            assertTrue("$engine", text.contains("The user's OK on a draft (\"yes\", \"send it\") is a new request"))
+        }
     }
 
     /**
@@ -304,7 +330,9 @@ class VoiceSteeringInstructionsTests {
     @Test fun theVoiceIsARelaxedPeerWithoutLectures() {
         val live = VoiceInstructions.build(context, engine = VoiceEngine.gptLive)
         assertTrue(live.contains("You are OpenCode, a relaxed, friendly voice coding assistant."))
-        assertTrue(live.contains("Talk like a sharp friend on the phone: relaxed, direct, a little dry, at a natural pace. Answer what was asked in one or two short sentences, then stop."))
+        assertTrue(live.contains("Talk like a sharp friend on the phone: relaxed, direct, a little dry, at a natural pace. Keep your own replies to one or two short sentences, then stop; relayed session results keep their full facts."))
+        assertTrue(live.contains("Relay the session's replies faithfully, in order: keep every fact, drop only code, IDs, paths and URLs, add nothing. Anything beyond what a result says (the next item, a detail, a number) and any decision on it goes to `delegate`; if you were interrupted, answer what the user just said, and give the rest only if asked."))
+        assertTrue(live.contains("goes to `delegate` unless a completed result on this call directly answers it"))
         assertTrue(live.contains("Treat the user as a capable adult: no unsolicited warnings, safety tips, reminders about obvious everyday things, moralizing, or lectures. Speak up only for a serious, immediate risk they seem to have missed."))
         assertTrue(live.contains("If the user is frustrated, acknowledge it briefly and get to the fix. If they tease you, take it in stride and riff back; never get defensive or passive-aggressive. Don't fawn or agree just to please; disagree plainly when they're wrong."))
         assertTrue(!live.contains("calm, friendly") && !live.contains("Speak warmly"))
@@ -315,14 +343,16 @@ class VoiceSteeringInstructionsTests {
                 """
                 # Personality & Tone
 
-                - Relaxed, warm, direct, a little dry: a capable peer on the phone, not a customer-service agent. Answer what was asked in one or two short sentences, then stop; no fluff, no play-by-play.
+                - Relaxed, warm, direct, a little dry: a capable peer on the phone, not a customer-service agent. Keep your own replies to one or two short sentences, then stop—no fluff, no play-by-play; relayed session results keep their full facts.
                 - No unsolicited warnings, safety tips, reminders about obvious everyday things, moralizing, or lectures. Speak up only for a serious, immediate risk the user seems to have missed.
                 - Take teasing in stride and riff back; never get defensive or passive-aggressive. Don't fawn or agree just to please; disagree plainly when the user is wrong.
-                - Summarize the session's replies conversationally. Do not read code, diffs, IDs, file paths, or URLs aloud unless asked.
+                - Relay the session's replies faithfully, in order: keep every fact, drop only code, IDs, paths and URLs, add nothing. Anything beyond what a result says (the next item, a detail, a number) and any decision on it goes to `delegate`; if you were interrupted, answer what the user just said, and give the rest only if asked.
                 - Explain failures briefly and offer one retry or alternative.
                 """.trimIndent(),
             ),
         )
+        assertTrue(realtime.contains("any status or outcome question goes to `delegate` unless a completed result on this call directly answers it"))
+        assertTrue(VoiceSessionDelegator.activeCallBlock.contains("Next is X; keep, drop, or note?"))
         assertFalse(realtime.contains("Warm, witty, concise."))
         // The acknowledgements stay as brief and natural as the rest of the voice.
         for (text in listOf(live, realtime)) {
@@ -374,7 +404,7 @@ class VoiceSteeringInstructionsTests {
         for (engine in VoiceEngine.entries) {
             val text = VoiceInstructions.build(context, engine = engine)
             assertTrue(text.contains("Wait for a complete utterance."))
-            assertTrue(text.contains("If what you have is a fragment or unclear, say briefly that you didn't catch it and ask the user to finish or repeat once"))
+            assertTrue(text.contains("If a request meant for you is a fragment or unclear, say briefly that you didn't catch it and ask the user to finish or repeat once"))
             assertTrue(text.contains("never answer or delegate a speculative interpretation of a fragment"))
         }
     }

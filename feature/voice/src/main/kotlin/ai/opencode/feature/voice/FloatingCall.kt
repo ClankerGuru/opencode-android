@@ -1,263 +1,201 @@
 package ai.opencode.feature.voice
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.dependencies.dependency
-import ai.opencode.core.haptics.Haptic
-import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
-import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.core.sharing.experimental
-import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.observe
+import ai.opencode.core.tuning.Tunable
+import ai.opencode.core.tuning.TunableChoice
+import ai.opencode.core.tuning.TunableSpring
+import ai.opencode.core.tuning.TuningPreset
+import ai.opencode.core.tuning.TuningPresets
+import ai.opencode.core.tuning.TuningStore
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
-import ai.opencode.core.ui.openCodeTapTarget
-import android.os.Handler
-import android.os.Looper
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.AnimationSpec
-import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.snap
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.BlurEffect
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerInputScope
+import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
-import androidx.compose.ui.layout.layout
-import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.node.CompositionLocalConsumerModifierNode
 import androidx.compose.ui.node.GlobalPositionAwareModifierNode
 import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.node.currentValueOf
 import androidx.compose.ui.platform.InspectorInfo
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.dismiss
-import androidx.compose.ui.semantics.hideFromAccessibility
-import androidx.compose.ui.semantics.isTraversalGroup
+import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.yield
 import java.time.Duration
+import java.time.Instant
 import kotlin.math.abs
+import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.roundToInt
 
-// Floating Call (Experimental, D-60 option 2, OC-316): the composer's phone button breaks out
-// into an orb that floats above the whole screen, bottom right over the composer, through the
-// drawer swipe and session switches, while the composer stays a composer. The orb can be
-// dragged anywhere and docked into the screen's edge. Tapping it grows the same surface into a
-// control panel. Off, the call takes the composer's place as before ([VoiceCallComposer]).
-//
-// Android: iOS's Liquid Glass orb is a Material 3 tonal surface (no blur or glass imitation),
-// so the edge's own glass ("bead") is a plain surface capsule beside the orb rather than a
-// melting glass merge.
+// Port of iOS `OpenCode/Voice/FloatingCall.swift` (f657969b, "One Shape"): the call floats over
+// the app as one shape that is the orb at rest, the card, and the sheet. The composer's phone
+// button breaks out into the orb (Lift and Spin Up, `FloatingCallConnectMotion`); the orb floats
+// free (Floaty, `FloatingCallFloatMotion`), a tap grows it into the card and a drag steps it
+// between the orb, the card and the sheet (`FloatingCallStageMotion`); hanging up flies it back
+// into the call button. iOS's Liquid Glass shape is an M3 surface here (tonal fill, Material
+// shadow); the stage store is `FloatingCallStageFeature`, the geometry and motion live in
+// `FloatingCallStages.kt` and `FloatingCallFloat.kt`, and the card's content in
+// `FloatingCallStageContent.kt`. Coordinates are window dp, as iOS's screen points.
 
-/** Whether the orb is a bare orb that expands on tap, or a slightly wider capsule that keeps End one tap away. */
+/** The resting shape (iOS `FloatingCallStyle`): the orb, or a capsule with End beside it. */
 @Suppress("EnumEntryName")
-enum class FloatingCallStyle { orb, capsule }
+enum class FloatingCallStyle(override val rawValue: String) : TunableChoice {
+    orb("orb"),
+    capsule("capsule"),
+}
 
-/** Where the orb rests: floating clear of the edges, or melted into one. */
-@Suppress("EnumEntryName")
-enum class FloatingCallDock { float, edge }
-
-/**
- * iOS `FloatingCallTunables`, baked at their defaults (the tuning panel is not ported); each
- * keeps its tuning key. Lengths are points, i.e. dp. The presets (`call.float.style`,
- * `call.feel`: Tides, Twin Vortex, …) only change these values in the panel.
- */
+/** iOS `FloatingCallTunables`: placement, the break-out's shadows, and Floaty's drag and throw. */
 object FloatingCallTunables {
-    // Orb
-    /** `call.orb.style` (Orb style). */
-    val orbStyle = FloatingCallOrbStyle.tides
-    /** `call.orb.size` (Orb size, 40…84). */
-    const val orbSize = 58f
-    /** `call.orb.warm` (Your colour (warm) intensity). */
-    const val warm = 1.0
-    /** `call.orb.cool` (Agent colour (cool) intensity). */
-    const val cool = 1.0
-    /** `call.orb.saturation` (Aurora saturation). */
-    const val saturation = 1.15
-    /** `call.orb.goo` (Liquid gooeyness). */
-    const val goo = 0.11
-    /** `call.orb.idleSpeed` (Idle motion speed). */
-    const val idleSpeed = 0.45
-    /** `call.orb.speakingGain` (Speaking motion gain). */
-    const val speakingGain = 1.0
-    /** `call.orb.thinkingSpeed` (Thinking spin speed). */
-    const val thinkingSpeed = 1.0
-    /** `call.orb.glow` (Glow spill). */
-    const val glow = 0.55
-
-    // Dot-matrix takes
-    /** `call.dots.across` (Dots across). */
-    const val dotsAcross = 9f
-    /** `call.dots.fill` (Dot size). */
-    const val dotFill = 0.92f
-    /** `call.dots.body` (Force body). */
-    const val dotBody = 1f
-    /** `call.dots.base` (Base fill). */
-    const val dotBase = 0.4f
-
     // Placement and break-out
-    /** `call.float.kind` (Shape). */
-    val style = FloatingCallStyle.orb
-    /** `call.float.capsuleWidth` (Capsule width). */
-    const val capsuleWidth = 116f
-    /** `call.float.sideInset` (Rest inset from the side). */
-    const val sideInset = 18f
-    /** `call.float.composerGap` (Rest gap above the composer). */
-    const val composerGap = 12f
-    /** `call.float.liftScale` (Lift scale). */
-    const val liftScale = 1.35f
-    /** `call.float.liftShadow` (Lift shadow radius, pt). Android draws it as tonal elevation ([liftElevation]). */
-    const val liftShadow = 22f
-    /** `call.float.restShadow` (Rest shadow radius, pt). Android draws it as tonal elevation ([restElevation]). */
-    const val restShadow = 10f
-    /** `call.float.liftHold` (Lift before moving (s)). */
-    const val liftHold = 0.14
+    val style = Tunable("call.float.kind", "Shape", default = FloatingCallStyle.orb)
+    val capsuleWidth = Tunable("call.float.capsuleWidth", "Capsule width", default = 116.0, range = 88.0..180.0, step = 1.0)
+    val sideInset = Tunable("call.float.sideInset", "Keep-out from the sides", default = 16.0, range = 4.0..48.0, step = 1.0)
+    val topLimit = Tunable("call.float.topLimit", "Header keep-out (from the top)", default = 124.0, range = 60.0..240.0, step = 1.0)
+    val composerGap = Tunable("call.float.composerGap", "Keep-out gap above the composer", default = 12.0, range = 0.0..80.0, step = 1.0)
+    val liftShadow = Tunable("call.float.liftShadow", "Lift shadow radius", default = 22.0, range = 0.0..48.0, step = 1.0)
+    val restShadow = Tunable("call.float.restShadow", "Rest shadow radius", default = 10.0, range = 0.0..32.0, step = 1.0)
 
-    // Edge
-    /** `call.edge.mode` (Rest). */
-    val dock = FloatingCallDock.float
-    /** `call.edge.overlap` (Into the edge). */
-    const val overlap = 10f
-    /** `call.edge.stretch` (Docked height). */
-    const val stretch = 1.4f
-    /** `call.edge.squash` (Docked width). */
-    const val squash = 0.82f
-    /** `call.edge.merge` (Glass merge distance). */
-    const val merge = 26f
-    /** `call.edge.beadWidth` (Edge glass width). */
-    const val beadWidth = 12f
-    /** `call.edge.beadLength` (Edge glass length). */
-    const val beadLength = 130f
-    /** `call.edge.snapDistance` (Docks within). */
-    const val snapDistance = 64f
+    // Floaty (D-147 option 3): drag, tap and throw
+    val tapSlop = Tunable("call.float.tap.slop", "Tap: moves under", default = 10.0, range = 4.0..24.0, step = 1.0)
+    val tapTime = Tunable("call.float.tap.time", "Tap: lifts within (s)", default = 0.3, range = 0.12..0.6, step = 0.01)
+    val catchSpeed = Tunable("call.float.tap.catchSpeed", "Tap only catches above (pt/s)", default = 120.0, range = 20.0..600.0, step = 10.0)
+    val friction = Tunable("call.float.friction", "Friction (/s)", default = 3.2, range = 0.5..10.0, step = 0.1)
+    val maxSpeed = Tunable("call.float.maxSpeed", "Fastest throw (pt/s)", default = 6000.0, range = 1000.0..10000.0, step = 100.0)
+    val overshoot = Tunable("call.float.overshoot", "Runs past the keep-out, at most", default = 40.0, range = 0.0..160.0, step = 2.0)
 
-    // Panel
-    /** `call.panel.buttonSize` (Button size). */
-    const val buttonSize = 50f
-    /** `call.panel.strip` (Strip). */
-    val strip = FloatingCallStripStyle.scope
-    /** `call.panel.stripHeight` (Strip height). */
-    const val stripHeight = 44f
-    /** `call.panel.width` (Panel width). */
-    const val panelWidth = 408f
-    /** `call.panel.captionsHeight` (Captions height). */
-    const val captionsHeight = 84f
+    val edge = TunableSpring("call.float.edge", "Soft edge spring", duration = 0.4, bounce = 0.0)
+    val follow = TunableSpring("call.float.follow", "Follow the composer spring", duration = 0.35, bounce = 0.0)
 
-    // Springs
-    /** `call.float.lift` (Lift spring). */
-    val lift = MotionSpring(0.26, 0.22)
-    /** `call.float.breakout` (Break-out spring). */
-    val breakout = MotionSpring(0.55, 0.16)
-    /** `call.panel.expand` (Expand spring). */
-    val expand = MotionSpring(0.42, 0.08)
-    /** `call.edge.drag` (Drag and dock spring). */
-    val drag = MotionSpring(0.45, 0.2)
-    /** `call.edge.grab` (Under the finger spring). */
-    val grab = MotionSpring(0.16, 0.0)
-    /** `call.float.follow` (Follow the composer spring). */
-    val follow = MotionSpring(0.35, 0.0)
-    /** `call.float.leave` (End spring). */
-    val leave = MotionSpring(0.32, 0.0)
+    val styles: TuningPresets by lazy {
+        TuningPresets(
+            "call.float.style", "Shape",
+            listOf(
+                TuningPreset("Orb"),
+                TuningPreset("Capsule with End", style.preset(FloatingCallStyle.capsule)),
+            ),
+        )
+    }
 
-    /** [liftShadow] as Material elevation: a shadow's blur radius is about twice its elevation. */
-    val liftElevation = (liftShadow / 2).dp
-    /** [restShadow] as Material elevation. */
-    val restElevation = (restShadow / 2).dp
+    fun register(store: TuningStore = TuningStore.shared) {
+        store.register(styles)
+        store.register(style)
+        store.register(capsuleWidth, sideInset, topLimit, composerGap, liftShadow, restShadow)
+        store.register(tapSlop, tapTime, catchSpeed, friction, maxSpeed, overshoot)
+        store.register(edge)
+        store.register(follow)
+    }
 }
 
 /**
- * iOS `FloatingCallTunables.labStyle/labOrb/labEdge/labScenes` and `floating-call-forced`
- * (`-lab-floating-call-style capsule`, `-lab-floating-orb aurora`, `-lab-floating-edge YES`,
- * `-lab-floating-scenes YES`, `-floating-call-forced YES`): UI tests and captures pick a look.
- * Debug builds only, through [VoiceLabEnvironment]: `adb shell setprop
- * debug.opencode.lab_floating_call_style capsule`, `…lab_floating_orb aurora`,
- * `…lab_floating_edge 1`, `…lab_floating_scenes 1`, `…floating_call_forced 1`.
+ * iOS `FloatingCallTunables.labStyle/labScenes`
+ * (`-lab-floating-call-style capsule`, `-lab-floating-scenes YES`):
+ * UI tests and captures pick a look. Debug builds only, through [VoiceLabEnvironment]: `adb shell
+ * setprop debug.opencode.lab_floating_call_style capsule`, `…lab_floating_scenes 1`.
  */
 data class FloatingCallLab(
     val style: FloatingCallStyle? = null,
-    val orb: FloatingCallOrbStyle? = null,
-    val edge: Boolean = false,
     val scenes: Boolean = false,
 ) {
     companion object {
@@ -265,43 +203,59 @@ data class FloatingCallLab(
 
         /** Reads the properties (a `getprop` each, cached): call off the main thread. */
         fun read(): FloatingCallLab = FloatingCallLab(
-            style = VoiceLabEnvironment.string("LAB_FLOATING_CALL_STYLE")?.let { raw -> FloatingCallStyle.entries.firstOrNull { it.name == raw } },
-            orb = VoiceLabEnvironment.string("LAB_FLOATING_ORB")?.let(FloatingCallOrbStyle::fromRawValue),
-            edge = VoiceLabEnvironment.flag("LAB_FLOATING_EDGE"),
+            style = VoiceLabEnvironment.string("LAB_FLOATING_CALL_STYLE")?.let { raw -> FloatingCallStyle.entries.firstOrNull { it.rawValue == raw } },
             scenes = VoiceLabEnvironment.flag("LAB_FLOATING_SCENES"),
         )
     }
 }
 
-/** Where the orb rests: a side, and a height (`null` follows the composer), floating or docked (iOS `FloatingCallPlace`). */
-data class FloatingCallPlace(
-    val side: Side = Side.trailing,
-    val y: Float? = null,
-    val docked: Boolean = false,
-) {
-    @Suppress("EnumEntryName")
-    enum class Side { leading, trailing }
+/** Where the floating call takes touches (iOS `FloatingCallTouchArea`); everything else reaches the app beneath. */
+sealed interface FloatingCallTouchArea {
+    data object None : FloatingCallTouchArea
+
+    /** The orb or card, never smaller than a touch target. */
+    data class Frame(val rect: Rect) : FloatingCallTouchArea
+
+    /** The sheet: a touch on the dimmed session steps back. */
+    data object Everywhere : FloatingCallTouchArea
 }
 
 /**
- * Where the floating call starts and rests, and the playground's hold on the experiment (iOS
+ * Where the floating call starts and rests (iOS
  * `FloatingCallCenter`). The session screen reports its call button and composer, in window
  * coordinates in dp ([floatingCallButton], [floatingCallComposer]); the overlay reads them.
  * One per process, behind its dependency key; main thread only.
  */
-class FloatingCallCenter(readsLabHooks: Boolean = false) {
-    /** A panel or dock request: the target and a counter bumped on each request. */
-    data class Request(val value: Boolean, val count: Int)
+class FloatingCallCenter {
+    /** A panel request: open or shut, and a counter bumped on each request. */
+    data class Request(val open: Boolean, val count: Int)
 
     /** The composer's call button circle, as last laid out. */
     var callButton: Rect? = null
 
     /**
-     * Where the call button was when it was tapped: the break-out starts there. Taken once; a
-     * call started any other way appears at its rest. Session sets it from [callButton] when
-     * the call button starts a call.
+     * Where the call button was when it was tapped (the composer's or the drawer's): the
+     * break-out starts there. Taken once; a call started any other way starts at
+     * [landingButton] while it's fresh, else at its rest.
      */
     var breakoutFrom: Rect? = null
+
+    /** The drawer's call button circle, where it stands or comes back to, while the drawer offers a call; null otherwise. */
+    var drawerCallButton: Rect? = null
+
+    /** The phone's drawer is open over the session: its composer is out of sight. */
+    var isDrawerOpen: Boolean = false
+
+    /**
+     * Where a call ending now lands: with the drawer open its call button (or nowhere, so the
+     * call fades where it rests), never the composer's button hidden under the drawer; otherwise
+     * the composer's.
+     */
+    val landingButton: Rect?
+        get() = (if (isDrawerOpen) drawerCallButton else callButton)?.takeIf { it.width > 0f }
+
+    /** The floating call's screen, safe area and resting size while its overlay shows one, for [restingOrb]. */
+    var orbLayout by mutableStateOf<FloatingCallOrbLayout?>(null)
 
     /**
      * The composer and what stands above it (pills, the jump button), as last laid out with the
@@ -309,54 +263,77 @@ class FloatingCallCenter(readsLabHooks: Boolean = false) {
      */
     var composer by mutableStateOf<Rect?>(null)
 
-    /** The playground's Start Floating Call turns the experiment on for its run. */
-    var forced by mutableStateOf(false)
+    /** The card's frame as last laid out, in window dp: whether it covers the composer ([FloatingCallStage.covers]). */
+    var card by mutableStateOf<Rect?>(null)
+
+    /**
+     * The composer's readable column wherever it sits (beside a wide screen's sidebar too), for
+     * whether the card covers it. Unlike [composer] it keeps off-centre frames.
+     */
+    var composerColumn by mutableStateOf<Rect?>(null)
+        private set
 
     /** Playground scenes stand in for the call's voices and state. */
     var scene by mutableStateOf<FloatingCallScene?>(null)
 
-    /** Bumped by the playground to open or close the panel. */
+    /** Bumped by the playground to open or close the card. */
     var panelRequest by mutableStateOf(Request(false, 0))
         private set
 
-    /** Bumped by the playground to dock the orb into the edge or float it free. */
-    var dockRequest by mutableStateOf(Request(false, 0))
-        private set
-
-    /** Where the orb rests for this run, once dragged. */
-    var place: FloatingCallPlace? = null
+    /** Where the orb rests for this run, once dragged. The session makes room for it while it rests on the composer (`orbClearance`). */
+    var place by mutableStateOf<FloatingCallPlace?>(null)
 
     /** The overlay's width, to tell a composer at rest from one sliding with the drawer. */
     var screenWidth: Float = 0f
 
-    init {
-        // `-floating-call-forced YES`: a debug build opened straight into the playground. The
-        // property is read off the main thread (a `getprop`).
-        if (readsLabHooks) {
-            Thread {
-                if (VoiceLabEnvironment.flag("FLOATING_CALL_FORCED")) Handler(Looper.getMainLooper()).post { forced = true }
-            }.start()
-        }
+    /** The ended call's shape is flying into the call button: its host keeps it until it lands. */
+    var isLanding by mutableStateOf(false)
+
+    /** Some host ([FloatingCallWindow]) floats a call. */
+    var hasCall by mutableStateOf(false)
+        private set
+
+    /** The hosts floating a call: one closing leaves the others'. */
+    private val callAnchors = mutableSetOf<Any>()
+
+
+    fun noteCall(has: Boolean, anchor: Any) {
+        if (has) callAnchors.add(anchor) else callAnchors.remove(anchor)
+        if (hasCall == callAnchors.isEmpty()) hasCall = callAnchors.isNotEmpty()
     }
 
-    fun isOn(stored: Boolean): Boolean = forced || ExperimentalFeature.floatingCall.isActive(stored)
-
-    /** Kept only while the card rests shut: the composer slides with the drawer, and the orb stays where it was. */
-    fun noteComposer(frame: Rect) {
-        if (frame.width <= 0 || !(screenWidth == 0f || abs(frame.center.x - screenWidth / 2) < 2)) return
+    /**
+     * Kept only while the card rests shut: the composer slides with the drawer, and the orb stays
+     * where it was. Beside a wide screen's sidebar the composer stands off-centre and doesn't
+     * slide: kept there too.
+     */
+    fun noteComposer(frame: Rect, besideSidebar: Boolean = false) {
+        if (frame.width <= 0 || !(besideSidebar || screenWidth == 0f || abs(frame.center.x - screenWidth / 2) < 2)) return
         if (composer != frame) composer = frame
+    }
+
+    fun noteComposerColumn(frame: Rect) {
+        if (frame.width <= 0 || composerColumn == frame) return
+        composerColumn = frame
+    }
+
+    /**
+     * Where the orb rests (or comes back to from the card) over a composer whose top is
+     * [composerTop], in window dp: worked out from the composer as it's laid out, so the
+     * session's room for it never reads a rest the overlay hasn't caught up to.
+     */
+    fun restingOrb(composerTop: Float): Rect? {
+        val layout = orbLayout ?: return null
+        val area = FloatingCallRestArea(layout.screen, layout.safeArea, composerTop, layout.size)
+        return area.frame(place ?: FloatingCallPlace())
     }
 
     fun requestPanel(open: Boolean) {
         panelRequest = Request(open, panelRequest.count + 1)
     }
 
-    fun requestDock(docked: Boolean) {
-        dockRequest = Request(docked, dockRequest.count + 1)
-    }
-
     companion object Key : DependencyKey<FloatingCallCenter> {
-        override val liveValue: FloatingCallCenter by lazy { FloatingCallCenter(readsLabHooks = true) }
+        override val liveValue: FloatingCallCenter by lazy { FloatingCallCenter() }
         override val testValue: FloatingCallCenter get() = FloatingCallCenter()
         val shared: FloatingCallCenter get() = dependency(Key)
     }
@@ -368,7 +345,21 @@ fun Modifier.floatingCallComposer(): Modifier = this then FloatingCallFrameEleme
 /** Reports this element (the composer's call button circle) as [FloatingCallCenter.callButton]. */
 fun Modifier.floatingCallButton(): Modifier = this then FloatingCallFrameElement(FloatingCallFrameKind.callButton)
 
-private enum class FloatingCallFrameKind { composer, callButton }
+/**
+ * Reports this element (the drawer's call button circle) as [FloatingCallCenter.drawerCallButton],
+ * cleared when it leaves. Apply it only while the drawer offers a call.
+ */
+fun Modifier.floatingCallDrawerButton(): Modifier = this then FloatingCallFrameElement(FloatingCallFrameKind.drawerCallButton)
+
+/**
+ * Reports this element (the composer's readable column, not the pane) to
+ * [FloatingCallCenter.noteComposerColumn]: whether the call's card covers it. Apply it only while
+ * the call floats and the screen shows (iOS `onGeometryChange` gated on `!isCovered`).
+ */
+fun Modifier.floatingCallComposerColumn(): Modifier = this then FloatingCallFrameElement(FloatingCallFrameKind.composerColumn)
+
+@Suppress("EnumEntryName")
+private enum class FloatingCallFrameKind { composer, callButton, composerColumn, drawerCallButton }
 
 private data class FloatingCallFrameElement(val kind: FloatingCallFrameKind) : ModifierNodeElement<FloatingCallFrameNode>() {
     override fun create() = FloatingCallFrameNode(kind)
@@ -386,954 +377,1143 @@ private class FloatingCallFrameNode(var kind: FloatingCallFrameKind) : Modifier.
         when (kind) {
             FloatingCallFrameKind.composer -> center.noteComposer(frame)
             FloatingCallFrameKind.callButton -> center.callButton = frame
+            FloatingCallFrameKind.composerColumn -> center.noteComposerColumn(frame)
+            FloatingCallFrameKind.drawerCallButton -> center.drawerCallButton = frame
         }
+    }
+
+    override fun onDetach() {
+        if (kind == FloatingCallFrameKind.drawerCallButton) FloatingCallCenter.shared.drawerCallButton = null
     }
 }
 
-/** The overlay's stages (iOS `FloatingCallSurface.Stage`). */
-@Suppress("EnumEntryName")
-enum class FloatingCallStage { seed, lifted, resting, panel, leaving }
-
 /**
- * The floating call's geometry, in the overlay's coordinates (dp): where the orb rests, where
- * the panel opens, the frame of each stage, the edge's bead, and where a drag lands (iOS
- * `FloatingCallSurface`'s geometry). A plain value: the overlay rebuilds it as the screen, the
- * composer or the captions change.
+ * What a host floats (iOS `FloatingCallWindowContent`): the call, the last one (kept while its
+ * shape lands), and where the overlay takes touches, for a host that hosts it in a window of its
+ * own and must pass every other touch through.
  */
-data class FloatingCallLayout(
-    val screenWidth: Float,
-    val screenHeight: Float,
-    /** The top of the composer (iOS `composerTop`), or `null` before the session reported one. */
-    val composerMinY: Float?,
-    val orbDiameter: Float,
-    val style: FloatingCallStyle,
-    val showsCaptions: Boolean,
-) {
-    val topLimit: Float get() = 124f
-
-    /**
-     * The bottom of the space the orb may rest in: above the composer, its pills and the jump
-     * button, and the keyboard when it raises them.
-     */
-    val composerTop: Float get() = composerMinY ?: (screenHeight - 34 - CallTrayComposerMetrics.barHeight)
-
-    val restWidth: Float get() = if (style == FloatingCallStyle.capsule) max(orbDiameter, FloatingCallTunables.capsuleWidth) else orbDiameter
-    val restHeight: Float get() = orbDiameter
-
-    fun restFrame(place: FloatingCallPlace): Rect {
-        var width = restWidth
-        var height = restHeight
-        if (place.docked) {
-            width *= FloatingCallTunables.squash
-            height *= FloatingCallTunables.stretch
+@Stable
+class FloatingCallWindowContent {
+    var call: VoiceStoreOf?
+        get() = callState
+        set(value) {
+            callState = value
+            if (value != null) last = value
         }
-        val bottom = composerTop - FloatingCallTunables.composerGap - height
-        val y = min(max(place.y?.let { it - height / 2 } ?: bottom, topLimit), bottom)
-        val x = if (place.docked) {
-            if (place.side == FloatingCallPlace.Side.trailing) screenWidth - width + FloatingCallTunables.overlap else -FloatingCallTunables.overlap
-        } else {
-            if (place.side == FloatingCallPlace.Side.trailing) screenWidth - FloatingCallTunables.sideInset - width else FloatingCallTunables.sideInset
-        }
-        return Rect(x, y, x + width, y + height)
-    }
+    private var callState by mutableStateOf<VoiceStoreOf?>(null)
 
-    val panelHeight: Float
-        get() {
-            val button = max(44f, FloatingCallTunables.buttonSize)
-            return 8 + 48 + 8 + FloatingCallTunables.stripHeight + (if (showsCaptions) FloatingCallTunables.captionsHeight + 8 else 0f) + 14 + button + 14
-        }
+    var last by mutableStateOf<VoiceStoreOf?>(null)
 
-    fun panelFrame(place: FloatingCallPlace): Rect {
-        val rest = restFrame(place)
-        val width = min(screenWidth - 24, FloatingCallTunables.panelWidth)
-        val height = panelHeight
-        val x = if (place.side == FloatingCallPlace.Side.trailing) screenWidth - 12 - width else 12f
-        // It grows from the orb: up from an orb in the lower half, down from one in the upper.
-        val grows = if (rest.center.y > screenHeight / 2) rest.bottom - height else rest.top
-        val y = min(max(grows, topLimit), composerTop - FloatingCallTunables.composerGap - height)
-        val top = max(topLimit, y)
-        return Rect(x, top, x + width, top + height)
-    }
-
-    /** The frame of [stage]; [drag] is the finger's translation while carrying the orb. */
-    fun frame(stage: FloatingCallStage, place: FloatingCallPlace, drag: Offset?, seedFrame: Rect?): Rect {
-        val rest = restFrame(place)
-        return when (stage) {
-            FloatingCallStage.seed -> seedFrame ?: rest.inset(rest.width * 0.2f, rest.height * 0.2f)
-            FloatingCallStage.lifted -> {
-                val seed = seedFrame ?: rest
-                val scale = FloatingCallTunables.liftScale
-                seed.inset(-seed.width * (scale - 1) / 2, -seed.height * (scale - 1) / 2)
-            }
-            FloatingCallStage.resting -> {
-                if (drag == null) return rest
-                // Under the finger: floating size, wherever it's carried.
-                val floating = restFrame(place.copy(docked = false))
-                val cx = rest.center.x + drag.x
-                val cy = rest.center.y + drag.y
-                Rect(cx - floating.width / 2, cy - floating.height / 2, cx + floating.width / 2, cy + floating.height / 2)
-            }
-            FloatingCallStage.panel -> panelFrame(place)
-            FloatingCallStage.leaving -> rest.inset(rest.width * 0.25f, rest.height * 0.25f)
-        }
-    }
-
-    fun cornerRadius(stage: FloatingCallStage, frame: Rect): Float {
-        val radius = if (stage == FloatingCallStage.panel) 28f else min(frame.width, frame.height) / 2
-        // iOS `GlassShape.clamped`: never more than half the shorter side.
-        return min(max(0f, radius), max(0f, min(frame.width, frame.height)) / 2)
-    }
-
-    /** How close the orb is to its nearer side edge, 0 (far) to 1 (touching or docked). */
-    fun edgeProximity(frame: Rect, stage: FloatingCallStage, place: FloatingCallPlace, dragging: Boolean): Pair<FloatingCallPlace.Side, Float> {
-        if (stage == FloatingCallStage.resting && !dragging && place.docked) return place.side to 1f
-        if (stage != FloatingCallStage.resting || !dragging) return place.side to 0f
-        val leading = frame.left
-        val trailing = screenWidth - frame.right
-        val side = if (leading < trailing) FloatingCallPlace.Side.leading else FloatingCallPlace.Side.trailing
-        val distance = max(0f, min(leading, trailing))
-        return side to max(0f, 1 - distance / FloatingCallTunables.snapDistance)
-    }
-
-    /**
-     * The edge's surface, beside the orb: grows as it nears the bezel. Far from the edge it
-     * waits off screen, past the merge distance, so it slides in and out with the orb rather
-     * than appearing or vanishing.
-     */
-    fun beadFrame(frame: Rect, stage: FloatingCallStage, place: FloatingCallPlace, dragging: Boolean): Rect {
-        val (side, amount) = edgeProximity(frame, stage, place, dragging)
-        val width = FloatingCallTunables.beadWidth * amount
-        val length = FloatingCallTunables.beadLength * (0.4f + 0.6f * amount)
-        val away = max(0f, 1 - amount * 3) * (FloatingCallTunables.merge + 40)
-        val x = (if (side == FloatingCallPlace.Side.trailing) screenWidth - width + away else -away) + (if (side == FloatingCallPlace.Side.trailing) 0f else -20f)
-        val y = frame.center.y - length / 2
-        return Rect(x, y, x + width + 20, y + length)
-    }
-
-    /**
-     * Where a drag ends ([translation] where the finger lifted, [predicted] where its fling
-     * would carry it): the nearer side of the predicted point, docked when the dock is the edge
-     * or it landed within half the snap distance of an edge, and following the composer again
-     * when it lands near its usual height.
-     */
-    fun settle(place: FloatingCallPlace, translation: Offset, predicted: Offset): FloatingCallPlace {
-        val start = restFrame(place)
-        val predictedX = start.center.x + predicted.x
-        val predictedY = start.center.y + predicted.y
-        val landedX = start.center.x + translation.x
-        val side = if (predictedX < screenWidth / 2) FloatingCallPlace.Side.leading else FloatingCallPlace.Side.trailing
-        val distance = min(landedX, screenWidth - landedX) - restWidth / 2
-        val docked = FloatingCallTunables.dock == FloatingCallDock.edge || distance < FloatingCallTunables.snapDistance * 0.5f
-        val resting = composerTop - FloatingCallTunables.composerGap - restHeight / 2
-        val y = min(max(predictedY, topLimit + restHeight / 2), resting)
-        // Near its usual height it follows the composer again.
-        return place.copy(side = side, docked = docked, y = if (abs(y - resting) < 28) null else y)
-    }
-
-    companion object {
-        /** The strip's top in the panel: below the 8 + 48 dp header and an 8 dp gap. */
-        const val stripTop = 8f + 48f + 8f
-
-        /**
-         * SwiftUI's `predictedEndTranslation`: the fling's projection at UIKit's normal
-         * deceleration (0.998 per ms): `velocity / 1000 · 0.998 / (1 − 0.998)`, about half a
-         * second of the release velocity.
-         */
-        const val flingProjection = 0.998f / (1 - 0.998f) / 1000f
-    }
+    /** Written by the overlay as its shape moves (iOS `@ObservationIgnored`). */
+    var touchArea: FloatingCallTouchArea = FloatingCallTouchArea.None
 }
 
-/** CGRect's `insetBy(dx:dy:)`. */
-private fun Rect.inset(dx: Float, dy: Float): Rect = Rect(left + dx, top + dy, right - dx, bottom - dy)
+/** The host the overlay reports its touch area to, if any (iOS `\.floatingCallWindow`). */
+val LocalFloatingCallWindow = staticCompositionLocalOf<FloatingCallWindowContent?> { null }
 
-/** One animation of the overlay's surface: what `withAnimation` carried on iOS. */
-private sealed interface FloatingMove {
-    data class Spring(val spring: MotionSpring) : FloatingMove
-    data class EaseInOut(val seconds: Double) : FloatingMove
-
-    /** iOS `withAnimation(nil)`: no animation. */
-    data object Instant : FloatingMove
-
-    fun <T> spec(): AnimationSpec<T> = when (this) {
-        is Spring -> spring.spec()
-        is EaseInOut -> Motion.easeInOut(seconds)
-        Instant -> snap()
+/**
+ * The floating call's host (iOS `FloatingCallWindow` + `FloatingCallWindowRoot`), mounted once at
+ * the app's root over everything else, full window (its coordinates are the window's, in dp, as
+ * [floatingCallButton] and [floatingCallComposer] report them), drawn edge to edge: it reads the
+ * system bars and cutout itself.
+ *
+ * The host passes the call to float (null when there's none or the experiment is off,
+ * [FloatingCallCenter.isOn]). An ended call stays while its shape lands in the call button
+ * ([FloatingCallCenter.isLanding], at most 4 s), then fades out; a new call gets its own surface.
+ * Touches outside the shape reach the app beneath: the overlay has no pointer input but the
+ * shape's own (and, with the sheet up, the dimmed backdrop's), so Compose passes the rest to
+ * the content under it. A host that puts it in a separate window instead reads
+ * [FloatingCallWindowContent.touchArea] to decide what that window takes.
+ */
+@Composable
+fun FloatingCallWindow(
+    call: VoiceStoreOf?,
+    modifier: Modifier = Modifier,
+    content: FloatingCallWindowContent = remember { FloatingCallWindowContent() },
+) {
+    val center = remember { FloatingCallCenter.shared }
+    val anchor = remember { Any() }
+    SideEffect { if (content.call !== call) content.call = call }
+    DisposableEffect(call != null) {
+        center.noteCall(call != null, anchor)
+        onDispose {}
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            center.noteCall(false, anchor)
+            content.touchArea = FloatingCallTouchArea.None
+            content.last = null
+        }
+    }
+    // iOS waits for the landing up to 40 × 0.1 s before taking the window down.
+    var expired by remember { mutableStateOf(false) }
+    LaunchedEffect(call) {
+        expired = false
+        if (call == null) {
+            delay(4_000)
+            expired = true
+        }
+    }
+    val shown = call ?: if (center.isLanding && !expired) content.last else null
+    CompositionLocalProvider(LocalFloatingCallWindow provides content) {
+        AnimatedContent(
+            targetState = shown,
+            modifier = modifier.fillMaxSize(),
+            transitionSpec = {
+                EnterTransition.None togetherWith fadeOut(Motion.easeOut(0.25, delaySeconds = if (targetState == null) 0.15 else 0.0)) using SizeTransform(clip = false)
+            },
+            label = "floatingCallWindow",
+        ) { store ->
+            if (store != null) FloatingCallOverlay(store)
+        }
     }
 }
 
 /**
- * The floating call, over the whole window: the orb (or capsule) resting above the composer,
- * its panel, and the break-out out of the composer's call button. One surface morphs between
- * them (iOS `FloatingCallOverlay`).
- *
- * Hosting: Session (or Drawer, which keeps the call over the drawer swipe) places it over
- * everything, filling the whole window edge to edge (not inset by the system bars), while the
- * call shows and `FloatingCallCenter.shared.isOn(shared(experimental(.floatingCall)))` or the
- * Living Orb experiment is on. Report the composer with [floatingCallComposer] and its call
- * button with [floatingCallButton]; set `FloatingCallCenter.shared.breakoutFrom =
- * callButton` when the call button starts a call. Touches outside the orb pass through.
- *
- * @param store the call.
+ * The card and the sheet, grown from the orb where it rests, on its side of the screen (iOS
+ * `stageGeometry`). Covering (`call.stage.covers`), the card stands at the screen's foot with the
+ * same margin as its sides, over the composer and its pills, so the keyboard never squeezes it;
+ * otherwise it stands above the composer.
+ */
+internal fun floatingCallStageGeometry(area: FloatingCallRestArea, rest: Rect): FloatingCallStageGeometry {
+    val covers = FloatingCallStageTunables.covers.value
+    return FloatingCallStageGeometry(
+        screen = area.screen,
+        rest = rest,
+        low = if (covers) {
+            area.screen.height - FloatingCallStageTunables.coverInset.value
+        } else {
+            (area.bottom - FloatingCallTunables.composerGap.value.toFloat()).toDouble()
+        },
+        trailing = rest.center.x > area.screen.width / 2,
+        card = Size(
+            FloatingCallStageTunables.cardWidth.value.toFloat(),
+            (if (covers) FloatingCallStageTunables.coverHeight.value else FloatingCallStageTunables.cardHeight.value).toFloat(),
+        ),
+    )
+}
+
+/**
+ * The floating call over the whole window (iOS `FloatingCallOverlay`): drawn edge to edge, it
+ * reads the system bars and cutout as its safe area. Mount it through [FloatingCallWindow],
+ * which keeps an ended call while it lands; mounted on its own, keep it composed (with its
+ * store) until [FloatingCallCenter.isLanding] goes false, or the hang-up flight is cut short.
  */
 @Composable
 fun FloatingCallOverlay(store: VoiceStoreOf, modifier: Modifier = Modifier) {
     BoxWithConstraints(modifier.fillMaxSize()) {
-        FloatingCallSurface(store, screenWidth = maxWidth.value, screenHeight = maxHeight.value)
+        val density = LocalDensity.current
+        val direction = LocalLayoutDirection.current
+        val insets = WindowInsets.systemBars.union(WindowInsets.displayCutout)
+        val scale = density.density
+        val safeArea = FloatingCallEdgeInsets(
+            top = insets.getTop(density) / scale,
+            leading = insets.getLeft(density, direction) / scale,
+            bottom = insets.getBottom(density) / scale,
+            trailing = insets.getRight(density, direction) / scale,
+        )
+        FloatingCallSurface(store, Size(maxWidth.value, maxHeight.value), safeArea)
     }
 }
 
-/** The overlay at the window's size, in its coordinates (iOS `FloatingCallSurface`). */
-@Composable
-private fun FloatingCallSurface(store: VoiceStoreOf, screenWidth: Float, screenHeight: Float) {
-    val reduceMotion = rememberReduceMotion()
-    val dark = OpenCodeTheme.colors.isDark
-    val density = LocalDensity.current.density
-    val haptics = remember { dependency(HapticsClient) }
-    val center = remember { FloatingCallCenter.shared }
-    val scope = rememberCoroutineScope()
-    val livingOrbSetting by remember { shared(experimental(ExperimentalFeature.livingOrb)).flow }.collectAsState()
-    val savedLivingOrbStyle by remember { shared(VoiceSharedKeys.livingOrbStyle).flow }.collectAsState()
-    val usesLivingOrb = ExperimentalFeature.livingOrb.isActive(livingOrbSetting)
-    val orbDiameter = if (usesLivingOrb) LivingOrbTunables.size else FloatingCallTunables.orbSize
+/** What a drag on the card or sheet does (iOS `DragMode`): step the stage, or nothing (a sideways drag). */
+@Suppress("EnumEntryName")
+private enum class FloatingCallDragMode { stage, ignored }
 
-    val phase by store.observe { it.phase }
-    val isReconnecting by store.observe { it.isReconnecting }
-    val targetNeedsInput by store.observe { it.targetNeedsInput }
-    val isWorking by store.observe { it.isWorking }
-    val storeStatus by store.observe { it.statusText }
-    val sessionTitle by store.observe { it.sessionTitle }
-    val isMuted by store.observe { it.isMuted }
-    val isAssistantSpeaking by store.observe { it.isAssistantSpeaking }
-    val scopeStage by store.observe { it.scopeStage }
+/** A finger on the resting orb, from touch-down (iOS `OrbTouch`): where it held the orb, and whether it caught it mid-drift. */
+private class FloatingCallOrbTouch(
+    val offset: Offset,
+    val origin: Offset,
+    val began: Long,
+    val wasMoving: Boolean,
+    var location: Offset,
+    var moved: Long,
+) {
+    var travel = 0f
+}
 
-    var lab by remember { mutableStateOf(FloatingCallLab.none) }
-    val style = if (usesLivingOrb) FloatingCallStyle.orb else lab.style ?: FloatingCallTunables.style
-    val orbStyle = lab.orb ?: FloatingCallTunables.orbStyle
-    val defaultDocked = lab.edge || FloatingCallTunables.dock == FloatingCallDock.edge
+/**
+ * The surface's state and logic (iOS `FloatingCallSurface`'s `@State` and its functions): the
+ * three motions, the touch, the tag and the tasks. The body reads its snapshot state; gestures,
+ * effects and the motions' callbacks call into it.
+ */
+@Stable
+private class FloatingCallSurfaceModel(
+    val store: VoiceStoreOf,
+    val center: FloatingCallCenter,
+    val scope: CoroutineScope,
+) {
+    val layout = FloatingCallLayout()
+    val opacity = Animatable(0f)
+    var place by mutableStateOf(FloatingCallPlace())
+    val float = FloatingCallFloatMotion()
+    val motion = FloatingCallStageMotion()
+    val connect = FloatingCallConnectMotion()
+    var tagText by mutableStateOf<String?>(null)
+    var tagShown by mutableStateOf(false)
+    var bloomMounted by mutableStateOf(false)
+    var lab by mutableStateOf(FloatingCallLab.none)
 
-    // Whether the break-out starts from the composer's call button: a fresh call tapped there.
-    val breakout = remember {
-        val state = store.state
-        val from = center.breakoutFrom
-        if (state.phase == VoiceFeature.State.Phase.Connecting && state.connectedAt == null && !reduceMotion) from else null
-    }
-    var stage by remember { mutableStateOf(if (breakout != null) FloatingCallStage.seed else FloatingCallStage.resting) }
-    var seedFrame by remember { mutableStateOf(breakout) }
-    var place by remember { mutableStateOf(center.place ?: FloatingCallPlace(docked = defaultDocked)) }
-    var drag by remember { mutableStateOf<Offset?>(null) }
-    var showsCaptions by remember { mutableStateOf(false) }
-    var tagText by remember { mutableStateOf<String?>(null) }
-    // Controls are mounted only while their state shows or folds away, so TalkBack never
-    // reaches the hidden state's controls. The drawings (the face, the panel's scope) stay
-    // mounted, so opening and closing never builds one mid-animation; the hidden one stops
-    // drawing once it has faded.
-    var panelMounted by remember { mutableStateOf(false) }
-    var restMounted by remember { mutableStateOf(true) }
-    var scopeMounted by remember { mutableStateOf(false) }
-    var panelAwake by remember { mutableStateOf(false) }
-    var faceAwake by remember { mutableStateOf(true) }
-    val jobs = remember { FloatingCallJobs() }
+    var touch: FloatingCallOrbTouch? = null
+    var dragMode: FloatingCallDragMode? = null
+    var dragNearest: FloatingCallStage? = null
+    var tagJob: Job? = null
+    var mountJob: Job? = null
+    var lastPanelRequest = 0
 
-    val geometry = FloatingCallLayout(screenWidth, screenHeight, center.composer?.top, orbDiameter, style, showsCaptions)
+    // Kept current by the body.
+    var reduceMotion = false
+    var window: FloatingCallWindowContent? = null
+    var dismissKeyboard: () -> Unit = {}
+    var density = 1f
+    var dim = 0.0
+    var root: LayoutCoordinates? = null
+    var shapeCoordinates: LayoutCoordinates? = null
 
-    // The surface's frame and corner, animated with the move that changed them (iOS
-    // `withAnimation`); otherwise following the composer as the keyboard raises it.
-    val pending = remember { arrayOfNulls<FloatingMove>(1) }
-    fun move(next: FloatingMove, change: () -> Unit) {
-        pending[0] = next
-        change()
-    }
-    val followMove: FloatingMove = if (reduceMotion) FloatingMove.EaseInOut(0.2) else FloatingMove.Spring(FloatingCallTunables.follow)
-    val dragMove: FloatingMove = if (reduceMotion) FloatingMove.EaseInOut(0.2) else FloatingMove.Spring(FloatingCallTunables.drag)
-    val expandMove: FloatingMove = if (reduceMotion) FloatingMove.EaseInOut(0.2) else FloatingMove.Spring(FloatingCallTunables.expand)
+    val style: FloatingCallStyle get() = lab.style ?: FloatingCallTunables.style.value
 
-    val targetFrame = geometry.frame(stage, place, drag, seedFrame)
-    val targetRadius = geometry.cornerRadius(stage, targetFrame)
-    val frameAnim = remember { Animatable(targetFrame, Rect.VectorConverter) }
-    val radiusAnim = remember { Animatable(targetRadius) }
-    val opacity = remember { Animatable(0f) }
-    LaunchedEffect(targetFrame, targetRadius) {
-        val next = pending[0] ?: followMove
-        pending[0] = null
-        if (next == FloatingMove.Instant) {
-            frameAnim.snapTo(targetFrame)
-            radiusAnim.snapTo(targetRadius)
-            return@LaunchedEffect
+    val restSize: Size
+        get() {
+            val height = WispOrbTunables.size.value.toFloat()
+            val width = if (style == FloatingCallStyle.capsule) max(height, FloatingCallTunables.capsuleWidth.value.toFloat()) else height
+            return Size(width, height)
         }
-        launch { radiusAnim.animateTo(targetRadius, next.spec()) }
-        frameAnim.animateTo(targetFrame, next.spec())
+
+    /** Where the orb may be on the screen as it is when called (iOS `liveRestArea`), for motion that outlives a body. */
+    fun liveRestArea(): FloatingCallRestArea = FloatingCallRestArea(layout.screen, layout.safeArea, center.composer?.top, restSize, layout.keyboardTop)
+
+    val restFrame: Rect get() = liveRestArea().frame(place)
+
+    fun restingFrame(area: FloatingCallRestArea = liveRestArea()): Rect = float.position?.let { area.frame(centeredAt = it) } ?: area.frame(place)
+
+    fun stageGeometry(area: FloatingCallRestArea = liveRestArea()): FloatingCallStageGeometry = floatingCallStageGeometry(area, area.frame(place))
+
+    fun send(action: FloatingCallStageFeature.Action) {
+        store.send(VoiceFeature.Action.FloatingStage(action))
     }
 
-    fun hideTag() {
-        if (tagText == null) return
-        tagText = null
+    /** The screen or safe area changed (a rotation, a resize): motion reads the new bounds, and a drifting orb is kept on screen. */
+    fun laidOut(screen: Size, safeArea: FloatingCallEdgeInsets) {
+        layout.screen = screen
+        layout.safeArea = safeArea
+        center.screenWidth = screen.width
+        val area = liveRestArea()
+        float.clamp(into = area.reach.union(area.bounds))
     }
 
-    fun showTag(text: String) {
-        jobs.tag?.cancel()
+    fun appeared() {
+        FloatingCallTunables.register()
+        FloatingCallStageTunables.register()
+        FloatingCallConnectTunables.register()
+        WispOrbTunables.register()
+        scope.launch {
+            val read = withContext(Dispatchers.IO) { FloatingCallLab.read() }
+            lab = read
+            if (!read.scenes) return@launch
+            val scenes = listOf(FloatingCallScene.idle, FloatingCallScene.listening, FloatingCallScene.thinking, FloatingCallScene.agentSpeaking, FloatingCallScene.bothSpeaking, FloatingCallScene.needsInput)
+            while (isActive && !store.state.phase.isTerminal) {
+                for (scene in scenes) {
+                    center.scene = scene
+                    delay(2_500)
+                }
+            }
+        }
+        place = center.place ?: FloatingCallPlace()
+        lastPanelRequest = center.panelRequest.count
+        // Carried over to another screen grown: it stays grown.
+        val stage = store.state.floatingStage.stage
+        if (stage != FloatingCallStage.orb) {
+            bloomMounted = true
+            motion.jump(stage)
+        }
+        mountJob = scope.launch {
+            // After the break-out has landed, while the orb just rests.
+            delay(1_200)
+            bloomMounted = true
+        }
+        val state = store.state
+        val fresh = state.phase == VoiceFeature.State.Phase.Connecting && state.connectedAt == null
+        // A call just started always starts as the call button, however it was started.
+        val from = center.breakoutFrom ?: if (fresh) center.landingButton else null
+        center.breakoutFrom = null
+        if (!fresh || reduceMotion || from == null || from.width <= 0f) {
+            // Carried over, or Reduce Motion: it appears where it rests, and the bigger field mounts now.
+            mountJob?.cancel()
+            bloomMounted = true
+            scope.launch { opacity.animateTo(1f, Motion.easeOut(if (reduceMotion) 0.2 else 0.25)) }
+            return
+        }
+        scope.launch { opacity.snapTo(1f) }
+        connect.start(from = from, rest = { liveRestArea().frame(place) })
+    }
+
+    fun disappeared() {
+        window?.touchArea = FloatingCallTouchArea.None
+        if (center.isLanding) center.isLanding = false
+        motion.stop()
+        connect.stop()
+        float.stop()
+        mountJob?.cancel()
+        tagJob?.cancel()
+    }
+
+    fun expand() {
+        if (store.state.phase.isTerminal || float.position != null || dragMode != null) return
+        send(FloatingCallStageFeature.Action.OrbTapped)
+    }
+
+    /** Drifting or held when something else takes the shape: it rests where it is. */
+    fun settleFloat() {
+        touch = null
+        float.stop()?.let { rest(it) }
+    }
+
+    /** The stage changed without a drag (a tap, the chevron, TalkBack, the playground): the shape springs there. */
+    fun grow(next: FloatingCallStage) {
+        if (motion.isDragging || motion.target == next || store.state.phase.isTerminal) return
+        connect.cancel()
+        settleFloat()
+        hideTag()
+        bloomMounted = true
+        if (next != FloatingCallStage.orb) dismissKeyboard()
+        motion.animate(next, reduceMotion = reduceMotion)
+    }
+
+    /**
+     * A keyboard rising in this window (a field the card doesn't cover, a sheet's search) would
+     * bury Mute and End at the screen's foot: the card or sheet shrinks to the orb, which rides
+     * above it (iOS `keyboardRose`).
+     */
+    fun keyboardRose() {
+        if (store.state.floatingStage.stage == FloatingCallStage.orb || motion.isDragging || store.state.phase.isTerminal) return
+        send(FloatingCallStageFeature.Action.KeyboardRose)
+    }
+
+    /**
+     * A keyboard the composer doesn't ride (the drawer's search, a sheet's field) would hide the
+     * orb resting above the composer: it rests above the keyboard instead, and back down as it
+     * goes (iOS `keyboardMoved`). [top] is in this overlay's space, null with no keyboard.
+     */
+    fun keyboardMoved(top: Float?) {
+        if (layout.keyboardTop == top) return
+        layout.keyboardTop = top
+        val area = liveRestArea()
+        float.clamp(into = area.reach.union(area.bounds))
+    }
+
+    /**
+     * The call ended: from any stage, mid-lift included, the shape flies into the composer's
+     * call button with the speed it has, or shrinks away where it rests when there's none.
+     */
+    fun leave() {
+        hideTag()
+        val geometry = stageGeometry()
+        val flight = connect.hangUp(reduceMotion = reduceMotion)
+        val shaping = motion.isActive
+        val current = if (shaping) motion.frame(geometry) else flight?.frame ?: restingFrame()
+        val drifting = float.velocity
+        val velocity: List<Double>? = if (shaping) null else flight?.velocity ?: listOf(drifting.x.toDouble(), drifting.y.toDouble(), 0.0, 0.0)
+        settleFloat()
+        val rest = restFrame
+        val button = center.landingButton
+        val center = center
+        val target: (() -> Rect?)? = if (button != null) ({ center.landingButton }) else null
+        if (!reduceMotion && button != null) center.isLanding = true
+        // Into the drawer's button it fades as it lands: the drawer covers where it rests.
+        val fades = button == null || center.isDrawerOpen
+        motion.land(
+            rect = button ?: Rect(rest.left + rest.width * 0.25f, rest.top + rest.height * 0.25f, rest.right - rest.width * 0.25f, rest.bottom - rest.height * 0.25f),
+            current = current,
+            velocity = velocity,
+            fades = fades,
+            target = target,
+            geometry = geometry,
+            reduceMotion = reduceMotion,
+        )
+    }
+
+    /** The voice agent moved the call: say where it talks now. The user's own switches stay quiet. */
+    fun sessionMoved(title: String) {
+        if (store.state.phase.isTerminal) return
+        showTag("Now talking in $title")
+    }
+
+    private fun showTag(text: String) {
+        if (motion.isActive) return
+        tagJob?.cancel()
         tagText = text
-        jobs.tag = scope.launch {
+        tagShown = true
+        tagJob = scope.launch {
             delay(2_200)
             hideTag()
         }
     }
 
-    /** Once the surface has settled, the hidden state's controls leave and its drawing stops. */
-    fun settleHidden() {
-        jobs.awake?.cancel()
-        jobs.awake = scope.launch {
-            delay(600)
-            val open = stage == FloatingCallStage.panel
-            faceAwake = !open
-            panelAwake = open
-            restMounted = !open
-            panelMounted = open
-        }
+    fun hideTag() {
+        if (tagShown) tagShown = false
     }
 
-    fun expand() {
-        if (store.state.phase.isTerminal || stage == FloatingCallStage.panel || drag != null) return
-        jobs.breakout?.cancel()
-        haptics.play(Haptic.tap)
-        hideTag()
-        panelAwake = true
-        move(expandMove) {
-            // Mounted in the same frame, the controls fade in with it.
-            panelMounted = true
-            scopeMounted = true
-            stage = FloatingCallStage.panel
-        }
-        settleHidden()
+    private fun release(velocity: Offset) {
+        float.release(
+            velocity = velocity,
+            bounds = {
+                val now = liveRestArea()
+                FloatingCallFloatMotion.Bounds(now.bounds, now.reach)
+            },
+            reduceMotion = reduceMotion,
+        ) { point -> rest(point) }
     }
 
-    fun collapse() {
-        if (stage != FloatingCallStage.panel) return
-        faceAwake = true
-        move(expandMove) {
-            restMounted = true
-            stage = FloatingCallStage.resting
-        }
-        settleHidden()
+    /** The orb rests at [point], for this call and the next. At the bottom of its space it follows the composer again. */
+    fun rest(point: Offset) {
+        val area = liveRestArea()
+        val next = FloatingCallPlace(point.x, if (point.y >= area.bounds.bottom - 0.5f) null else point.y)
+        if (place != next) place = next
+        if (center.place != next) center.place = next
     }
 
-    fun leave() {
-        jobs.breakout?.cancel()
-        jobs.awake?.cancel()
-        faceAwake = true
-        hideTag()
-        val leaveMove = if (reduceMotion) FloatingMove.EaseInOut(0.2) else FloatingMove.Spring(FloatingCallTunables.leave)
-        move(leaveMove) {
-            restMounted = true
-            stage = FloatingCallStage.leaving
-        }
-        scope.launch { opacity.animateTo(0f, if (reduceMotion) Motion.easeOut(0.2) else FloatingCallTunables.leave.spec()) }
+    /** 1 once the shape has all but reached the call button it lands in. */
+    fun landedAmount(frame: Rect): Double {
+        val landing = motion.landing
+        if (!motion.landsInButton || landing == null) return 0.0
+        val distance = maxOf(
+            hypot(frame.center.x - landing.center.x, frame.center.y - landing.center.y),
+            abs(frame.width - landing.width),
+            abs(frame.height - landing.height),
+        )
+        return 1 - smooth(6.0, 40.0, distance.toDouble())
     }
 
-    // Appeared.
-    LaunchedEffect(Unit) {
-        center.screenWidth = screenWidth
-        launch {
-            val read = withContext(Dispatchers.IO) { FloatingCallLab.read() }
-            lab = read
-            if (read.scenes) {
-                while (isActive && !store.state.phase.isTerminal) {
-                    val scenes = if (usesLivingOrb) {
-                        listOf(FloatingCallScene.idle, FloatingCallScene.listening, FloatingCallScene.thinking, FloatingCallScene.agentSpeaking)
-                    } else {
-                        FloatingCallScene.entries
+    /** The orb (or capsule) takes touches where it's drawn, never smaller than a touch target; the card where it is, the sheet everywhere. */
+    fun touchArea(frame: Rect, terminal: Boolean): FloatingCallTouchArea {
+        if (opacity.value <= 0f || motion.landing != null || terminal) return FloatingCallTouchArea.None
+        if (motion.isActive && motion.target == FloatingCallStage.full) return FloatingCallTouchArea.Everywhere
+        if (motion.isActive || connect.frame == null) {
+            val dx = min(0f, (frame.width - MIN_TOUCH) / 2)
+            val dy = min(0f, (frame.height - MIN_TOUCH) / 2)
+            return FloatingCallTouchArea.Frame(Rect(frame.left + dx, frame.top + dy, frame.right - dx, frame.bottom - dy))
+        }
+        return FloatingCallTouchArea.None
+    }
+
+    fun dimTapped() {
+        if (dim > 0.001) send(FloatingCallStageFeature.Action.StepBack)
+    }
+
+    private fun toOverlay(local: Offset): Offset {
+        val root = root
+        val shape = shapeCoordinates
+        val position = if (root != null && shape != null && root.isAttached && shape.isAttached) root.localPositionOf(shape, local) else local
+        return position / density
+    }
+
+    // MARK: Dragging
+
+    /**
+     * The resting orb is under the finger from touch-down, 1:1, so a drag always moves it
+     * (catching it mid-drift too), and what the touch was is judged only when it lifts
+     * ([FloatingCallTouch]): a tap expands it, a tap on a drifting orb only stops it, and
+     * anything else lets it go with the throw's speed.
+     */
+    suspend fun PointerInputScope.orbDrag() {
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false)
+            // A control on it (the capsule's End) took the touch.
+            if (down.isConsumed) return@awaitEachGesture
+            val tracker = VelocityTracker()
+            val start = toOverlay(down.position)
+            tracker.addPosition(down.uptimeMillis, start)
+            orbChanged(start, start, down.uptimeMillis)
+            var ended = false
+            try {
+                while (true) {
+                    val event = awaitPointerEvent()
+                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                    val location = toOverlay(change.position)
+                    if (change.changedToUpIgnoreConsumed()) {
+                        ended = true
+                        if (change.isConsumed) {
+                            orbCancelled()
+                        } else {
+                            tracker.addPosition(change.uptimeMillis, location)
+                            val velocity = tracker.calculateVelocity()
+                            orbEnded(change.uptimeMillis, Offset(velocity.x, velocity.y))
+                        }
+                        break
                     }
-                    for (scene in scenes) {
-                        center.scene = scene
-                        delay(2_500)
+                    if (change.positionChanged()) {
+                        tracker.addPosition(change.uptimeMillis, location)
+                        orbChanged(location, start, change.uptimeMillis)
+                        change.consume()
                     }
                 }
+            } finally {
+                if (!ended) orbCancelled()
             }
         }
-        jobs.mount = launch {
-            // After the break-out has landed, while the orb just rests.
-            delay(1_200)
-            scopeMounted = true
-        }
-        center.breakoutFrom = null
-        if (breakout == null) {
-            // Carried over (a switch), or Reduce Motion: it appears where it rests.
-            opacity.animateTo(1f, Motion.easeOut(if (reduceMotion) 0.2 else 0.25))
-            return@LaunchedEffect
-        }
-        opacity.snapTo(1f)
-        jobs.breakout = launch {
-            // The button's surface lifts out of the composer (raised: bigger, with more
-            // shadow), then the same shape moves up into its rest and grows into the orb, one
-            // spring retargeting the other.
-            yield()
-            move(FloatingMove.Spring(FloatingCallTunables.lift)) { stage = FloatingCallStage.lifted }
-            delay((FloatingCallTunables.liftHold * 1000).toLong())
-            if (stage != FloatingCallStage.lifted) return@launch
-            move(if (reduceMotion) FloatingMove.Instant else FloatingMove.Spring(FloatingCallTunables.breakout)) { stage = FloatingCallStage.resting }
-        }
-    }
-    LaunchedEffect(screenWidth) { center.screenWidth = screenWidth }
-    LaunchedEffect(phase.isTerminal) { if (phase.isTerminal) leave() }
-    val lastTitle = remember { arrayOf(sessionTitle) }
-    LaunchedEffect(sessionTitle) {
-        // The call followed the screen to another session: say where it talks now.
-        val title = sessionTitle
-        val changed = title != lastTitle[0]
-        lastTitle[0] = title
-        if (changed && !store.state.phase.isTerminal) showTag("Now talking in $title")
-    }
-    val lastPanelRequest = remember { intArrayOf(center.panelRequest.count) }
-    LaunchedEffect(Unit) {
-        snapshotFlow { center.panelRequest }.collect { request ->
-            if (request.count == lastPanelRequest[0]) return@collect
-            lastPanelRequest[0] = request.count
-            if (request.value) expand() else collapse()
-        }
-    }
-    val lastDockRequest = remember { intArrayOf(center.dockRequest.count) }
-    LaunchedEffect(Unit) {
-        snapshotFlow { center.dockRequest }.collect { request ->
-            if (request.count == lastDockRequest[0]) return@collect
-            lastDockRequest[0] = request.count
-            collapse()
-            move(dragMove) { place = place.copy(docked = request.value, side = FloatingCallPlace.Side.trailing) }
-            center.place = place
-        }
-    }
-    LaunchedEffect(defaultDocked) {
-        if (center.place != null || place.docked == defaultDocked) return@LaunchedEffect
-        move(dragMove) { place = place.copy(docked = defaultDocked) }
     }
 
-    val mood = when (phase) {
-        VoiceFeature.State.Phase.Connecting -> FloatingCallMood.connecting
-        VoiceFeature.State.Phase.Ended, is VoiceFeature.State.Phase.Failed, VoiceFeature.State.Phase.Dropped -> FloatingCallMood.ended
-        VoiceFeature.State.Phase.Live, is VoiceFeature.State.Phase.EndingAfterGoodbye -> when {
-            isReconnecting -> FloatingCallMood.connecting
-            targetNeedsInput -> FloatingCallMood.needsInput
-            isWorking -> FloatingCallMood.thinking
-            else -> FloatingCallMood.live
+    private fun orbChanged(location: Offset, start: Offset, time: Long) {
+        if (connect.frame != null || motion.landing != null || store.state.phase.isTerminal) return
+        if (touch == null) {
+            val at = restingFrame().center
+            val speed = float.velocity.getDistance()
+            touch = FloatingCallOrbTouch(
+                offset = at - start,
+                origin = at,
+                began = time,
+                wasMoving = speed > FloatingCallTunables.catchSpeed.value,
+                location = location,
+                moved = time,
+            )
+            hideTag()
+            float.hold(at)
         }
-    }
-    val statusText = when (center.scene) {
-        FloatingCallScene.needsInput -> "Needs your input"
-        FloatingCallScene.thinking -> "Working"
-        FloatingCallScene.agentSpeaking -> "Speaking"
-        FloatingCallScene.listening -> "Listening"
-        FloatingCallScene.bothSpeaking -> "Both speaking"
-        FloatingCallScene.idle -> "Idle"
-        null -> storeStatus
+        val held = touch ?: return
+        held.travel = max(held.travel, (location - start).getDistance())
+        if ((location - held.location).getDistance() > 0.5f) {
+            held.location = location
+            held.moved = time
+        }
+        float.move(location + held.offset)
     }
 
-    val rest = geometry.restFrame(place)
-    val panel = geometry.panelFrame(place)
-    val lifted = stage == FloatingCallStage.seed || stage == FloatingCallStage.lifted || drag != null
-    val elevation by animateFloatAsState(
-        (if (lifted) FloatingCallTunables.liftElevation else FloatingCallTunables.restElevation).value,
-        FloatingCallTunables.lift.spec(),
-        label = "floatingCallElevation",
+    private fun orbEnded(time: Long, velocity: Offset) {
+        val held = touch ?: return
+        touch = null
+        val kind = FloatingCallTouch(travel = held.travel.toDouble(), duration = (time - held.began) / 1000.0, wasMoving = held.wasMoving)
+        when (kind) {
+            FloatingCallTouch.tap -> {
+                // It barely moved: it rests where it was, and grows from there.
+                float.stop()
+                if (held.origin != restFrame.center) rest(held.origin)
+                expand()
+            }
+            FloatingCallTouch.caught -> release(Offset.Zero)
+            FloatingCallTouch.drag -> {
+                // Held still before it lifted, it's set down rather than thrown.
+                val still = (time - held.moved) / 1000.0 > 0.06
+                var thrown = if (still) Offset.Zero else velocity
+                val speed = thrown.getDistance()
+                val limit = FloatingCallTunables.maxSpeed.value.toFloat()
+                if (speed > limit) thrown *= limit / speed
+                release(thrown)
+            }
+        }
+    }
+
+    /** The touch went to something else: the orb is set down where it is. */
+    private fun orbCancelled() {
+        if (touch == null) return
+        touch = null
+        release(Offset.Zero)
+    }
+
+    /** On the card or the sheet a vertical drag holds the shape's top edge; a sideways one does nothing. */
+    suspend fun PointerInputScope.shapeDrag() {
+        val slop = 8f * density
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false)
+            val start = toOverlay(down.position)
+            val tracker = VelocityTracker()
+            tracker.addPosition(down.uptimeMillis, start)
+            var began = false
+            try {
+                while (true) {
+                    val event = awaitPointerEvent()
+                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                    val location = toOverlay(change.position)
+                    tracker.addPosition(change.uptimeMillis, location)
+                    if (change.changedToUpIgnoreConsumed()) {
+                        if (began) shapeEnded(tracker.calculateVelocity().y)
+                        break
+                    }
+                    if (!began && (change.position - down.position).getDistance() >= slop) began = true
+                    if (began) {
+                        shapeChanged(location, location - start)
+                        if (dragMode == FloatingCallDragMode.stage) change.consume()
+                    }
+                }
+            } finally {
+                dragMode = null
+                dragNearest = null
+            }
+        }
+    }
+
+    private fun shapeChanged(location: Offset, translation: Offset) {
+        if (connect.frame != null || motion.landing != null || store.state.phase.isTerminal) return
+        val geometry = stageGeometry()
+        if (dragMode == null) beginDrag(location, translation, geometry)
+        if (dragMode != FloatingCallDragMode.stage) return
+        motion.drag(location.y.toDouble(), geometry)
+        val nearest = geometry.nearest(motion.progress)
+        if (nearest != dragNearest) {
+            dragNearest = nearest
+            send(FloatingCallStageFeature.Action.DragCrossed(nearest))
+        }
+    }
+
+    private fun beginDrag(location: Offset, translation: Offset, geometry: FloatingCallStageGeometry) {
+        // Held at the orb by a call row's request: a drag only moves it.
+        val vertical = abs(translation.y) > abs(translation.x)
+        dragMode = if (vertical && !store.state.floatingStage.isHeld) FloatingCallDragMode.stage else FloatingCallDragMode.ignored
+        hideTag()
+        if (dragMode != FloatingCallDragMode.stage) return
+        bloomMounted = true
+        dismissKeyboard()
+        motion.beginDrag(location.y.toDouble(), geometry)
+        dragNearest = store.state.floatingStage.stage
+        send(FloatingCallStageFeature.Action.DragBegan)
+    }
+
+    private fun shapeEnded(velocityY: Float) {
+        val mode = dragMode
+        dragMode = null
+        dragNearest = null
+        if (mode != FloatingCallDragMode.stage) return
+        val settled = stageGeometry().settle(motion.progress, velocityY.toDouble())
+        // A request that came up mid-drag holds it at the orb.
+        val stage = if (store.state.floatingStage.isHeld) FloatingCallStage.orb else settled.stage
+        send(FloatingCallStageFeature.Action.DragEnded(stage))
+        motion.endDrag(stage, settled.velocity, reduceMotion)
+    }
+
+    companion object {
+        /** Android's minimum touch target (iOS 44 pt). */
+        const val MIN_TOUCH = 48f
+    }
+}
+
+/** iOS `FloatingCallSurface.mood`. */
+private fun floatingCallMood(state: VoiceFeature.State): FloatingCallMood = when (state.phase) {
+    VoiceFeature.State.Phase.Connecting -> FloatingCallMood.connecting
+    VoiceFeature.State.Phase.Ended, VoiceFeature.State.Phase.Dropped, is VoiceFeature.State.Phase.Failed -> FloatingCallMood.ended
+    else -> when {
+        state.isReconnecting -> FloatingCallMood.connecting
+        state.targetNeedsInput || state.holdsClientToolCard -> FloatingCallMood.needsInput
+        state.isWorking -> FloatingCallMood.thinking
+        else -> FloatingCallMood.live
+    }
+}
+
+/** iOS `FloatingCallSurface.statusText`: playground scenes name themselves. */
+private fun floatingCallStatus(scene: FloatingCallScene?, status: String): String = when (scene) {
+    FloatingCallScene.needsInput -> "Needs your input"
+    FloatingCallScene.thinking -> "Working"
+    FloatingCallScene.agentSpeaking -> "Speaking"
+    FloatingCallScene.listening -> "Listening"
+    FloatingCallScene.bothSpeaking -> "Both speaking"
+    FloatingCallScene.idle -> "Idle"
+    null -> status
+}
+
+private class FloatingCallPrevious<T>(var value: T)
+
+/** iOS `.onChange(of:)`: runs [action] after a composition in which [value] changed (not initially). */
+@Composable
+private fun <T> OnChange(value: T, action: (T) -> Unit) {
+    val previous = remember { FloatingCallPrevious(value) }
+    SideEffect {
+        if (previous.value != value) {
+            previous.value = value
+            action(value)
+        }
+    }
+}
+
+/** Lays its children out unconstrained at its origin; each places itself with `offset` (SwiftUI's `.position`/`.offset` in a top-leading ZStack). */
+@Composable
+private fun FloatingCallStack(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    Layout(content, modifier) { measurables, constraints ->
+        val placeables = measurables.map { it.measure(Constraints()) }
+        layout(constraints.maxWidth, constraints.maxHeight) {
+            placeables.forEach { it.place(0, 0) }
+        }
+    }
+}
+
+private fun Modifier.placed(x: Float, y: Float, width: Float, height: Float): Modifier =
+    offset { IntOffset(x.dp.roundToPx(), y.dp.roundToPx()) }.size(max(0f, width).dp, max(0f, height).dp)
+
+@Composable
+private fun FloatingCallSurface(store: VoiceStoreOf, screen: Size, safeArea: FloatingCallEdgeInsets) {
+    val center = remember { FloatingCallCenter.shared }
+    val window = LocalFloatingCallWindow.current
+    val reduceMotion = rememberReduceMotion()
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    val density = LocalDensity.current.density
+    val scope = rememberCoroutineScope()
+    val model = remember(store) { FloatingCallSurfaceModel(store, center, scope) }
+    SideEffect {
+        model.reduceMotion = reduceMotion
+        model.window = window
+        model.density = density
+        model.dismissKeyboard = {
+            focusManager.clearFocus(force = true)
+            keyboard?.hide()
+        }
+    }
+
+    val phase by store.observe { it.phase }
+    val isMuted by store.observe { it.isMuted }
+    val isSpeaking by store.observe { it.isAssistantSpeaking }
+    val mood by store.observe { floatingCallMood(it) }
+    val storeStatus by store.observe { it.statusText }
+    val connected by store.observe { it.connectedAt != null }
+    val unpromptedMove by store.observe { it.unpromptedMove }
+    val stage by store.observe { it.floatingStage.stage }
+    val runningTool by store.observe { it.sessionDelegator.runningTools.lastOrNull()?.name }
+    val terminal = phase.isTerminal
+    val scene = center.scene
+    val statusText = floatingCallStatus(scene, storeStatus)
+
+    // The keyboard raises the composer in one layout pass: glide after it.
+    val rawComposerTop = center.composer?.top
+    val composerTop = if (rawComposerTop != null) {
+        animateFloatAsState(
+            rawComposerTop,
+            if (reduceMotion) Motion.easeInOut(0.2) else FloatingCallTunables.follow.spec(),
+            label = "floatingCallComposer",
+        ).value
+    } else {
+        null
+    }
+
+    val motion = model.motion
+    val connect = model.connect
+    val float = model.float
+    val style = model.style
+    val restSize = model.restSize
+    // The window's keyboard top while one is up, in this overlay's space (it fills the window
+    // edge to edge): iOS reads the scene's keyboard notifications, Android its IME insets.
+    val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current) / density
+    val keyboardTop = if (imeBottom > 0f && imeBottom < screen.height) screen.height - imeBottom else null
+    val restArea = FloatingCallRestArea(screen, safeArea, composerTop, restSize, keyboardTop)
+    val restFrame = restArea.frame(model.place)
+    val geometry = floatingCallStageGeometry(restArea, restFrame)
+    val shaping = motion.isActive
+    val lifting = !shaping && connect.frame != null
+    val restingFrame = float.position?.let { restArea.frame(centeredAt = it) } ?: restFrame
+    val frame = if (shaping) motion.frame(geometry) else connect.frame ?: restingFrame
+    val short = min(frame.width, frame.height).toDouble()
+    val radii = if (shaping) geometry.radii(frame) else FloatingCallStageGeometry.Radii(short / 2, short / 2)
+    val lifted = connect.isBreakingOut || float.isHeld
+    // Looking like the composer's button, it casts no shadow of its own.
+    val buttonLook = max(if (lifting) connect.button else 0.0, model.landedAmount(frame))
+    val trailing = frame.center.x > screen.width / 2
+    val dim = FloatingCallStageTunables.dim.value * (motion.progress - 1).coerceIn(0.0, 1.0) * motion.opacity
+    val touchArea = model.touchArea(frame, terminal)
+    SideEffect {
+        model.dim = dim
+        if (window != null && window.touchArea != touchArea) window.touchArea = touchArea
+        if (center.card != geometry.cardFrame) center.card = geometry.cardFrame
+        val orbLayout = FloatingCallOrbLayout(screen, safeArea, restSize)
+        if (center.orbLayout != orbLayout) center.orbLayout = orbLayout
+    }
+
+    // iOS onAppear: laidOut(), appeared(); a new screen or safe area lays out again.
+    LaunchedEffect(model) {
+        model.laidOut(screen, safeArea)
+        model.appeared()
+    }
+    OnChange(screen to safeArea) { (size, insets) -> model.laidOut(size, insets) }
+    DisposableEffect(model) {
+        onDispose {
+            if (center.orbLayout != null) center.orbLayout = null
+            model.disappeared()
+        }
+    }
+    motion.link.Drive()
+    connect.link.Drive()
+    float.link.Drive()
+
+    OnChange(terminal) { if (it) model.leave() }
+    OnChange(motion.hasLanded) { if (it && center.isLanding) center.isLanding = false }
+    OnChange(connected) { if (it && !store.state.phase.isTerminal) connect.connected(reduceMotion = reduceMotion) }
+    OnChange(unpromptedMove) { if (it != null) model.sessionMoved(store.state.sessionTitle) }
+    OnChange(stage) { model.grow(it) }
+    OnChange(keyboardTop != null) { if (it) model.keyboardRose() }
+    OnChange(keyboardTop) { model.keyboardMoved(it) }
+    val panelRequest = center.panelRequest
+    OnChange(panelRequest.count) { count ->
+        if (count != model.lastPanelRequest) {
+            model.lastPanelRequest = count
+            model.send(FloatingCallStageFeature.Action.Requested(if (panelRequest.open) FloatingCallStage.card else FloatingCallStage.orb))
+        }
+    }
+
+    val orbConfig = LivingOrbConfig(
+        mood = mood,
+        isMuted = isMuted,
+        isSpeaking = isSpeaking,
+        scene = scene,
+        isConnecting = phase == VoiceFeature.State.Phase.Connecting,
+        tool = runningTool,
     )
-    val surfaceColor = VoiceCallSurfaceDefaults.color
 
-    Box(
+    FloatingCallStack(
         Modifier
             .fillMaxSize()
+            .onPlaced { model.root = it }
+            // iOS `.accessibilityAction(.escape)` (VoiceOver's scrub): TalkBack's dismiss steps one stage down.
             .semantics {
-                isTraversalGroup = true
-                if (stage == FloatingCallStage.panel) dismiss { collapse(); true }
+                dismiss {
+                    model.send(FloatingCallStageFeature.Action.StepBack)
+                    true
+                }
             },
     ) {
-        if (stage == FloatingCallStage.panel) {
-            // Outside the panel: a tap folds it back into the orb.
+        if (dim > 0.001) {
+            // The session behind dims as the sheet fills.
             Box(
                 Modifier
-                    .fillMaxSize()
-                    .pointerInput(Unit) { detectTapGestures { collapse() } }
+                    .placed(0f, 0f, screen.width, screen.height)
+                    .background(Color.Black.copy(alpha = dim.toFloat()))
                     .clearAndSetSemantics {},
             )
         }
-        // Light from the face spills onto what's behind the surface, as Siri's does.
-        if (!usesLivingOrb && FloatingCallTunables.glow > 0 && stage != FloatingCallStage.panel && orbStyle != FloatingCallOrbStyle.dots) {
-            val colors = when {
-                // The pearls' own light, subtle like the dots.
-                orbStyle.dotTake != null -> listOf(Color(0.98f, 0.9f, 0.78f), Color(0.78f, 0.86f, 1.0f))
-                orbStyle == FloatingCallOrbStyle.aurora -> FloatingCallPalette.aurora(dark)
-                else -> FloatingCallPalette.warm(dark) + FloatingCallPalette.cool(dark)
-            }
+        if (touchArea == FloatingCallTouchArea.Everywhere) {
+            // With the sheet up the window takes every touch; a tap on the dimmed session steps back.
             Box(
                 Modifier
-                    .placeAt { frameAnim.value.let { f -> Rect(center = f.center, radius = f.height * 1.25f / 2) } }
-                    .graphicsLayer {
-                        val f = frameAnim.value
-                        val blur = f.height * 0.45f * density
-                        renderEffect = if (blur > 0) BlurEffect(blur, blur, TileMode.Decal) else null
-                        alpha = (FloatingCallTunables.glow * 0.5).toFloat() * opacity.value
-                    }
-                    .background(Brush.sweepGradient(colors + colors[0]), CircleShape)
+                    .placed(0f, 0f, screen.width, screen.height)
+                    .pointerInput(model) { detectTapGestures { model.dimTapped() } }
                     .clearAndSetSemantics {},
             )
         }
-        val tag = tagText
-        AnimatedVisibility(
-            visible = tag != null && stage == FloatingCallStage.resting && drag == null,
-            enter = fadeIn(if (reduceMotion) Motion.easeOut(0.2) else MotionSpring(0.3, 0.2).spec()) +
-                scaleIn(if (reduceMotion) Motion.easeOut(0.2) else MotionSpring(0.3, 0.2).spec(), initialScale = 0.92f, transformOrigin = TransformOrigin(if (place.side == FloatingCallPlace.Side.trailing) 1f else 0f, 0.5f)),
-            exit = fadeOut(Motion.easeOut(0.2)) + scaleOut(Motion.easeOut(0.2), targetScale = 0.92f, transformOrigin = TransformOrigin(if (place.side == FloatingCallPlace.Side.trailing) 1f else 0f, 0.5f)),
-            modifier = Modifier.layout { measurable, constraints ->
-                val placeable = measurable.measure(Constraints(maxWidth = (280 * density).roundToInt()))
-                val target = geometry.frame(stage, place, drag, seedFrame)
-                val x = if (place.side == FloatingCallPlace.Side.trailing) (target.left - 10) * density - placeable.width else (target.right + 10) * density
-                val y = target.center.y * density - placeable.height / 2f
-                layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(x.roundToInt(), y.roundToInt()) }
-            },
-        ) {
-            FloatingCallTag(tagText ?: "")
-        }
-        // The edge's own surface: the orb meets it as it nears the screen's edge.
-        Box(
-            Modifier
-                .placeAt { geometry.beadFrame(frameAnim.value, stage, place, drag != null) }
-                .graphicsLayer { alpha = if (opacity.value > 0f) opacity.value else 0f }
-                .background(surfaceColor, CircleShape)
-                .clearAndSetSemantics {},
-        )
-        // The surface: orb, capsule or panel, one shape.
-        Box(
-            Modifier
-                .placeAt { frameAnim.value }
-                .graphicsLayer {
-                    alpha = opacity.value
-                    shadowElevation = elevation * density
-                    shape = RoundedCornerShape(radiusAnim.value * density)
-                    clip = true
-                }
-                .background(surfaceColor)
-                // Not a control: a touch on the surface stays on it (its buttons own their targets).
-                .pointerInput(Unit) { detectTapGestures { } },
-        ) {
-            // Resting or opening, the face stays laid out at its rest and the panel grows over
-            // it; lifting, leaving or under the finger it rides with the surface instead of
-            // wiping through it.
-            val rides = drag != null || stage == FloatingCallStage.seed || stage == FloatingCallStage.lifted || stage == FloatingCallStage.leaving
-            fun restBox(): Rect = if (rides) frameAnim.value.let { Rect(0f, 0f, it.width, it.height) } else rest.translate(-frameAnim.value.left, -frameAnim.value.top)
 
-            // The composer's call button, lifting out of it.
-            val seedAlpha by animateFloatAsState(
-                when (stage) { FloatingCallStage.seed -> 1f; FloatingCallStage.lifted -> 0.55f; else -> 0f },
-                if (reduceMotion) snap() else FloatingCallTunables.breakout.spec(),
-                label = "floatingCallSeed",
-            )
-            if (seedAlpha > 0f) {
+        // The tag beside the orb naming the session the call now talks to.
+        val tagVisible = model.tagShown && !lifting && float.position == null && !shaping
+        Box(
+            Modifier.placed(if (trailing) frame.left - 10 - 280 else frame.right + 10, frame.center.y - 18, 280f, 36f),
+            contentAlignment = if (trailing) Alignment.CenterEnd else Alignment.CenterStart,
+        ) {
+            val origin = TransformOrigin(if (trailing) 1f else 0f, 0.5f)
+            AnimatedVisibility(
+                visible = tagVisible,
+                enter = fadeIn(if (reduceMotion) Motion.easeOut(0.2) else MotionSpring(0.3, 0.2).spec()) +
+                    scaleIn(if (reduceMotion) Motion.easeOut(0.2) else MotionSpring(0.3, 0.2).spec(), initialScale = 0.92f, transformOrigin = origin),
+                exit = fadeOut(Motion.easeOut(0.2)) + scaleOut(Motion.easeOut(0.2), targetScale = 0.92f, transformOrigin = origin),
+                label = "floatingCallTag",
+            ) {
+                FloatingCallTag(model.tagText.orEmpty())
+            }
+        }
+
+        val shape = RoundedCornerShape(
+            topStart = max(0.0, radii.top).toFloat().dp,
+            topEnd = max(0.0, radii.top).toFloat().dp,
+            bottomEnd = max(0.0, radii.bottom).toFloat().dp,
+            bottomStart = max(0.0, radii.bottom).toFloat().dp,
+        )
+        val shadow = (if (lifted) FloatingCallTunables.liftShadow.value else FloatingCallTunables.restShadow.value) / 2 * (1 - buttonLook)
+        val alpha = model.opacity.value * motion.opacity.toFloat()
+        // Resting as the orb, a touch holds it from touch-down; grown, a drag steps the card and sheet.
+        val gestures = when {
+            touchArea == FloatingCallTouchArea.None -> Modifier
+            shaping -> Modifier.pointerInput(model, "shape") { with(model) { shapeDrag() } }
+            else -> Modifier.pointerInput(model, "orb") { with(model) { orbDrag() } }
+        }
+        Box(
+            Modifier
+                .placed(frame.left, frame.top, frame.width, frame.height)
+                .onPlaced { model.shapeCoordinates = it }
+                .graphicsLayer {
+                    this.alpha = alpha
+                    this.shape = shape
+                    clip = true
+                    shadowElevation = max(0.0, shadow).toFloat().dp.toPx()
+                }
+                .background(VoiceCallSurfaceDefaults.color)
+                .then(gestures),
+        ) {
+            FloatingCallStack(Modifier.fillMaxSize()) {
+                val rest = restFrame
+                val rides = shaping || lifting || float.position != null
+                val grown = if (shaping) geometry.cardness(frame) else 0.0
+                val full = if (shaping) geometry.fullness(frame) else 0.0
+                // The small face hands over to the bigger field as the orb starts to grow.
+                val faceShown = 1 - smooth(0.03, 0.15, grown)
+                val bloomShown = smooth(0.0, 0.12, grown)
+                val restControls = !shaping || (motion.target == FloatingCallStage.orb && motion.progress < 0.05 && motion.landing == null)
+                val contentMounted = if (motion.landing == null) motion.progress > 0.01 || motion.target != FloatingCallStage.orb else motion.content > 0
+
+                // The sheet's backing deepens as it fills, so its text reads over anything.
+                val backing = lerp(FloatingCallStageTunables.cardFill.value, FloatingCallStageTunables.sheetFill.value, full) * grown
+                if (backing > 0) {
+                    Box(
+                        Modifier
+                            .placed(0f, 0f, frame.width, frame.height)
+                            .background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = backing.toFloat().coerceIn(0f, 1f))),
+                    )
+                }
+
+                if (model.bloomMounted) {
+                    // The orb's dot field grown with the shape: one disc near the card's top, smaller
+                    // and higher as the sheet fills. It keeps one size and moves with the bloom.
+                    val bloom = geometry.bloom(frame)
+                    val originX = bloom.centerX - screen.width / 2
+                    val originY = bloom.centerY - FIELD_ABOVE
+                    val bottom = min(geometry.visible(frame).bottom.toDouble(), bloom.centerY + bloom.radius * lerp(4.0, 1.35, full))
+                    val placed = LivingOrbBloom(
+                        center = Offset(screen.width / 2, FIELD_ABOVE.toFloat()),
+                        radius = bloom.radius.toFloat(),
+                        bottom = (bottom - originY).toFloat(),
+                        fade = if (full > 0) 40f else 0.5f,
+                        visible = frame.translate(-originX.toFloat(), -originY.toFloat()),
+                    )
+                    LivingOrbView(
+                        orbConfig.copy(bloom = placed),
+                        Modifier
+                            .placed((originX - frame.left).toFloat(), (originY - frame.top).toFloat(), screen.width, FIELD_HEIGHT)
+                            .graphicsLayer { this.alpha = bloomShown.toFloat() }
+                            .clearAndSetSemantics {},
+                        isHidden = bloomShown <= 0,
+                    )
+                }
+
+                // Growing, the orb's face keeps its own size and is scaled with the shape, as it is lifting out of the call button.
+                val faceScale = if ((shaping || lifting) && style == FloatingCallStyle.orb) min(frame.width / max(1f, rest.width), frame.height / max(1f, rest.height)) else 1f
+                val outerWidth = if (rides) frame.width else rest.width
+                val outerHeight = if (rides) frame.height else rest.height
+                val outerX = if (rides) 0f else rest.left - frame.left
+                val outerY = if (rides) 0f else rest.top - frame.top
+                val faceWidth = if (faceScale != 1f) rest.width else outerWidth
+                val faceHeight = if (faceScale != 1f) rest.height else outerHeight
                 Box(
                     Modifier
-                        .fillMaxSize()
-                        .alpha(seedAlpha)
-                        .background(OpenCodeTheme.colors.text, CircleShape)
+                        .placed(outerX, outerY, outerWidth, outerHeight)
+                        .graphicsLayer { this.alpha = faceShown.toFloat() }
                         .clearAndSetSemantics {},
                     contentAlignment = Alignment.Center,
                 ) {
-                    OpenCodeIcon(SFSymbol.PhoneFill, null, tint = MaterialTheme.colorScheme.background, size = 20.dp)
-                }
-            }
-
-            // The face clears out fast as the panel opens, so it never sits under End, and comes
-            // back just behind the panel folding away.
-            val restShown = stage == FloatingCallStage.resting || stage == FloatingCallStage.leaving || stage == FloatingCallStage.lifted
-            val restAlpha by animateFloatAsState(
-                if (restShown) 1f else 0f,
-                when {
-                    reduceMotion -> snap()
-                    stage == FloatingCallStage.panel -> Motion.easeOut(0.14)
-                    else -> Motion.easeOut(0.2, delaySeconds = 0.06)
-                },
-                label = "floatingCallRest",
-            )
-            Box(
-                Modifier
-                    .placeAt { restBox() }
-                    .alpha(restAlpha)
-                    .clearAndSetSemantics {},
-            ) {
-                RestContent(
-                    layer = RestLayer.face,
-                    style = style,
-                    place = place,
-                    dragging = drag != null,
-                    orbDiameter = orbDiameter,
-                    face = {
-                        if (usesLivingOrb) {
-                            LivingOrbView(
-                                LivingOrbConfig(
-                                    style = LivingOrbTunables.style.resolve(savedLivingOrbStyle),
-                                    mood = mood,
-                                    isMuted = isMuted,
-                                    isSpeaking = isAssistantSpeaking,
-                                    scene = center.scene,
-                                ),
-                                Modifier.fillMaxSize(),
-                                isHidden = !faceAwake,
-                            )
-                        } else {
-                            FloatingCallFace(orbStyle, mood, isMuted, Modifier.fillMaxSize(), scene = center.scene, isHidden = !faceAwake)
-                        }
-                    },
-                    controls = {},
-                )
-            }
-            if (restMounted) {
-                Box(
-                    Modifier
-                        .placeAt { restBox() }
-                        .alpha(restAlpha),
-                ) {
-                    RestContent(
-                        layer = RestLayer.controls,
+                    FloatingCallRestFace(
                         style = style,
-                        place = place,
-                        dragging = drag != null,
-                        orbDiameter = orbDiameter,
-                        face = {},
-                        controls = {
-                            OrbControls(
-                                isMuted = isMuted,
-                                statusText = statusText,
-                                reduceMotion = reduceMotion,
-                                onTap = { expand() },
-                                onDragChanged = { translation ->
-                                    if (stage == FloatingCallStage.resting) {
-                                        if (drag == null) hideTag()
-                                        // A short spring under the finger: picking up a docked
-                                        // orb grows it back to its floating size instead of
-                                        // snapping.
-                                        move(if (reduceMotion) FloatingMove.Instant else FloatingMove.Spring(FloatingCallTunables.grab)) { drag = translation }
-                                    }
-                                },
-                                onDragEnded = { translation, predicted ->
-                                    if (stage == FloatingCallStage.resting && drag != null) {
-                                        val next = geometry.settle(place, translation, predicted)
-                                        if (next.docked != place.docked || next.side != place.side) haptics.play(Haptic.selection)
-                                        move(dragMove) {
-                                            place = next
-                                            drag = null
-                                        }
-                                        center.place = next
-                                    }
-                                },
-                            )
-                        },
-                        onEnd = { store.send(VoiceFeature.Action.EndPressed) },
+                        orbSize = restSize.height,
+                        trailing = restingFrame.center.x > screen.width / 2,
+                        config = orbConfig,
+                        isHidden = faceShown <= 0,
+                        modifier = Modifier
+                            .requiredSize(max(0f, faceWidth).dp, max(0f, faceHeight).dp)
+                            .graphicsLayer {
+                                scaleX = faceScale
+                                scaleY = faceScale
+                            },
                     )
                 }
-            }
+                if (restControls) {
+                    FloatingCallRestControls(
+                        style = style,
+                        orbSize = restSize.height,
+                        trailing = restingFrame.center.x > screen.width / 2,
+                        isMuted = isMuted,
+                        statusText = statusText,
+                        reduceMotion = reduceMotion,
+                        isEnabled = !lifting,
+                        onExpand = model::expand,
+                        onEnd = { store.send(VoiceFeature.Action.EndPressed) },
+                        modifier = Modifier.placed(outerX, outerY, outerWidth, outerHeight),
+                    )
+                }
 
-            val panelShown = stage == FloatingCallStage.panel
-            val panelAlpha by animateFloatAsState(
-                if (panelShown) 1f else 0f,
-                when {
-                    reduceMotion -> snap()
-                    panelShown -> FloatingCallTunables.expand.spec()
-                    else -> Motion.easeOut(0.14)
-                },
-                label = "floatingCallPanel",
-            )
-            if (scopeMounted) {
-                Box(
-                    Modifier
-                        .placeAt {
-                            val f = frameAnim.value
-                            Rect(panel.left - f.left, panel.top - f.top + FloatingCallLayout.stripTop, panel.right - f.left, panel.top - f.top + FloatingCallLayout.stripTop + FloatingCallTunables.stripHeight)
-                        }
-                        .alpha(panelAlpha)
-                        .clearAndSetSemantics {},
-                ) {
-                    when (FloatingCallTunables.strip) {
-                        FloatingCallStripStyle.scope -> DotScopeView(DotScopeMode.Panel(scopeStage), Modifier.fillMaxSize(), isHidden = !panelAwake)
-                        FloatingCallStripStyle.matching -> FloatingCallFace(
-                            style = if (orbStyle == FloatingCallOrbStyle.dots || orbStyle == FloatingCallOrbStyle.activity) FloatingCallOrbStyle.vortex else orbStyle,
-                            mood = mood,
-                            isMuted = isMuted,
-                            modifier = Modifier.fillMaxSize(),
-                            scene = center.scene,
-                            cornerFraction = 0f,
-                            isHidden = !panelAwake,
+                if (contentMounted) {
+                    // The card's content is laid out at the card's size and pinned to the growing shape's
+                    // bottom corner, revealed as the shape grows over it; past the card it lays out on the shape.
+                    val card = geometry.cardFrame
+                    val asCard = if (motion.landing == null) motion.progress <= 1 else frame.height <= card.height + 0.5f
+                    val box = if (asCard) {
+                        Rect(Offset(if (geometry.trailing) frame.right - card.width else frame.left, frame.bottom - card.height), card.size)
+                    } else {
+                        geometry.visible(frame)
+                    }
+                    val layoutFull = if (asCard) 0.0 else full
+                    val bloom = FloatingCallStageGeometry.Bloom(
+                        y = lerp(geometry.cardBloom.y, geometry.fullBloom.y, layoutFull),
+                        radius = lerp(geometry.cardBloom.radius, geometry.fullBloom.radius, layoutFull),
+                    )
+                    val shown = (if (asCard) smooth(0.35, 0.92, grown) else 1.0) * motion.content
+                    val interactive = motion.target != FloatingCallStage.orb && motion.landing == null
+                    FloatingCallStageContent(
+                        store = store,
+                        width = box.width,
+                        height = box.height,
+                        fullness = layoutFull.toFloat(),
+                        bloom = bloom,
+                        status = statusText,
+                        onMinimize = { model.send(FloatingCallStageFeature.Action.MinimizeTapped) },
+                        modifier = Modifier
+                            .placed(box.left - frame.left, box.top - frame.top, box.width, box.height)
+                            .graphicsLayer { this.alpha = shown.toFloat() }
+                            .then(if (interactive) Modifier else Modifier.blocksTouches())
+                            .semantics {
+                                customActions = listOf(
+                                    CustomAccessibilityAction("Expand") {
+                                        model.send(FloatingCallStageFeature.Action.Requested(FloatingCallStage.full))
+                                        true
+                                    },
+                                )
+                            },
+                    )
+                }
+
+                // The composer's call button: the shape starts as it, the light giving way to the
+                // dark spinner as its glyph spins up, and landing it takes the button's look again.
+                if (buttonLook > 0) {
+                    Box(
+                        Modifier
+                            .placed(0f, 0f, frame.width, frame.height)
+                            .graphicsLayer { this.alpha = buttonLook.toFloat() }
+                            .background(OpenCodeTheme.colors.text, CircleShape)
+                            .clearAndSetSemantics {},
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        OpenCodeIcon(
+                            SFSymbol.PhoneFill,
+                            null,
+                            Modifier.graphicsLayer { rotationZ = Math.toDegrees(connect.glyphAngle).toFloat() },
+                            size = 20.dp,
+                            tint = MaterialTheme.colorScheme.background,
                         )
                     }
                 }
             }
-            if (panelMounted) {
-                Box(
-                    Modifier
-                        .placeAt { panel.translate(-frameAnim.value.left, -frameAnim.value.top) }
-                        .alpha(panelAlpha)
-                        .then(if (panelShown) Modifier else Modifier.semantics { hideFromAccessibility() }),
-                ) {
-                    FloatingCallPanelContent(
-                        store = store,
-                        status = statusText,
-                        showsCaptions = showsCaptions,
-                        enabled = panelShown,
-                        reduceMotion = reduceMotion,
-                        onToggleCaptions = {
-                            if (!showsCaptions) haptics.play(Haptic.tap)
-                            move(expandMove) { showsCaptions = !showsCaptions }
-                        },
-                        onMinimize = { collapse() },
-                    )
-                }
-            }
         }
     }
 }
 
-/** The overlay's cancellable tasks (iOS `breakoutTask`, `tagTask`, `awakeTask`, `mountTask`). */
-private class FloatingCallJobs {
-    var breakout: Job? = null
-    var tag: Job? = null
-    var awake: Job? = null
-    var mount: Job? = null
-}
+/** Above the bloom's centre and the room below it in its field: enough for the card and the sheet's field at any stage between. */
+private const val FIELD_ABOVE = 220.0
+private const val FIELD_HEIGHT = 720f
 
-/**
- * Measures the element at [rect]'s size (dp, read at layout time so animated rects never
- * recompose) and places it at [rect]'s origin within its parent.
- */
-private fun Modifier.placeAt(rect: () -> Rect): Modifier = layout { measurable, _ ->
-    val r = rect()
-    val w = (max(0f, r.width) * density).roundToInt()
-    val h = (max(0f, r.height) * density).roundToInt()
-    val placeable = measurable.measure(Constraints.fixed(w, h))
-    layout(0, 0) { placeable.place(IntOffset((r.left * density).roundToInt(), (r.top * density).roundToInt())) }
-}
-
-private enum class RestLayer { face, controls }
-
-/**
- * The resting orb in two layers laid out alike: the face (drawn always) and, over it, what you
- * touch (mounted only while resting).
- */
+/** The orb's face: the Wisp disc placed to fill it (the shape clips its dots), or kept within its own edge in the capsule. */
 @Composable
-private fun RestContent(
-    layer: RestLayer,
+private fun FloatingCallOrbFace(config: LivingOrbConfig, placed: Boolean, isHidden: Boolean, modifier: Modifier) {
+    BoxWithConstraints(modifier) {
+        val width = maxWidth.value
+        val height = maxHeight.value
+        val bloom = if (placed) LivingOrbBloom(center = Offset(width / 2, height / 2), radius = min(width, height) / 2) else null
+        LivingOrbView(config.copy(bloom = bloom), Modifier.fillMaxSize(), isHidden = isHidden)
+    }
+}
+
+/** The resting orb's face (iOS `restContent(.face)`), laid out as [FloatingCallRestControls]. */
+@Composable
+private fun FloatingCallRestFace(
     style: FloatingCallStyle,
-    place: FloatingCallPlace,
-    dragging: Boolean,
-    orbDiameter: Float,
-    face: @Composable () -> Unit,
-    controls: @Composable () -> Unit,
-    onEnd: () -> Unit = {},
+    orbSize: Float,
+    trailing: Boolean,
+    config: LivingOrbConfig,
+    isHidden: Boolean,
+    modifier: Modifier,
 ) {
-    // Docked, the face sits in the part of the surface still on screen.
-    val tucked = if (place.docked && !dragging) FloatingCallTunables.overlap else 0f
-    val trailing = place.side == FloatingCallPlace.Side.trailing
-    @Composable
-    fun orbLayer(modifier: Modifier) {
-        Box(modifier.padding(start = if (trailing) 0.dp else tucked.dp, end = if (trailing) tucked.dp else 0.dp)) {
-            when (layer) {
-                // The face fills the surface to its edge; the surface's shape clips it.
-                RestLayer.face -> face()
-                RestLayer.controls -> controls()
-            }
-        }
-    }
     when (style) {
-        FloatingCallStyle.orb -> orbLayer(Modifier.fillMaxSize())
+        FloatingCallStyle.orb -> FloatingCallOrbFace(config, placed = true, isHidden = isHidden, modifier = modifier)
         FloatingCallStyle.capsule -> {
-            // End sits toward the screen's middle, clear of the edge it rests on.
-            val diameter = min(40f, orbDiameter - 12)
-            Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
-                @Composable
-                fun end(modifier: Modifier) {
-                    when (layer) {
-                        RestLayer.face -> Spacer(modifier.size(44.dp))
-                        RestLayer.controls -> Box(modifier) { FloatingCallEndButton(diameter, onEnd) }
-                    }
+            val pad = capsuleEndPadding(orbSize)
+            Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+                if (trailing) Spacer(Modifier.padding(start = pad.dp).size(FloatingCallSurfaceModel.MIN_TOUCH.dp))
+                Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
+                    FloatingCallOrbFace(config, placed = false, isHidden = isHidden, modifier = Modifier.width(orbSize.dp).fillMaxHeight())
                 }
-                if (trailing) end(Modifier.padding(start = ((orbDiameter - diameter) / 2 - 2).dp))
-                Box(Modifier.weight(1f).fillMaxSize(), contentAlignment = Alignment.Center) {
-                    orbLayer(Modifier.width(orbDiameter.dp).fillMaxSize())
-                }
-                if (!trailing) end(Modifier.padding(end = ((orbDiameter - diameter) / 2 - 2).dp))
+                if (!trailing) Spacer(Modifier.padding(end = pad.dp).size(FloatingCallSurfaceModel.MIN_TOUCH.dp))
             }
         }
     }
 }
 
-/** The resting orb's touch layer: tap to expand, drag to carry it, and the mute badge. */
+/** End sits toward the screen's middle, clear of the edge it rests on. */
+private fun capsuleEndDiameter(orbSize: Float): Float = min(40f, orbSize - 12)
+
+private fun capsuleEndPadding(orbSize: Float): Float = max(0f, (orbSize - capsuleEndDiameter(orbSize)) / 2 - 2)
+
+/** What you touch on the resting orb (iOS `restContent(.controls)`): mounted only while it rests as the orb. */
 @Composable
-private fun OrbControls(
+private fun FloatingCallRestControls(
+    style: FloatingCallStyle,
+    orbSize: Float,
+    trailing: Boolean,
     isMuted: Boolean,
     statusText: String,
     reduceMotion: Boolean,
-    onTap: () -> Unit,
-    onDragChanged: (Offset) -> Unit,
-    onDragEnded: (translation: Offset, predicted: Offset) -> Unit,
+    isEnabled: Boolean,
+    onExpand: () -> Unit,
+    onEnd: () -> Unit,
+    modifier: Modifier,
 ) {
-    val coordinates = remember { arrayOfNulls<LayoutCoordinates>(1) }
-    val tap by rememberUpdatedState(onTap)
-    val dragChanged by rememberUpdatedState(onDragChanged)
-    val dragEnded by rememberUpdatedState(onDragEnded)
-    Box(
-        Modifier
-            .fillMaxSize()
-            .onGloballyPositioned { coordinates[0] = it }
-            .pointerInput(Unit) {
-                // SwiftUI `DragGesture(minimumDistance: 8, coordinateSpace: .global)` with
-                // `onTapGesture`: under 8 dp of travel it's a tap. Translations are in window
-                // coordinates, since the orb moves under the finger.
-                val slop = 8.dp.toPx()
-                awaitEachGesture {
-                    val down = awaitFirstDown()
-                    fun window(position: Offset): Offset = coordinates[0]?.takeIf { it.isAttached }?.localToWindow(position) ?: position
-                    val start = window(down.position)
-                    val tracker = VelocityTracker()
-                    tracker.addPosition(down.uptimeMillis, start)
-                    var dragging = false
-                    var translation = Offset.Zero
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                        val point = window(change.position)
-                        if (!change.pressed) {
-                            if (dragging) {
-                                val velocity = tracker.calculateVelocity()
-                                val v = Offset(velocity.x, velocity.y) / density
-                                dragEnded(translation, translation + v * FloatingCallLayout.flingProjection)
-                            } else {
-                                tap()
-                            }
-                            change.consume()
-                            break
-                        }
-                        tracker.addPosition(change.uptimeMillis, point)
-                        val delta = point - start
-                        if (!dragging && delta.getDistance() >= slop) dragging = true
-                        if (dragging) {
-                            translation = delta / density
-                            dragChanged(translation)
-                            change.consume()
-                        }
-                    }
+    when (style) {
+        FloatingCallStyle.orb -> FloatingCallOrbControls(isMuted, statusText, reduceMotion, onExpand, modifier)
+        FloatingCallStyle.capsule -> {
+            val diameter = capsuleEndDiameter(orbSize)
+            val pad = capsuleEndPadding(orbSize)
+            Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+                if (trailing) FloatingCallEndButton(diameter, isEnabled, onEnd, Modifier.padding(start = pad.dp))
+                Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
+                    FloatingCallOrbControls(isMuted, statusText, reduceMotion, onExpand, Modifier.width(orbSize.dp).fillMaxHeight())
                 }
+                if (!trailing) FloatingCallEndButton(diameter, isEnabled, onEnd, Modifier.padding(end = pad.dp))
             }
-            .semantics {
-                contentDescription = "Voice call"
-                stateDescription = statusText
-                role = Role.Button
-                onClick(label = "Shows the call’s controls") { tap(); true }
+        }
+    }
+}
+
+/** The orb as one control: a tap is told from a drag by the shape's own gesture; TalkBack expands it. */
+@Composable
+private fun FloatingCallOrbControls(isMuted: Boolean, statusText: String, reduceMotion: Boolean, onExpand: () -> Unit, modifier: Modifier) {
+    Box(
+        modifier.clearAndSetSemantics {
+            role = Role.Button
+            contentDescription = "Voice call"
+            stateDescription = statusText
+            testTag = "floating-call-orb"
+            onClick(label = "Shows the call’s controls") {
+                onExpand()
+                true
             }
-            .testTag("floating-call-orb"),
+        },
     ) {
         AnimatedVisibility(
             visible = isMuted,
-            enter = scaleIn(if (reduceMotion) Motion.easeOut(0.2) else MotionSpring(0.3, 0.25).spec(), initialScale = 0.4f) + fadeIn(if (reduceMotion) Motion.easeOut(0.2) else MotionSpring(0.3, 0.25).spec()),
-            exit = scaleOut(if (reduceMotion) Motion.easeOut(0.2) else MotionSpring(0.3, 0.25).spec(), targetScale = 0.4f) + fadeOut(if (reduceMotion) Motion.easeOut(0.2) else MotionSpring(0.3, 0.25).spec()),
-            modifier = Modifier.align(Alignment.TopEnd).offset(x = 2.dp, y = (-2).dp),
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .offset(x = 2.dp, y = (-2).dp),
+            enter = scaleIn(if (reduceMotion) Motion.easeOut(0.2) else MotionSpring(0.3, 0.25).spec(), initialScale = 0.4f) +
+                fadeIn(if (reduceMotion) Motion.easeOut(0.2) else MotionSpring(0.3, 0.25).spec()),
+            exit = scaleOut(if (reduceMotion) Motion.easeOut(0.2) else MotionSpring(0.3, 0.25).spec(), targetScale = 0.4f) +
+                fadeOut(if (reduceMotion) Motion.easeOut(0.2) else MotionSpring(0.3, 0.25).spec()),
+            label = "floatingCallMuteBadge",
         ) {
             Box(
                 Modifier
                     .size(20.dp)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHighest, CircleShape)
-                    .clearAndSetSemantics {},
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest, CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
-                OpenCodeIcon(SFSymbol.MicSlashFill, null, tint = OpenCodeTheme.colors.text, size = 12.dp)
+                OpenCodeIcon(SFSymbol.MicSlashFill, null, size = 12.dp, tint = OpenCodeTheme.colors.text)
             }
         }
     }
 }
 
-/** The capsule's End: a red circle, its target at least 48 dp. */
+/** The capsule's End (iOS `endButton(diameter:)`): a red circle in a full touch target. */
 @Composable
-private fun FloatingCallEndButton(diameter: Float, onEnd: () -> Unit) {
+private fun FloatingCallEndButton(diameter: Float, isEnabled: Boolean, onEnd: () -> Unit, modifier: Modifier = Modifier) {
     Box(
-        Modifier
-            .clickable(role = Role.Button, onClickLabel = null, onClick = onEnd)
-            .openCodeTapTarget()
+        modifier
+            .size(FloatingCallSurfaceModel.MIN_TOUCH.dp)
+            .clickable(enabled = isEnabled, role = Role.Button, onClick = onEnd)
             .semantics { contentDescription = "End voice call" },
         contentAlignment = Alignment.Center,
     ) {
-        Box(Modifier.size(diameter.dp).background(VoiceCallSurfaceDefaults.red, CircleShape), contentAlignment = Alignment.Center) {
-            OpenCodeIcon(SFSymbol.PhoneDownFill, null, tint = Color.White, size = 20.dp)
-        }
-    }
-}
-
-/** The panel: the session tag, the duration, captions and minimize; the strip's room; the controls. */
-@Composable
-private fun FloatingCallPanelContent(
-    store: VoiceStoreOf,
-    status: String,
-    showsCaptions: Boolean,
-    enabled: Boolean,
-    reduceMotion: Boolean,
-    onToggleCaptions: () -> Unit,
-    onMinimize: () -> Unit,
-) {
-    val sessionTitle by store.observe { it.sessionTitle }
-    val isMuted by store.observe { it.isMuted }
-    val isLive by store.observe { it.phase == VoiceFeature.State.Phase.Live }
-    val connectedAt by store.observe { it.connectedAt }
-    val button = FloatingCallTunables.buttonSize
-    Column(Modifier.fillMaxSize()) {
-        Row(
+        Box(
             Modifier
-                .padding(start = 18.dp, end = 8.dp, top = 8.dp)
-                .height(48.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                .size(diameter.dp)
+                .background(VoiceCallSurfaceDefaults.red, CircleShape),
+            contentAlignment = Alignment.Center,
         ) {
-            Column(Modifier.weight(1f).semantics(mergeDescendants = true) {}, verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                Text("Talking in", style = OpenCodeTextStyles.caption1, color = OpenCodeTheme.colors.secondaryText)
-                Text(sessionTitle, style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold), color = OpenCodeTheme.colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            FloatingCallDuration(connectedAt, status, Modifier.padding(end = 4.dp))
-            FloatingCallHeaderButton(
-                symbol = if (showsCaptions) SFSymbol.CaptionsBubbleFill else SFSymbol.CaptionsBubble,
-                label = if (showsCaptions) "Hide Captions" else "Show Captions",
-                tint = if (showsCaptions) OpenCodeTheme.colors.text else OpenCodeTheme.colors.secondaryText,
-                enabled = enabled,
-                onClick = onToggleCaptions,
-            )
-            FloatingCallHeaderButton(SFSymbol.ChevronDown, "Minimize", OpenCodeTheme.colors.secondaryText, enabled, onMinimize)
+            OpenCodeIcon(SFSymbol.PhoneDownFill, null, size = 18.dp, tint = Color.White)
         }
-        // Room for the fuller strip (`stripTop`): both voices across the panel's full width,
-        // edge to edge inside the surface.
-        Spacer(Modifier.padding(top = 8.dp).height(FloatingCallTunables.stripHeight.dp))
-        AnimatedVisibility(
-            visible = showsCaptions,
-            enter = fadeIn(if (reduceMotion) snap() else FloatingCallTunables.expand.spec()),
-            exit = fadeOut(if (reduceMotion) snap() else FloatingCallTunables.expand.spec()),
-        ) {
-            FloatingCallCaptions(
-                store,
-                Modifier
-                    .padding(start = 18.dp, end = 18.dp, top = 8.dp)
-                    .height(FloatingCallTunables.captionsHeight.dp),
-            )
-        }
-        Spacer(Modifier.weight(1f))
-        // One row of equal circles on one baseline; names only for TalkBack.
-        Row(Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, bottom = 14.dp)) {
-            val canAct = enabled
-            FloatingCallControl(if (isMuted) "Unmute" else "Mute", if (isMuted) SFSymbol.MicSlashFill else SFSymbol.MicFill, button, isOn = isMuted, isEnabled = canAct && isLive) { store.send(VoiceFeature.Action.MuteTapped) }
-            FloatingCallControl("Pause", SFSymbol.PauseFill, button, isEnabled = canAct, isPlaceholder = true) {}
-            FloatingCallControl("Camera", SFSymbol.VideoFill, button, isEnabled = canAct, isPlaceholder = true) {}
-            FloatingCallControl("Add", SFSymbol.Plus, button, isEnabled = canAct, isPlaceholder = true) {}
-            FloatingCallControl("End voice call", SFSymbol.PhoneDownFill, button, isEnabled = canAct, isDestructive = true) { store.send(VoiceFeature.Action.EndPressed) }
-        }
-    }
-}
-
-@Composable
-private fun FloatingCallHeaderButton(symbol: SFSymbol, label: String, tint: Color, enabled: Boolean, onClick: () -> Unit) {
-    Box(
-        Modifier
-            .size(48.dp)
-            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
-            .semantics { contentDescription = label },
-        contentAlignment = Alignment.Center,
-    ) {
-        OpenCodeIcon(symbol, null, tint = tint)
     }
 }
 
@@ -1353,13 +1533,13 @@ private fun FloatingCallTag(text: String) {
 }
 
 /**
- * One of the panel's controls: an equal circle, centred in an equal share of the row, so every
+ * One of the card's controls: an equal circle, centred in an equal share of the row, so every
  * glyph sits on one line.
  *
  * @param isPlaceholder shown so the layout can be judged; needs plumbing that isn't built yet.
  */
 @Composable
-private fun androidx.compose.foundation.layout.RowScope.FloatingCallControl(
+internal fun RowScope.FloatingCallControl(
     name: String,
     symbol: SFSymbol,
     diameter: Float,
@@ -1374,7 +1554,7 @@ private fun androidx.compose.foundation.layout.RowScope.FloatingCallControl(
     val dim by animateFloatAsState(if (isPlaceholder || !isEnabled) 0.35f else 1f, Motion.easeOut(0.18), label = "floatingCallControlDim")
     val text = OpenCodeTheme.colors.text
     val background = MaterialTheme.colorScheme.background
-    val fill by androidx.compose.animation.animateColorAsState(
+    val fill by animateColorAsState(
         if (isDestructive) VoiceCallSurfaceDefaults.red else if (isOn) text else VoiceCallSurfaceDefaults.tertiaryFill,
         Motion.easeOut(0.18),
         label = "floatingCallControlFill",
@@ -1406,9 +1586,9 @@ private fun androidx.compose.foundation.layout.RowScope.FloatingCallControl(
     }
 }
 
-/** How long the call has run, or what it's doing before it connects. */
+/** How long the call has run, or what it's doing before it connects (iOS `FloatingCallDuration`). */
 @Composable
-private fun FloatingCallDuration(connectedAt: java.time.Instant?, status: String, modifier: Modifier = Modifier) {
+internal fun FloatingCallDuration(connectedAt: Instant?, status: String, modifier: Modifier = Modifier) {
     val date = remember { dependency(DateClient) }
     var seconds by remember { mutableLongStateOf(0L) }
     LaunchedEffect(connectedAt) {
@@ -1432,35 +1612,10 @@ private fun FloatingCallDuration(connectedAt: java.time.Instant?, status: String
     )
 }
 
-/** The call's last few lines: yours in secondary, the agent's in primary. */
-@Composable
-private fun FloatingCallCaptions(store: VoiceStoreOf, modifier: Modifier = Modifier) {
-    val lines by store.observe { it.captionTargets.takeLast(3) }
-    Column(
-        modifier
-            .fillMaxWidth()
-            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-            .drawWithContent {
-                drawContent()
-                drawRect(
-                    Brush.verticalGradient(0f to Color.Transparent, 0.3f to Color.Black, startY = 0f, endY = size.height),
-                    blendMode = BlendMode.DstIn,
-                )
-            }
-            .testTag("floating-call-captions"),
-        verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.Bottom),
-    ) {
-        for (line in lines) {
-            androidx.compose.runtime.key(line.id) {
-                Text(
-                    line.text,
-                    style = OpenCodeTextStyles.subheadline,
-                    color = if (line.isUser) OpenCodeTheme.colors.secondaryText else OpenCodeTheme.colors.text,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.semantics { contentDescription = if (line.isUser) "You: ${line.text}" else line.text },
-                )
-            }
-        }
-    }
+private fun lerp(a: Double, b: Double, t: Double): Double = a + (b - a) * t
+
+/** 0 below [low], 1 above [high], eased between. */
+private fun smooth(low: Double, high: Double, value: Double): Double {
+    val t = ((value - low) / (high - low)).coerceIn(0.0, 1.0)
+    return t * t * (3 - 2 * t)
 }

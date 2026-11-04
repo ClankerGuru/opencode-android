@@ -5,6 +5,8 @@ import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.feature.media.AgentImageRowAnchor
+import ai.opencode.feature.media.DecodedImageCache
 import ai.opencode.feature.media.TranscriptImagePreview
 import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.LocalTranscriptRowContext
@@ -34,10 +36,10 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -51,6 +53,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.SingletonImageLoader
@@ -85,22 +88,49 @@ fun MarkdownImage(
     val cacheKey = remember(server, directory, source) {
         server?.let { OpenCodeClient.markdownImageKey(it, directory, source) } ?: source
     }
+    val decodedImages = remember { dependency(DecodedImageCache) }
+    // Bumped by Try Again, to load once more.
     var attempt by remember { mutableIntStateOf(0) }
-    val state by produceState<ImageLoad>(ImageLoad.Loading, cacheKey, attempt) {
-        value = ImageLoad.Loading
+    var image by remember(cacheKey) { mutableStateOf<ImageBitmap?>(null) }
+    var failed by remember(cacheKey) { mutableStateOf(false) }
+    // Marks the hosting row revised before an async load, failure, or retry resizes it.
+    val row = remember { AgentImageRowAnchor() }
+    AgentImageRowAnchor.Placement(row)
+    // iOS shows a cached image on the first frame; Android keeps its decoded copy for that, so
+    // a row coming back on screen doesn't decode on the main thread.
+    val cachedImage = remember(cacheKey) { decodedImages.image(cacheKey)?.asImageBitmap() }
+    val shown = image ?: cachedImage
+    fun applyState(nextImage: ImageBitmap?, nextFailed: Boolean, hadImage: Boolean) {
+        if (MarkdownImage.revisesRow(hadImage, failed, nextImage != null, nextFailed)) row.revised()
+        image = nextImage
+        failed = nextFailed
+    }
+    LaunchedEffect(cacheKey, attempt) {
+        val hadImage = shown != null
+        if (shown != null) {
+            applyState(shown, nextFailed = false, hadImage = hadImage)
+            return@LaunchedEffect
+        }
+        if (failed) applyState(null, nextFailed = false, hadImage = hadImage)
         val loaded: ImageBitmap? = withContext(Dispatchers.IO) {
             runCatching {
-                if (source.startsWith("http://", ignoreCase = true) || source.startsWith("https://", ignoreCase = true)) {
+                val bitmap = if (source.startsWith("http://", ignoreCase = true) || source.startsWith("https://", ignoreCase = true)) {
                     val result = SingletonImageLoader.get(context).execute(ImageRequest.Builder(context).data(source).build())
-                    (result as? SuccessResult)?.image?.toBitmap()?.asImageBitmap()
+                    (result as? SuccessResult)?.image?.toBitmap()
                 } else {
                     val bytes = client.cachedMarkdownImage(cacheKey)
                         ?: server?.let { client.markdownImage(it, directory, source, null) }
-                    bytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap() }
+                    bytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
                 }
+                bitmap?.also { decodedImages.insert(it, cacheKey) }?.asImageBitmap()
             }.getOrNull()
         }
-        value = if (loaded != null) ImageLoad.Loaded(loaded) else ImageLoad.Failed
+        applyState(loaded, nextFailed = loaded == null, hadImage = hadImage)
+    }
+    val state = when {
+        shown != null -> ImageLoad.Loaded(shown)
+        failed -> ImageLoad.Failed
+        else -> ImageLoad.Loading
     }
     val shape = RoundedCornerShape(TranscriptMetrics.cardCornerRadius)
     when (val load = state) {
@@ -132,7 +162,11 @@ fun MarkdownImage(
         ImageLoad.Failed -> FailedImageCard(
             name = fallbackFile?.path?.substringAfterLast('/') ?: alt.ifEmpty { "Image" },
             fallbackFile = fallbackFile,
-            onRetry = { attempt += 1 },
+            onRetry = {
+                if (failed) row.revised()
+                failed = false
+                attempt += 1
+            },
             modifier = modifier,
         )
         ImageLoad.Loading -> Box(
@@ -140,6 +174,13 @@ fun MarkdownImage(
             contentAlignment = Alignment.Center,
         ) { CircularProgressIndicator() }
     }
+}
+
+/** iOS `MarkdownImage`'s statics. */
+object MarkdownImage {
+    /** Whether changing between placeholder, loaded image, and failed card alters the row's height. */
+    fun revisesRow(hadImage: Boolean, wasFailed: Boolean, nextImage: Boolean, nextFailed: Boolean): Boolean =
+        hadImage != nextImage || (!nextImage && wasFailed != nextFailed)
 }
 
 private sealed interface ImageLoad {
@@ -172,6 +213,7 @@ private fun FailedImageCard(name: String, fallbackFile: AgentFileReference?, onR
                 .semantics {
                     contentDescription = name
                     stateDescription = "Couldn’t load image"
+                    testTag = "markdown-image-failed"
                 }
                 .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,

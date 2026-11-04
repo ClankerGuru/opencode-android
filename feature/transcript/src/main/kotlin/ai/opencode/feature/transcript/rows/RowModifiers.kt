@@ -1,9 +1,11 @@
 package ai.opencode.feature.transcript.rows
 
 import ai.opencode.core.motion.rememberReduceMotion
+import ai.opencode.core.tuning.AnimationTimeScale
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.LocalTranscriptLayoutTuning
+import ai.opencode.feature.transcript.list.LocalTranscriptTimelinePaused
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -136,6 +138,16 @@ fun Modifier.minimumHitTarget(side: Dp = MinimumHitRect.side, topReach: Dp = Dp.
 object InlineRowPulse {
     /** 1…0 and back over 2.2 s, eased. */
     fun level(atSeconds: Double): Double = 0.5 + 0.5 * cos(atSeconds * 2 * PI / 2.2)
+
+    /**
+     * iOS `AnimationTimeScale.referenceTime(date)`: wall time in `timeIntervalSinceReferenceDate`
+     * seconds (since 2001, so the phase matches iOS), advanced on the slow-mo clock while it's scaled.
+     */
+    fun referenceSeconds(wallMillis: Long): Double {
+        val realSeconds = System.nanoTime() / 1e9
+        val virtualAhead = AnimationTimeScale.shared.now(realSeconds) - realSeconds
+        return wallMillis / 1000.0 - 978_307_200.0 + virtualAhead
+    }
 }
 
 /** Applies [InlineRowPulse] while [isActive]: opacity `0.45 + 0.55 × level`, drawn per frame (no recomposition). */
@@ -143,8 +155,10 @@ object InlineRowPulse {
 fun Modifier.inlineRowPulse(isActive: Boolean): Modifier {
     val reduceMotion = rememberReduceMotion()
     if (!isActive || reduceMotion) return this
+    val paused = LocalTranscriptTimelinePaused.current
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(paused) {
+        if (paused) return@LaunchedEffect
         // ~30 Hz like iOS's `TimelineView(.animation(minimumInterval: 1 / 30))`.
         var last = 0L
         while (true) {
@@ -156,6 +170,5 @@ fun Modifier.inlineRowPulse(isActive: Boolean): Modifier {
             }
         }
     }
-    // iOS reads `timeIntervalSinceReferenceDate` (seconds since 2001), so the phase matches.
-    return this.graphicsLayer { alpha = (0.45 + 0.55 * InlineRowPulse.level(now / 1000.0 - 978_307_200.0)).toFloat() }
+    return this.graphicsLayer { alpha = (0.45 + 0.55 * InlineRowPulse.level(InlineRowPulse.referenceSeconds(now))).toFloat() }
 }

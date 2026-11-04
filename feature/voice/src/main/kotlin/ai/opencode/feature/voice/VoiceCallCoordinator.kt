@@ -49,9 +49,16 @@ class VoiceCallCoordinator(
         catch (_: Exception) { deliver(context); return }
         if (!finished) requestResponse()
     }
-    override suspend fun abandonDelegationImpl(callID: String) {
+    override suspend fun closeDelegationImpl(callID: String, reason: VoiceDelegationCloseReason) {
         val wasOpen = openCalls.remove(callID)
         val wasOrphan = orphanCalls.remove(callID)
+        val socket = active
+        if (wasOpen && socket != null && socket.ready) {
+            socket.connection.sendControlIfPossible(
+                RealtimeCommand.FunctionOutput(callID, "{\"status\":\"${reason.rawValue}\"}"),
+                "realtime.function_output",
+            )
+        }
         if (wasOpen || wasOrphan) discardStandbyAndRescheduleRotation()
     }
     override suspend fun setMutedImpl(muted: Boolean) {

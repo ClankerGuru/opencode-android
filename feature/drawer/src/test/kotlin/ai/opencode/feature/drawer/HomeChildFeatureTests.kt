@@ -33,8 +33,7 @@ import kotlin.time.Duration.Companion.seconds
  * Port of iOS `HomeChildFeatureTests.swift`: Home's child features, `HomeNotificationsFeature` and
  * `HomeConnectionFeature`, on their own.
  *
- * Not ported here (`HomeSettingsFeature` is `:feature:settings`'): `settingsChecksSupportForItsScopedServer`
- * and `modelPickerStyleIsOneSetting`.
+ * Not ported here (`HomeSettingsFeature` is `:feature:settings`'): `settingsChecksSupportForItsScopedServer`.
  *
  * `notificationPermissionDecisionIsOwnedByChild` is parameterized in iOS; each permission runs in
  * turn inside the one method.
@@ -196,12 +195,72 @@ class HomeChildFeatureTests {
         store.send(HomeConnectionFeature.Action.EventStreamFailed(OpenCodeClientError("Sign-in failed", statusCode = 401))) {
             it.copy(
                 connectionErrorMessage = "Sign-in failed",
+                credentialsRejected = true,
                 connectionStatus = HomeConnectionFeature.State.ConnectionStatus.disconnected,
                 isEventStreamLive = false,
             )
         }
         store.send(HomeConnectionFeature.Action.NetworkRerouted)
         store.send(HomeConnectionFeature.Action.RetryConnectionTapped)
+        store.finish()
+    }
+
+    /**
+     * Only a 401 is a credential problem; any other failure leaves Try Again working, and a later
+     * 401 still stops the stream.
+     */
+    @Test fun otherStreamFailuresStillRetry() = runTest {
+        val state = HomeConnectionFeature.State(server = server, isStreaming = true, isEventStreamLive = true)
+        var subscriptions = 0
+        val rejected = OpenCodeClientError("Sign-in failed", statusCode = 401)
+        val store = TestStore(state, HomeConnectionFeature(), this) {
+            this[OpenCodeClient] = this[OpenCodeClient].copy(
+                events = {
+                    subscriptions += 1
+                    flow {
+                        emit(OpenCodeServerEvent.Connected)
+                        throw rejected
+                    }
+                },
+            )
+        }
+        store.send(HomeConnectionFeature.Action.EventStreamFailed(OpenCodeClientError("The server had a problem", statusCode = 500))) {
+            it.copy(
+                connectionErrorMessage = "The server had a problem",
+                connectionStatus = HomeConnectionFeature.State.ConnectionStatus.disconnected,
+                isEventStreamLive = false,
+            )
+        }
+        store.send(HomeConnectionFeature.Action.RetryConnectionTapped) {
+            it.copy(connectionStatus = HomeConnectionFeature.State.ConnectionStatus.reconnecting)
+        }
+        store.receive(HomeConnectionFeature.Action.ServerConnected(server)) {
+            it.copy(connectionErrorMessage = null, hasConnected = true, isEventStreamLive = true)
+        }
+        store.receive(HomeConnectionFeature.Action.EventStreamFailed(rejected)) {
+            it.copy(
+                connectionErrorMessage = "Sign-in failed",
+                credentialsRejected = true,
+                connectionStatus = HomeConnectionFeature.State.ConnectionStatus.disconnected,
+                isEventStreamLive = false,
+            )
+        }
+        store.send(HomeConnectionFeature.Action.RetryConnectionTapped)
+        store.finish()
+        assertEquals(1, subscriptions)
+    }
+
+    @Test fun reconnectingClearsRejectedCredentials() = runTest {
+        val state = HomeConnectionFeature.State(
+            server = server,
+            connectionStatus = HomeConnectionFeature.State.ConnectionStatus.disconnected,
+            connectionErrorMessage = "Sign-in failed",
+            credentialsRejected = true,
+        )
+        val store = TestStore(state, HomeConnectionFeature(), this)
+        store.send(HomeConnectionFeature.Action.ServerConnected(server)) {
+            it.copy(connectionErrorMessage = null, credentialsRejected = false, hasConnected = true, isEventStreamLive = true)
+        }
         store.finish()
     }
 

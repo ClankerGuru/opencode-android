@@ -3,38 +3,29 @@ package ai.opencode.feature.session
 import ai.opencode.feature.composer.RequestDockFeature
 import ai.opencode.feature.composer.UndoSnapshot
 import ai.opencode.feature.composer.DraftState
-import ai.opencode.core.dependencies.DateClient
-import ai.opencode.core.dependencies.dependency
 import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.feature.composer.ComposerAttachmentsFeature
 import ai.opencode.feature.composer.ComposerFileAttachment
 import ai.opencode.feature.composer.DictationFeature
 import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.server.model.ModelSearch
-import ai.opencode.server.model.ModelVisibility
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
-import ai.opencode.feature.composer.SharedComposerDraft
 import ai.opencode.feature.composer.SharedLocation
 import ai.opencode.feature.transcript.TranscriptEntry
 import ai.opencode.feature.transcript.TranscriptSubagent
 import ai.opencode.feature.voice.VoiceBroker
 import ai.opencode.feature.voice.VoiceFeature
 import ai.opencode.feature.voice.VoiceLabDemo
+import ai.opencode.feature.voice.VoiceReadiness
 import ai.opencode.feature.voice.VoiceRoute
 import ai.opencode.server.model.OpenCodeDelivery
-import ai.opencode.server.model.OpenCodeFormRequest
-import ai.opencode.server.model.OpenCodeFormValue
-import ai.opencode.server.model.OpenCodeModel
 import ai.opencode.server.model.OpenCodeModelRef
 import ai.opencode.server.model.OpenCodeOutgoingAttachment
-import ai.opencode.server.model.OpenCodePermissionRequest
 import ai.opencode.server.model.OpenCodeProject
 import ai.opencode.server.model.OpenCodeQueuedInput
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.OpenCodeShell
 import ai.opencode.server.model.OpenCodeToolCall
 import ai.opencode.server.model.OpenCodeTranscriptItem
-import ai.opencode.server.model.ModelVariant
 import ai.opencode.server.model.OpenCodeCompaction
 import ai.opencode.server.model.SessionActivity
 import ai.opencode.server.model.SessionTitle
@@ -45,11 +36,14 @@ import ai.opencode.server.model.learningFirstPrompt
 import ai.opencode.server.model.model
 import java.time.Instant
 import java.util.UUID
+import ai.opencode.core.experiments.key
+import ai.opencode.core.sharing.shared
 
 // Port of iOS `SessionFeature+State.swift` (and the computed members of `SessionFeature.swift`'s
 // `State`): computed properties as extension `val`s, `mutating func`s as `fun State.x(): State`.
 // iOS get/set pairs are a getter plus a `withX(value)` setter. Nested types live in `State`
-// (`SessionFeature.kt`), since Kotlin keeps nested declarations in the class body.
+// (`SessionFeature.kt`), since Kotlin keeps nested declarations in the class body. As on iOS
+// (67a3fb61), dictation, models, requests and transcript state are in `SessionFeatureState<Area>.kt`.
 
 // region Draft (iOS `draft` `didSet`)
 
@@ -168,7 +162,25 @@ fun SessionFeature.SwitchSnapshot.Companion.from(state: State): SessionFeature.S
     val session = state.session ?: return null
     val queued = state.queuedInputs.filter { state.promptStates[it.id]?.admission != State.PromptState.Admission.sent }
     val queuedIDs = queued.map { it.id }.toSet()
-    val familyIDs = (listOf(session.id) + state.familySessions.map { it.id }).toSet()
+    val seenItemIDs: Set<String>
+    var hasUnseenItems = false
+    val mark = state.newMessages
+    val markIndex = mark?.let { m -> state.items.indexOfFirst { it.id == m.itemID } } ?: -1
+    val baseline = state.newMessagesBaseline
+    if (!state.readsOnView) {
+        seenItemIDs = state.catchUpOpeningSeen ?: baseline ?: emptySet()
+        hasUnseenItems = mark != null || state.newMessagesUnread
+    } else if (markIndex >= 0) {
+        seenItemIDs = state.items.subList(0, markIndex).mapTo(HashSet()) { it.id }
+        hasUnseenItems = true
+    } else if (baseline != null && (baseline.isNotEmpty() || state.newMessagesUnread || state.newMessagesBaselineTimestamp != null ||
+            state.isTranscriptCovered || state.isBackgrounded || state.items.isEmpty())
+    ) {
+        seenItemIDs = baseline + state.newMessagesWatched
+        hasUnseenItems = state.newMessagesUnread
+    } else {
+        seenItemIDs = state.items.mapTo(HashSet()) { it.id }
+    }
     return SessionFeature.SwitchSnapshot(
         session = session,
         family = state.familySessions,
@@ -178,6 +190,8 @@ fun SessionFeature.SwitchSnapshot.Companion.from(state: State): SessionFeature.S
         forms = state.formRequests,
         formAnswers = state.formAnswers,
         questionPageIndices = state.questionPageIndices,
+        collapsedRequests = state.requestDock.collapsedRequestIDs,
+        answerDrafts = state.answerDraftsIncludingBar,
         hasLoadedRequests = state.hasLoadedPendingRequests,
         completedRequests = state.completedRequestIDs,
         selectedRequest = state.selectedRequestID,
@@ -191,9 +205,8 @@ fun SessionFeature.SwitchSnapshot.Companion.from(state: State): SessionFeature.S
         movableWorkKey = state.movableWorkKey,
         // A claim no send has acted on yet isn't a move.
         movedWorkKeys = state.movedWorkKeys - state.autoBackgroundClaims.values.toSet(),
-        seenItemIDs = state.newMessagesBaseline ?: state.items.map { it.id }.toSet(),
-        leftAt = state.sinceYouLeftAt ?: State.defaultLeaveDate(),
-        sinceYouLeftCache = state.sinceYouLeftCache.filterKeys { it in familyIDs },
+        seenItemIDs = seenItemIDs,
+        hasUnseenItems = hasUnseenItems,
     )
 }
 
@@ -215,6 +228,8 @@ fun SessionFeature.SwitchSnapshot.restore(state: State): State {
             formRequests = forms,
             formAnswers = forms.associate { form -> form.id to (formAnswers[form.id] ?: form.defaultAnswers) },
             questionPageIndices = questionPageIndices,
+            collapsedRequestIDs = collapsedRequests,
+            answerDrafts = if (next.isAnsweringRequest) it.answerDrafts else answerDrafts,
             completedRequestIDs = completedRequests,
             // The pin comes back only while its request is still waiting.
             selectedRequestID = selectedRequest,
@@ -222,10 +237,8 @@ fun SessionFeature.SwitchSnapshot.restore(state: State): State {
     }
     next = next.pruneRequests()
     next = restoreSessionData(next)
-    for ((id, entry) in sinceYouLeftCache) {
-        if (next.sinceYouLeftCache[id] == null) next = next.cacheSinceYouLeft(entry.lastItemID, entry.text, id)
-    }
-    // A waiting request takes the composer from the first frame.
+    // A waiting request takes the composer from the first frame: the screen, a Catch Up card, or
+    // the session Catch Up returns to.
     if (next.wantsRequestDock && !next.isAnsweringRequest) next = next.beginAnswering()
     return next
 }
@@ -242,6 +255,8 @@ fun SessionFeature.SwitchSnapshot.pruneRequests(
         forms = forms,
         formAnswers = SessionFeature.prune(formAnswers, live),
         questionPageIndices = SessionFeature.prune(questionPageIndices, live),
+        collapsedRequests = collapsedRequests.intersect(live),
+        answerDrafts = SessionFeature.pruneAnswerDrafts(answerDrafts, live),
         selectedRequest = selectedRequest?.takeIf { it in live },
     )
 }
@@ -269,21 +284,6 @@ fun SessionFeature.SwitchSnapshot.restoreSessionData(state: State): State {
     )
     next = next.syncVoiceModel()
     return next.copy(sessionSheet = next.sessionSheet?.copy(pendingModel = pendingModel))
-}
-
-// endregion
-
-// region Since You Left
-
-fun State.cacheSinceYouLeft(lastItemID: String, text: String, sessionID: String): State {
-    val cache = sinceYouLeftCache.toMutableMap()
-    cache[sessionID] = SinceYouLeft.CacheEntry(lastItemID, text)
-    val order = sinceYouLeftCacheOrder.filter { it != sessionID }.toMutableList()
-    order += sessionID
-    while (order.size > SinceYouLeft.maxCachedSessions) {
-        cache.remove(order.removeAt(0))
-    }
-    return copy(sinceYouLeftCache = cache, sinceYouLeftCacheOrder = order)
 }
 
 // endregion
@@ -328,12 +328,6 @@ val State.dictationEndedAt: Instant? get() = dictation.endedAt
 fun State.withDictationEndedAt(value: Instant?): State = updateDictation { it.copy(endedAt = value) }
 val State.dictationHold: DictationFeature.Hold? get() = dictation.hold
 fun State.withDictationHold(value: DictationFeature.Hold?): State = updateDictation { it.copy(hold = value) }
-/** A dictated message on its way to Send: a request arriving meanwhile waits for it. */
-val State.dictationSendPending: Boolean get() = dictation.sendPending
-fun State.withDictationSendPending(value: Boolean): State = updateDictation { it.copy(sendPending = value) }
-/** An answer's recording carried here from the screen it answered on, to stop as this screen's task starts. */
-val State.discardedDictation: DictationFeature.Discarded? get() = dictation.discarded
-fun State.withDiscardedDictation(value: DictationFeature.Discarded?): State = updateDictation { it.copy(discarded = value) }
 
 // endregion
 
@@ -371,48 +365,15 @@ fun State.withUnstartedUploadIDs(value: List<UUID>): State = updateComposerAttac
 fun State.updateRequestDock(transform: (RequestDockFeature.State<DraftState>) -> RequestDockFeature.State<DraftState>): State =
     copy(requestDock = transform(requestDock))
 
-val State.permissionRequests: List<OpenCodePermissionRequest> get() = requestDock.permissionRequests
-fun State.withPermissionRequests(value: List<OpenCodePermissionRequest>): State = updateRequestDock { it.copy(permissionRequests = value) }
-val State.formRequests: List<OpenCodeFormRequest> get() = requestDock.formRequests
-fun State.withFormRequests(value: List<OpenCodeFormRequest>): State = updateRequestDock { it.copy(formRequests = value) }
-val State.formAnswers: Map<String, Map<String, OpenCodeFormValue>> get() = requestDock.formAnswers
-fun State.withFormAnswers(value: Map<String, Map<String, OpenCodeFormValue>>): State = updateRequestDock { it.copy(formAnswers = value) }
-val State.respondingRequestIDs: Set<String> get() = requestDock.respondingRequestIDs
-fun State.withRespondingRequestIDs(value: Set<String>): State = updateRequestDock { it.copy(respondingRequestIDs = value) }
-val State.questionPageIndices: Map<String, Int> get() = requestDock.questionPageIndices
-fun State.withQuestionPageIndices(value: Map<String, Int>): State = updateRequestDock { it.copy(questionPageIndices = value) }
-val State.requestLoadError: String? get() = requestDock.requestLoadError
-fun State.withRequestLoadError(value: String?): State = updateRequestDock { it.copy(requestLoadError = value) }
-val State.requestLoadAttempt: RequestDockFeature.State.LoadAttempt? get() = requestDock.requestLoadAttempt
-fun State.withRequestLoadAttempt(value: RequestDockFeature.State.LoadAttempt?): State = updateRequestDock { it.copy(requestLoadAttempt = value) }
-val State.requestFailureAwaitingReconnect: Boolean get() = requestDock.requestFailureAwaitingReconnect
-fun State.withRequestFailureAwaitingReconnect(value: Boolean): State =
-    updateRequestDock { it.copy(requestFailureAwaitingReconnect = value) }
-val State.requestsConnectionIsAvailable: Boolean get() = requestDock.requestsConnectionIsAvailable
-fun State.withRequestsConnectionIsAvailable(value: Boolean): State = updateRequestDock { it.copy(requestsConnectionIsAvailable = value) }
-val State.requestErrors: Map<String, String> get() = requestDock.requestErrors
-fun State.withRequestErrors(value: Map<String, String>): State = updateRequestDock { it.copy(requestErrors = value) }
-/** While a pending request docks, the composer is its answer, and what was typed waits here. */
-val State.parkedComposer: DraftState? get() = requestDock.parkedComposer
-fun State.withParkedComposer(value: DraftState?): State = updateRequestDock { it.copy(parkedComposer = value) }
-/** The bar's text for each question page or request it has answered. */
-val State.answerDrafts: Map<String, String> get() = requestDock.answerDrafts
-fun State.withAnswerDrafts(value: Map<String, String>): State = updateRequestDock { it.copy(answerDrafts = value) }
-/** Whose words the bar holds now (an `answerTarget`). */
-val State.answerShownTarget: String? get() = requestDock.answerShownTarget
-fun State.withAnswerShownTarget(value: String?): State = updateRequestDock { it.copy(answerShownTarget = value) }
-/** The bar's text as last loaded or applied. */
-val State.answerBarBaseline: String get() = requestDock.answerBarBaseline
-fun State.withAnswerBarBaseline(value: String): State = updateRequestDock { it.copy(answerBarBaseline = value) }
-/** The pending request the dock shows; null shows the first. */
-val State.selectedRequestID: String? get() = requestDock.selectedRequestID
-fun State.withSelectedRequestID(value: String?): State = updateRequestDock { it.copy(selectedRequestID = value) }
-/** Requests whose last reply didn't reach the server: their dock reads “Couldn’t send …”. */
-val State.failedReplyIDs: Set<String> get() = requestDock.failedReplyIDs
-fun State.withFailedReplyIDs(value: Set<String>): State = updateRequestDock { it.copy(failedReplyIDs = value) }
-/** A successful reply must not become actionable again through an older poll. */
-val State.completedRequestIDs: Set<String> get() = requestDock.completedRequestIDs
-fun State.withCompletedRequestIDs(value: Set<String>): State = updateRequestDock { it.copy(completedRequestIDs = value) }
+/**
+ * iOS `answerDraftsIncludingBar` (`Composer/SessionStatePersistence.swift`): [answerDrafts] with the
+ * words on the bar now, which are only filed there when the bar moves to another page or request.
+ */
+val State.answerDraftsIncludingBar: Map<String, String>
+    get() {
+        val shown = answerShownTarget
+        return if (parkedComposer != null && shown != null) answerDrafts + (shown to draft) else answerDrafts
+    }
 
 /** The composer as an undo/revert left it (the parked composer's while a request holds the bar). */
 val State.undoSnapshot: UndoSnapshot?
@@ -497,18 +458,24 @@ fun State.Companion.peekText(markdown: String): String {
  */
 val State.voiceRoute: VoiceRoute
     get() {
+        val hasOpenAIKey = !openAIAPIKey.value.isNullOrBlank()
         val broker = VoiceBroker(
             serverVoice = ExperimentalFeature.serverVoice.isActive(serverVoiceExperiment.value),
             choice = voiceServer.value,
+            provider = serverVoiceProvider.value,
             connected = server,
             saved = { VoiceFeature.savedServers },
+            readiness = VoiceReadiness(
+                answers = voiceModelsByServer.value,
+                support = serverVoiceSupportByServer.value,
+                hasPhoneKey = hasOpenAIKey,
+                engine = voiceEngine.value,
+            ),
         )
-        return VoiceRoute.resolve(
-            selectedEngine = voiceEngine.value,
-            serverVoiceEnabled = broker.isEnabled,
-            serverVoiceProvider = serverVoiceProvider.value,
-            serverVoiceSupport = broker.support(serverVoiceSupportByServer.value),
-            hasOpenAIKey = !openAIAPIKey.value.isNullOrBlank(),
+        return broker.route(
+            engine = voiceEngine.value,
+            support = broker.support(serverVoiceSupportByServer.value),
+            hasOpenAIKey = hasOpenAIKey,
             hasXAIKey = !xaiAPIKey.value.isNullOrBlank(),
         )
     }
@@ -596,7 +563,7 @@ fun State.renameVoiceTarget(sessionID: String, title: String): State {
     return copy(voice = voice.copy(sessionTitle = resolved))
 }
 
-/** A call is connecting, live, or leaving: its bar holds the composer's place and its audio holds the session. */
+/** A call is connecting, live, or leaving: its audio holds the session. A failed or dropped call's card leaves it free. */
 val State.callOwnsAudio: Boolean get() = voice?.let { !it.phase.showsCard } ?: false
 
 /** Whether tapping the composer's call button starts a call rather than opening the project picker or Settings. */
@@ -809,7 +776,7 @@ fun State.clearUntouchedUndoDraft(): State {
 /** The session moved on: Stop and every run-state read in flight are stale. */
 fun State.supersedeRunWork(): State = copy(runWorkGeneration = runWorkGeneration + 1, isInterrupting = false, stopAttempt = null)
 
-fun State.resetLiveProjection(): State = copy(liveText = emptyMap(), gappedLiveText = emptySet(), projectedMessageIDs = emptySet(), lastProjectedMessageID = null)
+fun State.resetLiveProjection(): State = copy(liveText = emptyMap(), projectedMessageIDs = emptySet(), lastProjectedMessageID = null)
 
 val State.showsMoveToBackground: Boolean
     get() {
@@ -911,249 +878,29 @@ fun State.currentModelReads(input: String): Boolean {
     return models.model(current)?.inputs?.contains(input) == true
 }
 
-/** Text typed into the composer by the app: a running recording's words follow it. */
-fun State.setTyped(text: String): State = if (hasLiveDictation) rebaseDictation(text) else withDraft(text)
-
-/** Text the app adds below what's already typed, never over it, and once. */
-fun State.typeBelow(text: String): State {
-    val added = text.trim()
-    return when {
-        draft.isEmpty() -> setTyped(text)
-        !hasLiveDictation && added.isNotEmpty() && !draft.contains(added) -> withDraft(SharedComposerDraft.joined(draft, text))
-        else -> this
-    }
-}
-
-/** Words that won't be sent after all land in this composer, after what's there, with their attachments. */
-fun State.keepAsDraft(kept: DraftState): State {
-    val next = applySessionComposer { it.appending(kept) }
-    return if (next.parkedComposer == null) next.clearEditedUndoDraft() else next
-}
-
-// endregion
-
-// region Dictation
-
-val State.isDictating: Boolean get() = dictation.isDictating
-val State.isPreparingDictation: Boolean get() = dictation.isPreparing
-val State.isFinishingDictation: Boolean get() = dictation.isFinishing
-
-/** Recording, or finalizing its last words. */
-val State.hasLiveDictation: Boolean get() = dictation.hasLive
-
-/** Raise to Talk never starts a call while the mic records or finalizes a message, nor within the grace after one ends. */
-fun State.dictationBlocksRaise(now: () -> Instant = { dependency(DateClient).now() }): Boolean = dictation.blocksRaise(now)
-
-/** Shows the words after what was typed: in the hold while the mic is held or locked, otherwise in the draft. */
-fun State.showDictation(transcript: String): State {
-    val (dictation, text) = dictation.show(transcript)
-    val next = copy(dictation = dictation)
-    return if (text != null) next.withDraft(text) else next
-}
-
-/** The composer as typed, without the running recording's words. */
-val State.composerWithoutDictation: DraftState
-    get() {
-        val composer = draftState
-        if (hasLiveDictation && dictationHold == null) {
-            return composer.copy(text = if (dictationBase.endsWith(" ")) dictationBase.dropLast(1) else dictationBase)
-        }
-        return composer
-    }
-
-/** The typed text changed under a running recording: its words follow the new text. */
-fun State.rebaseDictation(typed: String): State {
-    val (dictation, text) = dictation.rebase(typed, draft)
-    val next = copy(dictation = dictation)
-    return if (text != null) next.withDraft(text) else next
-}
-
-val State.carriedDictation: DictationFeature.Carried?
-    get() {
-        if (!hasLiveDictation && sendingDictation == null) return null
-        return DictationFeature.Carried(
-            phase = dictationPhase,
-            recording = dictationRecording,
-            press = dictationPress,
-            hold = dictationHold,
-            transcript = dictation.transcript(draft),
-            sending = sendingDictation,
-            isAnswer = isAnsweringRequest && hasLiveDictation,
-        )
-    }
-
-/** Takes over a recording from the screen this one replaces. */
-fun State.adoptDictation(carried: DictationFeature.Carried): State {
-    var next = withDictationRecording(carried.recording).withDictationPress(carried.press).withSendingDictation(carried.sending)
-    if (carried.phase == DictationFeature.Phase.Idle) return next
-    if (carried.isAnswer) {
-        // An answer's words never land in another session: the mic stops when this screen's task starts.
-        return next.withDiscardedDictation(DictationFeature.Discarded(carried.recording, carried.press))
-            .withDictationRecording(next.dictationRecording + 1)
-    }
-    // A message's recording is never an answer: the request waits for it.
-    if (next.isAnsweringRequest) next = next.endAnswering()
-    val phase = carried.phase
-    next = if (phase is DictationFeature.Phase.Finishing && phase.send != null) {
-        next.withDictationPhase(DictationFeature.Phase.Finishing(send = null))
-    } else {
-        next.withDictationPhase(phase)
-    }
-    next = next.withDictationBase(DictationFeature.State.base(next.draft))
-    carried.hold?.let { carriedHold ->
-        var hold = carriedHold
-        if (!hold.isLocked) hold = hold.copy(isLocked = true, armed = null)
-        next = next.withDictationHold(hold.copy(text = next.draft))
-    }
-    return next.showDictation(carried.transcript)
-}
-
 // endregion
 
 // region Models and projects
 
-/** The current model by its display name, never its slug once the catalog has it. */
-val State.currentModelName: String
+/**
+ * Where a session whose folder is gone can move: its project's folder, when that's somewhere
+ * else and isn't the home folder (iOS `missingFolderMoveTarget`).
+ */
+val State.missingFolderMoveTarget: OpenCodeProject?
     get() {
-        val current = currentModel ?: return "Model"
-        return models.model(current)?.name ?: current.id
+        val session = session ?: return null
+        val project = SessionListContext.project(session, projects) ?: return null
+        if (project.directory == session.directory || project.isHomeFolder) return null
+        return project
     }
-
-/** The current model's catalog entry. */
-val State.currentModelInfo: OpenCodeModel? get() = currentModel?.let { models.model(it) }
-
-/** "Claude Haiku 5.5 · High": the model and its reasoning variant, if any. */
-val State.currentModelLabel: String
-    get() {
-        val variant = currentModel?.variant
-        if (variant == null || variant == "default") return currentModelName
-        return "$currentModelName · ${ModelVariant.label(variant)}"
-    }
-
-val State.filteredModels: List<OpenCodeModel> get() = ModelSearch.rank(pickerModels, modelFilter, favoriteModelIDs.value)
-
-/** This server's model visibility while Hide Unused Models is on; null lists the whole catalog. */
-val State.modelVisibility: ModelVisibility?
-    get() {
-        if (!ExperimentalFeature.hideModels.isActive(hideModelsExperiment.value)) return null
-        return modelVisibilityByServer.value[server.persistenceID] ?: ModelVisibility()
-    }
-
-/** The models the pickers list: the visible ones and the current model, or all of them after Show All. */
-val State.pickerModels: List<OpenCodeModel>
-    get() {
-        val visibility = modelVisibility
-        if (visibility == null || showsAllModels) return models
-        return visibility.visible(models, currentModelInfo?.id)
-    }
-
-/** How many models Show All adds; zero hides the button. */
-val State.hiddenModelCount: Int
-    get() {
-        val visibility = modelVisibility ?: return 0
-        return models.size - visibility.visible(models, currentModelInfo?.id).size
-    }
-
-val State.isFilteringModels: Boolean get() = modelFilter.trim().isNotEmpty()
-
-val State.favoriteModels: List<OpenCodeModel> get() = filteredModels.filter { it.id in favoriteModelIDs.value }
-
-val State.unfavoriteModels: List<OpenCodeModel> get() = filteredModels.filter { it.id !in favoriteModelIDs.value }
-
-val State.filteredProjects: List<OpenCodeProject> get() = projects.filtered(projectFilter) { listOf(it.name, it.directory) }
-
-/** The projects a draft lists above its composer: the five most recent, with the chosen one first when it isn't among them. */
-val State.recentProjects: List<OpenCodeProject>
-    get() {
-        val directories = HashSet<String>()
-        val unique = projects.filter { directories.add(it.directory) }
-        val recent = unique.take(State.recentProjectLimit)
-        val chosen = draftProject ?: return recent
-        if (recent.any { it.id == chosen.id || it.directory == chosen.directory }) return recent
-        return listOf(chosen) + recent.take(State.recentProjectLimit - 1)
-    }
-
-/** A draft's project can change until its first send leaves; a call started here creates the session in it straight away. */
-val State.canChooseProject: Boolean get() = session == null && outboxDraftID == null && callSessionID == null && items.isEmpty()
 
 val State.queuedInputRows: List<OpenCodeQueuedInput>
-    get() = queuedInputs.map { OpenCodeQueuedInput(it, queuedInputImages[it.id] ?: emptyList()) }
+    get() = queuedInputs.map { input -> OpenCodeQueuedInput(input, queuedInputImages[input.id]?.takeIf { it.isNotEmpty() } ?: input.images) }
 
 // endregion
 
 // region Transcript window
 
 val State.isLoadingEarlier: Boolean get() = earlierHistory is State.EarlierHistory.Loading
-
-/** The transcript as the server confirmed it, for caches: no message still in flight or failed. */
-val State.cacheableItems: List<OpenCodeTranscriptItem> get() = items(optimisticPromptIDs + failedSends.ids)
-
-/** Without failed sends' bubbles, which `restoreFailedSends` brings back. */
-val State.itemsWithoutFailedSends: List<OpenCodeTranscriptItem> get() = items(failedSends.ids.toSet())
-
-/** The first loaded row the transcript shows. */
-val State.windowStart: Int
-    get() {
-        val latestStart = maxOf(0, items.size - visibleLimit)
-        val start = minOf(latestStart, browsingStartIndex ?: latestStart)
-        return TranscriptEntry.entryStart(start, items)
-    }
-
-val State.visibleItems: List<OpenCodeTranscriptItem>
-    get() = hidingUndone(items.subList(minOf(windowStart, items.size), items.size))
-
-val State.firstVisibleItemID: String?
-    get() {
-        if (session?.revertMessageID != null) return visibleItems.firstOrNull()?.id
-        val start = windowStart
-        return items.getOrNull(start)?.id
-    }
-
-/** Once drawn, keeps the window starting at the row it started at before an update (OC-375/386). */
-fun State.retainRenderedWindowStart(previousFirstID: String?): State {
-    if (!hasRenderedFirstContentFrame || previousFirstID == null) return this
-    val index = if (items.firstOrNull()?.id == previousFirstID) {
-        0
-    } else {
-        items.indexOfFirst { it.id == previousFirstID }.takeIf { it >= 0 }
-            ?: items.indexOfFirst {
-                val messageID = SessionFeature.messageID(it)
-                messageID == previousFirstID || previousFirstID.startsWith("$messageID-")
-            }.takeIf { it >= 0 }
-            ?: return this
-    }
-    // A row removed below it must not pull an earlier one into view: then exactly the rows from it on.
-    val nextLimit = if (windowStart < index) items.size - index else maxOf(visibleLimit, items.size - index)
-    return if (visibleLimit != nextLimit) copy(visibleLimit = nextLimit) else this
-}
-
-fun State.pinBrowsingWindowIfNeeded(): State {
-    if (browsingWindowStartID == null) return this
-    val start = windowStart
-    val nextID = items.getOrNull(start)?.id ?: firstVisibleItemID
-    return if (browsingWindowStartID != nextID) copy(browsingWindowStartID = nextID) else this
-}
-
-val State.hasEarlierItems: Boolean
-    get() = items.size > visibleLimit ||
-        // A restored cache can be browsed immediately, but do not start the cursor chain from its stale edge.
-        (earlierHistory != State.EarlierHistory.Exhausted && !isLoading &&
-            ((!hasRenderedFirstContentFrame &&
-                (earlierHistory != State.EarlierHistory.UnknownEdge || items.isEmpty() ||
-                    (refresh == null && items.size >= SessionFeature.initialFetchLimit))) ||
-                initialTranscriptIsFresh) &&
-            !(items.isEmpty() && initialTranscriptIsFresh && earlierHistory == State.EarlierHistory.UnknownEdge))
-
-/** Whether a transcript request is in flight or the first load has not yet been attempted. */
-val State.isTranscriptLoading: Boolean
-    get() = isLoading || isLoadingEarlier ||
-        (!initialTranscriptIsFresh &&
-            (refresh != null || initialTranscriptRequestIsExternal || (!isDraft && nextRefreshID == 0 && loadError == null)) &&
-            items.isEmpty())
-
-/** Whether the empty-session placeholder may be shown. */
-val State.showsEmptyState: Boolean
-    get() = !isDraft && initialTranscriptIsFresh && items.isEmpty() && queuedInputs.isEmpty() &&
-        !isRunning && !isTranscriptLoading && !hasEarlierItems && earlierHistoryError == null
 
 // endregion

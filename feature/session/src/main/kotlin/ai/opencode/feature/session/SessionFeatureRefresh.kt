@@ -191,7 +191,7 @@ internal fun SessionFeature.startPendingWork(
     attempt: RequestDockFeature.State.LoadAttempt,
 ): Reduced<SessionFeature.State, Action> {
     if (state.session == null) return Reduced(state)
-    return pollPendingWork(state.withRequestLoadAttempt(attempt).withRequestLoadError(null))
+    return pollPendingWork(state.withRequestLoadAttempt(attempt).withRequestLoadError(null).withRequestArrivalsAreLive(false))
 }
 
 /** A poll started before the stream proved healthy keeps its fallback cadence until restarted; restart it once the stream is healthy. */

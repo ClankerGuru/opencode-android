@@ -44,10 +44,17 @@ class RequestDockFeature<Draft> : Reducer<RequestDockFeature.State<Draft>, Reque
         val formAnswers: Map<String, Map<String, OpenCodeFormValue>> = emptyMap(),
         val respondingRequestIDs: Set<String> = emptySet(),
         val questionPageIndices: Map<String, Int> = emptyMap(),
+        /** Docked questions dragged down to their bar; tapping or dragging the bar up brings them back. */
+        val collapsedRequestIDs: Set<String> = emptySet(),
         val requestLoadError: String? = null,
         val requestLoadAttempt: LoadAttempt? = null,
         val requestFailureAwaitingReconnect: Boolean = false,
         val requestsConnectionIsAvailable: Boolean = true,
+        /**
+         * A snapshot since the screen opened or reconnected is the baseline: requests new after
+         * it arrived live (an event's reread, a later poll).
+         */
+        val requestArrivalsAreLive: Boolean = false,
         val requestErrors: Map<String, String> = emptyMap(),
         /**
          * While a pending request docks, the composer is its answer, and what was typed for
@@ -67,6 +74,10 @@ class RequestDockFeature<Draft> : Reducer<RequestDockFeature.State<Draft>, Reque
         val selectedRequestID: String? = null,
         /** Requests whose last reply didn't reach the server: their dock reads “Couldn’t send …” until the next attempt or edit. */
         val failedReplyIDs: Set<String> = emptySet(),
+        /** Requests whose last dismissal failed: their line reads “Couldn’t dismiss request”, and Send stays Send. */
+        val failedDismissalIDs: Set<String> = emptySet(),
+        /** Requests the server had already settled, or no longer has, when the last reply went: nothing to retry or send, and × clears them here. */
+        val settledRequestIDs: Set<String> = emptySet(),
         /** A successful reply must not become actionable again through an older poll. */
         val completedRequestIDs: Set<String> = emptySet(),
     ) {
@@ -76,6 +87,24 @@ class RequestDockFeature<Draft> : Reducer<RequestDockFeature.State<Draft>, Reque
         data class DockedFormPage(val form: OpenCodeFormRequest, val field: OpenCodeFormField?, val page: Int, val count: Int)
 
         val isAnswering: Boolean get() = parkedComposer != null
+
+        /** The docked request's last reply didn't reach the server: Send reads Retry. */
+        val dockReplyFailed: Boolean get() = dockRequestID?.let { it in failedReplyIDs } ?: false
+
+        /** What the request's error line leads with when its last reply or dismissal failed; null when its error is something else. */
+        fun replyFailureTitle(id: String, isForm: Boolean): String? {
+            if (id in failedDismissalIDs) return "Couldn’t dismiss request"
+            if (id !in failedReplyIDs && id !in settledRequestIDs) return null
+            return if (isForm) "Couldn’t send answer" else "Couldn’t send reply"
+        }
+
+        /** The reply or dismissal is going again (or the answer changed): last time's failure no longer stands. */
+        fun clearReplyFailure(id: String): State<Draft> = copy(
+            requestErrors = requestErrors - id,
+            failedReplyIDs = failedReplyIDs - id,
+            failedDismissalIDs = failedDismissalIDs - id,
+            settledRequestIDs = settledRequestIDs - id,
+        )
 
         val hasPendingRequests: Boolean get() = permissionRequests.isNotEmpty() || formRequests.isNotEmpty()
 
@@ -181,11 +210,9 @@ class RequestDockFeature<Draft> : Reducer<RequestDockFeature.State<Draft>, Reque
         fun setFormAnswer(formID: String, key: String, value: OpenCodeFormValue?): State<Draft> {
             val answers = formAnswers[formID] ?: return this
             val updated = if (value == null) answers - key else answers + (key to value)
-            return copy(
-                formAnswers = formAnswers + (formID to updated),
-                requestErrors = requestErrors - formID,
-                failedReplyIDs = failedReplyIDs - formID,
-            )
+            val next = copy(formAnswers = formAnswers + (formID to updated))
+            // A settled request's error stays: no answer can take now.
+            return if (formID in settledRequestIDs) next else next.clearReplyFailure(formID)
         }
 
         private fun setCustomAnswer(text: String, field: OpenCodeFormField, formID: String): State<Draft> {
@@ -228,7 +255,10 @@ class RequestDockFeature<Draft> : Reducer<RequestDockFeature.State<Draft>, Reque
                 formAnswers = formAnswers.filterKeys { it in live },
                 questionPageIndices = questionPageIndices.filterKeys { it in live },
                 requestErrors = requestErrors.filterKeys { it in live },
+                collapsedRequestIDs = if (live.containsAll(collapsedRequestIDs)) collapsedRequestIDs else collapsedRequestIDs.intersect(live),
                 failedReplyIDs = if (live.containsAll(failedReplyIDs)) failedReplyIDs else failedReplyIDs.intersect(live),
+                failedDismissalIDs = if (live.containsAll(failedDismissalIDs)) failedDismissalIDs else failedDismissalIDs.intersect(live),
+                settledRequestIDs = if (live.containsAll(settledRequestIDs)) settledRequestIDs else settledRequestIDs.intersect(live),
                 selectedRequestID = selected,
             )
             return next to (hadSelection && selected == null)
@@ -282,9 +312,14 @@ class RequestDockFeature<Draft> : Reducer<RequestDockFeature.State<Draft>, Reque
          * is whether new requests appeared (the session plays `.attention` when
          * [RequestAnswering.announcesArrival] also holds).
          */
-        fun reconciled(requests: OpenCodePendingRequests, familySessionIDs: Set<String>): Reconciled<Draft> {
+        fun reconciled(
+            requests: OpenCodePendingRequests,
+            familySessionIDs: Set<String>,
+            restoring: (State<Draft>) -> State<Draft> = { it },
+        ): Reconciled<Draft> {
             val oldIDs = reviewRequestIDs.toSet()
             val docked = dockRequestID
+            // A request whose error shows stays, a settled one included, until ×.
             val protectedIDs = respondingRequestIDs + requestErrors.keys
             val coveredOwners = familySessionIDs + "global"
             fun <R> reconcile(fetched: List<R>, requests: List<R>, id: (R) -> String, sessionID: (R) -> String): List<R> {
@@ -295,16 +330,19 @@ class RequestDockFeature<Draft> : Reducer<RequestDockFeature.State<Draft>, Reque
                 }
             }
             val forms = reconcile(requests.forms, formRequests, { it.id }, { it.sessionID })
-            var answers = formAnswers
-            for (form in forms) if (answers[form.id] == null) answers = answers + (form.id to form.defaultAnswers)
-            var next = copy(
-                requestLoadAttempt = null,
-                requestFailureAwaitingReconnect = false,
-                permissionRequests = reconcile(requests.permissions, permissionRequests, { it.id }, { it.sessionID }),
-                formRequests = forms,
-                requestLoadError = null,
-                formAnswers = answers,
+            // iOS `restorePersistedAnswers` runs before the defaults fill in what's left.
+            var next = restoring(
+                copy(
+                    requestLoadAttempt = null,
+                    requestFailureAwaitingReconnect = false,
+                    permissionRequests = reconcile(requests.permissions, permissionRequests, { it.id }, { it.sessionID }),
+                    formRequests = forms,
+                    requestLoadError = null,
+                ),
             )
+            var answers = next.formAnswers
+            for (form in next.formRequests) if (answers[form.id] == null) answers = answers + (form.id to form.defaultAnswers)
+            next = next.copy(formAnswers = answers)
             // Answered elsewhere or interrupted: the dock moves on.
             val (pruned, clearedSelection) = next.prune(keepingSelection = next.respondingRequestIDs)
             next = pruned
@@ -329,13 +367,15 @@ class RequestDockFeature<Draft> : Reducer<RequestDockFeature.State<Draft>, Reque
 
     sealed interface Action {
         data class PermissionReplyTapped(val id: String, val reply: OpenCodePermissionReply, val message: String? = null) : Action
-        data class ResponseFinished(val sessionID: String, val requestID: String, val error: OpenCodeClientError?) : Action
+        data class ResponseFinished(val sessionID: String, val requestID: String, val error: OpenCodeClientError?, val dismissal: Boolean = false) : Action
         data class ReviewRequestSelected(val id: String) : Action
         /** Opens the form in the review sheet instead of the dock. */
         data class SheetTapped(val id: String) : Action
         data object RefreshTapped : Action
         data object AutoRetry : Action
         data class QuestionPageChanged(val requestID: String, val index: Int) : Action
+        /** The docked question was dragged down to its bar, or brought back. */
+        data class CollapseChanged(val requestID: String, val collapsed: Boolean) : Action
         data class FormValueChanged(val formID: String, val key: String, val value: OpenCodeFormValue?) : Action
         data class FormSubmitTapped(val id: String) : Action
         /** Dismisses a pending form with `DELETE /api/form/{id}` so the agent's question tool receives a dismissal instead of hanging. */
@@ -354,6 +394,17 @@ class RequestDockFeature<Draft> : Reducer<RequestDockFeature.State<Draft>, Reque
             else Reduced(state.copy(selectedRequestID = action.id))
 
         is Action.QuestionPageChanged -> Reduced(state.changeQuestionPage(action.requestID, action.index))
+
+        is Action.CollapseChanged -> {
+            val known = state.formRequests.any { it.id == action.requestID }
+            if (!known || (action.requestID in state.collapsedRequestIDs) == action.collapsed) {
+                Reduced(state)
+            } else if (action.collapsed) {
+                Reduced(state.copy(collapsedRequestIDs = state.collapsedRequestIDs + action.requestID))
+            } else {
+                Reduced(state.copy(collapsedRequestIDs = state.collapsedRequestIDs - action.requestID))
+            }
+        }
 
         is Action.FormValueChanged ->
             if (action.formID in state.respondingRequestIDs) Reduced(state)
@@ -418,19 +469,19 @@ sealed interface RequestBar {
  */
 object RequestAnswering {
     /**
-     * A pending request takes the composer, except under a call (whose agent answers) and
-     * until any dictation into the message has finished.
+     * A pending request takes the composer once any dictation into the message has finished. A
+     * floating call leaves the composer, so the request docks there: “Needs your input” always
+     * has the request.
      */
     fun wantsRequestDock(
         hasPendingRequests: Boolean,
-        callOwnsAudio: Boolean,
         dictationSendPending: Boolean,
         isAnsweringRequest: Boolean,
         hasLiveDictation: Boolean,
         hasDictationHold: Boolean,
         isSendingDictation: Boolean,
     ): Boolean {
-        if (!hasPendingRequests || callOwnsAudio || dictationSendPending) return false
+        if (!hasPendingRequests || dictationSendPending) return false
         // A message still recording, or finalizing to send, goes as a message.
         return isAnsweringRequest || (!hasLiveDictation && !hasDictationHold && !isSendingDictation)
     }
@@ -440,6 +491,16 @@ object RequestAnswering {
      * message: an answer or a reason takes text.
      */
     fun takesPasteAttachments(isAnsweringRequest: Boolean): Boolean = !isAnsweringRequest
+
+    /** iOS `SessionFeature.pruneAnswerDrafts(_:to:)`: bar drafts are keyed by request or "request/field" (`answerTarget`). */
+    fun pruneAnswerDrafts(drafts: Map<String, String>, live: Set<String>): Map<String, String> {
+        fun isLive(key: String): Boolean {
+            if (key in live) return true
+            val slash = key.indexOf('/')
+            return slash >= 0 && key.substring(0, slash) in live
+        }
+        return if (drafts.keys.any { !isLive(it) }) drafts.filterKeys(::isLive) else drafts
+    }
 
     /** The draft differs from the bar's last answer only by Return's newline. */
     fun isOnlyReturn(text: String, returnKeySends: Boolean, nonSendNewlineDraft: String?, dock: RequestDockFeature.State<*>): Boolean =
@@ -489,7 +550,8 @@ object RequestReplies {
         directory: String?,
     ): Reduced<RequestDockFeature.State<D>, RequestDockFeature.Action> {
         val form = state.formRequests.firstOrNull { it.id == id } ?: return Reduced(state)
-        if (!canRespond(state, id)) return Reduced(state)
+        // Settled on the server already: sending again can't take (× clears it).
+        if (!canRespond(state, id) || id in state.settledRequestIDs) return Reduced(state)
         val result = form.validatedAnswer(state.formAnswers[id] ?: emptyMap())
         val failure = result.exceptionOrNull() as? OpenCodeFormRequest.ValidationFailure
         if (failure != null) {
@@ -498,6 +560,7 @@ object RequestReplies {
                 state.copy(
                     requestErrors = state.requestErrors + (id to failure.error.message),
                     questionPageIndices = state.questionPageIndices + (id to failure.error.fieldIndex),
+                    collapsedRequestIDs = state.collapsedRequestIDs - id,
                 ),
             )
         }
@@ -516,8 +579,14 @@ object RequestReplies {
     ): Reduced<RequestDockFeature.State<D>, RequestDockFeature.Action> {
         val form = state.formRequests.firstOrNull { it.id == id } ?: return Reduced(state)
         if (!canRespond(state, id)) return Reduced(state)
+        // Settled or gone on the server: × only clears it here.
+        if (id in state.settledRequestIDs) {
+            val (pruned, _) = state.copy(completedRequestIDs = state.completedRequestIDs + id)
+                .prune(shouldRemove = { requestID, _ -> requestID == id }, keepingSelection = state.respondingRequestIDs)
+            return Reduced(pruned)
+        }
         val reason = message?.trim()?.ifEmpty { null }
-        return respond(state, id, form.sessionID, server) { client, srv ->
+        return respond(state, id, form.sessionID, server, dismissal = true) { client, srv ->
             client.cancelForm(srv, form.sessionID, id, reason, directory = directory)
         }
     }
@@ -583,6 +652,7 @@ object RequestReplies {
         id: String,
         error: OpenCodeClientError?,
         familySessionIDs: Set<String>,
+        dismissal: Boolean = false,
     ): RequestDockFeature.Settled<D>? {
         val wasResponding = id in state.respondingRequestIDs
         val next = state.copy(respondingRequestIDs = state.respondingRequestIDs - id)
@@ -591,10 +661,16 @@ object RequestReplies {
         if (!(wasResponding || requestIsKnown || sessionID == "global" || sessionID in familySessionIDs)) return null
         dependency(HapticsClient).play(if (error == null) Haptic.success else Haptic.error)
         if (error != null) {
-            return RequestDockFeature.Settled(
-                next.copy(requestErrors = next.requestErrors + (id to error.message), failedReplyIDs = next.failedReplyIDs + id),
-                clearedSelection = false,
-            )
+            var failed = next.copy(requestErrors = next.requestErrors + (id to error.message))
+            if (dismissal) failed = failed.copy(failedDismissalIDs = failed.failedDismissalIDs + id)
+            if (error.requestSettled) {
+                failed = failed.copy(settledRequestIDs = failed.settledRequestIDs + id)
+            } else if (!dismissal) {
+                failed = failed.copy(failedReplyIDs = failed.failedReplyIDs + id)
+            }
+            // A folded question opens to show what went wrong.
+            failed = failed.copy(collapsedRequestIDs = failed.collapsedRequestIDs - id)
+            return RequestDockFeature.Settled(failed, clearedSelection = false)
         }
         val (pruned, cleared) = next.copy(completedRequestIDs = next.completedRequestIDs + id)
             .prune(shouldRemove = { requestID, _ -> requestID == id }, keepingSelection = next.respondingRequestIDs)
@@ -607,13 +683,11 @@ object RequestReplies {
         requestID: String,
         sessionID: String,
         server: OpenCodeServer,
+        dismissal: Boolean = false,
         reply: suspend (OpenCodeClient, OpenCodeServer) -> Unit,
     ): Reduced<RequestDockFeature.State<D>, RequestDockFeature.Action> {
-        val next = state.copy(
-            requestErrors = state.requestErrors - requestID,
-            failedReplyIDs = state.failedReplyIDs - requestID,
-            respondingRequestIDs = state.respondingRequestIDs + requestID,
-        )
+        val cleared = state.clearReplyFailure(requestID)
+        val next = cleared.copy(respondingRequestIDs = cleared.respondingRequestIDs + requestID)
         val effect = Effect.run<RequestDockFeature.Action> { send ->
             val client = dependency(OpenCodeClient)
             val error = try {
@@ -626,7 +700,7 @@ object RequestReplies {
             } catch (error: Exception) {
                 OpenCodeClientError(error.message ?: "The request failed")
             }
-            send(RequestDockFeature.Action.ResponseFinished(sessionID, requestID, error))
+            send(RequestDockFeature.Action.ResponseFinished(sessionID, requestID, error, dismissal))
         }
         return Reduced(next, effect)
     }

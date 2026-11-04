@@ -4,7 +4,11 @@
 #   scripts/check.sh :feature:composer   # one module (+ what it depends on)
 set -euo pipefail
 cd "$(dirname "$0")/.."
-export JAVA_HOME="${JAVA_HOME:-/opt/homebrew/opt/openjdk@17}"
+# macOS defaults to Homebrew's JDK 17; elsewhere Gradle runs on the `java` on PATH and
+# provisions the JDK 17 toolchain itself.
+if [[ "$(uname -s)" == Darwin ]]; then
+  export JAVA_HOME="${JAVA_HOME:-/opt/homebrew/opt/openjdk@17}"
+fi
 if [[ $# -gt 0 ]]; then
   tasks=()
   for module in "$@"; do tasks+=("$module:assembleDebug" "$module:lintDebug" "$module:testDebugUnitTest"); done

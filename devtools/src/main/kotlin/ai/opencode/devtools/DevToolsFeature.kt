@@ -30,7 +30,7 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.merge
 
 /**
- * Settings › Advanced › Developer, Android-native (iOS `DiagnosticsView` + `DeveloperMode`): the
+ * Settings › Developer, Android-native (iOS `DiagnosticsView` + `DeveloperMode`): the
  * Developer Mode switch with iOS's gating and copy, Record Diagnostics, and the tools — Tuning
  * Panel, slow motion, perf HUD, layout bounds, Troubleshooting (timeline), Logs, Network,
  * Session Lab and a diagnostics bundle export. Keep the public names stable: `:app` wires them.
@@ -215,7 +215,7 @@ class DevToolsFeature : Reducer<DevToolsFeature.State, DevToolsFeature.Action> {
                 val server = shared(ServerSharedKeys.savedServer).value
                 val bundle = ProblemReportBuilder.make(
                     id = id,
-                    context = ProblemReportContext(serverID = server?.persistenceID.orEmpty(), screen = "Settings › Advanced › Developer"),
+                    context = ProblemReportContext(serverID = server?.persistenceID.orEmpty(), screen = "Settings › Developer"),
                     device = client.device(),
                     now = now,
                     events = recorder.snapshot(),

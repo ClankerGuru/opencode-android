@@ -19,6 +19,7 @@ import ai.opencode.feature.drawer.HomeFeatureTestSupport.receiveDetail
 import ai.opencode.feature.drawer.HomeFeatureTestSupport.snapshot
 import ai.opencode.feature.session.SessionFeature
 import ai.opencode.feature.session.activeSubagents
+import ai.opencode.feature.session.answerDrafts
 import ai.opencode.feature.session.backgroundShells
 import ai.opencode.feature.session.completedRequestIDs
 import ai.opencode.feature.session.contextFraction
@@ -30,6 +31,7 @@ import ai.opencode.feature.session.hasBackgroundWork
 import ai.opencode.feature.session.permissionRequests
 import ai.opencode.feature.session.questionPageIndices
 import ai.opencode.feature.session.selectedRequestID
+import ai.opencode.feature.session.withAnswerDrafts
 import ai.opencode.feature.session.withCompletedRequestIDs
 import ai.opencode.feature.session.withFormAnswers
 import ai.opencode.feature.session.withFormRequests
@@ -194,6 +196,20 @@ class SessionSwitchTests {
             assertEquals(OpenCodeFormValue.Str("Edited before refresh"), store.state.sessionDetail?.formAnswers?.get(request.id)?.get("second"))
             h.skipInFlightEffects()
         }
+    }
+
+    @Test
+    fun switchingAwayKeepsTheBarsWordsForEachRequest() = homeTest { h ->
+        val request = form()
+        val home = h.update(h.homeState()) { home ->
+            home.updatingDetail { d -> d.withFormRequests(listOf(request)).withAnswerDrafts(mapOf("${request.id}/second" to "Half typed")) }
+        }
+        val store = h.store(home)
+        store.exhaustive = false
+        store.send(Action.SessionTapped("other"))
+        store.send(Action.SessionTapped("root"))
+        assertEquals(mapOf("${request.id}/second" to "Half typed"), store.state.sessionDetail?.answerDrafts)
+        h.skipInFlightEffects()
     }
 
     @Test

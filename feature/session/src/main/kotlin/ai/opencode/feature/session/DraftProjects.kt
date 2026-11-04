@@ -1,5 +1,7 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.motion.transitionBlur
+
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
@@ -329,7 +331,7 @@ private fun DraftProjectFade(isHidden: Boolean, reducedMotion: Boolean, content:
     Box(
         Modifier
             .alpha(alpha)
-            .blur(blur.dp)
+            .transitionBlur(blur.dp)
             .then(if (isHidden) Modifier.clearAndSetSemantics { hideFromAccessibility() } else Modifier),
     ) {
         content()

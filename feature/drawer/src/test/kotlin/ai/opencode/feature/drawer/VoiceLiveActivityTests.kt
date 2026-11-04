@@ -122,7 +122,6 @@ class VoiceLiveActivityTests {
         voiceAction(VoiceFeature.Action.CallEvent(VoiceCallEvent.AssistantDelta(itemID = "a", delta = "Sure.")))
         voiceAction(VoiceFeature.Action.CallEvent(VoiceCallEvent.AssistantDelta(itemID = "a", delta = " The upload")))
         voiceAction(VoiceFeature.Action.CallEvent(VoiceCallEvent.UserTranscript(itemID = "u", text = "hm", final = false)))
-        voiceAction(VoiceFeature.Action.CaptionsTapped)
         voiceAction(VoiceFeature.Action.MuteTapped)
         // A reconnect shows only once it passes a second.
         voiceAction(VoiceFeature.Action.CallEvent(VoiceCallEvent.Reconnecting))

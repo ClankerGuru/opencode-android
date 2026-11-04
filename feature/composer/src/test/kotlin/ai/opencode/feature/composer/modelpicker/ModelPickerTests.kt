@@ -1,22 +1,12 @@
 package ai.opencode.feature.composer.modelpicker
 
 import ai.opencode.feature.composer.ComposerSwipeOwnership
-import ai.opencode.feature.voice.ComposerExpansion
 import ai.opencode.server.model.ModelProviderGroup
 import ai.opencode.server.model.ModelSearch
 import ai.opencode.server.model.OpenCodeModel
 import ai.opencode.server.model.ambiguousShortNames
-import androidx.compose.runtime.MonotonicFrameClock
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.Size
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
-import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -43,16 +33,12 @@ import kotlin.time.Duration.Companion.milliseconds
  * `plainPickerSheetSortsFavoritesAndKeepsSheetOpenWhenChangingThinking`,
  * `openingPickerWhileLoadingRestartsModelCatalogFetchAndCancelsHungLoad`,
  * `failedModelCatalogRecordsErrorAndRetriesOnReopen`,
- * `theSheetsRecentHoldsStillWhileOpenAndUpdatesNextTime`,
- * `choosingModelAndLevelByTapDragAndRowMenuUpdatesRecentsAndRememberedVariants`,
- * `aFusedPickIsASelectionOnlyWhenItChangesTheModelOrLevel`,
  * `theSheetsLevelMenuPicksAndStaysOpenAndARowTapCloses`,
  * `aPickFromALevelDragThatTickedIsQuietOnRelease`, `aRowLevelIsASelectionOnlyWhenTheLevelChanges`,
  * and the reducer half of `searchParsesTrailingLevelAndReturnPicksBestMatchAtThatLevel`.
  *
- * Dropped: `turningOffCustomModelPickerUnregistersLevelTunables` (no Tuning Panel store on
- * Android: the tunables are baked constants), `searchableSheetsAvoidForcedNavigationBarDrawerOnMac`
- * (SwiftUI `SearchFieldPlacement` on Mac and an iOS source scan).
+ * Dropped: `searchableSheetsAvoidForcedNavigationBarDrawerOnMac` (SwiftUI `SearchFieldPlacement`
+ * on Mac and an iOS source scan).
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
@@ -216,25 +202,6 @@ class ModelPickerTests {
     }
 
     /**
-     * The picker's knobs default to the polished behaviour. iOS also checks the Tuning Panel's
-     * `modelPicker` group, its Today/Polished/Snappy presets and keys: n/a, Android has no
-     * Tuning Panel (the tunables are baked constants).
-     */
-    @Test fun pickerTunablesDefaultToWhatShipped() {
-        val t = ModelPickerTunables
-        assertEquals("spring(response: 0.42, dampingFraction: 0.9)", 0.42 to 0.1, t.glassOpen.duration to t.glassOpen.bounce)
-        assertEquals(0.3 to 0.0, t.glassClose.duration to t.glassClose.bounce)
-        assertEquals(0.42 to 0.06, t.restSpring.duration to t.restSpring.bounce)
-        assertEquals(0.44 to 0.08, t.levelOpen.duration to t.levelOpen.bounce)
-        assertEquals(0.36 to 0.0, t.levelClose.duration to t.levelClose.bounce)
-        assertEquals(0.26 to 0.12, t.levelStep.duration to t.levelStep.bounce)
-        assertEquals(10f..50f, ComposerExpansion.barFade)
-        assertEquals(34f..150f, ComposerExpansion.contentFade)
-        assertEquals(0.6, ComposerExpansion.settle, 0.0)
-        assertEquals(420.milliseconds, ModelPickerMotion.settle(reduceMotion = false))
-    }
-
-    /**
      * A drag that begins mid-spring starts from where the glass is drawn, not from the rest it's
      * heading for, and keeps that start; a drag the system cancels (no throw) settles at the
      * nearer rest, never in between.
@@ -292,13 +259,6 @@ class ModelPickerTests {
         assertEquals(listOf("second"), runs)
     }
 
-    @Test fun levelScrubberTunablesDefaultToKitPicks() {
-        assertTrue(!LevelScrubberStyle.PullOut.coversComposer && LevelScrubberStyle.BarPanel.coversComposer)
-        assertEquals("Kit's pick (build 384): the scrubber pulled out of the glyph", LevelScrubberStyle.PullOut, LevelScrubberTunables.style)
-        assertEquals("Kit picked D-65 option 3: Filled Arc", LevelIconStyle.FilledArc, LevelScrubberTunables.iconStyle)
-        assertEquals("Kit picked placing the level icon next to the model picker", LevelPlacement.BesideModel, LevelScrubberTunables.placement)
-    }
-
     /**
      * D-65 option 3: level j of n fills j/n of the arc, so the lowest is never empty and the
      * highest always full, at any count; Default fills to the middle, dimmed. iOS checks the
@@ -349,43 +309,7 @@ class ModelPickerTests {
         assertEquals(1.0, band[28], 0.0)
     }
 
-    /**
-     * The search clears from the panel's own closed state, whatever the timing: a settled close
-     * and a reset reach it once each, and a reopen mid-fold never does, so it can't be skipped or
-     * come too early.
-     */
-    @Test fun thePanelReachesClosedOnceWhateverTheTiming() = runTest {
-        val panel = GrowingPanel(this)
-        var closings = 0
-        backgroundScope.launch {
-            var wasShown = panel.isShown
-            while (isActive) {
-                if (wasShown && !panel.isShown) closings += 1
-                wasShown = panel.isShown
-                delay(5)
-            }
-        }
-        panel.open()
-        delay(30)
-        panel.close(reduceMotion = true)
-        assertTrue("Still folding", panel.isShown)
-        delay(320)
-        assertFalse(panel.isShown)
-        assertEquals("A settled close reaches closed", 1, closings)
-        panel.open()
-        delay(30)
-        panel.close(reduceMotion = true)
-        delay(100)
-        panel.open()
-        delay(320)
-        assertTrue("Reopened mid-fold: it stays open", panel.isOpen)
-        assertEquals("…and never reached closed", 1, closings)
-        panel.reset()
-        delay(30)
-        assertEquals("A reset reaches closed at once", 2, closings)
-    }
-
-    // MARK: - Fused + Stack Model Picker (OC-397)
+    // MARK: - Model names and levels (OC-397)
 
     private val opus55 = model("claude-opus-5-5", "anthropic", "Claude Opus 5.5", listOf("low", "medium", "high", "max"))
     private val sonnet55Anthropic = model("claude-sonnet-5-5", "anthropic", "Claude Sonnet 5.5", listOf("low", "medium", "high"))
@@ -409,20 +333,6 @@ class ModelPickerTests {
         assertEquals("The old picker keeps main's titles", "Console Google", ModelProviderGroup.title("console-google"))
         assertEquals("Fireworks Ai", ModelProviderGroup.title("fireworks-ai"))
         assertEquals("Fireworks AI", ModelProviderGroup.canonicalVendorTitle("fireworks-ai"))
-    }
-
-    @Test fun fusedSectionsOrderFavoritesThenThreeRecentThenAllModelsAlphabetically() {
-        val models = listOf(opus55, sonnet55Anthropic, argon, astra, haiku)
-        val sections = ModelPickerSection.fusedSections(
-            models = models,
-            favorites = setOf(opus55.id),
-            recents = listOf(opus55.id, argon.id, astra.id, haiku.id, sonnet55Anthropic.id),
-            recentLimit = 3,
-        )
-        assertEquals(listOf("Favorites", "Recent", "All Models"), sections.map { it.title })
-        assertEquals(listOf(opus55), sections[0].models)
-        assertEquals("Up to 3 recents not already in Favorites", listOf(argon, astra, haiku), sections[1].models)
-        assertEquals("Remaining catalog models appear under All Models", listOf(sonnet55Anthropic), sections[2].models)
     }
 
     /**
@@ -461,153 +371,5 @@ class ModelPickerTests {
         val parsedPlain = ModelSearch.parseLevelQuery("high")
         assertTrue("Single word stays a model query", parsedPlain.terms == listOf("high") && parsedPlain.level == null)
     }
-
-    @Test fun levelStackAndRowMenuStateAndFrozenSectionsDuringFold() = runTest {
-        val anchors = ModelPickerAnchors(animationScope())
-        val models = listOf(opus55, argon, astra)
-        anchors.frozenSections = ModelPickerSection.fusedSections(models = models, favorites = setOf(opus55.id), recents = listOf(argon.id))
-        assertEquals(3, anchors.frozenSections?.size)
-
-        // Open vertical level stack on Opus 5.5 at High (index 3 of [nil, low, medium, high, max]).
-        anchors.openLevelStack(
-            kind = FusedLevelStackState.SourceKind.Row,
-            model = opus55,
-            level = "high",
-            anchorX = 320f,
-            anchorY = 400f,
-            rightEdgeX = 350f,
-            tapMode = true,
-            reduceMotion = false,
-        )
-        assertEquals(3, anchors.levelStack?.currentIndex)
-        assertEquals(true, anchors.levelStack?.tapMode)
-
-        // Drag up by one stackGap (40 pt) -> index 4 ("max").
-        val steppedUp = anchors.updateLevelStackDrag(deltaY = 40.0)
-        assertEquals(4, steppedUp)
-        assertEquals(4, anchors.levelStack?.currentIndex)
-
-        // Drag down by two stackGaps (-80 pt from start 3) -> index 1 ("low").
-        val steppedDown = anchors.updateLevelStackDrag(deltaY = -80.0)
-        assertEquals(1, steppedDown)
-        assertEquals(1, anchors.levelStack?.currentIndex)
-
-        anchors.closeLevelStack(commit = true, reduceMotion = true)
-        assertEquals(true, anchors.levelStack?.isClosing)
-
-        // Long-press row menu opens and closes. iOS reads the alpha's model value: here the
-        // Animatable's target, set once the fade-in it interrupts has let go (next dispatch).
-        anchors.openRowMenu(model = argon, rowFrame = rect(16f, 240f, 340f, 48f), reduceMotion = true)
-        assertEquals(argon, anchors.rowMenu?.model)
-        anchors.closeRowMenu(reduceMotion = true)
-        runCurrent()
-        assertEquals(0f, anchors.rowMenuAlpha.targetValue, 0f)
-
-        anchors.resetFusedState()
-        assertNull(anchors.frozenSections)
-        assertNull(anchors.levelStack)
-        assertNull(anchors.rowMenu)
-    }
-
-    @Test fun onlyTheFusedPickerReadsALevelWordInASearch() {
-        val models = listOf(opus55, argon)
-        assertTrue("The plain picker searches every word, as on main", ModelSearch.rank(models, "argon high").isEmpty())
-        assertEquals(listOf(argon), ModelSearch.rank(models, "argon high", parseLevel = true))
-        assertEquals(ModelSearch.rank(models, "argon"), ModelSearch.rank(models, "argon", parseLevel = true))
-        assertTrue(ModelPickerSection.sections(models, emptySet(), filter = "argon high").isEmpty())
-        assertEquals(listOf(argon), ModelPickerSection.fusedSections(models = models, favorites = emptySet(), filter = "argon high").firstOrNull()?.models)
-    }
-
-    @Test fun foldingOverlaysStopOwningTouchesAndStaleFramesClear() = runTest {
-        val anchors = ModelPickerAnchors(animationScope())
-        anchors.openLevelStack(
-            kind = FusedLevelStackState.SourceKind.Row, model = opus55, level = "high", anchorX = 320f, anchorY = 400f,
-            rightEdgeX = 350f, tapMode = true, reduceMotion = true,
-        )
-        assertTrue(anchors.isLevelStackActive && anchors.isOverlayActive)
-        anchors.closeLevelStack(reduceMotion = true)
-        assertTrue("Still mounted, so its fold animates", anchors.levelStack != null)
-        assertTrue("A folding stack no longer blocks the rows", !anchors.isLevelStackActive && !anchors.isOverlayActive)
-
-        anchors.openRowMenu(model = argon, rowFrame = rect(16f, 240f, 340f, 48f), reduceMotion = true)
-        assertTrue(anchors.isRowMenuActive)
-        anchors.closeRowMenu(reduceMotion = true)
-        assertEquals("Still mounted, so its fold animates", true, anchors.rowMenu?.isClosing)
-        assertTrue("A folding menu no longer blocks the rows", !anchors.isRowMenuActive && !anchors.isOverlayActive)
-
-        anchors.chipFrame = rect(60f, 780f, 120f, 44f)
-        anchors.chipNameFrame = rect(60f, 792f, 70f, 20f)
-        anchors.chipLevelFrame = rect(135f, 792f, 40f, 20f)
-        anchors.levelControl = anchors.chipLevelFrame
-        anchors.clearChipLevelFrame()
-        assertTrue(anchors.chipLevelFrame == Rect.Zero && anchors.levelControl == Rect.Zero)
-        assertTrue("A model with no level keeps its name's frame", anchors.chipNameFrame != Rect.Zero)
-        anchors.clearChipFrames()
-        assertTrue(anchors.chipFrame == Rect.Zero && anchors.chipNameFrame == Rect.Zero)
-
-        anchors.rowFrames[argon.id] = rect(16f, 240f, 340f, 48f)
-        anchors.rowNameFrames[argon.id] = rect(50f, 254f, 120f, 20f)
-        anchors.rowLevelFrames[argon.id] = rect(300f, 254f, 40f, 20f)
-        anchors.resetFusedState()
-        assertTrue(anchors.rowFrames.isEmpty() && anchors.rowNameFrames.isEmpty() && anchors.rowLevelFrames.isEmpty())
-    }
-
-    @Test fun fusedTunablesMatchKitDefaultsAndPerFrameTracesHaveNoJumpOverOneAndAHalfPoints() {
-        val f = FusedModelPickerTunables
-        assertFalse("Provider logo on chip is off by default", f.chipProviderLogo)
-        assertEquals(0.34 to 0.12, f.open.duration to f.open.bounce)
-        assertEquals(0.25 to 0.0, f.close.duration to f.close.bounce)
-        assertEquals(0.32 to 0.08, f.flight.duration to f.flight.bounce)
-        assertEquals(470.0, f.mediumMax, 0.0)
-        assertEquals(200.0, f.chipMax, 0.0)
-        assertEquals(40.0, f.stackGap, 0.0)
-        assertEquals(0.65, f.focusDim, 0.0)
-        assertTrue(f.backdropDim == 0.0 && f.backdropBlur == 0.0)
-
-        // Verify 120 Hz trajectories for panel growth and label flight have no jump or handoff snap > 1.5 pt.
-        val openPositions = FusedPickerMotionTrace.springPositions(duration = f.open.duration, bounce = f.open.bounce, fps = 120.0)
-        val closePositions = FusedPickerMotionTrace.springPositions(duration = f.close.duration, bounce = f.close.bounce, fps = 120.0)
-        val flightPositions = FusedPickerMotionTrace.springPositions(duration = f.flight.duration, bounce = f.flight.bounce, fps = 120.0)
-
-        val composerTopY = 760f
-        val panelOpenTopY = 338f
-        val openPanelPoints = openPositions.map { t -> Offset(16f, composerTopY + (panelOpenTopY - composerTopY) * t.toFloat()) }
-        val closePanelPoints = closePositions.map { t -> Offset(16f, panelOpenTopY + (composerTopY - panelOpenTopY) * t.toFloat()) }
-        val openJump = FusedPickerMotionTrace.maxDiscontinuity(openPanelPoints, Offset(16f, composerTopY), Offset(16f, panelOpenTopY))
-        val closeJump = FusedPickerMotionTrace.maxDiscontinuity(closePanelPoints, Offset(16f, panelOpenTopY), Offset(16f, composerTopY))
-        assertTrue("Panel growth has no jump over 1.5 pt: $openJump", openJump < 1.5f)
-        assertTrue("Panel fold has no jump over 1.5 pt: $closeJump", closeJump < 1.5f)
-
-        // iOS lifts the label 6 pt mid-flight (a constant there, a parameter here).
-        val lift = 6f
-        val fromRect = rect(68f, 780f, 84f, 20f)
-        val toRect = rect(56f, 420f, 92f, 22f)
-        val openFlightPoints = flightPositions.map { t ->
-            FusedPickerMotionTrace.labelPoint(fromRect, toRect, t.toFloat(), FusedLabelFlight.Direction.Open, lift)
-        }
-        val closeFlightPoints = flightPositions.map { t ->
-            FusedPickerMotionTrace.labelPoint(toRect, fromRect, t.toFloat(), FusedLabelFlight.Direction.Close, lift)
-        }
-        val openFlightJump = FusedPickerMotionTrace.maxDiscontinuity(
-            openFlightPoints, Offset(fromRect.left, fromRect.center.y), Offset(toRect.left, toRect.center.y),
-        )
-        val closeFlightJump = FusedPickerMotionTrace.maxDiscontinuity(
-            closeFlightPoints, Offset(toRect.left, toRect.center.y), Offset(fromRect.left, fromRect.center.y),
-        )
-        assertTrue("Open label flight has no jump over 1.5 pt: $openFlightJump", openFlightJump < 1.5f)
-        assertTrue("Close label flight has no jump over 1.5 pt: $closeFlightJump", closeFlightJump < 1.5f)
-    }
-
-    private fun rect(x: Float, y: Float, width: Float, height: Float) = Rect(Offset(x, y), Size(width, height))
-
-    /** The anchors' fades run on `Animatable`s, which need a frame clock: a 60 Hz one on virtual time. */
-    private fun TestScope.animationScope(): CoroutineScope {
-        val clock = object : MonotonicFrameClock {
-            override suspend fun <R> withFrameNanos(onFrame: (frameTimeNanos: Long) -> R): R {
-                delay(16)
-                return onFrame(testScheduler.currentTime * 1_000_000)
-            }
-        }
-        return CoroutineScope(backgroundScope.coroutineContext + clock)
-    }
 }
+

@@ -1,5 +1,7 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.sound.SoundEffectsClient
+import ai.opencode.feature.composer.modelpicker.ModelDisplayNames
 import ai.opencode.feature.composer.RequestDockFeature
 import ai.opencode.feature.composer.UndeliveredPrompts
 import ai.opencode.feature.composer.PromptOutbox
@@ -9,7 +11,6 @@ import ai.opencode.core.dependencies.BackgroundTaskClient
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.Dependency
-import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.dependencies.PasteboardClient
 import ai.opencode.core.dependencies.UuidClient
 import ai.opencode.core.dependencies.dependency
@@ -17,14 +18,9 @@ import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.sharing.Shared
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
-import ai.opencode.core.store.Effect
 import ai.opencode.core.store.PresentationAction
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
-import ai.opencode.core.store.cancellable
-import ai.opencode.core.store.combine
-import ai.opencode.core.store.ifLet
-import ai.opencode.core.store.onChange
 import ai.opencode.core.store.scope
 import ai.opencode.feature.media.BrowserFeature
 import ai.opencode.feature.composer.ComposerAttachmentsFeature
@@ -37,7 +33,6 @@ import ai.opencode.feature.composer.DictationFeature
 import ai.opencode.core.experiments.key
 import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.ExperimentalFeatures
-import ai.opencode.core.diagnostics.LabMarks
 import ai.opencode.feature.media.LinkMenuAction
 import ai.opencode.feature.media.LinkProbe
 import ai.opencode.feature.transcript.markdown.MarkdownStreamClient
@@ -55,8 +50,9 @@ import ai.opencode.feature.composer.LocationClientError
 import ai.opencode.feature.media.UniversalLinkClient
 import ai.opencode.feature.voice.VoiceFeature
 import ai.opencode.feature.voice.VoiceServerChoice
-import ai.opencode.feature.media.VoiceViewingPage
 import ai.opencode.feature.voice.ServerVoiceProvider
+import ai.opencode.feature.media.MediaReferenceClient
+import ai.opencode.feature.voice.ServerVoiceModelsAnswer
 import ai.opencode.feature.voice.ServerVoiceSupport
 import ai.opencode.feature.voice.VoiceEngine
 import ai.opencode.feature.voice.VoiceSharedKeys
@@ -87,10 +83,10 @@ import ai.opencode.server.model.OpenCodeToolCall
 import ai.opencode.server.model.OpenCodeTranscriptItem
 import ai.opencode.server.model.OpenCodeTranscriptPage
 import ai.opencode.server.retry.NetworkPathClient
-import kotlinx.serialization.Serializable
 import java.time.Instant
 import java.util.UUID
-import kotlin.time.Duration.Companion.milliseconds
+import ai.opencode.feature.transcript.list.NewMessagesFold
+import ai.opencode.feature.transcript.list.NewMessagesEarlierBaseline
 
 /**
  * The Working line's manual Move to Background action (and its TalkBack action). Off for now:
@@ -106,12 +102,12 @@ object MoveToBackground {
  * new session's draft) — its transcript, composer, run, requests, call and sheets.
  *
  * Layout mirrors iOS: this file keeps [State]'s stored properties (and the nested types of
- * `+State`), [Action], dependencies and the body; each area's reducer lives in
- * `SessionFeature<Area>.kt` as `internal fun SessionFeature.reduceX(state, action): Reduced?`
- * (null: the action passes to the next step, iOS's `passes = true`). Helpers that mutate state and
+ * `+State` and `+ActionSupport`), [Action], dependencies and `reduce`; the body's composition is in
+ * `SessionFeatureComposition.kt`; each area's reducer lives in `SessionFeature<Area>.kt` as
+ * `internal fun SessionFeature.reduceX(state, action): Reduced?` (null: the action passes to the next step, iOS's `passes = true`). Helpers that mutate state and
  * return an effect (iOS `func x(_ state: inout State) -> Effect<Action>`) return
  * `Reduced<State, Action>`; pure state mutations (iOS `mutating func`) are
- * `fun State.x(): State` extensions in `SessionFeatureState.kt`.
+ * `fun State.x(): State` extensions in `SessionFeatureState*.kt`.
  *
  * Writes to [State.draft] go through [withDraft], which keeps iOS's `didSet` (an edit drops
  * [State.nonSendNewlineDraft]).
@@ -132,18 +128,29 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         val isVisible: Boolean = false,
         /** What was on screen when the reader last left, until the read after their return settles it. */
         val newMessagesBaseline: Set<String>? = null,
+        /**
+         * Server-side viewed timestamp (ms) when an unread session opens without a phone-local seen
+         * snapshot, until the read after opening settles it.
+         */
+        val newMessagesBaselineTimestamp: Long? = null,
+        /** Whether the session opened unread, so an empty baseline marks the unread turn when no item IDs or timestamps match. */
+        val newMessagesUnread: Boolean = false,
+        /**
+         * Unseen baseline retained while the mark sits at the top of a paged window (`earlierHistory
+         * != Exhausted`), so loading an earlier page moves the divider to the true first unseen row.
+         */
+        val newMessagesEarlierBaseline: NewMessagesEarlierBaseline? = null,
+        /** Rows that streamed in while the reader watched, before that read settled: seen, though rows the read brings above them may not be. */
+        val newMessagesWatched: Set<String> = emptySet(),
+        /** What a Catch Up card's reader had seen as it opened: kept unread, it's what they've seen next time too. */
+        val catchUpOpeningSeen: Set<String>? = null,
         /** The New divider: above the first row that arrived while they were away. */
         val newMessages: NewMessagesMark? = null,
         val newMessagesGeneration: Int = 0,
         /** The last row of a mark that fit on screen, seen once the reader is in front of it. */
         val newMessagesFitThrough: String? = null,
-        /** Since You Left unseen baseline, leave time, active summary, and bounded per-session cache. */
-        val sinceYouLeftSeen: Set<String>? = null,
-        val sinceYouLeftAt: Instant? = null,
-        val sinceYouLeft: SinceYouLeft? = null,
-        val sinceYouLeftDismissed: Boolean = false,
-        val sinceYouLeftCache: Map<String, SinceYouLeft.CacheEntry> = emptyMap(),
-        val sinceYouLeftCacheOrder: List<String> = emptyList(),
+        /** The last span of new rows found folded into a group already on screen, so deltas that add no row don't rebuild its turn to find that again. */
+        val newMessagesFolded: NewMessagesFold? = null,
         /** False for a catch-up card: the reader's swipe decides whether it was read. */
         val readsOnView: Boolean = true,
         /** Whether a pending-request snapshot has arrived for this screen yet. */
@@ -153,6 +160,8 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         val session: OpenCodeSession? = null,
         val draftProject: OpenCodeProject? = null,
         val projects: List<OpenCodeProject> = emptyList(),
+        /** A new computer's first session offers these until composing retires them (iOS `starterPrompts`). */
+        val starterPrompts: List<String> = emptyList(),
         val items: List<OpenCodeTranscriptItem> = emptyList(),
         val isLoading: Boolean = false,
         val initialTranscriptRequestIsExternal: Boolean = false,
@@ -171,14 +180,6 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         val streamSupportsProjection: Boolean = false,
         /** Raw live text, retained separately from rendered markdown so batches append exactly once. */
         val liveText: Map<String, String> = emptyMap(),
-        /**
-         * Text parts that were streaming when the stream had a gap (a reconnect, or the requests
-         * connection dropping): their deltas from before the gap are gone and the server doesn't
-         * replay them, so later deltas would rebuild only the tail. These keep the text already
-         * shown and wait for the part's end, which carries the whole text. Android-only: iOS
-         * restarts the accumulator and shows only the tail until the part ends.
-         */
-        val gappedLiveText: Set<String> = emptySet(),
         val projectedMessageIDs: Set<String> = emptySet(),
         val lastProjectedMessageID: String? = null,
         val resync: ResyncState? = null,
@@ -232,6 +233,8 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         val deliveryOverrides: Map<String, OpenCodeDelivery> = emptyMap(),
         /** Sends the server never took, in the order they failed. */
         val failedSends: List<FailedSend> = emptyList(),
+        /** The failed send whose Move to is on its way; Move to and Retry wait. */
+        val movingFailedSendID: String? = null,
         /** Prompt IDs whose client-rendered parts have not appeared in an authoritative window yet. */
         val optimisticPromptIDs: Set<String> = emptySet(),
         /** Durable per-message echoes waiting for a page that includes them. */
@@ -296,6 +299,8 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         val callsFromRoot: Boolean = false,
         /** A pushed subagent covers this screen. */
         val isCovered: Boolean = false,
+        /** Something sits over the transcript (a pushed subagent, its browser, Settings): what arrives isn't in front of the reader. */
+        val isTranscriptCovered: Boolean = false,
         /** The in-app browser over this session (Experimental). */
         val browser: BrowserFeature.State = BrowserFeature.State(),
         /** A link tap waiting on the system to say whether an app claims it. */
@@ -307,6 +312,7 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         val hideModelsExperiment: Shared<Boolean> = shared(ExperimentalFeature.hideModels.key),
         val recentModelIDs: Shared<List<String>> = shared(SharedKeys.recentModelIDs),
         val modelVariants: Shared<Map<String, String>> = shared(SharedKeys.modelVariants),
+        val modelDisplayNamesByServer: Shared<Map<String, ModelDisplayNames>> = shared(ModelDisplayNames.modelDisplayNamesByServer),
         val voiceModeEnabled: Shared<Boolean> = shared(SharedKeys.voiceModeEnabled),
         val openAIAPIKey: Shared<String?> = shared(SharedKeys.openAIAPIKey),
         val xaiAPIKey: Shared<String?> = shared(SharedKeys.xaiAPIKey),
@@ -315,6 +321,7 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         val serverVoiceProvider: Shared<ServerVoiceProvider> = shared(VoiceSharedKeys.serverVoiceProvider),
         val voiceServer: Shared<VoiceServerChoice> = shared(VoiceSharedKeys.voiceServerChoice),
         val serverVoiceSupportByServer: Shared<Map<String, ServerVoiceSupport>> = shared(VoiceSharedKeys.serverVoiceSupportByServer),
+        val voiceModelsByServer: Shared<Map<String, ServerVoiceModelsAnswer>> = shared(VoiceSharedKeys.voiceModelsByServer),
         val uploadUnsupportedServerIDs: Shared<Set<String>> = shared(SharedKeys.uploadUnsupportedServerIDs),
         val returnKeySends: Shared<Boolean> = shared(SharedKeys.returnKeySends),
         /**
@@ -365,6 +372,8 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
             val modelChanged: Boolean = false,
             /** A revert was staged, redone, or committed while it was on its way. */
             val revertChanged: Boolean = false,
+            /** The session moved folders while this read was in flight (iOS `directoryChanged`). */
+            val directoryChanged: Boolean = false,
         )
 
         // region Nested types of iOS `SessionFeature+State.swift`
@@ -432,6 +441,7 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
             fun session(
                 server: OpenCodeServer,
                 session: OpenCodeSession,
+                projects: List<OpenCodeProject> = emptyList(),
                 cachedItems: List<OpenCodeTranscriptItem>? = null,
                 initialTranscriptRequestIsExternal: Boolean = false,
                 isRunning: Boolean = false,
@@ -444,6 +454,8 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
                     navigationID = navigationID,
                     visit = visit ?: navigationID,
                     session = session,
+                    // Every screen knows its projects, so a session whose folder is gone can offer a move.
+                    projects = projects,
                     familySessions = listOf(session),
                     familyRootID = session.id,
                     activeFamilySessionIDs = if (isRunning) setOf(session.id) else emptySet(),
@@ -537,13 +549,6 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         data class NewMessagesPassed(val generation: Int) : Action
         /** Everything the mark covered fit on screen. */
         data class NewMessagesFit(val generation: Int) : Action
-        /** The New Messages Divider experiment was switched on or off. */
-        data class NewMessagesDividerChanged(val isOn: Boolean) : Action
-        /** The Since You Left experiment was switched on or off. */
-        data class SinceYouLeftChanged(val isOn: Boolean) : Action
-        data object SinceYouLeftTapped : Action
-        data class SinceYouLeftChunkReceived(val sessionID: String, val lastItemID: String, val text: String) : Action
-        data class SinceYouLeftFinished(val sessionID: String, val lastItemID: String, val fallback: String) : Action
         data object ShowEarlierTapped : Action
         data object FillEarlierHistory : Action
         data class EarlierHistoryResponse(
@@ -640,8 +645,6 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         data class ModelLevelPicked(val model: OpenCodeModel, val level: String?) : Action
         /** Scrubs or adjusts a model's remembered reasoning level in place. */
         data class ModelRowLevelChanged(val model: OpenCodeModel, val level: String?) : Action
-        /** Return in the picker's search field: picks the top match and any level word. */
-        data object ModelSearchSubmitted : Action
         /** A reasoning variant for the current model; null is its default. */
         data class VariantPicked(val variant: String?) : Action
         data class ToggleFavoriteModel(val model: OpenCodeModel) : Action
@@ -660,6 +663,8 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         data class ProjectPicked(val project: OpenCodeProject) : Action
         /** A recent project above a draft's composer was tapped. */
         data class DraftProjectTapped(val project: OpenCodeProject) : Action
+        /** A starter prompt was tapped: it's typed into the composer, not sent. */
+        data class StarterPromptTapped(val text: String) : Action
         /** Swaps the family member on screen in place. */
         data class FamilyPicked(val sessionID: String) : Action
         /** A subagent's card or row was tapped: Home pushes it over this screen. */
@@ -693,6 +698,12 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         /** Put a failed message's text and attachments back in the composer. */
         data class FailedSendEditTapped(val id: String) : Action
         data class FailedSendDeleteTapped(val id: String) : Action
+        /** Folder gone: move to `missingFolderMoveTarget`, then send again. */
+        data class FailedSendMoveTapped(val id: String) : Action
+        data class MissingFolderMoved(val sessionID: String, val messageID: String, val directory: String) : Action
+        data class MissingFolderMoveFailed(val sessionID: String, val messageID: String, val error: OpenCodeClientError) : Action
+        /** A family session now lives in [directory] (this phone's move or `session.moved`). */
+        data class SessionMoved(val sessionID: String, val directory: String) : Action
         /** A run error's action: Try Again, Edit, Compact, or Switch Model. */
         data class RunErrorActionTapped(val action: OpenCodeRunError.Action) : Action
         /** Edit's undo landed (or failed): the message's words go back to the composer. */
@@ -763,14 +774,16 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
 
             fun permissionReplyTapped(id: String, reply: OpenCodePermissionReply, message: String? = null): Action =
                 RequestDock(RequestDockFeature.Action.PermissionReplyTapped(id, reply, message))
-            fun requestResponseFinished(sessionID: String, requestID: String, error: OpenCodeClientError?): Action =
-                RequestDock(RequestDockFeature.Action.ResponseFinished(sessionID, requestID, error))
+            fun requestResponseFinished(sessionID: String, requestID: String, error: OpenCodeClientError?, dismissal: Boolean = false): Action =
+                RequestDock(RequestDockFeature.Action.ResponseFinished(sessionID, requestID, error, dismissal))
             fun reviewRequestSelected(id: String): Action = RequestDock(RequestDockFeature.Action.ReviewRequestSelected(id))
             fun requestSheetTapped(id: String): Action = RequestDock(RequestDockFeature.Action.SheetTapped(id))
             val refreshRequestsTapped: Action get() = RequestDock(RequestDockFeature.Action.RefreshTapped)
             val requestsAutoRetry: Action get() = RequestDock(RequestDockFeature.Action.AutoRetry)
             fun questionPageChanged(requestID: String, index: Int): Action =
                 RequestDock(RequestDockFeature.Action.QuestionPageChanged(requestID, index))
+            fun requestCollapseChanged(requestID: String, collapsed: Boolean): Action =
+                RequestDock(RequestDockFeature.Action.CollapseChanged(requestID, collapsed))
             fun formValueChanged(formID: String, key: String, value: OpenCodeFormValue?): Action =
                 RequestDock(RequestDockFeature.Action.FormValueChanged(formID, key, value))
             fun formSubmitTapped(id: String): Action = RequestDock(RequestDockFeature.Action.FormSubmitTapped(id))
@@ -805,7 +818,8 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
 
     /** iOS `SessionFeature.Action.Delegate`: list-level changes Home owns. */
     sealed interface Delegate {
-        data class OpenSession(val session: OpenCodeSession) : Delegate
+        /** [toolID]: a voice open (`android_voice_open_session`) App authorized; Home navigates only for it. */
+        data class OpenSession(val session: OpenCodeSession, val toolID: String? = null) : Delegate
         /** Push a subagent of this session's family over this screen. */
         data class OpenSubagent(val session: OpenCodeSession) : Delegate
         /** Titles for linked session IDs the family doesn't hold. */
@@ -861,6 +875,8 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         val forms: List<ai.opencode.server.model.OpenCodeFormRequest>,
         val formAnswers: Map<String, Map<String, OpenCodeFormValue>>,
         val questionPageIndices: Map<String, Int>,
+        /** Docked questions left dragged down to their bar. */
+        val collapsedRequests: Set<String> = emptySet(),
         val hasLoadedRequests: Boolean,
         val completedRequests: Set<String>,
         /** The docked request the reader pinned (`selectedRequestID`). */
@@ -876,8 +892,10 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         val movedWorkKeys: Set<String>,
         /** What was on screen as the reader left, for the New divider. */
         val seenItemIDs: Set<String>,
-        val leftAt: Instant? = null,
-        val sinceYouLeftCache: Map<String, SinceYouLeft.CacheEntry> = emptyMap(),
+        /** Something they hadn't seen was still there as they left. */
+        val hasUnseenItems: Boolean = false,
+        /** The request bar's unsent answers, the one on screen included. */
+        val answerDrafts: Map<String, String> = emptyMap(),
     ) {
         companion object
     }
@@ -903,6 +921,7 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         data object FamilyRefresh : CancelID
         data object Shells : CancelID
         data object Revert : CancelID
+        data object MissingFolderMove : CancelID
         data class Interrupt(val generation: Int) : CancelID
         data class InterruptSettle(val generation: Int) : CancelID
         data class RunEndCheck(val generation: Int) : CancelID
@@ -914,7 +933,6 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         data object ResyncMinimum : CancelID
         data object VoiceExit : CancelID
         data object VoiceViewing : CancelID
-        data object SinceYouLeft : CancelID
         data object AutocompleteCatalog : CancelID
         data object AutocompleteCommands : CancelID
         data object AutocompleteFiles : CancelID
@@ -964,6 +982,8 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
     internal val promptOutbox by Dependency(PromptOutbox)
     internal val sessionNotifications by Dependency(SessionNotificationsClient)
     internal val haptics by Dependency(HapticsClient)
+    internal val soundEffects by Dependency(SoundEffectsClient)
+    internal val mediaReferences by Dependency(MediaReferenceClient)
     internal val sceneWindow by Dependency(SceneWindowClient)
     internal val markdownStream by Dependency(MarkdownStreamClient)
     internal val dictation by Dependency(DictationClient)
@@ -975,259 +995,16 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
     internal val pasteboard by Dependency(PasteboardClient)
     internal val universalLinks by Dependency(UniversalLinkClient)
     internal val experimentalFeatures by Dependency(ExperimentalFeatures)
-    internal val sinceYouLeftClient by Dependency(SinceYouLeftClient)
     internal val sessionTimers by Dependency(SessionTimers)
 
     // endregion
 
     // region Body
 
-    /** iOS `reduceCore`: the ordered core steps; the first that takes the action wins. */
-    internal fun reduceCore(state: State, action: Action): Reduced<State, Action> {
-        for (step in coreSteps) {
-            step(this, state, action)?.let { return it }
-        }
-        return Reduced(state)
-    }
-
-    private object ShellOutputSlot
-    private object FolderBrowserSlot
-    private object VoiceSlot
-
-    /** Double optional for the call's viewing page (iOS `VoiceViewingPage??`). */
-    private data class ViewingBox(val page: VoiceViewingPage?)
-
-    private val coreReducers: Reducer<State, Action> by lazy {
-        Reducer<State, Action> { state, action -> reduceCore(state, action) }
-            .onChange({ state -> if (state.offersManualMoveToBackground) state.foregroundWork else null }) { _, _, state ->
-                scheduleBackgroundHint(state)
-            }
-            // One place cancels superseded run-state work: Stop's retries and reads, the read
-            // after a run's end, and Send Now's wake.
-            .onChange({ it.runWorkGeneration }) { old, _, state ->
-                Reduced(
-                    state,
-                    Effect.cancel(
-                        listOf(CancelID.Interrupt(old), CancelID.InterruptSettle(old), CancelID.RunEndCheck(old), CancelID.StrandedSteer(old)),
-                    ),
-                )
-            }
-            // In the action that starts or ends a run, so the transcript's first frame after it
-            // already has Starting Up or the finale.
-            .onChange({ it.workingRunSignal }) { old, new, state ->
-                val finale = state.workingRun.finale
-                val updated = state.updateWorkingRun(old)
-                val next = updated.workingRun.finale
-                val event: String? = if (new.isRunning != old.isRunning) {
-                    when {
-                        new.isRunning -> "start"
-                        next != null && next != finale -> if (next.kind == WorkingRun.Finale.Kind.pending) "pending" else "finale"
-                        else -> "end"
-                    }
-                } else if (next != null && next != finale && finale?.kind == WorkingRun.Finale.Kind.pending) {
-                    "finale"
-                } else {
-                    null
-                }
-                if (event != null) LabMarks.mark("working_run:$event", sessionID = new.sessionID)
-                Reduced(updated)
-            }
-    }
-
-    private val streamChain: Reducer<State, Action> by lazy {
-        coreReducers
-            // A queued send's message started with its pick still waiting.
-            .onChange({ it.queuedPickDue }) { _, _, state -> applyDueModelPick(state) }
-            .onChange({ it.queuedAgentPickDue }) { _, _, state -> applyDueAgentPick(state) }
-    }
-
-    private val coreChain: Reducer<State, Action> by lazy {
-        var reducer: Reducer<State, Action> = streamChain
-        reducer = ifLet(
-            id = ShellOutputSlot,
-            parent = reducer,
-            state = { it.shellOutput },
-            setState = { s, c -> s.copy(shellOutput = c) },
-            action = { (it as? Action.ShellOutput)?.action },
-            embed = Action::ShellOutput,
-            child = ShellOutputFeature(),
-        )
-        // Plain optional: `sessionSheet` runs header `…` menu actions and confirmations while the
-        // sheet is closed and keeps in-flight fork/export work alive across sheet dismissal.
-        reducer = ifLet(
-            parent = reducer,
-            state = { it.sessionSheet },
-            setState = { s, c -> s.copy(sessionSheet = c) },
-            action = { (it as? Action.SessionSheet)?.action },
-            embed = Action::SessionSheet,
-            child = SessionSheetFeature(),
-        )
-        reducer = ifLet(
-            id = FolderBrowserSlot,
-            parent = reducer,
-            state = { it.folderBrowser },
-            setState = { s, c -> s.copy(folderBrowser = c) },
-            action = { (it as? Action.FolderBrowser)?.action },
-            embed = Action::FolderBrowser,
-            child = FolderBrowserFeature(),
-        )
-        ifLet(
-            id = VoiceSlot,
-            parent = reducer,
-            state = { it.voice },
-            setState = { s, c -> s.copy(voice = c) },
-            action = { (it as? Action.Voice)?.action },
-            embed = Action::Voice,
-            child = VoiceFeature(),
-        )
-    }
-
-    private val sessionReducers: Reducer<State, Action> by lazy {
-        val core = coreChain
-        combine(
-            bindingReducer,
-            scope(
-                state = State::browser,
-                setState = { s, c -> s.copy(browser = c) },
-                action = { (it as? Action.Browser)?.action },
-                embed = Action::Browser,
-                child = BrowserFeature(),
-            ),
-            scope(
-                state = State::dictation,
-                setState = { s, c -> s.copy(dictation = c) },
-                action = { (it as? Action.Dictation)?.action },
-                embed = Action::Dictation,
-                child = DictationFeature,
-            ),
-            scope(
-                state = State::requestDock,
-                setState = { s, c -> s.copy(requestDock = c) },
-                action = { (it as? Action.RequestDock)?.action },
-                embed = Action::RequestDock,
-                child = RequestDockFeature<DraftState>(),
-            ),
-            scope(
-                state = State::composerAttachments,
-                setState = { s, c -> s.copy(composerAttachments = c) },
-                action = { (it as? Action.ComposerAttachments)?.action },
-                embed = Action::ComposerAttachments,
-                child = ComposerAttachmentsFeature(),
-            ),
-            Reducer { state, action ->
-                when {
-                    action is Action.ShellOutput && state.shellOutput == null -> Reduced(state)
-                    action is Action.SessionSheet && state.sessionSheet == null -> Reduced(state)
-                    action is Action.FolderBrowser && state.folderBrowser == null -> Reduced(state)
-                    action is Action.Voice && state.voice == null -> Reduced(state)
-                    else -> core.reduce(state, action)
-                }
-            },
-        )
-    }
-
-    private val fullBody: Reducer<State, Action> by lazy {
-        sessionReducers
-            // A pending request takes the composer as its answer and gives it back as it was
-            // (D-31 B); paging or switching requests moves the bar's words.
-            .onChange({ it.answerContext }) { old, _, state -> reconcileAnswering(old, state) }
-            .onChange({ it.persistedComposerWatch }) { old, _, state -> reconcilePersistedComposer(old, state) }
-            // Each admission and answer of a voice prompt re-reads the pinned session and retunes
-            // the watchdog, as a typed send and its reply do.
-            .onChange({ it.voice?.admittedPromptIDs ?: emptyList() }) { _, _, state ->
-                val session = state.session
-                if (session == null || state.voice?.target?.sessionID != session.id) return@onChange Reduced(state)
-                val watched = watchdog(state)
-                Reduced(watched.state, Effect.merge(Effect.send(Action.RefreshRequested(RefreshReason.RunState)), watched.effect))
-            }
-            // The call mirrors whether the family is blocked on a native approval the call cannot settle.
-            .onChange({ state ->
-                val voice = state.voice
-                if (voice == null || voice.target.sessionID != state.session?.id) null else state.hasPendingRequests
-            }) { _, _, state ->
-                val needsInput = state.hasPendingRequests
-                Reduced(state.copy(voice = state.voice?.copy(targetNeedsInput = needsInput)))
-            }
-            // A compaction in the call's session drops the delegation header from its context, so
-            // the next delegation explains itself again (D4a).
-            .onChange({ it.voiceCompaction }) { _, _, state ->
-                val mark = state.voiceCompaction ?: return@onChange Reduced(state)
-                Reduced(state, Effect.send(Action.voicePresented(VoiceFeature.Action.CompactionObserved(mark))))
-            }
-            // The call hears which page is open over the session. Debounced, so a burst of
-            // navigation sends one update; scrolling sends none.
-            .onChange({ state ->
-                val voice = state.voice
-                if (voice == null || voice.target.sessionID != state.session?.id) null else ViewingBox(state.browser.viewing)
-            }) { _, _, state ->
-                // Nothing to say when the call already knows (a call starting with no page).
-                val voice = state.voice ?: return@onChange Reduced(state, Effect.cancel(CancelID.VoiceViewing))
-                if (voice.viewing == state.browser.viewing) return@onChange Reduced(state)
-                val page = state.browser.viewing
-                val clock = clock
-                Reduced(
-                    state,
-                    Effect.run<Action> { send ->
-                        clock.sleep(600.milliseconds)
-                        send(Action.voicePresented(VoiceFeature.Action.ViewingChanged(page)))
-                    }.cancellable(CancelID.VoiceViewing, cancelInFlight = true),
-                )
-            }
-            // A call on a draft creates its session with the draft's model; on a session, its next
-            // delegation applies a pick still waiting.
-            .onChange({ it.sendModel }) { _, _, state ->
-                val synced = state.syncVoiceModel()
-                Reduced(synced.copy(sessionSheet = synced.sessionSheet?.copy(pendingModel = synced.pendingModel)))
-            }
-            // When the attached session gets a generated or edited title, tell the voice model.
-            .onChange({ VoiceSessionName(it.voice?.target?.sessionID, it.voice?.sessionTitle) }) { old, _, state ->
-                val sessionID = state.voice?.target?.sessionID
-                val title = state.voice?.sessionTitle
-                if (sessionID == null || old.sessionID != sessionID || title == null || old.title == title) {
-                    Reduced(state)
-                } else {
-                    Reduced(state, Effect.send(Action.voicePresented(VoiceFeature.Action.SessionRenamed(title))))
-                }
-            }
-    }
-
     /** iOS `builtBody`: content batches and family run changes skip the full body's hooks (the stream fast path). */
-    private val builtBody: Reducer<State, Action> by lazy {
-        val full = fullBody
-        val stream = streamChain
-        Reducer { state, action ->
-            when (action) {
-                is Action.ContentBatch, is Action.FamilyRunStateChanged -> stream.reduce(state, action)
-                else -> full.reduce(state, action)
-            }
-        }
-    }
+    private val builtBody: Reducer<State, Action> by lazy { composedBody() }
 
     override fun reduce(state: State, action: Action): Reduced<State, Action> = builtBody.reduce(state, action)
 
     // endregion
 }
-
-/**
- * Background timers `SessionFeature` starts on its own. Live sessions run all three; reducer
- * tests opt into the ones they exercise so unrelated tests do not inherit background loops.
- */
-@Serializable
-data class SessionTimers(
-    val watchdog: Boolean = true,
-    val runEndCheck: Boolean = true,
-    val requestRetry: Boolean = true,
-) {
-    companion object Key : DependencyKey<SessionTimers> {
-        override val liveValue = SessionTimers()
-        override val testValue = SessionTimers(watchdog = false, runEndCheck = false, requestRetry = false)
-    }
-}
-
-/** Case-insensitive multi-field filter used by the picker sheets (iOS `Array.filtered(by:fields:)`). */
-fun <T> List<T>.filtered(query: String, fields: (T) -> List<String>): List<T> {
-    val trimmed = query.trim()
-    if (trimmed.isEmpty()) return this
-    return filter { element -> fields(element).any { it.contains(trimmed, ignoreCase = true) } }
-}
-

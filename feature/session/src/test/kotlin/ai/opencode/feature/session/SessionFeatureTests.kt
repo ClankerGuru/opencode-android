@@ -757,7 +757,7 @@ class SessionFeatureTests {
         val store = h.store(state)
 
         store.send(Action.PendingRequestsResponse(sessionID = session.id, result = Result.success(OpenCodePendingRequests(permissions = emptyList())))) {
-            it.withRequestFailureAwaitingReconnect(false).withRequestLoadError(null)
+            it.withRequestFailureAwaitingReconnect(false).withRequestLoadError(null).withRequestArrivalsAreLive(true)
         }
         assertNull(store.state.settledRequestLoadError)
     }

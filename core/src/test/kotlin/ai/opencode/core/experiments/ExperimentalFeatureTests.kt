@@ -1,7 +1,11 @@
 package ai.opencode.core.experiments
 
 import ai.opencode.core.dependencies.DependencyValues
+import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.sharing.SharedKey
 import ai.opencode.core.sharing.SharedKeys
+import ai.opencode.core.sharing.InMemorySharedBytes
+import ai.opencode.core.sharing.SharedStore
 import ai.opencode.core.sharing.experimental
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.testing.TestIsolationRule
@@ -12,12 +16,27 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/** Port of iOS `ExperimentalFeatureTests`. */
+/**
+ * Port of iOS `ExperimentalFeatureTests`. `theSessionsPageDividerSwitchKeepsTheSavedChoice`
+ * drives `HomeSettingsFeature`, so it's in `:feature:settings`' `ExperimentalFeatureTests`.
+ */
 class ExperimentalFeatureTests {
     @get:Rule val isolation = TestIsolationRule()
 
     /** iOS `withDependencies { $0.defaultAppStorage = fresh }`: a fresh test container's storage. */
     private fun <R> withFreshStorage(block: () -> R): R = DependencyValues.withValues(DependencyValues.testing(), block)
+
+    /**
+     * iOS `defaults.set(_:forKey:)` on a fresh suite: a raw saved value, written even when it
+     * equals the key's default (a nullable key, so `false` is stored rather than skipped).
+     */
+    private fun SharedStore.save(id: String, value: Boolean) = reference(SharedKey.appStorage<Boolean?>(id, null)).set(value)
+
+    /** iOS `defaults.object(forKey:) != nil`. */
+    private fun SharedStore.has(id: String) = contains(SharedKey.appStorage<Boolean?>(id, null))
+
+    /** iOS `defaults.bool(forKey:)`. */
+    private fun SharedStore.bool(id: String) = reference(SharedKey.appStorage(id, false)).value
 
     @Test
     fun experimentsAreOffByDefaultAndPersistUnderAStableKey() {
@@ -28,14 +47,32 @@ class ExperimentalFeatureTests {
             inAppBrowser.set(true)
             assertTrue(ExperimentalFeatures.liveValue(ExperimentalFeature.inAppBrowser))
             assertEquals("The key is the phone's saved choice: never rename it", "experimental-in-app-browser", inAppBrowser.key.id)
+            assertTrue(dependency(SharedStore).has("experimental-in-app-browser"))
         }
         assertFalse(ExperimentalFeatures.testValue(ExperimentalFeature.inAppBrowser))
         assertTrue(ExperimentalFeatures.enabling(setOf(ExperimentalFeature.inAppBrowser))(ExperimentalFeature.inAppBrowser))
     }
 
+    /** No experiment starts on: graduated features have no switch at all. */
+    @Test
+    fun everyExperimentIsOffUntilSwitchedOn() {
+        withFreshStorage {
+            for (feature in ExperimentalFeature.allCases) {
+                assertFalse("$feature starts off", ExperimentalFeatures.liveValue(feature))
+            }
+        }
+    }
+
+    /** Welcome Preview moved to Developer › Playgrounds; it's not in the pane. */
+    @Test
+    fun welcomePreviewLeftExperimental() {
+        assertEquals(listOf(ExperimentalFeature.welcomePreview), ExperimentalFeature.allCases.filter { it.isGraduated })
+        assertFalse(ExperimentalGroup.entries.flatMap { it.features }.contains(ExperimentalFeature.welcomePreview))
+    }
+
     @Test
     fun everyExperimentHasACopyForSettings() {
-        for (feature in ExperimentalFeature.entries) {
+        for (feature in ExperimentalFeature.allCases) {
             assertTrue(feature.title.isNotEmpty())
             assertTrue(feature.summary.isNotEmpty())
             assertFalse("One line, no trailing period", feature.summary.endsWith("."))
@@ -47,87 +84,99 @@ class ExperimentalFeatureTests {
     @Test
     fun everyExperimentSitsInOneGroupInAStableOrder() {
         assertEquals(listOf(ExperimentalGroup.composer, ExperimentalGroup.calls, ExperimentalGroup.transcript, ExperimentalGroup.drawer), ExperimentalGroup.entries)
-        assertEquals(ExperimentalFeature.entries.toSet(), ExperimentalGroup.entries.flatMap { it.features }.toSet())
         assertEquals(
-            listOf(ExperimentalFeature.composerAutocomplete, ExperimentalFeature.plusMenuSheet, ExperimentalFeature.agentSelection, ExperimentalFeature.hideModels),
+            ExperimentalFeature.allCases.filter { !it.isGraduated }.toSet(),
+            ExperimentalGroup.entries.flatMap { it.features }.toSet(),
+        )
+        assertEquals(
+            listOf(ExperimentalFeature.onePicker, ExperimentalFeature.agentSelection, ExperimentalFeature.hideModels),
             ExperimentalGroup.composer.features,
         )
         assertEquals(
-            listOf(ExperimentalFeature.callTray, ExperimentalFeature.floatingCall, ExperimentalFeature.livingOrb, ExperimentalFeature.serverVoice, ExperimentalFeature.backgroundCallIntent),
+            listOf(
+                ExperimentalFeature.serverVoice, ExperimentalFeature.backgroundCallIntent, ExperimentalFeature.voiceSessionDelegator,
+                ExperimentalFeature.shareScreenWithAgents, ExperimentalFeature.openLinksFromCalls, ExperimentalFeature.audioInCalls,
+            ),
             ExperimentalGroup.calls.features,
         )
+        assertEquals(listOf(ExperimentalFeature.inAppBrowser), ExperimentalGroup.transcript.features)
         assertEquals(
-            "Call Style writes the other two",
-            listOf(ExperimentalFeature.livingOrb, ExperimentalFeature.serverVoice, ExperimentalFeature.backgroundCallIntent),
-            ExperimentalGroup.calls.toggles,
-        )
-        assertEquals(
-            listOf(ExperimentalFeature.newMessagesDivider, ExperimentalFeature.sinceYouLeft, ExperimentalFeature.imageLinkPreviews, ExperimentalFeature.inAppBrowser),
-            ExperimentalGroup.transcript.features,
-        )
-        assertEquals(
-            listOf(ExperimentalFeature.projectIcons, ExperimentalFeature.sessionSwitcher, ExperimentalFeature.serverTitleSwitch, ExperimentalFeature.serverDetails),
+            listOf(
+                ExperimentalFeature.inboxSidebar, ExperimentalFeature.serverDetails,
+                ExperimentalFeature.sessionLiveActivity, ExperimentalFeature.soundEffects,
+            ),
             ExperimentalGroup.drawer.features,
         )
         assertEquals(listOf("Composer", "Calls", "Transcript", "Drawer"), ExperimentalGroup.entries.map { it.title })
     }
 
+    /** Removed experiments and ones now always on (p217) leave no switch behind, whatever was saved. */
     @Test
-    fun modelPickerStyleReplacesTheTwoModelPickerSwitches() {
-        assertEquals(listOf("Today", "Sheet", "Grow from Composer"), ModelPickerStyle.entries.map { it.title })
-        assertEquals(ModelPickerStyle.today, ModelPickerStyle.of(newModelPicker = false, customModelPicker = false))
-        assertEquals(ModelPickerStyle.sheet, ModelPickerStyle.of(newModelPicker = true, customModelPicker = false))
-        assertEquals(ModelPickerStyle.growFromComposer, ModelPickerStyle.of(newModelPicker = false, customModelPicker = true))
-        assertEquals(
-            "Custom Model Picker won when both were on",
-            ModelPickerStyle.growFromComposer,
-            ModelPickerStyle.of(newModelPicker = true, customModelPicker = true),
+    fun removedExperimentsLeaveNoSwitchBehind() {
+        val retired = listOf(
+            "session-switcher", "server-title-switch",
+            "composer-autocomplete", "server-flow", "plus-menu-sheet", "project-icons",
+            "floating-call", "call-tray", "image-link-previews", "living-orb", "new-messages-divider",
         )
-        for (style in ModelPickerStyle.entries) {
-            assertTrue(style.summary.split(" ").size <= 6)
+        val leftovers = listOf(
+            "experimental-all-saved-living-orb", "experimental-all-skip-image-link-previews",
+            "call-style-migrated-living-orb", "call-style-migrated-orb-default",
+        )
+        withFreshStorage {
+            val defaults = dependency(SharedStore)
+            for ((index, name) in retired.withIndex()) {
+                defaults.save("experimental-$name", index % 2 == 0)
+            }
+            defaults.save("experimental-in-app-browser", true)
+            for (name in retired) {
+                assertNull(name, ExperimentalFeature.fromRawValue(name))
+            }
+            for (key in leftovers) {
+                defaults.save(key, true)
+            }
+            ExperimentalFeature.removeRetiredSwitches(defaults)
+            for (name in retired) {
+                assertFalse(name, defaults.has("experimental-$name"))
+            }
+            for (key in leftovers) {
+                assertFalse(key, defaults.has(key))
+            }
+            assertTrue("Live experiments keep their switch", defaults.bool("experimental-in-app-browser"))
         }
     }
 
-    /**
-     * Android's `migrateLegacySwitches` is a pure function of what the caller read (the stored
-     * style and the two legacy switches, null when absent); the caller writes the result and
-     * removes the switches, so iOS's "no leftovers" half is the caller's.
-     */
     @Test
-    fun modelPickerStyleMigratesTheOldSwitchesOnce() {
-        fun migrated(stored: ModelPickerStyle? = null, sheet: Boolean? = null, grow: Boolean? = null): String? =
-            ModelPickerStyle.migrateLegacySwitches(stored, sheet, grow)?.rawValue ?: stored?.rawValue
-        assertNull(migrated())
-        assertEquals("sheet", migrated(sheet = true))
-        assertEquals("grow-from-composer", migrated(sheet = true, grow = true))
-        assertNull(migrated(grow = false))
-        assertEquals("A style already chosen stays", "today", migrated(stored = ModelPickerStyle.today, grow = true))
-    }
-
-    @Test
-    fun labExperimentsPickAModelPickerStyle() {
-        assertNull(ModelPickerStyle.labStyle(""))
-        assertNull(ModelPickerStyle.labStyle("in-app-browser"))
-        assertEquals(ModelPickerStyle.sheet, ModelPickerStyle.labStyle("model-picker=sheet"))
-        assertEquals(ModelPickerStyle.growFromComposer, ModelPickerStyle.labStyle("in-app-browser,model-picker=grow-from-composer"))
-        assertEquals(ModelPickerStyle.today, ModelPickerStyle.labStyle("model-picker=today,custom-model-picker"))
-        assertEquals(ModelPickerStyle.sheet, ModelPickerStyle.labStyle("new-model-picker"))
-        assertEquals(ModelPickerStyle.growFromComposer, ModelPickerStyle.labStyle("custom-model-picker"))
-        assertEquals(ModelPickerStyle.growFromComposer, ModelPickerStyle.labStyle("new-model-picker,custom-model-picker"))
-    }
-
-    @Test
-    fun callStyleMapsOntoTheTwoCallExperiments() {
-        assertEquals(ExperimentalCallStyle.standard, ExperimentalCallStyle.of(callTray = false, floatingCall = false))
-        assertEquals(ExperimentalCallStyle.floating, ExperimentalCallStyle.of(callTray = false, floatingCall = true))
-        assertEquals(ExperimentalCallStyle.tray, ExperimentalCallStyle.of(callTray = true, floatingCall = false))
-        assertEquals("Call Tray wins when both are on", ExperimentalCallStyle.tray, ExperimentalCallStyle.of(callTray = true, floatingCall = true))
-        for (style in ExperimentalCallStyle.entries) {
-            assertEquals(style, ExperimentalCallStyle.of(style.callTray, style.floatingCall))
-            assertFalse("Choosing a style leaves at most one switch on", style.callTray && style.floatingCall)
-            assertTrue(style.summary.split(" ").size <= 6)
+    fun aSavedSheetOrGrowBecomesOnePickerOnce() {
+        fun migrated(setup: (SharedStore) -> Unit): Pair<Boolean, Boolean> = withFreshStorage {
+            val defaults = dependency(SharedStore)
+            setup(defaults)
+            ExperimentalFeature.migrateModelPicker(defaults)
+            val keys = listOf(LEGACY_MODEL_PICKER_KEY) + legacyModelPickerSwitchKeys
+            var leftover = false
+            for (key in keys) {
+                if (defaults.contains(SharedKey.appStorage<String?>(key, null))) leftover = true
+            }
+            defaults.bool("experimental-one-picker") to leftover
         }
-        assertEquals(listOf("Standard", "Floating", "Tray"), ExperimentalCallStyle.entries.map { it.title })
+        fun SharedStore.saveStyle(style: String) = reference(SharedKey.appStorage<String?>(LEGACY_MODEL_PICKER_KEY, null)).set(style)
+
+        assertEquals(false to false, migrated { })
+        assertEquals(false to false, migrated { it.saveStyle("today") })
+        for (style in listOf("sheet", "one-picker", "grow-from-composer")) {
+            assertEquals(style, true to false, migrated { it.saveStyle(style) })
+        }
+        for (key in legacyModelPickerSwitchKeys) {
+            assertEquals(key, true to false, migrated { it.save(key, true) })
+            assertEquals(key, false to false, migrated { it.save(key, false) })
+        }
+        assertEquals(
+            "One Picker already on stays on",
+            true to false,
+            migrated {
+                it.saveStyle("today")
+                it.save("experimental-one-picker", true)
+            },
+        )
     }
 
     /** `VoiceAudioDemoMode` lives in `:feature:voice`; its half of this test belongs there. */

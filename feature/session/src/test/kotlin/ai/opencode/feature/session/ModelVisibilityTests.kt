@@ -1,5 +1,7 @@
 package ai.opencode.feature.session
 
+import ai.opencode.feature.composer.modelpicker.ModelPickerSection
+import ai.opencode.feature.composer.modelpicker.OnePickerCatalog
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.feature.session.SessionFeatureTestsSendingSupport.assertEquals
@@ -41,13 +43,27 @@ class ModelVisibilityTests {
         return state
     }
 
+    /** The sections One Picker lists, from the models the picker may show. */
+    private fun onePickerSections(state: State): List<ModelPickerSection> {
+        val picker = state.modelPicker
+        return OnePickerCatalog.sections(
+            models = picker.pickerModels,
+            favorites = picker.favoriteModelIDs,
+            recents = emptyList(),
+            currentModelID = null,
+            filter = picker.modelFilter,
+            recentLimit = 3,
+            showsAllModels = true,
+        )
+    }
+
     @Test
     fun experimentOffListsTheWholeCatalog() = sessionTest { h ->
         val state = h.sessionState(ModelVisibility(hiddenModelIDs = setOf(mini.id, basalt.id)), experiment = false)
         assertEquals(catalog, state.pickerModels)
         assertEquals(catalog, state.filteredModels)
         assertEquals(0, state.hiddenModelCount)
-        assertEquals(catalog, state.modelSheetSections(recents = emptyList(), recentLimit = 3).flatMap { it.models })
+        assertEquals(catalog, onePickerSections(state).flatMap { it.models })
     }
 
     @Test
@@ -58,7 +74,7 @@ class ModelVisibilityTests {
             this[OpenCodeClient] = this[OpenCodeClient].copy(modelCatalog = { _, _ -> OpenCodeModelCatalog(models = models, defaultModel = null) })
         }
         assertEquals(listOf(cirrus, mini), store.state.filteredModels, "Today")
-        assertEquals(listOf(cirrus, mini), store.state.modelSheetSections(recents = emptyList(), recentLimit = 3).flatMap { it.models }, "Sheet")
+        assertEquals(listOf(cirrus, mini), onePickerSections(store.state).flatMap { it.models }, "One Picker")
         assertEquals(2, store.state.hiddenModelCount)
 
         store.send(Action.ShowAllModelsToggled) { it.copy(showsAllModels = true) }
@@ -78,7 +94,7 @@ class ModelVisibilityTests {
         var state = h.sessionState(ModelVisibility(hiddenProviderIDs = setOf("opencode", "openrouter", "halcyon"))).copy(currentModel = null)
         assertNull(state.currentModelInfo)
         assertTrue(state.filteredModels.isEmpty())
-        assertTrue(state.modelSheetSections(recents = emptyList(), recentLimit = 3).isEmpty())
+        assertTrue(onePickerSections(state).isEmpty())
         assertEquals(catalog.size, state.hiddenModelCount, "The empty state gives way to Show All")
         state = state.copy(showsAllModels = true)
         assertEquals(catalog, state.filteredModels)

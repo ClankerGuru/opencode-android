@@ -39,8 +39,8 @@ interface AgentImageViewport {
     val imageViewportIsSettling: Boolean
     /** Covered session roots stay composed: a hidden or covered list doesn't hold previews. */
     val imageViewportIsVisible: Boolean
-    /** An image inside [marker]'s row ([AgentImageMarkerView.rowKey]) is about to change the row's height. */
-    fun imageContentRevised(marker: AgentImageMarkerView)
+    /** An image inside the row keyed [row] ([LocalAgentImageRow]) is about to change the row's height. */
+    fun imageContentRevised(row: Any?)
 }
 
 /** The list the markers below belong to (iOS: the marker's ancestor viewport). */
@@ -158,12 +158,18 @@ class AgentImageVisibility(private val previews: AgentImagePreviews) {
     /** An entry is about to change its layout: the rows showing it ease. */
     private fun revised(key: AgentImageKey) {
         for (marker in markers.toList()) {
-            if (marker.sighting?.key == key) viewport(marker)?.imageContentRevised(marker)
+            if (marker.sighting?.key == key) viewport(marker)?.imageContentRevised(marker.rowKey)
         }
     }
 
+    /** The row holding [marker] is about to change height for an image. */
     fun revised(marker: AgentImageMarkerView) {
-        viewport(marker)?.imageContentRevised(marker)
+        viewport(marker)?.imageContentRevised(marker.rowKey)
+    }
+
+    /** The row keyed [row] in [viewport] is about to change height for an image ([AgentImageRowAnchor]). */
+    fun revised(viewport: AgentImageViewport?, row: Any?) {
+        viewport?.takeIf { it in viewports }?.imageContentRevised(row)
     }
 
     companion object Key : DependencyKey<AgentImageVisibility> {
@@ -318,6 +324,36 @@ val LocalAgentImageRowGrowth = staticCompositionLocalOf<AgentImageRowGrowth?> { 
 
 /** The block a gallery is in, so it can report its growth (iOS `agentImageBlock`). */
 val LocalAgentImageBlock = staticCompositionLocalOf<Int?> { null }
+
+/**
+ * The place in an image row of a layout that changes the row's height itself (`ToolImageMosaic`;
+ * iOS `AgentImageRowAnchor`): [revised] marks the row before it does. Held in `remember`, never
+ * observed; [Placement] records the row it's composed in.
+ */
+class AgentImageRowAnchor {
+    private var viewport: AgentImageViewport? = null
+    private var row: Any? = null
+    private var visibility: AgentImageVisibility? = null
+
+    fun revised() {
+        visibility?.revised(viewport, row)
+    }
+
+    companion object {
+        /** Records the viewport and row the anchor is composed in (iOS `Placement`). */
+        @Composable
+        fun Placement(anchor: AgentImageRowAnchor) {
+            val viewport = LocalAgentImageViewport.current
+            val row = LocalAgentImageRow.current
+            val visibility = remember { dependency(AgentImageVisibility) }
+            SideEffect {
+                anchor.viewport = viewport
+                anchor.row = row
+                anchor.visibility = visibility
+            }
+        }
+    }
+}
 
 /**
  * Holds a preview's read while it's on screen (iOS `AgentImageMarkerView`). Lives behind the

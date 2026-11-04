@@ -23,10 +23,12 @@ import ai.opencode.feature.settings.SettingsPageScaffold
 import ai.opencode.feature.settings.SettingsRowFrame
 import ai.opencode.feature.settings.SettingsSection
 import ai.opencode.feature.settings.SettingsStore
+import ai.opencode.feature.settings.SettingsText
 import ai.opencode.feature.settings.SettingsValueRow
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.friendlyName
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -40,13 +42,11 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -62,6 +62,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -72,12 +73,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -172,22 +172,15 @@ private fun ConnectionCardContent(
     onEditServer: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val reduceMotion = rememberReduceMotion()
     val colors = OpenCodeTheme.colors
     val presentation = ConnectionStatusPresentation(monitor.display)
     val action = CardAction.of(presentation.status)
+    // Android divergence: a ripple answers the press (iOS shrinks the card to 97.5 % and tints it).
     val interaction = remember { MutableInteractionSource() }
-    val isPressed by interaction.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        if (isPressed && !reduceMotion) 0.975f else 1f,
-        if (isPressed) tween(120, easing = Motion.EaseOut) else MotionSpring.fromResponse(0.4, 0.72).spec(),
-        label = "ConnectionCardPress",
-    )
     val cardShape = RoundedCornerShape(ConnectionCardMetrics.cornerRadius)
     val wellShape = RoundedCornerShape(ConnectionCardMetrics.cornerRadius - ConnectionCardMetrics.boxInset)
     val wellFill = if (colors.isDark) Color.Black.copy(alpha = if (colors.highContrast) 0.5f else 0.32f) else colors.groupedCanvas
     val wellEdge = (if (colors.isDark) Color.White else Color.Black).copy(alpha = if (colors.highContrast) 0.16f else 0.06f)
-    val pressFill = colors.text.copy(alpha = if (isPressed) 0.06f else 0f)
     val accessibilityValue = listOf(presentation.spokenStatus, monitor.server.host, monitor.route.rawValue).joinToString(", ")
 
     // Where the inline action sits: reserved after the status, the real button drawn over the card
@@ -198,10 +191,6 @@ private fun ConnectionCardContent(
     Box(
         modifier
             .fillMaxWidth()
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
             .onGloballyPositioned { root = it },
     ) {
         Column(
@@ -209,8 +198,7 @@ private fun ConnectionCardContent(
                 .fillMaxWidth()
                 .clip(cardShape)
                 .background(colors.groupedCard)
-                .background(pressFill)
-                .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onOpen)
+                .clickable(interactionSource = interaction, indication = ripple(), role = Role.Button, onClick = onOpen)
                 .clearAndSetSemantics {
                     contentDescription = monitor.name
                     stateDescription = accessibilityValue
@@ -263,11 +251,12 @@ private fun ConnectionCardContent(
             val shown = remember { mutableStateOf(action) }
             if (action != null) shown.value = action
             shown.value?.let { current ->
-                // iOS `RetryStyle`: dims to 55 % while pressed; a 44 pt (here 48 dp) target.
+                // iOS `RetryStyle` with a 44 pt (here 48 dp) target. Android divergence: a ripple
+                // inside the capsule answers the press (iOS dims it to 55 %).
                 val actionInteraction = remember { MutableInteractionSource() }
-                val actionPressed by actionInteraction.collectIsPressedAsState()
                 RetryLabel(
                     title = current.title,
+                    interaction = actionInteraction,
                     modifier = Modifier
                         .clickable(interactionSource = actionInteraction, indication = null, role = Role.Button) {
                             when (current) {
@@ -275,8 +264,7 @@ private fun ConnectionCardContent(
                                 CardAction.editServer -> onEditServer()
                             }
                         }
-                        .openCodeTapTarget()
-                        .graphicsLayer { alpha = if (actionPressed) 0.55f else 1f },
+                        .openCodeTapTarget(),
                 )
             }
         }
@@ -540,11 +528,16 @@ private fun StatusGlyph(presentation: ConnectionStatusPresentation, color: Color
 
 /** The inline action's capsule (iOS `RetryLabel`): subheadline semibold on a faint fill, 30 tall. */
 @Composable
-private fun RetryLabel(title: String, modifier: Modifier = Modifier) {
+private fun RetryLabel(
+    title: String,
+    modifier: Modifier = Modifier,
+    interaction: MutableInteractionSource = remember { MutableInteractionSource() },
+) {
     Box(
         modifier
             .clip(RoundedCornerShape(50))
             .background(OpenCodeTheme.colors.text.copy(alpha = 0.11f))
+            .indication(interaction, ripple())
             .height(30.dp)
             .padding(horizontal = 14.dp),
         contentAlignment = Alignment.Center,
@@ -595,11 +588,11 @@ fun ServerPage(store: SettingsStore) {
                     contentDescription = "Address"
                     stateDescription = monitor.server.host
                 }) {
-                    Text("Address", style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text)
+                    Text("Address", style = SettingsText.title, color = OpenCodeTheme.colors.text)
                     SelectionContainer(Modifier.weight(1f)) {
                         Text(
                             monitor.server.host,
-                            style = OpenCodeTextStyles.body.copy(fontFamily = FontFamily.Monospace),
+                            style = SettingsText.title.copy(fontFamily = FontFamily.Monospace),
                             color = OpenCodeTheme.colors.secondaryText,
                             maxLines = 1,
                             overflow = TextOverflow.MiddleEllipsis,
@@ -689,10 +682,10 @@ private fun StatusRow(presentation: ConnectionStatusPresentation) {
         contentDescription = "Status"
         stateDescription = presentation.spokenStatus
     }) {
-        Text("Status", style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
+        Text("Status", style = SettingsText.title, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
             OpenCodeIcon(presentation.symbol, contentDescription = null, size = 18.dp, tint = color)
-            val body = OpenCodeTextStyles.body.copy(fontFeatureSettings = "tnum")
+            val body = SettingsText.title.copy(fontFeatureSettings = "tnum")
             val milliseconds = presentation.milliseconds
             if (milliseconds != null) {
                 RollingNumber(

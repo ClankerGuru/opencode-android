@@ -20,11 +20,10 @@ val State.isAnsweringRequest: Boolean get() = requestDock.isAnswering
 /** A long paste becomes a Pasted Text card, and a pasted image an attachment, only in a message: an answer or a reason takes text. */
 val State.takesPasteAttachments: Boolean get() = RequestAnswering.takesPasteAttachments(isAnsweringRequest)
 
-/** A pending request takes the composer, except under a call (whose agent answers) and until any dictation into the message has finished. */
+/** A pending request takes the composer once any dictation into the message has finished. */
 val State.wantsRequestDock: Boolean
     get() = RequestAnswering.wantsRequestDock(
         hasPendingRequests = hasPendingRequests,
-        callOwnsAudio = callOwnsAudio,
         dictationSendPending = dictationSendPending,
         isAnsweringRequest = isAnsweringRequest,
         hasLiveDictation = hasLiveDictation,

@@ -21,20 +21,25 @@ data class VoiceRoutePreferences(
     val provider: Shared<ServerVoiceProvider> = shared(VoiceSharedKeys.serverVoiceProvider),
     val voiceServer: Shared<VoiceServerChoice> = shared(VoiceSharedKeys.voiceServerChoice),
     val support: Shared<Map<String, ServerVoiceSupport>> = shared(VoiceSharedKeys.serverVoiceSupportByServer),
+    val voiceModels: Shared<Map<String, ServerVoiceModelsAnswer>> = shared(VoiceSharedKeys.voiceModelsByServer),
 ) {
     fun route(server: OpenCodeServer): VoiceRoute {
-        val broker = VoiceBroker(
+        val hasOpenAIKey = !(openAIKey.value ?: "").trim().isEmpty()
+        val (broker, _) = VoiceBroker.resolve(
             serverVoice = ExperimentalFeature.serverVoice.isActive(serverVoice.value),
             choice = voiceServer.value,
+            provider = provider.value,
             connected = server,
             saved = { VoiceFeature.savedServers },
+            answers = voiceModels.value,
+            support = support.value,
+            hasOpenAIKey = hasOpenAIKey,
+            engine = engine.value,
         )
-        return VoiceRoute.resolve(
-            selectedEngine = engine.value,
-            serverVoiceEnabled = broker.isEnabled,
-            serverVoiceProvider = provider.value,
-            serverVoiceSupport = broker.support(support.value),
-            hasOpenAIKey = !(openAIKey.value ?: "").trim().isEmpty(),
+        return broker.route(
+            engine = engine.value,
+            support = broker.support(support.value),
+            hasOpenAIKey = hasOpenAIKey,
             hasXAIKey = !(xaiKey.value ?: "").trim().isEmpty(),
         )
     }

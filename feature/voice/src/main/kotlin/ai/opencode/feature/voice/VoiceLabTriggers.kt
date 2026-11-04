@@ -1,21 +1,32 @@
 package ai.opencode.feature.voice
 
 /**
- * UI tests post these to start a call, or open its transcript, while something covers the
- * call button or bar (iOS `VoiceLabTrigger`, `VoiceLabTriggers.swift`, DEBUG only). iOS
+ * UI tests post these to start a call while something covers the call button (iOS `VoiceLabTrigger`, `VoiceLabTriggers.swift`, DEBUG only). iOS
  * delivers them as Darwin notifications (`"OpenCodeLab." + rawValue`); on Android a debug
  * build can deliver them as broadcasts with the same names.
  *
  * The `VoiceLabTriggers` view modifier (it sends `SessionFeature` actions: `voiceTapped`,
- * `voice(.presented(.captionsTapped))`, `raisedToEar`) moved to `:feature:session`, which
- * owns that store.
+ * `raisedToEar`, and for [endCall]
+ * `voice(.presented(.endPressed))`) moved to `:feature:session`, which owns that store.
  */
 enum class VoiceLabTrigger(val rawValue: String) {
     startCall("ai.opencode.lab.voice-start"),
-    showCaptions("ai.opencode.lab.voice-captions"),
 
     /** Raise to Talk's detector firing: the emulator has no proximity sensor. */
     raiseToEar("ai.opencode.lab.voice-raise"),
+
+    /** A hang-up from outside the call's own controls, such as the ongoing notification's End or the agent ending the call. */
+    endCall("ai.opencode.lab.voice-end"),
+
+    /** An agent's `android_voice_play_audio` (Audio in Calls), with the lab's silent player. */
+    playAudio("ai.opencode.lab.voice-play-audio"),
+
+    /**
+     * Android only: an agent's `android_voice_request_screen` and `android_voice_open_url`, so the
+     * emulator can show their cards (session-lab has no client MCP socket).
+     */
+    requestScreen("ai.opencode.lab.voice-request-screen"),
+    openLink("ai.opencode.lab.voice-open-link"),
     ;
 
     /** iOS `notification`: `Notification.Name("OpenCodeLab." + rawValue)`. */

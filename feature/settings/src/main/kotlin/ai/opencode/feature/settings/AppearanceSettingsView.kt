@@ -10,7 +10,7 @@ import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.ThemeDefinition
-import ai.opencode.core.ui.ThemePalette
+import ai.opencode.core.ui.rememberThemeDefinition
 import ai.opencode.core.ui.ThemeSharedKeys
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
@@ -74,10 +74,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.ui.graphics.RenderEffect
-import androidx.compose.ui.graphics.asComposeRenderEffect
-import android.graphics.RuntimeShader
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
@@ -124,7 +120,7 @@ fun AppearanceSettingsView(store: SettingsStore) {
             ) {
                 val swatch = @Composable {
                     ThemeSwatchTile(
-                        ThemePalette.definition(appTheme),
+                        rememberThemeDefinition(appTheme),
                         isDark = isDark,
                         size = ThemeSwatchTile.Size.Compact,
                         cardBackground = OpenCodeTheme.colors.groupedCard,
@@ -133,20 +129,19 @@ fun AppearanceSettingsView(store: SettingsStore) {
                 if (isAccessibilitySize()) {
                     // iOS stacks the label over the swatch and value at the accessibility sizes.
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("Theme", style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text)
+                        Text("Theme", style = SettingsText.title, color = OpenCodeTheme.colors.text)
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             swatch()
-                            Text(appTheme.title, style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.secondaryText)
+                            Text(appTheme.title, style = SettingsText.title, color = OpenCodeTheme.colors.secondaryText)
                         }
                     }
                 } else {
-                    Text("Theme", style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
+                    Text("Theme", style = SettingsText.title, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         swatch()
-                        Text(appTheme.title, style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.secondaryText, maxLines = 1)
+                        Text(appTheme.title, style = SettingsText.title, color = OpenCodeTheme.colors.secondaryText, maxLines = 1)
                     }
                 }
-                SettingsChevron()
             }
         }
     }
@@ -165,11 +160,10 @@ fun ThemesSettingsView(store: SettingsStore) {
     val isDark = scheme.resolveIsDark(isSystemInDarkTheme())
     val reduceMotion = rememberReduceMotion()
     val colors = OpenCodeTheme.colors
-    val canvas = ThemePalette.definition(appTheme).variant(isDark).canvas.color
+    val canvas = rememberThemeDefinition(appTheme).variant(isDark).canvas.color
     val density = LocalDensity.current
     /** The pinned preview header's height (px), content plus its 14 pt bottom inset. */
     var headerHeight by remember { mutableIntStateOf(0) }
-    val softEdgeBlur = rememberSoftEdgeBlur(headerHeight, opaque = colors.highContrast)
 
     Scaffold(
         containerColor = colors.groupedCanvas,
@@ -191,17 +185,14 @@ fun ThemesSettingsView(store: SettingsStore) {
                     top = with(density) { headerHeight.toDp() } + AppearanceTunables.softEdgeHeight + 4.dp,
                     bottom = padding.calculateBottomPadding() + 24.dp,
                 ),
-                modifier = Modifier
-                    .fillMaxSize()
-                    // The soft edge's progressive blur, applied to the list's own layer.
-                    .graphicsLayer { renderEffect = softEdgeBlur },
+                modifier = Modifier.fillMaxSize(),
             ) {
                 settingsSection(key = "themes") {
                     AppTheme.entries.forEachIndexed { index, theme ->
                         if (index > 0) SettingsDivider(inset = true)
                         ThemeOptionRow(
                             theme = theme,
-                            definition = ThemePalette.definition(theme),
+                            definition = rememberThemeDefinition(theme),
                             isDark = isDark,
                             isSelected = appTheme == theme,
                             onClick = { store.send(SettingsFeature.Action.Settings(HomeSettingsFeature.Action.AppThemeChanged(theme))) },
@@ -241,7 +232,7 @@ fun ThemesSettingsView(store: SettingsStore) {
 internal object AppearanceTunables {
     /** Soft edge feather (pt). */
     val softEdgeHeight = 22.dp
-    /** Soft edge blur. */
+    /** iOS's soft edge blur. Not drawn on Android: the list fades under the gradient alone. */
     val softEdgeBlur = 12.dp
 }
 
@@ -250,9 +241,9 @@ private val SoftEdgeBottomInset = 14.dp
 /**
  * Soft scroll-edge backdrop behind the pinned split preview (iOS `ThemesSoftEdgeBackdrop`): full
  * [topBackground] through `fadeOrigin`, then a smoothstep gradient easing to transparent over the
- * feather below the preview, so scrolling theme rows dissolve before they reach it; the list
- * itself blurs progressively across the `bottomInset + feather` band ([rememberSoftEdgeBlur]).
- * Under high contrast it is opaque.
+ * feather below the preview, so scrolling theme rows dissolve before they reach it. iOS also
+ * blurs the list progressively across that band; Android doesn't blur scrolling content (a plain
+ * fading edge, as Android lists use). Under high contrast it is opaque.
  */
 @Composable
 private fun ThemesSoftEdgeBackdrop(
@@ -297,61 +288,6 @@ private fun ThemesSoftEdgeBackdrop(
     )
 }
 
-/**
- * The soft edge's progressive blur (iOS `DrawerEdgeBlur(fadeStart:height:radius:curve: .smoothstep,
- * edge: .top)` over the `bottomInset + feather` band below the preview): full [AppearanceTunables.
- * softEdgeBlur] over the bottom inset, easing to none across the feather. An AGSL effect on the
- * list's own layer, so the list is drawn once (re-drawing a recorded layer under a blur crashed
- * the emulator's renderer). Null under high contrast, where the backdrop is opaque.
- */
-@Composable
-private fun rememberSoftEdgeBlur(header: Int, opaque: Boolean): RenderEffect? {
-    val density = LocalDensity.current
-    val shader = remember { RuntimeShader(SoftEdgeBlurShader) }
-    return remember(header, opaque, density) {
-        if (opaque || header <= 0) return@remember null
-        val bottomInset = with(density) { SoftEdgeBottomInset.toPx() }
-        val feather = max(with(density) { AppearanceTunables.softEdgeHeight.toPx() }, 1f)
-        val fadeOrigin = max(header - bottomInset, 1f)
-        val band = bottomInset + feather
-        shader.setFloatUniform("origin", fadeOrigin)
-        shader.setFloatUniform("band", band)
-        shader.setFloatUniform("fadeStart", (bottomInset / band).coerceIn(0f, 1f))
-        shader.setFloatUniform("radius", with(density) { AppearanceTunables.softEdgeBlur.toPx() })
-        android.graphics.RenderEffect.createRuntimeShaderEffect(shader, "content").asComposeRenderEffect()
-    }
-}
-
-/** A Gaussian blur whose radius follows the smoothstep strength profile down the band. */
-private const val SoftEdgeBlurShader = """
-uniform shader content;
-uniform float origin;
-uniform float band;
-uniform float fadeStart;
-uniform float radius;
-
-half4 main(float2 p) {
-    float y = (p.y - origin) / band;
-    if (y < 0.0 || y > 1.0) return content.eval(p);
-    float t = clamp((y - fadeStart) / max(1.0 - fadeStart, 0.001), 0.0, 1.0);
-    float strength = y <= fadeStart ? 1.0 : 1.0 - t * t * (3.0 - 2.0 * t);
-    // Blur radius is about two standard deviations, as BlurEffect's.
-    float sigma = radius * strength * 0.5;
-    if (sigma < 0.3) return content.eval(p);
-    half4 sum = half4(0);
-    float weights = 0.0;
-    for (int i = -4; i <= 4; i++) {
-        for (int j = -4; j <= 4; j++) {
-            float2 o = float2(float(i), float(j)) * (sigma * 0.5);
-            float w = exp(-0.5 * dot(o, o) / (sigma * sigma));
-            sum += content.eval(p + o) * w;
-            weights += w;
-        }
-    }
-    return sum / weights;
-}
-"""
-
 @Composable
 private fun ThemeOptionRow(
     theme: AppTheme,
@@ -372,7 +308,7 @@ private fun ThemeOptionRow(
         ThemeSwatchTile(definition, isDark, ThemeSwatchTile.Size.Regular, cardBackground = OpenCodeTheme.colors.groupedCard)
         Text(
             theme.title,
-            style = OpenCodeTextStyles.body.copy(fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal),
+            style = SettingsText.title.copy(fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal),
             color = OpenCodeTheme.colors.text,
             maxLines = if (isAccessibilitySize()) Int.MAX_VALUE else 1,
             modifier = Modifier.weight(1f),
@@ -481,7 +417,7 @@ private const val PreviewMaxFontScale = 19f / 17f
 /** The palette-drawn stand-in for [LocalAppearanceTranscriptPreview] when no host provides rows. */
 @Composable
 private fun ImitationTranscriptPreview(theme: AppTheme, isDark: Boolean) {
-    val v = ThemePalette.definition(theme).variant(isDark)
+    val v = rememberThemeDefinition(theme).variant(isDark)
     val mono = FontFamily.Monospace
     Column(
         Modifier
@@ -496,7 +432,7 @@ private fun ImitationTranscriptPreview(theme: AppTheme, isDark: Boolean) {
             ) {
                 Text(
                     "Help me improve the session screen. Show me what you find and explain the changes.",
-                    style = OpenCodeTextStyles.body,
+                    style = SettingsText.title,
                     color = v.text.color,
                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                 )
@@ -511,7 +447,7 @@ private fun ImitationTranscriptPreview(theme: AppTheme, isDark: Boolean) {
                 }
                 append(". The transcript and composer share the available height, so the keyboard is a useful stress test.")
             },
-            style = OpenCodeTextStyles.body,
+            style = SettingsText.title,
             color = v.bodyText.color,
         )
         Spacer(Modifier.height(10.dp))
@@ -545,7 +481,7 @@ private fun ImitationTranscriptPreview(theme: AppTheme, isDark: Boolean) {
                     }
                     append("\n}")
                 },
-                style = OpenCodeTextStyles.footnote.copy(fontFamily = mono),
+                style = SettingsText.summary.copy(fontFamily = mono),
                 color = v.text.color,
                 softWrap = false,
             )

@@ -37,21 +37,29 @@ data class PersistedComposerState(
     @Required val drafts: List<DraftRecord> = emptyList(),
     @Required val outbox: List<OutboxRecord> = emptyList(),
     @Required val undelivered: List<UndeliveredRecord> = emptyList(),
+    /** A session's model pick and request answers. Optional so files written before it existed still decode. */
+    val sessionStates: List<SessionStateRecord>? = null,
 ) {
     @Serializable
     data class AttachmentRecord(
         @Serializable(with = UUIDSerializer::class) val id: UUID,
         val mime: String,
         val name: String? = null,
+        val mediaHash: String? = null,
+        val byteCount: Long? = null,
         val hasPastedText: Boolean,
         val pasted: PastedTextSummary? = null,
+        val videoDuration: Double? = null,
     ) {
         constructor(attachment: OpenCodeOutgoingAttachment) : this(
             id = attachmentUUID(attachment.id),
             mime = attachment.mime,
             name = attachment.name,
+            mediaHash = attachment.mediaHash,
+            byteCount = attachment.byteCount,
             hasPastedText = attachment.pastedText != null,
             pasted = attachment.pasted,
+            videoDuration = attachment.videoDuration,
         )
     }
 
@@ -127,7 +135,8 @@ data class PersistedComposerState(
     )
 
     val isEmpty: Boolean
-        get() = drafts.none { it.hasPersistedContent } && outbox.isEmpty() && undelivered.isEmpty()
+        get() = drafts.none { it.hasPersistedContent } && outbox.isEmpty() && undelivered.isEmpty() &&
+            sessionStates.orEmpty().isEmpty()
 
     val referencedAttachmentIDs: Set<UUID>
         get() {
@@ -144,12 +153,14 @@ data class PersistedComposerState(
         val cutoff = now.minusSeconds(STALENESS_INTERVAL_SECONDS)
         val hadStale = drafts.any { it.updatedAt < cutoff } ||
             outbox.any { it.updatedAt < cutoff } ||
-            undelivered.any { it.updatedAt < cutoff }
+            undelivered.any { it.updatedAt < cutoff } ||
+            sessionStates.orEmpty().any { it.updatedAt < cutoff }
         if (!hadStale) return null
         return copy(
             drafts = drafts.filterNot { it.updatedAt < cutoff },
             outbox = outbox.filterNot { it.updatedAt < cutoff },
             undelivered = undelivered.filterNot { it.updatedAt < cutoff },
+            sessionStates = sessionStates?.filterNot { it.updatedAt < cutoff },
         )
     }
 

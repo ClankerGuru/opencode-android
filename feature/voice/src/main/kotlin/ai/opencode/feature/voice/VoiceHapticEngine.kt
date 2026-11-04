@@ -72,7 +72,8 @@ class VoiceHapticEngine(private val context: Context, private val clock: Clock =
             amplitudes[i] = if (vibrator.hasAmplitudeControl()) (level.coerceIn(0f, 1f) * 255).roundToInt() else if (level > 0.1f) VibrationEffect.DEFAULT_AMPLITUDE else 0
         }
         if (amplitudes.all { it == 0 }) { vibrator.cancel(); return }
-        vibrator.vibrate(VibrationEffect.createWaveform(LongArray(count) { 1L }, amplitudes, -1),
+        val (timings, levels) = waveformSteps(amplitudes)
+        vibrator.vibrate(VibrationEffect.createWaveform(timings, levels, -1),
             VibrationAttributes.Builder().setUsage(VibrationAttributes.USAGE_TOUCH).build())
     }
     override fun cancel(kind: Kind) = synchronized(lock) {
@@ -88,6 +89,26 @@ class VoiceHapticEngine(private val context: Context, private val clock: Clock =
         synchronized(lock) { if (!isCallActive) { scheduled.clear(); vibrator.cancel(); prepared = false } }
     }
     companion object Key : DependencyKey<VoiceHapticPlaying> {
+        /**
+         * A waveform step costs a vibrator HAL round trip on devices without envelope support
+         * (about 20 ms on a Galaxy S24), so 1 ms steps stretched the 0.8 s connect pattern into a
+         * 17 s buzz. The mix is played in [stepMillis] windows at each window's peak (a tick
+         * keeps its strength), equal neighbours merge, and the silent tail is dropped.
+         */
+        internal fun waveformSteps(amplitudes: IntArray, stepMillis: Int = 25): Pair<LongArray, IntArray> {
+            val timings = mutableListOf<Long>(); val levels = mutableListOf<Int>()
+            var start = 0
+            while (start < amplitudes.size) {
+                val end = min(amplitudes.size, start + stepMillis)
+                var peak = 0
+                for (i in start until end) peak = max(peak, amplitudes[i])
+                if (levels.isNotEmpty() && levels.last() == peak) timings[timings.lastIndex] += (end - start).toLong()
+                else { timings.add((end - start).toLong()); levels.add(peak) }
+                start = end
+            }
+            while (levels.size > 1 && levels.last() == 0) { levels.removeAt(levels.lastIndex); timings.removeAt(timings.lastIndex) }
+            return timings.toLongArray() to levels.toIntArray()
+        }
         override val liveValue by lazy { VoiceHapticEngine(dependency(AppContext)) }
         override val testValue = object : VoiceHapticPlaying {
             override val isCallActive = false

@@ -20,14 +20,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 
 /**
  * The app's theme: wraps [MaterialExpressiveTheme] with a [ColorScheme] built from the iOS
  * theme ([OpenCodeColors.toColorScheme]), iOS-scaled [OpenCodeTypography], [OpenCodeShapes]
- * and the iOS-timed [OpenCodeMotionScheme], and provides [OpenCodeColors] for the colours
- * Material has no role for. Dynamic (wallpaper) colour is deliberately off.
+ * and the Material 3 Expressive [OpenCodeMotionScheme], and provides [OpenCodeColors] for the colours
+ * Material has no role for. The System theme uses the wallpaper's dynamic colour instead
+ * ([DynamicSystemTheme]); the curated themes keep their fixed palettes.
  *
  * At the app root, use [OpenCodeAppTheme], which reads the persisted Settings → Appearance
  * choice. Previews and the design-system gallery pass a theme explicitly.
@@ -46,8 +48,20 @@ fun OpenCodeTheme(
     content: @Composable () -> Unit,
 ) {
     val isDark = appearance.resolveIsDark(isSystemInDarkTheme())
-    val colors = remember(theme, isDark, highContrast) { OpenCodeColors.resolve(theme, isDark, highContrast) }
-    val colorScheme = remember(colors) { colors.toColorScheme() }
+    val context = LocalContext.current
+    // A wallpaper change arrives as a configuration change.
+    val configuration = LocalConfiguration.current
+    val dynamicScheme: ColorScheme? = remember(theme, isDark, context, configuration) {
+        if (theme == AppTheme.System) DynamicSystemTheme.colorScheme(context, isDark) else null
+    }
+    val colors = remember(theme, isDark, highContrast, dynamicScheme) {
+        if (dynamicScheme != null) {
+            DynamicSystemTheme.colors(dynamicScheme, isDark, highContrast)
+        } else {
+            OpenCodeColors.resolve(theme, isDark, highContrast)
+        }
+    }
+    val colorScheme = remember(colors, dynamicScheme) { dynamicScheme ?: colors.toColorScheme() }
     val motionScheme = remember(reduceMotion) { OpenCodeMotionScheme(reduceMotion) }
     CompositionLocalProvider(LocalOpenCodeColors provides colors) {
         MaterialExpressiveTheme(

@@ -15,6 +15,11 @@ import ai.opencode.feature.composer.reconcilePersistedComposer
 import ai.opencode.feature.composer.restorePersistedComposer
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.State
+import ai.opencode.feature.composer.PersistedSessionWatch
+import ai.opencode.feature.composer.PersistedSessionState
+import ai.opencode.feature.composer.reconcilePersistedSession
+import ai.opencode.feature.composer.restorePersistedAnswers
+import ai.opencode.feature.composer.RequestDockFeature
 
 // Port of the `extension SessionFeature` / `extension SessionFeature.State` half of iOS
 // `Composer/ComposerPersistence.swift`. The client, records and the pure logic are
@@ -37,6 +42,42 @@ internal fun SessionFeature.reconcilePersistedComposer(old: PersistedComposerWat
     composerPersistence.reconcilePersistedComposer(old, state.persistedComposerWatch, state.sessionComposer)
     return Reduced(state)
 }
+
+/** iOS `persistedSessionWatch`: the screen's waiting model pick and request answers. */
+val State.persistedSessionWatch: PersistedSessionWatch
+    get() {
+        val knowsRequests = requestDock.permissionRequests.isNotEmpty() || requestDock.formRequests.isNotEmpty()
+        return PersistedSessionWatch(
+            serverID = server.persistenceID,
+            sessionID = session?.id,
+            readsOnView = readsOnView,
+            update = PersistedSessionState.Update(
+                pendingModel = pendingModel,
+                requests = if (knowsRequests) {
+                    PersistedSessionState.RequestAnswers(
+                        formAnswers = requestDock.formAnswers,
+                        answerDrafts = answerDraftsIncludingBar,
+                        questionPageIndices = requestDock.questionPageIndices,
+                    )
+                } else {
+                    null
+                },
+            ),
+        )
+    }
+
+/** iOS `reconcilePersistedSession(from:in:)`: the same screen's pick or answers changed. */
+internal fun SessionFeature.reconcilePersistedSession(old: PersistedSessionWatch, state: State): Reduced<State, Action> {
+    composerPersistence.reconcilePersistedSession(old, state.persistedSessionWatch)
+    return Reduced(state)
+}
+
+/** iOS `restorePersistedAnswers(_:)`: requests that just arrived take back the answers saved before a relaunch. */
+internal fun SessionFeature.restoringPersistedAnswers(
+    dock: RequestDockFeature.State<DraftState>,
+    state: State,
+): RequestDockFeature.State<DraftState> =
+    composerPersistence.restorePersistedAnswers(dock, state.server.persistenceID, state.session, state.readsOnView)
 
 /** iOS `persistedDraftDirectory(for:isRetry:in:)`: where a retried draft send creates its session. */
 internal fun SessionFeature.persistedDraftDirectory(messageID: String, isRetry: Boolean, state: State): String? =

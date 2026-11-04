@@ -144,6 +144,9 @@ internal object LiveUpdateSystem {
     fun dictation(context: Context): LiveUpdateTracker =
         LiveUpdateTracker(context.applicationContext, LiveUpdateNotifications.DICTATION_ID, SystemNotificationChannels.DICTATION)
 
+    fun sessionRun(context: Context): LiveUpdateTracker =
+        LiveUpdateTracker(context.applicationContext, SessionRunLiveActivity.NOTIFICATION_ID, SystemNotificationChannels.SESSION_RUN)
+
     /** The app's or a channel's notifications switched in Settings (iOS `activityEnablementUpdates`). */
     private fun enablementUpdates(context: Context, tracker: LiveUpdateTracker): Flow<Boolean> = callbackFlow {
         val receiver = object : BroadcastReceiver() {

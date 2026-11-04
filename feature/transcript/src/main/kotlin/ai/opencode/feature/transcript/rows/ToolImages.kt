@@ -1,36 +1,26 @@
 package ai.opencode.feature.transcript.rows
 
-import ai.opencode.core.ui.OpenCodeTheme
-import ai.opencode.feature.media.TranscriptImagePreview
-import ai.opencode.feature.transcript.user.TranscriptDragPayload
-import ai.opencode.feature.transcript.user.transcriptDragSource
+import ai.opencode.feature.media.AgentImageRowAnchor
+import ai.opencode.feature.media.CachedImage
+import ai.opencode.feature.media.MediaReferenceResolver
+import ai.opencode.feature.transcript.user.ToolImageMosaicTile
 import ai.opencode.server.model.OpenCodeImageAttachment
-import android.graphics.BitmapFactory
-import android.util.LruCache
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asAndroidBitmap
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -38,74 +28,66 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Decoded tool images by attachment ID (iOS `CachedImage.decoded`), bounded by bytes. A view
- * cache, like iOS's: `:feature:media`'s `DecodedImageCache` replaces it once that port lands.
- */
-private object ToolImageCache {
-    private val cache = object : LruCache<String, ImageBitmap>(48 * 1024 * 1024) {
-        override fun sizeOf(key: String, value: ImageBitmap): Int = value.width * value.height * 4
-    }
-
-    fun cached(id: String): ImageBitmap? = cache.get(id)
-
-    /** Decodes off the main thread; null for bytes that aren't an image. */
-    suspend fun decoded(attachment: OpenCodeImageAttachment): ImageBitmap? {
-        cache.get(attachment.id)?.let { return it }
-        val image = withContext(Dispatchers.Default) {
-            runCatching { BitmapFactory.decodeByteArray(attachment.data, 0, attachment.data.size)?.asImageBitmap() }.getOrNull()
-        } ?: return null
-        cache.put(attachment.id, image)
-        return image
-    }
-}
-
-/**
- * iOS `TranscriptImagePreview.init?(attachments:selectedID:label:)`: every decoded image, in
- * order, opened at [selectedID]; null when the selected one didn't decode.
- */
-fun transcriptImagePreview(decoded: List<Pair<String, ImageBitmap>>, selectedID: String, label: String): TranscriptImagePreview? =
-    TranscriptImagePreview.fromAttachments(decoded.map { (id, image) -> id to image.asAndroidBitmap() }, selectedID, label)
-
-/**
  * Every image a tool read, whole and in order, so it can be read without opening it (iOS
  * `ToolImageMosaic`): justified rows ([JustifiedImageRows]) where each row's images share a
  * height and together fill the width, nothing cropped or hidden. Tapping one opens them all in
- * the gallery.
+ * the gallery, at [onPreview]'s ID.
  */
 @Composable
-fun ToolImageMosaic(images: List<OpenCodeImageAttachment>, modifier: Modifier = Modifier, onPreview: (TranscriptImagePreview) -> Unit) {
-    val decoded by produceState(initialValue = images.map { ToolImageCache.cached(it.id) }, images) {
-        value = images.map { ToolImageCache.decoded(it) }
+fun ToolImageMosaic(images: List<OpenCodeImageAttachment>, modifier: Modifier = Modifier, onPreview: (String) -> Unit) {
+    // Shapes of `media:` tiles, as they loaded or were first shown. The server sends no
+    // dimensions for tool images, so without these they'd be square until loaded, and again
+    // after a memory warning empties the caches.
+    val loadedAspects = remember { mutableStateMapOf<String, Float>() }
+    // The row's place in the transcript, to say its height is about to change.
+    val row = remember { AgentImageRowAnchor() }
+    val decoded by produceState(images.map { CachedImage.cached(it.id, it.mediaHash) }, images) {
+        value = withContext(Dispatchers.Default) { images.map(MediaReferenceResolver::decodedImage) }
     }
-    val aspects = decoded.map { image ->
-        if (image == null || image.width <= 0 || image.height <= 0) 1f else image.width.toFloat() / image.height
-    }
-    val shape = RoundedCornerShape(JustifiedImageRows.cornerRadius.dp)
-    JustifiedImagesLayout(aspects, modifier) {
+    val aspects = ToolImageMosaic.aspects(images, decoded.map { it?.let { image -> IntSize(image.width, image.height) } }, loadedAspects)
+    AgentImageRowAnchor.Placement(row)
+    JustifiedImagesLayout(aspects, modifier.semantics { testTag = "tool-image-mosaic" }) {
         images.forEachIndexed { index, attachment ->
-            val image = decoded.getOrNull(index)
-            Box(
-                Modifier
-                    .transcriptDragSource(
-                        TranscriptDragPayload.ImageAttachment(attachment.id, attachment.data, "tool-image-${index + 1}"),
-                        cornerRadius = JustifiedImageRows.cornerRadius.dp,
-                    )
-                    .clip(shape)
-                    // Behind transparent images, and while one decodes.
-                    .background(OpenCodeTheme.colors.userBubble)
-                    // Keeps a white image's edge visible on a white transcript.
-                    .border(0.5.dp, OpenCodeTheme.colors.border.copy(alpha = OpenCodeTheme.colors.border.alpha * 0.6f), shape)
-                    .clickable(role = Role.Image) {
-                        val pages = images.mapIndexedNotNull { i, a -> decoded.getOrNull(i)?.let { a.id to it } }
-                        transcriptImagePreview(pages, attachment.id, "Tool image")?.let(onPreview)
-                    }
-                    .semantics { contentDescription = "Open tool image ${index + 1} of ${images.size}" },
-            ) {
-                if (image != null) {
-                    Image(image, contentDescription = null, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-                }
+            key(attachment.id) {
+                ToolImageMosaicTile(
+                    attachment, decoded.getOrNull(index), index, images.size, onPreview,
+                    onLoad = { size ->
+                        val change = ToolImageMosaic.change(size, loadedAspects[attachment.id], aspects.getOrElse(index) { 1f })
+                        // A new shape marks the row revised first, so the list eases it, or lands
+                        // it with the offset compensated above the reader.
+                        if (change.revisesRow) row.revised()
+                        change.record?.let { loadedAspects[attachment.id] = it }
+                    },
+                )
             }
         }
+    }
+}
+
+/** iOS `ToolImageMosaic`'s statics. */
+object ToolImageMosaic {
+    /** What a tile's loaded image changes: the shape to remember (null when known), and whether the row's height may change. */
+    data class Change(val record: Float?, val revisesRow: Boolean)
+
+    /** Each tile's shape: its decoded image, else the size it loaded at, else the server's dimensions, else square. */
+    fun aspects(images: List<OpenCodeImageAttachment>, decoded: List<IntSize?>, loaded: Map<String, Float>): List<Float> =
+        images.zip(decoded) { attachment, size ->
+            if (size != null && size.width > 0 && size.height > 0) return@zip size.width.toFloat() / size.height
+            loaded[attachment.id] ?: attachment.aspectRatio?.toFloat() ?: 1f
+        }
+
+    /**
+     * What a tile's image of [size] changes: the shape to remember (null when already known),
+     * and whether the row's height may change, as it does when a new shape differs from the one
+     * the tile was laid out at. A known shape is already in the layout, whatever [laidOutAt] was
+     * captured.
+     */
+    fun change(size: IntSize, known: Float?, laidOutAt: Float): Change {
+        if (size.width <= 0 || size.height <= 0) return Change(null, false)
+        val aspect = size.width.toFloat() / size.height
+        val isKnown = known?.let { abs(it - aspect) < 0.001f } ?: false
+        if (isKnown) return Change(null, false)
+        return Change(aspect, abs(laidOutAt - aspect) >= 0.001f)
     }
 }
 

@@ -7,6 +7,7 @@ import ai.opencode.server.live.MarkdownImageCache
 import ai.opencode.server.live.markdownImageCacheKey
 import ai.opencode.server.live.requestActiveSessionParents
 import ai.opencode.server.live.requestAgents
+import ai.opencode.server.live.requestArchiveSession
 import ai.opencode.server.live.requestAssistantReply
 import ai.opencode.server.live.requestCancelForm
 import ai.opencode.server.live.requestCancelIntegrationOAuth
@@ -35,6 +36,7 @@ import ai.opencode.server.live.requestMarkdownImage
 import ai.opencode.server.live.requestMentionSessions
 import ai.opencode.server.live.requestMessage
 import ai.opencode.server.live.requestModelCatalog
+import ai.opencode.server.live.requestMoveSession
 import ai.opencode.server.live.requestMoveToBackground
 import ai.opencode.server.live.requestNotifyPluginStatus
 import ai.opencode.server.live.requestPendingInputs
@@ -43,9 +45,11 @@ import ai.opencode.server.live.requestRedeemPairing
 import ai.opencode.server.live.requestRenameSession
 import ai.opencode.server.live.requestReplyForm
 import ai.opencode.server.live.requestReplyPermission
+import ai.opencode.server.live.requestRunMessages
 import ai.opencode.server.live.requestRunReply
 import ai.opencode.server.live.requestRunningShells
 import ai.opencode.server.live.requestSearchSessions
+import ai.opencode.server.live.requestSessionPage
 import ai.opencode.server.live.requestSendCommand
 import ai.opencode.server.live.requestSendDeliveredPrompt
 import ai.opencode.server.live.requestSendPrompt
@@ -88,8 +92,11 @@ import ai.opencode.server.model.OpenCodeOutgoingAttachment
 import ai.opencode.server.model.OpenCodePendingInput
 import ai.opencode.server.model.OpenCodePendingRequests
 import ai.opencode.server.model.OpenCodePermissionReply
+import ai.opencode.server.model.OpenCodeRunMessagesPage
 import ai.opencode.server.model.OpenCodeServerCapabilities
 import ai.opencode.server.model.OpenCodeSession
+import ai.opencode.server.model.OpenCodeSessionPage
+import ai.opencode.server.model.OpenCodeSessionPageRequest
 import ai.opencode.server.model.OpenCodeSessionFamily
 import ai.opencode.server.model.OpenCodeShell
 import ai.opencode.server.model.OpenCodeShellOutputPage
@@ -120,6 +127,12 @@ data class OpenCodeClient(
     val homeAttention: suspend (server: OpenCodeServer, roots: List<OpenCodeSession>, directories: List<String>) -> Set<String>,
     /** Root sessions whose title contains `query`, newest first (`GET /api/session?search=`). */
     val searchSessions: suspend (server: OpenCodeServer, query: String, limit: Int) -> List<OpenCodeSession>,
+    /**
+     * One page of root sessions for the drawer: a search's first page, or the page after a
+     * cursor (`GET /api/session`). Not location-scoped.
+     */
+    val sessionPage: suspend (server: OpenCodeServer, request: OpenCodeSessionPageRequest, limit: Int) -> OpenCodeSessionPage =
+        { _, _, _ -> OpenCodeSessionPage(emptyList(), null) },
     val transcript: suspend (server: OpenCodeServer, sessionID: String, limit: Int) -> List<OpenCodeTranscriptItem>,
     /** One authoritative message projection. */
     val message: suspend (server: OpenCodeServer, sessionID: String, messageID: String) -> List<OpenCodeTranscriptItem>,
@@ -142,6 +155,8 @@ data class OpenCodeClient(
     val uploadFile: (server: OpenCodeServer, directory: String?, file: File, name: String) -> Flow<OpenCodeUploadEvent>,
     val waitForIdle: suspend (server: OpenCodeServer, sessionID: String) -> Unit,
     val isSessionActive: suspend (server: OpenCodeServer, sessionID: String) -> Boolean,
+    /** One page of a session's history as a voice watch reads a run, newest page first; `cursor` is the previous page's `next`. */
+    val runMessages: suspend (server: OpenCodeServer, sessionID: String, cursor: String?) -> OpenCodeRunMessagesPage,
     /** Stops the run and resumes its pending steering messages (`resume=true`). True when a run was going. */
     val interrupt: suspend (server: OpenCodeServer, sessionID: String) -> Boolean,
     /** `id`, when given, names the session: creating it again returns the same one. */
@@ -178,6 +193,10 @@ data class OpenCodeClient(
     /** Reads the session's newest messages for the context the last reply filled. */
     val contextUsage: suspend (server: OpenCodeServer, sessionID: String) -> OpenCodeContextReading,
     val renameSession: suspend (server: OpenCodeServer, sessionID: String, title: String) -> Unit,
+    /** Moves the session to another folder on the computer (`POST …/move`), at once when its own folder is gone. */
+    val moveSession: suspend (server: OpenCodeServer, sessionID: String, directory: String) -> Unit,
+    /** Archives the session (`PATCH {archived: true}`), as the desktop Inbox does. */
+    val archiveSession: suspend (server: OpenCodeServer, sessionID: String) -> Unit,
     /** Turns Always Notify on (with the phone's callback URL) or off (null), keeping other metadata. */
     val setAlwaysNotify: suspend (server: OpenCodeServer, sessionID: String, callbackURL: String?) -> Unit,
     /** Queues a compaction; it runs after the session's current run. */
@@ -233,6 +252,14 @@ data class OpenCodeClient(
         fun markdownImageKey(server: OpenCodeServer, directory: String?, source: String): String =
             markdownImageCacheKey(server, directory, source).removePrefix("markdown:")
 
+        /**
+         * iOS `OpenCodeClient.pairNotificationPreview(server:callbackURL:ref:publicKey:)`: sends
+         * this phone's notification public key for `ref` to the saved server's HTTPS address
+         * and returns the server's. Only public keys cross; throws without an HTTPS address.
+         */
+        suspend fun pairNotificationPreview(server: OpenCodeServer, callbackURL: String, ref: String, publicKey: String): String =
+            ai.opencode.server.live.requestPairNotificationPreview(server, callbackURL, ref, publicKey)
+
         /** iOS `OpenCodeClient.assistantReply(messagesJSON:afterMessageID:acrossSteers:)`: a prompt's reply in a `/message` page. */
         fun assistantReply(messagesJSON: ByteArray, afterMessageID: String, acrossSteers: Boolean = false): String? =
             ai.opencode.server.live.assistantReply(messagesJSON, afterMessageID, acrossSteers)
@@ -248,6 +275,7 @@ data class OpenCodeClient(
             activeSessionParents = ::requestActiveSessionParents,
             homeAttention = ::requestHomeAttentionSharingWindows,
             searchSessions = ::requestSearchSessions,
+            sessionPage = ::requestSessionPage,
             transcript = ::requestTranscript,
             message = ::requestMessage,
             sendPrompt = ::requestSendPrompt,
@@ -257,6 +285,7 @@ data class OpenCodeClient(
             uploadFile = ::uploadFile,
             waitForIdle = { server, sessionID -> requestWaitForIdle(server, sessionID, dependency(Clock)) },
             isSessionActive = ::requestIsSessionActive,
+            runMessages = ::requestRunMessages,
             interrupt = ::requestInterrupt,
             createSession = ::requestCreateSession,
             deleteSession = ::requestDeleteSession,
@@ -281,6 +310,8 @@ data class OpenCodeClient(
             viewSession = ::requestViewSession,
             contextUsage = ::requestContextUsage,
             renameSession = ::requestRenameSession,
+            moveSession = ::requestMoveSession,
+            archiveSession = ::requestArchiveSession,
             setAlwaysNotify = ::requestSetAlwaysNotify,
             compactSession = ::requestCompactSession,
             stageRevert = ::requestStageRevert,
@@ -332,6 +363,7 @@ data class OpenCodeClient(
                     uploadFile = { _, _, _, _ -> unimplemented("uploadFile") },
                     waitForIdle = { _, _ -> unimplemented("waitForIdle") },
                     isSessionActive = { _, _ -> unimplemented("isSessionActive") },
+                    runMessages = { _, _, _ -> unimplemented("runMessages") },
                     interrupt = { _, _ -> unimplemented("interrupt") },
                     createSession = { _, _, _ -> unimplemented("createSession") },
                     deleteSession = { _, _ -> unimplemented("deleteSession") },
@@ -356,6 +388,8 @@ data class OpenCodeClient(
                     viewSession = { _, _, _ -> unimplemented("viewSession") },
                     contextUsage = { _, _ -> OpenCodeContextReading.Inconclusive },
                     renameSession = { _, _, _ -> unimplemented("renameSession") },
+                    moveSession = { _, _, _ -> throw OpenCodeClientError("Unstubbed") },
+                    archiveSession = { _, _ -> unimplemented("archiveSession") },
                     setAlwaysNotify = { _, _, _ -> unimplemented("setAlwaysNotify") },
                     compactSession = { _, _ -> unimplemented("compactSession") },
                     stageRevert = { _, _, _ -> unimplemented("stageRevert") },

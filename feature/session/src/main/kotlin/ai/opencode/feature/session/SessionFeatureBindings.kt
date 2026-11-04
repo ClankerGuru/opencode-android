@@ -1,6 +1,5 @@
 package ai.opencode.feature.session
 
-import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.feature.composer.DraftState
 import ai.opencode.feature.composer.ComposerCommandOutcome
 import ai.opencode.feature.composer.ComposerAutocompleteOutcome
@@ -131,9 +130,10 @@ internal fun SessionFeature.reduceCallAndBindings(state: State, action: Action):
         if (state.session?.id != action.sessionID) {
             Reduced(state)
         } else {
+            // Spoken into the session, it reads what's above it, as a send does.
             // Reuse the outbox's delivery/echo guards: an early SSE delivery stays delivered, and a
             // late admission never duplicates an existing row.
-            val restored = restoreOutbox(state)
+            val restored = restoreOutbox(state.noteOwnSend())
             Reduced(
                 restored.state,
                 Effect.merge(
@@ -220,7 +220,10 @@ private fun SessionFeature.reduceVoice(state: State, action: PresentationAction<
 
         // The delegator moved the screen; Home switches sessions, and the call follows.
         is VoiceFeature.DelegateAction.OpenSession ->
-            Reduced(state, Effect.send(Action.Delegate(SessionFeature.Delegate.OpenSession(delegate.session))))
+            Reduced(state, Effect.send(Action.Delegate(SessionFeature.Delegate.OpenSession(delegate.session, toolID = delegate.toolID))))
+
+        // App arbitrates it with the MCP request (`VoiceOpenSessionFeature`) before any lookup.
+        is VoiceFeature.DelegateAction.OpenSessionRequested -> Reduced(state)
 
         is VoiceFeature.DelegateAction.SetPinned ->
             Reduced(state, Effect.send(Action.Delegate(SessionFeature.Delegate.SetPinned(delegate.session, delegate.pinned))))
@@ -261,8 +264,9 @@ private fun SessionFeature.reduceVoice(state: State, action: PresentationAction<
             if (state.session?.id != delegate.sessionID) Reduced(state)
             else Reduced(state.copy(currentModel = delegate.model, pendingModel = delegate.model))
 
-        // Home answers Check API Key (it opens Settings); support changes are the call's own.
-        VoiceFeature.DelegateAction.CheckAPIKey, is VoiceFeature.DelegateAction.ServerVoiceSupportChanged -> Reduced(state)
+        // Home answers Open Voice Settings and a delegator's new session; support changes are the call's own.
+        is VoiceFeature.DelegateAction.OpenVoiceSettings, is VoiceFeature.DelegateAction.ServerVoiceSupportChanged,
+        is VoiceFeature.DelegateAction.RequestSettled, is VoiceFeature.DelegateAction.DelegatorSessionCreated -> Reduced(state)
 
         // A call hung up from its bar stays while the scope sweeps out, then the composer returns;
         // a dismissed failure was never showing the bar.
@@ -359,7 +363,6 @@ internal fun SessionFeature.autocompleteEnvironment(): ComposerAutocompleteEnvir
     clock = clock,
     uuid = uuid,
     haptics = haptics,
-    isEnabled = experimentalFeatures(ExperimentalFeature.composerAutocomplete),
     cancelCatalogID = SessionFeature.CancelID.AutocompleteCatalog,
     cancelCommandsID = SessionFeature.CancelID.AutocompleteCommands,
     cancelFilesID = SessionFeature.CancelID.AutocompleteFiles,

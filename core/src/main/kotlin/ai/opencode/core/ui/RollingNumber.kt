@@ -34,6 +34,7 @@ import androidx.compose.ui.layout.LastBaseline
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFontFamilyResolver
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -41,8 +42,9 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -112,9 +114,11 @@ fun RollingNumber(
         return
     }
 
-    val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
-    val metrics = remember(measurer, resolvedStyle, density) { TextRollingMetrics(measurer, resolvedStyle) }
+    val fontFamilyResolver = LocalFontFamilyResolver.current
+    val metrics = remember(resolvedStyle, density, fontFamilyResolver) {
+        SharedRollingMetrics.get(resolvedStyle, density, fontFamilyResolver)
+    }
     val targetWidth = RollingNumberModel.targetWidth(text, metrics, locale)
 
     var frameNanos by remember { mutableLongStateOf(0L) }
@@ -163,6 +167,38 @@ private fun Modifier.baselineAt(ascender: Float): Modifier = layout { measurable
     val baseline = ascender.roundToInt()
     layout(placeable.width, placeable.height, mapOf(FirstBaseline to baseline, LastBaseline to baseline)) {
         placeable.place(0, 0)
+    }
+}
+
+/**
+ * Glyph metrics shared by every [RollingNumber] with the same style. A row that scrolls in
+ * (a "Used 25 tools" header, say) reuses its digits' text layouts instead of measuring each
+ * glyph again, which cost about a millisecond per row. Colour isn't part of the key: the
+ * glyphs are drawn with the number's colour. Keeps the few most recent styles.
+ */
+private object SharedRollingMetrics {
+    private const val MAX_STYLES = 8
+
+    private data class Key(val style: TextStyle, val density: Float, val fontScale: Float, val resolver: FontFamily.Resolver)
+
+    private val cache = LinkedHashMap<Key, TextRollingMetrics>(16, 0.75f, true)
+
+    fun get(style: TextStyle, density: Density, resolver: FontFamily.Resolver): TextRollingMetrics {
+        val layoutStyle = style.copy(color = Color.Unspecified)
+        val key = Key(layoutStyle, density.density, density.fontScale, resolver)
+        synchronized(cache) {
+            val cached = cache[key]
+            if (cached != null) return cached
+            // Rolling only runs left to right, so the glyphs are always measured that way.
+            val measurer = TextMeasurer(resolver, density, LayoutDirection.Ltr, cacheSize = 0)
+            val metrics = TextRollingMetrics(measurer, layoutStyle)
+            cache[key] = metrics
+            if (cache.size > MAX_STYLES) {
+                val oldest = cache.keys.first()
+                cache.remove(oldest)
+            }
+            return metrics
+        }
     }
 }
 

@@ -1,5 +1,8 @@
 package ai.opencode.feature.settings.onboarding
 
+import ai.opencode.core.motion.transitionBlurEffect
+
+import ai.opencode.core.diagnostics.HidesFromScreenshots
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.StoreOf
@@ -73,7 +76,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
@@ -115,7 +117,7 @@ private typealias PlaygroundStore = StoreOf<OnboardingPlaygroundFeature.State, A
  *
  * The Onboarding Playground: the onboarding's pages over the dot field, with a hideable control
  * bar for the variant, every phase, the simulated server's latency and failures, and Replay.
- * Shown full screen from Settings › Advanced › Developer › Playgrounds › Onboarding. It is a
+ * Shown full screen from Settings › Developer › Playgrounds › Onboarding. It is a
  * sandbox only; iOS has no first-run entry to it (the real first run is `:app`'s connection
  * screen), so there is none here either.
  */
@@ -263,7 +265,7 @@ private fun Entrance(isActive: Boolean, index: Int, modifier: Modifier = Modifie
             scaleX = scale
             scaleY = scale
             val blur = (OnboardingTunables.pageBlur.toFloat() * travel * away).dp.toPx()
-            renderEffect = if (blur > 0.25f) BlurEffect(blur, blur, TileMode.Decal) else null
+            renderEffect = transitionBlurEffect(blur)
         },
         contentAlignment = Alignment.Center,
     ) { content() }
@@ -705,7 +707,7 @@ private fun ApertureLayer(
                     scaleX = scale
                     scaleY = scale
                     val blur = if (reduceMotion) 0f else (4f * (1f - s)).dp.toPx()
-                    renderEffect = if (blur > 0.25f) BlurEffect(blur, blur, TileMode.Decal) else null
+                    renderEffect = transitionBlurEffect(blur)
                 }
                 .clip(shape)
                 .background(Color.Black)
@@ -720,6 +722,7 @@ private fun ApertureLayer(
         ) {
             if (cameraFeed == CameraFeed.live) {
                 QRCameraPreview(isRunning = phase == Phase.camera, modifier = Modifier.fillMaxSize(), onScanned = onScanned)
+                HidesFromScreenshots()
             } else {
                 SimulatedCameraFeed(isRunning = phase == Phase.camera && !reduceMotion, modifier = Modifier.fillMaxSize())
             }
@@ -739,7 +742,7 @@ private fun ApertureLayer(
                         scaleX = scale
                         scaleY = scale
                         val blur = if (reduceMotion) 0f else (3f * (1f - w)).dp.toPx()
-                        renderEffect = if (blur > 0.25f) BlurEffect(blur, blur, TileMode.Decal) else null
+                        renderEffect = transitionBlurEffect(blur)
                     },
             )
         }

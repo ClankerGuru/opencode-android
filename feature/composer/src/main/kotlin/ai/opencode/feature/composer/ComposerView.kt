@@ -1,14 +1,7 @@
 package ai.opencode.feature.composer
 
-import ai.opencode.core.experiments.ExperimentalFeature
 import ai.opencode.core.experiments.key
-import ai.opencode.core.motion.rememberReduceMotion
-import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.StoreOf
-import ai.opencode.feature.voice.CallTrayController
-import ai.opencode.feature.voice.CallTrayHost
-import ai.opencode.feature.voice.VoiceStoreOf
-import androidx.compose.runtime.collectAsState
 import ai.opencode.core.store.collectState
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
@@ -66,25 +59,14 @@ import androidx.compose.ui.unit.dp
  * Fill the session's screen with it (it draws its overlays over everything and sits the
  * capsule at the bottom, above the keyboard). The session area owns the iOS
  * `SessionView+Composer` capsule and may compose these pieces itself instead.
- *
- * The capsule sits in voice's [CallTrayHost] (iOS `composerCapsule.callTrayHost(…)`): with the
- * Call Tray on (Settings' Call Style) and a call, the tray splits out beneath it.
- *
- * @param callTray the session screen's [CallTrayController] (Home's), or `null`.
- * @param callStore the screen's call, or `null` without one.
  */
 @Composable
 fun ComposerView(
     store: StoreOf<ComposerFeature.State, ComposerFeature.Action>,
     modifier: Modifier = Modifier,
-    callTray: CallTrayController? = null,
-    callStore: VoiceStoreOf? = null,
 ) {
     LaunchedEffect(store) { store.send(ComposerFeature.Action.Task) }
     val state by store.collectState()
-    val reducedMotion = rememberReduceMotion()
-    val callTraySetting by remember { shared(ExperimentalFeature.callTray.key).flow }.collectAsState()
-    val usesCallTray = ExperimentalFeature.callTray.isActive(callTraySetting)
     val send: (ComposerFeature.Action) -> Unit = { store.send(it) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -122,91 +104,75 @@ fun ComposerView(
             state.sendError?.let { error ->
                 Text(error, style = OpenCodeTextStyles.footnote, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(8.dp))
             }
-            // iOS `docksRequest`: a pending request's panel holds the composer.
-            val docksRequest = state.requestDock.hasPendingRequests
-            CallTrayHost(
-                controller = if (usesCallTray) callTray else null,
-                store = callStore,
-                isEnabled = usesCallTray,
-                isFocused = state.isFocused,
-                reducedMotion = reducedMotion,
-                allowsMergedComposerGlass = callStore == null && !docksRequest && !state.isModelPickerOpen,
-                isRequestDocked = docksRequest,
-                onExpandTranscript = {
-                    if (state.isAttachmentMenuOpen) send(ComposerFeature.Action.AttachmentMenuDismissed)
-                },
+            Surface(
+                shape = RoundedCornerShape(28.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                tonalElevation = 3.dp,
+                shadowElevation = 2.dp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .animateContentSize()
+                    .attachmentMenuAnchor { anchors.composer = it }
+                    .testTag("composer"),
             ) {
-                Surface(
-                    shape = RoundedCornerShape(28.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    tonalElevation = 3.dp,
-                    shadowElevation = 2.dp,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .animateContentSize()
-                        .attachmentMenuAnchor { anchors.composer = it }
-                        .testTag("composer"),
-                ) {
-                    Column {
-                        AnimatedVisibility(state.requestDock.hasPendingRequests) {
-                            RequestDockView(
-                                dock = state.requestDock,
-                                context = RequestDockContext(currentSessionID = state.sessionID),
-                                isKeyboardUp = state.isFocused,
-                                send = { send(ComposerFeature.Action.RequestDock(it)) },
-                            )
-                        }
-                        AttachmentsRow(state, send)
-                        Box {
-                        if (state.draft.isEmpty()) {
-                            Text(
-                                state.requestDock.requestBar(state.draft)?.placeholder ?: "Message",
-                                style = OpenCodeTextStyles.body,
-                                color = OpenCodeTheme.colors.tertiaryText,
-                                modifier = Modifier.padding(start = 16.dp, top = 16.dp).clearAndSetSemantics {},
-                            )
-                        }
-                        ComposerTextInput(
-                            text = state.draft,
-                            onTextChange = { send(ComposerFeature.Action.DraftChanged(it)) },
-                            isFocused = state.isFocused,
-                            onFocusedChange = { send(ComposerFeature.Action.FocusChanged(it)) },
-                            expanded = true,
-                            onImagePaste = { importURIs(it, imageImporter, fileImporter, send) },
-                            onLongTextPaste = if (state.isAnsweringRequest) null else { text ->
-                                send(ComposerFeature.Action.Attachments(ComposerAttachmentsFeature.Action.AttachmentAdded(PastedText.attachment(text))))
-                            },
-                            accessibilityLabel = state.requestDock.requestBar(state.draft)?.fieldLabel ?: "Message",
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                Column {
+                    AnimatedVisibility(state.requestDock.hasPendingRequests) {
+                        RequestDockView(
+                            dock = state.requestDock,
+                            context = RequestDockContext(currentSessionID = state.sessionID),
+                            isKeyboardUp = state.isFocused,
+                            send = { send(ComposerFeature.Action.RequestDock(it)) },
                         )
-                        }
-                        Row(
-                            Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            AttachmentPickerButton(
-                                isLoading = imageImporter.isLoading || fileImporter.isLoading || state.attachments.isLocating,
-                                isOpen = state.isAttachmentMenuOpen,
-                                anchors = anchors,
-                                press = press,
-                                rows = if (state.isAttachmentMenuOpen) anchors.rows else emptyMap(),
-                                onToggle = { send(ComposerFeature.Action.PlusTapped) },
-                                onChoose = ::choose,
+                    }
+                    AttachmentsRow(state, send)
+                    Box {
+                    if (state.draft.isEmpty()) {
+                        Text(
+                            state.requestDock.requestBar(state.draft)?.placeholder ?: "Message",
+                            style = OpenCodeTextStyles.body,
+                            color = OpenCodeTheme.colors.tertiaryText,
+                            modifier = Modifier.padding(start = 16.dp, top = 16.dp).clearAndSetSemantics {},
+                        )
+                    }
+                    ComposerTextInput(
+                        text = state.draft,
+                        onTextChange = { send(ComposerFeature.Action.DraftChanged(it)) },
+                        isFocused = state.isFocused,
+                        onFocusedChange = { send(ComposerFeature.Action.FocusChanged(it)) },
+                        expanded = true,
+                        onImagePaste = { importURIs(it, imageImporter, fileImporter, send) },
+                        onLongTextPaste = if (state.isAnsweringRequest) null else { text ->
+                            send(ComposerFeature.Action.Attachments(ComposerAttachmentsFeature.Action.AttachmentAdded(PastedText.attachment(text))))
+                        },
+                        accessibilityLabel = state.requestDock.requestBar(state.draft)?.fieldLabel ?: "Message",
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    )
+                    }
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        AttachmentPickerButton(
+                            isLoading = imageImporter.isLoading || fileImporter.isLoading || state.attachments.isLocating,
+                            isOpen = state.isAttachmentMenuOpen,
+                            anchors = anchors,
+                            press = press,
+                            rows = if (state.isAttachmentMenuOpen) anchors.rows else emptyMap(),
+                            onToggle = { send(ComposerFeature.Action.PlusTapped) },
+                            onChoose = ::choose,
+                        )
+                        if (!state.isAnsweringRequest) {
+                            ModelPickerChip(
+                                state = state.modelPicker,
+                                onClick = { send(ComposerFeature.Action.ModelChipTapped) },
                             )
-                            if (!state.isAnsweringRequest) {
-                                ModelPickerChip(
-                                    state = state.modelPicker,
-                                    usesModelPickerSheet = false,
-                                    onClick = { send(ComposerFeature.Action.ModelChipTapped) },
-                                )
-                            }
-                            Spacer(Modifier.weight(1f))
-                            SendButton(
-                                enabled = state.requestDock.requestBar(state.draft)?.let { it.isReady && state.requestDock.respondingRequestIDs.isEmpty() } ?: state.canSend,
-                                label = sendLabel(state),
-                                onClick = { send(ComposerFeature.Action.SendTapped) },
-                            )
                         }
+                        Spacer(Modifier.weight(1f))
+                        SendButton(
+                            enabled = state.requestDock.requestBar(state.draft)?.let { it.isReady && state.requestDock.respondingRequestIDs.isEmpty() } ?: state.canSend,
+                            label = sendLabel(state),
+                            onClick = { send(ComposerFeature.Action.SendTapped) },
+                        )
                     }
                 }
             }

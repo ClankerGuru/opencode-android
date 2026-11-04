@@ -21,6 +21,7 @@ import ai.opencode.feature.system.share.ShareInboxClient
 import ai.opencode.feature.voice.ReplyWatch
 import ai.opencode.feature.voice.VoiceFeature
 import ai.opencode.feature.voice.VoiceWorkClient
+import ai.opencode.feature.voice.tracksSessionDelegatorTools
 import ai.opencode.server.OpenCodeLiveContentEvent
 
 /*
@@ -59,6 +60,7 @@ internal fun HomeFeature.reduceSubagent(state: State, id: Int, action: SessionFe
         is SessionFeature.Action.PendingRequestsResponse, is SessionFeature.Action.RequestDock,
         -> Reduced(state.syncingTopSubagentVoiceTarget(id))
         is SessionFeature.Action.ViewAcknowledged -> Reduced(state.notingViewAcknowledged(action.sessionID, action.idle))
+        is SessionFeature.Action.MissingFolderMoved -> sessionMoved(state, action.sessionID, action.directory)
         is SessionFeature.Action.Delegate -> reduceSessionDelegate(state, action.delegate)
         else -> Reduced(state)
     }
@@ -96,7 +98,20 @@ internal fun HomeFeature.reduceSessionDetail(state: State, action: SessionFeatur
             val voiceAction = (action.action as? PresentationAction.Presented)?.action
             val delegate = (voiceAction as? VoiceFeature.Action.Delegate)?.action ?: return Reduced(state)
             return when (delegate) {
-                VoiceFeature.DelegateAction.CheckAPIKey -> Reduced(state.showingSettings())
+                is VoiceFeature.DelegateAction.OpenVoiceSettings -> Reduced(state.showingSettings(voicePage = delegate.page))
+                // As the server's attention event does: REST settles every screen's requests (the
+                // answered one may be a subagent's) and the drawer's.
+                is VoiceFeature.DelegateAction.RequestSettled -> Reduced(
+                    state,
+                    Effect.merge(refreshAttention(state), forwardToScreens(state, SessionFeature.Action.RequestsChanged) { it.session != null }),
+                )
+                is VoiceFeature.DelegateAction.DelegatorSessionCreated -> {
+                    if (state.sessions.any { it.id == delegate.session.id }) {
+                        Reduced(state)
+                    } else {
+                        Reduced(state.copy(sessions = listOf(delegate.session) + state.sessions))
+                    }
+                }
                 // The root owns the call even when it targets a pushed subagent.
                 is VoiceFeature.DelegateAction.PromptAdmitted ->
                     Reduced(state, forwardToSubagents(state, delegate.sessionID, SessionFeature.Action.VoicePromptAdmitted(delegate.sessionID)))
@@ -131,10 +146,12 @@ internal fun HomeFeature.reduceSessionDetail(state: State, action: SessionFeatur
                     dependency(ShareInboxClient).donateSuggestion(s.server.persistenceID, sessionID, session.title)
                 }
             }
-            return Reduced(s)
+            return if (sessionID == null) Reduced(s) else startSessionActivity(s, sessionID)
         }
 
         is SessionFeature.Action.ViewAcknowledged -> return Reduced(state.notingViewAcknowledged(action.sessionID, action.idle))
+
+        is SessionFeature.Action.MissingFolderMoved -> return sessionMoved(state, action.sessionID, action.directory)
 
         is SessionFeature.Action.FamilyPicked -> {
             var s = state
@@ -143,7 +160,9 @@ internal fun HomeFeature.reduceSessionDetail(state: State, action: SessionFeatur
             if (detail != null && detail.session?.id == action.sessionID && snapshot != null &&
                 snapshot.session.directory == detail.session?.directory
             ) {
-                s = s.copy(sessionDetail = snapshot.restoreSessionData(detail).reconcileInvariants())
+                // What the reader saw there last time, as reopening it would.
+                val restored = snapshot.restoreSessionData(detail).noteOpening(seen = snapshot.seenItemIDs, unread = snapshot.hasUnseenItems)
+                s = s.copy(sessionDetail = restored.reconcileInvariants())
             }
             if (s.sessionDetail?.readsOnView == true) {
                 s.sessionDetail?.familySessions?.firstOrNull { it.id == action.sessionID }?.let { s = s.markingReadLocally(it) }
@@ -178,7 +197,13 @@ internal fun HomeFeature.reduceSessionDetail(state: State, action: SessionFeatur
         is SessionFeature.Action.AcceptedTranscriptUpdated -> {
             val s = state.learningFirstPrompt(state.sessionDetail?.session?.takeIf { it.id == action.sessionID })
                 .publishingTranscript(action.sessionID, action.items).persistingTranscriptCache(action.sessionID)
+                .syncingSeenItemsFromOpenDetail(action.sessionID)
             return Reduced(s, prefetchTranscripts(s))
+        }
+
+        is SessionFeature.Action.NewMessagesPassed, is SessionFeature.Action.NewMessagesFit -> {
+            val sessionID = state.sessionDetail?.session?.id ?: return Reduced(state)
+            return Reduced(state.syncingSeenItemsFromOpenDetail(sessionID))
         }
 
         is SessionFeature.Action.ModelApplied -> return Reduced(state.notingModel(action.model, action.sessionID))
@@ -197,8 +222,11 @@ internal fun HomeFeature.reduceSessionDetail(state: State, action: SessionFeatur
             val s = state.copy(sessions = listOf(session) + state.sessions.filterNot { it.id == session.id })
                 .updatingSessionReadDates { it + (state.sessionKey(session.id) to session.updatedAt) }
                 .updatingLastViewedSessionIDs { it + (state.server.persistenceID to session.id) }
-            // `core` persists the snapshot after this action.
-            return Reduced(s)
+            // `core` persists the snapshot after this action. A draft's send has a session to follow
+            // only now.
+            val detail = s.sessionDetail
+            if (session.parentID != null || detail?.session?.id != session.id || !detail.isAwaitingReply) return Reduced(s)
+            return startSessionActivity(s, session.id)
         }
 
         is SessionFeature.Action.Delegate -> return reduceSessionDelegate(state, action.delegate)
@@ -208,17 +236,7 @@ internal fun HomeFeature.reduceSessionDetail(state: State, action: SessionFeatur
 }
 
 private fun HomeFeature.reduceSessionDelegate(state: State, delegate: SessionFeature.Delegate): HomeReduced = when (delegate) {
-    is SessionFeature.Delegate.OpenSession -> {
-        val session = delegate.session
-        val index = state.sessions.indexOfFirst { it.id == session.id }
-        val s = if (index >= 0) {
-            // The event stream may have listed it before its model was set.
-            session.model?.let { model -> state.updatingSession(session.id) { it.copy(model = model) } } ?: state
-        } else {
-            state.copy(sessions = listOf(session) + state.sessions)
-        }
-        Reduced(s.copy(nextMoveReason = "the voice agent switched"), Effect.send(Action.SessionTapped(session.id)))
-    }
+    is SessionFeature.Delegate.OpenSession -> openSessionFromDelegate(state, delegate)
     is SessionFeature.Delegate.OpenSubagent -> {
         // A Catch Up card swaps its family in place: its swipe is the deck's, so nothing is pushed over it.
         if (state.catchUp != null) {
@@ -345,19 +363,31 @@ internal fun notifyVoiceContentBatch(state: State, sessionID: String, events: Li
     } else {
         Effect.none()
     }
+    val toolEvents = if (state.sessionDetail?.voice?.tracksSessionDelegatorTools(sessionID) == true) {
+        events.filter { it.isToolLifecycleEvent }
+    } else {
+        emptyList()
+    }
+    val delegatorToolsEffect: Effect<Action> = if (toolEvents.isEmpty()) {
+        Effect.none()
+    } else {
+        Effect.send(Action.detail(SessionFeature.Action.voicePresented(VoiceFeature.Action.SessionDelegatorTools(sessionID, toolEvents))))
+    }
     val pushed = forwardToSubagents(state, sessionID, SessionFeature.Action.ContentBatch(sessionID, events))
-    if (state.sessionDetail?.session?.id != sessionID) return Effect.merge(voiceEffect, pushed)
-    return Effect.merge(Effect.send(Action.detail(SessionFeature.Action.ContentBatch(sessionID, events))), voiceEffect, pushed)
+    if (state.sessionDetail?.session?.id != sessionID) return Effect.merge(voiceEffect, delegatorToolsEffect, pushed)
+    return Effect.merge(Effect.send(Action.detail(SessionFeature.Action.ContentBatch(sessionID, events))), voiceEffect, delegatorToolsEffect, pushed)
 }
 
 /** A run ended: the call's reply watch settles it, or just hears it stopped (iOS `notifyVoiceExecutionEnded`). */
 internal fun notifyVoiceExecutionEnded(state: State, sessionID: String): Reduced<State, Action> {
     val voice = state.sessionDetail?.voice ?: return Reduced(state)
-    if (!voice.replyWatch.isWatching(sessionID)) {
+    val relays = voice.usesSessionDelegator && voice.replyWatch.awaitsParentRelay(sessionID)
+    if (!voice.replyWatch.isWatching(sessionID) && !relays) {
         return Reduced(state.updatingDetail { it.copy(voice = voice.copy(replyWatch = voice.replyWatch.setSessionActive(sessionID, false))) })
     }
     val voiceWork = dependency(VoiceWorkClient)
-    val settle = Effect.run<Action> { voiceWork.noteSessionSettled(sessionID) }
+    val server = state.server
+    val settle = Effect.run<Action> { voiceWork.noteSessionSettled(server, sessionID) }
     val forward = Effect.send(Action.detail(SessionFeature.Action.voicePresented(VoiceFeature.Action.ReplyWatch(ReplyWatch.Event.SseExecutionEnded(sessionID)))))
     return Reduced(state, Effect.merge(settle, forward))
 }
@@ -369,10 +399,36 @@ internal fun notifyVoiceSnapshot(state: State, activeIDs: Set<String>): Reduced<
         return Reduced(state.updatingDetail { it.copy(voice = voice.copy(replyWatch = voice.replyWatch.copy(activeSessionIDs = activeIDs))) })
     }
     val voiceWork = dependency(VoiceWorkClient)
-    val settle = Effect.run<Action> { voiceWork.noteActiveSessions(activeIDs) }
+    val server = state.server
+    val settle = Effect.run<Action> { voiceWork.noteActiveSessions(server, activeIDs) }
     val forward = Effect.send(
         Action.detail(SessionFeature.Action.voicePresented(VoiceFeature.Action.ReplyWatch(ReplyWatch.Event.ActiveSessionsSnapshot(activeIDs, ReplyWatch.SettlementSource.snapshot)))),
     )
     return Reduced(state, Effect.merge(settle, forward))
 }
 
+/**
+ * iOS `.delegate(.openSession(session, toolID))`: the voice agent (or a fork) puts a session on
+ * screen. Settings, What’s New, a deletion confirmation and every mounted session's sheets go, the
+ * drawer closes, and Home's normal path moves there. A voice open (`toolID`) navigates only while
+ * App's operation authorizes it, and in this same turn.
+ */
+private fun HomeFeature.openSessionFromDelegate(state: State, delegate: SessionFeature.Delegate.OpenSession): HomeReduced {
+    val toolID = delegate.toolID
+    if (toolID != null && state.voiceNavigationToolID != toolID) return Reduced(state)
+    val session = delegate.session
+    var s = state.copy(settings = null, pendingDeletion = null).clearingSessionCovers()
+    val index = s.sessions.indexOfFirst { it.id == session.id }
+    if (index >= 0) {
+        // The event stream may have listed it before its model was set.
+        val model = session.model
+        if (model != null) s = s.updatingSession(session.id) { it.copy(model = model) }
+    } else {
+        s = s.copy(sessions = listOf(session) + s.sessions)
+    }
+    s = s.copy(nextMoveReason = "the voice agent switched", drawerCloseRequests = s.drawerCloseRequests + 1)
+    // The authorized navigation starts in this turn, not an unguarded queued SessionTapped that
+    // could outlive a timeout or refusal.
+    if (toolID != null) return reduceDrawer(s, Action.SessionTapped(session.id))
+    return Reduced(s, Effect.send(Action.SessionTapped(session.id)))
+}

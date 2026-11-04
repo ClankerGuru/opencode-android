@@ -117,6 +117,20 @@ class NewSessionDraftTests {
         assertEquals(renamed, order.projects[2])
     }
 
+    /**
+     * The Project sheet lists a folder once even when the server has it
+     * under two projects (TestFlight build 640 showed `/` twice).
+     */
+    @Test fun projectSheetListsEachFolderOnce() = draftTest { h ->
+        val root = OpenCodeProject(id = "global", name = "/", directory = "/")
+        val rootAgain = OpenCodeProject(id = "root-git", name = "/", directory = "/")
+        val copy = OpenCodeProject(id = "p1-again", name = "project-1", directory = projects[0].directory)
+        var state = h.draft().copy(projects = listOf(root, projects[0], rootAgain, copy, projects[1]))
+        assertEquals(listOf("global", "p1", "p2"), state.filteredProjects.map { it.id })
+        state = state.copy(projectFilter = "project")
+        assertEquals(listOf("p1", "p2"), state.filteredProjects.map { it.id })
+    }
+
     @Test fun aServerChangeDropsEveryPreviousProjectSlot() = draftTest { h ->
         val first = h.draft()
         val otherServer = OpenCodeServer(url = "http://localhost:10", username = "", password = "")

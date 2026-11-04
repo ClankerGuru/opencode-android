@@ -6,21 +6,24 @@ import ai.opencode.core.dependencies.asContextElement
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.sharing.SharedStore
+import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.Reducer
 import ai.opencode.core.store.TestStore
+import ai.opencode.feature.composer.modelpicker.ModelDisplayNames
 import ai.opencode.server.OpenCodeServer
+import ai.opencode.server.model.OpenCodeModel
 import ai.opencode.server.model.OpenCodeModelRef
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.OpenCodeTranscriptItem
+import java.time.Instant
+import kotlin.reflect.KClass
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
-import java.time.Instant
-import kotlin.reflect.KClass
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.seconds
 
 /**
  * Shared setup for the ports of the iOS session tests (`SessionFeatureTests` and its
@@ -73,6 +76,13 @@ internal object SessionTestSupport {
         }
         fun update(block: (T) -> T) = synchronized(this) { current = block(current) }
     }
+
+    /**
+     * iOS `$0.$modelDisplayNamesByServer.withLock { $0[server.persistenceID] = .init(models: …) }`
+     * inside a receive. `Shared` compares by reference, so the port checks the write after it.
+     */
+    fun SessionFeature.State.assertRemembersModelNames(models: List<OpenCodeModel>) =
+        org.junit.Assert.assertEquals(ModelDisplayNames(models), modelDisplayNamesByServer.value[server.persistenceID])
 
     fun <T> LockIsolated<List<T>>.append(value: T) = update { it + value }
     fun LockIsolated<Int>.increment(): Int = withValue { (it + 1) to (it + 1) }

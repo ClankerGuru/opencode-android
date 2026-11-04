@@ -6,8 +6,7 @@ import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.store.Effect
 import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.feature.composer.ComposerFileAttachment
-import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.core.sharing.ExperimentalFeatures
+import ai.opencode.feature.media.MediaReferenceClient
 import ai.opencode.feature.transcript.TranscriptEntry
 import ai.opencode.feature.transcript.rows.RunErrorState as TranscriptRunErrorState
 import ai.opencode.feature.voice.VoiceHandoff
@@ -113,24 +112,54 @@ fun State.restoredPrompt(messageID: String, uuid: UuidClient = dependency(UuidCl
         }
     }
     if (!matched || source != null || VoiceHandoff.parse(text) != null) return null
-    val attachments = images.map { image ->
-        OpenCodeOutgoingAttachment(id = uuid.next().toString(), data = image.data, mime = imageMIME(image.data))
-    }.toMutableList()
+    // A `media:<hash>` image or file restores from the memory cache, or empty with its hash for
+    // `stageRevert` to load (iOS 7f5ac4c5); one the server no longer has can't come back.
+    val mediaReferences = dependency(MediaReferenceClient)
+    val attachments = ArrayList<OpenCodeOutgoingAttachment>()
+    for (image in images) {
+        if (image.isUnavailable) return null
+        val data = if (image.data.isEmpty()) image.mediaHash?.let(mediaReferences.cachedData) ?: ByteArray(0) else image.data
+        if (data.isEmpty() && image.mediaHash == null) return null
+        attachments += OpenCodeOutgoingAttachment(
+            id = uuid.next().toString(), data = data, mime = image.mime ?: imageMIME(data),
+            name = image.name, mediaHash = image.mediaHash, byteCount = image.byteCount,
+        )
+    }
     val composerFiles = ArrayList<ComposerFileAttachment>()
     for (file in files) {
+        if (file.isUnavailable) return null
         val pasted = file.text
         val path = file.path
+        val mediaHash = file.mediaHash
         when {
-            pasted != null -> attachments += PastedText.attachment(pasted, id = uuid.next().toString())
+            pasted != null -> attachments += PastedText.attachment(pasted, id = uuid.next().toString()).withMediaHash(mediaHash)
             path != null -> composerFiles += ComposerFileAttachment(
                 id = uuid.next(), name = file.name, mime = file.mime, size = 0, localPath = path,
                 status = ComposerFileAttachment.Status.Uploaded(path),
             )
+            mediaHash != null -> {
+                val data = mediaReferences.cachedData(mediaHash) ?: ByteArray(0)
+                val text = if (data.isNotEmpty()) PastedText.text(file.mime, data) else null
+                attachments += if (text != null) {
+                    PastedText.attachment(text, id = uuid.next().toString()).withMediaHash(mediaHash)
+                } else {
+                    OpenCodeOutgoingAttachment(
+                        id = uuid.next().toString(), data = data, mime = file.mime, name = file.name,
+                        mediaHash = mediaHash, byteCount = file.byteCount,
+                    )
+                }
+            }
             else -> return null
         }
     }
     return PendingPrompt(messageID = messageID, text = text, attachments = attachments, files = composerFiles, requestEpoch = 0)
 }
+
+private fun OpenCodeOutgoingAttachment.withMediaHash(hash: String?): OpenCodeOutgoingAttachment =
+    if (hash == null) this else OpenCodeOutgoingAttachment(
+        id = id, data = data, mime = mime, name = name, pastedText = pastedText, pasted = pasted,
+        mediaHash = hash, byteCount = byteCount, videoDuration = videoDuration,
+    )
 
 /** A new prompt, plain or command, ends any staged revert still in flight. Returns the state and the revert's cancellation. */
 fun State.settleRevertForNewPrompt(): Pair<State, Effect<SessionFeature.Action>> =
@@ -149,18 +178,15 @@ fun State.dropUndone(): State {
  * The reader sent a message: everything above it is read, so the divider goes and nothing waiting
  * to be settled counts as new (iOS `Transcript/NewMessagesMark.swift` `noteOwnSend()`).
  */
-fun State.noteOwnSend(): State {
-    val showsSinceYouLeft = dependency(ExperimentalFeatures)(ExperimentalFeature.sinceYouLeft)
-    return copy(
-        newMessages = null,
-        newMessagesFitThrough = null,
-        newMessagesBaseline = null,
-        sinceYouLeft = null,
-        sinceYouLeftSeen = null,
-        sinceYouLeftAt = null,
-        sinceYouLeftDismissed = if (showsSinceYouLeft) true else sinceYouLeftDismissed,
-    )
-}
+fun State.noteOwnSend(): State = copy(
+    newMessages = null,
+    newMessagesFitThrough = null,
+    newMessagesBaseline = null,
+    newMessagesBaselineTimestamp = null,
+    newMessagesUnread = false,
+    newMessagesEarlierBaseline = null,
+    newMessagesWatched = emptySet(),
+)
 
 private fun startsMessage(item: OpenCodeTranscriptItem, messageID: String): Boolean = when (item) {
     is OpenCodeTranscriptItem.UserText -> item.id == messageID

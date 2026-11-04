@@ -21,9 +21,15 @@ sealed interface OpenCodeServerEvent {
     data class SessionCreated(val sessionID: String, val parentID: String?) : OpenCodeServerEvent
     data class SessionRenamed(val sessionID: String, val title: String) : OpenCodeServerEvent
 
+    /** `session.moved`: the session now lives in [directory] (Move to, or the server reviving one whose folder is gone). */
+    data class SessionMoved(val sessionID: String, val directory: String) : OpenCodeServerEvent
+
     /** Another client (or this one) read a session up to [idle]. */
     data class SessionViewChanged(val sessionID: String, val idle: Long) : OpenCodeServerEvent
     data class SessionDeleted(val sessionID: String) : OpenCodeServerEvent
+
+    /** `session.archived` / `session.unarchived`, from any client. */
+    data class SessionArchiveChanged(val sessionID: String, val isArchived: Boolean) : OpenCodeServerEvent
 
     /** A delivery: [inputID] moved from the inbox into history. */
     data class InputQueueChanged(val sessionID: String, val inputID: String?) : OpenCodeServerEvent
@@ -57,8 +63,10 @@ sealed interface OpenCodeServerEvent {
             is ExecutionStarted -> sessionID
             is ExecutionEnded -> sessionID
             is SessionRenamed -> sessionID
+            is SessionMoved -> sessionID
             is SessionViewChanged -> sessionID
             is SessionDeleted -> sessionID
+            is SessionArchiveChanged -> sessionID
             is InputQueueChanged -> sessionID
             is InputEnqueued -> sessionID
             is InputCancelled -> sessionID
@@ -106,6 +114,12 @@ sealed interface OpenCodeLiveContentEvent {
     val isDurableBoundary: Boolean
         get() = this is StepEnded || this is TextEnded || this is ToolInputEnded || this is ToolCalled ||
             this is ToolSucceeded || this is ToolFailed
+
+    val isToolLifecycleEvent: Boolean
+        get() = when (this) {
+            is ToolInputStarted, is ToolCalled, is ToolSucceeded, is ToolFailed -> true
+            else -> false
+        }
 
     /** The same semantic part identity used by REST decoding and live upserts. */
     val transcriptItemID: String?

@@ -11,11 +11,38 @@ import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
 import ai.opencode.core.store.cancellable
+import ai.opencode.core.tuning.AnimationTimeScale
 import ai.opencode.core.tuning.TuneValue
 import ai.opencode.core.tuning.TuningContext
 import ai.opencode.core.tuning.TuningSharedKeys
 import ai.opencode.core.tuning.TuningStore
 import kotlin.time.Duration.Companion.seconds
+
+/**
+ * The phone's slow-motion choice (iOS `SlowMotion`): the speed now, and the slow speed the quick
+ * toggle (`summonGesture`'s two-finger triple tap) returns to. Lives only in memory, so every
+ * launch starts at `1×`.
+ */
+data class SlowMotion(val scale: Double = 1.0, val lastSlowScale: Double = DEFAULT_SLOW_SCALE) {
+    val isSlowed: Boolean get() = scale != 1.0
+
+    /** A speed from the panel; a slow one becomes the toggle's. */
+    fun select(requested: Double): SlowMotion {
+        val next = AnimationTimeScale.normalizeScale(requested)
+        return SlowMotion(next, if (next != 1.0) next else lastSlowScale)
+    }
+
+    /** `1×` to the last slow speed, or back to `1×`. */
+    fun toggle(): SlowMotion = select(if (isSlowed) 1.0 else lastSlowScale)
+
+    companion object {
+        val scales: List<Double> = AnimationTimeScale.supportedScales
+        const val DEFAULT_SLOW_SCALE = 0.25
+
+        /** "0.25×". */
+        fun label(scale: Double): String = if (scale == Math.rint(scale)) "${scale.toInt()}×" else "$scale×"
+    }
+}
 
 /**
  * Android counterpart of iOS `TuningFeature` (`OpenCode/Tuning/TuningFeature.swift`): the floating
@@ -38,6 +65,7 @@ class TuningFeature : Reducer<TuningFeature.State, TuningFeature.Action> {
         val foldedGroups: Set<String> = emptySet(),
         /** The Developer screen, opened over the app from the panel's menu. */
         val showsDeveloperTools: Boolean = false,
+        val slowMotion: SlowMotion = SlowMotion(),
     )
 
     sealed interface Action {
@@ -64,6 +92,10 @@ class TuningFeature : Reducer<TuningFeature.State, TuningFeature.Action> {
         data class GroupFolded(val group: String, val folded: Boolean) : Action
         data object DeveloperToolsTapped : Action
         data object DeveloperToolsClosed : Action
+        /** The panel's Slow Motion control. */
+        data class SlowMotionSelected(val scale: Double) : Action
+        /** The quick toggle (`summonGesture`): `1×` ↔ the last slow speed. */
+        data object SlowMotionToggled : Action
     }
 
     private enum class CancelID { Copied }
@@ -101,8 +133,14 @@ class TuningFeature : Reducer<TuningFeature.State, TuningFeature.Action> {
             Action.TurnOffTapped -> {
                 shared(TuningSharedKeys.tuningEnabled).set(false)
                 tuning.setEnabled(false)
-                Reduced(state.copy(isPanelShown = false))
+                AnimationTimeScale.shared.reset()
+                Reduced(state.copy(isPanelShown = false, slowMotion = state.slowMotion.select(1.0)))
             }
+            is Action.SlowMotionSelected -> {
+                if (AnimationTimeScale.normalizeScale(action.scale) == state.slowMotion.scale) return Reduced(state)
+                applySlowMotion(state.slowMotion.select(action.scale), state)
+            }
+            Action.SlowMotionToggled -> applySlowMotion(state.slowMotion.toggle(), state)
             is Action.ValueChanged -> {
                 tuning.set(action.key, action.value)
                 Reduced(state)
@@ -154,6 +192,13 @@ class TuningFeature : Reducer<TuningFeature.State, TuningFeature.Action> {
                 send(Action.CopiedShown)
             }.cancellable(CancelID.Copied, cancelInFlight = true),
         )
+    }
+
+    /** Slows the app's clock (iOS `applySlowMotion`; there's no Mac page or playground to tell). */
+    private fun applySlowMotion(next: SlowMotion, state: State): Reduced<State, Action> {
+        dependency(HapticsClient).play(Haptic.selection)
+        AnimationTimeScale.shared.setScale(next.scale)
+        return Reduced(state.copy(slowMotion = next))
     }
 }
 

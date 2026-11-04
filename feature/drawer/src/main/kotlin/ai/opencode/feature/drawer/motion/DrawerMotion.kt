@@ -76,6 +76,12 @@ object DrawerMotionTunables {
     const val SHORTCUT_SCALE = 0.96f
     /** Shortcut exit delay after a page close (iOS `drawer.shortcuts.closeDelay`, 0.12 s). */
     const val SHORTCUT_CLOSE_DELAY = 0.12
+    /**
+     * Android only: how much of the drawer's width the card travels back toward shut while a
+     * predictive back gesture is held (at full progress). The commit then closes it the rest
+     * of the way; a cancel springs it open again.
+     */
+    const val BACK_PREVIEW_TRAVEL = 0.25f
 }
 
 /** Inputs driving the drawer's Catch Up and What’s New shortcut presence (iOS `DrawerShortcutInputs`). */
@@ -491,9 +497,6 @@ class DrawerMotionState(
     /** Whether a shut card about to move may hold its keyboard (iOS `holdKeyboardIfShut`'s guards: phone, no Catch Up, no pushed subagent). */
     var canHoldKeyboard: () -> Boolean = { true }
 
-    /** When true, opening dismisses the composer's keyboard instead of holding it (iOS `dismissesKeyboardOnOpen`). */
-    var dismissesKeyboardOnOpen: Boolean = false
-
     /** Reduce Motion: settles place the card without moving, and the list doesn't recede. */
     var reducedMotion: Boolean = false
         set(value) {
@@ -628,6 +631,16 @@ class DrawerMotionState(
     }
 
     /**
+     * A predictive back gesture committed: the card closes from wherever the gesture left it,
+     * however far that was (Android only; a finger pan decides with [endDrag]).
+     */
+    fun endBackDrag() {
+        if (consumeIgnoredEnd()) return
+        isDragging = false
+        close()
+    }
+
+    /**
      * The drawer button opens it (plays [Callbacks.onCommitted]); a programmatic close is a row,
      * New Session, Catch Up or What’s New taking the card back, and stays quiet.
      */
@@ -703,16 +716,11 @@ class DrawerMotionState(
 
     private fun holdKeyboardIfShut() {
         val hold = keyboardHold ?: return
-        if (dismissesKeyboardOnOpen) {
-            hold.letGo()
-            return
-        }
         if (!recedes || offset != 0f || !canHoldKeyboard() || isContentSuspended) return
         hold.begin()
     }
 
     private fun suspendContent() {
-        if (dismissesKeyboardOnOpen) keyboardHold?.letGo()
         // A drag closing the drawer takes the keyboard from its search too.
         keyboardHold?.setDrawerSearching(false)
         contentSuspendedState.value = true

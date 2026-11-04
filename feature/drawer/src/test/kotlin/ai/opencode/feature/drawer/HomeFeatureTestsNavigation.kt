@@ -429,6 +429,7 @@ class HomeFeatureTestsNavigation {
                 connection = it.connection.copy(
                     connectionStatus = HomeConnectionFeature.State.ConnectionStatus.disconnected,
                     connectionErrorMessage = error.message,
+                    credentialsRejected = true,
                 ),
             )
         }

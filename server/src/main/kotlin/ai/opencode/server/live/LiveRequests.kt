@@ -1,5 +1,7 @@
 package ai.opencode.server.live
 
+import ai.opencode.core.log.AppLog
+import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeFormRequest
 import ai.opencode.server.model.OpenCodeFormValue
@@ -13,6 +15,7 @@ import ai.opencode.server.model.PromptContext
 import ai.opencode.server.model.nonEmpty
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlin.time.Duration.Companion.seconds
 
@@ -94,20 +97,114 @@ internal suspend fun requestReplyPermission(
 }
 
 internal suspend fun requestReplyForm(server: OpenCodeServer, sessionID: String, formID: String, answer: Map<String, OpenCodeFormValue>) {
-    perform(
-        "/api/session/$sessionID/form/$formID/reply",
-        query = if (sessionID == "global") locationQuery(PromptContext.formLocationDirectory.current()) else emptyList(),
-        method = "POST",
-        body = encodedBody(FormReplyBody(answer), "form response"),
-        server = server,
-    )
+    val body = encodedBody(FormReplyBody(answer), "form response")
+    val query = if (sessionID == "global") locationQuery(PromptContext.formLocationDirectory.current()) else emptyList()
+    settleForm(server, sessionID, formID, FormSettlement.Answered(answer)) {
+        perform("/api/session/$sessionID/form/$formID/reply", query = query, method = "POST", body = body, server = server)
+    }
 }
 
 internal suspend fun requestCancelForm(server: OpenCodeServer, sessionID: String, formID: String, message: String?) {
     val query = (if (sessionID == "global") locationQuery(PromptContext.formLocationDirectory.current()) else emptyList()).toMutableList()
-    message?.nonEmpty?.let { query += "message" to it }
-    perform("/api/session/$sessionID/form/$formID", query = query, method = "DELETE", server = server)
+    val reason = message?.nonEmpty
+    if (reason != null) query += "message" to reason
+    settleForm(server, sessionID, formID, FormSettlement.Cancelled(reason)) {
+        perform("/api/session/$sessionID/form/$formID", query = query, method = "DELETE", server = server)
+    }
 }
+
+@Serializable
+enum class FormStatus {
+    @SerialName("pending") Pending,
+    @SerialName("answered") Answered,
+    @SerialName("cancelled") Cancelled,
+}
+
+/** A form's state on the server: what settled it, if anything did (iOS `FormState`). */
+@Serializable
+data class FormState(
+    val status: FormStatus,
+    val answer: Map<String, OpenCodeFormValue>? = null,
+    val message: String? = null,
+)
+
+/** How a reply or dismissal asks a form to settle (iOS `FormSettlement`). */
+sealed interface FormSettlement {
+    data class Answered(val answer: Map<String, OpenCodeFormValue>) : FormSettlement
+    data class Cancelled(val message: String?) : FormSettlement
+
+    /** The form settled this way: the same answer, or the same reason. */
+    fun matches(state: FormState): Boolean = when (this) {
+        is Answered -> state.status == FormStatus.Answered && state.answer == answer
+        is Cancelled -> state.status == FormStatus.Cancelled && state.message?.nonEmpty == message
+    }
+
+    /** Why a form settled otherwise can't take this one. */
+    fun conflict(state: FormState): String = when (this) {
+        is Answered -> if (state.status == FormStatus.Answered) "Already answered elsewhere" else "Already dismissed"
+        is Cancelled -> if (state.status == FormStatus.Answered) "Already answered" else "Already dismissed elsewhere"
+    }
+
+    val logName: String
+        get() = when (this) {
+            is Answered -> "reply"
+            is Cancelled -> "dismissal"
+        }
+}
+
+@Serializable private data class FormDetail(val state: FormState)
+
+/** Where a form stands on the server now (iOS `requestFormState`). */
+internal suspend fun requestFormState(server: OpenCodeServer, sessionID: String, formID: String): FormState =
+    request<DataPayload<FormDetail>>(
+        "/api/session/$sessionID/form/$formID",
+        query = if (sessionID == "global") locationQuery(PromptContext.formLocationDirectory.current()) else emptyList(),
+        server = server,
+    ).data.state
+
+/**
+ * Replies to and dismissals of a form aren't repeatable: one that landed answers a repeat with
+ * 409. When the connection broke after sending (a pooled connection the phone's sleep left dead
+ * fails the first POST while the event stream stays up), or the server says it's settled, the
+ * form's state says whether it took: settled with this answer (or reason) is success, still
+ * pending sends once more, settled otherwise or gone is final ([OpenCodeClientError.requestSettled]),
+ * and anything else stays the failure.
+ */
+private suspend fun settleForm(
+    server: OpenCodeServer,
+    sessionID: String,
+    formID: String,
+    wanted: FormSettlement,
+    send: suspend () -> Unit,
+) {
+    var resent = false
+    while (true) {
+        val error = try {
+            send()
+            return
+        } catch (failure: OpenCodeClientError) {
+            failure
+        }
+        if (isGone(error)) throw settled(error, "No longer waiting")
+        if (!error.mayHaveReachedServer && error.statusCode != 409) throw error
+        val state = try {
+            requestFormState(server, sessionID, formID)
+        } catch (read: OpenCodeClientError) {
+            throw if (isGone(read)) settled(error, "No longer waiting") else error
+        }
+        if (wanted.matches(state)) return
+        if (state.status != FormStatus.Pending) throw settled(error, wanted.conflict(state))
+        if (error.statusCode == 409 || resent) throw error
+        AppLog.send.notice { "form ${wanted.logName} still pending after ${error.logSummary}: resending" }
+        resent = true
+    }
+}
+
+/** The form, or its session, no longer exists on the server. */
+private fun isGone(error: OpenCodeClientError): Boolean = error.statusCode == 404 && !error.isLocationMissing
+
+private fun settled(error: OpenCodeClientError, message: String): OpenCodeClientError =
+    error.copy(message = message, requestSettled = true)
 
 // Shells (iOS `OpenCodeClient+Shells.swift`).
 

@@ -1,7 +1,7 @@
 package ai.opencode.feature.settings.serverdetails
 
+import ai.opencode.core.diagnostics.HidesFromScreenshots
 import ai.opencode.core.motion.MotionSpring
-import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.collectState
 import ai.opencode.core.store.scope
@@ -18,12 +18,11 @@ import ai.opencode.feature.settings.SettingsTint
 import ai.opencode.server.model.OpenCodeAccount
 import ai.opencode.server.model.OpenCodeAutocompleteSkill
 import ai.opencode.server.model.OpenCodeMCPServer
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -50,6 +49,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.pullToRefresh
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -60,6 +60,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
@@ -190,6 +191,7 @@ fun ServerDetailsPage(store: SettingsStore) {
     val state = stateOrNull ?: return
     state.tray?.let { tray -> ServerDetailsTray(state, tray, send) }
     if (state.awaitingCode) CodeAlert(instructions = state.signIn?.attempt?.instructions ?: "", send = send)
+    HidesFromScreenshots(shown = state.awaitingCode)
 }
 
 /** iOS's “Paste the Code” alert for a `code` mode sign-in. */
@@ -339,20 +341,14 @@ private fun OverviewTile(
     bottomPadding: androidx.compose.ui.unit.Dp = 18.dp,
     content: @Composable () -> Unit,
 ) {
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val reduceMotion = rememberReduceMotion()
-    val scale by animateFloatAsState(if (pressed) 0.98f else 1f, MotionSpring(0.2).animation(reduceMotion), label = "tile-press")
+    // Android divergence: a ripple answers the press (iOS shrinks the tile to 98 %).
     val shape = RoundedCornerShape(26.dp)
     Box(
         modifier
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
             .background(OpenCodeTheme.colors.groupedCard, shape)
             .border(0.5.dp, OpenCodeTheme.colors.text.copy(alpha = 0.06f), shape)
-            .clickable(interactionSource = interaction, indication = null, onClick = onTap)
+            .clip(shape)
+            .clickable(onClick = onTap)
             .clearAndSetSemantics {
                 contentDescription = title
                 stateDescription = value
@@ -454,10 +450,8 @@ internal fun CapsuleAction(title: String, kind: CapsuleKind, onClick: () -> Unit
         CapsuleKind.Tinted -> blue.copy(alpha = 0.15f) to blue
         CapsuleKind.Neutral -> tertiarySystemFill() to colors.text
     }
+    // Android divergence: a ripple inside the capsule answers the press (iOS shrinks it to 95 %).
     val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val reduceMotion = rememberReduceMotion()
-    val scale by animateFloatAsState(if (pressed) 0.95f else 1f, MotionSpring(0.2).animation(reduceMotion), label = "capsule-press")
     Box(
         modifier
             .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
@@ -466,13 +460,11 @@ internal fun CapsuleAction(title: String, kind: CapsuleKind, onClick: () -> Unit
     ) {
         Box(
             Modifier
-                .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                }
                 .height(32.dp)
                 .widthIn(min = 32.dp)
                 .background(fill, CircleShape)
+                .clip(CircleShape)
+                .indication(interaction, ripple())
                 .padding(horizontal = 14.dp),
             contentAlignment = Alignment.Center,
         ) {

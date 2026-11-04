@@ -14,6 +14,13 @@ import kotlin.time.Duration.Companion.seconds
 
 val voiceLog: AppLog = AppLog.voice
 
+/** Why a delegation closed without its result, sent as its function output's `status`. */
+enum class VoiceDelegationCloseReason(val rawValue: String) {
+    superseded("superseded"),
+    coveredByInterimSpeech("coveredByInterimSpeech"),
+    movedSession("movedSession"),
+}
+
 /**
  * At most one call at a time, like dictation. Starting a call ends any
  * previous one; the control methods address the current call.
@@ -22,25 +29,32 @@ class VoiceCallClient(
     /** The call's events until it ends (iOS `AsyncThrowingStream`): the flow completes, or throws why it dropped. */
     val start: suspend (apiKey: String, config: RealtimeSessionConfig) -> Flow<VoiceCallEvent>,
     val completeFunction: suspend (callID: String, output: String) -> Unit,
-    /** Quiet background progress for an active client delegation (`session.thinking.append`). */
-    val noteProgress: suspend (callID: String, text: String) -> Unit = { _, _ -> },
+    /**
+     * What a delegation's work is doing right now, for its spoken "still
+     * working" line (`VoiceProgressLine`); null when no named tool is running.
+     */
+    val noteProgressActivity: suspend (callID: String, activity: String?) -> Unit = { _, _ -> },
+    /**
+     * No spoken "still working" line for this delegation any more (its
+     * delegator gave its own status).
+     */
+    val stopProgressLine: suspend (callID: String) -> Unit = { },
     /**
      * Speaks news that belongs to no open delegation (work a delegation
-     * started has finished since): `session.commentary.append` with no ID.
+     * started has finished since, or an interim line): `session.commentary.append`
+     * with no ID.
      */
-    val announce: suspend (text: String) -> Unit = { },
-    /** The same for the prompts it answers, so the delegator can cancel it. */
-    val announceSession: (suspend (sessionID: String, promptIDs: List<String>, text: String) -> Unit)? = null,
+    val announce: suspend (sessionID: String?, promptIDs: List<String>, text: String) -> Unit = { _, _, _ -> },
     /**
      * Drops un-flushed announcements whose every prompt the delegator already
      * answered.
      */
     val cancelPendingAnnouncements: suspend (promptIDs: List<String>) -> Unit = { },
     /**
-     * Closes an abandoned delegation without speaking commentary, so a later
-     * rotation or reconnect does not report it as still running.
+     * Closes an abandoned or superseded delegation cleanly on the wire without
+     * triggering duplicate speech.
      */
-    val abandonDelegation: suspend (callID: String) -> Unit = { },
+    val closeDelegation: suspend (callID: String, reason: VoiceDelegationCloseReason) -> Unit = { _, _ -> },
     /**
      * The call moved to another session. Only the instructions that follow
      * change; nothing in flight is dropped or cut off.
@@ -67,16 +81,24 @@ class VoiceCallClient(
     val submitDelegatorInput: suspend (delegationID: String, input: List<VoiceDelegator.InputItem>) -> Boolean = { _, _ -> false },
     /** Server Voice: the backend delegator's new instructions, as the screen moves. */
     val updateDelegatorInstructions: suspend (instructions: String) -> Unit = { },
+    /**
+     * GPT-Live: returns when the user next says words, so a delegator wait
+     * can end and free the voice agent to answer them. Otherwise it returns
+     * only once cancelled.
+     */
+    val nextUserWords: suspend () -> Unit = { untilCancelled() },
 ) {
-    suspend fun announce(sessionID: String, promptIDs: List<String>, text: String) {
-        val announceSession = announceSession
-        if (announceSession != null) announceSession(sessionID, promptIDs, text) else announce(text)
-    }
+    suspend fun announce(text: String) = announce.invoke(null, emptyList(), text)
+
+    suspend fun announce(sessionID: String?, promptIDs: List<String> = emptyList(), text: String) =
+        announce.invoke(sessionID, promptIDs, text)
 
     val delegatorRounds: VoiceDelegatorRounds
         get() = VoiceDelegatorRounds(next = delegatorRound, submit = submitDelegatorInput)
 
     companion object Key : DependencyKey<VoiceCallClient> {
+        suspend fun untilCancelled(): Unit = kotlinx.coroutines.awaitCancellation()
+
         override val liveValue: VoiceCallClient by lazy {
             if (VoiceLabDemo.isEnabled) VoiceLabDemo.call else {
                 val host = VoiceCallHost()
@@ -87,11 +109,11 @@ class VoiceCallClient(
                         }
                     },
                     completeFunction = host::completeFunction,
-                    noteProgress = host::noteProgress,
-                    announce = { host.announce(it) },
-                    announceSession = { sessionID, promptIDs, text -> host.announce(text, sessionID, promptIDs) },
+                    noteProgressActivity = host::noteProgressActivity,
+                    stopProgressLine = host::stopProgressLine,
+                    announce = { sessionID, promptIDs, text -> host.announce(text, sessionID, promptIDs) },
                     cancelPendingAnnouncements = host::cancelPendingAnnouncements,
-                    abandonDelegation = host::abandonDelegation,
+                    closeDelegation = host::closeDelegation,
                     retarget = host::retarget,
                     setMuted = host::setMuted,
                     setAtEar = host::setAtEar,
@@ -100,6 +122,7 @@ class VoiceCallClient(
                     delegatorRound = host::delegatorRound,
                     submitDelegatorInput = host::submitDelegatorInput,
                     updateDelegatorInstructions = host::updateDelegatorInstructions,
+                    nextUserWords = host::nextUserWords,
                 )
             }
         }
@@ -109,8 +132,7 @@ class VoiceCallClient(
         private fun inert() = VoiceCallClient(
             start = { _, _ -> emptyFlow() },
             completeFunction = { _, _ -> },
-            noteProgress = { _, _ -> },
-            abandonDelegation = { },
+            closeDelegation = { _, _ -> },
             setMuted = { },
             updateInstructions = { _, _ -> },
             end = {},
@@ -159,6 +181,12 @@ data class VoiceCallTiming(
      */
     val liveUnbackedClaimWait: Duration = Duration.ZERO,
     /**
+     * The spoken "still working" line while a delegation is out
+     * (`VoiceProgressLine`). Zero `firstAfter`: off, the coordinator tests'
+     * default.
+     */
+    val liveProgress: VoiceProgressLine.Timing = VoiceProgressLine.Timing(),
+    /**
      * Realtime transcribes a turn after it ends, sometimes after the reply that
      * delegates it: how long a `delegate` call waits for the user's words.
      */
@@ -175,6 +203,12 @@ data class VoiceCallTiming(
      * wait until it starts, or until this long passes without one.
      */
     val liveAppendReplyWait: Duration = Duration.ZERO,
+    /**
+     * Session context (instructions) has nothing to say, and cutting off the
+     * reply the user is owed costs the turn: held alone, it waits for that
+     * reply to start, up to this long after the user's last words.
+     */
+    val liveContextReplyHold: Duration = Duration.ZERO,
     /**
      * Maximum time an append may be held while assistant audio is not playing,
      * so continuous user fragments or background noise cannot hold a completion
@@ -209,6 +243,29 @@ data class VoiceCallTiming(
      * replace it.
      */
     val liveAnswerStartWait: Duration = Duration.ZERO,
+    /**
+     * How long the user must have been quiet (no words transcribed and no
+     * voice on the microphone) before anything held for them is sent. Zero:
+     * a brief pause after their last transcript fragment (`liveAppendQuiet`,
+     * at most 450 ms), the coordinator tests' default.
+     */
+    val liveUserQuietGap: Duration = Duration.ZERO,
+    /**
+     * Microphone level (`VoiceAudioLevels` scale, 0–1) at which a capture
+     * chunk counts as the user's voice. Zero: the microphone isn't read.
+     */
+    val liveMicVoiceLevel: Float = 0f,
+    /**
+     * The microphone counts as the user talking only while their words were
+     * transcribed this recently, so a noise with no words never holds updates.
+     */
+    val liveMicVoiceWordWindow: Duration = 6.seconds,
+    /**
+     * The user talking over the voice agent this long (their voice on the
+     * microphone, with words transcribed over its speech) stops its audio.
+     * Zero: off, full duplex.
+     */
+    val liveBargeIn: Duration = Duration.ZERO,
 ) {
     // iOS `quietGate` (a `ReplyWatch.QuietGate`) is an extension next to ReplyWatch.
 
@@ -236,14 +293,28 @@ data class VoiceCallTiming(
                 return timing.copy(
                     liveAppendQuiet = 900.milliseconds,
                     liveAppendReplyWait = 1_500.milliseconds,
-                    liveAppendMaxHold = 5.seconds,
+                    liveContextReplyHold = 8.seconds,
+                    // No caps: an update waits for a real quiet moment however long that
+                    // takes (Kit's Oct 30 call: a 5 s cap sent one 1.5 s into a pause in his
+                    // dictation, and the voice agent talked over him for 9 s).
+                    liveAppendMaxHold = Duration.ZERO,
+                    liveUserQuietGap = Math.round(VoiceTurnTunables.userQuietGap.value * 1_000).milliseconds,
+                    liveMicVoiceLevel = VoiceTurnTunables.micVoiceLevel.value.toFloat(),
+                    liveBargeIn = Math.round(VoiceTurnTunables.bargeIn.value * 1_000).milliseconds,
                     liveAnswerPressedHold = 2_500.milliseconds,
-                    liveResultMaxHold = 5.seconds,
+                    liveResultMaxHold = Duration.ZERO,
                     liveAnswerSpeakingHold = 15.seconds,
                     liveAnswerStartWait = 1_200.milliseconds,
                     liveUnbackedClaimWait = 1_500.milliseconds,
+                    liveProgress = VoiceProgressLine.Timing(
+                        firstAfter = Math.round(VoiceProgressTunables.firstAfter.value * 1_000).milliseconds,
+                        quiet = Math.round(VoiceProgressTunables.quiet.value * 1_000).milliseconds,
+                        again = Math.round(VoiceProgressTunables.again.value * 1_000).milliseconds,
+                    ),
                 )
             }
+
+        val sessionDelegatorUnbackedClaimWait: Duration = 900.milliseconds
 
         private fun Instant.plusSeconds(seconds: Double): Instant = plusNanos(Math.round(seconds * 1e9))
     }

@@ -2,8 +2,12 @@ package ai.opencode.feature.drawer.catchup
 
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.experiments.ExperimentalFeature
+import ai.opencode.core.experiments.ExperimentalFeatures
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
+import ai.opencode.core.sound.SoundEffect
+import ai.opencode.core.sound.SoundEffectsClient
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
@@ -234,7 +238,12 @@ class CatchUpFeature : Reducer<CatchUpFeature.State, CatchUpFeature.Action> {
 
         Action.FinishChecked -> {
             // Ended early (a tap or new work) means no `.success`.
-            if (state.justFinished) dependency(HapticsClient).play(Haptic.success)
+            if (state.justFinished) {
+                dependency(HapticsClient).play(Haptic.success)
+                if (dependency(ExperimentalFeatures)(ExperimentalFeature.soundEffects)) {
+                    dependency(SoundEffectsClient).play(SoundEffect.catchUpDone)
+                }
+            }
             Reduced(state)
         }
 

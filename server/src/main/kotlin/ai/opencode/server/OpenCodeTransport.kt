@@ -16,6 +16,11 @@ class OpenCodeTransport(
     val measuredRequest: OkHttpClient,
     val longPoll: OkHttpClient,
     val eventStream: OkHttpClient,
+    /**
+     * Immutable `media:<hash>` blobs (iOS `media`: ephemeral, no URL cache, 20 s request
+     * interval). Defaults to [request] for test transports that stub one client.
+     */
+    val media: OkHttpClient = request,
 ) {
     companion object Key : DependencyKey<OpenCodeTransport> {
         override val liveValue: OpenCodeTransport by lazy { pools(TransportSecurity.interceptor) }
@@ -43,6 +48,13 @@ class OpenCodeTransport(
                     .readTimeout(90, TimeUnit.SECONDS)
                     .writeTimeout(90, TimeUnit.SECONDS)
                     .build(),
+                // OkHttp keeps no response cache unless one is configured; URLSession's
+                // `timeoutIntervalForRequest` is an idle interval, as OkHttp's per-phase timeouts.
+                media = recorded.newBuilder()
+                    .connectTimeout(20, TimeUnit.SECONDS)
+                    .readTimeout(20, TimeUnit.SECONDS)
+                    .writeTimeout(20, TimeUnit.SECONDS)
+                    .build(),
             )
         }
 
@@ -59,6 +71,7 @@ class OpenCodeTransport(
                 measuredRequest = live.measuredRequest.blocked(),
                 longPoll = live.longPoll.blocked(),
                 eventStream = live.eventStream.blocked(),
+                media = live.media.blocked(),
             )
         }
     }

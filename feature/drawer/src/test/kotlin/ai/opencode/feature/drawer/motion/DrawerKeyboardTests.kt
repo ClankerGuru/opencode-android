@@ -32,8 +32,8 @@ import org.junit.Test
  * - `suspendedSessionCardTranscriptIgnoresDrawerKeyboardFrameChanges` probes
  *   `TranscriptListViewController`'s UIKit content inset (`:feature:transcript`).
  *
- * Partially ported: in `keysLeavingWithAnotherSessionSlideOffAndReturnOnceTheyAreGone` and
- * `callTrayExperimentWithoutCall…` the keyboard window's transform; `safeAreaRegions` is
+ * Partially ported: in `keysLeavingWithAnotherSessionSlideOffAndReturnOnceTheyAreGone` the
+ * keyboard window's transform; `safeAreaRegions` is
  * [DrawerKeyboardHold.excludesKeyboard] (the container's `consumeWindowInsets(ime)`), and the
  * card's `isUserInteractionEnabled` is [DrawerMotionState.isContentSuspended].
  */
@@ -65,6 +65,63 @@ class DrawerKeyboardTests {
 
 class DrawerKeyboardHoldTests {
     @get:Rule val isolation = TestIsolationRule()
+
+    /**
+     * The IME's insets as the system hands them out: a request waits for control ([ready]) and
+     * keeps waiting until it's finished there or withdrawn.
+     */
+    private class Follower : DrawerKeyboardHold.Follower {
+        var requested = false
+            private set
+        var hasControl = false
+            private set
+        var withdrawn = 0
+            private set
+        val finished = mutableListOf<Boolean>()
+        private var pendingFinish: Boolean? = null
+
+        override val isActive: Boolean get() = requested
+        override var onRefused: () -> Unit = {}
+
+        override fun follow(shownFraction: Float) {
+            pendingFinish = null
+            requested = true
+        }
+
+        override fun finish(shown: Boolean) {
+            if (!requested) return
+            if (hasControl) end(shown) else pendingFinish = shown
+        }
+
+        override fun release(shown: Boolean): Boolean {
+            if (hasControl) {
+                end(shown)
+                return true
+            }
+            if (requested) withdrawn += 1
+            requested = false
+            pendingFinish = null
+            return false
+        }
+
+        override fun cancel() {
+            release(shown = true)
+        }
+
+        /** The system gives control to the request. */
+        fun ready() {
+            if (!requested) return
+            hasControl = true
+            pendingFinish?.let(::end)
+        }
+
+        private fun end(shown: Boolean) {
+            finished += shown
+            requested = false
+            hasControl = false
+            pendingFinish = null
+        }
+    }
 
     /** A focusable field reporting to the hold as `Modifier.drawerKeyboardField` / drawer search do. */
     private class Field(private val hold: DrawerKeyboardHold, private val key: String, private val inDrawer: Boolean = false) {
@@ -126,6 +183,34 @@ class DrawerKeyboardHoldTests {
             test.advanceTimeBy(millis)
             test.runCurrent()
         }
+    }
+
+    /**
+     * iOS: back from the background UIKit set the keyboard window's frame under the slide, so
+     * closing left the keys aside, the keyboard up with none of it on screen. Android: back
+     * from the background the system has the IME again; resting open the keys stay down beside
+     * the drawer, and closing gives them back on screen.
+     */
+    @Test
+    fun keysReframedUnderTheSlideComeBackToTheScreen() = runTest {
+        val harness = Harness(this)
+        harness.controller.setPresented(true, animated = false)
+        assertTrue(harness.keysAway)
+        assertEquals(1, harness.hides)
+
+        harness.hold.didBecomeActive()
+        assertTrue("Back from the background the keys are still beside the drawer", harness.keysAway)
+        assertEquals("and the system doesn't bring them up over it", 2, harness.hides)
+        assertTrue(harness.field.isFocused)
+        // The system restores the focused field's keys after ON_RESUME: down they go again.
+        harness.hold.imeVisibilityChanged(true)
+        assertEquals(3, harness.hides)
+        assertTrue(harness.keysAway)
+
+        harness.controller.setPresented(false, animated = false)
+        assertFalse("Closed, the keys are on screen", harness.keysAway)
+        assertEquals(1, harness.shows)
+        assertTrue(harness.field.isFocused)
     }
 
     @Test
@@ -287,22 +372,70 @@ class DrawerKeyboardHoldTests {
         assertFalse("Closing the drawer mid-search clears keyboard exclusion", harness.hold.excludesKeyboard)
     }
 
+    /**
+     * Android: the keys were following the card (control of the IME's insets asked for, not yet
+     * given) when a session was chosen. The let-go hands control back at once, so nothing of the
+     * hold's keeps the system from showing the next field's keys.
+     */
     @Test
-    fun callTrayExperimentWithoutCallKeepsKeyboardHoldAndDismissesIfCallStartsWhileSuspended() = runTest {
+    fun choosingASessionWhileTheKeysFollowTheCardGivesTheirControlBack() = runTest {
         val harness = Harness(this)
+        val follower = Follower()
+        harness.hold.follower = follower
+        assertTrue(harness.hold.begin())
+        harness.hold.follow(0.4f)
+        assertTrue(follower.isActive)
 
-        // With Experimental › Call Tray on and no active call, `dismissesKeyboardOnOpen` is false,
-        // so opening the drawer holds the keyboard.
-        harness.controller.dismissesKeyboardOnOpen = false
-        harness.controller.setPresented(true, animated = false)
-        assertTrue(harness.field.isFocused)
-        assertTrue(harness.hold.isHeld("composer"))
-
-        // If a call starts while the card is suspended under the open drawer,
-        // `dismissesKeyboardOnOpen` turns on and immediately lets go of the hold and ends editing.
-        harness.controller.dismissesKeyboardOnOpen = true
-        assertFalse(harness.hold.isHeld("composer"))
+        harness.hold.cardWillChange()
+        assertFalse("No request for the keys outlives the hold", follower.isActive)
+        assertEquals(1, follower.withdrawn)
+        assertFalse(harness.hold.isHolding)
         assertFalse(harness.field.isFocused)
-        assertTrue(harness.motion.isContentSuspended)
+
+        // Control arriving late isn't the hold's any more.
+        follower.ready()
+        assertFalse(follower.hasControl)
+
+        // The next session's composer takes the keyboard.
+        val next = Field(harness.hold, "next")
+        harness.fields += next
+        next.focus()
+        assertTrue(next.isFocused)
+        assertFalse(follower.isActive)
+    }
+
+    /** Resting open, control goes back with the keys down, even while a request still waits. */
+    @Test
+    fun keysRestingUnderTheOpenDrawerGiveTheirControlBack() = runTest {
+        val harness = Harness(this)
+        val follower = Follower()
+        harness.hold.follower = follower
+        assertTrue(harness.hold.begin())
+        harness.hold.follow(0.9f)
+        harness.hold.sendKeysAway()
+        assertFalse(follower.isActive)
+        assertEquals(1, harness.hides)
+
+        harness.hold.bringKeysBack()
+        harness.hold.follow(0.5f)
+        follower.ready()
+        harness.hold.sendKeysAway()
+        assertEquals("A controller puts them down itself", listOf(false), follower.finished)
+        assertEquals(1, harness.hides)
+    }
+
+    /** A field focused with nothing held takes back control a follower was left with. */
+    @Test
+    fun aFieldFocusedWithNothingHeldTakesBackALeftoverControl() = runTest {
+        val harness = Harness(this)
+        val follower = Follower()
+        harness.hold.follower = follower
+        harness.field.clearFocus()
+        follower.follow(0f)
+        follower.ready()
+
+        harness.field.focus()
+        assertFalse(follower.isActive)
+        assertEquals(listOf(true), follower.finished)
     }
 }

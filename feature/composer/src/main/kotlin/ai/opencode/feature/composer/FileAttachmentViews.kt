@@ -44,8 +44,10 @@ object FileAttachmentMetrics {
 
 /** A composer file: name, size, and upload progress, or a retry when the upload failed (iOS `ComposerFileChip`). */
 object ComposerFileChip {
+    /** The least height: larger text grows the chip rather than clipping it. */
     val height: Dp = 76.dp
     val width: Dp = 220.dp
+    /** iOS `ComposerTunables.attachmentRadius(plusMenu: false)`: main's corners. */
     val cornerRadius: Dp = 22.dp
 
     fun subtitle(file: ComposerFileAttachment): String = AttachmentFileType.subtitle(file.name, file.mime, file.size)
@@ -62,7 +64,13 @@ object ComposerFileChip {
 }
 
 @Composable
-fun ComposerFileChip(file: ComposerFileAttachment, canRetry: Boolean, onRetry: () -> Unit, modifier: Modifier = Modifier) {
+fun ComposerFileChip(
+    file: ComposerFileAttachment,
+    canRetry: Boolean,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+    cornerRadius: Dp = ComposerFileChip.cornerRadius,
+) {
     val retries = file.isFailed && canRetry
     FileAttachmentCard(
         name = file.name,
@@ -71,7 +79,7 @@ fun ComposerFileChip(file: ComposerFileAttachment, canRetry: Boolean, onRetry: (
         height = ComposerFileChip.height,
         detailLines = if (file.isFailed) 2 else 1,
         modifier = modifier
-            .clip(RoundedCornerShape(ComposerFileChip.cornerRadius))
+            .clip(RoundedCornerShape(cornerRadius))
             .background(MaterialTheme.colorScheme.surfaceContainerHighest)
             .then(if (retries) Modifier.clickable(role = Role.Button, onClick = onRetry) else Modifier)
             .clearAndSetSemantics {

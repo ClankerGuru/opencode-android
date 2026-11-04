@@ -3,6 +3,8 @@ package ai.opencode.server
 import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.dependencies.dependency
 import java.security.SecureRandom
+import java.time.Instant
+import java.util.UUID
 
 /**
  * IDs in the server's own shape (packages/schema/src/identifier.ts `create`): a prefix
@@ -27,6 +29,18 @@ object ServerID {
     }
 
     fun milliseconds(epochMillis: Long): Long = maxOf(0L, epochMillis)
+
+    /**
+     * A client-made session ID (`ses_`, descending time, and the last 14 letters and digits of
+     * [entropy]), so sessions created on this phone sort among the server's own and a retried
+     * create finds the one it already made.
+     */
+    fun newSessionID(at: Instant = Instant.now(), entropy: String = UUID.randomUUID().toString().uppercase()): String {
+        val time = timePart(milliseconds(at.toEpochMilli()), counter = 1, descending = true)
+        val random = entropy.split("_").lastOrNull { it.isNotEmpty() } ?: entropy
+        val tail = random.filter { it.isLetterOrDigit() }.takeLast(RANDOM_LENGTH)
+        return "ses_" + time + tail.padEnd(RANDOM_LENGTH, '0')
+    }
 
     /**
      * Mints IDs from a clock and random bytes, holding the server's last-millisecond

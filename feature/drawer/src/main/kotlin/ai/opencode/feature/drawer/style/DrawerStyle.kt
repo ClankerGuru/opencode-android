@@ -1,6 +1,9 @@
 package ai.opencode.feature.drawer.style
 
 import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.tuning.Tunable
+import ai.opencode.core.tuning.TunableSpring
+import ai.opencode.core.tuning.TuningStore
 import ai.opencode.core.ui.OpenCodeColors
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeIconSize
@@ -198,6 +201,18 @@ enum class DrawerRowLayout { OneLine, TwoLine }
  * with their owners (`DrawerMotion.swift`, `DrawerSearchPill.swift`).
  */
 object DrawerTunables {
+    /**
+     * iOS `DrawerTunables.register(in:)`: lists the drawer's tunable knobs (the pin drag's shadow,
+     * edge scroll, menu move and settles; the rest stay constants, as Android has no presets).
+     */
+    fun register(store: TuningStore = TuningStore.shared) {
+        if (!store.isEnabled) return
+        store.register(pinLiftShadow, pinLiftShadowY, pinLiftShadowRadius, pinEdgeBand, pinEdgeSpeed)
+        store.register(pinMoveSpring)
+        store.register(callButtonSpring)
+        store.register(pinMoveFade, holdSettle, pinLandFade)
+    }
+
     // Spacing (DrawerStyle.swift). The leading edge is derived (`rowEdge + textInset`).
     /** Row height. */
     val rowHeight: Dp = 44.dp
@@ -280,11 +295,18 @@ object DrawerTunables {
     /** Project icon size. */
     val projectIconSize: Dp = 20.dp
     /** Project icon corner radius (at a 20 dp tile; scales with the tile). */
-    val projectIconCornerRadius: Dp = 5.dp
+    val projectIconCornerRadius: Dp = 5.5.dp
     /** Project icon to title. */
     val projectIconGap: Dp = 9.dp
-    /** Project icon border opacity. */
-    const val projectIconBorderOpacity: Float = 0.85f
+    /**
+     * The tile's lighting (iOS D-137 Lit Glass Edge, a0fc7375): a highlight from the top,
+     * a 0.5 dp white edge fading toward the bottom, a contact shadow.
+     */
+    const val projectIconHighlight: Float = 0.3f
+    /** Project icon edge. */
+    const val projectIconEdgeOpacity: Float = 0.6f
+    /** Project icon shadow. */
+    const val projectIconShadow: Float = 1f
     /**
      * A long title fades out over its last [titleFade] dp instead of an ellipsis, ending at
      * the row's trailing inset, or [statusGap] before a status indicator.
@@ -302,8 +324,44 @@ object DrawerTunables {
     const val revealFadeIn: Double = 0.2
     /** Pin drag spring. */
     val pinDragSpring: MotionSpring = MotionSpring(duration = 0.42, bounce = 0.0)
+    /**
+     * The dragged row (iOS `DrawerLiftedRow`): it grows by [pinLiftScale] as it lifts on
+     * [pinLiftSpring], then springs from the finger's release into its slot on [pinDropSpring].
+     */
+    val pinLiftSpring: MotionSpring = MotionSpring(duration = 0.28, bounce = 0.1)
+    /** Dragged row grow. */
+    const val pinLiftScale: Float = 1.03f
+    /** Dragged row shadow: its opacity at full lift (iOS `DrawerLiftedRowView.apply(lift:)`). */
+    val pinLiftShadow = Tunable("drawer.pin.liftShadow", "Dragged row shadow", default = 0.3, range = 0.0..0.8, step = 0.01)
+    /** Dragged row shadow drop, dp. */
+    val pinLiftShadowY = Tunable("drawer.pin.liftShadowY", "Dragged row shadow drop", default = 6f, range = 0.0..24.0, step = 0.5)
+    /** Dragged row shadow blur, dp. */
+    val pinLiftShadowRadius = Tunable("drawer.pin.liftShadowRadius", "Dragged row shadow blur", default = 14f, range = 0.0..40.0, step = 0.5)
+    /** Dragged row landing. */
+    val pinDropSpring: MotionSpring = MotionSpring(duration = 0.36, bounce = 0.12)
+    /**
+     * Holding the dragged row within [pinEdgeBand] dp of the list's top or bottom scrolls it, up
+     * to [pinEdgeSpeed] dp a second at the edge.
+     */
+    val pinEdgeBand = Tunable("drawer.pin.edgeBand", "Drag scroll edge", default = 64f, range = 24.0..140.0, step = 1.0)
+    /** Drag scroll speed, dp/s. */
+    val pinEdgeSpeed = Tunable("drawer.pin.edgeSpeed", "Drag scroll speed", default = 900f, range = 100.0..2400.0, step = 10.0)
+    /**
+     * Pin and Unpin from the menu: the row travels to its new section, the rows between make
+     * room and the Pinned header fades in or out, as one move. Under Reduce Motion the list
+     * cross-fades over [pinMoveFade].
+     */
+    val pinMoveSpring = TunableSpring("drawer.pin.move", "Pin and Unpin move", duration = 0.36, bounce = 0.0)
+    /** The call button beside Settings coming and going as a call starts and ends. */
+    val callButtonSpring = TunableSpring("drawer.call.button", "Call button in and out", duration = 0.36, bounce = 0.0)
+    /** Pin and Unpin fade (Reduce Motion), s. */
+    val pinMoveFade = Tunable("drawer.pin.moveFade", "Pin and Unpin fade (Reduce Motion)", default = 0.2, range = 0.0..0.6, step = 0.01)
     /** Held row. */
     val holdStyle: DrawerHoldStyle = DrawerHoldStyle.InPlace
+    /** How long the menu's card takes to put its raised surface down as it returns to the list, s. */
+    val holdSettle = Tunable("drawer.hold.settle", "Held row settle", default = 0.3, range = 0.0..0.8, step = 0.01)
+    /** How long a dropped row keeps the drag's raised surface, fading it out, s. */
+    val pinLandFade = Tunable("drawer.pin.landFade", "Dropped row settle", default = 0.22, range = 0.0..0.8, step = 0.01)
     /**
      * How much of the system's grow to undo: the held row's preview starts this much
      * smaller. iOS grows a drawer row about 9.2 %, so 1.09 leaves it about 1 %.

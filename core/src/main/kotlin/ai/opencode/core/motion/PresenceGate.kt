@@ -87,7 +87,7 @@ fun Modifier.motionBlurReveal(
     val radius = MotionBlurReveal.blurRadius(clamped, maxBlur.value, reduceMotion)
     val offset = MotionBlurReveal.verticalOffset(clamped, rise.value, reduceMotion)
     val opacity = if (clamped <= 0.02f) 0f else clamped
-    val blurred = if (radius > 0f) this.blur(radius.dp) else this
+    val blurred = this.transitionBlur(radius.dp)
     return blurred.graphicsLayer {
         alpha = opacity
         translationY = offset.dp.toPx()

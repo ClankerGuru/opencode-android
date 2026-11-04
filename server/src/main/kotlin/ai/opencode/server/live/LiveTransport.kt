@@ -10,6 +10,7 @@ import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.OpenCodeTransport
 import ai.opencode.server.UrlErrorCode
 import ai.opencode.server.internal.WireJson
+import ai.opencode.server.model.OpenCodeMediaReference
 import ai.opencode.server.retry.NetworkRetry
 import ai.opencode.server.retry.RequestIdempotency
 import ai.opencode.server.retry.RetryPolicy
@@ -53,6 +54,22 @@ internal fun locationQuery(directory: String?): List<Pair<String, String>> =
     directory?.let { listOf("location[directory]" to it) } ?: emptyList()
 
 /** A route as the log shows it: IDs stay, a pairing code doesn't. */
+/**
+ * Advertises `X-OpenCode-Capabilities: experimental-media-uri` (merged into an existing
+ * comma-separated list); the server decides whether to answer with media references or inline
+ * data. Sent with every request that carries correlation headers, as iOS `applyCapabilities`.
+ */
+internal fun applyCapabilities(request: Request.Builder): Request.Builder {
+    val capability = OpenCodeMediaReference.CAPABILITY
+    val existing = request.build().header(CAPABILITIES_HEADER)?.trim()
+    if (existing.isNullOrEmpty()) return request.header(CAPABILITIES_HEADER, capability)
+    val values = existing.split(",").map { it.trim() }
+    if (capability in values) return request
+    return request.header(CAPABILITIES_HEADER, (values + capability).joinToString(", "))
+}
+
+internal const val CAPABILITIES_HEADER = "X-OpenCode-Capabilities"
+
 internal fun loggablePath(path: String): String = if (path.startsWith("/auth/")) "/auth/…" else path
 
 /**
@@ -122,8 +139,12 @@ internal fun requestBody(method: String, body: ByteArray?): RequestBody? = when 
 }
 
 /** The status error copy shared by every route. */
-internal fun statusError(status: Int, retryAfterHeader: String?): OpenCodeClientError = OpenCodeClientError(
-    message = if (status == 401) "The server rejected these credentials." else "The server returned HTTP $status.",
+internal fun statusError(status: Int, retryAfterHeader: String?, locationMissing: Boolean = false): OpenCodeClientError = OpenCodeClientError(
+    message = when {
+        status == 401 -> "The server rejected these credentials."
+        locationMissing -> OpenCodeClientError.FOLDER_GONE_MESSAGE
+        else -> "The server returned HTTP $status."
+    },
     statusCode = status,
     retryAfter = OpenCodeClientError.retryAfter(retryAfterHeader),
 )
@@ -226,6 +247,7 @@ private suspend fun performOnce(
         .method(method, requestBody(method, body))
         .header("Accept", "application/json")
     server.authorize(builder)
+    applyCapabilities(builder)
     correlation.identify(builder, requestID)
     val client = (if (longPoll) transport.longPoll else transport.request).withTimeout(timeout, followsRedirects)
     val response = try {
@@ -240,8 +262,11 @@ private suspend fun performOnce(
         throw transportError(error, failure)
     }
     if (response.code !in 200..299) {
-        AppLog.network.notice { "$method ${loggablePath(path)}: HTTP ${response.code} after ${(clock.now() - started).logSummary}" }
-        throw statusError(response.code, response.headers["Retry-After"])
+        val locationMissing = OpenCodeClientError.isLocationMissing(response.code, response.body)
+        AppLog.network.notice {
+            "$method ${loggablePath(path)}: HTTP ${response.code}${if (locationMissing) " (location missing)" else ""} after ${(clock.now() - started).logSummary}"
+        }
+        throw statusError(response.code, response.headers["Retry-After"], locationMissing)
     }
     ServerContact.shared.heard(server.persistenceID, response.url)
     return MeasuredResponse(response.body, requestID, correlation)

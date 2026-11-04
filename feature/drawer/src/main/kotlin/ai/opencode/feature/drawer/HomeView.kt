@@ -1,5 +1,10 @@
 package ai.opencode.feature.drawer
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import ai.opencode.feature.settings.onboarding.WelcomeView
+import ai.opencode.feature.settings.onboarding.WelcomeFeature
+import androidx.compose.ui.graphics.painter.Painter
 import ai.opencode.devtools.traces.TraceUploadsHost
 import ai.opencode.core.store.rememberScope
 import ai.opencode.core.dependencies.dependency
@@ -29,23 +34,14 @@ import ai.opencode.core.experiments.InAppNoticeMode
 import ai.opencode.feature.session.InAppNotice
 import ai.opencode.feature.drawer.notices.InAppNoticeSettings
 import ai.opencode.feature.system.notifications.SessionNotificationsClient
-import ai.opencode.core.experiments.ExperimentalCallStyle
 import ai.opencode.core.experiments.ExperimentalFeature
 import ai.opencode.core.experiments.key
-import ai.opencode.core.motion.Motion
 import ai.opencode.core.sharing.shared
 import ai.opencode.feature.drawer.style.DrawerMetrics
-import ai.opencode.feature.voice.CallTrayController
-import ai.opencode.feature.voice.CallTrayDock
-import ai.opencode.feature.voice.CallTrayDockGeometry
-import ai.opencode.feature.voice.CallTrayDockOverlay
-import ai.opencode.feature.voice.CallTrayTunables
-import ai.opencode.feature.voice.FloatingCallCenter
-import ai.opencode.feature.voice.FloatingCallOverlay
+import ai.opencode.feature.voice.FloatingCallWindow
 import ai.opencode.feature.voice.VoiceRoutePreferences
 import ai.opencode.feature.voice.VoiceStoreOf
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.displayCutout
@@ -60,13 +56,13 @@ import androidx.compose.ui.layout.positionInWindow
 import kotlin.math.max
 import ai.opencode.server.OpenCodeServer
 import androidx.compose.runtime.collectAsState
-import ai.opencode.feature.drawer.switcher.SessionSwitcherOverlay
 import ai.opencode.feature.session.SessionFeature
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
 import ai.opencode.core.store.Store
 import ai.opencode.feature.media.BrowserFeature
 import ai.opencode.feature.session.SessionBrowserPage
+import ai.opencode.feature.session.ServerConnectionNotice
 import ai.opencode.feature.session.SessionListContext
 import ai.opencode.feature.session.SessionPageStack
 import ai.opencode.feature.session.SessionStackPage
@@ -114,8 +110,8 @@ import kotlinx.coroutines.flow.map
 /**
  * Port of `OpenCode/Drawer/HomeView.swift`: one server's Home. The open session (or a draft) on
  * the session drawer's card ([SessionDrawerContainer]), its pushed subagents and in-app browser
- * pages (`:feature:session`'s [SessionPageStack], with predictive back), the call's tray and
- * floating orb, Catch Up, Settings pushed over everything, the delete confirmation, and the
+ * pages (`:feature:session`'s [SessionPageStack], with predictive back), the call's floating
+ * orb, Catch Up, Settings pushed over everything, the delete confirmation, and the
  * lifecycle that tells [HomeFeature] about the screen.
  *
  * A window at least [SidebarMetrics.minimumWindowWidth] wide lists the sessions in a sidebar
@@ -129,6 +125,7 @@ fun HomeView(
     store: StoreOf<HomeFeature.State, HomeFeature.Action>,
     modifier: Modifier = Modifier,
     initiallyOpenDrawer: Boolean = false,
+    welcomeMark: Painter? = null,
 ) {
     val view = rememberHomeViewState(store, initiallyOpenDrawer)
     val reducedMotion = rememberReduceMotion()
@@ -151,8 +148,9 @@ fun HomeView(
                 // An iPad-wide window lists the sessions in a sidebar beside the session; anything
                 // narrower slides the phone's drawer under it.
                 val usesSidebar = maxWidth >= SidebarMetrics.minimumWindowWidth
-                // Three quarters of a phone; on a wider window, no wider than a sidebar.
-                val drawerWidth = if (usesSidebar) SidebarMetrics.width else min(maxWidth * 0.75f, 400.dp)
+                // Android: Material's modal drawer width (at most 360 dp, leaving 56 dp of the session
+                // beside it to tap shut), where iOS takes three quarters of the phone.
+                val drawerWidth = if (usesSidebar) SidebarMetrics.width else min(maxWidth - 56.dp, 360.dp)
                 val containerWidth = maxWidth
                 SideEffect { view.usesSidebar = usesSidebar }
                 if (hasDetail) HomeLayout(store, view, usesSidebar, drawerWidth, containerWidth, reducedMotion)
@@ -161,6 +159,8 @@ fun HomeView(
         }
     }
     HomeSettingsBack(store)
+    HomeWelcome(store, welcomeMark)
+    HomeFloatingCallWindow(store)
     HomeLifecycle(store, view)
     // iOS hosts it on Home, so deletes from the session's own menu confirm too.
     HomeDeleteConfirmation(store)
@@ -189,24 +189,8 @@ private fun HomeLayout(
     val pushed by store.observe { it.subagentStack.isNotEmpty() || it.sessionDetail?.browser?.pageID != null }
     val settingsShown by store.observe { it.isSettingsShown }
     val sheetPresented by store.observe { it.topDetail?.activePicker != null || it.topDetail?.shellOutput != null }
-    val isDrawerOpen by store.observe { it.isDrawerOpen }
     val catchUpProxy = remember { CatchUpStageProxy() }
     val currentReducedMotion by rememberUpdatedState(reducedMotion)
-    val callPresentation = rememberCallPresentation()
-    val usesTray = callPresentation == ExperimentalCallStyle.tray
-    SideEffect { view.usesCallTray = usesTray }
-    val callTray = view.callTray
-    // The open session's call (iOS `sessionStore.scope(\.voice, action: \.voice.presented)`).
-    val call = rememberHomeCall(store)
-    // How far the drawer is open, each frame it moves: only the travelling tray reads these.
-    val drawerProgress = remember { mutableFloatStateOf(0f) }
-    val drawerTravels = remember { mutableStateOf(true) }
-    val firstUsesTray = remember { mutableStateOf<Boolean?>(null) }
-    LaunchedEffect(usesTray) {
-        val previous = firstUsesTray.value
-        firstUsesTray.value = usesTray
-        if (previous != null && !usesTray) callTray.reset()
-    }
     // The last stack shown, so the stage keeps its last count while it fades out.
     val lastCatchUp = remember { arrayOfNulls<CatchUpFeature.Stack>(1) }
     catchUp?.let { lastCatchUp[0] = it }
@@ -272,24 +256,11 @@ private fun HomeLayout(
             // iOS `@ScaledMetric(relativeTo: .footnote) timeRevealReach = 76`.
             view.timeReveal.update(phase, reach = TIME_REVEAL_REACH * density.fontScale, reducedMotion = currentReducedMotion)
         },
-        // The Call Tray follows the drawer into its bottom slot (D-114).
-        onDrawerProgress = { progress, travels ->
-            drawerProgress.floatValue = progress
-            drawerTravels.value = travels
-        },
-        dismissesKeyboardOnOpen = usesTray && (callTray.showsSurface || call != null),
         contentSessionID = DrawerKeyboard.closingSession(chosen = view.chosenSessionID, shown = selectedSessionID),
         isContentPushed = pushed,
         isSheetPresented = settingsShown || sheetPresented,
         content = {
-            SessionSwitcherOverlay(
-                store = store,
-                drawerOpen = view.isSessionDrawerPresented || isDrawerOpen,
-                usesSidebar = usesSidebar,
-                modifier = Modifier.fillMaxSize(),
-            ) {
-                HomeSessionStack(store, view, usesSidebar, containerWidth, callTray = if (usesTray) callTray else null)
-            }
+            HomeSessionStack(store, view, usesSidebar, containerWidth)
         },
         // The drawer's panel (iOS `sessionDrawer(width:insets:)`); Home hosts the delete confirmation.
         drawer = { HomeDrawer(store, view, Modifier.fillMaxSize(), hostsDeleteConfirmation = false) },
@@ -307,95 +278,20 @@ private fun HomeLayout(
         },
         preview = { sessionID, revision -> CatchUpPreviewCard(store, sessionID, revision) },
     )
-    // During a call the tray docks in the drawer beneath New Session (D-114).
-    if (usesTray && !usesSidebar) {
-        HomeCallTrayDock(
-            controller = callTray,
-            call = call,
-            reducedMotion = reducedMotion,
-            drawerWidth = drawerWidth,
-            isCatchingUp = catchUp != null,
-            drawerProgress = { drawerProgress.floatValue },
-            drawerTravels = { drawerTravels.value },
-        )
-    }
-    // A floating call stays put above both while the card slides and sessions change: the call
-    // belongs to the root session.
-    HomeFloatingCall(if (callPresentation == ExperimentalCallStyle.floating) call else null)
-}
-
-/** iOS `HomeView.callPresentation`: Settings' Call Style, from the call experiments. */
-@Composable
-private fun rememberCallPresentation(): ExperimentalCallStyle {
-    val callTraySetting by remember { shared(ExperimentalFeature.callTray.key).flow }.collectAsState()
-    val floatingCallSetting by remember { shared(ExperimentalFeature.floatingCall.key).flow }.collectAsState()
-    val livingOrbSetting by remember { shared(ExperimentalFeature.livingOrb.key).flow }.collectAsState()
-    val floatingCenter = remember { FloatingCallCenter.shared }
-    return ExperimentalCallStyle.of(
-        callTray = ExperimentalFeature.callTray.isActive(callTraySetting),
-        floatingCall = floatingCenter.isOn(floatingCallSetting),
-        livingOrb = ExperimentalFeature.livingOrb.isActive(livingOrbSetting),
-    )
 }
 
 /**
- * The travelling Call Tray over Home (iOS `CallTrayDockOverlay` in `homeLayout`), fed the drawer's
- * slot (iOS `drawerCallTrayGeometry`: where New Session and Settings stand without a call, as
- * wide as their row, in window space) and whether it may dock ([CallTrayDock.mayDock]).
+ * The floating call's window (iOS `homeLayout`'s `FloatingCallWindowAnchor`): a floating call stays
+ * put above everything while the card slides, sessions change and Settings, Welcome or a sheet
+ * opens: the call belongs to the root session, and its orb has a window of its own. Only while the
+ * call doesn't show its card (`call.flatMap { $0.phase.showsCard ? nil : $0 }`); a failed or
+ * dropped call hands over to its card, and the window fades the orb.
  */
 @Composable
-private fun HomeCallTrayDock(
-    controller: CallTrayController,
-    call: VoiceStoreOf?,
-    reducedMotion: Boolean,
-    drawerWidth: Dp,
-    isCatchingUp: Boolean,
-    drawerProgress: () -> Float,
-    drawerTravels: () -> Boolean,
-) {
-    val density = LocalDensity.current
-    val insetBottom = with(density) { WindowInsets.systemBars.union(WindowInsets.displayCutout).getBottom(this).toDp() }.value
-    var origin by remember { mutableStateOf(Offset.Zero) }
-    BoxWithConstraints(Modifier.fillMaxSize().onGloballyPositioned { origin = it.positionInWindow() / density.density }) {
-        val screen = Rect(origin.x, origin.y, origin.x + maxWidth.value, origin.y + maxHeight.value)
-        val height = CallTrayTunables.height
-        val edge = DrawerMetrics.rowEdge.value
-        // The slot's bottom is the resting composer's (`ComposerTunables.bottomGap`, 0).
-        val slotTop = screen.bottom - insetBottom - height
-        val geometry = CallTrayDockGeometry(
-            slot = Rect(screen.left + edge, slotTop, screen.left + edge + max(1f, drawerWidth.value - 2 * edge), slotTop + height),
-            bounds = Rect(screen.left, screen.top, screen.left + drawerWidth.value, screen.bottom),
-            // The phone's drawer recedes behind the card as it closes (iOS: phones, not iPads).
-            recedes = !reducedMotion,
-            screen = screen,
-        )
-        CallTrayDockOverlay(
-            controller = controller,
-            store = call,
-            reducedMotion = reducedMotion,
-            drawerProgress = drawerProgress,
-            drawerTravels = drawerTravels,
-            mayDock = CallTrayDock.mayDock(usesTray = true, usesSidebar = false, isCatchingUp = isCatchingUp, isResting = controller.isResting),
-            drawer = geometry,
-        )
-    }
-}
-
-/**
- * The floating call, full-window over Home (iOS `homeLayout`'s second overlay): shown while the
- * call doesn't show its card. A call that fails or drops hands over to its card: the orb fades
- * rather than vanishing (a hang-up already shrinks it away).
- */
-@Composable
-private fun HomeFloatingCall(call: VoiceStoreOf?) {
-    val showsCard = if (call == null) null else call.observe { it.phase.showsCard }.value
-    AnimatedVisibility(
-        visible = call != null && showsCard == false,
-        enter = EnterTransition.None,
-        exit = fadeOut(Motion.easeOut(0.25)),
-    ) {
-        if (call != null) FloatingCallOverlay(call)
-    }
+private fun HomeFloatingCallWindow(store: StoreOf<HomeFeature.State, HomeFeature.Action>) {
+    val call = rememberHomeCall(store)
+    val showsCard = call?.observe { it.phase.showsCard }?.value
+    FloatingCallWindow(if (call != null && showsCard == false) call else null)
 }
 
 /**
@@ -474,8 +370,7 @@ private fun stackEntries(state: HomeFeature.State): List<StackEntry> {
 /**
  * The session (or draft) at the root of [SessionPageStack], with each subagent pushed over it and
  * any in-app browser page over the screen that opened it. The root's call shows on whichever
- * subagent is on top (`hostedCall`). With the Call Tray style every page's composer hosts Home's
- * [callTray] (iOS `callTray: usesTray ? callTray : nil`).
+ * subagent is on top (`hostedCall`).
  */
 @Composable
 private fun HomeSessionStack(
@@ -483,7 +378,6 @@ private fun HomeSessionStack(
     view: HomeViewState,
     usesSidebar: Boolean,
     containerWidth: Dp,
-    callTray: CallTrayController?,
 ) {
     val root = rememberRootStore(store)
     val call = rememberHomeCall(store)
@@ -522,7 +416,7 @@ private fun HomeSessionStack(
                 navigationIcon = { HomeDrawerButton(store, view, usesSidebar, containerWidth) },
                 listContext = listContext,
                 onCatchUpOpen = if (catchingUp) ({ store.send(HomeFeature.Action.catchUpOpenTapped) }) else null,
-                callTray = callTray,
+                onConnectionAction = { action -> store.send(serverConnectionAction(action, store.state.server)) },
             )
         },
     ) { page ->
@@ -538,7 +432,6 @@ private fun HomeSessionStack(
                         if (index >= 0) store.send(HomeFeature.Action.SubagentsPopped(index))
                     },
                     hostedCall = call,
-                    callTray = callTray,
                 )
             }
             is StackEntry.Web -> SessionBrowserPage(if (entry.owner == null) root else subagent(entry.owner), Modifier.fillMaxSize())
@@ -553,7 +446,7 @@ private fun HomeSessionStack(
 /**
  * What a session screen shows of the drawer's knowledge of it (iOS `sessionListContext(for:)`):
  * its project, pin, read and mute state, the drawer button's dot for other sessions, and the
- * In-App Notice, outside Catch Up.
+ * In-App Notice and the connection pill, outside Catch Up.
  */
 internal fun HomeFeature.State.sessionListContext(session: OpenCodeSession?): SessionListContext {
     val listed = session?.let { s -> sessions.firstOrNull { it.id == s.id } }
@@ -565,8 +458,27 @@ internal fun HomeFeature.State.sessionListContext(session: OpenCodeSession?): Se
         isMuted = listed?.let { isMuted(it.id) } ?: false,
         elsewhere = if (isCatchUp) null else drawerBadge(excluding = session?.id),
         notice = if (isCatchUp) null else inAppNotice,
+        connection = if (isCatchUp) null else serverConnectionNotice,
     )
 }
+
+/** iOS `HomeView.serverConnectionNotice`: what the pill says of the connection. */
+internal val HomeFeature.State.serverConnectionNotice: ServerConnectionNotice?
+    get() = ServerConnectionNotice(
+        status = connectionStatus,
+        credentialsRejected = credentialsRejected,
+        errorMessage = connectionErrorMessage,
+        server = server,
+        isSwitching = switchingTo != null,
+    )
+
+/** iOS `HomeView.serverConnectionAction(_:)`: the pill's action, as Home's. */
+internal fun serverConnectionAction(action: ServerConnectionNotice.Action, server: OpenCodeServer): HomeFeature.Action =
+    when (action) {
+        ServerConnectionNotice.Action.retry -> HomeFeature.Action.RetryConnectionTapped
+        ServerConnectionNotice.Action.pairAgain -> HomeFeature.Action.Delegate(HomeFeature.DelegateAction.PairServerRequested)
+        ServerConnectionNotice.Action.editServer -> HomeFeature.Action.Delegate(HomeFeature.DelegateAction.EditServerRequested(server))
+    }
 
 /**
  * The session header's drawer button (iOS `SessionView(onOpenSessions:onNoticeTapped:)`): opens
@@ -656,8 +568,9 @@ internal class CatchUpPreviewStores {
         val next = Inputs(session, items, isRunning, snapshot, active)
         val existing = store
         if (existing != null && inputs == next) return existing
-        var state = SessionFeature.State.session(home.server, session, cachedItems = items, isRunning = isRunning)
-        state = home.seedingSessionSnapshot(state).copy(readsOnView = false)
+        var state = SessionFeature.State.session(home.server, session, projects = home.projects, cachedItems = items, isRunning = isRunning)
+        // Marked as the card will be once it's open, so it doesn't jump then.
+        state = home.applyingOpening(session, detail = home.seedingSessionSnapshot(state)).copy(readsOnView = false)
         if (existing != null && inputs?.session?.id == session.id && existing.state.hasRenderedFirstContentFrame) {
             state = state.copy(hasRenderedFirstContentFrame = true)
         }
@@ -740,7 +653,6 @@ private fun HomeLifecycle(store: StoreOf<HomeFeature.State, HomeFeature.Action>,
         if (previous == null || previous == serverID) return@LaunchedEffect
         view.cancelPinDrag()
         view.endSearch()
-        if (view.usesCallTray) view.callTray.reset()
     }
     // Search belongs to one visit to the drawer on one server.
     LaunchedEffect(view) {
@@ -823,6 +735,31 @@ private fun HomeSettings(store: StoreOf<HomeFeature.State, HomeFeature.Action>) 
     }
     CompositionLocalProvider(LocalAppearanceTranscriptPreview provides AppearanceTranscriptPreviewRows) { SettingsView(settings) }
 }
+
+/**
+ * Show Welcome (iOS `SettingsPresentation`'s welcome overlay): the first-run welcome, faded in over
+ * Settings and Home, never a cover, so pairing's scanner and the server form still present over
+ * it from the root. Close (and Back) dismiss it. [mark] is the app mark, from `:app`'s resources.
+ */
+@Composable
+private fun HomeWelcome(store: StoreOf<HomeFeature.State, HomeFeature.Action>, mark: Painter?) {
+    val shown by store.observe { it.welcome != null }
+    val dismiss = { store.send(HomeFeature.Action.Welcome(PresentationAction.Dismiss)) }
+    val welcome = remember(store) {
+        var last: WelcomeFeature.State? = null
+        store.scope<HomeFeature.State, HomeFeature.Action, WelcomeFeature.State, WelcomeFeature.Action>(
+            state = { home -> home.welcome?.also { last = it } ?: last ?: WelcomeFeature.State(isPreview = true) },
+            action = { HomeFeature.Action.Welcome(PresentationAction.Presented(it)) },
+        )
+    }
+    AnimatedVisibility(shown, enter = fadeIn(tween(WELCOME_FADE_MS)), exit = fadeOut(tween(WELCOME_FADE_MS))) {
+        BackHandler(onBack = dismiss)
+        WelcomeView(welcome, progress = null, problem = null, mark = mark, onClose = dismiss)
+    }
+}
+
+/** iOS `SettingsPresentation.fade`. */
+private const val WELCOME_FADE_MS = 300
 
 /**
  * Back closes Settings at its root, not what waits beneath it. `:feature:settings`'

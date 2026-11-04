@@ -17,6 +17,8 @@ import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.model.OpenCodeFormRequest
 import ai.opencode.server.model.OpenCodePermissionRequest
 import kotlin.time.Duration.Companion.seconds
+import ai.opencode.core.sound.SoundEffect
+import ai.opencode.core.experiments.ExperimentalFeature
 
 // Port of iOS `SessionFeature+Requests.swift`: pending requests (permissions, questions, forms).
 
@@ -63,15 +65,19 @@ internal fun SessionFeature.reduceRequests(state: State, action: Action): Reduce
         }
 
         is Action.RequestsConnectionChanged -> {
-            if (state.requestsConnectionIsAvailable == action.isAvailable) return Reduced(state)
-            var next = state.withRequestsConnectionIsAvailable(action.isAvailable)
+            // A catalogue failure can land after SSE connected. Even a repeated
+            // healthy snapshot earns one retry; the loading guard coalesces it.
+            val models = if (action.isAvailable && state.modelsLoadError != null) loadModelsIfNeeded(state) else Reduced(state)
+            if (state.requestsConnectionIsAvailable == action.isAvailable) return models
+            var next = models.state.withRequestsConnectionIsAvailable(action.isAvailable)
                 .copy(streamIsHealthy = action.isAvailable && state.streamIsHealthy)
                 .withRequestLoadError(null)
             if (!action.isAvailable) {
-                next = next.withRequestLoadAttempt(null).withRequestFailureAwaitingReconnect(true).copy(pendingWorkPollSeconds = null)
+                next = next.withRequestLoadAttempt(null).withRequestArrivalsAreLive(false)
+                    .withRequestFailureAwaitingReconnect(true).copy(pendingWorkPollSeconds = null)
                 // This read may predate the gap (including a local buffer overflow). Do not let
                 // reconnect join it or replay its pre-gap deltas over REST.
-                next = next.copy(liveText = emptyMap(), gappedLiveText = next.gappedLiveText + next.liveText.keys)
+                next = next.copy(liveText = emptyMap())
                 val abandon = abandonRefresh(next)
                 // Without the stream, reconciliation is the only content path: restart the watchdog at its unhealthy cadence.
                 val watched = watchdog(abandon.state)
@@ -103,7 +109,7 @@ internal fun SessionFeature.reduceRequests(state: State, action: Action): Reduce
                 recovery += Effect.send(Action.RefreshRequested(RefreshReason.Reconnect))
             }
             val started = startPendingWork(next, attempt)
-            return Reduced(started.state, Effect.merge(listOf(started.effect) + recovery))
+            return Reduced(started.state, Effect.merge(listOf(models.effect, started.effect) + recovery))
         }
 
         is Action.RequestDock -> return reduceRequestDock(action.action, state)
@@ -113,16 +119,22 @@ internal fun SessionFeature.reduceRequests(state: State, action: Action): Reduce
 }
 
 private fun SessionFeature.pendingRequestsLoaded(requests: OpenCodePendingRequests, state: State): Reduced<State, Action> {
-    val reconciled = state.requestDock.reconciled(requests, state.familySessions.map { it.id }.toSet())
+    val reconciled = state.requestDock.reconciled(requests, state.familySessions.map { it.id }.toSet()) { dock ->
+        restoringPersistedAnswers(dock, state)
+    }
     var next = state.copy(requestDock = reconciled.state)
     if (reconciled.clearedSelection && next.activePicker == State.ActivePicker.requests) next = next.copy(activePicker = null)
     // Requests dock in the composer's place; nothing opens on its own. A catch-up card's waiting
     // requests were already there.
     val announcesArrivals = next.readsOnView || next.hasLoadedPendingRequests
     if (!next.readsOnView) next = next.copy(hasLoadedPendingRequests = true)
+    val arrivedLive = next.requestArrivalsAreLive
+    if (!arrivedLive) next = next.withRequestArrivalsAreLive(true)
     // A call's bar takes the dock's place and has its own cues.
     if (RequestAnswering.announcesArrival(reconciled.arrived, announcesArrivals, next.callOwnsAudio, next.isCovered, sceneWindow.isFront)) {
         haptics.play(Haptic.attention)
+        // Never for what was already waiting when the screen opened or reconnected.
+        if (arrivedLive && experimentalFeatures(ExperimentalFeature.soundEffects)) soundEffects.play(SoundEffect.needsInput)
     }
     return Reduced(next)
 }
@@ -159,6 +171,7 @@ private fun SessionFeature.pendingRequestsFailed(error: OpenCodeClientError, sta
 private fun SessionFeature.reduceRequestDock(action: RequestDockFeature.Action, state: State): Reduced<State, Action> = when (action) {
     is RequestDockFeature.Action.ReviewRequestSelected,
     is RequestDockFeature.Action.QuestionPageChanged,
+    is RequestDockFeature.Action.CollapseChanged,
     is RequestDockFeature.Action.FormValueChanged,
     -> Reduced(state)
 
@@ -204,6 +217,7 @@ private fun SessionFeature.reduceRequestDock(action: RequestDockFeature.Action, 
     is RequestDockFeature.Action.ResponseFinished -> {
         val settled = RequestReplies.responseFinished(
             state.requestDock, action.sessionID, action.requestID, action.error, state.familySessions.map { it.id }.toSet(),
+            dismissal = action.dismissal,
         )
         if (settled == null) {
             Reduced(state)

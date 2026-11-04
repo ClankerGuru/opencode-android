@@ -30,7 +30,11 @@ android {
             applicationIdSuffix = ".debug"
         }
         release {
-            isMinifyEnabled = false
+            // R8 is what makes Compose fast in release: it strips the debug-only paths, inlines
+            // and devirtualises the runtime. Every library we use ships its own keep rules.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
             if (uploadKeystore != null) signingConfig = signingConfigs.getByName("upload")
         }
         create("benchmark") {
@@ -40,8 +44,6 @@ android {
             signingConfig = signingConfigs.getByName("debug")
             isDebuggable = false
             isProfileable = true
-            isMinifyEnabled = true
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
         }
     }
     buildFeatures {

@@ -1,5 +1,7 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.motion.transitionBlur
+
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import androidx.compose.foundation.Canvas
@@ -39,12 +41,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
@@ -353,7 +355,7 @@ private fun tone(value: Double): Color {
 
 /**
  * The growing autocomplete list mounted in the composer surface's panel slot (iOS
- * `ComposerAutocompletePanel`, mounted in `VoiceCallSurface`'s `panel`). Rows run bottom-up
+ * `ComposerAutocompletePanel`, mounted in `ComposerSurface`'s `panel`). Rows run bottom-up
  * from the composer text; the highlight sits concentric with the glass; edge fades show only
  * where rows overflow. One pointer handler owns the list (OC-474): a touch scrolls once it
  * passes the tap slop and never picks a row after that; a touch that stays within it picks the
@@ -393,7 +395,7 @@ fun ComposerAutocompletePanel(
                         transformOrigin = TransformOrigin(0.5f, 1f)
                         alpha = frame.contentAlpha.toFloat()
                     }
-                    .then(if (frame.contentBlur > 0.01) Modifier.blur(frame.contentBlur.dp) else Modifier),
+                    .then(if (frame.contentBlur > 0.01) Modifier.transitionBlur(frame.contentBlur.dp) else Modifier),
             ) {
                 AutocompleteListWindow(controller, frame, params, scale, onSelectRow)
             }
@@ -517,7 +519,7 @@ private fun AutocompleteRowSlot(
             .offset(slotRect.minX.dp, slotRect.minY.dp)
             .requiredSize(slotRect.width.dp, slotRect.height.dp)
             .clip(RoundedCornerShape(row.cornerRadius.dp))
-            .then(if (row.blur > 0.01) Modifier.blur(row.blur.dp) else Modifier)
+            .then(if (row.blur > 0.01) Modifier.transitionBlur(row.blur.dp) else Modifier)
             .alpha(row.alpha.toFloat())
             .clearAndSetSemantics {
                 contentDescription = label
@@ -1273,7 +1275,7 @@ fun AutocompleteInlineChips(bridge: ComposerAutocompleteTextBridge, modifier: Mo
 /**
  * The session view's `syncComposerAutocomplete(state:)`: wires [bridge] and the flight
  * landing slot, then mirrors [state] into [controller] whenever it or the composer's size
- * changes. [composerWidth]/[composerHeight] are the composer's measured size in dp.
+ * changes. [composerSize] is the composer's measured size in dp.
  */
 @Composable
 fun SyncComposerAutocomplete(
@@ -1281,11 +1283,15 @@ fun SyncComposerAutocomplete(
     isEnabled: Boolean,
     controller: AutocompleteMotionController,
     bridge: ComposerAutocompleteTextBridge,
-    composerWidth: Double,
-    composerHeight: Double,
+    composerSize: () -> Size,
     reducedMotion: Boolean,
     send: (ComposerAutocompleteAction) -> Unit,
 ) {
+    // The size is read here, not by the caller: it changes on every frame the composer grows (the
+    // keyboard's morph), and only this small scope should recompose for it.
+    val size = composerSize()
+    val composerWidth = size.width.toDouble()
+    val composerHeight = size.height.toDouble()
     val density = LocalDensity.current
     val currentSend by rememberUpdatedState(send)
     val last = remember { arrayOfNulls<Any>(1) }

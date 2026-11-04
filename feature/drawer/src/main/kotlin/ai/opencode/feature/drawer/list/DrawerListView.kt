@@ -6,7 +6,9 @@ import ai.opencode.core.motion.SpringSolver
 import ai.opencode.core.motion.motionFrameLoop
 import ai.opencode.core.motion.rememberFrameDurationSeconds
 import ai.opencode.core.store.StoreOf
+import ai.opencode.feature.drawer.DrawerListFooter
 import ai.opencode.feature.drawer.HomeFeature
+import ai.opencode.feature.drawer.SessionPagesAction
 import ai.opencode.feature.drawer.icons.resolved
 import ai.opencode.feature.drawer.isPinned
 import ai.opencode.feature.drawer.motion.DrawerPanRegions
@@ -14,6 +16,7 @@ import ai.opencode.feature.drawer.motion.DrawerShortcutInputs
 import ai.opencode.feature.drawer.motion.DrawerShortcutMotion
 import ai.opencode.feature.drawer.motion.DrawerTimeReveal
 import ai.opencode.feature.drawer.motion.DrawerTimestamp
+import ai.opencode.feature.drawer.motion.ServerSwapMotion
 import ai.opencode.feature.drawer.motion.drawerPanList
 import ai.opencode.feature.drawer.pinnedSessions
 import ai.opencode.feature.drawer.recentSessions
@@ -22,6 +25,7 @@ import ai.opencode.feature.drawer.style.DrawerHeaderScrollState
 import ai.opencode.feature.drawer.style.DrawerSectionHeaderKind
 import ai.opencode.feature.drawer.style.DrawerTunables
 import ai.opencode.feature.drawer.visibleSessions
+import ai.opencode.feature.session.ServerFlowTunables
 import ai.opencode.server.model.OpenCodeProject
 import android.view.accessibility.AccessibilityManager
 import androidx.compose.animation.core.Animatable
@@ -29,13 +33,14 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -52,25 +57,32 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalGraphicsContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.collectLatest
 import java.time.Instant
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.collectLatest
 
 /*
  * Port of iOS `DrawerListController.swift` (+ its SwiftUI host `DrawerListView`): the drawer's
@@ -139,9 +151,11 @@ fun DrawerListView(
     modifier: Modifier = Modifier,
     panRegions: DrawerPanRegions? = null,
     listState: LazyListState = rememberLazyListState(),
+    serverSwap: ServerSwapMotion? = null,
 ) {
     remember { DrawerListPerfProbe.mountStarted(); true }
     val density = LocalDensity.current
+    val windowInfo = LocalWindowInfo.current
     val scope = rememberCoroutineScope()
     val frameDuration = rememberFrameDurationSeconds()
     val currentActions by rememberUpdatedState(actions)
@@ -177,6 +191,16 @@ fun DrawerListView(
         }
     }
     val isSettingsShown by remember { derivedStateOf { homeState.value.isSettingsShown } }
+
+    // iOS `DrawerTunables.register(in:)`: the drawer's knobs join the tuning panel while it's on.
+    SideEffect { DrawerTunables.register() }
+
+    // Server Flow: before the rows it moves, as the title may not have drawn it yet.
+    val hasApplied = remember { booleanArrayOf(false) }
+    SideEffect {
+        inputs.serverSwap?.let { serverSwap?.sync(it, animated = hasApplied[0]) }
+        hasApplied[0] = true
+    }
 
     // The shortcut rows' spring follows what the list shows.
     val shortcutInputs = DrawerShortcutInputs(
@@ -249,12 +273,34 @@ fun DrawerListView(
 
             override val viewportTop: Float get() = -listState.layoutInfo.viewportStartOffset / density.density
 
+            override val height: Float get() = (listCoordinates[0]?.size?.height ?: 0) / density.density
+
+            override val headerBottom: Float
+                get() = max(listState.layoutInfo.beforeContentPadding / density.density - DrawerTunables.topGap.value, 0f)
+
+            override val footerTop: Float
+                get() = height - listState.layoutInfo.afterContentPadding / density.density
+
+            override val window: Rect
+                get() {
+                    val origin = listCoordinates[0]?.takeIf { it.isAttached }?.positionInWindow() ?: return super.window
+                    val size = windowInfo.containerSize
+                    return Rect(-origin.x, -origin.y, size.width - origin.x, size.height - origin.y).let {
+                        Rect(it.left / density.density, it.top / density.density, it.right / density.density, it.bottom / density.density)
+                    }
+                }
+
             override fun flushNow() {
                 homeState.value = store.state
             }
 
             override fun preserveScroll() {
                 listState.requestScrollToItem(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset)
+            }
+
+            override fun scrollBy(delta: Float) {
+                // Synchronous: the layout info the next read sees is already scrolled.
+                listState.dispatchRawDelta(delta * density.density)
             }
 
             override val scope: CoroutineScope get() = scope
@@ -308,13 +354,32 @@ fun DrawerListView(
         runCatching { target.requestFocus() }
     }
 
-    // Another server's Home arriving in place fades the list in.
+    // iOS `apply`'s server branches: Server Flow's switch leaves the old server's rows hanging off
+    // its name as it goes (`swapRows`); otherwise another server's Home arriving in place, or
+    // Server Flow's ghost rows giving way to what loaded, fades the list in.
     val listAlpha = remember { Animatable(1f) }
-    val shownServer = remember { arrayOf(model.serverID) }
-    LaunchedEffect(model.serverID) {
-        if (shownServer[0] == model.serverID) return@LaunchedEffect
-        shownServer[0] = model.serverID
-        if (currentInputs.value.reducedMotion) return@LaunchedEffect
+    val graphics = LocalGraphicsContext.current
+    val swapPictures = remember(graphics) { ServerSwapPictures(graphics) }
+    DisposableEffect(swapPictures) { onDispose { swapPictures.release() } }
+    val swapsRows = serverSwap != null && inputs.serverSwap != null
+    val shownList = remember { arrayOf(model.serverID to model.items) }
+    val listFades = remember { intArrayOf(0) }
+    val (shownServer, shownItems) = shownList[0]
+    if (shownServer != model.serverID || shownItems != model.items) {
+        val switched = shownServer != model.serverID
+        val ghosted = shownItems.any { it is DrawerListItem.Ghost }
+        if (switched && swapsRows && serverSwap != null) {
+            // Before the next server's rows compose: the rows on screen are still the old ones.
+            Snapshot.withoutReadObservation {
+                swapPictures.swap(server = shownServer, next = model.serverID, info = listState.layoutInfo, firstVisible = listState.firstVisibleItemIndex, motion = serverSwap)
+            }
+        } else if ((switched || (ghosted && swapsRows)) && !model.reducedMotion) {
+            listFades[0] += 1
+        }
+        shownList[0] = model.serverID to model.items
+    }
+    LaunchedEffect(listFades[0]) {
+        if (listFades[0] == 0) return@LaunchedEffect
         listAlpha.snapTo(0f)
         listAlpha.animateTo(1f, tween(250, easing = Motion.EaseInOut))
     }
@@ -334,12 +399,39 @@ fun DrawerListView(
         snapshotFlow { listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0 }
             .collect { restsAtTop[0] = it }
     }
+    // iOS `loadMoreIfFooterVisible`: the footer in view while it spins reads the next page, and
+    // each page's answer checks again, so a page too short to push it out reads the one after.
+    val currentModel = rememberUpdatedState(model)
+    LaunchedEffect(store, listState) {
+        snapshotFlow {
+            val footer = currentModel.value.footer
+            val footerShows = listState.layoutInfo.visibleItemsInfo.any { it.key == DrawerListItem.Footer.key }
+            Triple(footer == DrawerListFooter.loading && footerShows, currentModel.value.pagesRead, currentModel.value.search)
+        }.collect { (loadsMore, _, _) ->
+            if (loadsMore) store.send(HomeFeature.Action.SessionPages(SessionPagesAction.LoadMoreRequested))
+        }
+    }
+
     val firstKey = model.items.firstOrNull()?.key
     val shownFirstKey = remember { arrayOfNulls<String>(1) }
     if (shownFirstKey[0] != firstKey) {
         if (shownFirstKey[0] != null && restsAtTop[0]) listState.requestScrollToItem(0, 0)
         shownFirstKey[0] = firstKey
     }
+
+    // iOS ff935bef (`movesPins`): Pin, Unpin and Move Up/Down outside a drag (the menu, TalkBack)
+    // move the row to its new place as the rows between make room, in one move; not on another
+    // server's Home or a changed search, and a drag lands its own.
+    val shownPins = remember { arrayOfNulls<DrawerShownPins>(1) }
+    val pins = DrawerShownPins(
+        serverID = model.serverID,
+        search = model.search,
+        pinned = model.sections[DrawerListSection.pinned].orEmpty(),
+    )
+    shownPins[0]?.let { previous ->
+        if (previous.movesPins(pins) && isDrawerVisible) pinDrag.pinMove.begin(model.reducedMotion)
+    }
+    shownPins[0] = pins
 
     Box(modifier) {
         // Beneath the rows: they move out of its way, and the lifted row (drawn in the list)
@@ -350,13 +442,26 @@ fun DrawerListView(
             contentPadding = contentPadding,
             modifier = Modifier
                 .fillMaxSize()
+                // A Pin or Unpin's rows start where they showed, before the frame draws them anew.
+                .layout { measurable, constraints ->
+                    val placeable = measurable.measure(constraints)
+                    layout(placeable.width, placeable.height) {
+                        placeable.place(0, 0)
+                        pinDrag.pinMove.apply()
+                    }
+                }
                 .onGloballyPositioned { listCoordinates[0] = it }
                 .then(if (panRegions != null) Modifier.drawerPanList(panRegions) else Modifier)
                 .graphicsLayer { alpha = listAlpha.value }
                 .testTag("drawer-list"),
         ) {
             val current = model
-            items(current.items, key = { it.key }, contentType = { contentType(it) }) { item ->
+            itemsIndexed(current.items, key = { _, item -> item.key }, contentType = { _, item -> contentType(item) }) { index, item ->
+                Box(
+                    Modifier
+                        .serverSwapRow(serverSwap.takeIf { inputs.serverSwap != null }, current.serverID, current.reducedMotion) { index - listState.firstVisibleItemIndex }
+                        .serverSwapPicture(swapPictures.takeIf { swapsRows }, item.key),
+                ) {
                 when (item) {
                     DrawerListItem.CatchUp, DrawerListItem.WhatsNew -> DrawerListShortcutRow(
                         kind = if (item == DrawerListItem.CatchUp) DrawerListShortcutKind.CatchUp else DrawerListShortcutKind.WhatsNew,
@@ -372,8 +477,16 @@ fun DrawerListView(
                     DrawerListItem.DeletionError -> DrawerListDeletionErrorRow(current.deletionError.orEmpty())
                     is DrawerListItem.Header -> DrawerListHeaderCell(item.kind, pinDrag)
                     DrawerListItem.Empty -> DrawerListEmptyRow(current.search)
+                    DrawerListItem.Footer -> DrawerListFooterRow(
+                        footer = current.footer ?: DrawerListFooter.loading,
+                        retry = { store.send(HomeFeature.Action.SessionPages(SessionPagesAction.RetryTapped)) },
+                    )
+                    is DrawerListItem.Ghost -> DrawerListGhostCell(item.index, current.reducedMotion)
+                    DrawerListItem.ServerNote -> current.serverNote?.let { note ->
+                        DrawerServerNoteRow(note, onAction = { store.send(HomeFeature.Action.ServerSwitchNoteActionTapped) })
+                    }
                     is DrawerListItem.Session -> {
-                        val row = current.rows[item.id] ?: return@items
+                        val row = current.rows[item.id] ?: return@itemsIndexed
                         val rowActions = remember(row.session.id, row.unread, row.isPinnedSection) {
                             rowActions(row, store, holder, pinDrag, liftedID, { currentActions }, ::beginPinDrag)
                         }
@@ -387,7 +500,22 @@ fun DrawerListView(
                         )
                     }
                 }
+                }
             }
+        }
+        // iOS adds the leaving pictures over the cells; here they draw over the list.
+        if (serverSwap != null && swapsRows) {
+            Spacer(
+                Modifier
+                    .matchParentSize()
+                    .clipToBounds()
+                    .graphicsLayer { alpha = listAlpha.value }
+                    .drawBehind {
+                        serverSwap.frame // read so each frame redraws
+                        val travel = if (model.reducedMotion) 0f else ServerFlowTunables.listTravel.dp.toPx()
+                        with(swapPictures) { drawLeaving(serverSwap, travel) }
+                    },
+            )
         }
     }
 }
@@ -425,7 +553,7 @@ private fun rowActions(
         pressed = { store.send(HomeFeature.Action.DrawerRowPressed(id)) },
         menu = { holder.model.rows[id]?.let { actions().menu(it) }.orEmpty() },
         beginDrag = { y -> beginPinDrag(id, y) },
-        moveDrag = { y -> pinDrag.updateDrag(y) },
+        moveDrag = { y, time -> pinDrag.updateDrag(y, time) },
         endDrag = { x, y, cancelled ->
             if (cancelled) {
                 pinDrag.cancelDrag(deferLiftedClear = true)
@@ -490,6 +618,14 @@ private fun contentType(item: DrawerListItem): Int = when (item) {
     is DrawerListItem.Header -> 2
     is DrawerListItem.Session -> 3
     DrawerListItem.Empty -> 4
+    is DrawerListItem.Ghost -> 5
+    DrawerListItem.ServerNote -> 6
+    DrawerListItem.Footer -> 7
+}
+
+/** What the list showed of its pins, to tell a Pin, Unpin or Move outside a drag (iOS `movesPins`). */
+internal data class DrawerShownPins(val serverID: String, val search: String, val pinned: List<DrawerListItem>) {
+    fun movesPins(next: DrawerShownPins): Boolean = serverID == next.serverID && search == next.search && pinned != next.pinned
 }
 
 /** A `LazyColumn` key back to the pin drag's item (headers and rows only). */

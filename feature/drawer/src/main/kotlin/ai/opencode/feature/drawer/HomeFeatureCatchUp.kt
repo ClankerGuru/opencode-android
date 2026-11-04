@@ -50,14 +50,24 @@ internal fun HomeFeature.reduceCatchUp(state: State, action: CatchUpFeature.Acti
             if (observed != null && observed.id == action.sessionID && (observed.idleMilliseconds ?: -1) > (session.idleMilliseconds ?: -1)) {
                 session = session.copy(idleMilliseconds = observed.idleMilliseconds)
             }
+            val seenBeforeCard = if (state.sessionDetail?.session?.id == action.sessionID) state.sessionDetail?.catchUpOpeningSeen else null
             var s = state.withCatchUp(
                 stack.dismissFront(session, action.disposition, neededAttention = action.sessionID in state.attentionSessionIDs),
             )
             val opened = openCatchUpCard(s)
             s = opened.state
             // The card's flight plays its own haptic (the stack controller).
-            if (action.disposition != CatchUpFeature.Disposition.markRead) return Reduced(s, opened.effect)
-            s = s.markingReadLocally(session)
+            if (action.disposition != CatchUpFeature.Disposition.markRead) {
+                // Kept unread: what the card showed is still new next time.
+                if (seenBeforeCard != null) {
+                    s.sessionSnapshots[action.sessionID]?.let { snapshot ->
+                        s = s.copy(sessionSnapshots = s.sessionSnapshots + (action.sessionID to snapshot.copy(seenItemIDs = seenBeforeCard)))
+                    }
+                    if (seenBeforeCard.isNotEmpty()) s = s.copy(unopenedSeen = s.unopenedSeen + (action.sessionID to seenBeforeCard))
+                }
+                return Reduced(s, opened.effect)
+            }
+            s = s.markingReadLocally(session).clearingUnseenBaseline(session.id)
             return Reduced(s, Effect.merge(opened.effect, acknowledgeView(session, s.server)))
         }
 
@@ -130,7 +140,7 @@ internal fun HomeFeature.reduceCatchUp(state: State, action: CatchUpFeature.Acti
                     backups[session.id] = s.readBackup(session, idle)
                     receipts += session.id to idle
                 }
-                s = s.markingReadLocally(session)
+                s = s.markingReadLocally(session).clearingUnseenBaseline(session.id)
             }
             s = s.withMarkAllReceipts(s.markAllReceipts + backups).reconcilingCatchUp()
             return Reduced(

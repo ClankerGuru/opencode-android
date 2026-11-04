@@ -1,9 +1,6 @@
 package ai.opencode.feature.drawer
 
 import ai.opencode.core.dependencies.dependency
-import ai.opencode.feature.system.SessionWindowTarget
-import ai.opencode.feature.system.WindowsClient
-import ai.opencode.core.experiments.ExperimentalFeature
 import ai.opencode.core.experiments.key
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.sharing.shared
@@ -23,14 +20,17 @@ import ai.opencode.feature.drawer.list.DrawerListRow
 import ai.opencode.feature.drawer.list.DrawerListView
 import ai.opencode.feature.drawer.list.DrawerPinDrag
 import ai.opencode.feature.drawer.list.DrawerRowMenuItem
-import ai.opencode.feature.settings.whatsnew.WhatsNewFeature
-import ai.opencode.feature.drawer.motion.DrawerControlsTraceView
+import ai.opencode.feature.drawer.list.InboxSidebarList
+import ai.opencode.feature.drawer.list.rememberInboxSidebarOn
 import ai.opencode.feature.drawer.motion.DrawerControlsTrace
+import ai.opencode.feature.drawer.motion.DrawerControlsTraceView
 import ai.opencode.feature.drawer.motion.DrawerKeyboardMonitor
 import ai.opencode.feature.drawer.motion.DrawerRevealTrace
 import ai.opencode.feature.drawer.motion.DrawerSearchPill
 import ai.opencode.feature.drawer.motion.DrawerSearchPillDefaults
 import ai.opencode.feature.drawer.motion.DrawerTimeReveal
+import ai.opencode.feature.drawer.motion.RunServerSwapMotion
+import ai.opencode.feature.drawer.motion.ServerSwapMotion
 import ai.opencode.feature.drawer.motion.drawerControlsTraceProbe
 import ai.opencode.feature.drawer.motion.drawerPanList
 import ai.opencode.feature.drawer.motion.drawerSearchFocusFade
@@ -40,26 +40,28 @@ import ai.opencode.feature.drawer.style.DrawerEdgeStyle
 import ai.opencode.feature.drawer.style.DrawerFooterBackdrop
 import ai.opencode.feature.drawer.style.DrawerHeaderBackdrop
 import ai.opencode.feature.drawer.style.DrawerMetrics
-import ai.opencode.feature.drawer.style.DrawerSectionBreak
 import ai.opencode.feature.drawer.style.DrawerRowLayout
+import ai.opencode.feature.drawer.style.DrawerSectionBreak
 import ai.opencode.feature.drawer.style.DrawerTunables
-import ai.opencode.feature.drawer.switcher.DrawerTitleView
-import ai.opencode.feature.voice.CallTrayComposerMetrics
-import ai.opencode.feature.voice.CallTrayDockSlot
-import ai.opencode.feature.voice.CallTrayDockTunables
-import ai.opencode.feature.voice.CallTrayTunables
+import ai.opencode.feature.drawer.switcher.ServerFlowTitle
+import ai.opencode.feature.drawer.switcher.drawerTitleServers
+import ai.opencode.feature.session.ComposerTunables
+import ai.opencode.feature.settings.whatsnew.WhatsNewFeature
+import ai.opencode.feature.system.SessionWindowTarget
+import ai.opencode.feature.system.WindowsClient
+import ai.opencode.feature.voice.FloatingCallCenter
+import ai.opencode.feature.voice.floatingCallDrawerButton
+import ai.opencode.server.ServerSharedKeys
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.snap
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.layout.Column
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -70,6 +72,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.union
 import androidx.compose.material3.AlertDialog
@@ -80,6 +83,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -117,10 +121,7 @@ import kotlin.math.min
  * Android counterpart, so the drawer always draws its own footer wash ([DrawerFooterBackdrop], iOS's
  * `customBottom` path). `drawerControlsRaisedTargets` is n/a: the controls draw above the list, so
  * Compose's hit testing already gives the part of New Session and Settings that rises above their
- * bar to the buttons. During a call the Call Tray docks in the drawer's bottom slot (D-114):
- * [CallTrayDockSlot] beneath New Session and Settings, which lift above it
- * (`drawerCarriesCallTray`); Home measures the slot for the travelling tray
- * (`drawerCallTrayGeometry`, `HomeCallTrayDock` in `HomeView.kt`).
+ * bar to the buttons.
  * `scrawlScreenName` and `tuningContext` live with [HomeViewState] / have no Tuning Panel.
  */
 
@@ -129,11 +130,9 @@ private val DrawerHeaderTop: Dp = 8.dp
 
 /**
  * iOS `drawerFooterBottom`: New Session and Settings centred on the resting composer's line
- * (`ComposerTunables.bottomGap` 0 + (bar 56 − footer 50) / 2). With a call the tray occupies the
- * bottom slot and keeps the composer's bottom edge instead (`bottomGap` 0).
+ * (`ComposerTunables.bottomGap` 0 + (bar 56 − footer 50) / 2).
  */
-private fun drawerFooterBottom(carriesCallTray: Boolean): Dp =
-    if (carriesCallTray) 0.dp else ((CallTrayComposerMetrics.barHeight - DrawerTunables.footerHeight.value) / 2).dp
+private val DrawerFooterBottom: Dp = ((ComposerTunables.barHeight - DrawerTunables.footerHeight.value) / 2).dp
 
 /**
  * The session drawer's panel: everything inside the drawer, for the container's `drawer` slot.
@@ -182,8 +181,14 @@ fun HomeDrawer(
     val selectedSessionID by store.observe { viewState.drawerSelectedSessionID(it) }
     val disconnected by store.observe { it.connectionStatus == HomeConnectionFeature.State.ConnectionStatus.disconnected }
     val search by store.observe { it.search }
-    val projectIconsSwitch by remember { shared(ExperimentalFeature.projectIcons.key).flow }.collectAsState()
-    val showsProjectIcons = ExperimentalFeature.projectIcons.isActive(projectIconsSwitch)
+    val inboxSidebarOn = rememberInboxSidebarOn()
+    // Server Flow (iOS d8a311bd, graduated in p217): the title and the list share one swap motion.
+    val serverSwap = remember { ServerSwapMotion() }
+    RunServerSwapMotion(serverSwap)
+    val current by store.observe { it.server }
+    val switchingTo by store.observe { it.switchingTo }
+    val saved by remember { shared(ServerSharedKeys.savedServers).flow }.collectAsState()
+    val serverSwapTarget = ServerSwapTarget(current, switchingTo, drawerTitleServers(current, saved))
 
     // iOS draws its own bottom edge only with a keyboard on screen (`customBottom`); Android always does.
     val keyboardMonitor: DrawerKeyboardMonitor = viewState.keyboardMonitor
@@ -193,23 +198,16 @@ fun HomeDrawer(
     var headerHeight by remember { mutableFloatStateOf(0f) }
     var controlsHeight by remember { mutableFloatStateOf(DrawerTunables.footerHeight.value) }
     val controlsReach = (controlsHeight * DrawerTunables.controlsReach.coerceIn(0f, 1f)).dp
-    // The drawer carries the Call Tray in its bottom slot (D-114): New Session and Settings lift above it.
-    val carriesCallTray = viewState.callTray.dock.liftsDrawerControls
-    val trayMotion = if (reducedMotion) snap<Dp>() else CallTrayTunables.close.spec<Dp>()
-    val footerBottom by animateDpAsState(drawerFooterBottom(carriesCallTray), trayMotion, label = "drawerFooterBottom")
-    val callTrayLift by animateDpAsState(
-        if (carriesCallTray) (CallTrayTunables.height + CallTrayDockTunables.gap).dp else 0.dp,
-        trayMotion,
-        label = "drawerCallTrayLift",
-    )
+    val footerBottom = DrawerFooterBottom
 
     val inputs = DrawerListInputs(
         selectedSessionID = selectedSessionID,
-        showsProjectIcons = showsProjectIcons,
+        showsProjectIcons = true,
         reducedMotion = reducedMotion,
         increasedContrast = highContrast,
         alwaysShowsHeaders = DrawerTunables.sectionBreak == DrawerSectionBreak.Header,
         twoLineRows = DrawerTunables.rowLayout == DrawerRowLayout.TwoLine,
+        serverSwap = serverSwapTarget,
     )
     val actions = remember(store, viewState) {
         DrawerListActions(
@@ -226,7 +224,21 @@ fun HomeDrawer(
             .fillMaxSize()
             .background(colors.canvas),
     ) {
-        DrawerListView(
+        val listPadding = PaddingValues(
+            top = headerHeight.dp + DrawerTunables.topGap,
+            bottom = controlsHeight.dp + insetBottom + footerBottom + DrawerTunables.bottomGap,
+        )
+        // Inbox Sidebar (experimental, iOS 338d8d92): the sessions as an inbox.
+        if (inboxSidebarOn) InboxSidebarList(
+            store = store,
+            selectedSessionID = selectedSessionID,
+            headerScroll = viewState.headerScroll,
+            panRegions = viewState.panRegions,
+            contentPadding = listPadding,
+            select = viewState::selectSession,
+            openCatchUp = viewState::openCatchUp,
+            modifier = Modifier.fillMaxSize(),
+        ) else DrawerListView(
             store = store,
             pinDrag = pinDrag,
             timeReveal = viewState.timeReveal,
@@ -236,18 +248,16 @@ fun HomeDrawer(
             isDrawerVisible = isDrawerVisible,
             catchUpFocusRequests = viewState.catchUpFocusRequests,
             actions = actions,
-            contentPadding = PaddingValues(
-                top = headerHeight.dp + DrawerTunables.topGap,
-                bottom = controlsHeight.dp + callTrayLift + insetBottom + footerBottom + DrawerTunables.bottomGap,
-            ),
+            contentPadding = listPadding,
             modifier = Modifier.fillMaxSize(),
+            serverSwap = serverSwap,
         )
         // The list as the drawer's pan sees it: between the title band and the controls, which
         // take their own touches (iOS: the hit view is the band, not the collection view).
         Spacer(
             Modifier
                 .fillMaxSize()
-                .padding(top = headerHeight.dp, bottom = controlsHeight.dp + callTrayLift + insetBottom + footerBottom)
+                .padding(top = headerHeight.dp, bottom = controlsHeight.dp + insetBottom + footerBottom)
                 .drawerPanList(viewState.panRegions),
         )
         if (DrawerTimeReveal.IS_TRACED) DrawerRevealTrace(viewState.timeReveal)
@@ -274,14 +284,11 @@ fun HomeDrawer(
                     .padding(top = insetTop + DrawerHeaderTop, bottom = DrawerTunables.headerBottom),
                 contentAlignment = Alignment.CenterEnd,
             ) {
-                DrawerTitleView(
-                    store = store,
-                    onManage = viewState::manageServers,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = DrawerMetrics.textInset, end = DrawerSearchPillDefaults.size + DrawerTunables.searchGap)
-                        .drawerSearchTitleFade(viewState.search),
-                )
+                val titleModifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = DrawerMetrics.textInset, end = DrawerSearchPillDefaults.size + DrawerTunables.searchGap)
+                    .drawerSearchTitleFade(viewState.search)
+                ServerFlowTitle(store = store, motion = serverSwap, onManage = viewState::manageServers, modifier = titleModifier)
                 DrawerSearchPill(
                     state = viewState.search,
                     text = search,
@@ -327,21 +334,16 @@ fun HomeDrawer(
             ) {
                 DrawerNewSessionButton(enabled = !disconnected, onClick = viewState::startNewSessionFromDrawer)
                 Spacer(Modifier.weight(1f))
-                OpenCodeIconButton(
-                    symbol = SFSymbol.GearshapeFill,
-                    contentDescription = "Settings",
-                    onClick = viewState::openSettings,
-                    size = DrawerTunables.footerHeight,
-                    modifier = Modifier.testTag("drawer-settings"),
-                )
-            }
-            AnimatedVisibility(
-                visible = carriesCallTray,
-                enter = if (reducedMotion) EnterTransition.None else expandVertically(CallTrayTunables.close.spec()),
-                exit = if (reducedMotion) ExitTransition.None else shrinkVertically(CallTrayTunables.close.spec()),
-            ) {
-                // The open session's call, for the slot's Mute and End Call actions.
-                CallTrayDockSlot(store = rememberHomeCall(store))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    DrawerCallSlot(store, disconnected, reducedMotion)
+                    OpenCodeIconButton(
+                        symbol = SFSymbol.GearshapeFill,
+                        contentDescription = "Settings",
+                        onClick = viewState::openSettings,
+                        size = DrawerTunables.footerHeight,
+                        modifier = Modifier.testTag("drawer-settings"),
+                    )
+                }
             }
             }
         }
@@ -489,5 +491,49 @@ private fun DrawerNewSessionButton(enabled: Boolean, onClick: () -> Unit) {
 private fun Modifier.swallowingTouches(): Modifier = pointerInput(Unit) {
     awaitPointerEventScope {
         while (true) awaitPointerEvent()
+    }
+}
+
+/**
+ * The drawer's call button (iOS `DrawerCallButton`), left of Settings while the drawer offers a
+ * call ([drawerOffersCall]): a call on the session behind the drawer. Its slot stays while a call
+ * is live, so a call ending with the drawer open lands back in it; the button itself shows only
+ * with no call ([drawerShowsCallButton]).
+ */
+@Composable
+private fun DrawerCallSlot(store: StoreOf<HomeFeature.State, HomeFeature.Action>, disconnected: Boolean, reducedMotion: Boolean) {
+    val center = remember { FloatingCallCenter.shared }
+    val isDrawerOpen by store.observe { it.isDrawerOpen }
+    val offersCall by store.observe { it.drawerOffersCall }
+    val showsCall by store.observe { it.drawerShowsCallButton }
+    SideEffect { center.isDrawerOpen = isDrawerOpen }
+    DisposableEffect(center) {
+        onDispose {
+            center.isDrawerOpen = false
+            center.drawerCallButton = null
+        }
+    }
+    if (!offersCall) return
+    Box(Modifier.size(DrawerTunables.footerHeight), contentAlignment = Alignment.Center) {
+        // The circle a floating call breaks out of and lands back in, as the composer's call button's.
+        Box(Modifier.size(ComposerTunables.buttonDiameter.dp).floatingCallDrawerButton())
+        AnimatedVisibility(
+            visible = showsCall,
+            enter = if (reducedMotion) EnterTransition.None else fadeIn(DrawerTunables.callButtonSpring.spec()),
+            exit = if (reducedMotion) ExitTransition.None else fadeOut(DrawerTunables.callButtonSpring.spec()),
+        ) {
+            OpenCodeIconButton(
+                symbol = SFSymbol.Waveform,
+                contentDescription = "Start Voice Call",
+                onClick = {
+                    // The orb breaks out of this button, not the composer's under the drawer.
+                    center.breakoutFrom = center.drawerCallButton
+                    store.send(HomeFeature.Action.DrawerCallTapped)
+                },
+                size = DrawerTunables.footerHeight,
+                enabled = !disconnected,
+                modifier = Modifier.testTag("drawer-call"),
+            )
+        }
     }
 }

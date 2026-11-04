@@ -27,7 +27,8 @@ data class ShareCredentials(
         this(CURRENT_VERSION, server.persistenceID, server, callbackURL)
 
     companion object {
-        const val CURRENT_VERSION = 1
+        // v1 retained a plaintext-capable push callback. The server credentials still work.
+        const val CURRENT_VERSION = 2
     }
 }
 
@@ -47,17 +48,25 @@ class ShareCredentialStore(
         val live: ShareCredentialStore by lazy {
             val item = shared(key)
             ShareCredentialStore(
-                load = { item.value?.takeIf { it.version == ShareCredentials.CURRENT_VERSION } },
+                load = { current(item.value) },
                 save = { item.set(it) },
                 remove = { item.set(null) },
             )
+        }
+
+        /** A v1 item keeps its server, not its callback (iOS 1ddd36b2); other versions read as none. */
+        private fun current(stored: ShareCredentials?): ShareCredentials? {
+            val credentials = stored?.let {
+                if (it.version == 1) it.copy(version = ShareCredentials.CURRENT_VERSION, callbackURL = null) else it
+            }
+            return credentials?.takeIf { it.version == ShareCredentials.CURRENT_VERSION }
         }
 
         fun inMemory(): ShareCredentialStore {
             var stored: ShareCredentials? = null
             val lock = Any()
             return ShareCredentialStore(
-                load = { synchronized(lock) { stored } },
+                load = { current(synchronized(lock) { stored }) },
                 save = { synchronized(lock) { stored = it } },
                 remove = { synchronized(lock) { stored = null } },
             )

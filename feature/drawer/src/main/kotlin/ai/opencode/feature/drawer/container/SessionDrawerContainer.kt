@@ -11,10 +11,12 @@ import ai.opencode.feature.drawer.catchup.CatchUpStack
 import ai.opencode.feature.drawer.catchup.CatchUpStage
 import ai.opencode.feature.drawer.catchup.CatchUpStageProxy
 import ai.opencode.feature.drawer.catchup.rememberCatchUpStackController
+import ai.opencode.feature.drawer.list.rememberInboxSidebarOn
 import ai.opencode.feature.drawer.motion.DrawerCorner
 import ai.opencode.feature.drawer.motion.DrawerDepth
 import ai.opencode.feature.drawer.motion.DrawerDim
 import ai.opencode.feature.drawer.motion.DrawerKeyboardHold
+import ai.opencode.feature.drawer.motion.DrawerMotionTunables
 import ai.opencode.feature.drawer.motion.DrawerPanEvent
 import ai.opencode.feature.drawer.motion.DrawerPanRegions
 import ai.opencode.feature.drawer.motion.DrawerRevealPhase
@@ -24,29 +26,36 @@ import ai.opencode.feature.drawer.motion.drawerPanDrawer
 import ai.opencode.feature.drawer.motion.rememberDisplayCornerRadius
 import ai.opencode.feature.drawer.motion.rememberDrawerMotionState
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.systemBarsIgnoringVisibility
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.movableContentOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -87,7 +96,11 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
+import kotlin.coroutines.cancellation.CancellationException
+import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
 
 /**
  * Port of `OpenCode/Drawer/SessionDrawerContainer.swift`: the frame-locked drawer and Catch Up
@@ -118,10 +131,6 @@ import kotlin.math.roundToInt
  * @param onCommitted a release or tap commits to the other side: play `Haptic.snap` now.
  * @param onTouchDown a touch that may move the drawer began: prepare its haptic.
  * @param onReveal a drag on the open drawer toward the card, which reveals the rows' times.
- * @param onDrawerProgress how far the phone's drawer is open (0..1) each frame the card moves,
- *   and whether it got there by moving (`false`: Catch Up took the screen or handed it back).
- * @param dismissesKeyboardOnOpen opening the drawer dismisses the composer's keyboard instead
- *   of holding it beside the card.
  * @param contentSessionID the session the card shows or is about to show (`null` for a draft): a
  *   drawer that closes on another session than it opened on leaves the keyboard down.
  * @param isContentPushed a subagent or a web page is pushed over the session (its back gesture has the drag).
@@ -151,8 +160,6 @@ fun SessionDrawerContainer(
     onCommitted: () -> Unit = {},
     onTouchDown: () -> Unit = {},
     onReveal: (DrawerRevealPhase) -> Unit = {},
-    onDrawerProgress: (Float, Boolean) -> Unit = { _, _ -> },
-    dismissesKeyboardOnOpen: Boolean = false,
     contentSessionID: String? = null,
     isContentPushed: Boolean = false,
     isSheetPresented: Boolean = false,
@@ -224,11 +231,25 @@ fun SessionDrawerContainer(
     // place across visits, as iOS keeps its hosted drawer.
     val drawerEverShown = remember { booleanArrayOf(false) }
     if (drawerShows) drawerEverShown[0] = true
-    val drawerComposed = drawerShows || drawerEverShown[0]
-    val scrimColor = DrawerScrim.color(isDark, colors.highContrast)
+    // Android: composed hidden once the app has settled after launch, so the first open doesn't
+    // build every visible row in the frames the drawer starts moving in.
+    var drawerPrewarmed by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(DRAWER_PREWARM_DELAY_MS)
+        drawerPrewarmed = true
+    }
+    val drawerComposed = drawerShows || drawerEverShown[0] || drawerPrewarmed
+    // Android: the phone's drawer is a Material modal drawer. It slides in over the session,
+    // which stays put under a scrim, instead of the session sliding aside as iOS's card does.
+    val modal = sidebarShown == null
+    val scrimColor = if (modal) MaterialTheme.colorScheme.scrim.copy(alpha = MODAL_SCRIM_ALPHA) else DrawerScrim.color(isDark, colors.highContrast)
+    // A Catch Up morph poses the drawer itself (its scale is set); it isn't following the motion then.
+    val drawerPosed by remember(controller) { derivedStateOf { !controller.drawerScale.floatValue.isNaN() } }
     val chromeBackground = if (isDark) Color(0.04f, 0.04f, 0.04f, 1f) else colors.userBubble
     val borderColor = CatchUpMetrics.borderColor(isDark, colors.border)
     val borderWidthPx = if (isDark) with(density) { 1.dp.toPx() } else 1f
+    // Inbox Sidebar rows swipe Mark as Read and Archive themselves (iOS `rowsOwnSwipes`).
+    val inboxSidebarOn = rememberInboxSidebarOn()
 
     Box(
         modifier
@@ -241,6 +262,7 @@ fun SessionDrawerContainer(
                 isContentPushed = { pushed },
                 // Beside a sidebar the drawer doesn't move; Catch Up's stack runs its own swipe.
                 enabled = { controller.sidebarShown == null && controller.catchUp == null },
+                rowsOwnSwipes = { inboxSidebarOn },
                 onTouchDown = motion::touchDown,
             ) { event ->
                 if (!controller.acceptsPan(event)) return@drawerDirectionalPan
@@ -265,7 +287,7 @@ fun SessionDrawerContainer(
                 }
             },
     ) {
-        // The drawer (or sidebar), under the card; it recedes the more shut it is.
+        // The modal drawer, over the card; or the sidebar, beside it.
         if (drawerComposed) {
             val hiddenFromAccessibility = !drawerShows || catchUp != null ||
                 if (sidebarShown != null) !controller.isSidebarVisible else motion.isDrawerHiddenFromAccessibility.value
@@ -274,12 +296,26 @@ fun SessionDrawerContainer(
                     .width(width)
                     .fillMaxHeight()
                     .align(Alignment.CenterStart)
+                    .zIndex(if (modal && (catchUp == null || drawerPosed)) 1f else 0f)
                     .drawerPanDrawer(panRegions)
                     .graphicsLayer {
                         val override = controller.drawerScale.floatValue
-                        val scale = if (!override.isNaN()) override else DrawerDepth.scale(motion.progress, motion.reducedMotion || !motion.recedes)
-                        scaleX = scale
-                        scaleY = scale
+                        if (modal) {
+                            if (override.isNaN()) {
+                                // The drawer's trailing edge rides the finger, as the card's leading edge did.
+                                val shown = min(motion.offset, width.value)
+                                translationX = (shown - width.value).dp.toPx() * if (rtl) -1 else 1
+                            } else {
+                                scaleX = override
+                                scaleY = override
+                            }
+                            shape = ModalDrawerShape
+                            clip = true
+                        } else {
+                            val scale = if (!override.isNaN()) override else DrawerDepth.scale(motion.progress, motion.reducedMotion || !motion.recedes)
+                            scaleX = scale
+                            scaleY = scale
+                        }
                         alpha = if (drawerShows) controller.drawerAlpha.floatValue else 0f
                     }
                     .then(if (hiddenFromAccessibility) Modifier.clearAndSetSemantics {} else Modifier),
@@ -295,18 +331,6 @@ fun SessionDrawerContainer(
                             .background(colors.border),
                     )
                 }
-            }
-            if (sidebarShown == null && drawerShows) {
-                // Full size, outside the scaled drawer: the receding list never shows a bright strip.
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .drawBehind {
-                            val override = controller.dimAlpha.floatValue
-                            val alpha = if (!override.isNaN()) override else DrawerDim.alpha(motion.progress, DrawerDim.maximum(isDark))
-                            if (alpha > 0f) drawRect(DrawerDim.color, alpha = alpha)
-                        },
-                )
             }
         }
 
@@ -399,7 +423,7 @@ fun SessionDrawerContainer(
                             alpha = controller.cardAlpha.floatValue
                             shape = MaskShape(controller.currentMask(), controller.cardRadius.floatValue.dp.toPx())
                             clip = true
-                        } else {
+                        } else if (!modal) {
                             val offset = motion.offset
                             translationX = offset.dp.toPx() * if (rtl) -1 else 1
                             val radius = DrawerCorner.radius(motion.isCardMoving, offset, displayRadius.value)
@@ -414,7 +438,14 @@ fun SessionDrawerContainer(
                     Modifier
                         .fillMaxSize()
                         .graphicsLayer { alpha = controller.contentAlpha.floatValue }
-                        .then(if (contentHidden) Modifier.clearAndSetSemantics {} else Modifier),
+                        .then(if (contentHidden) Modifier.clearAndSetSemantics {} else Modifier)
+                        // Consumes nothing; it's here to be inserted with this slot. Catch Up's
+                        // stack consumes the system bars around the moved session, and a session
+                        // moved back here kept reading those consumed insets (its header under the
+                        // status bar, its composer on the gesture bar) because nothing on its new
+                        // path changed. A consumed-insets provider arriving above it makes its
+                        // inset paddings read again.
+                        .consumeWindowInsets(PaddingValues()),
                 ) {
                     cardContent()
                 }
@@ -501,7 +532,26 @@ fun SessionDrawerContainer(
         // Back: Catch Up exits; an open drawer closes (a pushed subagent's own back sits beneath).
         // Under Settings neither does: Back closes Settings, not what waits beneath it.
         BackHandler(enabled = !sheet && catchUp != null) { currentCatchUp?.onExit?.invoke() }
-        BackHandler(enabled = !sheet && catchUp == null && motion.isPresented) { controller.closeDrawer() }
+        // Android only: predictive back pulls the card part of the way shut with the gesture
+        // (DrawerMotionTunables.BACK_PREVIEW_TRAVEL); the commit closes it from there, a cancel
+        // springs it open again. A button or TalkBack back closes it at once, as before.
+        PredictiveBackHandler(enabled = !sheet && catchUp == null && motion.isPresented) { progress ->
+            var began = false
+            try {
+                progress.collect { event ->
+                    if (!began) {
+                        controller.panBegan()
+                        motion.beginDrag()
+                        began = true
+                    }
+                    motion.drag(-event.progress * motion.width * DrawerMotionTunables.BACK_PREVIEW_TRAVEL)
+                }
+                if (began) motion.endBackDrag() else controller.closeDrawer()
+            } catch (cancelled: CancellationException) {
+                if (began) motion.cancelDrag()
+                throw cancelled
+            }
+        }
     }
 
     DisposableEffect(controller) { onDispose { controller.dispose() } }
@@ -520,7 +570,6 @@ fun SessionDrawerContainer(
         controller.isDark = isDark
         controller.keyboardHold = keyboardHold
         motion.keyboardHold = keyboardHold
-        panRegions.isOnTextField = keyboardHold::isOnTextField
         controller.isSheetPresented = { sheet }
         controller.isContentPushed = { pushed }
         controller.clearFocus = { focusManager.clearFocus(force = true) }
@@ -530,14 +579,12 @@ fun SessionDrawerContainer(
         controller.onCommitted = onCommitted
         controller.onTouchDown = onTouchDown
         controller.onPresentationChanged = onPresentationChanged
-        controller.onDrawerProgress = onDrawerProgress
         if (controller.drawerWidth != width.value) {
             controller.finishModeTransition()
             controller.drawerWidth = width.value
             motion.updateWidth(width.value)
             controller.sidebarWidthChanged()
         }
-        controller.dismissesKeyboardOnOpen = dismissesKeyboardOnOpen
         controller.contentSessionID = contentSessionID
         // Before `setPresented`: leaving Catch Up for the open drawer is the stack's own exit,
         // not an opening to feel.
@@ -587,3 +634,12 @@ internal fun SessionDrawerController.currentMask(): Rect? {
     val end = cardMaskEnd ?: return null
     return lerp(start, end, maskProgress.floatValue)
 }
+
+/** Material's modal drawer scrim (the `scrim` role at 32%). */
+private const val MODAL_SCRIM_ALPHA = 0.32f
+
+/** How long after the container first composes the hidden drawer is built (ms). */
+private const val DRAWER_PREWARM_DELAY_MS = 1500L
+
+/** Material's modal drawer: its trailing corners round (the large shape, 16 dp). */
+private val ModalDrawerShape = RoundedCornerShape(topEnd = 16.dp, bottomEnd = 16.dp)

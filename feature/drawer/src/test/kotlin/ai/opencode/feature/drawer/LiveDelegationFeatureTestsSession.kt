@@ -169,8 +169,7 @@ class LiveDelegationFeatureTestsSession {
             this[VoiceCallClient] = VoiceCallClient(
                 start = { _, config -> harness.start(instructions = config.instructions) },
                 completeFunction = { callID, output -> harness.coordinator.completeFunction(callID, output) },
-                noteProgress = { callID, text -> harness.coordinator.noteProgress(callID, text) },
-                abandonDelegation = { callID -> harness.coordinator.abandonDelegation(callID) },
+                closeDelegation = { callID, reason -> harness.coordinator.closeDelegation(callID, reason) },
                 setMuted = { muted -> harness.coordinator.setMuted(muted) },
                 updateInstructions = { full, delta -> harness.coordinator.updateInstructions(full, delta) },
                 end = { harness.coordinator.end() },
@@ -210,15 +209,6 @@ class LiveDelegationFeatureTestsSession {
         first.yieldEvent(LiveServerEvent.DelegationCreated(id = "item_del_abandoned", target = "client", offsetMilliseconds = 500))
         store.receiveVoice(VoiceFeature.Action.CallEvent::class)
         store.receiveVoice(VoiceFeature.Action.WorkAdmitted::class)
-        var waited = 0
-        while (waited++ < 200 && first.thinking().none { it.delegationID == "item_del_abandoned" && it.content.startsWith("Running in session") }) {
-            delay(5)
-            store.skipReceivedActions()
-        }
-        assertTrue(
-            first.thinking().toString(),
-            first.thinking().any { it.delegationID == "item_del_abandoned" && it.content.startsWith("Running in session \"Voice lab\"") },
-        )
 
         // Switch sessions in the drawer while `item_del_abandoned` is still running.
         store.send(HomeFeature.Action.SessionTapped(other.id))

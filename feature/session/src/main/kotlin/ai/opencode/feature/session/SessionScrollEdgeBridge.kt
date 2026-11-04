@@ -1,5 +1,6 @@
 package ai.opencode.feature.session
 
+import ai.opencode.feature.transcript.list.TranscriptBorrowedDrag
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -28,6 +29,9 @@ class SessionScrollEdgeBridge {
 
     /** Bumped to scroll the list to its latest row. */
     var jumpRequest by mutableIntStateOf(0)
+
+    /** iOS `onBorrowedDrag`: drags on the controls over the list (Jump to latest, queued, capsule) scroll it. */
+    val borrowedDrag = TranscriptBorrowedDrag()
 
     /**
      * iOS `sendTransition`'s list half: the transcript's landing markers and its send hand-off,

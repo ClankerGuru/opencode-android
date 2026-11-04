@@ -1,42 +1,50 @@
 package ai.opencode.app
 
-import ai.opencode.core.store.onChange
-import ai.opencode.core.store.PresentationAction
-import ai.opencode.feature.session.SessionFeature
-import ai.opencode.feature.media.BrowserFeature
-import ai.opencode.feature.voice.VoiceCallServiceClient
-import ai.opencode.feature.voice.ScreenAwakeClient
-import ai.opencode.feature.system.liveactivity.VoiceLiveActivityClient
-import ai.opencode.feature.system.liveactivity.DictationLiveActivityClient
 import ai.opencode.core.dependencies.PasteboardClient
 import ai.opencode.core.dependencies.UuidClient
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.log.AppLog
+import ai.opencode.core.sharing.ExperimentalFeature
+import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.core.sharing.Shared
 import ai.opencode.core.sharing.SharedKeys
+import ai.opencode.core.sharing.installHistory
 import ai.opencode.core.sharing.shared
+import ai.opencode.core.sound.SoundEffectsClient
 import ai.opencode.core.store.Effect
+import ai.opencode.core.store.PresentationAction
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
 import ai.opencode.core.store.cancellable
+import ai.opencode.core.store.combine
 import ai.opencode.core.store.ifLet
+import ai.opencode.core.store.onChange
+import ai.opencode.core.store.scope
 import ai.opencode.core.ui.ThisDevice
 import ai.opencode.feature.drawer.HomeConnectionFeature
 import ai.opencode.feature.drawer.HomeFeature
 import ai.opencode.feature.drawer.HomeSnapshotDate
 import ai.opencode.feature.drawer.keepingSettings
 import ai.opencode.feature.drawer.persistingSnapshot
-import ai.opencode.feature.settings.servers.ServerTitleFeature
-import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.core.sharing.ExperimentalFeatures
+import ai.opencode.feature.media.BrowserFeature
+import ai.opencode.feature.session.SessionFeature
+import ai.opencode.feature.settings.onboarding.WelcomeFeature
 import ai.opencode.feature.system.NotificationDestination
 import ai.opencode.feature.system.SessionDirectory
 import ai.opencode.feature.system.SystemAction
 import ai.opencode.feature.system.SystemIntegrationClient
+import ai.opencode.feature.system.clienttools.ClientToolsFeature
+import ai.opencode.feature.system.liveactivity.DictationLiveActivityClient
+import ai.opencode.feature.system.liveactivity.SessionLiveActivityClient
+import ai.opencode.feature.system.liveactivity.VoiceLiveActivityClient
 import ai.opencode.feature.system.share.ReceivedShare
 import ai.opencode.feature.system.share.ShareInboxClient
+import ai.opencode.feature.voice.VoiceOpenSessionFeature
+import ai.opencode.feature.voice.ScreenAwakeClient
+import ai.opencode.feature.voice.VoiceCallLogClient
+import ai.opencode.feature.voice.VoiceCallServiceClient
 import ai.opencode.server.CachedHomeSnapshot
 import ai.opencode.server.ConnectionFailureDetail
 import ai.opencode.server.OpenCodeClient
@@ -77,13 +85,19 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         val returnServer: OpenCodeServer? = null,
         /** Why the welcome's Paste didn't pair, shown beside it. */
         val pasteError: String? = null,
+        /** The first-run welcome, with no saved server (Welcome Preview). */
+        val welcome: WelcomeFeature.State = WelcomeFeature.State(),
+        /** The phone's client tools' socket (Share Screen with Agents and the other call tools). */
+        val clientTools: ClientToolsFeature.State = ClientToolsFeature.State(),
+        /** Its second socket, for a call's delegator session in another directory. */
+        val delegatorClientTools: ClientToolsFeature.State = ClientToolsFeature.State(slot = ClientToolsFeature.State.Slot.Delegator),
+        /** Where that delegator session lives, once read. */
+        val voiceDelegatorLocation: ClientToolsLocation? = null,
+        val voiceOpenSession: VoiceOpenSessionFeature.State = VoiceOpenSessionFeature.State(),
         val connection: Connection = Connection.Idle,
         val connectionGeneration: Int = 0,
         val connectionAttempt: ConnectionAttempt? = null,
         val home: HomeFeature.State? = null,
-        /** The Experimental Title Is the Switch server sheet (iOS `@Presents var serverTitle`). */
-        val serverTitle: ServerTitleFeature.State? = null,
-        val serverSwitchConfirmation: String? = null,
         /** A tapped notification's session, opened once its server's home loads. */
         val pendingNotification: NotificationDestination? = null,
         val notificationError: String? = null,
@@ -207,7 +221,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
          * one. Also the open session's own presentations (`sessionDetail.presentsOverSession`).
          */
         val isPresentingAnything: Boolean
-            get() = serverTitle != null || isEditingServer || isScanningPairingCode || pendingPairing != null || pairingError != null ||
+            get() = isEditingServer || isScanningPairingCode || pendingPairing != null || pairingError != null ||
                 shareError != null || notificationError != null || systemActionError != null ||
                 home?.presentsOverHome == true || home?.presentsOverSession == true
 
@@ -249,6 +263,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         companion object {
             /** iOS `State.init()`: restores the last server and its cached Home so launch shows it at once. */
             fun initial(): State {
+                migrateBeforeRestore()
                 val saved = shared(ServerSharedKeys.savedServer)
                 val cached = shared(ServerSharedKeys.cachedHomeSnapshots)
                 var state = State(
@@ -326,8 +341,6 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
                     .filter { seen.add(it.lowercase()) }
             }
 
-        val alternateHosts: List<String> get() = hosts.drop(1)
-
         val title: String get() = "Pair with $host?"
 
         val message: String
@@ -354,8 +367,10 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
     data class ConnectionAttempt(
         val id: Int,
         val server: OpenCodeServer,
-        /** A computer paired for the first time: its Home opens the drawer on its sessions. */
-        val opensDrawer: Boolean = false,
+        /** A pairing: where its Home lands, and its handshake ([landPairing]). */
+        val pairing: PairingArrival? = null,
+        /** Server Flow: a drawer switch, which goes back to the Home it left on failure. */
+        val switchesBack: Boolean = false,
     )
 
     /** Safe to display or copy: no full URL, credentials, or raw network payload. */
@@ -418,7 +433,6 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         data class PasswordChanged(val value: String) : Action
         data class ServerNameChanged(val value: String) : Action
         data class HeadersChanged(val headers: List<OpenCodeServer.Header>) : Action
-        data object ServerSwitchConfirmationDismissed : Action
         data class NotificationOpened(val destination: NotificationDestination) : Action
         data class NotificationSessionLoaded(val destination: NotificationDestination, val result: Result<OpenCodeSession>) : Action
         data object NotificationErrorDismissed : Action
@@ -457,13 +471,17 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         data class HealthResponse(val attemptID: Int, val result: Result<OpenCodeServer>) : Action
         data class CopyTextTapped(val text: String) : Action
         data class Home(val action: HomeFeature.Action) : Action
-        /** Opens the Experimental server sheet (iOS `serverTitleOpened`). */
-        data object ServerTitleOpened : Action
-        data class ServerTitle(val action: PresentationAction<ServerTitleFeature.Action>) : Action
+        data class Welcome(val action: WelcomeFeature.Action) : Action
+        data class ClientTools(val action: ClientToolsFeature.Action) : Action
+        data class DelegatorClientTools(val action: ClientToolsFeature.Action) : Action
+        data class VoiceDelegatorLocated(val location: ClientToolsLocation) : Action
+        data class VoiceOpenSession(val action: VoiceOpenSessionFeature.Action) : Action
         data class HomeResponse(val attemptID: Int, val result: Result<OpenCodeHomeSnapshot>) : Action
+        /** Server Flow: the switch's server didn't answer in time. */
+        data class ServerSwitchTimedOut(val attemptID: Int) : Action
     }
 
-    internal enum class CancelID { Health, Home, Notification, SystemActions, SystemSession }
+    internal enum class CancelID { Health, Home, Notification, SystemActions, SystemSession, SwitchTimeout }
 
     private val core = Reducer<State, Action> { state, action -> reduceCore(state, action) }
 
@@ -479,30 +497,30 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
     )
 
     /** iOS `.keepingWhatsNewAcrossHomes()` (`AppFeatureWhatsNew.kt`). */
-    /** `.ifLet(\.$serverTitle, action: \.serverTitle)`: the sheet's probes and camera end with it. */
-    private val titleBody: Reducer<State, Action> = ifLet(
-        id = ServerTitlePresentation,
-        parent = body,
-        state = { it.serverTitle },
-        setState = { s, title -> s.copy(serverTitle = title) },
-        action = { (it as? Action.ServerTitle)?.action },
-        embed = Action::ServerTitle,
-        child = ServerTitleFeature(),
+    private val whatsNewBody: Reducer<State, Action> = body.keepingWhatsNewAcrossHomes()
+
+    /** iOS `Scope(\.welcome) { WelcomeFeature() }` then `welcomeRequests` (`AppFeatureWelcome.kt`). */
+    private val welcomeBody: Reducer<State, Action> = combine(
+        whatsNewBody,
+        scope(
+            state = { it.welcome },
+            setState = { s, welcome -> s.copy(welcome = welcome) },
+            action = { (it as? Action.Welcome)?.action },
+            embed = Action::Welcome,
+            child = WelcomeFeature(),
+        ),
+        welcomeRequests,
     )
-
-    private object ServerTitlePresentation
-
-    private val whatsNewBody: Reducer<State, Action> = titleBody.keepingWhatsNewAcrossHomes()
 
     /**
      * Leaving Home cancels a call or a recording without Home seeing it end, so their ongoing
-     * notifications are ended here (iOS `.onChange` of `voiceCallActivity`/`dictationActivity`).
+     * notifications are ended, and the call's log saved, here (iOS `.onChange` of `voiceCallActivity`/`dictationActivity`).
      * Android's call notification is voice's foreground service, keyed by the call's presence ID.
      * Then the screen stays on during a call, set at once rather than from an effect so a quick
      * on-then-off can't land out of order (watched from here so leaving Home mid-call lets the
      * screen sleep again too).
      */
-    private val liveBody: Reducer<State, Action> = whatsNewBody
+    private val liveBody: Reducer<State, Action> = sharingScreenWithAgents(welcomeBody)
         .onChange({ it.home?.sessionDetail?.voice?.callPresenceID }) { old, _, state ->
             if (old == null || state.home != null) return@onChange Reduced(state)
             val service = dependency(VoiceCallServiceClient)
@@ -513,6 +531,20 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
             if (!old || state.home != null) return@onChange Reduced(state)
             val dictationLiveActivity = dependency(DictationLiveActivityClient)
             Reduced(state, Effect.run { dictationLiveActivity.update(null, null) })
+        }
+        // And a followed run's, which can't update once its Home is gone (iOS
+        // AppFeature+LiveActivities): Home leaving, or another server's replacing it.
+        .onChange({ state -> state.home?.takeIf { it.sessionActivity != null }?.id }) { old, _, state ->
+            if (old == null || state.home?.id == old) return@onChange Reduced(state)
+            val sessionLiveActivity = dependency(SessionLiveActivityClient)
+            Reduced(state, Effect.run { sessionLiveActivity.update(null, null) })
+        }
+        // A call that goes with its Home never reaches a terminal phase, so its log is saved
+        // here (saving one already saved does nothing; iOS AppFeature+LiveActivities).
+        .onChange({ it.home?.sessionDetail?.voice?.callLogID }) { old, _, state ->
+            if (old == null || state.home?.sessionDetail?.voice?.callLogID == old) return@onChange Reduced(state)
+            val voiceCallLog = dependency(VoiceCallLogClient)
+            Reduced(state, Effect.run { voiceCallLog.finish(old) })
         }
         .onChange({ it.keepsScreenAwake }) { _, keeps, state ->
             dependency(ScreenAwakeClient).set(keeps)
@@ -530,13 +562,12 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
 
     private fun reduceCore(state: State, action: Action): Reduced<State, Action> = when (action) {
         Action.Task -> {
+            migrateSettingsIfNeeded(state.knownServers)
+            if (dependency(ExperimentalFeatures).isEnabled(ExperimentalFeature.soundEffects)) dependency(SoundEffectsClient).prepare()
             // Restored home owns revalidation; never replace its cached list with setup.
             val saved = state.savedServer.value
             if (state.connection != State.Connection.Idle || state.home != null) Reduced(state)
             else if (saved != null) connect(state.load(saved))
-            else if (dependency(ExperimentalFeatures)(ExperimentalFeature.serverTitleSwitch) && state.serverTitle == null) {
-                Reduced(state, Effect.send(Action.ServerTitleOpened))
-            }
             // With no last-used server, wait for a scan or an explicit selection.
             else Reduced(state)
         }
@@ -549,7 +580,6 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         is Action.PasswordChanged -> serverEdited(state, state.copy(password = action.value))
         is Action.ServerNameChanged -> serverEdited(state, state.copy(serverName = action.value))
         is Action.HeadersChanged -> serverEdited(state, state.copy(headers = action.headers))
-        Action.ServerSwitchConfirmationDismissed -> Reduced(state.copy(serverSwitchConfirmation = null))
         is Action.NotificationOpened -> notificationOpened(state, action.destination)
         is Action.NotificationSessionLoaded -> notificationSessionLoaded(state, action)
         Action.NotificationErrorDismissed -> Reduced(state.copy(notificationError = null))
@@ -593,9 +623,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         is Action.ServerTapped -> selectServer(action.server, state)
         Action.ReturnToServerTapped -> state.returnServer?.let { selectServer(it, state) } ?: Reduced(state)
         is Action.ServerDeleted -> serverDeleted(state, action.server)
-        Action.ScanPairingCodeTapped -> cancelConnection(
-            state.copy(pasteError = null, isScanningPairingCode = true, editingSavedServer = null),
-        )
+        Action.ScanPairingCodeTapped -> cancelConnection(beginPairing(state.copy(pasteError = null)))
         Action.ScannerDismissed -> {
             val next = state.copy(isScanningPairingCode = false)
             // Opened over Home, there's no attempt to cancel and Home carries on.
@@ -628,21 +656,9 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         }
         is Action.HealthResponse -> healthResponse(state, action)
         is Action.HomeResponse -> homeResponse(state, action)
+        is Action.ServerSwitchTimedOut -> serverSwitchTimedOut(action.attemptID, state)
         is Action.Home -> home(state, action.action)
-        Action.ServerTitleOpened -> serverTitleOpened(state)
-        is Action.ServerTitle -> when (val presentation = action.action) {
-            PresentationAction.Dismiss -> cancelServerTitleConnection(state)
-            is PresentationAction.Presented -> {
-                val delegate = (presentation.action as? ServerTitleFeature.Action.Delegate)?.delegate
-                if (delegate != null) serverTitleDelegate(delegate, state) else Reduced(state)
-            }
-        }
-    }
-
-    /** iOS `.serverTitleOpened, .home(.serversRequested)`: only with Title Is the Switch on. */
-    private fun serverTitleOpened(state: State): Reduced<State, Action> {
-        if (!dependency(ExperimentalFeatures)(ExperimentalFeature.serverTitleSwitch)) return Reduced(state)
-        return Reduced(openServerTitle(state))
+        is Action.Welcome, is Action.ClientTools, is Action.DelegatorClientTools, is Action.VoiceDelegatorLocated, is Action.VoiceOpenSession -> Reduced(state)
     }
 
     /**
@@ -716,35 +732,11 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
     }
 
     private fun homeDelegate(state: State, action: HomeFeature.DelegateAction): Reduced<State, Action> = when (action) {
-        HomeFeature.DelegateAction.ServersRequested -> serverTitleOpened(state)
-        // Back to the picker: Home is rebuilt from scratch on reconnect since sessions, projects
-        // and the event stream are all server-scoped.
-        HomeFeature.DelegateAction.ServerBadgeTapped,
-        -> cancelConnection(state.copy(returnServer = state.homeServer).withoutHome())
-        is HomeFeature.DelegateAction.ServerSwitchTapped -> {
-            val home = state.home
-            if (home == null || home.server.persistenceID == action.server.persistenceID) Reduced(state)
-            else {
-                // A switch that fails leaves the picker offering the way back.
-                var next = state.copy(returnServer = home.server)
-                val keepsHome = next.keepsHome(switchingTo = action.server)
-                if (keepsHome) next = next.showingSwitch(action.server)
-                selectServer(action.server, next, keepingHome = keepsHome)
-            }
-        }
+        is HomeFeature.DelegateAction.ServerSwitchTapped -> switchServer(action.server, state)
         is HomeFeature.DelegateAction.ServerRenamed -> Reduced(renameServer(action.server, action.name, state))
-        is HomeFeature.DelegateAction.EditServerRequested -> {
-            // The form opens over Home; Home stays until the edit connects.
-            val saved = state.knownServers.firstOrNull { it.persistenceID == action.server.persistenceID } ?: action.server
-            Reduced(state.copy(editingSavedServer = saved, manualEntryDraft = null, isEditingServer = true).load(saved))
-        }
-        is HomeFeature.DelegateAction.ServerRemovalConfirmed -> {
-            // The server in use isn't offered for removal; switch away first.
-            if (state.home?.server?.persistenceID == action.server.persistenceID) Reduced(state)
-            else Reduced(state, Effect.send(Action.ServerDeleted(action.server)))
-        }
-        HomeFeature.DelegateAction.PairServerRequested ->
-            Reduced(state.copy(editingSavedServer = null, isScanningPairingCode = true))
+        is HomeFeature.DelegateAction.EditServerRequested -> Reduced(editServer(action.server, state))
+        is HomeFeature.DelegateAction.ServerRemovalConfirmed -> Reduced(state, confirmRemoval(action.server, state))
+        HomeFeature.DelegateAction.PairServerRequested -> Reduced(beginPairing(state))
         HomeFeature.DelegateAction.AddServerRequested -> Reduced(beginNewServer(state))
     }
 
@@ -909,14 +901,13 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         val haptics = dependency(HapticsClient)
         return validatePairing(text).fold(
             onSuccess = { link ->
-                haptics.play(Haptic.success)
+                // The code was read; `success` waits for the pairing to land.
+                haptics.play(Haptic.tap)
                 redeem(link, next)
             },
             onFailure = { error ->
                 haptics.play(Haptic.error)
-                val failed = serverTitleFailed(error.message.orEmpty(), next)
-                if (failed.handled) Reduced(failed.state)
-                else cancelConnection(failed.state, State.Connection.Failed(message = error.message.orEmpty(), phase = FailureContext.Phase.Pair))
+                cancelConnection(next, State.Connection.Failed(message = error.message.orEmpty(), phase = FailureContext.Phase.Pair))
             },
         )
     }
@@ -962,7 +953,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
                 manualEntryDraft = null,
             ),
         )
-        dependency(HapticsClient).play(Haptic.success)
+        dependency(HapticsClient).play(Haptic.tap)
         return redeem(link, next)
     }
 
@@ -996,10 +987,9 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         if (attempt?.id != action.attemptID || state.connection != State.Connection.Pairing) return Reduced(state)
         val server = action.result.getOrElse { error ->
             val clientError = error as? OpenCodeClientError ?: OpenCodeClientError(OpenCodeClientError.UNREACHABLE_MESSAGE)
-            val failed = serverTitleFailed(clientError.message, state.copy(connectionAttempt = null))
-            if (failed.handled) return Reduced(failed.state)
             return Reduced(
-                failed.state.copy(
+                state.copy(
+                    connectionAttempt = null,
                     connection = State.Connection.Failed(
                         message = clientError.message,
                         context = FailureContext.of(attempt.server, FailureContext.Phase.Pair, action.attemptID, clientError.connectionFailures),
@@ -1007,8 +997,9 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
                 ),
             )
         }
-        val isNewComputer = server.isNewComputer(state.knownServers)
-        return connect(state.load(server.keepingLocalSettings(state.knownServers)), opensDrawer = isNewComputer)
+        val history = shared(SharedKeys.installHistory).value
+        val arrival = PairingArrival.of(server, state.knownServers, history)
+        return connect(state.load(server.keepingLocalSettings(state.knownServers)), pairing = arrival)
     }
 
     // MARK: Connecting
@@ -1018,11 +1009,11 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         if (attempt?.id != action.attemptID || state.connection != State.Connection.Connecting) return Reduced(state)
         val server = action.result.getOrElse { error ->
             val clientError = error as? OpenCodeClientError ?: OpenCodeClientError(OpenCodeClientError.UNREACHABLE_MESSAGE)
-            val failed = serverTitleFailed(clientError.message, state.copy(connectionAttempt = null))
-            if (failed.handled) return Reduced(failed.state)
+            if (attempt.switchesBack) return switchBack(state, after = clientError)
             // A switch kept Home up while it tried; the error needs the picker.
             return Reduced(
-                failed.state.copy(
+                state.copy(
+                    connectionAttempt = null,
                     connection = State.Connection.Failed(
                         message = clientError.message,
                         context = FailureContext.of(attempt.server, FailureContext.Phase.Connect, action.attemptID, clientError.connectionFailures),
@@ -1068,11 +1059,12 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         if (state.connectionAttempt?.id != action.attemptID || loading == null) return Reduced(state)
         val server = loading.server
         val snapshot = action.result.getOrElse { error ->
-            val message = (error as? OpenCodeClientError)?.message ?: OpenCodeClientError.UNREACHABLE_MESSAGE
-            val failed = serverTitleFailed(message, state.copy(connectionAttempt = null))
-            if (failed.handled) return Reduced(failed.state)
+            val clientError = error as? OpenCodeClientError ?: OpenCodeClientError(OpenCodeClientError.UNREACHABLE_MESSAGE)
+            if (state.connectionAttempt?.switchesBack == true) return switchBack(state, after = clientError)
+            val message = clientError.message
             return Reduced(
-                failed.state.copy(
+                state.copy(
+                    connectionAttempt = null,
                     editingSavedServer = null,
                     connection = State.Connection.Failed(
                         message = message,
@@ -1084,12 +1076,12 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         // An edit is saved only now; until then the original stays saved under its own identity,
         // so a failed read keeps what it had.
         var next = state
-        var forgotten: Effect<Action> = Effect.none()
+        var forgotten: Effect<Action> = Effect.cancel(CancelID.SwitchTimeout)
         next.editingSavedServer?.let { original ->
             if (original.persistenceID != server.persistenceID) {
                 val reduced = forgetIdentity(original.persistenceID, next)
                 next = reduced.state
-                forgotten = reduced.effect
+                forgotten = Effect.merge(forgotten, reduced.effect)
             }
             server.remember(original)
             next = next.copy(editingSavedServer = null)
@@ -1097,14 +1089,13 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         // A switch made from Settings stays in Settings: the connection card shows the new server arrive.
         val previous = next.home
         val keepsSettings = previous?.isSettingsShown == true && previous.switchingTo?.persistenceID == server.persistenceID
-        if (next.serverTitle != null) {
-            next = next.copy(serverSwitchConfirmation = "Switched to ${server.friendlyName}", serverTitle = null)
-        }
-        val opensDrawer = next.connectionAttempt?.opensDrawer == true
+        val pairing = next.connectionAttempt?.pairing
+        val reachability = previous?.serverReachability?.filterKeys { it != server.persistenceID }.orEmpty()
         next = next.withHome(server, snapshot)
         next = next.copy(
             home = next.home
                 ?.let { if (keepsSettings) it.keepingSettings(previous) else it }
+                ?.copy(serverReachability = reachability)
                 ?.persistingSnapshot(dependency(HomeSnapshotDate).now()),
         )
         next = next.copy(
@@ -1126,14 +1117,12 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
             next = reduced.state
             system = reduced.effect
         }
+        val landing = landPairing(pairing, server, asked)
         val destination = next.pendingNotification
         if (destination != null && destination.serverKey == server.persistenceID) {
-            return Reduced(next, Effect.merge(forgotten, shares, system, loadNotificationSession(destination, server)))
+            return Reduced(next, Effect.merge(forgotten, shares, system, landing, loadNotificationSession(destination, server)))
         }
-        if (opensDrawer && !asked) {
-            return Reduced(next, Effect.merge(forgotten, shares, Effect.send(Action.Home(HomeFeature.Action.PairedComputerOpened))))
-        }
-        return Reduced(next, Effect.merge(forgotten, shares, system))
+        return Reduced(next, Effect.merge(forgotten, shares, system, landing))
     }
 
     /**
@@ -1144,14 +1133,14 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         state: State,
         preservingPending: Boolean = false,
         keepingHome: Boolean = false,
-        opensDrawer: Boolean = false,
+        pairing: PairingArrival? = null,
     ): Reduced<State, Action> {
         var next = state
         if (!preservingPending) next = next.copy(pendingNotification = null, pendingSystemAction = null)
         val generation = next.connectionGeneration + 1
-        val attempt = ConnectionAttempt(id = generation, server = next.server, opensDrawer = opensDrawer)
+        val attempt = ConnectionAttempt(id = generation, server = next.server, pairing = pairing)
         next = next.copy(connection = State.Connection.Connecting, connectionGeneration = generation, connectionAttempt = attempt)
-        if (!keepingHome) next = next.keepingHomeBehindSheet(switchingTo = next.server) ?: next.withoutHome()
+        if (!keepingHome) next = next.withoutHome()
         val client = dependency(OpenCodeClient)
         val health = Effect.run<Action> { send ->
             val result = probe(client, attempt.server)

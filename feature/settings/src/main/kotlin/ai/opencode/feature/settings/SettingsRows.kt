@@ -2,12 +2,9 @@ package ai.opencode.feature.settings
 
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeRadius
-import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,11 +13,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -28,30 +28,54 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 
 /**
  * Port of iOS `Settings/SettingsRows.swift` plus the inset-grouped `List`/`Section` chrome every
  * Settings page uses, as Material surfaces: a page is a `LazyColumn` of [settingsSection]s, each a
  * rounded card on the grouped canvas with an optional header and footer.
+ *
+ * Android divergence: the rows look like a Material 3 Expressive segmented list, as Android's own
+ * Settings does. Rows are parted by small gaps instead of hairlines, icons are plain Material
+ * icons instead of tinted tiles, a row's value sits under its title, navigation rows have no
+ * chevron, section headers are in the accent colour, and text uses Material's list sizes.
  */
+
+/** Material's list type scale (16 sp titles, 14 sp summaries); the app's own styles are iOS sizes. */
+object SettingsText {
+    private val material = Typography()
+    val title: TextStyle = material.bodyLarge
+    val summary: TextStyle = material.bodyMedium
+    val header: TextStyle = material.titleSmall
+
+    /** Material's whole default scale, for the Settings top app bar's large title. */
+    val typography: Typography = material
+}
 
 /** iOS system tints for [SettingsIcon] tiles (`Color.purple`, `.blue`, …), light and dark. */
 enum class SettingsTint(private val light: Long, private val dark: Long) {
@@ -76,31 +100,22 @@ enum class SettingsTint(private val light: Long, private val dark: Long) {
     fun color(): Color = color(OpenCodeTheme.colors.isDark)
 }
 
-/** The tinted rounded tile in front of a settings row, as in system Settings (29 pt, radius 7, gradient fill). */
+/**
+ * The icon in front of a settings row. iOS draws a white symbol on a tinted rounded tile; Android
+ * draws a plain 24 dp Material icon in the secondary colour, as Material lists do. [tint] is
+ * kept so the call sites stay as on iOS, but it isn't drawn.
+ */
 @Composable
 fun SettingsIcon(symbol: String, tint: SettingsTint, modifier: Modifier = Modifier) {
-    val color = tint.color()
-    Box(
-        modifier
-            .size(29.dp)
-            .clip(RoundedCornerShape(7.dp))
-            .background(Brush.verticalGradient(listOf(color.copy(alpha = 0.85f).compositeOver(Color.White, 0.15f), color))),
-        contentAlignment = Alignment.Center,
-    ) {
-        OpenCodeIcon(symbol, contentDescription = null, size = 18.dp, tint = Color.White)
-    }
+    OpenCodeIcon(symbol, contentDescription = null, modifier = modifier, size = SettingsIconSize, tint = OpenCodeTheme.colors.secondaryText)
 }
+
+/** A settings row's icon size (Material list leading icon). */
+val SettingsIconSize = 24.dp
 
 @Composable
 fun SettingsIcon(symbol: SFSymbol, tint: SettingsTint, modifier: Modifier = Modifier) =
     SettingsIcon(symbol.sfName, tint, modifier)
-
-private fun Color.compositeOver(other: Color, amount: Float): Color = Color(
-    red = red * (1 - amount) + other.red * amount,
-    green = green * (1 - amount) + other.green * amount,
-    blue = blue * (1 - amount) + other.blue * amount,
-    alpha = alpha,
-)
 
 /**
  * iOS `dynamicTypeSize.isAccessibilitySize`: the accessibility text sizes start at AX1, whose body
@@ -109,12 +124,13 @@ private fun Color.compositeOver(other: Color, amount: Float): Color = Color(
 @Composable
 internal fun isAccessibilitySize(): Boolean = LocalDensity.current.fontScale >= 28f / 17f
 
-/** Minimum row height (iOS 44 pt list rows → the 48 dp target). */
-val SettingsRowMinHeight = 52.dp
+/** Minimum row height (iOS 44 pt list rows; Material's one-line list item is 56 dp). */
+val SettingsRowMinHeight = 56.dp
 
 /**
- * One section of an inset-grouped Settings list: a header (iOS section header, sentence case,
- * secondary), the rows on a rounded card separated by inset dividers, and a footer.
+ * One section of an inset-grouped Settings list: a header (sentence case, in the accent colour as
+ * Android's Settings shows one), the rows on a rounded card parted by [SettingsDivider] gaps, and
+ * a footer.
  */
 fun LazyListScope.settingsSection(
     key: Any,
@@ -134,7 +150,7 @@ fun footerText(text: String): @Composable ColumnScope.() -> Unit = { SettingsFoo
 fun SettingsFooterText(text: String, modifier: Modifier = Modifier) {
     Text(
         text,
-        style = OpenCodeTextStyles.footnote,
+        style = SettingsText.summary,
         color = OpenCodeTheme.colors.secondaryText,
         modifier = modifier,
     )
@@ -151,9 +167,9 @@ fun SettingsSection(
         if (header != null) {
             Text(
                 header,
-                style = OpenCodeTextStyles.footnote,
-                color = OpenCodeTheme.colors.secondaryText,
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 6.dp),
+                style = SettingsText.header,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
             )
         }
         Surface(
@@ -165,7 +181,7 @@ fun SettingsSection(
         }
         if (footer != null) {
             Column(
-                Modifier.padding(start = 16.dp, end = 16.dp, top = 6.dp),
+                Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
                 content = footer,
             )
@@ -173,18 +189,65 @@ fun SettingsSection(
     }
 }
 
-/** The inset divider between rows on a section card. */
+/**
+ * What parts two rows on a section card. iOS draws an inset hairline; Android leaves a 2 dp gap
+ * of the page canvas and rounds the rows' inner corners by 4 dp, as Material 3 Expressive
+ * segmented lists do. [inset] is kept so the call sites stay as on iOS, but every gap spans the
+ * card. The gap draws over its neighbours (`zIndex`), so a row's ripple or highlight never
+ * covers the rounded corners.
+ */
 @Composable
 fun SettingsDivider(inset: Boolean = false) {
-    HorizontalDivider(
-        // Inset: under the title, past the 16 dp side, the 29 dp tile and the 12 dp gap.
-        modifier = Modifier.padding(start = if (inset) 57.dp else 16.dp),
-        color = OpenCodeTheme.colors.border,
-        thickness = with(LocalDensity.current) { 1f.toDp() },
+    val canvas = OpenCodeTheme.colors.groupedCanvas
+    Spacer(
+        Modifier
+            .fillMaxWidth()
+            .height(SegmentGap)
+            .zIndex(1f)
+            .drawWithCache {
+                val corners = segmentCorners(size.width, size.height, SegmentInnerRadius.toPx())
+                onDrawBehind {
+                    drawRect(canvas)
+                    drawPath(corners, canvas)
+                }
+            },
     )
 }
 
-/** A row's frame: full-width target, 16 dp sides, at least [SettingsRowMinHeight] tall. */
+private val SegmentGap = 2.dp
+private val SegmentInnerRadius = 4.dp
+
+/**
+ * The canvas-coloured corners a gap of height [gap] fills in to round the rows beside it: the
+ * row above's bottom corners and the row below's top corners. Each is the [radius] square in the
+ * card's corner minus the quarter circle the rounded row keeps.
+ */
+private fun segmentCorners(width: Float, gap: Float, radius: Float): Path {
+    val path = Path()
+    // Above the gap, start edge.
+    path.moveTo(0f, 0f)
+    path.lineTo(radius, 0f)
+    path.arcTo(Rect(0f, -2 * radius, 2 * radius, 0f), 90f, 90f, false)
+    path.close()
+    // Above the gap, end edge.
+    path.moveTo(width, 0f)
+    path.lineTo(width - radius, 0f)
+    path.arcTo(Rect(width - 2 * radius, -2 * radius, width, 0f), 90f, -90f, false)
+    path.close()
+    // Below the gap, start edge.
+    path.moveTo(0f, gap)
+    path.lineTo(radius, gap)
+    path.arcTo(Rect(0f, gap, 2 * radius, gap + 2 * radius), 270f, -90f, false)
+    path.close()
+    // Below the gap, end edge.
+    path.moveTo(width, gap)
+    path.lineTo(width - radius, gap)
+    path.arcTo(Rect(width - 2 * radius, gap, width, gap + 2 * radius), 270f, 90f, false)
+    path.close()
+    return path
+}
+
+/** A row's frame: full-width target, 16 dp sides, at least [SettingsRowMinHeight] tall, 16 dp between its parts. */
 @Composable
 fun SettingsRowFrame(
     modifier: Modifier = Modifier,
@@ -199,16 +262,38 @@ fun SettingsRowFrame(
             .fillMaxWidth()
             .then(clickable)
             .heightIn(min = SettingsRowMinHeight)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
         content = content,
     )
 }
 
 /**
- * iOS `SettingsRow`: a tinted symbol tile, the title, and a quiet value; with [onClick] it is a
- * navigation row and ends in a chevron (iOS `NavigationLink`).
+ * A row's title with an optional summary under it (Android's preference summary: a row's value,
+ * caption or few words), up to two lines.
+ */
+@Composable
+fun SettingsRowText(title: String, summary: String?, modifier: Modifier = Modifier) {
+    Column(modifier) {
+        Text(title, style = SettingsText.title, color = OpenCodeTheme.colors.text)
+        if (summary != null) {
+            Text(
+                summary,
+                style = SettingsText.summary,
+                color = OpenCodeTheme.colors.secondaryText,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/**
+ * iOS `SettingsRow`: a symbol, the title, and a quiet value; with [onClick] it is a navigation
+ * row (iOS `NavigationLink`). Android divergence: the value is the summary under the title, and
+ * there's no chevron (Material lists don't mark navigation rows); [showsChevron] is kept so the
+ * call sites stay as on iOS.
  */
 @Composable
 fun SettingsRow(
@@ -222,38 +307,22 @@ fun SettingsRow(
 ) {
     SettingsRowFrame(modifier, onClick = onClick) {
         if (symbol != null) SettingsIcon(symbol, tint)
-        Text(title, style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
-        if (value != null) {
-            Text(
-                value,
-                style = OpenCodeTextStyles.body,
-                color = OpenCodeTheme.colors.secondaryText,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        if (onClick != null && showsChevron) SettingsChevron()
+        SettingsRowText(title, value, Modifier.weight(1f))
     }
 }
 
-/** The trailing disclosure chevron (tertiary, decorative). */
-@Composable
-fun SettingsChevron() {
-    OpenCodeIcon(SFSymbol.ChevronRight, contentDescription = null, size = 18.dp, tint = OpenCodeTheme.colors.tertiaryText)
-}
-
-/** iOS `LabeledContent(title, value:)`: a non-interactive title/value row. */
+/** iOS `LabeledContent(title, value:)`: a non-interactive title/value row; on Android the value is the summary. */
 @Composable
 fun SettingsValueRow(title: String, value: String, modifier: Modifier = Modifier) {
     SettingsRowFrame(modifier.semantics(mergeDescendants = true) {}) {
-        Text(title, style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
-        Text(value, style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        SettingsRowText(title, value, Modifier.weight(1f))
     }
 }
 
 /**
- * iOS `Toggle` in a Settings list, optionally with a [SettingsIcon] and a one-line [summary] (the
- * Experimental rows). The whole row toggles.
+ * iOS `Toggle` in a Settings list, optionally with a [SettingsIcon] and a [summary] (the
+ * Experimental rows). The whole row toggles. The switch shows a check while on, as Android's
+ * Settings switches do.
  */
 @Composable
 fun SettingsToggleRow(
@@ -271,19 +340,17 @@ fun SettingsToggleRow(
         onClick = null,
     ) {
         if (symbol != null) SettingsIcon(symbol, tint)
-        Column(Modifier.weight(1f)) {
-            Text(title, style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text)
-            if (summary != null) {
-                Text(
-                    summary,
-                    style = OpenCodeTextStyles.footnote,
-                    color = OpenCodeTheme.colors.secondaryText,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-        Switch(checked = checked, onCheckedChange = null, enabled = enabled)
+        SettingsRowText(title, summary, Modifier.weight(1f))
+        Switch(
+            checked = checked,
+            onCheckedChange = null,
+            enabled = enabled,
+            thumbContent = if (checked) {
+                { OpenCodeIcon(SFSymbol.Checkmark, contentDescription = null, size = SwitchDefaults.IconSize) }
+            } else {
+                null
+            },
+        )
     }
 }
 
@@ -304,7 +371,7 @@ fun SettingsButtonRow(
     }
     SettingsRowFrame(modifier, onClick = onClick, enabled = enabled) {
         if (symbol != null) OpenCodeIcon(symbol, contentDescription = null, size = 22.dp, tint = color)
-        Text(title, style = OpenCodeTextStyles.body, color = color, modifier = Modifier.weight(1f))
+        Text(title, style = SettingsText.title, color = color, modifier = Modifier.weight(1f))
     }
 }
 
@@ -312,9 +379,10 @@ fun SettingsButtonRow(
 data class SettingsMenuOption<T>(val value: T, val title: String, val caption: String? = null)
 
 /**
- * iOS `SettingsMenuRow`: a choice in a Settings list, as native Settings shows one: the title
- * (with an icon and a caption when given), then the value in the secondary colour with an
- * up-and-down chevron. The whole row opens the menu (a Material dropdown with checkmarks).
+ * iOS `SettingsMenuRow`: a choice in a Settings list: the title (with an icon and a caption when
+ * given), then the value at the row's end in the secondary colour. iOS ends it with an
+ * up-and-down chevron; Android uses Material's dropdown arrow. The whole row opens the menu (a
+ * Material dropdown with checkmarks).
  * [sections] groups options under headers (Voice › Model's provider groups); a single unnamed
  * section is a flat list.
  */
@@ -334,36 +402,6 @@ fun <T> SettingsMenuRow(
     var expanded by remember { mutableStateOf(false) }
     val stacked = isAccessibilitySize()
     Box(modifier) {
-        val label: @Composable () -> Unit = {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (symbol != null) SettingsIcon(symbol, tint)
-                Column {
-                    Text(title, style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text)
-                    if (caption != null) {
-                        Text(
-                            caption,
-                            style = OpenCodeTextStyles.footnote,
-                            color = OpenCodeTheme.colors.secondaryText,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-            }
-        }
-        val valueLabel: @Composable (Modifier) -> Unit = { valueModifier ->
-            Row(valueModifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text(
-                    value,
-                    style = OpenCodeTextStyles.body,
-                    color = OpenCodeTheme.colors.secondaryText,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                OpenCodeIcon(SFSymbol.ChevronUpChevronDown, contentDescription = null, size = 16.dp, tint = OpenCodeTheme.colors.tertiaryText)
-            }
-        }
         SettingsRowFrame(
             Modifier.semantics(mergeDescendants = true) {
                 contentDescription = accessibilityLabel
@@ -371,24 +409,26 @@ fun <T> SettingsMenuRow(
             },
             onClick = { expanded = true },
         ) {
+            if (symbol != null) SettingsIcon(symbol, tint)
             if (stacked) {
                 // iOS at accessibility sizes: the value goes under the title.
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    label()
-                    valueLabel(Modifier)
+                    SettingsRowText(title, caption)
+                    SettingsMenuValue(value)
                 }
             } else {
-                Box(Modifier.weight(1f)) { label() }
-                valueLabel(Modifier.weight(1f, fill = false))
+                // The title takes what's left; the value keeps to the end, ellipsized past its cap.
+                SettingsRowText(title, caption, Modifier.weight(1f))
+                SettingsMenuValue(value, Modifier.widthIn(max = SettingsMenuValueMaxWidth))
             }
         }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, modifier = Modifier.align(Alignment.TopEnd)) {
+        TrailingDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             sections.forEachIndexed { index, (header, options) ->
                 if (index > 0) HorizontalDivider()
                 if (header != null) {
                     Text(
                         header,
-                        style = OpenCodeTextStyles.footnote,
+                        style = MaterialTheme.typography.labelMedium,
                         color = OpenCodeTheme.colors.secondaryText,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
                     )
@@ -399,7 +439,7 @@ fun <T> SettingsMenuRow(
                             Column {
                                 Text(option.title)
                                 if (option.caption != null) {
-                                    Text(option.caption, style = OpenCodeTextStyles.footnote, color = OpenCodeTheme.colors.secondaryText)
+                                    Text(option.caption, style = MaterialTheme.typography.bodySmall, color = OpenCodeTheme.colors.secondaryText)
                                 }
                             }
                         },
@@ -421,6 +461,43 @@ fun <T> SettingsMenuRow(
     }
 }
 
+/** The widest a [SettingsMenuRow]'s value grows before it's ellipsized. */
+private val SettingsMenuValueMaxWidth = 168.dp
+
+/** A [SettingsMenuRow]'s value and its dropdown arrow. */
+@Composable
+private fun SettingsMenuValue(value: String, modifier: Modifier = Modifier) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            value,
+            style = SettingsText.summary,
+            color = OpenCodeTheme.colors.secondaryText,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
+        )
+        OpenCodeIcon(SFSymbol.ArrowtriangleDownFill, contentDescription = null, size = 24.dp, tint = OpenCodeTheme.colors.secondaryText)
+    }
+}
+
+/**
+ * The menu a [SettingsMenuRow] opens, hanging from the row's trailing edge where its value sits,
+ * as iOS shows a Settings picker's menu. Material's dropdown prefers its anchor's leading edge, so
+ * it's placed under the opposite layout direction (which prefers the trailing one) while its
+ * options keep the row's own.
+ */
+@Composable
+private fun TrailingDropdownMenu(expanded: Boolean, onDismissRequest: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+    val direction = LocalLayoutDirection.current
+    val trailing = if (direction == LayoutDirection.Ltr) LayoutDirection.Rtl else LayoutDirection.Ltr
+    CompositionLocalProvider(LocalLayoutDirection provides trailing) {
+        DropdownMenu(expanded = expanded, onDismissRequest = onDismissRequest) {
+            val menu = this
+            CompositionLocalProvider(LocalLayoutDirection provides direction) { menu.content() }
+        }
+    }
+}
+
 /** Flat-list overload of [SettingsMenuRow]. */
 @Composable
 fun <T> SettingsMenuRow(
@@ -437,4 +514,4 @@ fun <T> SettingsMenuRow(
 
 /** Leading spacer matching a row with an icon, for rows that line up under iconed rows. */
 @Composable
-fun RowScope.SettingsIconSpacer() = Spacer(Modifier.width(29.dp))
+fun RowScope.SettingsIconSpacer() = Spacer(Modifier.width(SettingsIconSize))

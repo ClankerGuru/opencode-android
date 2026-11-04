@@ -12,11 +12,15 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.min
 
 /*
  * Port of iOS `DrawerPinDrag.swift`: continuous 60–120 Hz spring motion across Pinned and Recents
@@ -33,8 +37,9 @@ import kotlin.math.max
  * itself follows the finger (iOS hides it under the system's platter) and lands in its slot on
  * the same spring; a release more than 24 dp beside the list cancels, as iOS's drop proposal does.
  * The collection-wide `UIDropInteraction` is the row's own pointer stream on Android. Positions are
- * dp in the list's own coordinates (its top edge, content padding included), stable during a drag
- * because the drag consumes the finger so the list never scrolls under it (iOS has no auto-scroll).
+ * dp in the list's own coordinates (its top edge, content padding included). The drag consumes the
+ * finger so the list only scrolls under it through [autoScroll], which shifts every spring and
+ * cached edge by what the rows moved.
  * `DrawerPinDragTraceView` and the per-frame trace (XCUITest hooks) are not ported.
  */
 
@@ -49,11 +54,29 @@ interface DrawerPinDragHost {
     /** The top of the list's visible content (iOS `contentOffset.y + adjustedContentInset.top`), dp. */
     val viewportTop: Float
 
+    /** The list's height, dp. */
+    val height: Float get() = Float.MAX_VALUE
+
+    /** The bottom of the drawer's header over the list (iOS `contentInset.top - topGap`), dp from the list's top. */
+    val headerBottom: Float get() = 0f
+
+    /** The top of the drawer's footer over the list (iOS `list.maxY - contentInset.bottom`), dp from the list's top. */
+    val footerTop: Float get() = Float.MAX_VALUE
+
+    /** The window, in the list's dp coordinates. */
+    val window: Rect get() = Rect(Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY, Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
+
     /** Applies the store's change now, so this frame lays out the rows in their new places (iOS `flushNow`). */
     fun flushNow()
 
     /** Keeps the scroll position by index across the drop's reorder (UIKit keeps its content offset). */
     fun preserveScroll()
+
+    /**
+     * Scrolls the list by [delta] dp (positive moves its content up), as far as it goes (iOS
+     * `autoScroll` sets the content offset, clamped to the content).
+     */
+    fun scrollBy(delta: Float) {}
 
     /** A scope on the composition's frame clock, and its frame duration. */
     val scope: CoroutineScope
@@ -92,8 +115,22 @@ class DrawerPinDrag {
         /** iOS `-lab-pin-drag-trace`; no launch arguments on Android. */
         const val IS_TRACED = false
 
-        /** A release this far beside the list cancels (iOS's `.cancel` drop proposal), dp. */
+        /** A release over the chrome this far beside the list still lands (iOS `landsOnCancel`), dp. */
         const val CANCEL_MARGIN = 24f
+
+        /**
+         * Whether a release outside the list's body (iOS: a cancelled system drop, 62af58a3) still
+         * lands the row in its slot: over the header (above [headerBottom]) or the footer (below
+         * [footerTop]), within the list's column (± [CANCEL_MARGIN]) and the [window]. Anywhere
+         * else the row springs back. All in the same coordinates (dp).
+         */
+        fun landsOnCancel(finger: Offset, list: Rect, headerBottom: Float, footerTop: Float, window: Rect): Boolean {
+            if (!window.contains(finger) || finger.x < list.left - CANCEL_MARGIN || finger.x > list.right + CANCEL_MARGIN) return false
+            return finger.y < headerBottom || finger.y > footerTop
+        }
+
+        /** The finger's speed over its last 100 ms (iOS `releaseVelocity`), clamped to this, dp/s. */
+        const val RELEASE_VELOCITY_LIMIT = 4000.0
 
         /** iOS's landing fallback: the system's drop animation, at most 0.55 s. */
         const val LANDING_FALLBACK_MILLIS = 550L
@@ -116,7 +153,21 @@ class DrawerPinDrag {
     var draggingID: String? by mutableStateOf(null)
         internal set
 
+    /**
+     * How lifted the dragged row is, 0…1 (iOS `DrawerLiftedRow.lift`): it grows by
+     * [DrawerTunables.pinLiftScale] on [DrawerTunables.pinLiftSpring] as it lifts, and settles
+     * back as it lands.
+     */
+    var liftProgress: Float by mutableFloatStateOf(0f)
+        internal set
+
     fun translation(key: ItemKey): Float = translations[key] ?: 0f
+
+    /** Pin, Unpin and Move outside a drag (iOS ff935bef): see [DrawerPinMove]. */
+    internal val pinMove = DrawerPinMove(this)
+
+    /** A row's opacity while a Pin or Unpin cross-fades it in under Reduce Motion. */
+    fun alpha(key: ItemKey): Float = pinMove.alphas[key] ?: 1f
 
     // ---- Drag state (iOS @ObservationIgnored) ----
 
@@ -137,6 +188,12 @@ class DrawerPinDrag {
     internal var hoverTarget: HoverTarget = HoverTarget.Recent
     internal var initialFingerY = 0f
     internal var lastFingerY = 0f
+
+    /** The finger's last 100 ms, (uptime ms, y dp), for the release velocity (iOS `samples`). */
+    private val samples = ArrayDeque<Pair<Long, Float>>()
+
+    /** The lift's spring (iOS `DrawerLiftedRow.lift`). */
+    private var liftSpring = SpringSolver.of(duration = 0.15, value = 0.0)
     /**
      * Where the finger holds the lifted row, from its centre. iOS centres its hidden cell on the
      * finger under the system's platter; Android shows the row itself, so it keeps the grip.
@@ -156,6 +213,8 @@ class DrawerPinDrag {
     internal var cachedFirstPinnedMinY = 0f
     internal var cachedFirstRecentMinY = 0f
     internal var cachedHeaderHeight = 56f
+    /** The drag has scrolled the list ([autoScroll]): rows coming into view start in their slots. */
+    internal var hasAutoScrolled = false
 
     internal val cellSprings = HashMap<ItemKey, SpringSolver>()
     internal var emptyZoneSpring = SpringSolver.of(duration = 0.42, bounce = 0.0)
@@ -244,6 +303,14 @@ class DrawerPinDrag {
 
         initialFingerY = fingerY
         lastFingerY = fingerY
+        hasAutoScrolled = false
+        samples.clear()
+        liftSpring = if (reducedMotion) {
+            SpringSolver.of(duration = 0.15, value = 1.0, target = 1.0)
+        } else {
+            SpringSolver(DrawerTunables.pinLiftSpring, value = 0.0, target = 1.0, positionEpsilon = 0.002, velocityEpsilon = 0.02)
+        }
+        liftProgress = liftSpring.value.toFloat()
 
         captureInitialGeometry()
         grabOffset = visibleItem(ItemKey.Row(sessionID))?.let { fingerY - (it.minY + it.height / 2) } ?: 0f
@@ -263,10 +330,14 @@ class DrawerPinDrag {
         }
     }
 
-    /** The finger moved to [fingerY] (dp, list coordinates). */
-    fun updateDrag(fingerY: Float) {
+    /** The finger moved to [fingerY] (dp, list coordinates) at [uptimeMillis] (the pointer event's). */
+    fun updateDrag(fingerY: Float, uptimeMillis: Long? = null) {
         if (activeSessionID == null || hasCommittedDrop || isLandingPlatter) return
         lastFingerY = fingerY
+        if (uptimeMillis != null) {
+            samples.addLast(uptimeMillis to fingerY)
+            while (samples.isNotEmpty() && uptimeMillis - samples.first().first > 100) samples.removeFirst()
+        }
         positionLiftedRowUnderFinger()
         evaluateHover(fingerY)
         retargetSprings()
@@ -284,19 +355,40 @@ class DrawerPinDrag {
     }
 
     /**
-     * The finger lifted at [fingerX]/[fingerY]: drops (lands the row in its slot, then commits), or
-     * cancels beside the list (iOS's `.cancel` proposal).
+     * The finger lifted at [fingerX]/[fingerY]: over the list's body it drops (lands the row in
+     * its slot, then commits); elsewhere it is iOS's cancelled drop, which still lands over the
+     * header or footer ([landsOnCancel], 62af58a3) and springs back anywhere else.
      */
     fun endDrag(fingerX: Float, fingerY: Float) {
         if (activeSessionID == null || hasCommittedDrop) return
+        val host = host
         val listWidth = host?.width?.takeIf { it > 0f } ?: Float.MAX_VALUE
-        if (fingerX < -CANCEL_MARGIN || fingerX > listWidth + CANCEL_MARGIN) {
+        val listHeight = host?.height?.takeIf { it > 0f } ?: Float.MAX_VALUE
+        val headerBottom = host?.headerBottom ?: 0f
+        val footerTop = host?.footerTop ?: Float.MAX_VALUE
+        val overBody = fingerX in 0f..listWidth && fingerY >= headerBottom && fingerY <= footerTop
+        val window = host?.window ?: Rect(Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY, Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
+        val list = Rect(0f, 0f, listWidth, listHeight)
+        if (!overBody && !landsOnCancel(Offset(fingerX, fingerY), list, headerBottom, footerTop, window)) {
             cancelDrag(deferLiftedClear = true)
             return
         }
         updateDrag(fingerY)
         beginLanding()
     }
+
+    /** The finger's speed over its last 100 ms, dp/s (iOS `releaseVelocity`). */
+    private fun releaseVelocity(): Double {
+        val first = samples.firstOrNull() ?: return 0.0
+        val last = samples.last()
+        val dt = (last.first - first.first) / 1000.0
+        if (dt <= 0.008) return 0.0
+        return ((last.second - first.second) / dt).coerceIn(-RELEASE_VELOCITY_LIMIT, RELEASE_VELOCITY_LIMIT)
+    }
+
+    /** The drop's spring (iOS `pinDropSpring`; 0.2 s without bounce under Reduce Motion). */
+    private val dropSpring: ai.opencode.core.motion.MotionSpring
+        get() = if (reducedMotion) ai.opencode.core.motion.MotionSpring(duration = 0.2) else DrawerTunables.pinDropSpring
 
     /** The slot the lifted row lands in on drop, as its top in dp (iOS `landingTarget`). */
     fun landingSlotMinY(): Float? {
@@ -359,6 +451,7 @@ class DrawerPinDrag {
 
         isCancellingEmptyZone = emptyZoneSpring.value > 0.5
         emptyZoneSpring.retarget(0.0)
+        liftSpring.retarget(0.0, duration = dropSpring.duration, bounce = 0.0)
         hoverSpring.retarget(if (startedInPinned) 1.0 else 0.0)
         retargetSprings()
 
@@ -406,6 +499,21 @@ class DrawerPinDrag {
             hoverSpring.retarget(0.0)
         }
         retargetSprings()
+        // The row springs from where it is, at the finger's speed, into its slot (iOS
+        // `DrawerLiftedRow.beginLanding`), and settles its lift on the way.
+        val drop = dropSpring
+        cellSprings[ItemKey.Row(draggedID)]?.let { row ->
+            cellSprings[ItemKey.Row(draggedID)] = SpringSolver.of(
+                duration = drop.duration,
+                bounce = drop.bounce,
+                value = row.value,
+                velocity = releaseVelocity(),
+                target = row.target,
+                positionEpsilon = 0.3,
+                velocityEpsilon = 12.0,
+            )
+        }
+        liftSpring.retarget(0.0, duration = drop.duration, bounce = 0.0)
         scheduleLandingFallback()
     }
 
@@ -504,12 +612,15 @@ class DrawerPinDrag {
     }
 
     fun resetAllCellsAndCleanup() {
+        pinMove.cancel()
         landingFallback?.cancel()
         landingFallback = null
         frameJob?.cancel()
         frameJob = null
         translations.clear()
         pinnedHeaderAlpha = 1f
+        liftProgress = 0f
+        samples.clear()
         dropZone = null
         cellSprings.clear()
         pendingResiduals = null
@@ -546,7 +657,7 @@ class DrawerPinDrag {
             resetAllCellsAndCleanup()
             return MotionFrameAction.Stop
         }
-        val keyed = host.visibleItems()
+        var keyed = host.visibleItems()
 
         // After a drop: the rows' new places are laid out; carry over what showed.
         pendingResiduals?.let { residuals ->
@@ -559,9 +670,16 @@ class DrawerPinDrag {
             pendingPinnedHeaderOffset = null
         }
 
+        if (autoScroll(dt)) {
+            keyed = host.visibleItems()
+            evaluateHover(lastFingerY)
+        }
+
         retargetSprings(keyed)
         emptyZoneSpring.step(dt)
         hoverSpring.step(dt)
+        liftSpring.step(dt)
+        liftProgress = liftSpring.value.toFloat().coerceAtLeast(0f)
 
         val visibleKeys = HashSet<ItemKey>(keyed.size)
         for (item in keyed) {
@@ -607,8 +725,55 @@ class DrawerPinDrag {
         return MotionFrameAction.Continue
     }
 
+    /**
+     * iOS `autoScroll` (DrawerPinDrag+Lifted): a finger held within
+     * [DrawerTunables.pinEdgeBand] of the list's top or bottom (inside the header and footer)
+     * scrolls it, faster the deeper it goes (`pinEdgeSpeed · depth · |depth|` dp a second), and
+     * the slots follow the finger through the content. Unlike iOS, whose lifted row is a
+     * window-level copy, the lifted row is the list's own cell, so the scroll stops before the
+     * dragged row's slot would leave the list and take the row with it. Returns whether the rows
+     * moved.
+     */
+    internal fun autoScroll(dt: Double): Boolean {
+        val host = host ?: return false
+        val draggedID = activeSessionID ?: return false
+        if (hasCommittedDrop || isLandingPlatter || dt <= 0) return false
+        val top = host.viewportTop
+        val bottom = min(host.footerTop, host.height)
+        val band = max(DrawerTunables.pinEdgeBand.value, 1f)
+        val y = lastFingerY
+        val depth = when {
+            y < top + band -> -min((top + band - y) / band, 1f)
+            y > bottom - band -> min((y - (bottom - band)) / band, 1f)
+            else -> return false
+        }
+        val dragged = visibleItem(ItemKey.Row(draggedID)) ?: return false
+        val speed = DrawerTunables.pinEdgeSpeed.value * depth * abs(depth)
+        val step = (speed * dt).toFloat()
+        val delta = if (step > 0) min(step, max(dragged.minY, 0f)) else max(step, -max(host.height - dragged.maxY, 0f))
+        if (abs(delta) < 0.01f) return false
+        host.scrollBy(delta)
+        val moved = (visibleItem(dragged.key)?.minY ?: return false) - dragged.minY
+        if (abs(moved) < 0.01f) return false
+        shiftGeometry(moved)
+        return true
+    }
+
+    /** The rows moved [by] dp under a scroll: what was measured against them moves with them. */
+    private fun shiftGeometry(by: Float) {
+        hasAutoScrolled = true
+        cachedTopMinY += by
+        cachedFirstPinnedMinY += by
+        cachedFirstRecentMinY += by
+        initialFingerY += by
+        for (spring in cellSprings.values) {
+            spring.value += by
+            spring.target += by
+        }
+    }
+
     internal fun allSpringsSettled(keyed: List<DrawerPinDragItem>? = null): Boolean {
-        if (!emptyZoneSpring.isSettled) return false
+        if (!emptyZoneSpring.isSettled || !liftSpring.isSettled) return false
         for (item in keyed ?: host?.visibleItems().orEmpty()) {
             val spring = cellSprings[item.key] ?: continue
             if (!spring.isSettled) return false

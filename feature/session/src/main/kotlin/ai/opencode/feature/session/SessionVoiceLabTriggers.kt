@@ -4,9 +4,15 @@ import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.store.PresentationAction
 import ai.opencode.core.store.StoreOf
+import ai.opencode.feature.voice.VoiceCallAudioFeature
 import ai.opencode.feature.voice.VoiceFeature
 import ai.opencode.feature.voice.VoiceLabDemo
 import ai.opencode.feature.voice.VoiceLabTrigger
+import ai.opencode.feature.voice.VoiceOpenLinkFeature
+import ai.opencode.feature.voice.VoiceScreenRequestFeature
+import ai.opencode.server.clienttools.ClientTool
+import ai.opencode.server.clienttools.ClientToolCall
+import ai.opencode.server.clienttools.JsonRpcID
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -32,9 +38,21 @@ internal fun SessionVoiceLabTriggers(store: StoreOf<SessionFeature.State, Sessio
                 when (intent.action) {
                     VoiceLabTrigger.startCall.notification ->
                         if (store.state.voice == null) store.send(SessionFeature.Action.VoiceTapped)
-                    VoiceLabTrigger.showCaptions.notification ->
-                        store.send(SessionFeature.Action.Voice(PresentationAction.Presented(VoiceFeature.Action.CaptionsTapped)))
                     VoiceLabTrigger.raiseToEar.notification -> store.send(SessionFeature.Action.RaisedToEar)
+                    VoiceLabTrigger.endCall.notification ->
+                        store.send(SessionFeature.Action.Voice(PresentationAction.Presented(VoiceFeature.Action.EndPressed)))
+                    VoiceLabTrigger.playAudio.notification -> {
+                        val call = labCall(1, ClientTool.voicePlayAudio, url = "https://example.com/audio/night-drive.mp3", title = "Night Drive")
+                        store.send(voice(VoiceFeature.Action.CallAudio(VoiceCallAudioFeature.Action.PlayRequested(call))))
+                    }
+                    VoiceLabTrigger.requestScreen.notification -> {
+                        val call = labCall(2, ClientTool.voiceRequestScreen, reason = "To check the layout.")
+                        store.send(voice(VoiceFeature.Action.ScreenRequest(VoiceScreenRequestFeature.Action.Requested(call))))
+                    }
+                    VoiceLabTrigger.openLink.notification -> {
+                        val call = labCall(3, ClientTool.voiceOpenURL, url = "https://m.uber.com/go/home", title = "Uber")
+                        store.send(voice(VoiceFeature.Action.OpenLink(VoiceOpenLinkFeature.Action.Requested(call))))
+                    }
                 }
             }
         }
@@ -43,3 +61,17 @@ internal fun SessionVoiceLabTriggers(store: StoreOf<SessionFeature.State, Sessio
         onDispose { if (registered) runCatching { context.unregisterReceiver(receiver) } }
     }
 }
+
+private fun voice(action: VoiceFeature.Action): SessionFeature.Action =
+    SessionFeature.Action.Voice(PresentationAction.Presented(action))
+
+private fun labCall(id: Long, tool: ClientTool, reason: String? = null, url: String? = null, title: String? = null): ClientToolCall =
+    ClientToolCall(
+        connection = ClientToolCall.labConnection,
+        id = JsonRpcID.Number(id),
+        tool = tool,
+        sessionID = null,
+        reason = reason,
+        url = url,
+        title = title,
+    )

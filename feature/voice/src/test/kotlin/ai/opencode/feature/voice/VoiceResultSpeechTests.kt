@@ -15,11 +15,13 @@ import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.live.assistantReply
 import ai.opencode.server.live.decodeTranscript
 import ai.opencode.server.model.OpenCodeJSONValue
+import ai.opencode.server.model.OpenCodePendingRequests
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.OpenCodeToolCall
 import ai.opencode.server.model.OpenCodeTranscriptItem
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.consumeAsFlow
 import kotlinx.coroutines.channels.Channel
@@ -46,9 +48,7 @@ import kotlin.time.Duration.Companion.seconds
 internal fun speechVoiceCall(
     start: suspend (String, RealtimeSessionConfig) -> Flow<VoiceCallEvent> = { _, _ -> kotlinx.coroutines.flow.emptyFlow() },
     completeFunction: suspend (String, String) -> Unit = { _, _ -> },
-    noteProgress: suspend (String, String) -> Unit = { _, _ -> },
-    announce: suspend (String) -> Unit = {},
-    announceSession: (suspend (String, List<String>, String) -> Unit)? = null,
+    announce: suspend (String?, List<String>, String) -> Unit = { _, _, _ -> },
     cancelPendingAnnouncements: suspend (List<String>) -> Unit = {},
     updateInstructions: suspend (String, String?) -> Unit = { _, _ -> },
     end: suspend () -> Unit = {},
@@ -58,9 +58,7 @@ internal fun speechVoiceCall(
 ): VoiceCallClient = VoiceCallClient(
     start = start,
     completeFunction = completeFunction,
-    noteProgress = noteProgress,
     announce = announce,
-    announceSession = announceSession,
     cancelPendingAnnouncements = cancelPendingAnnouncements,
     setMuted = {},
     updateInstructions = updateInstructions,
@@ -100,7 +98,11 @@ class VoiceLateResultTests {
             val effects = resolved(after = 0) { it.step(ReplyWatch.Event.WaitSucceeded(promptID = "msg_ios", reply = text)) }
             assertEquals(
                 text,
-                listOf(ReplyWatch.Effect.CancelWatch(promptID = "msg_ios"), ReplyWatch.Effect.Announce(sessionID = "ses_ios", promptIDs = listOf("msg_ios"), text = reply(text))),
+                listOf(
+                    ReplyWatch.Effect.CancelWatch(promptID = "msg_ios"),
+                    ReplyWatch.Effect.Announce(sessionID = "ses_ios", promptIDs = listOf("msg_ios"), text = reply(text)),
+                    ReplyWatch.Effect.FindBackgroundWork(sessionID = "ses_ios", promptID = "msg_ios", title = "OpenCode iOS", turn = 0, reply = text),
+                ),
                 effects,
             )
         }
@@ -118,6 +120,29 @@ class VoiceLateResultTests {
             assertTrue(effects.contains(ReplyWatch.Effect.Announce(sessionID = "ses_ios", promptIDs = listOf("msg_ios"), text = VoiceHandoff.earlierRequest(reply(text)))))
         }
         assertEquals(VoiceHandoff.earlierRequest("x"), VoiceHandoff.earlierRequest(VoiceHandoff.earlierRequest("x")))
+    }
+
+    /**
+     * From a call log: asked about a URI, the voice opened with an earlier
+     * request's result as if it answered him. A late result names its request.
+     */
+    @Test fun aLateResultNamesTheRequestItAnswers() {
+        val topic = "Rename Seer to Opticon and redo its icon"
+        val watch = Watch()
+        watch.step(ReplyWatch.Event.Sent(listOf(ReplyWatch.Prompt(promptID = "msg_rename", sessionID = "ses_ios", title = "OpenCode iOS", topic = topic))))
+        watch.noteUserActed()
+        val text = "Renamed it and drew the new icon."
+        val effects = watch.step(ReplyWatch.Event.WaitSucceeded(promptID = "msg_rename", reply = text))
+        val notice = ReplyWatch.Outcome.Replied(text).notice("OpenCode iOS", answering = listOf(topic), alreadyTold = null)
+        val spoken = VoiceHandoff.earlierRequest(notice, topic = topic)
+        assertTrue(spoken.startsWith(VoiceHandoff.earlierRequestLead + VoiceHandoff.earlierTopicLead + topic + "”. "))
+        assertTrue(effects.contains(ReplyWatch.Effect.Announce(sessionID = "ses_ios", promptIDs = listOf("msg_rename"), text = spoken)))
+        // Untitled prompts don't name a made-up topic.
+        assertFalse(
+            resolved(after = 1) { it.step(ReplyWatch.Event.WaitSucceeded(promptID = "msg_ios", reply = text)) }.any {
+                it is ReplyWatch.Effect.Announce && it.text.contains(VoiceHandoff.earlierTopicLead)
+            },
+        )
     }
 
     @Test fun failuresSpeak() {
@@ -144,15 +169,12 @@ class VoiceLateResultTests {
                 .stepping(ReplyWatch.Event.Sent(listOf(prompt)))
         }
         val announced = Locked(listOf<String>())
-        val noted = Locked(listOf<String>())
         val store = TestStore(voice, VoiceFeature(), this) {
             this[SharedStore] = shared.store
             this[Clock] = ImmediateClock()
             this[DateClient] = epoch
             this[VoiceCallClient] = speechVoiceCall(
-                announce = { text -> announced.update { it + text } },
-                announceSession = { _, _, text -> announced.update { it + text } },
-                noteProgress = { callID, text -> if (callID.isEmpty()) noted.update { it + text } },
+                announce = { _, _, text -> announced.update { it + text } },
                 cancelPendingAnnouncements = {},
             )
         }
@@ -161,7 +183,6 @@ class VoiceLateResultTests {
         store.send(VoiceFeature.Action.ReplyWatch(ReplyWatch.Event.WaitSucceeded(promptID = "msg_ios", reply = "Renamed the acknowledgement rule.")))
         store.finish()
         assertEquals(listOf(VoiceHandoff.earlierRequest(reply("Renamed the acknowledgement rule."))), announced.value)
-        assertTrue(noted.value.isEmpty())
     }
 }
 
@@ -448,6 +469,8 @@ class VoiceSuppressionTests {
             }
             this[OpenCodeClient] = OpenCodeClient.testValue.copy(
                 sendDeliveredPrompt = { _, _, _, _ -> "msg_cafe" },
+                // Every steer reads its target's requests first: none here.
+                familyPendingRequests = { _, _, _ -> OpenCodePendingRequests(permissions = emptyList(), forms = emptyList()) },
                 waitForIdle = { _, _ -> },
                 transcript = { _, _, _ -> transcript },
             )
@@ -464,7 +487,7 @@ class VoiceSuppressionTests {
                 )
             }
             this[VoiceCallClient] = speechVoiceCall(
-                announceSession = { _, ids, text -> announced.update { it + Announced(ids, text) } },
+                announce = { _, ids, text -> announced.update { it + Announced(ids, text) } },
             )
         }
         store.exhaustive = false
@@ -635,7 +658,7 @@ class VoiceSuppressionTests {
                     recentMessages = work.recentMessages,
                 )
             }
-            this[VoiceCallClient] = speechVoiceCall(announceSession = { _, _, text -> announced.update { it + text } })
+            this[VoiceCallClient] = speechVoiceCall(announce = { _, _, text -> announced.update { it + text } })
         }
         store.exhaustive = false
         store.send(VoiceFeature.Action.ReplyWatch(ReplyWatch.Event.Sent(steered)))
@@ -678,7 +701,10 @@ class VoiceSuppressionTests {
                     throw OpenCodeClientError("The delegator's reply wasn't readable.")
                 }
             }
-            this[OpenCodeClient] = OpenCodeClient.testValue.copy(sendDeliveredPrompt = { _, _, _, _ -> "msg_rename" })
+            this[OpenCodeClient] = OpenCodeClient.testValue.copy(
+                sendDeliveredPrompt = { _, _, _, _ -> "msg_rename" },
+                familyPendingRequests = { _, _, _ -> OpenCodePendingRequests(permissions = emptyList(), forms = emptyList()) },
+            )
             this[VoiceWorkClient] = VoiceWorkClient.testValue.let { work ->
                 VoiceWorkClient(
                     submit = work.submit,
@@ -692,7 +718,7 @@ class VoiceSuppressionTests {
                     recentMessages = work.recentMessages,
                 )
             }
-            this[VoiceCallClient] = speechVoiceCall(announceSession = { _, ids, text -> announced.update { it + Announced(ids, text) } })
+            this[VoiceCallClient] = speechVoiceCall(announce = { _, ids, text -> announced.update { it + Announced(ids, text) } })
         }
         store.exhaustive = false
         store.send(VoiceFeature.Action.CallEvent(VoiceCallEvent.FunctionCall(callID = "d1", name = "delegate", arguments = emptyArguments)))
@@ -919,6 +945,58 @@ class VoiceSuppressionTests {
         assertTrue(none.contains(""""latest_reply":"""""))
     }
 
+    /**
+     * From a call log: a 90 s wait held the delegation open while the user
+     * asked six times whether it heard them. Their words end the wait.
+     */
+    @Test fun waitForSessionEndsWhenTheUserSpeaks() = runTest {
+        val sleeping = OpenCodeClient.testValue.copy(
+            getSession = { _, _ -> gameEngine },
+            waitForIdle = { _, _ -> delay(600.seconds) },
+            // A read after the yield would hang: the answer can't wait on it.
+            transcript = { _, _, _ -> delay(600.seconds); emptyList() },
+        )
+        val notes = mutableListOf<String>()
+        val waits = mutableListOf<Boolean>()
+        val workspace = VoiceDelegatorWorkspace(
+            client = sleeping,
+            start = VoiceDelegatorWorkspace.Start(server = server, viewing = gameEngine, draftDirectory = gameEngine.directory, draftModel = null, transcriptDelta = emptyList(), explained = emptySet()),
+            effects = VoiceDelegatorWorkspace.Effects(
+                open = {},
+                explained = {},
+                waiting = { _, isWaiting -> waits += isWaiting },
+                userSpoke = { delay(50) },
+                note = { notes += it },
+            ),
+        )
+        // The wait and the read never finish on their own: only the user's words
+        // can have ended it.
+        val output = workspace.run(VoiceDelegator.ToolCall(callID = "c", name = "wait_for_session", arguments = "{}"))
+        val json = jsonObject(output)
+        assertEquals(false, json["finished"]?.jsonPrimitive?.content?.toBooleanStrictOrNull())
+        assertEquals(VoiceDelegatorWorkspace.userSpokeNote, json["user_spoke"]?.jsonPrimitive?.content)
+        assertEquals(listOf(true, false), waits)
+        assertTrue(notes.contains("Stopped waiting on “${gameEngine.title}”: the user spoke."))
+
+        // Nor can a failing read turn it into an error and lose user_spoke.
+        val failing = sleeping.copy(transcript = { _, _, _ -> throw OpenCodeClientError("Offline") })
+        val yielded = VoiceDelegatorWorkspace(
+            client = failing,
+            start = VoiceDelegatorWorkspace.Start(server = server, viewing = gameEngine, draftDirectory = gameEngine.directory, draftModel = null, transcriptDelta = emptyList(), explained = emptySet()),
+            effects = VoiceDelegatorWorkspace.Effects(open = {}, explained = {}, userSpoke = {}, note = {}),
+        ).run(VoiceDelegator.ToolCall(callID = "c", name = "wait_for_session", arguments = "{}"))
+        assertTrue(yielded.contains(""""user_spoke"""") && !yielded.contains("error"))
+
+        // A wait that finishes first says nothing of the user.
+        val idle = sleeping.copy(
+            transcript = { _, _, _ -> listOf(userText("msg_inbox", "Check my inbox")) },
+            waitForIdle = { _, _ -> },
+        )
+        val finished = gameWorkspace(idle).run(VoiceDelegator.ToolCall(callID = "c", name = "wait_for_session", arguments = "{}"))
+        assertTrue(finished.contains(""""finished":true"""))
+        assertFalse(finished.contains("user_spoke"))
+    }
+
     /** A small cut keeps most of its budget: it snaps back to a break only near its end. */
     @Test fun aShortCutKeepsMostOfItsBudget() {
         val part = "### Rules\n" + "The critters curl into balls to roll fast but blind. ".repeat(10)
@@ -943,7 +1021,7 @@ class VoiceSuppressionTests {
         val live = VoiceInstructions.buildLive(
             VoiceInstructions.Context(sessionTitle = "HOME", directoryName = "home", recentMessages = emptyList(), previousTail = emptyList(), previousEndedAt = null, managesSessions = true),
         )
-        assertTrue(live.contains("without predicting what will be done or found"))
+        assertTrue(live.contains("without predicting the session's steps or what will be found"))
         assertTrue(live.contains("While a request is out, never answer it from earlier results"))
         assertTrue(live.contains("The newest result about something replaces everything earlier about it"))
         assertTrue(VoiceDelegator.instructions.contains("never ask it to restate or recap it"))
@@ -956,16 +1034,16 @@ class VoiceSuppressionTests {
     private val upload: ReplyWatch.Prompt get() = ReplyWatch.Prompt(promptID = "msg_up", sessionID = "ses_upload", title = "Upload")
 
     /**
-     * A result from a session the delegator hasn't touched waits only a short
-     * grace (its read may be about to land), then speaks while it still works.
+     * A result from a session the delegator hasn't touched stays deferred while
+     * a foreground request is running (up to `claimedResultLimit`).
      */
-    @Test fun anUnclaimedResultSpeaksAfterAShortGrace() {
+    @Test fun anUnclaimedResultWaitsForRunningDelegatorsUpToTheLimit() {
         val watch = Watch()
         watch.step(ReplyWatch.Event.Sent(listOf(upload)))
         watch.step(ReplyWatch.Event.DelegatorStarted(requestID = "d1"))
         val landed = watch.step(ReplyWatch.Event.WaitSucceeded(promptID = "msg_up", reply = "All tests pass."))
         assertTrue(announcements(landed).isEmpty())
-        assertTrue(landed.contains(ReplyWatch.Effect.ExpireDeferral(key = "msg_up", after = ReplyWatch.unclaimedResultGrace)))
+        assertTrue(landed.contains(ReplyWatch.Effect.ExpireDeferral(key = "msg_up", after = ReplyWatch.claimedResultLimit)))
         val spoken = announcements(watch.step(ReplyWatch.Event.DeferralExpired(key = "msg_up")))
         assertEquals(listOf(ReplyWatch.Outcome.Replied("All tests pass.").notice("Upload")), spoken.map { it.text })
         assertEquals("Still working", setOf("d1"), watch.delegatorsInFlight)
@@ -983,9 +1061,9 @@ class VoiceSuppressionTests {
         watch.step(ReplyWatch.Event.DelegatorWaiting(sessionID = home, requestID = "d1", isWaiting = true))
         val landed = watch.step(ReplyWatch.Event.WaitSucceeded(promptID = "msg_inbox", reply = combined))
         assertTrue(announcements(landed).isEmpty())
-        assertTrue(landed.contains(ReplyWatch.Effect.ExpireDeferral(key = "msg_inbox", after = ReplyWatch.claimedResultLimit, claimed = true)))
+        assertTrue(landed.contains(ReplyWatch.Effect.ExpireDeferral(key = "msg_inbox", after = ReplyWatch.claimedResultLimit)))
         // The request keeps going (another wait, more rounds): the limit speaks it.
-        val spoken = announcements(watch.step(ReplyWatch.Event.DeferralExpired(key = "msg_inbox", claimed = true)))
+        val spoken = announcements(watch.step(ReplyWatch.Event.DeferralExpired(key = "msg_inbox")))
         assertEquals(listOf(listOf("msg_inbox")), spoken.map { it.promptIDs })
         assertTrue(watch.deferredNotices.isEmpty())
 
@@ -1000,7 +1078,7 @@ class VoiceSuppressionTests {
         val finished = answered.step(ReplyWatch.Event.DelegatorFinished(requestID = "d1", spoken = "Two DMs need replies."))
         assertTrue(announcements(finished).isEmpty())
         assertTrue(finished.contains(ReplyWatch.Effect.CancelDeferralExpiry(key = "msg_inbox")))
-        assertTrue("A late timer does nothing", answered.step(ReplyWatch.Event.DeferralExpired(key = "msg_inbox", claimed = true)).isEmpty())
+        assertTrue("A late timer does nothing", answered.step(ReplyWatch.Event.DeferralExpired(key = "msg_inbox")).isEmpty())
     }
 
     /**
@@ -1019,31 +1097,26 @@ class VoiceSuppressionTests {
     }
 
     /**
-     * A result whose session the delegator reads during the grace waits on
-     * for its answer instead, and isn't said twice.
+     * A result whose session the delegator reads while deferred waits for its
+     * answer without restarting its arrival-stamped 20 s timer, and isn't said twice.
      */
-    @Test fun aResultClaimedDuringItsGraceWaitsForTheAnswer() {
+    @Test fun aResultClaimedWhileDeferredKeepsItsArrivalDeadlineAndWaitsForTheAnswer() {
         val watch = Watch()
         watch.step(ReplyWatch.Event.Sent(listOf(steered[0])))
         watch.step(ReplyWatch.Event.DelegatorStarted(requestID = "d1"))
         watch.step(ReplyWatch.Event.WaitSucceeded(promptID = "msg_inbox", reply = combined))
         val read = watch.step(ReplyWatch.Event.DelegatorAnswered(sessionID = home, reply = combined, promptIDs = listOf("msg_inbox"), requestID = "d1"))
-        assertEquals(
-            "Claimed at once, within 20 s of arriving",
-            listOf(ReplyWatch.Effect.ExpireDeferral(key = "msg_inbox", after = ReplyWatch.claimedResultLimit - ReplyWatch.unclaimedResultGrace, claimed = true)),
-            read,
-        )
-        assertTrue("The grace timer it replaced is stale", watch.step(ReplyWatch.Event.DeferralExpired(key = "msg_inbox")).isEmpty())
+        assertTrue("Claiming an already-deferred notice keeps its arrival-stamped 20 s timer", read.isEmpty())
         val finished = watch.step(ReplyWatch.Event.DelegatorFinished(requestID = "d1", spoken = "Two DMs need replies."))
         assertTrue(announcements(finished).isEmpty())
         assertTrue(finished.contains(ReplyWatch.Effect.CancelWireAnnouncements(promptIDs = listOf("msg_inbox"))))
     }
 
     /**
-     * Through the call: with the delegator busy, a result from elsewhere is
-     * announced once the grace passes, not when the request ends.
+     * Through the call: with the delegator busy, an unclaimed result from
+     * elsewhere stays held while the foreground request runs and speaks when it finishes.
      */
-    @Test fun aResultSpeaksWithinTheGraceWhileTheDelegatorIsBusy() = runTest {
+    @Test fun anUnclaimedResultStaysHeldPastGraceWhileTheDelegatorIsBusy() = runTest {
         val shared = SpeechTestShared()
         val voice = delegatorCall(shared)
             .stepping(ReplyWatch.Event.DelegatorStarted(requestID = "d1"))
@@ -1058,18 +1131,17 @@ class VoiceSuppressionTests {
             this[VoiceWorkClient] = VoiceWorkClient.testValue.let { work ->
                 VoiceWorkClient(submit = work.submit, awaitReply = { _, _, _ -> "All tests pass." }, checkSessionActive = work.checkSessionActive, recentMessages = work.recentMessages)
             }
-            this[VoiceCallClient] = speechVoiceCall(announceSession = { _, _, text -> announced.update { it + text } })
+            this[VoiceCallClient] = speechVoiceCall(announce = { _, _, text -> announced.update { it + text } })
         }
         store.exhaustive = false
         store.send(VoiceFeature.Action.ReplyWatch(ReplyWatch.Event.Sent(listOf(upload))))
         store.receive(::isReplyWatch, timeout = 5.seconds)
-        clock.advance(ReplyWatch.unclaimedResultGrace - 100.milliseconds)
+        clock.advance(3.seconds)
         store.skipReceivedActions()
         assertTrue(announced.value.isEmpty())
-        clock.advance(100.milliseconds)
+        store.send(VoiceFeature.Action.ReplyWatch(ReplyWatch.Event.DelegatorFinished(requestID = "d1", spoken = "Done.")))
         store.eventuallyReducing(timeout = 5.seconds) { announced.value.isNotEmpty() }
         assertEquals(listOf(ReplyWatch.Outcome.Replied("All tests pass.").notice("Upload")), announced.value)
-        assertEquals(listOf("d1"), store.state.delegatorWork)
         effects.skipInFlightEffects()
     }
 
@@ -1154,25 +1226,56 @@ class VoiceSuppressionTests {
     }
 
     /**
-     * A result in its grace becomes claimed the moment a request starts
-     * waiting on its session.
+     * Sol finding 8: a deferred result claimed late (e.g. 15 s after arrival)
+     * keeps its original 20 s arrival deadline instead of restarting the timer.
      */
-    @Test fun aResultInItsGraceIsClaimedWhenAWaitStarts() {
+    @Test fun claimingADeferredResultDoesNotRestartItsTwentySecondDeadline() = runTest {
         val watch = Watch()
         watch.step(ReplyWatch.Event.Sent(listOf(steered[0])))
         watch.step(ReplyWatch.Event.DelegatorStarted(requestID = "d1"))
         watch.step(ReplyWatch.Event.WaitSucceeded(promptID = "msg_inbox", reply = combined))
         val waiting = watch.step(ReplyWatch.Event.DelegatorWaiting(sessionID = home, requestID = "d1", isWaiting = true))
-        assertEquals(
-            listOf(ReplyWatch.Effect.ExpireDeferral(key = "msg_inbox", after = ReplyWatch.claimedResultLimit - ReplyWatch.unclaimedResultGrace, claimed = true)),
-            waiting,
-        )
+        assertTrue("No replacement timer is scheduled when claiming", waiting.isEmpty())
         assertEquals(setOf("d1"), watch.deferredNotices.firstOrNull()?.heldBy)
-        assertTrue("Its grace timer is stale", watch.step(ReplyWatch.Event.DeferralExpired(key = "msg_inbox")).isEmpty())
         watch.step(ReplyWatch.Event.DelegatorAnswered(sessionID = home, reply = combined, promptIDs = listOf("msg_inbox"), requestID = "d1"))
         watch.step(ReplyWatch.Event.DelegatorWaiting(sessionID = home, requestID = "d1", isWaiting = false))
         val finished = watch.step(ReplyWatch.Event.DelegatorFinished(requestID = "d1", spoken = "Two DMs need replies."))
         assertTrue("The answer said it", announcements(finished).isEmpty())
+
+        // Clocked reducer proof: arrived at t=0, claimed at t=15 s, expires at t=20 s (5 s later).
+        val shared = SpeechTestShared()
+        val voice = delegatorCall(shared)
+            .stepping(ReplyWatch.Event.DelegatorStarted(requestID = "d1"))
+            .copy(delegatorWork = listOf("d1"))
+        val clock = TestClock()
+        val announced = Locked(listOf<String>())
+        val effects = detachedScope(coroutineContext)
+        val store = TestStore(voice, VoiceFeature(), effects) {
+            this[SharedStore] = shared.store
+            this[Clock] = clock
+            this[DateClient] = epoch
+            this[VoiceWorkClient] = VoiceWorkClient.testValue.let { work ->
+                VoiceWorkClient(submit = work.submit, awaitReply = { _, _, _ -> "All tests pass." }, checkSessionActive = work.checkSessionActive, recentMessages = work.recentMessages)
+            }
+            this[VoiceCallClient] = speechVoiceCall(announce = { _, _, text -> announced.update { it + text } })
+        }
+        store.send(VoiceFeature.Action.ReplyWatch(ReplyWatch.Event.Sent(listOf(upload)))) {
+            it.stepping(ReplyWatch.Event.Sent(listOf(upload)))
+        }
+        store.receive(VoiceFeature.Action.ReplyWatch(ReplyWatch.Event.WaitSucceeded(promptID = "msg_up", reply = "All tests pass.")), timeout = 5.seconds) {
+            it.stepping(ReplyWatch.Event.WaitSucceeded(promptID = "msg_up", reply = "All tests pass."))
+        }
+        clock.advance(15.seconds)
+        assertTrue(announced.value.isEmpty())
+        store.send(VoiceFeature.Action.ReplyWatch(ReplyWatch.Event.DelegatorWaiting(sessionID = "ses_upload", requestID = "d1", isWaiting = true))) {
+            it.stepping(ReplyWatch.Event.DelegatorWaiting(sessionID = "ses_upload", requestID = "d1", isWaiting = true))
+        }
+        clock.advance(5.seconds)
+        store.receive(VoiceFeature.Action.ReplyWatch(ReplyWatch.Event.DeferralExpired(key = "msg_up")), timeout = 5.seconds) {
+            it.stepping(ReplyWatch.Event.DeferralExpired(key = "msg_up"))
+        }
+        store.finish()
+        assertEquals(listOf(ReplyWatch.Outcome.Replied("All tests pass.").notice("Upload")), announced.value)
     }
 
     /** Ending the call cancels every held result's timer. */
@@ -1229,7 +1332,7 @@ class VoiceSuppressionTests {
             }
             this[VoiceCallClient] = speechVoiceCall(
                 completeFunction = { _, _ -> completing.complete(Unit); releaseComplete.await() },
-                announceSession = { _, _, text -> announced.update { it + text } },
+                announce = { _, _, text -> announced.update { it + text } },
             )
         }
         store.exhaustive = false
@@ -1285,7 +1388,7 @@ class VoiceSuppressionTests {
                     releaseComplete.await()
                     completed.update { it + callID }
                 },
-                announceSession = { _, _, text -> announced.update { it + text } },
+                announce = { _, _, text -> announced.update { it + text } },
                 end = {},
             )
         }

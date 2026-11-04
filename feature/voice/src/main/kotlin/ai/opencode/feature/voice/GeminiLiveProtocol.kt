@@ -26,12 +26,21 @@ data class GeminiLiveContentTurn(val role: String, val text: String) {
 
 data class GeminiLiveFunctionCall(val id: String, val name: String, val args: RealtimeJSON)
 
-data class GeminiLiveFunctionResponse(val id: String, val name: String, val response: RealtimeJSON) {
+data class GeminiLiveFunctionResponse(
+    val id: String,
+    val name: String,
+    val response: RealtimeJSON,
+    /** `SILENT` closes a call without the model speaking about it. */
+    val scheduling: String? = null,
+) {
     val json: RealtimeJSON
         get() = RealtimeJSONs.obj(
-            "id" to RealtimeJSONs.string(id),
-            "name" to RealtimeJSONs.string(name),
-            "response" to response,
+            *listOfNotNull(
+                "id" to RealtimeJSONs.string(id),
+                "name" to RealtimeJSONs.string(name),
+                "response" to response,
+                scheduling?.let { "scheduling" to RealtimeJSONs.string(it) },
+            ).toTypedArray(),
         )
 }
 

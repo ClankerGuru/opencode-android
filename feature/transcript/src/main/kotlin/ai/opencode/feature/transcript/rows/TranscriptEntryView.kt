@@ -6,7 +6,6 @@ import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.LocalTranscriptRowContext
 import ai.opencode.feature.transcript.RowProps
-import ai.opencode.feature.transcript.SinceYouLeft
 import ai.opencode.feature.transcript.TranscriptAction
 import ai.opencode.feature.transcript.TranscriptDisclosureState
 import ai.opencode.feature.transcript.TranscriptEntry
@@ -46,15 +45,8 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.semantics.CustomAccessibilityAction
-import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.Row
-import ai.opencode.feature.transcript.LocalTranscriptLayoutTuning
-import ai.opencode.feature.transcript.markdown.ui.HairlineRule
 import androidx.compose.ui.unit.dp
 import java.text.NumberFormat
 
@@ -84,11 +76,6 @@ fun TranscriptEntryView(
                 }
                 // The reply's links sit above its Copy row (iOS `LinkPreviewReplyEnd`).
                 LinkPreviewReplyEnd(entry.texts, key = rowID, entryID = entry.id, actions = actions)
-            }
-            is TranscriptEntry.SinceYouLeftEntry -> {
-                val onDismiss = { context.send(TranscriptAction.SinceYouLeftTapped) }
-                val slot = LocalTranscriptRowSlots.current.sinceYouLeft
-                if (slot != null) slot(entry.id, entry.summary, onDismiss) else SinceYouLeftFallback(entry.summary, onDismiss)
             }
         }
     }
@@ -231,43 +218,3 @@ private fun CompactionView(entry: TranscriptEntry, id: String, info: OpenCodeCom
     }
 }
 
-/**
- * Stand-in for `:feature:session`'s `SinceYouLeftRow` (`TranscriptRowSlots.sinceYouLeft`), laid
- * out as iOS's: “Since you left” and a hairline with the Dismiss cross, then the summary capped
- * at one line (fallback) or two (not at accessibility sizes), with a Dismiss action for TalkBack.
- */
-@Composable
-private fun SinceYouLeftFallback(summary: SinceYouLeft, onDismiss: () -> Unit) {
-    val colors = OpenCodeTheme.colors
-    val gutter = LocalTranscriptLayoutTuning.current.contentGutter.dp
-    val lineCap = if (isAccessibilityTextSize()) Int.MAX_VALUE else if (summary.isFallback) 1 else 2
-    val textStyle = OpenCodeTextStyles.subheadline
-    Column(verticalArrangement = Arrangement.spacedBy(scaledDp(TranscriptMetrics.compact.value))) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                "Since you left",
-                style = OpenCodeTextStyles.caption1.copy(fontWeight = FontWeight.Medium),
-                color = colors.secondaryText,
-                maxLines = 1,
-            )
-            HairlineRule(Modifier.weight(1f).clearAndSetSemantics {})
-            Box(
-                Modifier
-                    .clickable(role = Role.Button, onClick = onDismiss)
-                    .semantics { contentDescription = "Dismiss summary" }
-                    .padding(start = 14.dp, end = gutter),
-                contentAlignment = Alignment.Center,
-            ) {
-                OpenCodeIcon("xmark", contentDescription = null, size = scaledDp(12f), tint = colors.secondaryText)
-            }
-        }
-        Text(
-            summary.text,
-            Modifier.fillMaxWidth().semantics { customActions = listOf(CustomAccessibilityAction("Dismiss") { onDismiss(); true }) },
-            style = textStyle.copy(lineHeight = (textStyle.lineHeight.value + 2f).sp),
-            color = colors.secondaryText,
-            maxLines = lineCap,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}

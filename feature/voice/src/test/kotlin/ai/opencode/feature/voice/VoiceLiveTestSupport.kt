@@ -19,7 +19,9 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.consumeAsFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -103,9 +105,21 @@ class FakeLiveSocket(val config: LiveSessionConfig) {
     @Volatile var failOnCommentaryIndex: Int? = null
     private var commentaryCount = 0
 
-    /** While set, the first commentary sent stalls inside the socket's send. */
-    @Volatile var stallFirstCommentary = false
+    /**
+     * While set, the first commentary sent stalls inside the socket's send.
+     * Clearing it lets the send go on at once without moving virtual time, as
+     * iOS's real-time poll does while its test clock stands still.
+     */
+    var stallFirstCommentary: Boolean
+        get() = stall.value
+        set(value) { stall.value = value }
+    private val stall = MutableStateFlow(false)
     @Volatile var commentaryEntered = 0
+
+    /** Returns once [stallFirstCommentary] is clear. */
+    suspend fun awaitStallCleared() {
+        stall.first { !it }
+    }
 
     /** iOS `server.yield(_:)`. */
     fun yieldEvent(event: LiveServerEvent) {
@@ -205,10 +219,14 @@ class LiveHarness(
 
     /** iOS `coordinator.pendingAppendCount` (DEBUG-only there; internal state here). */
     suspend fun pendingAppendCount(): Int = coordinator.serialized {
-        coordinator.quietAppends.size + coordinator.heldAnnouncements.size + coordinator.undelivered.size
+        coordinator.pendingAppendCount
     }
 
-    suspend fun start(instructions: String = "Be brief.", delegation: LiveDelegation = LiveDelegation.client): Flow<VoiceCallEvent> {
+    suspend fun start(
+        instructions: String = "Be brief.",
+        delegation: LiveDelegation = LiveDelegation.client,
+        unboundSpeechUsesInstructions: Boolean = false,
+    ): Flow<VoiceCallEvent> {
         val live = LiveClient { _, config ->
             if (sockets.isNotEmpty() && failingConnects > 0) {
                 failingConnects -= 1
@@ -222,7 +240,7 @@ class LiveHarness(
                 send = { command ->
                     yield()
                     if (command is LiveCommand.AppendCommentary && ++socket.commentaryEntered == 1) {
-                        while (socket.stallFirstCommentary) delay(5)
+                        socket.awaitStallCleared()
                     }
                     socket.send(command)
                 },
@@ -253,7 +271,11 @@ class LiveHarness(
         })
         return coordinator.start(
             apiKey = "test",
-            config = LiveSessionConfig(instructions = instructions, delegation = delegation),
+            config = LiveSessionConfig(
+                instructions = instructions,
+                delegation = delegation,
+                unboundSpeechUsesInstructions = unboundSpeechUsesInstructions,
+            ),
             live = live,
             audio = audio,
         )
@@ -332,7 +354,7 @@ fun TestScope.voiceTestStore(
 fun testVoiceCall(
     start: suspend (String, RealtimeSessionConfig) -> Flow<VoiceCallEvent> = { _, _ -> kotlinx.coroutines.flow.emptyFlow() },
     completeFunction: suspend (String, String) -> Unit = { _, _ -> },
-    noteProgress: suspend (String, String) -> Unit = { _, _ -> },
+    noteProgressActivity: suspend (String, String?) -> Unit = { _, _ -> },
     cancelPendingAnnouncements: suspend (List<String>) -> Unit = { },
     retarget: suspend () -> Unit = { },
     setAtEar: suspend (Boolean) -> Unit = { },
@@ -344,7 +366,7 @@ fun testVoiceCall(
 ) = VoiceCallClient(
     start = start,
     completeFunction = completeFunction,
-    noteProgress = noteProgress,
+    noteProgressActivity = noteProgressActivity,
     cancelPendingAnnouncements = cancelPendingAnnouncements,
     retarget = retarget,
     setMuted = { },

@@ -9,27 +9,33 @@ import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.core.files.AttachmentFileType
 import ai.opencode.feature.composer.ComposerAttachmentsFeature
 import ai.opencode.feature.composer.ComposerFileAttachment
+import ai.opencode.server.model.OpenCodeOutgoingAttachment
 
 // Port of iOS `SessionFeature+Attachments.swift`: attachments, uploads, and Location as the session
 // sees them. `:feature:composer`'s `ComposerAttachmentsFeature` reduces the rest of each action
 // first.
 
+private fun SessionFeature.appendAttachment(state: State, attachment: OpenCodeOutgoingAttachment, haptic: Boolean = true): Reduced<State, Action> {
+    val parked = state.parkedComposer
+    return when {
+        // An import that finishes while the bar answers belongs to the waiting message.
+        parked != null -> Reduced(state.withParkedComposer(parked.copy(attachments = parked.attachments + attachment)))
+        !state.takesPasteAttachments -> Reduced(state)
+        else -> {
+            if (haptic) haptics.play(Haptic.selection)
+            Reduced(state.withPendingAttachments(state.pendingAttachments + attachment))
+        }
+    }
+}
+
 /** Attachments, uploads, and Location. Null: the action passes on. */
 internal fun SessionFeature.reduceAttachments(state: State, action: Action): Reduced<State, Action>? {
     val attachments = (action as? Action.ComposerAttachments)?.action ?: return null
     return when (attachments) {
-        is ComposerAttachmentsFeature.Action.AttachmentAdded -> {
-            val parked = state.parkedComposer
-            when {
-                // An import that finishes while the bar answers belongs to the waiting message.
-                parked != null -> Reduced(state.withParkedComposer(parked.copy(attachments = parked.attachments + attachments.attachment)))
-                !state.takesPasteAttachments -> Reduced(state)
-                else -> {
-                    haptics.play(Haptic.selection)
-                    Reduced(state.withPendingAttachments(state.pendingAttachments + attachments.attachment))
-                }
-            }
-        }
+        is ComposerAttachmentsFeature.Action.AttachmentAdded -> appendAttachment(state, attachments.attachment)
+
+        // Add already answered the press: one haptic per Add, not one per photo.
+        is ComposerAttachmentsFeature.Action.AttachmentLanded -> appendAttachment(state, attachments.attachment, haptic = false)
 
         is ComposerAttachmentsFeature.Action.AttachmentRemoved,
         ComposerAttachmentsFeature.Action.LocationTapped,

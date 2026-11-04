@@ -2,8 +2,12 @@ package ai.opencode.feature.drawer
 
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.experiments.ExperimentalFeature
+import ai.opencode.core.experiments.ExperimentalFeatures
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
+import ai.opencode.core.sound.SoundEffect
+import ai.opencode.core.sound.SoundEffectsClient
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.cancellable
@@ -11,7 +15,7 @@ import ai.opencode.feature.drawer.HomeFeature.Action
 import ai.opencode.feature.drawer.HomeFeature.State
 import ai.opencode.feature.drawer.notices.AccessibilityAnnouncer
 import ai.opencode.feature.session.InAppNotice
-import ai.opencode.feature.session.setTyped
+import ai.opencode.feature.settings.whatsnew.WhatsNewEntry
 import ai.opencode.core.experiments.InAppNoticeMode
 import ai.opencode.feature.drawer.notices.InAppNoticeSettings
 import ai.opencode.feature.drawer.notices.InAppNoticeSignal
@@ -40,17 +44,9 @@ internal fun HomeFeature.reduceNotifications(state: State, action: Action): Home
         Reduced(state, Effect.merge(credentials, if (changed && action.permission == NotificationPermission.Enabled) publishAppBadge(state) else Effect.none()))
     }
 
-    Action.NotifyPluginSetUpTapped -> {
-        if (state.connectionStatus == HomeConnectionFeature.State.ConnectionStatus.disconnected) {
-            Reduced(state)
-        } else {
-            val s = state.copy(settings = null)
-                .leavingCatchUp()
-                .openingDraft(reason = "notification setup")
-                .updatingDetail { it.setTyped(HomeFeature.notifyPluginSetUpPrompt) }
-            Reduced(s)
-        }
-    }
+    // Try It's path: onto the new-session draft, keeping anything already typed there.
+    Action.NotifyPluginSetUpTapped ->
+        tryWhatsNew(WhatsNewEntry.Destination.Prompt(HomeFeature.notifyPluginSetUpPrompt), "notification-plugin-setup", state)
 
     else -> Reduced(state)
 }
@@ -276,6 +272,9 @@ internal fun HomeFeature.inAppNoticeSignalChanged(oldInput: InAppNoticeInput, ne
     // iOS speaks up only from the window in use (Multiple Windows, `sceneWindow.isFront`); the
     // Android app has one task, so the window is always the one in use.
     if (urgent && !inCall) dependency(HapticsClient).play(Haptic.attention)
+    if (!inCall && dependency(ExperimentalFeatures)(ExperimentalFeature.soundEffects)) {
+        dependency(SoundEffectsClient).play(if (urgent) SoundEffect.needsInput else SoundEffect.replyDone)
+    }
     dependency(AccessibilityAnnouncer).announce(notice.announcement, urgent)
     val id = notice.id
     val hold = notice.hold

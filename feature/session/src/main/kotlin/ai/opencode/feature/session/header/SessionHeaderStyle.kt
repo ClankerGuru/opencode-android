@@ -126,7 +126,7 @@ data class SessionHeaderStyle(
             val fadeStart: Float,
             val fadeEnd: Float,
             val fadeIn: Float = 24f,
-            val radius: Float = HeaderBlurTunables.RADIUS,
+            val radius: Float = 8f,
         )
 
         sealed interface ResolvedBlur {
@@ -282,17 +282,8 @@ object HeaderBlurTunables {
             HeaderBlurMode.Off -> SessionHeaderStyle.Resolved.ResolvedBlur.None
             HeaderBlurMode.CustomBlur -> custom
             HeaderBlurMode.SystemEdge -> {
-                val current = resolved.blur
-                when {
-                    customKnobAdjusted -> custom
-                    current is SessionHeaderStyle.Resolved.ResolvedBlur.App -> {
-                        var app = current.blur
-                        if (pocketExtension == 0f || fadeAdjusted) app = app.copy(fadeStart = start, fadeEnd = end)
-                        app = app.copy(radius = radius)
-                        if (radius > 0) SessionHeaderStyle.Resolved.ResolvedBlur.App(app) else SessionHeaderStyle.Resolved.ResolvedBlur.None
-                    }
-                    else -> current
-                }
+                // Untouched knobs keep the shipped style on every OS, the app blur's own stops included (65c87b90).
+                if (customKnobAdjusted) custom else resolved.blur
             }
         }
 

@@ -9,7 +9,8 @@ import ai.opencode.feature.drawer.HomeFeature.Action
 import ai.opencode.feature.drawer.HomeFeature.State
 import ai.opencode.feature.session.SessionFeature
 import ai.opencode.feature.session.InAppNotice
-import ai.opencode.feature.drawer.switcher.reduceSessionSwitcher
+import ai.opencode.feature.settings.HomeSettingsFeature
+import ai.opencode.feature.settings.onboarding.WelcomeFeature
 import ai.opencode.server.OpenCodeServerEvent
 
 /*
@@ -25,9 +26,11 @@ internal fun HomeFeature.core(state: State, action: Action): Reduced<State, Acti
         Action.TranscriptCacheFlushRequested -> true
         is Action.ServerEvent -> action.event is OpenCodeServerEvent.SessionRenamed ||
             action.event is OpenCodeServerEvent.SessionDeleted ||
-            action.event is OpenCodeServerEvent.ProjectUpdated
+            action.event is OpenCodeServerEvent.SessionArchiveChanged ||
+            action.event is OpenCodeServerEvent.ProjectUpdated ||
+            action.event is OpenCodeServerEvent.SessionMoved
         is Action.SessionDetail -> when ((action.action as? PresentationAction.Presented)?.action) {
-            is SessionFeature.Action.SessionCreated -> true
+            is SessionFeature.Action.SessionCreated, is SessionFeature.Action.MissingFolderMoved -> true
             // A session that just learned its first prompt keeps it across launches.
             is SessionFeature.Action.AcceptedTranscriptUpdated -> reduced.state.sessions != state.sessions
             else -> false
@@ -39,10 +42,14 @@ internal fun HomeFeature.core(state: State, action: Action): Reduced<State, Acti
 }
 
 private fun HomeFeature.coreRoute(state: State, action: Action): Reduced<State, Action> = when (action) {
-    is Action.SessionSwitcher -> reduceSessionSwitcher(state, action.action)
     is Action.CatchUp -> reduceCatchUp(state, action.action)
     // The scoped `TraceUploadsFeature` reduces it (`HomeFeature+Composition`).
     is Action.Traces -> Reduced(state)
+    // The scoped `InboxSidebarFeature` owns Archive; Home stamps a confirmed one.
+    is Action.InboxSidebar -> {
+        val response = action.action as? InboxSidebarFeature.Action.ArchiveResponse
+        if (response != null && response.error == null) archiveConfirmed(state, response.sessionID) else Reduced(state)
+    }
 
     Action.NotificationSettingsRequested,
     is Action.NotificationPermissionLoaded,
@@ -71,6 +78,22 @@ private fun HomeFeature.coreRoute(state: State, action: Action): Reduced<State, 
     -> reduceConnection(state, action)
 
     is Action.ServerEvent -> reduceServerEvent(state, action.event)
+
+    is Action.SessionPages -> reduceSessionPages(state, action.action)
+
+    Action.ServerSwitchNoteActionTapped -> {
+        val note = state.serverSwitchNote
+        if (note == null) {
+            Reduced(state)
+        } else {
+            val delegate = if (note.reason == ServerSwitchNote.Reason.SignInFailed) {
+                HomeFeature.DelegateAction.PairServerRequested
+            } else {
+                HomeFeature.DelegateAction.ServerSwitchTapped(note.server)
+            }
+            Reduced(state.copy(serverSwitchNote = null), Effect.send(Action.Delegate(delegate)))
+        }
+    }
 
     is Action.VoiceCallCommandReceived,
     is Action.DictationCommandReceived,
@@ -143,8 +166,10 @@ private fun HomeFeature.coreRoute(state: State, action: Action): Reduced<State, 
     is Action.PlaygroundSetSessionDetail,
     is Action.PlaygroundReplaceState,
     Action.PairedComputerOpened,
+    Action.FirstComputerPaired,
     Action.DrawerOpenRequestHandled,
-    -> reduceDrawer(state, action)
+    Action.DrawerCallTapped,
+    -> reduceDrawer(state.adoptingSearchResultFor(action), action)
 
     is Action.InAppNoticeExpired ->
         if (state.inAppNotice?.id != action.id) Reduced(state) else Reduced(state.copy(inAppNotice = null))
@@ -158,6 +183,8 @@ private fun HomeFeature.coreRoute(state: State, action: Action): Reduced<State, 
 
     is Action.WhatsNew -> reduceWhatsNew(state, action.action)
     is Action.SettingsScreen -> reduceSettingsScreen(state, action.action)
+    // Show Welcome: WelcomeFeature reduces it; its pairing requests are the app's (AppFeature+Welcome).
+    is Action.Welcome -> Reduced(state)
 
     Action.InAppNoticeTapped -> {
         val notice = state.inAppNotice
@@ -193,6 +220,19 @@ private fun HomeFeature.coreRoute(state: State, action: Action): Reduced<State, 
         Reduced(if (action.isShown) state.showingSettings() else state.copy(settings = null))
 
     // The Onboarding Playground opens inside Settings (`SettingsFeature`), which sends it there.
-    is Action.Settings -> reducePreferences(state, action.action)
+    is Action.Settings -> {
+        val reduced = reducePreferences(state, action.action)
+        if (action.action == HomeSettingsFeature.Action.WelcomeOpened) {
+            // iOS `.settings(.welcomeOpened)`: Show Welcome, over Settings and Home.
+            Reduced(state.copy(welcome = WelcomeFeature.State(isPreview = true)))
+        } else if (!action.action.switchesOffSessionLiveActivity) {
+            reduced
+        } else {
+            val stopped = stopSessionActivity(reduced.state)
+            Reduced(stopped.state, Effect.merge(reduced.effect, stopped.effect))
+        }
+    }
+
+    is Action.SessionActivitySettled -> Reduced(state.notingSessionActivitySettled(action.sessionID, action.items))
 
 }

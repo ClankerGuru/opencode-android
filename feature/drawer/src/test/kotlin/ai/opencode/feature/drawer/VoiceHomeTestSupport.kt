@@ -5,7 +5,9 @@ import ai.opencode.core.store.TestStore
 import ai.opencode.feature.session.SessionFeature
 import ai.opencode.feature.voice.RealtimeJSON
 import ai.opencode.feature.voice.RealtimeSessionConfig
+import ai.opencode.feature.voice.VoiceBackgroundWork
 import ai.opencode.feature.voice.VoiceCallClient
+import ai.opencode.feature.voice.VoiceDelegationCloseReason
 import ai.opencode.feature.voice.VoiceCallEvent
 import ai.opencode.feature.voice.VoiceDelegator
 import ai.opencode.feature.voice.VoiceDelegatorClient
@@ -103,11 +105,11 @@ internal object VoiceHomeTestSupport {
     fun VoiceCallClient.copy(
         start: suspend (String, RealtimeSessionConfig) -> Flow<VoiceCallEvent> = this.start,
         completeFunction: suspend (String, String) -> Unit = this.completeFunction,
-        noteProgress: suspend (String, String) -> Unit = this.noteProgress,
-        announce: suspend (String) -> Unit = this.announce,
-        announceSession: (suspend (String, List<String>, String) -> Unit)? = this.announceSession,
+        noteProgressActivity: suspend (String, String?) -> Unit = this.noteProgressActivity,
+        stopProgressLine: suspend (String) -> Unit = this.stopProgressLine,
+        announce: suspend (String?, List<String>, String) -> Unit = this.announce,
         cancelPendingAnnouncements: suspend (List<String>) -> Unit = this.cancelPendingAnnouncements,
-        abandonDelegation: suspend (String) -> Unit = this.abandonDelegation,
+        closeDelegation: suspend (String, VoiceDelegationCloseReason) -> Unit = this.closeDelegation,
         retarget: suspend () -> Unit = this.retarget,
         setMuted: suspend (Boolean) -> Unit = this.setMuted,
         setAtEar: suspend (Boolean) -> Unit = this.setAtEar,
@@ -117,7 +119,7 @@ internal object VoiceHomeTestSupport {
         submitDelegatorInput: suspend (String, List<VoiceDelegator.InputItem>) -> Boolean = this.submitDelegatorInput,
         updateDelegatorInstructions: suspend (String) -> Unit = this.updateDelegatorInstructions,
     ) = VoiceCallClient(
-        start, completeFunction, noteProgress, announce, announceSession, cancelPendingAnnouncements, abandonDelegation,
+        start, completeFunction, noteProgressActivity, stopProgressLine, announce, cancelPendingAnnouncements, closeDelegation,
         retarget, setMuted, setAtEar, updateInstructions, end, delegatorRound, submitDelegatorInput, updateDelegatorInstructions,
     )
 
@@ -125,14 +127,30 @@ internal object VoiceHomeTestSupport {
     fun VoiceWorkClient.copy(
         submit: suspend (VoiceWorkTarget, String) -> VoiceWorkAdmission = this.submit,
         awaitReply: suspend (OpenCodeServer, String, String) -> String? = this.awaitReply,
+        awaitIdle: suspend (OpenCodeServer, String) -> Unit = this.awaitIdle,
         fetchReply: suspend (OpenCodeServer, String, String) -> String? = this.fetchReply,
         fetchRunReply: suspend (OpenCodeServer, String, String) -> String? = this.fetchRunReply,
+        backgroundWork: suspend (OpenCodeServer, String, String, String?) -> List<VoiceBackgroundWork> = this.backgroundWork,
+        backgroundReply: suspend (OpenCodeServer, String) -> String? = this.backgroundReply,
         checkSessionActive: suspend (OpenCodeServer, String) -> Boolean? = this.checkSessionActive,
         activeSessionIDs: suspend (OpenCodeServer) -> Set<String> = this.activeSessionIDs,
-        noteSessionSettled: suspend (String) -> Unit = this.noteSessionSettled,
-        noteActiveSessions: suspend (Set<String>) -> Unit = this.noteActiveSessions,
+        noteSessionSettled: suspend (OpenCodeServer, String) -> Unit = this.noteSessionSettled,
+        noteActiveSessions: suspend (OpenCodeServer, Set<String>) -> Unit = this.noteActiveSessions,
         recentMessages: suspend (OpenCodeServer, String, Int) -> List<String> = this.recentMessages,
-    ) = VoiceWorkClient(submit, awaitReply, fetchReply, fetchRunReply, checkSessionActive, activeSessionIDs, noteSessionSettled, noteActiveSessions, recentMessages)
+    ) = VoiceWorkClient(
+        submit = submit,
+        awaitReply = awaitReply,
+        awaitIdle = awaitIdle,
+        fetchReply = fetchReply,
+        fetchRunReply = fetchRunReply,
+        backgroundWork = backgroundWork,
+        backgroundReply = backgroundReply,
+        checkSessionActive = checkSessionActive,
+        activeSessionIDs = activeSessionIDs,
+        noteSessionSettled = noteSessionSettled,
+        noteActiveSessions = noteActiveSessions,
+        recentMessages = recentMessages,
+    )
 
     fun DependencyValues.Builder.voiceCall(update: VoiceCallClient.() -> VoiceCallClient) {
         this[VoiceCallClient] = this[VoiceCallClient].update()

@@ -9,18 +9,25 @@ import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.ServerIDClient
 import ai.opencode.server.model.OpenCodeDelivery
 import ai.opencode.server.model.OpenCodeModelRef
+import ai.opencode.server.model.OpenCodeRunMessage
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.OpenCodeTranscriptItem
 import ai.opencode.server.moveToBackgroundBeforeSteer
 import ai.opencode.server.retry.RetryBudget
 import ai.opencode.server.sendPromptConfirming
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -68,26 +75,26 @@ data class VoiceWorkAdmission(
 )
 
 /**
- * How long a result waits at most for the delegator request that read
- * its session (or is waiting on it) to answer. Past it, the result speaks
- * anyway; the delegator's answer may then repeat part of it.
+ * Work a session started in the background for a prompt the call watched
+ * (a background subagent), still running when that prompt's run finished.
+ */
+data class VoiceBackgroundWork(
+    /** The session doing it. */
+    val sessionID: String,
+    /** The session that started it. */
+    val parentSessionID: String,
+    val description: String,
+)
+
+/**
+ * How long a deferred result waits at most from arrival before speaking
+ * anyway, whether claimed or held behind another foreground turn.
  */
 val ReplyWatch.Companion.claimedResultLimit: Duration get() = 20.seconds
 
-/**
- * How long a result no request has claimed waits while one runs, in case
- * its read is about to land. Then it speaks.
- */
-val ReplyWatch.Companion.unclaimedResultGrace: Duration get() = 2.seconds
-
 fun ReplyWatch.Outcome.notice(title: String): String = when (this) {
     is ReplyWatch.Outcome.Replied -> {
-        val cleaned = LiveContentChunker.collapseCodeBlocks(reply.trim())
-        val bounded = if (cleaned.length > VoiceHandoff.replyLimit) {
-            cleaned.take(VoiceHandoff.replyLimit) + "…"
-        } else {
-            cleaned
-        }
+        val bounded = spoken(reply)
         "The session “$title” finished the work you started there. Tell the user only what's new since you last spoke about it; don't repeat the request or anything you already said, and if nothing is new, say nothing. Its reply: $bounded"
     }
     ReplyWatch.Outcome.FinishedWithoutText ->
@@ -100,12 +107,38 @@ fun ReplyWatch.Outcome.notice(title: String): String = when (this) {
         "Couldn’t reach the OpenCode server while waiting for “$title” ($message). Tell the user the server connection dropped while waiting on “$title”, and offer to check it again."
 }
 
+/** A reply as the voice agent gets it: code collapsed, bounded. */
+private fun spoken(reply: String): String {
+    val cleaned = LiveContentChunker.collapseCodeBlocks(reply.trim())
+    return if (cleaned.length > VoiceHandoff.replyLimit) cleaned.take(VoiceHandoff.replyLimit) + "…" else cleaned
+}
+
+/**
+ * Background work's result: the user heard only that it started, so it's
+ * news to tell them unasked.
+ */
+private fun ReplyWatch.Outcome.backgroundNotice(title: String, work: String): String {
+    val started = "The background work “$work” that the session “$title” started for the user"
+    return when (this) {
+        is ReplyWatch.Outcome.Replied ->
+            "$started has finished. Unless you've just told the user what it found, tell them now, briefly, without waiting to be asked; if you have, say nothing. Its result: ${spoken(reply)}"
+        ReplyWatch.Outcome.FinishedWithoutText ->
+            "$started has finished without a text result. Tell the user briefly that it's done."
+        is ReplyWatch.Outcome.ReplyUnreadable ->
+            "$started has finished, but its result couldn’t be read ($reason). Tell the user it's done and offer to read “$title”."
+        is ReplyWatch.Outcome.Failed ->
+            "$started stopped with an error: $message. Tell the user briefly what failed."
+        is ReplyWatch.Outcome.Unreachable ->
+            "Couldn’t reach the OpenCode server while waiting for the background work “$work” in “$title” ($message). Tell the user the connection dropped while waiting on it, and offer to check it again."
+    }
+}
+
 /**
  * One reply for several requests, or one the delegator already reported
  * in part: names what it answers and asks only for what's new.
  */
-fun ReplyWatch.Outcome.notice(title: String, answering: List<String>, alreadyTold: String?): String {
-    val base = notice(title)
+fun ReplyWatch.Outcome.notice(title: String, answering: List<String>, alreadyTold: String?, background: String? = null): String {
+    val base = background?.let { backgroundNotice(title, it) } ?: notice(title)
     if (answering.size <= 1 && alreadyTold == null) return base
     var lead = ""
     if (answering.size > 1) {
@@ -120,37 +153,133 @@ fun ReplyWatch.Outcome.notice(title: String, answering: List<String>, alreadyTol
 /**
  * Wakes in-flight `/wait` calls when SSE or `/api/session/active` reports a
  * session has settled, so a wedged long-poll socket never holds back a reply.
+ * It also owns each session's `/wait`: every reply watch and delegator wait
+ * on a session shares one long poll, cancelled once none of them is left.
  * (iOS actor → a [Mutex]-guarded class.)
  */
-private class VoiceWorkCoordinator {
-    private val mutex = Mutex()
-    private val waiters = HashMap<String, HashMap<Long, CompletableDeferred<Unit>>>()
-    private var nextID = 0L
-
-    suspend fun noteSessionSettled(sessionID: String) {
-        val sessionWaiters = mutex.withLock { waiters.remove(sessionID) } ?: return
-        for (signal in sessionWaiters.values) signal.complete(Unit)
+class VoiceWorkCoordinator {
+    /**
+     * A session on one server: two servers can share a session ID, and one
+     * server's settlement never ends a wait on the other.
+     */
+    private data class SessionKey(val server: String, val sessionID: String) {
+        constructor(server: OpenCodeServer, sessionID: String) : this(server.persistenceID, sessionID)
     }
 
-    suspend fun noteActiveSessions(activeIDs: Set<String>) {
-        val settled = mutex.withLock { waiters.keys.filter { it !in activeIDs } }
-        for (sessionID in settled) {
-            noteSessionSettled(sessionID)
+    private val mutex = Mutex()
+    private val waiters = HashMap<SessionKey, HashMap<Long, CompletableDeferred<Unit>>>()
+    private var nextID = 0L
+
+    private class SharedWait(
+        val generation: Long,
+        val job: Job,
+        val joined: HashMap<Long, CompletableDeferred<Result<Unit>>>,
+    )
+
+    private val sharedWaits = HashMap<SessionKey, SharedWait>()
+
+    /** Runs the shared polls: each outlives any one waiter and stops when the last leaves. */
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    /**
+     * `client.waitForIdle`, made once per session however many wait on it.
+     * A waiter that's cancelled returns at once; the poll stops when the last
+     * one leaves.
+     */
+    suspend fun sharedWaitForIdle(server: OpenCodeServer, sessionID: String, client: OpenCodeClient) {
+        // Already cancelled: it never opens a wait.
+        if (!currentCoroutineContext().isActive) throw leftWait
+        val key = SessionKey(server, sessionID)
+        val result = CompletableDeferred<Result<Unit>>()
+        val id = mutex.withLock {
+            val id = nextID++
+            val existing = sharedWaits[key]
+            if (existing != null) {
+                existing.joined[id] = result
+            } else {
+                val generation = nextID++
+                // Like iOS's unstructured `Task`, the shared wait keeps the caller's
+                // context (dependencies, retry policy, dispatcher) but outlives it.
+                val job = scope.launch(currentCoroutineContext().minusKey(Job), start = CoroutineStart.LAZY) {
+                    val outcome = try {
+                        client.waitForIdle(server, sessionID)
+                        Result.success(Unit)
+                    } catch (error: OpenCodeClientError) {
+                        Result.failure(error)
+                    }
+                    finish(key, generation, outcome)
+                }
+                sharedWaits[key] = SharedWait(generation, job, hashMapOf(id to result))
+                job.start()
+            }
+            id
         }
+        try {
+            result.await().getOrThrow()
+        } finally {
+            withContext(NonCancellable) { leave(key, id) }
+        }
+    }
+
+    private suspend fun finish(key: SessionKey, generation: Long, result: Result<Unit>) {
+        val wait = mutex.withLock {
+            val wait = sharedWaits[key]
+            if (wait == null || wait.generation != generation) return
+            sharedWaits.remove(key)
+            wait
+        }
+        for (continuation in wait.joined.values) continuation.complete(result)
+    }
+
+    private suspend fun leave(key: SessionKey, id: Long) {
+        mutex.withLock {
+            val wait = sharedWaits[key] ?: return
+            val continuation = wait.joined.remove(id) ?: return
+            continuation.complete(Result.failure(leftWait))
+            if (wait.joined.isEmpty()) {
+                wait.job.cancel()
+                sharedWaits.remove(key)
+            }
+        }
+    }
+
+    /**
+     * Who's waiting on the session's `/wait` (0 when none is open), and how
+     * many session waits are open in all.
+     */
+    suspend fun waiterCount(server: OpenCodeServer, sessionID: String): Int =
+        mutex.withLock { sharedWaits[SessionKey(server, sessionID)]?.joined?.size ?: 0 }
+
+    suspend fun openWaitCount(): Int = mutex.withLock { sharedWaits.size }
+
+    suspend fun noteSessionSettled(server: OpenCodeServer, sessionID: String) {
+        settle(SessionKey(server, sessionID))
+    }
+
+    /** A snapshot of one server's running sessions settles only that server's waits. */
+    suspend fun noteActiveSessions(server: OpenCodeServer, activeIDs: Set<String>) {
+        val settled = mutex.withLock { waiters.keys.filter { it.server == server.persistenceID && it.sessionID !in activeIDs } }
+        for (key in settled) settle(key)
+    }
+
+    private suspend fun settle(key: SessionKey) {
+        val sessionWaiters = mutex.withLock { waiters.remove(key) } ?: return
+        for (signal in sessionWaiters.values) signal.complete(Unit)
     }
 
     suspend fun waitForIdleOrSettlement(server: OpenCodeServer, sessionID: String, client: OpenCodeClient) {
         val signal = CompletableDeferred<Unit>()
+        val key = SessionKey(server, sessionID)
         val id = mutex.withLock {
             val id = nextID++
-            waiters.getOrPut(sessionID) { HashMap() }[id] = signal
+            waiters.getOrPut(key) { HashMap() }[id] = signal
             id
         }
         try {
             val failure: OpenCodeClientError? = coroutineScope {
                 val wait = async {
                     try {
-                        client.waitForIdle(server, sessionID)
+                        sharedWaitForIdle(server, sessionID, client)
                         null
                     } catch (error: OpenCodeClientError) {
                         error
@@ -167,11 +296,14 @@ private class VoiceWorkCoordinator {
         } finally {
             withContext(NonCancellable) {
                 mutex.withLock {
-                    waiters[sessionID]?.remove(id)
-                    if (waiters[sessionID]?.isEmpty() == true) waiters.remove(sessionID)
+                    waiters[key]?.remove(id)
+                    if (waiters[key]?.isEmpty() == true) waiters.remove(key)
                 }
             }
         }
+        // A cancelled wait ends its settlement stream too: that isn't a
+        // settlement, and the caller mustn't read the reply after it.
+        if (!currentCoroutineContext().isActive) throw leftWait
     }
 
     suspend fun fetchReply(
@@ -198,6 +330,10 @@ private class VoiceWorkCoordinator {
         }
         return null
     }
+
+    private companion object {
+        val leftWait = OpenCodeClientError(message = "Stopped waiting")
+    }
 }
 
 class VoiceWorkClient(
@@ -208,6 +344,13 @@ class VoiceWorkClient(
     val submit: suspend (target: VoiceWorkTarget, text: String) -> VoiceWorkAdmission,
     /** Waits for the run to settle and returns the attributed assistant text. */
     val awaitReply: suspend (server: OpenCodeServer, sessionID: String, promptID: String) -> String?,
+    /**
+     * Waits for the session to settle on the same `/wait` as its reply
+     * watches: the delegator's `wait_for_session`.
+     */
+    val awaitIdle: suspend (server: OpenCodeServer, sessionID: String) -> Unit = { server, sessionID ->
+        dependency(OpenCodeClient).waitForIdle(server, sessionID)
+    },
     /** Reads the assistant reply directly once SSE or a snapshot reported the session settled. */
     val fetchReply: suspend (server: OpenCodeServer, sessionID: String, promptID: String) -> String? = { server, sessionID, promptID ->
         dependency(OpenCodeClient).assistantReply(server, sessionID, promptID)
@@ -217,6 +360,22 @@ class VoiceWorkClient(
      * whose own read found none (a later delegation joined the run first).
      */
     val fetchRunReply: suspend (server: OpenCodeServer, sessionID: String, promptID: String) -> String? = { _, _, _ -> null },
+    /**
+     * Background work a prompt's run started that's still running (a
+     * background subagent), so its result is spoken when it lands.
+     * [reply] is the run's reply as the call read it: work whose completion
+     * the session wrote that reply after was covered by it.
+     */
+    val backgroundWork: suspend (server: OpenCodeServer, sessionID: String, promptID: String, reply: String?) -> List<VoiceBackgroundWork> = { _, _, _, _ -> emptyList() },
+    /** Background work's result: the final reply of the session doing it. */
+    val backgroundReply: suspend (server: OpenCodeServer, sessionID: String) -> String? = { _, _ -> null },
+    /**
+     * Session-delegator background work's result: what `parentSessionID` said
+     * when `<subagent>` reported `childSessionID`'s completion, or null when a
+     * user delegation turn in that run covers it (or the parent stayed silent).
+     */
+    val relayedBackgroundReply: suspend (server: OpenCodeServer, parentSessionID: String, childSessionID: String) -> String? =
+        { _, _, _ -> null },
     /** Tri-state active check: `true` if running, `false` if confirmed idle, `null` if unreachable. */
     val checkSessionActive: suspend (server: OpenCodeServer, sessionID: String) -> Boolean? = { server, sessionID ->
         try {
@@ -228,8 +387,8 @@ class VoiceWorkClient(
     val activeSessionIDs: suspend (server: OpenCodeServer) -> Set<String> = { server ->
         dependency(OpenCodeClient).homeSnapshot(server).activeSessionIDs
     },
-    val noteSessionSettled: suspend (sessionID: String) -> Unit = {},
-    val noteActiveSessions: suspend (activeSessionIDs: Set<String>) -> Unit = {},
+    val noteSessionSettled: suspend (server: OpenCodeServer, sessionID: String) -> Unit = { _, _ -> },
+    val noteActiveSessions: suspend (server: OpenCodeServer, activeSessionIDs: Set<String>) -> Unit = { _, _ -> },
     /** Recent plain-text messages for the voice model's context. */
     val recentMessages: suspend (server: OpenCodeServer, sessionID: String, limit: Int) -> List<String>,
 ) {
@@ -237,8 +396,10 @@ class VoiceWorkClient(
     data class NewestReply(val reply: String?, val promptIDs: Set<String>)
 
     companion object Key : DependencyKey<VoiceWorkClient> {
-        override val liveValue: VoiceWorkClient by lazy {
-            val coordinator = VoiceWorkCoordinator()
+        override val liveValue: VoiceWorkClient by lazy { live(VoiceWorkCoordinator()) }
+
+        /** The live client on its own coordinator: tests get a fresh one. */
+        fun live(coordinator: VoiceWorkCoordinator): VoiceWorkClient =
             VoiceWorkClient(
                 submit = { target, text ->
                     val client = dependency(OpenCodeClient)
@@ -287,20 +448,65 @@ class VoiceWorkClient(
                     coordinator.waitForIdleOrSettlement(server, sessionID, client)
                     coordinator.fetchReply(server, sessionID, promptID, client, clock)
                 },
+                awaitIdle = { server, sessionID ->
+                    coordinator.waitForIdleOrSettlement(server, sessionID, dependency(OpenCodeClient))
+                },
                 fetchReply = { server, sessionID, promptID ->
                     coordinator.fetchReply(server, sessionID, promptID, dependency(OpenCodeClient), dependency(Clock))
                 },
                 fetchRunReply = { server, sessionID, promptID ->
                     dependency(OpenCodeClient).runReply(server, sessionID, promptID)
                 },
-                noteSessionSettled = { sessionID -> coordinator.noteSessionSettled(sessionID) },
-                noteActiveSessions = { activeIDs -> coordinator.noteActiveSessions(activeIDs) },
+                backgroundWork = { server, sessionID, promptID, reply ->
+                    val client = dependency(OpenCodeClient)
+                    // The run may be longer than a page: read back to its prompt.
+                    var messages: List<OpenCodeRunMessage> = emptyList()
+                    var cursor: String? = null
+                    for (page in 0 until backgroundSearchPages) {
+                        val read = client.runMessages(server, sessionID, cursor)
+                        messages = read.messages + messages
+                        if (messages.any { it.id == promptID }) break
+                        cursor = read.next ?: break
+                    }
+                    pendingBackgroundWork(messages, sessionID, promptID, reply)
+                },
+                backgroundReply = { server, sessionID ->
+                    replyAfterPrompt(dependency(OpenCodeClient).transcript(server, sessionID, 40), afterPromptID = null)
+                },
+                relayedBackgroundReply = relayed@{ server, parentSessionID, childSessionID ->
+                    val client = dependency(OpenCodeClient)
+                    val clock = dependency(Clock)
+                    val delays = listOf(150.milliseconds, 400.milliseconds)
+                    for (attempt in 0..delays.size) {
+                        coordinator.waitForIdleOrSettlement(server, parentSessionID, client)
+                        var messages: List<OpenCodeRunMessage> = emptyList()
+                        var cursor: String? = null
+                        for (page in 0 until backgroundSearchPages) {
+                            val read = client.runMessages(server, parentSessionID, cursor)
+                            messages = read.messages + messages
+                            if (messages.any { it.completedChildID == childSessionID }) break
+                            cursor = read.next ?: break
+                        }
+                        when (val outcome = subagentRelayOutcome(messages, childSessionID)) {
+                            is SubagentRelayOutcome.Replied -> return@relayed outcome.reply
+                            SubagentRelayOutcome.CoveredOrSilent -> return@relayed null
+                            SubagentRelayOutcome.Pending -> {
+                                if (attempt >= delays.size || !currentCoroutineContext().isActive) {
+                                    throw OpenCodeClientError("Waiting for Voice session to relay background work.")
+                                }
+                                clock.sleep(delays[attempt])
+                            }
+                        }
+                    }
+                    throw OpenCodeClientError("Waiting for Voice session to relay background work.")
+                },
+                noteSessionSettled = { server, sessionID -> coordinator.noteSessionSettled(server, sessionID) },
+                noteActiveSessions = { server, activeIDs -> coordinator.noteActiveSessions(server, activeIDs) },
                 recentMessages = { server, sessionID, limit ->
                     val items = dependency(OpenCodeClient).transcript(server, sessionID, limit)
                     formatRecentMessages(items)
                 },
             )
-        }
 
         override val testValue: VoiceWorkClient
             get() = VoiceWorkClient(
@@ -309,6 +515,90 @@ class VoiceWorkClient(
                 checkSessionActive = { _, _ -> false },
                 recentMessages = { _, _, _ -> emptyList() },
             )
+
+        /** Pages read back looking for a watched prompt's run (40 messages each). */
+        const val backgroundSearchPages = 5
+
+        /**
+         * Background subagents a prompt's run started (from the prompt to the
+         * next prompt after the run's text) whose results the read [reply] didn't
+         * cover: still running, or finished without the session writing text of
+         * that reply after its completion landed.
+         */
+        fun pendingBackgroundWork(
+            messages: List<OpenCodeRunMessage>,
+            parentSessionID: String,
+            afterPromptID: String,
+            reply: String?,
+        ): List<VoiceBackgroundWork> {
+            val anchor = messages.indexOfLast { it.id == afterPromptID }
+            if (anchor < 0) return emptyList()
+            val launched = mutableListOf<VoiceBackgroundWork>()
+            val finished = mutableSetOf<String>()
+            val covered = mutableSetOf<String>()
+            var sawText = false
+            for (message in messages.subList(anchor + 1, messages.size)) {
+                if (message.type == "user") {
+                    if (sawText) break
+                    continue
+                }
+                message.completedChildID?.let { finished += it }
+                for (launch in message.launches) {
+                    if (launched.any { it.sessionID == launch.sessionID }) continue
+                    val description = launch.description?.trim()?.takeIf { it.isNotEmpty() }
+                    launched += VoiceBackgroundWork(launch.sessionID, parentSessionID, description ?: "background work")
+                }
+                if (message.type != "assistant" || message.text.isEmpty()) continue
+                sawText = true
+                if (isRead(message.text, reply)) covered += finished
+            }
+            return launched.filter { it.sessionID !in covered }
+        }
+
+        /** Text the read reply carries: its opening, since a long reply is cut. */
+        fun isRead(text: String, reply: String?): Boolean {
+            if (reply == null) return false
+            return reply.contains(text.take(200))
+        }
+
+        sealed interface SubagentRelayOutcome {
+            data object Pending : SubagentRelayOutcome
+            data object CoveredOrSilent : SubagentRelayOutcome
+            data class Replied(val reply: String) : SubagentRelayOutcome
+        }
+
+        /**
+         * What a session-delegator parent session said about a completed background
+         * subagent (`<subagent>` synthetic): [SubagentRelayOutcome.Pending] until `<subagent>` arrives
+         * and the parent's run after it settles (or is covered), [SubagentRelayOutcome.CoveredOrSilent]
+         * when a user turn or combined subagent reply covers it or it settled silent.
+         */
+        fun subagentRelayOutcome(messages: List<OpenCodeRunMessage>, childSessionID: String): SubagentRelayOutcome {
+            val anchor = messages.indexOfLast { it.completedChildID == childSessionID }
+            if (anchor < 0) return SubagentRelayOutcome.Pending
+            val runStart = messages.subList(0, anchor).indexOfLast { it.type == "idle" }.let { if (it < 0) 0 else it + 1 }
+            val before = messages.subList(runStart, anchor)
+            val launchedHere = before.any { message -> message.launches.any { it.sessionID == childSessionID } }
+            if (!launchedHere && before.any { it.type == "user" }) return SubagentRelayOutcome.CoveredOrSilent
+            var reply: String? = null
+            var settled = false
+            for (message in messages.subList(anchor + 1, messages.size)) {
+                if (message.type == "idle") {
+                    settled = true
+                    break
+                }
+                if (message.type == "user" || message.completedChildID != null) {
+                    return reply?.let(SubagentRelayOutcome::Replied) ?: SubagentRelayOutcome.CoveredOrSilent
+                }
+                if (message.type != "assistant" || message.text.isEmpty()) continue
+                reply = bounded(message.text, readMore = message.id)
+            }
+            if (!settled) return SubagentRelayOutcome.Pending
+            return reply?.let(SubagentRelayOutcome::Replied) ?: SubagentRelayOutcome.CoveredOrSilent
+        }
+
+        fun relayedSubagentReply(messages: List<OpenCodeRunMessage>, childSessionID: String): String? =
+            (subagentRelayOutcome(messages, childSessionID) as? SubagentRelayOutcome.Replied)?.reply
 
         /** How much of a session's final reply the delegator reads. */
         const val replyReadLimit = 6_000

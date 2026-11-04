@@ -116,7 +116,7 @@ class VoiceFeatureTests {
                 setPendingInputDelivery = { _, _, id, delivery -> deliveries.append("$id:${delivery.rawValue}") },
                 moveToBackground = { _, id -> deliveries.append("background:$id") },
             )
-            voiceCall { copy(completeFunction = { _, _ -> }, noteProgress = { _, _ -> }, end = {}) }
+            voiceCall { copy(completeFunction = { _, _ -> }, end = {}) }
         }
         store.exhaustive = false
         store.setAPIKey("sk-test")
@@ -201,7 +201,7 @@ class VoiceFeatureTests {
                 (input.firstOrNull() as? VoiceDelegator.InputItem.User)?.let { requests.append(it.text) }
                 response("r${requests.value.size}", text = "Started it.")
             }
-            voiceCall { copy(completeFunction = { _, output -> completed.append(output) }, noteProgress = { _, _ -> }) }
+            voiceCall { copy(completeFunction = { _, output -> completed.append(output) }) }
         }
         store.exhaustive = false
         store.setAPIKey("sk-test")
@@ -330,10 +330,11 @@ class VoiceFeatureTests {
         assertEquals(listOf("user: Check the upload test", "assistant: Checking."), voice.tail.lines)
         assertEquals(1, voice.captions.size)
         assertTrue("A reply being spoken carries on", voice.liveAssistantText == "Checking" && voice.liveAssistantItemID == "a1")
-        // B's earlier call is background; this call's lines never are.
-        assertEquals(listOf("user: Old docs question"), voice.instructionsContext.previousTail)
+        // Neither B's earlier call nor this call's lines are replayed on a switch.
+        assertTrue(voice.instructionsContext.previousTail.isEmpty())
         val delta = VoiceInstructions.buildRetarget(voice.instructionsContext, engine = VoiceEngine.gptLive)
         assertTrue(delta.contains("\"Docs\""))
+        assertFalse(delta.contains("Old docs question"))
         assertFalse(delta.contains("Check the upload test"))
 
         // Back to A, which this call already wrote to: nothing is replayed.
@@ -342,9 +343,9 @@ class VoiceFeatureTests {
         val back = VoiceInstructions.buildRetarget(voice.instructionsContext, engine = VoiceEngine.gptLive)
         assertFalse(back.contains("Previous voice call tail"))
         assertEquals(listOf("user: Check the upload test", "assistant: Checking."), voice.tail.lines.takeLast(2))
-        // Each session it visited keeps the call's tail for the next call.
+        // Each session it visited keeps only user turns for the next call's continuity.
         val transcripts = h.state { shared(VoiceSharedKeys.voiceTranscripts).value }
-        assertEquals(true, transcripts["${server.id}:${b.id}"]?.tail?.contains("user: Check the upload test"))
+        assertEquals(listOf("user: Check the upload test"), transcripts["${server.id}:${b.id}"]?.tail)
     }
 
     /**
@@ -381,5 +382,75 @@ class VoiceFeatureTests {
         assertFalse(VoiceInstructions.buildRetarget(back.instructionsContext, engine = VoiceEngine.gptLive).contains("1Password"))
         assertEquals(1, back.tail.lines.count { it.contains("1Password") })
         store.finish()
+    }
+
+    /**
+     * Build 685, 22:56:57Z (14:56:57 PT): opening HEX mid-call replayed a stale
+     * `VoiceTranscriptRecord.tail` containing Voice's own unbacked lines ("And
+     * that text to Olive went through, delivered"), causing Voice to answer
+     * "No. Just to Olive." nine seconds later without delegating.
+     */
+    @Test fun oliveHexRetargetNeverReplaysPastVoiceClaimsOrPreviousCallTail() = voiceTest { harness ->
+        h = harness
+        val ios = OpenCodeSession(id = "ses_olive_ios", serverTitle = "OPENCODE IOS", projectID = "p", directory = "/tmp/ios", updatedAt = VoiceFeatureTestSupport.distantPast)
+        val hex = OpenCodeSession(id = "ses_olive_hex", serverTitle = "HEX", projectID = "p", directory = "/tmp/hex", updatedAt = VoiceFeatureTestSupport.distantPast)
+
+        val staleEndedAt = Instant.parse("2026-11-01T22:00:00Z")
+        val connectedAt = Instant.parse("2026-11-01T22:50:00Z")
+        val retargetAt = Instant.parse("2026-11-01T22:56:57Z")
+
+        val staleOliveTail = listOf(
+            "user: Did you check notifications?",
+            "assistant: Still waiting on it. I don't have an answer yet on the text to your wife or the notifications.",
+            "assistant: Quick recap, we've got that text still unconfirmed, and your feedback already sent to the OPENCODE IOS session.",
+            "assistant: And that text to Olive went through,",
+            "assistant: delivered. I'm watching for her reply, and if she answers, I'll send it to you. That's the update.",
+            "Voice: No. Just to Olive.",
+        )
+
+        h.state {
+            shared(VoiceSharedKeys.voiceTranscripts).update {
+                it + ("${server.id}:${hex.id}" to VoiceTranscriptRecord(endedAt = staleEndedAt, tail = staleOliveTail, log = emptyList()))
+            }
+        }
+
+        // 1. Mid-call retarget to HEX at 22:56:57Z (14:56:57 PT): neither the delta nor full instructions replay the previous call's raw lines.
+        var voice = delegatorCall(on = ios).copy(connectedAt = connectedAt)
+        voice = h.state { voice.retarget(hex, reason = "you opened it", endedAt = retargetAt) }
+        assertTrue(voice.instructionsContext.previousTail.isEmpty())
+
+        val contextWithRecent = voice.instructionsContext.copy(recentMessages = listOf("assistant: HEX build is green."))
+        val retargetDelta = VoiceInstructions.buildRetarget(contextWithRecent, engine = VoiceEngine.gptLive)
+        val retargetFull = VoiceInstructions.build(contextWithRecent, engine = VoiceEngine.gptLive)
+        assertTrue(retargetDelta.contains("\"HEX\""))
+        assertTrue(retargetDelta.contains("HEX build is green."))
+        assertFalse(retargetDelta.contains("Olive"))
+        assertFalse(retargetDelta.contains("went through"))
+        assertFalse(retargetDelta.contains("Did you check notifications?"))
+        assertFalse(retargetDelta.contains("Previous voice call tail"))
+        assertFalse(retargetFull.contains("Olive"))
+        assertFalse(retargetFull.contains("# Previous Voice Call"))
+
+        // Even if a caller passes raw `previousTail` directly to `buildRetarget`, switching sessions never replays it.
+        val rawContext = contextWithRecent.copy(previousTail = staleOliveTail)
+        assertFalse(VoiceInstructions.buildRetarget(rawContext, engine = VoiceEngine.gptLive).contains("Olive"))
+        assertFalse(VoiceInstructions.buildRetarget(rawContext, engine = VoiceEngine.realtime).contains("Olive"))
+
+        // 2. Starting a brand-new call directly on HEX strips Voice's own `assistant:` / `Voice:` lines from continuity.
+        val freshOnHex = h.state { State(server, hex) }
+        assertEquals(listOf("user: Did you check notifications?"), freshOnHex.previousCallTail)
+        val startPrompt = VoiceInstructions.build(freshOnHex.instructionsContext, engine = VoiceEngine.gptLive)
+        assertTrue(startPrompt.contains("# Previous Voice Call"))
+        assertTrue(startPrompt.contains("silent memory"))
+        assertTrue(startPrompt.contains("never completed outcomes or facts"))
+        assertTrue(startPrompt.contains("user: Did you check notifications?"))
+        assertFalse(startPrompt.contains("Olive"))
+        assertFalse(startPrompt.contains("went through"))
+
+        // 3. Saving a transcript record strips `assistant:` and `Voice:` lines from `tail` while keeping `log`.
+        val saved = VoiceTranscriptRecord(endedAt = staleEndedAt, tail = emptyList(), log = emptyList())
+            .appending(tail = staleOliveTail, log = staleOliveTail, endedAt = retargetAt)
+        assertEquals(listOf("user: Did you check notifications?"), saved.tail)
+        assertEquals(staleOliveTail.size, saved.log.size)
     }
 }

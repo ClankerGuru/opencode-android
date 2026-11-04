@@ -1,5 +1,6 @@
 package ai.opencode.feature.transcript
 
+import ai.opencode.feature.transcript.user.TranscriptSendFailure
 import ai.opencode.server.model.PastedTextSummary
 import ai.opencode.feature.media.LinkMenuAction
 import ai.opencode.feature.media.TranscriptImagePreview
@@ -19,7 +20,6 @@ sealed interface TranscriptAction {
     data class TranscriptBrowsingChanged(val isBrowsing: Boolean) : TranscriptAction
     data class NewMessagesPassed(val generation: Int) : TranscriptAction
     data class NewMessagesFit(val generation: Int) : TranscriptAction
-    data object SinceYouLeftTapped : TranscriptAction
     data object ShowEarlierTapped : TranscriptAction
     data class CopyTextTapped(val text: String) : TranscriptAction
     data class QuoteTextTapped(val text: String) : TranscriptAction
@@ -28,6 +28,7 @@ sealed interface TranscriptAction {
     data class SessionLinksAppeared(val ids: List<String>) : TranscriptAction
     data class SubagentTapped(val sessionID: String) : TranscriptAction
     data object MoveToBackgroundTapped : TranscriptAction
+    data class FailedSendMoveTapped(val messageID: String) : TranscriptAction
     data class FailedSendRetryTapped(val messageID: String) : TranscriptAction
     data class FailedSendEditTapped(val messageID: String) : TranscriptAction
     data class FailedSendDeleteTapped(val messageID: String) : TranscriptAction
@@ -73,34 +74,17 @@ sealed interface SessionLinkTarget {
 
 /** The New divider, above the first row that arrived while the reader was away (iOS `NewMessagesPlacement`). */
 @Immutable
-data class NewMessagesPlacement(val entryID: String, val generation: Int, val showsDivider: Boolean = true) {
+data class NewMessagesPlacement(val entryID: String, val generation: Int) {
     companion object {
         /** The reader has read past the divider once its bottom is above the top of what they can see. */
         fun isPassed(dividerMaxY: Float, offsetY: Float, topInset: Float): Boolean = dividerMaxY <= offsetY + topInset
-    }
-}
 
-/**
- * Quiet 1–2 line summary when returning to a session with unseen turns (iOS `Session/SinceYouLeft.swift`'s
- * value type, moved down here because [TranscriptEntry] carries it; generation stays in `:feature:session`).
- */
-@Immutable
-data class SinceYouLeft(
-    val sessionID: String,
-    val lastItemID: String,
-    val text: String,
-    val phase: Phase,
-    val isFallback: Boolean = false,
-) {
-    enum class Phase { Generating, Done }
-
-    companion object {
-        const val minimumTurnCount = 2
-        const val minimumAbsenceDuration = 60.0
-        /** ~1,200 tokens at ~4 characters per token. */
-        const val maxInputCharacters = 4_800
-        const val maxTokenEstimate = 1_200
-        const val maxCachedSessions = 16
+        /**
+         * At the end with any of the divider still below the header (a reply a screen tall leaves
+         * it straddling the header's edge): everything under it is on screen.
+         */
+        fun isOnLastScreen(dividerMaxY: Float, offsetY: Float, topInset: Float, end: Float): Boolean =
+            offsetY >= end - 1 && !isPassed(dividerMaxY, offsetY, topInset)
     }
 }
 
@@ -137,7 +121,7 @@ data class TranscriptConfiguration(
     val isDraft: Boolean = false,
     val queuedInputs: List<OpenCodeQueuedInput> = emptyList(),
     /** Why each failed send failed, by message ID; its bubble offers Retry. */
-    val failedSends: Map<String, String> = emptyMap(),
+    val failedSends: Map<String, TranscriptSendFailure> = emptyMap(),
     /** A quiet line under a send that's taking a while, by message ID. */
     val deliveryNotes: Map<String, String> = emptyMap(),
     /** Messages waiting in the queued pill: a steering row that leaves for one flies into the pill. */

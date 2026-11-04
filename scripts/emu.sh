@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Emulator workflow for the OpenCode_API_36 AVD (Pixel 8, android-36 google_apis_playstore arm64).
+# Emulator workflow for the OpenCode_API_36 AVD (Pixel 8, android-36 google_apis_playstore;
+# arm64 on Apple silicon, x86_64 on Intel/AMD).
 #   scripts/emu.sh boot [port]     # headless, read-only (several agents can each boot one; even port 5554–5680)
 #   scripts/emu.sh install [port]  # assembleDebug + install + launch
 #   scripts/emu.sh shot <file.png> [port]
@@ -8,8 +9,14 @@
 # Never touch the Rebase_API_36 AVD.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-export ANDROID_HOME="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
-export JAVA_HOME="${JAVA_HOME:-/opt/homebrew/opt/openjdk@17}"
+# Default to Android Studio's SDK location for the platform. On macOS Gradle runs on Homebrew's
+# JDK 17; on Linux it runs on the system JDK and fetches JDK 17 for the build itself.
+if [[ "$(uname -s)" == Darwin ]]; then
+  export ANDROID_HOME="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
+  export JAVA_HOME="${JAVA_HOME:-/opt/homebrew/opt/openjdk@17}"
+else
+  export ANDROID_HOME="${ANDROID_HOME:-$HOME/Android/Sdk}"
+fi
 ADB="$ANDROID_HOME/platform-tools/adb"
 EMULATOR="$ANDROID_HOME/emulator/emulator"
 AVD=OpenCode_API_36
@@ -71,7 +78,7 @@ case "$command" in
     "$ADB" -s "emulator-$port" emu kill
     ;;
   *)
-    sed -n '2,9p' "$0"
+    sed -n '2,10p' "$0"
     exit 2
     ;;
 esac

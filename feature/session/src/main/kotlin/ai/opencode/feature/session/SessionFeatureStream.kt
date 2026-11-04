@@ -20,6 +20,7 @@ import ai.opencode.server.model.OpenCodeJSONValue
 import ai.opencode.server.model.OpenCodeToolCall
 import ai.opencode.server.model.OpenCodeTranscriptItem
 import kotlin.time.Duration
+import ai.opencode.feature.transcript.list.NewMessagesFold
 
 // Port of iOS `SessionFeature+Stream.swift`.
 
@@ -210,22 +211,27 @@ private fun SessionFeature.eventStreamConnected(
     // A new socket epoch invalidates delta accumulators, not rendered parts: unfinished
     // text/tools are still absent from REST. Keep their row protection until reconciliation can
     // echo them or the run ends. Shell events are ephemeral: an exit may have been missed. The
-    // reconnect's re-list replaces every listed shell.
+    // reconnect's re-list replaces every listed shell. A text row streamed before the gap keeps its
+    // words: a text delta leaves a row it has no accumulator for until its text ends.
     s = retune.state.copy(
         streamSupportsProjection = false,
         liveText = emptyMap(),
-        gappedLiveText = retune.state.gappedLiveText + retune.state.liveText.keys,
         lastProjectedMessageID = null,
         shells = retune.state.shells.map { if (it.isListed) it else it.copy(isListed = true) },
     )
+    // A failed first read used to leave the chip on its slug until the picker was opened. Retry
+    // after contact returns, even if a transcript refresh is already in flight. Keep any
+    // last-known display names.
+    val models = if (s.modelsLoadError != null) loadModelsIfNeeded(s) else Reduced(s)
+    s = models.state
     // A resume read that beat the socket handshake is already the REST hydration for this epoch.
     // Do not cancel it and start the same bytes again; subsequent events are buffered against
     // that in-flight read.
     val watched = watchdog(s)
-    if (watched.state.refresh != null) return Reduced(watched.state, Effect.merge(retune.effect, watched.effect))
+    if (watched.state.refresh != null) return Reduced(watched.state, Effect.merge(models.effect, retune.effect, watched.effect))
     return Reduced(
         watched.state,
-        Effect.merge(Effect.send(Action.RefreshRequested(RefreshReason.Reconnect)), retune.effect, watched.effect),
+        Effect.merge(models.effect, Effect.send(Action.RefreshRequested(RefreshReason.Reconnect)), retune.effect, watched.effect),
     )
 }
 
@@ -259,6 +265,13 @@ private fun SessionFeature.contentBatch(
         s = s.copy(refresh = refresh.copy(racedEvents = raced))
     }
     val previousFirstID = s.firstVisibleItemID
+    if (!s.isSceneActive && s.hasRenderedFirstContentFrame && s.newMessagesBaseline == null && events.any { it.projectsRows }) {
+        s = s.noteLeaving()
+    }
+    // Rows streaming in front of the reader before the return's read settles are seen: that read
+    // mustn't mark them.
+    val watchesBatch = s.watchesTranscript && s.newMessagesBaseline != null
+    val watchedIDs = ArrayList<String>()
     val projection = LiveProjection(s)
     var projected = s.projectedMessageIDs
     var lastProjected = s.lastProjectedMessageID
@@ -269,16 +282,22 @@ private fun SessionFeature.contentBatch(
             lastProjected = event.messageID
         }
         if (event is OpenCodeLiveContentEvent.StepEnded) contextNeedsRead = true
-        applyLiveEvent(event, projection)
+        val insertedID = applyLiveEvent(event, projection)
+        if (insertedID != null && watchesBatch) watchedIDs += insertedID
     }
     s = projection.applied(s).copy(
         projectedMessageIDs = projected,
         lastProjectedMessageID = lastProjected,
         contextNeedsRead = contextNeedsRead,
     )
+    for (id in watchedIDs) s = s.noteWatched(itemID = id)
     s = s.retainRenderedWindowStart(previousFirstID).pinBrowsingWindowIfNeeded()
     // Kept alive in the background, the stream brings what arrives while the reader is away.
-    if (!s.isVisible) s = s.updateNewMessagesMark(settles = false)
+    if (!s.watchesTranscript) {
+        s = s.updateNewMessagesMark(settles = false, keptShapes = NewMessagesFold.keepsShapes(events))
+    }
+    // Live events add only the agent's rows, never the reader's own message: nothing here can
+    // clear the mark (a read's merge can).
     LabMarks.mark("stream_delta_batch", sessionID = sessionID)
     // A flush can contain text.ended followed by step.ended for a different bookkeeping message.
     // Prefer the durable boundary that actually projected a row; that is the message REST must settle.
@@ -317,6 +336,9 @@ private fun SessionFeature.refreshRequested(
         if (reason is RefreshReason.Settlement && inFlight.reason == RefreshReason.Settlement(reason.messageID)) {
             // Text/tool/step boundaries for one assistant message commonly arrive together. The
             // in-flight read has a 200 ms coalescing delay and will observe all of them.
+        } else if (reason.messageID != null && inFlight.followup != null && inFlight.followup.messageID == null) {
+            // A whole page read already follows (the return's, which settles what's new): it
+            // covers this message too.
         } else if (inFlight.reason is RefreshReason.Settlement) {
             // A later request for a complete window must run after the targeted read; neither
             // scope may overwrite a newer read.
@@ -376,7 +398,12 @@ private fun SessionFeature.refreshResponse(
         // A failed read after the return can't say what's new; a later one mustn't call what
         // arrived in front of the reader new.
         if (s.isVisible && inFlight.followup == null) {
-            s = s.copy(newMessagesBaseline = null, sinceYouLeftSeen = null, sinceYouLeftAt = null)
+            s = s.copy(
+                newMessagesBaseline = null,
+                newMessagesBaselineTimestamp = null,
+                newMessagesUnread = false,
+                newMessagesEarlierBaseline = null,
+            )
         }
         if (s.cacheableItems.isEmpty() && !s.initialTranscriptIsFresh) s = s.copy(loadError = error.message)
         return Reduced(
@@ -422,28 +449,36 @@ private fun SessionFeature.refreshResponse(
         OpenCodeContextReading.Empty -> s.copy(contextUsage = null, contextNeedsRead = false)
         OpenCodeContextReading.Inconclusive -> s
     }
-    // The page read after the reader's return settles what arrived while they were away.
-    val settles = s.isVisible && refresh.scope == SessionFeature.AuthoritativeRefresh.Scope.Page
-    s = s.updateNewMessagesMark(settles = settles)
-    val sinceYouLeft = evaluateSinceYouLeft(s, settles = settles)
-    s = sinceYouLeft.state
+    // The page read after the reader's return settles what arrived while they were away. One
+    // message's read in front of the reader brings what they're watching: only the page read
+    // settles, or a read while away marks.
+    val returned = s.watchesTranscript
+    val settles = returned && refresh.scope == SessionFeature.AuthoritativeRefresh.Scope.Page
+    s = if (settles || !returned) s.updateNewMessagesMark(settles = settles) else s.noteWatched(previousIDs)
+    if (s.newMessages != null) s = s.clearNewMessagesAfterOwnPrompt()
     var observed = refresh.observed
     val current = s.session
-    if ((!refresh.observedIsRead || inFlight.revertChanged) && observed.id == current?.id) {
-        observed = observed.copy(revertMessageID = current?.revertMessageID)
-    }
-    val model = current?.model
-    if ((!refresh.observedIsRead || inFlight.modelChanged) && model != null && observed.id == current?.id) {
-        observed = observed.copy(model = model)
-    } else if (refresh.observedIsRead && observed.id == current?.id) {
-        s = s.adoptServerModel(observed.model)
+    if (current != null && observed.id == current.id) {
+        if (!refresh.observedIsRead || inFlight.revertChanged) {
+            observed = observed.copy(revertMessageID = current.revertMessageID)
+        }
+        // Only a page read reads the session; a message read carries the copy it started with,
+        // which may predate a move.
+        if (!refresh.observedIsRead || inFlight.directoryChanged) {
+            observed = observed.copy(directory = current.directory)
+        }
+        val model = current.model
+        if ((!refresh.observedIsRead || inFlight.modelChanged) && model != null) {
+            observed = observed.copy(model = model)
+        } else if (refresh.observedIsRead) {
+            s = s.adoptServerModel(observed.model)
+        }
     }
     s = s.updateObservedSession(observed)
     return Reduced(
         s,
         Effect.merge(
             settleCue,
-            sinceYouLeft.effect,
             Effect.send(Action.AcceptedTranscriptUpdated(sessionID = sessionID, items = s.cacheableItems)),
             acknowledgeViewed(refresh.observed, s),
             followup,
@@ -456,6 +491,7 @@ private fun SessionFeature.sceneActiveChanged(state: SessionFeature.State, isAct
     val returning = isActive && !state.isSceneActive
     var s = state.copy(isSceneActive = isActive)
     if (isActive) s = s.copy(isBackgrounded = false)
+    if (s.watchesTranscript) s = s.absorbFittingNewMessages()
     if (!returning) return Reduced(s)
     // Reads wait out the background: a Stop the server took reads on from here, and a read that
     // failed or was dropped must not leave Working up with nothing running.
@@ -470,52 +506,42 @@ private fun SessionFeature.visibilityChanged(state: SessionFeature.State, visibl
     var s = state.copy(isVisible = visible)
     if (isForegroundResume) LabMarks.mark("session_resume", sessionID = s.session?.id)
     // In front of the reader again: what fit on screen while they were away is what they're looking at.
-    if (visible) s = s.absorbFittingNewMessages()
+    if (s.watchesTranscript) s = s.absorbFittingNewMessages()
     if (!visible) {
         // Leaving the screen; a glance at the notification shade (the scene going inactive) isn't
         // leaving, but going on into the background is.
         if (s.hasRenderedFirstContentFrame && s.isSceneActive) s = s.noteLeaving()
         if (!s.initialTranscriptRequestIsExternal) s = s.copy(isLoading = false)
-        s = s.copy(sinceYouLeft = null)
         val abandoned = abandonRefresh(s)
         return Reduced(
             abandoned.state,
             Effect.merge(
                 releaseDictationHold(DictationHoldRelease.Left),
                 Effect.cancel(CancelID.ViewReceipt),
-                Effect.cancel(CancelID.SinceYouLeft),
                 Effect.cancel(CancelID.FamilyRefresh),
                 Effect.cancel(CancelID.Shells),
                 abandoned.effect,
             ),
         )
     }
-    val sinceYouLeft = evaluateSinceYouLeft(s, settles = false)
-    s = sinceYouLeft.state
+    val models = if (s.modelsLoadError != null) loadModelsIfNeeded(s) else Reduced(s)
+    s = models.state
     if (!s.hasRenderedFirstContentFrame) {
+        if (s.initialTranscriptIsFresh && s.newMessagesBaseline != null) s = s.updateNewMessagesMark(settles = true)
         val opens = s.session != null && s.cacheableItems.isEmpty() && !s.initialTranscriptIsFresh &&
             !s.initialTranscriptRequestIsExternal && !s.inheritsLiveWork && s.refresh == null && s.loadError == null
-        return Reduced(
-            s,
-            Effect.merge(
-                sinceYouLeft.effect,
-                if (opens) Effect.send(Action.RefreshRequested(RefreshReason.Open)) else Effect.none(),
-            ),
-        )
+        return Reduced(s, Effect.merge(models.effect, if (opens) Effect.send(Action.RefreshRequested(RefreshReason.Open)) else Effect.none()))
     }
     // A message's read started while away doesn't read the page: the return still needs one, after it.
     val refresh = s.refresh
     if (refresh != null && !s.initialTranscriptIsFresh && refresh.reason.messageID == null) {
         val began = beginResync(s, refreshID = refresh.id)
         val background = refreshBackgroundWork(began.state, RefreshReason.Resume)
-        return Reduced(background.state, Effect.merge(sinceYouLeft.effect, began.effect, background.effect))
+        return Reduced(background.state, Effect.merge(models.effect, began.effect, background.effect))
     }
     return Reduced(
         s,
-        Effect.merge(
-            sinceYouLeft.effect,
-            Effect.send(Action.RefreshRequested(if (isForegroundResume) RefreshReason.Resume else RefreshReason.Open)),
-        ),
+        Effect.merge(models.effect, Effect.send(Action.RefreshRequested(if (isForegroundResume) RefreshReason.Resume else RefreshReason.Open))),
     )
 }
 
@@ -562,7 +588,7 @@ private fun SessionFeature.task(state: SessionFeature.State): Reduced<SessionFea
                     CancelID.RequestsRetry, CancelID.RequestsChanged, CancelID.Freshness, CancelID.Watchdog,
                     CancelID.EarlierHistory, CancelID.FamilyRefresh, CancelID.Shells, CancelID.Revert,
                     CancelID.BackgroundHint, CancelID.ViewReceipt, CancelID.ResyncDelay, CancelID.ResyncMinimum,
-                    CancelID.SinceYouLeft, CancelID.AutocompleteCatalog, CancelID.AutocompleteCommands,
+                    CancelID.AutocompleteCatalog, CancelID.AutocompleteCommands,
                     CancelID.AutocompleteFiles, CancelID.AutocompleteSessions, CancelID.AutocompleteAutoRun,
                     CancelID.AutocompleteCommand, CancelID.AutocompleteCommandWait,
                 ),
@@ -586,17 +612,14 @@ private fun SessionFeature.task(state: SessionFeature.State): Reduced<SessionFea
     }
     if (s.loadError != null && s.items.isEmpty()) s = s.copy(isLoading = true)
     s = s.copy(loadError = null)
-    val sinceYouLeft = evaluateSinceYouLeft(s, settles = false)
-    s = sinceYouLeft.state
     if (s.initialTranscriptRequestIsExternal) {
-        return Reduced(s, Effect.merge(stopSessionWork, sinceYouLeft.effect, outbox.effect))
+        return Reduced(s, Effect.merge(stopSessionWork, outbox.effect))
     }
     // Navigation activation owns freshness; cached paint does not wait for visibility or the first frame.
     return Reduced(
         s,
         Effect.merge(
             Effect.concatenate(stopSessionWork, Effect.send(Action.RefreshRequested(RefreshReason.Open))),
-            sinceYouLeft.effect,
             outbox.effect,
         ),
     )
@@ -619,8 +642,6 @@ private fun SessionFeature.firstContentFrameRendered(state: SessionFeature.State
         .withRequestLoadError(null)
     val backgroundHint = scheduleBackgroundHint(s)
     s = backgroundHint.state
-    val sinceYouLeft = evaluateSinceYouLeft(s, settles = false)
-    s = sinceYouLeft.state
     val familyIsFresh = s.familyReadAt?.let { (date.now().toEpochMilli() - it.toEpochMilli()) / 1000.0 < 5 } == true
     val family = if (familyIsFresh) pollPendingWork(s) else refreshFamily(s)
     s = family.state
@@ -635,7 +656,6 @@ private fun SessionFeature.firstContentFrameRendered(state: SessionFeature.State
             shells.effect,
             backgroundHint.effect,
             loadModels.effect,
-            sinceYouLeft.effect,
             if (s.initialTranscriptIsFresh || s.loadError != null) Effect.none() else Effect.send(Action.RefreshRequested(RefreshReason.Open)),
         ),
     )
@@ -654,7 +674,6 @@ internal fun Throwable.asClientError(): ai.opencode.server.OpenCodeClientError =
 internal class LiveProjection(state: SessionFeature.State) {
     val items: MutableList<OpenCodeTranscriptItem> = ArrayList(state.items)
     val liveText: MutableMap<String, String> = LinkedHashMap(state.liveText)
-    val gappedLiveText: MutableSet<String> = HashSet(state.gappedLiveText)
     private val shellToolStatuses = HashMap(state.shellToolStatuses)
     private val subagentToolSessionIDs = HashSet(state.subagentToolSessionIDs)
     private var shellsChanged = false
@@ -677,7 +696,6 @@ internal class LiveProjection(state: SessionFeature.State) {
         var next = state
         if (itemsChanged) next = next.copy(items = items.toList())
         if (liveText != state.liveText) next = next.copy(liveText = liveText.toMap())
-        if (gappedLiveText != state.gappedLiveText) next = next.copy(gappedLiveText = gappedLiveText.toSet())
         if (shellsChanged) next = next.copy(shellToolStatuses = shellToolStatuses.toMap())
         if (subagentsChanged) next = next.copy(subagentToolSessionIDs = subagentToolSessionIDs.toSet())
         return next
@@ -688,26 +706,34 @@ internal class LiveProjection(state: SessionFeature.State) {
  * REST can already be ahead of a raced event. Tool input is writable only while streaming, and
  * progress must never restart a settled tool.
  */
-private fun SessionFeature.applyLiveEvent(event: OpenCodeLiveContentEvent, projection: LiveProjection) {
+private fun SessionFeature.applyLiveEvent(event: OpenCodeLiveContentEvent, projection: LiveProjection): String? =
     when (event) {
         is OpenCodeLiveContentEvent.TextStarted -> {
             val id = "${event.messageID}-text-${event.ordinal}"
-            if (id in projection.gappedLiveText) return
             projection.liveText[id] = projection.liveText[id] ?: ""
+            null
         }
         is OpenCodeLiveContentEvent.TextDelta -> {
             val id = "${event.messageID}-text-${event.ordinal}"
-            // Missed deltas aren't replayed: the text shown stays until the part's end has it all.
-            if (id in projection.gappedLiveText) return
-            val text = (projection.liveText[id] ?: "") + event.delta
-            projection.liveText[id] = text
-            if (upsertLiveText(id, text, streaming = true, items = projection.items)) projection.itemsChanged = true
+            // A row with no accumulator streamed before a gap (a reconnect, or a stream that shed
+            // this part's deltas): the deltas it missed are gone, so appending would lose text from
+            // its middle and starting from "" would shrink it to its tail. It stays as it is until
+            // its text ends with the whole text.
+            val accumulated = projection.liveText[id]
+                ?: if (projection.items.none { it.id == id }) "" else null
+            if (accumulated == null) {
+                null
+            } else {
+                val text = accumulated + event.delta
+                projection.liveText[id] = text
+                projection.upsertText(upsertLiveTextChange(id, text, streaming = true, items = projection.items), id)
+            }
         }
         is OpenCodeLiveContentEvent.TextEnded -> {
             val id = "${event.messageID}-text-${event.ordinal}"
-            projection.gappedLiveText.remove(id)
-            if (upsertLiveText(id, event.text, items = projection.items)) projection.itemsChanged = true
+            val insertedID = projection.upsertText(upsertLiveTextChange(id, event.text, items = projection.items), id)
             projection.liveText.remove(id)
+            insertedID
         }
         is OpenCodeLiveContentEvent.ToolInputStarted ->
             upsertLiveTool(event.messageID, event.toolID, OpenCodeJSONValue.Str(""), projection) { call ->
@@ -749,9 +775,17 @@ private fun SessionFeature.applyLiveEvent(event: OpenCodeLiveContentEvent, proje
             }
         is OpenCodeLiveContentEvent.StepStarted, is OpenCodeLiveContentEvent.StepStreamed, is OpenCodeLiveContentEvent.StepEnded,
         is OpenCodeLiveContentEvent.ReasoningStarted, is OpenCodeLiveContentEvent.ReasoningDelta, is OpenCodeLiveContentEvent.ReasoningEnded,
-        -> Unit
+        -> null
     }
+
+/** Marks [items][LiveProjection.items] changed for [change]; the ID when it inserted the row. */
+private fun LiveProjection.upsertText(change: LiveUpsert, id: String): String? {
+    if (change != LiveUpsert.Unchanged) itemsChanged = true
+    return if (change == LiveUpsert.Inserted) id else null
 }
+
+/** What an upsert of a live row did. */
+internal enum class LiveUpsert { Unchanged, Replaced, Inserted }
 
 /**
  * iOS `upsertLiveText(id:text:streaming:in:)`. [streaming] text is still arriving: a last line
@@ -764,18 +798,26 @@ internal fun SessionFeature.upsertLiveText(
     text: String,
     streaming: Boolean = false,
     items: MutableList<OpenCodeTranscriptItem>,
-): Boolean {
+): Boolean = upsertLiveTextChange(id, text, streaming, items) != LiveUpsert.Unchanged
+
+/** [upsertLiveText], saying whether it inserted the row (iOS returns the inserted ID). */
+internal fun SessionFeature.upsertLiveTextChange(
+    id: String,
+    text: String,
+    streaming: Boolean = false,
+    items: MutableList<OpenCodeTranscriptItem>,
+): LiveUpsert {
     val shown = if (streaming) OpenCodeMarkdownBlock.holdingPendingMarker(text) else text
-    if (shown.isBlank()) return false
+    if (shown.isBlank()) return LiveUpsert.Unchanged
     val index = items.indexOfLast { it.id == id }
     val item = OpenCodeTranscriptItem.AssistantMarkdown(id = id, text = shown)
     if (index >= 0) {
-        if (items[index] == item) return false
+        if (items[index] == item) return LiveUpsert.Unchanged
         items[index] = item
-    } else {
-        items.add(liveInsertionIndex(SessionFeature.messageID(item), items), item)
+        return LiveUpsert.Replaced
     }
-    return true
+    items.add(liveInsertionIndex(SessionFeature.messageID(item), items), item)
+    return LiveUpsert.Inserted
 }
 
 /**
@@ -805,7 +847,7 @@ private fun upsertLiveTool(
     defaultInput: OpenCodeJSONValue = OpenCodeJSONValue.Object(emptyMap()),
     projection: LiveProjection,
     update: (OpenCodeToolCall) -> OpenCodeToolCall,
-) {
+): String? {
     val items = projection.items
     val id = "$messageID-tool-$toolID"
     val index = items.indexOfLast { it.id == id }
@@ -837,6 +879,7 @@ private fun upsertLiveTool(
         val sessionID = call.metadata["sessionID"]?.string
         if (!sessionID.isNullOrEmpty()) projection.noteSubagent(sessionID)
     }
+    return if (index < 0) id else null
 }
 
 // endregion

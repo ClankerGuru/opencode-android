@@ -1,34 +1,37 @@
 package ai.opencode.feature.drawer
 
-import ai.opencode.core.diagnostics.LabMarks
-import ai.opencode.feature.composer.SharedDraftTarget
-import ai.opencode.feature.composer.SharedComposerDraft
-import ai.opencode.feature.composer.DraftState
-import ai.opencode.feature.composer.ComposerPersistence
-import ai.opencode.feature.session.*
-import ai.opencode.feature.system.share.ShareInboxClient
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.diagnostics.LabMarks
 import ai.opencode.core.diagnostics.PerfTimeline
+import ai.opencode.core.experiments.key
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.log.AppLog
+import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.cancellable
+import ai.opencode.feature.composer.ComposerPersistence
+import ai.opencode.feature.composer.DraftState
+import ai.opencode.feature.composer.SharedComposerDraft
+import ai.opencode.feature.composer.SharedDraftTarget
 import ai.opencode.feature.drawer.HomeFeature.Action
 import ai.opencode.feature.drawer.HomeFeature.State
 import ai.opencode.feature.media.BrowserFeature
+import ai.opencode.feature.session.*
 import ai.opencode.feature.settings.SettingsFeature
+import ai.opencode.feature.system.SystemAction
+import ai.opencode.feature.system.share.ShareInboxClient
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.OpenCodeTranscriptItem
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
-import kotlin.time.Duration.Companion.seconds
 
 /*
  * Port of iOS `HomeFeature+Drawer.swift`: the drawer's own actions — opening sessions and drafts,
@@ -41,12 +44,31 @@ internal fun HomeFeature.reduceDrawer(state: State, action: Action): HomeReduced
     when (action) {
         Action.SettingsTapped -> return Reduced(state.showingSettings())
 
+        Action.DrawerCallTapped -> {
+            if (!state.drawerShowsCallButton) return Reduced(state)
+            if (state.connectionStatus == HomeConnectionFeature.State.ConnectionStatus.disconnected) return Reduced(state)
+            // The screen on top's own call button: dictation yields first, and a pushed subagent
+            // asks the root, which owns the call. No haptic here: the call's start plays it. The
+            // drawer stays open under the orb.
+            val detail = state.sessionDetail
+            if (detail != null && (detail.session != null || detail.draftProject != null)) {
+                var s = state
+                if (detail.voice?.phase?.isTerminal == true) s = s.updatingDetail { it.copy(voice = null) }
+                val top = s.subagentStack.lastOrNull()
+                if (top != null) return Reduced(s, Effect.send(Action.SubagentStack(top.navigationID, SessionFeature.Action.VoiceTapped)))
+                return Reduced(s, Effect.send(Action.detail(SessionFeature.Action.VoiceTapped)))
+            }
+            // Nothing behind it to call: Start Voice Call's Last Viewed path.
+            return openSystemDestination(state, SystemAction.Destination.LastViewed, startsCall = true)
+        }
+
         Action.ManageServersTapped ->
             return Reduced(if (state.settings != null) state else state.presentingSettings(SettingsFeature.State.focusingServers(state.server)))
 
         is Action.SessionDrawerArrived -> {
             var s = state.copy(isDrawerOpen = action.isOpen)
-            if (!action.isOpen) return Reduced(s)
+            // Server Flow: a switch-back note is seen once, with the drawer.
+            if (!action.isOpen) return Reduced(s.copy(serverSwitchNote = null))
             // The reader is about to choose a session: read the likeliest ones again now, so the
             // one they open already has what's new (ahead of any read still waiting out its delay).
             val likely = s.sessionsByPriority().take(HomeFeature.prefetchCount).map { it.id }
@@ -68,6 +90,7 @@ internal fun HomeFeature.reduceDrawer(state: State, action: Action): HomeReduced
             val items = action.items ?: return Reduced(s)
             if (!canCacheBackgroundTranscript(s, action.sessionID)) return Reduced(s)
             s = s.copy(transcriptReadAt = s.transcriptReadAt + (action.sessionID to dependency(DateClient).now()))
+            s = s.notingUnopenedCopy(action.sessionID)
             s = s.publishingTranscript(action.sessionID, items).persistingTranscriptCache(action.sessionID)
             return Reduced(s)
         }
@@ -97,9 +120,10 @@ internal fun HomeFeature.reduceDrawer(state: State, action: Action): HomeReduced
         is Action.SessionNavigationReady -> {
             if (state.selectedTranscriptFetch?.sessionID != action.sessionID) return Reduced(state)
             val session = state.sessions.firstOrNull { it.id == action.sessionID } ?: return Reduced(state)
+            val reason = state.nextMoveReason
             var s = state.openingDetail(session, externalTranscript = true)
             s = s.copy(selectedTranscriptFetch = s.selectedTranscriptFetch?.copy(transition = s.detailGeneration))
-            s = s.pushingPendingSubagent()
+            s = s.pushingPendingSubagent(reason)
             LabMarks.mark("session_navigation_started", sessionID = action.sessionID)
             return Reduced(s)
         }
@@ -120,6 +144,20 @@ internal fun HomeFeature.reduceDrawer(state: State, action: Action): HomeReduced
             }
             AppLog.app.info { "paired computer opens drawer sessions=$roots" }
             return Reduced(state.copy(drawerOpenRequest = state.detailGeneration))
+        }
+
+        Action.FirstComputerPaired -> {
+            // The install's first computer opens a new session in its latest project, with starter
+            // prompts, ready to send. With no project but the home folder, or something already on
+            // screen, it lands as any new computer does.
+            val project = state.firstSessionProject
+            if (state.sessionDetail?.isDraft == false || state.catchUp != null || project == null) {
+                AppLog.app.info { "first computer has no project to open projects=${state.projects.size}" }
+                return reduceDrawer(state, Action.PairedComputerOpened)
+            }
+            AppLog.app.info { "first computer opens a ready session projects=${state.projects.size}" }
+            val (s, draft) = state.makeDraft(directory = project.directory, reason = "you paired your first computer")
+            return Reduced(s.copy(sessionDetail = draft.copy(starterPrompts = SessionFeature.State.firstSessionStarters)))
         }
 
         Action.DrawerOpenRequestHandled -> return Reduced(state.copy(drawerOpenRequest = null))
@@ -244,7 +282,7 @@ internal fun HomeFeature.reduceDrawer(state: State, action: Action): HomeReduced
         is Action.MarkRead -> {
             val session = state.sessions.firstOrNull { it.id == action.sessionID } ?: return Reduced(state)
             haptics.play(Haptic.selection)
-            return Reduced(state.markingReadLocally(session), acknowledgeView(session, state.server))
+            return Reduced(state.markingReadLocally(session).clearingUnseenBaseline(session.id), acknowledgeView(session, state.server))
         }
 
         is Action.MarkUnread -> {
@@ -265,28 +303,34 @@ internal fun HomeFeature.reduceDrawer(state: State, action: Action): HomeReduced
 private fun HomeFeature.sessionTapped(state: State, sessionID: String): HomeReduced {
     // Navigation and cached transcripts do not require a live event stream.
     val session = state.sessions.firstOrNull { it.id == sessionID } ?: return Reduced(state)
+    val moveReason = state.nextMoveReason
     var s = state
     if (s.pendingSubagentPush?.parentID != sessionID) s = s.copy(pendingSubagentPush = null)
     // A subagent (a link, a notification, the voice agent) lands pushed over its parent when the
     // parent is at hand; otherwise on its own. Already pushed: go back to it.
     val pushedIndex = s.subagentStack.indexOfFirst { it.session?.id == sessionID }
     if (session.parentID != null && s.catchUp == null && pushedIndex >= 0) {
-        s = s.copy(nextMoveReason = null).poppingSubagents(toDepth = pushedIndex + 1)
+        s = s.copy(nextMoveReason = null).poppingSubagents(toDepth = pushedIndex + 1, reason = moveReason)
         return Reduced(s, acknowledgeView(session, s.server))
     }
     val parentID = session.parentID
     if (parentID != null && s.topDetail?.session?.id != sessionID) {
         val parentIndex = s.subagentStack.indexOfFirst { it.session?.id == parentID }
         if (parentIndex >= 0 && s.catchUp == null) {
-            s = s.poppingSubagents(toDepth = parentIndex + 1).pushingSubagent(session)
+            s = s.copy(nextMoveReason = null).poppingSubagents(toDepth = parentIndex + 1, reason = moveReason)
+                .pushingSubagent(session, reason = moveReason)
             return cancelBackgroundTranscriptReads(s, setOf(sessionID))
         }
         if (s.sessionDetail?.session?.id == parentID && s.catchUp == null) {
-            s = s.poppingSubagents(toDepth = 0).pushingSubagent(session)
+            s = s.copy(nextMoveReason = null).poppingSubagents(toDepth = 0, reason = moveReason)
+                .pushingSubagent(session, reason = moveReason)
             return cancelBackgroundTranscriptReads(s, setOf(sessionID))
         }
         if (s.sessions.any { it.id == parentID }) {
-            return Reduced(s.copy(pendingSubagentPush = session), Effect.send(Action.SessionTapped(parentID)))
+            s = s.copy(pendingSubagentPush = session)
+            // An authorized voice open navigates in this turn, never through a queued action.
+            if (s.voiceNavigationToolID != null) return sessionTapped(s, parentID)
+            return Reduced(s, Effect.send(Action.SessionTapped(parentID)))
         }
     }
     // Opening a session leaves the stack for the session it names.
@@ -299,7 +343,7 @@ private fun HomeFeature.sessionTapped(state: State, sessionID: String): HomeRedu
         s = viewed.state.copy(nextMoveReason = null).promotingCatchUpDetail()
         // The drawer's row for the session on screen goes back to it, from under any page or subagent.
         if (s.sessionDetail?.browser?.isOpen == true) s = s.updatingDetail { it.copy(browser = BrowserFeature.State()) }
-        s = s.poppingSubagents(toDepth = 0).pushingPendingSubagent()
+        s = s.poppingSubagents(toDepth = 0, reason = moveReason).pushingPendingSubagent(moveReason)
         val pushedID = s.subagentStack.lastOrNull()?.session?.id ?: return Reduced(s, viewed.effect)
         val cancelled = cancelBackgroundTranscriptReads(s, setOf(sessionID, pushedID))
         return Reduced(cancelled.state, Effect.merge(cancelled.effect, viewed.effect))
@@ -311,6 +355,16 @@ private fun HomeFeature.sessionTapped(state: State, sessionID: String): HomeRedu
     if (cachedItems == null) {
         val viewed = openViewedSession(s, session, cachedItems = null, opensDetail = false)
         s = viewed.state.copy(selectedTranscriptFetch = HomeFeature.SelectedTranscriptFetch(sessionID, viewed.state.detailGeneration))
+        // An authorized voice open commits in the guarded Home action. Only the transcript load is
+        // asynchronous; no delayed navigation action can arrive after the shared operation times
+        // out or is refused.
+        val voiceNavigation = s.voiceNavigationToolID != null
+        if (voiceNavigation) {
+            val reason = s.nextMoveReason
+            s = s.openingDetail(session, externalTranscript = true)
+            s = s.copy(selectedTranscriptFetch = s.selectedTranscriptFetch?.copy(transition = s.detailGeneration))
+            s = s.pushingPendingSubagent(reason)
+        }
         val cancelled = cancelBackgroundTranscriptReads(s, setOf(sessionID))
         val server = s.server
         val client = dependency(OpenCodeClient)
@@ -318,7 +372,7 @@ private fun HomeFeature.sessionTapped(state: State, sessionID: String): HomeRedu
             LabMarks.mark("selected_transcript_effect_started", sessionID = sessionID)
             coroutineScope {
                 val loaded = async { selectedTranscript(client, server, sessionID) }
-                send(Action.SessionNavigationReady(sessionID))
+                if (!voiceNavigation) send(Action.SessionNavigationReady(sessionID))
                 val (result, pageCursor) = loaded.await()
                 send(Action.SelectedTranscriptResponse(sessionID, result, pageCursor))
             }
@@ -387,7 +441,8 @@ internal fun HomeFeature.openViewedSession(
     val openedNewDetail = opensDetail && s.sessionDetail?.session?.id != session.id
     var cancel: Effect<Action> = Effect.none()
     if (openedNewDetail) {
-        s = s.openingDetail(session, cachedItems = cachedItems, reason = reason).pushingPendingSubagent()
+        val moveReason = s.nextMoveReason
+        s = s.openingDetail(session, cachedItems = cachedItems, reason = reason).pushingPendingSubagent(moveReason)
         val cancelled = cancelBackgroundTranscriptReads(s, setOf(session.id))
         s = cancelled.state
         cancel = cancelled.effect
@@ -491,3 +546,25 @@ internal fun dropPin(state: State, id: String, pinnedIndex: Int?): State {
     val targetKey = if (clamped < otherIDs.size) state.sessionKey(otherIDs[clamped]) else null
     return insertingPinKey(state, key, targetKey)
 }
+
+/**
+ * The drawer offers a call (iOS `drawerOffersCall`): with Voice set up, and with something to call: the
+ * session or project draft behind the drawer, or the session Start Voice Call's Last Viewed path
+ * would open. A draft with no project and no session to fall back on offers none, rather than
+ * opening a project picker behind the drawer.
+ */
+val HomeFeature.State.drawerOffersCall: Boolean
+    get() {
+        val detail = sessionDetail ?: return lastViewedOrNewestSession != null
+        if (!detail.isVoiceAvailable) return false
+        return detail.session != null || detail.draftProject != null || lastViewedOrNewestSession != null
+    }
+
+/** The drawer's call button: offered, and never while a call is live (the orb is the call then). */
+val HomeFeature.State.drawerShowsCallButton: Boolean
+    get() = drawerOffersCall && (sessionDetail?.voice?.phase?.isTerminal ?: true)
+
+/** The session Start Voice Call's Last Viewed path opens: the last one viewed on this server, else the newest unarchived root session. */
+val HomeFeature.State.lastViewedOrNewestSession: OpenCodeSession?
+    get() = lastViewedSessionIDs[server.persistenceID]?.let { id -> sessions.firstOrNull { it.id == id } }
+        ?: sessions.filter { it.parentID == null && !it.isArchived }.maxByOrNull { it.updatedAt }

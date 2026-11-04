@@ -39,6 +39,16 @@ data class FailedSend(
     val reason: String,
 ) {
     val id: String get() = pending.messageID
+
+    /**
+     * The session's folder no longer exists on the computer, so every
+     * retry fails the same way until the session moves somewhere that does.
+     */
+    val isFolderGone: Boolean get() = reason == OpenCodeClientError.FOLDER_GONE_MESSAGE || reason == moveFailedReason
+
+    companion object {
+        const val moveFailedReason = "Couldn’t move session"
+    }
 }
 
 /** iOS `SessionFeature.DeliveryNote`: why a send hasn't reached the server yet, when the reader needs to know. */
@@ -319,7 +329,7 @@ internal fun SessionFeature.Companion.deliveryJob(
                     } catch (thrown: OpenCodeClientError) {
                         attempts += 1
                         log.notice { "$sendID couldn’t apply its agent to $sessionID: ${thrown.logSummary}" }
-                        val error = thrown.copy(message = "Couldn’t switch agent: ${thrown.message}")
+                        val error = if (thrown.isLocationMissing) thrown else thrown.copy(message = "Couldn’t switch agent: ${thrown.message}")
                         if (!waitToRetry(error)) return failed(sessionID, created, error)
                         handle.networkOperation.retried()
                         continue
@@ -337,7 +347,7 @@ internal fun SessionFeature.Companion.deliveryJob(
                         // A failed switch is a failed attempt of the send.
                         attempts += 1
                         log.notice { "$sendID couldn’t apply its model to $sessionID: ${thrown.logSummary}" }
-                        val error = thrown.copy(message = "Couldn’t switch model: ${thrown.message}")
+                        val error = if (thrown.isLocationMissing) thrown else thrown.copy(message = "Couldn’t switch model: ${thrown.message}")
                         if (!waitToRetry(error)) return failed(sessionID, created, error)
                         handle.networkOperation.retried()
                         continue

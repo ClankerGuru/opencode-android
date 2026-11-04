@@ -7,15 +7,17 @@ import ai.opencode.core.diagnostics.DiagnosticsFailurePhase
 import ai.opencode.core.diagnostics.DiagnosticsRecorder
 import ai.opencode.core.diagnostics.DiagnosticsStreamName
 import ai.opencode.core.diagnostics.DiagnosticsStreamProgress
-import ai.opencode.core.log.AppLog
 import ai.opencode.server.EventBatcher
 import ai.opencode.server.EventBatcherHooks
+import ai.opencode.server.EventEmission
+import ai.opencode.server.EventStreamFocusClient
 import ai.opencode.server.EventStreamOverflow
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeLiveContentEvent
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.OpenCodeServerEvent
 import ai.opencode.server.OpenCodeTransport
+import ai.opencode.server.SelfViewReceipts
 import ai.opencode.server.internal.ElementSerializer
 import ai.opencode.server.internal.WireJson
 import ai.opencode.server.internal.obj
@@ -26,49 +28,66 @@ import ai.opencode.server.model.OpenCodeProjectIcon
 import ai.opencode.server.model.utf8Length
 import ai.opencode.server.retry.NetworkRetry
 import ai.opencode.server.retry.ServerContact
+import java.util.UUID
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import okhttp3.Call
 import okhttp3.Request
-import java.util.UUID
-import java.util.concurrent.atomic.AtomicReference
 
 private const val MAX_FRAME_BYTES = 16 * 1024 * 1024
-private const val EVENT_BUFFER = 128
 
 /**
  * Long-lived SSE subscription to `/api/event`. The flow throws on disconnect (an
  * [OpenCodeClientError], or [EventStreamOverflow] when the collector fell 128 events behind);
  * the caller owns the reconnect-and-rehydrate loop.
  */
-internal fun subscribeEvents(server: OpenCodeServer): Flow<OpenCodeServerEvent> = callbackFlow {
+internal fun subscribeEvents(server: OpenCodeServer): Flow<OpenCodeServerEvent> = flow {
+    // The events sent and not yet taken by the collector. `callbackFlow` doesn't expose its
+    // buffer's fill level, which iOS reads from each `yield`'s result; the batcher sheds deltas
+    // for sessions off screen once half the buffer is waiting.
+    val waiting = AtomicInteger(0)
+    emitAll(eventSource(server, waiting).onEach { waiting.decrementAndGet() })
+}
+
+private fun eventSource(server: OpenCodeServer, waiting: AtomicInteger): Flow<OpenCodeServerEvent> = callbackFlow {
     val batches = EventBatcher(
         scope = this,
         emit = { event ->
+            val queued = waiting.incrementAndGet()
             val result = trySend(event)
             when {
-                result.isSuccess -> true
-                result.isClosed -> false
+                result.isSuccess -> EventEmission.Enqueued(remaining = EventBatcher.BUFFER_CAPACITY - queued)
+                result.isClosed -> {
+                    waiting.decrementAndGet()
+                    EventEmission.Terminated
+                }
                 else -> {
+                    waiting.decrementAndGet()
                     // A missing delta makes the rest of this connection incomplete: finish so the
                     // subscriber reconnects and hydrates from REST rather than hiding a gap.
-                    AppLog.stream.notice { "Event buffer overflow: dropped=1" }
                     close(EventStreamOverflow())
-                    false
+                    EventEmission.Dropped
                 }
             }
         },
         hooks = dependency(EventBatcherHooks),
         clock = dependency(Clock),
+        isFocused = dependency(EventStreamFocusClient).contains,
     )
+    val selfViewReceipts = dependency(SelfViewReceipts)
     val activeCall = AtomicReference<Call?>(null)
     val operationID = NetworkRetry.streamOperationID.current() ?: UUID.randomUUID().toString().uppercase()
     val stream = StreamDiagnostics(operationID)
@@ -78,6 +97,7 @@ internal fun subscribeEvents(server: OpenCodeServer): Flow<OpenCodeServerEvent> 
             val builder = Request.Builder().url(url).header("Accept", "text/event-stream")
             server.authorize(builder)
             builder.header("X-OpenCode-Op", operationID).header("X-OpenCode-Req", UUID.randomUUID().toString().uppercase())
+            applyCapabilities(builder)
             val call = dependency(OpenCodeTransport).eventStream.newCall(builder.build())
             activeCall.set(call)
             stream.record(DiagnosticsStreamName.ConnectStart)
@@ -92,6 +112,7 @@ internal fun subscribeEvents(server: OpenCodeServer): Flow<OpenCodeServerEvent> 
                 }
                 stream.connected(response.code)
                 ServerContact.shared.heard(server.persistenceID)
+                selfViewReceipts.streamConnected(server.persistenceID)
                 // The server frames one `data: {json}` line per event (no event:/id: fields, no
                 // multi-line data) plus `: heartbeat` comment lines.
                 val source = response.body.source()
@@ -106,6 +127,11 @@ internal fun subscribeEvents(server: OpenCodeServer): Flow<OpenCodeServerEvent> 
                     }
                     // JSON tolerates the whitespace after `data:`.
                     val event = decodeStreamFrame(line.substring(5)) ?: continue
+                    if (event is OpenCodeServerEvent.SessionViewChanged &&
+                        selfViewReceipts.consumeEcho(server.persistenceID, event.sessionID, event.idle)
+                    ) {
+                        continue
+                    }
                     batches.receive(event)
                 }
             }
@@ -128,7 +154,7 @@ internal fun subscribeEvents(server: OpenCodeServer): Flow<OpenCodeServerEvent> 
         }
     }
     awaitClose { activeCall.get()?.cancel() }
-}.buffer(EVENT_BUFFER)
+}.buffer(EventBatcher.BUFFER_CAPACITY)
 
 /** The event stream's diagnostics marks (iOS `DiagnosticsRecorder.stream`): line counts and timings only. */
 private class StreamDiagnostics(private val operationID: String) {
@@ -184,6 +210,8 @@ internal data class EventPayload(
     val text: String? = null,
     val id: String? = null,
     val name: String? = null,
+    /** `session.execution.interrupted`'s cause (`"superseded"` when a steer interrupts the active step to start the next one). */
+    val reason: String? = null,
     val canonical: String? = null,
     val repository: String? = null,
     val icon: OpenCodeProjectIcon? = null,
@@ -194,15 +222,23 @@ internal data class EventPayload(
     val info: ShellInfo? = null,
     /** `session.revert.staged`'s boundary. */
     val revert: RevertPayload? = null,
+    /** `session.moved`'s destination; other events' locations never spoil the rest of their payload. */
+    @Serializable(with = LenientLocationSerializer::class) val location: Location? = null,
     /** `session.inbox.enqueued`'s admitted item; one the app can't read leaves the rest intact. */
     @Serializable(with = LenientInboxItemSerializer::class) val item: InboxItem? = null,
 ) {
     @Serializable data class Form(val sessionID: String)
+    @Serializable data class Location(val directory: String? = null)
     @Serializable data class Content(val type: String, val text: String? = null)
     @Serializable data class InboxItem(val type: String, val payload: PendingInputsPayload.Payload? = null, val delivery: String? = null)
 
     val textOutput: List<String> get() = content?.filter { it.type == "text" }?.mapNotNull { it.text } ?: emptyList()
 }
+
+internal object LenientLocationSerializer : ElementSerializer<EventPayload.Location?>(
+    decode = { element -> runCatching { WireJson.decodeFromJsonElement(EventPayload.Location.serializer(), element) }.getOrNull() },
+    encode = { location -> location?.let { WireJson.encodeToJsonElement(EventPayload.Location.serializer(), it) } ?: JsonNull },
+)
 
 internal object LenientInboxItemSerializer : ElementSerializer<EventPayload.InboxItem?>(
     decode = { element -> runCatching { WireJson.decodeFromJsonElement(EventPayload.InboxItem.serializer(), element) }.getOrNull() },
@@ -215,7 +251,7 @@ private val HANDLED_TYPES = setOf(
     "session.execution.succeeded", "session.execution.failed", "session.execution.interrupted",
     "session.created", "session.forked", "session.viewed",
     "session.revert.staged", "session.revert.cleared", "session.revert.committed",
-    "session.renamed", "session.deleted",
+    "session.renamed", "session.deleted", "session.archived", "session.unarchived",
     "session.inbox.cancelled", "session.inbox.enqueued", "session.inbox.delivery.changed", "session.inbox.delivered",
     "session.step.started", "session.step.streamed", "session.step.ended", "session.step.failed",
     "session.text.started", "session.text.delta", "session.text.ended",
@@ -273,8 +309,12 @@ private fun serverEvent(type: String, data: EventPayload?): OpenCodeServerEvent?
     return when (type) {
         "server.connected" -> OpenCodeServerEvent.Connected
         "session.execution.started" -> data?.sessionID?.let(OpenCodeServerEvent::ExecutionStarted)
-        "session.execution.succeeded", "session.execution.failed", "session.execution.interrupted" ->
+        "session.execution.succeeded", "session.execution.failed" ->
             data?.sessionID?.let(OpenCodeServerEvent::ExecutionEnded)
+        // A steer interrupts the active step with `reason == "superseded"` and immediately starts
+        // the next one; the session hasn't settled.
+        "session.execution.interrupted" ->
+            if (data?.reason == "superseded") null else data?.sessionID?.let(OpenCodeServerEvent::ExecutionEnded)
         "session.created" -> data?.sessionID?.let { OpenCodeServerEvent.SessionCreated(it, data.parentID) }
         // A fork is a new root: its `parentID` names the session it was copied from, not a parent.
         "session.forked" -> data?.sessionID?.let { OpenCodeServerEvent.SessionCreated(it, null) }
@@ -295,7 +335,15 @@ private fun serverEvent(type: String, data: EventPayload?): OpenCodeServerEvent?
             val title = data.title ?: return null
             OpenCodeServerEvent.SessionRenamed(id, title)
         }
+        "session.moved" -> {
+            val id = data?.sessionID ?: return null
+            // Home invalidates its messages too, as for the content-free events below.
+            val directory = data.location?.directory ?: return OpenCodeServerEvent.MessageInvalidated(id)
+            OpenCodeServerEvent.SessionMoved(id, directory)
+        }
         "session.deleted" -> data?.sessionID?.let(OpenCodeServerEvent::SessionDeleted)
+        "session.archived", "session.unarchived" ->
+            data?.sessionID?.let { OpenCodeServerEvent.SessionArchiveChanged(it, isArchived = type == "session.archived") }
         "project.updated" -> {
             val id = data?.id ?: return null
             val canonical = data.canonical ?: return null
@@ -366,7 +414,7 @@ private fun serverEvent(type: String, data: EventPayload?): OpenCodeServerEvent?
             )
         }
         "session.message.content.updated", "session.synthetic", "session.instructions.updated",
-        "session.agent.selected", "session.model.selected", "session.moved", "session.permissions",
+        "session.agent.selected", "session.model.selected", "session.permissions",
         "session.retry.scheduled", "session.compaction.started",
         "session.compaction.ended", "session.compaction.failed", "session.shell.started", "session.shell.ended",
         -> data?.sessionID?.let(OpenCodeServerEvent::MessageInvalidated)

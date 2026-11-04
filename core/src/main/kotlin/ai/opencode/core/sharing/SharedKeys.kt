@@ -30,7 +30,7 @@ object SharedKeys {
     /** The file viewer's Wrap Lines choice, kept across files and launches. Off by default. */
     val fileViewerWrapsLines = SharedKey.appStorage("file-viewer-wraps-lines", false)
 
-    /** Gates experimental Voice Mode inside Settings → Advanced. Off by default. */
+    /** Gates experimental Voice Mode inside Settings → Experimental. Off by default. */
     val voiceModeEnabled = SharedKey.appStorage("voice-mode-enabled", false)
 
     /** Developer Mode: upload voice calls and traces to the log server. Off by default. Keeps the voice-only switch's key. */

@@ -1,8 +1,10 @@
 package ai.opencode.feature.settings
 
-import ai.opencode.feature.system.notifications.NotificationPermission
-import ai.opencode.core.experiments.key
 import ai.opencode.core.experiments.ExperimentalFeature
+import ai.opencode.core.experiments.key
+import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.PageTransitions
+import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.PresentationAction
@@ -21,8 +23,8 @@ import ai.opencode.feature.settings.serverdetails.ServerDetailsPage
 import ai.opencode.feature.settings.whatsnew.WhatsNewDetailPage
 import ai.opencode.feature.settings.whatsnew.WhatsNewListPage
 import ai.opencode.feature.settings.whatsnew.WhatsNewSmallerListPage
-import ai.opencode.core.motion.Motion
-import androidx.compose.animation.Crossfade
+import ai.opencode.feature.system.notifications.NotificationPermission
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
@@ -37,11 +39,14 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LargeFlexibleTopAppBar
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -51,8 +56,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -69,8 +78,8 @@ private sealed interface SettingsRoute {
 
 /**
  * Port of iOS `SessionSettingsView` (`Settings/SettingsView.swift`): Settings' own stack, the root
- * page (connection card; Appearance, Composer, Models, Voice, Notifications, What’s New; Server
- * Details; Advanced and the version line) and the pages it pushes. Back on a pushed page goes back
+ * page (connection card; Appearance, Sessions, Models, Voice, Notifications; What’s New; Server
+ * Details; Experimental, Developer and the version line) and the pages it pushes. Back on a pushed page goes back
  * one level; at the root it closes Settings ([SettingsFeature.SettingsDelegate.Close]).
  */
 @Composable
@@ -82,15 +91,23 @@ fun SettingsView(store: SettingsStore, modifier: Modifier = Modifier) {
         listOf<SettingsRoute>(SettingsRoute.Root) + path.mapIndexed { index, page -> SettingsRoute.Page(index, page) }
     }
     Box(modifier.fillMaxSize()) {
+        // Android divergence: pages move on Material's shared axis (and the back gesture previews
+        // the pop) instead of Navigation 3's default 0.7 s cross-fade or iOS's push.
+        val reduceMotion = rememberReduceMotion()
+        val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+        val slidePx = with(LocalDensity.current) { PageTransitions.SlideDistance.roundToPx() }
         NavDisplay(
             backStack = backStack,
             onBack = { store.send(SettingsFeature.Action.BackTapped) },
+            transitionSpec = { PageTransitions.forward(slidePx, rtl, reduceMotion) },
+            popTransitionSpec = { PageTransitions.backward(slidePx, rtl, reduceMotion) },
+            predictivePopTransitionSpec = { PageTransitions.predictiveBack(slidePx, rtl, reduceMotion) },
             entryProvider = { route ->
                 when (route) {
                     SettingsRoute.Root -> NavEntry(route) {
-                        // Settings asked for while What’s New is the page up cross-fades to
-                        // Settings' root (iOS `SettingsPresentation.fade`, 0.3 s ease-in-out).
-                        Crossfade(root, animationSpec = tween(300, easing = Motion.EaseInOut), label = "settings-root") { shown ->
+                        // Settings asked for while What’s New is the page up switches Settings'
+                        // root (iOS cross-fades, `SettingsPresentation.fade`; Android fades through).
+                        AnimatedContent(root, transitionSpec = { PageTransitions.fadeThrough(reduceMotion) }, label = "settings-root") { shown ->
                             when (shown) {
                                 SettingsFeature.State.Root.settings -> SettingsRootPage(store)
                                 SettingsFeature.State.Root.whatsNew -> WhatsNewListPage(store)
@@ -111,10 +128,13 @@ private fun SettingsPageContent(store: SettingsStore, page: SettingsPage) {
         SettingsPage.Server -> ServerPage(store)
         SettingsPage.Appearance -> AppearanceSettingsView(store)
         SettingsPage.Themes -> ThemesSettingsView(store)
-        SettingsPage.Composer -> ComposerSettingsView(store)
+        SettingsPage.Sessions -> SessionsSettingsView(store)
         SettingsPage.Models -> ModelVisibilitySettingsView(store)
         is SettingsPage.ModelProvider -> ModelVisibilityProviderView(store, page.providerID)
         SettingsPage.Voice -> VoiceSettingsView(store)
+        is SettingsPage.VoiceProvider -> VoiceProviderDetailPage(store, page.opensAccount)
+        SettingsPage.VoiceAccount -> VoiceProviderAccountPage(store)
+        SettingsPage.VoiceDelegator -> VoiceDelegatorSettingsPage(store)
         SettingsPage.CallVoicePicker -> CallVoicePickerView(store)
         SettingsPage.CallHistory -> CallHistoryView(store)
         is SettingsPage.CallReplay -> CallReplayView(store, page.log)
@@ -123,7 +143,7 @@ private fun SettingsPageContent(store: SettingsStore, page: SettingsPage) {
         is SettingsPage.WhatsNewDetail -> WhatsNewDetailPage(store, page.entryID)
         SettingsPage.WhatsNewSmallerChanges -> WhatsNewSmallerListPage(store)
         SettingsPage.ServerDetails -> ServerDetailsPage(store)
-        is SettingsPage.Advanced -> ExperimentalSettingsView(store, focus = page.focus?.let(ExperimentalFeature::fromRawValue))
+        is SettingsPage.Experimental -> ExperimentalSettingsView(store, focus = page.focus?.let(ExperimentalFeature::fromRawValue))
         SettingsPage.Developer -> DeveloperSettingsView(store)
         SettingsPage.Playgrounds -> PlaygroundsSettingsView(store)
     }
@@ -152,10 +172,16 @@ private fun OnboardingPlaygroundPresentation(store: SettingsStore) {
 }
 
 /**
- * One Settings page's chrome (iOS `List` + inline `navigationTitle` + Back): a centred title, a
- * Back control (“Back” closes Settings at the root, pops otherwise) and an inset-grouped list.
+ * One Settings page's chrome (iOS `List` + inline `navigationTitle` + Back): a Back control
+ * (“Back” closes Settings at the root, pops otherwise) and a list of grouped rows.
+ *
+ * Android divergence: the bar is Material 3 Expressive's large flexible top app bar, whose
+ * start-aligned title collapses into the bar as the list scrolls, and the page sets text in
+ * Material's own type scale ([SettingsText.typography]) rather than iOS's 17 pt body. A page
+ * that draws its own title ([titleVisible] false, as What's New's entry page does) keeps the
+ * small bar, its title fading in over 0.15 s once the page's title scrolls under it.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SettingsPageScaffold(
     title: String,
@@ -163,48 +189,70 @@ fun SettingsPageScaffold(
     modifier: Modifier = Modifier,
     /** False hides the bar's title (fading over 0.15 s, ease-out), as What's New's entry page does until its own title scrolls under the bar. */
     titleVisible: Boolean = true,
+    /** Whether the page draws its own title, so the bar stays small (What's New's entry page). */
+    drawsOwnTitle: Boolean = false,
     listState: LazyListState = rememberLazyListState(),
     actions: @Composable RowScope.() -> Unit = {},
     bottomBar: @Composable () -> Unit = {},
     content: LazyListScope.() -> Unit,
 ) {
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
-    Scaffold(
-        modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        containerColor = OpenCodeTheme.colors.groupedCanvas,
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                    val alpha by animateFloatAsState(if (titleVisible) 1f else 0f, tween(150, easing = Motion.EaseOut), label = "settings-title")
-                    Text(
-                        title,
-                        style = OpenCodeTextStyles.headline,
-                        modifier = Modifier
-                            .graphicsLayer { this.alpha = alpha }
-                            .then(if (titleVisible) Modifier else Modifier.clearAndSetSemantics {}),
+    val canvas = OpenCodeTheme.colors.groupedCanvas
+    val barColors = TopAppBarDefaults.topAppBarColors(containerColor = canvas, scrolledContainerColor = canvas)
+    val scrollBehavior = if (drawsOwnTitle) {
+        TopAppBarDefaults.pinnedScrollBehavior()
+    } else {
+        TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    }
+    val back: @Composable () -> Unit = {
+        IconButton(onClick = { store.send(SettingsFeature.Action.BackTapped) }) {
+            OpenCodeIcon(SFSymbol.ChevronBackward, contentDescription = "Back")
+        }
+    }
+    MaterialTheme(
+        colorScheme = MaterialTheme.colorScheme,
+        motionScheme = MaterialTheme.motionScheme,
+        shapes = MaterialTheme.shapes,
+        typography = SettingsText.typography,
+    ) {
+        Scaffold(
+            modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+            containerColor = canvas,
+            topBar = {
+                if (drawsOwnTitle) {
+                    TopAppBar(
+                        title = {
+                            val alpha by animateFloatAsState(if (titleVisible) 1f else 0f, tween(150, easing = Motion.EaseOut), label = "settings-title")
+                            Text(
+                                title,
+                                modifier = Modifier
+                                    .graphicsLayer { this.alpha = alpha }
+                                    .then(if (titleVisible) Modifier else Modifier.clearAndSetSemantics {}),
+                            )
+                        },
+                        navigationIcon = back,
+                        actions = actions,
+                        scrollBehavior = scrollBehavior,
+                        colors = barColors,
                     )
-                },
-                navigationIcon = {
-                    IconButton(onClick = { store.send(SettingsFeature.Action.BackTapped) }) {
-                        OpenCodeIcon(SFSymbol.ChevronBackward, contentDescription = "Back")
-                    }
-                },
-                actions = actions,
-                scrollBehavior = scrollBehavior,
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = OpenCodeTheme.colors.groupedCanvas,
-                    scrolledContainerColor = OpenCodeTheme.colors.groupedCanvas,
-                ),
+                } else {
+                    LargeFlexibleTopAppBar(
+                        title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        navigationIcon = back,
+                        actions = actions,
+                        scrollBehavior = scrollBehavior,
+                        colors = barColors,
+                    )
+                }
+            },
+            bottomBar = bottomBar,
+        ) { padding ->
+            LazyColumn(
+                state = listState,
+                contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 24.dp),
+                modifier = Modifier.fillMaxSize(),
+                content = content,
             )
-        },
-        bottomBar = bottomBar,
-    ) { padding ->
-        LazyColumn(
-            state = listState,
-            contentPadding = PaddingValues(top = padding.calculateTopPadding() + 4.dp, bottom = padding.calculateBottomPadding() + 24.dp),
-            modifier = Modifier.fillMaxSize(),
-            content = content,
-        )
+        }
     }
 }
 
@@ -223,11 +271,11 @@ private fun SettingsRootPage(store: SettingsStore) {
         item(key = "connection", contentType = "connection") {
             ConnectionCard(store, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
         }
-        // Preferences: Appearance, Composer, Voice, Notifications, and What’s New.
+        // Preferences: Appearance, Sessions, Models, Voice and Notifications.
         settingsSection(key = "preferences") {
             SettingsRow("Appearance", "paintpalette.fill", SettingsTint.Purple, value = appTheme.title) { push(SettingsPage.Appearance) }
             SettingsDivider(inset = true)
-            SettingsRow("Composer", "keyboard.fill", SettingsTint.Blue) { push(SettingsPage.Composer) }
+            SettingsRow("Sessions", "bubble.left.fill", SettingsTint.Blue) { push(SettingsPage.Sessions) }
             if (ExperimentalFeature.hideModels.isActive(hideModels)) {
                 SettingsDivider(inset = true)
                 SettingsRow("Models", "cpu", SettingsTint.Teal) { push(SettingsPage.Models) }
@@ -245,7 +293,8 @@ private fun SettingsRootPage(store: SettingsStore) {
                     value = if (permission == NotificationPermission.Enabled) "On" else "Off",
                 ) { push(SettingsPage.Notifications) }
             }
-            SettingsDivider(inset = true)
+        }
+        settingsSection(key = "whats-new") {
             SettingsRow("What’s New", "sparkles", SettingsTint.Orange) { push(SettingsPage.WhatsNew) }
         }
         if (ExperimentalFeature.serverDetails.isActive(serverDetails)) {
@@ -254,9 +303,9 @@ private fun SettingsRootPage(store: SettingsStore) {
             }
         }
         settingsSection(
-            key = "advanced",
+            key = "experimental",
             footer = {
-                SettingsFooterText("Experimental features, diagnostics, and developer tools.")
+                SettingsFooterText("Unfinished features, diagnostics, and live tuning.")
                 // iOS stacks the footer's lines 14 apart; the footer column already spaces them 6.
                 SelectionContainer(Modifier.fillMaxWidth().padding(top = 8.dp)) {
                     Text(
@@ -269,12 +318,11 @@ private fun SettingsRootPage(store: SettingsStore) {
                 }
             },
         ) {
-            SettingsRow(
-                "Advanced",
-                "gearshape.2.fill",
-                SettingsTint.Gray,
-                value = if (developerMode) "Developer Mode" else null,
-            ) { push(SettingsPage.Advanced()) }
+            ExperimentalSettingsRow { push(SettingsPage.Experimental()) }
+            SettingsDivider(inset = true)
+            SettingsRow("Developer", "hammer.fill", SettingsTint.Teal, value = if (developerMode) "On" else "Off") {
+                push(SettingsPage.Developer)
+            }
         }
     }
 }

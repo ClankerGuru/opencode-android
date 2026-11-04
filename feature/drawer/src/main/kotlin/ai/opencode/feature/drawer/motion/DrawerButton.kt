@@ -1,5 +1,7 @@
 package ai.opencode.feature.drawer.motion
 
+import ai.opencode.core.motion.transitionBlur
+
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
@@ -16,6 +18,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FiniteAnimationSpec
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -50,7 +53,6 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -429,9 +431,16 @@ private fun DrawerButtonCapsule(
     } else {
         Modifier.wrapContentWidth(Alignment.Start, unbounded = true).layoutWidth { widthDp?.invoke() ?: size.value }
     }
+    // Android divergence: at rest the button is a plain top-app-bar icon (no glass circle); the
+    // capsule's fill shows only while it grows into a notice.
+    val fill by animateColorAsState(
+        targetValue = if (shown != null && expanded) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent,
+        animationSpec = if (expanded) growSpring.spec() else foldSpring.spec(),
+        label = "drawer-button-fill",
+    )
     Surface(
         shape = OpenCodeShape.capsule,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = fill,
         contentColor = OpenCodeTheme.colors.text,
         modifier = widthModifier
             .height(size)
@@ -628,7 +637,7 @@ fun Modifier.steppingAside(aside: Boolean, reducedMotion: Boolean): Modifier = c
         else -> MotionSpring(0.35, 0.0).animation(reduceMotion = false, delaySeconds = 0.12)
     }
     val progress by animateFloatAsState(if (aside) 1f else 0f, spec, label = "stepping-aside")
-    val blurred = if (!reducedMotion && progress > 0.001f) Modifier.blur((6 * progress).dp) else Modifier
+    val blurred = if (!reducedMotion && progress > 0.001f) Modifier.transitionBlur((6 * progress).dp) else Modifier
     this
         .then(blurred)
         .graphicsLayer { alpha = 1 - progress }

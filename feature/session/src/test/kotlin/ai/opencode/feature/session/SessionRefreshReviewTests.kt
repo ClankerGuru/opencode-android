@@ -753,9 +753,9 @@ class SessionRefreshReviewTests {
      * [ComposerFoldFrames]). Frames are the children's tops; widths are the column's.
      */
     @Test fun composerFoldLayoutMatchesMainWhenNoLocationIsMountedIncludingPreparingDictationRow() {
-        // 1. With no location mounted, progress is always 1 whether or not other attachments
-        // (paste, photo, file) are present, so adding them never animates 0 -> 1.
-        assertEquals(1f, ComposerFoldFrames.attachmentRevealProgress(locationMounted = false, locationPresented = false, hasNonLocationAttachments = false, reduceMotion = false))
+        // 1. An absent attachment row starts at zero so its first reservation can animate into
+        // the layout. Existing attachments keep the row revealed.
+        assertEquals(0f, ComposerFoldFrames.attachmentRevealProgress(locationMounted = false, locationPresented = false, hasNonLocationAttachments = false, reduceMotion = false))
         assertEquals(1f, ComposerFoldFrames.attachmentRevealProgress(locationMounted = false, locationPresented = false, hasNonLocationAttachments = true, reduceMotion = false))
         assertEquals(0f, ComposerFoldFrames.attachmentRevealProgress(locationMounted = true, locationPresented = false, hasNonLocationAttachments = false, reduceMotion = false))
         assertEquals(1f, ComposerFoldFrames.attachmentRevealProgress(locationMounted = true, locationPresented = true, hasNonLocationAttachments = false, reduceMotion = false))
@@ -785,6 +785,19 @@ class SessionRefreshReviewTests {
             spacing = 8f,
         )
         assertEquals(22f..64f, foldedWithPreparing.visible)
+
+        // Mid-fold the visible range passes between the two, so the height animates instead of
+        // landing on the folded one.
+        val halfFolded = ComposerFoldFrames.frames(
+            sizes = listOf(composer, preparingRow),
+            folds = listOf(false, true),
+            firstStayingFoldTop = 22f,
+            isFolded = false,
+            foldProgress = 0.5f,
+            attachmentRevealProgress = 1f,
+            spacing = 8f,
+        )
+        assertEquals(11f..78f, halfFolded.visible)
 
         // 3. Even while a location card is unfolding at the top (progress < 1), the upper bound
         // stays at `y` so a bottom `composerFolds` subview is never clipped.

@@ -46,8 +46,17 @@ object ComposerMorphTunables {
     /** Kit's morph spring (chip to panel), open and close. */
     val open = MotionSpring(0.42, 0.12)
     val close = MotionSpring(0.36, 0.0)
-    val photoOpen = MotionSpring(0.3, 0.08)
-    val photoReturn = MotionSpring(0.28, 0.0)
+    /** As snappy as the + menu's open (Kit: “fast openings are nice”). */
+    val photoOpen = MotionSpring(0.2, 0.0)
+    val photoReturn = MotionSpring(0.22, 0.0)
+    /** Back: the sheet folding onto the menu (Kit: “it could be a little faster”). */
+    val photoBack = MotionSpring(0.18, 0.0)
+    /** Back from the expanded sheet travels three times as far: at 0.18 s it jumped to the menu in a frame or two. */
+    val photoBackExpanded = MotionSpring(0.3, 0.0)
+    /** Where a sheet folding into the composer gives its glass up (progress 1 → 0): on the tap it vanished and left the photos as a ghost. */
+    const val photoGlassOut = 0.35
+    /** How far (dp) a pull down past compact brings the composer back up under it. */
+    const val composerRise = 160.0
     const val photoContentDelay = 0.0
     const val photoBackdropBlur = 0.0
     const val photoBackdropDim = 0.0
@@ -63,8 +72,20 @@ object ComposerMorphTunables {
     const val outgoingBlur = 10.0
     const val outgoingGrowth = 0.12
     const val contentBlur = 14.0
+    /**
+     * Cross-fading with what it grows out of, the content is whole by this share of its reveal
+     * (1 is a plain cross-fade). At 1 both sat half gone and blurred mid-way: a stalled frame
+     * there read as an empty glass blob.
+     */
+    const val photoContentLead = 0.4
     const val exitBlur = 10.0
+    /** iOS's backdrop blur (dp). Not drawn on Android, which dims with a scrim only (see [noBlurDimBoost]). */
     const val backdropBlur = 18.0
+    /**
+     * iOS Reduce Transparency's dim boost, used when there is no backdrop blur. Android never blurs
+     * what's behind a sheet (Material scrims only), so its dim is always boosted.
+     */
+    const val noBlurDimBoost = 1.6
     const val dimDark = 0.3
     const val dimLight = 0.12
     const val topRadius = 30.0
@@ -141,21 +162,6 @@ class ComposerMorph(private val scope: CoroutineScope) {
     private var settleTask: Job? = null
     private var dragTask: Job? = null
 
-    /**
-     * Where the surface last drew its rest and how strongly to blur what's behind it, for
-     * [composerMorphBackdrop] on the content beneath: Compose can't blur a sibling, so the
-     * host's content blurs itself from these (iOS `ComposerMorphBackdrop`'s `ProgressiveBlur`).
-     */
-    @Stable
-    class Backdrop {
-        /** The sheet's resting top, in root px. */
-        var sheetTop by mutableFloatStateOf(0f)
-        /** The full blur radius (px) at progress 1; 0 under Reduce Transparency. */
-        var blurPx by mutableFloatStateOf(0f)
-    }
-
-    val backdrop = Backdrop()
-
     val isOpen: Boolean get() = phase == Phase.Open
     /** Drawn: armed, open, or shrinking back into its source. */
     val isShown: Boolean get() = phase != Phase.Closed
@@ -217,14 +223,25 @@ class ComposerMorph(private val scope: CoroutineScope) {
         }
     }
 
-    /** Folds back into its source on [animation] from wherever a finger drew it, its bottom edge on [edge] if given. */
-    fun fold(animation: FiniteAnimationSpec<Float>, edge: FiniteAnimationSpec<Float>? = null, reduceMotion: Boolean) {
+    /**
+     * Folds back into its source on [animation] from wherever a finger drew it, its bottom edge on
+     * [edge] if given. A photo dismissal keeps content on this clock too ([contentFollowsFold]):
+     * issuing content-out first would start the detached footer fading before the return spring
+     * receives the phase change. [completion] runs once the fold's spring is done (or replaced).
+     */
+    fun fold(
+        animation: FiniteAnimationSpec<Float>,
+        edge: FiniteAnimationSpec<Float>? = null,
+        reduceMotion: Boolean,
+        contentFollowsFold: Boolean = false,
+        completion: () -> Unit = {},
+    ) {
         foldPending = false
-        if (phase == Phase.Open && content.value > 0f) {
+        if (phase == Phase.Open && content.value > 0f && !contentFollowsFold) {
             scope.launch { content.animateTo(0f, ComposerMorphTunables.contentOut.spec()) }
         }
         animateDrag(0f, animation)
-        close(reduceMotion, movesEdge = edge == null, animation = animation)
+        close(reduceMotion, movesEdge = edge == null, animation = animation, onFinished = completion)
         if (edge != null && phase == Phase.Closing) scope.launch { bottomProgress.animateTo(0f, edge) }
     }
 
@@ -258,12 +275,23 @@ class ComposerMorph(private val scope: CoroutineScope) {
      * Shrinks back into its source, drawn until its spring lands. Armed, it hadn't grown: it's
      * gone at once. Without [animation] the glass snaps (iOS: a close outside `withAnimation`).
      */
-    fun close(reduceMotion: Boolean, movesEdge: Boolean = true, animation: FiniteAnimationSpec<Float>? = null) {
-        if (phase == Phase.Armed) return reset()
-        if (phase != Phase.Open) return
+    fun close(
+        reduceMotion: Boolean,
+        movesEdge: Boolean = true,
+        animation: FiniteAnimationSpec<Float>? = null,
+        onFinished: (() -> Unit)? = null,
+    ) {
+        if (phase == Phase.Armed) return reset().also { onFinished?.invoke() }
+        if (phase != Phase.Open) return onFinished?.invoke() ?: Unit
         generation += 1
         phase = Phase.Closing
-        scope.launch { if (animation != null) progress.animateTo(0f, animation) else progress.snapTo(0f) }
+        scope.launch {
+            try {
+                if (animation != null) progress.animateTo(0f, animation) else progress.snapTo(0f)
+            } finally {
+                onFinished?.invoke()
+            }
+        }
         if (movesEdge) scope.launch { if (animation != null) bottomProgress.animateTo(0f, animation) else bottomProgress.snapTo(0f) }
         if (animation == null) scope.launch { content.snapTo(0f) }
         val rawSettle = if (reduceMotion) 0.22 else maxOf(
@@ -327,6 +355,9 @@ class ComposerMorph(private val scope: CoroutineScope) {
     }
 
     companion object {
+        /** Wall-clock seconds for [seconds] of animation time, under slow motion too. */
+        fun wallSeconds(seconds: Double): Double = AnimationTimeScale.shared.wallSeconds(seconds)
+
         /** Whether a drag let go closes it: drawn past `dragCloses`, or thrown down (dp, dp/s). */
         fun closes(translation: Double, predicted: Double, velocity: Double): Boolean =
             translation > ComposerMorphTunables.dragCloses ||
@@ -395,9 +426,17 @@ data class ComposerMorphGeometry(
          * its height then kept and its top raised, never above [ceiling]. [density] converts the
          * dp tunables.
          */
-        fun sheet(top: Float, column: Rect?, screen: Rect, keyboardTop: Float?, ceiling: Float, density: Float): Rect {
-            val side = (ComposerMorphTunables.sideInset * density).toFloat()
-            val inset = (ComposerMorphTunables.bottomInset * density).toFloat()
+        fun sheet(
+            top: Float,
+            column: Rect?,
+            screen: Rect,
+            keyboardTop: Float?,
+            ceiling: Float,
+            density: Float,
+            edgeToEdge: Boolean = false,
+        ): Rect {
+            val side = if (edgeToEdge) 0f else (ComposerMorphTunables.sideInset * density).toFloat()
+            val inset = if (edgeToEdge) 0f else (ComposerMorphTunables.bottomInset * density).toFloat()
             val least = 120 * density
             val x = column?.left ?: (screen.left + side)
             val width = column?.width ?: (screen.width - side * 2)
@@ -433,9 +472,14 @@ data class ComposerMorphGeometry(
             return rect to min(lerp(seedRadius, menuRadius, clamped), limit)
         }
 
-        /** Stretches or compresses a sheet's top edge by [pull] keeping its bottom edge when [stretchesUpward]. Returns the rect and the remaining downward offset. */
-        fun stretched(rect: Rect, pull: Float, stretchesUpward: Boolean, minHeightPx: Float): Pair<Rect, Float> {
-            if (!stretchesUpward) return rect to pull
+        /**
+         * Upward travel grows a sheet toward its expanded detent, its bottom edge kept. A dismissal
+         * drag from compact ([translatesDownward]) carries the whole sheet, without compressing its
+         * grid or clamping the grabber above the finger at a minimum height. Returns the rect and
+         * the remaining downward offset.
+         */
+        fun stretched(rect: Rect, pull: Float, stretchesUpward: Boolean, minHeightPx: Float, translatesDownward: Boolean = false): Pair<Rect, Float> {
+            if (!stretchesUpward || (translatesDownward && pull > 0f)) return rect to pull
             val minHeight = min(rect.height, minHeightPx)
             val height = max(rect.height - pull, minHeight)
             return Rect(rect.left, rect.bottom - height, rect.right, rect.bottom) to 0f
@@ -473,16 +517,13 @@ data class ComposerMorphGeometry(
         /** Where a sheet dismissing downward lands as progress goes from 1 to 0 ([dropPx] = `dismissDrop` in px). */
         fun downwardDismissSource(target: Rect, dropPx: Float): Rect = target.translate(0f, dropPx)
 
-        /** The composer's offset (dp) and opacity while a photo sheet sits above it or springs back on dismiss. */
-        fun composerUnderSheetPose(
-            isOpen: Boolean,
-            foldPending: Boolean,
-            reduceMotion: Boolean,
-            sink: Double = ComposerMorphTunables.composerSink,
-        ): Pair<Double, Float> {
-            val hidden = isOpen && !foldPending
-            val offsetY = if (hidden && !reduceMotion) sink else 0.0
-            return offsetY to (if (hidden) 0f else 1f)
+        /**
+         * A dismissal destination belongs only to that fold. Once closed, the next menu must use
+         * its full measured frame, not squeeze its rows into the + seed.
+         */
+        fun resolvedSource(shown: Boolean, sheetActive: Boolean, source: Rect, openedFrom: Rect?, landsOn: Rect?): Rect {
+            if (sheetActive) return openedFrom ?: source
+            return if (shown) landsOn ?: source else source
         }
 
         /** State of the unified `+` menu / photo sheet surface (closed, menu, photos, back to menu, downward dismiss). */
@@ -496,45 +537,5 @@ data class ComposerMorphGeometry(
             val entranceProgress = if (menuShown || sheetActive) 1f else 0f
             return UnifiedMenuState(usesDownwardDismiss, closingToMenu, menuProgress, menuInteractive, entranceProgress)
         }
-    }
-}
-
-/**
- * iOS `View.handsGlassOver(to:...)`: the morph's source under it hands its surface over to the
- * morph as the morph starts to grow (fading out in 0.12 s), and takes it back as the morph lands
- * on it (after `close.duration × 0.62`, or [closeDelay]). [sinksUnderSheet]: the composer sinks
- * [ComposerMorphTunables.composerSink] and fades under a photo sheet instead.
- */
-fun Modifier.handsGlassOver(
-    morph: ComposerMorph,
-    reduceMotion: Boolean,
-    isEnabled: Boolean = true,
-    returnsImmediately: Boolean = false,
-    closeDelay: Double? = null,
-    sinksUnderSheet: Boolean = false,
-): Modifier = composed {
-    if (!isEnabled) return@composed this
-    val density = LocalDensity.current
-    if (sinksUnderSheet) {
-        val hidden = morph.isOpen && !morph.foldPending
-        val motion: FiniteAnimationSpec<Float> = if (reduceMotion) tween(200, easing = Motion.EaseInOut)
-        else (if (hidden) ComposerMorphTunables.photoOpen else ComposerMorphTunables.photoReturn).spec()
-        val p by animateFloatAsState(if (hidden) 1f else 0f, motion, label = "under-sheet")
-        val clamped = p.coerceIn(0f, 1f)
-        val offsetY = if (reduceMotion) 0f else clamped * ComposerMorphTunables.composerSink.toFloat() * density.density
-        val opacity = if (reduceMotion) 1 - clamped else 1 - (clamped / 0.65f).coerceIn(0f, 1f)
-        this
-            .graphicsLayer { translationY = offsetY; alpha = opacity }
-            .semantics { if (clamped >= 0.65f) hideFromAccessibility() }
-    } else {
-        val open = morph.isOpen
-        val delaySeconds = closeDelay ?: (ComposerMorphTunables.close.duration * 0.62)
-        val spec: FiniteAnimationSpec<Float> = when {
-            reduceMotion -> tween(200, easing = Motion.EaseInOut)
-            returnsImmediately -> tween(140, easing = Motion.EaseInOut)
-            else -> tween(120, delayMillis = if (open) 0 else (delaySeconds * 1000).roundToInt(), easing = Motion.EaseInOut)
-        }
-        val a by animateFloatAsState(if (open) 0f else 1f, spec, label = "hands-glass-over")
-        this.graphicsLayer { alpha = a }
     }
 }

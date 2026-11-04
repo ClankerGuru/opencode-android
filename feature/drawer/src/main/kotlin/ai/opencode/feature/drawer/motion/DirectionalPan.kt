@@ -78,10 +78,15 @@ object DirectionalPan {
         return if (scrollerOwnsDrag) Decision.Fail else Decision.Begin
     }
 
-    /** [dx] is toward the trailing side (mirror it in RTL); distances in one unit with [decisionDistance]. */
-    fun decision(origin: TouchOrigin, presented: Boolean, dx: Float, dy: Float, decisionDistance: Float): Decision {
+    /**
+     * [dx] is toward the trailing side (mirror it in RTL); distances in one unit with [decisionDistance].
+     * [rowsOwnSwipes]: the open drawer's rows have swipe actions (Inbox Sidebar), so a sideways
+     * drag on a row is the row's rather than the drawer's.
+     */
+    fun decision(origin: TouchOrigin, presented: Boolean, dx: Float, dy: Float, decisionDistance: Float, rowsOwnSwipes: Boolean = false): Decision {
         if (dx * dx + dy * dy < decisionDistance * decisionDistance) return Decision.Wait
         if (abs(dx) <= abs(dy)) return Decision.Fail
+        if (presented && rowsOwnSwipes && origin == TouchOrigin.DrawerRow) return Decision.Fail
         if (dx <= 0) return if (presented) Decision.Begin else Decision.Fail
         if (presented && (origin == TouchOrigin.DrawerRow || origin == TouchOrigin.DrawerList)) return Decision.Reveal
         if (!presented && origin == TouchOrigin.Content(horizontalScrollerOwnsRightwardDrag = true)) return Decision.Fail
@@ -126,18 +131,10 @@ class DrawerPanRegions : DrawerPanExclusion {
     internal var dragCard: LayoutCoordinates? = null
     internal var dragCardHidden: () -> Boolean = { false }
     internal val lists = HashMap<Any, LayoutCoordinates>()
+    internal val rows = HashMap<Any, LayoutCoordinates>()
     internal val scrollers = HashMap<Any, Scroller>()
     internal val claims = HashMap<Any, LayoutCoordinates>()
     internal val exclusions = HashMap<Any, LayoutCoordinates>()
-
-    /**
-     * The session switcher's strip: kept from the drawer's pan except over a text field, which
-     * the switcher refuses (iOS's drawer pan waits for the switcher's, which fails there at once).
-     */
-    internal val switcherStrips = HashMap<Any, LayoutCoordinates>()
-
-    /** Whether a point (px in the pan's coordinates) is on one of the card's text fields. */
-    internal var isOnTextField: (LayoutCoordinates, Offset) -> Boolean = { _, _ -> false }
 
     override fun updateExclusion(id: Any, coordinates: LayoutCoordinates?) {
         if (coordinates == null) exclusions.remove(id) else exclusions[id] = coordinates
@@ -157,8 +154,7 @@ class DrawerPanRegions : DrawerPanExclusion {
         scrollers.values.filter { contains(it.coordinates, pan, point) }
 
     internal fun isExcluded(pan: LayoutCoordinates, point: Offset): Boolean =
-        exclusions.values.any { contains(it, pan, point) } ||
-            (switcherStrips.values.any { contains(it, pan, point) } && !isOnTextField(pan, point))
+        exclusions.values.any { contains(it, pan, point) }
 
     internal fun contains(region: LayoutCoordinates?, pan: LayoutCoordinates, point: Offset): Boolean {
         if (region == null || !region.isAttached || !pan.isAttached) return false
@@ -173,32 +169,6 @@ private fun Modifier.region(regions: DrawerPanRegions, set: (Any, LayoutCoordina
     onGloballyPositioned { set(id, it) }
 }
 
-/**
- * The session switcher's gesture strip, kept from the drawer's pan while [isEnabled] except over
- * a text field (see [DrawerPanRegions.switcherStrips]). Outside a drawer it's a plain
- * `excludedFromDrawerPan`.
- */
-fun Modifier.drawerPanSwitcherStrip(isEnabled: Boolean): Modifier = composed {
-    val regions = LocalDrawerPanExclusion.current as? DrawerPanRegions
-    if (regions == null) {
-        excludedFromDrawerPan(isEnabled)
-    } else {
-        val id = remember { Any() }
-        // The strip's last layout, so enabling it again (the keyboard gone) registers it at once
-        // rather than at its next placement.
-        val placed = remember { arrayOfNulls<LayoutCoordinates>(1) }
-        DisposableEffect(regions, isEnabled) {
-            val coordinates = placed[0]
-            if (isEnabled && coordinates != null) regions.switcherStrips[id] = coordinates else regions.switcherStrips.remove(id)
-            onDispose { regions.switcherStrips.remove(id) }
-        }
-        onGloballyPositioned {
-            placed[0] = it
-            if (isEnabled) regions.switcherStrips[id] = it
-        }
-    }
-}
-
 /** The drawer (iOS `drawerView`). */
 fun Modifier.drawerPanDrawer(regions: DrawerPanRegions): Modifier =
     region(regions) { _, c -> regions.drawer = c }
@@ -206,6 +176,10 @@ fun Modifier.drawerPanDrawer(regions: DrawerPanRegions): Modifier =
 /** The drawer's session list (iOS's `UICollectionView`): a rightward drag on the open drawer reveals times. */
 fun Modifier.drawerPanList(regions: DrawerPanRegions): Modifier =
     region(regions) { id, c -> if (c == null) regions.lists.remove(id) else regions.lists[id] = c }
+
+/** One drawer row that owns its sideways swipes (iOS `.drawerRow` origin; the Inbox Sidebar's rows). */
+fun Modifier.drawerPanRow(regions: DrawerPanRegions): Modifier =
+    region(regions) { id, c -> if (c == null) regions.rows.remove(id) else regions.rows[id] = c }
 
 /** The session card (iOS `exposedCardView`). Put it on the translated card itself. */
 fun Modifier.drawerPanCard(regions: DrawerPanRegions): Modifier =
@@ -242,6 +216,7 @@ fun Modifier.drawerPanClaimsDrag(regions: DrawerPanRegions): Modifier =
  * @param isCardSwipe Catch Up turns the pan into a two-way card swipe.
  * @param isContentPushed a subagent is pushed over the session: the back pan has the drag, and
  *   only the root session's drag opens the drawer.
+ * @param rowsOwnSwipes the open drawer's rows have swipe actions (Inbox Sidebar).
  * @param onTouchDown a touch that may move the drawer began (not in Catch Up).
  */
 fun Modifier.drawerDirectionalPan(
@@ -250,6 +225,7 @@ fun Modifier.drawerDirectionalPan(
     isCardSwipe: () -> Boolean = { false },
     isContentPushed: () -> Boolean = { false },
     enabled: () -> Boolean = { true },
+    rowsOwnSwipes: () -> Boolean = { false },
     onTouchDown: () -> Unit = {},
     onPan: (DrawerPanEvent) -> Unit,
 ): Modifier = composed {
@@ -269,7 +245,9 @@ fun Modifier.drawerDirectionalPan(
                 val presented = isDrawerPresented()
                 val cardSwipe = isCardSwipe()
                 val point = down.position
-                val onExposedCard = regions.contains(regions.card, pan, point)
+                // Android's modal drawer lies over the card: a touch on the open drawer is the drawer's.
+                val onExposedCard = regions.contains(regions.card, pan, point) &&
+                    !(presented && regions.contains(regions.drawer, pan, point))
                 // Controls that own a sideways drag (the + menu, the held mic) keep it.
                 if (!presented && onExposedCard && regions.isExcluded(pan, point)) {
                     return@awaitEachGesture
@@ -285,11 +263,13 @@ fun Modifier.drawerDirectionalPan(
                 val ownsLeftward = scrollersHere.any { if (rtl) it.canScrollBackward() else it.canScrollForward() }
                 val hitDrawer = regions.contains(regions.drawer, pan, point)
                 val isDrawerList = regions.lists.values.any { regions.contains(it, pan, point) }
+                val isDrawerRow = regions.rows.values.any { regions.contains(it, pan, point) }
                 val hitDragCard = cardSwipe && !regions.dragCardHidden() && regions.contains(regions.dragCard, pan, point)
                 val hitExposedCard = hitDragCard || onExposedCard
                 val cardSwipeOrigin = DirectionalPan.CardSwipeOrigin(hitExposedCard, ownsRightward, ownsLeftward)
                 val touchOrigin: DirectionalPan.TouchOrigin = if (presented) {
                     when {
+                        isDrawerRow && hitDrawer -> DirectionalPan.TouchOrigin.DrawerRow
                         isDrawerList && hitDrawer -> DirectionalPan.TouchOrigin.DrawerList
                         hitExposedCard -> DirectionalPan.TouchOrigin.ExposedCard
                         else -> DirectionalPan.TouchOrigin.DrawerChrome
@@ -336,7 +316,7 @@ fun Modifier.drawerDirectionalPan(
                     val decision = if (cardSwipe) {
                         DirectionalPan.cardSwipeDecision(cardSwipeOrigin, dx, delta.y, decisionDistance)
                     } else {
-                        DirectionalPan.decision(touchOrigin, presented, dx, delta.y, decisionDistance)
+                        DirectionalPan.decision(touchOrigin, presented, dx, delta.y, decisionDistance, rowsOwnSwipes())
                     }
                     when (decision) {
                         DirectionalPan.Decision.Wait -> {
@@ -378,6 +358,7 @@ fun Modifier.drawerPan(
     isCardSwipe: () -> Boolean = { false },
     isContentPushed: () -> Boolean = { false },
     enabled: () -> Boolean = { true },
+    rowsOwnSwipes: () -> Boolean = { false },
     onCardSwipe: (DrawerPanEvent) -> Unit = {},
 ): Modifier = drawerDirectionalPan(
     regions = regions,
@@ -385,6 +366,7 @@ fun Modifier.drawerPan(
     isCardSwipe = isCardSwipe,
     isContentPushed = isContentPushed,
     enabled = enabled,
+    rowsOwnSwipes = rowsOwnSwipes,
     onTouchDown = motion::touchDown,
 ) { event ->
     if (isCardSwipe()) {

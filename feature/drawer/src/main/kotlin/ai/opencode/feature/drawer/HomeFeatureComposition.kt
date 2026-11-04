@@ -1,5 +1,6 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.server.EventStreamFocusClient
 import ai.opencode.feature.session.*
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.dependency
@@ -21,7 +22,6 @@ import ai.opencode.feature.composer.DictationFeature
 import ai.opencode.feature.drawer.catchup.CatchUpFeature
 import ai.opencode.feature.media.PageReaderClient
 import ai.opencode.feature.drawer.notices.DeliveredNotificationsClient
-import ai.opencode.feature.drawer.switcher.SessionSwitcherFeature
 import ai.opencode.devtools.traces.TraceUploadsFeature
 import ai.opencode.feature.session.SessionFeature
 import ai.opencode.feature.session.hasLiveDictation
@@ -30,6 +30,7 @@ import ai.opencode.feature.session.dictationPhase
 import ai.opencode.feature.session.dictationPress
 import ai.opencode.feature.session.unstartedUploadIDs
 import ai.opencode.feature.settings.SettingsFeature
+import ai.opencode.feature.settings.onboarding.WelcomeFeature
 import ai.opencode.feature.system.liveactivity.DictationActivityAttributes
 import ai.opencode.feature.system.liveactivity.DictationLiveActivity
 import ai.opencode.feature.system.liveactivity.DictationLiveActivityClient
@@ -56,13 +57,20 @@ import java.util.UUID
 
 private object SessionDetailSlot
 private object SettingsSlot
+private object WelcomeSlot
 private object SubagentStackSlot
 
 internal fun HomeFeature.builtBody(): Reducer<State, Action> {
     val full = fullBody()
     val sessions = detailSessionsCore()
     return Reducer { state, action ->
-        val reduced = if (isFastStreamAction(state, action)) sessions.reduce(state, action) else full.reduce(state, action)
+        val isFast = isFastStreamAction(state, action)
+        var reduced = if (isFast) sessions.reduce(state, action) else full.reduce(state, action)
+        // The fast path skips the watches below it, the followed run's too.
+        if (isFast && reduced.state.streamMovesSessionActivity(action)) {
+            val synced = syncSessionActivity(reduced.state)
+            reduced = Reduced(synced.state, Effect.merge(reduced.effect, synced.effect))
+        }
         var s = reduced.state
         // The Catch Up preview's revision bumps when its inputs change for the same session.
         val oldSlice = state.catchUpPreviewSlice
@@ -89,7 +97,15 @@ internal fun HomeFeature.builtBody(): Reducer<State, Action> {
 private fun HomeFeature.fullBody(): Reducer<State, Action> =
     ifLet<State, Action, SettingsFeature.State, SettingsFeature.Action>(
         id = SettingsSlot,
-        parent = homeReducers(),
+        parent = ifLet<State, Action, WelcomeFeature.State, WelcomeFeature.Action>(
+            id = WelcomeSlot,
+            parent = homeReducers(),
+            state = { it.welcome },
+            setState = { s: State, c: WelcomeFeature.State? -> s.copy(welcome = c) },
+            action = { (it as? Action.Welcome)?.action },
+            embed = Action::Welcome,
+            child = WelcomeFeature(),
+        ),
         state = { it.settings },
         setState = { s: State, c: SettingsFeature.State? -> s.copy(settings = c) },
         action = { (it as? Action.SettingsScreen)?.action },
@@ -98,6 +114,18 @@ private fun HomeFeature.fullBody(): Reducer<State, Action> =
     )
         .onChange({ it.settings?.whatsNew }) { old, new, state ->
             if (old == null || new != null) Reduced(state) else Reduced(settingsClosed(old, state))
+        }
+        .onChange({ it.search }) { _, _, state -> sessionSearchChanged(state) }
+        // Only the screen on top shows its transcript: a subagent pushed over it, its browser or
+        // Settings covers it (what arrives is new there).
+        .onChange({ it.transcriptCoverIsStale }) { _, _, state ->
+            Reduced(if (state.transcriptCoverIsStale) state.syncingTranscriptCover() else state)
+        }
+        // The stream sheds other sessions' deltas under load, never these. Watched over all of
+        // Home, so Catch Up reconciling to another card counts too (cd04514c).
+        .onChange({ it.streamFocusSessionIDs }) { _, new, state ->
+            dependency(EventStreamFocusClient).publish(streamFocusOwner, new)
+            Reduced(state)
         }
         .onChange({ it.settingsHomeInput }) { old, new, state ->
             if (old == null || new == null) {
@@ -115,13 +143,6 @@ private fun HomeFeature.fullBody(): Reducer<State, Action> =
         }
 
 private fun HomeFeature.homeReducers(): Reducer<State, Action> = combine(
-    scope(
-        state = { it.sessionSwitcher },
-        setState = { s: State, c: SessionSwitcherFeature.State -> s.copy(sessionSwitcher = c) },
-        action = { (it as? Action.SessionSwitcher)?.action },
-        embed = Action::SessionSwitcher,
-        child = SessionSwitcherFeature(),
-    ),
     scope(
         state = { it.traces },
         setState = { s: State, c: TraceUploadsFeature.State -> s.copy(traces = c) },
@@ -219,6 +240,7 @@ private fun HomeFeature.detailSessionsCore(): Reducer<State, Action> {
     val catchUp = CatchUpFeature()
     val notifications = HomeNotificationsFeature()
     val connection = HomeConnectionFeature()
+    val inboxSidebar = InboxSidebarFeature()
     val session = SessionFeature()
     val home = combine<State, Action>(
         scope(
@@ -237,6 +259,13 @@ private fun HomeFeature.detailSessionsCore(): Reducer<State, Action> {
             action = ::notificationsAction,
             embed = ::homeAction,
             child = notifications,
+        ),
+        scope(
+            state = { it.inboxSidebar },
+            setState = { s: State, c: InboxSidebarFeature.State -> s.copy(inboxSidebarStatus = c.status) },
+            action = { (it as? Action.InboxSidebar)?.action },
+            embed = Action::InboxSidebar,
+            child = inboxSidebar,
         ),
         scope(
             state = { it.connection },
@@ -474,6 +503,9 @@ private fun Reducer<State, Action>.homeChildrenObservers(feature: HomeFeature): 
             val client = dependency(DictationLiveActivityClient)
             Reduced(state.copy(dictationActivity = content), Effect.run { client.update(content, attributes) })
         }
+        // A run a send started follows its session's state here, from wherever it changes (stream,
+        // snapshots, the open screen, the background wait).
+        .onChange({ it.sessionActivityRun }) { _, _, state -> feature.syncSessionActivity(state) }
         .onChange({ if (LabMarks.isEnabled) it.sessionIndicators else emptyMap() }) { old, _, state ->
             for ((sessionID, indicator) in state.sessionIndicators) {
                 if (old[sessionID] != indicator) LabMarks.mark("indicator:${indicator.labMarkName}", sessionID = sessionID)

@@ -3,6 +3,7 @@ package ai.opencode.feature.drawer
 import ai.opencode.feature.session.*
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
+import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.PresentationAction
 import ai.opencode.core.store.Reduced
@@ -17,9 +18,11 @@ import ai.opencode.feature.session.isDraft
 import ai.opencode.feature.session.sessionComposer
 import ai.opencode.feature.session.typeBelow
 import ai.opencode.feature.drawer.catchup.CatchUpFeature
+import ai.opencode.feature.settings.NotifyPluginCheck
 import ai.opencode.feature.settings.ConnectionStatus
 import ai.opencode.feature.settings.HomeSettingsFeature
 import ai.opencode.feature.settings.SettingsFeature
+import ai.opencode.feature.settings.onboarding.WelcomeFeature
 import ai.opencode.feature.settings.SettingsFeature.SettingsDelegate
 import ai.opencode.feature.settings.whatsnew.WhatsNewEntry
 import ai.opencode.feature.settings.whatsnew.WhatsNewFeature
@@ -33,12 +36,17 @@ import ai.opencode.feature.voice.VoiceRoutePreferences
  * page and the drawer for the session, then opens where the feature is.
  */
 
-/** Settings opened with Home's current connection and notification state already in it. */
+/**
+ * Settings opened with Home's current connection and notification state already in it, and
+ * Home's sessions for Voice's Delegator pick (iOS `VoiceSettingsView(server: home.server,
+ * sessions: home.sessions)`), so that page doesn't wait on its own load.
+ */
 internal fun State.presentingSettings(settings: SettingsFeature.State): State {
     val home = settingsHome
     val notifications = settingsNotifications
     return copy(
         settings = settings.copy(
+            voice = settings.voice.copy(server = home.server ?: settings.voice.server, sessions = sessions),
             server = home.server,
             connectionStatus = home.connectionStatus,
             switchingTo = home.switchingTo,
@@ -73,6 +81,12 @@ private val State.settingsNotifications: SettingsFeature.Action.NotificationsCha
         permission = notificationPermission,
         isRequesting = isRequestingNotifications,
         setupError = notificationSetupError,
+        notifyPlugin = when (val check = notifyPlugin) {
+            null -> null
+            HomeNotificationsFeature.NotifyPluginCheck.Checking -> NotifyPluginCheck.Checking
+            is HomeNotificationsFeature.NotifyPluginCheck.Checked -> NotifyPluginCheck.Checked(check.status)
+            HomeNotificationsFeature.NotifyPluginCheck.Failed -> NotifyPluginCheck.Failed
+        },
     )
 
 /** What Settings shows of Home's notification state while it's up (null while it isn't). */
@@ -103,7 +117,7 @@ internal fun HomeFeature.reduceWhatsNew(state: State, action: WhatsNewFeature.Ac
             Reduced(state)
         } else {
             val whatsNew = SettingsFeature.State.whatsNew(state.server)
-            Reduced(state.presentingSettings(whatsNew.copy(whatsNew = whatsNew.whatsNew.copy(isPresented = true))))
+            Reduced(state.copy(settingsVoicePage = null).presentingSettings(whatsNew.copy(whatsNew = whatsNew.whatsNew.copy(isPresented = true))))
         }
     WhatsNewFeature.Action.HideTapped -> {
         WhatsNewFeature().reduce(WhatsNewFeature.State(), action)
@@ -133,8 +147,16 @@ internal fun reducePreferences(state: State, action: HomeSettingsFeature.Action)
 internal fun HomeFeature.reduceSettingsScreen(state: State, action: PresentationAction<SettingsFeature.Action>): HomeReduced {
     val presented = (action as? PresentationAction.Presented)?.action ?: return Reduced(state)
     return when (presented) {
-        // Leave this server to pick or pair another (AppFeature).
-        SettingsFeature.Action.ServersTapped -> Reduced(state, Effect.send(Action.Delegate(DelegateAction.ServersRequested)))
+        // iOS removed `.serversRequested` with Title Is the Switch (c75d4a1e): nothing sends it.
+        SettingsFeature.Action.ServersTapped -> Reduced(state)
+        // Settings › Experimental › Show Welcome: the first-run welcome, over Settings and Home.
+        is SettingsFeature.Action.Settings ->
+            when {
+                presented.action == HomeSettingsFeature.Action.WelcomeOpened ->
+                    Reduced(state.copy(welcome = WelcomeFeature.State(isPreview = true)))
+                presented.action.switchesOffSessionLiveActivity -> stopSessionActivity(state)
+                else -> Reduced(state)
+            }
         is SettingsFeature.Action.Delegate -> when (val delegate = presented.action) {
             SettingsDelegate.Close -> Reduced(state.copy(settings = null))
             is SettingsDelegate.SwitchServer -> Reduced(state, Effect.send(Action.Delegate(DelegateAction.ServerSwitchTapped(delegate.server))))
@@ -148,6 +170,8 @@ internal fun HomeFeature.reduceSettingsScreen(state: State, action: Presentation
                 Reduced(state, Effect.send(Action.Delegate(DelegateAction.ServerRemovalConfirmed(delegate.server))))
             SettingsDelegate.EnableNotificationsTapped -> Reduced(state, Effect.send(Action.EnableNotificationsTapped))
             SettingsDelegate.NotificationSettingsRequested -> Reduced(state, Effect.send(Action.NotificationSettingsRequested))
+            SettingsDelegate.NotifyPluginCheckRequested -> Reduced(state, Effect.send(Action.NotifyPluginCheckRequested))
+            SettingsDelegate.NotifyPluginSetUpTapped -> Reduced(state, Effect.send(Action.NotifyPluginSetUpTapped))
             is SettingsDelegate.TryWhatsNew -> tryWhatsNew(delegate.destination, delegate.entryID, state)
         }
         else -> Reduced(state)
@@ -217,3 +241,18 @@ internal fun HomeFeature.tryWhatsNew(destination: WhatsNewEntry.Destination, ent
         is WhatsNewEntry.Destination.Open -> Reduced(s)
     }
 }
+
+/**
+ * iOS `.settings(.experimentalFeatureChanged(.sessionLiveActivity, false))` and
+ * `.settings(.experimentalFeatureApplied(.sessionLiveActivity, false))` (All Experiments).
+ */
+internal val HomeSettingsFeature.Action.switchesOffSessionLiveActivity: Boolean
+    get() {
+        if (this is HomeSettingsFeature.Action.ExperimentalFeatureChanged) {
+            return feature == ExperimentalFeature.sessionLiveActivity && !on
+        }
+        if (this is HomeSettingsFeature.Action.ExperimentalFeatureApplied) {
+            return feature == ExperimentalFeature.sessionLiveActivity && !on
+        }
+        return false
+    }

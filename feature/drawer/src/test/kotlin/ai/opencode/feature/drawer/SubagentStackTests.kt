@@ -52,6 +52,7 @@ import ai.opencode.server.model.OpenCodeSessionFamily
 import ai.opencode.server.model.OpenCodeShell
 import ai.opencode.server.model.OpenCodeTranscriptItem
 import java.util.UUID
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.suspendCancellableCoroutine
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -61,7 +62,6 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
-import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Port of iOS `SubagentStackTests`: opening a subagent pushes it over its parent; going back pops
@@ -461,7 +461,6 @@ class SubagentStackTests {
         assertEquals("starting a call from a pushed subagent reflects its pending requests", true, voice.targetNeedsInput)
         assertEquals("starting a call from a pushed subagent seeds its finished compaction", "cmp-child", voice.compactions[child.id])
         assertEquals("starting a call from a pushed subagent carries its open browser page", childURL, voice.viewing?.url)
-        assertEquals("attaching a call on the root ends answering", false, store.state.sessionDetail?.isAnsweringRequest)
         h.skipInFlightEffects()
     }
 
@@ -491,8 +490,7 @@ class SubagentStackTests {
 
         val switched = store.state.sessionDetail!!
         assertEquals("other", switched.session?.id)
-        assertEquals("a live call hides the request dock and restores the parked composer draft", false, switched.isAnsweringRequest)
-        assertEquals("Parked message on other", switched.draft)
+        assertTrue("a floating call leaves the composer, so the request docks", switched.isAnsweringRequest)
         assertEquals("other", switched.voice?.target?.sessionID)
         assertEquals(otherModel, switched.voice?.pendingModel)
         assertEquals("restored pending requests on the target session sync to voice.targetNeedsInput", true, switched.voice?.targetNeedsInput)
@@ -519,7 +517,7 @@ class SubagentStackTests {
         deferredStore.receiveVoice(VoiceFeature.Action.CompactionObserved::class)
         val deferredSwitched = deferredStore.state.sessionDetail!!
         assertEquals("other", deferredSwitched.session?.id)
-        assertEquals(false, deferredSwitched.isAnsweringRequest)
+        assertTrue(deferredSwitched.isAnsweringRequest)
         assertEquals("other", deferredSwitched.voice?.target?.sessionID)
         assertEquals(otherModel, deferredSwitched.voice?.pendingModel)
         assertEquals(true, deferredSwitched.voice?.targetNeedsInput)
@@ -692,7 +690,6 @@ class SubagentStackTests {
         store.send(detail(SessionFeature.Action.ShellOutput(PresentationAction.Dismiss)))
         store.send(detail(SessionFeature.Action.FolderBrowser(PresentationAction.Presented(FolderBrowserFeature.Action.RoutesChanged(emptyList())))))
         store.send(detail(SessionFeature.Action.FolderBrowser(PresentationAction.Dismiss)))
-        store.send(detail(SessionFeature.Action.voicePresented(VoiceFeature.Action.CaptionsDismissed)))
         store.send(detail(SessionFeature.Action.Voice(PresentationAction.Dismiss)))
         assertFalse(store.state.sessionDetail?.voice != null)
         h.skipInFlightEffects()

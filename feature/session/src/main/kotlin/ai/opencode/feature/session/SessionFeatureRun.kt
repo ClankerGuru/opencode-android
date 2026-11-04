@@ -1,5 +1,7 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.experiments.ExperimentalFeature
+import ai.opencode.core.sound.SoundEffect
 import ai.opencode.feature.composer.RequestDockFeature
 import ai.opencode.feature.composer.PromptOutbox
 import ai.opencode.core.haptics.Haptic
@@ -172,6 +174,9 @@ private fun SessionFeature.promptFailed(
     // Sends behind it wait for Retry or Delete, so nothing is working.
     if (!s.hasMovingLocalPrompt) s = s.copy(isAwaitingReply = false)
     haptics.play(Haptic.error)
+    if (!s.callOwnsAudio && sceneWindow.isFront && experimentalFeatures(ExperimentalFeature.soundEffects)) {
+        soundEffects.play(SoundEffect.error)
+    }
     return Reduced(s, publishCache(s))
 }
 

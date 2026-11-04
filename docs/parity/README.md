@@ -24,6 +24,10 @@ Each area has one file listing **every** iOS source file it owns:
 ## Status values
 
 - `todo`: not started.
+- `sync: <old status>`: the iOS file changed after the synced commit; port the change, then
+  restore the status (see [Keeping up with iOS](#keeping-up-with-ios)).
+- `removed in <sha>: <old status>`: iOS deleted the file in that commit; delete or re-home the
+  Kotlin, then drop the row.
 - `partial: <what is missing>`: some behaviour ported; say exactly what is not.
 - `done`: every behaviour in the Swift file exists in Kotlin (logic, copy, constants, logging,
   haptics, error states). Visuals are Material equivalents, not pixel copies.
@@ -38,8 +42,27 @@ Each area has one file listing **every** iOS source file it owns:
    file, point each row at it.
 2. A type a lower module needs moves down (to `:core`, `:server` or the lowest feature that uses
    it); note the move in both areas' files. Never add an upward or cyclic module dependency.
-3. Re-run the inventory if iOS adds files: the `find OpenCode/<Area> -name '*.swift' -o -name
-   '*.metal'` list must match the table.
+3. `scripts/ios-sync.py check` must pass: every iOS source file at the synced (or target) commit
+   has a row, and every row's Lines matches iOS.
+
+## Keeping up with iOS
+
+[sync.json](sync.json) records the iOS commit these tables describe (`synced`) and, during a
+sync, the commit being caught up to (`target`). The first port was taken from iOS `062f3732`
+(2026-10-24); every Lines count in these tables matched that commit exactly.
+`scripts/ios-sync.py` (iOS checkout in `$OPENCODE_IOS`) moves it forward:
+
+1. `scripts/ios-sync.py status --to origin/main`: what changed, per area.
+2. `scripts/ios-sync.py plan --to <sha>` writes `sync/<from>-<to>.md`: every changed iOS file
+   with its diff size, the iOS commits that touched it and the Kotlin it maps to, plus the iOS
+   tests to port. Port from the net diff (`scripts/ios-sync.py diff <ios path>`), not commit by
+   commit: iOS often lands a feature and reworks it a few commits later.
+3. `scripts/ios-sync.py stale` marks the rows (`sync:`, `todo`, `removed in`) and records the
+   target. Commit the plan and the marked tables together.
+4. Port area by area, as in the first port: each commit brings a set of rows and their tests
+   back to `done`/`partial`/`n/a` and ticks them in the plan.
+5. When `scripts/ios-sync.py check` is clean with nothing waiting, `scripts/ios-sync.py advance`
+   makes the target the synced commit.
 
 ## Tests
 
@@ -51,21 +74,28 @@ under the same name; anything not ported anywhere is listed as deleted with its 
 2026-10-26 by matching every iOS test name against the Kotlin test functions: 2,858 iOS tests ported,
 268 deleted, none unaccounted for.
 
+Synced to iOS fc25a553 (2026-11-02): iOS has 3,539 tests; 3,228 have a Kotlin test of the same
+name and 311 don't. The 74 that were ported at 062f3732 and have no Kotlin test now were all deleted
+from iOS too. The 53 new iOS tests (since 062f3732) without a Kotlin test of the same name are each
+named with a reason in their module's Tests row or in the sync plans under `sync/`. The first three
+columns' totals are still the 062f3732 audit (the syncs updated some module rows); the JVM column is
+recounted from Gradle at the fc25a553 sync.
+
 | Module | iOS test files covered | iOS tests ported | Deleted with reason | JVM tests (Gradle) |
 | --- | ---: | ---: | ---: | ---: |
-| `:app` | 21 | 125 | 27 | 125 |
-| `:core` | 18 | 109 | 72 | 113 |
-| `:server` | 35 | 225 | 3 | 244 (2 opt-in live checks skipped) |
-| `:devtools` | 4 | 14 | 10 | 14 |
-| `:feature:media` | 15 | 175 | 14 | 180 |
-| `:feature:voice` | 30 | 444 | 16 | 511 |
-| `:feature:system` | 9 | 88 | 2 | 89 |
-| `:feature:transcript` | 31 | 268 | 43 | 276 (1 env-gated metric skipped) |
-| `:feature:composer` | 26 | 229 | 18 | 230 |
-| `:feature:settings` | 17 | 98 | 10 | 98 |
-| `:feature:session` | 58 | 706 | 41 | 719 |
-| `:feature:drawer` | 49 | 422 | 12 | 424 |
-| **Total** | 173 distinct | 2,858 distinct | 268 | 3,023 |
+| `:app` | 22 | 126 | 27 | 141 |
+| `:core` | 19 | 112 | 74 | 138 |
+| `:server` | 36 | 230 | 3 | 259 (2 opt-in live checks skipped) |
+| `:devtools` | 4 | 14 | 10 | 17 |
+| `:feature:media` | 17 | 178 | 15 | 183 |
+| `:feature:voice` | 34 | 499 | 16 | 700 |
+| `:feature:system` | 9 | 88 | 2 | 103 |
+| `:feature:transcript` | 34 | 274 | 57 | 283 (1 env-gated metric skipped) |
+| `:feature:composer` | 41 | 267 | 40 | 280 |
+| `:feature:settings` | 17 | 98 | 10 | 99 |
+| `:feature:session` | 59 | 707 | 41 | 756 |
+| `:feature:drawer` | 49 | 422 | 12 | 487 |
+| **Total** | 173 distinct (at 062f3732) | 2,858 distinct (at 062f3732) | 268 (at 062f3732) | 3,446 |
 
 "Deleted" counts whole iOS tests, each charged to the module whose section records it: UIKit and
 SwiftUI layout probes, Tuning Panel and Mac playgrounds, MetricKit, Touch Probe, Team Feedback and

@@ -36,12 +36,19 @@ sealed interface SettingsPage {
     data object Server : SettingsPage
     data object Appearance : SettingsPage
     data object Themes : SettingsPage
-    data object Composer : SettingsPage
+    /** Settings › Sessions (iOS `SessionsSettingsView`): the transcript and composer preferences. */
+    data object Sessions : SettingsPage
     /** Settings › Models (experimental `hideModels`). */
     data object Models : SettingsPage
     /** Settings › Models › one provider (`ModelVisibilityProviderView`). */
     data class ModelProvider(val providerID: String) : SettingsPage
     data object Voice : SettingsPage
+    /** Settings › Voice › Voice Provider (iOS `VoiceProviderDetailPage`, Server Voice); [opensAccount] pushes Your Account over it. */
+    data class VoiceProvider(val opensAccount: Boolean = false) : SettingsPage
+    /** Settings › Voice › Voice Provider › Your Account (iOS `VoiceProviderAccountPage`). */
+    data object VoiceAccount : SettingsPage
+    /** Settings › Voice › Delegator (iOS `VoiceDelegatorSettingsPage`, OpenCode Session Delegator). */
+    data object VoiceDelegator : SettingsPage
     /** Settings › Voice › Voice (`CallVoicePicker`). */
     data object CallVoicePicker : SettingsPage
     /** Settings › Voice › Call History (`VoiceCallLogList`, `:feature:voice`). */
@@ -56,8 +63,9 @@ sealed interface SettingsPage {
     data object WhatsNewSmallerChanges : SettingsPage
     /** Settings › Server Details (experimental `serverDetails`). */
     data object ServerDetails : SettingsPage
-    /** Settings › Advanced; [focus] scrolls to and tints that experiment's row (What's New). */
-    data class Advanced(val focus: String? = null) : SettingsPage
+    /** Settings › Experimental; [focus] scrolls to and tints that experiment's row (What's New). */
+    data class Experimental(val focus: String? = null) : SettingsPage
+    /** Settings › Developer (iOS `DiagnosticsView`; Android's `:devtools` page). */
     data object Developer : SettingsPage
     data object Playgrounds : SettingsPage
 }
@@ -86,6 +94,8 @@ class SettingsFeature : Reducer<SettingsFeature.State, SettingsFeature.Action> {
         val notificationPermission: NotificationPermission? = null,
         val isRequestingNotifications: Boolean = false,
         val notificationSetupError: String? = null,
+        /** The server half of notifications (iOS `HomeFeature.State.notifyPlugin`), read when Notifications opens. */
+        val notifyPlugin: NotifyPluginCheck? = null,
         /** What the push shows, fixed as it opens: Settings, or What's New from the drawer's row. */
         val root: Root = Root.settings,
         /** Pages pushed above the root, innermost last. */
@@ -131,6 +141,7 @@ class SettingsFeature : Reducer<SettingsFeature.State, SettingsFeature.Action> {
             val permission: NotificationPermission?,
             val isRequesting: Boolean,
             val setupError: String?,
+            val notifyPlugin: NotifyPluginCheck? = null,
         ) : Action
 
         /** Push a page (iOS `NavigationLink`). */
@@ -166,6 +177,10 @@ class SettingsFeature : Reducer<SettingsFeature.State, SettingsFeature.Action> {
         data class RemoveServer(val server: OpenCodeServer) : SettingsDelegate
         data object EnableNotificationsTapped : SettingsDelegate
         data object NotificationSettingsRequested : SettingsDelegate
+        /** Check Again, and opening Notifications (iOS `notifyPluginCheckRequested`). */
+        data object NotifyPluginCheckRequested : SettingsDelegate
+        /** Set Up with OpenCode (iOS `notifyPluginSetUpTapped`, 7969c85c). */
+        data object NotifyPluginSetUpTapped : SettingsDelegate
         /** What's New's action that leaves Settings for a session (`HomeFeature.tryWhatsNew`). */
         data class TryWhatsNew(val destination: WhatsNewEntry.Destination, val entryID: String) : SettingsDelegate
     }
@@ -266,6 +281,7 @@ class SettingsFeature : Reducer<SettingsFeature.State, SettingsFeature.Action> {
                 notificationPermission = action.permission,
                 isRequestingNotifications = action.isRequesting,
                 notificationSetupError = action.setupError,
+                notifyPlugin = action.notifyPlugin,
             ),
         )
         is Action.PagePushed -> push(state, action.page)
@@ -365,11 +381,11 @@ class SettingsFeature : Reducer<SettingsFeature.State, SettingsFeature.Action> {
 /** The Settings page a What's New action opens (iOS `WhatsNewSettingsPage`). */
 fun WhatsNewEntry.SettingsDestination.settingsPage(): SettingsPage = when (this) {
     WhatsNewEntry.SettingsDestination.Themes -> SettingsPage.Themes
-    WhatsNewEntry.SettingsDestination.Composer -> SettingsPage.Composer
+    WhatsNewEntry.SettingsDestination.Sessions -> SettingsPage.Sessions
     WhatsNewEntry.SettingsDestination.Voice -> SettingsPage.Voice
     WhatsNewEntry.SettingsDestination.Notifications -> SettingsPage.Notifications
     WhatsNewEntry.SettingsDestination.Servers -> SettingsPage.Server
-    WhatsNewEntry.SettingsDestination.Advanced -> SettingsPage.Advanced()
-    is WhatsNewEntry.SettingsDestination.Experiment -> SettingsPage.Advanced(focus = id)
+    WhatsNewEntry.SettingsDestination.Experimental -> SettingsPage.Experimental()
+    is WhatsNewEntry.SettingsDestination.Experiment -> SettingsPage.Experimental(focus = id)
     WhatsNewEntry.SettingsDestination.Developer -> SettingsPage.Developer
 }

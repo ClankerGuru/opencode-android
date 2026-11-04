@@ -4,19 +4,15 @@ import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.ImmediateClock
 import ai.opencode.core.dependencies.UuidClient
-import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.TestStore
 import ai.opencode.core.testing.TestIsolationRule
 import ai.opencode.feature.drawer.HomeFeature
 import ai.opencode.feature.drawer.catchup.CatchUpFeature
 import ai.opencode.feature.drawer.persistingSnapshot
-import ai.opencode.feature.drawer.switcher.SessionSwitcherFeature
 import ai.opencode.feature.session.SessionFeature
 import ai.opencode.feature.session.isDraft
 import ai.opencode.feature.settings.SettingsFeature
-import ai.opencode.feature.settings.servers.ServerTitleFeature
 import ai.opencode.feature.voice.VoiceFeature
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeClientError
@@ -44,7 +40,8 @@ import java.util.UUID
 
 /**
  * Port of iOS `PairingOpensDrawerAppTests.swift`: pairing a computer for the first time opens
- * the drawer on its sessions once its list loads; anything else keeps today's landing.
+ * the drawer on its sessions once its list loads (the install's very first computer opens a
+ * ready session instead: `FirstComputerPairingTests`); anything else keeps today's landing.
  * `aComputerSharingAnAddressWithASavedOneIsNotNew` (`OpenCodeServer.isNewComputer`) is
  * `:server`'s `PairingOpensDrawerAppTests`. In `pickingASessionBeforeTheDrawerOpensDropsIt`
  * Home's own bookkeeping on the tap (read dates, transcript publishing) is asserted by the
@@ -60,6 +57,15 @@ class PairingOpensDrawerAppTests {
     private val link = "http://10.0.10.26:4196/auth/connect/abc"
     private val paired = OpenCodeServer(url = "http://10.0.10.26:4196", username = "opencode", password = "1790000000.sig")
 
+    /** A computer saved before, sharing no address: the paired one is new, but not the install's first. */
+    private val elsewhere = OpenCodeServer(url = "http://10.0.0.9:4096", username = "opencode", password = "c")
+
+    private val withAnotherComputer: AppFeature.State
+        get() = shared.run {
+            shared(ServerSharedKeys.savedServers).set(listOf(elsewhere))
+            AppFeature.State.initial()
+        }
+
     /** What the link names before it's redeemed. */
     private val unredeemed: OpenCodeServer get() = OpenCodeServer(url = paired.url, username = "opencode", password = "")
 
@@ -70,16 +76,14 @@ class PairingOpensDrawerAppTests {
     }
 
     private fun TestScope.pairingStore(
-        state: AppFeature.State = shared.appState(),
+        state: AppFeature.State? = null,
         paired: OpenCodeServer,
         gates: Gates = Gates(),
-        experiments: Set<ExperimentalFeature> = emptySet(),
         homeSnapshot: suspend () -> OpenCodeHomeSnapshot,
     ): TestStore<AppFeature.State, AppFeature.Action> {
         effects = detachedScope(coroutineContext)
-        return shared.appStore(state, effects) {
+        return shared.appStore(state ?: withAnotherComputer, effects) {
             this[Clock] = ImmediateClock()
-            this[ExperimentalFeatures] = ExperimentalFeatures.enabling(experiments)
             this[OpenCodeClient] = OpenCodeClient.testValue.copy(
                 redeemPairing = { paired },
                 health = { gates.health.receiveCatching() },
@@ -128,8 +132,8 @@ class PairingOpensDrawerAppTests {
     private suspend fun pairUntilListLoads(
         store: TestStore<AppFeature.State, AppFeature.Action>,
         gates: Gates,
-        opensDrawer: Boolean,
-        saved: List<OpenCodeServer> = emptyList(),
+        arrival: PairingArrival = PairingArrival.newComputer,
+        saved: List<OpenCodeServer> = listOf(elsewhere),
     ) {
         store.send(AppFeature.Action.PairingCodeScanned(link)) {
             it.copy(
@@ -142,7 +146,7 @@ class PairingOpensDrawerAppTests {
             it.load(paired).copy(
                 connection = AppFeature.State.Connection.Connecting,
                 connectionGeneration = 2,
-                connectionAttempt = AppFeature.ConnectionAttempt(id = 2, server = paired, opensDrawer = opensDrawer),
+                connectionAttempt = AppFeature.ConnectionAttempt(id = 2, server = paired, pairing = arrival),
             )
         }
         gates.health.trySend(Unit)
@@ -170,7 +174,7 @@ class PairingOpensDrawerAppTests {
         val gates = Gates()
         val list = GatedSnapshot(snapshot)
         val store = pairingStore(paired = paired, gates = gates, homeSnapshot = list.read)
-        pairUntilListLoads(store, gates, opensDrawer = true)
+        pairUntilListLoads(store, gates)
         list.release.complete(Unit)
         store.receiveCase<AppFeature.Action.HomeResponse> { landHome(it, snapshot) }
         receivePairedComputerOpened(store)
@@ -188,7 +192,7 @@ class PairingOpensDrawerAppTests {
         val gates = Gates()
         val list = GatedSnapshot(snapshot)
         val store = pairingStore(shared.appState(), paired = paired, gates = gates, homeSnapshot = list.read)
-        pairUntilListLoads(store, gates, opensDrawer = false, saved = listOf(saved))
+        pairUntilListLoads(store, gates, arrival = PairingArrival.knownComputer, saved = listOf(saved))
         list.release.complete(Unit)
         store.receiveCase<AppFeature.Action.HomeResponse> { landHome(it, snapshot) }
         assertEquals(true, store.state.home?.sessionDetail?.isDraft)
@@ -200,7 +204,7 @@ class PairingOpensDrawerAppTests {
     fun aFailedListReadAfterPairingKeepsTodaysFailure() = runTest {
         val gates = Gates()
         val store = pairingStore(paired = paired, gates = gates) { throw OpenCodeClientError("Couldn’t load projects and sessions") }
-        pairUntilListLoads(store, gates, opensDrawer = true)
+        pairUntilListLoads(store, gates)
         store.receiveCase<AppFeature.Action.HomeResponse> {
             it.copy(
                 connectionAttempt = null,
@@ -226,7 +230,7 @@ class PairingOpensDrawerAppTests {
                 cancelled.set(true)
             }
         }
-        pairUntilListLoads(store, gates, opensDrawer = true)
+        pairUntilListLoads(store, gates)
         store.send(AppFeature.Action.CancelEditingTapped) {
             it.copy(connection = AppFeature.State.Connection.Picking, connectionAttempt = null)
         }
@@ -247,7 +251,7 @@ class PairingOpensDrawerAppTests {
         val gates = Gates()
         val list = GatedSnapshot(snapshot)
         val store = pairingStore(paired = paired, gates = gates, homeSnapshot = list.read)
-        pairUntilListLoads(store, gates, opensDrawer = true)
+        pairUntilListLoads(store, gates)
         list.release.complete(Unit)
         store.receiveCase<AppFeature.Action.HomeResponse> { landHome(it, snapshot) }
         receivePairedComputerOpened(store)
@@ -273,33 +277,13 @@ class PairingOpensDrawerAppTests {
         effects.skipInFlightEffects()
     }
 
-    /** The servers sheet opened before the view opens the drawer drops the request, so the drawer can't open beneath it. */
-    @Test
-    fun theServersSheetBeforeTheDrawerOpensDropsIt() = runTest {
-        val snapshot = recentSnapshot
-        val gates = Gates()
-        val list = GatedSnapshot(snapshot)
-        val store = pairingStore(paired = paired, gates = gates, experiments = setOf(ExperimentalFeature.serverTitleSwitch), homeSnapshot = list.read)
-        pairUntilListLoads(store, gates, opensDrawer = true)
-        list.release.complete(Unit)
-        store.receiveCase<AppFeature.Action.HomeResponse> { landHome(it, snapshot) }
-        receivePairedComputerOpened(store)
-        store.send(AppFeature.Action.Home(HomeFeature.Action.Delegate(HomeFeature.DelegateAction.ServersRequested))) {
-            it.copy(
-                serverTitle = shared.run { ServerTitleFeature.State.opening(paired) },
-                home = it.home?.copy(drawerOpenRequest = null),
-            )
-        }
-        effects.skipInFlightEffects()
-    }
-
     /** Pairs and lands Home with the drawer open asked for, not yet taken. */
     private suspend fun TestScope.landWithDrawerRequested(): TestStore<AppFeature.State, AppFeature.Action> {
         val snapshot = recentSnapshot
         val gates = Gates()
         val list = GatedSnapshot(snapshot)
         val store = pairingStore(paired = paired, gates = gates, homeSnapshot = list.read)
-        pairUntilListLoads(store, gates, opensDrawer = true)
+        pairUntilListLoads(store, gates)
         list.release.complete(Unit)
         store.receiveCase<AppFeature.Action.HomeResponse> { landHome(it, snapshot) }
         receivePairedComputerOpened(store)
@@ -345,7 +329,6 @@ class PairingOpensDrawerAppTests {
         fun AppFeature.State.detail(change: (SessionFeature.State) -> SessionFeature.State) =
             home { it.copy(sessionDetail = it.sessionDetail?.let(change)) }
         val changes: List<Pair<String, (AppFeature.State) -> AppFeature.State>> = listOf(
-            "servers sheet" to { it.copy(serverTitle = ServerTitleFeature.State.opening(paired)) },
             "server setup" to { it.copy(isEditingServer = true) },
             "scanner" to { it.copy(isScanningPairingCode = true) },
             "pairing confirmation" to { it.copy(pendingPairing = AppFeature.PendingPairing(id = "pending", link = link)) },
@@ -358,7 +341,6 @@ class PairingOpensDrawerAppTests {
             },
             "Settings" to { state -> state.home { it.copy(settings = SettingsFeature.State(server = paired)) } },
             "What’s New" to { state -> state.home { it.copy(settings = SettingsFeature.State(server = paired, root = SettingsFeature.State.Root.whatsNew)) } },
-            "Session Switcher" to { state -> state.home { it.copy(sessionSwitcher = SessionSwitcherFeature.State(isPresented = true)) } },
             "delete confirmation" to { state -> state.home { it.copy(pendingDeletion = it.sessions.first()) } },
             "subagent push" to { state -> state.home { it.copy(pendingSubagentPush = it.sessions.first()) } },
             "model picker" to { state -> state.detail { it.copy(activePicker = SessionFeature.State.ActivePicker.model) } },

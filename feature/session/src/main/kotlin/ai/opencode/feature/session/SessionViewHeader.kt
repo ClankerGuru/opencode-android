@@ -1,5 +1,7 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.motion.transitionBlur
+
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
@@ -10,8 +12,8 @@ import ai.opencode.core.store.observe
 import ai.opencode.core.ui.OpenCodeColors
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeIconButton
+import ai.opencode.core.ui.OpenCodeIconButtonStyle
 import ai.opencode.core.ui.OpenCodeIconSize
-import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.openCodeTapTarget
@@ -21,7 +23,6 @@ import ai.opencode.feature.session.header.BreathingTitleHold
 import ai.opencode.feature.session.header.HeaderBlurTunables
 import ai.opencode.feature.session.header.SessionContextRing
 import ai.opencode.feature.session.header.SessionContextText
-import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.server.model.OpenCodeExportFormat
 import ai.opencode.server.model.isUntitled
 import androidx.compose.animation.AnimatedVisibility
@@ -55,7 +56,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -63,7 +63,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
@@ -72,7 +71,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
@@ -182,35 +180,23 @@ internal fun SessionHeaderControls(
     val model by store.observe(SessionHeaderModel::from)
     val reducedMotion = rememberReduceMotion()
     val density = LocalDensity.current
-    var trailingWidth by remember { mutableFloatStateOf(0f) }
     val showsSessionMenu = onCatchUpOpen == null && model.sessionID != null
     // A draft keeps the session menu's place, so the menu fading in as its session arrives moves nothing.
     val holdsSessionMenuSlot = onCatchUpOpen == null && model.isDraft
     // While the drawer button's label shows, the title steps aside under it.
     val noticeCoversTitle = onBack == null && listContext.notice != null
 
-    // How far the title capsule shifts to sit on the header's centre line: the difference between
-    // what each side holds beside it (its controls and the row's 10 dp spacing).
-    val titleCentring = if (isAccessibilityFontScale(density.fontScale)) {
-        0f
-    } else {
-        val buttonSize = headerButtonSize.value
-        val leading = if (onCatchUpOpen == null) buttonSize + 10 else 0f
-        val count = (if (model.backToRootID != null) 1 else 0) + (if (showsSessionMenu || holdsSessionMenuSlot) 1 else 0)
-        val known = if (count == 0) 0f else count * buttonSize + (count - 1) * 8
-        val controls = max(trailingWidth, known)
-        val trailing = if (controls > 0) controls + 10 else 0f
-        trailing - leading
-    }
-
+    // Android divergence: a Material top app bar (start-aligned title, plain icon buttons, 64 dp
+    // tall) in place of iOS's centred title capsule between glass circles.
     Row(
         modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp)
-            .padding(top = if (onCatchUpOpen == null) TranscriptMetrics.clustered else CATCH_UP_COMPOSER_INSET.dp)
+            .padding(horizontal = 4.dp)
+            .padding(top = if (onCatchUpOpen == null) 0.dp else CATCH_UP_COMPOSER_INSET.dp)
+            .heightIn(min = TOP_APP_BAR_HEIGHT)
             .onSizeChanged { onHeaderHeight(with(density) { it.height.toDp().value }) },
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         when {
             onBack != null -> BackControl(onBack)
@@ -219,17 +205,12 @@ internal fun SessionHeaderControls(
         Box(
             Modifier
                 .weight(1f)
-                // The title is centred on the header, not between the controls.
-                .padding(start = max(0f, titleCentring).dp, end = max(0f, -titleCentring).dp)
                 .steppingAside(noticeCoversTitle, reducedMotion),
-            contentAlignment = Alignment.TopCenter,
+            contentAlignment = Alignment.CenterStart,
         ) {
             HeaderTitle(store, model, listContext, onCatchUpOpen, reducedMotion)
         }
-        Row(
-            Modifier.onSizeChanged { trailingWidth = with(density) { it.width.toDp().value } },
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(0.dp)) {
             model.backToRootID?.let { rootID ->
                 FloatingControl(SFSymbol.ArrowUturnBackward, "Back to main session") { store.send(Action.FamilyPicked(rootID)) }
             }
@@ -249,6 +230,9 @@ internal fun SessionHeaderControls(
 /** iOS `CatchUpMetrics.composerInset`. */
 private const val CATCH_UP_COMPOSER_INSET = 12f
 
+/** Material 3's small top app bar height. */
+private val TOP_APP_BAR_HEIGHT = 64.dp
+
 /** The drawer button's label grows over the title: it fades and blurs out of the way, and back once it has folded past. */
 private fun Modifier.steppingAside(aside: Boolean, reducedMotion: Boolean): Modifier = composed {
     val spec = when {
@@ -259,7 +243,7 @@ private fun Modifier.steppingAside(aside: Boolean, reducedMotion: Boolean): Modi
     val progress by animateFloatAsState(if (aside) 1f else 0f, spec, label = "steppingAside")
     this
         .alpha(1 - progress)
-        .blur(if (reducedMotion) 0.dp else (6 * progress).dp)
+        .transitionBlur(if (reducedMotion) 0.dp else (6 * progress).dp)
         .then(if (aside) Modifier.clearAndSetSemantics {} else Modifier)
 }
 
@@ -274,13 +258,14 @@ private fun BackControl(onBack: () -> Unit) {
         contentDescription = "Back",
         onClick = onBack,
         size = headerButtonSize,
+        style = OpenCodeIconButtonStyle.Standard,
         modifier = Modifier.testTag("subagent-back"),
     )
 }
 
 @Composable
 internal fun FloatingControl(symbol: SFSymbol, label: String, onClick: () -> Unit) {
-    OpenCodeIconButton(symbol = symbol, contentDescription = label, onClick = onClick, size = headerButtonSize)
+    OpenCodeIconButton(symbol = symbol, contentDescription = label, onClick = onClick, size = headerButtonSize, style = OpenCodeIconButtonStyle.Standard)
 }
 
 /** iOS `headerProjectColor(for:)`: secondary under high contrast, else primary at 75 %. */
@@ -324,14 +309,14 @@ private fun HeaderTitle(
                 if (model.isResyncing) "Syncing" else if (model.refreshFailed) "Last known" else null,
             ).joinToString(", ")
         }
+        // Android divergence: the title sits on the bar itself (no capsule); a press shows the
+        // ripple in a rounded rectangle around it.
         Surface(
-            shape = OpenCodeShape.capsule,
-            // The same tonal glass as the header's circles (`OpenCodeIconButton`): over the
-            // scroll-edge scrim (`surfaceContainer`) a `surfaceContainerHigh` capsule vanished.
-            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+            shape = MaterialTheme.shapes.medium,
+            color = Color.Transparent,
             tonalElevation = 0.dp,
             modifier = Modifier
-                .clip(OpenCodeShape.capsule)
+                .clip(MaterialTheme.shapes.medium)
                 .clickable(role = Role.Button, onClickLabel = hint, onClick = onClick)
                 .openCodeTapTarget()
                 .testTag(if (model.isDraft) "draft-title" else "session-title")
@@ -345,9 +330,8 @@ private fun HeaderTitle(
                     // The header doesn't carry the screen's transactions: the capsule animates its own width.
                     .animateContentSize(if (reducedMotion || !animates) snap() else capsuleSmooth.spec())
                     .heightIn(min = headerButtonSize)
-                    // A wider inset than the controls' sets the text clear of the capsule's rounded ends.
-                    .padding(horizontal = HeaderBlurTunables.titleInset, vertical = if (isAccessibilityFontScale(fontScale)) 8.dp else 3.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
+                    .padding(horizontal = 8.dp, vertical = if (isAccessibilityFontScale(fontScale)) 8.dp else 3.dp),
+                horizontalAlignment = Alignment.Start,
                 verticalArrangement = Arrangement.Center,
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -356,6 +340,7 @@ private fun HeaderTitle(
                         isSyncing = model.isSyncing,
                         isLastKnown = model.isLastKnown,
                         animates = animates,
+                        style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.weight(1f, fill = false),
                     )
                     if (onCatchUpOpen != null) {
@@ -371,7 +356,7 @@ private fun HeaderTitle(
                     if (model.autoRenameFailed) {
                         Text(
                             shown,
-                            style = HeaderBlurTunables.projectFont.textStyle,
+                            style = MaterialTheme.typography.labelMedium,
                             color = projectColor,
                             maxLines = 1,
                         )
@@ -379,7 +364,7 @@ private fun HeaderTitle(
                         ProjectHeaderSubtitle(shown) {
                             Text(
                                 it,
-                                style = HeaderBlurTunables.projectFont.textStyle,
+                                style = MaterialTheme.typography.labelMedium,
                                 color = projectColor,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -406,6 +391,7 @@ private fun SessionMenuButton(store: StoreOf<State, Action>, model: SessionHeade
             contentDescription = "More",
             onClick = { expanded = true },
             size = headerButtonSize,
+            style = OpenCodeIconButtonStyle.Standard,
             modifier = Modifier
                 .testTag("session-menu")
                 .semantics { if (value.isNotEmpty()) stateDescription = value },
@@ -446,15 +432,8 @@ private fun SessionMenu(
     val developerMode by remember { shared(SharedKeys.developerMode) }.flow.collectAsState()
     var exportOpen by remember(expanded) { mutableStateOf(false) }
     fun menu(action: SessionSheetFeature.Action) = send(Action.SessionMenu(action))
+    // No title heading: the header already shows it (6bbf321d); exports still name the file by it.
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
-        Text(
-            title,
-            style = MaterialTheme.typography.labelMedium,
-            color = OpenCodeTheme.colors.secondaryText,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp).semantics { this.heading() },
-        )
         listContext.isPinned?.let { isPinned ->
             MenuItem(if (isPinned) "Unpin" else "Pin", if (isPinned) SFSymbol.PinSlash else SFSymbol.Pin) {
                 menu(SessionSheetFeature.Action.PinTapped)

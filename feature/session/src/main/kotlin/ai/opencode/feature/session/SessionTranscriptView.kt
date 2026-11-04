@@ -2,36 +2,34 @@
 
 package ai.opencode.feature.session
 
-import ai.opencode.feature.composer.PastedTextViewer
-import ai.opencode.core.ui.ProviderIcon
-import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.experiments.key
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
-import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.core.sharing.shared
+import ai.opencode.core.motion.transitionBlur
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.core.ui.ProviderIcon
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.feature.composer.PastedTextViewer
+import ai.opencode.feature.media.AgentFileViewer
+import ai.opencode.feature.media.LinkMenuAction
+import ai.opencode.feature.media.LocalMediaPresenter
+import ai.opencode.feature.media.MediaPresenter
+import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.feature.session.header.HeaderBlurTunables
 import ai.opencode.feature.session.header.SessionHeaderStyle
 import ai.opencode.feature.session.header.titleBreathing
-import ai.opencode.feature.media.DecodedImageCache
-import ai.opencode.feature.media.LocalMediaPresenter
-import ai.opencode.feature.media.MediaPresenter
-import ai.opencode.feature.media.AgentFileViewer
+import ai.opencode.feature.transcript.NewMessagesPlacement
 import ai.opencode.feature.transcript.TranscriptAction
 import ai.opencode.feature.transcript.TranscriptConfiguration
 import ai.opencode.feature.transcript.TranscriptEntry
-import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.TranscriptTunables
-import ai.opencode.feature.media.LinkMenuAction
-import ai.opencode.feature.transcript.NewMessagesPlacement
+import ai.opencode.feature.transcript.list.LocalTranscriptTimelinePaused
 import ai.opencode.feature.transcript.list.NewMessagesMark
 import ai.opencode.feature.transcript.list.TranscriptList
 import ai.opencode.feature.transcript.list.TranscriptSlots
@@ -41,13 +39,13 @@ import ai.opencode.feature.transcript.rows.ReplyCopyGlyph
 import ai.opencode.feature.transcript.rows.TranscriptFonts
 import ai.opencode.feature.transcript.rows.TranscriptRowSlots
 import ai.opencode.feature.transcript.rows.TranscriptTimeStamps
+import ai.opencode.feature.transcript.user.TranscriptSendFailure
 import ai.opencode.feature.transcript.user.TranscriptUserMessage
 import ai.opencode.server.OpenCodePairingLink
 import ai.opencode.server.model.OpenCodeModel
 import ai.opencode.server.model.OpenCodeTranscriptItem
 import android.content.Context
 import android.content.Intent
-import android.graphics.BitmapFactory
 import android.text.format.DateFormat
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -84,6 +82,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
@@ -95,41 +94,40 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.blur
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.currentStateAsState
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 import java.time.Instant
 import java.time.ZoneId
 import java.util.Locale
 import kotlin.math.roundToLong
-import ai.opencode.feature.transcript.SinceYouLeft as TranscriptSinceYouLeft
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
 // Port of iOS `Session/SessionTranscriptView.swift`: the transcript host below the header and
 // above the composer, and the session-owned pieces the transcript draws (the title, the Working
@@ -157,16 +155,13 @@ fun SessionTranscriptView(
     scrollEdgeBridge: SessionScrollEdgeBridge,
     top: SessionHeaderStyle.Resolved.TranscriptTop,
     modifier: Modifier = Modifier,
+    /** Server Flow: the server dropped; Working holds still. */
+    holdsWorking: Boolean = false,
 ) {
     val context = LocalContext.current
     val host = LocalSessionComposerHost.current
     val presenter = LocalMediaPresenter.current
     val reducedMotion = rememberReduceMotion()
-    val sinceYouLeftSetting by remember { shared(ExperimentalFeature.sinceYouLeft.key) }.flow
-        .collectAsState(shared(ExperimentalFeature.sinceYouLeft.key).value)
-    val imageLinkPreviewsSetting by remember { shared(ExperimentalFeature.imageLinkPreviews.key) }.flow
-        .collectAsState(shared(ExperimentalFeature.imageLinkPreviews.key).value)
-    val usesSinceYouLeft = ExperimentalFeature.sinceYouLeft.isActive(sinceYouLeftSetting)
     val hour24 = remember(context) { DateFormat.is24HourFormat(context) }
     val cache = remember { SessionTranscriptView.ProjectionCache() }
 
@@ -176,12 +171,12 @@ fun SessionTranscriptView(
         state = state,
         cache = cache,
         scrollEdgeBridge = scrollEdgeBridge,
-        usesSinceYouLeft = usesSinceYouLeft,
         hour24 = hour24,
+        holdsWorking = holdsWorking,
     )
-    val projection by remember(store, usesSinceYouLeft, hour24) {
+    val projection by remember(store, hour24, holdsWorking) {
         store.states.map(::project).distinctUntilChanged()
-    }.collectAsState(remember(store, usesSinceYouLeft, hour24) { project(store.state) })
+    }.collectAsState(remember(store, hour24, holdsWorking) { project(store.state) })
     val latestProjection by rememberUpdatedState(projection)
     val showsMoveToBackground by store.observe { it.showsMoveToBackground }
 
@@ -204,9 +199,6 @@ fun SessionTranscriptView(
     }
     val rowSlots = remember {
         TranscriptRowSlots(
-            sinceYouLeft = { entryID, summary, onDismiss ->
-                SinceYouLeftRow(entryID, SessionTranscriptView.sinceYouLeft(summary), onDismiss)
-            },
             agentGlyph = { glyph, glyphModifier ->
                 AgentActivityGlyph(
                     source = AgentActivitySource.Subagent(SessionTranscriptView.subagentActivity(glyph)),
@@ -219,6 +211,8 @@ fun SessionTranscriptView(
     }
     // The reader's drag takes the list: the keyboard goes (iOS `scrollViewWillBeginDragging`
     // calls `dismissKeyboard`), once per gesture. Programmatic scrolls and flings don't count.
+    // A drag borrowed from a pill over the list dismisses the keyboard too (iOS: it begins the list's drag).
+    SideEffect { scrollEdgeBridge.borrowedDrag.onBegan = { host?.dismissComposerKeyboard() } }
     val dismissOnDrag = remember(host) {
         object : NestedScrollConnection {
             var dismissed = false
@@ -258,10 +252,9 @@ fun SessionTranscriptView(
             jumpRequest = scrollEdgeBridge.jumpRequest,
             onShowsJumpButtonChanged = { host?.showsJumpButton = it },
             slots = slots,
-            layoutTuning = TranscriptTunables.layoutSnapshot(
-                imageLinkPreviews = ExperimentalFeature.imageLinkPreviews.isActive(imageLinkPreviewsSetting),
-            ),
+            layoutTuning = TranscriptTunables.layoutSnapshot(),
             onScrolledUnderHeader = { scrollEdgeBridge.scrolled(underHeader = it, revealDistance = top.revealDistance) },
+            borrowedDrag = scrollEdgeBridge.borrowedDrag,
         )
     }
 
@@ -304,7 +297,6 @@ object SessionTranscriptView {
             val showsWorking: Boolean,
             val failedFinale: Boolean,
             val models: List<OpenCodeModel>,
-            val sinceYouLeft: TranscriptSinceYouLeft?,
         )
 
         private data class StampInputs(
@@ -376,7 +368,6 @@ object SessionTranscriptView {
             showsWorking: Boolean,
             failedFinale: Boolean,
             models: List<OpenCodeModel>,
-            sinceYouLeft: TranscriptSinceYouLeft? = null,
             sentNow: Boolean?,
             mark: NewMessagesMark?,
             now: Instant = Instant.now(),
@@ -433,7 +424,7 @@ object SessionTranscriptView {
                     return entries to newMessages
                 }
             }
-            val structural = StructuralInputs(visibleItems, allItems, showsWorking, failedFinale, models, sinceYouLeft)
+            val structural = StructuralInputs(visibleItems, allItems, showsWorking, failedFinale, models)
             if (structural != structuralInputs) {
                 structuralInputs = structural
                 // While the Working line plays Failed, it is the failure: the run's error line
@@ -444,7 +435,6 @@ object SessionTranscriptView {
                     isRunning = showsWorking,
                     models = models,
                     sessionStartModels = TranscriptEntry.sessionStartModelIDs(allItems),
-                    sinceYouLeft = sinceYouLeft,
                 )
                 structuralGeneration += 1
             }
@@ -475,9 +465,9 @@ object SessionTranscriptView {
         state: State,
         cache: ProjectionCache,
         scrollEdgeBridge: SessionScrollEdgeBridge,
-        usesSinceYouLeft: Boolean,
         now: Double = AgentActivityClock.now(),
         hour24: Boolean? = null,
+        holdsWorking: Boolean = false,
     ): Projection {
         val visibleItems = cache.resolveVisibleItems(
             items = state.items,
@@ -486,7 +476,7 @@ object SessionTranscriptView {
             revertMessageID = state.session?.revertMessageID,
             compute = { state.visibleItems },
         )
-        val working = workingActivity(state, visibleItems, scrollEdgeBridge, now)
+        val working = workingActivity(state, visibleItems, scrollEdgeBridge, now, holdsWorking)
         // The finale holds the transcript as it was running, so Working leaves and the reply's
         // end arrives together, as they do without it.
         val showsWorking = working != null
@@ -498,7 +488,6 @@ object SessionTranscriptView {
             showsWorking = showsWorking,
             failedFinale = isFailedFinale,
             models = state.models,
-            sinceYouLeft = if (usesSinceYouLeft && !state.isDraft) state.sinceYouLeft?.let(::transcriptSinceYouLeft) else null,
             sentNow = sentNow,
             mark = state.newMessages,
             hour24 = hour24,
@@ -531,7 +520,20 @@ object SessionTranscriptView {
             failedSends = if (state.failedSends.isEmpty()) {
                 emptyMap()
             } else {
-                buildMap { for (failed in state.failedSends) putIfAbsent(failed.id, failed.reason) }
+                val moveTo = state.missingFolderMoveTarget?.name
+                buildMap {
+                    for (failed in state.failedSends) {
+                        putIfAbsent(
+                            failed.id,
+                            TranscriptSendFailure(
+                                reason = failed.reason,
+                                moveTo = if (failed.isFolderGone) moveTo else null,
+                                // The whole session is moving: every row whose folder is gone waits.
+                                isMoving = failed.isFolderGone && state.movingFailedSendID != null,
+                            ),
+                        )
+                    }
+                }
             },
             deliveryNotes = if (state.failedSends.isEmpty()) emptyMap() else state.deliveryNotes.mapValues { it.value.label },
             queuedPillTexts = if (queuedRows.isEmpty()) {
@@ -620,7 +622,7 @@ object SessionTranscriptView {
         is TranscriptAction.TranscriptBrowsingChanged -> Action.TranscriptBrowsingChanged(action.isBrowsing)
         is TranscriptAction.NewMessagesPassed -> Action.NewMessagesPassed(action.generation)
         is TranscriptAction.NewMessagesFit -> Action.NewMessagesFit(action.generation)
-        TranscriptAction.SinceYouLeftTapped -> Action.SinceYouLeftTapped
+        // Since You Left was removed in iOS cd6be7c6; the transcript's action goes with it.
         TranscriptAction.ShowEarlierTapped -> Action.ShowEarlierTapped
         is TranscriptAction.CopyTextTapped -> Action.CopyTextTapped(action.text)
         is TranscriptAction.QuoteTextTapped -> Action.QuoteTextTapped(action.text)
@@ -629,6 +631,8 @@ object SessionTranscriptView {
         is TranscriptAction.SessionLinksAppeared -> Action.SessionLinksAppeared(action.ids)
         is TranscriptAction.SubagentTapped -> Action.SubagentTapped(action.sessionID)
         TranscriptAction.MoveToBackgroundTapped -> Action.MoveToBackgroundTapped
+        // Move to needs the session's missing-folder move (iOS b629d780), not ported here yet.
+        is TranscriptAction.FailedSendMoveTapped -> Action.FailedSendMoveTapped(action.messageID)
         is TranscriptAction.FailedSendRetryTapped -> Action.FailedSendRetryTapped(action.messageID)
         is TranscriptAction.FailedSendEditTapped -> Action.FailedSendEditTapped(action.messageID)
         is TranscriptAction.FailedSendDeleteTapped -> Action.FailedSendDeleteTapped(action.messageID)
@@ -640,24 +644,6 @@ object SessionTranscriptView {
         is TranscriptAction.PendingInputCancelTapped -> Action.PendingInputCancelTapped(action.inputID)
         is TranscriptAction.OpenFile, is TranscriptAction.PreviewImage, is TranscriptAction.OpenPastedText -> null
     }
-
-    /** The transcript's copy of the Since You Left value (`:feature:transcript` draws its row). */
-    fun transcriptSinceYouLeft(summary: SinceYouLeft) = TranscriptSinceYouLeft(
-        sessionID = summary.sessionID,
-        lastItemID = summary.lastItemID,
-        text = summary.text,
-        phase = if (summary.phase == SinceYouLeft.Phase.Generating) TranscriptSinceYouLeft.Phase.Generating else TranscriptSinceYouLeft.Phase.Done,
-        isFallback = summary.isFallback,
-    )
-
-    /** Back to the session's value for [SinceYouLeftRow]. */
-    fun sinceYouLeft(summary: TranscriptSinceYouLeft) = SinceYouLeft(
-        sessionID = summary.sessionID,
-        lastItemID = summary.lastItemID,
-        text = summary.text,
-        phase = if (summary.phase == TranscriptSinceYouLeft.Phase.Generating) SinceYouLeft.Phase.Generating else SinceYouLeft.Phase.Done,
-        isFallback = summary.isFallback,
-    )
 
     /** A transcript row's subagent glyph as the activity orb reads it. */
     fun subagentActivity(glyph: AgentGlyphState) = SubagentActivity(
@@ -691,6 +677,7 @@ object SessionTranscriptView {
         visibleItems: List<OpenCodeTranscriptItem>,
         scrollEdgeBridge: SessionScrollEdgeBridge,
         now: Double,
+        holdsWorking: Boolean = false,
     ): WorkingActivity? {
         val run = state.workingRun
         val key = state.workingOrbKey
@@ -702,6 +689,7 @@ object SessionTranscriptView {
                 needsInput = state.hasPendingRequests,
                 key = key,
                 retry = WorkingActivity.retry(visibleItems),
+                isHeld = holdsWorking,
             )
         } else {
             null
@@ -759,23 +747,26 @@ val State.transcriptIdentity: TranscriptIdentity
 
 /**
  * Decodes image bytes once and caches the result (iOS `CachedImage`); decoding in a list row
- * would otherwise run on every recomposition. Fills its bounds, cropping.
+ * would otherwise run on every recomposition. Fills its bounds, cropping. A `media:<hash>`
+ * reference loads from [server]; the view moved down to `:feature:media`, which the composer's
+ * queued messages share.
  */
 @Composable
-fun CachedImage(id: String, data: ByteArray, modifier: Modifier = Modifier) {
-    val image = remember(id, data) { CachedImage.decoded(id, data) } ?: return
-    Image(image, contentDescription = null, modifier = modifier, contentScale = ContentScale.Crop)
-}
+fun CachedImage(
+    id: String,
+    data: ByteArray,
+    modifier: Modifier = Modifier,
+    mediaHash: String? = null,
+    name: String? = null,
+    isUnavailable: Boolean = false,
+    server: ai.opencode.server.OpenCodeServer? = null,
+    compact: Boolean = false,
+) = ai.opencode.feature.media.CachedImage(id, data, modifier, mediaHash, name, isUnavailable, server, compact)
 
 object CachedImage {
-    fun decoded(id: String, data: ByteArray): ImageBitmap? {
-        val cache = dependency(DecodedImageCache)
-        val key = "attachment:$id"
-        cache.image(key)?.let { return it.asImageBitmap() }
-        val bitmap = BitmapFactory.decodeByteArray(data, 0, data.size) ?: return null
-        cache.insert(bitmap, key)
-        return bitmap.asImageBitmap()
-    }
+    /** iOS `CachedImage.decoded(id:data:mediaHash:)`, moved down to `:feature:media` for its resolver. */
+    fun decoded(id: String, data: ByteArray, mediaHash: String? = null): ImageBitmap? =
+        ai.opencode.feature.media.CachedImage.decoded(id, data, mediaHash)?.asImageBitmap()
 }
 
 /**
@@ -792,6 +783,7 @@ fun SyncingSessionTitle(
     isLastKnown: Boolean,
     modifier: Modifier = Modifier,
     animates: Boolean = true,
+    style: TextStyle = HeaderBlurTunables.titleFont.textStyle.copy(fontWeight = FontWeight.Bold),
 ) {
     val reducedMotion = rememberReduceMotion()
     val colors = OpenCodeTheme.colors
@@ -813,7 +805,7 @@ fun SyncingSessionTitle(
     ) { shown ->
         Text(
             shown,
-            style = HeaderBlurTunables.titleFont.textStyle.copy(fontWeight = FontWeight.Bold),
+            style = style,
             color = color,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -839,7 +831,7 @@ fun WorkingIndicator(activity: WorkingActivity, modifier: Modifier = Modifier) {
         AgentActivityGlyph(
             source = AgentActivitySource.Session(activity),
             size = orbSize,
-            isPaused = activity.phase == WorkingActivity.Phase.stopping,
+            isPaused = activity.phase == WorkingActivity.Phase.stopping || activity.isHeld,
             modifier = Modifier.clearAndSetSemantics {},
         )
         val style = TranscriptFonts.metaFont(FontWeight.Medium)
@@ -877,7 +869,8 @@ fun WorkingLineRow(
 ) {
     val reduceMotion = rememberReduceMotion()
     val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
-    val active = lifecycle.isAtLeast(Lifecycle.State.RESUMED)
+    // In the list its timeline follows the list's gate (iOS `transcriptTimelineGate`).
+    val active = lifecycle.isAtLeast(Lifecycle.State.RESUMED) && !LocalTranscriptTimelinePaused.current
     val offersMove = activity.finaleStartedAt == null && !activity.needsInput && showsMoveToBackground
     // One clock throughout, so the indicator keeps its identity (and its orb its pose) when the
     // finale starts it. It ticks only during the finale, while the app is active.
@@ -922,7 +915,7 @@ private fun WorkingLine(activity: WorkingActivity, pose: WorkingHandoffPose, off
             Modifier
                 .offset(x = ReplyCopyGlyph.leading)
                 .alpha(pose.copyOpacity.toFloat())
-                .blur(pose.copyBlur.dp)
+                .transitionBlur(pose.copyBlur.dp)
                 .graphicsLayer {
                     scaleX = pose.copyScale.toFloat()
                     scaleY = pose.copyScale.toFloat()
@@ -936,7 +929,7 @@ private fun WorkingLine(activity: WorkingActivity, pose: WorkingHandoffPose, off
             Modifier
                 .align(Alignment.CenterStart)
                 .offset(x = COPY_CENTRE * (1 - scale))
-                .blur(pose.indicatorBlur.dp)
+                .transitionBlur(pose.indicatorBlur.dp)
                 .graphicsLayer {
                     scaleX = scale
                     scaleY = scale

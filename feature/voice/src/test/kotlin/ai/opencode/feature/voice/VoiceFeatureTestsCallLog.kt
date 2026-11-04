@@ -27,6 +27,7 @@ import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.model.OpenCodeFileReference
 import ai.opencode.server.model.OpenCodeJSONValue
+import ai.opencode.server.model.OpenCodePendingRequests
 import ai.opencode.server.model.OpenCodeToolCall
 import ai.opencode.server.model.OpenCodeTranscriptItem
 import ai.opencode.server.model.OpenCodeUploadEvent
@@ -124,7 +125,7 @@ class VoiceFeatureTestsCallLog {
             this[Clock] = ImmediateClock()
             this[DateClient] = DateClient.constant(Instant.EPOCH)
             voiceWork { copy(activeSessionIDs = { emptySet() }, fetchReply = { _, _, _ -> "Recovered on voice socket reconnect." }) }
-            voiceCall { copy(announce = { text -> announced.append(text) }) }
+            voiceCall { copy(announce = { _, _, text -> announced.append(text) }) }
         }
         store.exhaustive = false
 
@@ -215,7 +216,7 @@ class VoiceFeatureTestsCallLog {
                             checkSessionActive = { _, _ -> true },
                         )
                     }
-                    voiceCall { copy(announce = { text -> announced.append(text) }, end = {}) }
+                    voiceCall { copy(announce = { _, _, text -> announced.append(text) }, end = {}) }
                 }
                 store.exhaustive = false
 
@@ -250,7 +251,7 @@ class VoiceFeatureTestsCallLog {
         val announced = LockIsolated(listOf<String>())
         val store = h.store(voice) {
             this[DateClient] = DateClient.constant(Instant.EPOCH)
-            voiceCall { copy(announce = { text -> announced.append(text) }) }
+            voiceCall { copy(announce = { _, _, text -> announced.append(text) }) }
         }
         store.exhaustive = false
 
@@ -422,9 +423,10 @@ class VoiceFeatureTestsCallLog {
                     pendingInputs = { _, _ -> emptyList() },
                     isSessionActive = { _, _ -> false },
                     getSession = { _, _ -> session },
+                    familyPendingRequests = { _, _, _ -> OpenCodePendingRequests(permissions = emptyList(), forms = emptyList()) },
                 )
                 voiceWork { copy(awaitReply = { _, _, _ -> "Root cause identified." }) }
-                voiceCall { copy(completeFunction = { _, _ -> }, noteProgress = { _, _ -> }, announce = { }) }
+                voiceCall { copy(completeFunction = { _, _ -> }, announce = { _, _, _ -> }) }
             }
             store.exhaustive = false
             store.setAPIKey("sk-test")

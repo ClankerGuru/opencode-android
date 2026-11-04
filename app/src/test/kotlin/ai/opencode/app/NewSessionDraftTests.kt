@@ -1,8 +1,11 @@
 package ai.opencode.app
 
+import ai.opencode.core.dependencies.Clock
+import ai.opencode.core.dependencies.TestClock
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.TestStore
 import ai.opencode.core.testing.TestIsolationRule
+import ai.opencode.feature.composer.modelpicker.ModelDisplayNames
 import ai.opencode.feature.drawer.HomeFeature
 import ai.opencode.feature.session.SessionFeature
 import ai.opencode.feature.session.currentLevelScale
@@ -82,6 +85,7 @@ class NewSessionDraftTests {
         val gate = GatedHome()
         val effects = detachedScope(coroutineContext)
         val store: TestStore<AppFeature.State, AppFeature.Action> = shared.appStore(app, effects) {
+            this[Clock] = TestClock()
             this[OpenCodeClient] = noSends(gate.client()).copy(
                 modelCatalog = { server, _ ->
                     val model = if (server.persistenceID == studio.persistenceID) studioModel else laptopModel
@@ -95,6 +99,7 @@ class NewSessionDraftTests {
             { it == detailAction(SessionFeature.Action.ModelsResponse(Result.success(OpenCodeModelCatalog(models = listOf(laptopModel), defaultModel = laptopModel)))) },
             "home.sessionDetail.presented.modelsResponse.success",
         ) { it.detail { d -> d.copy(isLoadingModels = false, models = listOf(laptopModel)) } }
+        assertEquals(ModelDisplayNames(listOf(laptopModel)), store.state.home?.sessionDetail?.modelDisplayNamesByServer?.value?.get(laptop.persistenceID))
         assertEquals("Laptop 4", store.state.home?.sessionDetail?.currentModelName)
 
         store.send(AppFeature.Action.Home(HomeFeature.Action.Delegate(HomeFeature.DelegateAction.ServerSwitchTapped(studio)))) {
@@ -106,7 +111,7 @@ class NewSessionDraftTests {
                 serverName = "Studio",
                 connection = AppFeature.State.Connection.Connecting,
                 connectionGeneration = 1,
-                connectionAttempt = AppFeature.ConnectionAttempt(id = 1, server = studio),
+                connectionAttempt = AppFeature.ConnectionAttempt(id = 1, server = studio, switchesBack = true),
             )
         }
         store.receiveCase<AppFeature.Action.HealthResponse> { it.copy(connection = AppFeature.State.Connection.LoadingHome(studio)) }
@@ -136,6 +141,7 @@ class NewSessionDraftTests {
             { it == detailAction(SessionFeature.Action.ModelsResponse(Result.success(OpenCodeModelCatalog(models = listOf(studioModel), defaultModel = studioModel)))) },
             "home.sessionDetail.presented.modelsResponse.success",
         ) { it.detail { d -> d.copy(isLoadingModels = false, models = listOf(studioModel)) } }
+        assertEquals(ModelDisplayNames(listOf(studioModel)), store.state.home?.sessionDetail?.modelDisplayNamesByServer?.value?.get(studio.persistenceID))
         assertEquals("Studio 4", store.state.home?.sessionDetail?.currentModelName)
         assertNotNull(store.state.home?.sessionDetail?.currentLevelScale)
         store.finish()

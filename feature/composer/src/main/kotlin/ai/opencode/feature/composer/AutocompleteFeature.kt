@@ -255,15 +255,13 @@ data class ComposerAutocompleteOutcome<A>(
  * `ComposerAutocompleteReducer` call. [embed] wraps an autocomplete action into the parent's
  * (`SessionFeature.Action.autocomplete`); [sendTapped], [refreshRequestedOpen] and
  * [replyCompleted] are the session actions the effects send (`.sendTapped`,
- * `.refreshRequested(.open)`, `.replyCompleted(sessionID:)`). [isEnabled] is
- * `experimentalFeatures(.composerAutocomplete)`.
+ * `.refreshRequested(.open)`, `.replyCompleted(sessionID:)`).
  */
 class ComposerAutocompleteEnvironment<A>(
     val client: OpenCodeClient,
     val clock: Clock,
     val uuid: UuidClient,
     val haptics: HapticsClient,
-    val isEnabled: Boolean,
     val cancelCatalogID: Any,
     val cancelCommandsID: Any,
     val cancelFilesID: Any,
@@ -299,7 +297,7 @@ object ComposerAutocompleteReducer {
     ): ComposerAutocompleteOutcome<A> {
         var state = autocomplete
         val draft = host.draft
-        if (!env.isEnabled || host.isAnsweringRequest) {
+        if (host.isAnsweringRequest) {
             if (state.activeTrigger != null || state.rows.isNotEmpty()) state = state.closePopover()
             return outcome(state, draft, Effect.cancel(env.cancelAutoRunID))
         }

@@ -300,6 +300,19 @@ internal class ComposerPersistenceWriter(
         generation?.let(::scheduleWrite)
     }
 
+    fun loadSessionState(serverID: String, sessionID: String): PersistedSessionState? = synchronized(lock) {
+        ensureLoaded().sessionStates?.firstOrNull { it.serverID == serverID && it.sessionID == sessionID }?.state
+    }
+
+    fun scheduleSessionState(serverID: String, sessionID: String, update: PersistedSessionState.Update) {
+        val timestamp = now()
+        val generation = synchronized(lock) {
+            val next = ensureLoaded().applySessionState(update, serverID, sessionID, timestamp) ?: return@synchronized null
+            commitLocked(next)
+        }
+        generation?.let(::scheduleWrite)
+    }
+
     fun removeSession(serverID: String, sessionID: String?) {
         val generation = synchronized(lock) {
             val current = ensureLoaded()
@@ -311,10 +324,13 @@ internal class ComposerPersistenceWriter(
                 it.serverID == serverID && (it.sessionID == sessionID || (it.createdSession?.id != null && it.createdSession.id == sessionID))
             }
             val undelivered = current.undelivered.filterNot { it.serverID == serverID && it.sessionID == sessionID }
-            if (drafts.size == current.drafts.size && outbox.size == current.outbox.size && undelivered.size == current.undelivered.size) {
+            val removedState = current.removeSessionStates { it.serverID == serverID && it.sessionID == sessionID }
+            if (drafts.size == current.drafts.size && outbox.size == current.outbox.size && undelivered.size == current.undelivered.size &&
+                removedState == null
+            ) {
                 return@synchronized null
             }
-            commitLocked(current.copy(drafts = drafts, outbox = outbox, undelivered = undelivered))
+            commitLocked((removedState ?: current).copy(drafts = drafts, outbox = outbox, undelivered = undelivered))
         }
         generation?.let(::scheduleWrite)
     }
@@ -327,10 +343,13 @@ internal class ComposerPersistenceWriter(
             val drafts = current.drafts.filterNot { it.serverID == serverID }
             val outbox = current.outbox.filterNot { it.serverID == serverID }
             val undelivered = current.undelivered.filterNot { it.serverID == serverID }
-            if (drafts.size == current.drafts.size && outbox.size == current.outbox.size && undelivered.size == current.undelivered.size) {
+            val removedStates = current.removeSessionStates { it.serverID == serverID }
+            if (drafts.size == current.drafts.size && outbox.size == current.outbox.size && undelivered.size == current.undelivered.size &&
+                removedStates == null
+            ) {
                 return@synchronized null
             }
-            commitLocked(current.copy(drafts = drafts, outbox = outbox, undelivered = undelivered))
+            commitLocked((removedStates ?: current).copy(drafts = drafts, outbox = outbox, undelivered = undelivered))
         }
         generation?.let(::scheduleWrite)
     }
@@ -464,6 +483,8 @@ internal class ComposerPersistenceWriter(
 
     private fun cacheAttachments(attachments: List<OpenCodeOutgoingAttachment>) {
         for (attachment in attachments) {
+            // A `media:<hash>` reference re-sent without its bytes has nothing to cache.
+            if (attachment.data.isEmpty()) continue
             val id = PersistedComposerState.attachmentUUID(attachment.id)
             state.attachmentCache[id] = attachment.data
             state.pendingAttachmentWrites[id] = attachment.data
@@ -549,8 +570,8 @@ internal class ComposerPersistenceWriter(
     private fun restoreAttachment(record: PersistedComposerState.AttachmentRecord): OpenCodeOutgoingAttachment? {
         val data = state.attachmentCache[record.id]
             ?: storage.readAttachment(record.id)?.also { state.attachmentCache[record.id] = it }
-            ?: return null
-        val pastedText = if (record.hasPastedText) runCatching {
+            ?: if (record.mediaHash != null) ByteArray(0) else return null
+        val pastedText = if (record.hasPastedText && data.isNotEmpty()) runCatching {
             Charsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(data)).toString()
         }.getOrNull() else null
         return OpenCodeOutgoingAttachment(
@@ -560,6 +581,9 @@ internal class ComposerPersistenceWriter(
             name = record.name,
             pastedText = pastedText,
             pasted = record.pasted,
+            mediaHash = record.mediaHash,
+            byteCount = record.byteCount,
+            videoDuration = record.videoDuration,
         )
     }
 

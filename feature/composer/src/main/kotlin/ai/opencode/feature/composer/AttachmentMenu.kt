@@ -3,35 +3,25 @@ package ai.opencode.feature.composer
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
+import ai.opencode.core.motion.transitionBlur
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.openCodeTapTarget
+import ai.opencode.feature.composer.plusmenu.PlusMenuPlacement
 import android.net.Uri
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.core.snap
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.RoundRect
-import androidx.compose.ui.graphics.Outline
-import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.layout.layout
-import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector4D
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.TwoWayConverter
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -39,16 +29,19 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -59,8 +52,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -69,13 +62,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.layout.findRootCoordinates
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInRoot
@@ -90,16 +90,19 @@ import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * Where the attachment menu is (iOS `AttachmentMenuPhase`). The menu and the photo card are one
@@ -194,14 +197,19 @@ object AttachmentMenuMetrics {
  */
 object PlusMenuTunables {
     const val FLIGHT_DURATION = 0.34
-    val open = MotionSpring(0.34, 0.12)
-    val close = MotionSpring(0.26, 0.0)
-    const val MENU_BLUR = 10f
-    const val MENU_SCALE = 0.92f
+    val open = MotionSpring(0.2, 0.14)
+    val close = MotionSpring(0.2, 0.0)
+    const val MENU_BLUR = 3.5f
+    const val MENU_SCALE = 0.96f
+    /** Each row's reveal starts this much (× open) after the one before. */
+    const val ROW_STAGGER = 0.02f
+    /** A row's reveal spans this much of the open (× open). */
+    const val ROW_SPAN = 0.65f
     const val HOLD_DURATION = 0.18
     val peekOpen = MotionSpring(0.28, 0.14)
     const val PEEK_CLOSE = 0.16
     const val PEEK_STAGGER = 0.02
+    /** iOS's peek backdrop blur (pt). Not drawn on Android, which dims the band with a scrim. */
     const val PEEK_BLUR = 10f
     const val PEEK_DIM = 0f
     const val PEEK_FEATHER = 56f
@@ -210,11 +218,35 @@ object PlusMenuTunables {
     const val VIDEO_BADGE_RADIUS = 6f
     const val VIDEO_BADGE_OPACITY = 0.58
     /** Rim inset around the photo grid inside the photo sheet. */
-    const val GRID_INSET = 6f
-    /** How far the menu's foot sits below the composer's; by default it stands on the keyboard's top edge. */
-    const val MENU_DROP = 0f
+    const val GRID_INSET = 0f
+    const val SELECTION_DIM = 0.18
+    /** The unpicked photos' wash once the limit is picked. */
+    const val LIMIT_DIM = 0.5
+    const val SELECTION_BADGE_SIZE = 24f
+    const val SELECTION_BADGE_INSET = 6f
+    /** How far the menu's foot sits below the composer's (iOS overlaps the keys in its own window). */
+    const val MENU_DROP = 80f
+    /** The menu's width, × the screen's. */
+    const val MENU_WIDTH = 0.63f
+    const val MENU_RADIUS = 28f
+    const val MENU_ROW_HEIGHT = 56f
     /** The menu's leading edge in from the composer's. */
     const val MENU_INSET = 0f
+
+    // iOS declares these in `PlusMenuGlassSurface.swift` (an extension of `PlusMenuTunables`).
+    // Measured from ChatGPT's iOS + menu at 60 fps: its glass shrinks to a +-sized disc on a
+    // critically damped ~0.3 s curve, the disc leaves within two frames at 250 ms, and its +
+    // fades in from inside the disc between 200 and 300 ms; these run at two thirds of that.
+    val collapse = MotionSpring(0.2, 0.0)
+    /** When the collapsed glass leaves the +, in seconds after close. */
+    const val COLLAPSE_GLASS_OUT = 0.2
+    /** The collapsing glass's size where it leaves, as a fraction of the + frame (1 leaves a +-sized disc, which reads as a pop). */
+    const val COLLAPSE_END = 0.25f
+    const val COLLAPSE_FADE = 0.08
+    /** The scale the + pops back from as the glass arrives (1 is a fade only). */
+    const val PLUS_POP = 0.8
+    const val PLUS_POP_DELAY = 0.13
+    val plusPopSpring = MotionSpring(0.22, 0.45)
 }
 
 /**
@@ -250,6 +282,10 @@ fun AttachmentMenuRows(
     entranceProgress: Float = 1f,
     entranceBlur: Float = 0f,
     entranceScale: Float = 1f,
+    /** New Plus Menu: taller rows with the icon on a circle. */
+    largeMenu: Boolean = false,
+    /** New Plus Menu: the menu's fixed width; otherwise the rows size to their content. */
+    menuWidth: Dp? = null,
     onRowFrame: ((AttachmentMenuItem, Rect) -> Unit)? = null,
     onChoose: (AttachmentMenuItem) -> Unit = {},
     onPaste: () -> Unit = {},
@@ -261,13 +297,20 @@ fun AttachmentMenuRows(
     val count = items.size
     Column(
         modifier
-            .width(IntrinsicSize.Max)
+            .then(if (menuWidth != null) Modifier.width(max(menuWidth.value, AttachmentMenuMetrics.minimumWidth.value).dp) else Modifier.width(IntrinsicSize.Max))
             .widthIn(min = AttachmentMenuMetrics.minimumWidth)
             .padding(AttachmentMenuMetrics.padding),
     ) {
         items.forEachIndexed { index, item ->
             val label = @Composable { lit: Boolean ->
-                AttachmentMenuRowLabel(item, iconWidth, iconInset, rowHeight, isLit = lit)
+                AttachmentMenuRowLabel(
+                    item,
+                    iconWidth = if (largeMenu) iconWidth * 1.3f else iconWidth,
+                    inset = iconInset,
+                    height = if (largeMenu) rowHeight * (PlusMenuTunables.MENU_ROW_HEIGHT / 48f) else rowHeight,
+                    isLit = lit,
+                    circularIcon = largeMenu,
+                )
             }
             when {
                 onRowFrame != null -> Box(
@@ -279,17 +322,17 @@ fun AttachmentMenuRows(
                     val reveal = if (staggeredEntrance) {
                         Modifier.menuRowEntranceReveal(entranceProgress, max(count - 1 - index, 0), count, entranceBlur, entranceScale)
                     } else Modifier
-                    val interaction = remember { MutableInteractionSource() }
-                    val pressed by interaction.collectIsPressedAsState()
+                    // Android divergence: a ripple answers a tap (iOS lights the row while pressed);
+                    // the press-and-slide highlight stays.
                     Box(
                         reveal
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(AttachmentMenuRowHighlightRadius))
-                            .clickable(interactionSource = interaction, indication = null, role = Role.Button) {
+                            .clickable(role = Role.Button) {
                                 if (item == AttachmentMenuItem.Paste) onPaste() else onChoose(item)
                             }
                             .semantics { testTag = "attachment-menu-${item.name.lowercase()}" },
-                    ) { label(pressed || highlighted == item) }
+                    ) { label(highlighted == item) }
                 }
             }
         }
@@ -300,7 +343,7 @@ private val AttachmentMenuRowHighlightRadius: Dp = AttachmentMenuMetrics.cornerR
 
 /** The system menus' highlight: a quiet fill concentric with the panel, for a press or a finger sliding over the row from +. */
 @Composable
-private fun AttachmentMenuRowLabel(item: AttachmentMenuItem, iconWidth: Dp, inset: Dp, height: Dp, isLit: Boolean) {
+private fun AttachmentMenuRowLabel(item: AttachmentMenuItem, iconWidth: Dp, inset: Dp, height: Dp, isLit: Boolean, circularIcon: Boolean = false) {
     val lit by animateFloatAsState(
         if (isLit) 1f else 0f,
         MotionSpring(if (isLit) 0.08 else 0.2).spec(),
@@ -315,7 +358,16 @@ private fun AttachmentMenuRowLabel(item: AttachmentMenuItem, iconWidth: Dp, inse
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Box(Modifier.width(iconWidth), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier
+                .width(iconWidth)
+                .then(
+                    if (circularIcon) {
+                        Modifier.height(iconWidth).background(MaterialTheme.colorScheme.surfaceContainerHighest, androidx.compose.foundation.shape.CircleShape)
+                    } else Modifier,
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
             OpenCodeIcon(item.systemImage, contentDescription = null, tint = OpenCodeTheme.colors.text)
         }
         Text(item.title, style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text, maxLines = 1)
@@ -330,11 +382,10 @@ private fun AttachmentMenuRowLabel(item: AttachmentMenuItem, iconWidth: Dp, inse
  */
 fun Modifier.menuRowEntranceReveal(progress: Float, bottomIndex: Int, totalCount: Int, blur: Float, scale: Float): Modifier {
     val clamped = progress.coerceIn(0f, 1f)
-    val stagger = if (totalCount > 1) 0.11f else 0f
+    val stagger = if (totalCount > 1) PlusMenuTunables.ROW_STAGGER else 0f
     val delay = bottomIndex * stagger
-    val span = max(1 - max(totalCount - 1, 0) * stagger, 0.5f)
-    val local = ((clamped - delay) / span).coerceIn(0f, 1f)
-    val eased = local * local * (3 - 2 * local)
+    val span = max(PlusMenuTunables.ROW_SPAN - max(totalCount - 1, 0) * stagger, 0.25f)
+    val eased = PickerDissolve.smoothstep(delay, delay + span, clamped)
     val currentScale = scale + (1 - scale) * eased
     val lift = (1 - eased) * (5 + bottomIndex * 3)
     val radius = if (blur > 0 && eased > 0.01f && eased < 0.99f) (1 - eased) * blur else 0f
@@ -346,7 +397,7 @@ fun Modifier.menuRowEntranceReveal(progress: Float, bottomIndex: Int, totalCount
             translationY = if (blur > 0) lift.dp.toPx() else 0f
             alpha = eased
         }
-        .then(if (radius > 0f) Modifier.blur(radius.dp) else Modifier)
+        .then(if (radius > 0f) Modifier.transitionBlur(radius.dp) else Modifier)
 }
 
 // endregion
@@ -405,7 +456,10 @@ fun AttachmentMenuOverlay(
 ) {
     val reduceMotion = rememberReduceMotion()
     val density = LocalDensity.current
+    val fontScale = density.fontScale
     val scope = androidx.compose.runtime.rememberCoroutineScope()
+    // The docked keyboard's top in the overlay's space (iOS `DockedKeyboard.frameInScreen`).
+    val imeBottom = WindowInsets.ime.getBottom(density)
     var filter by remember { mutableStateOf(InlinePhotoFilter.All) }
     var linger by remember { mutableStateOf(AttachmentMenuLinger()) }
     var rowsSize by remember { mutableStateOf(Size.Zero) }
@@ -415,6 +469,7 @@ fun AttachmentMenuOverlay(
     var isDragging by remember { mutableStateOf(false) }
     var origin by remember { mutableStateOf(Offset.Zero) }
     var overlaySize by remember { mutableStateOf(Size.Zero) }
+    var rootHeight by remember { mutableFloatStateOf(0f) }
     var previousPhase by remember { mutableStateOf(phase) }
     val library = remember { InlinePhotoLibrary() }
     val localSelection = remember { InlinePhotoSelection() }
@@ -430,25 +485,23 @@ fun AttachmentMenuOverlay(
         }
     }
     LaunchedEffect(phase, identity) { linger = linger.phaseChanged(phase, identity) }
+    // One linger task (iOS `LingerTaskID`): the rows go after 400 ms, the picker and the glass 150 ms later.
     LaunchedEffect(identity, phase) {
-        if (phase != AttachmentMenuPhase.Menu && linger.rowsLinger(identity)) {
-            delay(400)
-            if (phase != AttachmentMenuPhase.Menu) linger = linger.syncIdentity(identity, phase).copy(rowsLinger = false)
-        }
-    }
-    LaunchedEffect(identity, phase) {
-        if (phase != AttachmentMenuPhase.Photos && linger.keepsPickerDrawn(identity)) {
-            delay(550)
-            if (phase != AttachmentMenuPhase.Photos) linger = linger.syncIdentity(identity, phase).copy(keepsPickerDrawn = false)
-        }
-    }
-    LaunchedEffect(identity, phase) {
-        if (phase == AttachmentMenuPhase.Closed && linger.glassLingers(identity)) {
-            delay(550)
-            if (phase == AttachmentMenuPhase.Closed) linger = linger.syncIdentity(identity, phase).copy(glassLingers = false)
-        }
+        val lingersAfterRows = { (phase != AttachmentMenuPhase.Photos && linger.keepsPickerDrawn(identity)) ||
+            (phase == AttachmentMenuPhase.Closed && linger.glassLingers(identity)) }
+        if (!(phase != AttachmentMenuPhase.Menu && linger.rowsLinger(identity)) && !lingersAfterRows()) return@LaunchedEffect
+        delay(400)
+        if (phase != AttachmentMenuPhase.Menu) linger = linger.syncIdentity(identity, phase).copy(rowsLinger = false)
+        if (!lingersAfterRows()) return@LaunchedEffect
+        delay(150)
+        if (phase != AttachmentMenuPhase.Photos) linger = linger.syncIdentity(identity, phase).copy(keepsPickerDrawn = false)
+        if (phase == AttachmentMenuPhase.Closed) linger = linger.syncIdentity(identity, phase).copy(glassLingers = false)
     }
 
+    val keyboardTop = if (overComposer && imeBottom > 0 && overlaySize.height > 0f) {
+        val top = rootHeight - imeBottom - origin.y
+        if (top < overlaySize.height) top else null
+    } else null
     val frames = with(density) {
         attachmentMenuFrames(
             anchors = anchors,
@@ -457,6 +510,9 @@ fun AttachmentMenuOverlay(
             rowsSize = rowsSize,
             overComposer = overComposer,
             px = { it.toPx() },
+            itemCount = items.size,
+            fontScale = min(fontScale, 2f),
+            keyboardTop = keyboardTop,
         )
     }
 
@@ -572,12 +628,15 @@ fun AttachmentMenuOverlay(
             .onGloballyPositioned {
                 origin = it.positionInRoot()
                 overlaySize = it.size.toSize()
+                rootHeight = it.findRootCoordinates().size.height.toFloat()
             },
     ) {
         // Measures the rows where nothing can see or reach them, at the menu's resting frame.
         AttachmentMenuRows(
             items = items,
             buttonCenterX = buttonCenterX,
+            largeMenu = overComposer,
+            menuWidth = if (overComposer) with(density) { frames.menu.width.toDp() } else null,
             modifier = Modifier
                 .offset { IntOffset(frames.menu.left.roundToInt(), frames.menu.top.roundToInt()) }
                 .alpha(0f)
@@ -726,6 +785,10 @@ internal fun attachmentMenuFrames(
     rowsSize: Size,
     overComposer: Boolean,
     px: (Dp) -> Float,
+    itemCount: Int = 0,
+    fontScale: Float = 1f,
+    /** The docked keyboard's top in the overlay's space, if it covers part of it. */
+    keyboardTop: Float? = null,
 ): AttachmentMenuFrames {
     val button = anchors.button.translate(-origin)
     val composer = anchors.composer.translate(-origin)
@@ -734,14 +797,26 @@ internal fun attachmentMenuFrames(
     // Everything rests on this line, a little above the composer.
     val base = composer.top - px(AttachmentMenuMetrics.composerGap)
     val seedSize = px(AttachmentMenuMetrics.seedSize)
-    val rows = if (rowsSize == Size.Zero) Size(px(AttachmentMenuMetrics.minimumWidth), px(160.dp)) else rowsSize
+    // Row membership can change while the measuring copy is hidden (Location): its old measured
+    // height must never reserve a blank row on the next open, so the height comes from the rows.
+    val rowHeight = px(48.dp) * fontScale * (if (overComposer) PlusMenuTunables.MENU_ROW_HEIGHT / 48f else 1f)
+    val rows = Size(
+        if (overComposer) overlaySize.width * PlusMenuTunables.MENU_WIDTH
+        else if (rowsSize == Size.Zero) px(AttachmentMenuMetrics.minimumWidth) else rowsSize.width,
+        rowHeight * itemCount + px(AttachmentMenuMetrics.padding) * 2,
+    )
     val screenHeight = overlaySize.height
     val seed: Rect
     val menu: Rect
     if (overComposer) {
         // Its foot below the composer's, short of the screen's bottom edge.
-        val floor = overlaySize.height - px(AttachmentMenuMetrics.overComposerFloor)
-        val foot = min(composer.bottom + px(PlusMenuTunables.MENU_DROP.dp), floor)
+        val foot = PlusMenuPlacement.foot(
+            composer = composer,
+            screenBottom = overlaySize.height,
+            keyboardTop = keyboardTop,
+            drop = px(PlusMenuTunables.MENU_DROP.dp),
+            floor = px(AttachmentMenuMetrics.overComposerFloor),
+        )
         seed = Rect(Offset(button.center.x - seedSize / 2, button.center.y - seedSize / 2), Size(seedSize, seedSize))
         menu = Rect(
             Offset(composer.left + px(PlusMenuTunables.MENU_INSET.dp), foot - rows.height),
@@ -825,14 +900,19 @@ private fun MenuRowsSlot(
             Modifier
                 .requiredSize(with(density) { frames.menu.width.toDp() }, with(density) { frames.menu.height.toDp() })
                 .graphicsLayer { alpha = rowsAlpha * cardFade * handoffFade }
-                .then(if (handoffBlur > 0f) Modifier.blur(handoffBlur.dp) else Modifier),
+                .then(if (handoffBlur > 0f) Modifier.transitionBlur(handoffBlur.dp) else Modifier),
             contentAlignment = Alignment.BottomStart,
         ) {
             AttachmentMenuRows(
                 items = items,
                 buttonCenterX = buttonCenterX,
                 highlighted = press.highlighted,
-                onChoose = { item -> if (!isDragging) onChoose(item) },
+                onChoose = { item ->
+                    if (!isDragging) {
+                        press.rowTapped()
+                        onChoose(item)
+                    }
+                },
                 onPaste = onPaste,
             )
         }

@@ -1,5 +1,6 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.server.EventStreamFocusClient
 import ai.opencode.feature.session.*
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.dependency
@@ -25,10 +26,14 @@ import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.SessionActivity
 import ai.opencode.server.model.keepingFirstPrompts
 import ai.opencode.server.remember
+import ai.opencode.feature.voice.VoiceFeature
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlin.time.Duration.Companion.milliseconds
+import ai.opencode.feature.voice.VoiceAppState
+import ai.opencode.feature.composer.DictationFeature
+import ai.opencode.core.tuning.DeveloperMode
 
 /*
  * Port of iOS `HomeFeature+Connection.swift`: what Home does as the connection comes and goes
@@ -41,6 +46,8 @@ internal fun HomeFeature.reduceConnection(state: State, action: Action): HomeRed
     Action.Task -> {
         LabMarks.mark("home_task_started")
         val s = if (state.isConnected) state.initializingInbox() else state
+        // A restored session was open before any change could publish it.
+        dependency(EventStreamFocusClient).publish(streamFocusOwner, s.streamFocusSessionIDs)
         val load = if (s.isConnected) Reduced(s, Effect.merge(refreshAttention(s), resolveActiveAncestry(s))) else refreshSnapshot(s)
         // The call's and the recording's ongoing-notification buttons.
         val voiceLiveActivity = dependency(VoiceLiveActivityClient)
@@ -67,7 +74,11 @@ internal fun HomeFeature.reduceConnection(state: State, action: Action): HomeRed
         Reduced(state, Effect.merge(Effect.run { persistence.flush() }, flushPersistedComposer(state)))
     }
 
-    Action.SceneEnteredBackground -> Reduced(state, publishAppBadge(state))
+    Action.SceneEnteredBackground -> {
+        val sessionID = state.sessionDetail?.session?.id
+        val s = if (sessionID != null) state.syncingSeenItemsFromOpenDetail(sessionID) else state
+        Reduced(s, Effect.merge(publishAppBadge(s), waitToSettleSessionActivity(s)))
+    }
 
     is Action.ServerConnected -> {
         // The stream started before any rename since; the name on screen wins.
@@ -192,13 +203,28 @@ private fun HomeFeature.snapshotRefreshed(state: State, action: Action.SnapshotR
     )
     // The list is one page of the newest roots, not the whole server. Whatever is open or pinned
     // and fell off that page is unknown, not gone (deletion arrives as its own event), so keep the
-    // last copy instead of kicking the reader to a draft or silently dropping a pin.
+    // last copy instead of kicking the reader to a draft or silently dropping a pin. Older pages
+    // the drawer read (or is reading: its cursor follows the rows already listed) stay too, and
+    // their cursor goes on, as do search results the person acted on.
     val openRootID = s.sessionDetail?.familyRootID
+    val keepsOlderPages = s.sessionPages.olderPagesLoaded > 0 || s.sessionPages.older.isLoading
+    val adopted = s.sessionPages.adoptedIDs
     val carried = s.sessions.filter { session ->
-        session.id !in incomingSessionIDs && session.id !in recentlyDeleted && (session.id == openRootID || s.isPinned(session.id))
+        session.id !in incomingSessionIDs && session.id !in recentlyDeleted &&
+            (keepsOlderPages || session.id == openRootID || s.isPinned(session.id) || session.id in adopted)
     }
     // Server copies don't carry the first prompt an unnamed session is shown by; keep what's known.
     s = s.copy(sessions = snapshotSessions.keepingFirstPrompts(s.sessions) + carried, activeSessionIDs = snapshotActive)
+    if (!keepsOlderPages && !s.sessionPages.older.isLoading) {
+        s = s.copy(sessionPages = s.sessionPages.copy(older = s.sessionPages.older.copy(next = incoming.nextCursor, failed = false)))
+    }
+    // A search typed before the list knew it had more pages asks now.
+    var searchesServer: Effect<Action> = Effect.none()
+    if (s.sessionPages.search == null) {
+        val searched = sessionSearchChanged(s)
+        s = searched.state
+        searchesServer = searched.effect
+    }
     var parents = s.activeSessionParents + (incoming.activeSessionParents ?: emptyMap())
     if (parents.size > HomeFeature.parentLinkLimit) parents = SessionActivity.ancestry(s.activeSessionIDs, parents)
     s = s.copy(activeSessionParents = parents)
@@ -230,13 +256,21 @@ private fun HomeFeature.snapshotRefreshed(state: State, action: Action.SnapshotR
     val openID = s.sessionDetail?.familyRootID
     if (openID != null && s.sessions.none { it.id == openID }) {
         val serverID = s.server.persistenceID
-        s = s.updatingLastViewedSessionIDs { it - serverID }.openingDraft(reason = "the session went away on the server")
+        s = s.updatingLastViewedSessionIDs { it - serverID }.openingDraft(reason = VoiceFeature.State.MoveReason.sessionWentAway)
     } else if (s.sessionDetail?.isDraft == true) {
         // A draft opened before the first snapshot (cold launch, empty cache) has no folders to
         // offer; refresh its choices as the list arrives so the Project picker is never empty on a
         // live server.
-        val projects = s.projectsByRecency
-        s = s.updatingDetail { it.copy(projects = projects, draftProject = it.draftProject ?: projects.firstOrNull()) }
+        val recents = s.projectsByRecency
+        s = s.updatingDetail { it.copy(projects = recents, draftProject = it.draftProject ?: recents.firstOrNull()) }
+    } else if (s.sessionDetail != null && s.sessionDetail?.projects != s.projects) {
+        // A session finds its project's folder here (Move to).
+        val projects = s.projects
+        s = s.updatingDetail { it.copy(projects = projects) }
+    }
+    if (s.subagentStack.any { it.projects != s.projects }) {
+        val projects = s.projects
+        s = s.updatingSubagents { if (it.projects != projects) it.copy(projects = projects) else it }
     }
     val currentUpdatedAt = s.sessions.associate { it.id to it.updatedAt }
     // A cached session that changed is read again rather than dropped, so opening it shows what's
@@ -255,6 +289,7 @@ private fun HomeFeature.snapshotRefreshed(state: State, action: Action.SnapshotR
         connection = s.connection.copy(
             connectionStatus = HomeConnectionFeature.State.ConnectionStatus.connected,
             connectionErrorMessage = null,
+            credentialsRejected = false,
             snapshotFailures = 0,
             lastKnownActivityDeadline = null,
         ),
@@ -303,6 +338,7 @@ private fun HomeFeature.snapshotRefreshed(state: State, action: Action.SnapshotR
                 drained.effect,
                 voiceSnapshot,
                 subagentRuns,
+                searchesServer,
                 update,
                 if (detail.isExternallyActive == runState) Effect.none()
                 else sendToDetail(s, SessionFeature.Action.ExternalRunStateChanged(runState)),
@@ -310,7 +346,7 @@ private fun HomeFeature.snapshotRefreshed(state: State, action: Action.SnapshotR
             ),
         )
     }
-    return Reduced(s, Effect.merge(attention, ancestry, prefetch, drained.effect, voiceSnapshot, subagentRuns))
+    return Reduced(s, Effect.merge(attention, ancestry, prefetch, drained.effect, voiceSnapshot, subagentRuns, searchesServer))
 }
 
 private fun HomeFeature.activeAncestryResolved(state: State, resolved: Map<String, String>): HomeReduced {
@@ -447,5 +483,29 @@ internal val State.voiceSessionBoard: VoiceSessionBoard?
             pinnedSessionKeys = pinnedSessionKeys,
             attentionDirectories = HomeFeature.attentionDirectories(this).toSet(),
             isLive = status.showsActivity,
+            home = if (DeveloperMode.isEnabled) voiceAppStateHome else null,
         )
     }
+
+/** The drawer and the top session's composer, for a call's screenshots (iOS `voiceAppStateHome`). */
+internal val State.voiceAppStateHome: VoiceAppState.Home
+    get() = VoiceAppState.Home(
+        drawerOpen = isDrawerOpen,
+        settingsShown = isSettingsShown,
+        catchUpShown = catchUp != null,
+        composer = topDetail?.let { detail ->
+            VoiceAppState.Composer(
+                draftCharacters = detail.draft.length,
+                dictation = when (val phase = detail.dictation.phase) {
+                    DictationFeature.Phase.Idle -> "idle"
+                    DictationFeature.Phase.Preparing -> "preparing"
+                    DictationFeature.Phase.Recording -> "recording"
+                    is DictationFeature.Phase.Finishing -> "finishing(send: ${phase.send ?: "nil"})"
+                },
+                images = detail.composerAttachments.pendingAttachments.size,
+                files = detail.composerAttachments.pendingFiles.size,
+                pendingPermissions = detail.requestDock.permissionRequests.size,
+                pendingQuestions = detail.requestDock.formRequests.size,
+            )
+        },
+    )

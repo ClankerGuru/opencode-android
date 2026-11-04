@@ -6,7 +6,6 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import kotlin.math.E
 import kotlin.math.abs
 
 /**
@@ -46,6 +45,41 @@ class CaptionRevealTests {
         assertEquals(4, reveal.lines[0].revealable)
     }
 
+    @Test fun aLongCallKeepsOnlyTheNewestLines() {
+        fun targets(count: Int) = (0 until count).map { CaptionTarget(id = "line-$it", isUser = it % 2 == 0, text = "Line $it words") }
+        var reveal = CaptionReveal()
+        reveal = reveal.sync(targets(220), revealed = true)
+        reveal = reveal.trim(force = true) ?: reveal
+        assertEquals((190 until 220).map { "line-$it" }, reveal.lines.map { it.id })
+
+        reveal = reveal.sync(targets(240))
+        assertEquals(50, reveal.lines.size)
+        val trimmedAtFifty = reveal.trim()
+        assertNull(trimmedAtFifty)
+        reveal = reveal.revealNext(1.0)
+        assertEquals(listOf(1.0), reveal.lines[30].revealedAt)
+
+        reveal = reveal.sync(targets(241))
+        val trimmedPastFifty = reveal.trim()
+        assertNotNull(trimmedPastFifty)
+        reveal = trimmedPastFifty!!
+        assertEquals((211 until 241).map { "line-$it" }, reveal.lines.map { it.id })
+        assertEquals(listOf(1.0), reveal.lines[9].revealedAt)
+
+        reveal = reveal.sync(targets(260))
+        assertEquals("line-211", reveal.lines.firstOrNull()?.id)
+        assertEquals(49, reveal.lines.size)
+    }
+
+    @Test fun captionsStartingOverShowFromTheirFirstLine() {
+        var reveal = CaptionReveal()
+        reveal = reveal.sync((0 until 60).map { CaptionTarget(id = "old-$it", isUser = false, text = "Old") }, revealed = true)
+        reveal = reveal.trim(force = true) ?: reveal
+        reveal = reveal.sync(listOf(CaptionTarget(id = "new-0", isUser = true, text = "Hello there")))
+        assertEquals(listOf("new-0"), reveal.lines.map { it.id })
+        assertNull(reveal.firstLineID)
+    }
+
     @Test fun settlingUnderANewIDInheritsByPosition() {
         var reveal = CaptionReveal()
         reveal = reveal.sync(listOf(CaptionTarget(id = "assistant-live", isUser = false, text = "Sure thing ", isLive = true)))
@@ -59,15 +93,6 @@ class CaptionRevealTests {
         assertEquals(listOf(1.0), reveal.lines[0].revealedAt)
     }
 
-    @Test fun glideDecaysTowardZeroAndAccumulates() {
-        var glide = CaptionGlide()
-        glide = glide.push(22f, now = 0.0)
-        assertEquals(22f, glide.offset(0.0))
-        assertTrue(abs(glide.offset(0.16) - 22 / E.toFloat()) < 0.001f)
-        glide = glide.push(22f, now = 0.16)
-        assertTrue(abs(glide.offset(0.16) - (22 + 22 / E.toFloat())) < 0.001f)
-        assertTrue(glide.offset(glide.settlesAt) < 0.31f)
-    }
 }
 
 class VoiceAudioQualityTests {

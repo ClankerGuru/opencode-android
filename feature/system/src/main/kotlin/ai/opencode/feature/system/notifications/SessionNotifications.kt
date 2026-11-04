@@ -8,6 +8,7 @@ import ai.opencode.core.log.AppLog
 import ai.opencode.core.sharing.InstantSerializer
 import ai.opencode.core.sharing.SharedKey
 import ai.opencode.core.sharing.shared
+import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeServer
 import android.Manifest
 import android.content.Context
@@ -16,6 +17,7 @@ import android.content.pm.PackageManager
 import android.provider.Settings
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -24,6 +26,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -35,6 +38,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import java.time.Instant
 import java.time.OffsetDateTime
@@ -42,6 +46,7 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 enum class NotificationPermission { NotDetermined, Disabled, Enabled }
 
@@ -72,6 +77,36 @@ class NotificationPermissionClient(
             status = { NotificationPermission.Enabled },
             request = { NotificationPermission.Enabled },
             openSettings = { true },
+        )
+    }
+}
+
+/**
+ * Port of iOS `NotificationKeysClient` (1ddd36b2): this phone's notification keys, off the
+ * main thread. The live value is [NotificationKeyStore.live]; the test value has no keys.
+ */
+class NotificationKeysClient(
+    /** This phone's public key for `ref`, made the first time. */
+    val prepare: suspend (ref: String) -> String,
+    val establish: suspend (ref: String, serverPublicKey: String) -> Unit,
+    val remove: suspend (ref: String) -> Unit,
+    /** The authenticated payload, or null when the box or key doesn't hold. */
+    val verify: suspend (NotificationContent.Envelope) -> NotificationContent.Verified?,
+) {
+    companion object Key : DependencyKey<NotificationKeysClient> {
+        override val liveValue: NotificationKeysClient by lazy {
+            NotificationKeysClient(
+                prepare = { ref -> withContext(Dispatchers.IO) { NotificationKeyStore.live.prepare(ref) } },
+                establish = { ref, serverKey -> withContext(Dispatchers.IO) { NotificationKeyStore.live.establish(ref, serverKey) } },
+                remove = { ref -> withContext(Dispatchers.IO) { NotificationKeyStore.live.remove(ref) } },
+                verify = { envelope -> withContext(Dispatchers.IO) { NotificationContent.verify(envelope) } },
+            )
+        }
+        override val testValue = NotificationKeysClient(
+            prepare = { throw NotificationKeyStore.Failure.MissingKey },
+            establish = { _, _ -> throw NotificationKeyStore.Failure.MissingKey },
+            remove = {},
+            verify = { null },
         )
     }
 }
@@ -149,6 +184,13 @@ enum class NotificationPresentation { None, Banner, ListOnly }
  * the token and the relay keeps nothing. The `ref` exists only so a tap can find the saved
  * server; it is random, never derived from the server's address or credentials.
  *
+ * Previews are encrypted (iOS 1ddd36b2): for each ref this phone makes a P-256 key and swaps
+ * public keys with the saved server over HTTPS ([OpenCodeClient.pairNotificationPreview]); the
+ * server seals each push's text with the derived key, so the relay and FCM only carry a
+ * `v2` envelope. Only `/v2/notify/` callbacks on the relay are minted or reused
+ * ([isEncryptedCallback]); a missing plugin, unavailable key store or failed exchange can
+ * yield a generic "New activity" notification, never a clear-text one.
+ *
  * Android pushes ride FCM: the build's push environment is [FCM_ENVIRONMENT] (`"fcm"`, iOS
  * `development`/`production`), and the token is the FCM registration token. The relay
  * (`packages/notify-relay`) seals APNs tokens only today, so it answers this registration
@@ -187,7 +229,10 @@ class SessionNotifications internal constructor(private val tokens: PushTokenPro
     private var pendingDestination: NotificationDestination? = null
     @Volatile private var confirmedToken: String? = null
     private val lock = Any()
-    private val mintTasks = HashMap<String, Deferred<Minted?>>()
+    private val preparations = HashMap<String, Deferred<String?>>()
+    /** Server key → the callback last paired and when to try again (a day after a pairing, a minute after a failure). */
+    private val pairChecks = HashMap<String, Pair<String, Instant>>()
+    private val keys get() = dependency(NotificationKeysClient)
     private val tokenWaiters = mutableListOf<CompletableDeferred<String?>>()
     private val saved get() = shared(savedKey)
     private var permissionRequest: CompletableDeferred<Boolean>? = null
@@ -207,7 +252,15 @@ class SessionNotifications internal constructor(private val tokens: PushTokenPro
         @Serializable(with = InstantSerializer::class) val expiresAt: Instant,
         val token: String,
         val environment: String,
-    )
+        /** The device public key this callback was paired with (iOS 1ddd36b2). */
+        val phonePublicKey: String? = null,
+    ) {
+        fun isReusable(token: String, environment: String, publicKey: String?, relay: HttpUrl?, now: Instant): Boolean =
+            this.token == token && this.environment == environment &&
+                expiresAt.toEpochMilli() - now.toEpochMilli() > 3.days.inWholeMilliseconds &&
+                (publicKey == null || phonePublicKey == null || phonePublicKey == publicKey) &&
+                isEncryptedCallback(url, relay)
+    }
 
     data class Minted(val url: String, val expiresAt: Instant)
 
@@ -264,8 +317,9 @@ class SessionNotifications internal constructor(private val tokens: PushTokenPro
     }
 
     /**
-     * A callback URL for [server], minting one when the saved one is missing, stale, or for an
-     * older token. Null whenever notifications are unavailable.
+     * A callback URL for [server], minting one when the saved one is missing, stale, for an
+     * older token or another device key, then pairing this phone's notification key with the
+     * server. Null whenever notifications are unavailable.
      */
     suspend fun callbackURL(server: OpenCodeServer): String? {
         val environment = environment
@@ -275,27 +329,82 @@ class SessionNotifications internal constructor(private val tokens: PushTokenPro
         val token = waitForToken() ?: return null
         if (!currentCoroutineContext().isActive) return null
         val key = server.persistenceID
-        saved.value.callbacks[key]?.let { callback ->
-            if (callback.token == token && callback.environment == environment &&
-                callback.expiresAt.toEpochMilli() - Instant.now().toEpochMilli() > 3.days.inWholeMilliseconds
-            ) return callback.url
-        }
+        synchronized(lock) { preparations[key] }?.let { return awaitPreparation(it) }
         val ref = ref(key)
         val task = synchronized(lock) {
-            mintTasks[key] ?: mintScope.async { mint(token, environment, ref) }.also { mintTasks[key] = it }
+            preparations[key] ?: mintScope.async {
+                val publicKey = runCatching { keys.prepare(ref) }.getOrNull()
+                // Forgotten while the key was made: don't leave it behind.
+                if (saved.value.refs[key] != ref) {
+                    runCatching { keys.remove(ref) }
+                    return@async null
+                }
+                prepareCallback(server, key, ref, publicKey, token, environment)
+            }.also { preparations[key] = it }
         }
-        val minted = task.await()
-        synchronized(lock) { if (mintTasks[key] === task) mintTasks.remove(key) }
-        // A server forgotten meanwhile keeps no callback.
-        if (minted == null || confirmedToken != token || saved.value.refs[key] != ref) return null
-        saved.update { it.copy(callbacks = it.callbacks + (key to Callback(minted.url, minted.expiresAt, token, environment))) }
-        return minted.url
+        val url = awaitPreparation(task)
+        if (saved.value.refs[key] == ref) synchronized(lock) { if (preparations[key] === task) preparations.remove(key) }
+        return url
     }
 
-    /** Forgets a removed server's ref and callback. */
-    fun forget(serverKey: String) {
-        saved.update { it.copy(refs = it.refs - serverKey, callbacks = it.callbacks - serverKey) }
+    /** A preparation forgotten meanwhile is cancelled; the send goes on without a callback. */
+    private suspend fun awaitPreparation(task: Deferred<String?>): String? = try {
+        task.await()
+    } catch (cancelled: CancellationException) {
+        if (!currentCoroutineContext().isActive) throw cancelled
+        null
     }
+
+    private suspend fun prepareCallback(
+        server: OpenCodeServer, key: String, ref: String, publicKey: String?, token: String, environment: String,
+    ): String? {
+        suspend fun current() = currentCoroutineContext().isActive && confirmedToken == token && saved.value.refs[key] == ref
+        val cached = saved.value.callbacks[key]
+        var callback = if (cached != null && cached.isReusable(token, environment, publicKey, RELAY_URL.toHttpUrlOrNull(), Instant.now())) {
+            cached
+        } else {
+            val minted = mint(token, environment, ref) ?: return null
+            if (!current()) return null
+            Callback(minted.url, minted.expiresAt, token, environment, phonePublicKey = publicKey ?: cached?.phonePublicKey)
+        }
+        if (!current()) return null
+        if (publicKey != null) callback = callback.copy(phonePublicKey = publicKey)
+        if (saved.value.callbacks[key] != callback) saved.update { it.copy(callbacks = it.callbacks + (key to callback)) }
+        synchronized(lock) { pairChecks[key] }?.let { (url, retryAt) ->
+            if (url == callback.url && retryAt.isAfter(Instant.now())) return callback.url
+        }
+
+        // Only public keys cross the direct server connection. A missing plugin, locked key
+        // store or failed handshake can yield a generic v2 notification, never a v1 callback.
+        var paired = false
+        if (publicKey != null) {
+            val serverKey = runCatching { OpenCodeClient.pairNotificationPreview(server, callback.url, ref, publicKey) }
+                .onFailure { if (it is CancellationException) throw it }
+                .getOrNull()
+            if (serverKey != null) {
+                if (!current()) return null
+                paired = runCatching { keys.establish(ref, serverKey) }.onFailure { if (it is CancellationException) throw it }.isSuccess
+            }
+        }
+        if (!current()) return null
+        val retry = if (paired) 86_400.seconds else 60.seconds
+        synchronized(lock) { pairChecks[key] = callback.url to Instant.now().plusMillis(retry.inWholeMilliseconds) }
+        return callback.url
+    }
+
+    /** Forgets a removed server's ref, callback and notification key. */
+    suspend fun forget(serverKey: String) {
+        synchronized(lock) {
+            preparations.remove(serverKey)?.cancel()
+            pairChecks.remove(serverKey)
+        }
+        val ref = saved.value.refs[serverKey]
+        saved.update { it.copy(refs = it.refs - serverKey, callbacks = it.callbacks - serverKey) }
+        if (ref != null) runCatching { keys.remove(ref) }
+    }
+
+    /** The authenticated payload of a push envelope (iOS `verify(_:)`). */
+    suspend fun verify(envelope: NotificationContent.Envelope): NotificationContent.Verified? = keys.verify(envelope)
 
     fun didRegister(token: String) {
         if (token.isEmpty()) return
@@ -313,6 +422,12 @@ class SessionNotifications internal constructor(private val tokens: PushTokenPro
     fun destination(ref: String, sessionID: String): NotificationDestination? {
         val serverKey = saved.value.refs.entries.firstOrNull { it.value == ref }?.key ?: return null
         return NotificationDestination(serverKey, sessionID).takeIf { it.isValid }
+    }
+
+    /** A tapped notification: its envelope is authenticated again, then routed (iOS `didReceive`). */
+    suspend fun open(envelope: NotificationContent.Envelope) {
+        val verified = verify(envelope) ?: return
+        open(verified.ref, verified.payload.sessionID)
     }
 
     /** Routes a tapped notification's `ref` to the server it was minted for. */
@@ -371,7 +486,27 @@ class SessionNotifications internal constructor(private val tokens: PushTokenPro
         private val json = Json { ignoreUnknownKeys = true }
 
         /**
-         * `POST /v1/register` on the relay. Fails open within three seconds, never follows a
+         * iOS `isEncryptedCallback(_:relay:)`: only a `/v2/notify/<token>` URL on the relay's
+         * own HTTPS origin, with no user, password, query or fragment, is ever used as a
+         * callback. Old (`/v1/`) or foreign capabilities never reach a prompt.
+         */
+        fun isEncryptedCallback(url: String, relay: HttpUrl? = RELAY_URL.toHttpUrlOrNull()): Boolean {
+            relay ?: return false
+            val parts = runCatching { java.net.URI(url) }.getOrNull() ?: return false
+            if (parts.scheme != "https" || parts.host?.lowercase() != relay.host.lowercase()) return false
+            if ((parts.port.takeIf { it != -1 } ?: 443) != relay.port) return false
+            if (parts.rawUserInfo != null || parts.rawQuery != null || parts.rawFragment != null) return false
+            val prefix = "/v2/notify/"
+            val path = parts.rawPath ?: return false
+            if (!path.startsWith(prefix)) return false
+            val token = path.removePrefix(prefix).toByteArray(Charsets.UTF_8)
+            return token.size in 1..1024 && token.all {
+                it in 65..90 || it in 97..122 || it in 48..57 || it.toInt() == 45 || it.toInt() == 95
+            }
+        }
+
+        /**
+         * `POST /v2/register` on the relay. Fails open within three seconds, never follows a
          * redirect, and sends nothing but the token, environment, and ref.
          */
         internal fun mint(token: String, environment: String, ref: String): Minted? {
@@ -388,7 +523,7 @@ class SessionNotifications internal constructor(private val tokens: PushTokenPro
                 .cache(null)
                 .build()
             val request = Request.Builder()
-                .url(relay.newBuilder().addPathSegments("v1/register").build())
+                .url(relay.newBuilder().addPathSegments("v2/register").build())
                 .header("Content-Type", "application/json")
                 .cacheControl(okhttp3.CacheControl.FORCE_NETWORK)
                 .post(body.toRequestBody("application/json".toMediaType()))
@@ -399,8 +534,7 @@ class SessionNotifications internal constructor(private val tokens: PushTokenPro
                     val output = json.parseToJsonElement(response.body.string()) as? JsonObject ?: return null
                     val url = output["callbackURL"]?.jsonPrimitive?.content ?: return null
                     val expiresAt = output["expiresAt"]?.jsonPrimitive?.content?.let(::parseDate) ?: return null
-                    val parsed = url.toHttpUrlOrNull() ?: return null
-                    if (!parsed.isHttps || parsed.host != relay.host) return null
+                    if (!isEncryptedCallback(url, relay) || !expiresAt.isAfter(Instant.now())) return null
                     Minted(url, expiresAt)
                 }
             } catch (_: Exception) {

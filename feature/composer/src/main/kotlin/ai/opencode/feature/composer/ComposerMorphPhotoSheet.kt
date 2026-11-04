@@ -2,7 +2,7 @@ package ai.opencode.feature.composer
 
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.rememberReduceMotion
-import ai.opencode.feature.composer.modelpicker.FusedModelPickerTunables
+import ai.opencode.feature.composer.modelpicker.ModelPickerTunables
 import ai.opencode.feature.composer.plusmenu.PhotoFlights
 import ai.opencode.feature.composer.plusmenu.PhotoLibraryAccessHost
 import ai.opencode.feature.composer.plusmenu.PlusCameraPresentation
@@ -82,7 +82,6 @@ fun ComposerMorphPhotoSheet(
     morph: ComposerMorph = rememberComposerMorph(),
 ) {
     val reduceMotion = rememberReduceMotion()
-    val reduceTransparency = rememberReduceTransparency()
     val density = LocalDensity.current
     val px = density.density
     val scope = rememberCoroutineScope()
@@ -101,7 +100,7 @@ fun ComposerMorphPhotoSheet(
     val currentNavigationBottom by rememberUpdatedState(navigationBottom)
     val currentOnDismiss by rememberUpdatedState(onDismiss)
 
-    /** iOS `modelSheetTop(composer:)`: the compact detent's top (root dp). */
+    /** iOS `composerSheetTop(composer:)`: the compact detent's top (root dp). */
     fun compactTop(): Float {
         val composer = anchors.composer
         val keyboard = currentImeBottom / px
@@ -110,7 +109,7 @@ fun ComposerMorphPhotoSheet(
         val focused = currentHadKeyboard
         val composerTop = composer.top / px
         if (focused && software) return composerTop
-        val minLift = max(ComposerMorphTunables.leastLift, FusedModelPickerTunables.mediumMax - max(composer.height / px.toDouble(), 56.0)).toFloat()
+        val minLift = max(ComposerMorphTunables.leastLift, ModelPickerTunables.mediumMax - max(composer.height / px.toDouble(), 56.0)).toFloat()
         val lift = if (software) keyboard - safeBottom else minLift
         val bar = if (focused) max(keyboard - safeBottom, 0f) else 0f
         return composerTop - max(lift - bar, 0f)
@@ -143,12 +142,14 @@ fun ComposerMorphPhotoSheet(
     /** iOS `backFromPhotoSheet`: folds onto the menu's surface, which (and whose rows) come back as it lands. */
     fun back() {
         if (!morph.isOpening) return
-        library.clearPicks()
-        library.resetClosingPicks()
+        // The picks are dropped, but their badges stay until the sheet has folded away.
+        library.setAsidePicks()
         foldsToComposer = false
         camera.expanded = false
         landsOn = if (source == Rect.Zero) null else source
-        morph.fold(ComposerMorphTunables.animation(opening = false, reduceMotion = reduceMotion), reduceMotion = reduceMotion)
+        val back = if (detent.isExpanded) ComposerMorphTunables.photoBackExpanded else ComposerMorphTunables.photoBack
+        val animation: FiniteAnimationSpec<Float> = if (reduceMotion) tween(200, easing = Motion.EaseInOut) else back.spec()
+        morph.fold(animation, reduceMotion = reduceMotion)
     }
 
     /** iOS `closePhotoSheet` / `foldPhotoSheet`: slides down and fades out while the composer rises back. */
@@ -163,7 +164,8 @@ fun ComposerMorphPhotoSheet(
             morph.dragTo(0f)
         }
         foldsToComposer = true
-        landsOn = null
+        // The sheet scales into the + and fades, keeping its content sharp.
+        landsOn = anchors.seed.takeIf { it != Rect.Zero }
         camera.expanded = false
         val animation: FiniteAnimationSpec<Float> = if (reduceMotion) tween(200, easing = Motion.EaseInOut) else ComposerMorphTunables.photoReturn.spec()
         morph.fold(animation, reduceMotion = reduceMotion)
@@ -257,8 +259,7 @@ fun ComposerMorphPhotoSheet(
         openedFrom = source.takeIf { it != Rect.Zero },
         landsOn = landsOn,
         stretchesUpward = true,
-        backdropBlur = if (reduceTransparency) 0.0 else ComposerMorphTunables.photoBackdropBlur,
-        backdropDim = ComposerMorphTunables.photoBackdropDim * if (reduceTransparency) 1.6 else 1.0,
+        backdropDim = ComposerMorphTunables.photoBackdropDim * ComposerMorphTunables.noBlurDimBoost,
         foot = {
             PlusPhotoSheetFoot(
                 library = library,
@@ -271,6 +272,9 @@ fun ComposerMorphPhotoSheet(
         outgoingReturns = menuOpen && !foldsToComposer,
         continuousGlass = true,
         dismissesDown = foldsToComposer,
+        keyboardStaysAsItFolds = true,
+        translatesDownward = detent.dragOriginExpanded == false,
+        seed = anchors.seed,
         retainsContent = true,
     ) {
         PlusPhotoSheetContent(

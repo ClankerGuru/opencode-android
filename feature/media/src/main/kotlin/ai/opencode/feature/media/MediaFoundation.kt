@@ -3,6 +3,9 @@ package ai.opencode.feature.media
 import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.tuning.Tunable
+import ai.opencode.server.OpenCodeServer
+import ai.opencode.server.model.OpenCodeImageAttachment
 import android.content.ComponentCallbacks2
 import android.content.res.Configuration
 import android.graphics.Bitmap
@@ -52,29 +55,99 @@ object TranscriptMetrics {
 }
 
 /**
- * What the full-screen photo viewer pages through (iOS `TranscriptImagePreview` in
- * `Transcript/TranscriptEntryView.swift`). Moved to media because the viewer, the image gallery
- * and Mermaid cards build it; the transcript sits above media.
+ * iOS `TranscriptTunables.sendImageDuration` (declared in `Composer/SentImageFlight.swift`): how
+ * long a sent photo takes to fly from the composer into its slot, the 99.5% time of a critical
+ * spring. Lives here because the composer's `SentImageFlight` and the session's flight read it
+ * and `:feature:transcript` (which registers it, after `jumpDuration`) sits above the composer.
  */
-data class TranscriptImagePreview(val id: String, val pages: List<Page>) {
-    /** [label] is the accessibility label / title; [image] the decoded original. */
-    class Page(val id: String, val image: Bitmap, val label: String) {
-        // iOS `Page: Equatable` compares id, label and image identity.
+object SendImageTunables {
+    val sendImageDuration = Tunable("transcript.send.imageDuration", "Image send duration", default = 0.55, range = 0.25..1.2, step = 0.01)
+
+    /** The flight's 99.5% time, seconds; ω = 7.43 / this. */
+    val duration: Double get() = sendImageDuration.value
+}
+
+/**
+ * What the full-screen photo viewer pages through (iOS `TranscriptImagePreview`, now in
+ * `Media/TranscriptImageViewer.swift`). Lives in media because the viewer, the image gallery
+ * and Mermaid cards build it; the transcript sits above media. A `media:<hash>` page may
+ * arrive without its image: the viewer loads it from [server].
+ */
+data class TranscriptImagePreview(val id: String, val pages: List<Page>, val server: OpenCodeServer? = null) {
+    /** [label] is the accessibility label / title; [image] the decoded original, or `null` while it loads. */
+    data class Page(
+        val id: String,
+        val image: Bitmap?,
+        val label: String,
+        /** A line under the title, such as dimensions and size. */
+        val detail: String? = null,
+        val mediaHash: String? = null,
+        val name: String? = null,
+        val isUnavailable: Boolean = false,
+        val loadFailed: Boolean = false,
+    ) {
+        // iOS `Page: Equatable`: every field, and the image by identity or by its pixels.
         override fun equals(other: Any?): Boolean =
-            other is Page && other.id == id && other.label == label && other.image === image
+            other is Page &&
+                other.id == id &&
+                other.label == label &&
+                other.detail == detail &&
+                other.mediaHash == mediaHash &&
+                other.name == name &&
+                other.isUnavailable == isUnavailable &&
+                other.loadFailed == loadFailed &&
+                (other.image === image || (other.image != null && image != null && other.image.sameAs(image)))
+
         override fun hashCode(): Int = id.hashCode() * 31 + label.hashCode()
     }
 
-    constructor(id: String, image: Bitmap, label: String) : this(id, listOf(Page(id, image, label)))
+    constructor(id: String, image: Bitmap, label: String, server: OpenCodeServer? = null) :
+        this(id, listOf(Page(id, image, label)), server)
 
     companion object {
-        /** iOS `init?(attachments:selectedID:label:)`: every decodable attachment, labelled "label i of n". */
+        /**
+         * iOS `init?(attachments:selectedID:label:server:)`: every decodable attachment, and
+         * every `media:<hash>` or unavailable one (shown loading or unavailable), each named or
+         * labelled "label i of n"; `null` when [selectedID] isn't among them.
+         */
         fun fromAttachments(
-            attachments: List<Pair<String, Bitmap?>>,
+            attachments: List<OpenCodeImageAttachment>,
+            selectedID: String,
+            label: String,
+            server: OpenCodeServer? = null,
+        ): TranscriptImagePreview? {
+            val items = attachments.mapNotNull { attachment ->
+                val image = CachedImage.decoded(attachment.id, attachment.data, attachment.mediaHash)
+                when {
+                    image != null -> attachment to image
+                    attachment.mediaHash != null || attachment.isUnavailable -> attachment to null
+                    else -> null
+                }
+            }
+            if (items.none { it.first.id == selectedID }) return null
+            return TranscriptImagePreview(
+                selectedID,
+                items.mapIndexed { index, (attachment, image) ->
+                    Page(
+                        id = attachment.id,
+                        image = image,
+                        label = attachment.name ?: "$label ${index + 1} of ${items.size}",
+                        mediaHash = attachment.mediaHash,
+                        name = attachment.name,
+                        isUnavailable = attachment.isUnavailable || MediaReferenceResolver.isUnavailable(attachment, server),
+                    )
+                },
+                server,
+            )
+        }
+
+        /** Already-decoded images by ID, each labelled "label i of n" (the agent image gallery and lab). */
+        fun fromImages(
+            images: List<Pair<String, Bitmap?>>,
             selectedID: String,
             label: String,
         ): TranscriptImagePreview? {
-            val decoded = attachments.mapNotNull { (id, image) -> image?.let { id to it } }
+            val decoded = images.mapNotNull { (id, image) -> image?.let { id to it } }
             if (decoded.none { it.first == selectedID }) return null
             return TranscriptImagePreview(
                 selectedID,

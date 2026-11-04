@@ -74,6 +74,7 @@ sealed interface VoiceRoute {
         isAtEar: Boolean,
         server: OpenCodeServer,
         delegation: LiveDelegation = LiveDelegation.client,
+        unboundSpeechUsesInstructions: Boolean = false,
     ): RealtimeSessionConfig = RealtimeSessionConfig(
         engine = engine,
         model = modelID,
@@ -84,6 +85,7 @@ sealed interface VoiceRoute {
         serverVoice = if (isServer) server else null,
         provider = provider,
         liveDelegation = if (usesBrokerDelegator) delegation else LiveDelegation.client,
+        unboundSpeechUsesInstructions = unboundSpeechUsesInstructions,
     )
 
     companion object {
@@ -100,6 +102,7 @@ sealed interface VoiceRoute {
             serverVoiceSupport: ServerVoiceSupport,
             hasOpenAIKey: Boolean,
             hasXAIKey: Boolean,
+            fallsBackToPhoneKey: Boolean = true,
         ): VoiceRoute {
             // Server Voice never owns Grok, including when Gemini is selected on the server.
             if (selectedEngine == VoiceEngine.grok) {
@@ -111,7 +114,9 @@ sealed interface VoiceRoute {
             if (serverVoiceEnabled && serverVoiceSupport != ServerVoiceSupport.unsupported) {
                 return serverOpenAI(if (selectedEngine == VoiceEngine.gptLive) OpenAI.gptLive else OpenAI.realtime)
             }
-            // Preserve the documented fallback only after a confirmed unsupported route.
+            // A server the person picked is never swapped for the phone's key.
+            if (serverVoiceEnabled && !fallsBackToPhoneKey) return Unavailable(Reason.ServerUnsupported)
+            // Automatic falls back only after a confirmed unsupported route.
             return if (hasOpenAIKey) PhoneKey(selectedEngine) else Unavailable(Reason.MissingPhoneKey(selectedEngine))
         }
     }
@@ -151,25 +156,90 @@ sealed interface VoiceKeySource {
 
 /**
  * Which server brokers a new call's Server Voice session (Settings › Voice ›
- * Voice Server), for calls on `connected`. Settings, Home, the session and a
- * call's start all resolve it here, and `resolve` takes its inputs from it.
- * Only the broker moves: a call's session, context and tools stay on its own server.
+ * Voice Provider), for calls on `connected`. Settings, Home, the session and a
+ * call's start all resolve it here ([VoicePick.resolve]), and [route] resolves
+ * the call from it. Only the broker moves: a call's session, context and
+ * tools stay on its own server.
  */
-class VoiceBroker(serverVoice: Boolean, choice: VoiceServerChoice, connected: OpenCodeServer?, saved: () -> List<OpenCodeServer>) {
-    /** Server Voice brokers new calls: it's on, and This iPhone isn't chosen. */
-    val isEnabled: Boolean = serverVoice && choice != VoiceServerChoice.Phone
+class VoiceBroker(
+    serverVoice: Boolean,
+    choice: VoiceServerChoice,
+    provider: ServerVoiceProvider = ServerVoiceProvider.openAI,
+    connected: OpenCodeServer?,
+    saved: () -> List<OpenCodeServer>,
+    readiness: VoiceReadiness = VoiceReadiness(),
+) {
+    /** Server Voice brokers new calls: it's on, and the pick is a server. */
+    val isEnabled: Boolean
 
-    /**
-     * The chosen saved server, else the connected one (by default, or once the
-     * chosen one is no longer saved). Null while nothing brokers.
-     */
-    val server: OpenCodeServer? = if (isEnabled) choice.savedServer(saved()) ?: connected else null
+    /** The server that brokers, picked or chosen automatically. Null while nothing brokers. */
+    val server: OpenCodeServer?
+
+    /** Chosen automatically: a server without the voice routes falls back to the phone's key. A pick never does. */
+    val isAutomatic: Boolean
+
+    /** The provider the broker runs: the picked one, OpenAI automatically. */
+    val provider: ServerVoiceProvider
+
+    init {
+        if (!serverVoice) {
+            isEnabled = false
+            server = null
+            isAutomatic = choice == VoiceServerChoice.Automatic
+            this.provider = provider
+        } else {
+            val pick = VoicePick.resolve(choice, provider, connected, saved(), readiness)
+            if (pick.place == VoiceProviderOption.Place.Phone) {
+                isEnabled = false
+                server = null
+            } else {
+                isEnabled = true
+                server = pick.server ?: connected
+            }
+            isAutomatic = pick.isAutomatic
+            this.provider = pick.provider
+        }
+    }
+
+    companion object {
+        /** The broker and the readiness it was resolved with (iOS `resolve(…)` returning a tuple). */
+        fun resolve(
+            serverVoice: Boolean,
+            choice: VoiceServerChoice,
+            provider: ServerVoiceProvider = ServerVoiceProvider.openAI,
+            connected: OpenCodeServer?,
+            saved: () -> List<OpenCodeServer>,
+            answers: Map<String, ServerVoiceModelsAnswer>,
+            support: Map<String, ServerVoiceSupport>,
+            hasOpenAIKey: Boolean,
+            engine: VoiceEngine,
+        ): Pair<VoiceBroker, VoiceReadiness> {
+            val readiness = VoiceReadiness(answers = answers, support = support, hasPhoneKey = hasOpenAIKey, engine = engine)
+            val broker = VoiceBroker(serverVoice, choice, provider, connected, saved, readiness)
+            return broker to readiness
+        }
+    }
 
     /** What's known of whether the broker offers `POST /api/experimental/voice/session`. */
     fun support(supportByServer: Map<String, ServerVoiceSupport>): ServerVoiceSupport =
         server?.let { supportByServer[it.persistenceID] } ?: ServerVoiceSupport.unknown
 
-    override fun equals(other: Any?): Boolean = other is VoiceBroker && other.isEnabled == isEnabled && other.server == server
-    override fun hashCode(): Int = isEnabled.hashCode() * 31 + server.hashCode()
-    override fun toString(): String = "VoiceBroker(isEnabled=$isEnabled, server=${server?.persistenceID?.let { "set" }})"
+    /** The route a new call on `engine` takes through this broker. */
+    fun route(engine: VoiceEngine, support: ServerVoiceSupport, hasOpenAIKey: Boolean, hasXAIKey: Boolean): VoiceRoute =
+        VoiceRoute.resolve(
+            selectedEngine = engine,
+            serverVoiceEnabled = isEnabled,
+            serverVoiceProvider = provider,
+            serverVoiceSupport = support,
+            hasOpenAIKey = hasOpenAIKey,
+            hasXAIKey = hasXAIKey,
+            fallsBackToPhoneKey = !isEnabled || isAutomatic,
+        )
+
+    override fun equals(other: Any?): Boolean =
+        other is VoiceBroker && other.isEnabled == isEnabled && other.server == server &&
+            other.isAutomatic == isAutomatic && other.provider == provider
+    override fun hashCode(): Int = listOf(isEnabled, server, isAutomatic, provider).hashCode()
+    override fun toString(): String =
+        "VoiceBroker(isEnabled=$isEnabled, server=${server?.persistenceID?.let { "set" }}, isAutomatic=$isAutomatic, provider=$provider)"
 }

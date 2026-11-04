@@ -24,7 +24,7 @@ import kotlin.math.abs
  * Partly ported: `onlyTheLabOverridesTheShippedStyle` and `headerBlurTunablesRegisterAndResolveLive`
  * keep only their baked-default checks (Android has no `TuningStore`, lab overrides or presets).
  * Not ported here: `composerGlassIsInteractiveAndSwipeDownDismissesKeyboard` (`ComposerSwipeDown`,
- * `:feature:composer`, ported there; `VoiceCallSurface.usesInteractiveGlass` has no Android counterpart).
+ * `:feature:composer`, ported there; `ComposerSurface.usesInteractiveGlass` has no Android counterpart).
  * Dropped (no Android counterpart): `removedSettingsPickCannotLeaveAnInvisibleHeaderOverride`
  * (`TuningStore`/`UserDefaults`), `decodesTheLabsJSON` (the lab's JSON bridge isn't ported, the style
  * isn't `Codable` here), `variableBlurAttachesANewFilterOnEveryLiveChange` and
@@ -285,14 +285,15 @@ class SessionHeaderStyleTests {
         assertEquals(ai.opencode.feature.session.header.HeaderTextStyle.Subheadline, HeaderBlurTunables.titleFont)
         assertEquals(ai.opencode.feature.session.header.HeaderTextStyle.Footnote, HeaderBlurTunables.projectFont)
 
-        // Default values match the shipped system edge on iOS 27, and apply the
-        // baked radius (4.5) and fadeStart (-20) on the app-blur path (iOS 26 / Force App Blur).
+        // Default values match the shipped style on both iOS 27 (system edge)
+        // and iOS 26 / Force App Blur (the app's progressive blur over the pocket).
         val defaulted = HeaderBlurTunables.resolved(env(osVersion = "27.0"))
         assertEquals(SessionHeaderStyle.shipped.resolved(env(osVersion = "27.0")), defaulted)
         assertEquals(Resolved.SystemEdge(pocket = 52f, isHard = false), defaulted.systemEdge)
         assertNull(defaulted.appBlur)
         val defaultedAppBlur = HeaderBlurTunables.resolved(env(osVersion = "26.6.1"))
-        assertEquals(Resolved.AppBlur(fadeStart = -20f, fadeEnd = 64f, radius = 4.5f), defaultedAppBlur.appBlur)
+        assertEquals(SessionHeaderStyle.shipped.resolved(env(osVersion = "26.6.1")), defaultedAppBlur)
+        assertEquals(Resolved.AppBlur(fadeStart = 40f, fadeEnd = 68f, radius = 8f), defaultedAppBlur.appBlur)
     }
 
     /**

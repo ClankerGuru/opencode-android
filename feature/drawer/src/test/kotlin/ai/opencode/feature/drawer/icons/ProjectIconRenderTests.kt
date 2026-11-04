@@ -19,6 +19,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import androidx.compose.ui.graphics.asAndroidBitmap
 import java.io.ByteArrayOutputStream
 import java.util.Base64
 import org.junit.Assert.assertEquals
@@ -33,7 +34,7 @@ import org.robolectric.annotation.GraphicsMode
 
 /**
  * iOS `ProjectIconTests`' tests that decode images (`rasterizesSVGAndClassifiesFullBleedAndTransparentGlyphs`,
- * `composerWrapperRendersItsLayerAndBackground`, `embeddedImagesStayLocalAndBounded`,
+ * `composerWrapperRendersItsLayerAndBackground`, `tileLightingIsBrightAtTheTopAndShared`, `embeddedImagesStayLocalAndBounded`,
  * `serverDataURLsCacheLocallyAndRefreshWhenContentChanges`, `loaderCachesOnDiskCoalescesAndRespectsLowDataMode`),
  * apart from `ProjectIconTests.kt` because they need real Android pixels: Robolectric's native graphics.
  */
@@ -53,6 +54,29 @@ class ProjectIconRenderTests {
         canvas.drawRect(l, t, r, b, Paint().apply { this.color = color })
 
     private fun b64(bytes: ByteArray) = Base64.getEncoder().encodeToString(bytes)
+
+    @Test
+    fun tileLightingIsBrightAtTheTopAndShared() {
+        val key = ai.opencode.feature.drawer.list.ProjectTileLighting.Key(side = 20f, radius = 5.5f, scale = 3f, highlight = 0.3f, edgeOpacity = 0.6f)
+        val image = checkNotNull(ai.opencode.feature.drawer.list.ProjectTileLighting.image(key))
+        assertTrue(ai.opencode.feature.drawer.list.ProjectTileLighting.image(key) === image)
+        assertEquals(60, image.width)
+        assertEquals(60, image.height)
+        val bitmap = image.asAndroidBitmap()
+        val alpha = { x: Int, y: Int -> Color.alpha(bitmap.getPixel(x, y)) }
+        // Highlight: strong near the top, gone by the bottom.
+        assertTrue(alpha(30, 6) > 30)
+        assertEquals(0, alpha(30, 50))
+        // Edge: brighter on the top row than the bottom row, both drawn.
+        assertTrue(alpha(30, 0) > alpha(30, 59))
+        assertTrue(alpha(30, 59) > 0)
+        // Nothing to draw (Increase Contrast with Reduce Transparency): no bitmap.
+        assertNull(
+            ai.opencode.feature.drawer.list.ProjectTileLighting.image(
+                ai.opencode.feature.drawer.list.ProjectTileLighting.Key(side = 20f, radius = 5.5f, scale = 3f, highlight = 0f, edgeOpacity = 0f),
+            ),
+        )
+    }
 
     @Test
     fun rasterizesSVGAndClassifiesFullBleedAndTransparentGlyphs() {

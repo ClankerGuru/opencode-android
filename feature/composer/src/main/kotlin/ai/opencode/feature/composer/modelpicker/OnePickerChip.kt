@@ -1,0 +1,230 @@
+package ai.opencode.feature.composer.modelpicker
+
+import ai.opencode.core.motion.transitionBlur
+
+import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.rememberReduceMotion
+import ai.opencode.core.ui.OpenCodeIcon
+import ai.opencode.core.ui.OpenCodeTextStyles
+import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.core.ui.SFSymbol
+import ai.opencode.core.ui.excludedFromDrawerPan
+import ai.opencode.core.ui.openCodeTapTarget
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.setProgress
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
+
+/**
+ * Port of iOS `OnePickerChip`: One Picker's composer chip, the provider's mark, the short model
+ * name and the level word dimmed ([OnePickerTunables.LEVEL_ALPHA]). A tap opens One Picker. The
+ * name rolls (a few dp of travel, a slight scale and blur) only when [ModelKey] changes, so a
+ * level change rolls the word alone, and the chip's width eases with them; neither animates
+ * while the picker is shown. Its root-dp frame goes to [OnePickerController.chipFrame].
+ *
+ * TalkBack: one "Choose model" button whose value is the name and level; on an adjustable model
+ * it is also a slider whose steps send [ModelPickerEvent.ModelRowLevelChanged] (iOS
+ * `accessibilityAdjustableAction`). Material 3 Expressive: no button chrome of its own, as the
+ * composer's other chips.
+ */
+@Composable
+fun OnePickerChip(
+    state: ModelPickerState,
+    controller: OnePickerController,
+    onEvent: (ModelPickerEvent) -> Unit,
+    onOpen: () -> Unit,
+    modifier: Modifier = Modifier,
+    isEnabled: Boolean = true,
+) {
+    val reduceMotion = rememberReduceMotion()
+    val density = LocalDensity.current
+    val key = OnePickerChip.ModelKey(state)
+    val scale = state.currentLevelScale
+    val levelLabel = state.currentChipLevelLabel
+    val animates = !controller.isShown
+    val model = state.currentModelInfo
+    val level = state.currentLevel
+    val value = listOfNotNull(key.shortName, levelLabel).joinToString(", ")
+
+    Row(
+        modifier
+            .excludedFromDrawerPan()
+            .onGloballyPositioned { coordinates ->
+                val bounds = coordinates.boundsInRoot()
+                if (bounds.width > 0f) {
+                    controller.chipFrame = Rect(
+                        bounds.left / density.density,
+                        bounds.top / density.density,
+                        bounds.right / density.density,
+                        bounds.bottom / density.density,
+                    )
+                }
+            }
+            .clickable(enabled = isEnabled, role = Role.Button) { onOpen() }
+            .openCodeTapTarget()
+            .heightIn(min = 48.dp)
+            .animateContentSize(if (animates) OnePickerTunables.chipWidth.animation(reduceMotion) else snap())
+            .clearAndSetSemantics {
+                contentDescription = "Choose model"
+                stateDescription = value
+                role = Role.Button
+                onClick { if (isEnabled) onOpen(); isEnabled }
+                if (scale != null && model != null) {
+                    val index = scale.index(level)
+                    progressBarRangeInfo = ProgressBarRangeInfo(index.toFloat(), 0f..(scale.count - 1).toFloat(), steps = (scale.count - 2).coerceAtLeast(0))
+                    setProgress { target ->
+                        val delta = target.roundToInt() - index
+                        if (delta == 0) return@setProgress false
+                        onEvent(ModelPickerEvent.ModelRowLevelChanged(model, scale.stepped(level, if (delta > 0) 1 else -1)))
+                        true
+                    }
+                }
+            }
+            .testTag("composer-model"),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        OnePickerChipRoll(key, animates, reduceMotion, label = "onePickerName") { rolled ->
+            Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (OnePickerTunables.CHIP_SHOWS_LOGO && (state.currentModel != null || model != null)) {
+                    OnePickerProviderMark(
+                        providerID = state.currentModel?.providerID ?: "opencode",
+                        canonical = model?.canonicalProviderID,
+                        size = 15.dp,
+                        tint = OpenCodeTheme.colors.secondaryText,
+                    )
+                }
+                Text(rolled.shortName, style = ChipTextStyle, color = OpenCodeTheme.colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        if (scale != null) {
+            if (OnePickerTunables.CHIP_SHOWS_ARC) {
+                AnimatedLevelArc(scale, level, size = 14.5.dp, color = OpenCodeTheme.colors.text.copy(alpha = 0.78f))
+            }
+            if (OnePickerTunables.CHIP_SHOWS_LEVEL_WORD && levelLabel != null) {
+                OnePickerChipRoll(levelLabel, animates, reduceMotion, label = "onePickerLevel") { word ->
+                    Text(
+                        word,
+                        style = ChipTextStyle,
+                        color = OpenCodeTheme.colors.text.copy(alpha = OnePickerTunables.LEVEL_ALPHA.toFloat()),
+                        maxLines = 1,
+                        softWrap = false,
+                    )
+                }
+            }
+        }
+        if (OnePickerTunables.CHIP_SHOWS_CHEVRON) {
+            OpenCodeIcon(SFSymbol.ChevronDown, null, size = 11.dp, tint = OpenCodeTheme.colors.secondaryText)
+        }
+    }
+}
+
+/** Names [OnePickerChip]'s identity: what changes it rolls the name. */
+object OnePickerChip {
+    /**
+     * iOS `OnePickerChip.ModelKey`: the chip rolls its name only when the model, its label or its
+     * mark changes, never for a level change or the catalogue arriving with the same label.
+     */
+    data class ModelKey(val id: String, val shortName: String, val icon: String) {
+        constructor(state: ModelPickerState) : this(
+            id = state.currentModel?.let { "${it.providerID}/${it.id}" } ?: "none",
+            shortName = state.currentModelShortName,
+            icon = (state.currentModel?.providerID ?: "opencode").let { providerID ->
+                OnePickerProviderMark.resolvedAssetName(providerID, state.currentModelInfo?.canonicalProviderID)
+                    ?: "fallback:${OnePickerProviderMark.fallbackInitial(providerID)}"
+            },
+        )
+    }
+}
+
+/** iOS `.subheadline.weight(.medium)`. */
+private val ChipTextStyle: TextStyle get() = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium)
+
+/**
+ * iOS `ChipRollModifier`: the outgoing value rises 5 pt, shrinks to 0.96, blurs (2.5) and fades
+ * as the next comes up from below (blur 2.0); under Reduce Motion only the opacity changes. Not
+ * animated ([animates] false) the value is swapped at once.
+ */
+@Composable
+private fun <T> OnePickerChipRoll(
+    target: T,
+    animates: Boolean,
+    reduceMotion: Boolean,
+    label: String,
+    content: @Composable (T) -> Unit,
+) {
+    val density = LocalDensity.current
+    val travel = with(density) { 5.dp.roundToPx() }
+    val roll: MotionSpring = OnePickerTunables.chipRoll
+    AnimatedContent(
+        targetState = target,
+        transitionSpec = {
+            val size = SizeTransform(clip = false) { _, _ -> if (animates) OnePickerTunables.chipWidth.animation(reduceMotion) else snap() }
+            if (!animates) {
+                (fadeIn(snap()) togetherWith fadeOut(snap())).using(size)
+            } else if (reduceMotion) {
+                (fadeIn(roll.animation(true)) togetherWith fadeOut(roll.animation(true))).using(size)
+            } else {
+                val slide = roll.animation<IntOffset>(false)
+                val fade = roll.animation<Float>(false)
+                (
+                    (slideInVertically(slide) { travel } + scaleIn(fade, initialScale = 0.96f) + fadeIn(fade)) togetherWith
+                        (slideOutVertically(slide) { -travel } + scaleOut(fade, targetScale = 0.96f) + fadeOut(fade))
+                    ).using(size)
+            }
+        },
+        contentAlignment = Alignment.CenterStart,
+        label = label,
+    ) { value ->
+        val blur by transition.animateFloat(
+            transitionSpec = { if (animates) roll.animation(reduceMotion) else snap() },
+            label = "$label-blur",
+        ) { phase ->
+            when {
+                reduceMotion || !animates || phase == EnterExitState.Visible -> 0f
+                phase == EnterExitState.PreEnter -> 2.0f
+                else -> 2.5f
+            }
+        }
+        Box(Modifier.transitionBlur { blur }) { content(value) }
+    }
+}

@@ -667,9 +667,10 @@ private fun promoteDelivered(id: String, state: State): State {
 /** A delivered message's rows as the server's decoder names them, at the transcript's end; kept like a per-message echo until a page has it. */
 private fun appendDelivered(input: OpenCodePendingInput, state: State): State {
     val id = input.id
+    val localImages = state.queuedInputImages[id]
     val rows = SessionFeature.promptRows(
         messageID = id, text = input.text, source = input.source,
-        images = state.queuedInputImages[id] ?: emptyList(),
+        images = localImages?.takeIf { it.isNotEmpty() } ?: input.images,
         fileReferences = input.files, inlineFiles = input.inlineFiles,
     )
     if (rows.isEmpty()) return state

@@ -1,24 +1,27 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.diagnostics.LabMarks
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticEffect
 import ai.opencode.core.haptics.HapticsClient
-import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.log.AppLog
-import ai.opencode.core.tuning.InternalBuild
-import ai.opencode.feature.voice.VoiceLabEnvironment
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionFrameAction
 import ai.opencode.core.motion.motionFrameLoop
 import ai.opencode.core.motion.rememberFrameDurationSeconds
 import ai.opencode.core.motion.rememberReduceMotion
+import ai.opencode.core.motion.transitionBlur
+import ai.opencode.core.tuning.InternalBuild
 import ai.opencode.core.ui.OpenCodeFonts
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.RollingNumber
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.feature.transcript.list.TranscriptBorrowedDrag
+import ai.opencode.feature.transcript.list.passesDragsToTranscript
+import ai.opencode.feature.voice.VoiceLabEnvironment
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.OpenCodeShell
 import androidx.activity.compose.BackHandler
@@ -34,11 +37,10 @@ import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -52,7 +54,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -73,14 +75,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.composed
-import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -90,17 +89,21 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.node.GlobalPositionAwareModifierNode
+import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -119,15 +122,15 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import java.time.Duration
 import java.time.Instant
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 // Port of iOS `Session/BackgroundWorkPanel.swift`. iOS reads `SessionFeature` state inside the
 // presentation; here every view takes immutable values and action lambdas so `SessionView` can
@@ -164,10 +167,42 @@ class BackgroundWorkAnchor {
 @Composable
 fun rememberBackgroundWorkAnchor(): BackgroundWorkAnchor = remember { BackgroundWorkAnchor() }
 
-/** Marks the capsule the background-work panel anchors to. */
-fun Modifier.backgroundActivityAnchor(anchor: BackgroundWorkAnchor): Modifier = onGloballyPositioned {
-    anchor.coordinates = it
-    anchor.bounds = it.boundsInRoot()
+/**
+ * Marks the capsule the background-work panel anchors to. Like iOS's anchor preference, the mark
+ * goes when its place does (the work ending takes the pill row's place away): the panel never
+ * keeps a capsule, or its touch target, where the place last was.
+ */
+fun Modifier.backgroundActivityAnchor(anchor: BackgroundWorkAnchor): Modifier = this then BackgroundActivityAnchorElement(anchor)
+
+private data class BackgroundActivityAnchorElement(val anchor: BackgroundWorkAnchor) : ModifierNodeElement<BackgroundActivityAnchorNode>() {
+    override fun create() = BackgroundActivityAnchorNode(anchor)
+
+    override fun update(node: BackgroundActivityAnchorNode) {
+        if (node.anchor === anchor) return
+        node.release()
+        node.anchor = anchor
+    }
+}
+
+private class BackgroundActivityAnchorNode(var anchor: BackgroundWorkAnchor) : Modifier.Node(), GlobalPositionAwareModifierNode {
+    private var marked: LayoutCoordinates? = null
+
+    override fun onGloballyPositioned(coordinates: LayoutCoordinates) {
+        marked = coordinates
+        anchor.coordinates = coordinates
+        anchor.bounds = coordinates.boundsInRoot()
+    }
+
+    override fun onDetach() = release()
+
+    /** Clears the mark unless another place has taken it since. */
+    fun release() {
+        val mine = marked ?: return
+        marked = null
+        if (anchor.coordinates !== mine) return
+        anchor.coordinates = null
+        anchor.bounds = null
+    }
 }
 
 /** The open panel covers the composer pills beside and above the capsule. */
@@ -312,7 +347,7 @@ private fun Opening(isOpen: Boolean, content: @Composable () -> Unit) {
 /** Blurs 3 dp while arriving or leaving (iOS `BlurFade`), never at rest. */
 private fun Modifier.blurringWith(scope: AnimatedVisibilityScope): Modifier = composed {
     val blur by scope.transition.animateFloat(label = "blur") { if (it == EnterExitState.Visible) 0f else 3f }
-    if (blur > 0.01f) blur(blur.dp, BlurredEdgeTreatment.Unbounded) else this
+    transitionBlur(blur.dp)
 }
 
 /**
@@ -386,8 +421,7 @@ private class Retained {
  *   tap on the scrim, a drag, Back, or the work ending).
  * @param isCovered a panel grown out of the composer (the model list, the level picker) stands
  *   over the capsule's place, so it hides like the pills.
- * @param inCall a voice call takes the composer's place: the panel closes.
- * @param showsCallTranscript the call's captions cover the pills: the capsule hides.
+ * @param inCall a voice call starts: the panel closes.
  * @param onToggle before the capsule toggles the panel (the composer gives up focus).
  * @param onOpenSubagent a subagent row tapped (`.subagentTapped(id)`); the panel closes first.
  * @param onOpenShell a shell row tapped (`.shellOutputTapped(id)`); the panel closes first.
@@ -407,7 +441,7 @@ fun BackgroundWorkPresentation(
     modifier: Modifier = Modifier,
     isCovered: Boolean = false,
     inCall: Boolean = false,
-    showsCallTranscript: Boolean = false,
+    transcript: TranscriptBorrowedDrag? = null,
     onToggle: () -> Unit = {},
     content: @Composable () -> Unit,
 ) {
@@ -471,7 +505,6 @@ fun BackgroundWorkPresentation(
     val latestHasWork by rememberUpdatedState(hasWork)
     val latestSession by rememberUpdatedState(sessionID)
     val latestCovered by rememberUpdatedState(isCovered)
-    val latestCallTranscript by rememberUpdatedState(showsCallTranscript)
 
     fun setCapsuleShown(shown: Boolean, animated: Boolean, completion: (() -> Unit)? = null) {
         capsuleShown = shown
@@ -580,14 +613,14 @@ fun BackgroundWorkPresentation(
         if (InternalBuild.isDebug) LabMarks.mark("background_work_close")
         val (spec, velocity) = BackgroundWorkMotion.closeAnimation(releaseVelocity, remainingDistance, reduceMotion)
         stage = BackgroundWorkStage.capsule
-        if (latestCallTranscript || latestCovered) setCapsuleShown(false, animated = !reduceMotion)
+        if (latestCovered) setCapsuleShown(false, animated = !reduceMotion)
         scope.launch {
             try {
                 progress.animateTo(0f, spec, initialVelocity = -velocity)
                 if (current == motion && !latestPresented && stage == BackgroundWorkStage.capsule) {
                     stage = BackgroundWorkStage.closed
                     dragController.reset()
-                    if (!latestCallTranscript && !latestCovered && latestHasWork) setCapsuleShown(true, animated = false)
+                    if (!latestCovered && latestHasWork) setCapsuleShown(true, animated = false)
                 }
             } catch (_: CancellationException) {
             }
@@ -646,19 +679,11 @@ fun BackgroundWorkPresentation(
     // Opening taps, closing is quiet, like the attachment menu.
     HapticEffect(Haptic.tap, isPresented) { _, open -> open }
     OnChange(sessionID) { _, _ -> reset() }
-    // A call takes the composer's place; its transcript covers the pills.
     OnChange(inCall) { _, call -> if (call) onPresentedChange(false) }
-    OnChange(showsCallTranscript) { _, shows ->
-        if (shows) {
-            if (latestPresented) onPresentedChange(false) else if (stage != BackgroundWorkStage.closed) close()
-        } else if (!latestCovered && latestHasWork) {
-            setCapsuleShown(true, animated = !reduceMotion)
-        }
-    }
     OnChange(isCovered) { _, covered ->
         if (covered) {
             if (latestPresented) onPresentedChange(false) else if (stage != BackgroundWorkStage.closed) close()
-        } else if (!latestCallTranscript && latestHasWork) {
+        } else if (latestHasWork) {
             setCapsuleShown(true, animated = !reduceMotion)
         }
     }
@@ -725,8 +750,8 @@ fun BackgroundWorkPresentation(
             traced.pill = pill.translate(o)
             traced.panel = panel.translate(o)
         }
-        // Like the pills it grows from, it hides under the call's transcript and under a panel grown out of the composer.
-        val hidden = showsCallTranscript || isCovered
+        // Like the pills it grows from, it hides under a panel grown out of the composer.
+        val hidden = isCovered
         val hiddenAlpha by androidx.compose.animation.core.animateFloatAsState(if (hidden) 0f else 1f, Motion.reducedFadeSpec(), label = "hidden")
         val summary = BackgroundWorkSummary.summary(rowAgents, rowShells)
         val surfaceColor = MaterialTheme.colorScheme.surfaceContainerHigh
@@ -804,8 +829,12 @@ fun BackgroundWorkPresentation(
                         .fillMaxSize()
                         .graphicsLayer { alpha = 1f - progress.value }
                         .then(
-                            if (stage == BackgroundWorkStage.closed && !hidden) {
+                            // iOS draws the capsule's button only while its glass is up (`capsuleShown`):
+                            // a capsule fading with the work, or gone, takes no touch.
+                            if (stage == BackgroundWorkStage.closed && !hidden && capsuleShown) {
                                 Modifier
+                                    // iOS `CapsuleDragsTranscript`: a vertical drag on the capsule scrolls the transcript.
+                                    .passesDragsToTranscript(transcript)
                                     .clickable(onClickLabel = "Shows running subagents and shells") {
                                         onToggle()
                                         onPresentedChange(!isPresented)
@@ -1017,27 +1046,20 @@ private fun BackgroundWorkRow(
     isLive: Boolean = true,
     leading: @Composable () -> Unit,
 ) {
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    // iOS `Color.primary.opacity(0.08)`.
-    val highlight = OpenCodeTheme.colors.text.copy(alpha = 0.08f)
     Row(
         modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp)
-            // A pressed row lifts a soft highlight inset from the panel's edges.
-            .drawBehind {
-                if (pressed) {
-                    val inset = 8.dp.toPx()
-                    drawRoundRect(highlight, Offset(inset, 0f), Size(size.width - 2 * inset, size.height), CornerRadius(16.dp.toPx()))
-                }
-            }
-            .clickable(interactionSource = interaction, indication = null, onClickLabel = accessibilityHint, onClick = onTap)
+            // Android divergence: a ripple inset from the panel's edges answers the press (iOS
+            // lifts a soft highlight there).
+            .padding(horizontal = 8.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClickLabel = accessibilityHint, onClick = onTap)
             .semantics(mergeDescendants = true) {
                 contentDescription = title
                 onClick(label = accessibilityHint) { onTap(); true }
             }
-            .padding(horizontal = 20.dp),
+            .padding(horizontal = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

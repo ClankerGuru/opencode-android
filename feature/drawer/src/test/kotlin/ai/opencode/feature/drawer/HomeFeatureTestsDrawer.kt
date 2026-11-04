@@ -729,52 +729,6 @@ class HomeFeatureTestsDrawer {
     }
 
     @Test
-    fun markReadClearsServerUnreadIndicatorBeforeReceiptCompletes() = homeTest { h ->
-        val session = session("ses_unread", "Unread", Instant.now(), idle = 2_000, viewed = 1_000)
-        val store = h.store(h.state { HomeFeature.State(server, snapshot(listOf(session))) }) {
-            this[OpenCodeClient] = OpenCodeClient.testValue.copy(viewSession = { _, _, _ -> throw OpenCodeClientError("Offline") })
-        }
-        assertEquals(HomeFeature.State.Indicator.unread, store.state.indicator(session))
-        store.send(Action.MarkRead(session.id)) {
-            it.copy(
-                sessions = listOf(it.sessions[0].copy(viewedMilliseconds = 2_000)),
-                locallyViewedMilliseconds = it.locallyViewedMilliseconds + (session.id to 2_000L),
-                sessionReadDates = it.sessionReadDates + (key(session.id) to session.updatedAt),
-            )
-        }
-        assertEquals(HomeFeature.State.Indicator.none, store.state.indicator(store.state.sessions[0]))
-        store.finish()
-    }
-
-    @Test
-    fun openingSessionClearsUnreadInTheSelectionStep() = homeTest { h ->
-        val session = session("ses_open", "Open me", date(10), idle = 2_000, viewed = 1_000)
-        val state = h.state {
-            HomeFeature.State(server, snapshot(listOf(session)))
-                .copy(transcriptCache = mapOf(session.id to emptyList()))
-                .updatingManuallyUnreadSessionKeys { it + key(session.id) }
-        }
-        val store = h.store(state) {
-            this[OpenCodeClient] = OpenCodeClient.testValue.copy(viewSession = { _, _, _ -> throw OpenCodeClientError("Offline") })
-        }
-
-        store.send(Action.SessionTapped(session.id)) {
-            val viewed = session.copy(viewedMilliseconds = 2_000)
-            it.copy(
-                sessions = listOf(viewed),
-                locallyViewedMilliseconds = it.locallyViewedMilliseconds + (session.id to 2_000L),
-                lastViewedSessionIDs = it.lastViewedSessionIDs + (server.persistenceID to session.id),
-                sessionReadDates = it.sessionReadDates + (key(session.id) to session.updatedAt),
-                manuallyUnreadSessionKeys = it.manuallyUnreadSessionKeys - key(session.id),
-                detailGeneration = 2,
-                sessionDetail = h.state { SessionFeature.State.session(server, session, cachedItems = emptyList(), navigationID = 2) },
-            )
-        }
-        assertEquals(HomeFeature.State.Indicator.none, store.state.indicator(store.state.sessions[0]))
-        store.finish()
-    }
-
-    @Test
     fun staleSnapshotAndFailedReceiptDoNotResurrectOpenedUnreadSession() = homeTest { h ->
         val session = session("ses_stale", "Stale", date(10), idle = 2_000, viewed = 1_000)
         val snapshot = snapshot(listOf(session))

@@ -57,12 +57,60 @@ class VoiceTimeline : Reducer<VoiceFeature.State, VoiceFeature.Action> {
                 val event = action.event
                 if (event is ReplyWatch.Event.WaitSucceeded) mark("voice_delegated_reply", "promptID=${event.promptID}", excerpt = event.reply)
             }
+            is VoiceFeature.Action.SessionDelegatorAdmitted -> mark(
+                "voice_session_delegator_admitted",
+                "callID=${action.callID} session=${action.admission.sessionID} promptID=${action.admission.promptID}",
+            )
+            is VoiceFeature.Action.SessionDelegatorAdmissionFailed ->
+                mark("voice_session_delegator_failed", "callID=${action.callID} error=${action.error.message}")
+            is VoiceFeature.Action.ScreenRequest -> when (action.action) {
+                is VoiceScreenRequestFeature.Action.Requested -> mark("voice_screen_requested")
+                VoiceScreenRequestFeature.Action.ShareTapped ->
+                    if (state.screenRequest.pending != null) mark("voice_screen_shared") else null
+                VoiceScreenRequestFeature.Action.NotNowTapped ->
+                    if (state.screenRequest.pending != null) mark("voice_screen_declined") else null
+                VoiceScreenRequestFeature.Action.TimedOut ->
+                    if (state.screenRequest.pending != null) mark("voice_screen_request_timed_out") else null
+                else -> null
+            }
+            is VoiceFeature.Action.OpenLink -> when (action.action) {
+                is VoiceOpenLinkFeature.Action.Requested -> mark("voice_open_link_requested")
+                VoiceOpenLinkFeature.Action.OpenTapped ->
+                    if (state.openLink.pending != null) mark("voice_open_link_opened") else null
+                VoiceOpenLinkFeature.Action.NotNowTapped ->
+                    if (state.openLink.pending != null) mark("voice_open_link_declined") else null
+                VoiceOpenLinkFeature.Action.TimedOut ->
+                    if (state.openLink.pending != null) mark("voice_open_link_timed_out") else null
+                else -> null
+            }
+            is VoiceFeature.Action.CallAudio -> {
+                val audio = action.action
+                if (audio is VoiceCallAudioFeature.Action.Started) {
+                    val result = audio.result
+                    if (result is CallAudioResult.Failed) {
+                        mark("voice_audio_failed", result.failure::class.simpleName)
+                    } else if (audio.replied) {
+                        mark("voice_audio_started")
+                    } else {
+                        mark("voice_audio_failed", "socket closed")
+                    }
+                }
+                val ends = audio == VoiceCallAudioFeature.Action.StopTapped ||
+                    (audio is VoiceCallAudioFeature.Action.Player && audio.event is CallAudioEvent.Finished)
+                if (ends && state.callAudio.track != null) mark("voice_audio_stopped")
+            }
+            is VoiceFeature.Action.CallRouteResolved -> action.note?.let { mark("voice_delegator_fallback", it) }
             VoiceFeature.Action.StartIfNeeded, VoiceFeature.Action.EndPressed, VoiceFeature.Action.ReconnectingShown,
-            is VoiceFeature.Action.SessionRenamed, VoiceFeature.Action.CaptionsTapped, VoiceFeature.Action.CaptionsDismissed,
+            is VoiceFeature.Action.SessionRenamed,
             is VoiceFeature.Action.CompactionObserved, is VoiceFeature.Action.DelegatorExplained, is VoiceFeature.Action.DelegatorPinned,
-            is VoiceFeature.Action.DelegatorOpenedDraft, VoiceFeature.Action.DelegatorRequestedEnd, is VoiceFeature.Action.PendingModelApplied,
-            is VoiceFeature.Action.DelegatorKeptPick, is VoiceFeature.Action.AtEarChanged, is VoiceFeature.Action.ServerVoiceSupportUpdated,
-            is VoiceFeature.Action.CallRouteResolved, is VoiceFeature.Action.CallCommand, is VoiceFeature.Action.Delegate,
+            is VoiceFeature.Action.DelegatorOpenedDraft, VoiceFeature.Action.DelegatorRequestedEnd, is VoiceFeature.Action.DelegatorSettledRequest,
+            is VoiceFeature.Action.PendingModelApplied, is VoiceFeature.Action.FloatingStage,
+            is VoiceFeature.Action.DelegatorKeptPick, is VoiceFeature.Action.SessionDelegatorAutomaticResolved,
+            is VoiceFeature.Action.SessionDelegatorTools, VoiceFeature.Action.SessionDelegatorStreamReconnected,
+            is VoiceFeature.Action.SessionDelegatorReconciledTools, is VoiceFeature.Action.SessionDelegatorSessionDeleted,
+            is VoiceFeature.Action.AtEarChanged, is VoiceFeature.Action.ServerVoiceSupportUpdated,
+            is VoiceFeature.Action.CallPlaceChanged, is VoiceFeature.Action.CallBrokerMoved, is VoiceFeature.Action.FailureFixTapped,
+            is VoiceFeature.Action.CallCommand, is VoiceFeature.Action.Delegate,
             -> Unit
         }
         return Reduced(state)

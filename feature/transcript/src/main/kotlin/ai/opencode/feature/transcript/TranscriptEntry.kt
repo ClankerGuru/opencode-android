@@ -51,16 +51,12 @@ sealed interface TranscriptEntry {
      */
     data class ReplyEnd(val endID: String, val texts: List<String>) : TranscriptEntry
 
-    /** Quiet 1–2 line summary at the end of the transcript (`OC-420`, `D-94`). */
-    data class SinceYouLeftEntry(val summary: SinceYouLeft) : TranscriptEntry
-
     val id: String
         get() = when (this) {
             is Single -> item.id
             is UserGroup -> "user-$groupID"
             is ToolGroup -> "group-$groupID"
             is ReplyEnd -> endID
-            is SinceYouLeftEntry -> "since-you-left-${summary.sessionID}-${summary.lastItemID}"
         }
 
     /** IDs of all transcript items represented by this list entry. */
@@ -70,7 +66,6 @@ sealed interface TranscriptEntry {
             is UserGroup -> items.map { it.id }
             is ToolGroup -> tools.map { it.id }
             is ReplyEnd -> emptyList()
-            is SinceYouLeftEntry -> listOf("since-you-left-${summary.lastItemID}")
         }
 
     /** Images produced by the tool calls this entry renders, in display order. */
@@ -121,7 +116,6 @@ sealed interface TranscriptEntry {
             is UserGroup -> "user"
             is ToolGroup -> "tools"
             is ReplyEnd -> "reply-end"
-            is SinceYouLeftEntry -> "since-you-left"
             is Single -> when (item) {
                 is OpenCodeTranscriptItem.AssistantMarkdown -> when {
                     item.text.contains("\n|") || item.text.startsWith("|") -> "table"
@@ -154,7 +148,6 @@ sealed interface TranscriptEntry {
                 is ToolGroup -> RowInsets(flow, flow)
                 // Belongs to the reply above it; the next row is a new turn.
                 is ReplyEnd -> RowInsets(flow, turn)
-                is SinceYouLeftEntry -> RowInsets(flow, flow)
             }
         }
 
@@ -204,7 +197,6 @@ sealed interface TranscriptEntry {
             isRunning: Boolean = false,
             models: List<OpenCodeModel> = emptyList(),
             sessionStartModels: Set<String>? = null,
-            sinceYouLeft: SinceYouLeft? = null,
         ): List<TranscriptEntry> {
             val startModels = sessionStartModels ?: sessionStartModelIDs(items)
             val entries = mutableListOf<TranscriptEntry>()
@@ -289,7 +281,6 @@ sealed interface TranscriptEntry {
             }
             flush()
             if (!isRunning) endReply()
-            if (sinceYouLeft != null && sinceYouLeft.text.isNotEmpty()) entries += SinceYouLeftEntry(sinceYouLeft)
             return entries
         }
 
@@ -342,7 +333,6 @@ sealed interface TranscriptEntry {
          */
         fun tail(entries: List<TranscriptEntry>): List<TranscriptEntry> {
             val last = entries.lastOrNull() ?: return emptyList()
-            if (last is SinceYouLeftEntry) return tail(entries.dropLast(1)) + last
             if (last !is ReplyEnd) return listOf(last)
             val content = entries.lastOrNull { it !is ReplyEnd } ?: return listOf(last)
             return listOf(last, content)

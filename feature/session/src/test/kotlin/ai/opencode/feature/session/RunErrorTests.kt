@@ -4,8 +4,6 @@ import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.ImmediateClock
 import ai.opencode.core.dependencies.UuidClient
 import ai.opencode.core.haptics.HapticsClient
-import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.feature.composer.AutocompleteItem
 import ai.opencode.feature.composer.ComposerAttachmentsFeature
 import ai.opencode.feature.composer.ComposerAutocompleteChip
@@ -758,6 +756,7 @@ class RunErrorTests {
                     familyTranscriptCache = it.familyTranscriptCache + ("ses_2" to emptyList()),
                     session = restoredSession,
                     items = items,
+                    newMessagesBaseline = items.map { item -> item.id }.toSet(),
                     runWorkGeneration = 2,
                     historyGeneration = 2,
                     earlierHistoryGeneration = 2,
@@ -924,7 +923,6 @@ class RunErrorTests {
             autocomplete = base.autocomplete.copy(chips = listOf(ComposerAutocompleteChip(AutocompleteItem.command(command), id = UUID(0, 0)))),
         )
         val store = h.store(initial) {
-            this[ExperimentalFeatures] = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.composerAutocomplete))
             this[UuidClient] = UuidClient.incrementing()
             this[OpenCodeClient] = this[OpenCodeClient].copy(
                 stageRevert = { _, _, _ -> stageGate.await() },

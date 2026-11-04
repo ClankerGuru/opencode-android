@@ -1,6 +1,7 @@
 package ai.opencode.server.live
 
 import ai.opencode.core.log.AppLog
+import ai.opencode.server.EventBatcher
 import ai.opencode.server.EventStreamOverflow
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
@@ -76,7 +77,7 @@ internal class SharedEventStreams(private val source: (OpenCodeServer) -> Flow<O
             }
         }
         awaitClose { leave(server, id) }
-    }.buffer(128)
+    }.buffer(EventBatcher.BUFFER_CAPACITY)
 
     private suspend fun pump(channel: Channel, upstream: Flow<OpenCodeServerEvent>) {
         var failure: Throwable? = null

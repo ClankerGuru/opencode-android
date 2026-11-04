@@ -168,6 +168,48 @@ class OpenCodeClientDecodingTests {
     }
 
     @Test
+    fun archivedTimeDecodes() = runTest {
+        val fixture = WireFixture {
+            Reply.Json(200, """{"data":{"id":"ses_archived","projectID":"p","title":"Archived","location":{"directory":"/project"},"time":{"updated":1789440123999,"archived":1789440124000}}}""")
+        }
+        withFixture(fixture) {
+            val session = OpenCodeClient.liveValue.getSession(fixture.server, "ses_archived")
+            assertEquals(1789440124000L, session.archivedMilliseconds)
+        }
+    }
+
+    /**
+     * Recents and search ask for unarchived roots, and drop any archived one
+     * a server that ignores `archived=false` still lists.
+     */
+    @Test
+    fun homeSnapshotAndSearchLeaveArchivedSessionsOut() = runTest {
+        val archived = """{"id":"ses_archived","projectID":"p","title":"Old","location":{"directory":"/project"},"time":{"updated":2000,"archived":1500}}"""
+        val fixture = WireFixture { request ->
+            when (request.route) {
+                "GET /api/project" -> Reply.Json(200, "[]")
+                "GET /api/session/active" -> Reply.Json(200, """{"data":{}}""")
+                "GET /api/session" -> Reply.Json(200, "{\"data\":[$archived,${sessionJSON("ses_live")}]}")
+                else -> Reply.status(404)
+            }
+        }
+        withFixture(fixture) {
+            val snapshot = OpenCodeClient.liveValue.homeSnapshot(fixture.server)
+            assertEquals(listOf("ses_live"), snapshot.sessions.map { it.id })
+            val found = OpenCodeClient.liveValue.searchSessions(fixture.server, "o", 20)
+            assertEquals(listOf("ses_live"), found.map { it.id })
+            val lists = fixture.requests.filter { it.route == "GET /api/session" }
+            assertEquals(2, lists.size)
+            assertTrue(lists.all { it.queryValue("archived") == "false" })
+        }
+
+        val fetched = WireFixture { Reply.Json(200, "{\"data\":$archived}") }
+        withFixture(fetched) {
+            assertTrue(OpenCodeClient.liveValue.getSession(fetched.server, "ses_archived").isArchived)
+        }
+    }
+
+    @Test
     fun homeActivityResolvesOnlyActiveAncestorsIncludingNestedChildren() = runTest {
         val responses = mapOf(
             "GET /api/project" to "[]",

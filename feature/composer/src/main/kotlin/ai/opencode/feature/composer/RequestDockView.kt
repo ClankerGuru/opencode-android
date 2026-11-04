@@ -6,6 +6,7 @@ import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
+import ai.opencode.core.motion.transitionBlurEffect
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.ui.OpenCodeTextStyles
@@ -13,13 +14,12 @@ import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.RollingNumber
 import ai.opencode.core.ui.RollingNumberAlignment
 import ai.opencode.core.ui.SFSymbol
-import ai.opencode.core.ui.openCodeTapTarget
 import ai.opencode.server.model.OpenCodeFormField
 import ai.opencode.server.model.OpenCodeFormFieldType
 import ai.opencode.server.model.OpenCodeFormOption
-import ai.opencode.server.model.OpenCodeJSONValue
 import ai.opencode.server.model.OpenCodeFormRequest
 import ai.opencode.server.model.OpenCodeFormValue
+import ai.opencode.server.model.OpenCodeJSONValue
 import ai.opencode.server.model.OpenCodePermissionReply
 import ai.opencode.server.model.OpenCodePermissionRequest
 import ai.opencode.server.model.OpenCodeSession
@@ -38,23 +38,25 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -67,12 +69,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.BlurEffect
-import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layout
@@ -98,21 +102,22 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.offset
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
-import androidx.compose.ui.unit.IntRect
-import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.LayoutDirection
+import kotlin.math.max
+import kotlin.math.min
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.math.max
-import kotlin.math.min
 
 /** The panel's measures (iOS `RequestDockView` statics). */
 object RequestDockMetrics {
@@ -197,8 +202,11 @@ fun RequestDockView(
     isKeyboardUp: Boolean,
     send: (RequestDockFeature.Action) -> Unit,
     modifier: Modifier = Modifier,
+    gesture: RequestPanelGesture? = null,
 ) {
     val reducedMotion = rememberReduceMotion()
+    val ownGesture = remember { RequestPanelGesture() }
+    val panelGesture = gesture ?: ownGesture
     val live = remember(dock, context.transcripts) { liveShown(dock, context) }
     var lastShown by remember { mutableStateOf<Shown?>(null) }
     var arrivedID by remember { mutableStateOf<String?>(null) }
@@ -221,7 +229,12 @@ fun RequestDockView(
     }
     SideEffect { if (live != null && live != lastShown) lastShown = live }
     // Mounted hidden for its first frame, so it rises in; cleared when it leaves, so the same request docking again rises again.
-    LaunchedEffect(live?.id) { arrivedID = live?.id }
+    LaunchedEffect(live?.id) {
+        arrivedID = live?.id
+        // Another request docked, or none: a drag or settle under way was the last one's.
+        panelGesture.reset()
+    }
+    DisposableEffect(Unit) { onDispose { panelGesture.reset() } }
     LaunchedEffect(live == null) {
         if (live != null || lastShown == null) return@LaunchedEffect
         delay(500)
@@ -269,7 +282,7 @@ fun RequestDockView(
                     this.alpha = alpha
                     translationY = rise.dp.toPx()
                     val radius = blur.dp.toPx()
-                    renderEffect = if (radius > 0.01f) BlurEffect(radius, radius, TileMode.Decal) else null
+                    renderEffect = transitionBlurEffect(radius)
                 }
                 .testTag(if (leaving) "request-dock-leaving" else "request-dock")
                 .semantics {
@@ -281,7 +294,7 @@ fun RequestDockView(
             val scope = DockScope(
                 dock, context, isKeyboardUp, send, state, focus, reducedMotion,
                 enabled = !leaving, pickScope = pickScope, latest = { latestDock to latestDictating },
-                screenReaderOn = screenReaderOn,
+                screenReaderOn = screenReaderOn, gesture = panelGesture,
             )
             scope.Content(shown)
         }
@@ -435,6 +448,8 @@ private class DockScope(
     val latest: () -> Pair<RequestDockFeature.State<*>, Boolean>,
     /** TalkBack is on (iOS `UIAccessibility.isVoiceOverRunning`). */
     val screenReaderOn: () -> Boolean,
+    /** The docked question's fold, which the session's surface follows. */
+    val gesture: RequestPanelGesture,
 ) {
     fun responding(id: String) = id in dock.respondingRequestIDs
 
@@ -458,6 +473,7 @@ private class DockScope(
         progress: Pair<Int, Int>? = null,
         onBack: (() -> Unit)? = null,
         busy: Boolean = false,
+        fold: (() -> Float)? = null,
     ) {
         val colors = OpenCodeTheme.colors
         val idle = dock.respondingRequestIDs.isEmpty()
@@ -499,7 +515,9 @@ private class DockScope(
             }
             if (progress != null && progress.second > 1) {
                 val (page, count) = progress
-                Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.Center) {
+                // Android: gone early in a fold, before the bar's count and arrow arrive in its place.
+                val leaves = if (fold == null) Modifier else Modifier.graphicsLayer { alpha = RequestCollapseFade.opacity(fold(), isBar = false, window = 0f..0.3f) }
+                Box(Modifier.heightIn(min = 48.dp).then(leaves), contentAlignment = Alignment.Center) {
                     RollingNumber(
                         text = "${page + 1} of $count",
                         style = OpenCodeTextStyles.footnote.copy(fontFeatureSettings = "tnum"),
@@ -510,30 +528,35 @@ private class DockScope(
                 }
             }
             if (dock.reviewRequestIDs.size > 1) QueueMenu()
-            if (closes) {
-                // Its centre on the corner arc's: `cornerRadius` in from the edge.
-                Box(
-                    Modifier
-                        .outset(end = RequestDockMetrics.edge - (RequestDockMetrics.cornerRadius - 22.dp))
-                        .size(48.dp)
-                        // iOS hint “Tells the agent what’s in your answer instead”: TalkBack reads “Double-tap to tell…”.
-                        .clickable(enabled = enabled && idle && !busy, onClickLabel = "Tell the agent what’s in your answer instead", role = Role.Button) {
-                            send(RequestDockFeature.Action.DismissTapped)
-                        }
-                        .semantics { contentDescription = "Dismiss" }
-                        .testTag("request-dismiss"),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Box(
-                        Modifier
-                            .size(RequestDockMetrics.closeSize)
-                            .clip(OpenCodeShape.circle)
-                            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        OpenCodeIcon(SFSymbol.Xmark, contentDescription = null, size = 16.dp, tint = colors.secondaryText)
-                    }
+            if (closes) CloseButton(busy)
+        }
+    }
+
+    @Composable
+    fun CloseButton(busy: Boolean) {
+        val colors = OpenCodeTheme.colors
+        val idle = dock.respondingRequestIDs.isEmpty()
+        // Its centre on the corner arc's: `cornerRadius` in from the edge.
+        Box(
+            Modifier
+                .outset(end = RequestDockMetrics.edge - (RequestDockMetrics.cornerRadius - 22.dp))
+                .size(48.dp)
+                // iOS hint “Tells the agent what’s in your answer instead”: TalkBack reads “Double-tap to tell…”.
+                .clickable(enabled = enabled && idle && !busy, onClickLabel = "Tell the agent what’s in your answer instead", role = Role.Button) {
+                    send(RequestDockFeature.Action.DismissTapped)
                 }
+                .semantics { contentDescription = "Dismiss" }
+                .testTag("request-dismiss"),
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(
+                Modifier
+                    .size(RequestDockMetrics.closeSize)
+                    .clip(OpenCodeShape.circle)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                contentAlignment = Alignment.Center,
+            ) {
+                OpenCodeIcon(SFSymbol.Xmark, contentDescription = null, size = 16.dp, tint = colors.secondaryText)
             }
         }
     }
@@ -607,10 +630,58 @@ private class DockScope(
         LaunchedEffect(pageKey) {
             if (pageKey != firstPage && enabled && screenReaderOn()) runCatching { focus.requestFocus() }
         }
+        val collapsed = form.id in dock.collapsedRequestIDs
+        val fold = rememberFold(form.id, collapsed)
+        RequestCollapseLayout(
+            progress = { fold.progress.value },
+            gesture = gesture,
+            collapsed = collapsed,
+            modifier = fold.dragModifier(form.id, enabled),
+            open = {
+                Box(
+                    Modifier
+                        .graphicsLayer { alpha = RequestCollapseFade.opacity(fold.progress.value, isBar = false) }
+                        .then(
+                            if (collapsed) Modifier.clearAndSetSemantics {}
+                            else Modifier.semantics {
+                                customActions = listOf(CustomAccessibilityAction("Collapse") { fold.settle(form.id, collapsed = true); true })
+                            },
+                        ),
+                ) {
+                    OpenFormPanel(form, answers, page, pageCount, field, caption, leavingPage, pageKey, firstPage, autoAdvance, fold = { fold.progress.value })
+                }
+            },
+            bar = {
+                Box(
+                    Modifier
+                        .graphicsLayer { alpha = RequestCollapseFade.opacity(fold.progress.value, isBar = true) }
+                        .then(if (collapsed) Modifier else Modifier.clearAndSetSemantics {}),
+                ) {
+                    CollapsedBar(form, caption, answers, progress = { fold.progress.value }) { fold.settle(form.id, collapsed = false) }
+                }
+            },
+        )
+    }
+
+    @Composable
+    fun OpenFormPanel(
+        form: OpenCodeFormRequest,
+        answers: Map<String, OpenCodeFormValue>,
+        page: Int,
+        pageCount: Int,
+        field: OpenCodeFormField?,
+        caption: String,
+        leavingPage: PageSnapshot?,
+        pageKey: String,
+        firstPage: String,
+        autoAdvance: Int?,
+        fold: () -> Float,
+    ) {
         RequestPanelFallback(Modifier.padding(bottom = 6.dp)) {
             Header(
                 AnnotatedString(caption), caption, closes = true,
                 progress = page to pageCount,
+                fold = fold,
                 onBack = if (page > 0) ({ changePage(form.id, page - 1) }) else null,
                 busy = responding(form.id),
             )
@@ -628,6 +699,90 @@ private class DockScope(
             }
             ErrorLines(form.id, isForm = true, inline = field?.let { inlineValidation(it, answers) })
         }
+    }
+
+    /**
+     * The question folded down: its caption, how many are left, and ×. A tap or a drag up brings
+     * it back. Android adds the expand arrow Material's collapsed content shows.
+     */
+    @Composable
+    fun CollapsedBar(
+        form: OpenCodeFormRequest,
+        caption: String,
+        answers: Map<String, OpenCodeFormValue>,
+        progress: () -> Float,
+        onExpand: () -> Unit,
+    ) {
+        val colors = OpenCodeTheme.colors
+        val left = RequestCollapse.remaining(form, answers)
+        val count = if (form.isQuestion && left > 0) "$left ${if (left == 1) "question" else "questions"} left" else null
+        Row(
+            Modifier.fillMaxWidth().padding(top = RequestDockMetrics.headerTop, bottom = 6.dp).heightIn(min = 48.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Row(
+                Modifier
+                    .weight(1f)
+                    .heightIn(min = 48.dp)
+                    .outset(start = 12.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable(enabled = enabled, onClickLabel = "Show the question", role = Role.Button, onClick = onExpand)
+                    .padding(start = 12.dp)
+                    .semantics(mergeDescendants = true) {
+                        contentDescription = "Needs your input, $caption"
+                        if (count != null) stateDescription = count
+                    }
+                    .testTag("request-expand"),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    caption,
+                    style = OpenCodeTextStyles.footnote.copy(fontWeight = FontWeight.Medium),
+                    color = colors.secondaryText,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                if (count != null) {
+                    Text(
+                        count,
+                        style = OpenCodeTextStyles.footnote.copy(fontFeatureSettings = "tnum"),
+                        color = colors.secondaryText,
+                        maxLines = 1,
+                        modifier = Modifier.graphicsLayer { alpha = RequestCollapseFade.opacity(progress(), isBar = true, window = 0.7f..1f) },
+                    )
+                }
+                OpenCodeIcon(
+                    SFSymbol.ChevronUp,
+                    contentDescription = null,
+                    size = 20.dp,
+                    tint = colors.secondaryText,
+                    modifier = Modifier.graphicsLayer { alpha = RequestCollapseFade.opacity(progress(), isBar = true, window = 0.7f..1f) },
+                )
+            }
+            CloseButton(busy = responding(form.id))
+        }
+    }
+
+    @Composable
+    fun rememberFold(formID: String, collapsed: Boolean): RequestFold {
+        val haptics = remember { dependency(HapticsClient) }
+        val density = LocalDensity.current.density
+        val scope = rememberCoroutineScope()
+        val fold = remember(formID) { RequestFold(if (collapsed) 1f else 0f) }
+        fold.bind(gesture, scope, haptics, density, reducedMotion, send) { latest().first.collapsedRequestIDs }
+        // The reducer folded or opened it (a failed send opens it): it springs there.
+        LaunchedEffect(fold, collapsed) { fold.follow(collapsed) }
+        DisposableEffect(fold) {
+            onDispose {
+                // The panel went mid-drag: its drag's end won't come.
+                fold.drag = null
+                gesture.reset()
+            }
+        }
+        return fold
     }
 
     fun changePage(formID: String, page: Int) {
@@ -953,12 +1108,10 @@ private class DockScope(
     fun ErrorLines(id: String, isForm: Boolean, inline: String? = null) {
         val error = dock.requestErrors[id]
         if (error != null) {
-            if (id in dock.failedReplyIDs) {
-                RequestErrorLine(
-                    if (isForm) "Couldn’t send answer" else "Couldn’t send reply",
-                    detail = error,
-                    modifier = Modifier.padding(vertical = 6.dp),
-                )
+            val title = dock.replyFailureTitle(id, isForm)
+            if (title != null) {
+                // Send has become Retry (or × can go again), so a line is all it needs.
+                RequestErrorLine(title, detail = error, modifier = Modifier.padding(vertical = 6.dp))
             } else if (error != inline) {
                 RequestErrorLine(error, modifier = Modifier.padding(vertical = 6.dp))
             }
@@ -980,103 +1133,61 @@ private class DockScope(
     }
 }
 
-/** A choice: its mark on the title's baseline, the title 12 dp after it (iOS `RequestOptionRow`). */
-@Composable
-fun RequestOptionRow(
-    title: String,
-    description: String?,
-    selected: Boolean,
-    multiple: Boolean,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-    onClick: () -> Unit,
-) {
-    val colors = OpenCodeTheme.colors
-    Row(
-        modifier
-            .fillMaxWidth()
-            .heightIn(min = 48.dp)
-            .clickable(enabled = enabled, role = if (multiple) Role.Checkbox else Role.RadioButton, onClick = onClick)
-            .semantics(mergeDescendants = true) { this.selected = selected }
-            .padding(vertical = 11.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.Top,
-    ) {
-        SelectionMark(selected, multiple)
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-            Text(title, style = OpenCodeTextStyles.body, color = colors.text)
-            description?.ifEmpty { null }?.let {
-                Text(it, style = OpenCodeTextStyles.footnote, color = colors.secondaryText)
-            }
-        }
-    }
-}
-
-/** Hairlines start at the titles (iOS `RequestOptionRow.divider`). */
-@Composable
-fun RequestOptionRowDivider() {
-    HorizontalDivider(Modifier.padding(start = SelectionMarkWidth + 12.dp), color = OpenCodeTheme.colors.border)
-}
-
-/** [SelectionMark]'s width. */
-val SelectionMarkWidth: Dp = 22.dp
-
 /**
- * The empty or filled mark beside a choice: a circle for one answer, a rounded square for
- * several. Filled is the cue beyond colour.
+ * Scrolls what's taller than [cap], sized to what it holds; its edges fade only where there's
+ * more, so nothing slides under a hard edge. In a panel short of room it gives up height,
+ * down to [floor], in [priority] order (iOS `FadingScroll`). It reaches the panel's edges,
+ * so bands inside run full width; content pads itself to [RequestDockMetrics.edge].
  */
 @Composable
-fun SelectionMark(selected: Boolean, multiple: Boolean) {
-    val colors = OpenCodeTheme.colors
-    val reducedMotion = rememberReduceMotion()
-    val symbol = when {
-        selected && multiple -> SFSymbol.CheckmarkSquareFill
-        selected -> SFSymbol.CheckmarkCircleFill
-        multiple -> SFSymbol.Square
-        else -> SFSymbol.Circle
-    }
-    // Sits on the title's first line (body, 22 sp line).
-    Box(Modifier.width(SelectionMarkWidth).heightIn(min = 22.dp), contentAlignment = Alignment.Center) {
-        if (reducedMotion) {
-            OpenCodeIcon(symbol, contentDescription = null, size = SelectionMarkWidth, tint = if (selected) colors.text else colors.tertiaryText)
-        } else {
-            // Crossfade's fade without its transition machinery per row: a panel of choices builds in one cheap pass.
-            var leaving by remember { mutableStateOf<Pair<SFSymbol, Color>?>(null) }
-            var current by remember { mutableStateOf(symbol to (if (selected) colors.text else colors.tertiaryText)) }
-            val fade = remember { Animatable(1f) }
-            val tint = if (selected) colors.text else colors.tertiaryText
-            LaunchedEffect(symbol, tint) {
-                if (current.first == symbol) {
-                    current = symbol to tint
-                    return@LaunchedEffect
-                }
-                leaving = current
-                current = symbol to tint
-                fade.snapTo(0f)
-                fade.animateTo(1f, Motion.easeOut(Motion.fadeFast))
-                leaving = null
+internal fun FadingScroll(
+    cap: Dp,
+    floor: Dp,
+    priority: Double,
+    identifier: String,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    val scroll = rememberScrollState()
+    val fade = 20.dp
+    Box(
+        modifier
+            .requestPanelPart(cap, floor, priority)
+            .heightIn(max = cap)
+            .bleedHorizontally(RequestDockMetrics.edge)
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+            .drawWithContent {
+                drawContent()
+                // A question that fits never fades, even mid-transition.
+                val scrolls = scroll.maxValue > 1
+                val top = scrolls && scroll.value > 1
+                val bottom = scrolls && scroll.maxValue - scroll.value > 1
+                if (!top && !bottom || size.height <= 0f) return@drawWithContent
+                val edge = min(fade.toPx() / size.height, 0.5f)
+                drawRect(
+                    Brush.verticalGradient(
+                        0f to (if (top) Color.Transparent else Color.Black),
+                        edge to Color.Black,
+                        1f - edge to Color.Black,
+                        1f to (if (bottom) Color.Transparent else Color.Black),
+                    ),
+                    blendMode = BlendMode.DstIn,
+                )
             }
-            leaving?.let { (old, oldTint) ->
-                OpenCodeIcon(old, contentDescription = null, size = SelectionMarkWidth, tint = oldTint, modifier = Modifier.graphicsLayer { alpha = 1f - fade.value })
-            }
-            OpenCodeIcon(current.first, contentDescription = null, size = SelectionMarkWidth, tint = current.second, modifier = Modifier.graphicsLayer { alpha = fade.value })
-        }
-    }
+            .verticalScroll(scroll)
+            .testTag(identifier),
+    ) { content() }
 }
 
-/** “Couldn’t send answer”, with the server's reason beneath (iOS `RequestErrorLine`). */
-@Composable
-fun RequestErrorLine(title: String, modifier: Modifier = Modifier, detail: String? = null) {
-    val colors = OpenCodeTheme.colors
-    Column(modifier.fillMaxWidth().semantics(mergeDescendants = true) {}, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-            OpenCodeIcon(SFSymbol.ExclamationmarkCircleFill, contentDescription = null, size = 16.dp, tint = colors.destructive)
-            Text(title, style = OpenCodeTextStyles.footnote.copy(fontWeight = FontWeight.Medium), color = colors.destructive)
-        }
-        if (detail != null) {
-            Text(detail, style = OpenCodeTextStyles.caption1, color = colors.secondaryText, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        }
-    }
+/** iOS `.padding(.horizontal, -edge)`: reaches [edge] past each side of what it's given. */
+internal fun Modifier.bleedHorizontally(edge: Dp): Modifier = layout { measurable, constraints ->
+    val extra = (edge * 2).roundToPx()
+    val widened = if (constraints.hasBoundedWidth) {
+        constraints.copy(minWidth = constraints.minWidth + extra, maxWidth = constraints.maxWidth + extra)
+    } else constraints
+    val placeable = measurable.measure(widened)
+    val width = (placeable.width - extra).coerceIn(constraints.minWidth, constraints.maxWidth)
+    layout(width, placeable.height) { placeable.place(-edge.roundToPx(), 0) }
 }
 
 /**
@@ -1135,8 +1246,11 @@ private fun SideBySideOrStacked(spacing: Dp, content: @Composable () -> Unit) {
 
 /** iOS negative padding: reaches past its slot by [start] / [end] without taking their room. */
 private fun Modifier.outset(start: Dp = 0.dp, end: Dp = 0.dp): Modifier = layout { measurable, constraints ->
-    val placeable = measurable.measure(constraints)
-    val width = max(placeable.width - start.roundToPx() - end.roundToPx(), 0)
+    val reach = start.roundToPx() + end.roundToPx()
+    // Measured with the reach added, so the reported width still meets a `weight`'s minimum; under it,
+    // Compose would centre the row in its slot and shift it by half the reach.
+    val placeable = measurable.measure(constraints.offset(horizontal = reach))
+    val width = max(placeable.width - reach, 0)
     layout(width, placeable.height) { placeable.place(-start.roundToPx(), 0) }
 }
 

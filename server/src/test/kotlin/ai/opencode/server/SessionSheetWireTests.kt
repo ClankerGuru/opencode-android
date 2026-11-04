@@ -14,6 +14,7 @@ import kotlinx.serialization.json.JsonElement
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Rule
@@ -158,7 +159,9 @@ class SessionSheetWireTests {
             assertEquals(listOf("alias", null), catalog.models.map { it.catalogID })
             assertTrue(catalog.models[0].matches(OpenCodeModelRef(id = "alias", providerID = "p")))
             assertFalse(catalog.models[0].matches(OpenCodeModelRef(id = "api-model", providerID = "p")))
-            assertEquals(catalog.models[0], catalog.models.model(OpenCodeModelRef(id = "api-model", providerID = "p")))
+            assertNull(catalog.models.model(OpenCodeModelRef(id = "api-model", providerID = "p")))
+            assertEquals(catalog.models[0], catalog.models.model(OpenCodeModelRef(id = "alias", providerID = "p")))
+            assertEquals(400_000, catalog.models.model(OpenCodeModelRef(id = "alias", providerID = "p"))?.contextLimit)
             assertEquals(OpenCodeModelRef(id = "alias", providerID = "p"), catalog.models[0].ref)
             assertFalse(catalog.models[0].matches(OpenCodeModelRef(id = "alias", providerID = "other")))
         } finally {

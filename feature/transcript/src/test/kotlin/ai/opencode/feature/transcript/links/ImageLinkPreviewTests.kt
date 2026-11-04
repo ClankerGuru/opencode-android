@@ -66,9 +66,7 @@ class ImageLinkPreviewTests {
 
     @Test
     fun imageLinkSettingsArePartOfTheEquatableLayoutSnapshot() {
-        val before = TranscriptTunables.layoutSnapshot(imageLinkPreviews = false)
-        val enabled = TranscriptTunables.layoutSnapshot(imageLinkPreviews = true)
-        assertNotEquals(before, enabled)
+        val enabled = TranscriptTunables.layoutSnapshot()
         val taller = enabled.copy(linkMaxHeight = enabled.linkMaxHeight + 10)
         assertNotEquals(enabled, taller)
     }

@@ -1,7 +1,14 @@
 package ai.opencode.feature.transcript.rows
 
+import ai.opencode.feature.media.MermaidDiagramMetrics
 import ai.opencode.feature.transcript.list.GrowthSoftEdge
+import ai.opencode.feature.transcript.markdown.ui.MarkdownImage
+import ai.opencode.server.model.OpenCodeImageAttachment
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.unit.IntSize
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.abs
@@ -72,6 +79,22 @@ class TranscriptLayoutTests {
         assertEquals(0f, edge.drawn(1.0 + GrowthSoftEdge.LEAVE_DURATION + 0.001), 0.001f)
         assertTrue(edge.isIdle(1.0 + GrowthSoftEdge.LEAVE_DURATION + 0.001))
     }
+
+    /**
+     * iOS 79bfa45f: a promotion that takes the growth over (the row stands below where its edge
+     * began, still short of its content) eases the edge away instead of dropping it in one frame.
+     */
+    @Test
+    fun aPromotionThatTakesTheGrowthOverEasesItsEdgeAway() {
+        val edge = GrowthSoftEdge()
+        edge.update(28f, measured = 34f, now = 0.0, maxFade = 28f)
+        edge.update(31f, measured = 34f, now = 0.0, maxFade = 28f)
+        assertEquals(3f, edge.drawn(0.0), 0.01f)
+        edge.update(27f, measured = 40f, now = 1.0, maxFade = 28f)
+        assertTrue(edge.isLeaving)
+        assertEquals(3f, edge.drawn(1.0), 0.01f)
+        assertEquals(0f, edge.drawn(1.0 + GrowthSoftEdge.LEAVE_DURATION + 0.001), 0.001f)
+    }
 }
 
 class JustifiedImageRowsTests {
@@ -122,5 +145,64 @@ class JustifiedImageRowsTests {
         val panorama = rows.frames[1]
         assertEquals(width, panorama.width, 0.01f)
         assertEquals("icon and portrait share a row", rows.frames[2].top, rows.frames[3].top)
+    }
+
+    @Test
+    fun aMediaTileWithoutDimensionsTakesItsShapeOnceLoaded() {
+        val hash = "a1".repeat(32)
+        val images = listOf(
+            OpenCodeImageAttachment(id = "inline"),
+            OpenCodeImageAttachment(id = "sized", mediaHash = hash, pixelWidth = 400, pixelHeight = 300),
+            OpenCodeImageAttachment(id = "unsized", mediaHash = hash),
+        )
+        val decoded = listOf(IntSize(1179, 2556), null, null)
+        val phone = 1179f / 2556
+        val sized = 4f / 3
+        val wide = 16f / 9
+        val before = ToolImageMosaic.aspects(images, decoded, emptyMap())
+        assertEquals(listOf(phone, sized, 1f), before)
+        val after = ToolImageMosaic.aspects(images, decoded, mapOf("unsized" to wide, "inline" to 3f))
+        assertEquals(listOf(phone, sized, wide), after)
+    }
+
+    @Test
+    fun aTilesNewShapeRevisesItsRowOnlyWhenTheLayoutChanges() {
+        val size = IntSize(1600, 900)
+        val wide = 16f / 9
+        // Loaded cold, laid out square: remember it and revise the row.
+        val cold = ToolImageMosaic.change(size, known = null, laidOutAt = 1f)
+        assertEquals(wide, cold.record)
+        assertTrue(cold.revisesRow)
+        // Shown warm at its shape: remember it for after a purge, nothing moves.
+        val warm = ToolImageMosaic.change(size, known = null, laidOutAt = wide)
+        assertEquals(wide, warm.record)
+        assertFalse(warm.revisesRow)
+        // Reloaded after a purge, laid out at the remembered shape: nothing at all.
+        val reloaded = ToolImageMosaic.change(size, known = wide, laidOutAt = wide)
+        assertNull(reloaded.record)
+        assertFalse(reloaded.revisesRow)
+        // Reported again before the mosaic re-laid out: already known, nothing moves.
+        val again = ToolImageMosaic.change(size, known = wide, laidOutAt = 1f)
+        assertNull(again.record)
+        assertFalse(again.revisesRow)
+        assertNull(ToolImageMosaic.change(IntSize.Zero, known = null, laidOutAt = 1f).record)
+    }
+
+    @Test
+    fun markdownImageAndMermaidDiagramReviseRowsOnAsyncHeightChanges() {
+        // Cached Markdown images laid out on Frame 0 do not revise the row when the load runs.
+        assertFalse(MarkdownImage.revisesRow(hadImage = true, wasFailed = false, nextImage = true, nextFailed = false))
+        // Cold placeholder (120 dp) -> loaded image or failed card (48 dp) revises the row.
+        assertTrue(MarkdownImage.revisesRow(hadImage = false, wasFailed = false, nextImage = true, nextFailed = false))
+        assertTrue(MarkdownImage.revisesRow(hadImage = false, wasFailed = false, nextImage = false, nextFailed = true))
+        // Retrying from failed card -> loading placeholder revises the row.
+        assertTrue(MarkdownImage.revisesRow(hadImage = false, wasFailed = true, nextImage = false, nextFailed = false))
+
+        // Mermaid cards sized from a prepared diagram do not revise when the render confirms the same size.
+        val preloaded = Size(320f, 180f)
+        assertFalse(MermaidDiagramMetrics.revisesRow(laidOutSize = preloaded, renderedSize = preloaded))
+        // Uncached placeholder or changed diagram dimensions revise the row.
+        assertTrue(MermaidDiagramMetrics.revisesRow(laidOutSize = null, renderedSize = preloaded))
+        assertTrue(MermaidDiagramMetrics.revisesRow(laidOutSize = preloaded, renderedSize = Size(320f, 240f)))
     }
 }

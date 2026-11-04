@@ -1,10 +1,11 @@
 package ai.opencode.feature.session
 
-import ai.opencode.feature.composer.modelpicker.ModelPickerSection
+import ai.opencode.feature.composer.modelpicker.ModelDisplayNames
 import ai.opencode.feature.composer.modelpicker.ModelPickerState
 import ai.opencode.feature.composer.RequestDockFeature
 import ai.opencode.feature.composer.DraftState
 import ai.opencode.core.haptics.Haptic
+import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.cancellable
@@ -13,12 +14,14 @@ import ai.opencode.feature.session.SessionFeature.CancelID
 import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.feature.composer.ComposerAutocompleteState
 import ai.opencode.feature.composer.modelpicker.ModelLevelScale
-import ai.opencode.server.model.ModelSearch
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.model.OpenCodeModel
 import ai.opencode.server.model.OpenCodeModelRef
+import ai.opencode.server.model.model
 import ai.opencode.server.model.OpenCodeProject
 import ai.opencode.server.model.OpenCodeTranscriptItem
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 
 // Port of iOS `SessionFeature+Models.swift`: models, projects, the family, shells, and the Session
 // sheet.
@@ -41,9 +44,23 @@ internal fun SessionFeature.reduceModelsAndFamily(state: State, action: Action):
     is Action.ModelsResponse -> {
         val catalog = action.result.getOrNull()
         if (catalog != null) {
+            val serverID = state.server.persistenceID
+            val remembered = state.modelDisplayNamesByServer.value[serverID]
+            val names = (remembered ?: ModelDisplayNames()).remember(catalog.models)
+            if (names.entries.isNotEmpty() && remembered != names) {
+                state.modelDisplayNamesByServer.update { it + (serverID to names) }
+            }
             var next = state.copy(isLoadingModels = false, modelsLoadError = null)
             // A momentarily empty answer never replaces a list already shown.
-            if (catalog.models.isNotEmpty() || next.models.isEmpty()) next = next.copy(models = catalog.models)
+            if ((catalog.models.isNotEmpty() || next.models.isEmpty()) && next.models != catalog.models) {
+                next = next.copy(models = catalog.models)
+            }
+            // A pick whose provider or model went away (often one saved before a relaunch) falls
+            // back to the session's model rather than fail the send.
+            val pending = next.pendingModel
+            if (pending != null && next.models.isNotEmpty() && !SessionFeature.catalog(next.models, offers = pending)) {
+                next = next.copy(pendingModel = null, currentModel = next.session?.model ?: catalog.defaultModel?.ref)
+            }
             if (next.currentModel == null) next = next.copy(currentModel = catalog.defaultModel?.ref)
             Reduced(next)
         } else {
@@ -71,21 +88,6 @@ internal fun SessionFeature.reduceModelsAndFamily(state: State, action: Action):
 
     is Action.ModelRowLevelChanged -> Reduced(modelRowLevelChanged(action.model, action.level, state))
 
-    Action.ModelSearchSubmitted -> {
-        val resolved = ModelSearch.resolvePick(
-            state.models,
-            query = state.modelFilter,
-            favorites = state.favoriteModelIDs.value,
-            recents = state.recentModelIDs.value,
-        )
-        if (resolved == null) {
-            Reduced(state)
-        } else {
-            val level = if (resolved.hasExplicitLevel) resolved.variant else state.rememberedLevel(resolved.model)
-            Reduced(pickWithLevel(resolved.model, level, ticked = false, state))
-        }
-    }
-
     is Action.VariantPicked -> {
         // The same model at another reasoning effort; the picker stays open.
         val current = state.currentModel
@@ -107,9 +109,19 @@ internal fun SessionFeature.reduceModelsAndFamily(state: State, action: Action):
     Action.ProjectButtonTapped -> Reduced(if (state.canChooseProject) state.openProjectPicker() else state)
 
     // Only the picker's own choice; a system action opening a draft is quiet.
-    is Action.ProjectPicked -> Reduced(pickProject(action.project, byHand = state.activePicker == State.ActivePicker.project, state))
+    is Action.ProjectPicked -> pickProject(action.project, byHand = state.activePicker == State.ActivePicker.project, state)
 
-    is Action.DraftProjectTapped -> Reduced(pickProject(action.project, byHand = true, state))
+    is Action.DraftProjectTapped -> pickProject(action.project, byHand = true, state)
+
+    is Action.StarterPromptTapped -> {
+        // Typed in, not sent: the person sends it, as with What’s New’s Try It.
+        if (!state.canChooseProject || action.text !in state.starterPrompts || state.hasPromptContent) {
+            Reduced(state)
+        } else {
+            haptics.play(Haptic.tap)
+            Reduced(state.setTyped(action.text).copy(composerFocusRequest = state.composerFocusRequest + 1))
+        }
+    }
 
     is Action.SubagentTapped -> {
         val selected = state.familySessions.firstOrNull { it.id == action.sessionID }
@@ -271,11 +283,11 @@ private fun SessionFeature.familyPicked(id: String, state: State): Reduced<State
     var next = state.copy(
         newMessages = null,
         newMessagesBaseline = null,
+        newMessagesBaselineTimestamp = null,
+        newMessagesUnread = false,
+        newMessagesEarlierBaseline = null,
+        newMessagesWatched = emptySet(),
         newMessagesFitThrough = null,
-        sinceYouLeft = null,
-        sinceYouLeftSeen = null,
-        sinceYouLeftAt = null,
-        sinceYouLeftDismissed = false,
     )
     next = cacheFamilyTranscript(next.itemsWithoutFailedSends, current.id, next)
     // A recording follows the screen, as across Home's switches: what was typed beside it stays in
@@ -326,6 +338,7 @@ private fun SessionFeature.familyPicked(id: String, state: State): Reduced<State
         sentDeliveries = emptyMap(),
         deliveryOverrides = emptyMap(),
         failedSends = emptyList(),
+        movingFailedSendID = null,
         promptStates = emptyMap(),
     )
     next = restorePersistedComposer(next)
@@ -357,6 +370,9 @@ private fun SessionFeature.familyPicked(id: String, state: State): Reduced<State
         initialTranscriptIsFresh = false,
     )
     next = next.resetLiveProjection().copy(lastSentItemID = null)
+    // Its cached rows are the ones the reader had on screen there (left, or popped back from):
+    // what the read brings past them is new.
+    if (selectedItems != null) next = next.noteOpening(seen = null)
     val abandon = abandonRefresh(next)
     val requests = startPendingWork(abandon.state, RequestDockFeature.State.LoadAttempt.Initial)
     val shells = refreshShells(requests.state)
@@ -367,7 +383,6 @@ private fun SessionFeature.familyPicked(id: String, state: State): Reduced<State
             Effect.cancel(CancelID.EarlierHistory),
             Effect.cancel(CancelID.PromptEcho),
             Effect.cancel(CancelID.InboxFetch),
-            Effect.cancel(CancelID.SinceYouLeft),
             Effect.cancel(CancelID.AutocompleteCatalog),
             Effect.cancel(CancelID.AutocompleteCommands),
             Effect.cancel(CancelID.AutocompleteFiles),
@@ -391,16 +406,23 @@ private fun SessionFeature.familyPicked(id: String, state: State): Reduced<State
 
 /**
  * iOS `pickProject(_:byHand:_:)`: moves the draft to [project]. A choice made by hand that changes it
- * plays `.selection`; the project already chosen plays nothing.
+ * plays `.selection`; the project already chosen plays nothing. Moving to another folder asks for
+ * that folder's agents.
  */
-private fun SessionFeature.pickProject(project: OpenCodeProject, byHand: Boolean, state: State): State {
+private fun SessionFeature.pickProject(project: OpenCodeProject, byHand: Boolean, state: State): Reduced<State, Action> {
     // Once the first send has left, it goes where it was sent.
     if (!state.canChooseProject) {
-        return if (state.activePicker == State.ActivePicker.project) state.copy(activePicker = null) else state
+        return Reduced(if (state.activePicker == State.ActivePicker.project) state.copy(activePicker = null) else state)
     }
     val changes = state.draftProject?.let { it.id != project.id && it.directory != project.directory } ?: true
     if (byHand && changes) haptics.play(Haptic.selection)
-    return state.copy(draftProject = project, activePicker = null, voice = state.voice?.moveDraft(project.directory))
+    val movesFolder = state.draftProject?.directory != project.directory
+    var next = state.copy(draftProject = project, activePicker = null, voice = state.voice?.moveDraft(project.directory))
+    // Each folder has its own agents: the last folder's list isn't this one's, so it's dropped and
+    // asked for again from the new folder.
+    if (!movesFolder || !experimentalFeatures(ExperimentalFeature.agentSelection)) return Reduced(next)
+    if (next.primaryAgents.isNotEmpty()) next = next.withPrimaryAgents(emptyList())
+    return Reduced(next, Effect.send(Action.AgentsRequested))
 }
 
 /**
@@ -432,7 +454,7 @@ internal fun SessionFeature.loadModelsIfNeeded(state: State): Reduced<State, Act
  * iOS `reloadModels(_:)`: starts or restarts a model catalog read for the picker, cancelling any
  * earlier in-flight read so a retry while loading is never dropped.
  */
-private fun SessionFeature.reloadModels(state: State): Reduced<State, Action> {
+internal fun SessionFeature.reloadModels(state: State): Reduced<State, Action> {
     var next = state
     if (next.models.isEmpty()) next = next.copy(isLoadingModels = true)
     next = next.copy(modelsLoadError = null)
@@ -445,8 +467,11 @@ private fun SessionFeature.fetchModels(state: State): Effect<Action> {
     val client = openCodeClient
     return Effect.run<Action> { send ->
         try {
-            send(Action.ModelsResponse(Result.success(client.modelCatalog(server, directory))))
+            val catalog = client.modelCatalog(server, directory)
+            if (!currentCoroutineContext().isActive) return@run
+            send(Action.ModelsResponse(Result.success(catalog)))
         } catch (error: OpenCodeClientError) {
+            if (!currentCoroutineContext().isActive) return@run
             send(Action.ModelsResponse(Result.failure(error)))
         }
     }.cancellable(CancelID.Models, cancelInFlight = true)
@@ -468,7 +493,20 @@ val State.modelPicker: ModelPickerState
         modelsLoadError = modelsLoadError,
         modelVisibility = modelVisibility,
         showsAllModels = showsAllModels,
+        modelDisplayNames = modelDisplayNamesByServer.value[server.persistenceID] ?: ModelDisplayNames(),
     )
+
+/** iOS `currentModelName`: resolve a label without borrowing another provider's capabilities. */
+val State.currentModelName: String get() = modelPicker.currentModelName
+
+/** iOS `currentModelInfo`: only the live catalogue can supply availability and capabilities. */
+val State.currentModelInfo: OpenCodeModel? get() = currentModel?.let { models.model(it) }
+
+/** iOS `currentModelLabel`: "Claude Haiku 5.5 · High", the model and its reasoning variant, if any. */
+val State.currentModelLabel: String get() = modelPicker.currentModelLabel
+
+/** iOS `currentModelShortName`: compact name for the composer chip (`"Opus 5.5"` for `"Claude Opus 5.5"`). */
+val State.currentModelShortName: String get() = modelPicker.currentModelShortName
 
 /** iOS `currentLevelScale`: the current model's levels, when it has any to choose between. */
 val State.currentLevelScale: ModelLevelScale? get() = modelPicker.currentLevelScale
@@ -476,13 +514,13 @@ val State.currentLevelScale: ModelLevelScale? get() = modelPicker.currentLevelSc
 /** iOS `currentLevel`: the current level; null is the model's default. */
 val State.currentLevel: String? get() = modelPicker.currentLevel
 
-/** iOS `modelSheetSections(recents:recentLimit:)`. */
-fun State.modelSheetSections(recents: List<String>, recentLimit: Int): List<ModelPickerSection> =
-    modelPicker.modelSheetSections(recents, recentLimit)
-
 /**
  * iOS `rememberedLevel(for:)`: the level shown for [model] on its row in the list (and picked when
  * tapping its name): a level parsed from the search query when searching, else the active level
  * for the current model, else the remembered variant in `modelVariants`, else null (`"Default"`).
  */
 fun State.rememberedLevel(model: OpenCodeModel): String? = modelPicker.rememberedLevel(model)
+
+/** iOS `SessionFeature.catalog(_:offers:)`: whether the catalogue still lists `ref`'s model. */
+internal fun SessionFeature.Companion.catalog(models: List<OpenCodeModel>, offers: OpenCodeModelRef): Boolean =
+    models.any { it.ref.sameModel(offers) }

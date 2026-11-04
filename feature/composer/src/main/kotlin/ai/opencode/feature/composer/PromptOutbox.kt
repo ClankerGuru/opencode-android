@@ -338,7 +338,7 @@ class PromptOutbox(
                         serverKey = serverKey,
                         draftID = if (explicitSessionID == null) explicitDraftID else null,
                         directory = directory,
-                        newSessionID = newSessionID ?: newSessionID(now(), id),
+                        newSessionID = newSessionID ?: ServerID.newSessionID(now(), id),
                         createdSessionID = explicitSessionID,
                     )
                     if (lane is Lane.Draft) state.isDraft = true
@@ -439,7 +439,7 @@ class PromptOutbox(
     fun recordAdmitted(pending: PendingPrompt, sessionID: String, serverKey: String) {
         synchronized(lock) {
             val key = resolve(Lane.Session(sessionID), serverKey)
-            val lane = storage.lanes[key] ?: LaneState(serverKey = serverKey, newSessionID = newSessionID(now(), pending.messageID))
+            val lane = storage.lanes[key] ?: LaneState(serverKey = serverKey, newSessionID = ServerID.newSessionID(now(), pending.messageID))
             val admitted = pending.copy(ownsRun = false, wasRunning = pending.messageID !in storage.delivered)
             lane.admitted = lane.admitted.filterNot { it.pending.messageID == admitted.messageID }
             lane.appendAdmitted(admitted, sessionID, now())
@@ -911,18 +911,5 @@ class PromptOutbox(
             is Lane.Draft -> "$serverKey|draft|${lane.id}"
         }
 
-        /**
-         * A session ID in the server's own shape (`ses_` + a descending time + randomness), so
-         * sessions made here sort among the rest. The randomness comes from the random tail of
-         * the lane's first message ID. Any session the app creates carries one, so a create
-         * retried after a lost response finds the session it already made instead of making a
-         * second (iOS `ShareSendRequest.newSessionID`).
-         */
-        fun newSessionID(at: Instant = Instant.now(), entropy: String = UUID.randomUUID().toString().uppercase()): String {
-            val time = ServerID.timePart(ServerID.milliseconds(at.toEpochMilli()), counter = 1, descending = true)
-            val random = entropy.split("_").lastOrNull { it.isNotEmpty() } ?: entropy
-            val tail = random.filter { it.isLetterOrDigit() }.takeLast(ServerID.RANDOM_LENGTH)
-            return "ses_" + time + tail.padEnd(ServerID.RANDOM_LENGTH, '0')
-        }
     }
 }

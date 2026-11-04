@@ -1,5 +1,13 @@
 package ai.opencode.feature.session
 
+import ai.opencode.server.model.PastedTextSummary
+import ai.opencode.feature.media.MediaReferenceLoadResult
+import ai.opencode.feature.media.MediaReferenceClient
+import ai.opencode.core.sharing.SharedKeys
+import ai.opencode.core.sharing.shared
+import ai.opencode.core.sound.SoundEffect
+import ai.opencode.core.sound.soundEffectsSend
+import ai.opencode.feature.composer.RequestDockFeature
 import ai.opencode.feature.composer.SharedLocation
 import ai.opencode.feature.composer.AutocompleteItem
 import ai.opencode.feature.composer.ComposerCommandResult
@@ -77,21 +85,61 @@ internal fun SessionFeature.reduceSending(state: State, action: Action): Reduced
         }
 
         is Action.FailedSendRetryTapped -> {
-            val id = action.id
-            val failed = state.failedSends.withID(id) ?: return Reduced(state)
+            // A move on its way sends it again once the session has moved.
+            if (state.movingFailedSendID != null) return Reduced(state)
+            val failed = state.failedSends.withID(action.id) ?: return Reduced(state)
             if (state.session == null && state.draftProject == null) return Reduced(state)
             haptics.play(Haptic.tap)
-            // It goes again from its own place in the outbox, ahead of the sends that waited behind
-            // it. In an idle session its bubble stays where it is; mid-run it becomes a pending row again.
-            val next = removeFailedSend(id, state, leavesOutbox = false, keepsBubble = !state.isRunning)
-            // The same ID and delivery: the server admits an ID once, so a send that landed after all can't arrive twice.
-            val pending = failed.pending
-            return submit(
-                messageID = id, text = pending.text, attachments = pending.attachments, files = pending.files,
-                delivery = pending.delivery, page = pending.page, mentions = pending.mentions, chips = pending.chips,
-                isRetry = true, state = next,
+            return retry(failed, state)
+        }
+
+        is Action.FailedSendMoveTapped -> {
+            val id = action.id
+            if (state.movingFailedSendID != null) return Reduced(state)
+            val failed = state.failedSends.withID(id)?.takeIf { it.isFolderGone } ?: return Reduced(state)
+            val session = state.session ?: return Reduced(state)
+            val target = state.missingFolderMoveTarget ?: return Reduced(state)
+            haptics.play(Haptic.tap)
+            val server = state.server
+            AppLog.send.notice { "$id: ${session.id}'s folder is gone, moving it to its project's folder" }
+            return Reduced(
+                state.copy(movingFailedSendID = id),
+                Effect.run<Action> { send ->
+                    try {
+                        openCodeClient.moveSession(server, session.id, target.directory)
+                        send(Action.MissingFolderMoved(sessionID = session.id, messageID = failed.id, directory = target.directory))
+                    } catch (error: OpenCodeClientError) {
+                        send(Action.MissingFolderMoveFailed(sessionID = session.id, messageID = failed.id, error = error))
+                    }
+                }.cancellable(SessionFeature.CancelID.MissingFolderMove, cancelInFlight = true),
             )
         }
+
+        is Action.MissingFolderMoved -> {
+            var next = state
+            if (next.movingFailedSendID == action.messageID) next = next.copy(movingFailedSendID = null)
+            AppLog.send.notice { "${action.sessionID} moved to its project's folder" }
+            // The server's move event says the same; the send can't wait for it.
+            val moved = sessionMoved(action.sessionID, action.directory, next)
+            val failed = moved.state.failedSends.withID(action.messageID)
+            if (moved.state.session?.id != action.sessionID || failed == null) return moved
+            val retried = retry(failed, moved.state)
+            return Reduced(retried.state, Effect.merge(moved.effect, retried.effect))
+        }
+
+        is Action.MissingFolderMoveFailed -> {
+            var next = state
+            if (next.movingFailedSendID == action.messageID) next = next.copy(movingFailedSendID = null)
+            if (next.session?.id != action.sessionID || next.failedSends.withID(action.messageID) == null) return Reduced(next)
+            AppLog.send.error { "${action.sessionID} couldn’t move to its project's folder: ${action.error.logSummary}" }
+            next = next.copy(
+                failedSends = next.failedSends.map { if (it.id == action.messageID) it.copy(reason = FailedSend.moveFailedReason) else it },
+            )
+            haptics.play(Haptic.error)
+            return Reduced(next)
+        }
+
+        is Action.SessionMoved -> return sessionMoved(action.sessionID, action.directory, state)
 
         is Action.FailedSendEditTapped -> {
             val failed = state.failedSends.withID(action.id) ?: return Reduced(state)
@@ -295,7 +343,10 @@ internal fun SessionFeature.sendComposer(
         return Reduced(next.withSendAfterUploads(delivery))
     }
     next = next.withSendAfterUploads(null)
-    if (!isDeferred) haptics.play(Haptic.tap)
+    if (!isDeferred) {
+        haptics.play(Haptic.tap)
+        playSendSound(next)
+    }
     var stopDictating: Effect<Action> = Effect.none()
     if (!keepsDictation) {
         val stopped = stopDictation(next)
@@ -305,7 +356,7 @@ internal fun SessionFeature.sendComposer(
     next = next.withDictationError(null)
     val savedDraft = next.draftState
     val sentChips = next.autocomplete.chips
-    val autocompleteResolution = if (experimentalFeatures(ExperimentalFeature.composerAutocomplete) && sentChips.isNotEmpty()) {
+    val autocompleteResolution = if (sentChips.isNotEmpty()) {
         ComposerAutocompleteDraftResolution.resolve(draft = rawDraft, sentPromptText = text, chips = sentChips)
     } else {
         null
@@ -328,7 +379,6 @@ internal fun SessionFeature.sendComposer(
             Effect.merge(
                 stopDictating,
                 Effect.cancel(SessionFeature.CancelID.AutocompleteAutoRun),
-                Effect.cancel(SessionFeature.CancelID.SinceYouLeft),
                 cancelRevert,
                 Effect.run<Action> { send ->
                     try {
@@ -374,7 +424,7 @@ internal fun SessionFeature.sendComposer(
         files = files,
         delivery = delivery,
         mentions = mentions,
-        chips = if (experimentalFeatures(ExperimentalFeature.composerAutocomplete)) sentChips else emptyList(),
+        chips = sentChips,
         isRetry = false,
         state = next,
     )
@@ -548,7 +598,6 @@ internal fun SessionFeature.submit(
     return Reduced(
         next,
         Effect.merge(
-            Effect.cancel(SessionFeature.CancelID.SinceYouLeft),
             cancelRevert,
             deliver(
                 pending = pending, target = target, lane = lane, server = next.server,
@@ -678,17 +727,39 @@ internal fun SessionFeature.stageRevert(
 ): Reduced<State, Action> {
     val server = state.server
     val client = openCodeClient
+    val references = mediaReferences
     return Reduced(
         state.copy(isUndoingLastMessage = true),
         Effect.run<Action> { send ->
-            val error = try {
+            try {
                 client.stageRevert(server, sessionID, messageID)
-                null
             } catch (error: OpenCodeClientError) {
-                error
+                send(Action.MessageReverted(sessionID, messageID, restoring, error))
+                return@run
             }
-            send(Action.MessageReverted(sessionID, messageID, restoring, error))
+            // A `media:<hash>` attachment comes back without its bytes: load them so Edit's
+            // composer shows the image (or Pasted Text card) again (7f5ac4c5).
+            val hydrated = restoring.copy(attachments = restoring.attachments.map { attachment -> hydrated(attachment, server, references) })
+            send(Action.MessageReverted(sessionID, messageID, hydrated, null))
         }.cancellable(SessionFeature.CancelID.Revert, cancelInFlight = true),
+    )
+}
+
+private suspend fun hydrated(attachment: OpenCodeOutgoingAttachment, server: OpenCodeServer, references: MediaReferenceClient): OpenCodeOutgoingAttachment {
+    val hash = attachment.mediaHash
+    if (attachment.data.isNotEmpty() || hash == null) return attachment
+    val data = (references.load(server, hash) as? MediaReferenceLoadResult.Loaded)?.data ?: return attachment
+    val pastedText = attachment.pastedText ?: PastedText.text(attachment.mime, data)
+    return OpenCodeOutgoingAttachment(
+        id = attachment.id,
+        data = data,
+        mime = attachment.mime,
+        name = attachment.name,
+        pastedText = pastedText,
+        pasted = if (attachment.pastedText == null && pastedText != null) PastedTextSummary(pastedText) else attachment.pasted,
+        mediaHash = attachment.mediaHash,
+        byteCount = attachment.byteCount ?: data.size.toLong(),
+        videoDuration = attachment.videoDuration,
     )
 }
 
@@ -826,7 +897,16 @@ private fun showRestored(pending: PendingPrompt, admission: State.PromptState.Ad
  */
 private fun localImages(attachments: List<OpenCodeOutgoingAttachment>, messageID: String): List<OpenCodeImageAttachment> =
     attachments.mapIndexedNotNull { index, attachment ->
-        if (attachment.isImage) OpenCodeImageAttachment(id = "$messageID-img-$index", data = attachment.data) else null
+        if (attachment.isImage) {
+            OpenCodeImageAttachment(
+                id = "$messageID-img-$index",
+                data = attachment.data,
+                mediaHash = attachment.mediaHash,
+                name = attachment.name,
+                mime = attachment.mime,
+                byteCount = attachment.byteCount,
+            )
+        } else null
     }
 
 /**
@@ -881,6 +961,8 @@ internal fun SessionFeature.Companion.inlineFiles(messageID: String, attachments
             mime = attachment.mime,
             text = text,
             pasted = attachment.pasted,
+            mediaHash = attachment.mediaHash,
+            byteCount = attachment.byteCount,
         )
     }
 
@@ -918,8 +1000,45 @@ internal fun pick(model: OpenCodeModelRef, state: State): State {
 }
 
 /** Retry, Edit, and Delete all take the failed bubble away first. Edit and Delete also take it out of the outbox, so the sends behind it go on. */
+/**
+ * Sends a failed message again from its own place in the outbox, ahead of the sends that waited
+ * behind it. In an idle session its bubble stays where it is; mid-run it becomes a pending row again.
+ */
+internal fun SessionFeature.retry(failed: FailedSend, state: State): Reduced<State, Action> {
+    val next = removeFailedSend(failed.id, state, leavesOutbox = false, keepsBubble = !state.isRunning)
+    // The same ID and delivery: the server admits an ID once, so a send that landed after all can't arrive twice.
+    val pending = failed.pending
+    return submit(
+        messageID = failed.id, text = pending.text, attachments = pending.attachments, files = pending.files,
+        delivery = pending.delivery, page = pending.page, mentions = pending.mentions, chips = pending.chips,
+        isRetry = true, state = next,
+    )
+}
+
+/**
+ * [sessionID] now lives in [directory]. On its own screen, what was read in the old folder
+ * (requests, models, shells) is read again in the new one, and a read already on its way keeps
+ * the new folder.
+ */
+internal fun SessionFeature.sessionMoved(sessionID: String, directory: String, state: State): Reduced<State, Action> {
+    var next = state
+    val index = next.familySessions.indexOfFirst { it.id == sessionID }
+    if (index >= 0 && next.familySessions[index].directory != directory) {
+        next = next.copy(familySessions = next.familySessions.toMutableList().also { it[index] = it[index].copy(directory = directory) })
+    }
+    next.voice?.let { voice -> next = next.copy(voice = voice.sessionMoved(sessionID, directory)) }
+    val session = next.session
+    if (session?.id != sessionID || session.directory == directory) return Reduced(next)
+    next = next.copy(session = session.copy(directory = directory), refresh = next.refresh?.copy(directoryChanged = true))
+    val pending = startPendingWork(next, RequestDockFeature.State.LoadAttempt.Initial)
+    val models = if (pending.state.models.isEmpty()) reloadModels(pending.state) else Reduced(pending.state)
+    val shells = refreshShells(models.state)
+    return Reduced(shells.state, Effect.merge(pending.effect, models.effect, shells.effect))
+}
+
 private fun SessionFeature.removeFailedSend(id: String, state: State, leavesOutbox: Boolean = true, keepsBubble: Boolean = false): State {
     var next = state.copy(failedSends = state.failedSends.filterNot { it.id == id })
+    if (next.movingFailedSendID == id) next = next.copy(movingFailedSendID = null)
     if (!keepsBubble) {
         next = next.copy(
             queuedPicks = next.queuedPicks - id,
@@ -1048,4 +1167,10 @@ internal fun SessionFeature.follow(statuses: Flow<PromptOutbox.Status>, pending:
         if (!currentCoroutineContext().isActive) return@run
         send(Action.ReplyCompleted(sessionID))
     }
+}
+
+/** Sound Effects' Send, only when Send Sound is on: the `.tap` already answers the finger. */
+private fun SessionFeature.playSendSound(state: State) {
+    if (state.callOwnsAudio || !experimentalFeatures(ExperimentalFeature.soundEffects)) return
+    if (shared(SharedKeys.soundEffectsSend).value) soundEffects.play(SoundEffect.send)
 }
