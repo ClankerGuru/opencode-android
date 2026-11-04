@@ -46,6 +46,7 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
@@ -1274,7 +1275,7 @@ fun AutocompleteInlineChips(bridge: ComposerAutocompleteTextBridge, modifier: Mo
 /**
  * The session view's `syncComposerAutocomplete(state:)`: wires [bridge] and the flight
  * landing slot, then mirrors [state] into [controller] whenever it or the composer's size
- * changes. [composerWidth]/[composerHeight] are the composer's measured size in dp.
+ * changes. [composerSize] is the composer's measured size in dp.
  */
 @Composable
 fun SyncComposerAutocomplete(
@@ -1282,11 +1283,15 @@ fun SyncComposerAutocomplete(
     isEnabled: Boolean,
     controller: AutocompleteMotionController,
     bridge: ComposerAutocompleteTextBridge,
-    composerWidth: Double,
-    composerHeight: Double,
+    composerSize: () -> Size,
     reducedMotion: Boolean,
     send: (ComposerAutocompleteAction) -> Unit,
 ) {
+    // The size is read here, not by the caller: it changes on every frame the composer grows (the
+    // keyboard's morph), and only this small scope should recompose for it.
+    val size = composerSize()
+    val composerWidth = size.width.toDouble()
+    val composerHeight = size.height.toDouble()
     val density = LocalDensity.current
     val currentSend by rememberUpdatedState(send)
     val last = remember { arrayOfNulls<Any>(1) }

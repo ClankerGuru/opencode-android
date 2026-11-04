@@ -16,6 +16,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
@@ -105,23 +106,30 @@ fun Modifier.composerKeyboardStepHold(): Modifier = composed {
     val density = LocalDensity.current
     val view = LocalView.current
     val reduceMotion = rememberReduceMotion()
-    val bottom = WindowInsets.ime.getBottom(density)
-    val animating = WindowInsets.imeAnimationSource.getBottom(density) != WindowInsets.imeAnimationTarget.getBottom(density)
-    var previous by remember { mutableFloatStateOf(bottom.toFloat()) }
-    LaunchedEffect(bottom) {
-        val old = previous
-        previous = bottom.toFloat()
-        if (reduceMotion || animating || old == bottom.toFloat()) return@LaunchedEffect
-        val height = view.rootView.height.toFloat()
-        val width = view.rootView.width.toFloat()
-        if (height <= 0f) return@LaunchedEffect
-        val px = density.density
-        // In dp, as iOS's points, so the 80 pt cap holds on every screen.
-        val begin = Rect(0f, (height - old) / px, width / px, height / px)
-        val end = Rect(0f, (height - bottom) / px, width / px, height / px)
-        val window = Rect(0f, 0f, width / px, height / px)
-        val stepDp = DockedKeyboard.unanimatedStep(begin, end, window, screenMaxY = height / px) ?: return@LaunchedEffect
-        step.keyboardChanged(stepDp * px, scope)
+    // The insets are read in a snapshot flow, not in composition: reading them here would
+    // recompose the whole composer column on every frame of the keyboard's animation.
+    val ime = WindowInsets.ime
+    val imeSource = WindowInsets.imeAnimationSource
+    val imeTarget = WindowInsets.imeAnimationTarget
+    val previous = remember { floatArrayOf(Float.NaN) }
+    LaunchedEffect(ime, imeSource, imeTarget, density, view, reduceMotion) {
+        snapshotFlow { ime.getBottom(density) }.collect { bottom ->
+            val old = previous[0]
+            previous[0] = bottom.toFloat()
+            if (old.isNaN() || reduceMotion || old == bottom.toFloat()) return@collect
+            val animating = imeSource.getBottom(density) != imeTarget.getBottom(density)
+            if (animating) return@collect
+            val height = view.rootView.height.toFloat()
+            val width = view.rootView.width.toFloat()
+            if (height <= 0f) return@collect
+            val px = density.density
+            // In dp, as iOS's points, so the 80 pt cap holds on every screen.
+            val begin = Rect(0f, (height - old) / px, width / px, height / px)
+            val end = Rect(0f, (height - bottom) / px, width / px, height / px)
+            val window = Rect(0f, 0f, width / px, height / px)
+            val stepDp = DockedKeyboard.unanimatedStep(begin, end, window, screenMaxY = height / px) ?: return@collect
+            step.keyboardChanged(stepDp * px, scope)
+        }
     }
     DisposableEffect(Unit) { onDispose { step.stop() } }
     layout { measurable, constraints ->

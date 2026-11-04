@@ -507,8 +507,7 @@ fun SessionComposer(
         isEnabled = true,
         controller = view.autocompleteController,
         bridge = view.autocompleteBridge,
-        composerWidth = view.surfaceSize.width.toDouble(),
-        composerHeight = view.surfaceSize.height.toDouble(),
+        composerSize = { view.surfaceSize },
         reducedMotion = reducedMotion,
         send = { store.send(Action.Autocomplete(it)) },
     )
@@ -1156,8 +1155,10 @@ private fun SessionComposerEnv.ComposerCapsule() {
     // With no panel or call, Composer Autocomplete's suggestions grow there instead.
     val showsAutocomplete = !showsRequestPanel && voiceStore == null
     val photoSheet = LocalSessionPhotoSheet.current
-    val cap = requestPanelCap()
-    val activeHeight = { activeRequestPanelHeight(cap) }
+    // Read where it's used (layout, or the panel's own scope), never here: the room under the
+    // header changes on every frame of the keyboard's animation.
+    val cap = { requestPanelCap() }
+    val activeHeight = { activeRequestPanelHeight(cap()) }
     val room = { if (voiceStore == null && showsRequestPanel) activeHeight() else 0f }
     Box(
         Modifier
@@ -1175,12 +1176,17 @@ private fun SessionComposerEnv.ComposerCapsule() {
             },
     ) {
         // iOS `composerSurfacePanel`: the request's panel, else the suggestions, on the surface.
-        val autocompleteExtent = if (showsAutocomplete) view.autocompleteController.glassExtent.toFloat() else 0f
         val controller = view.autocompleteController
+        // The suggestions' frame changes with the composer's size on every keyboard frame, so it's
+        // read in the surface's layout, and only what it shows is read here.
+        val autocompleteExtent = { if (showsAutocomplete) controller.glassExtent.toFloat() else 0f }
+        val autocompleteShown by remember(controller, showsAutocomplete, reducedMotion) {
+            derivedStateOf { showsAutocomplete && (if (reducedMotion) controller.isOpen else controller.isShown) }
+        }
         ComposerSurface(
             panel = when {
                 showsRequestPanel || docksRequest -> {
-                    { RequestPanelContent(isShown = docksRequest, cap = cap) }
+                    { RequestPanelContent(isShown = docksRequest, cap = cap()) }
                 }
                 showsAutocomplete -> {
                     {
@@ -1193,10 +1199,10 @@ private fun SessionComposerEnv.ComposerCapsule() {
                 else -> null
             },
             // Laid out from its arrival until its surface has folded.
-            panelExtent = { if (showsRequestPanel) activeHeight() else autocompleteExtent },
+            panelExtent = { if (showsRequestPanel) activeHeight() else autocompleteExtent() },
             // Under Reduce Motion the surface keeps its reach while the panel fades.
-            panelReveal = { if (showsRequestPanel) activeHeight() * view.requestPanelReveal.value else autocompleteExtent },
-            panelShown = docksRequest || (showsAutocomplete && (if (reducedMotion) controller.isOpen else controller.isShown)),
+            panelReveal = { if (showsRequestPanel) activeHeight() * view.requestPanelReveal.value else autocompleteExtent() },
+            panelShown = docksRequest || autocompleteShown,
         )
     }
 }
@@ -1214,7 +1220,6 @@ private val SessionComposerEnv.lingersRequestPanel: Boolean
  * the header (OC-471), from the room between the top safe area and the keyboard, the header and
  * the composer's chrome outside the panel.
  */
-@Composable
 private fun SessionComposerEnv.requestPanelCap(): Float? {
     return RequestPanelFit.panelCap(room = host.availableHeight, header = host.headerHeight, chrome = view.requestChromeHeight)
 }
@@ -1409,7 +1414,10 @@ private fun SessionComposerEnv.ComposerSurface(
                     .border(2.dp, accent, RoundedCornerShape(ComposerTunables.cornerRadius.dp)),
             )
         }
-        if (view.autocompleteController.currentFrame.flights.isNotEmpty()) {
+        val hasFlights by remember(view.autocompleteController) {
+            derivedStateOf { view.autocompleteController.currentFrame.flights.isNotEmpty() }
+        }
+        if (hasFlights) {
             AutocompleteFlightOverlay(view.autocompleteController, Modifier.matchParentSize())
         }
         // Above the surface, so its edge never crosses the hold circle.
