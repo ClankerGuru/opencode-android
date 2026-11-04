@@ -47,7 +47,6 @@ import ai.opencode.server.model.learningFirstPrompt
 import ai.opencode.server.model.model
 import java.time.Instant
 import java.util.UUID
-import ai.opencode.core.experiments.ExperimentalCallStyle
 import ai.opencode.core.experiments.key
 import ai.opencode.core.sharing.shared
 
@@ -628,12 +627,9 @@ fun State.renameVoiceTarget(sessionID: String, title: String): State {
 /** A call is connecting, live, or leaving: its bar holds the composer's place and its audio holds the session. */
 val State.callOwnsAudio: Boolean get() = voice?.let { !it.phase.showsCard } ?: false
 
-/** A Living Orb or tray call leaves the composer where it is (iOS `callKeepsComposer`). */
+/** A Living Orb call leaves the composer where it is (iOS `callKeepsComposer`). */
 val State.callKeepsComposer: Boolean
-    get() = ExperimentalCallStyle.of(
-        callTray = ExperimentalFeature.callTray.isActive(shared(ExperimentalFeature.callTray.key).value),
-        livingOrb = ExperimentalFeature.livingOrb.isActive(shared(ExperimentalFeature.livingOrb.key).value),
-    ) != ExperimentalCallStyle.standard
+    get() = ExperimentalFeature.livingOrb.isActive(shared(ExperimentalFeature.livingOrb.key).value)
 
 /** Whether tapping the composer's call button starts a call rather than opening the project picker or Settings. */
 val State.canStartCallFromTap: Boolean

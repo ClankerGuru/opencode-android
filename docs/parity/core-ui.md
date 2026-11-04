@@ -175,7 +175,7 @@ and `ellipsis` (every overflow menu) is the vertical `more_vert`, as on other An
 | `hand.draw.fill` | `draw` (fill) | `ms_draw_fill` | `SFSymbol.HandDrawFill` | TraceTriggers, WhatsNewList |
 | `hand.point.up.left` | `pan_tool_alt` | `ms_pan_tool_alt` | `SFSymbol.HandPointUpLeft` | WhatsNewList |
 | `hand.point.up.left.fill` | `pan_tool_alt` (fill) | `ms_pan_tool_alt_fill` | `SFSymbol.HandPointUpLeftFill` | TraceTriggers |
-| `hand.raised.fill` | `back_hand` (fill) | `ms_back_hand_fill` | `SFSymbol.HandRaisedFill` | CallTrayViews, RunErrorRow, ShellOutputView, WhatsNewList |
+| `hand.raised.fill` | `back_hand` (fill) | `ms_back_hand_fill` | `SFSymbol.HandRaisedFill` | RunErrorRow, ShellOutputView, VoiceCallCenterButton, WhatsNewList |
 | `hand.tap` | `touch_app` | `ms_touch_app` | `SFSymbol.HandTap` | WhatsNewList |
 | `hand.tap.fill` | `touch_app` (fill) | `ms_touch_app_fill` | `SFSymbol.HandTapFill` | TraceTriggers |
 | `hand.wave` | `waving_hand` | `ms_waving_hand` | `SFSymbol.HandWave` | WelcomePreviewExperiment, WhatsNew/Entries |
@@ -205,7 +205,7 @@ and `ellipsis` (every overflow menu) is the vertical `more_vert`, as on other An
 | `mappin.circle.fill` | `location_on` (fill) | `ms_location_on_fill` | `SFSymbol.MappinCircleFill` | SharedLocation |
 | `mic` | `mic` | `ms_mic` | `SFSymbol.Mic` | ComposerViews, SessionSwitcher, WhatsNewList |
 | `mic.fill` | `mic` (fill) | `ms_mic_fill` | `SFSymbol.MicFill` | DictationLiveActivity, DictationViews, FloatingCall, VoiceCallLiveActivity, VoiceView, WhatsNewList |
-| `mic.slash` | `mic_off` | `ms_mic_off` | `SFSymbol.MicSlash` | CallTrayViews |
+| `mic.slash` | `mic_off` | `ms_mic_off` | `SFSymbol.MicSlash` | — (iOS's last use went with the Call Tray, ea61212b) |
 | `mic.slash.fill` | `mic_off` (fill) | `ms_mic_off_fill` | `SFSymbol.MicSlashFill` | FloatingCall, VoiceCallLiveActivity, VoiceView |
 | `music.note` | `music_note` | `ms_music_note` | `SFSymbol.MusicNote` | Audio in Calls (Experimental), VoiceCallRows |
 | `minus.circle.fill` | `do_not_disturb_on` (fill) | `ms_do_not_disturb_on_fill` | `SFSymbol.MinusCircleFill` | AppView |
@@ -217,7 +217,7 @@ and `ellipsis` (every overflow menu) is the vertical `more_vert`, as on other An
 | `paintpalette.fill` | `palette` (fill) | `ms_palette_fill` | `SFSymbol.PaintpaletteFill` | SettingsView |
 | `paperclip` | `attach_file` | `ms_attach_file` | `SFSymbol.Paperclip` | TranscriptUserMessage |
 | `paperplane` | `send` | `ms_send` | `SFSymbol.Paperplane` | WhatsNew/Entries |
-| `pause.fill` | `pause` (fill) | `ms_pause_fill` | `SFSymbol.PauseFill` | CallTrayViews, FloatingCall, VoiceCallLogView |
+| `pause.fill` | `pause` (fill) | `ms_pause_fill` | `SFSymbol.PauseFill` | FloatingCall, VoiceCallCenterButton, VoiceCallLogView |
 | `pencil` | `edit` | `ms_edit` | `SFSymbol.Pencil` | AppView, RunError, ServerTitleView, SessionView+Header, SettingsServers, TranscriptUserMessage |
 | `pencil.and.scribble` | `signature` | `ms_signature` | `SFSymbol.PencilAndScribble` | TraceTriggers |
 | `person.2` | `group` | `ms_group` | `SFSymbol.Person2` | WhatsNewList |
@@ -228,8 +228,8 @@ and `ellipsis` (every overflow menu) is the vertical `more_vert`, as on other An
 | `phone.and.waveform.fill` | `phone_in_talk` (fill) | `ms_phone_in_talk_fill` | `SFSymbol.PhoneAndWaveformFill` | WhatsNewList |
 | `phone.circle.fill` | `call` (fill) | `ms_call_fill` | `SFSymbol.PhoneCircleFill` | ExperimentalFeatures |
 | `phone.connection` | `phone_in_talk` | `ms_phone_in_talk` | `SFSymbol.PhoneConnection` | WhatsNew/Entries |
-| `phone.down.fill` | `call_end` (fill) | `ms_call_end_fill` | `SFSymbol.PhoneDownFill` | CallTrayViews, FloatingCall, VoiceCallLiveActivity, VoiceView |
-| `phone.fill` | `call` (fill) | `ms_call_fill` | `SFSymbol.PhoneFill` | CallTrayViews, ExperimentalSettingsView, FloatingCall, SessionView+ComposerControls |
+| `phone.down.fill` | `call_end` (fill) | `ms_call_end_fill` | `SFSymbol.PhoneDownFill` | FloatingCall, VoiceCallLiveActivity, VoiceView |
+| `phone.fill` | `call` (fill) | `ms_call_fill` | `SFSymbol.PhoneFill` | ExperimentalSettingsView, FloatingCall, SessionView+ComposerControls |
 | `photo` | `image` | `ms_image` | `SFSymbol.Photo` | AgentFileReference, AttachmentFileType, ExperimentalFeatures, TranscriptImageViewer, WhatsNewList |
 | `photo.badge.exclamationmark` | `broken_image` | `ms_broken_image` | `SFSymbol.PhotoBadgeExclamationmark` | AgentImageGallery, TranscriptEntryView |
 | `photo.badge.plus` | `add_photo_alternate` | `ms_add_photo_alternate` | `SFSymbol.PhotoBadgePlus` | PlusPhotoSheet |
@@ -308,7 +308,7 @@ and `ellipsis` (every overflow menu) is the vertical `more_vert`, as on other An
 | `waveform.and.magnifyingglass` | `troubleshoot` | `ms_troubleshoot` | `SFSymbol.WaveformAndMagnifyingglass` | TraceTriggers |
 | `waveform.path.ecg` | `monitor_heart` | `ms_monitor_heart` | `SFSymbol.WaveformPathEcg` | ConnectionCard, DiagnosticsView |
 | `wifi` | `wifi` | `ms_wifi` | `SFSymbol.Wifi` | WhatsNewList |
-| `wifi.exclamationmark` | `wifi_tethering_error` | `ms_wifi_tethering_error` | `SFSymbol.WifiExclamationmark` | CallTrayViews, ConnectionCard |
+| `wifi.exclamationmark` | `wifi_tethering_error` | `ms_wifi_tethering_error` | `SFSymbol.WifiExclamationmark` | ConnectionCard, VoiceCallCenterButton |
 | `wifi.slash` | `wifi_off` | `ms_wifi_off` | `SFSymbol.WifiSlash` | VoiceProviderViews, VoiceProviderPage |
 | `xmark` | `close` | `ms_close` | `SFSymbol.Xmark` | AttachmentCameraView, BrowserView, DrawerSearchPill, OnboardingPlaygroundControls, RequestDockView, RequestReviewView, ServerTitleView, ShareView, ShellOutputView, SinceYouLeft, TranscriptImageViewer, TuningPanelView, VoiceView |
 | `xmark.circle` | `cancel` | `ms_cancel` | `SFSymbol.XmarkCircle` | LinkPreviewViews, TuningPanelView |

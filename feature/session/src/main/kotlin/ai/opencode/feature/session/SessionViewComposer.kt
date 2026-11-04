@@ -1,6 +1,5 @@
 package ai.opencode.feature.session
 
-import ai.opencode.core.experiments.ExperimentalCallStyle
 import ai.opencode.core.experiments.key
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
@@ -57,8 +56,6 @@ import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.transcript.TranscriptTunables
 import ai.opencode.feature.transcript.list.TranscriptBorrowedDrag
 import ai.opencode.feature.transcript.list.passesDragsToTranscript
-import ai.opencode.feature.voice.CallTrayController
-import ai.opencode.feature.voice.CallTrayHost
 import ai.opencode.feature.voice.VoiceCallComposer
 import ai.opencode.feature.voice.VoiceCallRowsCard
 import ai.opencode.feature.voice.VoiceCallSurface
@@ -223,7 +220,7 @@ class SessionComposerHost {
     val keepsComposerExpanded: Boolean get() = modelPanels?.keepsComposerExpanded == true
     /** A panel or overlay owns downward drags now (iOS `composerSwipeYields`' panels). */
     val swipeYields: Boolean get() = modelPanels?.swipeYields == true
-    /** A call's bar holds the composer's place (iOS `callStore != nil && !floatsCall && !usesCallTray`). */
+    /** A call's bar holds the composer's place (iOS `callStore != nil && !floatsCall`). */
     internal var callHoldsComposer by mutableStateOf(false)
     /** iOS `UIAccessibility.post(.announcement)`, set by the composer (the view announces). */
     internal var announcer: (String) -> Unit = {}
@@ -450,7 +447,6 @@ fun SessionComposer(
     store: StoreOf<SessionFeature.State, SessionFeature.Action>,
     modifier: Modifier = Modifier,
     callStore: VoiceStoreOf? = null,
-    callTray: CallTrayController? = null,
 ) {
     val host = LocalSessionComposerHost.current ?: remember { SessionComposerHost() }
     val view = remember { SessionComposerViewState() }
@@ -464,9 +460,7 @@ fun SessionComposer(
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
-    val callPresentation = rememberCallPresentation(callTray)
-    val floatsCall = callPresentation == ExperimentalCallStyle.floating
-    val usesCallTray = callPresentation == ExperimentalCallStyle.tray
+    val floatsCall = rememberFloatsCall()
     val callShowsCard by remember(callStore) { callStore?.let { call -> call.states.map { it.phase.showsCard } } ?: flowOf(false) }
         .collectAsState(callStore?.state?.phase?.showsCard ?: false)
     val callShowsCaptions by remember(callStore) { callStore?.let { call -> call.states.map { it.showsCaptions } } ?: flowOf(false) }
@@ -496,13 +490,11 @@ fun SessionComposer(
         },
         scope = scope,
         callStore = callStore,
-        // iOS `voiceStore`: the bar takes the composer's place unless the call floats, rides the
-        // Call Tray, or shows a card.
-        voiceStore = if (floatsCall || usesCallTray || callShowsCard) null else callStore,
+        // iOS `voiceStore`: the bar takes the composer's place unless the call floats or shows a card.
+        voiceStore = if (floatsCall || callShowsCard) null else callStore,
         floatsCall = floatsCall,
         callShowsCaptions = callShowsCaptions,
         holdsClientToolCard = holdsClientToolCard,
-        callTray = if (usesCallTray) callTray else null,
         callOwnsAudio = callStore != null && !callShowsCard,
         photoSheet = LocalSessionPhotoSheet.current,
         windowSize = LocalWindowInfo.current.containerSize,
@@ -634,8 +626,6 @@ internal class SessionComposerEnv(
     val callShowsCaptions: Boolean = false,
     /** iOS `holdsClientToolCard`: an agent's screen request or link waits on the user. */
     val holdsClientToolCard: Boolean = false,
-    /** iOS `usesCallTray ? callTray : nil`: Home's Call Tray motion while the call style is the tray. */
-    val callTray: CallTrayController? = null,
     /** iOS `callOwnsAudio`: the screen's call (its own or its root's) owns audio. */
     val callOwnsAudio: Boolean = false,
     /** The New Plus Menu's sheet and flights (iOS `photoSheet…`), null outside a session screen. */
@@ -643,18 +633,9 @@ internal class SessionComposerEnv(
     /** The window's size (px): a sent photo's copy flies only from a thumbnail on screen. */
     val windowSize: IntSize = IntSize.Zero,
 ) {
-    /** iOS `usesCallTray` (`callPresentation == .tray`). */
-    val usesCallTray: Boolean get() = callTray != null
-
-    /** iOS `holdsCallTrayButton`: the tray's disc holds the call button's place. */
-    val holdsCallTrayButton: Boolean get() = usesCallTray && !s.isCovered && callTray?.holdsCallButton == true
-
-    /**
-     * iOS `showsCallTranscript`: the call's open transcript covers what stands above the composer.
-     * With the tray, a request's panel holding the composer keeps it shut.
-     */
+    /** iOS `showsCallTranscript`: the call's open transcript covers what stands above the composer. */
     val showsCallTranscript: Boolean
-        get() = callShowsCaptions && (!usesCallTray || (!docksRequest && !holdsRequestPanelRoom && !lingersRequestPanel))
+        get() = callShowsCaptions
 
     /** iOS `hasCall`: the screen's own call or its root's. */
     val hasCall: Boolean get() = s.hasCall || callStore != null
@@ -715,21 +696,10 @@ internal class SessionComposerEnv(
                 isRunning = s.isRunning,
                 canSend = canSend || (hasReservedPhotos && !s.hasFailedFiles),
                 expanded = expanded,
-                canCall = (showsVoiceControl || (usesCallTray && (callOwnsAudio || holdsCallTrayButton))) && !s.hasPromptContent && !hasReservedPhotos,
+                canCall = showsVoiceControl && !s.hasPromptContent && !hasReservedPhotos,
                 keepsSendVisible = sheet != null,
                 isInCall = sheet != null && callOwnsAudio,
             )
-            // With the Call Tray, the mic stays in its slot and animates out and back in with
-            // `CallTrayController.composerMicLook`.
-            if (usesCallTray && (callOwnsAudio || holdsCallTrayButton) && controls.trailing == ComposerTrailingControl.Mic) {
-                return ComposerPresentation(
-                    expanded,
-                    controls.copy(
-                        trailing = ComposerTrailingControl.Send(enabled = false),
-                        secondaryMic = if (expanded) ComposerControls.MicPlacement.leading else ComposerControls.MicPlacement.trailing,
-                    ),
-                )
-            }
             return ComposerPresentation(expanded, controls)
         }
 
@@ -1189,66 +1159,45 @@ private fun SessionComposerEnv.ComposerCapsule() {
     val cap = requestPanelCap()
     val activeHeight = { activeRequestPanelHeight(cap) }
     val room = { if (voiceStore == null && showsRequestPanel) activeHeight() else 0f }
-    // iOS `.callTrayHost(…)`: in the Call Tray style the composer stays and the tray splits out
-    // beneath it, merging the composer's surface into its own while nothing else grows out of it.
-    CallTrayHost(
-        controller = callTray,
-        store = callStore,
-        isEnabled = usesCallTray && !s.isCovered,
-        isFocused = messageFieldFocused,
-        reducedMotion = reducedMotion,
-        allowsMergedComposerGlass = voiceStore == null &&
-            !docksRequest && !holdsRequestPanelRoom && !lingersRequestPanel &&
-            host.modelPanels?.holdsComposerGlass != true &&
-            !(photoSheet != null && (photoSheet.morph.isOpen || photoSheet.morph.isShown)),
-        isRequestDocked = docksRequest || holdsRequestPanelRoom || lingersRequestPanel,
-        // iOS `closeOthersForModelPanel()` + `closeModelPanels()`.
-        onExpandTranscript = {
-            host.closeAttachmentMenu()
-            host.modelPanels?.closeOthersForModelPanel()
-            host.modelPanels?.closeModelPanels()
-        },
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .layout { measurable, constraints ->
+                val bar = measurable.measure(constraints.offset(vertical = -room().dp.roundToPx()))
+                // Measuring a self-animating permission updates its height. Reserve that
+                // same frame's room so the pills cannot lag over the panel's caption.
+                val top = room().dp.roundToPx()
+                val height = constraints.constrainHeight(bar.height + top)
+                view.requestPanelRoomPx = height - bar.height
+                layout(bar.width, height) {
+                    bar.placeRelative(0, top)
+                }
+            },
     ) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .layout { measurable, constraints ->
-                    val bar = measurable.measure(constraints.offset(vertical = -room().dp.roundToPx()))
-                    // Measuring a self-animating permission updates its height. Reserve that
-                    // same frame's room so the pills cannot lag over the panel's caption.
-                    val top = room().dp.roundToPx()
-                    val height = constraints.constrainHeight(bar.height + top)
-                    view.requestPanelRoomPx = height - bar.height
-                    layout(bar.width, height) {
-                        bar.placeRelative(0, top)
+        // iOS `composerSurfacePanel`: the request's panel, else the suggestions, on the surface.
+        val autocompleteExtent = if (showsAutocomplete) view.autocompleteController.glassExtent.toFloat() else 0f
+        val controller = view.autocompleteController
+        ComposerSurface(
+            panel = when {
+                showsRequestPanel || docksRequest -> {
+                    { RequestPanelContent(isShown = docksRequest, cap = cap) }
+                }
+                showsAutocomplete -> {
+                    {
+                        ComposerAutocompletePanel(
+                            controller = controller,
+                            onSelectRow = { store.send(Action.Autocomplete(ComposerAutocompleteAction.RowChosen(it))) },
+                        )
                     }
-                },
-        ) {
-            // iOS `composerSurfacePanel`: the request's panel, else the suggestions, on the surface.
-            val autocompleteExtent = if (showsAutocomplete) view.autocompleteController.glassExtent.toFloat() else 0f
-            val controller = view.autocompleteController
-            ComposerSurface(
-                panel = when {
-                    showsRequestPanel || docksRequest -> {
-                        { RequestPanelContent(isShown = docksRequest, cap = cap) }
-                    }
-                    showsAutocomplete -> {
-                        {
-                            ComposerAutocompletePanel(
-                                controller = controller,
-                                onSelectRow = { store.send(Action.Autocomplete(ComposerAutocompleteAction.RowChosen(it))) },
-                            )
-                        }
-                    }
-                    else -> null
-                },
-                // Laid out from its arrival until its surface has folded.
-                panelExtent = { if (showsRequestPanel) activeHeight() else autocompleteExtent },
-                // Under Reduce Motion the surface keeps its reach while the panel fades.
-                panelReveal = { if (showsRequestPanel) activeHeight() * view.requestPanelReveal.value else autocompleteExtent },
-                panelShown = docksRequest || (showsAutocomplete && (if (reducedMotion) controller.isOpen else controller.isShown)),
-            )
-        }
+                }
+                else -> null
+            },
+            // Laid out from its arrival until its surface has folded.
+            panelExtent = { if (showsRequestPanel) activeHeight() else autocompleteExtent },
+            // Under Reduce Motion the surface keeps its reach while the panel fades.
+            panelReveal = { if (showsRequestPanel) activeHeight() * view.requestPanelReveal.value else autocompleteExtent },
+            panelShown = docksRequest || (showsAutocomplete && (if (reducedMotion) controller.isOpen else controller.isShown)),
+        )
     }
 }
 

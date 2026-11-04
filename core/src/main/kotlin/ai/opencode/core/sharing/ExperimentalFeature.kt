@@ -8,7 +8,7 @@ import ai.opencode.core.experiments.ExperimentalGroup
  * and `ExperimentalFeatures` (`OpenCode/Settings/ExperimentalFeatures.swift`): features still
  * being tried out on phones, listed in Settings › Experimental, off by default (a graduated one
  * on, [defaultEnabled]), kept on this phone. Lives in `:core` because Composer, Transcript, Voice,
- * Drawer and Settings all read it; Settings owns the Call Style and the list UI.
+ * Drawer and Settings all read it; Settings owns the list UI.
  *
  * iOS declares each experiment in its own `Experimental/Features/<Name>Experiment.swift` and
  * generates the registry at build time (`scripts/registries.py`); this enum is that registry, one
@@ -46,7 +46,6 @@ enum class ExperimentalFeature(
     onePicker("one-picker", "One Picker", ExperimentalGroup.composer, "Favorites, recents, and inline levels", "cpu", order = 15),
     agentSelection("agent-selection", "Agent Selection", ExperimentalGroup.composer, "Choose Build, Plan, or your own", "person.crop.circle", order = 30),
     hideModels("hide-models", "Hide Unused Models", ExperimentalGroup.composer, "Choose models the picker lists", "eye.slash", order = 40),
-    callTray("call-tray", "Call Tray", ExperimentalGroup.calls, "Call scope beneath the composer", "rectangle.bottomhalf.inset.filled", order = 50),
     livingOrb("living-orb", "Living Orb", ExperimentalGroup.calls, "Keep calls in a floating orb", "circle.hexagongrid.fill", order = 60, defaultEnabled = true),
     newMessagesDivider(
         "new-messages-divider", "New Messages Divider", ExperimentalGroup.transcript, "Mark long unread replies",

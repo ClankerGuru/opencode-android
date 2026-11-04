@@ -49,22 +49,14 @@ import ai.opencode.feature.session.ComposerTunables
 import ai.opencode.feature.settings.whatsnew.WhatsNewFeature
 import ai.opencode.feature.system.SessionWindowTarget
 import ai.opencode.feature.system.WindowsClient
-import ai.opencode.feature.voice.CallTrayComposerMetrics
-import ai.opencode.feature.voice.CallTrayDockSlot
-import ai.opencode.feature.voice.CallTrayDockTunables
-import ai.opencode.feature.voice.CallTrayTunables
 import ai.opencode.feature.voice.FloatingCallCenter
 import ai.opencode.feature.voice.floatingCallDrawerButton
 import ai.opencode.server.ServerSharedKeys
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.snap
-import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -129,10 +121,7 @@ import kotlin.math.min
  * Android counterpart, so the drawer always draws its own footer wash ([DrawerFooterBackdrop], iOS's
  * `customBottom` path). `drawerControlsRaisedTargets` is n/a: the controls draw above the list, so
  * Compose's hit testing already gives the part of New Session and Settings that rises above their
- * bar to the buttons. During a call the Call Tray docks in the drawer's bottom slot (D-114):
- * [CallTrayDockSlot] beneath New Session and Settings, which lift above it
- * (`drawerCarriesCallTray`); Home measures the slot for the travelling tray
- * (`drawerCallTrayGeometry`, `HomeCallTrayDock` in `HomeView.kt`).
+ * bar to the buttons.
  * `scrawlScreenName` and `tuningContext` live with [HomeViewState] / have no Tuning Panel.
  */
 
@@ -141,11 +130,9 @@ private val DrawerHeaderTop: Dp = 8.dp
 
 /**
  * iOS `drawerFooterBottom`: New Session and Settings centred on the resting composer's line
- * (`ComposerTunables.bottomGap` 0 + (bar 56 − footer 50) / 2). With a call the tray occupies the
- * bottom slot and keeps the composer's bottom edge instead (`bottomGap` 0).
+ * (`ComposerTunables.bottomGap` 0 + (bar 56 − footer 50) / 2).
  */
-private fun drawerFooterBottom(carriesCallTray: Boolean): Dp =
-    if (carriesCallTray) 0.dp else ((CallTrayComposerMetrics.barHeight - DrawerTunables.footerHeight.value) / 2).dp
+private val DrawerFooterBottom: Dp = ((ComposerTunables.barHeight - DrawerTunables.footerHeight.value) / 2).dp
 
 /**
  * The session drawer's panel: everything inside the drawer, for the container's `drawer` slot.
@@ -211,15 +198,7 @@ fun HomeDrawer(
     var headerHeight by remember { mutableFloatStateOf(0f) }
     var controlsHeight by remember { mutableFloatStateOf(DrawerTunables.footerHeight.value) }
     val controlsReach = (controlsHeight * DrawerTunables.controlsReach.coerceIn(0f, 1f)).dp
-    // The drawer carries the Call Tray in its bottom slot (D-114): New Session and Settings lift above it.
-    val carriesCallTray = viewState.callTray.dock.liftsDrawerControls
-    val trayMotion = if (reducedMotion) snap<Dp>() else CallTrayTunables.close.spec<Dp>()
-    val footerBottom by animateDpAsState(drawerFooterBottom(carriesCallTray), trayMotion, label = "drawerFooterBottom")
-    val callTrayLift by animateDpAsState(
-        if (carriesCallTray) (CallTrayTunables.height + CallTrayDockTunables.gap).dp else 0.dp,
-        trayMotion,
-        label = "drawerCallTrayLift",
-    )
+    val footerBottom = DrawerFooterBottom
 
     val inputs = DrawerListInputs(
         selectedSessionID = selectedSessionID,
@@ -247,7 +226,7 @@ fun HomeDrawer(
     ) {
         val listPadding = PaddingValues(
             top = headerHeight.dp + DrawerTunables.topGap,
-            bottom = controlsHeight.dp + callTrayLift + insetBottom + footerBottom + DrawerTunables.bottomGap,
+            bottom = controlsHeight.dp + insetBottom + footerBottom + DrawerTunables.bottomGap,
         )
         // Inbox Sidebar (experimental, iOS 338d8d92): the sessions as an inbox.
         if (inboxSidebarOn) InboxSidebarList(
@@ -278,7 +257,7 @@ fun HomeDrawer(
         Spacer(
             Modifier
                 .fillMaxSize()
-                .padding(top = headerHeight.dp, bottom = controlsHeight.dp + callTrayLift + insetBottom + footerBottom)
+                .padding(top = headerHeight.dp, bottom = controlsHeight.dp + insetBottom + footerBottom)
                 .drawerPanList(viewState.panRegions),
         )
         if (DrawerTimeReveal.IS_TRACED) DrawerRevealTrace(viewState.timeReveal)
@@ -365,14 +344,6 @@ fun HomeDrawer(
                         modifier = Modifier.testTag("drawer-settings"),
                     )
                 }
-            }
-            AnimatedVisibility(
-                visible = carriesCallTray,
-                enter = if (reducedMotion) EnterTransition.None else expandVertically(CallTrayTunables.close.spec()),
-                exit = if (reducedMotion) ExitTransition.None else shrinkVertically(CallTrayTunables.close.spec()),
-            ) {
-                // The open session's call, for the slot's Mute and End Call actions.
-                CallTrayDockSlot(store = rememberHomeCall(store))
             }
             }
         }
@@ -548,8 +519,8 @@ private fun DrawerCallSlot(store: StoreOf<HomeFeature.State, HomeFeature.Action>
         Box(Modifier.size(ComposerTunables.buttonDiameter.dp).floatingCallDrawerButton())
         AnimatedVisibility(
             visible = showsCall,
-            enter = if (reducedMotion) EnterTransition.None else fadeIn(CallTrayTunables.close.spec()),
-            exit = if (reducedMotion) ExitTransition.None else fadeOut(CallTrayTunables.close.spec()),
+            enter = if (reducedMotion) EnterTransition.None else fadeIn(DrawerTunables.callButtonSpring.spec()),
+            exit = if (reducedMotion) ExitTransition.None else fadeOut(DrawerTunables.callButtonSpring.spec()),
         ) {
             OpenCodeIconButton(
                 symbol = SFSymbol.Waveform,

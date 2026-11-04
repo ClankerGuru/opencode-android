@@ -32,8 +32,8 @@ import org.junit.Test
  * - `suspendedSessionCardTranscriptIgnoresDrawerKeyboardFrameChanges` probes
  *   `TranscriptListViewController`'s UIKit content inset (`:feature:transcript`).
  *
- * Partially ported: in `keysLeavingWithAnotherSessionSlideOffAndReturnOnceTheyAreGone` and
- * `callTrayExperimentWithoutCall…` the keyboard window's transform; `safeAreaRegions` is
+ * Partially ported: in `keysLeavingWithAnotherSessionSlideOffAndReturnOnceTheyAreGone` the
+ * keyboard window's transform; `safeAreaRegions` is
  * [DrawerKeyboardHold.excludesKeyboard] (the container's `consumeWindowInsets(ime)`), and the
  * card's `isUserInteractionEnabled` is [DrawerMotionState.isContentSuspended].
  */
@@ -370,25 +370,6 @@ class DrawerKeyboardHoldTests {
         // Close the drawer mid-search without first tapping Cancel in the search bar.
         harness.controller.setPresented(false, animated = false)
         assertFalse("Closing the drawer mid-search clears keyboard exclusion", harness.hold.excludesKeyboard)
-    }
-
-    @Test
-    fun callTrayExperimentWithoutCallKeepsKeyboardHoldAndDismissesIfCallStartsWhileSuspended() = runTest {
-        val harness = Harness(this)
-
-        // With Experimental › Call Tray on and no active call, `dismissesKeyboardOnOpen` is false,
-        // so opening the drawer holds the keyboard.
-        harness.controller.dismissesKeyboardOnOpen = false
-        harness.controller.setPresented(true, animated = false)
-        assertTrue(harness.field.isFocused)
-        assertTrue(harness.hold.isHeld("composer"))
-
-        // If a call starts while the card is suspended under the open drawer,
-        // `dismissesKeyboardOnOpen` turns on and immediately lets go of the hold and ends editing.
-        harness.controller.dismissesKeyboardOnOpen = true
-        assertFalse(harness.hold.isHeld("composer"))
-        assertFalse(harness.field.isFocused)
-        assertTrue(harness.motion.isContentSuspended)
     }
 
     /**

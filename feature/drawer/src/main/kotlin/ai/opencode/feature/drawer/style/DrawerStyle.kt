@@ -209,6 +209,7 @@ object DrawerTunables {
         if (!store.isEnabled) return
         store.register(pinLiftShadow, pinLiftShadowY, pinLiftShadowRadius, pinEdgeBand, pinEdgeSpeed)
         store.register(pinMoveSpring)
+        store.register(callButtonSpring)
         store.register(pinMoveFade, holdSettle, pinLandFade)
     }
 
@@ -351,6 +352,8 @@ object DrawerTunables {
      * cross-fades over [pinMoveFade].
      */
     val pinMoveSpring = TunableSpring("drawer.pin.move", "Pin and Unpin move", duration = 0.36, bounce = 0.0)
+    /** The call button beside Settings coming and going as a call starts and ends. */
+    val callButtonSpring = TunableSpring("drawer.call.button", "Call button in and out", duration = 0.36, bounce = 0.0)
     /** Pin and Unpin fade (Reduce Motion), s. */
     val pinMoveFade = Tunable("drawer.pin.moveFade", "Pin and Unpin fade (Reduce Motion)", default = 0.2, range = 0.0..0.6, step = 0.01)
     /** Held row. */

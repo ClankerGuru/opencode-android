@@ -3,7 +3,6 @@
 package ai.opencode.feature.session
 
 import ai.opencode.core.dependencies.dependency
-import ai.opencode.core.experiments.ExperimentalCallStyle
 import ai.opencode.core.experiments.key
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticEffect
@@ -49,7 +48,6 @@ import ai.opencode.feature.session.header.HeaderBlurTunables
 import ai.opencode.feature.session.header.SessionHeaderBackdrop
 import ai.opencode.feature.session.header.SessionHeaderStyle
 import ai.opencode.feature.system.notifications.SessionNotificationsClient
-import ai.opencode.feature.voice.CallTrayController
 import ai.opencode.feature.voice.DotScopeRenderer
 import ai.opencode.feature.voice.FloatingCallCenter
 import ai.opencode.feature.voice.FloatingCallRestArea
@@ -158,8 +156,6 @@ import kotlinx.coroutines.flow.map
  * @param onCatchUpOpen set while the session is a catch-up card: the title leaves Catch Up for the session.
  * @param hostedCall the call its root owns, on a pushed subagent (iOS `hostedCall`): its cards and
  *   bar show here, as the screen's own call would.
- * @param callTray Home's Call Tray motion (iOS `callTray`), while Settings' Call Style is the tray:
- *   the composer hosts the tray instead of swapping in the call bar.
  */
 @Composable
 fun SessionView(
@@ -171,7 +167,6 @@ fun SessionView(
     onBack: (() -> Unit)? = null,
     onCatchUpOpen: (() -> Unit)? = null,
     hostedCall: VoiceStoreOf? = null,
-    callTray: CallTrayController? = null,
 ) {
     val scrollEdgeBridge = remember { SessionScrollEdgeBridge() }
     val backgroundWorkAnchor = rememberBackgroundWorkAnchor()
@@ -202,9 +197,9 @@ fun SessionView(
     val ownsCall by store.observe { it.voice != null }
     SessionCallTasks(store, callStore, hasCall = ownsCall || hostedCall != null)
     val isCovered by store.observe { it.isCovered }
-    val floatsCall = rememberFloatsCall(callTray)
+    val floatsCall = rememberFloatsCall()
     // iOS `floatingCallCoverage(sessionLifecycle)`: what the Living Orb's card covers gives way.
-    SessionFloatingCallCoverage(store, callStore, floatsCall, rememberCallPresentation(callTray) == ExperimentalCallStyle.tray, composerHost, photoSheet)
+    SessionFloatingCallCoverage(store, callStore, floatsCall, composerHost, photoSheet)
     // iOS `clearOverClientToolCard()`: an agent's screen request or link came up, so the keyboard
     // and the composer's panels would stand over its card.
     val holdsClientToolCard by remember(callStore) { callStore?.let { call -> call.states.map { it.holdsClientToolCard } } ?: flowOf(false) }
@@ -352,7 +347,7 @@ fun SessionView(
                         .then(if (floatsCall && !isCovered) Modifier.floatingCallComposerColumn() else Modifier),
                 ) {
                     SessionCallCards(callStore)
-                    SessionComposer(store, Modifier.modelPanelsComposer(composerHost), callStore = callStore, callTray = callTray)
+                    SessionComposer(store, Modifier.modelPanelsComposer(composerHost), callStore = callStore)
                 }
                 // A send's words fly from the field into its bubble, over both.
                 SessionSendFlightOverlay(composerHost, scrollEdgeBridge, Modifier.matchParentSize())

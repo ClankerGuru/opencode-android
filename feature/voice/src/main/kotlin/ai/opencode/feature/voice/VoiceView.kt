@@ -54,7 +54,6 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -126,21 +125,28 @@ internal fun <V> VoiceStoreOf?.watch(select: (VoiceFeature.State) -> V): V? {
     return observe(select).value
 }
 
-/** iOS `EnvironmentValues.composerGlassHostedByCallTray`: true while [CallTrayHost] is mounted on the composer capsule. */
-val LocalComposerGlassHostedByCallTray = staticCompositionLocalOf { false }
-
 /**
- * iOS `EnvironmentValues.composerGlassMergedInCallTray`: true while [CallTrayHost] draws the
- * composer's surface itself, behind the tray, so [VoiceCallSurface] draws none.
+ * The composer's own metrics the call bar lays itself out against (iOS `ComposerTunables`,
+ * `Session/ComposerViews.swift`). Composer is a module above voice, so voice keeps the iOS
+ * defaults here; Session's `ComposerTunables` uses the same values (dp = iOS pt).
  */
-val LocalComposerGlassMergedInCallTray = staticCompositionLocalOf { false }
+object ComposerMetrics {
+    /** `composer.size.barHeight`. */
+    const val barHeight = 56f
+
+    /** `composer.size.cornerRadius`. */
+    const val cornerRadius = 28f
+
+    /** `composer.spacing.innerHorizontal`. */
+    const val innerHorizontal = 6f
+}
 
 /**
  * The call's surfaces (iOS Liquid Glass) as Material 3 tonal surfaces: no blur or glass
  * imitation.
  */
 object VoiceCallSurfaceDefaults {
-    /** The composer capsule, the tray and the call's cards. */
+    /** The composer capsule and the call's cards. */
     val color: Color
         @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.surfaceContainerHigh
 
@@ -236,8 +242,8 @@ fun VoiceCallComposer(store: VoiceStoreOf, modifier: Modifier = Modifier) {
     Box(
         modifier
             .fillMaxWidth()
-            .height(CallTrayComposerMetrics.barHeight.dp)
-            .clip(RoundedCornerShape(CallTrayComposerMetrics.cornerRadius.dp))
+            .height(ComposerMetrics.barHeight.dp)
+            .clip(RoundedCornerShape(ComposerMetrics.cornerRadius.dp))
             // An ended call is only sweeping out.
             .then(if (isTerminal) Modifier.blocksTouches() else Modifier),
     ) {
@@ -245,7 +251,7 @@ fun VoiceCallComposer(store: VoiceStoreOf, modifier: Modifier = Modifier) {
         Row(
             Modifier
                 .fillMaxSize()
-                .padding(horizontal = CallTrayComposerMetrics.innerHorizontal.dp),
+                .padding(horizontal = ComposerMetrics.innerHorizontal.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             val muteLabel = if (isMuted) "Unmute" else "Mute"
@@ -446,8 +452,6 @@ fun VoiceCallSurface(
     val activeExpansion = if (store == null) expansion else null
     val reduceMotion = rememberReduceMotion()
     val isDark = OpenCodeTheme.colors.isDark
-    val hosted = LocalComposerGlassHostedByCallTray.current
-    val merged = LocalComposerGlassMergedInCallTray.current
     val fontScale = LocalDensity.current.fontScale
     val isExpanded = store.watch { it.showsCaptions } == true
     // @ScaledMetric(relativeTo: .body) 176, capped at 300.
@@ -537,7 +541,7 @@ fun VoiceCallSurface(
         label = "expansionDim",
     )
     val surfaceColor = VoiceCallSurfaceDefaults.color
-    val cornerRadius = CallTrayComposerMetrics.cornerRadius
+    val cornerRadius = ComposerMetrics.cornerRadius
     val showsExpansion = activeExpansion?.isShown == true || (activeExpansion != null && expansionReach > 0)
     val glassFullAlpha by animateFloatAsState(if (surfaceExpanded) 1f else 0f, Motion.reducedFadeSpec(), label = "surfaceFull")
 
@@ -564,18 +568,16 @@ fun VoiceCallSurface(
             // The surface: one shape that grows and shrinks; under Reduce Motion the bar's and the
             // full surface's cross-fade instead.
             Box(Modifier.layoutId(SurfaceSlot.glass)) {
-                if (!(hosted && merged)) {
-                    if (reduceMotion) {
-                        Box(
-                            Modifier
-                                .fillMaxSize()
-                                .graphicsLayer { alpha = 1f - glassFullAlpha }
-                                .callSurface({ TopInsetRect(extent(), cornerRadius) }, surfaceColor),
-                        )
-                        Box(Modifier.fillMaxSize().graphicsLayer { alpha = glassFullAlpha }.callSurface(RoundedCornerShape(cornerRadius.dp), surfaceColor))
-                    } else {
-                        Box(Modifier.fillMaxSize().callSurface({ TopInsetRect(unrevealed(), cornerRadius) }, surfaceColor))
-                    }
+                if (reduceMotion) {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .graphicsLayer { alpha = 1f - glassFullAlpha }
+                            .callSurface({ TopInsetRect(extent(), cornerRadius) }, surfaceColor),
+                    )
+                    Box(Modifier.fillMaxSize().graphicsLayer { alpha = glassFullAlpha }.callSurface(RoundedCornerShape(cornerRadius.dp), surfaceColor))
+                } else {
+                    Box(Modifier.fillMaxSize().callSurface({ TopInsetRect(unrevealed(), cornerRadius) }, surfaceColor))
                 }
             }
             // The surface reveals the transcript from the bar up as it grows.
@@ -827,7 +829,7 @@ private class HiddenNode(var isHidden: Boolean, var kind: HiddenKind) :
  * Fades and rises in as the surface grows, and out as it shrinks; under Reduce Motion it only
  * fades. TalkBack's dismiss action closes it.
  *
- * @param animation the spec its fade follows for a given shown state (the tray's springs); the
+ * @param animation the spec its fade follows for a given shown state; the
  *   surface's own springs by default.
  */
 @Composable

@@ -497,9 +497,6 @@ class DrawerMotionState(
     /** Whether a shut card about to move may hold its keyboard (iOS `holdKeyboardIfShut`'s guards: phone, no Catch Up, no pushed subagent). */
     var canHoldKeyboard: () -> Boolean = { true }
 
-    /** When true, opening dismisses the composer's keyboard instead of holding it (iOS `dismissesKeyboardOnOpen`). */
-    var dismissesKeyboardOnOpen: Boolean = false
-
     /** Reduce Motion: settles place the card without moving, and the list doesn't recede. */
     var reducedMotion: Boolean = false
         set(value) {
@@ -719,16 +716,11 @@ class DrawerMotionState(
 
     private fun holdKeyboardIfShut() {
         val hold = keyboardHold ?: return
-        if (dismissesKeyboardOnOpen) {
-            hold.letGo()
-            return
-        }
         if (!recedes || offset != 0f || !canHoldKeyboard() || isContentSuspended) return
         hold.begin()
     }
 
     private fun suspendContent() {
-        if (dismissesKeyboardOnOpen) keyboardHold?.letGo()
         // A drag closing the drawer takes the keyboard from its search too.
         keyboardHold?.setDrawerSearching(false)
         contentSuspendedState.value = true

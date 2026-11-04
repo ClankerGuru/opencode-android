@@ -4,6 +4,8 @@ plugins {
 
 android {
     namespace = "ai.opencode.feature.session"
+    // Robolectric resolves the composer's drawables and fonts (ComposerIdentityTests hosts SessionView).
+    testOptions.unitTests.isIncludeAndroidResources = true
 }
 
 // Feature dependencies mirror iOS type references; the graph is acyclic:

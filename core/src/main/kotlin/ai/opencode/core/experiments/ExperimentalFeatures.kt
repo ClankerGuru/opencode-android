@@ -7,8 +7,8 @@ import ai.opencode.core.sharing.experimental
 /**
  * Settings' half of iOS `OpenCode/Settings/ExperimentalFeatures.swift`, in `:core` beside the
  * registry itself (`ai.opencode.core.sharing.ExperimentalFeature`, `experimental(feature)`,
- * `ExperimentalFeatures`): the groups, Call Style and the launch migrations of removed
- * switches. The typealiases let code import everything experimental from this package.
+ * `ExperimentalFeatures`): the groups and the launch migrations of removed switches. The
+ * typealiases let code import everything experimental from this package.
  */
 typealias ExperimentalFeature = ai.opencode.core.sharing.ExperimentalFeature
 typealias ExperimentalFeatures = ai.opencode.core.sharing.ExperimentalFeatures
@@ -24,9 +24,6 @@ private val experimentalKeys: Map<ExperimentalFeature, SharedKey<Boolean>> =
 
 /** SF Symbol name (iOS `systemImage`). */
 val ExperimentalFeature.systemImage: String get() = symbol
-
-/** Written by Settings' Call Style menu rather than shown as a switch. */
-val ExperimentalFeature.isCallStyle: Boolean get() = ExperimentalCallStyle.entries.any { it.feature == this }
 
 /** The sections of Settings › Experimental, in order, all open. */
 enum class ExperimentalGroup {
@@ -45,89 +42,49 @@ enum class ExperimentalGroup {
     /** The group's experiments, graduated ones aside. */
     val features: List<ExperimentalFeature>
         get() = ExperimentalFeature.allCases.filter { it.group == this && !it.isGraduated }
-
-    /** The group's switches: every feature but those a style menu writes (Call Style's). */
-    val toggles: List<ExperimentalFeature> get() = features.filter { !it.isCallStyle }
 }
 
+/** The old Floating Call switch's saved key. */
+val ai.opencode.core.sharing.ExperimentalFeature.Companion.legacyFloatingCallKey: String get() = "experimental-floating-call"
+
+/** The removed Call Tray's saved key. */
+val ai.opencode.core.sharing.ExperimentalFeature.Companion.legacyCallTrayKey: String get() = "experimental-call-tray"
+
+/** Marks the one move to Living Orb as done. */
+val ai.opencode.core.sharing.ExperimentalFeature.Companion.callStyleMigrationKey: String get() = "call-style-migrated-living-orb"
+
+/** The earlier move's marker (Living Orb the default, Tray kept, Nov 1). */
+val ai.opencode.core.sharing.ExperimentalFeature.Companion.orbDefaultMigrationKey: String get() = "call-style-migrated-orb-default"
+
 /**
- * Settings' one Call Style choice, stored as the two call experiments so saved switches carry
- * over. Living Orb is the floating call and the default (`livingOrb` is on until switched off);
- * it replaced the old Floating Call switch. [migrateToLivingOrbDefault] moves earlier installs to
- * it once. Living Orb wins when both are on.
+ * Living Orb is the one call style besides Standard (iOS p217): once per install, before anything
+ * reads its switch (`migrateBeforeLaunch`), Tray users and installs from before Living Orb was the
+ * default take it. A switch saved before then can't tell a choice from the old default; one saved
+ * after the Nov 1 move is a choice and stays. Then the Floating Call and Tray switches, and the
+ * earlier marker, go.
+ *
+ * Android divergence: iOS's lab `OPENCODE_LAB_EXPERIMENTS_OFF` (UI suites starting Living Orb off)
+ * is n/a; Android has no lab experiment overrides.
  */
-enum class ExperimentalCallStyle {
-    standard, floating, tray;
-
-    val id: String get() = name
-    val callTray: Boolean get() = this == tray
-    val livingOrb: Boolean get() = this == floating
-
-    /** The experiment this style turns on. */
-    val feature: ExperimentalFeature?
-        get() = when (this) {
-            standard -> null
-            floating -> ExperimentalFeature.livingOrb
-            tray -> ExperimentalFeature.callTray
-        }
-
-    val title: String
-        get() = when (this) {
-            standard -> "Standard"
-            floating -> ExperimentalFeature.livingOrb.title
-            tray -> "Tray"
-        }
-
-    val summary: String
-        get() = when (this) {
-            standard -> "The built-in call view"
-            floating -> ExperimentalFeature.livingOrb.summary
-            tray -> ExperimentalFeature.callTray.summary
-        }
-
-    companion object {
-        /** The old Floating Call switch's saved key. */
-        const val LEGACY_FLOATING_KEY = "experimental-floating-call"
-
-        /** iOS `init(callTray:livingOrb:)`. */
-        fun of(callTray: Boolean, livingOrb: Boolean): ExperimentalCallStyle =
-            if (livingOrb) floating else if (callTray) tray else standard
-
-        /** iOS `defaultStyle`: the style with neither switch set, Living Orb. */
-        val defaultStyle: ExperimentalCallStyle
-            get() = of(
-                callTray = ExperimentalFeature.callTray.defaultEnabled,
-                livingOrb = ExperimentalFeature.livingOrb.defaultEnabled,
-            )
-
-        /** Marks the one-time move to Living Orb as done. */
-        const val LIVING_ORB_MIGRATION_KEY = "call-style-migrated-orb-default"
-
-        /**
-         * Living Orb became the default (iOS, Nov 1): once per install, before anything reads a
-         * call-style switch (`migrateBeforeLaunch`). A saved switch can't tell a choice from an
-         * untouched default, so a Tray in use stays the Tray (a saved Floating Call switch it
-         * overrode included) and everyone else takes Living Orb. A choice made after that sticks.
-         *
-         * Android divergence: iOS's lab `OPENCODE_LAB_EXPERIMENTS_OFF` (UI suites starting Living
-         * Orb off) is n/a; Android has no lab experiment overrides.
-         */
-        fun migrateToLivingOrbDefault(store: SharedStore) {
-            val marker = store.reference(SharedKey.appStorage(LIVING_ORB_MIGRATION_KEY, false))
-            if (marker.value) return
-            marker.set(true)
-            val livingOrbKey = experimental(ExperimentalFeature.livingOrb)
-            val trayKey = experimental(ExperimentalFeature.callTray)
-            store.remove(SharedKey.appStorage(LEGACY_FLOATING_KEY, false))
-            val trayInUse = store.contains(trayKey) && store.reference(trayKey).value
-            val orbSaved = store.contains(livingOrbKey) && store.reference(livingOrbKey).value
-            if (trayInUse && !orbSaved) {
-                store.reference(livingOrbKey).set(false)
-            } else {
-                // Unset, it reads the default: Living Orb.
-                store.remove(livingOrbKey)
-            }
-        }
+fun ai.opencode.core.sharing.ExperimentalFeature.Companion.migrateCallStyles(store: SharedStore) {
+    val marker = store.reference(SharedKey.appStorage(ExperimentalFeature.callStyleMigrationKey, false))
+    if (marker.value) return
+    marker.set(true)
+    val trayKey = SharedKey.appStorage(ExperimentalFeature.legacyCallTrayKey, false)
+    val nov1Key = SharedKey.appStorage(ExperimentalFeature.orbDefaultMigrationKey, false)
+    val trayUser = store.contains(trayKey) && store.reference(trayKey).value
+    val movedNov1 = store.contains(nov1Key) && store.reference(nov1Key).value
+    if (trayUser || !movedNov1) {
+        // Unset, it reads the default: Living Orb.
+        store.remove(experimental(ExperimentalFeature.livingOrb))
+    }
+    val leftovers = listOf(
+        ExperimentalFeature.legacyFloatingCallKey,
+        ExperimentalFeature.legacyCallTrayKey,
+        ExperimentalFeature.orbDefaultMigrationKey,
+    )
+    for (key in leftovers) {
+        store.remove(SharedKey.appStorage(key, false))
     }
 }
 

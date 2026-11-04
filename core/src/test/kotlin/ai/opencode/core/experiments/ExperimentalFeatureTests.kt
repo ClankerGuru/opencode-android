@@ -18,8 +18,7 @@ import org.junit.Test
 
 /**
  * Port of iOS `ExperimentalFeatureTests`. `theSessionsPageDividerSwitchKeepsTheSavedChoice`
- * drives `HomeSettingsFeature`, so it's in `:feature:settings`' `ExperimentalFeatureTests`, with
- * the `settingsRowID` line of `callStyleMapsOntoTheTwoCallExperiments`.
+ * drives `HomeSettingsFeature`, so it's in `:feature:settings`' `ExperimentalFeatureTests`.
  */
 class ExperimentalFeatureTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -109,19 +108,11 @@ class ExperimentalFeatureTests {
         )
         assertEquals(
             listOf(
-                ExperimentalFeature.callTray, ExperimentalFeature.livingOrb, ExperimentalFeature.serverVoice,
+                ExperimentalFeature.livingOrb, ExperimentalFeature.serverVoice,
                 ExperimentalFeature.backgroundCallIntent, ExperimentalFeature.voiceSessionDelegator,
                 ExperimentalFeature.shareScreenWithAgents, ExperimentalFeature.openLinksFromCalls, ExperimentalFeature.audioInCalls,
             ),
             ExperimentalGroup.calls.features,
-        )
-        assertEquals(
-            "Call Style writes the other two",
-            listOf(
-                ExperimentalFeature.serverVoice, ExperimentalFeature.backgroundCallIntent, ExperimentalFeature.voiceSessionDelegator,
-                ExperimentalFeature.shareScreenWithAgents, ExperimentalFeature.openLinksFromCalls, ExperimentalFeature.audioInCalls,
-            ),
-            ExperimentalGroup.calls.toggles,
         )
         assertEquals(listOf(ExperimentalFeature.imageLinkPreviews, ExperimentalFeature.inAppBrowser), ExperimentalGroup.transcript.features)
         assertEquals(
@@ -193,67 +184,52 @@ class ExperimentalFeatureTests {
     }
 
     @Test
-    fun callStyleMapsOntoTheTwoCallExperiments() {
-        assertEquals(ExperimentalCallStyle.standard, ExperimentalCallStyle.of(callTray = false, livingOrb = false))
-        assertEquals(ExperimentalCallStyle.floating, ExperimentalCallStyle.of(callTray = false, livingOrb = true))
-        assertEquals(ExperimentalCallStyle.tray, ExperimentalCallStyle.of(callTray = true, livingOrb = false))
-        assertEquals("Living Orb wins when both are on", ExperimentalCallStyle.floating, ExperimentalCallStyle.of(callTray = true, livingOrb = true))
-        for (style in ExperimentalCallStyle.entries) {
-            assertEquals(style, ExperimentalCallStyle.of(style.callTray, style.livingOrb))
-            assertFalse("Choosing a style leaves at most one switch on", style.callTray && style.livingOrb)
-            assertTrue(style.summary.split(" ").size <= 6)
-        }
-        assertEquals(listOf("Standard", "Living Orb", "Tray"), ExperimentalCallStyle.entries.map { it.title })
-    }
-
-    @Test
-    fun livingOrbIsTheDefaultCallStyle() {
+    fun livingOrbIsOnByDefault() {
         assertTrue(ExperimentalFeature.livingOrb.defaultEnabled)
-        assertFalse("Call Style stays in Settings › Experimental › Calls", ExperimentalFeature.livingOrb.isGraduated)
-        assertFalse(ExperimentalFeature.callTray.defaultEnabled)
-        assertEquals(ExperimentalCallStyle.floating, ExperimentalCallStyle.defaultStyle)
+        assertFalse("Its switch stays in Settings › Experimental › Calls", ExperimentalFeature.livingOrb.isGraduated)
         assertFalse("Reducer tests still start every experiment off", ExperimentalFeatures.testValue(ExperimentalFeature.livingOrb))
     }
 
     /**
-     * Living Orb became the default (Nov 1): every install moves to it once, except a Tray in
-     * use. Saved switches can't tell a choice from a default an earlier read wrote, so Standard
-     * moves too. Each phase opens its own [SharedStore] over the same bytes, as each launch does.
+     * Living Orb is the one call style besides Standard (p217): everyone moves to it once, a Tray
+     * user included. Saved switches can't tell a choice from a default an earlier read wrote, so
+     * Standard moves too, unless it was chosen after the Nov 1 move (that move's marker is set).
+     * Each phase opens its own [SharedStore] over the same bytes, as each launch does.
      */
     @Test
-    fun livingOrbBecomesTheDefaultOnceExceptForATrayInUse() {
+    fun livingOrbOnceForEveryoneATrayUserIncluded() {
         val orb = "experimental-living-orb"
-        val tray = "experimental-call-tray"
-        val legacy = ExperimentalCallStyle.LEGACY_FLOATING_KEY
-        fun style(setup: (SharedStore) -> Unit): Pair<ExperimentalCallStyle, Boolean> {
+        val tray = ExperimentalFeature.legacyCallTrayKey
+        val floating = ExperimentalFeature.legacyFloatingCallKey
+        val nov1 = ExperimentalFeature.orbDefaultMigrationKey
+        fun migrated(setup: (SharedStore) -> Unit): Pair<Boolean, Boolean> {
             val bytes = InMemorySharedBytes()
             setup(SharedStore(bytes))
-            ExperimentalCallStyle.migrateToLivingOrbDefault(SharedStore(bytes))
+            ExperimentalFeature.migrateCallStyles(SharedStore(bytes))
             val after = SharedStore(bytes)
             val livingOrb = after.reference(experimental(ExperimentalFeature.livingOrb)).value
-            val callTray = after.reference(experimental(ExperimentalFeature.callTray)).value
-            return ExperimentalCallStyle.of(callTray = callTray, livingOrb = livingOrb) to after.has(legacy)
+            val leftover = after.has(floating) || after.has(tray) || after.has(nov1)
+            return livingOrb to leftover
         }
-        assertEquals("Never chose: Living Orb", ExperimentalCallStyle.floating to false, style { })
-        assertEquals("A written default or Standard: Living Orb", ExperimentalCallStyle.floating to false, style { it.save(orb, false) })
-        assertEquals(ExperimentalCallStyle.floating to false, style { it.save(orb, false); it.save(tray, false) })
-        assertEquals("A Tray in use stays", ExperimentalCallStyle.tray to false, style { it.save(tray, true) })
-        assertEquals(ExperimentalCallStyle.tray to false, style { it.save(tray, true); it.save(orb, false) })
-        assertEquals("Living Orb won over the tray", ExperimentalCallStyle.floating to false, style { it.save(tray, true); it.save(orb, true) })
-        assertEquals(ExperimentalCallStyle.floating to false, style { it.save(orb, true) })
-        assertEquals("Floating Call moves to Living Orb", ExperimentalCallStyle.floating to false, style { it.save(legacy, true) })
-        assertEquals(ExperimentalCallStyle.floating to false, style { it.save(legacy, false) })
+        assertEquals("Never chose: Living Orb", true to false, migrated { })
+        assertEquals("A written default or Standard: Living Orb", true to false, migrated { it.save(orb, false) })
+        assertEquals("A Tray user takes Living Orb", true to false, migrated { it.save(tray, true) })
+        assertEquals(true to false, migrated { it.save(tray, true); it.save(orb, false) })
+        assertEquals("Floating Call moves to Living Orb", true to false, migrated { it.save(floating, true) })
+        assertEquals(true to false, migrated { it.save(floating, false) })
         assertEquals(
-            "Call Tray won over Floating Call, so the tray stays",
-            ExperimentalCallStyle.tray to false,
-            style { it.save(legacy, true); it.save(tray, true) },
+            "The Tray kept on Nov 1 moves now",
+            true to false,
+            migrated { it.save(nov1, true); it.save(tray, true); it.save(orb, false) },
         )
+        assertEquals("Standard chosen after Nov 1 stays", false to false, migrated { it.save(nov1, true); it.save(orb, false) })
+        assertEquals(true to false, migrated { it.save(nov1, true) })
 
         // Once: a choice made afterwards sticks.
         val bytes = InMemorySharedBytes()
-        ExperimentalCallStyle.migrateToLivingOrbDefault(SharedStore(bytes))
-        SharedStore(bytes).let { it.save(orb, false); it.save(tray, false) }
-        ExperimentalCallStyle.migrateToLivingOrbDefault(SharedStore(bytes))
+        ExperimentalFeature.migrateCallStyles(SharedStore(bytes))
+        SharedStore(bytes).save(orb, false)
+        ExperimentalFeature.migrateCallStyles(SharedStore(bytes))
         assertEquals(
             "Standard chosen after the move stays",
             false,

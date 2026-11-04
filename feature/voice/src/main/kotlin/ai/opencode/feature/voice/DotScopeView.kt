@@ -70,17 +70,6 @@ sealed interface DotScopeMode {
 
     /** The floating call's panel: the call's scope across its full width, with no room kept for buttons at either end. */
     data class Panel(val stage: DotScopeSimulation.Stage) : DotScopeMode
-
-    /** The call tray: the call's scope running from the rounded leading cap all the way to Mute and End on the trailing side. */
-    data class Tray(
-        val stage: DotScopeSimulation.Stage,
-        val leadingInset: Float,
-        val trailingInset: Float,
-        val visibleWidth: Float = 0f,
-        val fade: Float = DotScopeSimulation.windowFade,
-        val scanReach: Float = 1f,
-        val cornerRadius: Float = 28f,
-    ) : DotScopeMode
 }
 
 /**
@@ -98,8 +87,8 @@ sealed interface DotScopeMode {
  * frame whenever its inputs change.
  *
  * @param isHidden faded out behind something else: no drawing.
- * @param renderer one call's scope drawn by whichever view shows it (the Call Tray in the
- *   session, then in the drawer), so its trails carry across. `null` makes one.
+ * @param renderer one call's scope shared by the views that show it, so its trails carry
+ *   across. `null` makes one.
  */
 @Composable
 fun DotScopeView(
@@ -186,8 +175,8 @@ object DotScopePalette {
 
 /**
  * Steps the scope's simulation at a fixed rate and draws the lit grid (iOS `DotScopeRenderer`).
- * A plain object: one per mounted scope, or one per call shared by the tray in the session and
- * in the drawer ([CallTrayController.scopeRenderer]). Configuration and publication are main
+ * A plain object: one per mounted scope, or one per call shared by the views that show it.
+ * Configuration and publication are main
  * thread only; simulation and half-float packing run on Default. The mutex covers both, so
  * shared surfaces never advance the same simulation or reuse its buffer concurrently.
  */
@@ -304,43 +293,35 @@ class DotScopeRenderer private constructor() {
         val target = when (mode) {
             is DotScopeMode.Call, is DotScopeMode.Preview -> ScopeVector2(DotScopeSimulation.windowInset, DotScopeSimulation.windowInset)
             is DotScopeMode.Panel -> ScopeVector2(0f, 0f)
-            is DotScopeMode.Tray -> ScopeVector2(mode.leadingInset, mode.trailingInset)
             is DotScopeMode.Dictation -> ScopeVector2(mode.leadingInset, mode.trailingInset)
         }
         if (isStill) {
             val connected = when (mode) {
                 is DotScopeMode.Call -> mode.stage == DotScopeSimulation.Stage.live
                 is DotScopeMode.Panel -> mode.stage == DotScopeSimulation.Stage.live
-                is DotScopeMode.Tray -> mode.stage == DotScopeSimulation.Stage.live
                 is DotScopeMode.Preview -> mode.active
                 is DotScopeMode.Dictation -> true
             }
             simulation = DotScopeSimulation.still(connected)
             insets = target
             simulation.windowInsets = target
-            applyTrayMetrics(grid, mode)
         } else {
             val rawElapsed = (nowSeconds - (lastFrame ?: nowSeconds)).coerceIn(0.0, 0.1)
             // iOS `AnimationTimeScale` is a lab hook; real time here.
             val elapsed = rawElapsed
             lastFrame = nowSeconds
-            val eased = if (mode is DotScopeMode.Tray) target else insets?.let {
+            val eased = insets?.let {
                 val k = min(1f, elapsed.toFloat() * 12)
                 ScopeVector2(it.x + (target.x - it.x) * k, it.y + (target.y - it.y) * k)
             } ?: target
             insets = eased
             simulation.windowInsets = eased
-            applyTrayMetrics(grid, mode)
             when (mode) {
                 is DotScopeMode.Call, is DotScopeMode.Panel -> {
                     val stage = if (mode is DotScopeMode.Call) mode.stage else (mode as DotScopeMode.Panel).stage
                     // Where the shared clock was when this frame's step begins.
                     simulation.setStage(stage, stageElapsed?.let { max(0.0, it - elapsed) })
                     simulation.advance(elapsed, you = snapshot.user, agent = snapshot.assistant, connected = stage == DotScopeSimulation.Stage.live)
-                }
-                is DotScopeMode.Tray -> {
-                    simulation.setStage(mode.stage)
-                    simulation.advance(elapsed, you = snapshot.user, agent = snapshot.assistant, connected = mode.stage == DotScopeSimulation.Stage.live)
                 }
                 is DotScopeMode.Dictation -> {
                     simulation.advance(elapsed, you = snapshot.user, agent = snapshot.assistant, connected = true)
@@ -351,19 +332,6 @@ class DotScopeRenderer private constructor() {
             }
         }
         simulation.render(grid, field)
-    }
-
-    private fun applyTrayMetrics(grid: DotScopeGrid, mode: DotScopeMode) {
-        if (mode is DotScopeMode.Tray) {
-            val w = if (mode.visibleWidth > 0) min(grid.width, mode.visibleWidth) else grid.width
-            simulation.reachesLeadingEdge = true
-            simulation.trayFade = mode.fade
-            simulation.trayScanReach = mode.scanReach
-            simulation.visibleBar = ScopeVector2(0f, w)
-        } else {
-            simulation.reachesLeadingEdge = false
-            simulation.visibleBar = ScopeVector2()
-        }
     }
 
     // The texture holds raw half-float bits (`Half.toHalf` → `putShort`), read by the shader as data.
@@ -396,17 +364,6 @@ class DotScopeRenderer private constructor() {
             is DotScopeMode.Panel -> {
                 isDictation = false
                 window = floatArrayOf(0f, 1f, 0f, 1f)
-            }
-            is DotScopeMode.Tray -> {
-                isDictation = false
-                val eased = state.insets ?: ScopeVector2(mode.leadingInset, mode.trailingInset)
-                val w = if (mode.visibleWidth > 0) min(grid.width, mode.visibleWidth) else grid.width
-                val leftFade = max(6f, mode.fade)
-                window = floatArrayOf(eased.x, mode.fade, eased.y, 0f)
-                // The fixed-size canvas is pinned to the glass's leading edge. A stale frame may
-                // carry an older trailing width, but cannot detach its leading mask from the cap.
-                bar[1] = w; bar[2] = leftFade; bar[3] = CallTrayTunables.scopeEdgeCurve
-                shape[0] = min(mode.cornerRadius, min(w / 2, grid.height / 2))
             }
             is DotScopeMode.Dictation -> {
                 isDictation = true

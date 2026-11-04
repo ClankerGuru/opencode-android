@@ -50,7 +50,7 @@ data class FloatingCallRestArea(
     /** The bottom of the space the orb may rest in. */
     val bottom: Float
         get() {
-            val composer = composerTop ?: (screen.height - 34 - CallTrayComposerMetrics.barHeight)
+            val composer = composerTop ?: (screen.height - 34 - ComposerMetrics.barHeight)
             return keyboardTop?.let { min(composer, it) } ?: composer
         }
 

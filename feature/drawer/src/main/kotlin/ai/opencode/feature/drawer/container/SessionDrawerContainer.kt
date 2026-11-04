@@ -127,10 +127,6 @@ import kotlin.math.roundToInt
  * @param onCommitted a release or tap commits to the other side: play `Haptic.snap` now.
  * @param onTouchDown a touch that may move the drawer began: prepare its haptic.
  * @param onReveal a drag on the open drawer toward the card, which reveals the rows' times.
- * @param onDrawerProgress how far the phone's drawer is open (0..1) each frame the card moves,
- *   and whether it got there by moving (`false`: Catch Up took the screen or handed it back).
- * @param dismissesKeyboardOnOpen opening the drawer dismisses the composer's keyboard instead
- *   of holding it beside the card.
  * @param contentSessionID the session the card shows or is about to show (`null` for a draft): a
  *   drawer that closes on another session than it opened on leaves the keyboard down.
  * @param isContentPushed a subagent or a web page is pushed over the session (its back gesture has the drag).
@@ -160,8 +156,6 @@ fun SessionDrawerContainer(
     onCommitted: () -> Unit = {},
     onTouchDown: () -> Unit = {},
     onReveal: (DrawerRevealPhase) -> Unit = {},
-    onDrawerProgress: (Float, Boolean) -> Unit = { _, _ -> },
-    dismissesKeyboardOnOpen: Boolean = false,
     contentSessionID: String? = null,
     isContentPushed: Boolean = false,
     isSheetPresented: Boolean = false,
@@ -574,14 +568,12 @@ fun SessionDrawerContainer(
         controller.onCommitted = onCommitted
         controller.onTouchDown = onTouchDown
         controller.onPresentationChanged = onPresentationChanged
-        controller.onDrawerProgress = onDrawerProgress
         if (controller.drawerWidth != width.value) {
             controller.finishModeTransition()
             controller.drawerWidth = width.value
             motion.updateWidth(width.value)
             controller.sidebarWidthChanged()
         }
-        controller.dismissesKeyboardOnOpen = dismissesKeyboardOnOpen
         controller.contentSessionID = contentSessionID
         // Before `setPresented`: leaving Catch Up for the open drawer is the stack's own exit,
         // not an opening to feel.

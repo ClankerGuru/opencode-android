@@ -74,7 +74,7 @@ class VoiceScreenshotToolTests {
         val call = SpeechTestShared().run {
             VoiceFeature.State(server, session).withPhase(VoiceFeature.State.Phase.Live)
         }
-        return VoiceAppState(call, experiments = listOf("call-tray"), developerMode = true, device = device)
+        return VoiceAppState(call, experiments = listOf("living-orb"), developerMode = true, device = device)
     }
 
     private fun client(sent: Locked<List<Sent>>): OpenCodeClient = OpenCodeClient.testValue.copy(
@@ -271,7 +271,7 @@ class VoiceScreenshotToolTests {
         assertEquals("ses_voice", decoded.obj("session")?.string("id"))
         assertEquals("OpenCode iOS", decoded.obj("session")?.string("title"))
         assertEquals("live", decoded.obj("call")?.string("phase"))
-        assertEquals(listOf("call-tray"), (decoded["experiments"] as? JsonArray)?.map { (it as JsonPrimitive).content })
+        assertEquals(listOf("living-orb"), (decoded["experiments"] as? JsonArray)?.map { (it as JsonPrimitive).content })
         val composer = assertNotNullValue(decoded.obj("home")?.obj("composer"))
         assertEquals(draft.length, (composer["draftCharacters"] as? JsonPrimitive)?.intOrNull)
         for (secret in listOf("hunter2", "kit:", "studio.example", "ts.net", "4096", "https://", "secret plan")) {

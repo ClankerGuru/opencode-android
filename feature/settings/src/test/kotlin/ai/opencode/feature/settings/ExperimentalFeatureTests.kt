@@ -10,7 +10,6 @@ import ai.opencode.core.store.TestStore
 import ai.opencode.core.testing.TestIsolationRule
 import ai.opencode.server.OpenCodeServer
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -18,8 +17,7 @@ import org.junit.Test
 
 /**
  * Port of iOS `ExperimentalFeatureTests.swift`, the `:feature:settings` part (the rest is
- * `:core`'s port): the Sessions page's divider switch goes through [HomeSettingsFeature], and
- * `settingsRowID` is Settings › Experimental's.
+ * `:core`'s port): the Sessions page's divider switch goes through [HomeSettingsFeature].
  */
 class ExperimentalFeatureTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -45,12 +43,5 @@ class ExperimentalFeatureTests {
         assertFalse(shared.get(key))
         assertFalse(live())
         store.finish()
-    }
-
-    /** The Settings half of iOS `callStyleMapsOntoTheTwoCallExperiments` (the mapping is `:core`'s). */
-    @Test fun callStyleMapsOntoTheTwoCallExperiments() {
-        assertEquals(ExperimentalFeature.callTray, ExperimentalFeature.livingOrb.settingsRowID)
-        assertEquals(ExperimentalFeature.callTray, ExperimentalFeature.callTray.settingsRowID)
-        assertEquals(ExperimentalFeature.serverVoice, ExperimentalFeature.serverVoice.settingsRowID)
     }
 }

@@ -3,7 +3,6 @@ package ai.opencode.feature.session
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.DependencyValues
 import ai.opencode.core.dependencies.asContextElement
-import ai.opencode.core.experiments.ExperimentalCallStyle
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.sharing.ExperimentalFeature
@@ -121,12 +120,11 @@ internal object SessionTestSupport {
         fun <R> state(block: () -> R): R = DependencyValues.withValues(values, block)
 
         /**
-         * iOS `@Test(.callStyle(x))`: this test's shared store holds one call style. Living Orb is
-         * the default; tests about the Standard call view name it.
+         * iOS `@Test(.callStyle(livingOrb:))`: this test's shared store holds one call style. Living
+         * Orb is the default; tests about the Standard call view switch it off.
          */
-        fun callStyle(style: ExperimentalCallStyle) = state {
-            shared(experimental(ExperimentalFeature.livingOrb)).set(style.livingOrb)
-            shared(experimental(ExperimentalFeature.callTray)).set(style.callTray)
+        fun callStyle(livingOrb: Boolean) = state {
+            shared(experimental(ExperimentalFeature.livingOrb)).set(livingOrb)
         }
 
         /** iOS `makeState(...)` (`SessionFeatureTests`). */

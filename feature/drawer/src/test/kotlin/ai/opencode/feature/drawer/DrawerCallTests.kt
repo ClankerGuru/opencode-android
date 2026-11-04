@@ -4,7 +4,6 @@ import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.TestClock
 import ai.opencode.core.dependencies.UuidClient
-import ai.opencode.core.experiments.ExperimentalCallStyle
 import ai.opencode.core.experiments.key
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
@@ -37,7 +36,7 @@ import org.junit.Test
  * Living Orb it calls the screen behind the drawer through its own call button, else Start Voice
  * Call's Last Viewed path, and it's gone during a call.
  *
- * iOS runs the suite under `.callStyle(.floating)`; here Living Orb is the stored default, so each
+ * iOS runs the suite under `.callStyle(livingOrb: true)`; here Living Orb is the stored default, so each
  * test starts there, and voice set-up is written into the test's own shared store.
  */
 class DrawerCallTests {
@@ -162,20 +161,17 @@ class DrawerCallTests {
         assertTrue(store.state.isDrawerOpen)
     }
 
-    /** Only Living Orb's call floats above the open drawer; the other styles' call lives in the composer under it, so the drawer offers none. */
+    /** Only Living Orb's call floats above the open drawer; with it off the call lives in the composer under it, so the drawer offers none. */
     @Test
-    fun otherCallStylesOfferNoDrawerCall() = runTest {
+    fun theStandardCallOffersNoDrawerCall() = runTest {
         voiceSetUp(true)
-        for (style in listOf(ExperimentalCallStyle.standard, ExperimentalCallStyle.tray)) {
-            context.read { shared(ExperimentalFeature.livingOrb.key).set(true) }
-            val state = context.read { home().showing(newer) }
-            assertTrue(context.read { state.drawerShowsCallButton })
-            context.read { shared(ExperimentalFeature.livingOrb.key).set(style.livingOrb) }
-            assertFalse("$style", context.read { state.drawerShowsCallButton })
-            val store = store(backgroundScope) { state }
-            store.send(HomeFeature.Action.DrawerCallTapped)
-            assertNull("$style", store.state.sessionDetail?.voice)
-        }
+        val state = context.read { home().showing(newer) }
+        assertTrue(context.read { state.drawerShowsCallButton })
+        context.read { shared(ExperimentalFeature.livingOrb.key).set(false) }
+        assertFalse(context.read { state.drawerShowsCallButton })
+        val store = store(backgroundScope) { state }
+        store.send(HomeFeature.Action.DrawerCallTapped)
+        assertNull(store.state.sessionDetail?.voice)
     }
 
     @Test

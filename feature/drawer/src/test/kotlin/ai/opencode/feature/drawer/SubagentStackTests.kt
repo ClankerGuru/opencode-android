@@ -4,7 +4,6 @@ import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.TestClock
 import ai.opencode.core.dependencies.UuidClient
-import ai.opencode.core.experiments.ExperimentalCallStyle
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.store.PresentationAction
 import ai.opencode.core.store.TestStore
@@ -430,7 +429,7 @@ class SubagentStackTests {
 
     @Test
     fun startingACallFromAPushedSubagentSyncsTheTopScreensVoiceInvariants() = homeTest { h ->
-        h.callStyle(ExperimentalCallStyle.standard)
+        h.callStyle(livingOrb = false)
         val childModel = OpenCodeModelRef(id = "gpt-5.4", providerID = "openai", variant = "high")
         val childURL = "https://docs.example.com/subagent"
         h.setShared(SharedKeys.voiceModeEnabled, true)
@@ -469,7 +468,7 @@ class SubagentStackTests {
 
     @Test
     fun switchingToARestoredSessionDuringACallSyncsPendingRequestsAndEndsAnswering() = homeTest { h ->
-        h.callStyle(ExperimentalCallStyle.standard)
+        h.callStyle(livingOrb = false)
         val otherModel = OpenCodeModelRef(id = "claude-sonnet-4", providerID = "anthropic", variant = "high")
         val state = h.home().let { home ->
             h.state {

@@ -58,7 +58,6 @@ internal fun SessionFloatingCallCoverage(
     store: StoreOf<State, Action>,
     callStore: VoiceStoreOf?,
     floatsCall: Boolean,
-    usesCallTray: Boolean,
     host: SessionComposerHost,
     photoSheet: SessionPhotoSheetState,
 ) {
@@ -91,18 +90,16 @@ internal fun SessionFloatingCallCoverage(
     // The card and the sheet would cover a docked request: the call shrinks back to its orb, which
     // sits above the composer, whichever request docks and on whichever screen, once it's
     // uncovered. iOS `docksRequest`: `voiceStore == nil && isAnsweringRequest`.
-    val holdsBar = callStore != null && !floatsCall && !usesCallTray && !callShowsCard
+    val holdsBar = callStore != null && !floatsCall && !callShowsCard
     val dock by store.observe {
         RequestDockCall(it.taskIdentity, it.dockRequestID, it.isCovered, docksRequest = !holdsBar && it.isAnsweringRequest)
     }
     val call by rememberUpdatedState(callStore)
     val floats by rememberUpdatedState(floatsCall)
-    val tray by rememberUpdatedState(usesCallTray)
     // iOS `onChange(of:initial: true)`: the first value counts too.
     LaunchedEffect(dock) {
         if (!dock.shrinksCall) return@LaunchedEffect
         val current = call ?: return@LaunchedEffect
-        if (tray && current.state.showsCaptions) current.send(VoiceFeature.Action.CaptionsDismissed)
         if (floats) current.send(VoiceFeature.Action.FloatingStage(FloatingCallStageFeature.Action.RequestDocked))
     }
 }

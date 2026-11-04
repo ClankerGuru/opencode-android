@@ -1,8 +1,6 @@
 package ai.opencode.feature.settings
 
 import ai.opencode.core.experiments.key
-import ai.opencode.core.experiments.isCallStyle
-import ai.opencode.core.experiments.ExperimentalCallStyle
 import ai.opencode.core.experiments.ExperimentalFeature
 import ai.opencode.core.experiments.ExperimentalGroup
 import ai.opencode.core.motion.Motion
@@ -40,24 +38,18 @@ import kotlinx.coroutines.delay
  */
 @Composable
 fun ExperimentalSettingsView(store: SettingsStore, focus: ExperimentalFeature?) {
-    val callTray by remember { shared(ExperimentalFeature.callTray.key).flow }.collectAsState()
-    val livingOrb by remember { shared(ExperimentalFeature.livingOrb.key).flow }.collectAsState()
     // Every switch, so headers count what's on and rows redraw when a value changes.
     val enabled = ExperimentalFeature.allCases.associateWith { feature ->
         remember(feature) { shared(feature.key).flow }.collectAsState().value
     }
     val send = { action: HomeSettingsFeature.Action -> store.send(SettingsFeature.Action.Settings(action)) }
-    val callStyle = ExperimentalCallStyle.of(
-        callTray = ExperimentalFeature.callTray.isActive(callTray),
-        livingOrb = ExperimentalFeature.livingOrb.isActive(livingOrb),
-    )
     val listState = rememberLazyListState()
     var highlighted by remember { mutableStateOf<ExperimentalFeature?>(null) }
 
     // Scroll to the focused row (each group's section is one list item, in order), centred as
     // iOS `scrollTo(_, anchor: .center)`, and tint it.
     LaunchedEffect(focus) {
-        val target = focus?.settingsRowID ?: return@LaunchedEffect
+        val target = focus ?: return@LaunchedEffect
         val index = ExperimentalGroup.entries.indexOf(target.group)
         // A frame for the list to lay out its rows first.
         withFrameNanos {}
@@ -74,7 +66,7 @@ fun ExperimentalSettingsView(store: SettingsStore, focus: ExperimentalFeature?) 
 
     @Composable
     fun ColumnScope.toggles(group: ExperimentalGroup, leadingDivider: Boolean) {
-        group.toggles.forEachIndexed { index, feature ->
+        group.features.forEachIndexed { index, feature ->
             if (leadingDivider || index > 0) SettingsDivider(inset = true)
             ExperimentalFeatureToggle(
                 feature = feature,
@@ -86,7 +78,8 @@ fun ExperimentalSettingsView(store: SettingsStore, focus: ExperimentalFeature?) 
     }
 
     fun header(group: ExperimentalGroup, styled: Int = 0): String {
-        val on = styled + group.toggles.count { enabled.getValue(it) }
+        // Turned on: ones on by default (Living Orb) don't count (iOS `isTurnedOn`).
+        val on = styled + group.features.count { !it.defaultEnabled && enabled.getValue(it) }
         return if (on == 0) group.title else "${group.title} · $on on"
     }
 
@@ -94,30 +87,8 @@ fun ExperimentalSettingsView(store: SettingsStore, focus: ExperimentalFeature?) 
         settingsSection(key = ExperimentalGroup.composer, header = header(ExperimentalGroup.composer)) {
             toggles(ExperimentalGroup.composer, leadingDivider = false)
         }
-        settingsSection(
-            key = ExperimentalGroup.calls,
-            header = header(ExperimentalGroup.calls, if (callStyle != ExperimentalCallStyle.defaultStyle) 1 else 0),
-        ) {
-            val highlight by animateColorAsState(
-                if (highlighted == ExperimentalFeature.callTray) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) else Color.Transparent,
-                highlightSpec(highlighted == ExperimentalFeature.callTray),
-                label = "call-style-highlight",
-            )
-            SettingsMenuRow(
-                title = "Call Style",
-                value = callStyle.title,
-                selection = callStyle,
-                options = ExperimentalCallStyle.entries.map { SettingsMenuOption(it, it.title) },
-                onSelect = { style ->
-                    send(HomeSettingsFeature.Action.ExperimentalFeatureChanged(ExperimentalFeature.callTray, style.callTray))
-                    send(HomeSettingsFeature.Action.ExperimentalFeatureChanged(ExperimentalFeature.livingOrb, style.livingOrb))
-                },
-                caption = callStyle.summary,
-                symbol = "phone.fill",
-                tint = ExperimentalGroup.calls.tint,
-                modifier = Modifier.background(highlight),
-            )
-            toggles(ExperimentalGroup.calls, leadingDivider = true)
+        settingsSection(key = ExperimentalGroup.calls, header = header(ExperimentalGroup.calls)) {
+            toggles(ExperimentalGroup.calls, leadingDivider = false)
         }
         settingsSection(key = ExperimentalGroup.transcript, header = header(ExperimentalGroup.transcript)) {
             toggles(ExperimentalGroup.transcript, leadingDivider = false)
@@ -165,23 +136,20 @@ private fun highlightSpec(highlighted: Boolean): AnimationSpec<Color> =
     if (highlighted) snap() else tween(durationMillis = 600, easing = Motion.EaseOut)
 
 /**
- * iOS `ExperimentalSettingsRow`: Settings' row into Experimental, counting what's on (a Call
- * Style other than the default counts as one).
+ * iOS `ExperimentalSettingsRow`: Settings' row into Experimental, counting experiments turned on.
+ * One on by default (Living Orb) doesn't count.
  */
 @Composable
 fun ExperimentalSettingsRow(onClick: () -> Unit) {
-    val callTray by remember { shared(ExperimentalFeature.callTray.key).flow }.collectAsState()
-    val livingOrb by remember { shared(ExperimentalFeature.livingOrb.key).flow }.collectAsState()
-    val toggles = ExperimentalGroup.entries.flatMap { it.toggles }
-    val enabled = toggles.map { feature -> remember(feature) { shared(feature.key).flow }.collectAsState().value }
-    val styled = (if (ExperimentalCallStyle.of(callTray = callTray, livingOrb = livingOrb) != ExperimentalCallStyle.defaultStyle) 1 else 0)
-    val on = styled + enabled.count { it }
+    val features = ExperimentalGroup.entries.flatMap { it.features }
+    val enabled = features.map { feature -> remember(feature) { shared(feature.key).flow }.collectAsState().value }
+    var on = 0
+    for ((index, feature) in features.withIndex()) {
+        // Turned on: ones on by default (Living Orb) don't count (iOS `isTurnedOn`).
+        if (!feature.defaultEnabled && enabled[index]) on += 1
+    }
     SettingsRow("Experimental", "flask.fill", SettingsTint.Gray, value = if (on == 0) null else "$on On", onClick = onClick)
 }
-
-/** The row an experiment lives on: Call Style's for the styles it writes. */
-val ExperimentalFeature.settingsRowID: ExperimentalFeature
-    get() = if (isCallStyle) ExperimentalFeature.callTray else this
 
 val ExperimentalGroup.tint: SettingsTint
     get() = when (this) {

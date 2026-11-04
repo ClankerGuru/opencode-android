@@ -3,7 +3,6 @@ package ai.opencode.feature.session
 import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.DependencyValues
 import ai.opencode.core.dependencies.UuidClient
-import ai.opencode.core.experiments.ExperimentalCallStyle
 import ai.opencode.core.files.ComposerStagedFile
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.feature.composer.ComposerAttachmentsFeature
@@ -261,7 +260,7 @@ class RequestAnswerTests {
     }
 
     @Test fun aCallKeepsTheComposerAndItsAgentAnswers() = sessionTest { h ->
-        h.callStyle(ExperimentalCallStyle.standard)
+        h.callStyle(livingOrb = false)
         val base = h.state(draft = "Half a message", forms = listOf(slack), answering = false)
         val initial = h.state { base.copy(voice = VoiceFeature.State(base.server, session)) }
         assertFalse(h.state { initial.wantsRequestDock })

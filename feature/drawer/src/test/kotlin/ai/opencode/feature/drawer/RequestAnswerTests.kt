@@ -4,7 +4,6 @@ import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.ImmediateClock
 import ai.opencode.core.dependencies.UuidClient
-import ai.opencode.core.experiments.ExperimentalCallStyle
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.testing.TestIsolationRule
 import ai.opencode.feature.drawer.HomeFeatureTestSupport.detail
@@ -61,7 +60,7 @@ class RequestAnswerTests {
 
     @Test
     fun switchingIntoASnapshotDuringACallEndsTheRestoredAnswer() = homeTest { h ->
-        h.callStyle(ExperimentalCallStyle.standard)
+        h.callStyle(livingOrb = false)
         val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
         val target = OpenCodeSession(id = "ses_target", serverTitle = "Target", projectID = "proj", directory = "/tmp/target", updatedAt = Instant.ofEpochSecond(20))
         val targetShell = OpenCodePermissionRequest(

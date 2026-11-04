@@ -2,7 +2,7 @@
 
 Module: `:feature:composer`. iOS folders: `OpenCode/Composer/`. 48 files, 26,082 lines.
 
-Composer host: `ComposerFeature.kt` / `ComposerView.kt` compose these ports into a working composer (its capsule wrapped in `:feature:voice`'s `CallTrayHost` as iOS `SessionView+Composer`'s `.callTrayHost`, fed `ComposerView(callTray:, callStore:)` by the session; draft, + menu with Photos/Files/Location, attachment chips and uploads, request dock answering permissions and forms, Today model picker, Send under `RetryPolicy.send`), configured by its parent with `ComposerFeature.Action.Configure(server, sessionID, directory)`. iOS keeps that state on `SessionFeature` (`SessionFeature+Send/+Requests/+Models/+Attachments`, `SessionView+Composer`), which the session area ports; until it wires these pieces itself, the host keeps the composer usable. Pending requests follow iOS `SessionFeature+Refresh`: read on open, on SSE `permission.*`/`form.*` (`AttentionChanged`) and stream (re)connects, and otherwise on iOS's `pendingWorkPollSeconds` fallback (12 s with a healthy stream, 2 s without).
+Composer host: `ComposerFeature.kt` / `ComposerView.kt` compose these ports into a working composer (draft, + menu with Photos/Files/Location, attachment chips and uploads, request dock answering permissions and forms, Today model picker, Send under `RetryPolicy.send`), configured by its parent with `ComposerFeature.Action.Configure(server, sessionID, directory)`. iOS keeps that state on `SessionFeature` (`SessionFeature+Send/+Requests/+Models/+Attachments`, `SessionView+Composer`), which the session area ports; until it wires these pieces itself, the host keeps the composer usable. Pending requests follow iOS `SessionFeature+Refresh`: read on open, on SSE `permission.*`/`form.*` (`AttentionChanged`) and stream (re)connects, and otherwise on iOS's `pendingWorkPollSeconds` fallback (12 s with a healthy stream, 2 s without).
 
 Types moved down into `:feature:composer` from `Session/` (session area uses them from here): `PendingPrompt` (`SessionFeature+Send.swift`), `DraftState`, `UndoSnapshot`, `DeliveryOutcome`, `SharedComposerDraft` (`ComposerPersistenceDrafts.kt`), `DictationHoldTracker`/`DictationDrag` (`MicPressGesture.kt`, from `DictationViews.swift`). Into `:server`: `PageShareRequest` (`Browser/BrowserFeature.swift`). `ComposerStagedFile`/`ComposerFileStaging` come from `:core` (`core/files`, the system area's move); `ComposerUriStaging` (`ComposerFileImport.kt`) stages picker `Uri`s into the same folder.
 
@@ -165,7 +165,7 @@ Total (`./gradlew :feature:composer:testDebugUnitTest`): 270 tests, 0 failures.
 Composer-named files owned elsewhere: `SessionFeatureTests+Composer/+Dictation/+ModelPicks` (`:feature:session`),
 `ShareComposerTests` (system/drawer; its `SharedComposerDraft`/`PromptOutbox` tests are here), `PairingPasteTests` (`:app`, ported there), `AgentFileTests` (media/transcript),
 `ModelSwitchRuleTests` (`:feature:transcript`), `WireRequestTests`/`PairingDeviceNameTests`/`ModelVisibilityTests`
-(already in `:server`), `FloatingCallModelTests(+Dock)` (`:feature:voice`).
+(already in `:server`), `ComposerIdentityTests` (`:feature:session`).
 
 Bugs the ports found (fixed): dictation kept private copies of `AudioSessionOwner`/`AudioSessionGeneration`,
 so it never saw a call take the audio (a hold could outlive a call starting, and dictation could release

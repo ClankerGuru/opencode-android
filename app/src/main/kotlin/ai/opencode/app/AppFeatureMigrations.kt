@@ -1,7 +1,7 @@
 package ai.opencode.app
 
 import ai.opencode.core.dependencies.dependency
-import ai.opencode.core.experiments.ExperimentalCallStyle
+import ai.opencode.core.experiments.migrateCallStyles
 import ai.opencode.core.experiments.migrateModelPicker
 import ai.opencode.core.log.AppLog
 import ai.opencode.core.sharing.ExperimentalFeature
@@ -28,7 +28,7 @@ import ai.opencode.server.OpenCodeServer
  * restored session included) reads shared switches as it's made.
  */
 internal fun migrateBeforeLaunch() {
-    ExperimentalCallStyle.migrateToLivingOrbDefault(dependency(SharedStore))
+    ExperimentalFeature.migrateCallStyles(dependency(SharedStore))
 }
 
 /** Runs every launch migration, in iOS's order. */
