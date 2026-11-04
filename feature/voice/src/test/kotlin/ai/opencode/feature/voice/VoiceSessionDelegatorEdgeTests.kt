@@ -177,10 +177,7 @@ class VoiceSessionDelegatorEdgeTests {
                         )
                     }
                 },
-                getSession = { _, id ->
-                    assertEquals(openedTarget.id, id)
-                    openedTarget
-                },
+                getSession = { _, _ -> openedTarget },
             )
             this[VoiceCallClient] = testVoiceCall(end = { endedCalls.update { it + 1 } })
                 .copy(announce = { _, _, text -> announced.update { it + text } })
@@ -201,8 +198,7 @@ class VoiceSessionDelegatorEdgeTests {
                 ),
             )
         }
-        pagedStore.receive(VoiceFeature.Action.DelegatorOpened(openedTarget), timeout = 5.seconds)
-        pagedStore.receive(VoiceFeature.Action.Delegate(VoiceFeature.DelegateAction.OpenSession(openedTarget)))
+        pagedStore.receive(VoiceFeature.Action.Delegate(VoiceFeature.DelegateAction.OpenSessionRequested(toolID = "t_page1_open", targetID = openedTarget.id)))
         eventually { announced.value.size == 1 }
         assertEquals(1, announced.value.size)
 

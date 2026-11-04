@@ -838,7 +838,8 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
 
     /** iOS `SessionFeature.Action.Delegate`: list-level changes Home owns. */
     sealed interface Delegate {
-        data class OpenSession(val session: OpenCodeSession) : Delegate
+        /** [toolID]: a voice open (`android_voice_open_session`) App authorized; Home navigates only for it. */
+        data class OpenSession(val session: OpenCodeSession, val toolID: String? = null) : Delegate
         /** Push a subagent of this session's family over this screen. */
         data class OpenSubagent(val session: OpenCodeSession) : Delegate
         /** Titles for linked session IDs the family doesn't hold. */

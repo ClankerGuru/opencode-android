@@ -121,9 +121,10 @@ internal fun HomeFeature.reduceDrawer(state: State, action: Action): HomeReduced
         is Action.SessionNavigationReady -> {
             if (state.selectedTranscriptFetch?.sessionID != action.sessionID) return Reduced(state)
             val session = state.sessions.firstOrNull { it.id == action.sessionID } ?: return Reduced(state)
+            val reason = state.nextMoveReason
             var s = state.openingDetail(session, externalTranscript = true)
             s = s.copy(selectedTranscriptFetch = s.selectedTranscriptFetch?.copy(transition = s.detailGeneration))
-            s = s.pushingPendingSubagent()
+            s = s.pushingPendingSubagent(reason)
             LabMarks.mark("session_navigation_started", sessionID = action.sessionID)
             return Reduced(s)
         }
@@ -303,28 +304,34 @@ internal fun HomeFeature.reduceDrawer(state: State, action: Action): HomeReduced
 private fun HomeFeature.sessionTapped(state: State, sessionID: String): HomeReduced {
     // Navigation and cached transcripts do not require a live event stream.
     val session = state.sessions.firstOrNull { it.id == sessionID } ?: return Reduced(state)
+    val moveReason = state.nextMoveReason
     var s = state
     if (s.pendingSubagentPush?.parentID != sessionID) s = s.copy(pendingSubagentPush = null)
     // A subagent (a link, a notification, the voice agent) lands pushed over its parent when the
     // parent is at hand; otherwise on its own. Already pushed: go back to it.
     val pushedIndex = s.subagentStack.indexOfFirst { it.session?.id == sessionID }
     if (session.parentID != null && s.catchUp == null && pushedIndex >= 0) {
-        s = s.copy(nextMoveReason = null).poppingSubagents(toDepth = pushedIndex + 1)
+        s = s.copy(nextMoveReason = null).poppingSubagents(toDepth = pushedIndex + 1, reason = moveReason)
         return Reduced(s, acknowledgeView(session, s.server))
     }
     val parentID = session.parentID
     if (parentID != null && s.topDetail?.session?.id != sessionID) {
         val parentIndex = s.subagentStack.indexOfFirst { it.session?.id == parentID }
         if (parentIndex >= 0 && s.catchUp == null) {
-            s = s.poppingSubagents(toDepth = parentIndex + 1).pushingSubagent(session)
+            s = s.copy(nextMoveReason = null).poppingSubagents(toDepth = parentIndex + 1, reason = moveReason)
+                .pushingSubagent(session, reason = moveReason)
             return cancelBackgroundTranscriptReads(s, setOf(sessionID))
         }
         if (s.sessionDetail?.session?.id == parentID && s.catchUp == null) {
-            s = s.poppingSubagents(toDepth = 0).pushingSubagent(session)
+            s = s.copy(nextMoveReason = null).poppingSubagents(toDepth = 0, reason = moveReason)
+                .pushingSubagent(session, reason = moveReason)
             return cancelBackgroundTranscriptReads(s, setOf(sessionID))
         }
         if (s.sessions.any { it.id == parentID }) {
-            return Reduced(s.copy(pendingSubagentPush = session), Effect.send(Action.SessionTapped(parentID)))
+            s = s.copy(pendingSubagentPush = session)
+            // An authorized voice open navigates in this turn, never through a queued action.
+            if (s.voiceNavigationToolID != null) return sessionTapped(s, parentID)
+            return Reduced(s, Effect.send(Action.SessionTapped(parentID)))
         }
     }
     // Opening a session leaves the stack for the session it names.
@@ -337,7 +344,7 @@ private fun HomeFeature.sessionTapped(state: State, sessionID: String): HomeRedu
         s = viewed.state.copy(nextMoveReason = null).promotingCatchUpDetail()
         // The drawer's row for the session on screen goes back to it, from under any page or subagent.
         if (s.sessionDetail?.browser?.isOpen == true) s = s.updatingDetail { it.copy(browser = BrowserFeature.State()) }
-        s = s.poppingSubagents(toDepth = 0).pushingPendingSubagent()
+        s = s.poppingSubagents(toDepth = 0, reason = moveReason).pushingPendingSubagent(moveReason)
         val pushedID = s.subagentStack.lastOrNull()?.session?.id ?: return Reduced(s, viewed.effect)
         val cancelled = cancelBackgroundTranscriptReads(s, setOf(sessionID, pushedID))
         return Reduced(cancelled.state, Effect.merge(cancelled.effect, viewed.effect))
@@ -349,6 +356,16 @@ private fun HomeFeature.sessionTapped(state: State, sessionID: String): HomeRedu
     if (cachedItems == null) {
         val viewed = openViewedSession(s, session, cachedItems = null, opensDetail = false)
         s = viewed.state.copy(selectedTranscriptFetch = HomeFeature.SelectedTranscriptFetch(sessionID, viewed.state.detailGeneration))
+        // An authorized voice open commits in the guarded Home action. Only the transcript load is
+        // asynchronous; no delayed navigation action can arrive after the shared operation times
+        // out or is refused.
+        val voiceNavigation = s.voiceNavigationToolID != null
+        if (voiceNavigation) {
+            val reason = s.nextMoveReason
+            s = s.openingDetail(session, externalTranscript = true)
+            s = s.copy(selectedTranscriptFetch = s.selectedTranscriptFetch?.copy(transition = s.detailGeneration))
+            s = s.pushingPendingSubagent(reason)
+        }
         val cancelled = cancelBackgroundTranscriptReads(s, setOf(sessionID))
         val server = s.server
         val client = dependency(OpenCodeClient)
@@ -356,7 +373,7 @@ private fun HomeFeature.sessionTapped(state: State, sessionID: String): HomeRedu
             LabMarks.mark("selected_transcript_effect_started", sessionID = sessionID)
             coroutineScope {
                 val loaded = async { selectedTranscript(client, server, sessionID) }
-                send(Action.SessionNavigationReady(sessionID))
+                if (!voiceNavigation) send(Action.SessionNavigationReady(sessionID))
                 val (result, pageCursor) = loaded.await()
                 send(Action.SelectedTranscriptResponse(sessionID, result, pageCursor))
             }
@@ -425,7 +442,8 @@ internal fun HomeFeature.openViewedSession(
     val openedNewDetail = opensDetail && s.sessionDetail?.session?.id != session.id
     var cancel: Effect<Action> = Effect.none()
     if (openedNewDetail) {
-        s = s.openingDetail(session, cachedItems = cachedItems, reason = reason).pushingPendingSubagent()
+        val moveReason = s.nextMoveReason
+        s = s.openingDetail(session, cachedItems = cachedItems, reason = reason).pushingPendingSubagent(moveReason)
         val cancelled = cancelBackgroundTranscriptReads(s, setOf(session.id))
         s = cancelled.state
         cancel = cancelled.effect

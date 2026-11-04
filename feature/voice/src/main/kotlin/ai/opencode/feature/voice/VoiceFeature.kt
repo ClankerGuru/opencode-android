@@ -634,7 +634,7 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
         data class ViewingChanged(val page: VoiceViewingPage?) : Action
         data class WorkReplied(val callID: String, val reply: String?) : Action
         data class WorkFailed(val callID: String, val message: String) : Action
-        data class DelegatorOpened(val session: OpenCodeSession) : Action
+        data class DelegatorOpened(val session: OpenCodeSession, val toolID: String? = null) : Action
         data class DelegatorPinned(val session: OpenCodeSession, val pinned: Boolean) : Action
         data object DelegatorRequestedEnd : Action
 
@@ -722,7 +722,10 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
         data class PromptAdmitted(val sessionID: String) : DelegateAction
 
         /** The delegator put a session on the user's screen. */
-        data class OpenSession(val session: OpenCodeSession) : DelegateAction
+        data class OpenSession(val session: OpenCodeSession, val toolID: String? = null) : DelegateAction
+
+        /** SSE requests are arbitrated with MCP at App scope before any lookup. */
+        data class OpenSessionRequested(val toolID: String, val targetID: String) : DelegateAction
 
         /** The delegator pinned or unpinned a session. */
         data class SetPinned(val session: OpenCodeSession, val pinned: Boolean) : DelegateAction
@@ -1006,7 +1009,7 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
 
             is Action.DelegatorOpened -> {
                 if (state.phase.isTerminal) Reduced(state)
-                else Reduced(state, Effect.send(Action.Delegate(DelegateAction.OpenSession(action.session))))
+                else Reduced(state, Effect.send(Action.Delegate(DelegateAction.OpenSession(action.session, toolID = action.toolID))))
             }
 
             is Action.DelegatorPinned -> {

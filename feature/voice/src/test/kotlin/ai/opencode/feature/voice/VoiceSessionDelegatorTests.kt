@@ -774,10 +774,7 @@ class VoiceSessionDelegatorTests {
                         next = null,
                     )
                 },
-                getSession = { _, id ->
-                    assertEquals(target.id, id)
-                    target
-                },
+                getSession = { _, _ -> target },
             )
             this[VoiceCallClient] = testVoiceCall().copy(announce = { _, _, text -> announced.update { it + text } })
         }
@@ -792,8 +789,7 @@ class VoiceSessionDelegatorTests {
         store.receive(VoiceFeature.Action.SessionDelegatorReconciledTools(expectedCalls), timeout = 5.seconds) {
             it.copy(sessionDelegator = it.sessionDelegator.copy(appliedToolCallIDs = it.sessionDelegator.appliedToolCallIDs + "t_missed_open"))
         }
-        store.receive(VoiceFeature.Action.DelegatorOpened(target), timeout = 5.seconds)
-        store.receive(VoiceFeature.Action.Delegate(VoiceFeature.DelegateAction.OpenSession(target)))
+        store.receive(VoiceFeature.Action.Delegate(VoiceFeature.DelegateAction.OpenSessionRequested(toolID = "t_missed_open", targetID = target.id)))
         assertTrue("Pre-anchor and already-applied tool IDs must not re-fire on reconnect", announced.value.isEmpty())
         store.finish()
         effects.skipInFlightEffects()

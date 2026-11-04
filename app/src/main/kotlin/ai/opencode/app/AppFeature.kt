@@ -41,6 +41,7 @@ import ai.opencode.feature.system.liveactivity.SessionLiveActivityClient
 import ai.opencode.feature.system.liveactivity.VoiceLiveActivityClient
 import ai.opencode.feature.system.share.ReceivedShare
 import ai.opencode.feature.system.share.ShareInboxClient
+import ai.opencode.feature.voice.VoiceOpenSessionFeature
 import ai.opencode.feature.voice.ScreenAwakeClient
 import ai.opencode.feature.voice.VoiceCallLogClient
 import ai.opencode.feature.voice.VoiceCallServiceClient
@@ -92,6 +93,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         val delegatorClientTools: ClientToolsFeature.State = ClientToolsFeature.State(slot = ClientToolsFeature.State.Slot.Delegator),
         /** Where that delegator session lives, once read. */
         val voiceDelegatorLocation: ClientToolsLocation? = null,
+        val voiceOpenSession: VoiceOpenSessionFeature.State = VoiceOpenSessionFeature.State(),
         val connection: Connection = Connection.Idle,
         val connectionGeneration: Int = 0,
         val connectionAttempt: ConnectionAttempt? = null,
@@ -472,6 +474,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         data class ClientTools(val action: ClientToolsFeature.Action) : Action
         data class DelegatorClientTools(val action: ClientToolsFeature.Action) : Action
         data class VoiceDelegatorLocated(val location: ClientToolsLocation) : Action
+        data class VoiceOpenSession(val action: VoiceOpenSessionFeature.Action) : Action
         data class HomeResponse(val attemptID: Int, val result: Result<OpenCodeHomeSnapshot>) : Action
         /** Server Flow: the switch's server didn't answer in time. */
         data class ServerSwitchTimedOut(val attemptID: Int) : Action
@@ -654,7 +657,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         is Action.HomeResponse -> homeResponse(state, action)
         is Action.ServerSwitchTimedOut -> serverSwitchTimedOut(action.attemptID, state)
         is Action.Home -> home(state, action.action)
-        is Action.Welcome, is Action.ClientTools, is Action.DelegatorClientTools, is Action.VoiceDelegatorLocated -> Reduced(state)
+        is Action.Welcome, is Action.ClientTools, is Action.DelegatorClientTools, is Action.VoiceDelegatorLocated, is Action.VoiceOpenSession -> Reduced(state)
     }
 
     /**

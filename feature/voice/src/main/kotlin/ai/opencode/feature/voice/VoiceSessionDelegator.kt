@@ -126,7 +126,7 @@ object VoiceSessionDelegator {
 
     /** Phone-side effects triggered immediately from `ios_voice_*` tool inputs. */
     sealed interface PhoneToolEffect {
-        data class OpenSession(val sessionID: String) : PhoneToolEffect
+        data class OpenSession(val sessionID: String, val toolID: String) : PhoneToolEffect
         data class PinSession(val sessionID: String, val pinned: Boolean) : PhoneToolEffect
         data class WatchSession(val toolID: String, val sessionID: String, val note: String?) : PhoneToolEffect
         data class Say(val text: String) : PhoneToolEffect
@@ -145,7 +145,7 @@ object VoiceSessionDelegator {
         val obj = input.obj ?: return null
         fun trimmedString(key: String): String? = obj[key]?.string?.trim()?.takeIf { it.isNotEmpty() }
         return when (shortName) {
-            "ios_voice_open_session" -> trimmedString("session_id")?.let { PhoneToolEffect.OpenSession(it) }
+            "ios_voice_open_session" -> trimmedString("session_id")?.let { PhoneToolEffect.OpenSession(sessionID = it, toolID = toolID) }
             "ios_voice_pin_session" -> {
                 val sessionID = trimmedString("session_id") ?: return null
                 val pinned = (obj["pinned"] as? OpenCodeJSONValue.Bool)?.value ?: return null

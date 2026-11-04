@@ -76,10 +76,11 @@ class ClientToolsTarget(
 }
 
 /**
- * The tools the phone hosts, each behind its experiment (iOS `ClientTool`). Nothing is read from
- * the phone, or opened on it, until the person says yes.
+ * The tools the phone hosts (iOS `ClientTool`): navigation during a session-delegator call, plus
+ * the opt-in screen, links and audio experiments.
  */
 enum class ClientTool(val rawValue: String) {
+    voiceOpenSession("voice_open_session"),
     voiceRequestScreen("voice_request_screen"),
     voiceOpenURL("voice_open_url"),
     voicePlayAudio("voice_play_audio"),
@@ -88,6 +89,8 @@ enum class ClientTool(val rawValue: String) {
 
     val description: String
         get() = when (this) {
+            voiceOpenSession ->
+                "Open a session on the phone during a live voice call. Returns opened only after navigation and drawer closure."
             voiceRequestScreen ->
                 "During a voice call, ask the user to share the OpenCode Android app's screen. They see a card with Share and Not Now; on Share you get a JPEG of the app's own window (never other apps). Refused when they say no, don't answer within a minute, the call ends, or a password, pairing or Settings screen shows."
             voicePlayAudio ->
@@ -108,7 +111,7 @@ enum class ClientTool(val rawValue: String) {
                     put("destructiveHint", false)
                     put("openWorldHint", true)
                 }
-                voicePlayAudio, voiceAudioControl -> put("readOnlyHint", false)
+                voicePlayAudio, voiceAudioControl, voiceOpenSession -> put("readOnlyHint", false)
             }
         }
 
@@ -117,6 +120,13 @@ enum class ClientTool(val rawValue: String) {
         get() = buildJsonObject {
             put("type", "object")
             when (this@ClientTool) {
+                voiceOpenSession -> {
+                    putJsonObject("properties") {
+                        putJsonObject("session_id") { put("type", "string") }
+                        putJsonObject("tool_call_id") { put("type", "string") }
+                    }
+                    putJsonArray("required") { add(JsonPrimitive("session_id")) }
+                }
                 voiceRequestScreen -> putJsonObject("properties") {
                     putJsonObject("reason") {
                         put("type", "string")
@@ -219,6 +229,10 @@ data class ClientToolCall(
     val title: String? = null,
     /** `voice_audio_control`'s `action`. */
     val action: String? = null,
+    /** Navigation destination; distinct from the caller's [sessionID] metadata. */
+    val targetSessionID: String? = null,
+    /** Original server tool-call ID, shared by MCP and the SSE fallback. */
+    val toolCallID: String? = null,
 ) {
     companion object {
         /** The voice lab's stand-in socket: its replies count as sent (debug builds only use it). */
@@ -362,6 +376,8 @@ object ClientMcpProtocol {
                         url = arguments.trimmedArgument("url"),
                         title = arguments.trimmedArgument("title"),
                         action = arguments.trimmedArgument("action"),
+                        targetSessionID = arguments.trimmedArgument("session_id"),
+                        toolCallID = arguments.trimmedArgument("tool_call_id"),
                     ),
                 )
             }

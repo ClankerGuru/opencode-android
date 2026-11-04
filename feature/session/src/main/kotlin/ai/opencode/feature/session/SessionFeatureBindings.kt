@@ -221,7 +221,10 @@ private fun SessionFeature.reduceVoice(state: State, action: PresentationAction<
 
         // The delegator moved the screen; Home switches sessions, and the call follows.
         is VoiceFeature.DelegateAction.OpenSession ->
-            Reduced(state, Effect.send(Action.Delegate(SessionFeature.Delegate.OpenSession(delegate.session))))
+            Reduced(state, Effect.send(Action.Delegate(SessionFeature.Delegate.OpenSession(delegate.session, toolID = delegate.toolID))))
+
+        // App arbitrates it with the MCP request (`VoiceOpenSessionFeature`) before any lookup.
+        is VoiceFeature.DelegateAction.OpenSessionRequested -> Reduced(state)
 
         is VoiceFeature.DelegateAction.SetPinned ->
             Reduced(state, Effect.send(Action.Delegate(SessionFeature.Delegate.SetPinned(delegate.session, delegate.pinned))))

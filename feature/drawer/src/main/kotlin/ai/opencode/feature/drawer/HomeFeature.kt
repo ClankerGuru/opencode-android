@@ -242,6 +242,11 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         val pushedDetailCount: Int = 0,
         /** Why the next screen change happens, when the action that asks for it isn't the one that makes it. */
         val nextMoveReason: String? = null,
+        /**
+         * App refreshes this from the shared open-session operation before Home handles an action
+         * (iOS `voiceNavigationToolID`). A queued navigation cannot outlive its authorization.
+         */
+        val voiceNavigationToolID: String? = null,
     ) {
         enum class NoticeReadiness { unsettled, listed, settled }
 
@@ -1078,7 +1083,7 @@ private fun HomeFeature.State.beginningDetailTransition(
     targetIsDraft: Boolean = false,
 ): Pair<HomeFeature.State, DetailTransition> {
     // Another session replaces the root: whatever was pushed over it goes.
-    var s = poppingSubagents(toDepth = 0).rememberingSession().syncingOutgoingDetailDraft(targetIsDraft)
+    var s = poppingSubagents(toDepth = 0, reason = nextMoveReason).rememberingSession().syncingOutgoingDetailDraft(targetIsDraft)
     val reason = s.nextMoveReason ?: defaultReason
     // Keeping the identity keeps a live call's or recording's effects alive.
     val activeVoice = s.sessionDetail?.voice?.takeIf { !it.phase.isTerminal }
@@ -1254,7 +1259,7 @@ fun HomeFeature.State.remembering(detail: SessionFeature.State): HomeFeature.Sta
  * parent already knows (its transcript, its own subagents, their requests), so nothing new is
  * read to show it.
  */
-fun HomeFeature.State.pushingSubagent(session: OpenCodeSession): HomeFeature.State {
+fun HomeFeature.State.pushingSubagent(session: OpenCodeSession, reason: String? = null): HomeFeature.State {
     val parent = topDetail ?: return this
     if (parent.session?.id == session.id) return this
     val pushedCount = pushedDetailCount + 1
@@ -1307,7 +1312,7 @@ fun HomeFeature.State.pushingSubagent(session: OpenCodeSession): HomeFeature.Sta
     if (detail.wantsRequestDock && !detail.isAnsweringRequest) detail = detail.beginAnswering()
     val (restored, withDraft) = s.restoringPersistedDraft(detail)
     s = restored.copy(subagentStack = restored.subagentStack + withDraft)
-    return s.markingTopScreen().absorbingSharedDrafts().retargetingCallToTop(reason = "you opened a subagent")
+    return s.markingTopScreen().absorbingSharedDrafts().retargetingCallToTop(reason = reason ?: "you opened a subagent")
 }
 
 /** Only the screen on top of the stack plays a request's arrival. */
@@ -1323,7 +1328,7 @@ private fun HomeFeature.State.markingTopScreen(): HomeFeature.State {
  * items, their transcripts stay with the parent for the next push, and a recording there ends
  * with its words.
  */
-fun HomeFeature.State.poppingSubagents(toDepth: Int): HomeFeature.State {
+fun HomeFeature.State.poppingSubagents(toDepth: Int, reason: String? = null): HomeFeature.State {
     val targetDepth = maxOf(toDepth, 0)
     if (subagentStack.size <= targetDepth) return this
     var s = copy(
@@ -1352,26 +1357,7 @@ fun HomeFeature.State.poppingSubagents(toDepth: Int): HomeFeature.State {
             s.updatingDetail { it.copy(familyTranscriptCache = it.familyTranscriptCache + (sessionID to items)) }
         }
     }
-    return s.markingTopScreen().retargetingCallToTop(reason = "you went back")
-}
-
-fun HomeFeature.State.pushingPendingSubagent(): HomeFeature.State {
-    val child = pendingSubagentPush ?: return this
-    if (child.parentID != sessionDetail?.session?.id) return this
-    return copy(pendingSubagentPush = null).pushingSubagent(child)
-}
-
-/** The call follows the screen on top, as it follows a drawer switch (iOS `retargetCallToTop(reason:)`). */
-fun HomeFeature.State.retargetingCallToTop(reason: String): HomeFeature.State {
-    val voice = sessionDetail?.voice ?: return this
-    if (voice.phase.isTerminal) return this
-    val topScreen = topDetail ?: return this
-    val top = topScreen.session ?: return this
-    if (voice.target.sessionID == top.id) return this
-    return updatingDetail { detail ->
-        val moved = detail.voice?.retarget(top, reason = reason)?.copy(viewing = topScreen.browser.viewing)
-        detail.copy(voice = moved).reconcileInvariants(targetScreen = topScreen)
-    }
+    return s.markingTopScreen().retargetingCallToTop(reason = reason ?: "you went back")
 }
 
 /** Shared by the selected detail and Catch Up's inert next-card preview. */

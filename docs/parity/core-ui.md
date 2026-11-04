@@ -65,6 +65,7 @@ and `ellipsis` (every overflow menu) is the vertical `more_vert`, as on other An
 | `arrow.right` | `arrow_forward` | `ms_arrow_forward` | `SFSymbol.ArrowRight` | AppView |
 | `arrow.triangle.2.circlepath` | `sync` | `ms_sync` | `SFSymbol.ArrowTriangle2Circlepath` | AttachmentCameraView |
 | `arrow.triangle.branch` | `call_split` | `ms_call_split` | `SFSymbol.ArrowTriangleBranch` | SessionSheetView, SessionView+Header, WhatsNewList |
+| `arrow.triangle.swap` | `swap_horiz` | `ms_swap_horiz` | `SFSymbol.ArrowTriangleSwap` | WhatsNewList (Switch Sessions by Voice) |
 | `arrow.triangle.merge` | `merge` | `ms_merge` | `SFSymbol.ArrowTriangleMerge` | LinkPreviewViews |
 | `arrow.triangle.pull` | `merge_type` | `ms_merge_type` | `SFSymbol.ArrowTrianglePull` | LinkPreviewViews, MarkdownBlockView |
 | `arrow.trianglehead.2.clockwise` | `autorenew` | `ms_autorenew` | `SFSymbol.ArrowTrianglehead2Clockwise` | ConnectionCard, OnboardingPlaygroundView |

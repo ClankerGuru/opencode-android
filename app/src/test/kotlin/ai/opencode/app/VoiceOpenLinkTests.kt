@@ -30,6 +30,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -102,7 +103,9 @@ class VoiceOpenLinkTests {
         val opened = Locked<List<String>>(emptyList())
         val voiceSession = voiceSession
         val effects = detachedScope(coroutineContext)
-        val store = shared.appStore(liveCallState(delegatorElsewhere = true), effects) {
+        val initial = liveCallState(delegatorElsewhere = true)
+            .copy(voiceDelegatorLocation = ClientToolsLocation(sessionID = voiceSession.id, directory = voiceSession.directory))
+        val store = shared.appStore(initial, effects) {
             this[Clock] = TestClock()
             this[OpenCodeClient] = OpenCodeClient.testValue.copy(getSession = { _, _ -> voiceSession })
             this[VoiceOpenURLClient] = VoiceOpenURLClient { url ->
@@ -111,7 +114,7 @@ class VoiceOpenLinkTests {
             }
             this[ClientToolsClient] = ClientToolsClient(
                 connect = { target ->
-                    assertEquals(links, target.tools)
+                    assertTrue(target.tools == links + ClientTool.voiceOpenSession || target.tools == setOf(ClientTool.voiceOpenSession))
                     val channel = Channel<ClientToolsEvent>(Channel.UNLIMITED)
                     streams.update { it + (target.directory to channel) }
                     channel.receiveAsFlow()
@@ -122,9 +125,8 @@ class VoiceOpenLinkTests {
                 },
             )
         }
-        val callTarget = ClientToolsTarget(server = server, directory = session.directory, tools = links)
-        val home = ClientToolsTarget(server = server, directory = voiceSession.directory, tools = links)
-        val location = ClientToolsLocation(sessionID = voiceSession.id, directory = voiceSession.directory)
+        val callTarget = ClientToolsTarget(server = server, directory = session.directory, tools = links + ClientTool.voiceOpenSession)
+        val home = ClientToolsTarget(server = server, directory = voiceSession.directory, tools = links + ClientTool.voiceOpenSession)
 
         store.send(AppFeature.Action.ClientTools(ClientToolsFeature.Action.ToolsChanged(links))) {
             it.withClientTools { c -> c.copy(tools = links) }
@@ -132,7 +134,6 @@ class VoiceOpenLinkTests {
         store.receive(AppFeature.Action.ClientTools(ClientToolsFeature.Action.TargetChanged(callTarget))) {
             it.withClientTools { c -> c.copy(target = callTarget, status = ClientToolsFeature.State.Status.Connecting) }
         }
-        store.receive(AppFeature.Action.VoiceDelegatorLocated(location)) { it.copy(voiceDelegatorLocation = location) }
         store.receive(AppFeature.Action.DelegatorClientTools(ClientToolsFeature.Action.TargetChanged(home))) {
             it.withDelegatorClientTools { c -> c.copy(target = home, status = ClientToolsFeature.State.Status.Connecting) }
         }
@@ -167,13 +168,12 @@ class VoiceOpenLinkTests {
         }
         waitFor { replies.value.size >= 2 }
 
-        // Both sockets' teardown interleaves; what matters is that it closes them.
+        // Turning off links retains the call's navigation sockets.
         store.exhaustive = false
         store.send(AppFeature.Action.ClientTools(ClientToolsFeature.Action.ToolsChanged(emptySet())))
         store.skipReceivedActions()
-        store.finish()
-        assertNull(store.state.clientTools.target)
-        assertNull(store.state.delegatorClientTools.target)
+        assertEquals(setOf(ClientTool.voiceOpenSession), store.state.clientTools.target?.tools)
+        assertEquals(setOf(ClientTool.voiceOpenSession), store.state.delegatorClientTools.target?.tools)
 
         assertEquals(listOf(uber), opened.value)
         assertEquals(

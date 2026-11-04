@@ -236,17 +236,7 @@ internal fun HomeFeature.reduceSessionDetail(state: State, action: SessionFeatur
 }
 
 private fun HomeFeature.reduceSessionDelegate(state: State, delegate: SessionFeature.Delegate): HomeReduced = when (delegate) {
-    is SessionFeature.Delegate.OpenSession -> {
-        val session = delegate.session
-        val index = state.sessions.indexOfFirst { it.id == session.id }
-        val s = if (index >= 0) {
-            // The event stream may have listed it before its model was set.
-            session.model?.let { model -> state.updatingSession(session.id) { it.copy(model = model) } } ?: state
-        } else {
-            state.copy(sessions = listOf(session) + state.sessions)
-        }
-        Reduced(s.copy(nextMoveReason = "the voice agent switched"), Effect.send(Action.SessionTapped(session.id)))
-    }
+    is SessionFeature.Delegate.OpenSession -> openSessionFromDelegate(state, delegate)
     is SessionFeature.Delegate.OpenSubagent -> {
         // A Catch Up card swaps its family in place: its swipe is the deck's, so nothing is pushed over it.
         if (state.catchUp != null) {
@@ -417,3 +407,28 @@ internal fun notifyVoiceSnapshot(state: State, activeIDs: Set<String>): Reduced<
     return Reduced(state, Effect.merge(settle, forward))
 }
 
+/**
+ * iOS `.delegate(.openSession(session, toolID))`: the voice agent (or a fork) puts a session on
+ * screen. Settings, What’s New, a deletion confirmation and every mounted session's sheets go, the
+ * drawer closes, and Home's normal path moves there. A voice open (`toolID`) navigates only while
+ * App's operation authorizes it, and in this same turn.
+ */
+private fun HomeFeature.openSessionFromDelegate(state: State, delegate: SessionFeature.Delegate.OpenSession): HomeReduced {
+    val toolID = delegate.toolID
+    if (toolID != null && state.voiceNavigationToolID != toolID) return Reduced(state)
+    val session = delegate.session
+    var s = state.copy(settings = null, pendingDeletion = null).clearingSessionCovers()
+    val index = s.sessions.indexOfFirst { it.id == session.id }
+    if (index >= 0) {
+        // The event stream may have listed it before its model was set.
+        val model = session.model
+        if (model != null) s = s.updatingSession(session.id) { it.copy(model = model) }
+    } else {
+        s = s.copy(sessions = listOf(session) + s.sessions)
+    }
+    s = s.copy(nextMoveReason = "the voice agent switched", drawerCloseRequests = s.drawerCloseRequests + 1)
+    // The authorized navigation starts in this turn, not an unguarded queued SessionTapped that
+    // could outlive a timeout or refusal.
+    if (toolID != null) return reduceDrawer(s, Action.SessionTapped(session.id))
+    return Reduced(s, Effect.send(Action.SessionTapped(session.id)))
+}

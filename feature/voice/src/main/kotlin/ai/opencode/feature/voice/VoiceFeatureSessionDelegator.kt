@@ -827,13 +827,10 @@ private fun VoiceFeature.applyPhoneToolEffect(
         null
     }
     return when (effect) {
+        // SSE requests are arbitrated with MCP at App scope (`VoiceOpenSessionFeature`) before any lookup.
         is VoiceSessionDelegator.PhoneToolEffect.OpenSession -> Reduced(
             state,
-            Effect.run<Action> { send ->
-                val session = session(effect.sessionID) ?: return@run
-                if (isCancelled()) return@run
-                send(Action.DelegatorOpened(session))
-            }.cancellable(CancelID.CallScope),
+            Effect.send(Action.Delegate(DelegateAction.OpenSessionRequested(toolID = effect.toolID, targetID = effect.sessionID))),
         )
 
         is VoiceSessionDelegator.PhoneToolEffect.PinSession -> Reduced(

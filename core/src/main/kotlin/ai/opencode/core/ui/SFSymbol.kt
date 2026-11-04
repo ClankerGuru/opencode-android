@@ -38,6 +38,7 @@ enum class SFSymbol(val sfName: String, @DrawableRes val drawable: Int) {
     ArrowtriangleDownFill("arrowtriangle.down.fill", R.drawable.ms_arrow_drop_down),
     ArrowTriangle2Circlepath("arrow.triangle.2.circlepath", R.drawable.ms_sync),
     ArrowTriangleBranch("arrow.triangle.branch", R.drawable.ms_call_split),
+    ArrowTriangleSwap("arrow.triangle.swap", R.drawable.ms_swap_horiz),
     ArrowTriangleMerge("arrow.triangle.merge", R.drawable.ms_merge),
     ArrowTrianglePull("arrow.triangle.pull", R.drawable.ms_merge_type),
     ArrowTrianglehead2Clockwise("arrow.trianglehead.2.clockwise", R.drawable.ms_autorenew),

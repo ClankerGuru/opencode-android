@@ -96,6 +96,7 @@ fixtures: `server/src/testFixtures` (`WireFixture`, `ServerTestIsolation`, and `
 | `NetworkRetryFormTests.swift` | `retry/NetworkRetryFormTests.kt` | 4 | — |
 | `ClientToolsTests.swift` | `clienttools/ClientToolsTests.kt` | 6 (handshake, tool calls, replies, the socket request, one reply per call, audio tools; the server is named `android`) | reducer → `:feature:system`; app → `:app` |
 | `VoiceOpenLinkTests.swift` | `clienttools/VoiceOpenLinkTests.kt` | 1 (`theSocketListsOnlyWhatsOnAndParsesTheLink`) | rest → `:feature:voice`, `:app` |
+| `VoiceOpenSessionAcknowledgementTests.swift` | `clienttools/VoiceOpenSessionAcknowledgementTests.kt` | 2 (`wireRequestKeepsCallerSeparateFromDestination`, `wireRequestPreservesTheServerToolIDForSSECorrelation`) | rest → `:feature:voice`, `:app` |
 | `ServerIDTests.swift` | `ServerIDTests.kt` | 6 of 7 | `shareSheetIDsUseTheSameShape` → `:feature:system`; `TranscriptTimeStamps` readback → `:feature:transcript` |
 | `PairPageLinkTests.swift` | `PairPageLinkTests.kt` | 6 | — |
 | `MultipleWindowsTests.swift` | `EventBatcherTests.kt`, `live/MultipleWindowsTests.kt` | 8 (batcher overflow; 7 `SharedEventStreams`/`SharedReads`) | window roster/app-wide work → `:app`; `aFurtherWindowKeepsItsOwnSidebar` → `:feature:drawer` |

@@ -17,6 +17,7 @@ import ai.opencode.feature.voice.CallAudioFailure
 import ai.opencode.feature.voice.VoiceCallAudioFeature
 import ai.opencode.feature.voice.VoiceFeature
 import ai.opencode.feature.voice.VoiceOpenLinkFeature
+import ai.opencode.feature.voice.VoiceOpenSessionFeature
 import ai.opencode.feature.voice.VoiceScreenRequestFeature
 import ai.opencode.feature.voice.sessionDelegatorElsewhereID
 import ai.opencode.server.OpenCodeClient
@@ -26,8 +27,9 @@ import ai.opencode.server.clienttools.ClientToolsTarget
 import kotlin.coroutines.cancellation.CancellationException
 
 /*
- * Port of iOS `AppFeature+ClientTools.swift`: the phone's client tools (Share Screen with
- * Agents, Open Links from Calls, Audio in Calls) around Home.
+ * Port of iOS `AppFeature+ClientTools.swift`: the phone's client tools (opening sessions during
+ * a session-delegator call, and the Share Screen with Agents, Open Links from Calls and Audio in
+ * Calls experiments) around Home.
  */
 
 /** The directory a call's delegator session lives in, read from the server. */
@@ -39,7 +41,9 @@ data class ClientToolsLocation(val sessionID: String, val directory: String)
  */
 internal val AppFeature.State.clientToolsTarget: ClientToolsTarget?
     get() {
-        val tools = clientTools.tools
+        // Keep the reply's socket through retargeting and until its reply is sent.
+        if (voiceOpenSession.inFlight) return clientTools.target
+        val tools = offeredClientTools
         if (tools.isEmpty()) return null
         val home = home ?: return null
         val voice = home.sessionDetail?.voice
@@ -55,19 +59,85 @@ internal val AppFeature.State.clientToolsTarget: ClientToolsTarget?
 /** The session a live call's delegator steers in another directory; it gets its own socket. */
 internal val AppFeature.State.voiceDelegatorSessionID: String?
     get() {
-        if (clientTools.tools.isEmpty()) return null
+        if (offeredClientTools.isEmpty()) return null
         return home?.sessionDetail?.voice?.sessionDelegatorElsewhereID
     }
 
 /** The second socket, while the delegator's session lives outside the call's directory. */
 internal val AppFeature.State.delegatorClientToolsTarget: ClientToolsTarget?
     get() {
+        if (voiceOpenSession.inFlight) return delegatorClientTools.target
         val home = home ?: return null
         val id = voiceDelegatorSessionID ?: return null
         val location = voiceDelegatorLocation ?: return null
         if (location.sessionID != id) return null
         if (location.directory == clientToolsTarget?.directory) return null
-        return ClientToolsTarget(home.server, location.directory, clientTools.tools)
+        return ClientToolsTarget(home.server, location.directory, offeredClientTools)
+    }
+
+/** The experiments that are on, plus opening sessions during a live session-delegator call. */
+internal val AppFeature.State.offeredClientTools: Set<ClientTool>
+    get() {
+        val voice = home?.sessionDetail?.voice
+        if (voice == null || voice.phase != VoiceFeature.State.Phase.Live || !voice.usesSessionDelegator) return clientTools.tools
+        return clientTools.tools + ClientTool.voiceOpenSession
+    }
+
+/** What `VoiceOpenSessionFeature` checks a voice open against: the screen, the sockets and the navigation. */
+internal val AppFeature.State.openSessionEnvironment: VoiceOpenSessionFeature.Environment
+    get() {
+        val home = home
+        val voice = home?.sessionDetail?.voice
+        val elsewhere = voice?.sessionDelegatorElsewhereID
+        val location = voiceDelegatorLocation
+        val slot: ClientToolsFeature.State? = when {
+            elsewhere == null -> clientTools
+            location?.sessionID != elsewhere -> null
+            location.directory == clientTools.target?.directory -> clientTools
+            else -> delegatorClientTools
+        }
+        val attached = slot != null && slot.status == ClientToolsFeature.State.Status.Attached && slot.connection != null &&
+            slot.target?.tools?.contains(ClientTool.voiceOpenSession) == true
+        var navigation: VoiceOpenSessionFeature.Navigation? = null
+        if (home != null) {
+            val stack = mutableListOf<Int>()
+            val presentations = mutableListOf<VoiceOpenSessionFeature.Presentation>()
+            val detail = home.sessionDetail
+            val mounted = if (detail != null) listOf(detail) + home.subagentStack else home.subagentStack
+            if (detail != null) stack.add(detail.navigationID)
+            for (pushed in home.subagentStack) stack.add(pushed.navigationID)
+            for (screen in mounted) {
+                presentations.add(
+                    VoiceOpenSessionFeature.Presentation(
+                        picker = screen.activePicker?.rawValue,
+                        folder = screen.folderBrowser != null,
+                        shell = screen.shellOutput?.shell?.id,
+                    ),
+                )
+            }
+            navigation = VoiceOpenSessionFeature.Navigation(
+                rootGeneration = home.detailGeneration,
+                stack = stack,
+                sessionID = home.topDetail?.session?.id,
+                browserID = home.topDetail?.browser?.pageID,
+                catchUp = home.catchUp != null,
+                // What's New is a Settings root on Android, so `settings` covers both.
+                settings = home.isSettingsShown,
+                deletion = home.pendingDeletion?.id,
+                presentations = presentations,
+            )
+        }
+        return VoiceOpenSessionFeature.Environment(
+            screen = VoiceOpenSessionFeature.Screen(
+                sessionID = home?.topDetail?.session?.id,
+                visible = clientToolScreenBlock(includingRequestDock = false) == null,
+                live = voice?.phase == VoiceFeature.State.Phase.Live,
+            ),
+            foreground = isInForeground,
+            attached = attached,
+            navigation = navigation,
+            callID = voice?.callLogID,
+        )
     }
 
 /** Why a screen request can't be put to the person now, or null when its card would show. */
@@ -97,7 +167,10 @@ private enum class ClientToolCardBlock { NoCall, Background, Covered }
 
 /** What stops a client tool's card showing above the call's composer. */
 private val AppFeature.State.clientToolCardBlock: ClientToolCardBlock?
-    get() {
+    get() = clientToolScreenBlock(includingRequestDock = true)
+
+/** The dock is part of the session, but covers the slot for consent cards. */
+private fun AppFeature.State.clientToolScreenBlock(includingRequestDock: Boolean): ClientToolCardBlock? {
         val home = home ?: return ClientToolCardBlock.NoCall
         val detail = home.sessionDetail ?: return ClientToolCardBlock.NoCall
         val voice = detail.voice ?: return ClientToolCardBlock.NoCall
@@ -112,11 +185,14 @@ private val AppFeature.State.clientToolCardBlock: ClientToolCardBlock?
             home.welcome != null || home.pendingDeletion != null || home.isDrawerOpen
         // Not `presentsOverSession`: the call itself counts there.
         val top = home.topDetail ?: detail
-        val coversSession = top.activePicker != null || top.folderBrowser != null || top.shellOutput != null ||
-            top.browser.isOpen || top.requestDock.isAnswering
+        // A sheet presented by any mounted screen covers the one on top.
+        var coversSession = top.browser.isOpen || (includingRequestDock && top.requestDock.isAnswering)
+        for (screen in listOf(detail) + home.subagentStack) {
+            if (screen.activePicker != null || screen.folderBrowser != null || screen.shellOutput != null) coversSession = true
+        }
         if (coversApp || coversHome || coversSession) return ClientToolCardBlock.Covered
         return null
-    }
+}
 
 private enum class ClientToolsLocateID { Locate }
 
@@ -127,6 +203,9 @@ private enum class ClientToolsLocateID { Locate }
  */
 internal fun sharingScreenWithAgents(base: Reducer<AppFeature.State, AppFeature.Action>): Reducer<AppFeature.State, AppFeature.Action> {
     val sockets = combine(
+        // A lookup can arrive before a queued observation action. Always give the coordinator the
+        // current screen before it handles that lookup.
+        Reducer { state, action -> authorizingVoiceNavigation(state, action) },
         scope(
             state = { it.clientTools },
             setState = { s, tools -> s.copy(clientTools = tools) },
@@ -141,10 +220,21 @@ internal fun sharingScreenWithAgents(base: Reducer<AppFeature.State, AppFeature.
             embed = AppFeature.Action::DelegatorClientTools,
             child = ClientToolsFeature(),
         ),
+        scope(
+            state = { it.voiceOpenSession },
+            setState = { s, open -> s.copy(voiceOpenSession = open) },
+            action = { (it as? AppFeature.Action.VoiceOpenSession)?.action },
+            embed = AppFeature.Action::VoiceOpenSession,
+            child = VoiceOpenSessionFeature(),
+        ),
         base,
         Reducer { state, action -> routeClientTools(state, action) },
     )
     return sockets
+        .onChange({ it.voiceOpenSession.observation }) { _, _, state ->
+            if (state.voiceOpenSession.active == null) Reduced(state)
+            else Reduced(state, Effect.send(AppFeature.Action.VoiceOpenSession(VoiceOpenSessionFeature.Action.EnvironmentChanged)))
+        }
         .onChange({ it.clientToolsTarget }) { _, target, state ->
             Reduced(state, Effect.send(AppFeature.Action.ClientTools(ClientToolsFeature.Action.TargetChanged(target))))
         }
@@ -154,7 +244,85 @@ internal fun sharingScreenWithAgents(base: Reducer<AppFeature.State, AppFeature.
         }
 }
 
+/** The voice open Home handles this action for, when App's operation still authorizes it. */
+private fun authorizingVoiceNavigation(state: AppFeature.State, action: AppFeature.Action): Reduced<AppFeature.State, AppFeature.Action> {
+    val startsOpen = action is AppFeature.Action.VoiceOpenSession &&
+        (action.action is VoiceOpenSessionFeature.Action.Requested || action.action is VoiceOpenSessionFeature.Action.Fallback)
+    var s = state
+    if (startsOpen || s.voiceOpenSession.inFlight) {
+        s = s.copy(voiceOpenSession = s.voiceOpenSession.observing(s.openSessionEnvironment))
+    }
+    val operation = s.voiceOpenSession.active
+    val requestedID = openSessionToolID(action)
+    var permitted: String? = null
+    if (operation != null && operation.authorized && operation.id == requestedID &&
+        operation.generation == s.voiceOpenSession.generation &&
+        s.openSessionEnvironment.screen.live && s.isInForeground
+    ) {
+        permitted = operation.id
+    }
+    val home = s.home
+    if (home != null && home.voiceNavigationToolID != permitted) s = s.copy(home = home.copy(voiceNavigationToolID = permitted))
+    return Reduced(s)
+}
+
+/** The tool-call ID of a voice open on its way into Home, if [action] is one. */
+private fun openSessionToolID(action: AppFeature.Action): String? {
+    val home = (action as? AppFeature.Action.Home)?.action as? HomeFeature.Action.SessionDetail ?: return null
+    val detail = (home.action as? PresentationAction.Presented)?.action as? SessionFeature.Action.Delegate ?: return null
+    return (detail.delegate as? SessionFeature.Delegate.OpenSession)?.toolID
+}
+
+/** The SSE fallback of a voice open, from the call's delegator. */
+private fun openSessionRequest(action: AppFeature.Action): VoiceFeature.DelegateAction.OpenSessionRequested? {
+    val home = (action as? AppFeature.Action.Home)?.action as? HomeFeature.Action.SessionDetail ?: return null
+    val detail = (home.action as? PresentationAction.Presented)?.action as? SessionFeature.Action.Voice ?: return null
+    val voice = (detail.action as? PresentationAction.Presented)?.action as? VoiceFeature.Action.Delegate ?: return null
+    return voice.action as? VoiceFeature.DelegateAction.OpenSessionRequested
+}
+
 private fun routeClientTools(state: AppFeature.State, action: AppFeature.Action): Reduced<AppFeature.State, AppFeature.Action> {
+    var observed = state
+    if (observed.voiceOpenSession.inFlight) {
+        observed = observed.copy(voiceOpenSession = observed.voiceOpenSession.observing(observed.openSessionEnvironment))
+    }
+    return routingClientTools(observed, action)
+}
+
+private fun routingClientTools(state: AppFeature.State, action: AppFeature.Action): Reduced<AppFeature.State, AppFeature.Action> {
+    if (action is AppFeature.Action.VoiceOpenSession) {
+        val delegate = action.action as? VoiceOpenSessionFeature.Action.Delegate ?: return Reduced(state)
+        val active = state.voiceOpenSession.active
+        val environmentChanged = Effect.send<AppFeature.Action>(AppFeature.Action.VoiceOpenSession(VoiceOpenSessionFeature.Action.EnvironmentChanged))
+        if (active == null || active.id != delegate.id || active.stage != VoiceOpenSessionFeature.Stage.navigating ||
+            active.generation != state.voiceOpenSession.generation || !state.openSessionEnvironment.screen.live || !state.isInForeground
+        ) {
+            return Reduced(state, environmentChanged)
+        }
+        val open = state.voiceOpenSession.copy(active = active.copy(authorized = true))
+        val home = AppFeature.Action.Home(
+            HomeFeature.Action.detail(SessionFeature.Action.Delegate(SessionFeature.Delegate.OpenSession(delegate.session, toolID = delegate.id))),
+        )
+        return Reduced(state.copy(voiceOpenSession = open), Effect.send(home))
+    }
+    val toolID = openSessionToolID(action)
+    if (toolID != null) {
+        val active = state.voiceOpenSession.active
+        if (state.home?.voiceNavigationToolID != toolID || active?.id != toolID) return Reduced(state)
+        val open = state.voiceOpenSession.copy(active = active.copy(committed = true, generation = state.voiceOpenSession.generation))
+        return Reduced(
+            state.copy(voiceOpenSession = open),
+            Effect.send(AppFeature.Action.VoiceOpenSession(VoiceOpenSessionFeature.Action.EnvironmentChanged)),
+        )
+    }
+    val request = openSessionRequest(action)
+    if (request != null) {
+        val server = state.home?.server ?: return Reduced(state)
+        return Reduced(
+            state,
+            Effect.send(AppFeature.Action.VoiceOpenSession(VoiceOpenSessionFeature.Action.Fallback(request.toolID, request.targetID, server))),
+        )
+    }
     if (action is AppFeature.Action.ClientTools) {
         val delegate = action.action as? ClientToolsFeature.Action.Delegate ?: return Reduced(state)
         return Reduced(state, route(delegate.delegate, state) { call, message ->
@@ -185,7 +353,13 @@ private fun route(
 ): Effect<AppFeature.Action> {
     if (delegate is ClientToolsFeature.DelegateAction.Disconnected) {
         if (state.home?.sessionDetail?.voice == null) return Effect.none()
+        val openSession: Effect<AppFeature.Action> = if (state.voiceOpenSession.inFlight) {
+            Effect.send(AppFeature.Action.VoiceOpenSession(VoiceOpenSessionFeature.Action.ConnectionClosed(delegate.connection)))
+        } else {
+            Effect.none()
+        }
         return Effect.concatenate(
+            openSession,
             Effect.send(voiceAction(VoiceFeature.Action.ScreenRequest(VoiceScreenRequestFeature.Action.ConnectionClosed(delegate.connection)))),
             Effect.send(voiceAction(VoiceFeature.Action.OpenLink(VoiceOpenLinkFeature.Action.ConnectionClosed(delegate.connection)))),
         )
@@ -193,6 +367,10 @@ private fun route(
     val call = (delegate as ClientToolsFeature.DelegateAction.ToolCalled).call
     val isLive = state.home?.sessionDetail?.voice?.phase == VoiceFeature.State.Phase.Live
     when (call.tool) {
+        ClientTool.voiceOpenSession -> {
+            val home = state.home ?: return Effect.send(AppFeature.Action.VoiceOpenSession(VoiceOpenSessionFeature.Action.Refused(call, "call_ended")))
+            return Effect.send(AppFeature.Action.VoiceOpenSession(VoiceOpenSessionFeature.Action.Requested(call, home.server)))
+        }
         ClientTool.voiceRequestScreen -> {
             val refusal = state.screenRequestRefusal
             if (refusal != null) return Effect.send(refuse(call, refusal))

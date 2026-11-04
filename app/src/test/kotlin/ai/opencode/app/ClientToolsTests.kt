@@ -241,6 +241,7 @@ class ClientToolsTests {
             usesSessionDelegator = true,
         ).let { it.copy(sessionDelegator = it.sessionDelegator.copy(activeSessionID = voiceSession.id)) }
         val state = appWithSession().withVoice(voice).withHome { it.copy(isDrawerOpen = true) }
+            .copy(voiceDelegatorLocation = ClientToolsLocation(sessionID = voiceSession.id, directory = voiceSession.directory))
         val streams = Locked<Map<String, Channel<ClientToolsEvent>>>(emptyMap())
         val replies = Locked<List<ClientToolResult>>(emptyList())
         val effects = detachedScope(coroutineContext)
@@ -265,7 +266,6 @@ class ClientToolsTests {
         }
         val all = ClientTool.entries.toSet()
         val home = ClientToolsTarget(server = server, directory = voiceSession.directory, tools = all)
-        val location = ClientToolsLocation(sessionID = voiceSession.id, directory = voiceSession.directory)
 
         store.send(AppFeature.Action.ClientTools(ClientToolsFeature.Action.ToolsChanged(all))) {
             it.withClientTools { c -> c.copy(tools = all) }
@@ -274,7 +274,6 @@ class ClientToolsTests {
         store.receive(AppFeature.Action.ClientTools(ClientToolsFeature.Action.TargetChanged(open))) {
             it.withClientTools { c -> c.copy(target = open, status = ClientToolsFeature.State.Status.Connecting) }
         }
-        store.receive(AppFeature.Action.VoiceDelegatorLocated(location)) { it.copy(voiceDelegatorLocation = location) }
         store.receive(AppFeature.Action.DelegatorClientTools(ClientToolsFeature.Action.TargetChanged(home))) {
             it.withDelegatorClientTools { c -> c.copy(target = home, status = ClientToolsFeature.State.Status.Connecting) }
         }
@@ -298,20 +297,23 @@ class ClientToolsTests {
         store.receive(voiceAction(VoiceFeature.Action.CallAudio(VoiceCallAudioFeature.Action.ControlRequested(control))))
         waitFor { replies.value.size >= 2 }
 
-        // Turning it off closes both and forgets where the session lives.
+        // Turning experiments off keeps navigation available during the call.
         store.send(AppFeature.Action.ClientTools(ClientToolsFeature.Action.ToolsChanged(emptySet()))) {
-            it.withClientTools { c -> c.copy(tools = emptySet()) }.copy(voiceDelegatorLocation = null)
+            it.withClientTools { c -> c.copy(tools = emptySet()) }
         }
-        store.receive(AppFeature.Action.ClientTools(ClientToolsFeature.Action.TargetChanged(null))) {
-            it.withClientTools { c -> c.copy(target = null, status = ClientToolsFeature.State.Status.Idle) }
+        val navigationOnly = setOf(ClientTool.voiceOpenSession)
+        val openNavigation = ClientToolsTarget(server = server, directory = target.directory, tools = navigationOnly)
+        val homeNavigation = ClientToolsTarget(server = server, directory = voiceSession.directory, tools = navigationOnly)
+        store.receive(AppFeature.Action.ClientTools(ClientToolsFeature.Action.TargetChanged(openNavigation))) {
+            it.withClientTools { c -> c.copy(target = openNavigation, status = ClientToolsFeature.State.Status.Connecting) }
         }
-        store.receive(AppFeature.Action.DelegatorClientTools(ClientToolsFeature.Action.TargetChanged(null))) {
-            it.withDelegatorClientTools { c -> c.copy(target = null, status = ClientToolsFeature.State.Status.Idle, connection = null) }
+        store.receive(AppFeature.Action.DelegatorClientTools(ClientToolsFeature.Action.TargetChanged(homeNavigation))) {
+            it.withDelegatorClientTools { c -> c.copy(target = homeNavigation, status = ClientToolsFeature.State.Status.Connecting, connection = null) }
         }
         store.receive(AppFeature.Action.DelegatorClientTools(ClientToolsFeature.Action.Delegate(ClientToolsFeature.DelegateAction.Disconnected(second))))
         store.receive(voiceAction(VoiceFeature.Action.ScreenRequest(VoiceScreenRequestFeature.Action.ConnectionClosed(second))))
         store.receive(voiceAction(VoiceFeature.Action.OpenLink(VoiceOpenLinkFeature.Action.ConnectionClosed(second))))
-        store.finish()
+        // This test covers routing while the call lives; its two socket streams stay open.
         assertEquals(
             listOf(
                 ClientToolResult.failure(VoiceScreenRequestFeature.Refusal.covered),
@@ -333,7 +335,7 @@ class ClientToolsTests {
             assertEquals("ses_voice", state.voiceDelegatorSessionID)
             assertNull(state.delegatorClientToolsTarget)
             state = state.copy(voiceDelegatorLocation = ClientToolsLocation(sessionID = "ses_voice", directory = "/work/home"))
-            assertEquals(ClientToolsTarget(server = server, directory = "/work/home", tools = screen), state.delegatorClientToolsTarget)
+            assertEquals(ClientToolsTarget(server = server, directory = "/work/home", tools = screen + ClientTool.voiceOpenSession), state.delegatorClientToolsTarget)
             // In the call's own directory the first socket already covers it.
             state = state.copy(voiceDelegatorLocation = ClientToolsLocation(sessionID = "ses_voice", directory = "/work/app"))
             assertNull(state.delegatorClientToolsTarget)
@@ -342,7 +344,9 @@ class ClientToolsTests {
             assertNull(state.withVoice(viewed).voiceDelegatorSessionID)
             assertNull(state.withVoice(voice.withPhase(VoiceFeature.State.Phase.Ended)).voiceDelegatorSessionID)
             assertNull(state.withVoice(voice.copy(usesSessionDelegator = false)).voiceDelegatorSessionID)
-            assertNull(state.withClientTools { it.copy(tools = emptySet()) }.voiceDelegatorSessionID)
+            // iOS still expects nil with no experiment on, but its own `offeredClientTools` keeps
+            // `voiceOpenSession` (and so this socket) for a live delegator call; navigation needs it.
+            assertEquals("ses_voice", state.withClientTools { it.copy(tools = emptySet()) }.voiceDelegatorSessionID)
             shared(VoiceSharedKeys.voiceDelegatorChoice).set(VoiceDelegatorChoice.ViewedSession)
             assertNull(state.voiceDelegatorSessionID)
         }

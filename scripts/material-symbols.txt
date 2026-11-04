@@ -217,7 +217,7 @@ star_half                           # star.slash
 star_shine fill                     # sparkle
 stop fill                           # stop.fill
 subdirectory_arrow_right mirror     # arrow.turn.down.right
-swap_horiz                          # arrow.left.arrow.right
+swap_horiz                          # arrow.left.arrow.right, arrow.triangle.swap
 sync                                # arrow.triangle.2.circlepath
 table                               # tablecells
 tag                                 # number
