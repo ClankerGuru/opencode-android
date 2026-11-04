@@ -144,6 +144,39 @@ class SessionFeatureTestsAgentSelection {
         assertEquals(agentsAttempts, tries.value)
     }
 
+    /**
+     * Moving a new session's draft to another project lists that project's
+     * agents, not the ones of the project it started in (TestFlight build 702).
+     */
+    @Test fun aDraftMovedToAnotherProjectListsThatProjectsAgents() = sessionTest { h ->
+        val first = OpenCodeProject(id = "p1", name = "one", directory = "/srv/one")
+        val second = OpenCodeProject(id = "p2", name = "two", directory = "/srv/two")
+        val manager = listOf(OpenCodeAutocompleteAgent(id = "manager", name = "Manager", mode = "primary"))
+        val asked = LockIsolated(listOf<String?>())
+        val agents = agents
+        val state = h.state {
+            State.draft(server = testServer, draftProject = first, projects = listOf(first, second)).withPrimaryAgents(agents)
+        }
+        val store = h.store(state) {
+            this[Clock] = ImmediateClock()
+            this[ExperimentalFeatures] = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.agentSelection))
+            this[OpenCodeClient] = this[OpenCodeClient].copy(
+                primaryAgents = { _, directory ->
+                    asked.append(directory)
+                    manager
+                },
+            )
+        }
+        store.send(Action.DraftProjectTapped(second)) {
+            it.copy(draftProject = second).withPrimaryAgents(emptyList())
+        }
+        store.receive(Action.AgentsRequested)
+        store.receive({ it is Action.AgentsResponse && it.result.isSuccess }, "agentsResponse.success") {
+            it.withPrimaryAgents(manager)
+        }
+        assertEquals(listOf<String?>("/srv/two"), asked.value)
+    }
+
     /** The list is kept for Settings; a pick is remembered for its session. */
     @Test fun aPickIsRememberedForItsSession() = sessionTest { h ->
         val store = h.agentStore(h.makeState(session = agentSession()), calls = LockIsolated(emptyList()))

@@ -6,6 +6,7 @@ import ai.opencode.feature.composer.modelpicker.ModelPickerState
 import ai.opencode.feature.composer.RequestDockFeature
 import ai.opencode.feature.composer.DraftState
 import ai.opencode.core.haptics.Haptic
+import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.cancellable
@@ -109,9 +110,9 @@ internal fun SessionFeature.reduceModelsAndFamily(state: State, action: Action):
     Action.ProjectButtonTapped -> Reduced(if (state.canChooseProject) state.openProjectPicker() else state)
 
     // Only the picker's own choice; a system action opening a draft is quiet.
-    is Action.ProjectPicked -> Reduced(pickProject(action.project, byHand = state.activePicker == State.ActivePicker.project, state))
+    is Action.ProjectPicked -> pickProject(action.project, byHand = state.activePicker == State.ActivePicker.project, state)
 
-    is Action.DraftProjectTapped -> Reduced(pickProject(action.project, byHand = true, state))
+    is Action.DraftProjectTapped -> pickProject(action.project, byHand = true, state)
 
     is Action.StarterPromptTapped -> {
         // Typed in, not sent: the person sends it, as with What’s New’s Try It.
@@ -406,16 +407,23 @@ private fun SessionFeature.familyPicked(id: String, state: State): Reduced<State
 
 /**
  * iOS `pickProject(_:byHand:_:)`: moves the draft to [project]. A choice made by hand that changes it
- * plays `.selection`; the project already chosen plays nothing.
+ * plays `.selection`; the project already chosen plays nothing. Moving to another folder asks for
+ * that folder's agents.
  */
-private fun SessionFeature.pickProject(project: OpenCodeProject, byHand: Boolean, state: State): State {
+private fun SessionFeature.pickProject(project: OpenCodeProject, byHand: Boolean, state: State): Reduced<State, Action> {
     // Once the first send has left, it goes where it was sent.
     if (!state.canChooseProject) {
-        return if (state.activePicker == State.ActivePicker.project) state.copy(activePicker = null) else state
+        return Reduced(if (state.activePicker == State.ActivePicker.project) state.copy(activePicker = null) else state)
     }
     val changes = state.draftProject?.let { it.id != project.id && it.directory != project.directory } ?: true
     if (byHand && changes) haptics.play(Haptic.selection)
-    return state.copy(draftProject = project, activePicker = null, voice = state.voice?.moveDraft(project.directory))
+    val movesFolder = state.draftProject?.directory != project.directory
+    var next = state.copy(draftProject = project, activePicker = null, voice = state.voice?.moveDraft(project.directory))
+    // Each folder has its own agents: the last folder's list isn't this one's, so it's dropped and
+    // asked for again from the new folder.
+    if (!movesFolder || !experimentalFeatures(ExperimentalFeature.agentSelection)) return Reduced(next)
+    if (next.primaryAgents.isNotEmpty()) next = next.withPrimaryAgents(emptyList())
+    return Reduced(next, Effect.send(Action.AgentsRequested))
 }
 
 /**
