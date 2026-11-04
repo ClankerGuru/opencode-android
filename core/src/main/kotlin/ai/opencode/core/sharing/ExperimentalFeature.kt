@@ -42,6 +42,11 @@ enum class ExperimentalFeature(
      * [allCases], never listed, never on.
      */
     val isRetired: Boolean = false,
+    /**
+     * All Experiments switches it (iOS `joinsAll`). False for experiments that ask for a
+     * permission or share data, which stay a choice of their own; graduated ones never join.
+     */
+    joinsAll: Boolean = true,
 ) {
     onePicker("one-picker", "One Picker", ExperimentalGroup.composer, "Favorites, recents, and inline levels", "cpu", order = 15),
     agentSelection("agent-selection", "Agent Selection", ExperimentalGroup.composer, "Choose Build, Plan, or your own", "person.crop.circle", order = 30),
@@ -65,6 +70,8 @@ enum class ExperimentalFeature(
     backgroundCallIntent(
         "background-call-intent", "Background Action Button Call", ExperimentalGroup.calls, "Calls start without opening the app",
         "button.programmable", order = 180,
+        // Starts the microphone with the app in the background.
+        joinsAll = false,
     ),
     voiceSessionDelegator(
         "voice-session-delegator", "OpenCode Session Delegator", ExperimentalGroup.calls, "Delegate calls to an OpenCode session",
@@ -73,6 +80,8 @@ enum class ExperimentalFeature(
     shareScreenWithAgents(
         "share-screen-with-agents", "Share Screen with Agents", ExperimentalGroup.calls, "Agents may ask to see it",
         "rectangle.on.rectangle", order = 200,
+        // Sends a picture of the app to the agent.
+        joinsAll = false,
     ),
     openLinksFromCalls("open-links-from-calls", "Open Links from Calls", ExperimentalGroup.calls, "Agents may open links", "arrow.up.forward.app", order = 210),
     audioInCalls("audio-in-calls", "Audio in Calls", ExperimentalGroup.calls, "Agents can play music on calls", "music.note", order = 220),
@@ -93,6 +102,9 @@ enum class ExperimentalFeature(
     ;
 
     val id: String get() = rawValue
+
+    /** All Experiments switches it: it didn't opt out and hasn't graduated (iOS `joinsAll`). */
+    val joinsAll: Boolean = joinsAll && !isGraduated && !isRetired
 
     /** Retired: always off. */
     private val isOff: Boolean get() = isRetired

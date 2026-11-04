@@ -4,6 +4,7 @@ import ai.opencode.core.experiments.key
 import ai.opencode.core.experiments.ExperimentalFeature
 import ai.opencode.core.experiments.ExperimentalGroup
 import ai.opencode.core.motion.Motion
+import ai.opencode.core.sharing.AllExperiments
 import ai.opencode.core.sharing.shared
 import ai.opencode.devtools.DevTools
 import ai.opencode.devtools.DevToolsView
@@ -30,9 +31,10 @@ import androidx.compose.ui.graphics.Color
 import kotlinx.coroutines.delay
 
 /**
- * Port of iOS `Settings/ExperimentalSettingsView.swift`: Settings › Experimental, the experimental
- * switches in open groups (Composer, Calls, Transcript, Drawer). Sound Effects' volume and send
- * rows sit under the drawer's switches while it's on.
+ * Port of iOS `Settings/ExperimentalSettingsView.swift`: Settings › Experimental, All Experiments
+ * in its own section, then the experimental switches in open groups (Composer, Calls,
+ * Transcript, Drawer). Sound Effects' volume and send rows sit under the drawer's switches while
+ * it's on.
  * Opened for one experiment (What’s New), it scrolls to that row and briefly highlights it
  * (1.2 s, then a 0.6 s ease-out).
  */
@@ -42,15 +44,16 @@ fun ExperimentalSettingsView(store: SettingsStore, focus: ExperimentalFeature?) 
     val enabled = ExperimentalFeature.allCases.associateWith { feature ->
         remember(feature) { shared(feature.key).flow }.collectAsState().value
     }
+    val all by remember { shared(AllExperiments.key).flow }.collectAsState()
     val send = { action: HomeSettingsFeature.Action -> store.send(SettingsFeature.Action.Settings(action)) }
     val listState = rememberLazyListState()
     var highlighted by remember { mutableStateOf<ExperimentalFeature?>(null) }
 
-    // Scroll to the focused row (each group's section is one list item, in order), centred as
-    // iOS `scrollTo(_, anchor: .center)`, and tint it.
+    // Scroll to the focused row (All Experiments, then each group's section, are one list item
+    // each, in order), centred as iOS `scrollTo(_, anchor: .center)`, and tint it.
     LaunchedEffect(focus) {
         val target = focus ?: return@LaunchedEffect
-        val index = ExperimentalGroup.entries.indexOf(target.group)
+        val index = 1 + ExperimentalGroup.entries.indexOf(target.group)
         // A frame for the list to lay out its rows first.
         withFrameNanos {}
         listState.scrollToItem(index)
@@ -77,13 +80,29 @@ fun ExperimentalSettingsView(store: SettingsStore, focus: ExperimentalFeature?) 
         }
     }
 
-    fun header(group: ExperimentalGroup, styled: Int = 0): String {
+    fun header(group: ExperimentalGroup): String {
         // Turned on: ones on by default (Living Orb) don't count (iOS `isTurnedOn`).
-        val on = styled + group.features.count { !it.defaultEnabled && enabled.getValue(it) }
+        val on = group.features.count { !it.defaultEnabled && enabled.getValue(it) }
         return if (on == 0) group.title else "${group.title} · $on on"
     }
 
     SettingsPageScaffold(title = "Experimental", store = store, listState = listState) {
+        settingsSection(
+            key = "experimental-all",
+            footer = footerText(
+                if (all) "New experiments turn on as they arrive. Switch one off to skip it."
+                else "Unfinished features that may change or go away.",
+            ),
+        ) {
+            SettingsToggleRow(
+                title = "All Experiments",
+                checked = all,
+                onCheckedChange = { send(HomeSettingsFeature.Action.AllExperimentsChanged(it)) },
+                symbol = "flask.fill",
+                tint = SettingsTint.Gray,
+                summary = "Try everything, new ones included",
+            )
+        }
         settingsSection(key = ExperimentalGroup.composer, header = header(ExperimentalGroup.composer)) {
             toggles(ExperimentalGroup.composer, leadingDivider = false)
         }
@@ -93,11 +112,7 @@ fun ExperimentalSettingsView(store: SettingsStore, focus: ExperimentalFeature?) 
         settingsSection(key = ExperimentalGroup.transcript, header = header(ExperimentalGroup.transcript)) {
             toggles(ExperimentalGroup.transcript, leadingDivider = false)
         }
-        settingsSection(
-            key = ExperimentalGroup.drawer,
-            header = header(ExperimentalGroup.drawer),
-            footer = footerText("Unfinished features that may change or go away."),
-        ) {
+        settingsSection(key = ExperimentalGroup.drawer, header = header(ExperimentalGroup.drawer)) {
             toggles(ExperimentalGroup.drawer, leadingDivider = false)
             if (ExperimentalFeature.soundEffects.isActive(enabled.getValue(ExperimentalFeature.soundEffects))) {
                 SettingsDivider(inset = true)
@@ -136,11 +151,12 @@ private fun highlightSpec(highlighted: Boolean): AnimationSpec<Color> =
     if (highlighted) snap() else tween(durationMillis = 600, easing = Motion.EaseOut)
 
 /**
- * iOS `ExperimentalSettingsRow`: Settings' row into Experimental, counting experiments turned on.
- * One on by default (Living Orb) doesn't count.
+ * iOS `ExperimentalSettingsRow`: Settings' row into Experimental, counting experiments turned on
+ * (“2 On”), or “All On” while All Experiments is. One on by default (Living Orb) doesn't count.
  */
 @Composable
 fun ExperimentalSettingsRow(onClick: () -> Unit) {
+    val all by remember { shared(AllExperiments.key).flow }.collectAsState()
     val features = ExperimentalGroup.entries.flatMap { it.features }
     val enabled = features.map { feature -> remember(feature) { shared(feature.key).flow }.collectAsState().value }
     var on = 0
@@ -148,7 +164,8 @@ fun ExperimentalSettingsRow(onClick: () -> Unit) {
         // Turned on: ones on by default (Living Orb) don't count (iOS `isTurnedOn`).
         if (!feature.defaultEnabled && enabled[index]) on += 1
     }
-    SettingsRow("Experimental", "flask.fill", SettingsTint.Gray, value = if (on == 0) null else "$on On", onClick = onClick)
+    val value = if (all) "All On" else if (on == 0) null else "$on On"
+    SettingsRow("Experimental", "flask.fill", SettingsTint.Gray, value = value, onClick = onClick)
 }
 
 val ExperimentalGroup.tint: SettingsTint

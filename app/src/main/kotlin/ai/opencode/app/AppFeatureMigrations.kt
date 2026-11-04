@@ -9,6 +9,7 @@ import ai.opencode.core.sharing.InstallHistory
 import ai.opencode.core.sharing.SharedKey
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.SharedStore
+import ai.opencode.core.sharing.adoptNewExperimentsIntoAll
 import ai.opencode.core.sharing.installHistory
 import ai.opencode.feature.settings.whatsnew.WhatsNewEntry
 import ai.opencode.feature.settings.whatsnew.WhatsNewFeature
@@ -37,6 +38,7 @@ internal fun migrateSettingsIfNeeded(savedServers: List<OpenCodeServer>) {
     recordInstallHistory(store, savedServers)
     ExperimentalFeature.migrateModelPicker(store)
     ExperimentalFeature.removeRetiredSwitches(store)
+    ExperimentalFeature.adoptNewExperimentsIntoAll()
     removeRetiredOrbStyles(store)
 }
 

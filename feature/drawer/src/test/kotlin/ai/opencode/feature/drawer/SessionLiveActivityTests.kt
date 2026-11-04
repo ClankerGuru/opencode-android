@@ -397,4 +397,21 @@ class SessionLiveActivityTests {
     }
 
     // endregion
+
+    /**
+     * Port of iOS `AllExperimentsTests.allSwitchingTheLiveActivityOffEndsIt`: All Experiments
+     * switching Session Live Activity off ends the activity, as the switch itself does.
+     */
+    @Test
+    fun allSwitchingTheLiveActivityOffEndsIt() = homeTest { h ->
+        val pushes = LockIsolated(listOf<SessionActivityAttributes.ContentState?>())
+        val store = h.store(h.following()) {
+            this[SessionLiveActivityClient] = recorder(pushes)
+        }
+        store.send(Action.Settings(HomeSettingsFeature.Action.ExperimentalFeatureApplied(ExperimentalFeature.sessionLiveActivity, false))) {
+            it.copy(sessionActivity = null)
+        }
+        store.finish()
+        assertEquals(listOf<SessionActivityAttributes.ContentState?>(null), pushes.value)
+    }
 }

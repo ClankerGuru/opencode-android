@@ -6,9 +6,13 @@ import ai.opencode.core.experiments.ExperimentalFeature
 import ai.opencode.core.experiments.InAppNoticeMode
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
+import ai.opencode.core.sharing.AllExperiments
 import ai.opencode.core.sharing.SharedKey
 import ai.opencode.core.sharing.SharedKeys
+import ai.opencode.core.sharing.allExperimentsSkips
+import ai.opencode.core.sharing.restoreFromAll
 import ai.opencode.core.sharing.shared
+import ai.opencode.core.sharing.switchAllOn
 import ai.opencode.core.sound.SoundEffect
 import ai.opencode.core.sound.SoundEffectsClient
 import ai.opencode.core.sound.soundEffectsSend
@@ -54,6 +58,10 @@ class HomeSettingsFeature : Reducer<HomeSettingsFeature.State, HomeSettingsFeatu
         data object SidebarToggled : Action
         data class InAppNoticeModeChanged(val mode: InAppNoticeMode) : Action
         data class ExperimentalFeatureChanged(val feature: ExperimentalFeature, val on: Boolean) : Action
+        /** Settings › Experimental › All Experiments. */
+        data class AllExperimentsChanged(val on: Boolean) : Action
+        /** All Experiments switched this experiment; its side effects run here. */
+        data class ExperimentalFeatureApplied(val feature: ExperimentalFeature, val on: Boolean) : Action
         /** Settings › Experimental › Sound Effects › Volume (0…1). */
         data class SoundEffectsVolumeChanged(val volume: Double) : Action
         /** Settings › Experimental › Sound Effects › Send Sound. */
@@ -99,19 +107,42 @@ class HomeSettingsFeature : Reducer<HomeSettingsFeature.State, HomeSettingsFeatu
         return true
     }
 
+    /**
+     * What switching one experiment does beyond its saved switch. Home ends a Session Live
+     * Activity switched off (`HomeFeatureSettings`).
+     */
+    private fun experimentalFeatureApplied(feature: ExperimentalFeature, on: Boolean): Effect<Action> {
+        if (feature == ExperimentalFeature.serverVoice) {
+            if (!ExperimentalFeature.serverVoice.isActive(on)) return Effect.none()
+            return Effect.send(Action.CheckServerVoiceSupport)
+        }
+        if (feature == ExperimentalFeature.soundEffects) {
+            if (ExperimentalFeature.soundEffects.isActive(on)) soundEffects.prepare()
+        }
+        return Effect.none()
+    }
+
     override fun reduce(state: State, action: Action): Reduced<State, Action> {
         when (action) {
             Action.SidebarToggled -> shared(SharedKeys.sidebarShown).update { !it }
             is Action.InAppNoticeModeChanged -> setShared(InAppNoticeMode.key, action.mode)
             is Action.ExperimentalFeatureChanged -> {
                 if (!setShared(action.feature.key, action.on)) return Reduced(state)
-                if (action.feature == ExperimentalFeature.serverVoice && ExperimentalFeature.serverVoice.isActive(action.on)) {
-                    return Reduced(state, Effect.send(Action.CheckServerVoiceSupport))
+                // Switched by hand while All Experiments is on: off is a skip, kept for next time.
+                if (shared(AllExperiments.key).value && action.feature.joinsAll) {
+                    setShared(allExperimentsSkips(action.feature), !action.on)
                 }
-                if (action.feature == ExperimentalFeature.soundEffects && ExperimentalFeature.soundEffects.isActive(action.on)) {
-                    soundEffects.prepare()
-                }
+                return Reduced(state, experimentalFeatureApplied(action.feature, action.on))
             }
+            is Action.AllExperimentsChanged -> {
+                if (!setShared(AllExperiments.key, action.on)) return Reduced(state)
+                val changed = if (action.on) ExperimentalFeature.switchAllOn() else ExperimentalFeature.restoreFromAll()
+                val effects = mutableListOf<Effect<Action>>()
+                for (change in changed) effects.add(Effect.send(Action.ExperimentalFeatureApplied(change.feature, change.on)))
+                return Reduced(state, Effect.merge(effects))
+            }
+            is Action.ExperimentalFeatureApplied ->
+                return Reduced(state, experimentalFeatureApplied(action.feature, action.on))
             is Action.SoundEffectsVolumeChanged ->
                 // Each new level plays a sample at it.
                 if (setShared(SharedKeys.soundEffectsVolume, action.volume.coerceIn(0.0, 1.0))) {

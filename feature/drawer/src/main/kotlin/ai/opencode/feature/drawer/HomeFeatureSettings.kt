@@ -242,6 +242,17 @@ internal fun HomeFeature.tryWhatsNew(destination: WhatsNewEntry.Destination, ent
     }
 }
 
-/** iOS `.settings(.experimentalFeatureChanged(.sessionLiveActivity, false))`. */
+/**
+ * iOS `.settings(.experimentalFeatureChanged(.sessionLiveActivity, false))` and
+ * `.settings(.experimentalFeatureApplied(.sessionLiveActivity, false))` (All Experiments).
+ */
 internal val HomeSettingsFeature.Action.switchesOffSessionLiveActivity: Boolean
-    get() = this is HomeSettingsFeature.Action.ExperimentalFeatureChanged && feature == ExperimentalFeature.sessionLiveActivity && !on
+    get() {
+        if (this is HomeSettingsFeature.Action.ExperimentalFeatureChanged) {
+            return feature == ExperimentalFeature.sessionLiveActivity && !on
+        }
+        if (this is HomeSettingsFeature.Action.ExperimentalFeatureApplied) {
+            return feature == ExperimentalFeature.sessionLiveActivity && !on
+        }
+        return false
+    }
