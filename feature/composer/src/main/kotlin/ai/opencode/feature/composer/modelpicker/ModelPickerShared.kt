@@ -42,8 +42,8 @@ class ComposerFocusRestore(private val scope: CoroutineScope) {
 
 /**
  * iOS `ProgressiveBlur.Profile`: full strength at one edge fading out, or a band peaking in the
- * middle. Only its strengths are ported here: the blurs themselves are `ComposerMorphBlur` and
- * `RecentPhotoPeek`'s RenderEffects.
+ * middle. Only its strengths are ported here; Android draws no backdrop blur (Material scrims
+ * instead), so the strengths only shape dims.
  */
 sealed interface ProgressiveBlurProfile {
     /** Strongest at the top ([top]) or the bottom edge. */

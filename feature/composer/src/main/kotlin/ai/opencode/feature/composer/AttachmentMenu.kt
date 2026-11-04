@@ -209,6 +209,7 @@ object PlusMenuTunables {
     val peekOpen = MotionSpring(0.28, 0.14)
     const val PEEK_CLOSE = 0.16
     const val PEEK_STAGGER = 0.02
+    /** iOS's peek backdrop blur (pt). Not drawn on Android, which dims the band with a scrim. */
     const val PEEK_BLUR = 10f
     const val PEEK_DIM = 0f
     const val PEEK_FEATHER = 56f

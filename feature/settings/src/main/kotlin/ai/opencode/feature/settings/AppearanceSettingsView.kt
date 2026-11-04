@@ -74,10 +74,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.ui.graphics.RenderEffect
-import androidx.compose.ui.graphics.asComposeRenderEffect
-import android.graphics.RuntimeShader
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
@@ -168,7 +164,6 @@ fun ThemesSettingsView(store: SettingsStore) {
     val density = LocalDensity.current
     /** The pinned preview header's height (px), content plus its 14 pt bottom inset. */
     var headerHeight by remember { mutableIntStateOf(0) }
-    val softEdgeBlur = rememberSoftEdgeBlur(headerHeight, opaque = colors.highContrast)
 
     Scaffold(
         containerColor = colors.groupedCanvas,
@@ -190,10 +185,7 @@ fun ThemesSettingsView(store: SettingsStore) {
                     top = with(density) { headerHeight.toDp() } + AppearanceTunables.softEdgeHeight + 4.dp,
                     bottom = padding.calculateBottomPadding() + 24.dp,
                 ),
-                modifier = Modifier
-                    .fillMaxSize()
-                    // The soft edge's progressive blur, applied to the list's own layer.
-                    .graphicsLayer { renderEffect = softEdgeBlur },
+                modifier = Modifier.fillMaxSize(),
             ) {
                 settingsSection(key = "themes") {
                     AppTheme.entries.forEachIndexed { index, theme ->
@@ -240,7 +232,7 @@ fun ThemesSettingsView(store: SettingsStore) {
 internal object AppearanceTunables {
     /** Soft edge feather (pt). */
     val softEdgeHeight = 22.dp
-    /** Soft edge blur. */
+    /** iOS's soft edge blur. Not drawn on Android: the list fades under the gradient alone. */
     val softEdgeBlur = 12.dp
 }
 
@@ -249,9 +241,9 @@ private val SoftEdgeBottomInset = 14.dp
 /**
  * Soft scroll-edge backdrop behind the pinned split preview (iOS `ThemesSoftEdgeBackdrop`): full
  * [topBackground] through `fadeOrigin`, then a smoothstep gradient easing to transparent over the
- * feather below the preview, so scrolling theme rows dissolve before they reach it; the list
- * itself blurs progressively across the `bottomInset + feather` band ([rememberSoftEdgeBlur]).
- * Under high contrast it is opaque.
+ * feather below the preview, so scrolling theme rows dissolve before they reach it. iOS also
+ * blurs the list progressively across that band; Android doesn't blur scrolling content (a plain
+ * fading edge, as Android lists use). Under high contrast it is opaque.
  */
 @Composable
 private fun ThemesSoftEdgeBackdrop(
@@ -295,61 +287,6 @@ private fun ThemesSoftEdgeBackdrop(
             .background(Brush.verticalGradient(*stops)),
     )
 }
-
-/**
- * The soft edge's progressive blur (iOS `DrawerEdgeBlur(fadeStart:height:radius:curve: .smoothstep,
- * edge: .top)` over the `bottomInset + feather` band below the preview): full [AppearanceTunables.
- * softEdgeBlur] over the bottom inset, easing to none across the feather. An AGSL effect on the
- * list's own layer, so the list is drawn once (re-drawing a recorded layer under a blur crashed
- * the emulator's renderer). Null under high contrast, where the backdrop is opaque.
- */
-@Composable
-private fun rememberSoftEdgeBlur(header: Int, opaque: Boolean): RenderEffect? {
-    val density = LocalDensity.current
-    val shader = remember { RuntimeShader(SoftEdgeBlurShader) }
-    return remember(header, opaque, density) {
-        if (opaque || header <= 0) return@remember null
-        val bottomInset = with(density) { SoftEdgeBottomInset.toPx() }
-        val feather = max(with(density) { AppearanceTunables.softEdgeHeight.toPx() }, 1f)
-        val fadeOrigin = max(header - bottomInset, 1f)
-        val band = bottomInset + feather
-        shader.setFloatUniform("origin", fadeOrigin)
-        shader.setFloatUniform("band", band)
-        shader.setFloatUniform("fadeStart", (bottomInset / band).coerceIn(0f, 1f))
-        shader.setFloatUniform("radius", with(density) { AppearanceTunables.softEdgeBlur.toPx() })
-        android.graphics.RenderEffect.createRuntimeShaderEffect(shader, "content").asComposeRenderEffect()
-    }
-}
-
-/** A Gaussian blur whose radius follows the smoothstep strength profile down the band. */
-private const val SoftEdgeBlurShader = """
-uniform shader content;
-uniform float origin;
-uniform float band;
-uniform float fadeStart;
-uniform float radius;
-
-half4 main(float2 p) {
-    float y = (p.y - origin) / band;
-    if (y < 0.0 || y > 1.0) return content.eval(p);
-    float t = clamp((y - fadeStart) / max(1.0 - fadeStart, 0.001), 0.0, 1.0);
-    float strength = y <= fadeStart ? 1.0 : 1.0 - t * t * (3.0 - 2.0 * t);
-    // Blur radius is about two standard deviations, as BlurEffect's.
-    float sigma = radius * strength * 0.5;
-    if (sigma < 0.3) return content.eval(p);
-    half4 sum = half4(0);
-    float weights = 0.0;
-    for (int i = -4; i <= 4; i++) {
-        for (int j = -4; j <= 4; j++) {
-            float2 o = float2(float(i), float(j)) * (sigma * 0.5);
-            float w = exp(-0.5 * dot(o, o) / (sigma * sigma));
-            sum += content.eval(p + o) * w;
-            weights += w;
-        }
-    }
-    return sum / weights;
-}
-"""
 
 @Composable
 private fun ThemeOptionRow(

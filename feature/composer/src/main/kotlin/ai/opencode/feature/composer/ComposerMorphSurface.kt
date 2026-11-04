@@ -70,10 +70,9 @@ import kotlin.math.roundToInt
  * of arriving open. Everything is placed from the morph's progress, so opening and closing in
  * any order only retargets its springs.
  *
- * - **Backdrop**: everything above the sheet dims (dark 0.3 / light 0.12, ×1.6 under Reduce
- *   Transparency) as it grows, and a tap closes it. The blur (iOS `ProgressiveBlur`, 18 by
- *   default) is published on [ComposerMorph.backdrop] for the host to apply to its content with
- *   [composerMorphBackdrop], since Compose can't blur a sibling.
+ * - **Backdrop**: everything above the sheet dims as it grows (a Material scrim: iOS's dark 0.3 /
+ *   light 0.12 at its no-blur strength, ×1.6), and a tap closes it. iOS also blurs the content
+ *   behind (`ProgressiveBlur`, 18); Android never blurs what's behind a sheet, so it doesn't.
  * - **Glass**: one M3 tonal surface (Liquid Glass → `surfaceContainerHigh`) on one rect from the
  *   source to the rest, the width leading, its corners interpolating, drawn down (or, with
  *   [stretchesUpward], its top stretched) by the morph's drag, cross-fading with the source over
@@ -122,8 +121,7 @@ fun ComposerMorphSurface(
     stretchesUpward: Boolean = false,
     /** A dismissal drag from compact carries the whole sheet rather than compressing it. */
     translatesDownward: Boolean = false,
-    /** Backdrop blur (dp) and dim overrides (iOS `backdropBlur`, `backdropDim`). */
-    backdropBlur: Double? = null,
+    /** Backdrop dim override (iOS `backdropDim`); iOS's `backdropBlur` has no Android counterpart. */
     backdropDim: Double? = null,
     /** Controls along the sheet's foot, over its content but outside its mask; they arrive and leave with the content. */
     foot: (@Composable () -> Unit)? = null,
@@ -148,7 +146,6 @@ fun ComposerMorphSurface(
     content: @Composable () -> Unit,
 ) {
     val reduceMotion = rememberReduceMotion()
-    val reduceTransparency = rememberReduceTransparency()
     val density = LocalDensity.current
     val px = density.density
     val dark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
@@ -194,7 +191,6 @@ fun ComposerMorphSurface(
             .onGloballyPositioned { screen = it.boundsInRoot() },
     ) {
         if (!shown || screen == Rect.Zero) {
-            SideEffect { morph.backdrop.blurPx = 0f }
             if (retained && screen != Rect.Zero) RetainedClosedContent(screen, target, movableContent)
             return@Box
         }
@@ -213,12 +209,8 @@ fun ComposerMorphSurface(
         )
         val minHeight = 120 * px
         val dimBase = backdropDim ?: if (dark) ComposerMorphTunables.dimDark else ComposerMorphTunables.dimLight
-        val dim = (dimBase * if (reduceTransparency) 1.6 else 1.0).toFloat()
-        val blurDp = if (reduceTransparency) 0.0 else backdropBlur ?: ComposerMorphTunables.backdropBlur
-        SideEffect {
-            morph.backdrop.sheetTop = rest.top
-            morph.backdrop.blurPx = if (shown) (blurDp * px).toFloat() else 0f
-        }
+        // No backdrop blur on Android, so the scrim takes iOS's no-blur strength.
+        val dim = (dimBase * ComposerMorphTunables.noBlurDimBoost).toFloat()
 
         // A zero-dim backdrop may draw nothing: the modal target still covers the whole session
         // and swallows the dismissing tap.

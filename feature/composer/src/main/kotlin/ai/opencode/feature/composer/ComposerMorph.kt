@@ -79,7 +79,13 @@ object ComposerMorphTunables {
      */
     const val photoContentLead = 0.4
     const val exitBlur = 10.0
+    /** iOS's backdrop blur (dp). Not drawn on Android, which dims with a scrim only (see [noBlurDimBoost]). */
     const val backdropBlur = 18.0
+    /**
+     * iOS Reduce Transparency's dim boost, used when there is no backdrop blur. Android never blurs
+     * what's behind a sheet (Material scrims only), so its dim is always boosted.
+     */
+    const val noBlurDimBoost = 1.6
     const val dimDark = 0.3
     const val dimLight = 0.12
     const val topRadius = 30.0
@@ -155,21 +161,6 @@ class ComposerMorph(private val scope: CoroutineScope) {
         private set
     private var settleTask: Job? = null
     private var dragTask: Job? = null
-
-    /**
-     * Where the surface last drew its rest and how strongly to blur what's behind it, for
-     * [composerMorphBackdrop] on the content beneath: Compose can't blur a sibling, so the
-     * host's content blurs itself from these (iOS `ComposerMorphBackdrop`'s `ProgressiveBlur`).
-     */
-    @Stable
-    class Backdrop {
-        /** The sheet's resting top, in root px. */
-        var sheetTop by mutableFloatStateOf(0f)
-        /** The full blur radius (px) at progress 1; 0 under Reduce Transparency. */
-        var blurPx by mutableFloatStateOf(0f)
-    }
-
-    val backdrop = Backdrop()
 
     val isOpen: Boolean get() = phase == Phase.Open
     /** Drawn: armed, open, or shrinking back into its source. */

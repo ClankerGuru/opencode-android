@@ -82,7 +82,6 @@ fun ComposerMorphPhotoSheet(
     morph: ComposerMorph = rememberComposerMorph(),
 ) {
     val reduceMotion = rememberReduceMotion()
-    val reduceTransparency = rememberReduceTransparency()
     val density = LocalDensity.current
     val px = density.density
     val scope = rememberCoroutineScope()
@@ -260,8 +259,7 @@ fun ComposerMorphPhotoSheet(
         openedFrom = source.takeIf { it != Rect.Zero },
         landsOn = landsOn,
         stretchesUpward = true,
-        backdropBlur = if (reduceTransparency) 0.0 else ComposerMorphTunables.photoBackdropBlur,
-        backdropDim = ComposerMorphTunables.photoBackdropDim * if (reduceTransparency) 1.6 else 1.0,
+        backdropDim = ComposerMorphTunables.photoBackdropDim * ComposerMorphTunables.noBlurDimBoost,
         foot = {
             PlusPhotoSheetFoot(
                 library = library,
