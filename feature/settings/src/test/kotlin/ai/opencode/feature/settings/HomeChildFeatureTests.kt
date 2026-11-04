@@ -1,6 +1,5 @@
 package ai.opencode.feature.settings
 
-import ai.opencode.core.experiments.ModelPickerStyle
 import ai.opencode.core.sharing.SharedStore
 import ai.opencode.core.store.TestStore
 import ai.opencode.core.testing.TestIsolationRule
@@ -16,8 +15,8 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * Port of iOS `HomeChildFeatureTests.swift`, the `:feature:settings` part: the two
- * `HomeSettingsFeature` tests (Android keeps that reducer here). The `HomeNotificationsFeature`
+ * Port of iOS `HomeChildFeatureTests.swift`, the `:feature:settings` part: the
+ * `HomeSettingsFeature` test (Android keeps that reducer here). The `HomeNotificationsFeature`
  * and other Home children are `:feature:drawer`'s port.
  */
 class HomeChildFeatureTests {
@@ -48,20 +47,6 @@ class HomeChildFeatureTests {
         store.receive(HomeSettingsFeature.Action.ServerVoiceSupportLoaded(server.persistenceID, ServerVoiceSupport.supported))
         assertEquals(ServerVoiceSupport.supported, shared.get(VoiceSharedKeys.serverVoiceSupportByServer)[server.persistenceID])
         assertEquals(ServerVoiceModelsAnswer.Listed(listOf(gptLive)), shared.get(VoiceSharedKeys.voiceModelsByServer)[server.persistenceID])
-        store.finish()
-    }
-
-    @Test fun modelPickerStyleIsOneSetting() = runTest {
-        val shared = SettingsTestShared()
-        val store = TestStore(HomeSettingsFeature.State(server = server), HomeSettingsFeature(), this) {
-            this[SharedStore] = shared.store
-        }
-        store.send(HomeSettingsFeature.Action.ModelPickerStyleChanged(ModelPickerStyle.sheet))
-        assertEquals(ModelPickerStyle.sheet, shared.get(ModelPickerStyle.key))
-        store.send(HomeSettingsFeature.Action.ModelPickerStyleChanged(ModelPickerStyle.onePicker))
-        assertEquals(ModelPickerStyle.onePicker, shared.get(ModelPickerStyle.key))
-        store.send(HomeSettingsFeature.Action.ModelPickerStyleChanged(ModelPickerStyle.growFromComposer))
-        assertEquals(ModelPickerStyle.growFromComposer, shared.get(ModelPickerStyle.key))
         store.finish()
     }
 }

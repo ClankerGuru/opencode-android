@@ -4,7 +4,6 @@ import ai.opencode.core.experiments.key
 import ai.opencode.core.dependencies.Dependency
 import ai.opencode.core.experiments.ExperimentalFeature
 import ai.opencode.core.experiments.InAppNoticeMode
-import ai.opencode.core.experiments.ModelPickerStyle
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.sharing.SharedKey
@@ -55,7 +54,6 @@ class HomeSettingsFeature : Reducer<HomeSettingsFeature.State, HomeSettingsFeatu
         data object SidebarToggled : Action
         data class InAppNoticeModeChanged(val mode: InAppNoticeMode) : Action
         data class ExperimentalFeatureChanged(val feature: ExperimentalFeature, val on: Boolean) : Action
-        data class ModelPickerStyleChanged(val style: ModelPickerStyle) : Action
         /** Settings › Experimental › Sound Effects › Volume (0…1). */
         data class SoundEffectsVolumeChanged(val volume: Double) : Action
         /** Settings › Experimental › Sound Effects › Send Sound. */
@@ -114,7 +112,6 @@ class HomeSettingsFeature : Reducer<HomeSettingsFeature.State, HomeSettingsFeatu
                     soundEffects.prepare()
                 }
             }
-            is Action.ModelPickerStyleChanged -> setShared(ModelPickerStyle.key, action.style)
             is Action.SoundEffectsVolumeChanged ->
                 // Each new level plays a sample at it.
                 if (setShared(SharedKeys.soundEffectsVolume, action.volume.coerceIn(0.0, 1.0))) {

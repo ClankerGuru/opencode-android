@@ -12,7 +12,6 @@ import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.PresentationAction
-import ai.opencode.core.store.Store
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
 import ai.opencode.core.store.scope
@@ -37,7 +36,6 @@ import ai.opencode.feature.composer.RequestReviewSheet
 import ai.opencode.feature.composer.SentImageFlight
 import ai.opencode.feature.composer.SentImageFlightOverlay
 import ai.opencode.feature.composer.composerKeyboardStepHold
-import ai.opencode.feature.composer.modelpicker.ModelPickerAnchors
 import ai.opencode.feature.composer.plusmenu.PhotoFlightCanvas
 import ai.opencode.feature.composer.plusmenu.PlusMenuGlassSurface
 import ai.opencode.feature.composer.plusmenu.RecentPhotoPeekOverlay
@@ -110,7 +108,6 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -181,8 +178,6 @@ fun SessionView(
     // What the composer shares with the screen around it (the capsule's place, jump to latest, the + menu).
     val composerHost = remember { SessionComposerHost() }
     val importer = rememberSessionAttachmentImporter(store)
-    val anchorScope = rememberCoroutineScope()
-    val modelPickerAnchors = remember { ModelPickerAnchors(anchorScope) }
     val colors = OpenCodeTheme.colors
     val density = LocalDensity.current
     // The New Plus Menu (graduated in iOS p217): the + menu grows into the photo sheet, and a hold on + peeks.
@@ -257,7 +252,6 @@ fun SessionView(
         composerHost.borrowedDrag = scrollEdgeBridge.borrowedDrag
         composerHost.isImportingAttachments = importer.isLoadingImages || importer.isLoadingFiles
         composerHost.importer = importer
-        composerHost.modelPickerAnchors = modelPickerAnchors
         composerHost.headerHeight = headerHeight
         if (composerHost.pendingAttachmentsRow == null) composerHost.pendingAttachmentsRow = { expanded -> SessionPendingAttachments(store, composerHost.sendTransition.images, expanded) }
     }
@@ -365,7 +359,7 @@ fun SessionView(
                 // Its photos fly into their slots above the words (iOS installs the copies in the window).
                 SentImageFlightOverlay(composerHost.sendTransition.images, Modifier.matchParentSize())
                 RequestPanelRoomProbe(composerHost, Modifier.matchParentSize())
-                SessionModelPickerOverlays(store, modelPickerAnchors, headerHeight, composerHost.attachmentAnchors.composer)
+                SessionModelPickerOverlays(store, headerHeight)
             }
         }
         SessionAttachmentMenu(store, composerHost, importer, photoSheet)

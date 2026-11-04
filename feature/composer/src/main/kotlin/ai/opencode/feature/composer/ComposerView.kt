@@ -196,7 +196,6 @@ fun ComposerView(
                             if (!state.isAnsweringRequest) {
                                 ModelPickerChip(
                                     state = state.modelPicker,
-                                    usesModelPickerSheet = false,
                                     onClick = { send(ComposerFeature.Action.ModelChipTapped) },
                                 )
                             }

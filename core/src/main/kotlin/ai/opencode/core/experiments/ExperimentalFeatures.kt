@@ -3,14 +3,12 @@ package ai.opencode.core.experiments
 import ai.opencode.core.sharing.SharedKey
 import ai.opencode.core.sharing.SharedStore
 import ai.opencode.core.sharing.experimental
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 
 /**
  * Settings' half of iOS `OpenCode/Settings/ExperimentalFeatures.swift`, in `:core` beside the
  * registry itself (`ai.opencode.core.sharing.ExperimentalFeature`, `experimental(feature)`,
- * `ExperimentalFeatures`): the groups, Call Style, Model Picker and the launch migrations of
- * removed switches. The typealiases let code import everything experimental from this package.
+ * `ExperimentalFeatures`): the groups, Call Style and the launch migrations of removed
+ * switches. The typealiases let code import everything experimental from this package.
  */
 typealias ExperimentalFeature = ai.opencode.core.sharing.ExperimentalFeature
 typealias ExperimentalFeatures = ai.opencode.core.sharing.ExperimentalFeatures
@@ -133,85 +131,40 @@ enum class ExperimentalCallStyle {
     }
 }
 
+/** The removed Model Picker menu's saved style (`today`, `sheet`, `one-picker`, `grow-from-composer`). */
+const val LEGACY_MODEL_PICKER_KEY = "experimental-model-picker"
+
 /**
- * Settings' one Model Picker choice: the model chip opens today's menu, a stock sheet with each
- * model's level (`ModelPickerSheet`), One Picker, or the composer grows into the custom picker
- * (WIP). Replaced the New Model Picker and Custom Model Picker switches; [migrateLegacySwitches]
- * carries them over.
+ * The switches the Model Picker menu replaced: New Model Picker (Sheet) and Custom Model Picker
+ * (Grow from Composer).
  */
-@Serializable
-enum class ModelPickerStyle(val rawValue: String) {
-    @SerialName("today") today("today"),
-    @SerialName("sheet") sheet("sheet"),
-    @SerialName("one-picker") onePicker("one-picker"),
-    @SerialName("grow-from-composer") growFromComposer("grow-from-composer");
+val legacyModelPickerSwitchKeys = listOf("experimental-new-model-picker", "experimental-custom-model-picker")
 
-    val id: String get() = rawValue
-
-    val title: String
-        get() = when (this) {
-            today -> "Today"
-            sheet -> "Sheet"
-            onePicker -> "One Picker"
-            growFromComposer -> "Grow from Composer"
-        }
-
-    val summary: String
-        get() = when (this) {
-            today -> "The built-in model menu"
-            sheet -> "Pick a model in a sheet"
-            onePicker -> "Favorites, recents, and bottom search"
-            growFromComposer -> "Composer grows into a model picker"
-        }
-
-    companion object {
-        const val STORAGE_KEY = "experimental-model-picker"
-        const val LEGACY_SHEET_KEY = "experimental-new-model-picker"
-        const val LEGACY_GROW_KEY = "experimental-custom-model-picker"
-
-        /** The style the old switches meant. Custom Model Picker won when both were on. */
-        fun of(newModelPicker: Boolean, customModelPicker: Boolean): ModelPickerStyle =
-            if (customModelPicker) growFromComposer else if (newModelPicker) sheet else today
-
-        /**
-         * Moves the old New Model Picker and Custom Model Picker switches into the style once,
-         * then removes them. A style already chosen stays.
-         */
-        fun migrateLegacySwitches(store: SharedStore) {
-            val sheetKey = SharedKey.appStorage(LEGACY_SHEET_KEY, false)
-            val growKey = SharedKey.appStorage(LEGACY_GROW_KEY, false)
-            val sheet = store.contains(sheetKey)
-            val grow = store.contains(growKey)
-            if (!sheet && !grow) return
-            if (!store.contains(key)) {
-                val style = of(store.reference(sheetKey).value, store.reference(growKey).value)
-                if (style != today) store.reference(key).set(style)
-            }
-            store.remove(sheetKey)
-            store.remove(growKey)
-        }
-
-        /** The style in use. iOS lab runs may override it; Android uses the saved one. */
-        fun active(stored: ModelPickerStyle): ModelPickerStyle = stored
-
-        /**
-         * `model-picker=sheet` (or `=grow-from-composer`, `=today`) in an experiments list; the
-         * old `new-model-picker` and `custom-model-picker` names still pick Sheet and Grow from
-         * Composer, and `one-picker` picks One Picker.
-         */
-        fun labStyle(experiments: String): ModelPickerStyle? {
-            val names = experiments.split(",").map { it.trim() }.toSet()
-            names.firstNotNullOfOrNull { name ->
-                if (!name.startsWith("model-picker=")) null
-                else entries.firstOrNull { it.rawValue == name.removePrefix("model-picker=") }
-            }?.let { return it }
-            if ("one-picker" in names) return onePicker
-            if ("custom-model-picker" in names) return growFromComposer
-            if ("new-model-picker" in names) return sheet
-            return null
-        }
-
-        /** Settings › Experimental › Model Picker. Today by default. Lazy: the enum serializer isn't ready during companion init. */
-        val key: SharedKey<ModelPickerStyle> by lazy { SharedKey.appStorage(STORAGE_KEY, today) }
+/**
+ * iOS `ExperimentalFeature.migrateModelPicker(in:)`: moves a saved Model Picker style, or the
+ * older switches before it, to One Picker once, then removes them. Sheet and Grow from Composer
+ * are gone (iOS 0fbb99f8), and any of them but Today means One Picker. (Fully qualified: a
+ * typealias can't reach the enum's companion.)
+ */
+fun ai.opencode.core.sharing.ExperimentalFeature.Companion.migrateModelPicker(store: SharedStore) {
+    val styleKey = SharedKey.appStorage<String?>(LEGACY_MODEL_PICKER_KEY, null)
+    val switchKeys = mutableListOf<SharedKey<Boolean>>()
+    for (name in legacyModelPickerSwitchKeys) {
+        switchKeys.add(SharedKey.appStorage(name, false))
     }
+    var anySaved = store.contains(styleKey)
+    for (key in switchKeys) {
+        if (store.contains(key)) anySaved = true
+    }
+    if (!anySaved) return
+
+    val style = if (store.contains(styleKey)) store.reference(styleKey).value else null
+    var picksOnePicker = style != null && style != "today"
+    for (key in switchKeys) {
+        if (store.contains(key) && store.reference(key).value) picksOnePicker = true
+    }
+    if (picksOnePicker) store.reference(experimental(ExperimentalFeature.onePicker)).set(true)
+
+    store.remove(styleKey)
+    for (key in switchKeys) store.remove(key)
 }

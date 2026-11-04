@@ -2,7 +2,7 @@ package ai.opencode.feature.composer
 
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.rememberReduceMotion
-import ai.opencode.feature.composer.modelpicker.FusedModelPickerTunables
+import ai.opencode.feature.composer.modelpicker.ModelPickerTunables
 import ai.opencode.feature.composer.plusmenu.PhotoFlights
 import ai.opencode.feature.composer.plusmenu.PhotoLibraryAccessHost
 import ai.opencode.feature.composer.plusmenu.PlusCameraPresentation
@@ -101,7 +101,7 @@ fun ComposerMorphPhotoSheet(
     val currentNavigationBottom by rememberUpdatedState(navigationBottom)
     val currentOnDismiss by rememberUpdatedState(onDismiss)
 
-    /** iOS `modelSheetTop(composer:)`: the compact detent's top (root dp). */
+    /** iOS `composerSheetTop(composer:)`: the compact detent's top (root dp). */
     fun compactTop(): Float {
         val composer = anchors.composer
         val keyboard = currentImeBottom / px
@@ -110,7 +110,7 @@ fun ComposerMorphPhotoSheet(
         val focused = currentHadKeyboard
         val composerTop = composer.top / px
         if (focused && software) return composerTop
-        val minLift = max(ComposerMorphTunables.leastLift, FusedModelPickerTunables.mediumMax - max(composer.height / px.toDouble(), 56.0)).toFloat()
+        val minLift = max(ComposerMorphTunables.leastLift, ModelPickerTunables.mediumMax - max(composer.height / px.toDouble(), 56.0)).toFloat()
         val lift = if (software) keyboard - safeBottom else minLift
         val bar = if (focused) max(keyboard - safeBottom, 0f) else 0f
         return composerTop - max(lift - bar, 0f)

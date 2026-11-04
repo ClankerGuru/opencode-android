@@ -77,60 +77,6 @@ data class ModelPickerSection(val kind: Kind, val models: List<OpenCodeModel>) {
             byProvider.forEach { (id, list) -> sections += ModelPickerSection(Kind.Provider(id), list) }
             return sections
         }
-
-        /**
-         * Fused + Stack sections: Favorites, then Recent (up to [recentLimit], keeping the current
-         * model visible if it isn't in Favorites), then All Models for the remaining catalog
-         * entries. Searching returns a single flat ranked section.
-         */
-        fun fusedSections(
-            models: List<OpenCodeModel>,
-            favorites: Set<String>,
-            recents: List<String> = emptyList(),
-            currentModelID: String? = null,
-            filter: String = "",
-            recentLimit: Int = 3,
-            includeAllModels: Boolean = true,
-        ): List<ModelPickerSection> {
-            val needle = filter.trim()
-            if (needle.isNotEmpty()) {
-                val ranked = ModelSearch.rank(models, needle, favorites, recents, parseLevel = true)
-                if (ranked.isEmpty()) return emptyList()
-                return listOf(ModelPickerSection(Kind.SearchResults, ranked.take(24)))
-            }
-            val byID = LinkedHashMap<String, OpenCodeModel>()
-            for (model in models) byID.putIfAbsent(model.id, model)
-            val favModels = models.filter { it.id in favorites }
-            val favIDs = favModels.mapTo(HashSet()) { it.id }
-
-            var recentModels = mutableListOf<OpenCodeModel>()
-            val seenRecent = HashSet<String>()
-            for (id in recents) {
-                if (id in favIDs) continue
-                if (!seenRecent.add(id)) continue
-                val model = byID[id] ?: continue
-                recentModels += model
-                if (recentModels.size >= maxOf(0, recentLimit)) break
-            }
-            if (currentModelID != null && currentModelID !in favIDs && recentModels.none { it.id == currentModelID }) {
-                byID[currentModelID]?.let { currentModel ->
-                    recentModels.add(0, currentModel)
-                    if (recentLimit > 0 && recentModels.size > recentLimit) {
-                        recentModels = recentModels.take(recentLimit).toMutableList()
-                    }
-                }
-            }
-
-            val sections = mutableListOf<ModelPickerSection>()
-            if (favModels.isNotEmpty()) sections += ModelPickerSection(Kind.Favorites, favModels)
-            if (recentModels.isNotEmpty()) sections += ModelPickerSection(Kind.Recent, recentModels)
-            if (includeAllModels) {
-                val shownIDs = favIDs + recentModels.map { it.id }
-                val remaining = models.filter { it.id !in shownIDs }
-                if (remaining.isNotEmpty()) sections += ModelPickerSection(Kind.AllModels, remaining)
-            }
-            return sections
-        }
     }
 }
 
@@ -212,25 +158,6 @@ data class ModelPickerState(
     val modelSections: List<ModelPickerSection>
         get() = ModelPickerSection.sections(models, favoriteModelIDs, modelFilter)
 
-    /**
-     * The New Model Picker's sheet: Favorites, then Recent from [recents] (the sheet passes the
-     * list as it opened, so it never reorders while open), then each provider.
-     */
-    fun modelSheetSections(recents: List<String>, recentLimit: Int): List<ModelPickerSection> =
-        ModelPickerSection.sections(pickerModels, favoriteModelIDs, modelFilter, recents, recentLimit)
-
-    /** The Fused + Stack sections (`Favorites`, `Recent`, `All Models`, or flat search matches). */
-    fun fusedModelSections(recentLimit: Int = 3, includeAllModels: Boolean = true): List<ModelPickerSection> =
-        ModelPickerSection.fusedSections(
-            models = models,
-            favorites = favoriteModelIDs,
-            recents = recentModelIDs,
-            currentModelID = currentModelInfo?.id,
-            filter = modelFilter,
-            recentLimit = recentLimit,
-            includeAllModels = includeAllModels,
-        )
-
     /** The current model's levels, when it has any to choose between. */
     val currentLevelScale: ModelLevelScale?
         get() {
@@ -259,7 +186,7 @@ data class ModelPickerState(
         }
 
     /**
-     * The level shown for [model] on its row (and picked when tapping its name): a level parsed
+     * The level shown for [model] on its row in One Picker (and picked when tapping its name): a level parsed
      * from the search query when searching, else the active level for the current model, else
      * the remembered variant in [modelVariants], else null (`"Default"`).
      */
@@ -277,17 +204,6 @@ data class ModelPickerState(
         if (saved != null && saved != "default" && saved in model.variants) return saved
         return null
     }
-
-    // The composer chip's words (`SessionView+ComposerControls.swift`), kept beside the values
-    // they read so the session area's chip says exactly what iOS's does.
-
-    /** The Sheet style's chip words before the chevron: `"<Short name> <Level>"` (no level without variants). */
-    val sheetChipText: String
-        get() = listOfNotNull(currentModelShortName, currentChipLevelLabel).joinToString(" ")
-
-    /** The Sheet style's chip TalkBack value: `"Cirrus 4, High"`. */
-    val sheetChipAccessibilityValue: String
-        get() = listOfNotNull(currentModelShortName, currentChipLevelLabel).joinToString(", ")
 }
 
 /**

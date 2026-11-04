@@ -1,7 +1,6 @@
 package ai.opencode.feature.session
 
 import ai.opencode.feature.composer.modelpicker.ModelDisplayNames
-import ai.opencode.feature.composer.modelpicker.ModelPickerSection
 import ai.opencode.feature.composer.modelpicker.ModelPickerState
 import ai.opencode.feature.composer.RequestDockFeature
 import ai.opencode.feature.composer.DraftState
@@ -514,10 +513,6 @@ val State.currentLevelScale: ModelLevelScale? get() = modelPicker.currentLevelSc
 
 /** iOS `currentLevel`: the current level; null is the model's default. */
 val State.currentLevel: String? get() = modelPicker.currentLevel
-
-/** iOS `modelSheetSections(recents:recentLimit:)`. */
-fun State.modelSheetSections(recents: List<String>, recentLimit: Int): List<ModelPickerSection> =
-    modelPicker.modelSheetSections(recents, recentLimit)
 
 /**
  * iOS `rememberedLevel(for:)`: the level shown for [model] on its row in the list (and picked when

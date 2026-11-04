@@ -33,8 +33,7 @@ import kotlin.time.Duration.Companion.seconds
  * Port of iOS `HomeChildFeatureTests.swift`: Home's child features, `HomeNotificationsFeature` and
  * `HomeConnectionFeature`, on their own.
  *
- * Not ported here (`HomeSettingsFeature` is `:feature:settings`'): `settingsChecksSupportForItsScopedServer`
- * and `modelPickerStyleIsOneSetting`.
+ * Not ported here (`HomeSettingsFeature` is `:feature:settings`'): `settingsChecksSupportForItsScopedServer`.
  *
  * `notificationPermissionDecisionIsOwnedByChild` is parameterized in iOS; each permission runs in
  * turn inside the one method.

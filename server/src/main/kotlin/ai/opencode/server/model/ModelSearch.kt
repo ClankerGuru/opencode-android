@@ -100,7 +100,7 @@ object ModelSearch {
         val index: Int,
     )
 
-    /** [parseLevel] (the Fused + Stack picker only) also scores the query without a level word, favouring models that offer that level. */
+    /** [parseLevel] (One Picker only) also scores the query without a level word, favouring models that offer that level. */
     fun rank(
         models: List<OpenCodeModel>,
         query: String,

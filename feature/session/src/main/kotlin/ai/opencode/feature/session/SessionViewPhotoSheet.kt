@@ -14,7 +14,6 @@ import ai.opencode.feature.composer.ComposerMorph
 import ai.opencode.feature.composer.ComposerMorphGeometry
 import ai.opencode.feature.composer.ComposerMorphSurface
 import ai.opencode.feature.composer.ComposerMorphTunables
-import ai.opencode.feature.composer.modelpicker.FusedModelPickerTunables
 import ai.opencode.feature.composer.modelpicker.ModelPickerTunables
 import ai.opencode.feature.composer.plusmenu.PhotoFlights
 import ai.opencode.feature.composer.plusmenu.PhotoLibraryAccessHost
@@ -179,17 +178,18 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
         get() = env.host?.attachmentAnchors?.composer?.takeIf { it != Rect.Zero }?.translate(env.rootOffset)
 
     /**
-     * iOS `modelSheetTop(composer:)` (dp): with the keyboard up the sheet takes its place, from the
-     * composer's top; without one it stands `leastLift` (or the fused list's medium height) above.
+     * iOS `composerSheetTop(composer:)` (dp): where a sheet grown from the composer rests: the
+     * composer's top with the keyboard up; with it down, as high as the composer would stand over
+     * the keyboard or `mediumMax` (470 dp).
      */
-    fun modelSheetTop(composer: Rect): Float {
+    private fun composerSheetTop(composer: Rect): Float {
         val d = env.density
         val keyboard = env.imeBottomPx / d
         val software = keyboard > 120
         val focused = env.host?.messageFieldFocused == true
         val composerTop = composer.top / d
         if (focused && software) return composerTop
-        val minLift = max(ComposerMorphTunables.leastLift, FusedModelPickerTunables.mediumMax - max(composer.height / d, 56f)).toFloat()
+        val minLift = max(ComposerMorphTunables.leastLift, ModelPickerTunables.mediumMax - max(composer.height / d, 56f)).toFloat()
         val bottom = env.navigationBottomPx / d
         val lift = if (software) keyboard - bottom else minLift
         val bar = if (focused) max(keyboard - bottom, 0f) else 0f
@@ -201,7 +201,7 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
     private fun withMeasuredDetent(): PlusPhotoSheetDetent {
         val next = detent.copy()
         next.ceiling = ceiling
-        if (next.compactTop <= 0) next.compactTop = modelSheetTop(composerAnchor())
+        if (next.compactTop <= 0) next.compactTop = composerSheetTop(composerAnchor())
         return next
     }
 
@@ -226,7 +226,7 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
         library.resetClosingPicks()
         menuTakesBack = false
         if (usesPlusMenuSheet) flights.cancelAll()
-        val compactTop = modelSheetTop(host.attachmentAnchors.composer)
+        val compactTop = composerSheetTop(host.attachmentAnchors.composer)
         if (!morph.isOpening) source = menu
         detent = PlusPhotoSheetDetent().also { it.open(compactTop, ceiling) }
         snapTop(compactTop)

@@ -104,7 +104,7 @@ class ExperimentalFeatureTests {
             ExperimentalGroup.entries.flatMap { it.features }.toSet(),
         )
         assertEquals(
-            listOf(ExperimentalFeature.agentSelection, ExperimentalFeature.hideModels),
+            listOf(ExperimentalFeature.onePicker, ExperimentalFeature.agentSelection, ExperimentalFeature.hideModels),
             ExperimentalGroup.composer.features,
         )
         assertEquals(
@@ -159,63 +159,37 @@ class ExperimentalFeatureTests {
     }
 
     @Test
-    fun modelPickerStyleReplacesTheTwoModelPickerSwitches() {
-        assertEquals(listOf("Today", "Sheet", "One Picker", "Grow from Composer"), ModelPickerStyle.entries.map { it.title })
-        assertEquals(ModelPickerStyle.today, ModelPickerStyle.of(newModelPicker = false, customModelPicker = false))
-        assertEquals(ModelPickerStyle.sheet, ModelPickerStyle.of(newModelPicker = true, customModelPicker = false))
-        assertEquals(ModelPickerStyle.growFromComposer, ModelPickerStyle.of(newModelPicker = false, customModelPicker = true))
-        assertEquals(
-            "Custom Model Picker won when both were on",
-            ModelPickerStyle.growFromComposer,
-            ModelPickerStyle.of(newModelPicker = true, customModelPicker = true),
-        )
-        for (style in ModelPickerStyle.entries) {
-            assertTrue(style.summary.split(" ").size <= 6)
-        }
-    }
-
-    @Test
-    fun modelPickerStyleMigratesTheOldSwitchesOnce() {
-        fun migrated(setup: (SharedStore) -> Unit): Pair<String?, Boolean> = withFreshStorage {
+    fun aSavedSheetOrGrowBecomesOnePickerOnce() {
+        fun migrated(setup: (SharedStore) -> Unit): Pair<Boolean, Boolean> = withFreshStorage {
             val defaults = dependency(SharedStore)
             setup(defaults)
-            ModelPickerStyle.migrateLegacySwitches(defaults)
-            val leftovers = defaults.has(ModelPickerStyle.LEGACY_SHEET_KEY) || defaults.has(ModelPickerStyle.LEGACY_GROW_KEY)
-            val stored = if (defaults.contains(ModelPickerStyle.key)) defaults.reference(ModelPickerStyle.key).value.rawValue else null
-            stored to leftovers
+            ExperimentalFeature.migrateModelPicker(defaults)
+            val keys = listOf(LEGACY_MODEL_PICKER_KEY) + legacyModelPickerSwitchKeys
+            var leftover = false
+            for (key in keys) {
+                if (defaults.contains(SharedKey.appStorage<String?>(key, null))) leftover = true
+            }
+            defaults.bool("experimental-one-picker") to leftover
         }
-        assertEquals(null to false, migrated { })
-        assertEquals("sheet" to false, migrated { it.save(ModelPickerStyle.LEGACY_SHEET_KEY, true) })
-        assertEquals(
-            "grow-from-composer" to false,
-            migrated {
-                it.save(ModelPickerStyle.LEGACY_SHEET_KEY, true)
-                it.save(ModelPickerStyle.LEGACY_GROW_KEY, true)
-            },
-        )
-        assertEquals(null to false, migrated { it.save(ModelPickerStyle.LEGACY_GROW_KEY, false) })
-        assertEquals(
-            "A style already chosen stays",
-            "today" to false,
-            migrated {
-                it.reference(SharedKey.appStorage<ModelPickerStyle?>(ModelPickerStyle.STORAGE_KEY, null)).set(ModelPickerStyle.today)
-                it.save(ModelPickerStyle.LEGACY_GROW_KEY, true)
-            },
-        )
-    }
+        fun SharedStore.saveStyle(style: String) = reference(SharedKey.appStorage<String?>(LEGACY_MODEL_PICKER_KEY, null)).set(style)
 
-    @Test
-    fun labExperimentsPickAModelPickerStyle() {
-        assertNull(ModelPickerStyle.labStyle(""))
-        assertNull(ModelPickerStyle.labStyle("in-app-browser"))
-        assertEquals(ModelPickerStyle.sheet, ModelPickerStyle.labStyle("model-picker=sheet"))
-        assertEquals(ModelPickerStyle.onePicker, ModelPickerStyle.labStyle("model-picker=one-picker"))
-        assertEquals(ModelPickerStyle.onePicker, ModelPickerStyle.labStyle("one-picker"))
-        assertEquals(ModelPickerStyle.growFromComposer, ModelPickerStyle.labStyle("in-app-browser,model-picker=grow-from-composer"))
-        assertEquals(ModelPickerStyle.today, ModelPickerStyle.labStyle("model-picker=today,custom-model-picker"))
-        assertEquals(ModelPickerStyle.sheet, ModelPickerStyle.labStyle("new-model-picker"))
-        assertEquals(ModelPickerStyle.growFromComposer, ModelPickerStyle.labStyle("custom-model-picker"))
-        assertEquals(ModelPickerStyle.growFromComposer, ModelPickerStyle.labStyle("new-model-picker,custom-model-picker"))
+        assertEquals(false to false, migrated { })
+        assertEquals(false to false, migrated { it.saveStyle("today") })
+        for (style in listOf("sheet", "one-picker", "grow-from-composer")) {
+            assertEquals(style, true to false, migrated { it.saveStyle(style) })
+        }
+        for (key in legacyModelPickerSwitchKeys) {
+            assertEquals(key, true to false, migrated { it.save(key, true) })
+            assertEquals(key, false to false, migrated { it.save(key, false) })
+        }
+        assertEquals(
+            "One Picker already on stays on",
+            true to false,
+            migrated {
+                it.saveStyle("today")
+                it.save("experimental-one-picker", true)
+            },
+        )
     }
 
     @Test

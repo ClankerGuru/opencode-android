@@ -1,7 +1,6 @@
 package ai.opencode.feature.session
 
 import ai.opencode.core.experiments.ExperimentalCallStyle
-import ai.opencode.core.experiments.ModelPickerStyle
 import ai.opencode.core.experiments.key
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
@@ -209,9 +208,7 @@ class SessionComposerHost {
     var isImportingAttachments by mutableStateOf(false)
     /** iOS `pendingAttachmentsRow` (VIEW-PICKERS): shown above the field when the composer has attachments. */
     var pendingAttachmentsRow: (@Composable (composerExpanded: Boolean) -> Unit)? by mutableStateOf(null)
-    /** Model Picker › Grow from Composer: the chip's level stack and label flight (iOS `modelPickerAnchors`). */
-    var modelPickerAnchors: ai.opencode.feature.composer.modelpicker.ModelPickerAnchors? by mutableStateOf(null)
-    /** Grow from Composer's panels (iOS `modelList`, `modelSheet`, `levelPanel`), set by `SessionModelPickerOverlays`. */
+    /** One Picker's panel (iOS `onePicker`), set by `SessionModelPickerOverlays`. */
     internal var modelPanels: SessionModelPanels? by mutableStateOf(null)
     /** Composer Autocomplete's suggestions are open (iOS `autocompleteController.isOpen`), set by the composer. */
     internal var autocompleteCovers by mutableStateOf(false)
@@ -220,9 +217,9 @@ class SessionComposerHost {
      * `SessionFloatingCallCoverage`. The composer and its pills hide under it.
      */
     internal var floatingCallCovers by mutableStateOf(false)
-    /** iOS `composerPanelCovers`: a panel grown out of the composer (model list, level panel, suggestions), or the Living Orb's card, stands over what sits above it. */
+    /** iOS `composerPanelCovers`: a panel grown out of the composer (One Picker, suggestions), or the Living Orb's card, stands over what sits above it. */
     val composerPanelCovers: Boolean get() = modelPanels?.covers == true || autocompleteCovers || floatingCallCovers
-    /** The model list or level panel is shown: the composer stays expanded under it. */
+    /** One Picker is shown: the composer stays expanded under it. */
     val keepsComposerExpanded: Boolean get() = modelPanels?.keepsComposerExpanded == true
     /** A panel or overlay owns downward drags now (iOS `composerSwipeYields`' panels). */
     val swipeYields: Boolean get() = modelPanels?.swipeYields == true
@@ -234,10 +231,6 @@ class SessionComposerHost {
     /** iOS `UIAccessibility.post(notification: .announcement, argument:)`. */
     fun announce(text: String) = announcer(text)
 
-    /** iOS `openModelList` (the Grow from Composer chip): the model list grows out of the composer. */
-    fun openModelList() {
-        modelPanels?.openModelList()
-    }
     /** The screen's imports (iOS `imageImporter`/`fileImporter`): pastes and drops on the field start them. */
     var importer: SessionAttachmentImporter? by mutableStateOf(null)
     /**
@@ -463,7 +456,7 @@ fun SessionComposer(
     val view = remember { SessionComposerViewState() }
     val snapshot by store.observe { ComposerSnapshot.of(it) }
     val returnKeySends by remember(store) { store.state.returnKeySends.flow }.collectAsState(store.state.returnKeySends.value)
-    val modelPickerStyle by remember { shared(ModelPickerStyle.key).flow }.collectAsState(shared(ModelPickerStyle.key).value)
+    val onePickerSetting by remember { shared(ExperimentalFeature.onePicker.key).flow }.collectAsState(false)
     val agentSelection by remember { shared(ExperimentalFeature.agentSelection.key).flow }
         .collectAsState(false)
     val autocomplete by store.observe { it.autocomplete }
@@ -488,7 +481,7 @@ fun SessionComposer(
         s = snapshot,
         reducedMotion = reducedMotion,
         returnKeySends = returnKeySends,
-        modelPickerStyle = ModelPickerStyle.active(modelPickerStyle),
+        usesOnePicker = ExperimentalFeature.onePicker.isActive(onePickerSetting),
         agentSelection = ExperimentalFeature.agentSelection.isActive(agentSelection),
         autocomplete = autocomplete,
         focus = {
@@ -624,7 +617,8 @@ internal class SessionComposerEnv(
     val s: ComposerSnapshot,
     val reducedMotion: Boolean,
     val returnKeySends: Boolean,
-    val modelPickerStyle: ModelPickerStyle,
+    /** iOS `usesOnePicker`: Experimental › One Picker is on. */
+    val usesOnePicker: Boolean,
     val agentSelection: Boolean,
     val autocomplete: ComposerAutocompleteState,
     val focus: () -> Unit,
@@ -918,10 +912,10 @@ internal class SessionComposerEnv(
 
 @Composable
 private fun SessionComposerEnv.ComposerArea(modifier: Modifier) {
-    // iOS `composerArea`: only this subtree follows the keyboard's frames. Focus (the field's, or
-    // the model search holding the keys) opens the row on the keyboard's spring.
+    // iOS `composerArea`: only this subtree follows the keyboard's frames. The field's focus
+    // opens the row on the keyboard's spring.
     ComposerKeyboardMorph(
-        focused = messageFieldFocused || host.modelPanels?.modelSearchHoldsKeyboard == true,
+        focused = messageFieldFocused,
         expanded = composerPresentation.expanded,
         pinned = composerPinnedExpanded,
         reducedMotion = reducedMotion,
@@ -1212,7 +1206,7 @@ private fun SessionComposerEnv.ComposerCapsule() {
         onExpandTranscript = {
             host.closeAttachmentMenu()
             host.modelPanels?.closeOthersForModelPanel()
-            host.modelPanels?.closeModelPanels() ?: host.modelPickerAnchors?.resetFusedState()
+            host.modelPanels?.closeModelPanels()
         },
     ) {
         Box(

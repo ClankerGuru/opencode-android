@@ -5,7 +5,6 @@ import ai.opencode.feature.voice.FloatingCallCenter
 import ai.opencode.feature.voice.VoiceFeature
 import ai.opencode.feature.voice.callTrayMic
 import ai.opencode.feature.voice.floatingCallButton
-
 import ai.opencode.feature.composer.ComposerKeyboardReveal
 import ai.opencode.feature.composer.LocalComposerKeyboardMorph
 import ai.opencode.feature.composer.MicPressCallbacks
@@ -20,7 +19,6 @@ import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.excludedFromDrawerPan
 import ai.opencode.core.ui.openCodeTapTarget
 import ai.opencode.feature.session.SessionFeature.Action
-import ai.opencode.core.experiments.ModelPickerStyle
 import ai.opencode.feature.composer.AttachmentMenuPhase
 import ai.opencode.feature.composer.AttachmentPickerButton
 import ai.opencode.feature.composer.ComposerAgentChip
@@ -29,7 +27,6 @@ import ai.opencode.feature.composer.RequestDockMetrics
 import ai.opencode.feature.composer.SelectionMark
 import ai.opencode.feature.composer.SelectionMarkWidth
 import ai.opencode.feature.composer.micPressGesture
-import ai.opencode.feature.composer.modelpicker.FusedModelChip
 import ai.opencode.feature.composer.modelpicker.ModelPickerChip
 import ai.opencode.feature.composer.modelpicker.OnePickerChip
 import ai.opencode.feature.composer.modelpicker.OnePickerController
@@ -144,34 +141,15 @@ private fun SessionComposerEnv.AgentButton() {
 }
 
 /**
- * The model control (iOS `modelButton`): Model Picker › Today and › Sheet show composer's
- * [ModelPickerChip]; › Grow from Composer its [FusedModelChip] (tap opens the list, a vertical
- * drag raises the level stack, a sideways drag scrubs the level); › One Picker its [OnePickerChip]
- * (tap grows One Picker out of the composer).
+ * The model control (iOS `modelButton`): composer's [ModelPickerChip] (tap opens the model
+ * picker sheet); with One Picker on, its [OnePickerChip] (tap grows One Picker out of the
+ * composer).
  */
 @Composable
 private fun SessionComposerEnv.ModelButton(enabled: Boolean) {
     val picker = rememberModelPickerState(store)
-    val anchors = host.modelPickerAnchors
     ComposerHidden(foldsComposerControls) {
-        if (modelPickerStyle == ModelPickerStyle.growFromComposer && anchors != null) {
-            FusedModelChip(
-                state = picker,
-                anchors = anchors,
-                composerTop = host.attachmentAnchors.composer.top,
-                onEvent = { event -> modelPickerAction(event)?.let(store::send) },
-                // iOS `openModelList`: the list grows out of the composer as the sheet it morphs into.
-                onOpenList = {
-                    if (host.modelPanels != null) {
-                        host.openModelList()
-                    } else {
-                        dismissKeyboard()
-                        store.send(Action.ModelButtonTapped)
-                    }
-                },
-                isEnabled = enabled && host.modelPanels?.modelList?.isOpen != true,
-            )
-        } else if (modelPickerStyle == ModelPickerStyle.onePicker) {
+        if (usesOnePicker) {
             val panels = host.modelPanels
             val unmounted = remember { OnePickerController() }
             OnePickerChip(
@@ -190,10 +168,8 @@ private fun SessionComposerEnv.ModelButton(enabled: Boolean) {
                 isEnabled = enabled && panels?.onePicker?.isOpen != true,
             )
         } else {
-            val usesSheet = modelPickerStyle == ModelPickerStyle.sheet
             ModelPickerChip(
                 state = picker,
-                usesModelPickerSheet = usesSheet,
                 onClick = {
                     if (!enabled) return@ModelPickerChip
                     // Put away under any picker sheet (iOS 07b2f5f8), or a row's level menu raises the

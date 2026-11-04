@@ -6,6 +6,7 @@ import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeIconSize
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.core.ui.ProviderIcon as CoreProviderIcon
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.openCodeTapTarget
 import ai.opencode.feature.composer.OpenCodeBottomSheet
@@ -13,286 +14,98 @@ import ai.opencode.server.model.ModelProviderGroup
 import ai.opencode.server.model.ModelVariant
 import ai.opencode.server.model.OpenCodeModel
 import android.view.accessibility.AccessibilityManager
-import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.SheetValue
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.input.pointer.util.addPointerInputChange
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlin.math.min
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * Port of iOS `ModelPickerSheet` (`Composer/ModelPicker/ModelPickerSheet.swift`): the model
- * picker under Model Picker › Sheet (OC-469). A stock sheet listing Favorites, Recent and then
- * each provider's models, searchable, with each model's thinking level as a menu on its row.
- * Tapping a row picks that model at its level and closes the sheet ([ModelPickerEvent.ModelPickedWithLevel]);
- * choosing a level picks the model at that level and leaves the sheet open
- * ([ModelPickerEvent.ModelLevelPicked]). The reducer plays `.selection` only when the model or
- * level changes. No custom glass, gestures or motion.
- *
- * Also here, from `Session/SessionView+ModelPicker.swift` (whose views the session area owns but
- * which compose these leaves): [ModelPickerDetentsSheet] (`ModelPickerDetents`), the Today
- * picker [PlainModelPickerSheet] (`plainModelPicker` and its **Thinking** menu) and the chip
- * ([ModelPickerChip], `SessionView+ComposerControls.swift`).
+ * The Today model picker and its leaves, from iOS `Session/SessionView+ModelPicker.swift`
+ * (`plainModelPicker`, `ModelPickerDetents`) and `SessionView+ComposerControls.swift` (the chip):
+ * [ModelPickerDetentsSheet], [PlainModelPickerSheet] with its **Thinking** menu, and
+ * [ModelPickerChip]. The session area owns those iOS views; they live here because the composer's
+ * standalone [ai.opencode.feature.composer.ComposerView] and One Picker's sheet host compose them
+ * too. iOS's Today picker searches with `.searchable`; here [ModelSearchCapsuleField] stands in.
+ * They used to sit in `ModelPickerSheet.kt` beside the Sheet picker, deleted with iOS 0fbb99f8.
  */
-@Composable
-fun ModelPickerSheet(
-    state: ModelPickerState,
-    onEvent: (ModelPickerEvent) -> Unit,
-) {
-    // Recent as it was when the sheet opened: picks made in it land in Recent next time, so
-    // rows never move under a finger.
-    val recentsAtOpen = remember { state.recentModelIDs }
-    // Once per redraw, not per row: the sections walk the whole catalogue, and the current model is a search of it.
-    val sections = state.modelSheetSections(recentsAtOpen, roundHalfAwayFromZero(FusedModelPickerTunables.recents).toInt())
-    val currentID = state.currentModelInfo?.id
-    val favorites = state.favoriteModelIDs
-
-    ModelPickerDetentsSheet(onClose = { onEvent(ModelPickerEvent.Dismiss) }, onClosed = { onEvent(ModelPickerEvent.ModelListClosed) }) {
-        @Suppress("NAME_SHADOWING") val onEvent = closingAfterHide(onEvent)
-        Column(Modifier.fillMaxSize().testTag("screen-Model Picker")) {
-            ModelSheetTitleBar(
-                title = "Model",
-                trailing = { TextButton(onClick = { onEvent(ModelPickerEvent.Dismiss) }) { Text("Done", fontWeight = FontWeight.SemiBold) } },
-            )
-            ModelSearchCapsuleField(
-                text = state.modelFilter,
-                onTextChange = { onEvent(ModelPickerEvent.FilterChanged(it)) },
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                minHeight = 44.0,
-            )
-            Box(Modifier.fillMaxWidth().weight(1f)) {
-                LazyColumn(Modifier.fillMaxSize()) {
-                    for (section in sections) {
-                        item(key = "header-${section.id}") { SheetSectionHeader(section.title) }
-                        items(section.models, key = { "${section.id}-${it.id}" }) { model ->
-                            SheetModelRow(model, section.kind, state, isCurrent = model.id == currentID, isFavorite = model.id in favorites, onEvent)
-                        }
-                    }
-                    if (state.hiddenModelCount > 0) {
-                        item(key = "show-all") {
-                            ShowAllModelsRow(state.hiddenModelCount, state.showsAllModels, onToggle = { onEvent(ModelPickerEvent.ShowAllModelsToggled) })
-                        }
-                    }
-                }
-                ModelSheetEmptyState(state, isEmpty = sections.isEmpty(), onEvent = onEvent)
-            }
-        }
-    }
-}
-
-@Composable
-private fun SheetSectionHeader(title: String) {
-    if (title.isEmpty()) return
-    Text(
-        title,
-        style = OpenCodeTextStyles.footnote,
-        fontWeight = FontWeight.SemiBold,
-        color = OpenCodeTheme.colors.secondaryText,
-        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 4.dp).semantics { heading() },
-    )
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun SheetModelRow(
-    model: OpenCodeModel,
-    kind: ModelPickerSection.Kind,
-    state: ModelPickerState,
-    isCurrent: Boolean,
-    isFavorite: Boolean,
-    onEvent: (ModelPickerEvent) -> Unit,
-) {
-    // Favorites and Recent mix providers, so their rows name the provider and carry their own identifiers.
-    val prefix = when (kind) {
-        ModelPickerSection.Kind.Favorites -> "model-favorite"
-        ModelPickerSection.Kind.Recent -> "model-recent"
-        else -> "model-row"
-    }
-    val mixesProviders = kind == ModelPickerSection.Kind.Favorites || kind == ModelPickerSection.Kind.Recent
-    val provider = ModelProviderGroup.title(model.providerID)
-    val scale = ModelLevelScale(model.variants)
-    val remembered = state.rememberedLevel(model)
-    var menuOpen by remember { mutableStateOf(false) }
-    val favoriteTitle = if (isFavorite) "Remove from Favorites" else "Add to Favorites"
-
-    FavoriteSwipeBox(isFavorite = isFavorite, onToggle = { onEvent(ModelPickerEvent.ToggleFavoriteModel(model)) }) {
-        Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.weight(1f)) {
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .combinedClickable(
-                            role = Role.Button,
-                            onClick = { onEvent(ModelPickerEvent.ModelPickedWithLevel(model, remembered)) },
-                            onLongClick = { menuOpen = true },
-                        )
-                        .heightIn(min = 48.dp)
-                        .padding(start = 16.dp, end = 8.dp, top = 6.dp, bottom = 6.dp)
-                        .clearAndSetSemantics {
-                            contentDescription = model.name
-                            stateDescription = if (isFavorite) "$provider, Favorite" else provider
-                            selected = isCurrent
-                            role = Role.Button
-                            customActions = listOf(CustomAccessibilityAction(favoriteTitle) { onEvent(ModelPickerEvent.ToggleFavoriteModel(model)); true })
-                        }
-                        .testTag("$prefix-${model.id}"),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f, fill = false)) {
-                        Text(model.name, style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text)
-                        if (mixesProviders) {
-                            Text(provider, style = OpenCodeTextStyles.subheadline, color = OpenCodeTheme.colors.secondaryText)
-                        }
-                    }
-                    Spacer(Modifier.weight(1f, fill = true))
-                    if (isCurrent) {
-                        OpenCodeIcon(SFSymbol.Checkmark, null, size = OpenCodeIconSize.small, tint = OpenCodeTheme.colors.text)
-                    }
-                }
-                // Hold a row for Add to Favorites (iOS `contextMenu`).
-                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                    DropdownMenuItem(
-                        text = { Text(favoriteTitle) },
-                        leadingIcon = { OpenCodeIcon(if (isFavorite) SFSymbol.StarSlash else SFSymbol.Star, null) },
-                        onClick = {
-                            menuOpen = false
-                            onEvent(ModelPickerEvent.ToggleFavoriteModel(model))
-                        },
-                    )
-                }
-            }
-            if (scale.isAdjustable) {
-                RowLevelMenu(
-                    model = model,
-                    scale = scale,
-                    level = remembered,
-                    testTag = "$prefix-level-${model.id}",
-                    onPick = { onEvent(ModelPickerEvent.ModelLevelPicked(model, it)) },
-                )
-            }
-        }
-    }
-}
-
-/**
- * A row's level as a menu (iOS: a `Menu` around a "Thinking Level" `Picker`), labelled with its
- * level and a chevron in secondary text, never the accent (Kit: “I don't like the blue text”).
- */
-@Composable
-private fun RowLevelMenu(
-    model: OpenCodeModel,
-    scale: ModelLevelScale,
-    level: String?,
-    testTag: String,
-    onPick: (String?) -> Unit,
-) {
-    var open by remember { mutableStateOf(false) }
-    val label = ModelLevelScale.label(level)
-    Box {
-        Row(
-            Modifier
-                .clickable(role = Role.Button) { open = true }
-                .openCodeTapTarget()
-                .clearAndSetSemantics {
-                    contentDescription = "${model.name} Thinking Level"
-                    stateDescription = label
-                    role = Role.DropdownList
-                }
-                .testTag(testTag)
-                .padding(horizontal = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(label, style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.secondaryText, maxLines = 1)
-            OpenCodeIcon(SFSymbol.ChevronUpChevronDown, null, size = 14.dp, tint = OpenCodeTheme.colors.secondaryText)
-        }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            for (option in scale.levels) {
-                val selected = option == level
-                DropdownMenuItem(
-                    text = { Text(ModelLevelScale.label(option)) },
-                    leadingIcon = {
-                        Box(Modifier.width(24.dp)) {
-                            if (selected) OpenCodeIcon(SFSymbol.Checkmark, null, size = OpenCodeIconSize.small)
-                        }
-                    },
-                    modifier = Modifier.semantics { this.selected = selected },
-                    onClick = {
-                        open = false
-                        onPick(option)
-                    },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ModelSheetEmptyState(state: ModelPickerState, isEmpty: Boolean, onEvent: (ModelPickerEvent) -> Unit) {
-    if (state.isLoadingModels && state.models.isEmpty()) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-    } else if (isEmpty && state.hiddenModelCount == 0) {
-        ModelListEmptyState(state, includesLoadError = true, onTryAgain = { onEvent(ModelPickerEvent.ModelListOpened) })
-    }
-}
 
 /** The sheet's inline title row: [title] centred, optional leading and trailing buttons. */
 @Composable
@@ -314,8 +127,8 @@ internal fun ModelSheetTitleBar(
 }
 
 /**
- * iOS `ModelPickerDetents` around a stock sheet: the Today and Sheet pickers (and the
- * Session sheet's model list) open at the partially expanded rest and drag up to full. Dragged
+ * iOS `ModelPickerDetents` around a stock sheet: the Today picker (and One Picker's sheet while
+ * the composer is covered) open at the partially expanded rest and drag up to full. Dragged
  * down from full, a flick at [ModelPickerTunables.flickCloses] (800 dp/s) or faster closes them
  * and a slower drag rests partially expanded (a probe beside the sheet's own drag reads the
  * release velocity, which the settled value doesn't carry). Under TalkBack the grabber still
@@ -555,15 +368,13 @@ private fun PlainModelRow(model: OpenCodeModel, state: ModelPickerState, onEvent
 }
 
 /**
- * The composer's model chip for the Today and Sheet styles (`SessionView+ComposerControls.swift`):
- * Today reads `"<Model> ⌄"` or `"<Model> · <Level> ⌄"`; Sheet reads `"<Short name> <Level> ⌄"`
- * with the name in primary text. TalkBack: **Choose model**, its value the label (Sheet:
- * `"Cirrus 4, High"`). Secondary text, subheadline medium, ≥ 48 dp tall.
+ * The composer's model chip with One Picker off (`SessionView+ComposerControls.swift`): reads
+ * `"<Model> ⌄"` or `"<Model> · <Level> ⌄"`. TalkBack: **Choose model**, its value the label.
+ * Secondary text, subheadline medium, ≥ 48 dp tall.
  */
 @Composable
 fun ModelPickerChip(
     state: ModelPickerState,
-    usesModelPickerSheet: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -577,7 +388,7 @@ fun ModelPickerChip(
                 .heightIn(min = 48.dp)
                 .clearAndSetSemantics {
                     contentDescription = "Choose model"
-                    stateDescription = if (usesModelPickerSheet) state.sheetChipAccessibilityValue else state.currentModelLabel
+                    stateDescription = state.currentModelLabel
                     role = Role.Button
                 }
                 .testTag("composer-model"),
@@ -585,14 +396,193 @@ fun ModelPickerChip(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             val style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium)
-            if (usesModelPickerSheet) {
-                // New Model Picker: the short name, then its level.
-                Text(state.currentModelShortName, style = style, color = OpenCodeTheme.colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-                state.currentChipLevelLabel?.let { Text(it, style = style, color = secondary, maxLines = 1, softWrap = false) }
-            } else {
-                Text(state.currentModelLabel, style = style, color = secondary, maxLines = 1, overflow = TextOverflow.MiddleEllipsis, modifier = Modifier.weight(1f, fill = false))
-            }
+            Text(state.currentModelLabel, style = style, color = secondary, maxLines = 1, overflow = TextOverflow.MiddleEllipsis, modifier = Modifier.weight(1f, fill = false))
             OpenCodeIcon(SFSymbol.ChevronDown, null, size = 12.dp, tint = secondary)
         }
     }
 }
+
+/**
+ * A magnifier, the placeholder, and a Clear button while there's text, in a tertiary-fill capsule:
+ * the Today picker's search (iOS `ModelSearchCapsuleField`, deleted with Grow from Composer in
+ * 0fbb99f8; iOS's Today picker uses `.searchable`).
+ */
+@Composable
+internal fun ModelSearchCapsuleField(
+    text: String,
+    onTextChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    focusRequester: FocusRequester? = null,
+    spacing: Dp = 6.dp,
+    leadingPadding: Dp = 12.dp,
+    emptyTrailingPadding: Dp = 12.dp,
+    clearTrailingPadding: Dp = 0.dp,
+    minHeight: Double = 44.0,
+    imeAction: ImeAction = ImeAction.Search,
+    placeholder: String = "Search Models",
+    onSubmit: () -> Unit = {},
+) {
+    // Feed edits back to BasicTextField immediately, before the store's Flow collector redraws
+    // its parent. An old value in between resets the caret and reorders the next characters.
+    // A delayed echo of an earlier edit must not roll back newer keystrokes. External changes
+    // still replace the buffer; an echo acknowledges all edits up to that value.
+    var input by remember { mutableStateOf(text) }
+    val pendingEdits = remember { mutableListOf<String>() }
+    LaunchedEffect(text) {
+        val acknowledged = pendingEdits.indexOf(text)
+        if (acknowledged >= 0) {
+            pendingEdits.subList(0, acknowledged + 1).clear()
+        } else if (input != text) {
+            pendingEdits.clear()
+            input = text
+        }
+    }
+    val changeText: (String) -> Unit = {
+        input = it
+        pendingEdits.add(it)
+        onTextChange(it)
+    }
+    val textColor = OpenCodeTheme.colors.text
+    Row(
+        modifier
+            .fillMaxWidth()
+            .heightIn(min = minHeight.dp)
+            .background(OpenCodeTheme.colors.inlineCodeFill, CircleShape)
+            .padding(start = leadingPadding, end = if (input.isEmpty()) emptyTrailingPadding else clearTrailingPadding),
+        horizontalArrangement = Arrangement.spacedBy(spacing),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        OpenCodeIcon(SFSymbol.Magnifyingglass, null, size = 20.dp, tint = OpenCodeTheme.colors.secondaryText)
+        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+            if (input.isEmpty()) Text(placeholder, style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.secondaryText, maxLines = 1)
+            BasicTextField(
+                value = input,
+                onValueChange = changeText,
+                singleLine = true,
+                textStyle = OpenCodeTextStyles.body.copy(color = textColor),
+                cursorBrush = SolidColor(OpenCodeTheme.colors.accent),
+                // Autocorrection stays on: its suggestions keep the keyboard the message field's height.
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, imeAction = imeAction),
+                keyboardActions = KeyboardActions(onAny = { onSubmit() }),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .let { if (focusRequester != null) it.focusRequester(focusRequester) else it }
+                    .semantics { contentDescription = placeholder }
+                    .testTag("model-search"),
+            )
+        }
+        if (input.isNotEmpty()) {
+            Box(
+                Modifier
+                    .clickable(role = Role.Button) { changeText("") }
+                    .openCodeTapTarget()
+                    .semantics { contentDescription = "Clear" },
+                contentAlignment = Alignment.Center,
+            ) {
+                OpenCodeIcon(SFSymbol.XmarkCircleFill, null, size = 20.dp, tint = OpenCodeTheme.colors.tertiaryText)
+            }
+        }
+    }
+}
+
+/** iOS's `.yellow` swipe tint (the Today picker and One Picker). */
+internal val FavoriteYellow = Color(0xFFFFCC00)
+
+/**
+ * A trailing swipe that favorites or unfavorites the row (iOS `swipeActions(edge: .trailing,
+ * allowsFullSwipe: true)`): swiped past the threshold it toggles and springs back.
+ */
+@Composable
+internal fun FavoriteSwipeBox(
+    isFavorite: Boolean,
+    onToggle: () -> Unit,
+    tint: Color = FavoriteYellow,
+    /** The Favorite action's glyph (the Sheet and composer lists `star.fill`, Today's `star`). */
+    favoriteSymbol: SFSymbol = SFSymbol.StarFill,
+    /** The row's own fill, drawn over the action while it rests. */
+    containerColor: Color = BottomSheetDefaults.ContainerColor,
+    /** One Picker's rows also swipe from the leading edge (iOS's leading and trailing actions). */
+    swipesFromStart: Boolean = false,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    val swipe = rememberSwipeToDismissBoxState()
+    SwipeToDismissBox(
+        state = swipe,
+        modifier = modifier,
+        enableDismissFromStartToEnd = swipesFromStart,
+        backgroundContent = {
+            Row(
+                Modifier.fillMaxSize().background(tint).padding(horizontal = 20.dp),
+                horizontalArrangement = if (swipe.dismissDirection == SwipeToDismissBoxValue.StartToEnd) Arrangement.Start else Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OpenCodeIcon(if (isFavorite) SFSymbol.StarSlash else favoriteSymbol, null, size = 20.dp, tint = Color.White)
+                Spacer(Modifier.width(6.dp))
+                Text(if (isFavorite) "Unfavorite" else "Favorite", color = Color.White, style = OpenCodeTextStyles.subheadline)
+            }
+        },
+        onDismiss = { value ->
+            if (value != SwipeToDismissBoxValue.Settled) onToggle()
+            scope.launch { swipe.reset() }
+        },
+    ) {
+        Box(Modifier.background(containerColor)) { content() }
+    }
+}
+
+/**
+ * The provider's mark: iOS `ProviderIcon` (`Session/SessionView.swift`), the `provider-<id>`
+ * template image (its own, else its canonical provider's, else a Console connection's upstream,
+ * else a neutral placeholder), drawn in [tint]. Decorative (TalkBack hidden).
+ */
+@Composable
+internal fun ProviderIcon(providerID: String, canonical: String?, size: Dp, tint: Color, modifier: Modifier = Modifier) {
+    CoreProviderIcon(providerID, modifier.size(size), canonical, tint)
+}
+
+/**
+ * Decodes the picker's provider marks into the image cache before the picker first opens, so
+ * its rows draw them on their first frame instead of popping in as each SVG decodes (and the
+ * decoder's classes load off the opening). Starts a beat after it appears; each distinct mark
+ * (current, favourites, then the rest, at most [PROVIDER_PREWARM_LIMIT]) is composed once at the
+ * largest size the picker draws, transparent, taking no room and outside semantics.
+ */
+@Composable
+internal fun ProviderIconPrewarm(state: ModelPickerState) {
+    var started by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(PROVIDER_PREWARM_DELAY_MILLIS)
+        started = true
+    }
+    if (!started) return
+    val marks = remember(state.models, state.modelVisibility, state.currentModel, state.favoriteModelIDs) {
+        val current = state.currentModelInfo
+        val visible = state.pickerModels
+        (listOfNotNull(current) + visible.filter { it.id in state.favoriteModelIDs } + visible)
+            .distinctBy { CoreProviderIcon.assetName(it.providerID, it.canonicalProviderID) }
+            .take(PROVIDER_PREWARM_LIMIT)
+    }
+    Layout(
+        content = {
+            for (model in marks) {
+                key(model.providerID, model.canonicalProviderID) {
+                    CoreProviderIcon(model.providerID, Modifier, model.canonicalProviderID)
+                }
+            }
+        },
+        modifier = Modifier
+            .graphicsLayer { alpha = 0f }
+            .clearAndSetSemantics {},
+    ) { measurables, _ ->
+        val side = PROVIDER_PREWARM_SIDE.roundToPx()
+        val placeables = measurables.map { it.measure(Constraints.fixed(side, side)) }
+        layout(0, 0) { placeables.forEach { it.place(0, 0) } }
+    }
+}
+
+/** The largest provider mark the pickers draw (the sheets' rows). */
+private val PROVIDER_PREWARM_SIDE = 20.dp
+private const val PROVIDER_PREWARM_LIMIT = 24
+private const val PROVIDER_PREWARM_DELAY_MILLIS = 900L

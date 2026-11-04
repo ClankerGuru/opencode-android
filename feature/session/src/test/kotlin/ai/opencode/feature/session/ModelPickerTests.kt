@@ -32,23 +32,18 @@ import java.time.Instant
 
 /**
  * Port of the `SessionFeature` half of iOS `ModelPickerTests.swift` (its Reducer section, and
- * the store parts of the search and fused-picker tests), keeping iOS names.
+ * the store parts of the search tests), keeping iOS names.
  *
  * Not ported here (`:feature:composer`, the picker's own types): favoritesThenOneSectionPerProviderInTheServersOrder,
  * aModelSeveralProvidersOfferIsListedUnderEach, searchDropsFavoritesAndMatchesNamesAndProviders,
  * aProvidersNameListsItsModels, wordsMatchInAnyOrderAcrossNameAndProvider, betterMatchesComeFirstThenFavorites,
  * emptyAndPunctuationQueriesKeepTheList, levelsRunFromTheDefaultUpThroughTheSortedVariants,
  * scrubbingStepsOneLevelPerThirtyPointsFromWhereTheHoldBegan, aDragKeepsTheOwnerItStartedWith,
- * theListRestsLikeASheetsDetents, pickerTunablesDefaultToWhatShipped,
- * aDragCatchesTheGlassWhereItIsAndACancelledOneSettles, aCancelledDragSettlesFromWhereTheFingerLeftIt,
- * theGrabberAdjustsTheRest, aFocusRestoreRunsOnceUnlessCancelled, levelScrubberTunablesDefaultToKitPicks,
+ * theListRestsLikeASheetsDetents, aDragCatchesTheGlassWhereItIsAndACancelledOneSettles,
+ * aCancelledDragSettlesFromWhereTheFingerLeftIt, theGrabberAdjustsTheRest, aFocusRestoreRunsOnceUnlessCancelled,
  * theArcFillsToTheLevelAtAnyCount, theBackdropIsStrongestOverTheComposerAndGoneAtBothEnds,
- * thePanelReachesClosedOnceWhateverTheTiming, turningOffCustomModelPickerUnregistersLevelTunables,
  * shortNamesStripRedundantVendorWordsAndDisambiguateSharedShortNames,
- * fusedSectionsOrderFavoritesThenThreeRecentThenAllModelsAlphabetically,
- * theSheetsRecentSitsAfterFavoritesWithoutThemUpToItsLimit, levelStackAndRowMenuStateAndFrozenSectionsDuringFold,
- * onlyTheFusedPickerReadsALevelWordInASearch, foldingOverlaysStopOwningTouchesAndStaleFramesClear,
- * fusedTunablesMatchKitDefaultsAndPerFrameTracesHaveNoJumpOverOneAndAHalfPoints.
+ * theSheetsRecentSitsAfterFavoritesWithoutThemUpToItsLimit.
  * Not ported (iOS-only): searchableSheetsAvoidForcedNavigationBarDrawerOnMac (SwiftUI's
  * `SearchFieldPlacement` on Mac and a source scan of the Swift views).
  * `searchParsesTrailingLevelAndReturnPicksBestMatchAtThatLevel` keeps both halves here: the
@@ -278,29 +273,6 @@ class ModelPickerTests {
      * once but only shows in Recent the next time it opens.
      */
     @Test
-    fun theSheetsRecentHoldsStillWhileOpenAndUpdatesNextTime() = sessionTest { h ->
-        val initial = h.state(model = opus55.ref(variant = "high")).copy(models = listOf(opus55, argon, astra), activePicker = State.ActivePicker.model)
-        initial.favoriteModelIDs.set(emptySet())
-        initial.modelVariants.set(emptyMap())
-        initial.recentModelIDs.set(listOf(opus55.id, argon.id))
-        val store = h.store(initial)
-        store.exhaustive = false
-        val atOpen = store.state.recentModelIDs.value
-        fun recent(sections: List<ModelPickerSection>) = sections.firstOrNull { it.kind == ModelPickerSection.Kind.Recent }?.models
-        assertEquals(listOf(opus55, argon), recent(store.state.modelSheetSections(recents = atOpen, recentLimit = 3)))
-
-        store.send(Action.ModelLevelPicked(astra, "high"))
-        assertEquals(State.ActivePicker.model, store.state.activePicker)
-        assertEquals(listOf(astra.id, opus55.id, argon.id), store.state.recentModelIDs.value, "The pick is recorded at once")
-        assertEquals(listOf(opus55, argon), recent(store.state.modelSheetSections(recents = atOpen, recentLimit = 3)), "The open sheet's Recent holds still")
-        assertEquals(
-            listOf(astra, opus55, argon),
-            recent(store.state.modelSheetSections(recents = store.state.recentModelIDs.value, recentLimit = 3)),
-            "Opened again, the pick leads Recent",
-        )
-    }
-
-    @Test
     fun searchParsesTrailingLevelAndReturnPicksBestMatchAtThatLevel() = sessionTest { h ->
         val models = listOf(opus55, sonnet55Anthropic, argon, astra, haiku)
         val parsedHigh = ModelSearch.parseLevelQuery("argon high")
@@ -332,68 +304,6 @@ class ModelPickerTests {
         assertEquals("High", store.state.modelPicker.currentChipLevelLabel)
     }
 
-    @Test
-    fun choosingModelAndLevelByTapDragAndRowMenuUpdatesRecentsAndRememberedVariants() = sessionTest { h ->
-        val models = listOf(opus55, argon, astra, haiku)
-        val initial = h.state(model = opus55.ref(variant = "high")).copy(models = models)
-        val haptics = HapticsRecorder()
-        val store = h.hapticStore(initial, haptics)
-
-        // 1. Scrubbing / stepping a row's level remembers that model's variant and updates currentModel if active.
-        store.send(Action.ModelRowLevelChanged(opus55, "max")) {
-            it.copy(currentModel = opus55.ref(variant = "max"), pendingModel = opus55.ref(variant = "max"))
-        }
-        assertEquals("max", store.state.modelVariants.value[opus55.id])
-        assertEquals(listOf(Haptic.selection), haptics.log)
-
-        // 2. Scrubbing a non-active row's level remembers its variant without switching currentModel yet.
-        store.send(Action.ModelRowLevelChanged(argon, "low"))
-        assertEquals("low", store.state.modelVariants.value[argon.id])
-        assertEquals("low", store.state.rememberedLevel(argon))
-        assertEquals(opus55.ref(variant = "max"), store.state.currentModel)
-
-        // 3. Picking Argon from the vertical level stack (tap or drag-release) commits it and promotes it in Recent.
-        store.send(Action.ModelPickedWithLevel(argon, "high")) {
-            it.copy(currentModel = argon.ref(variant = "high"), pendingModel = argon.ref(variant = "high"))
-        }
-        assertEquals(listOf(argon.id), store.state.recentModelIDs.value)
-        assertEquals("high", store.state.modelVariants.value[argon.id])
-
-        // 4. Long-press menu favorite toggle adds/removes from Favorites.
-        store.send(Action.ToggleFavoriteModel(astra))
-        assertEquals(setOf(astra.id), store.state.favoriteModelIDs.value)
-        assertEquals(listOf(astra), store.state.modelPicker.fusedModelSections().firstOrNull()?.models)
-    }
-
-    @Test
-    fun aFusedPickIsASelectionOnlyWhenItChangesTheModelOrLevel() = sessionTest { h ->
-        val initial = h.state(model = opus55.ref(variant = "high")).copy(models = listOf(opus55, argon))
-        initial.modelVariants.set(emptyMap())
-        initial.recentModelIDs.set(emptyList())
-        val haptics = HapticsRecorder()
-        val store = h.hapticStore(initial, haptics)
-        store.send(Action.ModelPickedWithLevel(opus55, "high")) { it.copy(pendingModel = opus55.ref(variant = "high")) }
-        assertEquals(mapOf(opus55.id to "high"), store.state.modelVariants.value)
-        assertEquals(listOf(opus55.id), store.state.recentModelIDs.value)
-        assertTrue(haptics.log.isEmpty(), "Re-choosing the current model at its level is quiet")
-        store.send(Action.ModelPickedWithLevel(opus55, "max")) {
-            it.copy(currentModel = opus55.ref(variant = "max"), pendingModel = opus55.ref(variant = "max"))
-        }
-        assertEquals("max", store.state.modelVariants.value[opus55.id])
-        assertEquals(listOf(Haptic.selection), haptics.log)
-        store.send(Action.ModelPickedWithLevel(argon, null)) {
-            it.copy(currentModel = argon.ref(variant = null), pendingModel = argon.ref(variant = null))
-        }
-        assertEquals("default", store.state.modelVariants.value[argon.id])
-        assertEquals(listOf(argon.id, opus55.id), store.state.recentModelIDs.value)
-        assertEquals(listOf(Haptic.selection, Haptic.selection), haptics.log)
-    }
-
-    /**
-     * New Model Picker (OC-469): a row's level menu picks that model at the
-     * level and leaves the sheet open; tapping a row picks it and closes it.
-     * A selection only when the model or level changes.
-     */
     @Test
     fun theSheetsLevelMenuPicksAndStaysOpenAndARowTapCloses() = sessionTest { h ->
         val initial = h.state(model = opus55.ref(variant = "high")).copy(models = listOf(opus55, argon), activePicker = State.ActivePicker.model)
