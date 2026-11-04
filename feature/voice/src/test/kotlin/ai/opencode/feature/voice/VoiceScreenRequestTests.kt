@@ -29,7 +29,6 @@ import ai.opencode.feature.voice.VoiceFeatureTestSupport.settle
 import ai.opencode.feature.voice.VoiceFeatureTestSupport.voiceCall
 import ai.opencode.feature.voice.VoiceFeatureTestSupport.voiceTest
 import ai.opencode.feature.voice.VoiceScreenRequestFeature.Action
-import ai.opencode.feature.voice.VoiceScreenRequestFeature.DelegateAction
 import ai.opencode.feature.voice.VoiceScreenRequestFeature.Refusal
 import ai.opencode.feature.voice.VoiceScreenRequestFeature.State
 import ai.opencode.server.clienttools.ClientTool
@@ -113,8 +112,7 @@ class VoiceScreenRequestTests {
         clock.advance(349.milliseconds)
         assertEquals(0, captures.value)
         clock.advance(1.milliseconds)
-        store.receive(Action.Captured(call, VoiceScreenshotClient.Result.Taken(shot), replied = true)) { it.copy(capturing = null) }
-        store.receive(Action.Delegate(DelegateAction.DidShare("ses_voice")))
+        store.receive(Action.Captured(call, VoiceScreenshotClient.Result.Taken(shot))) { it.copy(capturing = null) }
         // The minute's timer went with the card.
         clock.advance(60.seconds)
         store.finish()
@@ -216,7 +214,7 @@ class VoiceScreenRequestTests {
         store.send(Action.Requested(call)) { it.copy(pending = call) }
         store.send(Action.ShareTapped) { it.copy(pending = null, capturing = call) }
         clock.advance(VoiceScreenRequestFeature.SETTLE)
-        store.receive(Action.Captured(call, failed, replied = true)) { it.copy(capturing = null) }
+        store.receive(Action.Captured(call, failed)) { it.copy(capturing = null) }
         store.finish()
 
         assertEquals(listOf(ClientToolResult.failure(Refusal.failed(VoiceScreenshotClient.Failure.credentials))), replies.value)
@@ -274,8 +272,7 @@ class VoiceScreenRequestTests {
         store.send(Action.Requested(call)) { it.copy(pending = call) }
         store.send(Action.ShareTapped) { it.copy(pending = null, capturing = call) }
         clock.advance(VoiceScreenRequestFeature.SETTLE)
-        // No `DidShare`: the agent never got it.
-        store.receive(Action.Captured(call, VoiceScreenshotClient.Result.Taken(shot), replied = false)) { it.copy(capturing = null) }
+        store.receive(Action.Captured(call, VoiceScreenshotClient.Result.Taken(shot))) { it.copy(capturing = null) }
         store.finish()
         assertEquals(1, replies.value.size)
         scope.cancel()
@@ -446,7 +443,6 @@ class VoiceScreenRequestTests {
         clock.advance(VoiceScreenRequestFeature.SETTLE)
         store.receive({ it is VoiceFeature.Action.ScreenRequest && it.action is Action.Captured }, "captured")
         assertNull(store.state.screenRequest.capturing)
-        store.receive({ it is VoiceFeature.Action.ScreenRequest && it.action is Action.Delegate }, "didShare")
         assertEquals(1, replies.value.size)
         assertTrue(replies.value.first().content.contains(ClientToolResult.Content.Jpeg(byteArrayOf(0xFF.toByte()))))
         store.send(VoiceFeature.Action.EndTapped)

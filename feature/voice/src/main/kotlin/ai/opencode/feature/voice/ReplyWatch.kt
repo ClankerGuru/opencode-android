@@ -280,7 +280,6 @@ data class ReplyWatch(
          */
         data class HeldBack(val turns: Map<String, Int>) : Event
         data class SseStepEnded(val sessionID: String) : Event
-        data class SseExecutionStarted(val sessionID: String) : Event
         data class SseExecutionEnded(val sessionID: String, val source: SettlementSource = SettlementSource.sse) : Event
         data class ActiveSessionsSnapshot(val ids: Set<String>, val source: SettlementSource = SettlementSource.snapshot) : Event
         data class WaitSucceeded(val promptID: String, val reply: String?) : Event
@@ -458,11 +457,6 @@ data class ReplyWatch(
                 }
                 deferredNotices = deferredNotices.map { restamp(it, event.turns) }.toMutableList()
                 connectingNotices = connectingNotices.map { restamp(it, event.turns) }.toMutableList()
-                emptyList()
-            }
-
-            is Event.SseExecutionStarted -> {
-                activeSessionIDs += event.sessionID
                 emptyList()
             }
 

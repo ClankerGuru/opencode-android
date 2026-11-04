@@ -50,14 +50,8 @@ class VoiceScreenRequestFeature : Reducer<VoiceScreenRequestFeature.State, Voice
          */
         data class ConnectionClosed(val connection: UUID) : Action
 
-        /** The capture's reply went out ([replied]) or found its call gone. */
-        data class Captured(val call: ClientToolCall, val result: VoiceScreenshotClient.Result, val replied: Boolean) : Action
-        data class Delegate(val action: DelegateAction) : Action
-    }
-
-    sealed interface DelegateAction {
-        /** The screen went to the agent. */
-        data class DidShare(val sessionID: String?) : DelegateAction
+        /** The capture's reply went out, or found its call gone. */
+        data class Captured(val call: ClientToolCall, val result: VoiceScreenshotClient.Result) : Action
     }
 
     object Refusal {
@@ -150,11 +144,8 @@ class VoiceScreenRequestFeature : Reducer<VoiceScreenRequestFeature.State, Voice
                 if (result is VoiceScreenshotClient.Result.Failed) {
                     AppLog.voice.notice { "Screen request capture refused: ${result.failure}" }
                 }
-                if (result !is VoiceScreenshotClient.Result.Taken || !action.replied) return Reduced(next)
-                Reduced(next, Effect.send(Action.Delegate(DelegateAction.DidShare(action.call.sessionID))))
+                Reduced(next)
             }
-
-            is Action.Delegate -> Reduced(state)
         }
     }
 
@@ -194,8 +185,8 @@ class VoiceScreenRequestFeature : Reducer<VoiceScreenRequestFeature.State, Voice
                 )
                 is VoiceScreenshotClient.Result.Failed -> ClientToolResult.failure(Refusal.failed(result.failure))
             }
-            val replied = clientTools.reply(call, answer)
-            send(Action.Captured(call, result, replied))
+            clientTools.reply(call, answer)
+            send(Action.Captured(call, result))
         }.cancellable(CancelID.capture, cancelInFlight = true)
     }
 
@@ -208,9 +199,6 @@ class VoiceScreenRequestFeature : Reducer<VoiceScreenRequestFeature.State, Voice
 
         /** After Share, how long the card has to leave before the capture, so it isn't in the picture. */
         val SETTLE: Duration = 350.milliseconds
-
-        /** What the voice model hears once the screen was shared. */
-        const val SHARED_NOTE = "The user shared the app's screen with the agent working on their request; that agent can see it now."
 
         /** The line beside the image: what it is, never what's in it. */
         fun caption(capture: VoiceScreenshotClient.Capture): String {

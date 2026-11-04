@@ -23,7 +23,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.UUID
 import kotlin.coroutines.resume
@@ -435,40 +434,16 @@ private object VoicePreviewAudioPlayer {
     /** Generates a short syllable-shaped PCM16 WAV clip for lab demos (iOS `#if DEBUG`; used by VoiceLabDemo). */
     @Suppress("unused")
     fun makeDemoWAV(duration: Double, frequency: Double): ByteArray {
-        val sampleRate = 24_000
+        val sampleRate = PCM.sampleRate
         val frameCount = maxOf(1, (duration * sampleRate).toInt())
-        val dataBytes = frameCount * 2
-        val wav = ByteArrayOutputStream(44 + dataBytes)
-        fun appendASCII(text: String) = wav.write(text.toByteArray(Charsets.US_ASCII))
-        fun appendUInt32(value: Int) {
-            for (shift in 0 until 32 step 8) wav.write((value ushr shift) and 0xFF)
-        }
-        fun appendUInt16(value: Int) {
-            wav.write(value and 0xFF)
-            wav.write((value ushr 8) and 0xFF)
-        }
-        appendASCII("RIFF")
-        appendUInt32(36 + dataBytes)
-        appendASCII("WAVE")
-        appendASCII("fmt ")
-        appendUInt32(16)
-        appendUInt16(1)
-        appendUInt16(1)
-        appendUInt32(sampleRate)
-        appendUInt32(sampleRate * 2)
-        appendUInt16(2)
-        appendUInt16(16)
-        appendASCII("data")
-        appendUInt32(dataBytes)
+        val samples = FloatArray(frameCount)
         for (i in 0 until frameCount) {
-            val t = i.toDouble() / sampleRate
+            val t = i / sampleRate
             val envelope = sin(PI * min(1.0, t / 0.08)) * sin(PI * min(1.0, (duration - t) / 0.12))
             val syllable = 0.35 + 0.65 * abs(sin(t * PI * 4.2))
-            val sample = sin(2 * PI * frequency * t) * envelope * syllable * 0.25
-            val pcm = (sample * Short.MAX_VALUE).toInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
-            appendUInt16(pcm and 0xFFFF)
+            samples[i] = (sin(2 * PI * frequency * t) * envelope * syllable * 0.25).toFloat()
         }
-        return wav.toByteArray()
+        return VoiceCallSoundBank.wavData(samples)
     }
 }
 /** iOS CallVoice.swift's DEBUG-only VoiceLabDemo extension. Only read in lab mode. */

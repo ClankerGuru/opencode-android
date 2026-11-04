@@ -53,12 +53,6 @@ class VoiceCallAudioFeature : Reducer<VoiceCallAudioFeature.State, VoiceCallAudi
 
         /** The call ended or failed: the audio stops with it. */
         data object CallEnded : Action
-        data class Delegate(val action: DelegateAction) : Action
-    }
-
-    sealed interface DelegateAction {
-        /** For the voice model, so “pause the music” makes sense to it. */
-        data class Note(val text: String) : DelegateAction
     }
 
     object Reply {
@@ -79,14 +73,6 @@ class VoiceCallAudioFeature : Reducer<VoiceCallAudioFeature.State, VoiceCallAudi
             val total = seconds.roundToInt()
             return String.format(Locale.US, "%d:%02d", total / 60, total % 60)
         }
-    }
-
-    object Note {
-        fun started(track: CallAudioTrack): String =
-            "“${track.title}” is now playing on the call; it ducks while either of you speaks. The user can pause or stop it on screen; if they ask you to, delegate it (the agent has android_voice_audio_control)."
-
-        fun stopped(track: CallAudioTrack): String = "“${track.title}” stopped playing on the call."
-        fun finished(track: CallAudioTrack): String = "“${track.title}” finished playing on the call."
     }
 
     enum class CancelID { load, events }
@@ -113,7 +99,7 @@ class VoiceCallAudioFeature : Reducer<VoiceCallAudioFeature.State, VoiceCallAudi
                 val result = action.result
                 if (result is CallAudioResult.Started && action.replied) {
                     val playing = next.copy(track = result.track, isPaused = false, isDucked = false)
-                    return Reduced(playing, Effect.send(Action.Delegate(DelegateAction.Note(Note.started(result.track)))))
+                    return Reduced(playing)
                 }
                 if (result is CallAudioResult.Started) {
                     // Its socket went first: the track stopped, and it had replaced what played.
@@ -163,16 +149,11 @@ class VoiceCallAudioFeature : Reducer<VoiceCallAudioFeature.State, VoiceCallAudi
                     val track = state.track
                     if (track == null || track.id != event.id) return Reduced(state)
                     AppLog.voice.info { "Call audio finished" }
-                    Reduced(
-                        clear(state),
-                        Effect.merge(Effect.cancel(CancelID.events), Effect.send(Action.Delegate(DelegateAction.Note(Note.finished(track))))),
-                    )
+                    Reduced(clear(state), Effect.cancel(CancelID.events))
                 }
             }
 
             Action.CallEnded -> endCall(state)
-
-            is Action.Delegate -> Reduced(state)
         }
     }
 
@@ -237,7 +218,7 @@ class VoiceCallAudioFeature : Reducer<VoiceCallAudioFeature.State, VoiceCallAudi
     }
 
     private fun stop(state: State): Reduced<State, Action> {
-        val track = state.track ?: return Reduced(state)
+        if (state.track == null) return Reduced(state)
         AppLog.voice.info { "Call audio stopped" }
         val callAudio = dependency(CallAudioClient)
         return Reduced(
@@ -245,7 +226,6 @@ class VoiceCallAudioFeature : Reducer<VoiceCallAudioFeature.State, VoiceCallAudi
             Effect.merge(
                 Effect.cancel(CancelID.events),
                 Effect.run { callAudio.stop() },
-                Effect.send(Action.Delegate(DelegateAction.Note(Note.stopped(track)))),
             ),
         )
     }

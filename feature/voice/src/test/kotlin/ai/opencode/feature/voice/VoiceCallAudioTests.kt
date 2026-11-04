@@ -5,8 +5,6 @@ import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.store.TestStore
 import ai.opencode.core.testing.TestIsolationRule
 import ai.opencode.feature.voice.VoiceCallAudioFeature.Action
-import ai.opencode.feature.voice.VoiceCallAudioFeature.DelegateAction
-import ai.opencode.feature.voice.VoiceCallAudioFeature.Note
 import ai.opencode.feature.voice.VoiceCallAudioFeature.Reply
 import ai.opencode.feature.voice.VoiceCallAudioFeature.State
 import ai.opencode.feature.voice.VoiceFeatureTestSupport.LockIsolated
@@ -143,7 +141,7 @@ class VoiceCallAudioTests {
 
     private fun text(value: String) = ClientToolResult(listOf(ClientToolResult.Content.Text(value)))
 
-    @Test fun playStartsReportsItAndNotesTheVoiceModel() = runTest {
+    @Test fun playStartsAndRepliesWithTheTrack() = runTest {
         val player = Player(listOf(started(song)))
         val scope = effects(this)
         val store = makeStore(scope, player)
@@ -151,7 +149,6 @@ class VoiceCallAudioTests {
 
         store.send(Action.PlayRequested(call)) { it.copy(loading = call) }
         store.receive(Action.Started(call, started(song), replied = true)) { it.copy(loading = null, track = song) }
-        store.receive(Action.Delegate(DelegateAction.Note(Note.started(song))))
         store.send(Action.CallEnded) { it.copy(track = null) }
         store.finish()
         until { player.calls.value.size == 2 }
@@ -173,7 +170,6 @@ class VoiceCallAudioTests {
 
         store.send(Action.PlayRequested(call)) { it.copy(loading = call) }
         store.receive(Action.Started(call, started(song), replied = true)) { it.copy(loading = null, track = song) }
-        store.receive(Action.Delegate(DelegateAction.Note(Note.started(song))))
         player.yield(CallAudioEvent.Ducked(true))
         store.receive(Action.Player(CallAudioEvent.Ducked(true))) { it.copy(isDucked = true) }
         player.yield(CallAudioEvent.Ducked(false))
@@ -204,13 +200,12 @@ class VoiceCallAudioTests {
         scope.cancel()
     }
 
-    @Test fun stopFromTheRowClearsItAndNotesTheVoiceModel() = runTest {
+    @Test fun stopFromTheRowClearsIt() = runTest {
         val player = Player(emptyList())
         val scope = effects(this)
         val store = makeStore(scope, player, initialState = playing)
 
         store.send(Action.StopTapped) { it.copy(track = null) }
-        store.receive(Action.Delegate(DelegateAction.Note(Note.stopped(song))))
         // Nothing left to control.
         store.send(Action.ControlRequested(control(2, "resume")))
         store.finish()
@@ -228,7 +223,6 @@ class VoiceCallAudioTests {
         val store = makeStore(scope, player, initialState = playing)
 
         store.send(Action.ControlRequested(control(2, "stop"))) { it.copy(track = null) }
-        store.receive(Action.Delegate(DelegateAction.Note(Note.stopped(song))))
         store.finish()
         until { player.replies.value.isNotEmpty() }
 
@@ -245,13 +239,11 @@ class VoiceCallAudioTests {
 
         store.send(Action.PlayRequested(call)) { it.copy(loading = call) }
         store.receive(Action.Started(call, started(clip), replied = true)) { it.copy(loading = null, track = clip) }
-        store.receive(Action.Delegate(DelegateAction.Note(Note.started(clip))))
         // A replaced track's end is ignored.
         player.yield(CallAudioEvent.Finished(song.id))
         store.receive(Action.Player(CallAudioEvent.Finished(song.id)))
         player.yield(CallAudioEvent.Finished(clip.id))
         store.receive(Action.Player(CallAudioEvent.Finished(clip.id))) { it.copy(track = null) }
-        store.receive(Action.Delegate(DelegateAction.Note(Note.finished(clip))))
         store.finish()
 
         assertEquals(listOf("play https://example.com/clip.wav -"), player.calls.value)
@@ -362,11 +354,9 @@ class VoiceCallAudioTests {
 
         store.send(Action.PlayRequested(first)) { it.copy(loading = first) }
         store.receive(Action.Started(first, started(song), replied = true)) { it.copy(loading = null, track = song) }
-        store.receive(Action.Delegate(DelegateAction.Note(Note.started(song))))
         store.send(Action.PauseTapped) { it.copy(isPaused = true) }
         store.send(Action.PlayRequested(second)) { it.copy(loading = second) }
         store.receive(Action.Started(second, started(clip), replied = true)) { it.copy(loading = null, track = clip, isPaused = false) }
-        store.receive(Action.Delegate(DelegateAction.Note(Note.started(clip))))
         store.send(Action.CallEnded) { it.copy(track = null) }
         store.finish()
 
@@ -394,7 +384,6 @@ class VoiceCallAudioTests {
         store.send(Action.PlayRequested(first)) { it.copy(loading = first) }
         store.send(Action.PlayRequested(second)) { it.copy(loading = second) }
         store.receive(Action.Started(second, started(clip), replied = true)) { it.copy(loading = null, track = clip) }
-        store.receive(Action.Delegate(DelegateAction.Note(Note.started(clip))))
         // The first download lands late: it stops only its own track, never the clip.
         until { player.replies.value.size == 2 }
         gate.open()

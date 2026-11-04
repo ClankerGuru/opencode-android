@@ -87,12 +87,6 @@ class WispOrbSim {
         this.muted = muted
     }
 
-    /** `push_pulse`: a result ring from the core with a gentle swell. */
-    fun pushPulse() {
-        if (reduceMotion) return
-        if (pulses.emit(ambient = false)) power.kick(WispPulseRings.scaleKick)
-    }
-
     // Step
 
     /** Advances by [dtSecs] (clamped to 0…0.25) in fixed 1/240 s steps. */

@@ -121,11 +121,6 @@ internal fun wispSmoothstep(a: Float, b: Float, x: Float): Float {
     return t * t * (3 - 2 * t)
 }
 
-internal fun wispBump(d: Float, w: Float): Float {
-    val q = d / w
-    return exp(-q * q)
-}
-
 internal fun wispMix3(a: WispVec3, b: WispVec3, t: Float): WispVec3 = a + (b - a) * min(max(t, 0f), 1f)
 
 internal fun wispClamp(v: Float, lo: Float, hi: Float): Float = min(max(v, lo), hi)
@@ -853,16 +848,15 @@ class WispPulseRings {
     val ambient = BooleanArray(count)
     var sinceEmit = 1e3f
 
-    fun emit(ambient: Boolean): Boolean {
+    fun emit(ambient: Boolean) {
         var slot = ages.indexOfFirst { it < 0 }.takeIf { it >= 0 }
         if (slot == null) {
             slot = ages.indices.filter { ages[it] / duration > 0.75f }.maxByOrNull { ages[it] }
         }
-        val i = slot ?: return false
+        val i = slot ?: return
         ages[i] = 0f
         this.ambient[i] = ambient
         sinceEmit = 0f
-        return true
     }
 
     fun tick(h: Float, pulsing: Boolean) {
@@ -909,6 +903,5 @@ class WispPulseRings {
         const val duration: Float = 1.65f
         const val ambientCadence: Float = 1.35f
         const val ambientGain: Float = 0.78f
-        const val scaleKick: Float = 0.62f
     }
 }

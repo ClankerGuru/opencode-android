@@ -190,14 +190,6 @@ class WispAttentiveSim {
         quietSecs = 0f
     }
 
-    fun setQuietSecsForPreview(secs: Float) {
-        val s = if (secs.isFinite()) wispClamp(secs, 0f, 3_600f) else 0f
-        quietSecs = s
-        t = s
-        blinkAge = 1f
-        nextBlink = s + 1.8f
-    }
-
     private fun glanceGoal(perk: Float): WispVec2 {
         val wander = WispVec2(0.045f * sin(0.41f * t), 0.026f * sin(0.31f * t + 1.1f))
         val base = wispKitLook * 0.65f + wander * (1 - 0.5f * perk)
@@ -299,12 +291,6 @@ class WispFidgetSim {
 
     fun onLeaveThinking() {
         thinkingElapsed = 0f
-    }
-
-    fun setElapsedForPreview(secs: Float) {
-        val s = if (secs.isFinite()) wispClamp(secs, 0f, 3_600f) else 0f
-        thinkingElapsed = s
-        clock = max(s - start, 0f)
     }
 
     private val beatAndU: Pair<Int, Float>

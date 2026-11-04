@@ -1120,9 +1120,6 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
 
             is Action.ScreenRequest -> {
                 val requested = action.action is VoiceScreenRequestFeature.Action.Requested
-                // The voice model is no longer told about a shared screen (`noteProgress` is
-                // gone with the voice cleanup): the agent that asked has the picture.
-                if (action.action is VoiceScreenRequestFeature.Action.Delegate) return Reduced(state)
                 Reduced(holdForClientToolCard(state, requested))
             }
 
@@ -1131,7 +1128,6 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
                 Reduced(holdForClientToolCard(state, requested))
             }
 
-            // The track's row says what plays.
             is Action.CallAudio, is Action.FloatingStage, is Action.Delegate -> Reduced(state)
         }
     }
