@@ -121,6 +121,12 @@ private fun HomeFeature.fullBody(): Reducer<State, Action> =
         .onChange({ it.transcriptCoverIsStale }) { _, _, state ->
             Reduced(if (state.transcriptCoverIsStale) state.syncingTranscriptCover() else state)
         }
+        // The stream sheds other sessions' deltas under load, never these. Watched over all of
+        // Home, so Catch Up reconciling to another card counts too (cd04514c).
+        .onChange({ it.streamFocusSessionIDs }) { _, new, state ->
+            dependency(EventStreamFocusClient).publish(streamFocusOwner, new)
+            Reduced(state)
+        }
         .onChange({ it.settingsHomeInput }) { old, new, state ->
             if (old == null || new == null) {
                 Reduced(state)
@@ -449,11 +455,6 @@ private fun Reducer<State, Action>.homeChildrenObservers(feature: HomeFeature): 
             val next = new.ledger
             if (next == old.ledger) return@onChange Reduced(state)
             Reduced(state, feature.publishAppBadge(state, next))
-        }
-        // The stream sheds other sessions' deltas under load, never these.
-        .onChange({ it.streamFocusSessionIDs }) { _, new, state ->
-            dependency(EventStreamFocusClient).publish(feature.streamFocusOwner, new)
-            Reduced(state)
         }
         // The share sheet offers what the drawer does, kept current for a share sheet opened over the app.
         .onChange({ it.shareTargetsPublication }) { old, _, state ->

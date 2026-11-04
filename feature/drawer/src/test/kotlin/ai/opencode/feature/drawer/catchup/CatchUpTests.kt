@@ -1,5 +1,7 @@
 package ai.opencode.feature.drawer.catchup
 
+import ai.opencode.server.OpenCodeServerEvent
+import ai.opencode.server.EventStreamFocusClient
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.ImmediateClock
@@ -154,6 +156,22 @@ class CatchUpTests {
         store.finish()
         assertTrue(receipts.isEmpty())
         assertEquals(HomeFeature.State.Indicator.unread, store.state.indicator(store.state.sessions[0]))
+    }
+
+    /**
+     * The open card deleted elsewhere: Catch Up opens the next one after the detail reducer has
+     * run, and the stream still treats it as on screen.
+     */
+    @Test fun theCardCatchUpOpensAfterADeletionIsStreamFocused() = runTest {
+        val focus = EventStreamFocusClient.inMemory()
+        val store = store(home(includeWaiting = false, catchUpQueue = listOf("newer", "older"), returnSessionID = "read"))
+        store.updateDependencies { this[EventStreamFocusClient] = focus }
+        assertEquals("newer", store.state.sessionDetail?.session?.id)
+        store.send(Action.ServerEvent(OpenCodeServerEvent.SessionDeleted("newer")))
+        assertEquals("older", store.state.sessionDetail?.session?.id)
+        assertTrue(focus.contains("older"))
+        assertFalse(focus.contains("newer"))
+        store.skipInFlightEffects()
     }
 
     @Test fun catchUpCardsLeaveQuietlyAndUndoTicks() = runTest {
