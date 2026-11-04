@@ -223,7 +223,7 @@ table                               # tablecells
 tag                                 # number
 terminal                            # apple.terminal, terminal
 text_format                         # textformat
-text_select_start                   # selection.pin.in.out, character.cursor.ibeam
+text_select_start                   # selection.pin.in.out, character.cursor.ibeam, text.cursor
 toggle_off                          # capsule
 toggle_on                           # switch.2
 touch_app                           # hand.tap

@@ -26,7 +26,10 @@ fun State.dictationBlocksRaise(now: () -> Instant = { dependency(DateClient).now
 fun State.showDictation(transcript: String): State {
     val (dictation, text) = dictation.show(transcript)
     val next = copy(dictation = dictation)
-    return if (text != null) next.withDraft(text) else next
+    if (text == null || text == draft) return next
+    // The words land at the end: the caret the reader left mid-draft goes (iOS 6b8772f3).
+    val shown = next.withDraft(text)
+    return shown.copy(autocomplete = shown.autocomplete.setCaret(offset = null, draftLength = text.length))
 }
 
 /** The composer as typed, without the running recording's words. */

@@ -261,6 +261,7 @@ enum class SFSymbol(val sfName: String, @DrawableRes val drawable: Int) {
     TextAlignleft("text.alignleft", R.drawable.ms_format_align_left),
     TextBadgePlus("text.badge.plus", R.drawable.ms_post_add),
     TextBubble("text.bubble", R.drawable.ms_chat),
+    TextCursor("text.cursor", R.drawable.ms_text_select_start),
     TextLineFirstAndArrowtriangleForward("text.line.first.and.arrowtriangle.forward", R.drawable.ms_vertical_align_top),
     TextLineLastAndArrowtriangleForward("text.line.last.and.arrowtriangle.forward", R.drawable.ms_vertical_align_bottom),
     TextQuote("text.quote", R.drawable.ms_format_quote),

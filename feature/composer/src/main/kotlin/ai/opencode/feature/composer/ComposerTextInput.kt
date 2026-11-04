@@ -292,10 +292,24 @@ class ComposerSwipeOwnership {
     }
 }
 
-/** Per-field state the iOS `ImagePasteTextView` kept on itself: scroll pinning and swipe flags. */
-private class ComposerTextInputController {
+/**
+ * Per-field state the iOS `ImagePasteTextView` kept on itself: scroll pinning and swipe flags,
+ * and the text sync of iOS `ComposerTextInput.updateUIView` ([syncText], [publish]).
+ */
+class ComposerTextInputController {
     /** The last text the parent passed (or we reported): a different one is a programmatic change. */
     var externalText: String? = null
+
+    /**
+     * iOS `isPublishingText`: set while the field reports the reader's edit. The field owns the
+     * text in that interval, so a sync that runs inside it never writes an older draft back.
+     */
+    var isPublishingText = false
+        private set
+
+    /** iOS `textFocusRequest`: the parent's last focus request; a new one places the caret at the end. */
+    var textFocusRequest = 0
+        private set
 
     /**
      * Set after a programmatic text change: layouts keep the end in view while the composer
@@ -330,6 +344,84 @@ private class ComposerTextInputController {
     var measuredHeight: Float? = null
     var heightAnimation: Job? = null
     val animatedHeight = Animatable(0f)
+
+    /**
+     * iOS `ComposerTextInput.updateUIView`'s text sync: brings the parent's draft into [state].
+     * [currentText] reads the parent's draft now, not the [text] an earlier composition captured
+     * (02e85073), so a recomposition that lands between the reader's edit and the parent taking
+     * it can't write the older draft back. A sync while the field publishes an edit does nothing.
+     *
+     * The caret: a new [focusRequest] (Quote, a restored draft) puts it at the end; otherwise
+     * Composer Autocomplete's caret wins (null means the end, 6b8772f3); otherwise a focused
+     * field keeps its selection, clamped to the new text; otherwise the caret goes to the end.
+     * [onNewText] runs for a draft the field hasn't seen yet, before it lands.
+     */
+    fun syncText(
+        state: TextFieldState,
+        text: String,
+        currentText: (() -> String)?,
+        focusRequest: Int,
+        hasFocus: Boolean,
+        bridge: ComposerAutocompleteTextBridge?,
+        onNewText: (String) -> Unit = {},
+    ) {
+        if (isPublishingText) return
+        val draft = currentText?.invoke() ?: text
+        val requestedEnd = textFocusRequest != focusRequest
+        textFocusRequest = focusRequest
+        if (externalText == null) externalText = draft
+        if (draft == externalText) return
+        externalText = draft
+        onNewText(draft)
+        if (state.text.toString() == draft) return
+        val previous = state.selection
+        val preserveSelection = hasFocus && !requestedEnd
+        val caret = bridge?.caretUTF16Offset
+        val usesAutocompleteCaret = bridge != null && !requestedEnd && bridge.isEnabled &&
+            (caret == null || caret in 0..draft.length)
+        bridge?.beginProgrammaticTextUpdate()
+        try {
+            // iOS `finishCompositionIfNeeded` (60dddffa): an open composition (an IME's composing
+            // region, voice typing) must finish before the text changes under it (a send's clear),
+            // or it lands in a stale range. A programmatic `edit` commits the composing region where
+            // it is and restarts the IME's input, so the words it held don't come back.
+            state.edit {
+                replace(0, length, draft)
+                if (usesAutocompleteCaret) {
+                    // Autocomplete normalizes an intentional end position to null.
+                    selection = TextRange(caret ?: draft.length)
+                } else if (preserveSelection) {
+                    val start = min(previous.start, draft.length)
+                    val end = min(previous.end, draft.length)
+                    selection = TextRange(start, end)
+                } else {
+                    placeCursorAtEnd()
+                }
+            }
+            if (usesAutocompleteCaret) {
+                bridge.syncLastSentCaretOffset()
+                pinsToEnd = (caret ?: draft.length) == draft.length
+            } else {
+                pinsToEnd = !preserveSelection
+            }
+        } finally {
+            bridge?.endProgrammaticTextUpdate()
+        }
+    }
+
+    /**
+     * iOS `textViewDidChange`'s write-back: the reader's edit goes to [onTextChange] with
+     * [isPublishingText] set, so a sync it sets off can't undo it.
+     */
+    fun publish(newText: String, onTextChange: (String) -> Unit) {
+        isPublishingText = true
+        try {
+            externalText = newText
+            onTextChange(newText)
+        } finally {
+            isPublishingText = false
+        }
+    }
 
     /** iOS `ComposerSwipePanRecognizer.textOwnership` for the drag in progress. */
     var isSwipeYieldedToText = false
@@ -418,7 +510,9 @@ private class ComposerFieldSwipeInput : ComposerSwipeInput {
  * reaches the draft. [canTakeFocus] is iOS `isReachable`: never take focus under something that
  * takes its touches (the drawer, Settings). [topInsetFraction] sets how much of [topInset] shows
  * (the keyboard morph scrubs it; null follows [expanded]); [refusesFocus] keeps the field from
- * taking focus while something else owns the composer (One Picker open).
+ * taking focus while something else owns the composer (One Picker open). [currentText] reads
+ * the parent's draft as it is now (a composition's [text] can lag the reader's edit), and a new
+ * [focusRequest] places the caret at the end ([ComposerTextInputController.syncText]).
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -449,6 +543,8 @@ fun ComposerTextInput(
     canTakeFocus: Boolean = true,
     topInsetFraction: Float? = null,
     refusesFocus: (() -> Boolean)? = null,
+    currentText: (() -> String)? = null,
+    focusRequest: Int = 0,
 ) {
     val state = remember { TextFieldState(text, TextRange(text.length)) }
     val controller = remember { ComposerTextInputController() }
@@ -484,38 +580,11 @@ fun ComposerTextInput(
     // Programmatic updates (dictation, a restored draft, Share/Quote) follow the newest text;
     // synced before the field measures so the first frame of an expand already has it.
     SideEffect {
-        if (controller.externalText == null) controller.externalText = text
-        if (text == controller.externalText) return@SideEffect
-        controller.externalText = text
-        // A send's clear shrinks on its own spring (`sendShrinkAnimation`); any other change lands at once.
-        controller.heightSpring = ComposerLineGrowth.sendShrinkSpring(sendTransition?.takeShrinkOmega(), reduceMotion)
-        controller.heightSpringText = text
-        controller.heightSpringShrinks = true
-        if (state.text.toString() == text) return@SideEffect
-        val bridge = autocompleteBridge
-        bridge?.beginProgrammaticTextUpdate()
-        try {
-            val caret = bridge?.caretUTF16Offset
-            // iOS `finishCompositionIfNeeded` (60dddffa): an open composition (an IME's composing
-            // region, voice typing) must finish before the text changes under it (a send's clear),
-            // or it lands in a stale range. A programmatic `edit` commits the composing region where
-            // it is and restarts the IME's input, so the words it held don't come back.
-            state.edit {
-                replace(0, length, text)
-                if (bridge != null && bridge.isEnabled && caret != null && caret in 0..text.length) {
-                    selection = TextRange(caret)
-                } else {
-                    placeCursorAtEnd()
-                }
-            }
-            if (bridge != null && bridge.isEnabled && caret != null && caret in 0..text.length) {
-                bridge.syncLastSentCaretOffset()
-                controller.pinsToEnd = false
-            } else {
-                controller.pinsToEnd = true
-            }
-        } finally {
-            bridge?.endProgrammaticTextUpdate()
+        controller.syncText(state, text, currentText, focusRequest, hasFocus, autocompleteBridge) { newText ->
+            // A send's clear shrinks on its own spring (`sendShrinkAnimation`); any other change lands at once.
+            controller.heightSpring = ComposerLineGrowth.sendShrinkSpring(sendTransition?.takeShrinkOmega(), reduceMotion)
+            controller.heightSpringText = newText
+            controller.heightSpringShrinks = true
         }
     }
 
@@ -531,8 +600,7 @@ fun ComposerTextInput(
             val nonSendFrom = controller.nonSendEditFrom
             controller.nonSendEditFrom = null
             if (nonSendFrom != null && newText == nonSendFrom + "\n") currentOnNonSendNewline?.invoke(newText)
-            controller.externalText = newText
-            currentOnTextChange(newText)
+            controller.publish(newText, currentOnTextChange)
             currentBridge?.notifyCaretAfterEdit(newText, state.selection, state.composition)
         }
     }

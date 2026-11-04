@@ -1851,6 +1851,9 @@ private fun SessionComposerEnv.ComposerInput(expanded: Boolean, recording: Boole
         val takesPaste = s.takesPasteAttachments
         ComposerTextInput(
             text = s.draft,
+            // The reducer's draft now, not the snapshot this composition captured (iOS 02e85073).
+            currentText = { store.state.draft },
+            focusRequest = s.composerFocusRequest,
             // Folded while dictating: keys typed into the hidden field don't reach the draft.
             onTextChange = { new -> onDraftEdited(new, recording) },
             isFocused = host.messageFieldFocused,
