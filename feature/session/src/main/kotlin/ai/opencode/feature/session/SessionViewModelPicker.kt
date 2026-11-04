@@ -1,5 +1,6 @@
 package ai.opencode.feature.session
 
+import androidx.activity.compose.BackHandler
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticEffect
 import ai.opencode.core.motion.rememberReduceMotion
@@ -464,6 +465,9 @@ internal fun SessionModelPickerOverlays(
         seenIdentity = taskIdentity
         panels.closeModelPanels()
     }
+    // Android-ify: system back folds an open One Picker away first, as it would close any sheet
+    // (iOS has no back; the tap outside and the grabber's pull stay as they are).
+    BackHandler(enabled = usesOnePicker && panels.onePicker.isOpen) { panels.closeOnePicker() }
 
     Box(Modifier.fillMaxSize().onGloballyPositioned { screenOrigin = it.boundsInRoot().topLeft })
     if (usesOnePicker) {
