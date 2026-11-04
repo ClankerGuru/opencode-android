@@ -10,8 +10,8 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * What arrived while the reader was away (iOS `NewMessagesMark`): from the first row that wasn't on
- * screen when they last left the session. The list brings them to it at the end; with the New
- * Messages Divider experiment on, a New divider sits above it when it doesn't fit on screen.
+ * screen when they last left the session. The list brings them to it at the end; a New divider
+ * sits above it when it doesn't fit on screen.
  *
  * The session-state half of iOS's file (`SessionFeature.State.noteLeaving/noteOpening/
  * noteOwnSend/absorbFittingNewMessages/updateNewMessagesMark`, `newMessagesContext = 20`) is
@@ -25,8 +25,6 @@ data class NewMessagesMark(
     val lastItemID: String? = null,
     /** Changes whenever the divider moves to another item, so the list lands on each mark once. */
     val generation: Int,
-    /** The New Messages Divider experiment was on. */
-    val showsDivider: Boolean = true,
 ) {
     companion object {
         /** Rows kept above the New divider (iOS `SessionFeature.State.newMessagesContext`). */
@@ -130,7 +128,7 @@ data class NewMessagesMark(
             ) {
                 index--
             }
-            return NewMessagesPlacement(entries[index].id, mark.generation, mark.showsDivider)
+            return NewMessagesPlacement(entries[index].id, mark.generation)
         }
     }
 }

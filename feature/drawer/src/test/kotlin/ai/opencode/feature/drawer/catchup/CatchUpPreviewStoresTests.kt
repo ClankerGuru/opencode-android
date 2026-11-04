@@ -1,8 +1,10 @@
 package ai.opencode.feature.drawer.catchup
 
+import ai.opencode.feature.transcript.SessionSeenWatermark
 import ai.opencode.core.dependencies.DependencyValues
 import ai.opencode.feature.drawer.CatchUpPreviewStores
 import ai.opencode.feature.drawer.HomeFeature
+import ai.opencode.feature.drawer.notingUnopenedCopy
 import ai.opencode.feature.session.SessionFeature
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeHomeSnapshot
@@ -21,8 +23,6 @@ import ai.opencode.core.store.TestStore
 import ai.opencode.feature.drawer.HomeSnapshotDate
 import ai.opencode.feature.drawer.makeDetail
 import ai.opencode.feature.session.from
-import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.feature.drawer.openingCatchUpCard
 import ai.opencode.feature.drawer.persistingTranscriptCache
 import ai.opencode.feature.drawer.publishingTranscript
@@ -124,6 +124,7 @@ class CatchUpPreviewStoresTests {
         store.receive(HomeFeature.Action.CachedTranscriptRefreshed(sessionID = "newer", items = refreshedItems)) {
             store.withDependencies {
                 it.copy(refreshingTranscripts = emptySet(), transcriptReadAt = it.transcriptReadAt + ("newer" to now))
+                    .notingUnopenedCopy("newer")
                     .publishingTranscript("newer", refreshedItems)
                     .persistingTranscriptCache(including = "newer")
             }.copy(previewRevision = 2)
@@ -143,9 +144,7 @@ class CatchUpPreviewStoresTests {
      * second card's state lands with `commit()` as it does after composition.
      */
     @Test
-    fun catchUpPreviewMarksWhatArrivedLikeTheOpenCard() = DependencyValues.withValues(
-        DependencyValues.testing().update { this[ExperimentalFeatures] = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.newMessagesDivider)) },
-    ) {
+    fun catchUpPreviewMarksWhatArrivedLikeTheOpenCard() = DependencyValues.withValues(DependencyValues.testing()) {
         fun user(id: String) = OpenCodeTranscriptItem.UserText(id = id, text = id)
         fun reply(id: String) = OpenCodeTranscriptItem.AssistantMarkdown(id = id, text = "Reply $id")
         val next = session("next", 20)

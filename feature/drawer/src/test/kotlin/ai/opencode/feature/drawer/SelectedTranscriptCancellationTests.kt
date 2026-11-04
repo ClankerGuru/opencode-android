@@ -1,5 +1,6 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.feature.transcript.SessionSeenWatermark
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.ImmediateClock
@@ -136,7 +137,10 @@ class SelectedTranscriptCancellationTests {
                 d.copy(initialTranscriptRequestIsExternal = false, initialTranscriptIsFresh = true, isLoading = false, items = items)
             }
         }
-        store.receive(Action.detail(SessionFeature.Action.AcceptedTranscriptUpdated(sessionID, items)))
+        store.receive(Action.detail(SessionFeature.Action.AcceptedTranscriptUpdated(sessionID, items))) {
+            // iOS asserts this write on the response before; it happens here, in `syncSeenItemsFromOpenDetail`.
+            store.withDependencies { it.settingSeenWatermark(SessionSeenWatermark(itemID = items.lastOrNull()?.id, viewedMilliseconds = 1_000), sessionID) }
+        }
     }
 
     private suspend fun receiveDrainedRefresh(
@@ -150,6 +154,7 @@ class SelectedTranscriptCancellationTests {
         store.receive(Action.CachedTranscriptRefreshed(sessionID = id, items = freshItems)) {
             store.withDependencies {
                 it.copy(refreshingTranscripts = expectedRemaining, transcriptReadAt = it.transcriptReadAt + (id to Instant.ofEpochSecond(500)))
+                    .notingUnopenedCopy(id)
                     .publishingTranscript(id, freshItems)
                     .persistingTranscriptCache(including = id)
             }
@@ -406,7 +411,9 @@ class SelectedTranscriptCancellationTests {
         }
         assertFalse(store.state.isInitialTranscriptInFlight)
         store.receive(Action.detail(SessionFeature.Action.AcceptedTranscriptUpdated(sessionID = "home", items = refreshedItems))) {
+            // iOS asserts this write on the response before; it happens here, in `syncSeenItemsFromOpenDetail`.
             it.copy(transcriptCache = it.transcriptCache + ("home" to refreshedItems))
+                .settingSeenWatermark(SessionSeenWatermark(itemID = "h0", viewedMilliseconds = 1_000), "home")
         }
         assertTrue(
             eventually {
@@ -602,6 +609,7 @@ class SelectedTranscriptCancellationTests {
         store.receive(Action.CachedTranscriptRefreshed(sessionID = "cached", items = cachedItems)) {
             store.withDependencies {
                 it.copy(refreshingTranscripts = emptySet(), transcriptReadAt = it.transcriptReadAt + ("cached" to Instant.ofEpochSecond(100)))
+                    .notingUnopenedCopy("cached")
                     .publishingTranscript("cached", cachedItems)
                     .persistingTranscriptCache(including = "cached")
             }
@@ -809,7 +817,10 @@ class SelectedTranscriptCancellationTests {
                 d.copy(refresh = null, initialTranscriptIsFresh = true)
             }
         }
-        store.receive(Action.detail(SessionFeature.Action.AcceptedTranscriptUpdated(sessionID = "home", items = homeFresh)))
+        store.receive(Action.detail(SessionFeature.Action.AcceptedTranscriptUpdated(sessionID = "home", items = homeFresh))) {
+            // iOS asserts this write on the response before; it happens here, in `syncSeenItemsFromOpenDetail`.
+            it.settingSeenWatermark(SessionSeenWatermark(itemID = "h0", viewedMilliseconds = 1_000), "home")
+        }
 
         // 4. Advance the clock in 500 ms steps: each dirty cached session refreshes in order.
         val remaining = expectedDirty.toMutableSet()
@@ -912,6 +923,7 @@ class SelectedTranscriptCancellationTests {
         store.receive(Action.CachedTranscriptRefreshed(sessionID = "cached", items = freshCached)) {
             store.withDependencies {
                 it.copy(refreshingTranscripts = emptySet(), transcriptReadAt = it.transcriptReadAt + ("cached" to Instant.ofEpochSecond(200)))
+                    .notingUnopenedCopy("cached")
                     .publishingTranscript("cached", freshCached)
                     .persistingTranscriptCache(including = "cached")
             }
@@ -983,7 +995,10 @@ class SelectedTranscriptCancellationTests {
         store.receive({ it.isDetailAction<SessionFeature.Action.RefreshResponse>() }, "refreshResponse") {
             it.updatingDetail { d -> d.copy(refresh = null, initialTranscriptIsFresh = true) }
         }
-        store.receive(Action.detail(SessionFeature.Action.AcceptedTranscriptUpdated(sessionID = "home", items = homeFresh)))
+        store.receive(Action.detail(SessionFeature.Action.AcceptedTranscriptUpdated(sessionID = "home", items = homeFresh))) {
+            // iOS asserts this write on the response before; it happens here, in `syncSeenItemsFromOpenDetail`.
+            it.settingSeenWatermark(SessionSeenWatermark(itemID = "h0", viewedMilliseconds = 1_000), "home")
+        }
         assertFalse(store.state.isInitialTranscriptInFlight)
         assertFalse(store.state.isConnected)
         assertEquals(listOf("s1", "s2"), store.state.dirtyCachedTranscriptIDs)

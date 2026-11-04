@@ -322,7 +322,7 @@ class SessionVoiceTests {
 
     @Test fun anEndedCallSweepsOutBeforeTheComposerReturns() = sessionTest { h ->
         val clock = TestClock()
-        val state = h.hosting(root).withVoice { it.copy(showsCaptions = true) }
+        val state = h.hosting(root)
         val store = h.store(state) {
             this[Clock] = clock
             this[DateClient] = DateClient.constant(Instant.EPOCH)
@@ -340,12 +340,9 @@ class SessionVoiceTests {
         store.send(Action.voicePresented(VoiceFeature.Action.EndTapped))
         store.receive(voiceEnded, "delegate.ended")
         assertEquals("The bar stays while the scope sweeps out", VoiceFeature.State.Phase.Ended, store.state.voice?.phase)
-        assertEquals("Captions close with the call", false, store.state.voice?.showsCaptions)
 
         // Taps during the sweep change nothing and don't restart it.
         store.send(Action.voicePresented(VoiceFeature.Action.EndTapped))
-        store.send(Action.voicePresented(VoiceFeature.Action.CaptionsTapped))
-        assertEquals(false, store.state.voice?.showsCaptions)
 
         clock.advance(((DotScopeSimulation.exitDuration - 0.1) * 1000).toLong().milliseconds)
         assertNotNull(store.state.voice)

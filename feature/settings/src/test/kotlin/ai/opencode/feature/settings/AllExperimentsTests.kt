@@ -112,7 +112,7 @@ class AllExperimentsTests {
         store.finish()
         val before = setOf(ExperimentalFeature.onePicker, ExperimentalFeature.soundEffects, ExperimentalFeature.backgroundCallIntent)
         for (feature in listed) {
-            assertEquals("$feature", feature.defaultEnabled || feature in before, shared.on(feature))
+            assertEquals("$feature", feature in before, shared.on(feature))
         }
         assertEquals("back on as before, preloaded again", listOf("sound.prepare"), log.value)
         assertNull("nothing saved while it's off", shared.get(allExperimentsSaved(ExperimentalFeature.onePicker)))
@@ -124,14 +124,14 @@ class AllExperimentsTests {
         val shared = SettingsTestShared()
         shared.set(AllExperiments.key, true)
         for (feature in ExperimentalFeature.joiningAll) {
-            if (feature == ExperimentalFeature.inAppBrowser || feature == ExperimentalFeature.imageLinkPreviews) continue
+            if (feature == ExperimentalFeature.inAppBrowser || feature == ExperimentalFeature.inboxSidebar) continue
             shared.set(experimental(feature), true)
             shared.set(allExperimentsSaved(feature), false)
         }
-        shared.set(allExperimentsSkips(ExperimentalFeature.imageLinkPreviews), true)
+        shared.set(allExperimentsSkips(ExperimentalFeature.inboxSidebar), true)
         shared.read { ExperimentalFeature.adoptNewExperimentsIntoAll() }
         assertTrue(shared.on(ExperimentalFeature.inAppBrowser))
-        assertFalse("skipped before, still off", shared.on(ExperimentalFeature.imageLinkPreviews))
+        assertFalse("skipped before, still off", shared.on(ExperimentalFeature.inboxSidebar))
         assertEquals(false, shared.get(allExperimentsSaved(ExperimentalFeature.inAppBrowser)))
         shared.read { ExperimentalFeature.adoptNewExperimentsIntoAll() }
         assertTrue(shared.on(ExperimentalFeature.inAppBrowser))
@@ -147,7 +147,7 @@ class AllExperimentsTests {
         val shared = SettingsTestShared()
         shared.read { ExperimentalFeature.adoptNewExperimentsIntoAll() }
         for (feature in ExperimentalFeature.allCases) {
-            assertTrue("$feature", !shared.on(feature) || feature.defaultEnabled)
+            assertFalse("$feature", shared.on(feature))
             assertFalse("$feature", shared.store.contains(allExperimentsSaved(feature)))
         }
     }

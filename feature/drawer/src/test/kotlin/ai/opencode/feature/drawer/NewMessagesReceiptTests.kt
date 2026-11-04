@@ -6,8 +6,6 @@ import ai.opencode.core.dependencies.DependencyValues
 import ai.opencode.core.dependencies.ImmediateClock
 import ai.opencode.core.dependencies.UuidClient
 import ai.opencode.core.dependencies.withDependenciesSuspending
-import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.core.store.TestStore
 import ai.opencode.core.testing.TestIsolationRule
 import ai.opencode.feature.transcript.list.NewMessagesMark
@@ -49,8 +47,6 @@ class NewMessagesReceiptTests {
         OpenCodeTranscriptItem.UserText(id = "u2", text = "u2"), OpenCodeTranscriptItem.AssistantMarkdown(id = "a2", text = "Reply a2"),
     )
 
-    private val divider = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.newMessagesDivider))
-
     private fun session(id: String, updated: Long) = OpenCodeSession(
         id = id, serverTitle = id, projectID = "project", directory = "/project", updatedAt = Instant.ofEpochSecond(updated),
         idleMilliseconds = 2_000, viewedMilliseconds = 1_000,
@@ -74,9 +70,8 @@ class NewMessagesReceiptTests {
             events
         }
 
-    /** [body] with the store's experiments, as iOS's `TestStore` runs its expected-state updates. */
-    private fun <R> on(body: () -> R): R =
-        DependencyValues.withValues(DependencyValues.testing().update { this[ExperimentalFeatures] = divider }, body)
+    /** [body] in the test's dependencies, as iOS's `TestStore` runs its expected-state updates. */
+    private fun <R> on(body: () -> R): R = DependencyValues.withValues(DependencyValues.testing(), body)
 
     private fun store(server: OpenCodeServer, receipts: SelfViewReceipts, scope: CoroutineScope): TestStore<HomeFeature.State, HomeFeature.Action> {
         val current = session("ses_current", updated = 30)
@@ -90,7 +85,6 @@ class NewMessagesReceiptTests {
         val cached = items
         val live = OpenCodeClient.liveValue
         return TestStore(home, HomeFeature(), scope) {
-            this[ExperimentalFeatures] = divider
             this[SelfViewReceipts] = receipts
             this[Clock] = ImmediateClock()
             this[DateClient] = DateClient { Instant.ofEpochSecond(100) }

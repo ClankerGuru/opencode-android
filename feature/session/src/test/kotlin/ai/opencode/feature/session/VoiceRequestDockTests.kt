@@ -1,8 +1,6 @@
 package ai.opencode.feature.session
 
 import ai.opencode.core.experiments.key
-import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.core.sharing.shared
 import ai.opencode.core.testing.TestIsolationRule
 import ai.opencode.feature.composer.DraftState
 import ai.opencode.feature.session.SessionFeature.Action
@@ -44,15 +42,14 @@ class VoiceRequestDockTests {
               {"key":"q0","type":"string","title":"Shipped cards","options":[{"value":"done","label":"Mark them Done"},{"value":"skip","label":"Leave them"}]}]}""",
         )
 
-    private fun Harness.calling(floating: Boolean): SessionFeature.State = state {
-        shared(ExperimentalFeature.livingOrb.key).set(floating)
+    private fun Harness.calling(): SessionFeature.State = state {
         val voice = VoiceFeature.State(server, session).withPhase(VoiceFeature.State.Phase.Live)
         SessionFeature.State.session(server = server, session = session, cachedItems = emptyList())
             .copy(voice = voice, hasLoadedPendingRequests = true)
     }
 
     @Test fun aFloatingCallDocksTheRequestAndOnlyTheServerClearsIt() = sessionTest { h ->
-        val initial = h.calling(floating = true)
+        val initial = h.calling()
         val cleanup = cleanup
         val pending = LockIsolated(OpenCodePendingRequests(permissions = emptyList(), forms = listOf(cleanup)))
         val store = h.store(initial) {
@@ -94,13 +91,5 @@ class VoiceRequestDockTests {
                 .endAnswering()
         }
         assertFalse(store.state.isAnsweringRequest)
-    }
-
-    @Test fun aStandardCallsBarKeepsTheComposersPlace() = sessionTest { h ->
-        val state = h.calling(floating = false).withFormRequests(listOf(cleanup))
-        h.state {
-            assertTrue(state.callOwnsAudio)
-            assertFalse(state.wantsRequestDock)
-        }
     }
 }

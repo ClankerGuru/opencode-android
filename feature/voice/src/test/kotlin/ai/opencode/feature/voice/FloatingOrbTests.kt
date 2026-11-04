@@ -1,15 +1,12 @@
 package ai.opencode.feature.voice
 
 import ai.opencode.core.motion.MotionFrameAction
-import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.core.testing.TestIsolationRule
 import ai.opencode.core.tuning.TuneValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -205,17 +202,6 @@ class FloatingOrbTests {
         // No call window: no room.
         center.orbLayout = null
         assertNull(center.restingOrb(862f))
-    }
-
-    @Test fun theExperimentIsOnByDefaultButOffInTests() {
-        assertTrue(ExperimentalFeature.livingOrb.defaultEnabled)
-        assertFalse(ExperimentalFeatures.testValue(ExperimentalFeature.livingOrb))
-        assertEquals("Living Orb", ExperimentalFeature.livingOrb.title)
-        val center = FloatingCallCenter()
-        center.forced = false
-        assertEquals(ExperimentalFeature.livingOrb.isActive(false), center.isOn(false))
-        center.forced = true
-        assertTrue(center.isOn(false))
     }
 
     // MARK: FloatingOrbSurfaceTests: the surface's motion reads the screen as it is each frame,

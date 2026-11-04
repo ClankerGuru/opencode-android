@@ -350,9 +350,6 @@ fun HomeFeature.State.openingParameters(
     pending: HomeFeature.State.PendingOpenReadState? = null,
 ): OpeningParameters {
     val snapshot = sessionSnapshots[session.id]
-    if (!SessionFeature.State.showsNewMessagesDivider) {
-        return OpeningParameters(seen = snapshot?.seenItemIDs ?: unopenedSeen[session.id], viewedMilliseconds = null, unread = false)
-    }
     val serverViewed = if (pending != null) pending.viewedMilliseconds else unseenCutoffMilliseconds(session, wasUnread = false)
     val snapshotSeen = snapshot?.seenItemIDs
     val unopened = unopenedSeen[session.id]
@@ -390,7 +387,6 @@ fun HomeFeature.State.applyingOpening(
 
 /** iOS `setSeenWatermark(_:for:)`. */
 fun HomeFeature.State.settingSeenWatermark(watermark: SessionSeenWatermark, sessionID: String): HomeFeature.State {
-    if (!SessionFeature.State.showsNewMessagesDivider) return this
     val key = sessionKey(sessionID)
     if (sessionSeenWatermarks[key] == watermark && sessionSeenWatermarks.order.lastOrNull() == key) return this
     return updatingSessionSeenWatermarks { it.setting(watermark, key) }
@@ -443,7 +439,7 @@ fun HomeFeature.State.syncingSeenItemsFromOpenDetail(sessionID: String): HomeFea
 
 /** iOS `syncSeenWatermark(from:sessionID:)`: keeps how far the reader had seen [detail], for a cold launch into it. */
 fun HomeFeature.State.syncingSeenWatermark(detail: SessionFeature.State, sessionID: String): HomeFeature.State {
-    if (!SessionFeature.State.showsNewMessagesDivider || !detail.readsOnView) return this
+    if (!detail.readsOnView) return this
     val sessionViewed = maxOf(
         locallyViewedMilliseconds[sessionID] ?: 0,
         detail.viewedIdle[sessionID] ?: 0,
@@ -515,8 +511,7 @@ fun HomeFeature.State.notingLocalActivity(sessionID: String, at: Instant): HomeF
 
 fun HomeFeature.State.markingReadLocally(session: OpenCodeSession): HomeFeature.State {
     var s = this
-    if (SessionFeature.State.showsNewMessagesDivider &&
-        sessionDetail?.session?.id != session.id &&
+    if (sessionDetail?.session?.id != session.id &&
         pendingOpenReadState[session.id] == null
     ) {
         val current = sessions.firstOrNull { it.id == session.id } ?: session

@@ -9,7 +9,6 @@ import ai.opencode.core.experiments.key
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.log.AppLog
-import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
@@ -549,15 +548,13 @@ internal fun dropPin(state: State, id: String, pinnedIndex: Int?): State {
 }
 
 /**
- * The drawer offers a call (iOS `drawerOffersCall`): under Living Orb (the other styles' call
- * lives in the composer, under the drawer), with Voice set up, and with something to call: the
+ * The drawer offers a call (iOS `drawerOffersCall`): with Voice set up, and with something to call: the
  * session or project draft behind the drawer, or the session Start Voice Call's Last Viewed path
  * would open. A draft with no project and no session to fall back on offers none, rather than
  * opening a project picker behind the drawer.
  */
 val HomeFeature.State.drawerOffersCall: Boolean
     get() {
-        if (!ExperimentalFeature.livingOrb.isActive(shared(ExperimentalFeature.livingOrb.key).value)) return false
         val detail = sessionDetail ?: return lastViewedOrNewestSession != null
         if (!detail.isVoiceAvailable) return false
         return detail.session != null || detail.draftProject != null || lastViewedOrNewestSession != null

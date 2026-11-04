@@ -1,5 +1,6 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.feature.transcript.SessionSeenWatermark
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.DependencyValues
@@ -147,7 +148,8 @@ class TranscriptCachePersistenceTests {
         val store = world.store(this, state)
         val fresh = listOf<OpenCodeTranscriptItem>(OpenCodeTranscriptItem.UserText(id = "fresh", text = "Refreshed"))
         store.send(detail(SessionFeature.Action.AcceptedTranscriptUpdated(sessionID = "open", items = fresh))) { s ->
-            store.withDependencies { s.publishingTranscript("open", fresh).persistingTranscriptCache("open") }
+            store.withDependencies { s.publishingTranscript("open", fresh).persistingTranscriptCache("open")
+                .settingSeenWatermark(SessionSeenWatermark(itemID = "cached", viewedMilliseconds = null), "open") }
         }
         store.finish()
         // The cache's writer schedules each change off the reducer's thread.

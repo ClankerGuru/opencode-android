@@ -192,109 +192,11 @@ internal fun Modifier.blocksTouches(): Modifier = pointerInput(Unit) {
 }
 
 /**
- * The call in the session's composer slot. Session places it where the composer goes while a
- * call holds the composer (iOS `SessionView` + `composerCapsule`): the failure card
- * ([VoiceCallFailure]) or the dropped-call card ([VoiceCallEnded]) when the phase shows a card,
- * otherwise the call bar ([VoiceCallComposer]) on its surface ([VoiceCallSurface]), whose
- * transcript grows up out of it. Sessions that put the composer and the call in one capsule
- * use [VoiceCallSurface] and [VoiceCallComposer] directly.
- *
- * Its appearance starts the call once (`.startIfNeeded`); only Try Again and Rejoin start it
- * again.
- */
-@Composable
-fun VoiceView(store: VoiceStoreOf, modifier: Modifier = Modifier) {
-    // Once per call: the call keeps running while the drawer swaps sessions.
-    LaunchedEffect(store) { store.send(VoiceFeature.Action.StartIfNeeded) }
-    val phase by store.observe { it.phase }
-    when (val current = phase) {
-        is VoiceFeature.State.Phase.Failed -> VoiceCallFailure(
-            store = store,
-            message = current.message,
-            modifier = modifier.padding(start = 12.dp, end = 12.dp, bottom = 6.dp),
-        )
-        VoiceFeature.State.Phase.Dropped -> VoiceCallEnded(store, modifier.padding(start = 12.dp, end = 12.dp, bottom = 6.dp))
-        else -> VoiceCallSurface(store, modifier) { VoiceCallComposer(store) }
-    }
-}
-
-/**
- * A live call takes the composer's place: the dot scope fills the capsule behind Mute and End.
- * Tapping it grows the capsule's surface up into the call's transcript ([VoiceCallSurface]);
- * the bar itself never moves or changes height. The host supplies the surface, shared with
- * the composer, so one capsule morphs between them; the scope scans in while the call
- * connects and sweeps out on End.
- */
-@Composable
-fun VoiceCallComposer(store: VoiceStoreOf, modifier: Modifier = Modifier) {
-    val isTerminal by store.observe { it.phase.isTerminal }
-    val isMuted by store.observe { it.isMuted }
-    val showsPoorConnection by store.observe { it.showsPoorConnection }
-    val scopeStage by store.observe { it.scopeStage }
-    val isLive = scopeStage == DotScopeSimulation.Stage.live
-    val reduceMotion = rememberReduceMotion()
-    // A weak connection quiets the scope so its note reads cleanly.
-    val scopeAlpha by animateFloatAsState(
-        if (showsPoorConnection) 0.25f else 1f,
-        if (reduceMotion) Motion.reducedFadeSpec() else MotionSpring(0.4).spec(),
-        label = "voiceScopePoor",
-    )
-    Box(
-        modifier
-            .fillMaxWidth()
-            .height(ComposerMetrics.barHeight.dp)
-            .clip(RoundedCornerShape(ComposerMetrics.cornerRadius.dp))
-            // An ended call is only sweeping out.
-            .then(if (isTerminal) Modifier.blocksTouches() else Modifier),
-    ) {
-        DotScopeView(DotScopeMode.Call(scopeStage), Modifier.fillMaxSize().graphicsLayer { alpha = scopeAlpha })
-        Row(
-            Modifier
-                .fillMaxSize()
-                .padding(horizontal = ComposerMetrics.innerHorizontal.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            val muteLabel = if (isMuted) "Unmute" else "Mute"
-            Box(
-                Modifier
-                    .then(if (isLive) Modifier.clickable(interactionSource = null, indication = null, role = Role.Button) { store.send(VoiceFeature.Action.MuteTapped) } else Modifier)
-                    .openCodeTapTarget()
-                    .semantics { contentDescription = muteLabel; role = Role.Button },
-                contentAlignment = Alignment.Center,
-            ) {
-                // A soft disc balances End's red circle on the other side.
-                Box(
-                    Modifier
-                        .size(44.dp)
-                        .background(VoiceCallSurfaceDefaults.tertiaryFill, CircleShape)
-                        .graphicsLayer { alpha = if (isLive) 1f else 0.4f },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    OpenCodeIcon(if (isMuted) SFSymbol.MicSlashFill else SFSymbol.MicFill, null, tint = OpenCodeTheme.colors.text, size = 22.dp)
-                }
-            }
-            VoiceCallCenterButton(store = store, canToggleCaptions = true, animation = if (reduceMotion) Motion.reducedFadeSpec() else MotionSpring(0.25).spec())
-            Box(
-                Modifier
-                    .clickable(interactionSource = null, indication = null, role = Role.Button) { store.send(VoiceFeature.Action.EndPressed) }
-                    .openCodeTapTarget()
-                    .semantics { contentDescription = "End voice call"; role = Role.Button },
-                contentAlignment = Alignment.Center,
-            ) {
-                Box(Modifier.size(40.dp).background(VoiceCallSurfaceDefaults.red, CircleShape), contentAlignment = Alignment.Center) {
-                    OpenCodeIcon(SFSymbol.PhoneDownFill, null, tint = Color.White, size = 22.dp)
-                }
-            }
-        }
-    }
-}
-
-/**
  * Something the composer's own surface grows into, above the bar (the model list). Its
  * content is laid out once at the full open height, its top riding the surface's top edge
  * like a sheet's, while the bar's own contents fade out beneath it. It can rest at more than
  * one height (detents): a drag moves the surface with the finger, and settling springs it to
- * its next rest with the finger's speed. Composer builds it; [VoiceCallSurface] draws it.
+ * its next rest with the finger's speed. Composer builds it; [ComposerSurface] draws it.
  *
  * @property isOpen grown, or growing.
  * @property isShown drawn: open, or shrinking back into the bar.
@@ -409,21 +311,15 @@ private fun Modifier.reachFade(
     alpha = max(shown, minimum)
 }
 
-/** Unbouncy, and quicker to close than to open; springs retarget smoothly when toggled mid-flight. */
-internal fun voiceSurfaceAnimation(expanding: Boolean): MotionSpring =
-    if (expanding) MotionSpring.fromResponse(0.36, 0.9) else MotionSpring.fromResponse(0.26, 1.0)
-
 /**
- * The composer capsule's surface (iOS `voiceCallSurface(_:panel:…)`). During a call with
- * captions open it grows up out of the bar into one surface holding the transcript, drawn above
- * the capsule's frame so the layout around it never changes; it measures as [content] (the bar)
- * alone. With no call ([store] `null`) the same surface grows for a pending request's [panel]
- * (D-31 B) or an [expansion] (the model list): one shape, never a second surface.
+ * The composer capsule's surface (iOS `composerSurface(panel:…)`, e5c22780). It grows up out of
+ * the bar for a pending request's [panel] (D-31 B), the call's rows, or an [expansion] (the
+ * model list): one shape, never a second surface, drawn above the capsule's frame so the layout
+ * around it never changes; it measures as [content] (the bar) alone.
  *
  * Only the reach shows: unrevealed room above the bar is clipped from both drawing and touches
- * ([TopInsetRect]), so it passes touches through to the transcript beneath. Unbouncy spring,
- * quicker closing, retargeting on rapid toggles; Reduce Motion cross-fades. The transcript stays
- * mounted a second after closing. Everything above an open transcript dismisses it.
+ * ([TopInsetRect]), so it passes touches through to the transcript beneath. Reduce Motion
+ * cross-fades.
  *
  * @param panel stands on the bar at its own height; [panelExtent] is the room above the bar it's
  *   laid out in, held steady while the surface grows or folds, and [panelReveal] is how far up
@@ -434,8 +330,7 @@ internal fun voiceSurfaceAnimation(expanding: Boolean): MotionSpring =
  *   TalkBack too.
  */
 @Composable
-fun VoiceCallSurface(
-    store: VoiceStoreOf?,
+fun ComposerSurface(
     modifier: Modifier = Modifier,
     panel: (@Composable () -> Unit)? = null,
     panelExtent: () -> Float = { 0f },
@@ -446,32 +341,9 @@ fun VoiceCallSurface(
     panelHidden: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    val panelExtentValue = { if (store == null) panelExtent() else 0f }
-    val panelRevealValue = { if (store == null) panelReveal() else 0f }
-    val panelIsShown = store == null && panelShown
-    val activeExpansion = if (store == null) expansion else null
+    val activeExpansion = expansion
     val reduceMotion = rememberReduceMotion()
     val isDark = OpenCodeTheme.colors.isDark
-    val fontScale = LocalDensity.current.fontScale
-    val isExpanded = store.watch { it.showsCaptions } == true
-    // @ScaledMetric(relativeTo: .body) 176, capped at 300.
-    val height = min(176f * fontScale, 300f)
-    var isLingering by remember { mutableStateOf(false) }
-    LaunchedEffect(isExpanded) {
-        if (isExpanded) {
-            isLingering = true
-        } else if (isLingering) {
-            // Kept through the collapse, so toggling again mid-flight retargets the same transcript.
-            delay(1_000)
-            isLingering = false
-        }
-    }
-    val callExtentTarget = if (isExpanded || (store != null && reduceMotion && isLingering)) height else 0f
-    val callExtent by animateFloatAsState(
-        callExtentTarget,
-        if (reduceMotion) snap() else voiceSurfaceAnimation(isExpanded).spec(),
-        label = "voiceSurfaceExtent",
-    )
 
     // The expansion's reach, animated here unless the opener holds it.
     val localReach = remember { ComposerExpansionReach() }
@@ -530,10 +402,10 @@ fun VoiceCallSurface(
     }
     val expansionReach = reachBox.value
     val expanding = expansionReach > 0 || expansionOpen
-    val extent = { if (store == null) max(panelExtentValue(), expansionReach) else callExtent }
-    val surfaceExpanded = if (store == null) panelIsShown || expansionOpen else isExpanded
+    val extent = { max(panelExtent(), expansionReach) }
+    val surfaceExpanded = panelShown || expansionOpen
     // The room above the bar the surface doesn't reach yet (or any more).
-    val unrevealed = { if (store == null && !expanding) max(0f, extent() - panelRevealValue()) else 0f }
+    val unrevealed = { if (!expanding) max(0f, extent() - panelReveal()) else 0f }
     val reducedReach by animateFloatAsState(if (expansionOpen) 1_000f else 0f, Motion.reducedFadeSpec(), label = "reducedReach")
     val dim by animateFloatAsState(
         if (expansionOpen) (if (isDark) ComposerExpansion.dimDark else ComposerExpansion.dimLight) else 0f,
@@ -548,11 +420,7 @@ fun VoiceCallSurface(
     Layout(
         modifier = modifier,
         content = {
-            if (store != null && isExpanded) {
-                // Everything above the surface dismisses it.
-                Box(Modifier.layoutId(SurfaceSlot.backdrop)) { VoiceCaptionsDismissBackdrop(store) }
-            }
-            if (activeExpansion != null && store == null) {
+            if (activeExpansion != null) {
                 // Everything outside the expansion, above and below the bar, dims a little and dismisses it.
                 Box(
                     Modifier
@@ -580,22 +448,6 @@ fun VoiceCallSurface(
                     Box(Modifier.fillMaxSize().callSurface({ TopInsetRect(unrevealed(), cornerRadius) }, surfaceColor))
                 }
             }
-            // The surface reveals the transcript from the bar up as it grows.
-            Box(
-                Modifier
-                    .layoutId(SurfaceSlot.transcript)
-                    .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-                    .then(if (isExpanded) Modifier else Modifier.blocksTouches()),
-                contentAlignment = Alignment.BottomCenter,
-            ) {
-                if (store != null && (isExpanded || isLingering)) {
-                    VoiceCallTranscript(
-                        store = store,
-                        isExpanded = isExpanded,
-                        modifier = Modifier.fillMaxWidth().wrapContentHeight(Alignment.Bottom, unbounded = true).height(height.dp),
-                    )
-                }
-            }
             Box(
                 Modifier
                     .layoutId(SurfaceSlot.content)
@@ -604,7 +456,7 @@ fun VoiceCallSurface(
                     .reachFade(reach = { if (reduceMotion) reducedReach else reachBox.value }, range = ComposerExpansion.barFade, showsAbove = false)
                     .then(if (expansionOpen) Modifier.clearAndSetSemantics {} else Modifier),
             ) { content() }
-            if (panel != null && store == null) {
+            if (panel != null) {
                 // A request's panel sits on the bar, its position fixed there; only the clip (the
                 // surface's reach) grows and folds, so the panel never moves under it. Laid out
                 // even before the surface reveals any of it, so its height is known to grow to.
@@ -612,10 +464,10 @@ fun VoiceCallSurface(
                     Modifier
                         .layoutId(SurfaceSlot.panel)
                         .graphicsLayer {
-                            shape = BottomRevealShape(min(panelRevealValue(), extent()), 28f)
+                            shape = BottomRevealShape(min(panelReveal(), extent()), 28f)
                             clip = true
                         }
-                        .then(if (panelIsShown) Modifier else Modifier.blocksTouches())
+                        .then(if (panelShown) Modifier else Modifier.blocksTouches())
                         .then(if (panelHidden) Modifier.clearAndSetSemantics {} else Modifier),
                 ) { panel() }
             }
@@ -652,11 +504,11 @@ fun VoiceCallSurface(
                 }
             }
         },
-        measurePolicy = surfaceMeasurePolicy(extent = extent, fullExtent = activeExpansion?.fullExtent ?: 0f, panelExtent = panelExtentValue, transcriptHeight = height),
+        measurePolicy = surfaceMeasurePolicy(extent = extent),
     )
 }
 
-private enum class SurfaceSlot { backdrop, glass, transcript, content, panel, expansion }
+private enum class SurfaceSlot { backdrop, glass, content, panel, expansion }
 
 private class ExpansionMotion {
     var previousTarget = 0f
@@ -665,7 +517,7 @@ private class ExpansionMotion {
 }
 
 /** Laid out as the bar alone: what grows above it never moves the session's insets. */
-private fun surfaceMeasurePolicy(extent: () -> Float, fullExtent: Float, panelExtent: () -> Float, transcriptHeight: Float) = MeasurePolicy { measurables, constraints ->
+private fun surfaceMeasurePolicy(extent: () -> Float) = MeasurePolicy { measurables, constraints ->
     val bar = measurables.first { it.layoutId == SurfaceSlot.content }.measure(constraints.copy(minHeight = 0))
     val width = bar.width
     // A self-animating panel reports its current height during measurement. Read the
@@ -676,7 +528,6 @@ private fun surfaceMeasurePolicy(extent: () -> Float, fullExtent: Float, panelEx
     val placeables = measurables.filter { it.layoutId != SurfaceSlot.content }.map { measurable ->
         val c = when (measurable.layoutId) {
             SurfaceSlot.glass -> Constraints.fixed(width, bar.height + extentPx)
-            SurfaceSlot.transcript -> Constraints.fixed(width, extentPx)
             // At its own height (it caps itself): [panelExtent] is the room the session keeps for it.
             SurfaceSlot.panel -> Constraints(minWidth = width, maxWidth = width)
             SurfaceSlot.expansion -> Constraints.fixed(width, bar.height + extentPx)
@@ -684,13 +535,11 @@ private fun surfaceMeasurePolicy(extent: () -> Float, fullExtent: Float, panelEx
         }
         measurable.layoutId to (if (measurable.layoutId == SurfaceSlot.panel) panel!! else measurable.measure(c))
     }
-    val expansionHeight = fullExtent.dp.roundToPx() + bar.height
     layout(width, bar.height) {
         for ((id, placeable) in placeables) {
             when (id) {
                 SurfaceSlot.backdrop -> placeable.place((width - placeable.width) / 2, (bar.height - placeable.height) / 2)
                 SurfaceSlot.glass -> placeable.place(0, -extentPx)
-                SurfaceSlot.transcript -> placeable.place(0, -extentPx)
                 else -> Unit
             }
         }
@@ -703,9 +552,6 @@ private fun surfaceMeasurePolicy(extent: () -> Float, fullExtent: Float, panelEx
                 else -> Unit
             }
         }
-        @Suppress("UNUSED_EXPRESSION") expansionHeight
-        @Suppress("UNUSED_EXPRESSION") transcriptHeight
-        @Suppress("UNUSED_EXPRESSION") panelExtent
     }
 }
 
@@ -745,12 +591,6 @@ private class BottomRevealShape(private val height: Float, private val cornerRad
 }
 
 /**
- * What sits above the call bar keeps its place but hides while the call's transcript covers
- * it, so it neither shows through the surface nor stays reachable by TalkBack or touch.
- */
-fun Modifier.hiddenUnderVoiceTranscript(isHidden: Boolean): Modifier = this then HiddenElement(isHidden, HiddenKind.voiceTranscript)
-
-/**
  * What sits above the composer (the pills, the background-work capsule, a draft's projects)
  * hides while a panel grown out of the composer (the model list, the level picker) stands over
  * it: gone as the surface grows over it, and back only once the surface has shrunk below it.
@@ -764,14 +604,13 @@ fun Modifier.hiddenUnderComposerPanel(isHidden: Boolean): Modifier = this then H
 fun Modifier.hiddenUnderFloatingCall(isHidden: Boolean): Modifier = this then HiddenElement(isHidden, HiddenKind.floatingCall)
 
 @Suppress("EnumEntryName")
-private enum class HiddenKind { voiceTranscript, composerPanel, floatingCall }
+private enum class HiddenKind { composerPanel, floatingCall }
 
 private data class HiddenElement(val isHidden: Boolean, val kind: HiddenKind) : ModifierNodeElement<HiddenNode>() {
     override fun create() = HiddenNode(isHidden, kind)
     override fun update(node: HiddenNode) = node.update(isHidden, kind)
     override fun InspectorInfo.inspectableProperties() {
         name = when (kind) {
-            HiddenKind.voiceTranscript -> "hiddenUnderVoiceTranscript"
             HiddenKind.composerPanel -> "hiddenUnderComposerPanel"
             HiddenKind.floatingCall -> "hiddenUnderFloatingCall"
         }
@@ -796,12 +635,9 @@ private class HiddenNode(var isHidden: Boolean, var kind: HiddenKind) :
         val context = currentValueOf(LocalContext)
         val reduceMotion = Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
         if (reduceMotion) return Motion.reducedFadeSpec()
-        return when (kind) {
-            // Opening, the surface reaches the pill row within a few frames, so what's there fades
-            // out about as fast; closing, the surface passes back below it 0.15 s into its fold.
-            HiddenKind.composerPanel, HiddenKind.floatingCall -> if (hiding) tween(140, easing = Motion.EaseOut) else tween(200, delayMillis = 150, easing = Motion.EaseInOut)
-            HiddenKind.voiceTranscript -> voiceSurfaceAnimation(expanding = hiding).spec()
-        }
+        // Opening, the surface reaches the pill row within a few frames, so what's there fades
+        // out about as fast; closing, the surface passes back below it 0.15 s into its fold.
+        return if (hiding) tween(140, easing = Motion.EaseOut) else tween(200, delayMillis = 150, easing = Motion.EaseInOut)
     }
 
     override fun androidx.compose.ui.layout.MeasureScope.measure(measurable: androidx.compose.ui.layout.Measurable, constraints: Constraints): androidx.compose.ui.layout.MeasureResult {
@@ -822,124 +658,6 @@ private class HiddenNode(var isHidden: Boolean, var kind: HiddenKind) :
     }
 
     override fun onCancelPointerInput() = Unit
-}
-
-/**
- * The surface above the bar: the call's captions, with its duration in the top trailing corner.
- * Fades and rises in as the surface grows, and out as it shrinks; under Reduce Motion it only
- * fades. TalkBack's dismiss action closes it.
- *
- * @param animation the spec its fade follows for a given shown state; the
- *   surface's own springs by default.
- */
-@Composable
-fun VoiceCallTranscript(
-    store: VoiceStoreOf,
-    isExpanded: Boolean,
-    modifier: Modifier = Modifier,
-    animation: ((Boolean) -> FiniteAnimationSpec<Float>)? = null,
-) {
-    val reduceMotion = rememberReduceMotion()
-    var isMounted by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { isMounted = true }
-    val isShown = isExpanded && isMounted
-    val spec: FiniteAnimationSpec<Float> = if (reduceMotion) Motion.reducedFadeSpec() else animation?.invoke(isShown) ?: voiceSurfaceAnimation(isShown).spec()
-    val shown by animateFloatAsState(if (isShown) 1f else 0f, spec, label = "voiceTranscriptShown")
-    val connectedAt by store.observe { it.connectedAt }
-    var durationSize by remember { mutableStateOf(IntSize.Zero) }
-    Box(
-        modifier
-            .graphicsLayer {
-                alpha = shown
-                translationY = if (reduceMotion) 0f else (1 - shown) * 10.dp.toPx()
-            }
-            .semantics {
-                dismiss { store.send(VoiceFeature.Action.CaptionsDismissed); true }
-            },
-    ) {
-        VoiceCaptions(
-            store = store,
-            isVisible = isExpanded,
-            modifier = Modifier
-                .fillMaxSize()
-                // Lines scrolled under the duration fade out around it.
-                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                .drawWithContent {
-                    drawContent()
-                    if (connectedAt != null && durationSize.width > 0) {
-                        val fadeLeading = 40.dp.toPx()
-                        val fadeBottom = 10.dp.toPx()
-                        val w = durationInsetTrailing.dp.toPx() + durationSize.width + 6.dp.toPx() + fadeLeading
-                        val h = durationInsetTop.dp.toPx() + durationSize.height + 2.dp.toPx() + fadeBottom
-                        val left = size.width - w
-                        val horizontal = android.graphics.LinearGradient(left, 0f, left + fadeLeading, 0f, 0, android.graphics.Color.BLACK, android.graphics.Shader.TileMode.CLAMP)
-                        val vertical = android.graphics.LinearGradient(0f, h - fadeBottom, 0f, h, android.graphics.Color.BLACK, 0, android.graphics.Shader.TileMode.CLAMP)
-                        val combined = android.graphics.ComposeShader(horizontal, vertical, android.graphics.BlendMode.DST_IN)
-                        drawRect(ShaderBrush(combined), topLeft = Offset(left, 0f), size = Size(w, h), blendMode = BlendMode.DstOut)
-                    }
-                },
-        )
-        connectedAt?.let { since ->
-            CallDuration(
-                since = since,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = durationInsetTop.dp, end = durationInsetTrailing.dp)
-                    .onSizeChanged { durationSize = it },
-            )
-        }
-    }
-}
-
-private const val durationInsetTop = 10f
-private const val durationInsetTrailing = 18f
-
-/** How long the call has been connected, as “2:31”. */
-@Composable
-private fun CallDuration(since: Instant, modifier: Modifier = Modifier) {
-    val date = remember { dependency(DateClient) }
-    var elapsed by remember { mutableLongStateOf(0L) }
-    LaunchedEffect(since) {
-        while (true) {
-            val now = date.now()
-            val millis = Duration.between(since, now).toMillis()
-            elapsed = max(0L, millis / 1000)
-            // Next whole second from `since`.
-            delay(1_000 - Math.floorMod(millis, 1_000L))
-        }
-    }
-    val text = formatCallDuration(elapsed)
-    val spoken = spokenCallDuration(elapsed)
-    Text(
-        text,
-        style = OpenCodeTextStyles.footnote.copy(fontFeatureSettings = "tnum"),
-        color = OpenCodeTheme.colors.secondaryText,
-        modifier = modifier.clearAndSetSemantics {
-            contentDescription = "Call duration"
-            stateDescription = spoken
-        },
-    )
-}
-
-/** `Duration.formatted(.time(pattern: .minuteSecond))`, or `.hourMinuteSecond` from an hour. */
-internal fun formatCallDuration(seconds: Long): String {
-    val h = seconds / 3600
-    val m = (seconds % 3600) / 60
-    val s = seconds % 60
-    return if (seconds >= 3600) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(seconds / 60, s)
-}
-
-/** `Duration.formatted(.units(allowed: [.hours, .minutes, .seconds], width: .wide))`: “2 minutes, 31 seconds”. */
-internal fun spokenCallDuration(seconds: Long): String {
-    val parts = mutableListOf<String>()
-    val h = seconds / 3600
-    val m = (seconds % 3600) / 60
-    val s = seconds % 60
-    fun unit(n: Long, name: String) = "$n $name${if (n == 1L) "" else "s"}"
-    if (h > 0) parts += unit(h, "hour")
-    if (m > 0) parts += unit(m, "minute")
-    if (s > 0 || parts.isEmpty()) parts += unit(s, "second")
-    return parts.joinToString(", ")
 }
 
 /** Lays out [wide] when it fits the width, else [narrow] (SwiftUI `ViewThatFits(in: .horizontal)`). */

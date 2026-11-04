@@ -123,7 +123,7 @@ class MediaLabActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         DependencyValues.installRoot {
-            this[ExperimentalFeatures] = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.inAppBrowser, ExperimentalFeature.imageLinkPreviews))
+            this[ExperimentalFeatures] = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.inAppBrowser))
         }
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)

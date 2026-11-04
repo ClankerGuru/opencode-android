@@ -421,8 +421,7 @@ private class Retained {
  *   tap on the scrim, a drag, Back, or the work ending).
  * @param isCovered a panel grown out of the composer (the model list, the level picker) stands
  *   over the capsule's place, so it hides like the pills.
- * @param inCall a voice call takes the composer's place: the panel closes.
- * @param showsCallTranscript the call's captions cover the pills: the capsule hides.
+ * @param inCall a voice call starts: the panel closes.
  * @param onToggle before the capsule toggles the panel (the composer gives up focus).
  * @param onOpenSubagent a subagent row tapped (`.subagentTapped(id)`); the panel closes first.
  * @param onOpenShell a shell row tapped (`.shellOutputTapped(id)`); the panel closes first.
@@ -442,7 +441,6 @@ fun BackgroundWorkPresentation(
     modifier: Modifier = Modifier,
     isCovered: Boolean = false,
     inCall: Boolean = false,
-    showsCallTranscript: Boolean = false,
     transcript: TranscriptBorrowedDrag? = null,
     onToggle: () -> Unit = {},
     content: @Composable () -> Unit,
@@ -507,7 +505,6 @@ fun BackgroundWorkPresentation(
     val latestHasWork by rememberUpdatedState(hasWork)
     val latestSession by rememberUpdatedState(sessionID)
     val latestCovered by rememberUpdatedState(isCovered)
-    val latestCallTranscript by rememberUpdatedState(showsCallTranscript)
 
     fun setCapsuleShown(shown: Boolean, animated: Boolean, completion: (() -> Unit)? = null) {
         capsuleShown = shown
@@ -616,14 +613,14 @@ fun BackgroundWorkPresentation(
         if (InternalBuild.isDebug) LabMarks.mark("background_work_close")
         val (spec, velocity) = BackgroundWorkMotion.closeAnimation(releaseVelocity, remainingDistance, reduceMotion)
         stage = BackgroundWorkStage.capsule
-        if (latestCallTranscript || latestCovered) setCapsuleShown(false, animated = !reduceMotion)
+        if (latestCovered) setCapsuleShown(false, animated = !reduceMotion)
         scope.launch {
             try {
                 progress.animateTo(0f, spec, initialVelocity = -velocity)
                 if (current == motion && !latestPresented && stage == BackgroundWorkStage.capsule) {
                     stage = BackgroundWorkStage.closed
                     dragController.reset()
-                    if (!latestCallTranscript && !latestCovered && latestHasWork) setCapsuleShown(true, animated = false)
+                    if (!latestCovered && latestHasWork) setCapsuleShown(true, animated = false)
                 }
             } catch (_: CancellationException) {
             }
@@ -682,19 +679,11 @@ fun BackgroundWorkPresentation(
     // Opening taps, closing is quiet, like the attachment menu.
     HapticEffect(Haptic.tap, isPresented) { _, open -> open }
     OnChange(sessionID) { _, _ -> reset() }
-    // A call takes the composer's place; its transcript covers the pills.
     OnChange(inCall) { _, call -> if (call) onPresentedChange(false) }
-    OnChange(showsCallTranscript) { _, shows ->
-        if (shows) {
-            if (latestPresented) onPresentedChange(false) else if (stage != BackgroundWorkStage.closed) close()
-        } else if (!latestCovered && latestHasWork) {
-            setCapsuleShown(true, animated = !reduceMotion)
-        }
-    }
     OnChange(isCovered) { _, covered ->
         if (covered) {
             if (latestPresented) onPresentedChange(false) else if (stage != BackgroundWorkStage.closed) close()
-        } else if (!latestCallTranscript && latestHasWork) {
+        } else if (latestHasWork) {
             setCapsuleShown(true, animated = !reduceMotion)
         }
     }
@@ -761,8 +750,8 @@ fun BackgroundWorkPresentation(
             traced.pill = pill.translate(o)
             traced.panel = panel.translate(o)
         }
-        // Like the pills it grows from, it hides under the call's transcript and under a panel grown out of the composer.
-        val hidden = showsCallTranscript || isCovered
+        // Like the pills it grows from, it hides under a panel grown out of the composer.
+        val hidden = isCovered
         val hiddenAlpha by androidx.compose.animation.core.animateFloatAsState(if (hidden) 0f else 1f, Motion.reducedFadeSpec(), label = "hidden")
         val summary = BackgroundWorkSummary.summary(rowAgents, rowShells)
         val surfaceColor = MaterialTheme.colorScheme.surfaceContainerHigh

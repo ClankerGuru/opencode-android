@@ -38,8 +38,6 @@ internal fun SessionVoiceLabTriggers(store: StoreOf<SessionFeature.State, Sessio
                 when (intent.action) {
                     VoiceLabTrigger.startCall.notification ->
                         if (store.state.voice == null) store.send(SessionFeature.Action.VoiceTapped)
-                    VoiceLabTrigger.showCaptions.notification ->
-                        store.send(SessionFeature.Action.Voice(PresentationAction.Presented(VoiceFeature.Action.CaptionsTapped)))
                     VoiceLabTrigger.raiseToEar.notification -> store.send(SessionFeature.Action.RaisedToEar)
                     VoiceLabTrigger.endCall.notification ->
                         store.send(SessionFeature.Action.Voice(PresentationAction.Presented(VoiceFeature.Action.EndPressed)))

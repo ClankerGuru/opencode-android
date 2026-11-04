@@ -59,27 +59,25 @@ fun HomeFeature.State.restoringTranscriptCache(): HomeFeature.State {
     val restored = snapshots.validItems(server.persistenceID, missing, snapshotNow())
     if (restored.isEmpty()) return this
     var unopened = unopenedSeen
-    if (SessionFeature.State.showsNewMessagesDivider) {
-        val rememberedID = lastViewedSessionIDs[server.persistenceID]
-        val entryUpdatedAt = HashMap<String, Instant>()
-        for (entry in snapshots.entries) {
-            if (entry.serverID == server.persistenceID) entryUpdatedAt.putIfAbsent(entry.sessionID, entry.updatedAt)
+    val rememberedID = lastViewedSessionIDs[server.persistenceID]
+    val entryUpdatedAt = HashMap<String, Instant>()
+    for (entry in snapshots.entries) {
+        if (entry.serverID == server.persistenceID) entryUpdatedAt.putIfAbsent(entry.sessionID, entry.updatedAt)
+    }
+    for (session in missing) {
+        val items = restored[session.id]
+        if (items.isNullOrEmpty() ||
+            session.id in unopened ||
+            session.id in sessionSnapshots ||
+            sessionSeenWatermarks[sessionKey(session.id)] != null
+        ) {
+            continue
         }
-        for (session in missing) {
-            val items = restored[session.id]
-            if (items.isNullOrEmpty() ||
-                session.id in unopened ||
-                session.id in sessionSnapshots ||
-                sessionSeenWatermarks[sessionKey(session.id)] != null
-            ) {
-                continue
-            }
-            val serverViewed = unseenCutoffMilliseconds(session, wasUnread = false)
-            val lastID = items.lastOrNull { !it.id.startsWith("info-") }?.id ?: items.last().id
-            if (serverViewed != null && TranscriptTimeStamps.isBefore(serverViewed, lastID) == true) continue
-            if (session.id == rememberedID || entryUpdatedAt[session.id]?.let { it < session.updatedAt } == true) {
-                unopened = unopened + (session.id to items.map { it.id }.toSet())
-            }
+        val serverViewed = unseenCutoffMilliseconds(session, wasUnread = false)
+        val lastID = items.lastOrNull { !it.id.startsWith("info-") }?.id ?: items.last().id
+        if (serverViewed != null && TranscriptTimeStamps.isBefore(serverViewed, lastID) == true) continue
+        if (session.id == rememberedID || entryUpdatedAt[session.id]?.let { it < session.updatedAt } == true) {
+            unopened = unopened + (session.id to items.map { it.id }.toSet())
         }
     }
     val merged = transcriptCache.toMutableMap()
@@ -114,7 +112,7 @@ fun HomeFeature.State.syncingTranscriptCover(): HomeFeature.State {
  * that copy stays what it's compared with.
  */
 fun HomeFeature.State.notingUnopenedCopy(sessionID: String): HomeFeature.State {
-    if (!SessionFeature.State.showsNewMessagesDivider || sessionID in sessionSnapshots || sessionID in unopenedSeen) return this
+    if (sessionID in sessionSnapshots || sessionID in unopenedSeen) return this
     val session = sessions.firstOrNull { it.id == sessionID } ?: return this
     val copy = cachedTranscriptItems(session)
     if (copy.isNullOrEmpty()) return this

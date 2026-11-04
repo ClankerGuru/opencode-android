@@ -2,10 +2,8 @@ package ai.opencode.feature.drawer
 
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.DependencyValues
-import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.SharedKey
 import ai.opencode.core.sharing.SharedStore
-import ai.opencode.core.sharing.experimental
 import ai.opencode.core.store.TestStore
 import ai.opencode.feature.composer.ComposerPersistence
 import ai.opencode.feature.composer.PromptOutbox
@@ -132,14 +130,6 @@ internal object HomeFeatureTestSupport {
         fun <T> shared(key: SharedKey<T>): T = state { ai.opencode.core.sharing.shared(key).value }
 
         fun <T> setShared(key: SharedKey<T>, value: T) = state { ai.opencode.core.sharing.shared(key).set(value) }
-
-        /**
-         * iOS `@Test(.callStyle(livingOrb:))`: this test's shared store holds one call style. Living
-         * Orb is the default; tests about the Standard call view switch it off.
-         */
-        fun callStyle(livingOrb: Boolean) {
-            setShared(experimental(ExperimentalFeature.livingOrb), livingOrb)
-        }
 
         private val stores = ArrayList<TestStore<*, *>>()
 

@@ -6,8 +6,8 @@ import ai.opencode.core.experiments.ExperimentalGroup
 /**
  * Port of iOS `ExperimentalFeature` (`OpenCode/Settings/Experimental/ExperimentalFeature.swift`)
  * and `ExperimentalFeatures` (`OpenCode/Settings/ExperimentalFeatures.swift`): features still
- * being tried out on phones, listed in Settings › Experimental, off by default (a graduated one
- * on, [defaultEnabled]), kept on this phone. Lives in `:core` because Composer, Transcript, Voice,
+ * being tried out on phones, listed in Settings › Experimental, off by default, kept on this
+ * phone. Lives in `:core` because Composer, Transcript, Voice,
  * Drawer and Settings all read it; Settings owns the list UI.
  *
  * iOS declares each experiment in its own `Experimental/Features/<Name>Experiment.swift` and
@@ -30,11 +30,9 @@ enum class ExperimentalFeature(
     val symbol: String,
     /** Settings position: lower first. Leave gaps (10, 20, …) so a new one can slot between. */
     val order: Int,
-    /** On until switched off: graduated to everyone but keeps its switch. */
-    val defaultEnabled: Boolean = false,
     /**
-     * Graduated: its switch left Experimental for a regular Settings page (New Messages Divider →
-     * Settings › Sessions, Welcome Preview → Developer › Playgrounds). It keeps its `experimental-…` key, so a saved choice carries over.
+     * Graduated: its switch left Experimental for a regular Settings page (Welcome Preview →
+     * Developer › Playgrounds). It keeps its `experimental-…` key, so a saved choice carries over.
      */
     val isGraduated: Boolean = false,
     /**
@@ -51,12 +49,6 @@ enum class ExperimentalFeature(
     onePicker("one-picker", "One Picker", ExperimentalGroup.composer, "Favorites, recents, and inline levels", "cpu", order = 15),
     agentSelection("agent-selection", "Agent Selection", ExperimentalGroup.composer, "Choose Build, Plan, or your own", "person.crop.circle", order = 30),
     hideModels("hide-models", "Hide Unused Models", ExperimentalGroup.composer, "Choose models the picker lists", "eye.slash", order = 40),
-    livingOrb("living-orb", "Living Orb", ExperimentalGroup.calls, "Keep calls in a floating orb", "circle.hexagongrid.fill", order = 60, defaultEnabled = true),
-    newMessagesDivider(
-        "new-messages-divider", "New Messages Divider", ExperimentalGroup.transcript, "Mark long unread replies",
-        "text.line.first.and.arrowtriangle.forward", order = 70, defaultEnabled = true, isGraduated = true,
-    ),
-    imageLinkPreviews("image-link-previews", "Image Link Previews", ExperimentalGroup.transcript, "Load linked images in replies", "photo", order = 80),
     inboxSidebar("inbox-sidebar", "Inbox Sidebar", ExperimentalGroup.drawer, "Sessions as an inbox", "tray", order = 90),
     serverDetails("server-details", "Server Details", ExperimentalGroup.drawer, "MCP servers, skills, and accounts", "server.rack", order = 110),
     welcomePreview("welcome-preview", "Welcome Preview", ExperimentalGroup.drawer, "The new first-run welcome", "hand.wave", order = 130, isGraduated = true),
@@ -122,15 +114,28 @@ enum class ExperimentalFeature(
         fun fromRawValue(rawValue: String): ExperimentalFeature? = allCases.firstOrNull { it.rawValue == rawValue }
 
         /**
-         * Switches of removed experiments (Session Switcher, Title Is the Switch) and of ones now
-         * always on (Composer Autocomplete, Server Flow, New Plus Menu, Project Icons). Nothing
-         * reads them; they're cleared at launch.
+         * Switches of removed experiments (Session Switcher, Title Is the Switch, Floating Call,
+         * Call Tray) and of ones now always on (Composer Autocomplete, Server Flow, New Plus Menu,
+         * Project Icons, Image Link Previews, Living Orb, New Messages Divider), with the
+         * call-style migration's markers. Nothing reads them; they're cleared at launch.
          */
-        val retiredKeys = listOf(
-            "experimental-session-switcher", "experimental-server-title-switch",
-            "experimental-composer-autocomplete", "experimental-server-flow",
-            "experimental-plus-menu-sheet", "experimental-project-icons",
-        )
+        val retiredKeys: List<String> = buildList {
+            add("experimental-session-switcher")
+            add("experimental-server-title-switch")
+            add("experimental-composer-autocomplete")
+            add("experimental-server-flow")
+            add("experimental-plus-menu-sheet")
+            add("experimental-project-icons")
+            add("experimental-floating-call")
+            add("experimental-call-tray")
+            add("call-style-migrated-living-orb")
+            add("call-style-migrated-orb-default")
+            for (name in listOf("image-link-previews", "living-orb", "new-messages-divider")) {
+                add("experimental-$name")
+                add("experimental-all-skip-$name")
+                add("experimental-all-saved-$name")
+            }
+        }
 
         fun removeRetiredSwitches(store: SharedStore) {
             for (key in retiredKeys) store.remove(SharedKey.appStorage(key, false))
@@ -138,12 +143,9 @@ enum class ExperimentalFeature(
     }
 }
 
-/**
- * One experimental feature's switch (iOS `.experimental(feature)`): `experimental-<rawValue>`,
- * off by default unless it has graduated ([ExperimentalFeature.defaultEnabled]).
- */
+/** One experimental feature's switch (iOS `.experimental(feature)`): `experimental-<rawValue>`, off by default. */
 fun experimental(feature: ExperimentalFeature): SharedKey<Boolean> =
-    SharedKey.appStorage("experimental-${feature.rawValue}", feature.defaultEnabled)
+    SharedKey.appStorage("experimental-${feature.rawValue}", false)
 
 /** The experimental switches as reducers read them, overridable in tests. */
 class ExperimentalFeatures(val isEnabled: (ExperimentalFeature) -> Boolean) {

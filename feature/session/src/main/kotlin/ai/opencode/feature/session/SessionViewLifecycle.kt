@@ -2,8 +2,6 @@ package ai.opencode.feature.session
 
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.experiments.key
-import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
 import ai.opencode.feature.session.SessionFeature.Action
@@ -20,7 +18,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.currentStateAsState
-import kotlinx.coroutines.flow.drop
 
 // Port of iOS `Session/SessionView+Lifecycle.swift` (split out of `SessionView.swift` in
 // 9972785b): the screen's task, visibility and scene phase, and the settings it watches.
@@ -89,12 +86,5 @@ internal fun SessionLifecycle(store: StoreOf<State, Action>) {
     }
     DisposableEffect(notifications) {
         onDispose { notifications.setVisibleSession(false, latestSessionID) }
-    }
-
-    // Switched off in Settings, an open session's divider goes at once.
-    LaunchedEffect(store) {
-        shared(ExperimentalFeature.newMessagesDivider.key).flow.drop(1).collect {
-            store.send(Action.NewMessagesDividerChanged(it))
-        }
     }
 }

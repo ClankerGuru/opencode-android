@@ -6,7 +6,6 @@ import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
-import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.store.observe
 import ai.opencode.core.tuning.Tunable
 import ai.opencode.core.tuning.TunableChoice
@@ -18,8 +17,6 @@ import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
-import android.os.Handler
-import android.os.Looper
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
@@ -192,11 +189,10 @@ object FloatingCallTunables {
 }
 
 /**
- * iOS `FloatingCallTunables.labStyle/labScenes` and `floating-call-forced`
- * (`-lab-floating-call-style capsule`, `-lab-floating-scenes YES`, `-floating-call-forced YES`):
+ * iOS `FloatingCallTunables.labStyle/labScenes`
+ * (`-lab-floating-call-style capsule`, `-lab-floating-scenes YES`):
  * UI tests and captures pick a look. Debug builds only, through [VoiceLabEnvironment]: `adb shell
- * setprop debug.opencode.lab_floating_call_style capsule`, `…lab_floating_scenes 1`,
- * `…floating_call_forced 1`.
+ * setprop debug.opencode.lab_floating_call_style capsule`, `…lab_floating_scenes 1`.
  */
 data class FloatingCallLab(
     val style: FloatingCallStyle? = null,
@@ -225,12 +221,12 @@ sealed interface FloatingCallTouchArea {
 }
 
 /**
- * Where the floating call starts and rests, and the playground's hold on the experiment (iOS
+ * Where the floating call starts and rests (iOS
  * `FloatingCallCenter`). The session screen reports its call button and composer, in window
  * coordinates in dp ([floatingCallButton], [floatingCallComposer]); the overlay reads them.
  * One per process, behind its dependency key; main thread only.
  */
-class FloatingCallCenter(readsLabHooks: Boolean = false) {
+class FloatingCallCenter {
     /** A panel request: open or shut, and a counter bumped on each request. */
     data class Request(val open: Boolean, val count: Int)
 
@@ -277,9 +273,6 @@ class FloatingCallCenter(readsLabHooks: Boolean = false) {
     var composerColumn by mutableStateOf<Rect?>(null)
         private set
 
-    /** The playground's Start Floating Call turns the experiment on for its run. */
-    var forced by mutableStateOf(false)
-
     /** Playground scenes stand in for the call's voices and state. */
     var scene by mutableStateOf<FloatingCallScene?>(null)
 
@@ -303,23 +296,11 @@ class FloatingCallCenter(readsLabHooks: Boolean = false) {
     /** The hosts floating a call: one closing leaves the others'. */
     private val callAnchors = mutableSetOf<Any>()
 
-    init {
-        // `-floating-call-forced YES`: a debug build opened straight into the playground. The
-        // property is read off the main thread (a `getprop`).
-        if (readsLabHooks) {
-            Thread {
-                if (VoiceLabEnvironment.flag("FLOATING_CALL_FORCED")) Handler(Looper.getMainLooper()).post { forced = true }
-            }.start()
-        }
-    }
 
     fun noteCall(has: Boolean, anchor: Any) {
         if (has) callAnchors.add(anchor) else callAnchors.remove(anchor)
         if (hasCall == callAnchors.isEmpty()) hasCall = callAnchors.isNotEmpty()
     }
-
-    /** Living Orb's stored switch, or the lab's forced flag (iOS 64ff3ed7 merged Floating Call into Living Orb). */
-    fun isOn(stored: Boolean): Boolean = forced || ExperimentalFeature.livingOrb.isActive(stored)
 
     /**
      * Kept only while the card rests shut: the composer slides with the drawer, and the orb stays
@@ -352,7 +333,7 @@ class FloatingCallCenter(readsLabHooks: Boolean = false) {
     }
 
     companion object Key : DependencyKey<FloatingCallCenter> {
-        override val liveValue: FloatingCallCenter by lazy { FloatingCallCenter(readsLabHooks = true) }
+        override val liveValue: FloatingCallCenter by lazy { FloatingCallCenter() }
         override val testValue: FloatingCallCenter get() = FloatingCallCenter()
         val shared: FloatingCallCenter get() = dependency(Key)
     }
@@ -373,7 +354,7 @@ fun Modifier.floatingCallDrawerButton(): Modifier = this then FloatingCallFrameE
 /**
  * Reports this element (the composer's readable column, not the pane) to
  * [FloatingCallCenter.noteComposerColumn]: whether the call's card covers it. Apply it only while
- * the call floats and the screen shows (iOS `onGeometryChange` gated on `floatsCall`, `!isCovered`).
+ * the call floats and the screen shows (iOS `onGeometryChange` gated on `!isCovered`).
  */
 fun Modifier.floatingCallComposerColumn(): Modifier = this then FloatingCallFrameElement(FloatingCallFrameKind.composerColumn)
 

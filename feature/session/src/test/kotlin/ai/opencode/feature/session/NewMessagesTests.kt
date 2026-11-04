@@ -2,12 +2,9 @@ package ai.opencode.feature.session
 
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.DateClient
-import ai.opencode.core.dependencies.DependencyValues
 import ai.opencode.core.dependencies.ImmediateClock
 import ai.opencode.core.dependencies.TestClock
 import ai.opencode.core.dependencies.UuidClient
-import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.core.store.TestStore
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionTestSupport.Harness
@@ -61,22 +58,14 @@ class NewMessagesTests {
     private fun user(id: String): OpenCodeTranscriptItem = OpenCodeTranscriptItem.UserText(id = id, text = id)
     private fun reply(id: String): OpenCodeTranscriptItem = OpenCodeTranscriptItem.AssistantMarkdown(id = id, text = "Reply $id")
 
-    private val divider = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.newMessagesDivider))
-
-    /** Runs [body] with the New Messages Divider experiment on (iOS `on { }`). */
-    private fun <R> Harness.on(body: () -> R): R =
-        DependencyValues.withValues(values.update { this[ExperimentalFeatures] = divider }, body)
-
     private fun Harness.sessionState(id: String, items: List<OpenCodeTranscriptItem>): SessionFeature.State =
         state { SessionFeature.State.session(server = server, session = session(id), cachedItems = items) }
 
     private fun Harness.resumeStore(
         state: SessionFeature.State,
-        dividerEnabled: Boolean = true,
         transcript: () -> List<OpenCodeTranscriptItem>,
     ): TestStore<SessionFeature.State, Action> {
         val store = store(state) {
-            if (dividerEnabled) this[ExperimentalFeatures] = divider
             this[Clock] = ImmediateClock()
             this[DateClient] = DateClient.constant(Instant.ofEpochSecond(100))
             this[OpenCodeClient] = this[OpenCodeClient].copy(
@@ -131,44 +120,19 @@ class NewMessagesTests {
     }
 
     /**
-     * Off (the default), a session is a plain chat: what arrived is still
-     * noted, so the list can bring it in at the end, but its mark never
-     * shows a divider, however much arrived.
-     */
-    @Test fun withTheExperimentOffNoMarkShowsADivider() = sessionTest { h ->
-        val away = listOf(user("m1"), reply("m2"))
-        val back = away + (3 until 40).map { reply("m$it") }
-        val state = h.sessionState("ses_off", away).copy(hasRenderedFirstContentFrame = true, initialTranscriptIsFresh = true, isVisible = true)
-        val store = h.resumeStore(state, dividerEnabled = false) { back }
-        store.send(Action.VisibilityChanged(false))
-        store.send(Action.VisibilityChanged(true))
-        store.receive(Action.RefreshResponse::class, timeout = 1.seconds)
-        assertEquals("m3", store.state.newMessages?.itemID)
-        assertEquals(false, store.state.newMessages?.showsDivider)
-        val placement = NewMessagesMark.resolve(store.state.newMessages, store.state.items, TranscriptEntry.build(store.state.items))
-        assertEquals(false, placement?.showsDivider)
-        h.skipInFlightEffects()
-
-        val opened = h.state { h.sessionState("ses_off_open", back).noteOpening(seen = setOf("m1", "m2")) }
-        assertEquals(false, opened.newMessages?.showsDivider)
-        val enabled = h.on { h.sessionState("ses_on_open", back).noteOpening(seen = setOf("m1", "m2")) }
-        assertEquals(true, enabled.newMessages?.showsDivider)
-    }
-
-    /**
      * Several messages that fit on screen show at the bottom with no divider:
      * in front of the reader they're read, so only what comes after them can
      * make one.
      */
     @Test fun messagesThatFitAreReadOnceShown() = sessionTest { h ->
-        val state = h.on {
+        val state = h.state {
             h.sessionState("ses_fit", listOf(user("m1"), reply("m2"), reply("m3"), reply("m4"), reply("m5")))
                 .copy(isVisible = true)
                 .noteOpening(seen = setOf("m1", "m2"))
         }
         assertEquals("m3", state.newMessages?.itemID)
         val generation = state.newMessages?.generation ?: 0
-        val store = h.store(state) { this[ExperimentalFeatures] = divider }
+        val store = h.store(state)
         store.exhaustive = false
         // An older mark's answer changes nothing.
         store.send(Action.NewMessagesFit(generation = generation - 1))
@@ -179,7 +143,7 @@ class NewMessagesTests {
         assertNull(store.state.newMessagesFitThrough)
 
         var after = store.state
-        h.on {
+        h.state {
             after = after.updateNewMessagesMark(settles = false)
             assertNull("nothing new since what fit", after.newMessages)
             after = after.copy(items = after.items + reply("m6")).updateNewMessagesMark(settles = true)
@@ -195,7 +159,7 @@ class NewMessagesTests {
      */
     @Test fun theArrivalsDecisionHoldsWhileStreaming() {
         for (fits in listOf(true, false)) sessionTest { h ->
-            val state = h.on {
+            val state = h.state {
                 h.sessionState("ses_decided", listOf(user("m1"), reply("m2"), reply("m3")))
                     .copy(isVisible = true, hasRenderedFirstContentFrame = true)
                     .noteOpening(seen = setOf("m1", "m2"))
@@ -203,7 +167,6 @@ class NewMessagesTests {
             val mark = state.newMessages!!
             assertEquals(NewMessagesMark(itemID = "m3", lastItemID = "m3", generation = 1), mark)
             val store = h.store(state) {
-                this[ExperimentalFeatures] = divider
                 this[Clock] = ImmediateClock()
             }
             if (fits) {
@@ -244,9 +207,8 @@ class NewMessagesTests {
      * read only once the reader is back in front of it.
      */
     @Test fun whatFitsWhileAwayIsMeasuredAgainAsMoreArrives() = sessionTest { h ->
-        val state = h.on { h.sessionState("ses_away", listOf(user("m1"), reply("m2"), reply("m3"))).noteOpening(seen = setOf("m1", "m2")) }
+        val state = h.state { h.sessionState("ses_away", listOf(user("m1"), reply("m2"), reply("m3"))).noteOpening(seen = setOf("m1", "m2")) }
         val store = h.store(state) {
-            this[ExperimentalFeatures] = divider
             this[Clock] = ImmediateClock()
         }
         store.exhaustive = false
@@ -255,7 +217,7 @@ class NewMessagesTests {
         assertEquals("m3", store.state.newMessagesFitThrough)
         assertEquals("not read while away", setOf("m1", "m2"), store.state.newMessagesBaseline)
 
-        val away = h.on { store.state.copy(items = store.state.items + reply("m4")).updateNewMessagesMark(settles = false) }
+        val away = h.state { store.state.copy(items = store.state.items + reply("m4")).updateNewMessagesMark(settles = false) }
         assertEquals("the whole span, from the first row they missed", "m3", away.newMessages?.itemID)
         assertNull(away.newMessagesFitThrough)
 
@@ -272,13 +234,13 @@ class NewMessagesTests {
      * the list brings the reader to those rows too; leaving drops it.
      */
     @Test fun moreRowsUnderAnEarlyMarkMakeANewMark() = sessionTest { h ->
-        var state = h.on { h.sessionState("ses_more", listOf(user("m1"), reply("m2"), reply("m3"))).noteOpening(seen = setOf("m1", "m2")) }
+        var state = h.state { h.sessionState("ses_more", listOf(user("m1"), reply("m2"), reply("m3"))).noteOpening(seen = setOf("m1", "m2")) }
         val early = state.newMessages
         assertEquals("m3", early?.itemID)
-        state = h.on { state.copy(items = state.items + reply("m4")).updateNewMessagesMark(settles = true) }
+        state = h.state { state.copy(items = state.items + reply("m4")).updateNewMessagesMark(settles = true) }
         assertEquals("m3", state.newMessages?.itemID)
         assertNotEquals(early?.generation, state.newMessages?.generation)
-        state = h.on { state.noteLeaving() }
+        state = h.state { state.noteLeaving() }
         assertNull(state.newMessages)
         assertEquals(setOf("m1", "m2"), state.newMessagesBaseline)
     }
@@ -289,7 +251,7 @@ class NewMessagesTests {
      */
     @Test fun theDividersWindowStopsShortOfEveryLoadedRow() = sessionTest { h ->
         val items = (0 until 30).map { reply("m$it") }
-        val state = h.on { h.sessionState("ses_window", items).noteOpening(seen = (0 until 12).map { "m$it" }.toSet()) }
+        val state = h.state { h.sessionState("ses_window", items).noteOpening(seen = (0 until 12).map { "m$it" }.toSet()) }
         assertEquals("m12", state.newMessages?.itemID)
         assertEquals(29, state.visibleLimit)
     }
@@ -330,7 +292,7 @@ class NewMessagesTests {
 
     @Test fun aGlanceAtControlCenterIsntLeaving() = sessionTest { h ->
         val state = h.sessionState("ses_glance", listOf(user("m1"))).copy(hasRenderedFirstContentFrame = true, isVisible = true)
-        val store = h.store(state) { this[ExperimentalFeatures] = divider }
+        val store = h.store(state)
         store.exhaustive = false
         store.send(Action.SceneActiveChanged(false))
         store.send(Action.VisibilityChanged(false))
@@ -340,22 +302,6 @@ class NewMessagesTests {
         h.skipInFlightEffects()
     }
 
-    /** Switched off mid-session, any mark on screen goes. */
-    @Test fun switchingTheExperimentOffClearsTheDivider() = sessionTest { h ->
-        val state = h.sessionState("ses_toggle", listOf(user("m1"), reply("m2")))
-            .copy(newMessages = NewMessagesMark(itemID = "m2", generation = 1, showsDivider = true))
-        val store = h.store(state)
-        store.send(Action.NewMessagesDividerChanged(true))
-        store.send(Action.NewMessagesDividerChanged(false)) { it.copy(newMessages = null) }
-        store.finish()
-
-        val quiet = h.sessionState("ses_toggle_quiet", listOf(user("m1"), reply("m2")))
-            .copy(newMessages = NewMessagesMark(itemID = "m2", generation = 1, showsDivider = false))
-        val quietStore = h.store(quiet)
-        quietStore.send(Action.NewMessagesDividerChanged(false)) { it.copy(newMessages = null) }
-        quietStore.finish()
-    }
-
     /**
      * A send from this phone reads everything above it, after the return's
      * read settled the divider too: the divider goes, and nothing waiting to
@@ -363,7 +309,7 @@ class NewMessagesTests {
      */
     @Test fun sendingClearsTheDivider() = sessionTest { h ->
         val state = h.sessionState("ses_send", listOf(user("m1"), reply("m2"), reply("m3"))).copy(
-            newMessages = NewMessagesMark(itemID = "m3", generation = 1, showsDivider = true),
+            newMessages = NewMessagesMark(itemID = "m3", generation = 1),
             newMessagesBaseline = setOf("m1", "m2"),
         ).withDraft("Thanks")
         val store = h.store(state) {
@@ -397,13 +343,13 @@ class NewMessagesTests {
     @Test fun openingFromAFresherCopyPlacesTheDividerInTheFirstFrame() = sessionTest { h ->
         val seen = (0 until 4).map { "m$it" }.toSet()
         val items = listOf(user("m0")) + (1 until 30).map { reply("m$it") }
-        val detail = h.on { h.sessionState("ses_open", items).noteOpening(seen = seen) }
+        val detail = h.state { h.sessionState("ses_open", items).noteOpening(seen = seen) }
         assertEquals("m4", detail.newMessages?.itemID)
         assertTrue(detail.visibleItems.any { it.id == "m4" })
         // With rows above it, so landing there doesn't page in more history.
         assertEquals("m1", detail.visibleItems.firstOrNull()?.id)
         // A copy this run hasn't shown is taken as seen.
-        val fresh = h.on { h.sessionState("ses_fresh", items).noteOpening(seen = null) }
+        val fresh = h.state { h.sessionState("ses_fresh", items).noteOpening(seen = null) }
         assertNull(fresh.newMessages)
     }
 
@@ -437,7 +383,7 @@ class NewMessagesTests {
 
     @Test fun theDividersWindowReachesTheFirstRowOnceHistoryIsExhausted() = sessionTest { h ->
         val items = (0 until 30).map { reply("m$it") }
-        val state = h.on {
+        val state = h.state {
             h.sessionState("ses_window_all", items).copy(earlierHistory = SessionFeature.State.EarlierHistory.Exhausted)
                 .noteOpening(seen = (0 until 12).map { "m$it" }.toSet())
         }
@@ -487,7 +433,7 @@ class NewMessagesTests {
      * put a divider above it.
      */
     @Test fun fittingMarkAbsorbedInFrontOfReaderDoesNotReappearOnSubsequentStreamRead() = sessionTest { h ->
-        val state = h.on { h.watching(listOf(user("m1"), reply("m2"), reply("r1")), reason = RefreshReason.Open).noteOpening(seen = setOf("m1", "m2")) }
+        val state = h.state { h.watching(listOf(user("m1"), reply("m2"), reply("r1")), reason = RefreshReason.Open).noteOpening(seen = setOf("m1", "m2")) }
         val mark = checkNotNull(state.newMessages)
         val store = h.resumeStore(state) { emptyList() }
         store.send(Action.NewMessagesFit(generation = mark.generation))
@@ -526,7 +472,7 @@ class NewMessagesTests {
      */
     @Test fun midActivityGroupUnseenSettledDoesNotTriggerDividerOnNextLiveReply() = sessionTest { h ->
         var state = h.sessionState("ses_group", listOf(user("u1"), tool("t1"), tool("t2"))).copy(newMessagesBaseline = setOf("u1", "t1"))
-        state = h.on { state.updateNewMessagesMark(settles = true) }
+        state = h.state { state.updateNewMessagesMark(settles = true) }
         assertNull(state.newMessages)
         state = state.copy(items = state.items + reply("a1"))
         val entries = TranscriptEntry.build(state.items)
@@ -559,10 +505,9 @@ class NewMessagesTests {
      * changes nothing. Rows that join a group already on screen mark nothing.
      */
     @Test fun streamingWhileAwayMovesTheMarksEndAndFoldsIntoAGroupOnScreen() = sessionTest { h ->
-        val state = h.on { h.sessionState("ses_away", listOf(user("u1"), tool("t1"), reply("a1"))).noteOpening(seen = setOf("u1", "t1", "a1")) }
+        val state = h.state { h.sessionState("ses_away", listOf(user("u1"), tool("t1"), reply("a1"))).noteOpening(seen = setOf("u1", "t1", "a1")) }
         assertNull(state.newMessages)
         val store = h.store(state) {
-            this[ExperimentalFeatures] = divider
             this[Clock] = ImmediateClock()
         }
         store.send(toolStarted("x1")) {
@@ -582,9 +527,8 @@ class NewMessagesTests {
         store.send(toolTyped("x2")) { it.copy(items = it.items.replacing(4, streamingTool("x2", input = "x"))) }
 
         // New tools under the reader's own tool group: no row of their own.
-        val folding = h.on { h.sessionState("ses_away", listOf(user("u1"), tool("t1"))).noteOpening(seen = setOf("u1", "t1")) }
+        val folding = h.state { h.sessionState("ses_away", listOf(user("u1"), tool("t1"))).noteOpening(seen = setOf("u1", "t1")) }
         val foldStore = h.store(folding) {
-            this[ExperimentalFeatures] = divider
             this[Clock] = ImmediateClock()
         }
         foldStore.send(toolStarted("x1")) {
@@ -608,13 +552,12 @@ class NewMessagesTests {
                 output = emptyList(), metadata = emptyMap(),
             ),
         )
-        val state = h.on {
+        val state = h.state {
             h.sessionState("ses_away", listOf(user("u1"), tool("t1"), question(OpenCodeToolCall.Status.Running))).noteOpening(seen = setOf("u1", "t1"))
         }
         assertNull(state.newMessages)
         assertEquals(NewMessagesFold(itemID = "msg_a-tool-q1", lastItemID = "msg_a-tool-q1", count = 3), state.newMessagesFolded)
         val store = h.store(state) {
-            this[ExperimentalFeatures] = divider
             this[Clock] = TestClock()
         }
         store.send(Action.ContentBatch(sessionID = "ses_away", events = listOf(OpenCodeLiveContentEvent.ReasoningDelta(messageID = "msg_a", ordinal = 0, delta = "x")))) {
@@ -650,9 +593,8 @@ class NewMessagesTests {
     @Test fun streamingWhileAwayReadsNoTurnPerDelta() = sessionTest { h ->
         val turn = listOf(user("u1")) + (0 until 300).map { tool("t$it") }
         val marked = NewMessagesMark.Companion.Tally()
-        val state = h.on { h.sessionState("ses_away", turn + reply("a1")).let { s -> s.noteOpening(seen = s.items.map { it.id }.toSet()) } }
+        val state = h.state { h.sessionState("ses_away", turn + reply("a1")).let { s -> s.noteOpening(seen = s.items.map { it.id }.toSet()) } }
         val store = h.store(state) {
-            this[ExperimentalFeatures] = divider
             this[Clock] = ImmediateClock()
         }
         store.exhaustive = false
@@ -670,9 +612,8 @@ class NewMessagesTests {
         assertEquals("msg_a-tool-x49", store.state.newMessages?.lastItemID)
 
         val folded = NewMessagesMark.Companion.Tally()
-        val folding = h.on { h.sessionState("ses_away", turn).let { s -> s.noteOpening(seen = s.items.map { it.id }.toSet()) } }
+        val folding = h.state { h.sessionState("ses_away", turn).let { s -> s.noteOpening(seen = s.items.map { it.id }.toSet()) } }
         val foldStore = h.store(folding) {
-            this[ExperimentalFeatures] = divider
             this[Clock] = ImmediateClock()
         }
         foldStore.exhaustive = false
@@ -763,7 +704,7 @@ class NewMessagesTests {
         val tailWindow = (0 until 80).map { reply("r$it") }
         val olderPage = seenItems + earlyUnseen + reply("r0")
         val merged = seenItems + earlyUnseen + tailWindow
-        val state = h.on {
+        val state = h.state {
             h.sessionState("ses_overflow", tailWindow).copy(
                 isVisible = true,
                 hasRenderedFirstContentFrame = true,
@@ -775,7 +716,6 @@ class NewMessagesTests {
         }
         assertEquals(NewMessagesMark(itemID = "r0", lastItemID = "r79", generation = 1), state.newMessages)
         val store = h.store(state) {
-            this[ExperimentalFeatures] = divider
             this[OpenCodeClient] = this[OpenCodeClient].copy(historyPage = { _, _, _ -> OpenCodeTranscriptPage(items = olderPage, next = null) })
         }
         store.send(Action.ShowEarlierTapped) {

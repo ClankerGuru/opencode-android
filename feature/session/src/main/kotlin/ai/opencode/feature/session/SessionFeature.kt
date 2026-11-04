@@ -549,8 +549,6 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         data class NewMessagesPassed(val generation: Int) : Action
         /** Everything the mark covered fit on screen. */
         data class NewMessagesFit(val generation: Int) : Action
-        /** The New Messages Divider experiment was switched on or off. */
-        data class NewMessagesDividerChanged(val isOn: Boolean) : Action
         data object ShowEarlierTapped : Action
         data object FillEarlierHistory : Action
         data class EarlierHistoryResponse(

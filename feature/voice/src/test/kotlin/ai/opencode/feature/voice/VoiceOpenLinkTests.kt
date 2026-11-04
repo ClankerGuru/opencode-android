@@ -314,11 +314,8 @@ class VoiceOpenLinkTests {
                 },
             )
         }
-        store.send(VoiceFeature.Action.CaptionsTapped)
-        assertTrue(store.state.showsCaptions)
         store.send(VoiceFeature.Action.OpenLink(Action.Requested(linkCall)))
         assertEquals(linkCall, store.state.openLink.pending)
-        assertFalse(store.state.showsCaptions)
         assertTrue(store.state.floatingStage.isHeld)
 
         store.send(VoiceFeature.Action.EndTapped)

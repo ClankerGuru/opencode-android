@@ -53,34 +53,20 @@ class ExperimentalFeatureTests {
         assertTrue(ExperimentalFeatures.enabling(setOf(ExperimentalFeature.inAppBrowser))(ExperimentalFeature.inAppBrowser))
     }
 
-    /** The New Messages Divider is on for everyone who never touched its switch; someone who switched it off keeps it off. */
+    /** No experiment starts on: graduated features have no switch at all. */
     @Test
-    fun theNewMessagesDividerIsOnUntilSwitchedOff() {
+    fun everyExperimentIsOffUntilSwitchedOn() {
         withFreshStorage {
-            assertTrue(ExperimentalFeatures.liveValue(ExperimentalFeature.newMessagesDivider))
-            assertTrue(shared(experimental(ExperimentalFeature.newMessagesDivider)).value)
-            assertTrue(ExperimentalFeatures.liveValue(ExperimentalFeature.livingOrb))
-            val onByDefault = setOf(ExperimentalFeature.newMessagesDivider, ExperimentalFeature.livingOrb)
             for (feature in ExperimentalFeature.allCases) {
-                if (feature in onByDefault) continue
-                assertFalse("$feature stays off", ExperimentalFeatures.liveValue(feature))
+                assertFalse("$feature starts off", ExperimentalFeatures.liveValue(feature))
             }
         }
-        withFreshStorage {
-            dependency(SharedStore).save("experimental-new-messages-divider", false)
-            assertFalse(ExperimentalFeatures.liveValue(ExperimentalFeature.newMessagesDivider))
-        }
-        assertFalse("tests opt in", ExperimentalFeatures.testValue(ExperimentalFeature.newMessagesDivider))
     }
 
-    /** The divider moved to Settings › Sessions, Welcome Preview to Developer › Playgrounds; neither is in the pane. */
+    /** Welcome Preview moved to Developer › Playgrounds; it's not in the pane. */
     @Test
-    fun theDividerAndWelcomePreviewLeftExperimental() {
-        assertEquals(
-            listOf(ExperimentalFeature.newMessagesDivider, ExperimentalFeature.welcomePreview),
-            ExperimentalFeature.allCases.filter { it.isGraduated },
-        )
-        assertFalse(ExperimentalGroup.entries.flatMap { it.features }.contains(ExperimentalFeature.newMessagesDivider))
+    fun welcomePreviewLeftExperimental() {
+        assertEquals(listOf(ExperimentalFeature.welcomePreview), ExperimentalFeature.allCases.filter { it.isGraduated })
         assertFalse(ExperimentalGroup.entries.flatMap { it.features }.contains(ExperimentalFeature.welcomePreview))
     }
 
@@ -108,13 +94,12 @@ class ExperimentalFeatureTests {
         )
         assertEquals(
             listOf(
-                ExperimentalFeature.livingOrb, ExperimentalFeature.serverVoice,
-                ExperimentalFeature.backgroundCallIntent, ExperimentalFeature.voiceSessionDelegator,
+                ExperimentalFeature.serverVoice, ExperimentalFeature.backgroundCallIntent, ExperimentalFeature.voiceSessionDelegator,
                 ExperimentalFeature.shareScreenWithAgents, ExperimentalFeature.openLinksFromCalls, ExperimentalFeature.audioInCalls,
             ),
             ExperimentalGroup.calls.features,
         )
-        assertEquals(listOf(ExperimentalFeature.imageLinkPreviews, ExperimentalFeature.inAppBrowser), ExperimentalGroup.transcript.features)
+        assertEquals(listOf(ExperimentalFeature.inAppBrowser), ExperimentalGroup.transcript.features)
         assertEquals(
             listOf(
                 ExperimentalFeature.inboxSidebar, ExperimentalFeature.serverDetails,
@@ -131,6 +116,11 @@ class ExperimentalFeatureTests {
         val retired = listOf(
             "session-switcher", "server-title-switch",
             "composer-autocomplete", "server-flow", "plus-menu-sheet", "project-icons",
+            "floating-call", "call-tray", "image-link-previews", "living-orb", "new-messages-divider",
+        )
+        val leftovers = listOf(
+            "experimental-all-saved-living-orb", "experimental-all-skip-image-link-previews",
+            "call-style-migrated-living-orb", "call-style-migrated-orb-default",
         )
         withFreshStorage {
             val defaults = dependency(SharedStore)
@@ -141,9 +131,15 @@ class ExperimentalFeatureTests {
             for (name in retired) {
                 assertNull(name, ExperimentalFeature.fromRawValue(name))
             }
+            for (key in leftovers) {
+                defaults.save(key, true)
+            }
             ExperimentalFeature.removeRetiredSwitches(defaults)
             for (name in retired) {
                 assertFalse(name, defaults.has("experimental-$name"))
+            }
+            for (key in leftovers) {
+                assertFalse(key, defaults.has(key))
             }
             assertTrue("Live experiments keep their switch", defaults.bool("experimental-in-app-browser"))
         }
@@ -180,60 +176,6 @@ class ExperimentalFeatureTests {
                 it.saveStyle("today")
                 it.save("experimental-one-picker", true)
             },
-        )
-    }
-
-    @Test
-    fun livingOrbIsOnByDefault() {
-        assertTrue(ExperimentalFeature.livingOrb.defaultEnabled)
-        assertFalse("Its switch stays in Settings › Experimental › Calls", ExperimentalFeature.livingOrb.isGraduated)
-        assertFalse("Reducer tests still start every experiment off", ExperimentalFeatures.testValue(ExperimentalFeature.livingOrb))
-    }
-
-    /**
-     * Living Orb is the one call style besides Standard (p217): everyone moves to it once, a Tray
-     * user included. Saved switches can't tell a choice from a default an earlier read wrote, so
-     * Standard moves too, unless it was chosen after the Nov 1 move (that move's marker is set).
-     * Each phase opens its own [SharedStore] over the same bytes, as each launch does.
-     */
-    @Test
-    fun livingOrbOnceForEveryoneATrayUserIncluded() {
-        val orb = "experimental-living-orb"
-        val tray = ExperimentalFeature.legacyCallTrayKey
-        val floating = ExperimentalFeature.legacyFloatingCallKey
-        val nov1 = ExperimentalFeature.orbDefaultMigrationKey
-        fun migrated(setup: (SharedStore) -> Unit): Pair<Boolean, Boolean> {
-            val bytes = InMemorySharedBytes()
-            setup(SharedStore(bytes))
-            ExperimentalFeature.migrateCallStyles(SharedStore(bytes))
-            val after = SharedStore(bytes)
-            val livingOrb = after.reference(experimental(ExperimentalFeature.livingOrb)).value
-            val leftover = after.has(floating) || after.has(tray) || after.has(nov1)
-            return livingOrb to leftover
-        }
-        assertEquals("Never chose: Living Orb", true to false, migrated { })
-        assertEquals("A written default or Standard: Living Orb", true to false, migrated { it.save(orb, false) })
-        assertEquals("A Tray user takes Living Orb", true to false, migrated { it.save(tray, true) })
-        assertEquals(true to false, migrated { it.save(tray, true); it.save(orb, false) })
-        assertEquals("Floating Call moves to Living Orb", true to false, migrated { it.save(floating, true) })
-        assertEquals(true to false, migrated { it.save(floating, false) })
-        assertEquals(
-            "The Tray kept on Nov 1 moves now",
-            true to false,
-            migrated { it.save(nov1, true); it.save(tray, true); it.save(orb, false) },
-        )
-        assertEquals("Standard chosen after Nov 1 stays", false to false, migrated { it.save(nov1, true); it.save(orb, false) })
-        assertEquals(true to false, migrated { it.save(nov1, true) })
-
-        // Once: a choice made afterwards sticks.
-        val bytes = InMemorySharedBytes()
-        ExperimentalFeature.migrateCallStyles(SharedStore(bytes))
-        SharedStore(bytes).save(orb, false)
-        ExperimentalFeature.migrateCallStyles(SharedStore(bytes))
-        assertEquals(
-            "Standard chosen after the move stays",
-            false,
-            SharedStore(bytes).reference(SharedKey.appStorage<Boolean?>(orb, null)).value,
         )
     }
 

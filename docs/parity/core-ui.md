@@ -110,6 +110,7 @@ and `ellipsis` (every overflow menu) is the vertical `more_vert`, as on other An
 | `checkmark.circle` | `check_circle` | `ms_check_circle` | `SFSymbol.CheckmarkCircle` | LinkPreviewViews, OnboardingPlaygroundControls, WhatsNewList |
 | `checkmark.circle.fill` | `check_circle` (fill) | `ms_check_circle_fill` | `SFSymbol.CheckmarkCircleFill` | AppearanceSettingsView, RequestDockView, SettingsView, ShellOutputView, TraceTriggers |
 | `checkmark.seal` | `verified` | `ms_verified` | `SFSymbol.CheckmarkSeal` | WhatsNew/Entries |
+| `checkmark.seal.fill` | `verified` (fill) | `ms_verified_fill` | `SFSymbol.CheckmarkSealFill` | WhatsNew/Entries |
 | `checkmark.square.fill` | `check_box` (fill) | `ms_check_box_fill` | `SFSymbol.CheckmarkSquareFill` | MarkdownBlockView, RequestDockView |
 | `chevron.backward` | `arrow_back` | `ms_arrow_back` | `SFSymbol.ChevronBackward` | AppView, BrowserView, CatchUpChrome, OnboardingPlaygroundView, SessionView, SettingsView, WhatsNewView |
 | `chevron.compact.left` | `chevron_left` | `ms_chevron_left` | `SFSymbol.ChevronCompactLeft` | TuningPanelView |

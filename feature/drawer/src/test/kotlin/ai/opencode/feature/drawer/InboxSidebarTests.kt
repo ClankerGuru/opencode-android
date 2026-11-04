@@ -1,5 +1,6 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.feature.transcript.SessionSeenWatermark
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.ImmediateClock
@@ -108,7 +109,7 @@ class InboxSidebarTests {
             it.withSession("unread_new") { s -> s.copy(viewedMilliseconds = 2_000) }.copy(
                 locallyViewedMilliseconds = it.locallyViewedMilliseconds + ("unread_new" to 2_000L),
                 sessionReadDates = it.sessionReadDates + (key("unread_new") to date(400)),
-            )
+            ).settingSeenWatermark(SessionSeenWatermark(itemID = null, viewedMilliseconds = 2_000), "unread_new")
         }
         assertEquals(
             listOf("waiting", "unread_old", "newest_read", "unread_new", "working", "read_old"),
@@ -133,7 +134,7 @@ class InboxSidebarTests {
                 inboxSidebarStatus = it.inboxSidebarStatus.copy(archivedIDs = emptySet()),
                 locallyViewedMilliseconds = it.locallyViewedMilliseconds + ("newest_read" to 2_000L),
                 sessionReadDates = it.sessionReadDates + (key("newest_read") to date(500)),
-            )
+            ).settingSeenWatermark(SessionSeenWatermark(itemID = "reply", viewedMilliseconds = 2_000), "newest_read")
         }
         assertEquals(listOf("newest_read"), archived.value)
         assertEquals(listOf("waiting", "unread_new", "unread_old", "working", "read_old"), store.state.inboxSidebarRows().map { it.id })
@@ -159,7 +160,7 @@ class InboxSidebarTests {
                 inboxSidebarStatus = it.inboxSidebarStatus.copy(archivedIDs = emptySet()),
                 locallyViewedMilliseconds = it.locallyViewedMilliseconds + ("unread_new" to 2_000L),
                 sessionReadDates = it.sessionReadDates + (key("unread_new") to date(400)),
-            )
+            ).settingSeenWatermark(SessionSeenWatermark(itemID = null, viewedMilliseconds = 2_000), "unread_new")
         }
         // …and after: read, so nothing counts it or reopens it.
         assertEquals(listOf("waiting", "unread_old"), store.state.catchUpSessions.map { it.id })
@@ -259,7 +260,7 @@ class InboxSidebarTests {
                 inboxSidebarStatus = it.inboxSidebarStatus.copy(archivedIDs = emptySet()),
                 locallyViewedMilliseconds = it.locallyViewedMilliseconds + ("read_old" to 2_000L),
                 sessionReadDates = it.sessionReadDates + (key("read_old") to date(100)),
-            )
+            ).settingSeenWatermark(SessionSeenWatermark(itemID = null, viewedMilliseconds = 2_000), "read_old")
         }
         assertEquals(1, requests.value)
         store.finish()

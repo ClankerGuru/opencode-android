@@ -5,9 +5,7 @@ import ai.opencode.core.dependencies.DependencyValues
 import ai.opencode.core.dependencies.asContextElement
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
-import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.SharedStore
-import ai.opencode.core.sharing.experimental
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.Reducer
 import ai.opencode.core.store.TestStore
@@ -118,14 +116,6 @@ internal object SessionTestSupport {
 
         /** Builds a value that reads shared keys (a `SessionFeature.State`) in this world. */
         fun <R> state(block: () -> R): R = DependencyValues.withValues(values, block)
-
-        /**
-         * iOS `@Test(.callStyle(livingOrb:))`: this test's shared store holds one call style. Living
-         * Orb is the default; tests about the Standard call view switch it off.
-         */
-        fun callStyle(livingOrb: Boolean) = state {
-            shared(experimental(ExperimentalFeature.livingOrb)).set(livingOrb)
-        }
 
         /** iOS `makeState(...)` (`SessionFeatureTests`). */
         fun makeState(

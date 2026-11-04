@@ -259,14 +259,6 @@ class RequestAnswerTests {
         assertEquals(listOf(shell.id), store.state.permissionRequests.map { it.id })
     }
 
-    @Test fun aCallKeepsTheComposerAndItsAgentAnswers() = sessionTest { h ->
-        h.callStyle(livingOrb = false)
-        val base = h.state(draft = "Half a message", forms = listOf(slack), answering = false)
-        val initial = h.state { base.copy(voice = VoiceFeature.State(base.server, session)) }
-        assertFalse(h.state { initial.wantsRequestDock })
-        assertNull(h.state { initial.requestBar })
-    }
-
     // region The parked message is a composer of its own
 
     private fun file(name: String, id: Long = 1, status: ComposerFileAttachment.Status = ComposerFileAttachment.Status.Uploading(sent = 0)) =

@@ -56,22 +56,19 @@ import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.transcript.TranscriptTunables
 import ai.opencode.feature.transcript.list.TranscriptBorrowedDrag
 import ai.opencode.feature.transcript.list.passesDragsToTranscript
-import ai.opencode.feature.voice.VoiceCallComposer
+import ai.opencode.feature.voice.FloatingCallCenter
 import ai.opencode.feature.voice.VoiceCallRowsCard
-import ai.opencode.feature.voice.VoiceCallSurface
+import ai.opencode.feature.voice.ComposerSurface as VoiceComposerSurface
 import ai.opencode.feature.voice.VoiceStoreOf
 import ai.opencode.feature.voice.hiddenUnderFloatingCall
-import ai.opencode.feature.voice.hiddenUnderVoiceTranscript
 import ai.opencode.feature.voice.holdsClientToolCard
 import ai.opencode.server.model.OpenCodeProject
 import ai.opencode.server.model.OpenCodeQueuedInput
 import ai.opencode.server.model.PastedText
 import androidx.activity.compose.LocalActivity
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.VisibilityThreshold
@@ -84,7 +81,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.border
 import androidx.compose.foundation.draganddrop.dragAndDropTarget
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -220,8 +216,6 @@ class SessionComposerHost {
     val keepsComposerExpanded: Boolean get() = modelPanels?.keepsComposerExpanded == true
     /** A panel or overlay owns downward drags now (iOS `composerSwipeYields`' panels). */
     val swipeYields: Boolean get() = modelPanels?.swipeYields == true
-    /** A call's bar holds the composer's place (iOS `callStore != nil && !floatsCall`). */
-    internal var callHoldsComposer by mutableStateOf(false)
     /** iOS `UIAccessibility.post(.announcement)`, set by the composer (the view announces). */
     internal var announcer: (String) -> Unit = {}
 
@@ -460,11 +454,8 @@ fun SessionComposer(
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
-    val floatsCall = rememberFloatsCall()
     val callShowsCard by remember(callStore) { callStore?.let { call -> call.states.map { it.phase.showsCard } } ?: flowOf(false) }
         .collectAsState(callStore?.state?.phase?.showsCard ?: false)
-    val callShowsCaptions by remember(callStore) { callStore?.let { call -> call.states.map { it.showsCaptions } } ?: flowOf(false) }
-        .collectAsState(callStore?.state?.showsCaptions ?: false)
     val holdsClientToolCard by remember(callStore) { callStore?.let { call -> call.states.map { it.holdsClientToolCard } } ?: flowOf(false) }
         .collectAsState(callStore?.state?.holdsClientToolCard ?: false)
 
@@ -490,10 +481,6 @@ fun SessionComposer(
         },
         scope = scope,
         callStore = callStore,
-        // iOS `voiceStore`: the bar takes the composer's place unless the call floats or shows a card.
-        voiceStore = if (floatsCall || callShowsCard) null else callStore,
-        floatsCall = floatsCall,
-        callShowsCaptions = callShowsCaptions,
         holdsClientToolCard = holdsClientToolCard,
         callOwnsAudio = callStore != null && !callShowsCard,
         photoSheet = LocalSessionPhotoSheet.current,
@@ -517,12 +504,10 @@ fun SessionComposer(
     host.dismissAction = env.dismissKeyboard
     SideEffect {
         host.autocompleteCovers = view.autocompleteController.isOpen
-        host.callHoldsComposer = env.voiceStore != null
     }
-    // A request docking, a call taking the composer's place, or dictation taking the composer
-    // closes what grew out of it (iOS `closeModelPanels()` on each).
+    // A request docking, or dictation taking the composer, closes what grew out of it (iOS
+    // `closeModelPanels()` on each).
     LaunchedEffect(env.docksRequest) { if (env.docksRequest) host.modelPanels?.closeModelPanels() }
-    LaunchedEffect(env.voiceStore != null) { if (env.voiceStore != null) host.modelPanels?.closeModelPanels() }
 
     // A share or quote continued in OpenCode lands with the keyboard up (iOS `composerFocusRequest`,
     // handled here because the composer owns the field). Catch Up's cards never take it.
@@ -617,12 +602,6 @@ internal class SessionComposerEnv(
     val scope: kotlinx.coroutines.CoroutineScope,
     /** iOS `callStore`: the screen's call, or its root's. */
     val callStore: VoiceStoreOf? = null,
-    /** iOS `voiceStore`: the call whose bar stands in the composer's place. */
-    val voiceStore: VoiceStoreOf? = null,
-    /** iOS `floatsCall`. */
-    val floatsCall: Boolean = false,
-    /** The call shows its transcript (iOS `callStore?.showsCaptions`). */
-    val callShowsCaptions: Boolean = false,
     /** iOS `holdsClientToolCard`: an agent's screen request or link waits on the user. */
     val holdsClientToolCard: Boolean = false,
     /** iOS `callOwnsAudio`: the screen's call (its own or its root's) owns audio. */
@@ -632,10 +611,6 @@ internal class SessionComposerEnv(
     /** The window's size (px): a sent photo's copy flies only from a thumbnail on screen. */
     val windowSize: IntSize = IntSize.Zero,
 ) {
-    /** iOS `showsCallTranscript`: the call's open transcript covers what stands above the composer. */
-    val showsCallTranscript: Boolean
-        get() = callShowsCaptions
-
     /** iOS `hasCall`: the screen's own call or its root's. */
     val hasCall: Boolean get() = s.hasCall || callStore != null
 
@@ -662,8 +637,11 @@ internal class SessionComposerEnv(
         get() = s.hasNonLocationAttachments || s.wantsLocationAttachment ||
             photoSheet?.flights?.reservedAttachments?.isNotEmpty() == true
 
-    /** iOS `docksRequest`: answering a request, its panel grows out of the composer (never under a call). */
-    val docksRequest: Boolean get() = voiceStore == null && s.isAnsweringRequest
+    /** iOS `callLanding`: a hung-up floating call's shape is still flying into the call button. */
+    val callLanding: Boolean get() = FloatingCallCenter.shared.isLanding
+
+    /** iOS `docksRequest`: answering a request, its panel grows out of the composer. */
+    val docksRequest: Boolean get() = s.isAnsweringRequest
 
     /** iOS `showsVoiceControl`: Voice is set up and no call is running. */
     val showsVoiceControl: Boolean get() = s.isVoiceAvailable && !hasCall
@@ -689,7 +667,7 @@ internal class SessionComposerEnv(
                 )
             // Photos still decoding already count: their slots are in the row.
             val hasReservedPhotos = sheet != null && sheet.flights.reservedAttachments.isNotEmpty()
-            val controls = ComposerControls.make(
+            var controls = ComposerControls.make(
                 isDictating = s.isDictating && !holding,
                 isFinishing = s.isFinishingDictation && !holding,
                 isRunning = s.isRunning,
@@ -699,6 +677,12 @@ internal class SessionComposerEnv(
                 keepsSendVisible = sheet != null,
                 isInCall = sheet != null && callOwnsAudio,
             )
+            // A floating call holds the mic: the composer offers only typing.
+            val holdsMic = callOwnsAudio || callLanding
+            if (holdsMic && (controls.trailing == ComposerTrailingControl.Mic || controls.secondaryMic != ComposerControls.MicPlacement.none)) {
+                val trailing = if (controls.trailing == ComposerTrailingControl.Mic) ComposerTrailingControl.Send(enabled = false) else controls.trailing
+                controls = controls.copy(trailing = trailing, secondaryMic = ComposerControls.MicPlacement.none)
+            }
             return ComposerPresentation(expanded, controls)
         }
 
@@ -801,8 +785,6 @@ internal class SessionComposerEnv(
                 start = start,
             )
         ) return true
-        // The call's bar shares the surface: its drags never raise or dismiss the keyboard.
-        if (voiceStore != null) return true
         if (start == null) return false
         val mic = view.dictationMicFrame
         return mic != Rect.Zero && mic.inflate(4f).contains(start)
@@ -929,11 +911,11 @@ private fun SessionComposerEnv.ComposerAreaContent(modifier: Modifier) {
                 enter = if (reducedMotion) EnterTransition.None else expandVertically(MotionSpring(PILL_ROW_SECONDS).spec(IntSize.VisibilityThreshold), Alignment.Bottom, clip = false),
                 exit = if (reducedMotion) ExitTransition.None else shrinkVertically(MotionSpring(PILL_ROW_SECONDS).spec(IntSize.VisibilityThreshold), Alignment.Bottom, clip = false),
             ) {
-                HiddenUnderComposerPanel(host.composerPanelCovers, Modifier.hiddenUnderVoiceTranscript(showsCallTranscript)) { ComposerPills() }
+                HiddenUnderComposerPanel(host.composerPanelCovers) { ComposerPills() }
             }
             val error = s.settledRequestLoadError
             if (error != null) {
-                HiddenUnderComposerPanel(host.composerPanelCovers, Modifier.hiddenUnderVoiceTranscript(showsCallTranscript)) {
+                HiddenUnderComposerPanel(host.composerPanelCovers) {
                     ComposerBanner(
                         symbol = SFSymbol.ExclamationmarkTriangleFill,
                         iconTint = androidx.compose.ui.graphics.Color(0xFFFF9500),
@@ -946,10 +928,10 @@ private fun SessionComposerEnv.ComposerAreaContent(modifier: Modifier) {
                 }
             }
             ServerConnection()
-            // iOS `callRows`: none while the call bar's captions cover it, or a docked request's panel holds the glass.
+            // iOS `callRows`: none while a docked request's panel holds the composer's surface.
             VoiceCallRowsCard(
                 store = callStore,
-                hidden = (voiceStore != null && callShowsCaptions) || docksRequest,
+                hidden = docksRequest,
                 reduceMotion = reducedMotion,
             )
             // iOS `.handsGlassOver(to: photoSheet, …, sinksUnderSheet: true, pulledDown:)` and its
@@ -983,7 +965,7 @@ private fun SessionComposerEnv.ComposerAreaContent(modifier: Modifier) {
                     .offset(y = -(48 + pillGap + host.orbClearance).dp),
             ) {
                 // The call's open transcript covers where it would float.
-                val jumpShown = host.showsJumpButton && !showsCallTranscript && !holdsClientToolCard
+                val jumpShown = host.showsJumpButton && !holdsClientToolCard
                 JumpToLatestPill(isShown = jumpShown, onClick = host.onJumpToLatest, modifier = Modifier.passesDragsToTranscript(host.borrowedDrag, isEnabled = jumpShown))
             }
         }
@@ -1008,7 +990,7 @@ private fun SessionComposerEnv.ServerConnection() {
         exit = transition.exit(reducedMotion),
     ) {
         val notice = shown ?: return@AnimatedVisibility
-        HiddenUnderComposerPanel(host.composerPanelCovers, Modifier.hiddenUnderVoiceTranscript(showsCallTranscript)) {
+        HiddenUnderComposerPanel(host.composerPanelCovers) {
             ServerConnectionPill(notice, host.onConnectionAction)
         }
     }
@@ -1037,7 +1019,7 @@ private fun SessionComposerEnv.DraftProjectsOverlay(modifier: Modifier) {
         contentAlignment = Alignment.BottomCenter,
     ) {
         AnimatedVisibility(visible = showsDraftProjects, enter = enter, exit = exit) {
-            HiddenUnderComposerPanel(host.composerPanelCovers, Modifier.hiddenUnderVoiceTranscript(showsCallTranscript)) {
+            HiddenUnderComposerPanel(host.composerPanelCovers) {
                 Column(verticalArrangement = Arrangement.spacedBy(StarterPromptTunables.listGap.dp)) {
                     AnimatedVisibility(visible = showsStarterPrompts, enter = fadeIn(), exit = fadeOut()) {
                         StarterPromptList(s.starterPrompts, onPick = { store.send(Action.StarterPromptTapped(it)) })
@@ -1142,9 +1124,7 @@ private fun SessionComposerEnv.QueuedActivity(hasQueued: Boolean) {
 // region Capsule
 
 /**
- * iOS `composerCapsule`: the composer and a call share one surface ([VoiceCallSurface]): starting
- * or ending a call swaps what's inside it, + becoming Mute and the call button End, and the call's
- * transcript grows out of the same surface. A pending request's panel grows up out of it too,
+ * iOS `composerCapsule`: the composer's surface ([ComposerSurface]). A pending request's panel grows up out of it,
  * drawn above the bar in the room the capsule makes for it (layout-phase top padding),
  * which stays until the surface has folded, so nothing under the panel moves while it shows.
  */
@@ -1152,14 +1132,14 @@ private fun SessionComposerEnv.QueuedActivity(hasQueued: Boolean) {
 private fun SessionComposerEnv.ComposerCapsule() {
     RequestPanelPresence()
     val showsRequestPanel = holdsRequestPanelRoom || lingersRequestPanel
-    // With no panel or call, Composer Autocomplete's suggestions grow there instead.
-    val showsAutocomplete = !showsRequestPanel && voiceStore == null
+    // With no panel, Composer Autocomplete's suggestions grow there instead.
+    val showsAutocomplete = !showsRequestPanel
     val photoSheet = LocalSessionPhotoSheet.current
     // Read where it's used (layout, or the panel's own scope), never here: the room under the
     // header changes on every frame of the keyboard's animation.
     val cap = { requestPanelCap() }
     val activeHeight = { activeRequestPanelHeight(cap()) }
-    val room = { if (voiceStore == null && showsRequestPanel) activeHeight() else 0f }
+    val room = { if (showsRequestPanel) activeHeight() else 0f }
     Box(
         Modifier
             .fillMaxWidth()
@@ -1292,8 +1272,8 @@ private fun SessionComposerEnv.requestPanelLeft() {
     } else {
         scope.launch { view.requestPanelReveal.animateTo(0f, RequestPanelReveal.glass(opening = false)) }
     }
-    // No request docked again (iOS `!docksRequest`, read now: a call holding the composer docks none), same screen.
-    fun stillLeaving() = !(!host.callHoldsComposer && store.state.isAnsweringRequest) && view.requestPanelIdentity == leaving
+    // No request docked again (iOS `!docksRequest`, read now), same screen.
+    fun stillLeaving() = !store.state.isAnsweringRequest && view.requestPanelIdentity == leaving
     view.requestPanelLeaveJob = scope.launch {
         delay(350)
         if (!stillLeaving()) return@launch
@@ -1328,8 +1308,8 @@ private fun SessionComposerEnv.resetRequestPanel() {
 }
 
 /**
- * The composer's surface, shared with a call ([VoiceCallSurface]): a request's [panel] on the bar,
- * autocomplete, the composer (or the call's bar) and the dictation hold layer.
+ * The composer's surface (iOS `ComposerSurface`): a request's [panel] on the bar, autocomplete,
+ * the composer and the dictation hold layer.
  */
 @Composable
 private fun SessionComposerEnv.ComposerSurface(
@@ -1340,17 +1320,15 @@ private fun SessionComposerEnv.ComposerSurface(
 ) {
     val density = LocalDensity.current
     val current by rememberUpdatedState(this)
-    val call = voiceStore
     val dropTarget = rememberComposerDropTarget()
     Box(Modifier.fillMaxWidth()) {
-        VoiceCallSurface(
-            store = call,
+        VoiceComposerSurface(
             modifier = Modifier
                 .fillMaxWidth()
                 // Under the Living Orb's card it hides, out of reach and out of TalkBack.
                 .hiddenUnderFloatingCall(host.floatingCallCovers)
                 // iOS `.onDrop(of: TranscriptComposerDrop.acceptedTypes, isTargeted:)`: anywhere on the composer.
-                .then(if (call == null) Modifier.dragAndDropTarget(shouldStartDragAndDrop = { true }, target = dropTarget) else Modifier)
+                .dragAndDropTarget(shouldStartDragAndDrop = { true }, target = dropTarget)
                 .onGloballyPositioned {
                     view.surfaceBounds = it.boundsInRoot()
                     host.attachmentAnchors.composer = view.surfaceBounds
@@ -1364,44 +1342,18 @@ private fun SessionComposerEnv.ComposerSurface(
             controlsTakeTouches = composerPresentation.expanded,
             panelHidden = host.floatingCallCovers,
         ) {
-            // The composer and the call trade places inside the one surface.
-            AnimatedContent(
-                targetState = call,
-                contentKey = { it != null },
-                transitionSpec = {
-                    val spec: androidx.compose.animation.core.FiniteAnimationSpec<Float> = if (reducedMotion) Motion.easeInOut(0.2) else MotionSpring(0.32).spec()
-                    // Clipped to the surface as it resizes: the taller composer fading out never
-                    // shows past the bar's edge.
-                    fadeIn(spec) togetherWith fadeOut(spec) using SizeTransform(clip = true)
-                },
-                label = "composerCallSwap",
-            ) { shown ->
-                if (shown != null) {
-                    VoiceCallComposer(shown)
-                } else {
-                    // Leaving for a call, the composer fades out as it was (SwiftUI's removed view
-                    // keeps its last state): the draft becoming the call's session mid-swap mustn't
-                    // collapse it to one line under the arriving bar.
-                    // This scope's transition targets EnterExitState, never the nullable call.
-                    // Freeze only when the outer AnimatedContent is actually targeting a call.
-                    val leaving = call != null
-                    val live = this@ComposerSurface
-                    val frozen = remember(leaving) { if (leaving) live else null }
-                    val env = frozen ?: live
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .autocompleteComposerAnchor(view.autocompleteBridge)
-                            .onSizeChanged { size ->
-                                view.surfaceSize = with(density) { androidx.compose.ui.geometry.Size(size.width.toDp().value, size.height.toDp().value) }
-                            },
-                    ) { env.Composer() }
-                }
-            }
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .autocompleteComposerAnchor(view.autocompleteBridge)
+                    .onSizeChanged { size ->
+                        view.surfaceSize = with(density) { androidx.compose.ui.geometry.Size(size.width.toDp().value, size.height.toDp().value) }
+                    },
+            ) { Composer() }
         }
         // The drop highlight: decoration, taking no touches (iOS accent stroke, 2 pt, easeOut 0.15 s).
         val dropAlpha by animateFloatAsState(
-            if (view.isImageDropTargeted && call == null) 1f else 0f,
+            if (view.isImageDropTargeted) 1f else 0f,
             if (reducedMotion) snap() else tween(150, easing = Motion.EaseOut),
             label = "composerDropTarget",
         )
@@ -1422,7 +1374,7 @@ private fun SessionComposerEnv.ComposerSurface(
         }
         // Above the surface, so its edge never crosses the hold circle.
         val hold = shownDictationHold
-        if (hold != null && call == null) {
+        if (hold != null) {
             DictationBarPresence(isLeaving = s.dictationHold == null, modifier = Modifier.matchParentSize()) {
                 DictationHoldLayer(
                     pose = dictationPose(hold),

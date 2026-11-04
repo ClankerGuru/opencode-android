@@ -1,7 +1,6 @@
 package ai.opencode.feature.session
 
 import ai.opencode.core.dependencies.dependency
-import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.experiments.key
@@ -9,7 +8,6 @@ import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.State
-import ai.opencode.feature.voice.FloatingCallCenter
 import ai.opencode.feature.voice.LiveSocketWarmer
 import ai.opencode.feature.voice.LiveSocketWarmerClient
 import ai.opencode.feature.voice.RaiseToEarClient
@@ -25,8 +23,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -44,8 +42,8 @@ import kotlin.time.Duration.Companion.seconds
 // The call's part of iOS `SessionView`: which store is the screen's call (`callStore`), its
 // presentation (`callPresentation`/`voiceStore`), the failed and ended cards above the composer,
 // and the screen's `.task`s that start it once, listen for Raise to Talk and keep a GPT-Live socket
-// warm. The bar itself is :feature:voice's `VoiceCallComposer` on `VoiceCallSurface`, swapped into
-// the composer's place by `SessionComposer`; with Living Orb the call floats and the composer stays.
+// warm. The call floats over the screen (Living Orb, :feature:voice's `FloatingCallOverlay`) and
+// the composer stays a composer.
 
 /**
  * iOS `callStore`: the call on this screen, its own (`store.scope(\.voice, action: \.voice.presented)`)
@@ -54,17 +52,6 @@ import kotlin.time.Duration.Companion.seconds
 @Composable
 internal fun StoreOf<State, Action>.rememberCallStore(hostedCall: VoiceStoreOf?): VoiceStoreOf? =
     rememberOptionalScope<VoiceFeature.State, VoiceFeature.Action>({ it.voice }, { Action.voicePresented(it) }) ?: hostedCall
-
-/**
- * iOS `floatsCall` (`floatingCallCenter.isOn(livingOrbSetting)`): Living Orb is on, so the call
- * floats over the screen (Home hosts `FloatingCallOverlay`) and the composer stays a composer.
- */
-@Composable
-internal fun rememberFloatsCall(): Boolean {
-    val center = remember { dependency(FloatingCallCenter) }
-    val livingOrb by remember { shared(ExperimentalFeature.livingOrb.key).flow }.collectAsState(shared(ExperimentalFeature.livingOrb.key).value)
-    return center.isOn(livingOrb)
-}
 
 /**
  * The screen's call tasks (iOS `sessionScaffold`'s `.task`s and the composer area's `.task(id: hasCall)`):

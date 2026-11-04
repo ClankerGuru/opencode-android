@@ -177,9 +177,8 @@ fun SessionView(
     val ownsCall by store.observe { it.voice != null }
     SessionCallTasks(store, callStore, hasCall = ownsCall || hostedCall != null)
     val isCovered by store.observe { it.isCovered }
-    val floatsCall = rememberFloatsCall()
     // iOS `floatingCallCoverage(sessionLifecycle)`: what the Living Orb's card covers gives way.
-    SessionFloatingCallCoverage(store, callStore, floatsCall, composerHost, photoSheet)
+    SessionFloatingCallCoverage(store, callStore, composerHost, photoSheet)
     // iOS `clearOverClientToolCard()`: an agent's screen request or link came up, so the keyboard
     // and the composer's panels would stand over its card.
     val holdsClientToolCard by remember(callStore) { callStore?.let { call -> call.states.map { it.holdsClientToolCard } } ?: flowOf(false) }
@@ -201,7 +200,7 @@ fun SessionView(
     val callLive by remember(callStore) { callStore?.let { call -> call.states.map { !it.phase.isTerminal } } ?: flowOf(false) }
         .collectAsState(false)
     var orbComposer by remember { mutableStateOf(Rect.Zero) }
-    val orbRoom = if (!floatsCall || isCovered || !callLive) 0f else {
+    val orbRoom = if (isCovered || !callLive) 0f else {
         val orb = floatingCallCenter.restingOrb(composerTop = orbComposer.top)
         if (orb == null) 0f else FloatingCallRestArea.clearance(orb, orbComposer, FloatingCallTunables.composerGap.value.toFloat())
     }
@@ -256,7 +255,6 @@ fun SessionView(
             onOpenShell = { store.send(Action.ShellOutputTapped(it)) },
             isCovered = composerHost.composerPanelCovers,
             inCall = work.inCall,
-            showsCallTranscript = work.showsCallTranscript,
             transcript = scrollEdgeBridge.borrowedDrag,
             // The capsule draws above the + menu's dismiss area: tapping it closes the menu.
             // iOS: typing ends, and the capsule draws above the menu's dismiss area: tapping it closes the menu.
@@ -311,20 +309,16 @@ fun SessionView(
                         // The resting orb's room: the transcript's end rises above it.
                         .padding(top = orbClearance.dp)
                         // The composer without that room, for where the orb rests.
-                        .then(
-                            if (floatsCall) {
-                                Modifier.onGloballyPositioned {
-                                    val b = it.boundsInWindow()
-                                    val d = density.density
-                                    val frame = Rect(b.left / d, b.top / d, b.right / d, b.bottom / d)
-                                    if (orbComposer != frame) orbComposer = frame
-                                }
-                            } else Modifier,
-                        )
+                        .onGloballyPositioned {
+                            val b = it.boundsInWindow()
+                            val d = density.density
+                            val frame = Rect(b.left / d, b.top / d, b.right / d, b.bottom / d)
+                            if (orbComposer != frame) orbComposer = frame
+                        }
                         // A floating call rests above the composer.
-                        .then(if (floatsCall) Modifier.floatingCallComposer() else Modifier)
+                        .floatingCallComposer()
                         // The column itself, not the pane: whether the call's card covers it.
-                        .then(if (floatsCall && !isCovered) Modifier.floatingCallComposerColumn() else Modifier),
+                        .then(if (!isCovered) Modifier.floatingCallComposerColumn() else Modifier),
                 ) {
                     SessionCallCards(callStore)
                     SessionComposer(store, Modifier.modelPanelsComposer(composerHost), callStore = callStore)
@@ -361,7 +355,6 @@ private data class BackgroundWorkModel(
     val waitingSessionIDs: Set<String>,
     val probe: ShellGlyphProbe?,
     val inCall: Boolean,
-    val showsCallTranscript: Boolean,
 ) {
     companion object {
         fun from(state: State) = BackgroundWorkModel(
@@ -370,9 +363,7 @@ private data class BackgroundWorkModel(
             shells = state.backgroundShells,
             waitingSessionIDs = state.waitingSessionIDs,
             probe = state.shellGlyphProbe,
-            // A call takes the composer's place; its transcript covers the pills.
             inCall = state.voice != null,
-            showsCallTranscript = state.voice?.showsCaptions == true,
         )
     }
 }

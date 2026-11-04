@@ -563,12 +563,8 @@ fun State.renameVoiceTarget(sessionID: String, title: String): State {
     return copy(voice = voice.copy(sessionTitle = resolved))
 }
 
-/** A call is connecting, live, or leaving: its bar holds the composer's place and its audio holds the session. */
+/** A call is connecting, live, or leaving: its audio holds the session. A failed or dropped call's card leaves it free. */
 val State.callOwnsAudio: Boolean get() = voice?.let { !it.phase.showsCard } ?: false
-
-/** A Living Orb call leaves the composer where it is (iOS `callKeepsComposer`). */
-val State.callKeepsComposer: Boolean
-    get() = ExperimentalFeature.livingOrb.isActive(shared(ExperimentalFeature.livingOrb.key).value)
 
 /** Whether tapping the composer's call button starts a call rather than opening the project picker or Settings. */
 val State.canStartCallFromTap: Boolean

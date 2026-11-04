@@ -31,15 +31,6 @@ internal fun SessionFeature.reduceHistory(
         },
     )
 
-    is Action.NewMessagesDividerChanged ->
-        // Off, no divider stays up; on, the next mark may show one.
-        Reduced(
-            if (!action.isOn) {
-                state.copy(newMessages = null, newMessagesFolded = null, newMessagesFitThrough = null, newMessagesEarlierBaseline = null)
-            } else {
-                state
-            },
-        )
 
     is Action.NewMessagesFit -> {
         val mark = state.newMessages

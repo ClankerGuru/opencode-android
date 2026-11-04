@@ -91,7 +91,6 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
         val visitedSessionIDs: List<String> = emptyList(),
         /** Where the screen last moved from, for a request spoken around the move. */
         val lastMove: Move? = null,
-        val showsCaptions: Boolean = false,
         /** How far the floating call (Living Orb) has grown: orb, card or sheet. */
         val floatingStage: FloatingCallStageFeature.State = FloatingCallStageFeature.State(),
         /** An agent asking to see the screen (Share Screen with Agents). */
@@ -664,8 +663,6 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
         /** The finger's own hang-up: the bar's End, or Close on a call's card. */
         data object EndPressed : Action
         data object EndTapped : Action
-        data object CaptionsTapped : Action
-        data object CaptionsDismissed : Action
         data class FloatingStage(val action: FloatingCallStageFeature.Action) : Action
         data class ScreenRequest(val action: VoiceScreenRequestFeature.Action) : Action
         data class OpenLink(val action: VoiceOpenLinkFeature.Action) : Action
@@ -1100,15 +1097,6 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
                 Reduced(finished.state, Effect.merge(finished.effect, Effect.run { voiceCall.end() }))
             }
 
-            Action.CaptionsTapped -> {
-                if (state.phase.isTerminal || state.showsCaptions) return Reduced(state)
-                // Opening taps, closing is quiet, like the attachment menu.
-                haptics.play(Haptic.tap)
-                Reduced(state.copy(showsCaptions = true))
-            }
-
-            Action.CaptionsDismissed -> Reduced(state.copy(showsCaptions = false))
-
             is Action.CallCommand -> {
                 // An ended call can still be in state while its bar sweeps out.
                 if (state.phase.isTerminal) return Reduced(state)
@@ -1133,18 +1121,16 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
     }
 
     /**
-     * Nothing of the call's covers a client tool's card: on a request, captions close and the
-     * floating call goes back to the orb, held there until the card goes.
+     * Nothing of the call's covers a client tool's card: on a request, the floating call goes
+     * back to the orb, held there until the card goes.
      */
     private fun holdForClientToolCard(state: State, requested: Boolean): State {
         val holds = state.holdsClientToolCard
         var stage = state.floatingStage
-        var showsCaptions = state.showsCaptions
         if (requested && holds) {
-            showsCaptions = false
             stage = stage.copy(dragTarget = null, stage = FloatingCallStage.orb)
         }
-        return state.copy(showsCaptions = showsCaptions, floatingStage = stage.copy(isHeld = holds))
+        return state.copy(floatingStage = stage.copy(isHeld = holds))
     }
 
     private fun reduceCallEvent(state: State, event: VoiceCallEvent): Reduced<State, Action> {
@@ -1348,8 +1334,7 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
         next.persistTranscript(endedAt = dependency(DateClient).now())
         next = next.copy(isAssistantSpeaking = false, isReconnecting = false, isAudioInterrupted = false)
             .clearLiveReply()
-            // Captions close with the call, not when its bar is finally removed.
-            .copy(pendingWork = emptyList(), abandonedCallIDs = emptyList(), showsCaptions = false)
+            .copy(pendingWork = emptyList(), abandonedCallIDs = emptyList())
             .withPhase(phase)
         // The kind only: a failure's message can carry the service's own text.
         val ended = when (phase) {

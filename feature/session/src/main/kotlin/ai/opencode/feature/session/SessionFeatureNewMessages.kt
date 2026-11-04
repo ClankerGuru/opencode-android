@@ -1,8 +1,5 @@
 package ai.opencode.feature.session
 
-import ai.opencode.core.dependencies.dependency
-import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.feature.session.SessionFeature.State.EarlierHistory
 import ai.opencode.feature.transcript.TranscriptEntry
 import ai.opencode.feature.transcript.list.NewMessagesEarlierBaseline
@@ -17,10 +14,6 @@ import ai.opencode.server.model.OpenCodeTranscriptItem
 
 /** Rows kept above the New divider (iOS `SessionFeature.State.newMessagesContext`). */
 val SessionFeature.State.Companion.newMessagesContext: Int get() = NewMessagesMark.NEW_MESSAGES_CONTEXT
-
-/** Whether the New Messages Divider experiment is on. Off, what arrived while away comes in at the end with no divider, as in a chat app. */
-val SessionFeature.State.Companion.showsNewMessagesDivider: Boolean
-    get() = dependency(ExperimentalFeatures)(ExperimentalFeature.newMessagesDivider)
 
 /** What was on screen as the reader leaves, kept until the read that follows their return settles what's new. */
 fun SessionFeature.State.noteLeaving(): SessionFeature.State {
@@ -157,17 +150,11 @@ fun SessionFeature.State.updateNewMessagesMark(settles: Boolean, keptShapes: Boo
             s = s.copy(
                 newMessagesFitThrough = null,
                 newMessagesGeneration = generation,
-                newMessages = NewMessagesMark(
-                    itemID = itemID,
-                    lastItemID = lastItemID,
-                    generation = generation,
-                    showsDivider = SessionFeature.State.showsNewMessagesDivider,
-                ),
+                newMessages = NewMessagesMark(itemID = itemID, lastItemID = lastItemID, generation = generation),
             )
         }
         if (settles) {
-            val mayHaveEarlierUnseen = SessionFeature.State.showsNewMessagesDivider &&
-                index == 0 &&
+            val mayHaveEarlierUnseen = index == 0 &&
                 s.earlierHistory != EarlierHistory.Exhausted &&
                 (s.earlierHistory != EarlierHistory.UnknownEdge || items.size >= SessionFeature.initialFetchLimit)
             s = s.copy(

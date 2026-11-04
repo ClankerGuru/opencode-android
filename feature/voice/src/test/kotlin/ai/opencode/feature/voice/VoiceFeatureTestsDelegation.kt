@@ -557,17 +557,6 @@ class VoiceFeatureTestsDelegation {
         assertEquals(listOf("voice.ended"), h.haptics.log)
     }
 
-    @Test fun openingTheCallTranscriptTapsAndClosingIsQuiet() = voiceTest { harness ->
-        h = harness
-        val (store, _) = startLiveCall()
-        h.haptics.reset()
-        store.send(Action.CaptionsTapped) { it.copy(showsCaptions = true) }
-        store.send(Action.CaptionsTapped)
-        store.send(Action.CaptionsDismissed) { it.copy(showsCaptions = false) }
-        assertEquals(listOf("tap"), h.haptics.log)
-        h.skipInFlightEffects()
-    }
-
     @Test fun callStartAndMuteTogglesTriggerDistinctVoiceHaptics() = voiceTest { harness ->
         h = harness
         val (store, events) = startLiveCall()

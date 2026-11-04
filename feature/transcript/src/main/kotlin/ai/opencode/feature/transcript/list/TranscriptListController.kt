@@ -1550,10 +1550,6 @@ class TranscriptListController(
         if (!isShowingToReader || isUserGestureActive) return false
         pendingNewMessagesLanding = null
         landedNewMessages = generation
-        if (!mark.showsDivider) {
-            hideFittingDivider()
-            return false
-        }
         if (behavior.mode == TranscriptScrollBehavior.Mode.Browsing) {
             // Browsing, the reader isn't at the end, but what's new may still all fit on the
             // last screen: judged where they are (no glide runs here, no hand holds the list).
@@ -1663,7 +1659,6 @@ class TranscriptListController(
     /** iOS `decideNewMessages(shows:)`: whether the mark's divider shows; one that doesn't goes. */
     private fun decideNewMessages(shows: Boolean) {
         val mark = configuration.newMessages ?: return
-        if (!mark.showsDivider) return
         newMessagesDecision = mark.entryID to shows
         if (!shows) hideFittingDivider()
     }

@@ -38,7 +38,6 @@ import ai.opencode.core.experiments.ExperimentalFeature
 import ai.opencode.core.experiments.key
 import ai.opencode.core.sharing.shared
 import ai.opencode.feature.drawer.style.DrawerMetrics
-import ai.opencode.feature.voice.FloatingCallCenter
 import ai.opencode.feature.voice.FloatingCallWindow
 import ai.opencode.feature.voice.VoiceRoutePreferences
 import ai.opencode.feature.voice.VoiceStoreOf
@@ -281,14 +280,6 @@ private fun HomeLayout(
     )
 }
 
-/** iOS `HomeView.floatsCall`: Settings › Experimental › Calls › Living Orb, through [FloatingCallCenter.isOn]. */
-@Composable
-private fun rememberFloatsCall(): Boolean {
-    val livingOrbSetting by remember { shared(ExperimentalFeature.livingOrb.key).flow }.collectAsState()
-    val floatingCenter = remember { FloatingCallCenter.shared }
-    return floatingCenter.isOn(livingOrbSetting)
-}
-
 /**
  * The floating call's window (iOS `homeLayout`'s `FloatingCallWindowAnchor`): a floating call stays
  * put above everything while the card slides, sessions change and Settings, Welcome or a sheet
@@ -298,10 +289,9 @@ private fun rememberFloatsCall(): Boolean {
  */
 @Composable
 private fun HomeFloatingCallWindow(store: StoreOf<HomeFeature.State, HomeFeature.Action>) {
-    val floats = rememberFloatsCall()
     val call = rememberHomeCall(store)
     val showsCard = call?.observe { it.phase.showsCard }?.value
-    FloatingCallWindow(if (floats && call != null && showsCard == false) call else null)
+    FloatingCallWindow(if (call != null && showsCard == false) call else null)
 }
 
 /**

@@ -6,7 +6,6 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import kotlin.math.E
 import kotlin.math.abs
 
 /**
@@ -94,15 +93,6 @@ class CaptionRevealTests {
         assertEquals(listOf(1.0), reveal.lines[0].revealedAt)
     }
 
-    @Test fun glideDecaysTowardZeroAndAccumulates() {
-        var glide = CaptionGlide()
-        glide = glide.push(22f, now = 0.0)
-        assertEquals(22f, glide.offset(0.0))
-        assertTrue(abs(glide.offset(0.16) - 22 / E.toFloat()) < 0.001f)
-        glide = glide.push(22f, now = 0.16)
-        assertTrue(abs(glide.offset(0.16) - (22 + 22 / E.toFloat())) < 0.001f)
-        assertTrue(glide.offset(glide.settlesAt) < 0.31f)
-    }
 }
 
 class VoiceAudioQualityTests {

@@ -1,5 +1,6 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.feature.transcript.SessionSeenWatermark
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.ImmediateClock
@@ -276,7 +277,7 @@ class DrawerActivityTests {
         val store = TestStore(state, HomeFeature(), this)
 
         store.send(HomeFeature.Action.ServerEvent(OpenCodeServerEvent.SessionViewChanged(viewed.id, idle = 2_000))) {
-            it.copy(sessions = listOf(viewed.copy(viewedMilliseconds = 2_000)))
+            it.copy(sessions = listOf(viewed.copy(viewedMilliseconds = 2_000))).settingSeenWatermark(SessionSeenWatermark(itemID = null, viewedMilliseconds = 2_000), viewed.id)
         }
         assertEquals(Indicator.none, store.state.indicator(store.state.sessions[0]))
         // An older watermark never makes it unread again.

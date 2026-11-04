@@ -44,50 +44,6 @@ enum class ExperimentalGroup {
         get() = ExperimentalFeature.allCases.filter { it.group == this && !it.isGraduated }
 }
 
-/** The old Floating Call switch's saved key. */
-val ai.opencode.core.sharing.ExperimentalFeature.Companion.legacyFloatingCallKey: String get() = "experimental-floating-call"
-
-/** The removed Call Tray's saved key. */
-val ai.opencode.core.sharing.ExperimentalFeature.Companion.legacyCallTrayKey: String get() = "experimental-call-tray"
-
-/** Marks the one move to Living Orb as done. */
-val ai.opencode.core.sharing.ExperimentalFeature.Companion.callStyleMigrationKey: String get() = "call-style-migrated-living-orb"
-
-/** The earlier move's marker (Living Orb the default, Tray kept, Nov 1). */
-val ai.opencode.core.sharing.ExperimentalFeature.Companion.orbDefaultMigrationKey: String get() = "call-style-migrated-orb-default"
-
-/**
- * Living Orb is the one call style besides Standard (iOS p217): once per install, before anything
- * reads its switch (`migrateBeforeLaunch`), Tray users and installs from before Living Orb was the
- * default take it. A switch saved before then can't tell a choice from the old default; one saved
- * after the Nov 1 move is a choice and stays. Then the Floating Call and Tray switches, and the
- * earlier marker, go.
- *
- * Android divergence: iOS's lab `OPENCODE_LAB_EXPERIMENTS_OFF` (UI suites starting Living Orb off)
- * is n/a; Android has no lab experiment overrides.
- */
-fun ai.opencode.core.sharing.ExperimentalFeature.Companion.migrateCallStyles(store: SharedStore) {
-    val marker = store.reference(SharedKey.appStorage(ExperimentalFeature.callStyleMigrationKey, false))
-    if (marker.value) return
-    marker.set(true)
-    val trayKey = SharedKey.appStorage(ExperimentalFeature.legacyCallTrayKey, false)
-    val nov1Key = SharedKey.appStorage(ExperimentalFeature.orbDefaultMigrationKey, false)
-    val trayUser = store.contains(trayKey) && store.reference(trayKey).value
-    val movedNov1 = store.contains(nov1Key) && store.reference(nov1Key).value
-    if (trayUser || !movedNov1) {
-        // Unset, it reads the default: Living Orb.
-        store.remove(experimental(ExperimentalFeature.livingOrb))
-    }
-    val leftovers = listOf(
-        ExperimentalFeature.legacyFloatingCallKey,
-        ExperimentalFeature.legacyCallTrayKey,
-        ExperimentalFeature.orbDefaultMigrationKey,
-    )
-    for (key in leftovers) {
-        store.remove(SharedKey.appStorage(key, false))
-    }
-}
-
 /** The removed Model Picker menu's saved style (`today`, `sheet`, `one-picker`, `grow-from-composer`). */
 const val LEGACY_MODEL_PICKER_KEY = "experimental-model-picker"
 

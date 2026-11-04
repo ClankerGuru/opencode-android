@@ -2,7 +2,6 @@ package ai.opencode.feature.settings.whatsnew.entries
 
 import ai.opencode.feature.settings.whatsnew.WhatsNewEntry
 import ai.opencode.feature.settings.whatsnew.WhatsNewEntry.Companion.feature
-import ai.opencode.feature.settings.whatsnew.WhatsNewEntry.Destination
 import ai.opencode.feature.settings.whatsnew.WhatsNewEntry.SettingsDestination
 import ai.opencode.feature.settings.whatsnew.WhatsNewEntry.Tint
 import ai.opencode.feature.settings.whatsnew.WhatsNewShipped
@@ -20,5 +19,4 @@ internal val WhatsNewShipped.newMessagesDivider: WhatsNewEntry
             "Switching back keeps a session’s background work and context gauge while it refreshes.",
         ),
         example = "Start a long task, switch to another session, and come back once it has replied",
-        tryIt = Destination.Open(SettingsDestination.Sessions),
     )

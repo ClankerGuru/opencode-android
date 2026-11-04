@@ -2,7 +2,6 @@ package ai.opencode.feature.settings.whatsnew.entries
 
 import ai.opencode.feature.settings.whatsnew.WhatsNewEntry
 import ai.opencode.feature.settings.whatsnew.WhatsNewEntry.Companion.feature
-import ai.opencode.feature.settings.whatsnew.WhatsNewEntry.Destination
 import ai.opencode.feature.settings.whatsnew.WhatsNewEntry.SettingsDestination
 import ai.opencode.feature.settings.whatsnew.WhatsNewEntry.Tint
 import ai.opencode.feature.settings.whatsnew.WhatsNewShipped
@@ -22,5 +21,4 @@ internal val WhatsNewShipped.newMessagesDividerOn: WhatsNewEntry
             "Turn it off in Settings › Sessions.",
         ),
         example = "Ask for a long reply, switch to another app until it finishes, then come back.",
-        tryIt = Destination.Open(SettingsDestination.Sessions),
     )

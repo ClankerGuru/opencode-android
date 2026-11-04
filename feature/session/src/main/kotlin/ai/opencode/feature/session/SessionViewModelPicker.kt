@@ -198,8 +198,8 @@ internal class SessionModelPanels(
     /** iOS `sessionSheetComposer`: where the focused composer sat as the session sheet opened (One Picker's space). */
     var sessionSheetComposer: Rect? = null
 
-    /** iOS `canPresentOnePickerMorph` (`voiceStore == nil && !docksRequest`): the composer is on screen to morph from. */
-    val canPresentOnePickerMorph: Boolean get() = !host.callHoldsComposer && !store.state.isAnsweringRequest
+    /** iOS `canPresentOnePickerMorph` (`!docksRequest`): the composer is on screen to morph from. */
+    val canPresentOnePickerMorph: Boolean get() = !store.state.isAnsweringRequest
 
     /** iOS `OnePickerComposerFade`: the composer fades as One Picker's glass grows out of it. */
     val composerOpacity: Float
@@ -229,7 +229,7 @@ internal class SessionModelPanels(
     fun restoreFocusAfterModelList(screen: SessionFeature.State.TaskIdentity): Boolean {
         val state = store.state
         if (state.taskIdentity != screen || !sceneActive || onePicker.isOpen ||
-            host.isAttachmentMenuOpen || host.callHoldsComposer || host.floatingCallCovers || state.isAnsweringRequest ||
+            host.isAttachmentMenuOpen || host.floatingCallCovers || state.isAnsweringRequest ||
             state.dictationHold != null || state.isDictating || state.isPreparingDictation
         ) return false
         host.focusComposer()

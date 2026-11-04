@@ -24,7 +24,7 @@ import kotlin.math.abs
  * Partly ported: `onlyTheLabOverridesTheShippedStyle` and `headerBlurTunablesRegisterAndResolveLive`
  * keep only their baked-default checks (Android has no `TuningStore`, lab overrides or presets).
  * Not ported here: `composerGlassIsInteractiveAndSwipeDownDismissesKeyboard` (`ComposerSwipeDown`,
- * `:feature:composer`, ported there; `VoiceCallSurface.usesInteractiveGlass` has no Android counterpart).
+ * `:feature:composer`, ported there; `ComposerSurface.usesInteractiveGlass` has no Android counterpart).
  * Dropped (no Android counterpart): `removedSettingsPickCannotLeaveAnInvisibleHeaderOverride`
  * (`TuningStore`/`UserDefaults`), `decodesTheLabsJSON` (the lab's JSON bridge isn't ported, the style
  * isn't `Codable` here), `variableBlurAttachesANewFilterOnEveryLiveChange` and

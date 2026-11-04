@@ -408,11 +408,8 @@ class VoiceScreenRequestTests {
                 },
             )
         }
-        store.send(VoiceFeature.Action.CaptionsTapped)
-        assertTrue(store.state.showsCaptions)
         store.send(VoiceFeature.Action.ScreenRequest(Action.Requested(screenCall)))
         assertEquals(screenCall, store.state.screenRequest.pending)
-        assertFalse(store.state.showsCaptions)
         assertTrue(store.state.floatingStage.isHeld)
         store.send(VoiceFeature.Action.ScreenRequest(Action.ConnectionClosed(screenCall.connection)))
         assertNull(store.state.screenRequest.pending)

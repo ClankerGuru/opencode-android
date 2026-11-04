@@ -166,7 +166,7 @@ class WhatsNewTests {
             WhatsNewEntry.SettingsDestination.Notifications,
             WhatsNewEntry.SettingsDestination.Servers,
             WhatsNewEntry.SettingsDestination.Experimental,
-            WhatsNewEntry.SettingsDestination.Experiment("living-orb"),
+            WhatsNewEntry.SettingsDestination.Experiment("server-voice"),
             WhatsNewEntry.SettingsDestination.Developer,
         )
         val entryIDs = listOf("a", "fix")

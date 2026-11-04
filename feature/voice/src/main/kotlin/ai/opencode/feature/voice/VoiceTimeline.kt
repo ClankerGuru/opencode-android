@@ -101,7 +101,7 @@ class VoiceTimeline : Reducer<VoiceFeature.State, VoiceFeature.Action> {
             }
             is VoiceFeature.Action.CallRouteResolved -> action.note?.let { mark("voice_delegator_fallback", it) }
             VoiceFeature.Action.StartIfNeeded, VoiceFeature.Action.EndPressed, VoiceFeature.Action.ReconnectingShown,
-            is VoiceFeature.Action.SessionRenamed, VoiceFeature.Action.CaptionsTapped, VoiceFeature.Action.CaptionsDismissed,
+            is VoiceFeature.Action.SessionRenamed,
             is VoiceFeature.Action.CompactionObserved, is VoiceFeature.Action.DelegatorExplained, is VoiceFeature.Action.DelegatorPinned,
             is VoiceFeature.Action.DelegatorOpenedDraft, VoiceFeature.Action.DelegatorRequestedEnd, is VoiceFeature.Action.DelegatorSettledRequest,
             is VoiceFeature.Action.PendingModelApplied, is VoiceFeature.Action.FloatingStage,

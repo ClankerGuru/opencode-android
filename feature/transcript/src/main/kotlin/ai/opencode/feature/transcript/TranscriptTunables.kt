@@ -344,8 +344,8 @@ object TranscriptTunables {
         }
     }
 
-    /** iOS `layoutSnapshot(in:imageLinkPreviews:)`: the live layout values. */
-    fun layoutSnapshot(imageLinkPreviews: Boolean = false): TranscriptLayoutTuning {
+    /** iOS `layoutSnapshot(in:)`: the live layout values. */
+    fun layoutSnapshot(): TranscriptLayoutTuning {
         val flow = flowHalf
         return TranscriptLayoutTuning(
             flowHalf = flow,
@@ -367,7 +367,6 @@ object TranscriptTunables {
             listNumSize = listNumSize,
             codeLeading = codeLeading,
             paragraphGap = resolvedParagraphGap(paragraphGap, flow),
-            imageLinkPreviews = imageLinkPreviews,
             linkMaxHeight = AgentImageTunables.linkMaxHeight.value,
         )
     }
@@ -406,7 +405,6 @@ data class TranscriptLayoutTuning(
     val listNumSize: Float = TranscriptTunables.listNumSize,
     val codeLeading: Float = TranscriptTunables.codeLeading,
     val paragraphGap: Float = TranscriptTunables.resolvedParagraphGap(TranscriptTunables.paragraphGap, TranscriptTunables.flowHalf),
-    val imageLinkPreviews: Boolean = false,
     /** `AgentImageTunables.linkMaxHeight` default. */
     val linkMaxHeight: Float = 220f,
 )

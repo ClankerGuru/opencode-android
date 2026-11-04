@@ -36,12 +36,11 @@ import kotlinx.coroutines.flow.map
  * (null with no call, or a call that's over).
  */
 internal fun floatingCallCovers(
-    floatsCall: Boolean,
     stage: FloatingCallStageFeature.State?,
     composerColumn: Rect?,
     card: Rect?,
 ): Boolean {
-    if (!floatsCall || stage == null || !FloatingCallStageTunables.covers.value) return false
+    if (stage == null || !FloatingCallStageTunables.covers.value) return false
     val grown = maxOf(stage.stage, stage.dragTarget ?: FloatingCallStage.orb)
     if (grown <= FloatingCallStage.orb) return false
     return grown.covers(composer = composerColumn, card = card)
@@ -57,7 +56,6 @@ internal fun floatingCallCovers(
 internal fun SessionFloatingCallCoverage(
     store: StoreOf<State, Action>,
     callStore: VoiceStoreOf?,
-    floatsCall: Boolean,
     host: SessionComposerHost,
     photoSheet: SessionPhotoSheetState,
 ) {
@@ -65,9 +63,7 @@ internal fun SessionFloatingCallCoverage(
     val liveStage by remember(callStore) {
         callStore?.states?.map { if (it.phase.isTerminal) null else it.floatingStage } ?: flowOf(null)
     }.collectAsState(callStore?.state?.let { if (it.phase.isTerminal) null else it.floatingStage })
-    val callShowsCard by remember(callStore) { callStore?.states?.map { it.phase.showsCard } ?: flowOf(false) }
-        .collectAsState(callStore?.state?.phase?.showsCard ?: false)
-    val covers = floatingCallCovers(floatsCall, liveStage, center.composerColumn, center.card)
+    val covers = floatingCallCovers(liveStage, center.composerColumn, center.card)
     SideEffect { if (host.floatingCallCovers != covers) host.floatingCallCovers = covers }
 
     var lastCovers by remember { mutableStateOf(covers) }
@@ -89,18 +85,16 @@ internal fun SessionFloatingCallCoverage(
 
     // The card and the sheet would cover a docked request: the call shrinks back to its orb, which
     // sits above the composer, whichever request docks and on whichever screen, once it's
-    // uncovered. iOS `docksRequest`: `voiceStore == nil && isAnsweringRequest`.
-    val holdsBar = callStore != null && !floatsCall && !callShowsCard
+    // uncovered. iOS `docksRequest`: `isAnsweringRequest`.
     val dock by store.observe {
-        RequestDockCall(it.taskIdentity, it.dockRequestID, it.isCovered, docksRequest = !holdsBar && it.isAnsweringRequest)
+        RequestDockCall(it.taskIdentity, it.dockRequestID, it.isCovered, docksRequest = it.isAnsweringRequest)
     }
     val call by rememberUpdatedState(callStore)
-    val floats by rememberUpdatedState(floatsCall)
     // iOS `onChange(of:initial: true)`: the first value counts too.
     LaunchedEffect(dock) {
         if (!dock.shrinksCall) return@LaunchedEffect
         val current = call ?: return@LaunchedEffect
-        if (floats) current.send(VoiceFeature.Action.FloatingStage(FloatingCallStageFeature.Action.RequestDocked))
+        current.send(VoiceFeature.Action.FloatingStage(FloatingCallStageFeature.Action.RequestDocked))
     }
 }
 

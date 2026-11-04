@@ -74,7 +74,7 @@ sealed interface SessionLinkTarget {
 
 /** The New divider, above the first row that arrived while the reader was away (iOS `NewMessagesPlacement`). */
 @Immutable
-data class NewMessagesPlacement(val entryID: String, val generation: Int, val showsDivider: Boolean = true) {
+data class NewMessagesPlacement(val entryID: String, val generation: Int) {
     companion object {
         /** The reader has read past the divider once its bottom is above the top of what they can see. */
         fun isPassed(dividerMaxY: Float, offsetY: Float, topInset: Float): Boolean = dividerMaxY <= offsetY + topInset

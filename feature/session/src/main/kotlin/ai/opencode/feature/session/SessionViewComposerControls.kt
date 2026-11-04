@@ -444,7 +444,7 @@ internal fun SessionComposerEnv.TrailingButton(control: ComposerTrailingControl)
             )
         } else {
         ComposerControlLabel(
-            systemImage = if (control == ComposerTrailingControl.Call && floatsCall) "phone.fill" else control.symbolName,
+            systemImage = control.symbolName,
             showsProgress = s.isWaitingForUploads || (control == ComposerTrailingControl.Stop && s.isInterrupting),
             foreground = control.foreground(),
             background = control.background(),
@@ -494,16 +494,14 @@ internal fun SessionComposerEnv.TrailingButton(control: ComposerTrailingControl)
                         indication = ripple(bounded = false, radius = 22.dp),
                         role = Role.Button,
                     ) {
-                        // Only ever starts a call; End is the call bar's.
-                        if (floatsCall) {
-                            val center = dependency(FloatingCallCenter)
-                            center.breakoutFrom = center.callButton
-                        }
+                        // Only ever starts a call; End is the floating call's.
+                        val center = dependency(FloatingCallCenter)
+                        center.breakoutFrom = center.callButton
                         if (!hasCall) store.send(Action.VoiceTapped)
                     }
                     .openCodeTapTarget(accessibility = false)
                     // Where a floating call breaks out of: the circle, in window space.
-                    .then(if (floatsCall) Modifier.floatingCallButton() else Modifier)
+                    .floatingCallButton()
                     .then(semantics),
                 contentAlignment = Alignment.Center,
             ) { label() }

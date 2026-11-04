@@ -469,22 +469,19 @@ sealed interface RequestBar {
  */
 object RequestAnswering {
     /**
-     * A pending request takes the composer, except under a standard call (whose bar holds the
-     * composer's place) and until any dictation into the message has finished. A floating or
-     * tray call leaves the composer ([callKeepsComposer]), so the request docks there: “Needs
-     * your input” always has the request.
+     * A pending request takes the composer once any dictation into the message has finished. A
+     * floating call leaves the composer, so the request docks there: “Needs your input” always
+     * has the request.
      */
     fun wantsRequestDock(
         hasPendingRequests: Boolean,
-        callOwnsAudio: Boolean,
         dictationSendPending: Boolean,
         isAnsweringRequest: Boolean,
         hasLiveDictation: Boolean,
         hasDictationHold: Boolean,
         isSendingDictation: Boolean,
-        callKeepsComposer: Boolean = false,
     ): Boolean {
-        if (!hasPendingRequests || (callOwnsAudio && !callKeepsComposer) || dictationSendPending) return false
+        if (!hasPendingRequests || dictationSendPending) return false
         // A message still recording, or finalizing to send, goes as a message.
         return isAnsweringRequest || (!hasLiveDictation && !hasDictationHold && !isSendingDictation)
     }

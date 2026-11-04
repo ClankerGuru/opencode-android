@@ -83,6 +83,7 @@ enum class SFSymbol(val sfName: String, @DrawableRes val drawable: Int) {
     CheckmarkCircle("checkmark.circle", R.drawable.ms_check_circle),
     CheckmarkCircleFill("checkmark.circle.fill", R.drawable.ms_check_circle_fill),
     CheckmarkSeal("checkmark.seal", R.drawable.ms_verified),
+    CheckmarkSealFill("checkmark.seal.fill", R.drawable.ms_verified_fill),
     CheckmarkSquareFill("checkmark.square.fill", R.drawable.ms_check_box_fill),
     ChevronBackward("chevron.backward", R.drawable.ms_arrow_back),
     ChevronCompactLeft("chevron.compact.left", R.drawable.ms_chevron_left),

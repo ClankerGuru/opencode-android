@@ -7,7 +7,6 @@ import ai.opencode.core.dependencies.UuidClient
 import ai.opencode.core.experiments.key
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
-import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.TestStore
@@ -32,12 +31,11 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * iOS `DrawerCallTests`: the drawer's call button ([HomeFeature.Action.DrawerCallTapped]). Under
- * Living Orb it calls the screen behind the drawer through its own call button, else Start Voice
+ * iOS `DrawerCallTests`: the drawer's call button ([HomeFeature.Action.DrawerCallTapped]): a call on
+ * it calls the screen behind the drawer through its own call button, else Start Voice
  * Call's Last Viewed path, and it's gone during a call.
  *
- * iOS runs the suite under `.callStyle(livingOrb: true)`; here Living Orb is the stored default, so each
- * test starts there, and voice set-up is written into the test's own shared store.
+ * Voice set-up is written into the test's own shared store.
  */
 class DrawerCallTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -159,19 +157,6 @@ class DrawerCallTests {
         store.receive(HomeFeature.Action.SubagentStack(top, SessionFeature.Action.Delegate(SessionFeature.Delegate.CallRequested)))
         assertEquals("ses_child", store.state.sessionDetail?.voice?.target?.sessionID)
         assertTrue(store.state.isDrawerOpen)
-    }
-
-    /** Only Living Orb's call floats above the open drawer; with it off the call lives in the composer under it, so the drawer offers none. */
-    @Test
-    fun theStandardCallOffersNoDrawerCall() = runTest {
-        voiceSetUp(true)
-        val state = context.read { home().showing(newer) }
-        assertTrue(context.read { state.drawerShowsCallButton })
-        context.read { shared(ExperimentalFeature.livingOrb.key).set(false) }
-        assertFalse(context.read { state.drawerShowsCallButton })
-        val store = store(backgroundScope) { state }
-        store.send(HomeFeature.Action.DrawerCallTapped)
-        assertNull(store.state.sessionDetail?.voice)
     }
 
     @Test

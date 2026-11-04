@@ -389,7 +389,7 @@ sealed interface ComposerTrailingControl {
             is Send -> "arrow.up"
             Stop -> "stop.fill"
             Mic -> "mic"
-            Call -> "waveform"
+            Call -> "phone.fill"
         }
 
     val accessibilityLabel: String

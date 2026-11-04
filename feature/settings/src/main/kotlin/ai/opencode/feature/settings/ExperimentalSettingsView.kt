@@ -81,8 +81,7 @@ fun ExperimentalSettingsView(store: SettingsStore, focus: ExperimentalFeature?) 
     }
 
     fun header(group: ExperimentalGroup): String {
-        // Turned on: ones on by default (Living Orb) don't count (iOS `isTurnedOn`).
-        val on = group.features.count { !it.defaultEnabled && enabled.getValue(it) }
+        val on = group.features.count { enabled.getValue(it) }
         return if (on == 0) group.title else "${group.title} · $on on"
     }
 
@@ -152,7 +151,7 @@ private fun highlightSpec(highlighted: Boolean): AnimationSpec<Color> =
 
 /**
  * iOS `ExperimentalSettingsRow`: Settings' row into Experimental, counting experiments turned on
- * (“2 On”), or “All On” while All Experiments is. One on by default (Living Orb) doesn't count.
+ * (“2 On”), or “All On” while All Experiments is.
  */
 @Composable
 fun ExperimentalSettingsRow(onClick: () -> Unit) {
@@ -161,8 +160,7 @@ fun ExperimentalSettingsRow(onClick: () -> Unit) {
     val enabled = features.map { feature -> remember(feature) { shared(feature.key).flow }.collectAsState().value }
     var on = 0
     for ((index, feature) in features.withIndex()) {
-        // Turned on: ones on by default (Living Orb) don't count (iOS `isTurnedOn`).
-        if (!feature.defaultEnabled && enabled[index]) on += 1
+        if (enabled[index]) on += 1
     }
     val value = if (all) "All On" else if (on == 0) null else "$on On"
     SettingsRow("Experimental", "flask.fill", SettingsTint.Gray, value = value, onClick = onClick)

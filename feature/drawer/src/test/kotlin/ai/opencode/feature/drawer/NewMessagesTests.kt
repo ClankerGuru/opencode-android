@@ -5,8 +5,6 @@ import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.DependencyValues
 import ai.opencode.core.dependencies.ImmediateClock
-import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.core.store.TestStore
 import ai.opencode.core.testing.TestIsolationRule
 import ai.opencode.core.dependencies.UuidClient
@@ -57,10 +55,8 @@ class NewMessagesTests {
 
     private val server = OpenCodeServer(url = "http://127.0.0.1:9", username = "", password = "")
 
-    private fun <R> on(body: () -> R): R = DependencyValues.withValues(
-        DependencyValues.testing().update { this[ExperimentalFeatures] = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.newMessagesDivider)) },
-        body,
-    )
+    /** [body] in the test's dependencies, as iOS's `TestStore` runs its expected-state updates. */
+    private fun <R> on(body: () -> R): R = DependencyValues.withValues(DependencyValues.testing(), body)
 
     private fun session(id: String) = OpenCodeSession(id = id, serverTitle = id, projectID = "project", directory = "/project", updatedAt = Instant.ofEpochSecond(10))
     private fun user(id: String): OpenCodeTranscriptItem = OpenCodeTranscriptItem.UserText(id = id, text = id)
@@ -125,11 +121,8 @@ class NewMessagesTests {
 
     // region Ported from iOS f657969b: the read watermarks, Catch Up and the covered screen
 
-    private val divider = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.newMessagesDivider))
-
-    /** iOS `on`: [body] in this test's world with the New Messages Divider experiment on. */
-    private fun <R> Harness.on(body: () -> R): R =
-        state { DependencyValues.withValues(DependencyValues.current.update { this[ExperimentalFeatures] = divider }, body) }
+    /** [body] in this test's world. */
+    private fun <R> Harness.on(body: () -> R): R = state(body)
 
     /** An expected-state update run in this test's world, as iOS's `TestStore` runs it with the store's dependencies. */
     private fun <S> Harness.expect(update: (S) -> S): (S) -> S = { s -> on { update(s) } }
@@ -154,7 +147,6 @@ class NewMessagesTests {
 
     /** iOS `stub`: a server that answers every read a screen makes with [transcript]. */
     private fun DependencyValues.Builder.stub(transcript: () -> List<OpenCodeTranscriptItem>) {
-        this[ExperimentalFeatures] = divider
         this[Clock] = ImmediateClock()
         this[DateClient] = DateClient.constant(Instant.ofEpochSecond(100))
         this[UuidClient] = UuidClient.incrementing()

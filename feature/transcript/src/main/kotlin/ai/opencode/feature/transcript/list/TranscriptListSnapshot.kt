@@ -209,9 +209,12 @@ data class TranscriptListSnapshot(
             }
         }
 
-        /** Whether the list holds a row for the mark's divider (iOS `drawsNewMessagesDivider`). */
+        /**
+         * Whether the list holds a row for the mark's divider (iOS `drawsNewMessagesDivider`):
+         * unless it fit, or the reader arrived on it without one.
+         */
         fun drawsNewMessagesDivider(mark: NewMessagesPlacement, fitting: Int?, decision: Pair<String, Boolean>?): Boolean {
-            if (!mark.showsDivider || mark.generation == fitting) return false
+            if (mark.generation == fitting) return false
             if (decision != null && decision.first == mark.entryID) return decision.second
             return true
         }

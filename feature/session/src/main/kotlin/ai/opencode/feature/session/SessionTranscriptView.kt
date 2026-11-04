@@ -7,8 +7,6 @@ import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.motion.transitionBlur
-import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
 import ai.opencode.core.ui.OpenCodeIcon
@@ -164,8 +162,6 @@ fun SessionTranscriptView(
     val host = LocalSessionComposerHost.current
     val presenter = LocalMediaPresenter.current
     val reducedMotion = rememberReduceMotion()
-    val imageLinkPreviewsSetting by remember { shared(ExperimentalFeature.imageLinkPreviews.key) }.flow
-        .collectAsState(shared(ExperimentalFeature.imageLinkPreviews.key).value)
     val hour24 = remember(context) { DateFormat.is24HourFormat(context) }
     val cache = remember { SessionTranscriptView.ProjectionCache() }
 
@@ -256,9 +252,7 @@ fun SessionTranscriptView(
             jumpRequest = scrollEdgeBridge.jumpRequest,
             onShowsJumpButtonChanged = { host?.showsJumpButton = it },
             slots = slots,
-            layoutTuning = TranscriptTunables.layoutSnapshot(
-                imageLinkPreviews = ExperimentalFeature.imageLinkPreviews.isActive(imageLinkPreviewsSetting),
-            ),
+            layoutTuning = TranscriptTunables.layoutSnapshot(),
             onScrolledUnderHeader = { scrollEdgeBridge.scrolled(underHeader = it, revealDistance = top.revealDistance) },
             borrowedDrag = scrollEdgeBridge.borrowedDrag,
         )
