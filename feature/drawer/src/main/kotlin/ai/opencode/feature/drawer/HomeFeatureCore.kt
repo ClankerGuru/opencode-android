@@ -79,6 +79,8 @@ private fun HomeFeature.coreRoute(state: State, action: Action): Reduced<State, 
 
     is Action.ServerEvent -> reduceServerEvent(state, action.event)
 
+    is Action.SessionPages -> reduceSessionPages(state, action.action)
+
     Action.ServerSwitchNoteActionTapped -> {
         val note = state.serverSwitchNote
         if (note == null) {
@@ -167,7 +169,7 @@ private fun HomeFeature.coreRoute(state: State, action: Action): Reduced<State, 
     Action.FirstComputerPaired,
     Action.DrawerOpenRequestHandled,
     Action.DrawerCallTapped,
-    -> reduceDrawer(state, action)
+    -> reduceDrawer(state.adoptingSearchResultFor(action), action)
 
     is Action.InAppNoticeExpired ->
         if (state.inAppNotice?.id != action.id) Reduced(state) else Reduced(state.copy(inAppNotice = null))

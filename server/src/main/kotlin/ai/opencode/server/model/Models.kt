@@ -292,7 +292,24 @@ data class OpenCodeHomeSnapshot(
     val activeSessionIDs: Set<String>,
     /** Only ancestry for active sessions; optional for older on-disk snapshots. */
     val activeSessionParents: Map<String, String>? = null,
+    /** The cursor of the page after `sessions`; null at the end of the list. */
+    val nextCursor: String? = null,
 )
+
+/** One page of root, unarchived sessions, newest first (`GET /api/session`). */
+data class OpenCodeSessionPage(
+    val sessions: List<OpenCodeSession>,
+    /** The cursor of the older page; null at the end of the list. */
+    val next: String?,
+)
+
+sealed interface OpenCodeSessionPageRequest {
+    /** The newest page whose titles match `text`. */
+    data class Search(val text: String) : OpenCodeSessionPageRequest
+
+    /** The page after one already read; the cursor carries its filters. */
+    data class After(val cursor: String) : OpenCodeSessionPageRequest
+}
 
 object SessionActivity {
     fun root(sessionID: String, parents: Map<String, String>): String {

@@ -6,7 +6,9 @@ import ai.opencode.core.motion.SpringSolver
 import ai.opencode.core.motion.motionFrameLoop
 import ai.opencode.core.motion.rememberFrameDurationSeconds
 import ai.opencode.core.store.StoreOf
+import ai.opencode.feature.drawer.DrawerListFooter
 import ai.opencode.feature.drawer.HomeFeature
+import ai.opencode.feature.drawer.SessionPagesAction
 import ai.opencode.feature.drawer.icons.resolved
 import ai.opencode.feature.drawer.isPinned
 import ai.opencode.feature.drawer.motion.DrawerPanRegions
@@ -397,6 +399,19 @@ fun DrawerListView(
         snapshotFlow { listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0 }
             .collect { restsAtTop[0] = it }
     }
+    // iOS `loadMoreIfFooterVisible`: the footer in view while it spins reads the next page, and
+    // each page's answer checks again, so a page too short to push it out reads the one after.
+    val currentModel = rememberUpdatedState(model)
+    LaunchedEffect(store, listState) {
+        snapshotFlow {
+            val footer = currentModel.value.footer
+            val footerShows = listState.layoutInfo.visibleItemsInfo.any { it.key == DrawerListItem.Footer.key }
+            Triple(footer == DrawerListFooter.loading && footerShows, currentModel.value.pagesRead, currentModel.value.search)
+        }.collect { (loadsMore, _, _) ->
+            if (loadsMore) store.send(HomeFeature.Action.SessionPages(SessionPagesAction.LoadMoreRequested))
+        }
+    }
+
     val firstKey = model.items.firstOrNull()?.key
     val shownFirstKey = remember { arrayOfNulls<String>(1) }
     if (shownFirstKey[0] != firstKey) {
@@ -462,6 +477,10 @@ fun DrawerListView(
                     DrawerListItem.DeletionError -> DrawerListDeletionErrorRow(current.deletionError.orEmpty())
                     is DrawerListItem.Header -> DrawerListHeaderCell(item.kind, pinDrag)
                     DrawerListItem.Empty -> DrawerListEmptyRow(current.search)
+                    DrawerListItem.Footer -> DrawerListFooterRow(
+                        footer = current.footer ?: DrawerListFooter.loading,
+                        retry = { store.send(HomeFeature.Action.SessionPages(SessionPagesAction.RetryTapped)) },
+                    )
                     is DrawerListItem.Ghost -> DrawerListGhostCell(item.index, current.reducedMotion)
                     DrawerListItem.ServerNote -> current.serverNote?.let { note ->
                         DrawerServerNoteRow(note, onAction = { store.send(HomeFeature.Action.ServerSwitchNoteActionTapped) })
@@ -601,6 +620,7 @@ private fun contentType(item: DrawerListItem): Int = when (item) {
     DrawerListItem.Empty -> 4
     is DrawerListItem.Ghost -> 5
     DrawerListItem.ServerNote -> 6
+    DrawerListItem.Footer -> 7
 }
 
 /** What the list showed of its pins, to tell a Pin, Unpin or Move outside a drag (iOS `movesPins`). */

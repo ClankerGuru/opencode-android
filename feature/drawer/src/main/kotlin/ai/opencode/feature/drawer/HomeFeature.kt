@@ -108,6 +108,8 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
          */
         val previewRevision: Int = 0,
         val search: String = "",
+        /** Older pages and the server's search results (`HomeFeatureSessionPages.kt`). */
+        val sessionPages: SessionPages = SessionPages(),
         val transcriptCache: Map<String, List<OpenCodeTranscriptItem>> = emptyMap(),
         /** Cached transcripts being read again (`refreshCachedTranscript`). */
         val refreshingTranscripts: Set<String> = emptySet(),
@@ -569,6 +571,7 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
                     sessions = snapshot.sessions,
                     activeSessionIDs = snapshot.activeSessionIDs,
                     activeSessionParents = snapshot.activeSessionParents ?: emptyMap(),
+                    sessionPages = SessionPages(older = SessionPageCursor(next = snapshot.nextCursor)),
                     pinnedSessionKeys = shared(SharedKeys.pinnedSessionKeys).value,
                     lastViewedSessionIDs = shared(SharedKeys.lastViewedSessionIDs).value,
                     sessionReadDates = shared(SharedKeys.sessionReadDates).value,
@@ -641,6 +644,7 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         data class CatchUp(val action: CatchUpFeature.Action) : Action
         data class Traces(val action: TraceUploadsFeature.Action) : Action
         data class InboxSidebar(val action: InboxSidebarFeature.Action) : Action
+        data class SessionPages(val action: SessionPagesAction) : Action
         /** The drawer's What's New row: open (`buttonTapped`) or hide (`hideTapped`). */
         data class WhatsNew(val action: WhatsNewFeature.Action) : Action
         /** Preferences (`:feature:settings`' `HomeSettingsFeature`); Home's own sender is the sidebar toggle. */
@@ -798,6 +802,8 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         data object LinkedSessionOpen : CancelID
         data class DeleteSession(val sessionID: String) : CancelID
         data class ViewReceipt(val sessionID: String) : CancelID
+        data object SessionSearch : CancelID
+        data object OlderSessions : CancelID
     }
 
     /** The assembled body (`HomeFeatureComposition.kt`). */

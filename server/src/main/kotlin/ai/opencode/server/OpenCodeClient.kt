@@ -49,6 +49,7 @@ import ai.opencode.server.live.requestRunMessages
 import ai.opencode.server.live.requestRunReply
 import ai.opencode.server.live.requestRunningShells
 import ai.opencode.server.live.requestSearchSessions
+import ai.opencode.server.live.requestSessionPage
 import ai.opencode.server.live.requestSendCommand
 import ai.opencode.server.live.requestSendDeliveredPrompt
 import ai.opencode.server.live.requestSendPrompt
@@ -94,6 +95,8 @@ import ai.opencode.server.model.OpenCodePermissionReply
 import ai.opencode.server.model.OpenCodeRunMessagesPage
 import ai.opencode.server.model.OpenCodeServerCapabilities
 import ai.opencode.server.model.OpenCodeSession
+import ai.opencode.server.model.OpenCodeSessionPage
+import ai.opencode.server.model.OpenCodeSessionPageRequest
 import ai.opencode.server.model.OpenCodeSessionFamily
 import ai.opencode.server.model.OpenCodeShell
 import ai.opencode.server.model.OpenCodeShellOutputPage
@@ -124,6 +127,12 @@ data class OpenCodeClient(
     val homeAttention: suspend (server: OpenCodeServer, roots: List<OpenCodeSession>, directories: List<String>) -> Set<String>,
     /** Root sessions whose title contains `query`, newest first (`GET /api/session?search=`). */
     val searchSessions: suspend (server: OpenCodeServer, query: String, limit: Int) -> List<OpenCodeSession>,
+    /**
+     * One page of root sessions for the drawer: a search's first page, or the page after a
+     * cursor (`GET /api/session`). Not location-scoped.
+     */
+    val sessionPage: suspend (server: OpenCodeServer, request: OpenCodeSessionPageRequest, limit: Int) -> OpenCodeSessionPage =
+        { _, _, _ -> OpenCodeSessionPage(emptyList(), null) },
     val transcript: suspend (server: OpenCodeServer, sessionID: String, limit: Int) -> List<OpenCodeTranscriptItem>,
     /** One authoritative message projection. */
     val message: suspend (server: OpenCodeServer, sessionID: String, messageID: String) -> List<OpenCodeTranscriptItem>,
@@ -266,6 +275,7 @@ data class OpenCodeClient(
             activeSessionParents = ::requestActiveSessionParents,
             homeAttention = ::requestHomeAttentionSharingWindows,
             searchSessions = ::requestSearchSessions,
+            sessionPage = ::requestSessionPage,
             transcript = ::requestTranscript,
             message = ::requestMessage,
             sendPrompt = ::requestSendPrompt,

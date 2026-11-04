@@ -8,6 +8,7 @@ import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.RollingNumber
 import ai.opencode.core.ui.RollingNumberAlignment
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.feature.drawer.DrawerListFooter
 import ai.opencode.feature.drawer.catchup.DrawerCatchUpFinishedLabel
 import ai.opencode.feature.drawer.motion.DrawerMotionTunables
 import ai.opencode.feature.drawer.motion.DrawerShortcutMotion
@@ -28,9 +29,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,6 +59,7 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -353,6 +358,44 @@ fun DrawerListEmptyRow(search: String, modifier: Modifier = Modifier) {
         } else {
             Text("No Results for “$search”", style = OpenCodeTextStyles.headline, color = colors.text)
             Text("Check the spelling or try a new search.", style = OpenCodeTextStyles.body, color = colors.secondaryText)
+        }
+    }
+}
+
+/**
+ * Under the last row: a spinner while the next page is read, or the read that failed with Try
+ * Again (iOS `DrawerListFooterRow`; Material's progress indicator and text button).
+ */
+@Composable
+fun DrawerListFooterRow(footer: DrawerListFooter, retry: () -> Unit, modifier: Modifier = Modifier) {
+    when (footer) {
+        DrawerListFooter.loading -> Box(
+            modifier
+                .fillMaxWidth()
+                .heightIn(min = DrawerMetrics.rowHeight)
+                .testTag("drawer-load-more")
+                .semantics { contentDescription = "Loading more sessions" },
+            contentAlignment = Alignment.Center,
+        ) {
+            CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = OpenCodeTheme.colors.secondaryText)
+        }
+        DrawerListFooter.failed -> Row(
+            modifier
+                .fillMaxWidth()
+                .heightIn(min = DrawerMetrics.rowHeight)
+                .padding(start = DrawerMetrics.leadingEdge, end = DrawerMetrics.rowEdge),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                "Couldn’t load more sessions",
+                style = OpenCodeTextStyles.footnote,
+                color = OpenCodeTheme.colors.secondaryText,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = retry, modifier = Modifier.testTag("drawer-load-more-retry")) {
+                Text("Try Again", style = OpenCodeTextStyles.footnote, fontWeight = FontWeight.SemiBold)
+            }
         }
     }
 }

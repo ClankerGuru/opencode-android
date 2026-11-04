@@ -204,6 +204,9 @@ internal data class ActiveSessionPayload(val type: String)
 @Serializable
 internal data class CursorPayload(val next: String? = null)
 
+@Serializable
+internal data class SessionsPayload(val data: List<SessionPayload>, val cursor: CursorPayload? = null)
+
 internal data class MessagesPayload(val data: List<MessagePayload>, val cursor: CursorPayload?) {
     companion object {
         fun decode(element: JsonElement): MessagesPayload {

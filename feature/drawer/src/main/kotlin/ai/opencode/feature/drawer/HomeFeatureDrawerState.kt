@@ -157,13 +157,25 @@ val HomeFeature.State.firstSessionProject: OpenCodeProject?
 
 /**
  * Root sessions only: subagents' sessions are kept for their family's activity but open from their
- * parent, as on desktop. Archived sessions stay out of every list.
+ * parent, as on desktop. Archived sessions stay out of every list. Searching adds the server's
+ * matches from every session; results of an earlier query show only while they still match.
  */
 val HomeFeature.State.visibleSessions: List<OpenCodeSession>
-    get() = if (search.isEmpty()) {
-        sessions.filter { it.parentID == null && !it.isArchived }
-    } else {
-        sessions.filter { it.parentID == null && !it.isArchived && it.title.contains(search, ignoreCase = true) }
+    get() {
+        if (search.isEmpty()) return sessions.filter { it.parentID == null && !it.isArchived }
+        val local = sessions.filter { it.parentID == null && !it.isArchived && it.title.contains(search, ignoreCase = true) }
+        val found = sessionPages.search
+        if (found == null || found.results.isEmpty()) return local
+        val current = found.query == search.trim()
+        val known = HashSet<String>()
+        for (session in sessions) known += session.id
+        val extra = mutableListOf<OpenCodeSession>()
+        for (result in found.results) {
+            if (result.id in known || result.isArchived || result.id in recentlyDeletedIDs) continue
+            if (!current && !result.title.contains(search, ignoreCase = true)) continue
+            extra += result
+        }
+        return local + extra
     }
 
 val HomeFeature.State.pinnedSessions: List<OpenCodeSession>
@@ -533,6 +545,7 @@ fun HomeFeature.State.markingReadLocally(session: OpenCodeSession): HomeFeature.
 fun HomeFeature.State.purgingSession(sessionID: String): HomeFeature.State {
     var s = copy(
         sessions = sessions.filterNot { it.id == sessionID },
+        sessionPages = sessionPages.removingResult(sessionID).copy(adoptedIDs = sessionPages.adoptedIDs - sessionID).markingGone(sessionID),
         activeSessionIDs = activeSessionIDs - sessionID,
         activeSessionParents = activeSessionParents - sessionID,
         attentionSessionIDs = attentionSessionIDs - sessionID,

@@ -114,6 +114,7 @@ private fun HomeFeature.fullBody(): Reducer<State, Action> =
         .onChange({ it.settings?.whatsNew }) { old, new, state ->
             if (old == null || new != null) Reduced(state) else Reduced(settingsClosed(old, state))
         }
+        .onChange({ it.search }) { _, _, state -> sessionSearchChanged(state) }
         // Only the screen on top shows its transcript: a subagent pushed over it, its browser or
         // Settings covers it (what arrives is new there).
         .onChange({ it.transcriptCoverIsStale }) { _, _, state ->

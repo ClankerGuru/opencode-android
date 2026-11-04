@@ -37,7 +37,7 @@ internal suspend fun requestHomeSnapshot(server: OpenCodeServer): OpenCodeHomeSn
             // them: a projects error wins over a sessions error that came back first.
             val projects = async { capturedRequest<List<ProjectPayload>>("/api/project", server = server) }
             val sessions = async {
-                capturedRequest<DataPayload<List<SessionPayload>>>(
+                capturedRequest<SessionsPayload>(
                     "/api/session",
                     query = listOf("parentID" to "null", "archived" to "false", "order" to "desc", "limit" to "50"),
                     server = server,
@@ -45,8 +45,9 @@ internal suspend fun requestHomeSnapshot(server: OpenCodeServer): OpenCodeHomeSn
             }
             val active = async { capturedRequest<ActivePayload>("/api/session/active", server = server) }
             val projectPayloads = projects.await().getOrThrow()
+            val sessionPayload = sessions.await().getOrThrow()
             // A server that ignores `archived=false` still lists them.
-            val roots = sessions.await().getOrThrow().data.map(::session).filterNot { it.isArchived }
+            val roots = sessionPayload.data.map(::session).filterNot { it.isArchived }
             val activeIDs = active.await().getOrThrow().data.keys
             val parents = cachedActiveSessionParents(server, activeIDs, roots.map { it.id })
             OpenCodeHomeSnapshot(
@@ -54,6 +55,7 @@ internal suspend fun requestHomeSnapshot(server: OpenCodeServer): OpenCodeHomeSn
                 sessions = roots,
                 activeSessionIDs = activeIDs,
                 activeSessionParents = parents.ifEmpty { null },
+                nextCursor = if (sessionPayload.data.isEmpty()) null else sessionPayload.cursor?.next,
             )
         }
     } catch (error: CancellationException) {

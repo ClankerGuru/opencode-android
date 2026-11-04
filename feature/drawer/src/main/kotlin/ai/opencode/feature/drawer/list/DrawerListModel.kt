@@ -1,9 +1,11 @@
 package ai.opencode.feature.drawer.list
 
+import ai.opencode.feature.drawer.DrawerListFooter
 import ai.opencode.feature.drawer.HomeFeature
 import ai.opencode.feature.drawer.HomeFeature.State.Indicator
 import ai.opencode.feature.drawer.ServerSwapTarget
 import ai.opencode.feature.drawer.ServerSwitchNote
+import ai.opencode.feature.drawer.drawerListFooter
 import ai.opencode.feature.drawer.pinnedSessions
 import ai.opencode.feature.drawer.recentSessions
 import ai.opencode.feature.drawer.statusSnapshot
@@ -32,6 +34,8 @@ sealed interface DrawerListItem {
     data class Header(val kind: DrawerSectionHeaderKind) : DrawerListItem
     data class Session(val id: String) : DrawerListItem
     data object Empty : DrawerListItem
+    /** Under the last row while more sessions can be read ([DrawerListFooter]). */
+    data object Footer : DrawerListItem
     /** Server Flow: a row's place while the server picked answers. */
     data class Ghost(val index: Int) : DrawerListItem
     /** Server Flow: a switch went back on its own. */
@@ -46,6 +50,7 @@ sealed interface DrawerListItem {
             is Header -> "header-${kind.name}"
             is Session -> "session-$id"
             Empty -> "empty"
+            Footer -> "footer"
             is Ghost -> "ghost-$index"
             ServerNote -> "server-note"
         }
@@ -121,6 +126,9 @@ data class DrawerListModel(
     val deletionError: String? = null,
     val serverNote: ServerSwitchNote? = null,
     val search: String = "",
+    val footer: DrawerListFooter? = null,
+    /** Page answers read: each one checks the footer again. */
+    val pagesRead: Int = 0,
     val serverID: String = "",
     val reducedMotion: Boolean = false,
 ) {
@@ -229,9 +237,11 @@ data class DrawerListModel(
                     rows[session.id] = row(session, pinned = false)
                     recentItems += DrawerListItem.Session(session.id)
                 }
-            } else if (pinned.isEmpty() && (state.search.isNotEmpty() || state.hasConnected)) {
+            } else if (pinned.isEmpty() && (state.search.isNotEmpty() || state.hasConnected) && state.drawerListFooter == null) {
                 recentItems += DrawerListItem.Empty
             }
+            val footer = state.drawerListFooter
+            if (footer != null) recentItems += DrawerListItem.Footer
             return DrawerListModel(
                 sections = mapOf(
                     DrawerListSection.top to top,
@@ -244,6 +254,8 @@ data class DrawerListModel(
                 deletionError = state.deletionError,
                 serverNote = serverNote,
                 search = state.search,
+                footer = footer,
+                pagesRead = if (footer != null) state.sessionPages.pagesRead else 0,
                 serverID = swap?.id ?: state.server.persistenceID,
                 reducedMotion = inputs.reducedMotion,
             )

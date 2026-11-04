@@ -200,13 +200,28 @@ private fun HomeFeature.snapshotRefreshed(state: State, action: Action.SnapshotR
     )
     // The list is one page of the newest roots, not the whole server. Whatever is open or pinned
     // and fell off that page is unknown, not gone (deletion arrives as its own event), so keep the
-    // last copy instead of kicking the reader to a draft or silently dropping a pin.
+    // last copy instead of kicking the reader to a draft or silently dropping a pin. Older pages
+    // the drawer read (or is reading: its cursor follows the rows already listed) stay too, and
+    // their cursor goes on, as do search results the person acted on.
     val openRootID = s.sessionDetail?.familyRootID
+    val keepsOlderPages = s.sessionPages.olderPagesLoaded > 0 || s.sessionPages.older.isLoading
+    val adopted = s.sessionPages.adoptedIDs
     val carried = s.sessions.filter { session ->
-        session.id !in incomingSessionIDs && session.id !in recentlyDeleted && (session.id == openRootID || s.isPinned(session.id))
+        session.id !in incomingSessionIDs && session.id !in recentlyDeleted &&
+            (keepsOlderPages || session.id == openRootID || s.isPinned(session.id) || session.id in adopted)
     }
     // Server copies don't carry the first prompt an unnamed session is shown by; keep what's known.
     s = s.copy(sessions = snapshotSessions.keepingFirstPrompts(s.sessions) + carried, activeSessionIDs = snapshotActive)
+    if (!keepsOlderPages && !s.sessionPages.older.isLoading) {
+        s = s.copy(sessionPages = s.sessionPages.copy(older = s.sessionPages.older.copy(next = incoming.nextCursor, failed = false)))
+    }
+    // A search typed before the list knew it had more pages asks now.
+    var searchesServer: Effect<Action> = Effect.none()
+    if (s.sessionPages.search == null) {
+        val searched = sessionSearchChanged(s)
+        s = searched.state
+        searchesServer = searched.effect
+    }
     var parents = s.activeSessionParents + (incoming.activeSessionParents ?: emptyMap())
     if (parents.size > HomeFeature.parentLinkLimit) parents = SessionActivity.ancestry(s.activeSessionIDs, parents)
     s = s.copy(activeSessionParents = parents)
@@ -320,6 +335,7 @@ private fun HomeFeature.snapshotRefreshed(state: State, action: Action.SnapshotR
                 drained.effect,
                 voiceSnapshot,
                 subagentRuns,
+                searchesServer,
                 update,
                 if (detail.isExternallyActive == runState) Effect.none()
                 else sendToDetail(s, SessionFeature.Action.ExternalRunStateChanged(runState)),
@@ -327,7 +343,7 @@ private fun HomeFeature.snapshotRefreshed(state: State, action: Action.SnapshotR
             ),
         )
     }
-    return Reduced(s, Effect.merge(attention, ancestry, prefetch, drained.effect, voiceSnapshot, subagentRuns))
+    return Reduced(s, Effect.merge(attention, ancestry, prefetch, drained.effect, voiceSnapshot, subagentRuns, searchesServer))
 }
 
 private fun HomeFeature.activeAncestryResolved(state: State, resolved: Map<String, String>): HomeReduced {

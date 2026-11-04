@@ -255,6 +255,7 @@ internal fun HomeFeature.reduceServerEvent(state: State, event: OpenCodeServerEv
                     )
                 },
             ).updatingSession(sessionID) { it.copy(serverTitle = title) }
+                .let { it.copy(sessionPages = it.sessionPages.renamingResult(sessionID, title)) }
             val renamed = SessionFeature.Action.FamilySessionRenamed(sessionID, title)
             val pushed = forwardToSubagentFamilies(s, sessionID, renamed)
             val detail = s.sessionDetail
@@ -300,9 +301,20 @@ internal fun HomeFeature.reduceServerEvent(state: State, event: OpenCodeServerEv
             // Kept in place, so an open session stays open; the lists hide it. The refresh replaces
             // a snapshot read before the change, and brings back one unarchived elsewhere that fell
             // off the listed page.
-            val s = state.updatingSession(event.sessionID) { session ->
+            var s = state.updatingSession(event.sessionID) { session ->
                 if (session.isArchived == event.isArchived) session
                 else session.copy(archivedMilliseconds = if (event.isArchived) dependency(DateClient).now().toEpochMilli() else null)
+            }
+            val pages = s.sessionPages
+            s = if (event.isArchived) {
+                s.copy(sessionPages = pages.removingResult(event.sessionID).markingGone(event.sessionID))
+            } else {
+                s.copy(
+                    sessionPages = pages.copy(
+                        olderGoneIDs = pages.olderGoneIDs - event.sessionID,
+                        searchGoneIDs = pages.searchGoneIDs - event.sessionID,
+                    ),
+                )
             }
             return refreshSnapshot(s)
         }

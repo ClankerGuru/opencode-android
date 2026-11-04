@@ -7,6 +7,8 @@ import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.SelfViewReceipts
 import ai.opencode.server.internal.WireJson
 import ai.opencode.server.model.OpenCodeSession
+import ai.opencode.server.model.OpenCodeSessionPage
+import ai.opencode.server.model.OpenCodeSessionPageRequest
 import ai.opencode.server.retry.NetworkRetry
 import ai.opencode.server.retry.RequestIdempotency
 import ai.opencode.server.retry.RetryPolicy
@@ -79,6 +81,37 @@ internal suspend fun requestInterrupt(server: OpenCodeServer, sessionID: String)
 
 internal suspend fun requestSearchSessions(server: OpenCodeServer, query: String, limit: Int): List<OpenCodeSession> =
     requestRootSessions(server, search = query, includeEmptySearch = true, limit = limit)
+
+/**
+ * The drawer's search and its older pages. A cursor carries the filters of the read it came
+ * from, so a next page sends only the cursor.
+ */
+internal suspend fun requestSessionPage(
+    server: OpenCodeServer,
+    request: OpenCodeSessionPageRequest,
+    limit: Int,
+): OpenCodeSessionPage {
+    val query = mutableListOf("limit" to limit.toString())
+    when (request) {
+        is OpenCodeSessionPageRequest.Search -> {
+            query += "parentID" to "null"
+            query += "archived" to "false"
+            query += "order" to "desc"
+            query += "search" to request.text
+        }
+        is OpenCodeSessionPageRequest.After -> query += "cursor" to request.cursor
+    }
+    val payload = request<SessionsPayload>("/api/session", query = query, server = server)
+    // A server that ignores `archived=false` still lists them.
+    val sessions = mutableListOf<OpenCodeSession>()
+    for (item in payload.data) {
+        val session = session(item)
+        if (!session.isArchived && session.parentID == null) sessions += session
+    }
+    // An empty page ends the list even if the server offers another cursor.
+    val next = if (payload.data.isEmpty()) null else payload.cursor?.next
+    return OpenCodeSessionPage(sessions, next)
+}
 
 /** Desktop's mention list: root sessions that aren't archived, newest first. */
 internal suspend fun requestMentionSessions(server: OpenCodeServer, search: String, limit: Int): List<OpenCodeSession> =
