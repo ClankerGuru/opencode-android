@@ -263,6 +263,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         companion object {
             /** iOS `State.init()`: restores the last server and its cached Home so launch shows it at once. */
             fun initial(): State {
+                migrateBeforeRestore()
                 val saved = shared(ServerSharedKeys.savedServer)
                 val cached = shared(ServerSharedKeys.cachedHomeSnapshots)
                 var state = State(

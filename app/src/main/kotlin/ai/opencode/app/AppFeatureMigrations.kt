@@ -13,6 +13,8 @@ import ai.opencode.core.sharing.installHistory
 import ai.opencode.feature.settings.whatsnew.WhatsNewEntry
 import ai.opencode.feature.settings.whatsnew.WhatsNewFeature
 import ai.opencode.feature.settings.whatsnew.all
+import ai.opencode.feature.transcript.SessionSeenWatermarks
+import ai.opencode.feature.transcript.sessionSeenWatermarks
 import ai.opencode.server.OpenCodeServer
 
 /*
@@ -59,4 +61,29 @@ private fun recordInstallHistory(store: SharedStore, savedServers: List<OpenCode
     seenIDs.set(all.map { it.id }.toSet())
     history.set(InstallHistory.fresh)
     AppLog.app.info { "fresh install marked What’s New seen entries=${all.size}" }
+}
+
+/**
+ * iOS `AppFeature.State.migrateBeforeRestore()`: saved state earlier builds left that Home reads
+ * as it restores the saved server, so it moves in [AppFeature.State.initial], before that. iOS's
+ * single-snapshot cache move is n/a: no Android build kept one.
+ */
+internal fun migrateBeforeRestore() {
+    retireNewMessagesDivider(dependency(SharedStore))
+}
+
+/**
+ * iOS `retireNewMessagesDivider(in:)`: New Messages Divider is always on now. While it was switched
+ * off, earlier builds stopped saving seen watermarks, so the saved ones are stale and would bring
+ * read replies back under New. Cleared once, they fall back to the server's viewed time.
+ */
+internal fun retireNewMessagesDivider(store: SharedStore) {
+    val key = SharedKey.appStorage("experimental-new-messages-divider", false)
+    if (!store.contains(key)) return
+    if (!store.reference(key).value) {
+        val watermarks = store.reference(SharedKeys.sessionSeenWatermarks)
+        AppLog.app.notice("Cleared ${watermarks.value.entries.size} seen watermarks saved with the divider off")
+        watermarks.set(SessionSeenWatermarks())
+    }
+    store.remove(key)
 }
