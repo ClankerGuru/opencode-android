@@ -186,4 +186,4 @@ exception class instead of its reason and turned cancellation into an engine err
 that failed when an interruption ended was never retried by the next route/configuration change;
 a just-finished call log was missing from `list()` while its save was still writing; End landed 2 dp left of the call button (48 dp slot kept the 6 dp padding); a reconnect or rotation replayed the connect chord; `RetryBudget.bounded` (`:server`) timed its limit on the scripted clock, so a lost send's answer was never read back; a cancelled speaker ramp re-sent an unchanged 1.0 gain (iOS only sets a changed volume) and a fallback to the built-in output was noted as “Route changed” instead of the ear's route; every call start re-sent its initial ear to the audio (iOS only re-applies one that changed while the audio started).
 
-Total: 751 voice tests (Gradle), all passing. Robolectric (test-only) runs only `VoiceCallTeardownFrameworkTests`.
+Total: 731 voice tests (Gradle), all passing. Robolectric (test-only) runs only `VoiceCallTeardownFrameworkTests`.

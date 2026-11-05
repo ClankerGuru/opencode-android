@@ -100,4 +100,4 @@ compares with the JSON `:server`'s internal `promptBody` writes; the app's `cont
 
 Production bugs the ported tests found: none.
 
-Total: 104 `:feature:system` tests, all passing (`./gradlew :feature:system:testDebugUnitTest`).
+Total: 106 `:feature:system` tests, all passing (`./gradlew :feature:system:testDebugUnitTest`).

@@ -152,7 +152,7 @@ Not ported here (subject is another module): `SubagentStackTests` (`HomeFeature`
 `SessionFeature` test: server decoding and transcript rows). `DiagnosticsRecorderTests.headerResolutionNotifiesObserversWhenChanged`
 (deferred here by core) is n/a: Android records no resolved header style (`devtools.md`).
 
-Total (`./gradlew :feature:session:testDebugUnitTest`): 767 tests, 0 failures.
+Total (`./gradlew :feature:session:testDebugUnitTest`): 774 tests, 0 failures.
 
 Code bugs the ported tests found (each in its own commit): `:server` `decodeTranscript` dropped
 the page's cursor/context capture (`TaskLocal` gains `currentBlocking()`, mirrored by a

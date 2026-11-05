@@ -84,7 +84,7 @@ store or Home state lives here, whichever iOS file it came from (no other module
 Shared support: `HomeFeatureTestSupport.kt`, `SystemIntegrationTestSupport.kt`,
 `VoiceHomeTestSupport.kt`. Robolectric (test-only, native graphics) runs only
 `icons/ProjectIconRenderTests` (decoded pixels, loader's decoding steps) and `catchup/CatchUpPreviewStoresTests` (the preview's real `Store` on the main looper). `./gradlew
-:feature:drawer:testDebugUnitTest`: 528 tests, offline, virtual time.
+:feature:drawer:testDebugUnitTest`: 531 tests, offline, virtual time.
 
 | iOS file | Kotlin | Ported | Left elsewhere / deleted (reason) |
 | --- | --- | --- | --- |
@@ -148,4 +148,4 @@ card drag ends when Catch Up closes, and `dismissCard`/`undoCard` finish its ent
 and `TestStore` follows TCA (drops cancelled effects' sends, `skipInFlightEffects`, non-exhaustive
 `finish`, effects inherit the sender's context).
 
-Total: 528 drawer tests (Gradle), all passing.
+Total: 531 drawer tests (Gradle), all passing.

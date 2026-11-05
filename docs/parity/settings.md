@@ -257,4 +257,4 @@ left to that module's port ("skipped"); "dropped" tests can't exist on Android.
 
 Production bugs the ported tests found: none (every ported test passed against the existing port).
 
-Total: 102 settings tests, all passing. Robolectric (test-only, `isIncludeAndroidResources`) runs only `WhatsNewDotSymbolTests`.
+Total: 101 settings tests, all passing. Robolectric (test-only, `isIncludeAndroidResources`) runs only `WhatsNewDotSymbolTests`.
