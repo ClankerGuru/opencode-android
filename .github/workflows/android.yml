@@ -2,7 +2,8 @@
 # Pushes to main and manual runs also:
 #   - publish the debug APK as the rolling `main-latest` pre-release (sideloading), and
 #   - build the release AAB signed with the Play upload key and ship it to Google Play's
-#     internal testing track, like iOS's push-to-main TestFlight builds (docs/releasing.md).
+#     internal testing track, like iOS's push-to-main TestFlight builds, then promote it to
+#     open testing once the PLAY_OPEN_TESTING repo variable is `true` (docs/releasing.md).
 name: Android
 
 on:
@@ -164,3 +165,25 @@ jobs:
           releaseName: 0.1.0-${{ env.SHORT }} (${{ github.run_number }})
           track: internal
           status: completed
+
+      - uses: actions/checkout@v4
+        if: env.SHIP == 'true'
+        with:
+          path: source
+          sparse-checkout: scripts/play-promote.sh
+          sparse-checkout-cone-mode: false
+
+      # Open testing is the public opt-in track, like iOS's External TestFlight group. It stays
+      # off until the PLAY_OPEN_TESTING repo variable is `true`: Play needs the store listing,
+      # content rating, data safety form and privacy policy before it accepts the release.
+      - name: Promote to Google Play open testing
+        if: env.SHIP == 'true'
+        env:
+          PLAY_OPEN_TESTING: ${{ vars.PLAY_OPEN_TESTING }}
+        run: |
+          if [ "$PLAY_OPEN_TESTING" != true ]; then
+            echo "::notice::PLAY_OPEN_TESTING isn't true; the build stays on internal testing only."
+            exit 0
+          fi
+          source/scripts/play-promote.sh ai.opencode.mobilecode beta "${{ github.run_number }}" \
+            "0.1.0-${SHORT} (${{ github.run_number }})"
