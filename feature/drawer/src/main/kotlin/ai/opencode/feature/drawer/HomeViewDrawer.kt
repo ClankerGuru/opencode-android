@@ -8,6 +8,7 @@ import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeIconButton
+import ai.opencode.core.ui.OpenCodeIconButtonStyle
 import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
@@ -55,8 +56,11 @@ import ai.opencode.server.ServerSharedKeys
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.VisibilityThreshold
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -103,6 +107,7 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import kotlin.math.max
 import kotlin.math.min
@@ -334,16 +339,7 @@ fun HomeDrawer(
             ) {
                 DrawerNewSessionButton(enabled = !disconnected, onClick = viewState::startNewSessionFromDrawer)
                 Spacer(Modifier.weight(1f))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    DrawerCallSlot(store, disconnected, reducedMotion)
-                    OpenCodeIconButton(
-                        symbol = SFSymbol.GearshapeFill,
-                        contentDescription = "Settings",
-                        onClick = viewState::openSettings,
-                        size = DrawerTunables.footerHeight,
-                        modifier = Modifier.testTag("drawer-settings"),
-                    )
-                }
+                DrawerFooterTrailing(store, disconnected, reducedMotion, onOpenSettings = viewState::openSettings)
             }
             }
         }
@@ -495,13 +491,19 @@ private fun Modifier.swallowingTouches(): Modifier = pointerInput(Unit) {
 }
 
 /**
- * The drawer's call button (iOS `DrawerCallButton`), left of Settings while the drawer offers a
- * call ([drawerOffersCall]): a call on the session behind the drawer. Its slot stays while a call
- * is live, so a call ending with the drawer open lands back in it; the button itself shows only
- * with no call ([drawerShowsCallButton]).
+ * The footer's trailing controls (iOS `DrawerFooterTrailing`): the call button and Settings in one
+ * tonal capsule, the New Session pill's colour and height (iOS's glass union → an M3 grouped
+ * capsule), each a `footerHeight` square. Without the call button (during a call, or Voice not
+ * set up) the capsule is Settings' circle alone: Settings keeps its place, and the call's half
+ * folds into it.
  */
 @Composable
-private fun DrawerCallSlot(store: StoreOf<HomeFeature.State, HomeFeature.Action>, disconnected: Boolean, reducedMotion: Boolean) {
+private fun DrawerFooterTrailing(
+    store: StoreOf<HomeFeature.State, HomeFeature.Action>,
+    disconnected: Boolean,
+    reducedMotion: Boolean,
+    onOpenSettings: () -> Unit,
+) {
     val center = remember { FloatingCallCenter.shared }
     val isDrawerOpen by store.observe { it.isDrawerOpen }
     val offersCall by store.observe { it.drawerOffersCall }
@@ -513,27 +515,63 @@ private fun DrawerCallSlot(store: StoreOf<HomeFeature.State, HomeFeature.Action>
             center.drawerCallButton = null
         }
     }
-    if (!offersCall) return
-    Box(Modifier.size(DrawerTunables.footerHeight), contentAlignment = Alignment.Center) {
-        // The circle a floating call breaks out of and lands back in, as the composer's call button's.
-        Box(Modifier.size(ComposerTunables.buttonDiameter.dp).floatingCallDrawerButton())
-        AnimatedVisibility(
-            visible = showsCall,
-            enter = if (reducedMotion) EnterTransition.None else fadeIn(DrawerTunables.callButtonSpring.spec()),
-            exit = if (reducedMotion) ExitTransition.None else fadeOut(DrawerTunables.callButtonSpring.spec()),
+    val square = DrawerTunables.footerHeight
+    Box(contentAlignment = Alignment.CenterEnd) {
+        if (offersCall) {
+            // The call's half stands left of Settings, shown or not, so a call ending with the
+            // drawer open lands back there. The circle a floating call breaks out of and lands in,
+            // as the composer's call button's (iOS `DrawerCallButton.circle(in:)`).
+            Box(
+                Modifier.align(Alignment.CenterEnd).offset(x = -square).size(square),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(Modifier.size(ComposerTunables.buttonDiameter.dp).floatingCallDrawerButton())
+            }
+        }
+        Surface(
+            shape = OpenCodeShape.capsule,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            contentColor = OpenCodeTheme.colors.text,
         ) {
-            OpenCodeIconButton(
-                symbol = SFSymbol.Waveform,
-                contentDescription = "Start Voice Call",
-                onClick = {
-                    // The orb breaks out of this button, not the composer's under the drawer.
-                    center.breakoutFrom = center.drawerCallButton
-                    store.send(HomeFeature.Action.DrawerCallTapped)
-                },
-                size = DrawerTunables.footerHeight,
-                enabled = !disconnected,
-                modifier = Modifier.testTag("drawer-call"),
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                AnimatedVisibility(
+                    visible = offersCall && showsCall,
+                    enter = if (reducedMotion) {
+                        EnterTransition.None
+                    } else {
+                        expandHorizontally(DrawerTunables.callButtonSpring.spec(IntSize.VisibilityThreshold), expandFrom = Alignment.End) +
+                            fadeIn(DrawerTunables.callButtonSpring.spec())
+                    },
+                    exit = if (reducedMotion) {
+                        ExitTransition.None
+                    } else {
+                        shrinkHorizontally(DrawerTunables.callButtonSpring.spec(IntSize.VisibilityThreshold), shrinkTowards = Alignment.End) +
+                            fadeOut(DrawerTunables.callButtonSpring.spec())
+                    },
+                ) {
+                    OpenCodeIconButton(
+                        symbol = SFSymbol.Waveform,
+                        contentDescription = "Start Voice Call",
+                        onClick = {
+                            // The orb breaks out of this button, not the composer's under the drawer.
+                            center.breakoutFrom = center.drawerCallButton
+                            store.send(HomeFeature.Action.DrawerCallTapped)
+                        },
+                        style = OpenCodeIconButtonStyle.Standard,
+                        size = square,
+                        enabled = !disconnected,
+                        modifier = Modifier.testTag("drawer-call"),
+                    )
+                }
+                OpenCodeIconButton(
+                    symbol = SFSymbol.GearshapeFill,
+                    contentDescription = "Settings",
+                    onClick = onOpenSettings,
+                    style = OpenCodeIconButtonStyle.Standard,
+                    size = square,
+                    modifier = Modifier.testTag("drawer-settings"),
+                )
+            }
         }
     }
 }
