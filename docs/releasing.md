@@ -1,11 +1,18 @@
 # Releasing
 
-Mirrors iOS (`opencode-ios/docs/releasing.md`): every push to `main` is a beta. Push only when
-Ryan asks or approves.
+Mirrors iOS (`opencode-ios/docs/releasing.md`): releases go through GitHub Releases only.
+Pushing `main` doesn't release to Play. Push and release only when Ryan asks or approves.
 
-## What a push to main does
+## Cutting a release
 
-`.github/workflows/android.yml`, after `scripts/check.sh` passes:
+From a green `main` commit:
+
+```sh
+gh release create "v$(scripts/version.sh <sha>)" --target "$(git rev-parse <sha>)" --generate-notes
+```
+
+(`--target` needs the full SHA.) The `v*` tag starts `.github/workflows/android.yml`, which,
+after `scripts/check.sh` passes:
 
 1. **Google Play internal testing.** Builds `:app:bundleRelease` signed with the Play upload key
    and uploads it to the internal testing track (`play` job), released to every tester at
@@ -14,12 +21,24 @@ Ryan asks or approves.
    the `PLAY_OPEN_TESTING` repo variable is `true`. The same `play` job then puts that bundle
    on the open testing (`beta`) track with `scripts/play-promote.sh`; it doesn't upload it a
    second time. Otherwise it skips with a notice.
-3. **Sideload APK.** Publishes the debug APK (`ai.opencode.mobilecode.debug`, installs beside
-   the Play build) as the rolling `main-latest` GitHub pre-release.
 
-Versions: `versionCode` is the workflow run number, so it only goes up (Play rejects a code it
-has seen); `versionName` is `0.1.0-<short sha>`. Never bump either by hand. A run that is
-re-run keeps its number and Play refuses the duplicate: push a new commit instead.
+Report the tag, the workflow run and the Play version code.
+
+## What a push to main does
+
+Runs `scripts/check.sh` and publishes the debug APK (`ai.opencode.mobilecode.debug`, installs
+beside the Play build) as the rolling `main-latest` GitHub pre-release for sideloading. Nothing
+goes to Play.
+
+## Versions
+
+`scripts/version.sh` gives every first-parent commit on `main` its own version from git history,
+with the same rules as iOS (patch per commit, minor for 400+ changed lines, major only for a
+`type!:` or `BREAKING CHANGE` marker) from this repo's baseline (`acc23eab` = 0.1.0). A release
+build's `versionName` is its tag without the `v`; other builds are `0.1.0-<short sha>`.
+`versionCode` is the workflow run number, so it only goes up (Play rejects a code it has seen).
+Never bump either by hand. A re-run keeps its number and Play refuses the duplicate: cut the
+release from a new commit instead.
 
 ## Google Play
 
@@ -45,5 +64,5 @@ re-run keeps its number and Play refuses the duplicate: push a new commit instea
 - Open testing: in Play Console (Testing → Open testing) choose the countries and set up the
   testers page, finish the items above, then `gh variable set PLAY_OPEN_TESTING --body true`.
   Unset it (`gh variable delete PLAY_OPEN_TESTING`) to stop. Google reviews open testing
-  releases, so a build can take a while to reach testers; a newer push replaces one still in
+  releases, so a build can take a while to reach testers; a newer release replaces one still in
   review. Anyone opts in at https://play.google.com/apps/testing/ai.opencode.mobilecode.
