@@ -5,6 +5,7 @@ import ai.opencode.core.diagnostics.PerfTimeline
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.core.ui.inContainer
 import ai.opencode.feature.media.AgentImageViewport
 import ai.opencode.feature.media.AgentImageVisibility
 import ai.opencode.feature.media.LinkPreviewStore
@@ -171,7 +172,7 @@ private fun TranscriptListContent(
     controller.flingBehavior = ScrollableDefaults.flingBehavior()
     // Applied in composition so this frame draws the new rows with their stable keys.
     controller.update(configuration)
-    controller.obstructionChanged(contentPadding.calculateBottomPadding().value, WindowInsets.ime.getBottom(density) / density.density)
+    controller.obstructionChanged(contentPadding.calculateBottomPadding().value, WindowInsets.ime.inContainer().getBottom(density) / density.density)
     SideEffect { controller.flushEffects() }
 
     LaunchedEffect(resumed) { controller.visibilityChanged() }

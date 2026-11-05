@@ -2,6 +2,7 @@
 
 package ai.opencode.feature.session
 
+import ai.opencode.core.ui.inContainer
 import ai.opencode.feature.composer.composerWindowTouches
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.experiments.key
@@ -280,7 +281,7 @@ fun SessionView(
                     backdrop = resolvedHeader.backdrop,
                     appBlur = resolvedHeader.appBlur,
                     header = resolvedHeader.header,
-                    safeTop = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding(),
+                    safeTop = WindowInsets.statusBarsIgnoringVisibility.inContainer().asPaddingValues().calculateTopPadding(),
                     scrolledUnderHeader = { scrollEdgeBridge.scrolledUnderHeader },
                     modifier = Modifier.align(Alignment.TopCenter),
                 )
@@ -583,8 +584,9 @@ private fun SessionComposerDismissArea(store: StoreOf<State, Action>, host: Sess
 private fun RequestPanelRoomProbe(host: SessionComposerHost, modifier: Modifier) {
     val density = LocalDensity.current
     var height by remember { mutableIntStateOf(0) }
-    val top = WindowInsets.statusBarsIgnoringVisibility.getTop(density)
-    val bottom = maxOf(WindowInsets.ime.getBottom(density), WindowInsets.navigationBars.getBottom(density))
+    // A Catch Up card's own edges, not the window's ([inContainer]).
+    val top = WindowInsets.statusBarsIgnoringVisibility.inContainer().getTop(density)
+    val bottom = maxOf(WindowInsets.ime.inContainer().getBottom(density), WindowInsets.navigationBars.inContainer().getBottom(density))
     Box(modifier.onSizeChanged { height = it.height })
     SideEffect {
         val room = with(density) { (height - top - bottom).coerceAtLeast(0).toDp().value }

@@ -2,6 +2,7 @@ package ai.opencode.feature.drawer.catchup
 
 import ai.opencode.core.motion.rememberFrameDurationSeconds
 import ai.opencode.core.motion.rememberReduceMotion
+import ai.opencode.core.ui.LocalContainerInsets
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.feature.drawer.motion.DirectionalPan
 import ai.opencode.feature.drawer.motion.DrawerPanRegions
@@ -11,6 +12,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.add
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.displayCutout
@@ -20,6 +22,7 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.key
@@ -69,9 +72,10 @@ fun rememberCatchUpStackController(): CatchUpStackController {
  * Unread; the chrome's buttons play the same flight through [proxy].
  *
  * Draw it edge to edge over [CatchUpChrome]; it insets the card itself (system bars + header,
- * system bars + footer, `sideInset` at the sides). The live card consumes those insets so the
- * hosted session lays out as in iOS's locked safe area (`CatchUpCardSurfaceView`); the keyboard
- * stays the session's to avoid.
+ * system bars + footer, `sideInset` at the sides). The live card and the preview consume those
+ * insets and provide them as [LocalContainerInsets], so the hosted session lays out against the
+ * card's edges as in iOS's locked safe area (`CatchUpCardSurfaceView`), and the keyboard reaches
+ * into the card only as far as it overlaps it (iOS `safeAreaRegions = .keyboard`).
  *
  * Swiping never recomposes [card] or [preview]: motion is snapshot state read in `graphicsLayer`.
  *
@@ -113,6 +117,19 @@ fun CatchUpStack(
     val liveLayer = rememberGraphicsLayer()
     val insets = WindowInsets.systemBars.union(WindowInsets.displayCutout)
     val insetPadding = insets.asPaddingValues()
+    // The window's edges outside the card: the system bars plus the header, footer and sides. The
+    // hosted session lays out against the card's edges, as in iOS's locked safe area, and the
+    // keyboard reaches into the card only as far as it overlaps it (UIKit's keyboard safe area).
+    val cardInsets = remember(insets) {
+        insets.add(
+            WindowInsets(
+                left = CatchUpMetrics.sideInset,
+                top = CatchUpMetrics.headerHeight,
+                right = CatchUpMetrics.sideInset,
+                bottom = CatchUpMetrics.footerHeight,
+            ),
+        )
+    }
     val cornerRadius = CatchUpMetrics.cornerRadius
     val shape = remember(cornerRadius) { RoundedCornerShape(cornerRadius) }
     val borderWidth: Dp = if (isDark) 1.dp else with(density) { 1f.toDp() }
@@ -188,7 +205,12 @@ fun CatchUpStack(
                     .background(canvas),
             ) {
                 val previewID = controller.shownPreviewID
-                if (previewID != null) preview(previewID, previewRevision)
+                if (previewID != null) {
+                    // Laid out as the live card is, so it doesn't shift when it becomes the live one.
+                    Box(Modifier.matchParentSize().consumeWindowInsets(cardInsets)) {
+                        CompositionLocalProvider(LocalContainerInsets provides cardInsets) { preview(previewID, previewRevision) }
+                    }
+                }
                 Box(
                     Modifier
                         .matchParentSize()
@@ -226,9 +248,9 @@ fun CatchUpStack(
                             drawLayer(liveLayer)
                         }
                         .background(canvas)
-                        .consumeWindowInsets(insets),
+                        .consumeWindowInsets(cardInsets),
                 ) {
-                    card(stage.cardID)
+                    CompositionLocalProvider(LocalContainerInsets provides cardInsets) { card(stage.cardID) }
                 }
                 CatchUpSwipeOverlay(controller.readBadge, opaque = colors.highContrast)
                 CatchUpSwipeOverlay(controller.keepBadge, opaque = colors.highContrast)
