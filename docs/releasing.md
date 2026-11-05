@@ -10,7 +10,11 @@ Ryan asks or approves.
 1. **Google Play internal testing.** Builds `:app:bundleRelease` signed with the Play upload key
    and uploads it to the internal testing track (`play` job), released to every tester at
    once. Testers get it as a normal Play update.
-2. **Sideload APK.** Publishes the debug APK (`ai.opencode.mobilecode.debug`, installs beside
+2. **Google Play open testing** (the counterpart of iOS's External TestFlight group), only when
+   the `PLAY_OPEN_TESTING` repo variable is `true`. The same `play` job then puts that bundle
+   on the open testing (`beta`) track with `scripts/play-promote.sh`; it doesn't upload it a
+   second time. Otherwise it skips with a notice.
+3. **Sideload APK.** Publishes the debug APK (`ai.opencode.mobilecode.debug`, installs beside
    the Play build) as the rolling `main-latest` GitHub pre-release.
 
 Versions: `versionCode` is the workflow run number, so it only goes up (Play rejects a code it
@@ -38,3 +42,8 @@ re-run keeps its number and Play refuses the duplicate: push a new commit instea
   Internal testing → Testers).
 - Internal testing has no Google review. Closed or open testing (like iOS's External group)
   needs the store listing, content rating, data safety form and privacy policy first.
+- Open testing: in Play Console (Testing → Open testing) choose the countries and set up the
+  testers page, finish the items above, then `gh variable set PLAY_OPEN_TESTING --body true`.
+  Unset it (`gh variable delete PLAY_OPEN_TESTING`) to stop. Google reviews open testing
+  releases, so a build can take a while to reach testers; a newer push replaces one still in
+  review. Anyone opts in at https://play.google.com/apps/testing/ai.opencode.mobilecode.
