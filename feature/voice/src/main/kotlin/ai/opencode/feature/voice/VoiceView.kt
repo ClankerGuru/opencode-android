@@ -767,7 +767,7 @@ private fun VoiceCallFailurePlainCard(store: VoiceStoreOf, message: String, modi
             } else {
                 OpenCodeSecondaryButton("Check API Key", onClick = { store.send(VoiceFeature.Action.FailureFixTapped(VoiceCallFix.setUpOnIPhone)) })
             }
-            OpenCodePrimaryButton("Try Again", onClick = { store.send(VoiceFeature.Action.Start) })
+            OpenCodePrimaryButton("Try Again", onClick = { store.send(VoiceFeature.Action.TryAgainTapped) })
         }
         ViewThatFitsHorizontally(
             wide = { Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) { actions() } },

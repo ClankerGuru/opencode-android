@@ -10,6 +10,7 @@ import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.drawerKeyboardField
 import ai.opencode.server.model.PastedText
 import android.net.Uri
+import android.os.SystemClock
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.content.MediaType
@@ -65,6 +66,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -332,6 +334,29 @@ class ComposerTextInputController {
     var layoutTick by mutableIntStateOf(0)
     var layout: TextLayoutResult? = null
 
+    /** iOS `lastTap`: the last quick finger tap on the text's last visible line ([ComposerDoubleTap]). */
+    var lastTap: ComposerTextTap? = null
+
+    /**
+     * iOS `noteSelectionChange`: keeps [lastTap] only while the selection is still the caret that
+     * tap placed; typing, removing an autocomplete chip, or any other move makes it stale.
+     */
+    fun noteSelectionChange(text: String, selection: TextRange) {
+        val tap = lastTap ?: return
+        val layout = layout
+        if (layout == null || layout.layoutInput.text.length != text.length) {
+            lastTap = null
+            return
+        }
+        val tapped = layout.getOffsetForPosition(tap.point)
+        if (!ComposerDoubleTap.keepsTap(tap, text, selection, tapped, ComposerDoubleTap.wordAt(layout, tapped))) lastTap = null
+    }
+
+    /** iOS `noteTextChange`. */
+    fun noteTextChange() {
+        lastTap = null
+    }
+
     /**
      * iOS `beginLineGrowth`: the spring the next height change rides, and the text it was set
      * for (a measure for any other text takes its height at once).
@@ -470,8 +495,10 @@ class ComposerTextInputController {
 private class ComposerFieldSwipeInput : ComposerSwipeInput {
     var yieldsToText: () -> Boolean = { false }
     var claims: (Offset) -> Boolean = { false }
+    var doubleTap: () -> Boolean = { false }
     override val isSwipeYieldedToText: Boolean get() = yieldsToText()
     override fun selectionClaims(rootPoint: Offset): Boolean = claims(rootPoint)
+    override fun takesDoubleTap(): Boolean = doubleTap()
 }
 
 /**
@@ -594,6 +621,7 @@ fun ComposerTextInput(
         snapshotFlow { state.text.toString() }.collect { newText ->
             val previous = controller.externalText ?: return@collect
             if (newText == previous) return@collect
+            controller.noteTextChange()
             // A reader's own edit owns the caret; drop any pending follow-the-end.
             controller.pinsToEnd = false
             controller.followsCaret = true
@@ -608,6 +636,7 @@ fun ComposerTextInput(
     // Moving the caret off the end is reading or editing earlier text.
     LaunchedEffect(state) {
         snapshotFlow { state.selection }.collect { selection ->
+            controller.noteSelectionChange(state.text.toString(), selection)
             if (!hasFocus) return@collect
             val current = state.text.toString()
             currentBridge?.selectionDidChange(current, selection, state.composition, controller.externalText ?: current)
@@ -742,6 +771,72 @@ fun ComposerTextInput(
         )
     }
 
+    /**
+     * iOS `takesDoubleTap`: whether the control tap now running is the second half of a finger's
+     * double tap on the text's last line. If so, focuses the field and selects the word under
+     * the first tap. Always clears the recorded tap.
+     */
+    fun takesDoubleTap(now: Long): Boolean {
+        val tap = controller.lastTap ?: return false
+        controller.lastTap = null
+        val coordinates = controller.swipeCoordinates?.takeIf { it.isAttached } ?: return false
+        val second = sendTransition?.windowTouches?.latest ?: return false
+        val secondPoint = coordinates.localPositionOf(coordinates.findRootCoordinates(), second.rootPoint)
+        val tapViewportX = tap.point.x
+        val isSecondHalf = ComposerDoubleTap.isSecondHalf(
+            tap = tap,
+            tapViewportX = tapViewportX,
+            text = state.text.toString(),
+            second = second,
+            secondViewportPoint = secondPoint,
+            fieldHeight = coordinates.size.height.toFloat(),
+            now = now,
+            density = density.density,
+        )
+        if (!isSecondHalf) return false
+        if (!hasFocus) {
+            focusRequester.requestFocus()
+            keyboard?.show()
+        }
+        val layout = controller.layout ?: return true
+        val word = ComposerDoubleTap.wordAt(layout, layout.getOffsetForPosition(tap.point)) ?: return true
+        state.edit { selection = word }
+        return true
+    }
+
+    /**
+     * iOS `ComposerTapObserver`'s end: a quick finger tap that began at [down] (viewport px) on
+     * the last visible line is recorded as [ComposerTextInputController.lastTap].
+     */
+    fun noteTap(down: Offset, began: Long, ended: Long, viewportHeight: Float) {
+        if (ended - began >= ComposerDoubleTap.TAP_DURATION_MS) return
+        val layout = controller.layout ?: return
+        val text = state.text.toString()
+        if (layout.layoutInput.text.length != text.length) return
+        val textPoint = Offset(down.x, down.y + scroll.value - currentInsetPx)
+        val caret = runCatching { layout.getCursorRect(layout.getOffsetForPosition(textPoint)) }.getOrNull() ?: return
+        val lastLineCaret = runCatching { layout.getCursorRect(text.length) }.getOrNull() ?: return
+        val visibleBottom = scroll.value + viewportHeight - currentInsetPx
+        if (!ComposerDoubleTap.isOnLastVisibleLine(caret, lastLineCaret, lineHeightPx, visibleBottom)) return
+        controller.lastTap = ComposerTextTap(textPoint, began, ended, text)
+    }
+
+    /** iOS: taps on inline controls (autocomplete chips, frames grown by 4 dp) don't count. */
+    fun isOnInlineControl(down: Offset): Boolean {
+        val bridge = currentBridge ?: return false
+        val styling = bridge.styling ?: return false
+        val layout = bridge.textLayout ?: return false
+        if (!bridge.isEnabled || layout.layoutInput.text.text != styling.visualText) return false
+        val textPoint = Offset(down.x, down.y + scroll.value - currentInsetPx)
+        val slop = ComposerDoubleTap.CONTROL_SLOP_DP * density.density
+        for (run in styling.chips) {
+            if (run.chip == null) continue
+            val rect = bridge.chipRectPx(run, layout, density) ?: continue
+            if (rect.inflate(slop).contains(textPoint)) return true
+        }
+        return false
+    }
+
     // iOS `sendTransition.input` (573770b6): the capsule's swipe asks the field whether a touch is
     // the text's, even one that starts just outside it, where a selection's handle hangs.
     val swipeInput = remember { ComposerFieldSwipeInput() }
@@ -757,10 +852,15 @@ fun ComposerTextInput(
             coordinates != null &&
                 selectionClaims(coordinates.localPositionOf(coordinates.findRootCoordinates(), rootPoint), isFocused = hasFocus)
         }
+        swipeInput.doubleTap = { takesDoubleTap(SystemClock.uptimeMillis()) }
         sendTransition?.input = swipeInput
     }
     DisposableEffect(sendTransition, swipeInput) {
-        onDispose { if (sendTransition?.input === swipeInput) sendTransition.input = null }
+        onDispose {
+            // iOS `didMoveToWindow`: a field leaving the screen forgets its tap.
+            controller.lastTap = null
+            if (sendTransition?.input === swipeInput) sendTransition.input = null
+        }
     }
 
     val receiveContent = remember {
@@ -916,9 +1016,15 @@ fun ComposerTextInput(
                     controller.swipeTextOwnership = if (startsOnSelection) true else null
                     controller.isSwipeYieldedToText = startsOnSelection
                     val decisionPx = BackSwipeRules.decisionDistance.toPx()
+                    // iOS `ComposerTapObserver`: a lone finger's quick tap on the text, off any
+                    // inline control, may be a double tap's first half ([ComposerDoubleTap]).
+                    var isTap = currentEvent.changes.size == 1 && down.type == PointerType.Touch && !isOnInlineControl(down.position)
+                    val tapSlopPx = ComposerDoubleTap.TAP_SLOP_DP.dp.toPx()
                     while (true) {
                         val event = awaitPointerEvent(PointerEventPass.Initial)
                         val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                        if (event.changes.size > 1 || (change.position - down.position).getDistance() > tapSlopPx) isTap = false
+                        if (isTap && !change.pressed) noteTap(down.position, down.uptimeMillis, change.uptimeMillis, size.height.toFloat())
                         tracker.addPosition(change.uptimeMillis, change.position)
                         controller.swipeLatestUptime = change.uptimeMillis
                         val heldFor = (change.uptimeMillis - down.uptimeMillis) / 1000.0

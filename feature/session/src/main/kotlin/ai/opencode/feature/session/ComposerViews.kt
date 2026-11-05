@@ -32,14 +32,11 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.indication
 import androidx.compose.material3.ripple
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.onClick
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -77,8 +74,6 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.Measurable
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalViewConfiguration
-import androidx.compose.ui.platform.ViewConfiguration
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -561,61 +556,6 @@ fun ComposerControlLabel(
                 )
             }
         }
-    }
-}
-
-// endregion
-
-// region Stop
-
-/**
- * iOS `ComposerStopButton`: the run's Stop. Held (0.5 s, iOS `LongPressGesture`'s default), it
- * starts a call instead ([onHold]) and that press's release never stops the run. TalkBack's
- * activation always stops; the call is its own action.
- */
-@Composable
-fun ComposerStopButton(
-    holdStartsCall: Boolean,
-    onStop: () -> Unit,
-    onHold: () -> Unit,
-    modifier: Modifier = Modifier,
-    label: @Composable () -> Unit,
-) {
-    val base = LocalViewConfiguration.current
-    val config = remember(base) {
-        object : ViewConfiguration by base {
-            override val longPressTimeoutMillis: Long get() = 500
-        }
-    }
-    val interactions = remember { MutableInteractionSource() }
-    CompositionLocalProvider(LocalViewConfiguration provides config) {
-        Box(
-            modifier
-                .indication(interactions, ripple(bounded = false, radius = 22.dp))
-                .pointerInput(holdStartsCall) {
-                    detectTapGestures(
-                        onPress = { offset ->
-                            val press = PressInteraction.Press(offset)
-                            interactions.emit(press)
-                            val released = tryAwaitRelease()
-                            interactions.emit(if (released) PressInteraction.Release(press) else PressInteraction.Cancel(press))
-                        },
-                        onLongPress = if (holdStartsCall) {
-                            { onHold() }
-                        } else {
-                            null
-                        },
-                        onTap = { onStop() },
-                    )
-                }
-                // Assistive activation always stops; the call is its own action.
-                .semantics {
-                    role = Role.Button
-                    onClick { onStop(); true }
-                }
-                .openCodeTapTarget(accessibility = false),
-            contentAlignment = Alignment.Center,
-        ) { label() }
     }
 }
 

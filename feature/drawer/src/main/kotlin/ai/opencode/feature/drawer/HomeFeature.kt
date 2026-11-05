@@ -1,5 +1,6 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.core.log.SystemActionOrigin
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.dependencies.dependency
@@ -763,6 +764,8 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
             val destination: SystemAction.Destination,
             val startsCall: Boolean,
             val inBackground: Boolean = false,
+            /** Which system surface asked, for the call's trigger log. */
+            val origin: SystemActionOrigin = SystemActionOrigin.other,
         ) : Action
         /** From the view, on appearing and whenever Voice is set up or not: publishes to the system. */
         data class SystemPublishRequested(val voiceAvailable: Boolean) : Action

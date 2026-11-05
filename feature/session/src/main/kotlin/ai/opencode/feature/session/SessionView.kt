@@ -2,6 +2,7 @@
 
 package ai.opencode.feature.session
 
+import ai.opencode.feature.composer.composerWindowTouches
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.experiments.key
 import ai.opencode.core.haptics.Haptic
@@ -241,7 +242,9 @@ fun SessionView(
         LocalSessionPhotoSheet provides photoSheet,
     ) {
         // The + menu draws above the background-work capsule (iOS: the menu's glass covers it).
-        Box(modifier.rootOffsetOnScreen { if (it != rootOffset) rootOffset = it }) {
+        // iOS `ComposerWindowTouchObserver` on the window: the screen's latest touch-down, for the
+        // model chip's double-tap check.
+        Box(modifier.rootOffsetOnScreen { if (it != rootOffset) rootOffset = it }.composerWindowTouches(composerHost.sendTransition.windowTouches)) {
         BackgroundWorkPresentation(
             anchor = backgroundWorkAnchor,
             sessionID = work.sessionID,

@@ -1,5 +1,6 @@
 package ai.opencode.feature.system.intents
 
+import ai.opencode.core.log.SystemActionOrigin
 import ai.opencode.feature.system.SystemAction
 import ai.opencode.feature.system.SessionDirectory
 /**
@@ -21,7 +22,7 @@ object OpenCodeControlKind {
 object ControlIntents {
     /** Start Call / Open Session / New Session: “Starts a voice call in the session the control is set up for.” etc. */
     fun perform(kind: String, target: String?): SystemAction? = when (kind) {
-        OpenCodeControlKind.START_CALL -> SystemAction.controlTarget(target, startsCall = true)
+        OpenCodeControlKind.START_CALL -> SystemAction.controlTarget(target, startsCall = true).copy(origin = SystemActionOrigin.control)
         OpenCodeControlKind.OPEN_SESSION -> SystemAction.controlTarget(target, startsCall = false)
         OpenCodeControlKind.NEW_SESSION -> SystemAction(destination = SystemAction.Destination.Draft(null))
         else -> null

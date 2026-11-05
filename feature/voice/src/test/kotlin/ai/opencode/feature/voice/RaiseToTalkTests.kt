@@ -85,6 +85,51 @@ class RaiseToTalkTests {
         assertFalse(RaiseToEarDetector.isHeldUp(g(-0.8, 0.1, -0.3)))
     }
 
+    @Test fun aHandOverTheSensorWhileReadingIsNoRaise() {
+        // Reading, screen tipped back 45–60°: held up, but not at an ear.
+        val reading = listOf(g(0.0, -0.7, -0.7), g(0.1, -0.6, -0.78), g(0.0, -0.75, -0.6))
+        for (gravity in reading) {
+            assertFalse(RaiseToEarDetector.isAtEarPosture(gravity))
+        }
+        assertTrue("Still held up, so a call at the ear stays there", RaiseToEarDetector.isHeldUp(g(0.0, -0.75, -0.6)))
+        // At the ear, every posture the raise accepted before still counts.
+        val ear = listOf(g(-0.2, -0.9, -0.3), g(-0.75, -0.5, -0.3), g(-0.8, -0.4, -0.3), g(-0.85, -0.25, -0.2))
+        for (gravity in ear) {
+            assertTrue(RaiseToEarDetector.isAtEarPosture(gravity))
+        }
+    }
+
+    @Test fun readingTiltStartsNoCallButALiveCallStillMovesToTheReceiver() = runBlocking {
+        val reading = g(0.0, -0.7, -0.7)
+        for (live in listOf(false, true)) {
+            val clock = TestClock()
+            val events = mutableListOf<EarRoute>()
+            val detector = RaiseToEarDetector(clock = clock, gravitySource = { reading }, onNote = {})
+            detector.start(
+                onRaise = { events += EarRoute.Raise; live },
+                onNear = { events += EarRoute.Near(it) },
+                callIsLive = { live },
+            )
+            detector.proximityChanged(true)
+            clock.advance(RaiseToEarDetector.dwell)
+            val message = if (live) "A live call goes to the receiver" else "No call starts"
+            assertEquals(message, if (live) raised else emptyList(), events)
+            detector.stop()
+        }
+    }
+
+    @Test fun aBriefCoverIsNoRaise() = runBlocking {
+        // A finger crossing the sensor for 400 ms (over the old 350 ms dwell).
+        val l = listen(heldUp = true)
+        l.detector.proximityChanged(true)
+        l.clock.advance(400.milliseconds)
+        l.detector.proximityChanged(false)
+        l.clock.advance(RaiseToEarDetector.dwell)
+        assertTrue(l.events.isEmpty())
+        assertTrue(RaiseToEarDetector.dwell >= 600.milliseconds)
+        l.detector.stop()
+    }
+
     @Test fun pocketingPhoneDoesNotTriggerRaise() = runBlocking {
         var gravity = g(0.65, 0.65, -0.2)
         val l = listenWithNotes(isHeldUp = { RaiseToEarDetector.isHeldUp(gravity) })

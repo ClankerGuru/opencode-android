@@ -1,5 +1,6 @@
 package ai.opencode.feature.system.intents
 
+import ai.opencode.core.log.SystemActionOrigin
 import ai.opencode.feature.system.SystemAction
 import ai.opencode.feature.system.SessionDirectory
 import ai.opencode.feature.system.ScopedID
@@ -22,11 +23,11 @@ data class SessionEntity(
     val symbol: SFSymbol get() = if (id == NEW_SESSION_ID) SFSymbol.SquareAndPencil else SFSymbol.BubbleLeft
 
     /** Where choosing this takes you. */
-    fun action(startsCall: Boolean = false): SystemAction? = when (id) {
-        LAST_VIEWED_ID -> SystemAction(destination = SystemAction.Destination.LastViewed, startsCall = startsCall)
-        NEW_SESSION_ID -> SystemAction(destination = SystemAction.Destination.Draft(null), startsCall = startsCall)
+    fun action(startsCall: Boolean = false, origin: SystemActionOrigin = SystemActionOrigin.other): SystemAction? = when (id) {
+        LAST_VIEWED_ID -> SystemAction(destination = SystemAction.Destination.LastViewed, startsCall = startsCall, origin = origin)
+        NEW_SESSION_ID -> SystemAction(destination = SystemAction.Destination.Draft(null), startsCall = startsCall, origin = origin)
         else -> ScopedID.parse(id)?.let {
-            SystemAction(it.serverKey, SystemAction.Destination.Session(it.id), startsCall)
+            SystemAction(it.serverKey, SystemAction.Destination.Session(it.id), startsCall, origin = origin)
         }
     }
 

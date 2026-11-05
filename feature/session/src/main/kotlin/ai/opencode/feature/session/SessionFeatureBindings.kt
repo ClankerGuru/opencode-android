@@ -6,6 +6,7 @@ import ai.opencode.feature.composer.ComposerAutocompleteOutcome
 import ai.opencode.feature.composer.ComposerAutocompleteEnvironment
 import ai.opencode.feature.composer.ComposerAutocompleteHost
 import ai.opencode.core.haptics.Haptic
+import ai.opencode.core.log.CallTrigger
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.PresentationAction
 import ai.opencode.core.store.Reduced
@@ -62,14 +63,26 @@ internal fun SessionFeature.reduceCallAndBindings(state: State, action: Action):
         state.voice != null || !state.isVoiceAvailable -> Reduced(state)
         // The phone comes near the face while dictating too; a call would take the mic and end the recording.
         state.dictationBlocksRaise { date.now() } -> Reduced(state)
-        // In order: the call must exist before it hears it's at the ear.
-        else -> callAfterDictation(state, atEar = true)
-            ?: Reduced(state, Effect.concatenate(Effect.send(Action.VoiceTapped), Effect.send(Action.AtEarChanged(true))))
+        else -> {
+            CallTrigger.RaiseToTalk.log()
+            // In order: the call must exist before it hears it's at the ear.
+            callAfterDictation(state, atEar = true)
+                ?: Reduced(state, Effect.concatenate(Effect.send(Action.VoiceTapped), Effect.send(Action.AtEarChanged(true))))
+        }
     }
 
     Action.StopLongPressed ->
-        if (state.voice != null || !state.isVoiceAvailable || !state.isRunning || state.hasPromptContent) Reduced(state)
-        else Reduced(state, Effect.send(Action.VoiceTapped))
+        if (state.voice != null || !state.isVoiceAvailable || !state.isRunning || state.hasPromptContent) {
+            Reduced(state)
+        } else {
+            CallTrigger.StopHeld.log()
+            Reduced(state, Effect.send(Action.VoiceTapped))
+        }
+
+    Action.CallButtonTapped -> {
+        CallTrigger.CallButton.log()
+        Reduced(state, Effect.send(Action.VoiceTapped))
+    }
 
     is Action.AtEarChanged ->
         if (state.voice == null) Reduced(state)

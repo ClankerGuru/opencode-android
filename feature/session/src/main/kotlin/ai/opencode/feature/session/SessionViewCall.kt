@@ -79,6 +79,8 @@ internal fun SessionCallTasks(store: StoreOf<State, Action>, callStore: VoiceSto
                 store.state.voice != null
             },
             { near -> store.send(Action.AtEarChanged(near)) },
+            // A live call moves to the receiver on the looser held-up posture.
+            { store.state.voice != null },
         )
     }
 

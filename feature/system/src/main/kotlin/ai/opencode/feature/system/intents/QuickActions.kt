@@ -1,5 +1,6 @@
 package ai.opencode.feature.system.intents
 
+import ai.opencode.core.log.SystemActionOrigin
 import ai.opencode.feature.system.SystemAction
 import ai.opencode.feature.system.SessionDirectory
 import ai.opencode.core.ui.SFSymbol
@@ -36,7 +37,7 @@ data class SystemQuickAction(
     val action: SystemAction?
         get() = when (kind) {
             Kind.NewSession -> SystemAction(serverKey, SystemAction.Destination.Draft(null))
-            Kind.StartCall -> SystemAction(serverKey, SystemAction.Destination.LastViewed, startsCall = true)
+            Kind.StartCall -> SystemAction(serverKey, SystemAction.Destination.LastViewed, startsCall = true, origin = SystemActionOrigin.quickAction)
             Kind.OpenSession -> sessionID?.let { SystemAction(serverKey, SystemAction.Destination.Session(it)) }
         }
 

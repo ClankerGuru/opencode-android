@@ -15,25 +15,25 @@ anomalyco/opencode-ios `b9e9ee1c52cf6d9724d78e0dda3ad86767ac708d` → `dccec82e4
 ### Changed (3)
 
 - [x] `OpenCode/App/AppFeature+ClientTools.swift` +5/−12 → `app/.../AppFeatureClientTools.kt`. 61a9bfd8 Client tools: connect only for a call, and stop at a server without the route (p217)
-- [ ] `OpenCode/App/AppFeature.swift` +4/−6 → `app/.../AppFeature.kt`, `app/.../AppFeatureServers.kt`, `app/.../AppFeatureShares.kt`, `app/.../AppFeatureWhatsNew.kt`, `app/.../AppDependencies.kt`, `feature/drawer/.../HomeFeatureApp.kt`, `app/.../AppFeatureServerFlow.kt`. dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts; da11bb99 Stop resting grips from starting voice calls; log each call's trigger
+- [x] `OpenCode/App/AppFeature.swift` +4/−6 → `app/.../AppFeature.kt`, `app/.../AppFeatureServers.kt`, `app/.../AppFeatureShares.kt`, `app/.../AppFeatureWhatsNew.kt`, `app/.../AppDependencies.kt`, `feature/drawer/.../HomeFeatureApp.kt`, `app/.../AppFeatureServerFlow.kt`. dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts; da11bb99 Stop resting grips from starting voice calls; log each call's trigger
 - [x] `OpenCode/App/AppView.swift` +3/−6 → `app/.../AppView.kt`. ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
 
 ### Tests (3)
 
 - [x] M `ClientToolsTests.swift` +97/−31 (Tests rows in app.md, server.md, system.md, voice.md). 61a9bfd8 Client tools: connect only for a call, and stop at a server without the route (p217)
-- [ ] M `SystemIntegrationTests.swift` +54/−3 (Tests rows in app.md, drawer.md, system.md). dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts; da11bb99 Stop resting grips from starting voice calls; log each call's trigger
+- [x] M `SystemIntegrationTests.swift` +54/−3 (Tests rows in app.md, drawer.md, system.md). dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts; da11bb99 Stop resting grips from starting voice calls; log each call's trigger
 - [x] M `WhatsNewTests.swift` +1/−1 (Tests rows in app.md, drawer.md, settings.md). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
 
 ## composer.md (3)
 
 ### Changed (2)
 
-- [ ] `OpenCode/Composer/ComposerTextInput.swift` +14/−0 → `ComposerTextInput.kt`. 52ae8547 Count a chip tap as a double tap's second half only for a nearby finger tap after a fresh tap on the ; 06cedc87 Keep a composer double tap on the text when its second tap drifts onto the model chip
+- [x] `OpenCode/Composer/ComposerTextInput.swift` +14/−0 → `ComposerTextInput.kt`. 52ae8547 Count a chip tap as a double tap's second half only for a nearby finger tap after a fresh tap on the ; 06cedc87 Keep a composer double tap on the text when its second tap drifts onto the model chip
 - [ ] `OpenCode/Composer/SessionStatePersistence.swift` +2/−4 → `SessionStatePersistence.kt`. b57c3bfb refactor(browser): remove dead page-screenshot path and deduplicate link helpers
 
 ### New (1)
 
-- [ ] `OpenCode/Composer/ComposerDoubleTap.swift` (149 lines). 52ae8547 Count a chip tap as a double tap's second half only for a nearby finger tap after a fresh tap on the 
+- [x] `OpenCode/Composer/ComposerDoubleTap.swift` (149 lines). 52ae8547 Count a chip tap as a double tap's second half only for a nearby finger tap after a fresh tap on the 
 
 ## core.md (3)
 
@@ -68,16 +68,16 @@ anomalyco/opencode-ios `b9e9ee1c52cf6d9724d78e0dda3ad86767ac708d` → `dccec82e4
 ### Changed (6)
 
 - [ ] `OpenCode/Drawer/HomeFeature+Drawer.swift` +3/−2 → `HomeFeatureDrawer.kt`. dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts; da11bb99 Stop resting grips from starting voice calls; log each call's trigger; b0d4a0f0 refactor(browser): centralize browser state ownership and scope BrowserPage
-- [ ] `OpenCode/Drawer/HomeFeature+Settings.swift` +1/−1 → `HomeFeatureSettings.kt`. dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts
-- [ ] `OpenCode/Drawer/HomeFeature+System.swift` +9/−6 → `HomeFeatureSystem.kt`. dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts
+- [x] `OpenCode/Drawer/HomeFeature+Settings.swift` +1/−1 → `HomeFeatureSettings.kt`. dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts
+- [x] `OpenCode/Drawer/HomeFeature+System.swift` +9/−6 → `HomeFeatureSystem.kt`. dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts
 - [ ] `OpenCode/Drawer/HomeFeature+VoiceNavigation.swift` +1/−1 → `HomeFeatureVoiceNavigation.kt`. b0d4a0f0 refactor(browser): centralize browser state ownership and scope BrowserPage
-- [ ] `OpenCode/Drawer/HomeFeature.swift` +1/−1 → `HomeFeature.kt`. dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts
+- [x] `OpenCode/Drawer/HomeFeature.swift` +1/−1 → `HomeFeature.kt`. dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts
 - [ ] `OpenCode/Drawer/HomeView.swift` +3/−2 → `feature/drawer/src/main/kotlin/ai/opencode/feature/drawer/HomeView.kt`, `feature/drawer/src/main/kotlin/ai/opencode/feature/drawer/HomeViewState.kt`. b0d4a0f0 refactor(browser): centralize browser state ownership and scope BrowserPage
 
 ### Tests (3)
 
 - [ ] M `BrowserTests.swift` +187/−573 (Tests rows in drawer.md, media.md, server.md, session.md, voice.md). 417d95aa fix(browser): preserve originating window scene and Ask closing snapshot; 26e5eb86 test(browser): add TestStore coverage for extracted BrowserFeature logic; b57c3bfb refactor(browser): remove dead page-screenshot path and deduplicate link helpers
-- [ ] M `SystemIntegrationTests.swift` +54/−3 (Tests rows in app.md, drawer.md, system.md). dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts; da11bb99 Stop resting grips from starting voice calls; log each call's trigger
+- [x] M `SystemIntegrationTests.swift` +54/−3 (Tests rows in app.md, drawer.md, system.md). dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts; da11bb99 Stop resting grips from starting voice calls; log each call's trigger
 - [x] M `WhatsNewTests.swift` +1/−1 (Tests rows in app.md, drawer.md, settings.md). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
 
 ## media.md (6)
@@ -110,23 +110,23 @@ anomalyco/opencode-ios `b9e9ee1c52cf6d9724d78e0dda3ad86767ac708d` → `dccec82e4
 
 ### Changed (7)
 
-- [ ] `OpenCode/Session/ComposerViews.swift` +0/−32 → `ComposerViews.kt`. da11bb99 Stop resting grips from starting voice calls; log each call's trigger
-- [ ] `OpenCode/Session/SessionFeature+Bindings.swift` +6/−0 → `SessionFeatureBindings.kt`. da11bb99 Stop resting grips from starting voice calls; log each call's trigger
+- [x] `OpenCode/Session/ComposerViews.swift` +0/−32 → `ComposerViews.kt`. da11bb99 Stop resting grips from starting voice calls; log each call's trigger
+- [x] `OpenCode/Session/SessionFeature+Bindings.swift` +6/−0 → `SessionFeatureBindings.kt`. da11bb99 Stop resting grips from starting voice calls; log each call's trigger
 - [ ] `OpenCode/Session/SessionFeature+Browser.swift` +18/−14 → `SessionFeatureBrowser.kt`. b0d4a0f0 refactor(browser): centralize browser state ownership and scope BrowserPage; b57c3bfb refactor(browser): remove dead page-screenshot path and deduplicate link helpers
 - [ ] `OpenCode/Session/SessionFeature+Delivery.swift` +5/−8 → `SessionFeatureDelivery.kt`. b57c3bfb refactor(browser): remove dead page-screenshot path and deduplicate link helpers
-- [ ] `OpenCode/Session/SessionFeature.swift` +2/−0 → `SessionFeature.kt`, `SessionFeatureComposition.kt`, `SessionTimers.kt`. da11bb99 Stop resting grips from starting voice calls; log each call's trigger
-- [ ] `OpenCode/Session/SessionView+ComposerControls.swift` +10/−4 → `SessionViewComposerControls.kt`. da11bb99 Stop resting grips from starting voice calls; log each call's trigger; 06cedc87 Keep a composer double tap on the text when its second tap drifts onto the model chip
-- [ ] `OpenCode/Session/SessionView.swift` +2/−1 → `SessionView.kt`, `SessionViewLifecycle.kt`, `SessionViewChrome.kt`, `SessionViewCall.kt`, `SessionBrowserPage.kt`, `SessionVoiceLabTriggers.kt`. dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts
+- [x] `OpenCode/Session/SessionFeature.swift` +2/−0 → `SessionFeature.kt`, `SessionFeatureComposition.kt`, `SessionTimers.kt`. da11bb99 Stop resting grips from starting voice calls; log each call's trigger
+- [x] `OpenCode/Session/SessionView+ComposerControls.swift` +10/−4 → `SessionViewComposerControls.kt`. da11bb99 Stop resting grips from starting voice calls; log each call's trigger; 06cedc87 Keep a composer double tap on the text when its second tap drifts onto the model chip
+- [x] `OpenCode/Session/SessionView.swift` +2/−1 → `SessionView.kt`, `SessionViewLifecycle.kt`, `SessionViewChrome.kt`, `SessionViewCall.kt`, `SessionBrowserPage.kt`, `SessionVoiceLabTriggers.kt`. dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts
 
 ### New (1)
 
-- [ ] `OpenCode/Session/ComposerCallControls.swift` (101 lines). dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts; da11bb99 Stop resting grips from starting voice calls; log each call's trigger
+- [x] `OpenCode/Session/ComposerCallControls.swift` (101 lines). dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts; da11bb99 Stop resting grips from starting voice calls; log each call's trigger
 
 ### Tests (3)
 
 - [ ] M `BrowserTests.swift` +187/−573 (Tests rows in drawer.md, media.md, server.md, session.md, voice.md). 417d95aa fix(browser): preserve originating window scene and Ask closing snapshot; 26e5eb86 test(browser): add TestStore coverage for extracted BrowserFeature logic; b57c3bfb refactor(browser): remove dead page-screenshot path and deduplicate link helpers
-- [ ] A `CallTriggerTests.swift` +87/−0 (no Tests row yet; guessed session.md). dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts; da11bb99 Stop resting grips from starting voice calls; log each call's trigger
-- [ ] M `RaiseToTalkTests.swift` +44/−0 (Tests rows in session.md, voice.md). dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts; da11bb99 Stop resting grips from starting voice calls; log each call's trigger
+- [x] A `CallTriggerTests.swift` +87/−0 (no Tests row yet; guessed session.md). dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts; da11bb99 Stop resting grips from starting voice calls; log each call's trigger
+- [x] M `RaiseToTalkTests.swift` +44/−0 (Tests rows in session.md, voice.md). dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts; da11bb99 Stop resting grips from starting voice calls; log each call's trigger
 
 ## settings.md (29)
 
@@ -177,16 +177,16 @@ anomalyco/opencode-ios `b9e9ee1c52cf6d9724d78e0dda3ad86767ac708d` → `dccec82e4
 
 - [x] `OpenCode/System/ClientTools/ClientToolsClient.swift` +17/−9 → `server/.../clienttools/ClientToolsClient.kt`. 61a9bfd8 Client tools: connect only for a call, and stop at a server without the route (p217)
 - [x] `OpenCode/System/ClientTools/ClientToolsFeature.swift` +28/−8 → `feature/system/.../clienttools/ClientToolsFeature.kt`. 61a9bfd8 Client tools: connect only for a call, and stop at a server without the route (p217)
-- [ ] `OpenCode/System/Intents/ControlIntents.swift` +3/−1 → `intents/ControlIntents.kt`. da11bb99 Stop resting grips from starting voice calls; log each call's trigger
-- [ ] `OpenCode/System/Intents/QuickActions.swift` +1/−1 → `intents/QuickActions.kt`, `res/xml/shortcuts.xml`. da11bb99 Stop resting grips from starting voice calls; log each call's trigger
-- [ ] `OpenCode/System/Intents/SystemAction.swift` +15/−0 → `intents/SystemAction.kt`, `intents/SystemActionActivity.kt`. da11bb99 Stop resting grips from starting voice calls; log each call's trigger
-- [ ] `OpenCode/System/Intents/SystemEntities.swift` +4/−4 → `intents/SystemEntities.kt`, `intents/SystemSearchIndex.kt`. da11bb99 Stop resting grips from starting voice calls; log each call's trigger
-- [ ] `OpenCode/System/Intents/SystemIntents.swift` +2/−2 → `intents/SystemIntents.kt`, `intents/BackgroundCallActivity.kt`. da11bb99 Stop resting grips from starting voice calls; log each call's trigger
+- [x] `OpenCode/System/Intents/ControlIntents.swift` +3/−1 → `intents/ControlIntents.kt`. da11bb99 Stop resting grips from starting voice calls; log each call's trigger
+- [x] `OpenCode/System/Intents/QuickActions.swift` +1/−1 → `intents/QuickActions.kt`, `res/xml/shortcuts.xml`. da11bb99 Stop resting grips from starting voice calls; log each call's trigger
+- [x] `OpenCode/System/Intents/SystemAction.swift` +15/−0 → `intents/SystemAction.kt`, `intents/SystemActionActivity.kt`. da11bb99 Stop resting grips from starting voice calls; log each call's trigger
+- [x] `OpenCode/System/Intents/SystemEntities.swift` +4/−4 → `intents/SystemEntities.kt`, `intents/SystemSearchIndex.kt`. da11bb99 Stop resting grips from starting voice calls; log each call's trigger
+- [x] `OpenCode/System/Intents/SystemIntents.swift` +2/−2 → `intents/SystemIntents.kt`, `intents/BackgroundCallActivity.kt`. da11bb99 Stop resting grips from starting voice calls; log each call's trigger
 
 ### Tests (2)
 
 - [x] M `ClientToolsTests.swift` +97/−31 (Tests rows in app.md, server.md, system.md, voice.md). 61a9bfd8 Client tools: connect only for a call, and stop at a server without the route (p217)
-- [ ] M `SystemIntegrationTests.swift` +54/−3 (Tests rows in app.md, drawer.md, system.md). dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts; da11bb99 Stop resting grips from starting voice calls; log each call's trigger
+- [x] M `SystemIntegrationTests.swift` +54/−3 (Tests rows in app.md, drawer.md, system.md). dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts; da11bb99 Stop resting grips from starting voice calls; log each call's trigger
 
 ## transcript.md (4)
 
@@ -204,21 +204,21 @@ anomalyco/opencode-ios `b9e9ee1c52cf6d9724d78e0dda3ad86767ac708d` → `dccec82e4
 
 ### Changed (5)
 
-- [ ] `OpenCode/Voice/RaiseToEar.swift` +49/−13 → `RaiseToEar.kt`. dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts; da11bb99 Stop resting grips from starting voice calls; log each call's trigger
+- [x] `OpenCode/Voice/RaiseToEar.swift` +49/−13 → `RaiseToEar.kt`. dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts; da11bb99 Stop resting grips from starting voice calls; log each call's trigger
 - [x] `OpenCode/Voice/VoiceAudioEngine.swift` +1/−2 → `VoiceAudioEngine.kt`. ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
-- [ ] `OpenCode/Voice/VoiceFeature.swift` +7/−0 → `VoiceFeature.kt`. dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts
-- [ ] `OpenCode/Voice/VoiceTimeline.swift` +1/−1 → `VoiceTimeline.kt`, `VoiceDiagnostics.kt`. dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts
-- [ ] `OpenCode/Voice/VoiceView.swift` +1/−1 → `VoiceView.kt`. dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts
+- [x] `OpenCode/Voice/VoiceFeature.swift` +7/−0 → `VoiceFeature.kt`. dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts
+- [x] `OpenCode/Voice/VoiceTimeline.swift` +1/−1 → `VoiceTimeline.kt`, `VoiceDiagnostics.kt`. dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts
+- [x] `OpenCode/Voice/VoiceView.swift` +1/−1 → `VoiceView.kt`. dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts
 
 ### New (1)
 
-- [ ] `OpenCode/Voice/CallTrigger.swift` (57 lines). dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts; da11bb99 Stop resting grips from starting voice calls; log each call's trigger
+- [x] `OpenCode/Voice/CallTrigger.swift` (57 lines). dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts; da11bb99 Stop resting grips from starting voice calls; log each call's trigger
 
 ### Tests (3)
 
 - [ ] M `BrowserTests.swift` +187/−573 (Tests rows in drawer.md, media.md, server.md, session.md, voice.md). 417d95aa fix(browser): preserve originating window scene and Ask closing snapshot; 26e5eb86 test(browser): add TestStore coverage for extracted BrowserFeature logic; b57c3bfb refactor(browser): remove dead page-screenshot path and deduplicate link helpers
 - [x] M `ClientToolsTests.swift` +97/−31 (Tests rows in app.md, server.md, system.md, voice.md). 61a9bfd8 Client tools: connect only for a call, and stop at a server without the route (p217)
-- [ ] M `RaiseToTalkTests.swift` +44/−0 (Tests rows in session.md, voice.md). dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts; da11bb99 Stop resting grips from starting voice calls; log each call's trigger
+- [x] M `RaiseToTalkTests.swift` +44/−0 (Tests rows in session.md, voice.md). dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts; da11bb99 Stop resting grips from starting voice calls; log each call's trigger
 
 ## Other iOS paths changed (review for product rules, assets, fixtures)
 
