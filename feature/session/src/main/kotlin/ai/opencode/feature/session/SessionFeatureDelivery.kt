@@ -292,15 +292,9 @@ internal fun SessionFeature.Companion.deliveryJob(
             val callbackURL = sessionNotifications.callbackURL(server)
             // The page is read now, once: never while browsing, never for a message that didn't come from it.
             val first = handle.current()
-            var attachments: List<OpenCodeOutgoingAttachment> = first.attachments
-            var page: OpenCodePageContext? = null
-            first.page?.let { request ->
-                val reading = pageReader.read(request)
-                page = reading.context
-                reading.screenshot?.let { screenshot ->
-                    attachments = attachments + OpenCodeOutgoingAttachment(data = screenshot, mime = "image/jpeg", name = "page.jpg")
-                }
-            }
+            val attachments: List<OpenCodeOutgoingAttachment> = first.attachments
+            val request = first.page
+            val page: OpenCodePageContext? = if (request != null) pageReader.read(request) else null
             var appliedModel = false
             while (true) {
                 // Each attempt posts the send as it stands now (Move to Queue, Send Now), unless it was

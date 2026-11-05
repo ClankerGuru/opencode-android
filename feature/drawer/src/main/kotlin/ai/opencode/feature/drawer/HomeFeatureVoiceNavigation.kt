@@ -1,6 +1,5 @@
 package ai.opencode.feature.drawer
 
-import ai.opencode.feature.media.BrowserFeature
 import ai.opencode.feature.session.SessionFeature
 import ai.opencode.feature.session.reconcileInvariants
 
@@ -33,4 +32,4 @@ internal fun HomeFeature.State.clearingSessionCovers(): HomeFeature.State =
         .syncingTranscriptCover()
 
 private fun SessionFeature.State.clearingVoiceNavigationCovers(): SessionFeature.State =
-    copy(browser = BrowserFeature.State(), activePicker = null, folderBrowser = null, shellOutput = null)
+    copy(browser = browser.close(), activePicker = null, folderBrowser = null, shellOutput = null)

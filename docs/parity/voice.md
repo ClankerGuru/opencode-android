@@ -170,7 +170,7 @@ another module are left to that module's port ("skipped"); "dropped" tests can't
 | `VoiceFeatureTests+Screen.swift` | `VoiceFeatureTestsScreen.kt` | 8 | 10 SessionFeature tests and the session half of `aDraftCallsRefusedModelSendsNothing` (`:feature:session`, ported there) | – |
 | `VoiceResumeTests.swift` | `VoiceResumeTests.kt` | 21 | – | – |
 | `VoiceLatencyBudgetTests.swift` | `VoiceLatencyBudgetTests.kt` | 22 | – | – |
-| `BrowserTests.swift` (`BrowserVoiceTests`) | `BrowserVoiceTests.kt` | 3 (`aPageOpenedWhileConnectingIsToldOnConnect`, `anotherSessionNeverInheritsThePage`, `aPageTitleIsDataNotInstructions`) | `aCallStartedOverAPageKnowsIt` (`SessionFeature`, `:feature:session`, ported there); the rest of the file (`:feature:media`, `:feature:session`, drawer) | – |
+| `BrowserTests.swift` (`BrowserVoiceTests`) | `BrowserVoiceTests.kt` | 3 (`aPageOpenedWhileConnectingIsToldOnConnect`, `anotherSessionNeverInheritsThePage`, `aPageTitleIsDataNotInstructions`) | `aCallStartedOverAPageKnowsIt` (`SessionFeature`, `:feature:session`, ported there); the rest of the file (`:feature:media`, `:feature:session`, drawer) | – Sync dccec82e (26e5eb86): unchanged. |
 | `NetworkRetryTests.swift` | `NetworkRetryTests.kt` | 1 (`actionsALoopThatOwnsItsRetriesSendsStartEffectsOutsideIt`, `runOwningRetries`) | rest (`:server`, `EventStreamReconnectTests` drawer; ported there) | – |
 
 Voice-named iOS files whose subject lives elsewhere (left to those modules' ports; see their parity files): `LabVoiceKeysTests` (ported in `:app`),

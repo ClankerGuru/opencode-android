@@ -6,6 +6,7 @@ import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.log.AppLog
+import ai.opencode.core.scene.ActiveScene
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
 import ai.opencode.core.store.Store
@@ -293,7 +294,11 @@ class RootStore(
         if (!SceneWindows.isSupported) return DependencyValues.root
         return DependencyValues.root.with(
             SceneWindowClient,
-            SceneWindowClient { activity.get()?.let { !it.isFinishing && it.hasWindowFocus() } ?: false },
+            SceneWindowClient(
+                front = { activity.get()?.let { !it.isFinishing && it.hasWindowFocus() } ?: false },
+                // The window's own id, so the browser's links open beside it (iOS `SceneWindow.sceneID`).
+                scene = { activity.get()?.let(ActiveScene::sceneID) },
+            ),
         )
     }
 

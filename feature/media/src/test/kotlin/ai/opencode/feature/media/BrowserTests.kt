@@ -135,6 +135,8 @@ class BrowserFeatureTests {
                 read = PageReaderClient.testValue.read,
                 goBack = { back.update { it + 1 } },
                 goForward = { forward.update { it + 1 } },
+                scrollToTop = {},
+                openExternal = PageReaderClient.testValue.openExternal,
                 discard = { id -> discarded.update { it + id } },
             )
         }
@@ -173,6 +175,8 @@ class BrowserFeatureTests {
                 read = PageReaderClient.testValue.read,
                 goBack = {},
                 goForward = {},
+                scrollToTop = {},
+                openExternal = PageReaderClient.testValue.openExternal,
                 discard = { id -> discarded.update { it + id } },
             )
         }
@@ -203,7 +207,7 @@ class BrowserFeatureTests {
             it.copy(pageID = uuid(0), openedURL = article, url = article, isLoading = true)
         }
         assertEquals(
-            PageShareRequest(pageID = uuid(0), url = article, title = "fastcompany.com", includesScreenshot = false),
+            PageShareRequest(pageID = uuid(0), url = article, title = "fastcompany.com"),
             store.state.shareRequest,
         )
         assertEquals(article, store.state.viewing?.url)
@@ -211,6 +215,170 @@ class BrowserFeatureTests {
         store.send(BrowserFeature.Action.AskDraftChanged("Summarise this")) { it.copy(askDraft = "Summarise this") }
         store.send(BrowserFeature.Action.AskDismissed) { it.copy(isAsking = false) }
         store.finish()
+    }
+
+    private data class ExternalOpen(val url: String, val sceneID: String?)
+
+    @Test
+    fun addressScrollsToTopAndSafariAndExternalLinksCarryTheOriginatingScene() = runTest {
+        val scrolled = Locked(listOf<UUID>())
+        val opened = Locked(listOf<ExternalOpen>())
+        val discarded = Locked(listOf<UUID>())
+        val store = TestStore(BrowserFeature.State(), BrowserFeature(), this) {
+            this[UuidClient] = UuidClient.incrementing()
+            this[PageReaderClient] = PageReaderClient(
+                read = PageReaderClient.testValue.read,
+                goBack = {},
+                goForward = {},
+                scrollToTop = { id -> scrolled.update { it + id } },
+                openExternal = { url, sceneID -> opened.update { it + ExternalOpen(url, sceneID) } },
+                discard = { id -> discarded.update { it + id } },
+            )
+        }
+        val download = "https://example.com/archive.zip"
+        val delayed = "https://example.com/report.pdf"
+        val pairing = "https://mini-trial.taila8e7c7.ts.net:4196/auth/connect/Ab3_x-9Q"
+
+        // Closed: every bar and delegate side effect is a no-op.
+        store.send(BrowserFeature.Action.AddressTapped)
+        store.send(BrowserFeature.Action.SafariTapped)
+        store.send(BrowserFeature.Action.ExternalURLRequested(download, sceneID = "scene-window-a"))
+        assertTrue(scrolled.current.isEmpty())
+        assertTrue(opened.current.isEmpty())
+
+        val id = uuid(0)
+        store.send(BrowserFeature.Action.Open(article)) {
+            it.copy(pageID = id, openedURL = article, url = article, isLoading = true)
+        }
+        store.send(BrowserFeature.Action.SceneChanged("scene-window-a")) { it.copy(sceneID = "scene-window-a") }
+        store.send(BrowserFeature.Action.AddressTapped)
+        store.send(BrowserFeature.Action.SafariTapped)
+        // Even if another window was touched before a delayed response arrives,
+        // the request's originating scene wins.
+        store.send(BrowserFeature.Action.SceneChanged("scene-window-b")) { it.copy(sceneID = "scene-window-b") }
+        store.send(BrowserFeature.Action.ExternalURLRequested(download, sceneID = "scene-window-a"))
+        store.send(BrowserFeature.Action.ExternalURLRequested(delayed, sceneID = null))
+        store.send(BrowserFeature.Action.ExternalURLRequested(pairing, sceneID = "scene-window-a"))
+        store.finish()
+        assertEquals(listOf(id), scrolled.current)
+        assertEquals(
+            "External opens preserve the originating page's scene and never open pairing links",
+            listOf(
+                ExternalOpen(article, "scene-window-a"),
+                ExternalOpen(download, "scene-window-a"),
+                ExternalOpen(delayed, "scene-window-b"),
+            ),
+            opened.current,
+        )
+
+        store.send(BrowserFeature.Action.CloseTapped) { BrowserFeature.State() }
+        store.finish()
+        assertEquals(listOf(id), discarded.current)
+    }
+
+    @Test
+    fun closingWithAskOpenKeepsComposerAndDraftInClosingSnapshot() = runTest {
+        val discarded = Locked(listOf<UUID>())
+        val store = TestStore(BrowserFeature.State(), BrowserFeature(), this) {
+            this[UuidClient] = UuidClient.incrementing()
+            this[PageReaderClient] = PageReaderClient(
+                read = PageReaderClient.testValue.read,
+                goBack = {},
+                goForward = {},
+                scrollToTop = {},
+                openExternal = PageReaderClient.testValue.openExternal,
+                discard = { id -> discarded.update { it + id } },
+            )
+        }
+        val id = uuid(0)
+        store.send(BrowserFeature.Action.Open(article)) {
+            it.copy(pageID = id, openedURL = article, url = article, isLoading = true)
+        }
+        store.send(BrowserFeature.Action.Navigated(url = article, title = "X’s UX update")) { it.copy(title = "X’s UX update") }
+        store.send(BrowserFeature.Action.AskTapped) { it.copy(isAsking = true) }
+        store.send(BrowserFeature.Action.AskDraftChanged("Explain section 2")) { it.copy(askDraft = "Explain section 2") }
+
+        val closingSnapshot = store.state.snapshot
+        assertEquals(true, closingSnapshot?.isAsking)
+        assertEquals("Explain section 2", closingSnapshot?.askDraft)
+        assertEquals(true, closingSnapshot?.canSendAsk)
+
+        store.send(BrowserFeature.Action.CloseTapped) { BrowserFeature.State() }
+        store.finish()
+        assertEquals(listOf(id), discarded.current)
+        assertNull(store.state.snapshot)
+
+        val displayed = BrowserFeature.State.Snapshot.displayed(live = store.state.snapshot, closing = closingSnapshot)
+        assertEquals(closingSnapshot, displayed)
+        assertEquals("Ask stays visible while the page slides off the stack", true, displayed?.isAsking)
+        assertEquals("Typed draft stays in place through dismissal", "Explain section 2", displayed?.askDraft)
+        assertEquals(true, displayed?.canSendAsk)
+    }
+
+    @Test
+    fun lateWebViewEventsAfterCloseLeaveStateClosed() = runTest {
+        val store = TestStore(BrowserFeature.State(), BrowserFeature(), this) {
+            this[UuidClient] = UuidClient.incrementing()
+        }
+        store.send(BrowserFeature.Action.Open(article)) {
+            it.copy(pageID = uuid(0), openedURL = article, url = article, isLoading = true)
+        }
+        store.send(BrowserFeature.Action.CloseTapped) { BrowserFeature.State() }
+        store.send(BrowserFeature.Action.TitleChanged("Late title"))
+        store.send(BrowserFeature.Action.LoadingChanged(true))
+        store.send(BrowserFeature.Action.CanGoBackChanged(true))
+        store.send(BrowserFeature.Action.CanGoForwardChanged(true))
+        store.send(BrowserFeature.Action.Navigated(url = article, title = "Late nav"))
+        store.send(BrowserFeature.Action.SceneChanged("scene-late"))
+        store.send(BrowserFeature.Action.AskDraftChanged("Late draft"))
+        store.send(BrowserFeature.Action.AskDismissed)
+        store.finish()
+        assertEquals(BrowserFeature.State(), store.state)
+    }
+
+    @Test
+    fun stateHelpersOwnLifecycleAndAskConsumption() {
+        var state = BrowserFeature.State()
+        assertNull(state.snapshot)
+        assertFalse(state.canSendAsk)
+        assertNull("Closing a closed browser discards nothing", state.pageID)
+        assertEquals(state, state.close())
+
+        var generatedIDs = 0
+        assertNull(state.takeAsk { generatedIDs += 1; "msg_unused" })
+        assertEquals(0, generatedIDs)
+
+        val firstID = uuid(0)
+        assertNull("Nothing was open before", state.pageID)
+        state = state.open(article, firstID)
+        assertEquals(firstID, state.snapshot?.pageID)
+        assertEquals("fastcompany.com", state.snapshot?.host)
+
+        state = state.copy(isAsking = true, askDraft = "   ")
+        assertFalse(state.canSendAsk)
+        assertNull(state.takeAsk { generatedIDs += 1; "msg_blank" })
+        assertEquals("Blank drafts never allocate a message ID", 0, generatedIDs)
+
+        state = state.copy(askDraft = "  Explain this section  ")
+        assertTrue(state.canSendAsk)
+        val taken = state.takeAsk { generatedIDs += 1; "msg_1" }
+        assertEquals(1, generatedIDs)
+        assertEquals("Explain this section", taken?.text)
+        assertEquals(PageShareRequest(pageID = firstID, url = article, title = "fastcompany.com"), taken?.page)
+        assertEquals("msg_1", taken?.messageID)
+        state = taken!!.state
+        assertTrue(state.askDraft.isEmpty())
+        assertFalse(state.isAsking)
+        assertEquals("msg_1", state.peekMessageID)
+
+        val secondID = uuid(1)
+        val other = "https://example.com/next"
+        assertEquals("Opening another page replaces this one", firstID, state.pageID)
+        state = state.open(other, secondID)
+        assertNull(state.peekMessageID)
+        assertEquals(secondID, state.pageID)
+        state = state.close()
+        assertEquals(BrowserFeature.State(), state)
     }
 }
 

@@ -302,7 +302,7 @@ object LinkMenuText {
 
     fun displayHost(url: String): String =
         OpenCodePairingLink.decode(url)?.server?.host
-            ?: browserHost(url)?.let { if (it.startsWith("www.")) it.drop(4) else it }
+            ?: BrowserLinkPolicy.displayHost(url)
             ?: url
 
     /** One link: the menu's own titles. Several: each names its host. */

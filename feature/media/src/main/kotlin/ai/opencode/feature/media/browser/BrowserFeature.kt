@@ -2,12 +2,12 @@ package ai.opencode.feature.media
 
 import ai.opencode.core.dependencies.Dependency
 import ai.opencode.core.dependencies.UuidClient
+import ai.opencode.core.scene.SceneWindowClient
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
+import ai.opencode.server.OpenCodePairingLink
 import ai.opencode.server.model.PageShareRequest
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
-import java.net.IDN
 import java.util.UUID
 
 /**
@@ -32,6 +32,8 @@ class BrowserFeature : Reducer<BrowserFeature.State, BrowserFeature.Action> {
         /** The Ask composer over the bar, and what's typed in it. */
         val isAsking: Boolean = false,
         val askDraft: String = "",
+        /** The window (task) showing the open page, so links it hands out open beside it. */
+        val sceneID: String? = null,
         /** The last question asked from this page; its reply shows in the capsule. */
         val peekMessageID: String? = null,
     ) {
@@ -48,11 +50,7 @@ class BrowserFeature : Reducer<BrowserFeature.State, BrowserFeature.Action> {
             }
         }
 
-        val host: String
-            get() {
-                val host = url?.let(::browserHost) ?: return ""
-                return if (host.startsWith("www.")) host.drop(4) else host
-            }
+        val host: String get() = url?.let(BrowserLinkPolicy::displayHost) ?: ""
 
         /** The title the bar shows: the page's, or its host while loading. */
         val displayTitle: String get() = title.trim().ifEmpty { host }
@@ -62,7 +60,7 @@ class BrowserFeature : Reducer<BrowserFeature.State, BrowserFeature.Action> {
             get() {
                 val pageID = pageID ?: return null
                 val url = url ?: return null
-                return PageShareRequest(pageID = pageID, url = url, title = displayTitle, includesScreenshot = false)
+                return PageShareRequest(pageID = pageID, url = url, title = displayTitle)
             }
 
         /** What the voice agent is told you're looking at. */
@@ -72,7 +70,79 @@ class BrowserFeature : Reducer<BrowserFeature.State, BrowserFeature.Action> {
                 if (pageID == null) return null
                 return VoiceViewingPage(url = url, title = displayTitle, isOpen = true)
             }
+
+        val canSendAsk: Boolean get() = askDraft.isNotBlank()
+
+        /** What the page shows: the open visit, or the one sliding off the stack after it closed. */
+        data class Snapshot(
+            val pageID: UUID,
+            val openedURL: String,
+            val url: String,
+            val displayTitle: String,
+            val host: String,
+            val isLoading: Boolean,
+            val canGoBack: Boolean,
+            val canGoForward: Boolean,
+            val isAsking: Boolean,
+            val askDraft: String,
+        ) {
+            val canSendAsk: Boolean get() = askDraft.isNotBlank()
+
+            companion object {
+                /** The open visit while there is one, or [closing] while a closed page slides off the stack. */
+                fun displayed(live: Snapshot?, closing: Snapshot?): Snapshot? = live ?: closing
+            }
+        }
+
+        val snapshot: Snapshot?
+            get() {
+                val pageID = pageID ?: return null
+                val url = url ?: return null
+                return Snapshot(
+                    pageID = pageID,
+                    openedURL = openedURL ?: url,
+                    url = url,
+                    displayTitle = displayTitle,
+                    host = host,
+                    isLoading = isLoading,
+                    canGoBack = canGoBack,
+                    canGoForward = canGoForward,
+                    isAsking = isAsking,
+                    askDraft = askDraft,
+                )
+            }
+
+        /**
+         * A new visit for [url] (iOS `open(_:id:)`). The caller discards this state's [pageID],
+         * the web view it replaces.
+         */
+        fun open(url: String, id: UUID): State =
+            State(pageID = id, openedURL = url, url = url, isLoading = true)
+
+        /** No visit (iOS `close()`). The caller discards this state's [pageID]. */
+        fun close(): State = State()
+
+        /**
+         * Ask's draft taken for sending with the open page (iOS `takeAsk(messageID:)`): the
+         * trimmed text, the page and [messageID], with the state after (draft cleared, Ask put
+         * away, the capsule tracking [messageID]'s reply). Null when there's nothing to send.
+         */
+        fun takeAsk(messageID: () -> String): TakenAsk? {
+            val text = askDraft.trim()
+            if (text.isEmpty()) return null
+            val page = shareRequest ?: return null
+            val id = messageID()
+            return TakenAsk(
+                text = text,
+                page = page,
+                messageID = id,
+                state = copy(askDraft = "", isAsking = false, peekMessageID = id),
+            )
+        }
     }
+
+    /** What [State.takeAsk] hands the session to send, and the browser after it. */
+    data class TakenAsk(val text: String, val page: PageShareRequest, val messageID: String, val state: State)
 
     sealed interface Action {
         /** A public web link tapped in a reply. */
@@ -81,6 +151,10 @@ class BrowserFeature : Reducer<BrowserFeature.State, BrowserFeature.Action> {
         data object CloseTapped : Action
         data object BackTapped : Action
         data object ForwardTapped : Action
+        /** The bar's address: back to the top of the page. */
+        data object AddressTapped : Action
+        /** The bar's Open in Browser. */
+        data object SafariTapped : Action
         data object AskTapped : Action
         data object AskDismissed : Action
         data class AskDraftChanged(val text: String) : Action
@@ -91,61 +165,113 @@ class BrowserFeature : Reducer<BrowserFeature.State, BrowserFeature.Action> {
         data class LoadingChanged(val loading: Boolean) : Action
         data class CanGoBackChanged(val canGoBack: Boolean) : Action
         data class CanGoForwardChanged(val canGoForward: Boolean) : Action
+        /** The page's web view moved to another window (or its first). */
+        data class SceneChanged(val sceneID: String?) : Action
+        /** A link the page hands to the system: another app's, a private host's, a download. */
+        data class ExternalURLRequested(val url: String, val sceneID: String?) : Action
         data class PairingLinkTapped(val url: String) : Action
         data class LinkMenu(val action: LinkMenuAction, val url: String) : Action
     }
 
     private val uuid by Dependency(UuidClient)
+    private val sceneWindow by Dependency(SceneWindowClient)
     private val pageReader by Dependency(PageReaderClient)
 
-    override fun reduce(state: State, action: Action): Reduced<State, Action> = when (action) {
-        is Action.Open -> {
-            // The same page (a link card or the link again) is already on top.
-            if (state.isOpen && state.shows(action.url)) {
-                Reduced(state)
-            } else {
-                val previous = state.pageID
-                Reduced(
-                    State(pageID = uuid.next(), openedURL = action.url, url = action.url, isLoading = true),
-                    discard(previous),
-                )
+    override fun reduce(state: State, action: Action): Reduced<State, Action> {
+        when (action) {
+            is Action.Open -> {
+                // The same page (a link card or the link again) is already on top.
+                if (state.isOpen && state.shows(action.url)) return Reduced(state)
+                return Reduced(state.open(action.url, uuid.next()), discard(state.pageID))
             }
+
+            Action.CloseTapped -> return Reduced(state.close(), discard(state.pageID))
+
+            Action.BackTapped -> {
+                val id = state.pageID
+                if (id == null || !state.canGoBack) return Reduced(state)
+                val pageReader = pageReader
+                return Reduced(state, Effect.run { pageReader.goBack(id) })
+            }
+
+            Action.ForwardTapped -> {
+                val id = state.pageID
+                if (id == null || !state.canGoForward) return Reduced(state)
+                val pageReader = pageReader
+                return Reduced(state, Effect.run { pageReader.goForward(id) })
+            }
+
+            Action.AddressTapped -> {
+                val id = state.pageID ?: return Reduced(state)
+                val pageReader = pageReader
+                return Reduced(state, Effect.run { pageReader.scrollToTop(id) })
+            }
+
+            Action.SafariTapped -> {
+                val url = state.url
+                if (!state.isOpen || url == null || OpenCodePairingLink.shouldHandleOpenURL(url)) return Reduced(state)
+                val pageReader = pageReader
+                val sceneID = state.sceneID ?: sceneWindow.sceneID
+                return Reduced(state, Effect.run { pageReader.openExternal(url, sceneID) })
+            }
+
+            Action.AskTapped -> {
+                if (!state.isOpen) return Reduced(state)
+                return Reduced(state.copy(isAsking = true))
+            }
+
+            Action.AskDismissed -> {
+                if (!state.isOpen) return Reduced(state)
+                return Reduced(state.copy(isAsking = false))
+            }
+
+            is Action.AskDraftChanged -> {
+                if (!state.isOpen) return Reduced(state)
+                return Reduced(state.copy(askDraft = action.text))
+            }
+
+            Action.AskSent -> return Reduced(state)
+
+            is Action.Navigated -> {
+                if (!state.isOpen) return Reduced(state)
+                return Reduced(state.copy(url = action.url, title = action.title))
+            }
+
+            is Action.TitleChanged -> {
+                if (!state.isOpen) return Reduced(state)
+                return Reduced(state.copy(title = action.title))
+            }
+
+            is Action.LoadingChanged -> {
+                if (!state.isOpen) return Reduced(state)
+                return Reduced(state.copy(isLoading = action.loading))
+            }
+
+            is Action.CanGoBackChanged -> {
+                if (!state.isOpen) return Reduced(state)
+                return Reduced(state.copy(canGoBack = action.canGoBack))
+            }
+
+            is Action.CanGoForwardChanged -> {
+                if (!state.isOpen) return Reduced(state)
+                return Reduced(state.copy(canGoForward = action.canGoForward))
+            }
+
+            is Action.SceneChanged -> {
+                if (!state.isOpen || state.sceneID == action.sceneID) return Reduced(state)
+                return Reduced(state.copy(sceneID = action.sceneID))
+            }
+
+            is Action.ExternalURLRequested -> {
+                if (!state.isOpen || OpenCodePairingLink.shouldHandleOpenURL(action.url)) return Reduced(state)
+                val pageReader = pageReader
+                val url = action.url
+                val origin = action.sceneID ?: state.sceneID ?: sceneWindow.sceneID
+                return Reduced(state, Effect.run { pageReader.openExternal(url, origin) })
+            }
+
+            is Action.PairingLinkTapped, is Action.LinkMenu -> return Reduced(state)
         }
-
-        Action.CloseTapped -> Reduced(State(), discard(state.pageID))
-
-        Action.BackTapped -> {
-            val id = state.pageID
-            if (id == null || !state.canGoBack) Reduced(state)
-            else pageReader.let { reader -> Reduced(state, Effect.run { reader.goBack(id) }) }
-        }
-
-        Action.ForwardTapped -> {
-            val id = state.pageID
-            if (id == null || !state.canGoForward) Reduced(state)
-            else pageReader.let { reader -> Reduced(state, Effect.run { reader.goForward(id) }) }
-        }
-
-        Action.AskTapped -> if (!state.isOpen) Reduced(state) else Reduced(state.copy(isAsking = true))
-
-        Action.AskDismissed -> Reduced(state.copy(isAsking = false))
-
-        is Action.AskDraftChanged -> Reduced(state.copy(askDraft = action.text))
-
-        Action.AskSent -> Reduced(state)
-
-        is Action.Navigated ->
-            if (!state.isOpen) Reduced(state) else Reduced(state.copy(url = action.url, title = action.title))
-
-        is Action.TitleChanged -> Reduced(state.copy(title = action.title))
-
-        is Action.LoadingChanged -> Reduced(state.copy(isLoading = action.loading))
-
-        is Action.CanGoBackChanged -> Reduced(state.copy(canGoBack = action.canGoBack))
-
-        is Action.CanGoForwardChanged -> Reduced(state.copy(canGoForward = action.canGoForward))
-
-        is Action.PairingLinkTapped, is Action.LinkMenu -> Reduced(state)
     }
 
     private fun discard(id: UUID?): Effect<Action> {
@@ -155,14 +281,18 @@ class BrowserFeature : Reducer<BrowserFeature.State, BrowserFeature.Action> {
     }
 }
 
+/** How the reply to the last question asked from the open page is going (iOS `BrowserReplyStatus`). */
+enum class BrowserReplyStatus {
+    Working,
+    NeedsInput,
+    Ready;
+
+    /** Once the agent waits on you or has answered, the capsule goes back to the session. */
+    val goesBack: Boolean get() = this != Working
+}
+
 /**
  * The page the voice agent hears about (iOS `VoiceViewingPage`). Declared in `:server` so the call
  * (`:feature:voice`) reads the same type the browser produces.
  */
 typealias VoiceViewingPage = ai.opencode.server.model.VoiceViewingPage
-
-/** `url.host(percentEncoded: false)` for web URLs: the host, Unicode rather than punycode. */
-internal fun browserHost(url: String): String? {
-    val host = url.toHttpUrlOrNull()?.host ?: return null
-    return runCatching { IDN.toUnicode(host) }.getOrDefault(host)
-}

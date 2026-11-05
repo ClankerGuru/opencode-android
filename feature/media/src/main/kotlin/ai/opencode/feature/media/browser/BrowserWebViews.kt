@@ -5,6 +5,7 @@ import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.scene.ActiveScene
 import ai.opencode.server.OpenCodePairingLink
 import ai.opencode.server.model.OpenCodePageContext
 import android.annotation.SuppressLint
@@ -16,7 +17,6 @@ import android.content.pm.ApplicationInfo
 import android.content.res.Resources
 import android.graphics.Color
 import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.os.Handler
 import android.os.Looper
 import android.os.Message
@@ -39,43 +39,35 @@ import androidx.webkit.ScriptHandler
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.ByteArrayInputStream
-import java.io.ByteArrayOutputStream
 import java.util.Locale
 import java.util.UUID
 import kotlin.coroutines.resume
-import kotlin.math.roundToInt
-
-/** What a send read from the open page (iOS `PageReading`). */
-class PageReading(
-    val context: OpenCodePageContext,
-    /** A JPEG of what's on screen, when the chip asked for one. */
-    val screenshot: ByteArray? = null,
-) {
-    override fun equals(other: Any?): Boolean =
-        other is PageReading && other.context == context && other.screenshot.contentEquals(screenshot)
-    override fun hashCode(): Int = context.hashCode() * 31 + (screenshot?.contentHashCode() ?: 0)
-}
 
 /**
- * The in-app browser's web views, for reducers: read the open page at send, navigate, and
- * release or discard a page's web content. Port of iOS `PageReaderClient` (`\.pageReader`).
+ * The in-app browser's web views, for reducers: read the open page at send, navigate, open a link
+ * outside the app, and discard a page's web content. Port of iOS `PageReaderClient`
+ * (`\.pageReader`).
  */
 class PageReaderClient(
     /**
-     * The page's URL, title, selection, visible text, and scroll position, read now. A page
-     * whose content was released (or failed to answer) still gives its URL and title.
+     * The page's URL, title, selection, visible text, and scroll position, read now. A page that
+     * was discarded (or failed to answer) still gives its URL and title.
      */
-    val read: suspend (PageShareRequest) -> PageReading,
+    val read: suspend (PageShareRequest) -> OpenCodePageContext,
     val goBack: suspend (UUID) -> Unit,
     val goForward: suspend (UUID) -> Unit,
+    /** Back to the top of the page (the bar's address). */
+    val scrollToTop: suspend (UUID) -> Unit,
+    /**
+     * Opens a link in whatever claims it, from the window with this scene ID (or the one in use),
+     * so the app it opens appears beside that window (iOS `ActiveScene.open(_:sceneID:)`).
+     */
+    val openExternal: suspend (url: String, sceneID: String?) -> Unit,
     /** Forgets the page entirely. */
     val discard: suspend (UUID) -> Unit,
 ) {
@@ -85,13 +77,17 @@ class PageReaderClient(
                 read = { request -> withContext(Dispatchers.Main) { BrowserWebViews.shared.read(request) } },
                 goBack = { id -> withContext(Dispatchers.Main) { BrowserWebViews.shared.goBack(id) } },
                 goForward = { id -> withContext(Dispatchers.Main) { BrowserWebViews.shared.goForward(id) } },
+                scrollToTop = { id -> withContext(Dispatchers.Main) { BrowserWebViews.shared.scrollToTop(id) } },
+                openExternal = { url, sceneID -> ActiveScene.open(url, sceneID) },
                 discard = { id -> withContext(Dispatchers.Main) { BrowserWebViews.shared.discard(id) } },
             )
         }
         override val testValue = PageReaderClient(
-            read = { PageReading(OpenCodePageContext(url = it.url, title = it.title)) },
+            read = { OpenCodePageContext(url = it.url, title = it.title) },
             goBack = {},
             goForward = {},
+            scrollToTop = {},
+            openExternal = { _, _ -> throw AssertionError("PageReaderClient.openExternal is unimplemented") },
             discard = {},
         )
     }
@@ -116,6 +112,8 @@ class BrowserWebViews private constructor() {
     class Entry(var url: String, val id: UUID) {
         var webView: WebView? = null
         var onEvent: ((BrowserFeature.Action) -> Unit)? = null
+        /** The window (task) showing the page, for links it hands to the system. */
+        var sceneID: String? = null
         /** The host's hold menu: a link held in the page, at a point in the web view. */
         var onLinkHeld: ((url: String, x: Float, y: Float) -> Unit)? = null
         var canGoBack = false
@@ -138,7 +136,6 @@ class BrowserWebViews private constructor() {
     }
 
     private val entries = HashMap<UUID, Entry>()
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var clearedThisRun = false
 
     /**
@@ -213,12 +210,6 @@ class BrowserWebViews private constructor() {
         entries[id]?.webView?.takeIf { it.canGoForward() }?.goForward()
     }
 
-    /**
-     * The page has its own history to go back through: the back gesture is the page's then, not
-     * the stack's (the session stack's `yieldsBackSwipe`).
-     */
-    fun canGoBack(id: UUID): Boolean = entries[id]?.webView?.canGoBack() ?: false
-
     fun scrollToTop(id: UUID) {
         entries[id]?.webView?.pageUp(true)
     }
@@ -229,8 +220,10 @@ class BrowserWebViews private constructor() {
         entry.webView?.let { tearDown(it, entry) }
     }
 
-    /** Whether the page is still held (not discarded). */
-    fun holds(id: UUID): Boolean = entries.containsKey(id)
+    /** The window (task) showing the page now, for the links it hands to the system. */
+    fun noteScene(id: UUID, sceneID: String?) {
+        entries[id]?.sceneID = sceneID
+    }
 
     /** Lends the page the host's context (dialogs, pickers) while shown; the app's otherwise. */
     fun setHostContext(id: UUID, context: Context?) {
@@ -238,9 +231,9 @@ class BrowserWebViews private constructor() {
         entry.context.baseContext = context ?: dependency(AppContext)
     }
 
-    suspend fun read(request: PageShareRequest): PageReading {
+    suspend fun read(request: PageShareRequest): OpenCodePageContext {
         var context = OpenCodePageContext(url = request.url, title = request.title)
-        val webView = entries[request.pageID]?.webView ?: return PageReading(context)
+        val webView = entries[request.pageID]?.webView ?: return context
         val raw = evaluate(webView, "(function(limit) {\n$READER_SCRIPT\n})(${OpenCodePageContext.VISIBLE_TEXT_LIMIT})")
         val result = raw?.let { runCatching { JSONObject(it) }.getOrNull() }
         if (result != null) {
@@ -253,8 +246,7 @@ class BrowserWebViews private constructor() {
                 scroll = if (result.has("scroll") && !result.isNull("scroll")) result.optDouble("scroll") else null,
             )
         }
-        val screenshot = if (request.includesScreenshot) snapshot(webView) else null
-        return PageReading(context.bounded, screenshot)
+        return context.bounded
     }
 
     // Back swipe: the session stack's back gesture, while the page has history (`canGoBack`),
@@ -306,10 +298,12 @@ class BrowserWebViews private constructor() {
     /** The hold menu's preview was tapped: what a tap on the link would do. */
     fun commitLinkPreview(id: UUID, url: String) {
         val entry = entries[id] ?: return
-        when {
-            OpenCodePairingLink.shouldHandleOpenURL(url) -> entry.onEvent?.invoke(BrowserFeature.Action.PairingLinkTapped(url))
-            BrowserLinkPolicy.isPublicWebPage(url) -> entry.webView?.loadUrl(url)
-            else -> openInSystem(url)
+        when (val decision = BrowserNavigationPolicy.decide(url, isMainFrame = true, isUserTap = true)) {
+            BrowserNavigationPolicy.Decision.Allow -> entry.webView?.loadUrl(url)
+            BrowserNavigationPolicy.Decision.Cancel -> Unit
+            is BrowserNavigationPolicy.Decision.Pair ->
+                entry.onEvent?.invoke(BrowserFeature.Action.PairingLinkTapped(decision.url))
+            is BrowserNavigationPolicy.Decision.OpenInSystem -> requestExternal(entry, decision.url)
         }
     }
 
@@ -381,7 +375,7 @@ class BrowserWebViews private constructor() {
         webView.setDownloadListener { url, _, contentDisposition, _, _ ->
             if (BrowserNavigationPolicy.handsToSystem(canShow = false, disposition = contentDisposition) &&
                 BrowserLinkPolicy.isPublicWebPage(url)
-            ) openInSystem(url)
+            ) requestExternal(entry, url)
         }
         webView.setOnTouchListener { _, event ->
             if (event.actionMasked == MotionEvent.ACTION_DOWN) {
@@ -458,9 +452,9 @@ class BrowserWebViews private constructor() {
         entry.webView = null
     }
 
-    private fun openInSystem(url: String) {
-        val opener = dependency(OpenURLClient)
-        scope.launch { opener.open(url) }
+    /** A link for the system: the reducer opens it, beside the page's window. */
+    private fun requestExternal(entry: Entry, url: String) {
+        entry.onEvent?.invoke(BrowserFeature.Action.ExternalURLRequested(url, entry.sceneID))
     }
 
     private fun emitHistory(entry: Entry, view: WebView) {
@@ -492,7 +486,7 @@ class BrowserWebViews private constructor() {
                 }
                 is BrowserNavigationPolicy.Decision.OpenInSystem -> {
                     // A private host, a signed link, or another app's link the reader tapped.
-                    openInSystem(decision.url)
+                    requestExternal(entry, decision.url)
                     true
                 }
             }
@@ -679,31 +673,11 @@ class BrowserWebViews private constructor() {
         }
     }
 
-    private fun snapshot(webView: WebView): ByteArray? {
-        if (webView.width <= 0 || webView.height <= 0) return null
-        val density = webView.resources.displayMetrics.density
-        val width = (SNAPSHOT_WIDTH * density).roundToInt().coerceAtMost(webView.width)
-        val scale = width.toFloat() / webView.width
-        val height = (webView.height * scale).roundToInt().coerceAtLeast(1)
-        return runCatching {
-            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-            val canvas = Canvas(bitmap)
-            canvas.scale(scale, scale)
-            webView.draw(canvas)
-            val out = ByteArrayOutputStream()
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 60, out)
-            bitmap.recycle()
-            out.toByteArray()
-        }.getOrNull()
-    }
-
     companion object {
         /** Process-wide, like iOS's `.shared`; reducers reach it only through [PageReaderClient]. */
         val shared: BrowserWebViews by lazy { BrowserWebViews() }
 
         private const val PROFILE_NAME = "opencode-browser"
-        /** iOS `WKSnapshotConfiguration.snapshotWidth`, in points → dp. */
-        private const val SNAPSHOT_WIDTH = 390
         /** iOS `SessionPageStack.parallax` (`SettingsPresentation.parallax`). */
         private const val PARALLAX = 0.3f
 

@@ -11,12 +11,12 @@ import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.core.store.TestStore
 import ai.opencode.feature.media.BrowserFeature
+import ai.opencode.feature.media.BrowserReplyStatus
 import ai.opencode.feature.media.LinkMenuAction
 import ai.opencode.feature.media.LinkMenuText
 import ai.opencode.feature.media.LinkProbe
 import ai.opencode.feature.media.OpenURLClient
 import ai.opencode.feature.media.PageReaderClient
-import ai.opencode.feature.media.PageReading
 import ai.opencode.feature.media.UniversalLinkClient
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionTestSupport.Harness
@@ -34,6 +34,7 @@ import ai.opencode.server.model.OpenCodeOutgoingAttachment
 import ai.opencode.server.model.OpenCodePageContext
 import ai.opencode.server.model.OpenCodePendingInput
 import ai.opencode.server.model.OpenCodePendingRequests
+import ai.opencode.server.model.OpenCodePermissionRequest
 import ai.opencode.server.model.OpenCodeDelivery
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.OpenCodeSessionFamily
@@ -95,9 +96,9 @@ class BrowserSendTests {
             this[PageReaderClient] = PageReaderClient(
                 read = { request ->
                     reads.append(request)
-                    PageReading(OpenCodePageContext(url = request.url, title = "Accept page context", selection = null, visibleText = "Prompts accept metadata.page.", scroll = 0.5))
+                    OpenCodePageContext(url = request.url, title = "Accept page context", selection = null, visibleText = "Prompts accept metadata.page.", scroll = 0.5)
                 },
-                goBack = {}, goForward = {}, discard = {},
+                goBack = {}, goForward = {}, scrollToTop = {}, openExternal = PageReaderClient.testValue.openExternal, discard = {},
             )
             this[OpenCodeClient] = this[OpenCodeClient].copy(
                 sendPrompt = { _, _, text, attachments, _, _, _ -> sent.setValue(Sent(text, PromptContext.page.current(), attachments)) },
@@ -160,9 +161,9 @@ class BrowserSendTests {
             this[PageReaderClient] = PageReaderClient(
                 read = {
                     issues.append("The page must not be read")
-                    PageReading(OpenCodePageContext(url = "https://x.test", title = ""))
+                    OpenCodePageContext(url = "https://x.test", title = "")
                 },
-                goBack = {}, goForward = {}, discard = {},
+                goBack = {}, goForward = {}, scrollToTop = {}, openExternal = PageReaderClient.testValue.openExternal, discard = {},
             )
             this[OpenCodeClient] = this[OpenCodeClient].copy(
                 sendPrompt = { _, _, _, _, _, _, _ -> pages.append(PromptContext.page.current()) },
@@ -462,7 +463,14 @@ class BrowserLifetimeTests {
         val store = h.store(state) {
             this[UuidClient] = UuidClient.incrementing()
             this[PageReaderClient] = PageReaderClient.testValue.let {
-                PageReaderClient(read = it.read, goBack = it.goBack, goForward = it.goForward, discard = { id -> discarded.append(id) })
+                PageReaderClient(
+                    read = it.read,
+                    goBack = it.goBack,
+                    goForward = it.goForward,
+                    scrollToTop = it.scrollToTop,
+                    openExternal = it.openExternal,
+                    discard = { id -> discarded.append(id) },
+                )
             }
             this[OpenCodeClient] = this[OpenCodeClient].copy(
                 getSession = { _, id -> session(id, parent = "root") },
@@ -542,6 +550,29 @@ class BrowserPeekEndTests {
 
         val queued = h.state().copy(items = emptyList(), queuedInputs = listOf(OpenCodePendingInput(id = "msg_page", text = "x", delivery = OpenCodeDelivery.Queue)))
         assertEquals("Waiting in the queue", SessionFeature.State.BrowserPeek(text = null), queued.browserPeek)
+    }
+
+    @Test fun replyStatusReflectsWorkingNeedsInputAndReady() = sessionTest { h ->
+        var current = h.state().copy(isAwaitingReply = true)
+        assertEquals(BrowserReplyStatus.Working, current.browserReplyStatus)
+        assertEquals(false, current.browserReplyStatus?.goesBack)
+
+        current = current.updateRequestDock { dock ->
+            dock.copy(
+                permissionRequests = listOf(
+                    OpenCodePermissionRequest(id = "per_1", sessionID = "ses_1", action = "shell", resources = listOf("ls"), save = null),
+                ),
+            )
+        }
+        assertEquals(BrowserReplyStatus.NeedsInput, current.browserReplyStatus)
+        assertEquals(true, current.browserReplyStatus?.goesBack)
+
+        current = current.copy(items = current.items + OpenCodeTranscriptItem.AssistantMarkdown(id = "m2-0", text = "Done."))
+        assertEquals(BrowserReplyStatus.Ready, current.browserReplyStatus)
+        assertEquals(true, current.browserReplyStatus?.goesBack)
+
+        current = current.copy(browser = current.browser.close())
+        assertNull(current.browserReplyStatus)
     }
 }
 

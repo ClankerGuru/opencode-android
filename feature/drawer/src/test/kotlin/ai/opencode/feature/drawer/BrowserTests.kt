@@ -325,6 +325,8 @@ class BrowserLifetimeTests {
                 read = PageReaderClient.testValue.read,
                 goBack = {},
                 goForward = {},
+                scrollToTop = {},
+                openExternal = PageReaderClient.testValue.openExternal,
                 discard = { id -> discarded.append(id) },
             )
             this[OpenCodeClient] = client().copy(

@@ -2,6 +2,8 @@ package ai.opencode.feature.media
 
 import ai.opencode.server.OpenCodePairingLink
 import ai.opencode.server.model.AgentFileReference
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import java.net.IDN
 
 /** Where a link tapped in a reply goes (iOS `BrowserLinkRoute`). URLs are strings. */
 sealed interface BrowserLinkRoute {
@@ -48,6 +50,17 @@ object BrowserLinkPolicy {
 
     fun isLoopback(host: String): Boolean =
         host.trim('.') in setOf("localhost", "127.0.0.1", "::1", "[::1]")
+
+    /**
+     * The host a page is named by: Unicode rather than punycode, without `www.`; null when the
+     * URL has none. The browser's bar and the link menu's header share it.
+     */
+    fun displayHost(url: String): String? {
+        val parsed = url.toHttpUrlOrNull()?.host ?: return null
+        val host = runCatching { IDN.toUnicode(parsed) }.getOrDefault(parsed)
+        if (host.isEmpty()) return null
+        return if (host.startsWith("www.")) host.drop(4) else host
+    }
 
     private val isDebuggable: Boolean
         get() = runCatching {
