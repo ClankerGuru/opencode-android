@@ -279,6 +279,7 @@ fun SessionView(
                 SessionHeaderBackdrop(
                     backdrop = resolvedHeader.backdrop,
                     appBlur = resolvedHeader.appBlur,
+                    header = resolvedHeader.header,
                     safeTop = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding(),
                     scrolledUnderHeader = { scrollEdgeBridge.scrolledUnderHeader },
                     modifier = Modifier.align(Alignment.TopCenter),

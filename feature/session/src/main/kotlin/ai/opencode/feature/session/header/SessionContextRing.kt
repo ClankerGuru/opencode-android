@@ -7,6 +7,8 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -66,6 +68,31 @@ fun SessionContextRing(
 }
 
 private val ringSpring = MotionSpring(0.45, 0.0)
+
+/**
+ * The context gauge around the header's More button. Android divergence: iOS draws a bare arc
+ * round its glass circle; on the bar a bare arc around a plain ⋮ read as part of the header, so
+ * here it is M3's determinate circular progress indicator: the same fill and tint as
+ * [SessionContextRing], over a full `outlineVariant` track, so it always reads as a ring.
+ */
+@Composable
+fun SessionContextGauge(fraction: Double, modifier: Modifier = Modifier) {
+    val reduceMotion = rememberReduceMotion()
+    val colors = OpenCodeTheme.colors
+    val animated by animateFloatAsState(
+        targetValue = fraction.coerceIn(0.0, 1.0).toFloat(),
+        animationSpec = if (reduceMotion) snap() else ringSpring.spec(),
+        label = "contextGauge",
+    )
+    CircularProgressIndicator(
+        progress = { animated },
+        modifier = modifier.clearAndSetSemantics {},
+        color = SessionContextRing.tint(fraction, colors.isDark, colors.text, colors.destructive),
+        strokeWidth = 3.dp,
+        trackColor = MaterialTheme.colorScheme.outlineVariant,
+        strokeCap = StrokeCap.Round,
+    )
+}
 
 /** iOS `SessionContextRing` statics. */
 object SessionContextRing {

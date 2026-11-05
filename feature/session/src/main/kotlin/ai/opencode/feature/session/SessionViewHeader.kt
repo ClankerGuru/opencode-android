@@ -21,7 +21,7 @@ import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.feature.session.header.BreathingTitleHold
 import ai.opencode.feature.session.header.HeaderBlurTunables
-import ai.opencode.feature.session.header.SessionContextRing
+import ai.opencode.feature.session.header.SessionContextGauge
 import ai.opencode.feature.session.header.SessionContextText
 import ai.opencode.server.model.OpenCodeExportFormat
 import ai.opencode.server.model.isUntitled
@@ -398,11 +398,9 @@ private fun SessionMenuButton(store: StoreOf<State, Action>, model: SessionHeade
         )
         val fraction = model.contextFraction
         AnimatedVisibility(visible = fraction != null, modifier = Modifier.matchParentSize(), enter = fadeIn(), exit = fadeOut()) {
-            SessionContextRing(
+            SessionContextGauge(
                 fraction = fraction ?: 0.0,
-                modifier = Modifier.fillMaxSize().padding(1.dp),
-                lineWidth = 2.dp,
-                trackOpacity = 0.0,
+                modifier = Modifier.fillMaxSize().padding(6.dp),
             )
         }
         SessionMenu(
