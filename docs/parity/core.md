@@ -53,6 +53,7 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 | `OpenCode/Core/TapTarget.swift` | 37 | see core-ui.md | — | |
 | `OpenCode/Core/Theme/Theme.swift` | 792 | see core-ui.md | — | |
 | `OpenCode/Core/Theme/ThemePalette+Generated.swift` | 397 | see core-ui.md | — | |
+| `OpenCode/Core/TouchRecovery.swift` | 158 |  | todo |  |
 
 ## Tests
 
