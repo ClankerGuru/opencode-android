@@ -116,6 +116,12 @@ object ComposerTunables {
     val textStyle = ComposerTextStyle.body
 
     const val horizontalMargin = 20f
+
+    /**
+     * With the keyboard up the composer widens to this margin, the same as its gap above the
+     * keys, so a tiny even margin rings it.
+     */
+    const val keyboardHorizontalMargin = 8f
     const val bottomGap = 0f
     const val keyboardGap = 8f
     const val innerHorizontal = 6f

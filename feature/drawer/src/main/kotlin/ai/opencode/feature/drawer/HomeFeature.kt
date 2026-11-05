@@ -298,9 +298,13 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
                 return Indicator.none
             }
 
-            /** Idle with something new, or waiting on the reader. Muted and archived sessions never do. */
+            /**
+             * Idle with something new, or waiting on the reader. Muted and archived sessions never
+             * do, and a subagent's session never does: it reaches the reader from its parent, which
+             * a pending request inside it already lights (`attentionSessionIDs` holds family roots).
+             */
             fun needsCatchUp(session: OpenCodeSession): Boolean {
-                if (session.isArchived || isMuted(session.id)) return false
+                if (session.parentID != null || session.isArchived || isMuted(session.id)) return false
                 return when (indicator(session)) {
                     Indicator.attention, Indicator.unread -> true
                     Indicator.running, Indicator.none -> false

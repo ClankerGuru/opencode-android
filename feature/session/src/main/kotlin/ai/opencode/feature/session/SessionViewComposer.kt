@@ -27,6 +27,7 @@ import ai.opencode.feature.composer.ComposerFileSource
 import ai.opencode.feature.composer.ComposerImageSource
 import ai.opencode.feature.composer.ComposerKeyboardMorph
 import ai.opencode.feature.composer.ComposerSendTransition
+import ai.opencode.feature.composer.ComposerSideMargins
 import ai.opencode.feature.composer.ComposerSwipeDown
 import ai.opencode.feature.composer.ComposerSwipeOwnership
 import ai.opencode.feature.composer.ComposerTextInput
@@ -878,7 +879,13 @@ private fun SessionComposerEnv.ComposerArea(modifier: Modifier) {
 @Composable
 private fun SessionComposerEnv.ComposerAreaContent(modifier: Modifier) {
     val pillGap = ComposerTunables.pillGap
-    val horizontalMargin = ComposerTunables.horizontalMargin
+    // iOS `composerSideMargin` / `composerKeyboardSideMargin`: with the keys up the composer
+    // widens to the keyboard gap's margin; a Catch Up card keeps its concentric clearance.
+    val sides = if (host.isCatchUpCard) {
+        ComposerSideMargins(CATCH_UP_COMPOSER_CLEARANCE.dp, CATCH_UP_COMPOSER_CLEARANCE.dp)
+    } else {
+        ComposerSideMargins(ComposerTunables.horizontalMargin.dp, ComposerTunables.keyboardHorizontalMargin.dp)
+    }
     val morph = LocalComposerKeyboardMorph.current
     Box(
         modifier
@@ -891,15 +898,16 @@ private fun SessionComposerEnv.ComposerAreaContent(modifier: Modifier) {
                 if (view.requestChromeHeight != chrome) view.requestChromeHeight = chrome
                 layout(area.width, area.height) { area.placeRelative(0, 0) }
             }
-            .padding(horizontal = horizontalMargin.dp)
             .padding(top = 6.dp)
-            // The bottom gap grows to the keyboard gap with the keys, frame by frame.
+            // The bottom gap grows to the keyboard gap with the keys, and the side margins
+            // shrink to it, frame by frame.
             .composerKeyboardSpacing(
                 morph,
                 top = false,
                 innerVertical = ComposerTunables.innerVertical.dp,
                 bottomGap = ComposerTunables.bottomGap.dp,
                 keyboardGap = ComposerTunables.keyboardGap.dp,
+                sides = sides,
             ),
     ) {
         ai.opencode.feature.composer.RequestDockPrewarm()

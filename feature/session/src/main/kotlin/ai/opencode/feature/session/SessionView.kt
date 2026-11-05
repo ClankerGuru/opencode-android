@@ -348,7 +348,7 @@ fun SessionView(
 }
 
 /** iOS `CatchUpMetrics.composerClearance.bottom`. */
-private const val CATCH_UP_COMPOSER_CLEARANCE = 12f
+internal const val CATCH_UP_COMPOSER_CLEARANCE = 12f
 
 
 /** What the background-work panel reads from the session. */
