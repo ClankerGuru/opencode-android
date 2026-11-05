@@ -44,24 +44,24 @@ anomalyco/opencode-ios `b9e9ee1c52cf6d9724d78e0dda3ad86767ac708d` → `dccec82e4
 ### Tests (2)
 
 - [x] M `ExperimentalFeatureTests.swift` +11/−9 (Tests rows in core.md). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
-- [ ] M `PerfFrameWindowTests.swift` +8/−3 (Tests rows in core.md). 03466416 Check display clock accuracy without a simulator cadence budget
+- [x] M `PerfFrameWindowTests.swift` +8/−3 (Tests rows in core.md). 03466416 Check display clock accuracy without a simulator cadence budget
 
 ## devtools.md (6)
 
 ### Changed (3)
 
-- [ ] `OpenCode/Diagnostics/Diagnostics.swift` +1/−0 → `core/.../diagnostics/DiagnosticsRecorder.kt`. 3fa9ff3e Restore transcript touches across loading lifecycle and log blockers (p282)
-- [ ] `OpenCode/Diagnostics/DiagnosticsView.swift` +20/−3 → `devtools/.../DevToolsView.kt`, `devtools/.../DevToolsFeature.kt`, `devtools/.../Troubleshooting.kt`. 3fa9ff3e Restore transcript touches across loading lifecycle and log blockers (p282); ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
-- [ ] `OpenCode/Diagnostics/TouchProbe.swift` +25/−24 → —. b2b9ca7f Respect loading time scale and bound touch blocker inspection; 3fa9ff3e Restore transcript touches across loading lifecycle and log blockers (p282)
+- [x] `OpenCode/Diagnostics/Diagnostics.swift` +1/−0 → `core/.../diagnostics/DiagnosticsRecorder.kt`. 3fa9ff3e Restore transcript touches across loading lifecycle and log blockers (p282)
+- [x] `OpenCode/Diagnostics/DiagnosticsView.swift` +20/−3 → `devtools/.../DevToolsView.kt`, `devtools/.../DevToolsFeature.kt`, `devtools/.../Troubleshooting.kt`. 3fa9ff3e Restore transcript touches across loading lifecycle and log blockers (p282); ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
+- [x] `OpenCode/Diagnostics/TouchProbe.swift` +25/−24 → —. b2b9ca7f Respect loading time scale and bound touch blocker inspection; 3fa9ff3e Restore transcript touches across loading lifecycle and log blockers (p282)
 
 ### New (1)
 
-- [ ] `OpenCode/Diagnostics/TranscriptTouchSafety.swift` (211 lines). b2b9ca7f Respect loading time scale and bound touch blocker inspection; 3fa9ff3e Restore transcript touches across loading lifecycle and log blockers (p282)
+- [x] `OpenCode/Diagnostics/TranscriptTouchSafety.swift` (211 lines). b2b9ca7f Respect loading time scale and bound touch blocker inspection; 3fa9ff3e Restore transcript touches across loading lifecycle and log blockers (p282)
 
 ### Tests (2)
 
-- [ ] M `TouchProbeTests.swift` +14/−0 (Tests rows in devtools.md). b2b9ca7f Respect loading time scale and bound touch blocker inspection
-- [ ] A `TranscriptTouchSafetyTests.swift` +116/−0 (no Tests row yet; guessed devtools.md). 3fa9ff3e Restore transcript touches across loading lifecycle and log blockers (p282)
+- [x] M `TouchProbeTests.swift` +14/−0 (Tests rows in devtools.md). b2b9ca7f Respect loading time scale and bound touch blocker inspection
+- [x] A `TranscriptTouchSafetyTests.swift` +116/−0 (no Tests row yet; guessed devtools.md). 3fa9ff3e Restore transcript touches across loading lifecycle and log blockers (p282)
 
 ## drawer.md (9)
 
@@ -145,7 +145,7 @@ anomalyco/opencode-ios `b9e9ee1c52cf6d9724d78e0dda3ad86767ac708d` → `dccec82e4
 ### New (2)
 
 - [x] `OpenCode/Settings/WhatsNew/Entries/2026-11-04-01-call-links-and-audio.swift` (11 lines). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
-- [ ] `OpenCode/Settings/WhatsNew/Entries/2026-11-04-01-loading-touch-recovery.swift` (3 lines). 3fa9ff3e Restore transcript touches across loading lifecycle and log blockers (p282)
+- [x] `OpenCode/Settings/WhatsNew/Entries/2026-11-04-01-loading-touch-recovery.swift` (3 lines). 3fa9ff3e Restore transcript touches across loading lifecycle and log blockers (p282)
 
 ### Deleted (15)
 
@@ -192,13 +192,13 @@ anomalyco/opencode-ios `b9e9ee1c52cf6d9724d78e0dda3ad86767ac708d` → `dccec82e4
 
 ### Changed (3)
 
-- [ ] `OpenCode/Transcript/TranscriptListViewController+DataSource.swift` +3/−0 → `list/TranscriptListSnapshot.kt`, `list/TranscriptList.kt`, `list/TranscriptListRows.kt` (`TranscriptTimelineGate`). 3fa9ff3e Restore transcript touches across loading lifecycle and log blockers (p282)
-- [ ] `OpenCode/Transcript/TranscriptListViewController.swift` +1/−0 → `list/TranscriptListController.kt`, `list/TranscriptList.kt`. 3fa9ff3e Restore transcript touches across loading lifecycle and log blockers (p282)
-- [ ] `OpenCode/Transcript/TranscriptMarkHandoff.swift` +22/−1 → `list/TranscriptList.kt`. b2b9ca7f Respect loading time scale and bound touch blocker inspection; 3fa9ff3e Restore transcript touches across loading lifecycle and log blockers (p282)
+- [x] `OpenCode/Transcript/TranscriptListViewController+DataSource.swift` +3/−0 → `list/TranscriptListSnapshot.kt`, `list/TranscriptList.kt`, `list/TranscriptListRows.kt` (`TranscriptTimelineGate`). 3fa9ff3e Restore transcript touches across loading lifecycle and log blockers (p282)
+- [x] `OpenCode/Transcript/TranscriptListViewController.swift` +1/−0 → `list/TranscriptListController.kt`, `list/TranscriptList.kt`. 3fa9ff3e Restore transcript touches across loading lifecycle and log blockers (p282)
+- [x] `OpenCode/Transcript/TranscriptMarkHandoff.swift` +22/−1 → `list/TranscriptList.kt`. b2b9ca7f Respect loading time scale and bound touch blocker inspection; 3fa9ff3e Restore transcript touches across loading lifecycle and log blockers (p282)
 
 ### Tests (1)
 
-- [ ] M `MarkLoadingTests.swift` +125/−0 (Tests rows in transcript.md). b2b9ca7f Respect loading time scale and bound touch blocker inspection; 3fa9ff3e Restore transcript touches across loading lifecycle and log blockers (p282)
+- [x] M `MarkLoadingTests.swift` +125/−0 (Tests rows in transcript.md). b2b9ca7f Respect loading time scale and bound touch blocker inspection; 3fa9ff3e Restore transcript touches across loading lifecycle and log blockers (p282)
 
 ## voice.md (9)
 

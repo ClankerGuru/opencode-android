@@ -204,6 +204,9 @@ object MarkLoadingTunables {
     const val minimumTime = 0.4
     const val fadeIn = 0.2
     const val fadeOut = 0.15
+    /** Upper ends of iOS's `minimumTime` (0...1) and `fadeOut` (0.01...0.5) tuning ranges. */
+    const val minimumTimeUpperBound = 1.0
+    const val fadeOutUpperBound = 0.5
 }
 
 /**
@@ -233,6 +236,23 @@ data class MarkLoadingTiming(
     fun isSettled(now: Double): Boolean {
         val start = start ?: return true
         return now >= start + delay + fadeIn
+    }
+
+    companion object {
+        /**
+         * Wall seconds after which a hand-off ends even if its frames never ran (iOS
+         * `TranscriptMarkHandoff` deadline): the longest supported hold and fade, in wall time at
+         * [timeScale] so slow motion still plays, plus 0.1 s.
+         */
+        fun handoffDeadlineSeconds(
+            hold: Double,
+            fade: Double,
+            timeScale: ai.opencode.core.tuning.AnimationTimeScale = ai.opencode.core.tuning.AnimationTimeScale.shared,
+        ): Double {
+            val maximumHold = max(hold, MarkLoadingTunables.minimumTimeUpperBound)
+            val maximumFade = max(fade, MarkLoadingTunables.fadeOutUpperBound)
+            return timeScale.wallSeconds(maximumHold + maximumFade) + 0.1
+        }
     }
 }
 

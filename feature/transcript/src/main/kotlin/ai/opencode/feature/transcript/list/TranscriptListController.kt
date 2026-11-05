@@ -34,6 +34,7 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -197,6 +198,11 @@ class TranscriptListController(
     data class EmptyHandoff(val loading: Boolean, val showsEmpty: Boolean, val since: Double?, val start: Double, val duration: Double)
     var emptyHandoff by mutableStateOf<EmptyHandoff?>(null)
         private set
+    /**
+     * Wall-clock backstop for [emptyHandoff] (iOS `TranscriptMarkHandoff.deadline`): the leaving
+     * mark takes every touch, so a frame loop that stops stepping must not keep the list locked.
+     */
+    private var handoffDeadline: Job? = null
 
     fun handoffProgress(): Float {
         @Suppress("UNUSED_VARIABLE") val tick = frameTick
@@ -393,7 +399,7 @@ class TranscriptListController(
         trailingSpace = 0f
         heldSpaceDrain = HeldSpaceDrain()
         emptyLoadingSince = null
-        emptyHandoff = null
+        finishHandoff()
         agentReveal = ai.opencode.feature.transcript.user.TranscriptAgentMessageReveal()
         disclosure = TranscriptDisclosureState().also { it.animateToggle = ::toggleDisclosure }
     }
@@ -446,8 +452,8 @@ class TranscriptListController(
             val time = transcriptNow()
             val hold = if (previous.isLoading) MarkLoadingTiming(emptyLoadingSince).handoffDelay(time) else 0.0
             if (hold != null) {
-                emptyHandoff = EmptyHandoff(previous.isLoading, previous.showsEmptyState, emptyLoadingSince,
-                    time + hold, if (previous.isLoading) MarkLoadingTunables.fadeOut else EmptyStateTunables.exitFade)
+                beginHandoff(previous.isLoading, previous.showsEmptyState, emptyLoadingSince, time, hold,
+                    if (previous.isLoading) MarkLoadingTunables.fadeOut else EmptyStateTunables.exitFade)
                 pendingEffects += { startMotion() }
             }
         }
@@ -698,6 +704,9 @@ class TranscriptListController(
     }
 
     fun visibilityChanged() {
+        // iOS `sceneEnteredBackground`/`sceneWillEnterForeground` cancel the mark hand-off:
+        // returning to the app mid-hand-off restores touches at once.
+        finishHandoff()
         if (isShowingToReader) {
             lastLayout?.let(::onLayout)
         } else {
@@ -1149,6 +1158,32 @@ class TranscriptListController(
         jumpGlide = null
     }
 
+    // MARK: Mark hand-off
+
+    /**
+     * Starts the empty row's hand-off (iOS `TranscriptMarkHandoff.init`): [hold] then a [fade] of
+     * the leaving mark, which takes no touches or TalkBack focus from the list meanwhile.
+     * Replacing a hand-off cancels its deadline first, so it can't end the new one early.
+     */
+    internal fun beginHandoff(loading: Boolean, showsEmpty: Boolean, since: Double?, time: Double, hold: Double, fade: Double) {
+        handoffDeadline?.cancel()
+        emptyHandoff = EmptyHandoff(loading, showsEmpty, since, time + hold, fade)
+        val seconds = MarkLoadingTiming.handoffDeadlineSeconds(hold, fade)
+        handoffDeadline = scope.launch {
+            delay((seconds * 1000).toLong())
+            if (emptyHandoff == null) return@launch
+            AppLog.app.error("transcript_handoff_deadline restoring interaction")
+            finishHandoff()
+        }
+    }
+
+    /** Ends the hand-off and its deadline (iOS `TranscriptMarkHandoff.finish`/`cancel`). */
+    private fun finishHandoff() {
+        handoffDeadline?.cancel()
+        handoffDeadline = null
+        emptyHandoff = null
+    }
+
     // MARK: Motion loop
 
     private fun startMotion() {
@@ -1195,7 +1230,7 @@ class TranscriptListController(
             }
         }
         emptyHandoff?.let {
-            if (now >= it.start + it.duration) emptyHandoff = null
+            if (now >= it.start + it.duration) finishHandoff()
             frameTick++
             moved = moved || emptyHandoff != null
         }
