@@ -107,15 +107,13 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.delay
 
-/** The phone's client tools whose experiments are on (iOS `AppView.clientTools`). */
-private fun clientTools(shareScreen: Boolean, openLinks: Boolean, audio: Boolean): Set<ClientTool> {
-    val tools = mutableSetOf<ClientTool>()
+/**
+ * The phone's client tools (iOS `AppView.clientTools`): links and audio always, the screen while
+ * its experiment is on.
+ */
+private fun clientTools(shareScreen: Boolean): Set<ClientTool> {
+    val tools = mutableSetOf(ClientTool.voiceOpenURL, ClientTool.voicePlayAudio, ClientTool.voiceAudioControl)
     if (ExperimentalFeature.shareScreenWithAgents.isActive(shareScreen)) tools.add(ClientTool.voiceRequestScreen)
-    if (ExperimentalFeature.openLinksFromCalls.isActive(openLinks)) tools.add(ClientTool.voiceOpenURL)
-    if (ExperimentalFeature.audioInCalls.isActive(audio)) {
-        tools.add(ClientTool.voicePlayAudio)
-        tools.add(ClientTool.voiceAudioControl)
-    }
     return tools
 }
 
@@ -138,9 +136,7 @@ fun AppView(store: StoreOf<AppFeature.State, AppFeature.Action>) {
     val welcomePreview by remember { shared(ExperimentalFeature.welcomePreview.key).flow }.collectAsState()
     val showsWelcome = !hasSavedServers && ExperimentalFeature.welcomePreview.isActive(welcomePreview)
     val shareScreenWithAgents by remember { shared(ExperimentalFeature.shareScreenWithAgents.key).flow }.collectAsState()
-    val openLinksFromCalls by remember { shared(ExperimentalFeature.openLinksFromCalls.key).flow }.collectAsState()
-    val audioInCalls by remember { shared(ExperimentalFeature.audioInCalls.key).flow }.collectAsState()
-    val clientTools = clientTools(shareScreenWithAgents, openLinksFromCalls, audioInCalls)
+    val clientTools = clientTools(shareScreenWithAgents)
     LaunchedEffect(store, clientTools) {
         store.send(AppFeature.Action.ClientTools(ClientToolsFeature.Action.ToolsChanged(clientTools)))
     }

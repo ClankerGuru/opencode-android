@@ -13,20 +13,21 @@ import ai.opencode.server.clienttools.ClientToolResult
 import ai.opencode.server.clienttools.ClientToolsClient
 import ai.opencode.server.clienttools.ClientToolsEvent
 import ai.opencode.server.clienttools.ClientToolsTarget
+import ai.opencode.server.OpenCodeServer
 import java.util.UUID
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * The phone's tools (Share Screen with Agents, Open Links from Calls, Audio in Calls; all
- * experimental): keeps one client MCP socket to a server and directory, so agents there get the
- * tools that are on (`android_voice_request_screen`, `android_voice_open_url`,
- * `android_voice_play_audio`, `android_voice_audio_control`). Reconnects with backoff; `AppFeature`
- * runs one per [State.Slot], sets each target and hands each call to the call on screen.
+ * The phone's tools for a call (links, audio, and Share Screen with Agents while its experiment is
+ * on): keeps one client MCP socket to a server and directory, so agents there get the tools offered
+ * (`android_voice_request_screen`, `android_voice_open_url`, `android_voice_play_audio`,
+ * `android_voice_audio_control`). Reconnects with backoff, except to a server without the route;
+ * `AppFeature` runs one per [State.Slot], sets each target and hands each call to the call on screen.
  */
 class ClientToolsFeature : Reducer<ClientToolsFeature.State, ClientToolsFeature.Action> {
     data class State(
-        /** The tools whose experiments are on. */
+        /** The tools the phone offers (the screen only while its experiment is on). */
         val tools: Set<ClientTool> = emptySet(),
         val target: ClientToolsTarget? = null,
         val status: Status = Status.Idle,
@@ -35,11 +36,16 @@ class ClientToolsFeature : Reducer<ClientToolsFeature.State, ClientToolsFeature.
         /** The socket calls are arriving on; its going clears what they showed. */
         val connection: UUID? = null,
         val slot: Slot = Slot.Session,
+        /**
+         * A server that answered the handshake with no such route: no socket to it again until the
+         * target's server changes or the app restarts.
+         */
+        val unavailableServer: OpenCodeServer? = null,
     ) {
         val isEnabled: Boolean get() = tools.isNotEmpty()
 
         enum class Slot(val rawValue: String) {
-            /** The open session's directory, or on a call the call's (`AppFeature.clientToolsTarget`). */
+            /** The call's directory (`AppFeature.clientToolsTarget`). */
             Session("session"),
 
             /** The directory of the session a call's delegator steers, when it's another (`AppFeature.delegatorClientToolsTarget`). */
@@ -53,6 +59,9 @@ class ClientToolsFeature : Reducer<ClientToolsFeature.State, ClientToolsFeature.
 
             /** Closed; trying again after the backoff. */
             Waiting,
+
+            /** The server has no client MCP route ([State.unavailableServer]). */
+            Unavailable,
         }
     }
 
@@ -85,21 +94,29 @@ class ClientToolsFeature : Reducer<ClientToolsFeature.State, ClientToolsFeature.
                 if (action.target == state.target) return Reduced(state)
                 val changed = state.copy(target = action.target, failures = 0)
                 val dropped = dropConnection(changed)
-                if (action.target == null) {
+                val target = action.target
+                if (target == null) {
                     AppLog.network.info { "client tools (${state.slot.rawValue}): disconnected" }
                     return Reduced(
                         dropped.state.copy(status = State.Status.Idle),
                         Effect.merge(dropped.effect, Effect.cancel(CancelID(state.slot))),
                     )
                 }
-                val connected = connect(dropped.state)
+                val unavailable = state.unavailableServer
+                if (unavailable != null && ClientToolsTarget.sameConnection(unavailable, target.server)) {
+                    return Reduced(
+                        dropped.state.copy(status = State.Status.Unavailable),
+                        Effect.merge(dropped.effect, Effect.cancel(CancelID(state.slot))),
+                    )
+                }
+                val connected = connect(dropped.state.copy(unavailableServer = null))
                 return Reduced(connected.state, Effect.merge(dropped.effect, connected.effect))
             }
 
             is Action.Socket -> return socket(state, action.event)
 
             Action.RetryElapsed -> {
-                if (state.target == null) return Reduced(state)
+                if (state.target == null || state.status == State.Status.Unavailable) return Reduced(state)
                 return connect(state)
             }
 
@@ -146,6 +163,19 @@ class ClientToolsFeature : Reducer<ClientToolsFeature.State, ClientToolsFeature.
                 return Reduced(
                     state.copy(connection = connection, failures = state.failures + 1, status = State.Status.Waiting),
                     Effect.merge(disconnected, retry),
+                )
+            }
+
+            is ClientToolsEvent.Unavailable -> {
+                val connection = if (state.connection == event.connection) null else state.connection
+                val disconnected: Effect<Action> = Effect.send(Action.Delegate(DelegateAction.Disconnected(event.connection)))
+                val target = state.target ?: return Reduced(state.copy(connection = connection), disconnected)
+                AppLog.network.notice {
+                    "client tools (${state.slot.rawValue}): the server has no client MCP route (HTTP ${event.status}), not retrying"
+                }
+                return Reduced(
+                    state.copy(connection = connection, status = State.Status.Unavailable, unavailableServer = target.server),
+                    disconnected,
                 )
             }
         }

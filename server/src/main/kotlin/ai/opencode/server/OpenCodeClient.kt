@@ -210,7 +210,7 @@ data class OpenCodeClient(
     /** The `SessionTransfer` JSON body (`{"data": {"info", "messages"}}`). */
     val exportSession: suspend (server: OpenCodeServer, sessionID: String) -> ByteArray,
     val historyPage: suspend (server: OpenCodeServer, sessionID: String, cursor: String?) -> OpenCodeTranscriptPage,
-    /** Settings › Server Details: MCP servers, skills, and sign-ins for the server's own location. */
+    /** Settings › Developer › Server Details: MCP servers, skills, and sign-ins for the server's own location. */
     val serverCapabilities: suspend (server: OpenCodeServer) -> OpenCodeServerCapabilities,
     val setMCPConnected: suspend (server: OpenCodeServer, name: String, connected: Boolean) -> Unit,
     val startIntegrationOAuth: suspend (server: OpenCodeServer, integrationID: String) -> OpenCodeOAuthAttempt,

@@ -12,6 +12,7 @@ import ai.opencode.feature.settings.whatsnew.WhatsNewShipped
 internal val whatsNewShippedEntries: List<WhatsNewEntry> by lazy {
     listOf(
         WhatsNewShipped.composerEditingCaret,
+        WhatsNewShipped.callLinksAndAudio,
         WhatsNewShipped.orbDividerImageLinks,
         WhatsNewShipped.voiceOpenSession,
         WhatsNewShipped.searchAllSessions,

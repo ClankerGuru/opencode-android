@@ -56,12 +56,7 @@ class ClientToolsTarget(
 ) {
     override fun equals(other: Any?): Boolean {
         if (other !is ClientToolsTarget) return false
-        return directory == other.directory &&
-            tools == other.tools &&
-            server.url == other.server.url &&
-            server.username == other.server.username &&
-            server.password == other.server.password &&
-            server.headers == other.server.headers
+        return directory == other.directory && tools == other.tools && sameConnection(server, other.server)
     }
 
     override fun hashCode(): Int {
@@ -73,11 +68,17 @@ class ClientToolsTarget(
 
     /** No address or credentials: targets show up in test failures and logs. */
     override fun toString(): String = "ClientToolsTarget(tools=${tools.map { it.rawValue }.sorted()})"
+
+    companion object {
+        /** The same server as far as a socket goes: address, credentials, headers. */
+        fun sameConnection(lhs: OpenCodeServer, rhs: OpenCodeServer): Boolean =
+            lhs.url == rhs.url && lhs.username == rhs.username && lhs.password == rhs.password && lhs.headers == rhs.headers
+    }
 }
 
 /**
- * The tools the phone hosts (iOS `ClientTool`): navigation during a session-delegator call, plus
- * the opt-in screen, links and audio experiments.
+ * The tools the phone hosts (iOS `ClientTool`), all for a live call: navigation during a
+ * session-delegator call, links and audio, and the opt-in screen.
  */
 enum class ClientTool(val rawValue: String) {
     voiceOpenSession("voice_open_session"),
@@ -266,6 +267,12 @@ sealed interface ClientToolsEvent {
 
     /** The socket ended; [reason] carries no address or credentials. Its unanswered calls were refused on the way out. */
     data class Closed(val connection: UUID, val reason: String) : ClientToolsEvent
+
+    /**
+     * The handshake failed for good: the server has no such route
+     * ([ClientMcpProtocol.PERMANENT_STATUSES]). Trying again won't help.
+     */
+    data class Unavailable(val connection: UUID, val status: Int) : ClientToolsEvent
 }
 
 /**
@@ -312,6 +319,9 @@ class ClientToolsClient(
  */
 object ClientMcpProtocol {
     const val PROTOCOL_VERSION = "2025-11-25"
+
+    /** Handshake answers that mean the server has no client MCP route, not a passing failure. */
+    val PERMANENT_STATUSES: Set<Int> = setOf(404, 405, 501)
     const val SESSION_ID_META_KEY = "ai.opencode/sessionID"
 
     sealed interface Step {
@@ -515,10 +525,11 @@ internal object ClientMcpSocket {
                 return@callbackFlow
             }
             val finished = AtomicBoolean(false)
-            fun finish(reason: String) {
+            fun finish(reason: String, unavailable: Int? = null) {
                 if (!finished.compareAndSet(false, true)) return
                 sockets.close(id, REFUSAL)
-                trySend(ClientToolsEvent.Closed(id, reason))
+                if (unavailable != null) trySend(ClientToolsEvent.Unavailable(id, unavailable))
+                else trySend(ClientToolsEvent.Closed(id, reason))
                 close()
             }
             val listener = object : WebSocketListener() {
@@ -553,7 +564,12 @@ internal object ClientMcpSocket {
 
                 override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                     val status = response?.code
-                    finish(if (status != null && status != 101) "HTTP $status" else logDescription(t))
+                    if (status != null && status != 101) {
+                        val unavailable = if (status in ClientMcpProtocol.PERMANENT_STATUSES) status else null
+                        finish("HTTP $status", unavailable)
+                    } else {
+                        finish(logDescription(t))
+                    }
                 }
             }
             val socket = client.newWebSocket(request, listener)

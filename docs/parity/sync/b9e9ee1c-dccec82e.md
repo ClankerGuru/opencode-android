@@ -14,15 +14,15 @@ anomalyco/opencode-ios `b9e9ee1c52cf6d9724d78e0dda3ad86767ac708d` → `dccec82e4
 
 ### Changed (3)
 
-- [ ] `OpenCode/App/AppFeature+ClientTools.swift` +5/−12 → `app/.../AppFeatureClientTools.kt`. 61a9bfd8 Client tools: connect only for a call, and stop at a server without the route (p217)
+- [x] `OpenCode/App/AppFeature+ClientTools.swift` +5/−12 → `app/.../AppFeatureClientTools.kt`. 61a9bfd8 Client tools: connect only for a call, and stop at a server without the route (p217)
 - [ ] `OpenCode/App/AppFeature.swift` +4/−6 → `app/.../AppFeature.kt`, `app/.../AppFeatureServers.kt`, `app/.../AppFeatureShares.kt`, `app/.../AppFeatureWhatsNew.kt`, `app/.../AppDependencies.kt`, `feature/drawer/.../HomeFeatureApp.kt`, `app/.../AppFeatureServerFlow.kt`. dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts; da11bb99 Stop resting grips from starting voice calls; log each call's trigger
-- [ ] `OpenCode/App/AppView.swift` +3/−6 → `app/.../AppView.kt`. ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
+- [x] `OpenCode/App/AppView.swift` +3/−6 → `app/.../AppView.kt`. ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
 
 ### Tests (3)
 
-- [ ] M `ClientToolsTests.swift` +97/−31 (Tests rows in app.md, server.md, system.md, voice.md). 61a9bfd8 Client tools: connect only for a call, and stop at a server without the route (p217)
+- [x] M `ClientToolsTests.swift` +97/−31 (Tests rows in app.md, server.md, system.md, voice.md). 61a9bfd8 Client tools: connect only for a call, and stop at a server without the route (p217)
 - [ ] M `SystemIntegrationTests.swift` +54/−3 (Tests rows in app.md, drawer.md, system.md). dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts; da11bb99 Stop resting grips from starting voice calls; log each call's trigger
-- [ ] M `WhatsNewTests.swift` +1/−1 (Tests rows in app.md, drawer.md, settings.md). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
+- [x] M `WhatsNewTests.swift` +1/−1 (Tests rows in app.md, drawer.md, settings.md). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
 
 ## composer.md (3)
 
@@ -43,7 +43,7 @@ anomalyco/opencode-ios `b9e9ee1c52cf6d9724d78e0dda3ad86767ac708d` → `dccec82e4
 
 ### Tests (2)
 
-- [ ] M `ExperimentalFeatureTests.swift` +11/−9 (Tests rows in core.md). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
+- [x] M `ExperimentalFeatureTests.swift` +11/−9 (Tests rows in core.md). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
 - [ ] M `PerfFrameWindowTests.swift` +8/−3 (Tests rows in core.md). 03466416 Check display clock accuracy without a simulator cadence budget
 
 ## devtools.md (6)
@@ -78,7 +78,7 @@ anomalyco/opencode-ios `b9e9ee1c52cf6d9724d78e0dda3ad86767ac708d` → `dccec82e4
 
 - [ ] M `BrowserTests.swift` +187/−573 (Tests rows in drawer.md, media.md, server.md, session.md, voice.md). 417d95aa fix(browser): preserve originating window scene and Ask closing snapshot; 26e5eb86 test(browser): add TestStore coverage for extracted BrowserFeature logic; b57c3bfb refactor(browser): remove dead page-screenshot path and deduplicate link helpers
 - [ ] M `SystemIntegrationTests.swift` +54/−3 (Tests rows in app.md, drawer.md, system.md). dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts; da11bb99 Stop resting grips from starting voice calls; log each call's trigger
-- [ ] M `WhatsNewTests.swift` +1/−1 (Tests rows in app.md, drawer.md, settings.md). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
+- [x] M `WhatsNewTests.swift` +1/−1 (Tests rows in app.md, drawer.md, settings.md). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
 
 ## media.md (6)
 
@@ -98,13 +98,13 @@ anomalyco/opencode-ios `b9e9ee1c52cf6d9724d78e0dda3ad86767ac708d` → `dccec82e4
 
 ### Changed (1)
 
-- [ ] `OpenCode/Server/OpenCodeClient.swift` +1/−1 → `OpenCodeClient.kt`. ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
+- [x] `OpenCode/Server/OpenCodeClient.swift` +1/−1 → `OpenCodeClient.kt`. ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
 
 ### Tests (3)
 
 - [ ] M `BrowserTests.swift` +187/−573 (Tests rows in drawer.md, media.md, server.md, session.md, voice.md). 417d95aa fix(browser): preserve originating window scene and Ask closing snapshot; 26e5eb86 test(browser): add TestStore coverage for extracted BrowserFeature logic; b57c3bfb refactor(browser): remove dead page-screenshot path and deduplicate link helpers
-- [ ] M `ClientToolsTests.swift` +97/−31 (Tests rows in app.md, server.md, system.md, voice.md). 61a9bfd8 Client tools: connect only for a call, and stop at a server without the route (p217)
-- [ ] M `ServerDetailsTests.swift` +1/−1 (Tests rows in server.md, settings.md). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
+- [x] M `ClientToolsTests.swift` +97/−31 (Tests rows in app.md, server.md, system.md, voice.md). 61a9bfd8 Client tools: connect only for a call, and stop at a server without the route (p217)
+- [x] M `ServerDetailsTests.swift` +1/−1 (Tests rows in server.md, settings.md). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
 
 ## session.md (11)
 
@@ -132,51 +132,51 @@ anomalyco/opencode-ios `b9e9ee1c52cf6d9724d78e0dda3ad86767ac708d` → `dccec82e4
 
 ### Changed (9)
 
-- [ ] `OpenCode/Settings/Experimental/ExperimentalFeature.swift` +66/−56 → `core/.../sharing/ExperimentalFeature.kt`. ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
-- [ ] `OpenCode/Settings/ExperimentalFeatures.swift` +11/−7 → `core/.../sharing/ExperimentalFeature.kt` (`experimental(f)`, `ExperimentalFeatures`, `retiredKeys`/`removeRetiredSwitches`), `core/.../experiments/ExperimentalFeatures.kt` (`key`, `ExperimentalGroup`, `migrateCallStyles` and its keys, `migrateModelPicker`). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
-- [ ] `OpenCode/Settings/ExperimentalSettingsView.swift` +21/−31 → `feature/settings/.../ExperimentalSettingsView.kt`. ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
-- [ ] `OpenCode/Settings/ServerDetails.swift` +1/−1 → `feature/settings/.../serverdetails/ServerDetails.kt`. ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
-- [ ] `OpenCode/Settings/ServerDetailsView.swift` +9/−12 → `feature/settings/.../serverdetails/ServerDetailsView.kt`. ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
-- [ ] `OpenCode/Settings/SettingsView.swift` +1/−2 → `feature/settings/.../SettingsView.kt`, `SettingsFeature.kt`, `AppVersion.kt`, `VoiceSettingsFeature.kt` (`VoiceProviderGroup`, `VoiceSettingsFeature`), `VoiceSettingsView.kt` (`VoiceSettingsView`/`AdvancedSettingsView`, `CallVoicePicker`, Call History), `ExperimentalSettingsView.kt` (`PlaygroundsSettingsView`). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
-- [ ] `OpenCode/Settings/WhatsNew/Entries/2026-11-01-03-audio-in-calls.swift` +1/−1 → `feature/settings/.../whatsnew/entries/2026-11-01-03-audio-in-calls.kt`. ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
-- [ ] `OpenCode/Settings/WhatsNew/Entries/2026-11-01-03-open-links-from-calls.swift` +1/−1 → `feature/settings/.../whatsnew/entries/2026-11-01-03-open-links-from-calls.kt`. ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
-- [ ] `OpenCode/Settings/WhatsNew/WhatsNewActions.swift` +1/−1 → `feature/settings/.../whatsnew/WhatsNewActions.kt`. ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
+- [x] `OpenCode/Settings/Experimental/ExperimentalFeature.swift` +66/−56 → `core/.../sharing/ExperimentalFeature.kt`. ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
+- [x] `OpenCode/Settings/ExperimentalFeatures.swift` +11/−7 → `core/.../sharing/ExperimentalFeature.kt` (`experimental(f)`, `ExperimentalFeatures`, `retiredKeys`/`removeRetiredSwitches`), `core/.../experiments/ExperimentalFeatures.kt` (`key`, `ExperimentalGroup`, `migrateCallStyles` and its keys, `migrateModelPicker`). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
+- [x] `OpenCode/Settings/ExperimentalSettingsView.swift` +21/−31 → `feature/settings/.../ExperimentalSettingsView.kt`. ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
+- [x] `OpenCode/Settings/ServerDetails.swift` +1/−1 → `feature/settings/.../serverdetails/ServerDetails.kt`. ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
+- [x] `OpenCode/Settings/ServerDetailsView.swift` +9/−12 → `feature/settings/.../serverdetails/ServerDetailsView.kt`. ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
+- [x] `OpenCode/Settings/SettingsView.swift` +1/−2 → `feature/settings/.../SettingsView.kt`, `SettingsFeature.kt`, `AppVersion.kt`, `VoiceSettingsFeature.kt` (`VoiceProviderGroup`, `VoiceSettingsFeature`), `VoiceSettingsView.kt` (`VoiceSettingsView`/`AdvancedSettingsView`, `CallVoicePicker`, Call History), `ExperimentalSettingsView.kt` (`PlaygroundsSettingsView`). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
+- [x] `OpenCode/Settings/WhatsNew/Entries/2026-11-01-03-audio-in-calls.swift` +1/−1 → `feature/settings/.../whatsnew/entries/2026-11-01-03-audio-in-calls.kt`. ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
+- [x] `OpenCode/Settings/WhatsNew/Entries/2026-11-01-03-open-links-from-calls.swift` +1/−1 → `feature/settings/.../whatsnew/entries/2026-11-01-03-open-links-from-calls.kt`. ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
+- [x] `OpenCode/Settings/WhatsNew/WhatsNewActions.swift` +1/−1 → `feature/settings/.../whatsnew/WhatsNewActions.kt`. ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
 
 ### New (2)
 
-- [ ] `OpenCode/Settings/WhatsNew/Entries/2026-11-04-01-call-links-and-audio.swift` (11 lines). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
+- [x] `OpenCode/Settings/WhatsNew/Entries/2026-11-04-01-call-links-and-audio.swift` (11 lines). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
 - [ ] `OpenCode/Settings/WhatsNew/Entries/2026-11-04-01-loading-touch-recovery.swift` (3 lines). 3fa9ff3e Restore transcript touches across loading lifecycle and log blockers (p282)
 
 ### Deleted (15)
 
-- [ ] `OpenCode/Settings/Experimental/Features/AgentSelectionExperiment.swift` → delete or re-home `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.agentSelection`). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
-- [ ] `OpenCode/Settings/Experimental/Features/AudioInCallsExperiment.swift` → delete or re-home `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.audioInCalls`). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
-- [ ] `OpenCode/Settings/Experimental/Features/BackgroundCallIntentExperiment.swift` → delete or re-home `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.backgroundCallIntent`). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
-- [ ] `OpenCode/Settings/Experimental/Features/HideModelsExperiment.swift` → delete or re-home `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.hideModels`). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
-- [ ] `OpenCode/Settings/Experimental/Features/InAppBrowserExperiment.swift` → delete or re-home `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.inAppBrowser`). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
-- [ ] `OpenCode/Settings/Experimental/Features/InboxSidebarExperiment.swift` → delete or re-home `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.inboxSidebar`). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
-- [ ] `OpenCode/Settings/Experimental/Features/OnePickerExperiment.swift` → delete or re-home `core/.../sharing/ExperimentalFeature.kt` (`onePicker`). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
-- [ ] `OpenCode/Settings/Experimental/Features/OpenLinksFromCallsExperiment.swift` → delete or re-home `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.openLinksFromCalls`). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
-- [ ] `OpenCode/Settings/Experimental/Features/ServerDetailsExperiment.swift` → delete or re-home `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.serverDetails`). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
-- [ ] `OpenCode/Settings/Experimental/Features/ServerVoiceExperiment.swift` → delete or re-home `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.serverVoice`). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
-- [ ] `OpenCode/Settings/Experimental/Features/SessionLiveActivityExperiment.swift` → delete or re-home `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.sessionLiveActivity`). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
-- [ ] `OpenCode/Settings/Experimental/Features/ShareScreenWithAgentsExperiment.swift` → delete or re-home `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.shareScreenWithAgents`). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
-- [ ] `OpenCode/Settings/Experimental/Features/SoundEffectsExperiment.swift` → delete or re-home `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.soundEffects`). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
-- [ ] `OpenCode/Settings/Experimental/Features/VoiceSessionDelegatorExperiment.swift` → delete or re-home `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.voiceSessionDelegator`). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
-- [ ] `OpenCode/Settings/Experimental/Features/WelcomePreviewExperiment.swift` → delete or re-home `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.welcomePreview`). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
+- [x] `OpenCode/Settings/Experimental/Features/AgentSelectionExperiment.swift` → delete or re-home `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.agentSelection`). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
+- [x] `OpenCode/Settings/Experimental/Features/AudioInCallsExperiment.swift` → delete or re-home `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.audioInCalls`). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
+- [x] `OpenCode/Settings/Experimental/Features/BackgroundCallIntentExperiment.swift` → delete or re-home `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.backgroundCallIntent`). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
+- [x] `OpenCode/Settings/Experimental/Features/HideModelsExperiment.swift` → delete or re-home `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.hideModels`). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
+- [x] `OpenCode/Settings/Experimental/Features/InAppBrowserExperiment.swift` → delete or re-home `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.inAppBrowser`). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
+- [x] `OpenCode/Settings/Experimental/Features/InboxSidebarExperiment.swift` → delete or re-home `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.inboxSidebar`). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
+- [x] `OpenCode/Settings/Experimental/Features/OnePickerExperiment.swift` → delete or re-home `core/.../sharing/ExperimentalFeature.kt` (`onePicker`). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
+- [x] `OpenCode/Settings/Experimental/Features/OpenLinksFromCallsExperiment.swift` → delete or re-home `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.openLinksFromCalls`). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
+- [x] `OpenCode/Settings/Experimental/Features/ServerDetailsExperiment.swift` → delete or re-home `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.serverDetails`). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
+- [x] `OpenCode/Settings/Experimental/Features/ServerVoiceExperiment.swift` → delete or re-home `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.serverVoice`). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
+- [x] `OpenCode/Settings/Experimental/Features/SessionLiveActivityExperiment.swift` → delete or re-home `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.sessionLiveActivity`). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
+- [x] `OpenCode/Settings/Experimental/Features/ShareScreenWithAgentsExperiment.swift` → delete or re-home `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.shareScreenWithAgents`). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
+- [x] `OpenCode/Settings/Experimental/Features/SoundEffectsExperiment.swift` → delete or re-home `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.soundEffects`). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
+- [x] `OpenCode/Settings/Experimental/Features/VoiceSessionDelegatorExperiment.swift` → delete or re-home `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.voiceSessionDelegator`). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
+- [x] `OpenCode/Settings/Experimental/Features/WelcomePreviewExperiment.swift` → delete or re-home `core/.../sharing/ExperimentalFeature.kt` (`ExperimentalFeature.welcomePreview`). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
 
 ### Tests (3)
 
-- [ ] M `AllExperimentsTests.swift` +2/−2 (Tests rows in settings.md). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
-- [ ] M `ServerDetailsTests.swift` +1/−1 (Tests rows in server.md, settings.md). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
-- [ ] M `WhatsNewTests.swift` +1/−1 (Tests rows in app.md, drawer.md, settings.md). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
+- [x] M `AllExperimentsTests.swift` +2/−2 (Tests rows in settings.md). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
+- [x] M `ServerDetailsTests.swift` +1/−1 (Tests rows in server.md, settings.md). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
+- [x] M `WhatsNewTests.swift` +1/−1 (Tests rows in app.md, drawer.md, settings.md). ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
 
 ## system.md (9)
 
 ### Changed (7)
 
-- [ ] `OpenCode/System/ClientTools/ClientToolsClient.swift` +17/−9 → `server/.../clienttools/ClientToolsClient.kt`. 61a9bfd8 Client tools: connect only for a call, and stop at a server without the route (p217)
-- [ ] `OpenCode/System/ClientTools/ClientToolsFeature.swift` +28/−8 → `feature/system/.../clienttools/ClientToolsFeature.kt`. 61a9bfd8 Client tools: connect only for a call, and stop at a server without the route (p217)
+- [x] `OpenCode/System/ClientTools/ClientToolsClient.swift` +17/−9 → `server/.../clienttools/ClientToolsClient.kt`. 61a9bfd8 Client tools: connect only for a call, and stop at a server without the route (p217)
+- [x] `OpenCode/System/ClientTools/ClientToolsFeature.swift` +28/−8 → `feature/system/.../clienttools/ClientToolsFeature.kt`. 61a9bfd8 Client tools: connect only for a call, and stop at a server without the route (p217)
 - [ ] `OpenCode/System/Intents/ControlIntents.swift` +3/−1 → `intents/ControlIntents.kt`. da11bb99 Stop resting grips from starting voice calls; log each call's trigger
 - [ ] `OpenCode/System/Intents/QuickActions.swift` +1/−1 → `intents/QuickActions.kt`, `res/xml/shortcuts.xml`. da11bb99 Stop resting grips from starting voice calls; log each call's trigger
 - [ ] `OpenCode/System/Intents/SystemAction.swift` +15/−0 → `intents/SystemAction.kt`, `intents/SystemActionActivity.kt`. da11bb99 Stop resting grips from starting voice calls; log each call's trigger
@@ -185,7 +185,7 @@ anomalyco/opencode-ios `b9e9ee1c52cf6d9724d78e0dda3ad86767ac708d` → `dccec82e4
 
 ### Tests (2)
 
-- [ ] M `ClientToolsTests.swift` +97/−31 (Tests rows in app.md, server.md, system.md, voice.md). 61a9bfd8 Client tools: connect only for a call, and stop at a server without the route (p217)
+- [x] M `ClientToolsTests.swift` +97/−31 (Tests rows in app.md, server.md, system.md, voice.md). 61a9bfd8 Client tools: connect only for a call, and stop at a server without the route (p217)
 - [ ] M `SystemIntegrationTests.swift` +54/−3 (Tests rows in app.md, drawer.md, system.md). dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts; da11bb99 Stop resting grips from starting voice calls; log each call's trigger
 
 ## transcript.md (4)
@@ -205,7 +205,7 @@ anomalyco/opencode-ios `b9e9ee1c52cf6d9724d78e0dda3ad86767ac708d` → `dccec82e4
 ### Changed (5)
 
 - [ ] `OpenCode/Voice/RaiseToEar.swift` +49/−13 → `RaiseToEar.kt`. dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts; da11bb99 Stop resting grips from starting voice calls; log each call's trigger
-- [ ] `OpenCode/Voice/VoiceAudioEngine.swift` +1/−2 → `VoiceAudioEngine.kt`. ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
+- [x] `OpenCode/Voice/VoiceAudioEngine.swift` +1/−2 → `VoiceAudioEngine.kt`. ac9fcd2b Simplify the Experimental pane: graduate call links and audio, one experiments table (p217)
 - [ ] `OpenCode/Voice/VoiceFeature.swift` +7/−0 → `VoiceFeature.kt`. dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts
 - [ ] `OpenCode/Voice/VoiceTimeline.swift` +1/−1 → `VoiceTimeline.kt`, `VoiceDiagnostics.kt`. dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts
 - [ ] `OpenCode/Voice/VoiceView.swift` +1/−1 → `VoiceView.kt`. dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts
@@ -217,7 +217,7 @@ anomalyco/opencode-ios `b9e9ee1c52cf6d9724d78e0dda3ad86767ac708d` → `dccec82e4
 ### Tests (3)
 
 - [ ] M `BrowserTests.swift` +187/−573 (Tests rows in drawer.md, media.md, server.md, session.md, voice.md). 417d95aa fix(browser): preserve originating window scene and Ask closing snapshot; 26e5eb86 test(browser): add TestStore coverage for extracted BrowserFeature logic; b57c3bfb refactor(browser): remove dead page-screenshot path and deduplicate link helpers
-- [ ] M `ClientToolsTests.swift` +97/−31 (Tests rows in app.md, server.md, system.md, voice.md). 61a9bfd8 Client tools: connect only for a call, and stop at a server without the route (p217)
+- [x] M `ClientToolsTests.swift` +97/−31 (Tests rows in app.md, server.md, system.md, voice.md). 61a9bfd8 Client tools: connect only for a call, and stop at a server without the route (p217)
 - [ ] M `RaiseToTalkTests.swift` +44/−0 (Tests rows in session.md, voice.md). dccec82e Calls: time presses from touch-down, give Stop a dead zone, log only real starts; da11bb99 Stop resting grips from starting voice calls; log each call's trigger
 
 ## Other iOS paths changed (review for product rules, assets, fixtures)
