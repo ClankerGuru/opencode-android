@@ -11,6 +11,8 @@ import ai.opencode.feature.settings.whatsnew.WhatsNewShipped
 /** Every shipped entry, newest first: by day, then by `NN` (higher is newer). */
 internal val whatsNewShippedEntries: List<WhatsNewEntry> by lazy {
     listOf(
+        WhatsNewShipped.stuckTouchRecovery,
+        WhatsNewShipped.plusMenuTouchRelease,
         WhatsNewShipped.composerKeyboardWidth,
         WhatsNewShipped.loadingTouchRecovery,
         WhatsNewShipped.composerEditingCaret,

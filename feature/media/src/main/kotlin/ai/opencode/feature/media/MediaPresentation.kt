@@ -2,6 +2,8 @@ package ai.opencode.feature.media
 
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.touch.TouchRecovery
+import ai.opencode.core.touch.rememberTouchRecovery
 import ai.opencode.core.ui.AppearanceColorScheme
 import ai.opencode.core.ui.OpenCodeAppTheme
 import ai.opencode.core.ui.OpenCodeTheme
@@ -1299,6 +1301,29 @@ internal class MediaViewerController(
         onDismissed()
     }
 
+    /**
+     * iOS `MediaViewerController.touchRecovery` inspect: a dismissal whose surface has already
+     * faded out (the backdrop, or the page for documents and Reduce Motion) but never finished
+     * still covers the session and takes its touches.
+     */
+    fun strandedExitFault(): TouchRecovery.Fault? {
+        if (!isLeaving || finished) return null
+        val shown = when (style) {
+            Style.Photos -> backdropAlpha
+            Style.Zoom -> hostAlpha
+            Style.Fade -> viewAlpha
+        }
+        if (shown > 0.01f) return null
+        return TouchRecovery.Fault(TouchRecovery.Reason.Closed, this)
+    }
+
+    /** iOS `touchRecovery` release: drops the flight and leaves at once. */
+    fun recoverStrandedExit() {
+        flightGeneration += 1
+        flightJob?.cancel()
+        finish()
+    }
+
     /** iOS `viewDidDisappear`. */
     fun disposed() {
         flightJob?.cancel()
@@ -1365,6 +1390,11 @@ internal fun MediaViewerHost(
     val controller = remember {
         MediaViewerController(state, isMedia, reducesMotion, scope, density) { currentDismissed() }
     }
+    rememberTouchRecovery(
+        owner = TouchRecovery.Owner.Zoom,
+        inspect = { controller.strandedExitFault() },
+        release = { controller.recoverStrandedExit() },
+    )
     val keyboard = LocalSoftwareKeyboardController.current
     val focus = LocalFocusManager.current
     val slop = LocalViewConfiguration.current.touchSlop
