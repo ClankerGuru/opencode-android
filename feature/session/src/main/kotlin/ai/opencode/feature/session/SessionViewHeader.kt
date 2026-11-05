@@ -192,9 +192,11 @@ internal fun SessionHeaderControls(
         modifier
             .fillMaxWidth()
             .padding(horizontal = 4.dp)
+            // Measured with the card's top inset, as iOS does, so the scrolled bar and the
+            // transcript's top clear the whole header.
+            .onSizeChanged { onHeaderHeight(with(density) { it.height.toDp().value }) }
             .padding(top = if (onCatchUpOpen == null) 0.dp else CATCH_UP_COMPOSER_INSET.dp)
-            .heightIn(min = TOP_APP_BAR_HEIGHT)
-            .onSizeChanged { onHeaderHeight(with(density) { it.height.toDp().value }) },
+            .heightIn(min = TOP_APP_BAR_HEIGHT),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
