@@ -61,7 +61,7 @@ sealed interface SettingsPage {
     data class WhatsNewDetail(val entryID: String) : SettingsPage
     /** What's New › Smaller Changes (iOS `WhatsNewSmallerList`). */
     data object WhatsNewSmallerChanges : SettingsPage
-    /** Settings › Server Details (experimental `serverDetails`). */
+    /** Settings › Developer › Server Details. */
     data object ServerDetails : SettingsPage
     /** Settings › Experimental; [focus] scrolls to and tints that experiment's row (What's New). */
     data class Experimental(val focus: String? = null) : SettingsPage

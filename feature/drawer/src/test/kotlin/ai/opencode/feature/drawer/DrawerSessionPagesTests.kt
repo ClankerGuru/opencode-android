@@ -288,6 +288,16 @@ class DrawerSessionPagesTests {
         assertEquals("the list's own paging is back", DrawerListFooter.loading, store.state.drawerListFooter)
     }
 
+    /** A server that answers search with a subagent's session still only offers roots: the drawer opens a subagent from its parent. */
+    @Test
+    fun aServersSearchMatchesNeverListSubagents() = homeTest { h ->
+        val root = session("root", "Drawer polish", updated = 30)
+        val child = session("child", "Drawer search", updated = 20).copy(parentID = root.id)
+        val home = h.state(listOf(root))
+        val searched = home.copy(search = "Drawer", sessionPages = home.sessionPages.copy(search = SessionSearch("Drawer", results = listOf(child))))
+        assertEquals(listOf("root"), searched.visibleSessions.map { it.id })
+    }
+
     @Test
     fun searchResultsPageAndEnd() = homeTest { h ->
         val clock = TestClock()

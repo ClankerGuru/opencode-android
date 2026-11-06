@@ -3,6 +3,7 @@ package ai.opencode.feature.transcript.markdown.ui
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.markdown.InlineText
+import ai.opencode.feature.transcript.selection.TranscriptSelectionLeafKey
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -18,9 +19,17 @@ import androidx.compose.ui.unit.dp
  * 220 (iOS `CappedWidthLayout`: short cells keep their natural width, longer ones wrap). Rules
  * under the header and between rows run the band's full width and stay put while the columns
  * scroll.
+ *
+ * @param selection the block's key in a reply: each cell joins the reply's one selection (its
+ *   part is [TranscriptSelectionLeafKey.tablePart]). Elsewhere cells aren't selectable, as on iOS.
  */
 @Composable
-fun MarkdownTable(header: List<InlineText>, rows: List<List<InlineText>>, modifier: Modifier = Modifier) {
+fun MarkdownTable(
+    header: List<InlineText>,
+    rows: List<List<InlineText>>,
+    selection: TranscriptSelectionLeafKey? = null,
+    modifier: Modifier = Modifier,
+) {
     val style = currentMarkdownStyle()
     val colors = style.colors
     val density = LocalDensity.current
@@ -45,14 +54,18 @@ fun MarkdownTable(header: List<InlineText>, rows: List<List<InlineText>>, modifi
     MarkdownBand(modifier, rules = rules) {
         Layout(
             content = {
-                for (row in listOf(presentedHeader) + presentedRows) {
+                for ((rowIndex, row) in (listOf(presentedHeader) + presentedRows).withIndex()) {
                     for (column in 0 until columns) {
                         val cell = row.getOrNull(column)
                         val isHeader = row === presentedHeader
                         if (cell == null) {
                             Box(Modifier)
                         } else {
-                            ArrivingText(cell, emptyList(), if (isHeader) headerStyle else cellStyle, if (isHeader) colors.secondaryText else colors.text)
+                            val key = selection?.copy(part = TranscriptSelectionLeafKey.tablePart(rowIndex, column))
+                            ArrivingText(
+                                cell, emptyList(), if (isHeader) headerStyle else cellStyle, if (isHeader) colors.secondaryText else colors.text,
+                                selectionKey = key,
+                            )
                         }
                     }
                 }

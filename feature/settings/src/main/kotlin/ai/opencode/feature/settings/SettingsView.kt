@@ -263,7 +263,6 @@ private fun SettingsRootPage(store: SettingsStore) {
     val voiceModeEnabled by remember { shared(SharedKeys.voiceModeEnabled).flow }.collectAsState()
     val developerMode by remember { shared(SharedKeys.developerMode).flow }.collectAsState()
     val hideModels by remember { shared(ExperimentalFeature.hideModels.key).flow }.collectAsState()
-    val serverDetails by remember { shared(ExperimentalFeature.serverDetails.key).flow }.collectAsState()
     val notificationPermission by store.observe { it.notificationPermission }
     val push = { page: SettingsPage -> store.send(SettingsFeature.Action.PagePushed(page)) }
 
@@ -296,11 +295,6 @@ private fun SettingsRootPage(store: SettingsStore) {
         }
         settingsSection(key = "whats-new") {
             SettingsRow("What’s New", "sparkles", SettingsTint.Orange) { push(SettingsPage.WhatsNew) }
-        }
-        if (ExperimentalFeature.serverDetails.isActive(serverDetails)) {
-            settingsSection(key = "server-details") {
-                SettingsRow("Server Details", "server.rack", SettingsTint.Teal) { push(SettingsPage.ServerDetails) }
-            }
         }
         settingsSection(
             key = "experimental",

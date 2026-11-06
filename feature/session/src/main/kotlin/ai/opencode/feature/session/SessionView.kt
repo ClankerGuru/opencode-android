@@ -2,6 +2,8 @@
 
 package ai.opencode.feature.session
 
+import ai.opencode.core.ui.inContainer
+import ai.opencode.feature.composer.composerWindowTouches
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.experiments.key
 import ai.opencode.core.haptics.Haptic
@@ -241,7 +243,9 @@ fun SessionView(
         LocalSessionPhotoSheet provides photoSheet,
     ) {
         // The + menu draws above the background-work capsule (iOS: the menu's glass covers it).
-        Box(modifier.rootOffsetOnScreen { if (it != rootOffset) rootOffset = it }) {
+        // iOS `ComposerWindowTouchObserver` on the window: the screen's latest touch-down, for the
+        // model chip's double-tap check.
+        Box(modifier.rootOffsetOnScreen { if (it != rootOffset) rootOffset = it }.composerWindowTouches(composerHost.sendTransition.windowTouches)) {
         BackgroundWorkPresentation(
             anchor = backgroundWorkAnchor,
             sessionID = work.sessionID,
@@ -276,7 +280,8 @@ fun SessionView(
                 SessionHeaderBackdrop(
                     backdrop = resolvedHeader.backdrop,
                     appBlur = resolvedHeader.appBlur,
-                    safeTop = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding(),
+                    header = resolvedHeader.header,
+                    safeTop = WindowInsets.statusBarsIgnoringVisibility.inContainer().asPaddingValues().calculateTopPadding(),
                     scrolledUnderHeader = { scrollEdgeBridge.scrolledUnderHeader },
                     modifier = Modifier.align(Alignment.TopCenter),
                 )
@@ -343,7 +348,7 @@ fun SessionView(
 }
 
 /** iOS `CatchUpMetrics.composerClearance.bottom`. */
-private const val CATCH_UP_COMPOSER_CLEARANCE = 12f
+internal const val CATCH_UP_COMPOSER_CLEARANCE = 12f
 
 
 /** What the background-work panel reads from the session. */
@@ -579,8 +584,9 @@ private fun SessionComposerDismissArea(store: StoreOf<State, Action>, host: Sess
 private fun RequestPanelRoomProbe(host: SessionComposerHost, modifier: Modifier) {
     val density = LocalDensity.current
     var height by remember { mutableIntStateOf(0) }
-    val top = WindowInsets.statusBarsIgnoringVisibility.getTop(density)
-    val bottom = maxOf(WindowInsets.ime.getBottom(density), WindowInsets.navigationBars.getBottom(density))
+    // A Catch Up card's own edges, not the window's ([inContainer]).
+    val top = WindowInsets.statusBarsIgnoringVisibility.inContainer().getTop(density)
+    val bottom = maxOf(WindowInsets.ime.inContainer().getBottom(density), WindowInsets.navigationBars.inContainer().getBottom(density))
     Box(modifier.onSizeChanged { height = it.height })
     SideEffect {
         val room = with(density) { (height - top - bottom).coerceAtLeast(0).toDp().value }

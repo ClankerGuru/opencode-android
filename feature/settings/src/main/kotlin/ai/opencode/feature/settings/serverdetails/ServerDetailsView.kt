@@ -91,7 +91,7 @@ internal typealias ServerDetailsStore = StoreOf<ServerDetailsFeature.State?, Ser
  * Port of iOS `ServerDetailsView` (`Settings/ServerDetailsView.swift`, D-125 Overview Tiles):
  * problems as banners with their action, then three tiles (MCP servers, Accounts, Skills) that
  * each open a tray with the full list. Values on a 4 dp grid; radii 26 tiles, 22 banners.
- * Settings' Server Details row lives on the root page ([ai.opencode.feature.settings.SettingsView]).
+ * Its row is the last one on Settings › Developer (`ai.opencode.devtools.DevToolsView`), with no switch.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

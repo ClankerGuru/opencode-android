@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.DropdownMenu
@@ -43,6 +44,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 // Port of iOS `Composer/AgentPicker.swift`. Agent Selection (experimental `agentSelection`,
@@ -88,6 +90,7 @@ fun ComposerAgentChip(
     onPick: (String) -> Unit,
     modifier: Modifier = Modifier,
     isFolded: Boolean = false,
+    targetDrop: Dp = 0.dp,
 ) {
     if (!isEnabled) return
     AgentChip(
@@ -98,10 +101,14 @@ fun ComposerAgentChip(
         onPick = onPick,
         modifier = if (isFolded) modifier.alpha(0f).clearAndSetSemantics {} else modifier,
         enabled = !isFolded,
+        targetDrop = targetDrop,
     )
 }
 
-/** iOS `AgentChip`: the current agent's name, opening a menu of the server's primary agents. */
+/**
+ * iOS `AgentChip`: the current agent's name, opening a menu of the server's primary agents.
+ * [targetDrop]: how far its target sits below its ink (the composer's `pickerTargetDrop`).
+ */
 @Composable
 fun AgentChip(
     name: String,
@@ -111,12 +118,15 @@ fun AgentChip(
     onPick: (String) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    targetDrop: Dp = 0.dp,
 ) {
     var open by remember { mutableStateOf(false) }
     // Mounted as the composer expands: the list is fresh before it opens.
     LaunchedEffect(Unit) { onOpen() }
     val secondary = OpenCodeTheme.colors.secondaryText
-    Box(modifier) {
+    // The whole menu moves its target down and its ink back up (iOS e16d3e8e), so the menu
+    // drops from the lowered target too.
+    Box(modifier.offset(y = targetDrop)) {
         Row(
             Modifier
                 .clickable(enabled = enabled, role = Role.Button) { open = true }
@@ -126,7 +136,8 @@ fun AgentChip(
                     stateDescription = name
                     role = Role.DropdownList
                 }
-                .testTag("composer-agent"),
+                .testTag("composer-agent")
+                .offset(y = -targetDrop),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {

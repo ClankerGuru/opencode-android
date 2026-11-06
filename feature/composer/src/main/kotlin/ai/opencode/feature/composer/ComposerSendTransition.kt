@@ -36,9 +36,19 @@ interface ComposerSwipeInput {
 
     /** iOS `selectionClaims(_:)`: whether [rootPoint] (root px) is on or near the selection being made. */
     fun selectionClaims(rootPoint: Offset): Boolean
+
+    /**
+     * iOS `ImagePasteTextView.takesDoubleTap`: whether a control's tap (the model chip's) is the
+     * second half of a finger's double tap on the text's last line ([ComposerDoubleTap]). If so
+     * it selects the word under the first tap and the control does nothing.
+     */
+    fun takesDoubleTap(): Boolean = false
 }
 
 class ComposerSendTransition {
+    /** iOS `ComposerWindowTouchObserver` on the window: the screen root feeds it ([composerWindowTouches]). */
+    val windowTouches = ComposerWindowTouchObserver()
+
     /** The next send's words as they leave the composer (window px). */
     data class Prepared(
         val text: String,

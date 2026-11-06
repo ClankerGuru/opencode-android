@@ -4,6 +4,8 @@ import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.TestClock
 import ai.opencode.core.dependencies.UuidClient
+import ai.opencode.core.log.CallTrigger
+import ai.opencode.core.log.SystemActionOrigin
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.TestStore
@@ -68,8 +70,12 @@ class SystemIntegrationTests {
             OpenCodeHomeSnapshot(projects = projects, sessions = sessions, activeSessionIDs = emptySet())
     }
 
-    private fun opened(destination: SystemAction.Destination, startsCall: Boolean, inBackground: Boolean = false) =
-        HomeFeature.Action.SystemActionOpened(destination, startsCall = startsCall, inBackground = inBackground)
+    private fun opened(
+        destination: SystemAction.Destination,
+        startsCall: Boolean,
+        inBackground: Boolean = false,
+        origin: SystemActionOrigin = SystemActionOrigin.other,
+    ) = HomeFeature.Action.SystemActionOpened(destination, startsCall = startsCall, inBackground = inBackground, origin = origin)
 
     private val voiceTapped = HomeFeature.Action.detail(SessionFeature.Action.VoiceTapped)
 
@@ -369,10 +375,11 @@ class SystemIntegrationTests {
 
     private fun callStore(
         scope: kotlinx.coroutines.CoroutineScope,
+        voiceModeEnabled: Boolean = true,
         detail: () -> SessionFeature.State,
     ): TestStore<HomeFeature.State, HomeFeature.Action> {
         val store = homeStore(scope, {
-            shared(SharedKeys.voiceModeEnabled).set(true)
+            shared(SharedKeys.voiceModeEnabled).set(voiceModeEnabled)
             shared(SharedKeys.openAIAPIKey).set("sk-test")
             HomeFeature.State(server, snapshot(listOf(project, docs), listOf(older, newer))).copy(sessionDetail = detail())
         }) {
@@ -409,6 +416,48 @@ class SystemIntegrationTests {
         assertEquals("ses_newer", store.state.sessionDetail?.session?.id)
         store.receive(voiceTapped)
         assertEquals("ses_newer", store.state.sessionDetail?.voice?.target?.sessionID)
+    }
+
+    /** Runs [body], returning the call triggers it logged. */
+    private suspend fun triggers(body: suspend () -> Unit): List<CallTrigger> {
+        val seen = Collections.synchronizedList(mutableListOf<CallTrigger>())
+        CallTrigger.observing({ seen += it }) { body() }
+        return seen.toList()
+    }
+
+    @Test
+    fun aSystemCallLogsItsTriggerOnlyOnceItStarts() = runTest {
+        val store = callStore(backgroundScope) {
+            SessionFeature.State.session(server = server, session = newer, cachedItems = emptyList())
+        }
+        val started = triggers {
+            store.send(opened(SystemAction.Destination.Session("ses_newer"), startsCall = true, origin = SystemActionOrigin.quickAction))
+            store.receive(voiceTapped)
+        }
+        assertEquals(listOf<CallTrigger>(CallTrigger.System(SystemActionOrigin.quickAction)), started)
+        assertNotNull(store.state.sessionDetail?.voice)
+
+        // A second request while that call is live starts nothing, so logs nothing.
+        val again = triggers {
+            store.send(opened(SystemAction.Destination.Session("ses_newer"), startsCall = true, origin = SystemActionOrigin.control))
+        }
+        assertTrue(again.isEmpty())
+    }
+
+    @Test
+    fun aSystemCallThatOpensSettingsInsteadLogsNothing() = runTest {
+        val store = callStore(backgroundScope, voiceModeEnabled = false) {
+            SessionFeature.State.session(server = server, session = newer, cachedItems = emptyList())
+        }
+        val logged = triggers {
+            store.send(opened(SystemAction.Destination.Session("ses_newer"), startsCall = true, origin = SystemActionOrigin.shortcut))
+        }
+        assertTrue(store.state.isSettingsShown)
+        assertTrue(logged.isEmpty())
+        val unresolved = triggers {
+            store.send(opened(SystemAction.Destination.Session("ses_missing"), startsCall = true, origin = SystemActionOrigin.shortcut))
+        }
+        assertTrue(unresolved.isEmpty())
     }
 
     // endregion

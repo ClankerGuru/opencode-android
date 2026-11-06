@@ -21,7 +21,7 @@ import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.feature.session.header.BreathingTitleHold
 import ai.opencode.feature.session.header.HeaderBlurTunables
-import ai.opencode.feature.session.header.SessionContextRing
+import ai.opencode.feature.session.header.SessionContextGauge
 import ai.opencode.feature.session.header.SessionContextText
 import ai.opencode.server.model.OpenCodeExportFormat
 import ai.opencode.server.model.isUntitled
@@ -192,9 +192,11 @@ internal fun SessionHeaderControls(
         modifier
             .fillMaxWidth()
             .padding(horizontal = 4.dp)
+            // Measured with the card's top inset, as iOS does, so the scrolled bar and the
+            // transcript's top clear the whole header.
+            .onSizeChanged { onHeaderHeight(with(density) { it.height.toDp().value }) }
             .padding(top = if (onCatchUpOpen == null) 0.dp else CATCH_UP_COMPOSER_INSET.dp)
-            .heightIn(min = TOP_APP_BAR_HEIGHT)
-            .onSizeChanged { onHeaderHeight(with(density) { it.height.toDp().value }) },
+            .heightIn(min = TOP_APP_BAR_HEIGHT),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -398,11 +400,9 @@ private fun SessionMenuButton(store: StoreOf<State, Action>, model: SessionHeade
         )
         val fraction = model.contextFraction
         AnimatedVisibility(visible = fraction != null, modifier = Modifier.matchParentSize(), enter = fadeIn(), exit = fadeOut()) {
-            SessionContextRing(
+            SessionContextGauge(
                 fraction = fraction ?: 0.0,
-                modifier = Modifier.fillMaxSize().padding(1.dp),
-                lineWidth = 2.dp,
-                trackOpacity = 0.0,
+                modifier = Modifier.fillMaxSize().padding(6.dp),
             )
         }
         SessionMenu(

@@ -1,5 +1,6 @@
 package ai.opencode.feature.system.intents
 
+import ai.opencode.core.log.SystemActionOrigin
 import ai.opencode.feature.system.SystemAction
 import ai.opencode.feature.system.SystemActionInbox
 import ai.opencode.feature.system.SessionDirectory
@@ -93,6 +94,7 @@ class SystemActionActivity : Activity() {
         private const val EXTRA_SESSION = "session"
         private const val EXTRA_PROJECT = "project"
         private const val EXTRA_STARTS_CALL = "startsCall"
+        private const val EXTRA_ORIGIN = "origin"
         /** A quick action's kind (`SystemQuickAction.Kind`), static or dynamic. */
         const val EXTRA_QUICK_ACTION = "quickAction"
         /** A control's choice (`SessionEntity` ID) and whether it starts a call. */
@@ -112,6 +114,7 @@ class SystemActionActivity : Activity() {
             Intent(context, SystemActionActivity::class.java).setAction(ACTION_SYSTEM)
                 .putExtra(EXTRA_SERVER, action.serverKey)
                 .putExtra(EXTRA_STARTS_CALL, action.startsCall)
+                .putExtra(EXTRA_ORIGIN, action.origin.name)
                 .apply {
                     when (val destination = action.destination) {
                         SystemAction.Destination.LastViewed -> putExtra(EXTRA_DESTINATION, "last")
@@ -158,7 +161,9 @@ class SystemActionActivity : Activity() {
                     "draft" -> SystemAction.Destination.Draft(intent.getStringExtra(EXTRA_PROJECT))
                     else -> return null
                 }
-                return SystemAction(server, resolved, startsCall)
+                val originName = intent.getStringExtra(EXTRA_ORIGIN)
+                val origin = SystemActionOrigin.entries.firstOrNull { it.name == originName } ?: SystemActionOrigin.other
+                return SystemAction(server, resolved, startsCall, origin = origin)
             }
             if (intent.action == Intent.ACTION_VIEW) {
                 val data = intent.dataString ?: return null

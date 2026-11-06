@@ -1,11 +1,15 @@
 package ai.opencode.feature.session.header
 
 import ai.opencode.core.ui.OpenCodeTheme
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Size
@@ -16,7 +20,6 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.max
-import kotlin.math.min
 
 /**
  * The band behind the session header, as resolved for this phone (iOS `SessionHeaderBackdrop`).
@@ -25,19 +28,21 @@ import kotlin.math.min
  *
  * Android mapping (no blur imitation, AGENTS.md):
  * - iOS's progressive blur ([SessionHeaderStyle.Resolved.AppBlur], and the iOS 27 system edge,
- *   which Android resolves to the same app path) is an M3 top-bar scrim: the
- *   `surfaceContainer` tone at full strength down to `fadeStart`, easing to nothing at `fadeEnd`
- *   (the same curve as iOS's blur mask). iOS revealed the blur by radius as content scrolled
- *   `fadeIn` under the header; here the scrim's opacity follows the same reveal.
+ *   which Android resolves to the same app path) is the M3 top app bar's scrolled state: once
+ *   content scrolls under the header, the bar from the top of the screen to the bottom of the
+ *   header row fills with `surfaceContainer`, with a hard bottom edge and no soft tail (a fading
+ *   tail left text showing through it). The fill fades in and out on the theme's effects spring,
+ *   as `TopAppBar`'s container colour does.
  * - The wash ([SessionHeaderStyle.Appearance]) is the canvas colour at its opacity through the same
  *   stops; its optional material is a tonal surface (ultraThin → `surfaceContainerLow`, thin →
  *   `surfaceContainer`, regular → `surfaceContainerHigh`), revealed over its own `fadeIn`.
  *
- * It takes no touches and is hidden from TalkBack. Scroll is read in the draw phase, so scrolling
- * never recomposes it.
+ * It takes no touches and is hidden from TalkBack. Scroll is read in the draw phase, and the bar
+ * recomposes only when content starts or stops being under it.
  *
  * @param backdrop the wash to draw, or null (`Resolved.backdrop`).
- * @param appBlur the edge band to draw as a scrim, or null (`Resolved.appBlur`).
+ * @param appBlur the edge band to draw as the scrolled bar, or null (`Resolved.appBlur`).
+ * @param header the header row's height below [safeTop] (dp; `Resolved.header`).
  * @param safeTop the screen's top inset (status bar) above the header; 0 in an inset card.
  * @param scrolledUnderHeader how far content has scrolled under the header (dp), read per frame.
  */
@@ -45,6 +50,7 @@ import kotlin.math.min
 fun SessionHeaderBackdrop(
     backdrop: SessionHeaderStyle.Appearance?,
     appBlur: SessionHeaderStyle.Resolved.AppBlur?,
+    header: Float,
     safeTop: Dp,
     scrolledUnderHeader: () -> Float,
     modifier: Modifier = Modifier,
@@ -60,33 +66,26 @@ fun SessionHeaderBackdrop(
         null -> Color.Transparent
     }
     val top = safeTop.value
-    val bandEnd = max(
-        appBlur?.let { max(it.fadeStart, it.fadeEnd) } ?: 0f,
-        backdrop?.fadeEnd ?: 0f,
+    val barHeight = top + max(header, 0f)
+    val height = max(barHeight, top + (backdrop?.fadeEnd ?: 0f))
+    // M3 `TopAppBar`: the scrolled colour turns on as soon as anything is under the bar.
+    val scrolledUnder by remember(scrolledUnderHeader) { derivedStateOf { scrolledUnderHeader() > 0.5f } }
+    val barAlpha by animateFloatAsState(
+        targetValue = if (appBlur != null && appBlur.radius > 0 && scrolledUnder) 1f else 0f,
+        animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
+        label = "headerBar",
     )
-    val height = max(top + bandEnd + SCRIM_FADE / 2, 0f)
     Spacer(
         modifier
             .fillMaxWidth()
             .height(height.dp)
             .clearAndSetSemantics {}
             .drawBehind {
-                val scrolled = scrolledUnderHeader()
-                if (appBlur != null && appBlur.radius > 0) {
-                    val end = max(appBlur.fadeStart, appBlur.fadeEnd)
-                    val revealed = if (appBlur.fadeIn > 0) min(max(scrolled / appBlur.fadeIn, 0f), 1f) else 1f
-                    // Without a blur, iOS's strength curve leaves text readable behind the header's
-                    // controls; an opaque scrim through the header row that fades out over
-                    // [SCRIM_FADE] below it hides what the blur hid (M3 scrolled top bar).
-                    val bandHeight = top + end + SCRIM_FADE / 2
-                    val solidEnd = max(top + end - SCRIM_FADE / 2, 0f)
-                    if (revealed > 0 && bandHeight > 0) {
-                        val stops = listOf(0f to scrim, solidEnd / bandHeight to scrim, 1f to scrim.copy(alpha = 0f))
-                        drawBand(stops, bandHeight, revealed)
-                    }
+                if (barAlpha > 0) {
+                    drawRect(color = scrim, size = Size(size.width, barHeight.dp.toPx()), alpha = barAlpha)
                 }
                 if (backdrop != null) {
-                    val revealed = backdrop.revealed(scrolled).toFloat()
+                    val revealed = backdrop.revealed(scrolledUnderHeader()).toFloat()
                     if (revealed > 0) {
                         if (backdrop.blur != null) drawBand(backdrop.stops(top, material, 1.0), top + backdrop.fadeEnd, revealed)
                         if (backdrop.opacity > 0) drawBand(backdrop.stops(top, canvas, backdrop.opacity), top + backdrop.fadeEnd, revealed)
@@ -107,5 +106,3 @@ private fun DrawScope.drawBand(stops: List<Pair<Float, Color>>, heightDp: Float,
     )
 }
 
-/** How far below the header row the app band's opaque scrim fades out (dp). */
-private const val SCRIM_FADE = 24f

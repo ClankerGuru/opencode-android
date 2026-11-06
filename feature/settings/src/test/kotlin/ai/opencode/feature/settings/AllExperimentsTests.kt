@@ -72,7 +72,7 @@ class AllExperimentsTests {
         }
         assertFalse(ExperimentalFeature.backgroundCallIntent.joinsAll)
         assertFalse(ExperimentalFeature.shareScreenWithAgents.joinsAll)
-        assertFalse("graduated experiments aren't in it", ExperimentalFeature.welcomePreview.joinsAll)
+        assertFalse("switches outside the pane aren't in it", ExperimentalFeature.welcomePreview.joinsAll)
         assertFalse(shared.on(ExperimentalFeature.welcomePreview))
         assertEquals("Sound Effects preloads as All turns it on", listOf("sound.prepare"), log.value)
         assertTrue(shared.get(AllExperiments.key))
@@ -91,7 +91,7 @@ class AllExperimentsTests {
         store.send(HomeSettingsFeature.Action.AllExperimentsChanged(true))
         store.finish()
         assertFalse("skipped stays off", shared.on(ExperimentalFeature.inboxSidebar))
-        assertTrue(shared.on(ExperimentalFeature.serverDetails))
+        assertTrue(shared.on(ExperimentalFeature.sessionLiveActivity))
         store.send(HomeSettingsFeature.Action.ExperimentalFeatureChanged(ExperimentalFeature.inboxSidebar, true))
         assertFalse("switching it back on unskips it", shared.get(allExperimentsSkips(ExperimentalFeature.inboxSidebar)))
         store.finish()

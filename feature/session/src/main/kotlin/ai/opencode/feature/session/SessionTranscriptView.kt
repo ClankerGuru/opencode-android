@@ -13,6 +13,7 @@ import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.ProviderIcon
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.core.ui.inContainer
 import ai.opencode.feature.composer.PastedTextViewer
 import ai.opencode.feature.media.AgentFileViewer
 import ai.opencode.feature.media.LinkMenuAction
@@ -234,8 +235,9 @@ fun SessionTranscriptView(
     // A new screen starts without the jump button (iOS `resetShowsJumpButton`).
     DisposableEffect(host) { onDispose { host?.showsJumpButton = false } }
 
-    val safeTop = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding()
-    val bottomObstruction = WindowInsets.ime.union(WindowInsets.navigationBars).asPaddingValues().calculateBottomPadding()
+    // Against a Catch Up card's own edges, not the window's ([inContainer]).
+    val safeTop = WindowInsets.statusBarsIgnoringVisibility.inContainer().asPaddingValues().calculateTopPadding()
+    val bottomObstruction = WindowInsets.ime.union(WindowInsets.navigationBars).inContainer().asPaddingValues().calculateBottomPadding()
     // Separate from the projection, so geometry and jumps never rebuild the configuration.
     CompositionLocalProvider(
         LocalTranscriptRowSlots provides rowSlots,

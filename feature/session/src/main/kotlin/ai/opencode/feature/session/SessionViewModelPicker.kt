@@ -1,5 +1,6 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.ui.inContainer
 import androidx.activity.compose.BackHandler
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticEffect
@@ -400,7 +401,7 @@ internal fun SessionModelPickerOverlays(
     val accessibility = remember(context) { context.getSystemService(AccessibilityManager::class.java) }
     val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
     val sceneActive = lifecycle.isAtLeast(Lifecycle.State.RESUMED)
-    val statusTop = WindowInsets.statusBars.getTop(density)
+    val statusTop = WindowInsets.statusBars.inContainer().getTop(density)
     var screenOrigin by remember { mutableStateOf(Offset.Zero) }
     // iOS `headerHeight + 8`, in One Picker's space (the session's box, under the status bar).
     val onePickerCeiling = statusTop / density.density + headerHeight + 8.0

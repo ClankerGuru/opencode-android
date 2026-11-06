@@ -32,6 +32,7 @@ enum class SFSymbol(val sfName: String, @DrawableRes val drawable: Int) {
     ArrowDownCircleFill("arrow.down.circle.fill", R.drawable.ms_arrow_circle_down_fill),
     ArrowDownRightAndArrowUpLeft("arrow.down.right.and.arrow.up.left", R.drawable.ms_close_fullscreen),
     ArrowDownToLine("arrow.down.to.line", R.drawable.ms_vertical_align_bottom),
+    ArrowLeftAndRight("arrow.left.and.right", R.drawable.ms_arrow_range),
     ArrowLeftAndRightTextVertical("arrow.left.and.right.text.vertical", R.drawable.ms_arrow_range),
     ArrowLeftArrowRight("arrow.left.arrow.right", R.drawable.ms_swap_horiz),
     ArrowRight("arrow.right", R.drawable.ms_arrow_forward),

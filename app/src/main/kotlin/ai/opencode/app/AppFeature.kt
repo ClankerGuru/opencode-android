@@ -874,11 +874,11 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         return Effect.send(Action.Home(HomeFeature.Action.SessionTapped(sessionID)))
     }
 
-    /** iOS `.home(.systemActionOpened(destination, startsCall:, inBackground:))`. */
+    /** iOS `.home(.systemActionOpened(destination, startsCall:, inBackground:, origin:))`. */
     private fun openInHome(action: SystemAction, destination: SystemAction.Destination): Effect<Action> =
         Effect.send(
             Action.Home(
-                HomeFeature.Action.SystemActionOpened(destination, startsCall = action.startsCall, inBackground = action.startsInBackground),
+                HomeFeature.Action.SystemActionOpened(destination, startsCall = action.startsCall, inBackground = action.startsInBackground, origin = action.origin),
             ),
         )
 

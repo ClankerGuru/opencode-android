@@ -1,5 +1,6 @@
 package ai.opencode.feature.system.intents
 
+import ai.opencode.core.log.SystemActionOrigin
 import ai.opencode.feature.system.SystemAction
 import ai.opencode.feature.system.SystemActionInbox
 import ai.opencode.feature.system.ScopedID
@@ -44,7 +45,7 @@ object StartVoiceCallIntent {
         "Starts a voice call with OpenCode in a session. Without a session, the call starts in the one you viewed last."
 
     fun perform(session: SessionEntity?) {
-        (session ?: SessionEntity.lastViewed(null)).action(startsCall = true)?.let(SystemActionInbox.shared::post)
+        (session ?: SessionEntity.lastViewed(null)).action(startsCall = true, origin = SystemActionOrigin.shortcut)?.let(SystemActionInbox.shared::post)
     }
 }
 
@@ -71,7 +72,7 @@ object StartBackgroundVoiceCallIntent {
      * running in the background.
      */
     suspend fun perform(session: SessionEntity?, continueInForeground: () -> Unit): Boolean {
-        val action = (session ?: SessionEntity.lastViewed(null)).action(startsCall = true) ?: return false
+        val action = (session ?: SessionEntity.lastViewed(null)).action(startsCall = true, origin = SystemActionOrigin.backgroundShortcut) ?: return false
         val activity = dependency(VoiceLiveActivityClient)
         if (!shared(experimentKey).value || !SystemActionInbox.shared.isListening ||
             !activity.prestart(VoiceCallActivityAttributes(serverID = action.serverKey ?: "", sessionID = ""))

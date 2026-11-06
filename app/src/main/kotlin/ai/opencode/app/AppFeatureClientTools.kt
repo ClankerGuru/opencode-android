@@ -28,16 +28,17 @@ import kotlin.coroutines.cancellation.CancellationException
 
 /*
  * Port of iOS `AppFeature+ClientTools.swift`: the phone's client tools (opening sessions during
- * a session-delegator call, and the Share Screen with Agents, Open Links from Calls and Audio in
- * Calls experiments) around Home.
+ * a session-delegator call, links and audio, and the Share Screen with Agents experiment), all for
+ * a live call, around Home.
  */
 
 /** The directory a call's delegator session lives in, read from the server. */
 data class ClientToolsLocation(val sessionID: String, val directory: String)
 
 /**
- * The phone's tools' socket: Home's server, in the open session's directory (on a call, the
- * call's), while the app is in the foreground or on a call.
+ * The phone's tools' socket: Home's server, in the call's directory, from the call's start until it
+ * ends, foreground or not. Every tool refuses outside a live call, so an open session alone gets
+ * none.
  */
 internal val AppFeature.State.clientToolsTarget: ClientToolsTarget?
     get() {
@@ -46,14 +47,9 @@ internal val AppFeature.State.clientToolsTarget: ClientToolsTarget?
         val tools = offeredClientTools
         if (tools.isEmpty()) return null
         val home = home ?: return null
-        val voice = home.sessionDetail?.voice
-        if (voice != null && !voice.phase.isTerminal) {
-            return ClientToolsTarget(home.server, voice.target.directory, tools)
-        }
-        if (!isInForeground) return null
-        val detail = home.topDetail ?: return null
-        val directory = detail.session?.directory ?: detail.draftProject?.directory ?: return null
-        return ClientToolsTarget(home.server, directory, tools)
+        val voice = home.sessionDetail?.voice ?: return null
+        if (voice.phase.isTerminal) return null
+        return ClientToolsTarget(home.server, voice.target.directory, tools)
     }
 
 /** The session a live call's delegator steers in another directory; it gets its own socket. */
@@ -75,7 +71,7 @@ internal val AppFeature.State.delegatorClientToolsTarget: ClientToolsTarget?
         return ClientToolsTarget(home.server, location.directory, offeredClientTools)
     }
 
-/** The experiments that are on, plus opening sessions during a live session-delegator call. */
+/** The tools the phone offers, plus opening sessions during a live session-delegator call. */
 internal val AppFeature.State.offeredClientTools: Set<ClientTool>
     get() {
         val voice = home?.sessionDetail?.voice

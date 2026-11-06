@@ -6,6 +6,7 @@ import ai.opencode.core.experiments.ExperimentalGroup
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.sharing.AllExperiments
 import ai.opencode.core.sharing.shared
+import ai.opencode.core.store.observe
 import ai.opencode.devtools.DevTools
 import ai.opencode.devtools.DevToolsView
 import androidx.compose.animation.animateColorAsState
@@ -32,15 +33,15 @@ import kotlinx.coroutines.delay
 
 /**
  * Port of iOS `Settings/ExperimentalSettingsView.swift`: Settings › Experimental, All Experiments
- * in its own section, then the experimental switches in open groups (Composer, Calls,
- * Transcript, Drawer). Sound Effects' volume and send rows sit under the drawer's switches while
- * it's on.
+ * in its own section, then the experimental switches in open groups (Composer, Calls, Drawer,
+ * Transcript); a group with one row has no header. Sound Effects' volume and send rows sit under
+ * the drawer's switches while it's on.
  * Opened for one experiment (What’s New), it scrolls to that row and briefly highlights it
  * (1.2 s, then a 0.6 s ease-out).
  */
 @Composable
 fun ExperimentalSettingsView(store: SettingsStore, focus: ExperimentalFeature?) {
-    // Every switch, so headers count what's on and rows redraw when a value changes.
+    // Every switch, so rows redraw when a value changes.
     val enabled = ExperimentalFeature.allCases.associateWith { feature ->
         remember(feature) { shared(feature.key).flow }.collectAsState().value
     }
@@ -53,7 +54,8 @@ fun ExperimentalSettingsView(store: SettingsStore, focus: ExperimentalFeature?) 
     // each, in order), centred as iOS `scrollTo(_, anchor: .center)`, and tint it.
     LaunchedEffect(focus) {
         val target = focus ?: return@LaunchedEffect
-        val index = 1 + ExperimentalGroup.entries.indexOf(target.group)
+        val group = target.group ?: return@LaunchedEffect
+        val index = 1 + ExperimentalGroup.entries.indexOf(group)
         // A frame for the list to lay out its rows first.
         withFrameNanos {}
         listState.scrollToItem(index)
@@ -80,17 +82,14 @@ fun ExperimentalSettingsView(store: SettingsStore, focus: ExperimentalFeature?) 
         }
     }
 
-    fun header(group: ExperimentalGroup): String {
-        val on = group.features.count { enabled.getValue(it) }
-        return if (on == 0) group.title else "${group.title} · $on on"
-    }
+    /** A lone row needs no title over it. */
+    fun header(group: ExperimentalGroup): String? = if (group.features.size > 1) group.title else null
 
     SettingsPageScaffold(title = "Experimental", store = store, listState = listState) {
         settingsSection(
             key = "experimental-all",
             footer = footerText(
-                if (all) "New experiments turn on as they arrive. Switch one off to skip it."
-                else "Unfinished features that may change or go away.",
+                "Turns on new experiments as they arrive, but not ones that see your screen or listen in the background.",
             ),
         ) {
             SettingsToggleRow(
@@ -99,7 +98,6 @@ fun ExperimentalSettingsView(store: SettingsStore, focus: ExperimentalFeature?) 
                 onCheckedChange = { send(HomeSettingsFeature.Action.AllExperimentsChanged(it)) },
                 symbol = "flask.fill",
                 tint = SettingsTint.Gray,
-                summary = "Try everything, new ones included",
             )
         }
         settingsSection(key = ExperimentalGroup.composer, header = header(ExperimentalGroup.composer)) {
@@ -108,9 +106,6 @@ fun ExperimentalSettingsView(store: SettingsStore, focus: ExperimentalFeature?) 
         settingsSection(key = ExperimentalGroup.calls, header = header(ExperimentalGroup.calls)) {
             toggles(ExperimentalGroup.calls, leadingDivider = false)
         }
-        settingsSection(key = ExperimentalGroup.transcript, header = header(ExperimentalGroup.transcript)) {
-            toggles(ExperimentalGroup.transcript, leadingDivider = false)
-        }
         settingsSection(key = ExperimentalGroup.drawer, header = header(ExperimentalGroup.drawer)) {
             toggles(ExperimentalGroup.drawer, leadingDivider = false)
             if (ExperimentalFeature.soundEffects.isActive(enabled.getValue(ExperimentalFeature.soundEffects))) {
@@ -118,10 +113,13 @@ fun ExperimentalSettingsView(store: SettingsStore, focus: ExperimentalFeature?) 
                 SoundEffectsSettingsRows(send)
             }
         }
+        settingsSection(key = ExperimentalGroup.transcript, header = header(ExperimentalGroup.transcript)) {
+            toggles(ExperimentalGroup.transcript, leadingDivider = false)
+        }
     }
 }
 
-/** One experiment's switch: its tinted symbol, title, and a few words. */
+/** One experiment's switch: its tinted symbol, title, and any few words. */
 @Composable
 fun ExperimentalFeatureToggle(
     feature: ExperimentalFeature,
@@ -139,7 +137,7 @@ fun ExperimentalFeatureToggle(
         checked = enabled,
         onCheckedChange = onChange,
         symbol = feature.symbol,
-        tint = feature.group.tint,
+        tint = feature.group?.tint ?: SettingsTint.Indigo,
         summary = feature.summary,
         modifier = Modifier.background(highlight),
     )
@@ -177,16 +175,19 @@ val ExperimentalGroup.tint: SettingsTint
 /**
  * Settings › Developer (iOS `Diagnostics/DiagnosticsView.swift`): `:devtools`'
  * Developer screen (Developer Mode, Record Diagnostics, Demo Call Audio, Troubleshooting,
- * Tuning, Android's tools), with Settings' Playgrounds under Tuning as on iOS. Its sub-pages
- * go back inside it; its main page's back pops Settings' stack. The overlay shares the store.
+ * Tuning, Android's tools), with Settings' Playgrounds under Tuning as on iOS, and the server's
+ * Server Details row last while there is a server (iOS p217). Its sub-pages go back inside it;
+ * its main page's back pops Settings' stack. The overlay shares the store.
  */
 @Composable
 fun DeveloperSettingsView(store: SettingsStore) {
+    val hasServer by store.observe { it.server != null }
     DevToolsView(
         DevTools.developerStore,
         Modifier.fillMaxSize(),
         onClose = { store.send(SettingsFeature.Action.BackTapped) },
         onOpenPlaygrounds = { store.send(SettingsFeature.Action.PagePushed(SettingsPage.Playgrounds)) },
+        onOpenServerDetails = if (hasServer) ({ store.send(SettingsFeature.Action.PagePushed(SettingsPage.ServerDetails)) }) else null,
     )
 }
 

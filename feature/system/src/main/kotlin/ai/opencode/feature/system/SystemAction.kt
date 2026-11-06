@@ -1,5 +1,6 @@
 package ai.opencode.feature.system
 
+import ai.opencode.core.log.SystemActionOrigin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.flow.Flow
@@ -26,6 +27,8 @@ data class SystemAction(
      * background Start Voice Call, which has already shown the call's Live Update).
      */
     val startsInBackground: Boolean = false,
+    /** Which surface made it, for the call trigger log line (iOS `SystemAction.Origin`). */
+    val origin: SystemActionOrigin = SystemActionOrigin.other,
 ) {
     sealed interface Destination {
         /** The session you'd see on opening the app: the last viewed, else the newest. */

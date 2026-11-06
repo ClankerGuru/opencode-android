@@ -134,6 +134,7 @@ private fun SessionComposerEnv.AgentButton() {
             agents = agents,
             onOpen = { store.send(Action.AgentsRequested) },
             onPick = { store.send(Action.AgentPicked(it)) },
+            targetDrop = ComposerLayoutMetrics.pickerTargetDrop.dp,
         )
     }
 }
@@ -156,6 +157,7 @@ private fun SessionComposerEnv.ModelButton(enabled: Boolean) {
                 onEvent = { event -> modelPickerAction(event)?.let(store::send) },
                 // iOS `openOnePicker()`: the picker grows out of the composer in the keyboard's place.
                 onOpen = {
+                    if (composerTextTakesDoubleTap()) return@OnePickerChip
                     if (panels != null && panels.canPresentOnePickerMorph) {
                         panels.openOnePicker()
                     } else {
@@ -164,21 +166,30 @@ private fun SessionComposerEnv.ModelButton(enabled: Boolean) {
                     }
                 },
                 isEnabled = enabled && panels?.onePicker?.isOpen != true,
+                targetDrop = ComposerLayoutMetrics.pickerTargetDrop.dp,
             )
         } else {
             ModelPickerChip(
                 state = picker,
                 onClick = {
                     if (!enabled) return@ModelPickerChip
+                    if (composerTextTakesDoubleTap()) return@ModelPickerChip
                     // Put away under any picker sheet (iOS 07b2f5f8), or a row's level menu raises the
                     // composer's keyboard over the sheet.
                     if (host.messageFieldFocused) dismissKeyboard()
                     store.send(Action.ModelButtonTapped)
                 },
+                targetDrop = ComposerLayoutMetrics.pickerTargetDrop.dp,
             )
         }
     }
 }
+
+/**
+ * iOS `composerTextTakesDoubleTap`: a chip's or the composer's own tap that's really a double
+ * tap's second half on the text ([ai.opencode.feature.composer.ComposerSwipeInput.takesDoubleTap]).
+ */
+internal fun SessionComposerEnv.composerTextTakesDoubleTap(): Boolean = host.sendTransition.input?.takesDoubleTap() == true
 
 /**
  * iOS `attachmentButton`: :feature:composer's [AttachmentPickerButton]. + opens the attachment
@@ -487,23 +498,15 @@ internal fun SessionComposerEnv.TrailingButton(control: ComposerTrailingControl)
                 onHold = { store.send(Action.StopLongPressed) },
                 modifier = semantics,
             ) { label() }
-            control == ComposerTrailingControl.Call -> Box(
-                Modifier
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = ripple(bounded = false, radius = 22.dp),
-                        role = Role.Button,
-                    ) {
-                        // Only ever starts a call; End is the floating call's.
-                        val center = dependency(FloatingCallCenter)
-                        center.breakoutFrom = center.callButton
-                        if (!hasCall) store.send(Action.VoiceTapped)
-                    }
-                    .openCodeTapTarget(accessibility = false)
-                    // Where a floating call breaks out of: the circle, in window space.
-                    .floatingCallButton()
-                    .then(semantics),
-                contentAlignment = Alignment.Center,
+            control == ComposerTrailingControl.Call -> ComposerCallButton(
+                onCall = {
+                    // Only ever starts a call; End is the floating call's.
+                    val center = dependency(FloatingCallCenter)
+                    center.breakoutFrom = center.callButton
+                    if (!hasCall) store.send(Action.CallButtonTapped)
+                },
+                // Where a floating call breaks out of: the circle, in window space.
+                modifier = Modifier.floatingCallButton().then(semantics),
             ) { label() }
             else -> Box(
                 Modifier

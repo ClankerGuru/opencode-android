@@ -425,5 +425,4 @@ data class PageShareRequest(
     val pageID: java.util.UUID,
     val url: String,
     val title: String,
-    val includesScreenshot: Boolean,
 )

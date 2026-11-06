@@ -1,5 +1,6 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.core.log.CallTrigger
 import ai.opencode.feature.session.*
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
@@ -97,7 +98,10 @@ internal fun HomeFeature.reduceSystem(state: State, action: Action): HomeReduced
     is Action.SharesReceived -> sharesReceived(state, action.shares)
 
     is Action.SystemActionOpened ->
-        openSystemDestination(state, action.destination, startsCall = action.startsCall, inBackground = action.inBackground)
+        openSystemDestination(
+            state, action.destination, startsCall = action.startsCall, inBackground = action.inBackground,
+            trigger = CallTrigger.System(action.origin),
+        )
 
     is Action.SystemPublishRequested -> {
         // A change publishes through `systemPublication`'s watch.
@@ -203,6 +207,7 @@ internal fun HomeFeature.openSystemDestination(
     destination: SystemAction.Destination,
     startsCall: Boolean,
     inBackground: Boolean = false,
+    trigger: CallTrigger,
 ): HomeReduced {
     var s = state.copy(settings = null)
     val session: OpenCodeSession? = when (destination) {
@@ -227,7 +232,7 @@ internal fun HomeFeature.openSystemDestination(
         // A project that's gone is asked for again, never swapped for another.
         if (projectID != null && project == null) s = s.updatingDetail { it.copy(draftProject = null) }
         if (startsCall) {
-            val call = startSystemCall(s, inBackground)
+            val call = startSystemCall(s, inBackground, trigger)
             s = call.state
             effects += call.effect
         }
@@ -239,7 +244,7 @@ internal fun HomeFeature.openSystemDestination(
     // the session loads its own transcript. A subagent of it on screen gives way to the session itself.
     s = s.withCatchUp(null).copy(pendingSubagentPush = null)
     val opened = openViewedSession(s, session, cachedItems = s.cachedTranscriptItems(session), reason = "a shortcut started a call")
-    val call = startSystemCall(opened.state, inBackground)
+    val call = startSystemCall(opened.state, inBackground, trigger)
     return Reduced(call.state, Effect.merge(opened.effect, call.effect))
 }
 
@@ -247,15 +252,16 @@ internal fun HomeFeature.openSystemDestination(
  * The call button's path. A call already live has moved here with the screen; one that ended is
  * cleared first, as the screen does when it changes; without Voice set up, Settings opens where
  * it's set up. In the background no call view appears to start the call (`startIfNeeded`), so
- * it's started here.
+ * it's started here. [trigger] is logged only once the call really starts.
  */
 @Suppress("UnusedReceiverParameter")
-internal fun HomeFeature.startSystemCall(state: State, inBackground: Boolean = false): HomeReduced {
+internal fun HomeFeature.startSystemCall(state: State, inBackground: Boolean = false, trigger: CallTrigger): HomeReduced {
     val detail = state.sessionDetail ?: return Reduced(state)
     var s = state
     if (detail.voice?.phase?.isTerminal == true) s = s.updatingDetail { it.copy(voice = null) }
     if (s.sessionDetail?.voice != null) return Reduced(s)
     if (!detail.isVoiceAvailable) return Reduced(s.showingSettings())
+    trigger.log()
     val tapped = Effect.send<Action>(Action.detail(SessionFeature.Action.VoiceTapped))
     if (!inBackground) return Reduced(s, tapped)
     return Reduced(s, Effect.concatenate(tapped, Effect.send(Action.detail(SessionFeature.Action.voicePresented(VoiceFeature.Action.StartIfNeeded)))))

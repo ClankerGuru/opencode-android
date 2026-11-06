@@ -15,6 +15,8 @@ import ai.opencode.feature.transcript.TranscriptAction
 import ai.opencode.feature.transcript.markdown.InlineText
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock.Kind
+import ai.opencode.feature.transcript.selection.LocalTranscriptReplySelection
+import ai.opencode.feature.transcript.selection.TranscriptSelectionLeafKey
 import ai.opencode.server.model.AgentFileReference
 import ai.opencode.feature.transcript.user.TranscriptDragContext
 import ai.opencode.feature.transcript.user.TranscriptDragPayload
@@ -64,6 +66,8 @@ import androidx.compose.ui.unit.sp
  *   block arrived and fades in whole).
  * @param isGrowingTail the reply's last block while it can still grow: a link still streaming
  *   in at its end keeps the globe.
+ * @param selectionItemID the reply row this block is in (iOS `selectionItemID`): its text joins
+ *   the list's one selection across the reply instead of being selectable on its own.
  */
 @Composable
 fun MarkdownBlockView(
@@ -71,25 +75,28 @@ fun MarkdownBlockView(
     modifier: Modifier = Modifier,
     arrivals: List<TranscriptTextReveal.Arrival> = emptyList(),
     isGrowingTail: Boolean = false,
+    selectionItemID: String? = null,
 ) {
     val reveal = LocalTranscriptTextReveal.current ?: remember { TranscriptTextReveal() }
     val whole = arrivals.firstOrNull { it.offset == 0 }
     val grown = arrivals.filter { it.offset > 0 }
+    val inList = LocalTranscriptReplySelection.current != null
+    val selection = if (selectionItemID != null && inList) TranscriptSelectionLeafKey(selectionItemID, block.id) else null
     Column(modifier.fillMaxWidth().arrivalFade(whole, reveal)) {
-        BlockContent(block.kind, grown, isGrowingTail)
+        BlockContent(block.kind, grown, isGrowingTail, selection)
     }
 }
 
 @Composable
-private fun BlockContent(kind: Kind, grown: List<TranscriptTextReveal.Arrival>, isGrowingTail: Boolean) {
+private fun BlockContent(kind: Kind, grown: List<TranscriptTextReveal.Arrival>, isGrowingTail: Boolean, selection: TranscriptSelectionLeafKey?) {
     val style = currentMarkdownStyle()
     val colors = style.colors
     val gutter = LocalTranscriptLayoutTuning.current.contentGutter.dp
     val context = LocalTranscriptRowContext.current
     val send = context.send
     when (kind) {
-        is Kind.NumberedItem -> ListItem(kind, kind.marker, 0, kind.text, grown, isGrowingTail)
-        is Kind.ListItem -> ListItem(kind, kind.marker, kind.level, kind.text, grown, isGrowingTail)
+        is Kind.NumberedItem -> ListItem(kind, kind.marker, 0, kind.text, grown, isGrowingTail, selection)
+        is Kind.ListItem -> ListItem(kind, kind.marker, kind.level, kind.text, grown, isGrowingTail, selection)
         is Kind.Blockquote -> Box(
             Modifier
                 .fillMaxWidth()
@@ -101,9 +108,9 @@ private fun BlockContent(kind: Kind, grown: List<TranscriptTextReveal.Arrival>, 
                 }
                 .padding(start = TranscriptMetrics.standard, top = TranscriptMetrics.compact, bottom = TranscriptMetrics.compact),
         ) {
-            BlockText(kind, kind.text, style.bodyStyle, colors.secondaryText, grown, isGrowingTail, tonesBody = false)
+            BlockText(kind, kind.text, style.bodyStyle, colors.secondaryText, grown, isGrowingTail, selection, tonesBody = false)
         }
-        is Kind.Paragraph -> BlockText(kind, kind.text, style.bodyStyle, style.bodyColor, grown, isGrowingTail)
+        is Kind.Paragraph -> BlockText(kind, kind.text, style.bodyStyle, style.bodyColor, grown, isGrowingTail, selection)
         Kind.Divider ->
             // Runs the screen's full width, like the code and table bands, with the block gap on each side.
             HairlineRule(Modifier.bleedHorizontal(gutter).clearAndSetSemantics {})
@@ -113,19 +120,19 @@ private fun BlockContent(kind: Kind, grown: List<TranscriptTextReveal.Arrival>, 
         // it's on screen; a file that can't be shown inline falls back to its card.
         is Kind.Image -> MarkdownImage(kind.source, kind.alt, fallbackFile = AgentFileReference.fromLink(kind.source))
         is Kind.Heading -> BlockText(
-            kind, kind.text, style.headingStyle(kind.level), colors.strongText, grown, isGrowingTail,
+            kind, kind.text, style.headingStyle(kind.level), colors.strongText, grown, isGrowingTail, selection,
             headingLevel = kind.level, modifier = Modifier.semantics { heading() },
         )
         is Kind.Code -> {
             val text = remember(kind.code, colors) { PresentedText.plain(MarkdownPresentation.code(kind.code, colors)) }
             MarkdownBand {
-                QuoteSelectionContainer(kind) {
-                    ArrivingText(text, grown, MarkdownStyle.codeTextStyle(style.tuning.codeLeading), colors.text, softWrap = false)
+                QuoteSelectionContainer(kind, inReply = selection != null) {
+                    ArrivingText(text, grown, MarkdownStyle.codeTextStyle(style.tuning.codeLeading), colors.text, softWrap = false, selectionKey = selection)
                 }
             }
         }
-        is Kind.Table -> MarkdownTable(kind.header, kind.rows)
-        is Kind.Math -> MathDisplayView(kind.math)
+        is Kind.Table -> MarkdownTable(kind.header, kind.rows, selection)
+        is Kind.Math -> MathDisplayView(kind.math, selection)
         // The diagram drags out as `diagram.png` (iOS `.transcriptDragSource(.image(...))`).
         is Kind.Mermaid -> androidx.compose.runtime.CompositionLocalProvider(
             ai.opencode.feature.media.LocalTranscriptImageDragSource provides MermaidImageDragSource,
@@ -147,6 +154,7 @@ private fun BlockText(
     color: Color,
     grown: List<TranscriptTextReveal.Arrival>,
     isGrowingTail: Boolean,
+    selection: TranscriptSelectionLeafKey?,
     modifier: Modifier = Modifier,
     secondary: Boolean = false,
     headingLevel: Int? = null,
@@ -175,8 +183,8 @@ private fun BlockText(
     val presented = remember(inline, options, sessionLinks.targets, style.colors, density, siteIcon, linkRevision) {
         MarkdownPresentation.present(inline, options, style, sessionLinks.targets, density, listener, siteIcon)
     }
-    QuoteSelectionContainer(kind, modifier) {
-        ArrivingText(presented, presented.mapArrivals(grown), textStyle, color)
+    QuoteSelectionContainer(kind, inReply = selection != null, modifier) {
+        ArrivingText(presented, presented.mapArrivals(grown), textStyle, color, selectionKey = selection)
     }
     ReportsSessionLinks(presented.sessionIDs)
     val fetchable = presented.fetchableLinks
@@ -187,7 +195,15 @@ private fun BlockText(
 
 /** The marker hangs, so wrapped lines align with the text, not under it. */
 @Composable
-private fun ListItem(kind: Kind, marker: String, level: Int, text: InlineText, grown: List<TranscriptTextReveal.Arrival>, isGrowingTail: Boolean) {
+private fun ListItem(
+    kind: Kind,
+    marker: String,
+    level: Int,
+    text: InlineText,
+    grown: List<TranscriptTextReveal.Arrival>,
+    isGrowingTail: Boolean,
+    selection: TranscriptSelectionLeafKey?,
+) {
     val style = currentMarkdownStyle()
     val colors = style.colors
     val done = marker == OpenCodeMarkdownBlock.doneTask
@@ -215,7 +231,7 @@ private fun ListItem(kind: Kind, marker: String, level: Int, text: InlineText, g
         }
         Box(Modifier.weight(1f).alignByBaseline()) {
             BlockText(
-                kind, text, bodyStyle, if (done) colors.secondaryText else style.bodyColor, grown, isGrowingTail,
+                kind, text, bodyStyle, if (done) colors.secondaryText else style.bodyColor, grown, isGrowingTail, selection,
                 secondary = done,
             )
         }

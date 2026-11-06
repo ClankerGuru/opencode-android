@@ -10,6 +10,8 @@ import ai.opencode.feature.session.SessionFeature.CancelID
 import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.feature.media.BrowserFeature
 import ai.opencode.feature.media.BrowserLinkPolicy
+import ai.opencode.feature.media.BrowserLinkRoute
+import ai.opencode.feature.media.BrowserReplyStatus
 import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.feature.media.LinkMenuAction
 import ai.opencode.feature.media.LinkProbe
@@ -58,8 +60,9 @@ private fun SessionFeature.openLink(url: String, state: State): Reduced<State, A
  * browser when it's on and takes the link, else the system browser.
  */
 private fun SessionFeature.openWithoutApps(url: String): Effect<Action> {
-    if (experimentalFeatures(ExperimentalFeature.inAppBrowser) && BrowserLinkPolicy.isPublicWebPage(url)) {
-        return Effect.send(Action.Browser(BrowserFeature.Action.Open(url)))
+    val route = BrowserLinkPolicy.route(url, inAppBrowser = experimentalFeatures(ExperimentalFeature.inAppBrowser))
+    if (route is BrowserLinkRoute.InAppBrowser) {
+        return Effect.send(Action.Browser(BrowserFeature.Action.Open(route.url)))
     }
     val openURL = openURL
     return Effect.run { openURL.open(url) }
@@ -90,11 +93,19 @@ private fun dropLinkProbe(state: State): Reduced<State, Action> {
     return Reduced(state.copy(linkProbe = null), Effect.cancel(CancelID.UniversalLink))
 }
 
+/** What [BrowserPage][ai.opencode.feature.media.BrowserPage]'s reply capsule shows, without the page reading the session (iOS `browserReplyStatus`). */
+val State.browserReplyStatus: BrowserReplyStatus?
+    get() {
+        val peek = browserPeek ?: return null
+        if (peek.text != null) return BrowserReplyStatus.Ready
+        return if (hasPendingRequests) BrowserReplyStatus.NeedsInput else BrowserReplyStatus.Working
+    }
+
 /** iOS `closeBrowser(_:)`: closes the in-app browser at once and forgets its page. */
 internal fun SessionFeature.closeBrowser(state: State): Reduced<State, Action> {
     val id = state.browser.pageID ?: return Reduced(state)
     val pageReader = pageReader
-    return Reduced(state.copy(browser = BrowserFeature.State()), Effect.run { pageReader.discard(id) })
+    return Reduced(state.copy(browser = state.browser.close()), Effect.run { pageReader.discard(id) })
 }
 
 /**
@@ -276,21 +287,19 @@ internal fun SessionFeature.reduceBrowserAndBackgroundWork(state: State, action:
 
 /** iOS `.browser(.askSent)`: Ask about this page. The question goes with the page attached, and its reply shows in the page's capsule. */
 private fun SessionFeature.askSent(state: State): Reduced<State, Action> {
-    val text = state.browser.askDraft.trim()
-    val page = state.browser.shareRequest
-    if (text.isEmpty() || page == null || (state.session == null && state.draftProject == null)) return Reduced(state)
+    if (state.session == null && state.draftProject == null) return Reduced(state)
+    val serverID = serverID
+    val ask = state.browser.takeAsk { serverID.messageID() } ?: return Reduced(state)
     haptics.play(Haptic.tap)
-    val messageID = serverID.messageID()
-    val next = state.copy(browser = state.browser.copy(askDraft = "", isAsking = false, peekMessageID = messageID))
     return submit(
-        messageID = messageID,
-        text = text,
+        messageID = ask.messageID,
+        text = ask.text,
         attachments = emptyList(),
         files = emptyList(),
         delivery = OpenCodeDelivery.Steer,
-        page = page,
+        page = ask.page,
         isRetry = false,
-        state = next,
+        state = state.copy(browser = ask.state),
     )
 }
 
@@ -299,8 +308,9 @@ private fun SessionFeature.linkMenu(action: LinkMenuAction, url: String, state: 
     LinkMenuAction.OpenInAppBrowser -> {
         // Navigation: quiet, like a tap on the link.
         val drop = dropLinkProbe(state)
-        if (!experimentalFeatures(ExperimentalFeature.inAppBrowser) || !BrowserLinkPolicy.isPublicWebPage(url)) drop
-        else Reduced(drop.state, Effect.merge(drop.effect, Effect.send(Action.Browser(BrowserFeature.Action.Open(url)))))
+        val route = BrowserLinkPolicy.route(url, inAppBrowser = experimentalFeatures(ExperimentalFeature.inAppBrowser))
+        if (route !is BrowserLinkRoute.InAppBrowser) drop
+        else Reduced(drop.state, Effect.merge(drop.effect, Effect.send(Action.Browser(BrowserFeature.Action.Open(route.url)))))
     }
 
     LinkMenuAction.OpenInSafari -> {

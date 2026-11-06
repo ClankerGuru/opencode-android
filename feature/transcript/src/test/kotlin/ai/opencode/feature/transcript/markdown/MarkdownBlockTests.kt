@@ -75,8 +75,7 @@ import org.junit.Test
  *   each test is ported (the highlight is derived from source and language).
  * - The UIKit halves of `accessibilityDynamicTypeScalesH3MarkersAndLeading` (`UIFontMetrics`;
  *   sp sizes follow the system font scale), `quotesAndTablesKeepMainColourPolicyAcrossContrastModes`
- *   (`UIColor.secondaryLabel` alpha) and `quoteEditMenuInsertsNextToCopyAndClearsSelectionOnPerform`
- *   (`UITextView`/`UIHostingConfiguration` edit menus); `consecutiveHeadings…`'s
+ *   (`UIColor.secondaryLabel` alpha); `consecutiveHeadings…`'s
  *   `TranscriptTimeStamp.font`/`MarkdownTable.cellFont` (local composable styles) and
  *   `refinedStandardTypography…`'s `TranscriptMetrics` meta fonts (`:feature:media`).
  */
@@ -586,13 +585,15 @@ class MarkdownBlockTests {
         }
     }
 
-    @Test fun quoteEditMenuInsertsNextToCopyAndClearsSelectionOnPerform() {
+    @Test fun markdownQuoteFormatsABlockquoteAndAppendsItToTheDraft() {
         assertNull(MarkdownQuote.blockquote("   \n "))
         assertEquals("> One\n> Two", MarkdownQuote.blockquote("One\nTwo"))
         assertEquals("> One\n> Two\n> Three", MarkdownQuote.blockquote("One\u2028Two\u2029Three"))
         assertEquals("> One\n\n", MarkdownQuote.append("> One", ""))
         assertEquals("Existing draft\n\n> Two\n\n", MarkdownQuote.append("> Two", "Existing draft\n"))
-        // The code block's anchor quotes its selection fenced in the block's language.
+        assertEquals("```swift\nlet x = 1\n```", MarkdownQuote.fencedCode("let x = 1\n", "swift"))
+        assertEquals("````\na ``` b\n````", MarkdownQuote.fencedCode("a ``` b", null))
+        // A code selection quotes fenced in the block's language.
         assertEquals("```swift\nlet retry\n```", MarkdownQuote.fencedCode("let retry", "swift"))
     }
 }

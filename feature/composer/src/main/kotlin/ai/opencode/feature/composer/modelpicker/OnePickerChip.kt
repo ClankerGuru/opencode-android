@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -50,6 +51,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
@@ -65,6 +67,8 @@ import kotlin.math.roundToInt
  * it is also a slider whose steps send [ModelPickerEvent.ModelRowLevelChanged] (iOS
  * `accessibilityAdjustableAction`). Material 3 Expressive: no button chrome of its own, as the
  * composer's other chips.
+ *
+ * [targetDrop]: how far its target sits below its ink (the composer's `pickerTargetDrop`).
  */
 @Composable
 fun OnePickerChip(
@@ -74,6 +78,7 @@ fun OnePickerChip(
     onOpen: () -> Unit,
     modifier: Modifier = Modifier,
     isEnabled: Boolean = true,
+    targetDrop: Dp = 0.dp,
 ) {
     val reduceMotion = rememberReduceMotion()
     val density = LocalDensity.current
@@ -99,6 +104,9 @@ fun OnePickerChip(
                     )
                 }
             }
+            // The target sits [targetDrop] below the ink (iOS `openCodeTapTarget(lowered:)`): the
+            // chip's touch and TalkBack bounds move down and its ink moves back up.
+            .offset(y = targetDrop)
             .clickable(enabled = isEnabled, role = Role.Button) { onOpen() }
             .openCodeTapTarget()
             .heightIn(min = 48.dp)
@@ -119,7 +127,8 @@ fun OnePickerChip(
                     }
                 }
             }
-            .testTag("composer-model"),
+            .testTag("composer-model")
+            .offset(y = -targetDrop),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

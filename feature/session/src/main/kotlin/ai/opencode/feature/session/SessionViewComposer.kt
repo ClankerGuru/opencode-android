@@ -27,6 +27,7 @@ import ai.opencode.feature.composer.ComposerFileSource
 import ai.opencode.feature.composer.ComposerImageSource
 import ai.opencode.feature.composer.ComposerKeyboardMorph
 import ai.opencode.feature.composer.ComposerSendTransition
+import ai.opencode.feature.composer.ComposerSideMargins
 import ai.opencode.feature.composer.ComposerSwipeDown
 import ai.opencode.feature.composer.ComposerSwipeOwnership
 import ai.opencode.feature.composer.ComposerTextInput
@@ -878,7 +879,13 @@ private fun SessionComposerEnv.ComposerArea(modifier: Modifier) {
 @Composable
 private fun SessionComposerEnv.ComposerAreaContent(modifier: Modifier) {
     val pillGap = ComposerTunables.pillGap
-    val horizontalMargin = ComposerTunables.horizontalMargin
+    // iOS `composerSideMargin` / `composerKeyboardSideMargin`: with the keys up the composer
+    // widens to the keyboard gap's margin; a Catch Up card keeps its concentric clearance.
+    val sides = if (host.isCatchUpCard) {
+        ComposerSideMargins(CATCH_UP_COMPOSER_CLEARANCE.dp, CATCH_UP_COMPOSER_CLEARANCE.dp)
+    } else {
+        ComposerSideMargins(ComposerTunables.horizontalMargin.dp, ComposerTunables.keyboardHorizontalMargin.dp)
+    }
     val morph = LocalComposerKeyboardMorph.current
     Box(
         modifier
@@ -891,15 +898,16 @@ private fun SessionComposerEnv.ComposerAreaContent(modifier: Modifier) {
                 if (view.requestChromeHeight != chrome) view.requestChromeHeight = chrome
                 layout(area.width, area.height) { area.placeRelative(0, 0) }
             }
-            .padding(horizontal = horizontalMargin.dp)
             .padding(top = 6.dp)
-            // The bottom gap grows to the keyboard gap with the keys, frame by frame.
+            // The bottom gap grows to the keyboard gap with the keys, and the side margins
+            // shrink to it, frame by frame.
             .composerKeyboardSpacing(
                 morph,
                 top = false,
                 innerVertical = ComposerTunables.innerVertical.dp,
                 bottomGap = ComposerTunables.bottomGap.dp,
                 keyboardGap = ComposerTunables.keyboardGap.dp,
+                sides = sides,
             ),
     ) {
         ai.opencode.feature.composer.RequestDockPrewarm()
@@ -1575,6 +1583,17 @@ private fun Modifier.composerSwipes(envNow: () -> SessionComposerEnv, density: F
 // region Composer
 
 /** iOS `composer`: the fold layout of attachments, the field and its controls, and status lines. */
+/**
+ * iOS `composerTapped(recording:)`: a tap on the composer around its text focuses the text.
+ * Folded while dictating, the field is out of sight, so the keyboard stays down; a tap that's a
+ * double tap's second half on the text does nothing else.
+ */
+private fun SessionComposerEnv.composerTapped(recording: Boolean) {
+    if (recording) return
+    if (composerTextTakesDoubleTap()) return
+    focus()
+}
+
 @Composable
 private fun SessionComposerEnv.Composer() {
     val (composerExpanded, composerControls) = composerPresentation
@@ -1614,14 +1633,17 @@ private fun SessionComposerEnv.Composer() {
         else if (rowReveal.value < 1f) rowReveal.animateTo(1f, PhotoFlightTunables.row.spec())
     }
     val attachmentReveal = if (holdsRow) 0f else rowReveal.value
+    val current by rememberUpdatedState(this)
     Box(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(ComposerTunables.cornerRadius.dp))
             .pointerInput(recording) {
-                // Folded, the field is out of sight: a tap beside the bar mustn't raise the keyboard.
+                // Also the gap between the text and the row: Compose hits one point and the
+                // pickers' targets end at the glass's bottom edge, so the gap is this tap's (iOS
+                // `composerTextReach`).
                 detectTapGestures {
-                    if (!recording) focus()
+                    current.composerTapped(recording)
                 }
             }
             // A send's shrink is the field's one spring (iOS animates both in the send's one

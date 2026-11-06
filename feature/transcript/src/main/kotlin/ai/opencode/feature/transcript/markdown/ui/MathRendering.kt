@@ -2,6 +2,9 @@ package ai.opencode.feature.transcript.markdown.ui
 
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
+import ai.opencode.feature.transcript.selection.LocalTranscriptReplySelection
+import ai.opencode.feature.transcript.selection.TranscriptSelectionLeafKey
+import ai.opencode.feature.transcript.selection.transcriptSelectionAnchor
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.util.LruCache
@@ -10,7 +13,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ImageBitmap
@@ -19,6 +25,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -90,9 +97,12 @@ object InlineMath {
  * iOS `MathDisplayView`: display math on the full-width band code blocks use, scrolling
  * sideways when it's wider than the screen. Source jlatexmath can't typeset shows as code, as
  * written.
+ *
+ * @param selection the block's key in a reply: the equation joins the reply's one selection, a
+ *   typeset one as one whole piece of its source (iOS's image leaf), source shown as code as text.
  */
 @Composable
-fun MathDisplayView(math: OpenCodeMarkdownBlock.MathBlock, modifier: Modifier = Modifier) {
+fun MathDisplayView(math: OpenCodeMarkdownBlock.MathBlock, selection: TranscriptSelectionLeafKey? = null, modifier: Modifier = Modifier) {
     val density = LocalDensity.current
     val colors = OpenCodeTheme.colors
     val fontSizePx = InlineMath.fontSizePx(MarkdownStyle.bodyTextSize, density) * 1.15f
@@ -103,12 +113,27 @@ fun MathDisplayView(math: OpenCodeMarkdownBlock.MathBlock, modifier: Modifier = 
             stateDescription = math.source
         },
     ) {
+        val replySelection = if (selection != null) LocalTranscriptReplySelection.current else null
         if (rendered != null) {
+            var image: Modifier = Modifier
+            if (replySelection != null && selection != null) {
+                image = Modifier.transcriptSelectionAnchor(selection, replySelection, layout = null)
+            }
             Image(
                 bitmap = rendered.image,
                 contentDescription = null,
                 colorFilter = ColorFilter.tint(colors.text),
-                modifier = Modifier.padding(vertical = 4.dp),
+                modifier = Modifier.padding(vertical = 4.dp).then(image),
+            )
+        } else if (replySelection != null && selection != null) {
+            var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
+            Text(
+                math.raw,
+                style = MarkdownStyle.codeTextStyle(codeLeading = 0f),
+                color = colors.text,
+                softWrap = false,
+                onTextLayout = { layout = it },
+                modifier = Modifier.transcriptSelectionAnchor(selection, replySelection) { layout },
             )
         } else {
             SelectionContainer {

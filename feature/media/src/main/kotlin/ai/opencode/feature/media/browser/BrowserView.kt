@@ -2,6 +2,9 @@ package ai.opencode.feature.media
 
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.motion.Motion
+import ai.opencode.core.scene.ActiveScene
+import ai.opencode.core.store.StoreOf
+import ai.opencode.core.store.observe
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeIcon
@@ -57,7 +60,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -88,7 +90,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import kotlinx.coroutines.launch
 import java.util.UUID
 import kotlin.math.roundToInt
 
@@ -103,29 +104,23 @@ object BrowserMetrics {
 }
 
 /**
- * What the reply capsule shows (the slice of iOS `SessionFeature.State.BrowserPeek` the page
- * reads): the reply's text once it lands, null while the agent works.
- */
-data class BrowserPeek(val text: CharSequence?)
-
-/**
  * The page pushed over the session (D-40, Push In): the web view edge to edge, a back button
  * where the drawer button sits, and a bar at the bottom (the page's back and forward, its title
  * and host, Share, Open in Browser, and Ask). Ask raises a composer over the bar; the question goes to the
  * session with the page attached, and a capsule shows the reply's progress. Going back from the
  * first page closes it: the back button, or the stack's back gesture (which steps back through
- * the page's history first: see [browserBackAction] and [BrowserWebViews.canGoBack]).
- * Port of iOS `BrowserPage`; the session passes its browser state, its peek and an action sink.
+ * the page's history first: see [browserBackAction]). Port of iOS `BrowserPage`: the session
+ * passes its scoped browser store and how the reply to the last question is going.
  *
+ * @param replyStatus the reply capsule's state (iOS `SessionFeature.State.browserReplyStatus`);
+ *   null hides it.
  * @param workingIndicator the session's `WorkingIndicator`, shown in the capsule while the
  *   agent works on the question (`needsInput`: a request waiting on you).
  */
 @Composable
 fun BrowserPage(
-    browser: BrowserFeature.State,
-    peek: BrowserPeek?,
-    hasPendingRequests: Boolean,
-    onAction: (BrowserFeature.Action) -> Unit,
+    store: StoreOf<BrowserFeature.State, BrowserFeature.Action>,
+    replyStatus: BrowserReplyStatus?,
     workingIndicator: @Composable (needsInput: Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -133,16 +128,21 @@ fun BrowserPage(
     val focusManager = LocalFocusManager.current
     val density = LocalDensity.current
     var bottomHeight by remember { mutableStateOf(BrowserMetrics.barHeight) }
+    val live by store.observe { it.snapshot }
     // The visit as it was last open: closing clears the store at once, while the page still
     // slides off the stack showing it.
-    var lastOpen by remember { mutableStateOf<BrowserFeature.State?>(null) }
-    LaunchedEffect(browser) { if (browser.isOpen) lastOpen = browser }
-    val shown = if (browser.isOpen) browser else lastOpen ?: browser
+    var closingSnapshot by remember { mutableStateOf(store.state.snapshot) }
+    LaunchedEffect(live) {
+        val snapshot = live
+        if (snapshot != null) closingSnapshot = snapshot
+    }
+    val page = BrowserFeature.State.Snapshot.displayed(live = live, closing = closingSnapshot)
+    val isAsking = page?.isAsking == true
 
     fun close() {
-        if (!browser.isOpen) return
+        if (!store.state.isOpen) return
         focusManager.clearFocus()
-        onAction(BrowserFeature.Action.CloseTapped)
+        store.send(BrowserFeature.Action.CloseTapped)
     }
 
     // The safe area (the keyboard's too, as iOS's bottom safe area is while it shows).
@@ -161,21 +161,19 @@ fun BrowserPage(
             }
             .testTag("browser"),
     ) {
-        val pageID = shown.pageID
-        val url = shown.openedURL ?: shown.url
-        if (pageID != null && url != null) {
+        if (page != null) {
             // Edge to edge; the back button above and the bar below are the page's obscured
             // insets, so it scrolls under them and fixed elements' first/last pixels clear them.
             BrowserWebViewHost(
-                pageID = pageID,
-                url = url,
+                pageID = page.pageID,
+                url = page.openedURL,
                 insets = BrowserInsets(
                     top = (safeTop + BrowserMetrics.headerClearance).value,
                     left = safeArea.calculateLeftPadding(LayoutDirection.Ltr).value,
                     bottom = (safeArea.calculateBottomPadding() + bottomHeight + 8.dp).value,
                     right = safeArea.calculateRightPadding(LayoutDirection.Ltr).value,
                 ),
-                onEvent = onAction,
+                onEvent = { store.send(it) },
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -218,20 +216,20 @@ fun BrowserPage(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             AnimatedVisibility(
-                visible = peek != null && !shown.isAsking,
+                visible = replyStatus != null && !isAsking,
                 enter = appear(reduceMotion),
                 exit = disappear(reduceMotion),
             ) {
-                if (peek != null) ReplyCapsule(peek, hasPendingRequests, ::close, workingIndicator)
+                if (replyStatus != null) ReplyCapsule(replyStatus, ::close, workingIndicator)
             }
             AnimatedVisibility(
-                visible = shown.isAsking,
+                visible = isAsking,
                 enter = appear(reduceMotion),
                 exit = disappear(reduceMotion),
             ) {
-                AskComposer(shown, onAction, onSend = { focusManager.clearFocus() })
+                if (page != null) AskComposer(store, page, onSend = { focusManager.clearFocus() })
             }
-            Bar(shown, onAction)
+            Bar(store, page)
         }
     }
 }
@@ -269,8 +267,8 @@ private fun disappear(reduceMotion: Boolean): ExitTransition =
     else slideOutVertically(snappy.spec(IntOffset.VisibilityThreshold)) { it } + fadeOut(snappy.spec())
 
 @Composable
-private fun Bar(browser: BrowserFeature.State, onAction: (BrowserFeature.Action) -> Unit) {
-    val scope = rememberCoroutineScope()
+private fun Bar(store: StoreOf<BrowserFeature.State, BrowserFeature.Action>, page: BrowserFeature.State.Snapshot?) {
+    val isAsking = page?.isAsking == true
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
         Surface(
             shape = OpenCodeShape.capsule,
@@ -281,35 +279,36 @@ private fun Bar(browser: BrowserFeature.State, onAction: (BrowserFeature.Action)
                 .height(BrowserMetrics.barHeight),
         ) {
             Row(Modifier.padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                BarButton("chevron.left", "Back", "browser-back", browser.canGoBack) { onAction(BrowserFeature.Action.BackTapped) }
-                BarButton("chevron.right", "Forward", "browser-forward", browser.canGoForward) {
-                    onAction(BrowserFeature.Action.ForwardTapped)
+                BarButton("chevron.left", "Back", "browser-back", page?.canGoBack == true) {
+                    store.send(BrowserFeature.Action.BackTapped)
                 }
-                Address(browser, Modifier.weight(1f))
-                val url = browser.url
-                if (url != null) {
+                BarButton("chevron.right", "Forward", "browser-forward", page?.canGoForward == true) {
+                    store.send(BrowserFeature.Action.ForwardTapped)
+                }
+                Address(page, onTap = { store.send(BrowserFeature.Action.AddressTapped) }, Modifier.weight(1f))
+                if (page != null) {
+                    // iOS `ShareLink`: the system's share sheet, presented by the button itself.
                     BarButton("square.and.arrow.up", "Share", "browser-share", enabled = true) {
-                        dependency(LinkShareSheet).present(url)
+                        dependency(LinkShareSheet).present(page.url)
                     }
                     BarButton("safari", "Open in Browser", "browser-safari", enabled = true) {
-                        val opener = dependency(OpenURLClient)
-                        scope.launch { opener.openInBrowser(url) }
+                        store.send(BrowserFeature.Action.SafariTapped)
                     }
                 }
             }
         }
         Surface(
-            onClick = { onAction(if (browser.isAsking) BrowserFeature.Action.AskDismissed else BrowserFeature.Action.AskTapped) },
+            onClick = { store.send(if (isAsking) BrowserFeature.Action.AskDismissed else BrowserFeature.Action.AskTapped) },
             shape = CircleShape,
             tonalElevation = 3.dp,
             shadowElevation = 2.dp,
             modifier = Modifier
                 .size(BrowserMetrics.barHeight)
-                .semantics { contentDescription = if (browser.isAsking) "Cancel" else "Ask About This Page" }
+                .semantics { contentDescription = if (isAsking) "Cancel" else "Ask About This Page" }
                 .testTag("browser-ask"),
         ) {
             // iOS `.contentTransition(.symbolEffect(.replace))`.
-            Crossfade(browser.isAsking, Modifier.fillMaxSize(), animationSpec = tween((Motion.fadeStandard * 1000).toInt()), label = "browser-ask") { asking ->
+            Crossfade(isAsking, Modifier.fillMaxSize(), animationSpec = tween((Motion.fadeStandard * 1000).toInt()), label = "browser-ask") { asking ->
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     OpenCodeIcon(if (asking) "xmark" else "text.bubble", contentDescription = null, tint = OpenCodeTheme.colors.text)
                 }
@@ -336,17 +335,19 @@ private fun BarButton(systemImage: String, label: String, tag: String, enabled: 
 
 /** The page's title over its host; a tap scrolls to the top. */
 @Composable
-private fun Address(browser: BrowserFeature.State, modifier: Modifier) {
+private fun Address(page: BrowserFeature.State.Snapshot?, onTap: () -> Unit, modifier: Modifier) {
+    val title = page?.displayTitle ?: ""
+    val url = page?.url
     Column(
         modifier
             .heightIn(min = BrowserMetrics.controlSize)
-            .clickable { browser.pageID?.let { BrowserWebViews.shared.scrollToTop(it) } }
+            .clickable(onClick = onTap)
             .clearAndSetSemantics {
-                contentDescription = browser.displayTitle
-                stateDescription = browser.url ?: ""
+                contentDescription = title
+                stateDescription = url ?: ""
                 role = Role.Button
                 onClick(label = "Scroll to the top of the page") {
-                    browser.pageID?.let { BrowserWebViews.shared.scrollToTop(it) }
+                    onTap()
                     true
                 }
             }
@@ -355,7 +356,7 @@ private fun Address(browser: BrowserFeature.State, modifier: Modifier) {
         verticalArrangement = Arrangement.spacedBy(1.dp, Alignment.CenterVertically),
     ) {
         Text(
-            browser.displayTitle,
+            title,
             style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold),
             color = OpenCodeTheme.colors.text,
             maxLines = 1,
@@ -363,24 +364,28 @@ private fun Address(browser: BrowserFeature.State, modifier: Modifier) {
         )
         Row(horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.CenterVertically) {
             val secondary = OpenCodeTheme.colors.secondaryText
-            if (browser.isLoading) {
+            if (page?.isLoading == true) {
                 CircularProgressIndicator(Modifier.size(10.dp), strokeWidth = 1.5.dp, color = secondary)
-            } else if (browser.url?.startsWith("https:", ignoreCase = true) == true) {
+            } else if (url?.startsWith("https:", ignoreCase = true) == true) {
                 OpenCodeIcon("lock.fill", contentDescription = null, size = 11.dp, tint = secondary)
             }
-            Text(browser.host, style = OpenCodeTextStyles.caption1, color = secondary, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
+            Text(page?.host ?: "", style = OpenCodeTextStyles.caption1, color = secondary, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
         }
     }
 }
 
 @Composable
-private fun AskComposer(browser: BrowserFeature.State, onAction: (BrowserFeature.Action) -> Unit, onSend: () -> Unit) {
+private fun AskComposer(
+    store: StoreOf<BrowserFeature.State, BrowserFeature.Action>,
+    page: BrowserFeature.State.Snapshot,
+    onSend: () -> Unit,
+) {
     val focus = remember { FocusRequester() }
-    val canSend = browser.askDraft.isNotBlank()
+    val canSend = page.canSendAsk
     fun send() {
-        if (!canSend) return
+        if (!store.state.canSendAsk) return
         onSend()
-        onAction(BrowserFeature.Action.AskSent)
+        store.send(BrowserFeature.Action.AskSent)
     }
     Surface(
         shape = RoundedCornerShape(BrowserMetrics.barHeight / 2),
@@ -390,10 +395,14 @@ private fun AskComposer(browser: BrowserFeature.State, onAction: (BrowserFeature
     ) {
         Row(verticalAlignment = Alignment.Bottom) {
             TextField(
-                value = browser.askDraft,
+                value = page.askDraft,
                 onValueChange = { text ->
                     // A multi-line field's Send key types a newline: that's Send.
-                    if (text == browser.askDraft + "\n") send() else onAction(BrowserFeature.Action.AskDraftChanged(text))
+                    if (text == page.askDraft + "\n") {
+                        send()
+                    } else if (store.state.isOpen) {
+                        store.send(BrowserFeature.Action.AskDraftChanged(text))
+                    }
                 },
                 placeholder = { Text("Ask about this page") },
                 maxLines = 5,
@@ -435,7 +444,7 @@ private fun AskComposer(browser: BrowserFeature.State, onAction: (BrowserFeature
             }
         }
     }
-    LaunchedEffect(Unit) { focus.requestFocus() }
+    LaunchedEffect(Unit) { if (store.state.isOpen) focus.requestFocus() }
 }
 
 /**
@@ -444,14 +453,16 @@ private fun AskComposer(browser: BrowserFeature.State, onAction: (BrowserFeature
  */
 @Composable
 private fun ReplyCapsule(
-    peek: BrowserPeek,
-    hasPendingRequests: Boolean,
+    status: BrowserReplyStatus,
     close: () -> Unit,
     workingIndicator: @Composable (needsInput: Boolean) -> Unit,
 ) {
-    // A request waiting on you (a permission, a question) is answered in the session.
-    val needsInput = peek.text == null && hasPendingRequests
-    val goesBack = peek.text != null || needsInput
+    val goesBack = status.goesBack
+    val label = when (status) {
+        BrowserReplyStatus.Ready -> "Reply ready"
+        BrowserReplyStatus.NeedsInput -> "Needs your input"
+        BrowserReplyStatus.Working -> "Working"
+    }
     Surface(
         shape = OpenCodeShape.capsule,
         tonalElevation = 3.dp,
@@ -460,7 +471,7 @@ private fun ReplyCapsule(
             .heightIn(min = BrowserMetrics.controlSize)
             .then(if (goesBack) Modifier.clickable(role = Role.Button, onClickLabel = "Go back to the session", onClick = close) else Modifier)
             .clearAndSetSemantics {
-                contentDescription = if (peek.text != null) "Reply ready" else if (needsInput) "Needs your input" else "Working"
+                contentDescription = label
                 if (goesBack) {
                     role = Role.Button
                     onClick(label = "Go back to the session") { close(); true }
@@ -469,8 +480,9 @@ private fun ReplyCapsule(
             .testTag("browser-reply"),
     ) {
         Box(Modifier.padding(horizontal = 14.dp).heightIn(min = BrowserMetrics.controlSize), contentAlignment = Alignment.CenterStart) {
-            if (peek.text == null) {
-                workingIndicator(needsInput)
+            if (status != BrowserReplyStatus.Ready) {
+                // A request waiting on you (a permission, a question) is answered in the session.
+                workingIndicator(status == BrowserReplyStatus.NeedsInput)
             } else {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                     val secondary = OpenCodeTheme.colors.secondaryText
@@ -498,46 +510,62 @@ fun BrowserWebViewHost(
     modifier: Modifier = Modifier,
 ) {
     class Coordinator(var pageID: UUID) {
-        /**
-         * The page's web view was attached once; if it's discarded later (the page closing), it
-         * isn't made again while the view slides away.
-         */
-        var attached = false
+        /** The window the page was last seen in, so a move to another is sent once. */
+        var sceneID: String? = null
     }
     val coordinator = remember { Coordinator(pageID) }
     val isDark = OpenCodeTheme.colors.isDark
     var held by remember { mutableStateOf<Triple<String, Float, Float>?>(null) }
     val pages = BrowserWebViews.shared
 
-    fun attach(container: FrameLayout) {
+    // Made once per page, on first show and when the page changes: a page discarded later (the
+    // page closing) isn't made again while the view slides away (iOS mounts in `makeUIView` and
+    // on a page change only).
+    fun mount(container: FrameLayout) {
         val webView = pages.webView(pageID, url, isDark)
         if (webView.parent !== container) {
             (webView.parent as? ViewGroup)?.removeView(webView)
             container.removeAllViews()
             container.addView(webView, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         }
+        pages.resume(pageID)
+    }
+
+    // On every update: the page's handlers, appearance and insets, and the window it's in (iOS
+    // `bindCallbacks`: `noteScene`, and `.sceneChanged` when the page moves to another window).
+    fun bind(container: FrameLayout) {
         pages.setHostContext(pageID, container.context)
         // The app's appearance, live (iOS: the web view follows its trait collection).
         pages.setAppearance(pageID, isDark)
         pages.setObscuredInsets(pageID, insets)
         pages.setEventHandler(pageID, onEvent)
         pages.setLinkHeldHandler(pageID) { link, x, y -> held = Triple(link, x, y) }
-        pages.resume(pageID)
+        val sceneID = ActiveScene.sceneID(container.context)
+        pages.noteScene(pageID, sceneID)
+        if (sceneID != null && sceneID != coordinator.sceneID) {
+            coordinator.sceneID = sceneID
+            // After this update, as iOS's `Task { @MainActor in … }`.
+            container.post { onEvent(BrowserFeature.Action.SceneChanged(sceneID)) }
+        }
     }
 
     Box(modifier) {
         AndroidView(
-            factory = { context -> FrameLayout(context).apply { clipChildren = true } },
+            factory = { context ->
+                FrameLayout(context).apply {
+                    clipChildren = true
+                    mount(this)
+                }
+            },
             update = { container ->
                 if (coordinator.pageID != pageID) {
                     pages.setEventHandler(coordinator.pageID, null)
                     pages.setLinkHeldHandler(coordinator.pageID, null)
                     coordinator.pageID = pageID
-                    coordinator.attached = false
+                    coordinator.sceneID = null
+                    mount(container)
                 }
-                if (coordinator.attached && !pages.holds(pageID)) return@AndroidView
-                attach(container)
-                coordinator.attached = true
+                bind(container)
             },
             // Off screen, the page plays nothing and keeps nothing of the screen.
             onRelease = { container ->

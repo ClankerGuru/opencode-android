@@ -223,23 +223,25 @@ internal object ComposerDateSerializer : KSerializer<Instant> {
     }
 }
 
-/** iOS `PageShareRequest: Codable`: `pageID`, `url`, `title`, `includesScreenshot`. */
+/**
+ * iOS `PageShareRequest: Codable`: `pageID`, `url`, `title`. An older save's `includesScreenshot`
+ * is ignored (`ComposerPersistenceState.json` ignores unknown keys).
+ */
 internal object PageShareRequestSerializer : KSerializer<PageShareRequest> {
     @Serializable
     private class Surrogate(
         @Serializable(with = UUIDSerializer::class) val pageID: UUID,
         val url: String,
         val title: String,
-        val includesScreenshot: Boolean,
     )
 
     override val descriptor: SerialDescriptor = Surrogate.serializer().descriptor
 
     override fun serialize(encoder: Encoder, value: PageShareRequest) =
-        encoder.encodeSerializableValue(Surrogate.serializer(), Surrogate(value.pageID, value.url, value.title, value.includesScreenshot))
+        encoder.encodeSerializableValue(Surrogate.serializer(), Surrogate(value.pageID, value.url, value.title))
 
     override fun deserialize(decoder: Decoder): PageShareRequest {
         val s = decoder.decodeSerializableValue(Surrogate.serializer())
-        return PageShareRequest(s.pageID, s.url, s.title, s.includesScreenshot)
+        return PageShareRequest(s.pageID, s.url, s.title)
     }
 }
