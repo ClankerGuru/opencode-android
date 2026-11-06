@@ -582,7 +582,7 @@ fun SessionDrawerContainer(
         if (controller.drawerWidth != width.value) {
             controller.finishModeTransition()
             controller.drawerWidth = width.value
-            motion.updateWidth(width.value)
+            motion.updateWidth(width.value, catchingUp = controller.catchUp != null)
             controller.sidebarWidthChanged()
         }
         controller.contentSessionID = contentSessionID

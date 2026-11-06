@@ -45,6 +45,13 @@ class AttachmentMenuPressTests {
     private fun AttachmentMenuPress.ended(at: Offset, rows: Map<AttachmentMenuItem, Rect> = this@AttachmentMenuPressTests.rows) =
         ended(at, button, rows, slop)
 
+    @Test fun theDismissAreaIsMountedOnlyForWhatIsDrawn() {
+        assertNull(ComposerDismissTarget.current(attachmentMenuOpen = false, autocompleteOpen = true, autocompleteDrawn = false))
+        assertEquals(ComposerDismissTarget.Autocomplete, ComposerDismissTarget.current(attachmentMenuOpen = false, autocompleteOpen = true, autocompleteDrawn = true))
+        assertEquals(ComposerDismissTarget.AttachmentMenu, ComposerDismissTarget.current(attachmentMenuOpen = true, autocompleteOpen = true, autocompleteDrawn = false))
+        assertNull(ComposerDismissTarget.current(attachmentMenuOpen = false, autocompleteOpen = false, autocompleteDrawn = true))
+    }
+
     @Test fun aTapTogglesAndOpeningPlaysOneLightTap() {
         val log = mutableListOf<String>()
         val press = press(log)

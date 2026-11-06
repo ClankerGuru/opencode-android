@@ -1,5 +1,6 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.log.AppLog
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionFrameAction
 import ai.opencode.core.motion.PageTransitions
@@ -644,7 +645,14 @@ internal class SessionPageStackMotion(
      * [leanSign] is which way the preview leans on screen (+1 right, -1 left).
      */
     fun dragBegan(leanSign: Float): Boolean {
-        if (width <= 0 || !canGoBack || isPopping) return false
+        if (width <= 0 || !canGoBack) return false
+        // A finger already down as a pop began: the pop owns the page until it lands, so this
+        // drag is ignored. Taking the page would drop the pop's landing.
+        if (isPopping) {
+            val depth = pages.size
+            AppLog.app.info { "page_stack_back_drag_ignored reason=popping depth=$depth" }
+            return false
+        }
         // Caught mid-push: the drag takes the page from where it is.
         stopMotion()
         landing = null

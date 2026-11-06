@@ -211,6 +211,8 @@ class SessionComposerHost {
      * `SessionFloatingCallCoverage`. The composer and its pills hide under it.
      */
     internal var floatingCallCovers by mutableStateOf(false)
+    /** iOS `showsAutocomplete`: no request panel holds the composer's glass, so its suggestions can be drawn there. Set by the capsule. */
+    internal var showsAutocomplete by mutableStateOf(true)
     /** iOS `composerPanelCovers`: a panel grown out of the composer (One Picker, suggestions), or the Living Orb's card, stands over what sits above it. */
     val composerPanelCovers: Boolean get() = modelPanels?.covers == true || autocompleteCovers || floatingCallCovers
     /** One Picker is shown: the composer stays expanded under it. */
@@ -1142,6 +1144,7 @@ private fun SessionComposerEnv.ComposerCapsule() {
     val showsRequestPanel = holdsRequestPanelRoom || lingersRequestPanel
     // With no panel, Composer Autocomplete's suggestions grow there instead.
     val showsAutocomplete = !showsRequestPanel
+    SideEffect { if (host.showsAutocomplete != showsAutocomplete) host.showsAutocomplete = showsAutocomplete }
     val photoSheet = LocalSessionPhotoSheet.current
     // Read where it's used (layout, or the panel's own scope), never here: the room under the
     // header changes on every frame of the keyboard's animation.

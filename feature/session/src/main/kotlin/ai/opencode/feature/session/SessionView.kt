@@ -22,6 +22,7 @@ import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.ProviderIcon
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.feature.composer.AttachmentMenuDismissArea
+import ai.opencode.feature.composer.ComposerDismissTarget
 import ai.opencode.feature.composer.AttachmentMenuItem
 import ai.opencode.feature.composer.AttachmentMenuOverlay
 import ai.opencode.feature.composer.AttachmentMenuPhase
@@ -568,10 +569,16 @@ private fun SessionAttachmentMenu(
 @Composable
 private fun SessionComposerDismissArea(store: StoreOf<State, Action>, host: SessionComposerHost) {
     val autocompleteOpen by store.observe { it.autocomplete.isOpen }
-    when {
-        host.isAttachmentMenuOpen -> AttachmentMenuDismissArea(onDismiss = host.closeAttachmentMenu)
-        autocompleteOpen ->
+    val target = ComposerDismissTarget.current(
+        attachmentMenuOpen = host.isAttachmentMenuOpen,
+        autocompleteOpen = autocompleteOpen,
+        autocompleteDrawn = host.showsAutocomplete && !host.floatingCallCovers,
+    )
+    when (target) {
+        ComposerDismissTarget.AttachmentMenu -> AttachmentMenuDismissArea(onDismiss = host.closeAttachmentMenu)
+        ComposerDismissTarget.Autocomplete ->
             AttachmentMenuDismissArea(onDismiss = { store.send(Action.Autocomplete(ComposerAutocompleteAction.Dismissed)) })
+        null -> Unit
     }
 }
 

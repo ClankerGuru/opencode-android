@@ -172,6 +172,7 @@ class ComposerMorph(private val scope: CoroutineScope) {
     fun open() {
         generation += 1
         settleTask?.cancel()
+        foldPending = false
         phase = Phase.Open
         scope.launch { progress.snapTo(1f); bottomProgress.snapTo(1f); content.snapTo(1f) }
     }
@@ -284,6 +285,8 @@ class ComposerMorph(private val scope: CoroutineScope) {
         if (phase == Phase.Armed) return reset().also { onFinished?.invoke() }
         if (phase != Phase.Open) return onFinished?.invoke() ?: Unit
         generation += 1
+        // Its pending fold's turn is dropped by the bump above: the flag goes too.
+        foldPending = false
         phase = Phase.Closing
         scope.launch {
             try {

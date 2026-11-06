@@ -1,6 +1,7 @@
 package ai.opencode.feature.drawer.motion
 
 import ai.opencode.core.diagnostics.PerfTimeline
+import ai.opencode.core.log.AppLog
 import ai.opencode.feature.transcript.list.TranscriptMotionTrace
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionFrameAction
@@ -568,27 +569,37 @@ class DrawerMotionState(
     private var isDragging = false
     private var ignoresDragUntilItEnds = false
 
-    /** The width changed (rotation, window resize): keep the progress (iOS `update(width:)`). */
-    fun updateWidth(newWidth: Float) {
+    /**
+     * The width changed (rotation, window resize): keep the progress (iOS `update(width:)`).
+     * [catchingUp]: Catch Up owns the card's pose, so a card at rest isn't resettled.
+     */
+    fun updateWidth(newWidth: Float, catchingUp: Boolean = false) {
         if (newWidth == width) return
-        if (width == 0f) {
-            widthState.floatValue = newWidth
-            apply(if (isPresented) newWidth else 0f)
-            return
-        }
+        val hadWidth = width > 0
         val wasAnimating = spring != null
         val currentOffset = stopAnimationAtCurrentOffset()
         val progress = if (width > 0) (currentOffset / width).coerceIn(0f, 1f) else 0f
         widthState.floatValue = newWidth
         dragStartOffset = newWidth * progress
         apply(dragStartOffset)
+        val target = if (isPresented) newWidth else 0f
         if (isDragging) {
             // iOS re-enables the recognizer, which cancels the pan.
             ignoresDragUntilItEnds = true
             isDragging = false
             cancelDrag()
         } else if (wasAnimating) {
-            settle(if (isPresented) newWidth else 0f, animated = true)
+            settle(target, animated = true)
+        } else if (catchingUp) {
+            // The first width while catching up: the card takes the model's pose, and Catch Up
+            // keeps its touches.
+            if (!hadWidth) apply(target)
+        } else if (abs(dragStartOffset - target) > 0.5f) {
+            // At rest the card sits where the model says: a drawer opened before it had a width
+            // (none to scale from) lands open now.
+            val open = isPresented
+            AppLog.app.notice { "drawer_pose_resettled reason=width_changed open=$open" }
+            settle(target, animated = false)
         }
     }
 

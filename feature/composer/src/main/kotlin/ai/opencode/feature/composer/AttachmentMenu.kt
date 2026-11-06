@@ -1151,6 +1151,25 @@ private val RectConverter: TwoWayConverter<Rect, AnimationVector4D> = TwoWayConv
     convertFromVector = { Rect(it.v1, it.v2, it.v3, it.v4) },
 )
 
+/**
+ * What the composer's dismiss area closes (iOS `ComposerDismissTarget`). It reaches over the
+ * whole transcript, so it's mounted only for something on screen.
+ */
+enum class ComposerDismissTarget {
+    AttachmentMenu,
+    Autocomplete,
+    ;
+
+    companion object {
+        fun current(attachmentMenuOpen: Boolean, autocompleteOpen: Boolean, autocompleteDrawn: Boolean): ComposerDismissTarget? {
+            if (attachmentMenuOpen) return AttachmentMenu
+            // A request panel or a call's rows hold the glass: its rows aren't there.
+            if (autocompleteOpen && autocompleteDrawn) return Autocomplete
+            return null
+        }
+    }
+}
+
 /** Dismisses the menu on a tap or a downward drag (iOS `AttachmentMenuDismissArea`). */
 @Composable
 fun AttachmentMenuDismissArea(onDismiss: () -> Unit, modifier: Modifier = Modifier, extent: Dp? = null) {
