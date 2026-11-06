@@ -95,4 +95,47 @@ class TouchRecoveryTests {
         assertFalse(watch.sample(now = 403.03))
         assertTrue(watch.sample(now = 404.04))
     }
+
+    @Test
+    fun slowMotionCannotStretchTheBackoffOrTheGrace() {
+        val holder = Holder()
+        var releases = 0
+        val watch = TouchRecovery(
+            owner = TouchRecovery.Owner.Drawer,
+            inspect = { TouchRecovery.Fault(TouchRecovery.Reason.Disabled, holder) },
+            release = { releases += 1 },
+        )
+        // At 0.1× animation time crawls; the backoff still runs in real seconds.
+        assertFalse(watch.sample(now = 0.0, wall = 0.0))
+        assertTrue(watch.sample(now = 1.01, wall = 1.01))
+        assertFalse(watch.sample(now = 1.2, wall = 3.02))
+        assertFalse(watch.sample(now = 1.3, wall = 5.0))
+        // The grace is one animation second, but never more than four real ones.
+        assertTrue(watch.sample(now = 1.45, wall = 7.1))
+        assertEquals(2, releases)
+    }
+
+    @Test
+    fun deadDragExpeditesOnlyAFaultStandingBeforeTheTouch() {
+        val holder = Holder()
+        var releases = 0
+        var grace: TouchRecovery.Fault.Grace = TouchRecovery.Fault.Grace.Animation
+        val watch = TouchRecovery(
+            owner = TouchRecovery.Owner.Transcript,
+            inspect = { TouchRecovery.Fault(TouchRecovery.Reason.Disabled, holder, grace = grace) },
+            release = { releases += 1 },
+        )
+        assertFalse(watch.sample(now = 10.0, wall = 10.0))
+        assertFalse("The fault came after the finger", watch.expedite(touchBegan = 9.9, now = 10.3, wall = 10.3))
+        assertTrue(watch.expedite(touchBegan = 10.1, now = 10.3, wall = 10.3))
+        assertEquals(1, releases)
+        // Inside its backoff a dead drag changes nothing.
+        assertFalse(watch.expedite(touchBegan = 10.4, now = 11.0, wall = 11.0))
+        // A hard deadline holds against a dead drag.
+        grace = TouchRecovery.Fault.Grace.Wall(3.0)
+        assertFalse(watch.sample(now = 20.0, wall = 20.0))
+        assertFalse(watch.expedite(touchBegan = 21.0, now = 22.0, wall = 22.0))
+        assertTrue(watch.expedite(touchBegan = 21.0, now = 23.1, wall = 23.1))
+        assertEquals(2, releases)
+    }
 }

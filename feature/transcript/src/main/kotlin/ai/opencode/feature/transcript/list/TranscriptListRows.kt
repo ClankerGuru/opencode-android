@@ -240,6 +240,14 @@ data class MarkLoadingTiming(
 
     companion object {
         /**
+         * Real seconds the touch net lets a hand-off hold the list (iOS
+         * `TranscriptTouchSafety.handoffDeadline`): its longest supported hold and fade, plus a
+         * second, however slow lab motion runs.
+         */
+        const val handoffTouchDeadline: Double =
+            MarkLoadingTunables.minimumTimeUpperBound + MarkLoadingTunables.fadeOutUpperBound + 1
+
+        /**
          * Wall seconds after which a hand-off ends even if its frames never ran (iOS
          * `TranscriptMarkHandoff` deadline): the longest supported hold and fade, in wall time at
          * [timeScale] so slow motion still plays, plus 0.1 s.

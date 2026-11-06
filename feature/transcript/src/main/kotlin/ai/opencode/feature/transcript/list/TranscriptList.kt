@@ -3,6 +3,8 @@ package ai.opencode.feature.transcript.list
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.diagnostics.PerfTimeline
 import ai.opencode.core.motion.rememberReduceMotion
+import ai.opencode.core.touch.TouchRecovery
+import ai.opencode.core.touch.rememberTouchRecovery
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.inContainer
@@ -182,6 +184,12 @@ private fun TranscriptListContent(
     controller.update(configuration)
     controller.obstructionChanged(contentPadding.calculateBottomPadding().value, WindowInsets.ime.inContainer().getBottom(density) / density.density)
     SideEffect { controller.flushEffects() }
+    // iOS `TranscriptTouchSafety`: a hand-off that never lands can't keep the list's touches.
+    rememberTouchRecovery(
+        owner = TouchRecovery.Owner.Transcript,
+        inspect = { controller.touchRecoveryFault() },
+        release = { controller.releaseTouchRecoveryFault() },
+    )
 
     // iOS `TranscriptListViewController+TextSelection`: one selection across a reply's rows.
     val replySelection = controller.replySelection

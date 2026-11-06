@@ -1,10 +1,13 @@
 package ai.opencode.feature.transcript.list
 
+import ai.opencode.core.dependencies.Clock
+import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.diagnostics.MotionFrame
 import ai.opencode.core.diagnostics.PerfTimeline
 import ai.opencode.core.log.AppLog
 import ai.opencode.core.motion.MotionFrameAction
 import ai.opencode.core.motion.motionFrameLoop
+import ai.opencode.core.touch.TouchRecovery
 import ai.opencode.feature.transcript.NewMessagesPlacement
 import ai.opencode.feature.transcript.TranscriptAction
 import ai.opencode.feature.transcript.TranscriptConfiguration
@@ -204,6 +207,13 @@ class TranscriptListController(
      * mark takes every touch, so a frame loop that stops stepping must not keep the list locked.
      */
     private var handoffDeadline: Job? = null
+
+    /**
+     * Real seconds ([Clock], the touch net's wall time) when the hand-off began (iOS
+     * `TranscriptMarkHandoff.startedAt`).
+     */
+    private var handoffStartedAt: Double? = null
+    private val clock = dependency(Clock)
 
     fun handoffProgress(): Float {
         @Suppress("UNUSED_VARIABLE") val tick = frameTick
@@ -716,6 +726,8 @@ class TranscriptListController(
         // returning to the app mid-hand-off restores touches at once.
         finishHandoff()
         if (isShowingToReader) {
+            // A drag the screen or the app took as it left never reported its end.
+            releaseStrandedGesture(reason = "reappeared")
             lastLayout?.let(::onLayout)
         } else {
             cancelBorrowedDrag()
@@ -947,6 +959,17 @@ class TranscriptListController(
         lastLayout?.let { checkNewMessagesPassed(it) }
         // iOS: the selection's menu comes back once the list settles.
         if (replySelection.isSelected && !replySelection.isDragging && !replySelection.menuWanted) replySelection.presentMenu()
+    }
+
+    /**
+     * iOS `releaseStrandedGesture`: the reader's hold on the list outlived its gesture (the list
+     * left the screen under a finger and no end was reported), so nothing holds it now. Like iOS
+     * it only drops the hold; the next layout follows or browses from where the list is.
+     */
+    private fun releaseStrandedGesture(reason: String) {
+        if (!isUserGestureActive || state.isScrollInProgress) return
+        isUserGestureActive = false
+        AppLog.app.notice("transcript_gesture_released owner=transcript_list reason=$reason")
     }
 
     /** TalkBack/focus scrolls enter LazyListState's scroll mutation without nested drag events. */
@@ -1232,6 +1255,7 @@ class TranscriptListController(
     internal fun beginHandoff(loading: Boolean, showsEmpty: Boolean, since: Double?, time: Double, hold: Double, fade: Double) {
         handoffDeadline?.cancel()
         emptyHandoff = EmptyHandoff(loading, showsEmpty, since, time + hold, fade)
+        handoffStartedAt = clock.now().inWholeNanoseconds / 1e9
         val seconds = MarkLoadingTiming.handoffDeadlineSeconds(hold, fade)
         handoffDeadline = scope.launch {
             delay((seconds * 1000).toLong())
@@ -1246,6 +1270,28 @@ class TranscriptListController(
         handoffDeadline?.cancel()
         handoffDeadline = null
         emptyHandoff = null
+        handoffStartedAt = null
+    }
+
+    /**
+     * The transcript's touch-net fault (iOS `TranscriptTouchSafety.recoveries`, `.transcript`
+     * owner): an unfinished hand-off owns the list's touches until
+     * [MarkLoadingTiming.handoffTouchDeadline] real seconds after it began, however slow lab motion
+     * runs. iOS's disabled-list and disabled-host faults are n/a: nothing here disables the list.
+     */
+    fun touchRecoveryFault(): TouchRecovery.Fault? {
+        val handoff = emptyHandoff ?: return null
+        return TouchRecovery.Fault(
+            TouchRecovery.Reason.Transition,
+            handoff,
+            grace = TouchRecovery.Fault.Grace.Wall(MarkLoadingTiming.handoffTouchDeadline),
+            startedAt = handoffStartedAt,
+        )
+    }
+
+    /** Releases a [touchRecoveryFault]: cancels the hand-off (iOS `handoff.cancel()`). */
+    fun releaseTouchRecoveryFault() {
+        if (emptyHandoff != null) finishHandoff()
     }
 
     // MARK: Motion loop
