@@ -134,6 +134,7 @@ private fun SessionComposerEnv.AgentButton() {
             agents = agents,
             onOpen = { store.send(Action.AgentsRequested) },
             onPick = { store.send(Action.AgentPicked(it)) },
+            targetDrop = ComposerLayoutMetrics.pickerTargetDrop.dp,
         )
     }
 }
@@ -165,6 +166,7 @@ private fun SessionComposerEnv.ModelButton(enabled: Boolean) {
                     }
                 },
                 isEnabled = enabled && panels?.onePicker?.isOpen != true,
+                targetDrop = ComposerLayoutMetrics.pickerTargetDrop.dp,
             )
         } else {
             ModelPickerChip(
@@ -177,16 +179,17 @@ private fun SessionComposerEnv.ModelButton(enabled: Boolean) {
                     if (host.messageFieldFocused) dismissKeyboard()
                     store.send(Action.ModelButtonTapped)
                 },
+                targetDrop = ComposerLayoutMetrics.pickerTargetDrop.dp,
             )
         }
     }
 }
 
 /**
- * iOS `composerTextTakesDoubleTap`: a chip tap that's really a double tap's second half on the
- * text ([ai.opencode.feature.composer.ComposerSwipeInput.takesDoubleTap]).
+ * iOS `composerTextTakesDoubleTap`: a chip's or the composer's own tap that's really a double
+ * tap's second half on the text ([ai.opencode.feature.composer.ComposerSwipeInput.takesDoubleTap]).
  */
-private fun SessionComposerEnv.composerTextTakesDoubleTap(): Boolean = host.sendTransition.input?.takesDoubleTap() == true
+internal fun SessionComposerEnv.composerTextTakesDoubleTap(): Boolean = host.sendTransition.input?.takesDoubleTap() == true
 
 /**
  * iOS `attachmentButton`: :feature:composer's [AttachmentPickerButton]. + opens the attachment

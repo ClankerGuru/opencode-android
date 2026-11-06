@@ -774,10 +774,13 @@ fun ComposerTextInput(
     /**
      * iOS `takesDoubleTap`: whether the control tap now running is the second half of a finger's
      * double tap on the text's last line. If so, focuses the field and selects the word under
-     * the first tap. Always clears the recorded tap.
+     * the first tap. Clears the recorded tap, except when asked about the first tap's own touch
+     * (the composer's tap can see taps on the text too): then it keeps the tap for the second.
      */
     fun takesDoubleTap(now: Long): Boolean {
         val tap = controller.lastTap ?: return false
+        val latest = sendTransition?.windowTouches?.latest
+        if (latest != null && latest.time <= tap.began) return false
         controller.lastTap = null
         val coordinates = controller.swipeCoordinates?.takeIf { it.isAttached } ?: return false
         val second = sendTransition?.windowTouches?.latest ?: return false

@@ -188,6 +188,25 @@ object ComposerLayoutMetrics {
     val expandedRowGap: Float get() = ComposerTunables.expandedRowGap
     val configuredRowHeight: Float get() = max(32f, ComposerTunables.barHeight - 2 * ComposerTunables.innerVertical)
 
+    /**
+     * iOS `pickerTargetDrop`: how far the row's pickers (model, agent) sit their targets below
+     * their ink, down to the glass's bottom edge (the composer pads its bottom by
+     * `innerVertical`), away from the text above. Taps aimed at the text kept opening the model
+     * picker.
+     *
+     * Only the pickers: they're bare text with no visible edge, so where their target sits can't
+     * be seen. + and the mic, Send and Call are glass or circle faces, and their target stays on
+     * the face you can see: don't lower them to match.
+     *
+     * Android: the 48 dp targets already overhang the 44 dp row by 2 dp, so they drop that much
+     * less (4 dp) to end on the same edge.
+     */
+    val pickerTargetDrop: Float
+        get() {
+            val overhang = max(0f, (48f - configuredRowHeight) / 2)
+            return max(0f, ComposerTunables.innerVertical - overhang)
+        }
+
     fun inputX(progress: Float, inline: ComposerLayoutInline?): Float {
         // On the request panel's edge: titles 12 dp after the marks, or the panel's 20 dp edge.
         if (inline != null) return if (inline.hasLeading) 48f else 14f

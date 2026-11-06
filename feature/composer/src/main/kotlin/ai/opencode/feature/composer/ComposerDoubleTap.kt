@@ -28,10 +28,11 @@ data class ComposerTextTap(
 
 /**
  * iOS `ComposerDoubleTap.swift`'s rules. A finger's second tap lands a little below its first,
- * and the model chip's target starts just under the last line. A chip tap that is that double
- * tap's second half selects the word under the first tap, and the chip does nothing. It counts
- * only when both taps are fingers, the first was a quick tap on the last visible line, and the
- * second began within 0.4 s of it, about 30 dp across and just below the text. Mouse and
+ * onto the row gap or the model chip's target under the last line. A tap there (the chip's, or
+ * the composer's own) that is that double tap's second half selects the word under the first
+ * tap, and the tap does nothing else. It counts only when both taps are fingers, the first was
+ * a quick tap on the last visible line, and the second began within 0.4 s of it, about 30 dp
+ * across and just below the text. Mouse and
  * stylus clicks and TalkBack activation never count. Distances in px; times in uptime millis.
  */
 object ComposerDoubleTap {

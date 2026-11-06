@@ -1583,6 +1583,17 @@ private fun Modifier.composerSwipes(envNow: () -> SessionComposerEnv, density: F
 // region Composer
 
 /** iOS `composer`: the fold layout of attachments, the field and its controls, and status lines. */
+/**
+ * iOS `composerTapped(recording:)`: a tap on the composer around its text focuses the text.
+ * Folded while dictating, the field is out of sight, so the keyboard stays down; a tap that's a
+ * double tap's second half on the text does nothing else.
+ */
+private fun SessionComposerEnv.composerTapped(recording: Boolean) {
+    if (recording) return
+    if (composerTextTakesDoubleTap()) return
+    focus()
+}
+
 @Composable
 private fun SessionComposerEnv.Composer() {
     val (composerExpanded, composerControls) = composerPresentation
@@ -1622,14 +1633,17 @@ private fun SessionComposerEnv.Composer() {
         else if (rowReveal.value < 1f) rowReveal.animateTo(1f, PhotoFlightTunables.row.spec())
     }
     val attachmentReveal = if (holdsRow) 0f else rowReveal.value
+    val current by rememberUpdatedState(this)
     Box(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(ComposerTunables.cornerRadius.dp))
             .pointerInput(recording) {
-                // Folded, the field is out of sight: a tap beside the bar mustn't raise the keyboard.
+                // Also the gap between the text and the row: Compose hits one point and the
+                // pickers' targets end at the glass's bottom edge, so the gap is this tap's (iOS
+                // `composerTextReach`).
                 detectTapGestures {
-                    if (!recording) focus()
+                    current.composerTapped(recording)
                 }
             }
             // A send's shrink is the field's one spring (iOS animates both in the send's one
