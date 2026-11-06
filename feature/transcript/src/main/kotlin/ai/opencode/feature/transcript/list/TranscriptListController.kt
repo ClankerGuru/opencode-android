@@ -12,6 +12,7 @@ import ai.opencode.feature.transcript.TranscriptDisclosureState
 import ai.opencode.feature.transcript.TranscriptEntry
 import ai.opencode.feature.transcript.TranscriptRowIdentityPlan
 import ai.opencode.feature.transcript.TranscriptTunables
+import ai.opencode.feature.transcript.selection.TranscriptReplySelection
 import ai.opencode.server.model.OpenCodeQueuedInput
 import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.gestures.FlingBehavior
@@ -237,6 +238,8 @@ class TranscriptListController(
             configuration.historyGeneration != old.historyGeneration
         if (sessionChanged) {
             resetForSessionChange()
+            // iOS: a session change clears the reply selection.
+            pendingEffects += { replySelection.clear() }
             pendingEffects += { execute(behavior.handle(TranscriptScrollBehavior.Event.SessionChanged)) }
         } else if (draftBecameSession && hasLaidOutContent && perfRows != null) {
             // The draft's first content frame was drawn before there was a session to tell.
@@ -246,6 +249,9 @@ class TranscriptListController(
         this.configuration = configuration
         runEnded = old.isRunning && !configuration.isRunning
         applySnapshot(configuration, if (sessionChanged) null else old)
+
+        // iOS `refreshReplySelection`: the selected reply's text changed, or its rows went.
+        if (!sessionChanged && replySelection.isSelected) pendingEffects += { replySelection.refresh() }
 
         val earlierWindowAdvanced = !sessionChanged && !configuration.isLoadingEarlier && configuration.hasEarlierItems &&
             old.entries.firstOrNull()?.id != configuration.entries.firstOrNull()?.id
@@ -257,6 +263,8 @@ class TranscriptListController(
         if (configuration.sendGeneration != old.sendGeneration && !sessionChanged) {
             followsSentRow = !wasBrowsing
             pendingEffects += {
+                // iOS: sending clears the reply selection (and no longer holds following for it).
+                replySelection.clear()
                 val returnsToEnd = wasBrowsing || behavior.mode == TranscriptScrollBehavior.Mode.Browsing
                 // A send during a jump's glide arrives under that glide: a flight on top would be a second motion.
                 val flies = !returnsToEnd && bottomSpring?.kind != SpringKind.Jump
@@ -909,6 +917,8 @@ class TranscriptListController(
 
     val nestedScrollConnection = object : NestedScrollConnection {
         override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+            // iOS `scrollViewWillBeginDragging`: where the reader takes the list, it stays.
+            if (source == NestedScrollSource.UserInput) selectionHoldsFollowing = false
             if (source == NestedScrollSource.UserInput && !isUserGestureActive) dragBegan()
             return Offset.Zero
         }
@@ -935,6 +945,8 @@ class TranscriptListController(
         isUserGestureActive = false
         handleBehavior(TranscriptScrollBehavior.Event.UserSettled(viewport(), contentArrivedDuringDrag))
         lastLayout?.let { checkNewMessagesPassed(it) }
+        // iOS: the selection's menu comes back once the list settles.
+        if (replySelection.isSelected && !replySelection.isDragging && !replySelection.menuWanted) replySelection.presentMenu()
     }
 
     /** TalkBack/focus scrolls enter LazyListState's scroll mutation without nested drag events. */
@@ -1057,7 +1069,57 @@ class TranscriptListController(
         if (previousMode != behavior.mode) {
             send(TranscriptAction.TranscriptBrowsingChanged(behavior.mode == TranscriptScrollBehavior.Mode.Browsing))
         }
+        // A selection holds the reader where it is: whatever made the list follow, it browses again.
+        if (event != TranscriptScrollBehavior.Event.UserLeftBottom && behavior.mode == TranscriptScrollBehavior.Mode.Following && replySelection.isSelected) {
+            holdFollowingForSelection()
+        }
     }
+
+    // MARK: Reply selection (iOS `TranscriptListViewController+TextSelection`)
+
+    /** The list's one selection across a reply's text. */
+    val replySelection = TranscriptReplySelection()
+
+    /**
+     * iOS `selectionHoldsFollowing`: a reader at the end who selects browses while it lasts (new
+     * output doesn't move the text under the handles) and follows again when they tap it away.
+     * Taking the list, autoscrolling it, Jump to latest, sending or leaving all drop the hold.
+     */
+    private var selectionHoldsFollowing = false
+
+    private fun holdFollowingForSelection() {
+        if (!replySelection.isSelected || behavior.mode != TranscriptScrollBehavior.Mode.Following) return
+        selectionHoldsFollowing = true
+        handleBehavior(TranscriptScrollBehavior.Event.UserLeftBottom)
+    }
+
+    /** iOS `replySelectionActiveChanged`: a selection began, or ended ([byReader]: tapped away). */
+    fun replySelectionActiveChanged(active: Boolean, byReader: Boolean) {
+        if (active) {
+            holdFollowingForSelection()
+            return
+        }
+        if (!byReader) selectionHoldsFollowing = false
+        if (selectionHoldsFollowing) {
+            selectionHoldsFollowing = false
+            jumpToLatest(TranscriptScrollBehavior.Event.JumpToLatestTapped, fromBrowsing = true)
+        }
+    }
+
+    /** The selection's autoscroll moved the list: the reader is no longer at the end it held. */
+    fun replySelectionScrolled() {
+        selectionHoldsFollowing = false
+    }
+
+    /** True while the list coasts or glides on its own: a touch then only stops it (iOS). */
+    val isCoasting: Boolean
+        get() = state.isScrollInProgress || jumpGlide != null || revealGlide != null || borrowed != null
+
+    /** The list item key of the row showing transcript entry [entryID]. */
+    fun messageItemKey(entryID: String): String = TranscriptItemID.Message(entryStableIDs[entryID] ?: entryID).key
+
+    /** Whether the row showing [entryID] is the reply still growing. */
+    fun isGrowingEntry(entryID: String): Boolean = snapshot.props[entryStableIDs[entryID] ?: entryID]?.isGrowing == true
 
     private fun execute(commands: List<TranscriptScrollBehavior.Command>) {
         for (command in commands) {
@@ -1088,6 +1150,8 @@ class TranscriptListController(
 
     /** Jump to latest, tapped or by sending while browsing (iOS `jumpToLatest`). */
     fun jumpToLatest(event: TranscriptScrollBehavior.Event = TranscriptScrollBehavior.Event.JumpToLatestTapped, fromBrowsing: Boolean = false) {
+        // iOS: Jump to latest clears the selection.
+        if (replySelection.isSelected) replySelection.clear()
         cancelBorrowedDrag()
         revealGlide = null
         revealsToEnd = false
