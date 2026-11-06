@@ -454,6 +454,8 @@ class DrawerActivityTests {
         store.send(HomeFeature.Action.SessionDetail(PresentationAction.Presented(SessionFeature.Action.FamilySessionDeleted(grandchild.id))))
         assertEquals(listOf(root, child), store.state.sessionDetail?.familySessions)
         assertEquals(emptySet<String>(), store.state.sessionDetail?.activeFamilySessionIDs)
+        // The server isn't answering: no poll until Home hears from it.
+        assertNull(store.state.sessionDetail?.pendingWorkPollSeconds)
         assertNull(store.state.activeSessionParents[grandchild.id])
         assertNotEquals(busyBeforeDelete, store.state.busySessionIDs)
         assertEquals(Indicator.none, store.state.indicator(root))

@@ -144,10 +144,16 @@ internal object HomeFeatureTestSupport {
         fun sessionStore(
             state: SessionFeature.State,
             dependencies: DependencyValues.Builder.() -> Unit = {},
-        ): TestStore<SessionFeature.State, SessionFeature.Action> = TestStore(state, SessionFeature(), scope) {
-            world()
-            dependencies()
-        }.also(stores::add)
+        ): TestStore<SessionFeature.State, SessionFeature.Action> {
+            val deps: DependencyValues.Builder.() -> Unit = {
+                world()
+                dependencies()
+            }
+            // Built under the test's dependencies, as `:feature:session`'s stores are: the reducer
+            // resolves its watchdog clock (`SessionTimers`) when it's made.
+            val reducer = DependencyValues.withValues(DependencyValues.testing().update(deps)) { SessionFeature() }
+            return TestStore(state, reducer, scope, deps).also(stores::add)
+        }
 
         fun skipInFlightEffects() = job.cancel()
 

@@ -1125,6 +1125,11 @@ private fun HomeFeature.State.finishingDetailTransition(
     val outgoing = sessionDetail
     // The screen swaps details in place without appearing again, so the new one inherits whether it is on screen.
     next = next.copy(isVisible = outgoing?.isVisible ?: false, inheritsLiveWork = keepsIdentity)
+    // Its timers wait, as the last one's did, for the server and the return.
+    next = next.withRequestsConnectionIsAvailable(isConnected).copy(
+        isSceneActive = outgoing?.isSceneActive ?: true,
+        isBackgrounded = outgoing?.isBackgrounded ?: false,
+    )
     // The same identity names the Working line's runs, so their numbers carry on.
     if (keepsIdentity) next = next.copy(workingRun = next.workingRun.copy(counter = outgoing?.workingRun?.counter ?: 0))
     // Raise to Talk's grace after a recording follows the screen too.
@@ -1286,6 +1291,8 @@ fun HomeFeature.State.pushingSubagent(session: OpenCodeSession, reason: String? 
     )
     detail = s.seedingSessionSnapshot(detail)
     detail = detail.copy(streamIsHealthy = s.isEventStreamLive || parent.streamIsHealthy)
+    detail = detail.withRequestsConnectionIsAvailable(parent.requestsConnectionIsAvailable)
+        .copy(isBackgrounded = parent.isBackgrounded)
     detail = s.applyingOpening(session, detail = detail)
     if (session.id in s.unopenedSeen) s = s.copy(unopenedSeen = s.unopenedSeen - session.id)
     val pick = s.waitingPicks[session.id]

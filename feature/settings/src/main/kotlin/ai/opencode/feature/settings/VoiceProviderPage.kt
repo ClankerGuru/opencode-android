@@ -98,6 +98,7 @@ internal fun VoiceProviderDetailPage(store: SettingsStore, opensAccount: Boolean
     var showsUnavailable by rememberSaveable { mutableStateOf(false) }
     var openedAccount by rememberSaveable { mutableStateOf(false) }
     val openAccount = { store.send(SettingsFeature.Action.PagePushed(SettingsPage.VoiceAccount)) }
+    LaunchedEffect(voice) { voice.send(VoiceSettingsFeature.Action.ProviderPageAppeared) }
     LaunchedEffect(opensAccount) {
         if (opensAccount && !openedAccount) {
             openedAccount = true

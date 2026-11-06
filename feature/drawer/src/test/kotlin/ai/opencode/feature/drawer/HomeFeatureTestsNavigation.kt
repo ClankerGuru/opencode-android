@@ -482,6 +482,7 @@ class HomeFeatureTestsNavigation {
                 initializedInboxServerIDs = setOf(server.persistenceID),
             )
         }
+        store.receive(detail(SessionFeature.Action.RequestsConnectionChanged(true))) // the draft hears it's back
         store.receive(Action.AttentionRefreshed(emptySet())) { it.copy(noticeReadiness = HomeFeature.State.NoticeReadiness.settled) }
         assertTrue(store.state.isConnected)
         assertTrue(store.state.sessions.none { store.state.isUnread(it) })
@@ -571,7 +572,7 @@ class HomeFeatureTestsNavigation {
                 it.copy(
                     detailGeneration = 2,
                     sessionDetail = h.state { SessionFeature.State.session(server, session, cachedItems = items, isRunning = true, navigationID = 2) }
-                        .copy(newMessagesBaseline = setOf("m_cached")),
+                        .copy(newMessagesBaseline = setOf("m_cached")).withRequestsConnectionIsAvailable(false),
                     sessionReadDates = it.sessionReadDates + (it.key(session.id) to session.updatedAt),
                     lastViewedSessionIDs = it.lastViewedSessionIDs + (server.persistenceID to session.id),
                 )
@@ -584,7 +585,8 @@ class HomeFeatureTestsNavigation {
                 store.send(Action.NewSessionTapped) {
                     h.state { it.rememberingSession() }.copy(
                         detailGeneration = 3,
-                        sessionDetail = h.state { SessionFeature.State.draft(server, draftProject = null, projects = emptyList(), inheritedModel = null, navigationID = 3) },
+                        sessionDetail = h.state { SessionFeature.State.draft(server, draftProject = null, projects = emptyList(), inheritedModel = null, navigationID = 3) }
+                            .withRequestsConnectionIsAvailable(false),
                     )
                 }
             } else {

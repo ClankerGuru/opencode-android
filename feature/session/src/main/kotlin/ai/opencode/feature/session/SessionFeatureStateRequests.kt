@@ -33,6 +33,8 @@ fun State.withRequestFailureAwaitingReconnect(value: Boolean): State =
     updateRequestDock { it.copy(requestFailureAwaitingReconnect = value) }
 val State.requestsConnectionIsAvailable: Boolean get() = requestDock.requestsConnectionIsAvailable
 fun State.withRequestsConnectionIsAvailable(value: Boolean): State = updateRequestDock { it.copy(requestsConnectionIsAvailable = value) }
+/** Timers may read the server: Home has heard from it and the app is in front. Otherwise Home's connection loop is the only thing that asks. */
+val State.pollsServer: Boolean get() = requestsConnectionIsAvailable && !isBackgrounded
 val State.requestErrors: Map<String, String> get() = requestDock.requestErrors
 fun State.withRequestErrors(value: Map<String, String>): State = updateRequestDock { it.copy(requestErrors = value) }
 /** While a pending request docks, the composer is its answer, and what was typed waits here. */

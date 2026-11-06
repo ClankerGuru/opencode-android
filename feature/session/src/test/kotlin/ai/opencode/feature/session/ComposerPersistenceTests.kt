@@ -596,7 +596,7 @@ class ComposerPersistenceTests {
                 familySessions = listOf(createdSession),
                 familyRootID = createdSession.id,
                 pendingModel = null,
-                pendingWorkPollSeconds = 2,
+                // Backgrounded: it reads its pending work once; the return polls.
             ).withRequestLoadAttempt(RequestDockFeature.State.LoadAttempt.Initial)
         }
         firstStore.receive(
@@ -735,7 +735,7 @@ class ComposerPersistenceTests {
                 familySessions = listOf(createdSession),
                 familyRootID = createdSession.id,
                 pendingModel = null,
-                pendingWorkPollSeconds = 2,
+                // Backgrounded: it reads its pending work once; the return polls.
             ).withRequestLoadAttempt(RequestDockFeature.State.LoadAttempt.Initial)
         }
         firstStore.receive(Action.PromptAdmitted(sessionID = createdSession.id, messageID = firstID, requestEpoch = 1)) { it.admitted(firstID) }

@@ -83,11 +83,10 @@ internal fun SessionFeature.watchdog(
     // reducer tests do not inherit a perpetual timer.
     val watchdogClock = watchdogClock
     if (!sessionTimers.watchdog || watchdogClock == null) return Reduced(state)
+    // No session (a draft), a server that isn't answering, or an app in the background: no
+    // reconciliation timer. A reconnect or the return re-arms it.
     val session = state.session
-        ?: return Reduced(
-            state.copy(watchdogSchedule = null, watchdogGeneration = state.watchdogGeneration + 1),
-            Effect.cancel(CancelID.Watchdog),
-        )
+    if (session == null || !state.pollsServer) return stopWatchdog(state)
     val seconds = when {
         state.streamIsHealthy && state.streamSupportsProjection -> 20
         state.isRunning -> 3
@@ -133,6 +132,50 @@ internal fun SessionFeature.watchdogElapsed(
     )
 }
 
+private fun stopWatchdog(state: SessionFeature.State): Reduced<SessionFeature.State, Action> {
+    var s = state
+    if (s.watchdogSchedule != null) {
+        s = s.copy(watchdogSchedule = null, watchdogGeneration = s.watchdogGeneration + 1)
+    }
+    return Reduced(s, Effect.cancel(CancelID.Watchdog))
+}
+
+/**
+ * iOS `quietServerPolling(_:)`: stops every timed read of the server: the pending-work polls and
+ * the watchdog. Requests that answer the person (replies, sends) carry on.
+ */
+internal fun quietServerPolling(state: SessionFeature.State): Reduced<SessionFeature.State, Action> {
+    val stopped = stopWatchdog(state.copy(pendingWorkPollSeconds = null))
+    return Reduced(
+        stopped.state,
+        Effect.merge(
+            Effect.cancel(CancelID.Requests),
+            Effect.cancel(CancelID.Inbox),
+            Effect.cancel(CancelID.InboxFetch),
+            Effect.cancel(CancelID.RequestsRetry),
+            Effect.cancel(CancelID.RequestsChanged),
+            stopped.effect,
+        ),
+    )
+}
+
+/**
+ * iOS `resumeServerPolling(_:)`: back in front with the server reachable, polls and the watchdog
+ * start again at once, and a request read that was owed its retry gets it.
+ */
+internal fun SessionFeature.resumeServerPolling(state: SessionFeature.State): Reduced<SessionFeature.State, Action> {
+    if (!state.pollsServer || state.session == null) return Reduced(state)
+    val watchdog = watchdog(state)
+    if (!watchdog.state.hasRenderedFirstContentFrame) return watchdog
+    val owesRetry = watchdog.state.requestFailureAwaitingReconnect && watchdog.state.requestLoadAttempt == null
+    val polls = if (owesRetry) {
+        startPendingWork(watchdog.state, attempt = RequestDockFeature.State.LoadAttempt.Reconnect)
+    } else {
+        pollPendingWork(watchdog.state)
+    }
+    return Reduced(polls.state, Effect.merge(watchdog.effect, polls.effect))
+}
+
 private fun SessionFeature.sleepWatchdog(schedule: WatchdogSchedule, generation: Int): Effect<Action> {
     val clock = watchdogClock ?: return Effect.none()
     return Effect.run<Action> { send ->
@@ -146,28 +189,37 @@ private fun SessionFeature.sleepWatchdog(schedule: WatchdogSchedule, generation:
 /**
  * Permission/question prompts and queued input are both ephemeral server state that a dropped
  * event stream would desync, so one timer re-reads both while the session is open. (Re)starting it
- * adopts the cadence the stream's current health warrants.
+ * adopts the cadence the stream's current health warrants. Nothing reads while the server isn't
+ * answering; in the background (a reconnect during a call) it reads once and the return starts the
+ * timer.
  */
 internal fun SessionFeature.pollPendingWork(
     state: SessionFeature.State,
 ): Reduced<SessionFeature.State, Action> {
-    val session = state.session ?: return Reduced(state)
+    val session = state.session
+    if (session == null || !state.requestsConnectionIsAvailable) {
+        return Reduced(state.copy(pendingWorkPollSeconds = null))
+    }
     val seconds = SessionFeature.pendingWorkPollSeconds(streamIsHealthy = state.streamIsHealthy)
+    val repeats = !state.isBackgrounded
     val server = state.server
     val family = state.familySessions.map { it.id }
     val requests = Effect.run<Action> { send ->
         while (currentCoroutineContext().isActive) {
             readPendingRequests(server, session, family, send)
+            if (!repeats) return@run
             delay(seconds.seconds)
         }
     }.cancellable(CancelID.Requests, cancelInFlight = true)
     val inbox = Effect.run<Action> { send ->
         while (currentCoroutineContext().isActive) {
             send(Action.PendingInputsRequested(sessionID = session.id))
+            if (!repeats) return@run
             delay(seconds.seconds)
         }
     }.cancellable(CancelID.Inbox, cancelInFlight = true)
-    return Reduced(state.copy(pendingWorkPollSeconds = seconds), Effect.merge(requests, inbox))
+    val pollSeconds = if (repeats) seconds else null
+    return Reduced(state.copy(pendingWorkPollSeconds = pollSeconds), Effect.merge(requests, inbox))
 }
 
 /** iOS `fetchQueuedInputs(server:sessionID:)`. */

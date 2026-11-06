@@ -41,7 +41,7 @@ import java.util.UUID
  * broker a call, and the calls a chosen server brokers while each call's own work stays on
  * its server.
  *
- * Not here (their stores live in other modules): `settingsAsksEverySavedServerAndListsTheOthersThatCanBrokerACall`,
+ * Not here (their stores live in other modules): `settingsAsksTheConnectedServerAndTheProviderPageAsksTheOthers`,
  * `settingsAsksNoServerWithServerVoiceOff`, `theChoiceStaysVisibleAndAStaleOneFallsBackToTheConnectedServer`,
  * `theKeyRowNamesOpenCodeWhenTheBrokerHostsTheCallThroughIt` (`VoiceSettingsFeature`, :feature:settings) and
  * `homeSavesTheChoiceAndAsksTheServerItNames` (`HomeSettingsFeature`). In

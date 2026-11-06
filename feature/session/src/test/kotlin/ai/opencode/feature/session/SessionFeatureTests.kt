@@ -613,8 +613,9 @@ class SessionFeatureTests {
 
     /**
      * Without a healthy stream, reconciliation is the only content path, so a
-     * running session falls back to the short cadence; a healthy projecting
-     * stream only needs a slow watchdog.
+     * running session the server answers for falls back to the short cadence;
+     * a healthy projecting stream only needs a slow watchdog. (A server that
+     * isn't answering gets none: SessionFeatureTestsQuietPolling.)
      */
     @Test fun watchdogCadenceFollowsStreamHealth() = sessionTest { h ->
         val session = testSession(id = "ses_watchdog", title = "Watchdog")
@@ -622,11 +623,13 @@ class SessionFeatureTests {
         val reads = LockIsolated(0)
         val state = h.state {
             State.session(testServer, session, cachedItems = listOf(OpenCodeTranscriptItem.UserText(id = "m1", text = "Hi")), isRunning = true)
-        }.withRequestsConnectionIsAvailable(true).copy(streamIsHealthy = true, streamSupportsProjection = true)
+        }.withRequestsConnectionIsAvailable(false)
         val store = h.store(state) {
             this[Clock] = clock
             this[SessionTimers] = SessionTimers.testValue.copy(watchdog = true)
             this[OpenCodeClient] = this[OpenCodeClient].copy(
+                familyPendingRequests = { _, _, _ -> OpenCodePendingRequests(permissions = emptyList(), forms = emptyList()) },
+                pendingInputs = { _, _ -> emptyList() },
                 getSession = { _, _ -> session },
                 transcript = { _, _, _ ->
                     reads.increment()
@@ -636,8 +639,9 @@ class SessionFeatureTests {
         }
         store.exhaustive = false
 
-        // Stream drops: the watchdog restarts at the running cadence (3 s + jitter ≤ 1 s).
-        store.send(Action.RequestsConnectionChanged(false))
+        // Home hears from the server before the stream proves itself: the
+        // watchdog runs at the running cadence (3 s; jitter is 0 at 3 s).
+        store.send(Action.RequestsConnectionChanged(true))
         clock.advance(4.seconds)
         store.receive(Action.RefreshRequested::class)
         store.receive(Action.RefreshResponse::class)

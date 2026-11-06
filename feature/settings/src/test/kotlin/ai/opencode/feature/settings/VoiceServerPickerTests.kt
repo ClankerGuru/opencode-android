@@ -72,11 +72,11 @@ class VoiceServerPickerTests {
     )
 
     /**
-     * Settings › Voice asks every saved server, the connected one too, and Voice Provider lists
-     * the others ready to take calls: not a Grok-only server (No key) or one without the list
-     * (Update OpenCode). A server that doesn't answer next time reads as offline.
+     * Settings › Voice asks only the connected server; opening Voice Provider asks the other saved
+     * servers, and it lists the ones ready to take calls: not a Grok-only server (No key) or one
+     * without the list (Update OpenCode). A server that doesn't answer next time reads as offline.
      */
-    @Test fun settingsAsksEverySavedServerAndListsTheOthersThatCanBrokerACall() = runTest {
+    @Test fun settingsAsksTheConnectedServerAndTheProviderPageAsksTheOthers() = runTest {
         val shared = SettingsTestShared()
         shared.save(listOf(server, studio, grokBox, oldBox))
         val clock = TestClock()
@@ -106,7 +106,12 @@ class VoiceServerPickerTests {
         store.send(VoiceSettingsFeature.Action.Task)
         clock.advance(1.seconds)
         store.receive(VoiceSettingsFeature.Action.VoiceModelsLoaded(server.persistenceID, 0, ServerVoiceModelsAnswer.Listed(listOf(gptLive))))
-        clock.advance(1.seconds)
+        clock.advance(10.seconds)
+        assertEquals("Settings › Voice leaves the other saved servers alone", listOf(server.persistenceID), asked.value)
+        store.withDependencies { assertTrue(store.state.providerCatalog.unavailable.isEmpty()) }
+
+        store.send(VoiceSettingsFeature.Action.ProviderPageAppeared)
+        clock.advance(2.seconds)
         store.receive(VoiceSettingsFeature.Action.VoiceModelsLoaded(studio.persistenceID, 0, ServerVoiceModelsAnswer.Listed(listOf(gptLive))))
         clock.advance(1.seconds)
         store.receive(VoiceSettingsFeature.Action.VoiceModelsLoaded(grokBox.persistenceID, 0, ServerVoiceModelsAnswer.Listed(listOf(grok))))
@@ -136,7 +141,8 @@ class VoiceServerPickerTests {
         store.send(VoiceSettingsFeature.Action.Task)
         clock.advance(1.seconds)
         store.receive(VoiceSettingsFeature.Action.VoiceModelsLoaded(server.persistenceID, 0, ServerVoiceModelsAnswer.Listed(listOf(gptLive))))
-        clock.advance(1.seconds)
+        store.send(VoiceSettingsFeature.Action.ProviderPageAppeared)
+        clock.advance(2.seconds)
         store.receive(VoiceSettingsFeature.Action.VoiceModelsLoaded(studio.persistenceID, 0, ServerVoiceModelsAnswer.NoAnswer))
         assertEquals(ServerVoiceModelsAnswer.NoAnswer, shared.get(VoiceSharedKeys.voiceModelsByServer)[studio.persistenceID])
         clock.advance(1.seconds)

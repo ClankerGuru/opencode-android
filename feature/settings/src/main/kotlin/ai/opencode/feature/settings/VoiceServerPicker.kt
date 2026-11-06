@@ -75,14 +75,19 @@ val VoiceSettingsFeature.State.keySource: VoiceKeySource
     }
 
 /**
- * Asks each saved server which voice models it holds keys for, so Voice Provider can say which
- * are ready and Automatic can move on to them. A server that doesn't answer reads as offline; one
- * without the list (a 404) as needing an update.
+ * Asks saved servers which voice models they hold keys for, so Voice Provider can say which are
+ * ready and Automatic can move on to them. A server that doesn't answer reads as offline; one
+ * without the list (a 404) as needing an update. Settings › Voice asks the connected server; the
+ * others only when Voice Provider's page, which lists them, opens: a saved server may be asleep,
+ * and asking one that won't answer is traffic into a dead route.
  */
-internal fun VoiceSettingsFeature.checkVoiceServers(state: VoiceSettingsFeature.State): Effect<VoiceSettingsFeature.Action> {
+internal fun VoiceSettingsFeature.checkVoiceServers(
+    servers: List<OpenCodeServer>,
+    state: VoiceSettingsFeature.State,
+): Effect<VoiceSettingsFeature.Action> {
     if (!ExperimentalFeature.serverVoice.isActive(state.serverVoiceExperiment)) return Effect.none()
     val client = serverVoice
-    return Effect.merge((listOfNotNull(state.connectedServer) + state.otherSavedServers).map { server ->
+    return Effect.merge(servers.map { server ->
         val epoch = VoiceModelsCache.epoch(server.persistenceID)
         Effect.run<VoiceSettingsFeature.Action> { send ->
             val models = client.models(server)

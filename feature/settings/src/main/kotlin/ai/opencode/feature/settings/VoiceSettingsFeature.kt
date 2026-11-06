@@ -156,6 +156,7 @@ class VoiceSettingsFeature : Reducer<VoiceSettingsFeature.State, VoiceSettingsFe
         data object VoicePickerDisappeared : Action
         data class RaiseToTalkChanged(val on: Boolean) : Action
         data class CallSoundPackSelected(val pack: VoiceCallSoundPack) : Action
+        data object ProviderPageAppeared : Action
         data class VoiceModelsLoaded(val serverID: String, val asked: Int, val answer: ServerVoiceModelsAnswer) : Action
         data class VoiceDelegatorChoiceChanged(val choice: VoiceDelegatorChoice) : Action
         data object DelegatorPageAppeared : Action
@@ -177,7 +178,7 @@ class VoiceSettingsFeature : Reducer<VoiceSettingsFeature.State, VoiceSettingsFe
 
     override fun reduce(state: State, action: Action): Reduced<State, Action> = when (action) {
         Action.Task -> {
-            val voiceServers = checkVoiceServers(state)
+            val voiceServers = checkVoiceServers(listOfNotNull(state.connectedServer), state)
             if (!state.voiceModeEnabled || !state.keySource.isPhoneKey) {
                 Reduced(state, voiceServers)
             } else {
@@ -270,6 +271,7 @@ class VoiceSettingsFeature : Reducer<VoiceSettingsFeature.State, VoiceSettingsFe
             if (state.callSoundPack != action.pack) shared(VoiceSharedKeys.callSoundPack).set(action.pack)
             Reduced(state)
         }
+        Action.ProviderPageAppeared -> Reduced(state, checkVoiceServers(state.otherSavedServers, state))
         is Action.VoiceModelsLoaded -> {
             VoiceModelsCache.record(action.answer, action.serverID, action.asked)
             Reduced(state)

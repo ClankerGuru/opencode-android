@@ -488,16 +488,25 @@ private fun SessionFeature.refreshResponse(
 }
 
 private fun SessionFeature.sceneActiveChanged(state: SessionFeature.State, isActive: Boolean): Reduced<SessionFeature.State, Action> {
-    val returning = isActive && !state.isSceneActive
+    val wasBackgrounded = state.isBackgrounded
+    // A screen swapped in while away may not have seen the scene go.
+    val returning = isActive && (!state.isSceneActive || wasBackgrounded)
     var s = state.copy(isSceneActive = isActive)
     if (isActive) s = s.copy(isBackgrounded = false)
     if (s.watchesTranscript) s = s.absorbFittingNewMessages()
     if (!returning) return Reduced(s)
+    // Polls stopped for the background, not for a glance at the notification shade.
+    var polls: Effect<Action> = Effect.none()
+    if (wasBackgrounded) {
+        val resumed = resumeServerPolling(s)
+        s = resumed.state
+        polls = resumed.effect
+    }
     // Reads wait out the background: a Stop the server took reads on from here, and a read that
     // failed or was dropped must not leave Working up with nothing running.
-    if (s.isInterrupting && s.stopAttempt?.acknowledged == true) return Reduced(s, settleStop(s))
-    if (!s.isAwaitingReply || s.isExternallyActive || s.isSubmittingPrompt) return Reduced(s)
-    return Reduced(s, confirmRunState(s, after = Duration.ZERO))
+    if (s.isInterrupting && s.stopAttempt?.acknowledged == true) return Reduced(s, Effect.merge(polls, settleStop(s)))
+    if (!s.isAwaitingReply || s.isExternallyActive || s.isSubmittingPrompt) return Reduced(s, polls)
+    return Reduced(s, Effect.merge(polls, confirmRunState(s, after = Duration.ZERO)))
 }
 
 private fun SessionFeature.visibilityChanged(state: SessionFeature.State, visible: Boolean): Reduced<SessionFeature.State, Action> {

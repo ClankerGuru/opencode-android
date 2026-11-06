@@ -321,6 +321,13 @@ private fun HomeFeature.snapshotRefreshed(state: State, action: Action.SnapshotR
         Effect.cancel(HomeFeature.CancelID.LastKnownActivity),
         retry,
     )
+    // The open screen hears the server is back, a draft too: a draft that becomes a session in
+    // place starts its polls from there.
+    val detailReconnected = if (wasConnected) {
+        Effect.none()
+    } else {
+        sendToDetail(s, SessionFeature.Action.RequestsConnectionChanged(true))
+    }
     // A whole run can start and finish while disconnected. Even idle → idle must revalidate the
     // transcript, not just the working indicator.
     val detail = s.sessionDetail
@@ -342,11 +349,11 @@ private fun HomeFeature.snapshotRefreshed(state: State, action: Action.SnapshotR
                 update,
                 if (detail.isExternallyActive == runState) Effect.none()
                 else sendToDetail(s, SessionFeature.Action.ExternalRunStateChanged(runState)),
-                if (wasConnected) Effect.none() else sendToDetail(s, SessionFeature.Action.RequestsConnectionChanged(true)),
+                detailReconnected,
             ),
         )
     }
-    return Reduced(s, Effect.merge(attention, ancestry, prefetch, drained.effect, voiceSnapshot, subagentRuns, searchesServer))
+    return Reduced(s, Effect.merge(attention, ancestry, prefetch, drained.effect, voiceSnapshot, subagentRuns, searchesServer, detailReconnected))
 }
 
 private fun HomeFeature.activeAncestryResolved(state: State, resolved: Map<String, String>): HomeReduced {

@@ -16,6 +16,7 @@ import ai.opencode.feature.transcript.list.NewMessagesFold
 import ai.opencode.feature.transcript.list.NewMessagesMark
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeClientError
+import ai.opencode.server.model.OpenCodePendingRequests
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeContextReading
 import ai.opencode.server.model.OpenCodeJSONValue
@@ -63,6 +64,7 @@ class NewMessagesTests {
 
     private fun Harness.resumeStore(
         state: SessionFeature.State,
+        pendingRequests: suspend () -> OpenCodePendingRequests = { throw OpenCodeClientError(message = "Offline") },
         transcript: () -> List<OpenCodeTranscriptItem>,
     ): TestStore<SessionFeature.State, Action> {
         val store = store(state) {
@@ -74,7 +76,7 @@ class NewMessagesTests {
                 sessionFamily = { _, root -> OpenCodeSessionFamily(sessions = listOf(root), activeSessionIDs = emptySet()) },
                 runningShells = { _, _ -> emptyList() },
                 modelCatalog = { _, _ -> OpenCodeModelCatalog(models = emptyList(), defaultModel = null) },
-                familyPendingRequests = { _, _, _ -> throw OpenCodeClientError(message = "Offline") },
+                familyPendingRequests = { _, _, _ -> pendingRequests() },
                 pendingInputs = { _, _ -> emptyList() },
                 contextUsage = { _, _ -> OpenCodeContextReading.Inconclusive },
                 viewSession = { _, _, _ -> },
@@ -633,7 +635,9 @@ class NewMessagesTests {
         val m1 = user("m1")
         val m2 = reply("m2")
         val live = liveRow
-        val store = h.resumeStore(h.watching(listOf(m1, m2))) { listOf(m1, m2, live) }
+        // The return restarts the pending-work poll; its request read stays out.
+        val held: suspend () -> OpenCodePendingRequests = { awaitCancellation() }
+        val store = h.resumeStore(h.watching(listOf(m1, m2)), pendingRequests = held) { listOf(m1, m2, live) }
         store.exhaustive = true
         store.send(Action.SceneActiveChanged(false)) { it.copy(isSceneActive = false) }
         store.send(liveDelta) {
@@ -677,7 +681,9 @@ class NewMessagesTests {
         val m1 = user("m1")
         val m2 = reply("m2")
         val live = liveRow
-        val store = h.resumeStore(h.watching(listOf(m1, m2))) { listOf(m1, m2, live) }
+        // The return restarts the pending-work poll; its request read stays out.
+        val held: suspend () -> OpenCodePendingRequests = { awaitCancellation() }
+        val store = h.resumeStore(h.watching(listOf(m1, m2)), pendingRequests = held) { listOf(m1, m2, live) }
         store.exhaustive = true
         store.send(Action.SceneActiveChanged(false)) { it.copy(isSceneActive = false) }
         store.send(Action.SceneEnteredBackground) { it.copy(isBackgrounded = true, newMessagesBaseline = setOf("m1", "m2")) }
@@ -689,7 +695,9 @@ class NewMessagesTests {
                 newMessages = NewMessagesMark(itemID = liveID, lastItemID = liveID, generation = 1),
             )
         }
-        store.send(Action.SceneActiveChanged(true)) { it.copy(isSceneActive = true, isBackgrounded = false) }
+        store.send(Action.SceneActiveChanged(true)) { it.copy(isSceneActive = true, isBackgrounded = false, pendingWorkPollSeconds = 12) }
+        store.receive(Action.PendingInputsRequested::class)
+        store.receive(Action.PendingInputsResponse::class)
         store.send(pageRead(listOf(m1, m2, live))) {
             it.copy(refresh = null, initialTranscriptIsFresh = true, newMessagesBaseline = null)
         }

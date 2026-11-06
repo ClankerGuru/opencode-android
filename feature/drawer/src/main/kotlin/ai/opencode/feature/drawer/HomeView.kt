@@ -72,6 +72,7 @@ import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.OpenCodeTranscriptItem
 import androidx.compose.runtime.DisposableEffect
 import ai.opencode.feature.session.SessionView
+import ai.opencode.feature.session.withRequestsConnectionIsAvailable
 import ai.opencode.feature.settings.HomeSettingsFeature
 import ai.opencode.feature.settings.LocalAppearanceTranscriptPreview
 import ai.opencode.feature.settings.SettingsFeature
@@ -581,6 +582,8 @@ internal class CatchUpPreviewStores {
         var state = SessionFeature.State.session(home.server, session, projects = home.projects, cachedItems = items, isRunning = isRunning)
         // Marked as the card will be once it's open, so it doesn't jump then.
         state = home.applyingOpening(session, detail = home.seedingSessionSnapshot(state)).copy(readsOnView = false)
+        // Inert: its shell glyph doesn't probe the server either.
+        state = state.withRequestsConnectionIsAvailable(false)
         if (existing != null && inputs?.session?.id == session.id && existing.state.hasRenderedFirstContentFrame) {
             state = state.copy(hasRenderedFirstContentFrame = true)
         }

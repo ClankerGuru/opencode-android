@@ -454,7 +454,8 @@ class SessionFeatureTestsDictation {
         for (touchEnd in listOf("tap", "lift", "cancel")) sessionTest { h ->
             val feed = Channel<String>(Channel.UNLIMITED)
             val stops = LockIsolated(0)
-            val store = h.store(h.makeState(draft = "Check")) {
+            // Not yet polling, so the return has no pending work to restart.
+            val store = h.store(h.makeState(draft = "Check", hasRenderedFirstContentFrame = false)) {
                 this[DictationClient] = DictationClient(
                     start = { feed },
                     stop = {

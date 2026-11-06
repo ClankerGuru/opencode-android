@@ -46,10 +46,10 @@ import kotlin.time.DurationUnit
 
 /**
  * Port of iOS `ConnectionProbeClient` (`Settings/ConnectionMonitor.swift`): health checks for the
- * connection card: a light `GET /api/info` every two seconds (1.5 while reconnecting), only while
- * the card is on screen and the app active, timed from the phone. Also finds the server's machine
- * name by a reverse lookup of its IP (MagicDNS answers for a tailnet IP), since V2 servers report
- * only addresses.
+ * connection card: a light `GET /api/info` every two seconds (1.5 while reconnecting, never more
+ * than one out at a time), only while the card is on screen and the app active, timed from the
+ * phone. Also finds the server's machine name by a reverse lookup of its IP (MagicDNS answers for
+ * a tailnet IP), since V2 servers report only addresses.
  *
  * Deliberately a single-shot probe like iOS's `URLRequest` on `URLSession.shared` (the transport's
  * request pool), not an `OpenCodeClient` call: each beat is one measured round trip, and a missed
@@ -299,6 +299,11 @@ class ConnectionMonitor(server: OpenCodeServer, link: ConnectionHealth.Link) {
         val id = health.beginCheck(now)
         publish()
         val server = arrivedServer ?: server
+        // One request at a time: while the last is still out (a server not answering holds it for
+        // its 4 s timeout), this beat sends nothing and drops at its deadline, as it would have
+        // anyway. Stacked requests into a dead route can stall a VPN tunnel
+        // (tailscale/tailscale#21773).
+        if (checks.isNotEmpty()) return
         val probe = probe
         checks[id] = scope.launch {
             try {
