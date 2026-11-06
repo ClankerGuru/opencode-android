@@ -94,6 +94,8 @@ object ServerFlowTunables {
     const val rise = 6f
     const val scale = 0.94f
     const val enterBlur = 4f
+    /** How long “Reconnecting…” waits before it shows (s), so the first connect at launch and a quick reconnect never flash the pill. */
+    const val grace = 2.0
 }
 
 /**
@@ -139,9 +141,10 @@ data class ServerConnectionNotice(
 
     companion object {
         /**
-         * iOS `init?(status:credentialsRejected:errorMessage:server:isSwitching:)` without Home's
-         * status type: null while connected, and while the drawer switches servers (the switch
-         * is the drawer's to show).
+         * iOS `init?(status:credentialsRejected:errorMessage:server:isSwitching:reconnectingIsDue:)`
+         * without Home's status type: null while connected, while the drawer switches servers (the
+         * switch is the drawer's to show), and while a reconnect is still in its grace (the
+         * drawer's `ServerConnectionGrace`).
          */
         fun of(
             isConnected: Boolean,
@@ -150,9 +153,13 @@ data class ServerConnectionNotice(
             errorMessage: String?,
             serverName: String,
             isSwitching: Boolean,
+            reconnectingIsDue: Boolean = true,
         ): ServerConnectionNotice? {
             if (isSwitching || isConnected) return null
-            if (isReconnecting) return ServerConnectionNotice(Kind.reconnecting, serverName)
+            if (isReconnecting) {
+                if (!reconnectingIsDue) return null
+                return ServerConnectionNotice(Kind.reconnecting, serverName)
+            }
             if (credentialsRejected) return ServerConnectionNotice(Kind.signInFailed, serverName)
             val detail = errorMessage?.takeIf { it.isNotEmpty() && !it.startsWith("Couldn’t") }
             return ServerConnectionNotice(Kind.failed, serverName, detail)

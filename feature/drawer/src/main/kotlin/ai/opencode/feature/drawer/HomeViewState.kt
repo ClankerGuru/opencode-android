@@ -48,6 +48,10 @@ class HomeViewState internal constructor(
     var isSceneActive: Boolean by mutableStateOf(true)
         internal set
 
+    /** A reconnect has waited out its grace, so “Reconnecting…” shows (iOS `reconnectingPillIsDue`, set by [ServerConnectionGrace]). */
+    var reconnectingPillIsDue: Boolean by mutableStateOf(false)
+        internal set
+
     /** The header shows the search field in place of the title (iOS `search`). */
     val search = DrawerSearchState()
 

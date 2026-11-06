@@ -14,6 +14,7 @@ internal val whatsNewShippedEntries: List<WhatsNewEntry> by lazy {
         WhatsNewShipped.scrollingUnsticks,
         WhatsNewShipped.replyTextSelection,
         WhatsNewShipped.stuckTouchRecovery,
+        WhatsNewShipped.quietReconnectingPill,
         WhatsNewShipped.plusMenuTouchRelease,
         WhatsNewShipped.composerKeyboardWidth,
         WhatsNewShipped.loadingTouchRecovery,

@@ -388,7 +388,13 @@ private fun HomeSessionStack(
         val top = it.topDetail
         top?.activePicker != null || top?.shellOutput != null
     }
-    val listContext by store.observe { it.sessionListContext(it.sessionDetail?.session) }
+    val connectionStatus by store.observe { it.connectionStatus }
+    ServerConnectionGrace(connectionStatus, view)
+    // The grace is the view's, not Home's, so the context is read again when it runs out.
+    val reconnectingIsDue = view.reconnectingPillIsDue
+    val listContext by remember(store, reconnectingIsDue) {
+        store.states.map { it.sessionListContext(it.sessionDetail?.session, reconnectingIsDue) }.distinctUntilChanged()
+    }.collectAsState(initial = store.state.sessionListContext(store.state.sessionDetail?.session, reconnectingIsDue))
     // Pages drawn while they animate out, by their identity.
     val known = remember { HashMap<Int, StackEntry>() }
     for (entry in entries) known[entry.page.id] = entry
@@ -448,7 +454,7 @@ private fun HomeSessionStack(
  * its project, pin, read and mute state, the drawer button's dot for other sessions, and the
  * In-App Notice and the connection pill, outside Catch Up.
  */
-internal fun HomeFeature.State.sessionListContext(session: OpenCodeSession?): SessionListContext {
+internal fun HomeFeature.State.sessionListContext(session: OpenCodeSession?, reconnectingIsDue: Boolean = true): SessionListContext {
     val listed = session?.let { s -> sessions.firstOrNull { it.id == s.id } }
     val isCatchUp = catchUp != null
     return SessionListContext(
@@ -458,18 +464,22 @@ internal fun HomeFeature.State.sessionListContext(session: OpenCodeSession?): Se
         isMuted = listed?.let { isMuted(it.id) } ?: false,
         elsewhere = if (isCatchUp) null else drawerBadge(excluding = session?.id),
         notice = if (isCatchUp) null else inAppNotice,
-        connection = if (isCatchUp) null else serverConnectionNotice,
+        connection = if (isCatchUp) null else serverConnectionNotice(reconnectingIsDue),
     )
 }
 
-/** iOS `HomeView.serverConnectionNotice`: what the pill says of the connection. */
-internal val HomeFeature.State.serverConnectionNotice: ServerConnectionNotice?
-    get() = ServerConnectionNotice(
+/**
+ * iOS `HomeView.serverConnectionNotice`: what the pill says of the connection. [reconnectingIsDue]
+ * is the view's [ServerConnectionGrace].
+ */
+internal fun HomeFeature.State.serverConnectionNotice(reconnectingIsDue: Boolean = true): ServerConnectionNotice? =
+    ServerConnectionNotice(
         status = connectionStatus,
         credentialsRejected = credentialsRejected,
         errorMessage = connectionErrorMessage,
         server = server,
         isSwitching = switchingTo != null,
+        reconnectingIsDue = reconnectingIsDue,
     )
 
 /** iOS `HomeView.serverConnectionAction(_:)`: the pill's action, as Home's. */
