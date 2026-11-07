@@ -122,7 +122,13 @@ private fun transcriptListState(index: Int, offset: Int) = LazyListState(
  * rows before it can differ after a process death (a shorter history window, a row more or
  * less), so the saved index alone would land on another row. The index stays the fallback.
  */
-private class TranscriptListPosition(val state: LazyListState, var anchor: Pair<String, Int>? = null)
+private class TranscriptListPosition(val state: LazyListState, var anchor: Pair<String, Int>? = null) {
+    /**
+     * Layouts left to settle a row put back: the composer's height reaches the list's padding a
+     * frame late, so the first layout clamps a row near the end, and it's asked for again.
+     */
+    var settleLayouts = 0
+}
 
 /** `LazyListState.Saver` for a state with the list's cache window (Compose keeps that saver internal), plus the first row's key. */
 private val transcriptListPositionSaver = listSaver<TranscriptListPosition, Any>(
@@ -236,10 +242,23 @@ private fun TranscriptListContent(
                 position.anchor = null
                 return@SideEffect
             }
+            if (position.settleLayouts > 0) return@SideEffect
             val index = controller.snapshot.items.indexOfFirst { it.key == key }
             if (index < 0) return@SideEffect
-            position.anchor = null
+            position.settleLayouts = 3
             listState.requestScrollToItem(index, offset)
+        }
+        LaunchedEffect(listState) {
+            snapshotFlow { listState.layoutInfo }.collect {
+                val (key, offset) = position.anchor ?: return@collect
+                if (position.settleLayouts <= 0) return@collect
+                val index = controller.snapshot.items.indexOfFirst { item -> item.key == key }
+                if (index < 0 || (listState.firstVisibleItemIndex == index && listState.firstVisibleItemScrollOffset == offset) || --position.settleLayouts == 0) {
+                    position.anchor = null
+                } else {
+                    listState.requestScrollToItem(index, offset)
+                }
+            }
         }
         LaunchedEffect(listState) {
             snapshotFlow { listState.isScrollInProgress }.first { it }
