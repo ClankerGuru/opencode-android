@@ -689,7 +689,8 @@ fun ComposerTextInput(
     LaunchedEffect(scroll, state) {
         snapshotFlow { Triple(scroll.maxValue, controller.layoutTick, state.selection) }.collectLatest { (maxValue, _, selection) ->
             if (maxValue <= 0) return@collectLatest
-            val viewport = capPx
+            // Short of room the composer lays the field out below its cap.
+            val viewport = scroll.viewportSize.takeIf { it > 0 }?.toFloat() ?: capPx
             if (controller.pinsToEnd) {
                 if (scroll.value != maxValue) scroll.scrollTo(maxValue)
                 return@collectLatest

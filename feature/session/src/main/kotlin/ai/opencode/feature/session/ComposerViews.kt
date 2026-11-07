@@ -72,6 +72,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.HorizontalAlignmentLine
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.Measurable
+import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
@@ -85,6 +86,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -177,6 +179,12 @@ object ComposerTunables {
 /** iOS `VerticalAlignment.composerFoldTop`: where a subview of a folded [ComposerFoldLayout] starts to stay. */
 val ComposerFoldTop = HorizontalAlignmentLine(::min)
 
+/**
+ * Android: where a [ComposerLayout] squeezed past its field's floor draws its field from (above
+ * its top, so negative), for [ComposerFoldLayout] to give that room before the attachments'.
+ */
+val ComposerOverflowTop = HorizontalAlignmentLine(::min)
+
 /** iOS `ComposerLayout.Inline`: answering a pending request, the field stays on the control row. */
 data class ComposerLayoutInline(val hasLeading: Boolean, val lineHeight: Float)
 
@@ -228,6 +236,11 @@ object ComposerLayoutMetrics {
  *
  * Android: control slots are measured at least 48 dp tall (touch targets) and centre on the
  * 44 dp visual row, overhanging it by 2 dp each side, as iOS's targets do past its glass.
+ *
+ * Android: offered less height than it wants (a short window with the keys up), the field gives
+ * way down to [inputLineHeight] (one line, dp), and scrolls; the control row never does. Past
+ * that the field overflows above the layout's top ([ComposerOverflowTop]), never the row below
+ * its bottom.
  */
 @Composable
 fun ComposerLayout(
@@ -237,6 +250,7 @@ fun ComposerLayout(
     leading: @Composable () -> Unit,
     trailing: @Composable () -> Unit,
     modifier: Modifier = Modifier,
+    inputLineHeight: Float = 0f,
 ) {
     Layout(contents = listOf(input, leading, trailing), modifier = modifier) { (inputs, leadings, trailings), constraints ->
         val p = if (inline != null) 0f else progress().coerceIn(0f, 1f)
@@ -254,16 +268,24 @@ fun ComposerLayout(
         } else {
             collapsedWidth + (expandedWidth - collapsedWidth) * p
         }.roundToInt().coerceAtLeast(0)
-        val inputPlaceable = inputs.map { it.measure(Constraints(minWidth = inputWidth, maxWidth = inputWidth)) }
-        val inputHeight = inputPlaceable.maxOfOrNull { it.height } ?: 0
         val controls = px(ComposerLayoutMetrics.configuredRowHeight)
         val inlinePad = px(ComposerLayoutMetrics.inlinePad(ComposerLayoutMetrics.configuredRowHeight, inline))
+        // The field's lines, without the top inset it adds itself as the row opens.
+        val topInset = ComposerTextInputTunables.expandedTopInset.toPx()
+        // Short of room, the field takes what the row leaves it, down to one line.
+        val inputMax = if (!constraints.hasBoundedHeight) {
+            Constraints.Infinity
+        } else {
+            val reserve = if (inline != null) 2 * inlinePad else (px(ComposerLayoutMetrics.expandedRowGap) + controls) * p
+            val floor = ceil(px(inputLineHeight) + if (inline != null) 0f else topInset * p)
+            max(floor, constraints.maxHeight - reserve).roundToInt()
+        }
+        val inputPlaceable = inputs.map { it.measure(Constraints(minWidth = inputWidth, maxWidth = inputWidth, maxHeight = inputMax)) }
+        val inputHeight = inputPlaceable.maxOfOrNull { it.height } ?: 0
         // Hit targets stay at least 48 dp tall even when the visual bar is compact.
         val targetHeight = max(48.dp.roundToPx(), controls.roundToInt())
         val leadingWidth = if (inline == null) max(px(44f), width - trailingWidth - px(4f)).roundToInt() else 48.dp.roundToPx()
         val leadingPlaceable = leadings.map { it.measure(Constraints(maxWidth = leadingWidth, maxHeight = targetHeight)) }
-        // The field's lines, without the top inset it adds itself as the row opens.
-        val topInset = ComposerTextInputTunables.expandedTopInset.toPx()
         val lines = if (inline != null) inputHeight.toFloat() else inputHeight - topInset * p
         val height = if (inline != null) {
             max(controls, inputHeight + 2 * inlinePad)
@@ -273,14 +295,20 @@ fun ComposerLayout(
             collapsed + (open - collapsed) * p
         }.roundToInt()
         // Folded for dictation, the composer keeps only the control row.
-        val foldTop: Int? = if (expanded || inline != null) (height - controls).roundToInt() else null
-        val alignment: Map<androidx.compose.ui.layout.AlignmentLine, Int> = if (foldTop != null) mapOf(ComposerFoldTop to foldTop) else emptyMap()
-        layout(width, height, alignment) {
-            val controlsY = height - controls / 2
+        // Past the field's floor the overflow goes above the top, keeping the row in place.
+        val laidOut = min(height, constraints.maxHeight)
+        val overflow = height - laidOut
+        val foldTop: Int? = if (expanded || inline != null) (laidOut - controls).roundToInt() else null
+        val alignment = buildMap<androidx.compose.ui.layout.AlignmentLine, Int> {
+            if (foldTop != null) put(ComposerFoldTop, foldTop)
+            if (overflow > 0) put(ComposerOverflowTop, -overflow)
+        }
+        layout(width, laidOut, alignment) {
+            val controlsY = laidOut - controls / 2
             val inputY = if (inline != null) {
-                height - inlinePad - inputHeight
+                laidOut - inlinePad - inputHeight
             } else {
-                (controls - lines) / 2 * (1 - p)
+                (controls - lines) / 2 * (1 - p) - overflow
             }
             inputPlaceable.forEach { it.place(inputX.roundToInt(), inputY.roundToInt()) }
             // The leading row ends 4 dp short of the trailing control: a mic at either end sits in
@@ -319,26 +347,47 @@ fun ComposerFoldLayout(
 ) {
     Layout(content = content, modifier = modifier) { measurables, constraints ->
         val width = constraints.maxWidth
-        val placeables = measurables.map { it.measure(Constraints(minWidth = 0, maxWidth = width)) }
         val folds = measurables.map { it.folds }
         val firstStaying = folds.indexOfFirst { !it }
+        val gap = spacing.toPx()
+        // Android: short of room (a short window with the keys up), the field and its controls
+        // get what the rest leaves them, so the field's lines give way first; past its floor the
+        // column's top (the attachments) is clipped, never the control row ([ComposerLayout]).
+        val squeezes = constraints.hasBoundedHeight && firstStaying >= 0
+        val measured = arrayOfNulls<Placeable>(measurables.size)
+        measurables.forEachIndexed { index, measurable ->
+            if (!squeezes || index != firstStaying) measured[index] = measurable.measure(Constraints(minWidth = 0, maxWidth = width))
+        }
+        if (squeezes) {
+            val rest = measured.sumOf { it?.height ?: 0 } + gap * (measurables.size - 1)
+            val room = (constraints.maxHeight - rest).roundToInt().coerceAtLeast(0)
+            measured[firstStaying] = measurables[firstStaying].measure(Constraints(minWidth = 0, maxWidth = width, maxHeight = room))
+        }
+        val placeables = measured.map { it!! }
+        // Past its field's floor the field reaches above its top: that reach takes the room
+        // above it, so the attachments go before the field does.
+        val reaches = placeables.mapIndexed { index, placeable ->
+            if (index != firstStaying) 0 else {
+                placeable[ComposerOverflowTop].takeIf { it != androidx.compose.ui.layout.AlignmentLine.Unspecified }?.let { -it } ?: 0
+            }
+        }
         val firstStayingFoldTop = if (firstStaying >= 0) {
-            placeables[firstStaying][ComposerFoldTop].takeIf { it != androidx.compose.ui.layout.AlignmentLine.Unspecified } ?: 0
+            (placeables[firstStaying][ComposerFoldTop].takeIf { it != androidx.compose.ui.layout.AlignmentLine.Unspecified } ?: 0) + reaches[firstStaying]
         } else {
             0
         }
-        val sizes = placeables.map { it.height.toFloat() }
-        val gap = spacing.toPx()
+        val sizes = placeables.mapIndexed { index, placeable -> (placeable.height + reaches[index]).toFloat() }
         val p = foldProgress.coerceIn(0f, 1f)
         val result = ComposerFoldFrames.frames(
             sizes, folds, firstStayingFoldTop.toFloat(), isFolded = p >= 1f, foldProgress = p,
             attachmentRevealProgress = attachmentRevealProgress, spacing = gap,
         )
-        val lower = result.visible.start
-        val height = (result.visible.endInclusive - lower).roundToInt().coerceAtLeast(0)
+        val upper = result.visible.endInclusive
+        val lower = if (constraints.hasBoundedHeight) max(result.visible.start, upper - constraints.maxHeight) else result.visible.start
+        val height = (upper - lower).roundToInt().coerceAtLeast(0)
         layout(width, height) {
             placeables.forEachIndexed { index, placeable ->
-                placeable.place(0, (result.frames[index] - lower).roundToInt())
+                placeable.place(0, (result.frames[index] + reaches[index] - lower).roundToInt())
             }
         }
     }
