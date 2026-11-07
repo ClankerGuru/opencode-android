@@ -672,36 +672,41 @@ fun JumpToLatestPill(
     val slotOpen = if (reduceMotion) (if (isShown) 1f else 0f) else presence.value.coerceIn(0f, 1f)
     val interactions = remember { MutableInteractionSource() }
     val slotWidth = if (collapsesSlot) (48f + JumpToLatestPillMotion.gap) * slotOpen else 48f
-    Box(modifier.width(slotWidth.dp).heightIn(min = 48.dp), contentAlignment = Alignment.CenterEnd) {
-        if (mounted) {
-            val p = presence.value
-            Box(
-                Modifier
-                    .scale(if (reduceMotion) 1f else 0.5f + 0.5f * p)
-                    .alpha(p.coerceIn(0f, 1f))
-                    .coveredByBackgroundWork()
-                    .then(
-                        if (isShown) {
-                            Modifier
-                                .clickable(interactionSource = interactions, indication = null, role = Role.Button, onClick = onClick)
-                                .semantics { contentDescription = "Scroll to latest" }
-                                .testTag("scroll-to-latest")
-                        } else {
-                            Modifier.clearAndSetSemantics { }.blockTouches()
-                        },
-                    )
-                    .openCodeTapTarget(accessibility = false),
-                contentAlignment = Alignment.Center,
-            ) {
-                Surface(
-                    shape = OpenCodeShape.circle,
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    tonalElevation = 2.dp,
-                    shadowElevation = 2.dp,
-                    modifier = Modifier.size(34.dp).clip(OpenCodeShape.circle).indication(interactions, ripple()),
+    // The empty slot takes no touches, as iOS's empty frame: [modifier] (the borrowed drag) wraps
+    // only the pill, so with nothing mounted a tap reaches the transcript under it, and a drag
+    // that started on the pill keeps its node as the pill leaves.
+    Box(Modifier.width(slotWidth.dp).heightIn(min = 48.dp), contentAlignment = Alignment.CenterEnd) {
+        Box(modifier) {
+            if (mounted) {
+                val p = presence.value
+                Box(
+                    Modifier
+                        .scale(if (reduceMotion) 1f else 0.5f + 0.5f * p)
+                        .alpha(p.coerceIn(0f, 1f))
+                        .coveredByBackgroundWork()
+                        .then(
+                            if (isShown) {
+                                Modifier
+                                    .clickable(interactionSource = interactions, indication = null, role = Role.Button, onClick = onClick)
+                                    .semantics { contentDescription = "Scroll to latest" }
+                                    .testTag("scroll-to-latest")
+                            } else {
+                                Modifier.clearAndSetSemantics { }.blockTouches()
+                            },
+                        )
+                        .openCodeTapTarget(accessibility = false),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        OpenCodeIcon(SFSymbol.ArrowDown, contentDescription = null, size = 18.dp, tint = OpenCodeTheme.colors.text)
+                    Surface(
+                        shape = OpenCodeShape.circle,
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        tonalElevation = 2.dp,
+                        shadowElevation = 2.dp,
+                        modifier = Modifier.size(34.dp).clip(OpenCodeShape.circle).indication(interactions, ripple()),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            OpenCodeIcon(SFSymbol.ArrowDown, contentDescription = null, size = 18.dp, tint = OpenCodeTheme.colors.text)
+                        }
                     }
                 }
             }
