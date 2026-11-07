@@ -154,6 +154,10 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
     val plusMenuRests: Boolean
         get() = attachmentMenu == AttachmentMenuPhase.Closed && !morph.isShown && !recentPeek.isShown && !camera.expanded
 
+    /** iOS `PlusMenuGlassSurface(isOpen:)`: the + menu's own surface shows its rows (not handed to the photo sheet). */
+    val plusMenuIsOpen: Boolean
+        get() = attachmentMenu == AttachmentMenuPhase.Menu && (!morph.isShown || menuTakesBack)
+
     internal var env = Env()
 
     /** What the functions read from the screen, set by `SessionView` on every composition. */

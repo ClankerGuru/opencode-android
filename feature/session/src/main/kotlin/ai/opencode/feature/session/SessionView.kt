@@ -272,6 +272,9 @@ fun SessionView(
                 composerHost.dismissComposerKeyboard()
                 if (photoSheet.attachmentMenu != AttachmentMenuPhase.Closed) photoSheet.closeAttachmentMenu()
             },
+            // iOS: the + menu is an `.isModal` container in its own window, so VoiceOver reaches
+            // nothing beneath it. TalkBack has no modal, so the screen under it (the + too) hides.
+            modifier = if (photoSheet.plusMenuIsOpen) Modifier.clearAndSetSemantics {} else Modifier,
         ) {
             Box(Modifier.fillMaxSize().background(colors.canvas)) {
                 if (errorMessage != null) {
@@ -565,7 +568,7 @@ private fun SessionAttachmentMenu(
     Box(Modifier.fillMaxSize().then(if (sheet.plusMenuRests) Modifier.clearAndSetSemantics {} else Modifier)) {
         PlusMenuGlassSurface(
             anchors = host.attachmentAnchors,
-            isOpen = phase == AttachmentMenuPhase.Menu && (!sheet.morph.isShown || sheet.menuTakesBack),
+            isOpen = sheet.plusMenuIsOpen,
             handsOff = sheet.morph.isShown && !sheet.menuTakesBack,
             items = items,
             highlighted = press.highlighted,
