@@ -6,6 +6,7 @@ import ai.opencode.core.store.TestStore
 import ai.opencode.core.testing.TestIsolationRule
 import ai.opencode.feature.drawer.HomeConnectionFeature.State.ConnectionStatus
 import ai.opencode.feature.drawer.switcher.DrawerTitle
+import ai.opencode.feature.session.ServerFlowTunables
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
@@ -16,6 +17,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Port of iOS `ServerSwitchingTests` (Home's half): Home keeps a server's name across a
@@ -97,21 +99,29 @@ class ServerSwitchingTests {
         val home = HomeFeature.State(laptop, snapshot).let {
             it.copy(connection = it.connection.copy(hasConnected = true))
         }
+        val clock = TestClock()
         val store = TestStore(home, HomeFeature(), backgroundScope) {
-            this[Clock] = TestClock()
+            this[Clock] = clock
             this[OpenCodeClient] = offlineClient()
         }
         store.exhaustive = false
-        fun title() = DrawerTitle.Presentation(serverCount = 1, status = store.state.connectionStatus)
+        fun title() = DrawerTitle.Presentation(serverCount = 1, status = store.state.connection.displayedStatus)
 
         store.send(HomeFeature.Action.ConnectionLost)
         assertEquals(ConnectionStatus.reconnecting, store.state.connectionStatus)
-        assertTrue("A blip doesn't dim the title", !title().isDimmed && !title().hasMenu)
+        assertTrue("A blip shows nothing", !title().isDimmed && !title().hasMenu && title().issue == null)
         store.send(HomeFeature.Action.ConnectionLost)
+        assertEquals("A second failure inside the grace isn't an outage yet", ConnectionStatus.reconnecting, store.state.connectionStatus)
+        clock.advance(ServerFlowTunables.grace.seconds)
+        store.receive({ it is HomeFeature.Action.ReconnectingGraceElapsed }, "reconnectingGraceElapsed")
+        assertTrue(title().issue == "Reconnecting" && !title().isDimmed)
+        clock.advance(ServerFlowTunables.offlineGrace.seconds)
+        store.receive({ it is HomeFeature.Action.OfflineGraceElapsed }, "offlineGraceElapsed")
         assertEquals(ConnectionStatus.disconnected, store.state.connectionStatus)
-        assertTrue("Failing again is an outage", title().isDimmed && title().offersTryAgain)
+        assertTrue("Still failing after the grace is an outage", title().isDimmed && title().offersTryAgain)
         store.send(HomeFeature.Action.RetryConnectionTapped)
         assertEquals(ConnectionStatus.reconnecting, store.state.connectionStatus)
+        assertEquals("Try Again shows its reconnect at once", "Reconnecting", title().issue)
         assertFalse("Try Again brightens it while it reconnects", title().isDimmed)
     }
 }

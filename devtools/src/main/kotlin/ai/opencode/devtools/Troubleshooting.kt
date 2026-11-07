@@ -30,8 +30,24 @@ object Troubleshooting {
             "Tap → first frame" to duration(open, frame),
             "Tap → first fresh content" to duration(open, fresh),
             "SSE" to (stream?.name ?: "No event recorded"),
+            "Address race" to (events.lastOrNull { it.name == "link_race" }?.reason ?: "None yet"),
+            "Network path" to (events.lastOrNull { it.name == "path_change" }?.reason ?: "No change recorded"),
+            "Stream watchdog" to watchdogSummary(events),
         ) + listOfNotNull(motionJumps?.let { "Motion Watch" to (if (it == 1) "1 jump" else "$it jumps") }) +
             listOf("Last 60 seconds" to lastMinute(events))
+    }
+
+    /** iOS `watchdogSummary`: stalled streams the watchdog ended, by which deadline passed. */
+    fun watchdogSummary(events: List<DiagnosticsEvent>): String {
+        var fired = 0
+        var silent = 0
+        for (event in events) {
+            if (event.name != "sse_watchdog") continue
+            fired += 1
+            if (event.reason == "idle") silent += 1
+        }
+        if (fired == 0) return "Never fired"
+        return "${fired - silent} didn’t open · $silent went silent"
     }
 
     fun lastMinute(events: List<DiagnosticsEvent>): String {

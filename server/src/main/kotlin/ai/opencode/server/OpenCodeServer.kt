@@ -62,6 +62,16 @@ data class OpenCodeServer(
     /** Every address to try, primary first, deduplicated. */
     val candidateURLs: List<String> get() = (listOf(url) + alternateURLs).distinct()
 
+    /**
+     * This server with [preferred]'s address order, when both list the same addresses. Pairing
+     * or the person set that order; which address answered last is runtime state
+     * ([ServerLinkClient]) and never reorders it.
+     */
+    fun keepingAddressOrder(preferred: OpenCodeServer?): OpenCodeServer {
+        if (preferred == null || preferred.persistenceID != persistenceID) return this
+        return copy(url = preferred.url, alternateURLs = preferred.alternateURLs)
+    }
+
     fun at(url: String): OpenCodeServer = copy(url = url, alternateURLs = candidateURLs.filter { it != url })
 
     /** "127.0.0.1:4096" — the address in use, without its scheme. */
@@ -228,6 +238,20 @@ data class OpenCodeServer(
 
     companion object {
         private val PAIRING_TOKEN = Regex("^[0-9]{10,}\\.[A-Za-z0-9_-]{20,}$")
+
+        /**
+         * "http://100.64.0.3:4096": scheme, host and port, lowercased, with the scheme's default
+         * port filled in, so two spellings of one address match.
+         */
+        fun origin(url: String): String? {
+            val parts = UrlParts.parse(url.trim()) ?: return null
+            val scheme = parts.scheme?.lowercase() ?: return null
+            if (scheme != "http" && scheme != "https") return null
+            val host = parts.host?.lowercase()
+            if (host.isNullOrEmpty()) return null
+            val port = parts.port ?: if (scheme == "https") 443 else 80
+            return "$scheme://$host:$port"
+        }
 
         /** A host name's first label ("basebook" of basebook.tail1234.ts.net:4443), or the whole address for an IP. */
         fun machineName(host: String): String {

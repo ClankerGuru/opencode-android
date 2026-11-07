@@ -5,6 +5,7 @@ import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.log.AppLog
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
+import ai.opencode.server.ServerLinkClient
 import ai.opencode.server.OpenCodeTransport
 import ai.opencode.core.files.AttachmentFileType
 import ai.opencode.server.model.FileReadTarget
@@ -88,12 +89,13 @@ internal suspend fun requestMarkdownImage(
         cache.insert(data, cacheKey)
         return data
     }
-    val outside = fallback?.let { server.fileReadRequest(it.location, it.relativePath) }
-    val request = server.imageRequest(source, directory) ?: outside ?: return null
+    val target = dependency(ServerLinkClient).resolve(server)
+    val outside = fallback?.let { target.fileReadRequest(it.location, it.relativePath) }
+    val request = target.imageRequest(source, directory) ?: outside ?: return null
     val requestURL = request.url
     val scheme = UrlParts.parse(source)?.scheme?.lowercase()
     val isExternalURL = scheme == "http" || scheme == "https"
-    val isServerRead = !isExternalURL && requestURL.encodedPath.startsWith("/api/fs/read/") && server.matchesOrigin(requestURL)
+    val isServerRead = !isExternalURL && requestURL.encodedPath.startsWith("/api/fs/read/") && target.matchesOrigin(requestURL)
     val contact = server.persistenceID
     val transport = dependency(OpenCodeTransport)
     val data = try {
@@ -149,16 +151,27 @@ private suspend fun performUpload(server: OpenCodeServer, directory: String?, fi
     // `paths.tmp` arrived just before the write route; without it, uploads have nowhere to go.
     val tmp = info.paths?.tmp?.ifEmpty { null } ?: throw OpenCodeClientError.uploadsUnsupported
     val query = locationQuery(directory) + listOf("path" to uploadPath(tmp, name = name))
-    val url = server.endpoint("/api/experimental/fs/write", query) ?: throw OpenCodeClientError("Enter a valid HTTP or HTTPS server URL.")
+    if (server.endpoint("/api/experimental/fs/write", query) == null) throw OpenCodeClientError("Enter a valid HTTP or HTTPS server URL.")
     // The same path on every attempt: a retry overwrites, never duplicates. Something the
-    // person is sending: it rides out a long drop like a send.
+    // person is sending: it rides out a long drop like a send. Like any request, it goes again
+    // as soon as the server answers anything, at whichever address answers then.
     val contact = server.persistenceID
+    val link = dependency(ServerLinkClient)
     return NetworkRetry.run(
         NetworkRetry.currentPolicy(RetryPolicy.send),
         idempotency = RequestIdempotency.Idempotent,
         label = "POST /api/experimental/fs/write",
         reachable = { ServerContact.shared.next(contact) },
-    ) { writeUpload(url, file, server, progress) }
+    ) {
+        val target = link.route(server)
+        val url = target.endpoint("/api/experimental/fs/write", query) ?: throw OpenCodeClientError("Enter a valid HTTP or HTTPS server URL.")
+        try {
+            writeUpload(url, file, target, progress)
+        } catch (error: OpenCodeClientError) {
+            if (error.transport != null) link.invalidate(server, target.url)
+            throw error
+        }
+    }
 }
 
 /** The file as an octet stream, reporting bytes sent about once per percent. */

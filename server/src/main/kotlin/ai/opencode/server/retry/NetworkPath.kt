@@ -12,7 +12,20 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.os.Bundle
 import android.os.PowerManager
+import ai.opencode.core.dependencies.Clock
+import ai.opencode.core.diagnostics.DiagnosticsRecorder
+import ai.opencode.core.log.AppLog
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.selects.select
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -20,7 +33,6 @@ import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flow
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
@@ -29,18 +41,89 @@ import java.util.concurrent.CopyOnWriteArrayList
  */
 class NetworkPathMonitor private constructor(context: Context) {
     data class Snapshot(
-        val isSatisfied: Boolean,
-        /** The interface traffic would leave on ("wifi wlan0", "cellular rmnet0"). */
-        val primaryInterface: String?,
+        val status: Status,
+        /**
+         * Every interface the path can use, in order of preference. The first carries traffic by
+         * default; a VPN adds an `other` interface (its tunnel) beside it.
+         */
+        val interfaces: List<Interface>,
         /** Metered: cellular or a hotspot (`NWPath.isExpensive`). */
         val isExpensive: Boolean = false,
         /** Data Saver restricts this app (`NWPath.isConstrained`, Low Data Mode). */
         val isConstrained: Boolean = false,
     ) {
-        /** A change worth reconnecting for: the path came back, or traffic moved to another interface. */
+        enum class Status(val rawValue: String) {
+            Satisfied("satisfied"),
+            /**
+             * No link yet, but sending would bring one up (iOS VPN On Demand, a dormant radio).
+             * Android's callback reports no such state; kept so the two codebases match.
+             */
+            RequiresConnection("requiresConnection"),
+            Unsatisfied("unsatisfied"),
+        }
+
+        /**
+         * One interface the path can use: its kind ("wifi", "cellular", "wiredEthernet", "other"
+         * for a tunnel) and system name ("wlan0", "tun0").
+         */
+        data class Interface(val type: String, val name: String)
+
+        /** [primaryInterface] reads like "wifi wlan0". */
+        constructor(
+            isSatisfied: Boolean,
+            primaryInterface: String?,
+            isExpensive: Boolean = false,
+            isConstrained: Boolean = false,
+        ) : this(
+            status = if (isSatisfied) Status.Satisfied else Status.Unsatisfied,
+            interfaces = interfacesOf(primaryInterface),
+            isExpensive = isExpensive,
+            isConstrained = isConstrained,
+        )
+
+        val isSatisfied: Boolean get() = status == Status.Satisfied
+
+        /** Only a path with nowhere to send is offline; [Status.RequiresConnection] is tried. */
+        val isOffline: Boolean get() = status == Status.Unsatisfied
+
+        /** The interface traffic would leave on ("wifi wlan0", "cellular rmnet0"). */
+        val primaryInterface: String? get() = interfaces.firstOrNull()?.let { "${it.type} ${it.name}" }
+
+        /**
+         * What decides where a connection goes: the interface traffic leaves on by default, and
+         * every tunnel (`other`) interface. A tunnel coming up, going down or restarting on a new
+         * interface strands connections made through the old one.
+         */
+        val routeSignature: List<Interface>
+            get() {
+                val first = interfaces.firstOrNull() ?: return emptyList()
+                val tunnels = interfaces.drop(1).filter { it.type == "other" }.sortedBy { it.name }
+                return listOf(first) + tunnels
+            }
+
+        /** A change worth reconnecting for: the path came back, or traffic can now leave another way. */
         fun isReroute(previous: Snapshot?): Boolean {
-            if (previous == null || !isSatisfied) return false
-            return !previous.isSatisfied || previous.primaryInterface != primaryInterface
+            if (previous == null || isOffline) return false
+            if (previous.isOffline) return true
+            if (status == Status.Satisfied && previous.status != Status.Satisfied) return true
+            return previous.routeSignature != routeSignature
+        }
+
+        /** For the log and diagnostics: kinds only, never names or addresses. */
+        val logSummary: String
+            get() {
+                val kinds = routeSignature.map { it.type }
+                val listed = if (kinds.isEmpty()) "none" else kinds.joinToString(",")
+                return "status=${status.rawValue} interfaces=$listed tunnels=${routeSignature.drop(1).size} " +
+                    "expensive=$isExpensive constrained=$isConstrained"
+            }
+
+        private companion object {
+            fun interfacesOf(primaryInterface: String?): List<Interface> {
+                val parts = primaryInterface?.split(" ", limit = 2) ?: return emptyList()
+                if (parts.size != 2) return emptyList()
+                return listOf(Interface(parts[0], parts[1]))
+            }
         }
     }
 
@@ -55,7 +138,7 @@ class NetworkPathMonitor private constructor(context: Context) {
     init {
         val manager = connectivity
         if (manager != null) {
-            if (manager.activeNetwork == null) receive(Snapshot(isSatisfied = false, primaryInterface = null))
+            if (manager.activeNetwork == null) receive(Snapshot(Snapshot.Status.Unsatisfied, emptyList()))
             manager.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
                 override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
                     synchronized(lock) { capabilities = networkCapabilities }
@@ -72,7 +155,7 @@ class NetworkPathMonitor private constructor(context: Context) {
                         capabilities = null
                         link = null
                     }
-                    receive(Snapshot(isSatisfied = false, primaryInterface = null))
+                    receive(Snapshot(Snapshot.Status.Unsatisfied, emptyList()))
                 }
             })
         }
@@ -82,18 +165,26 @@ class NetworkPathMonitor private constructor(context: Context) {
         val (caps, properties) = synchronized(lock) { capabilities to link }
         caps ?: return
         val satisfied = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-        val type = when {
-            caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN) -> "other"
+        val physical = when {
             caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "wifi"
             caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "cellular"
             caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "wiredEthernet"
             else -> "other"
         }
+        val name = properties?.interfaceName ?: ""
+        // A VPN is the default network itself, carrying its underlying transport: the physical
+        // link first (its name isn't reported), then the tunnel, as iOS lists a tunnel beside Wi-Fi.
+        val interfaces = when {
+            !satisfied -> emptyList()
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN) ->
+                listOf(Snapshot.Interface(physical, ""), Snapshot.Interface("other", name))
+            else -> listOf(Snapshot.Interface(physical, name))
+        }
         val constrained = connectivity?.restrictBackgroundStatus == ConnectivityManager.RESTRICT_BACKGROUND_STATUS_ENABLED
         receive(
             Snapshot(
-                isSatisfied = satisfied,
-                primaryInterface = if (satisfied) "$type ${properties?.interfaceName ?: ""}".trim() else null,
+                status = if (satisfied) Snapshot.Status.Satisfied else Snapshot.Status.Unsatisfied,
+                interfaces = interfaces,
                 isExpensive = !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED),
                 isConstrained = constrained,
             ),
@@ -121,19 +212,29 @@ class NetworkPathMonitor private constructor(context: Context) {
         awaitClose { observers.remove(observer) }
     }.buffer(4, BufferOverflow.DROP_OLDEST)
 
-    suspend fun waitUntilSatisfied() {
-        updates().first { it.isSatisfied }
+    /** Returns once sending could work: a satisfied path, or one that a connection would bring up. */
+    suspend fun waitUntilUsable() {
+        updates().first { !it.isOffline }
     }
 
     private fun receive(snapshot: Snapshot) {
-        synchronized(lock) {
+        val previous = synchronized(lock) {
             if (state == snapshot) return
+            val previous = state
             state = snapshot
+            previous
+        }
+        if (previous?.logSummary != snapshot.logSummary) {
+            AppLog.network.info { "Path ${snapshot.logSummary}" }
+            DiagnosticsRecorder.shared.recordLink("path_change", snapshot.logSummary)
         }
         for (observer in observers) observer(snapshot)
     }
 
     companion object {
+        /** A burst of path callbacks (Wi-Fi, then a tunnel, then DNS settling) is one reroute. */
+        val rerouteDebounce: Duration = 250.milliseconds
+
         /** The process-wide monitor; null where no application context is installed (JVM tests). */
         val shared: NetworkPathMonitor? by lazy {
             runCatching { NetworkPathMonitor(dependency(AppContext).applicationContext) }.getOrNull()
@@ -143,6 +244,33 @@ class NetworkPathMonitor private constructor(context: Context) {
             snapshot ?: return false
             if (snapshot.isConstrained) return true
             return snapshot.isExpensive && isLowPowerModeEnabled
+        }
+
+        /**
+         * One reroute per settled change in [updates]: each reroute restarts the [debounce] wait,
+         * and a path that drops meanwhile cancels it.
+         */
+        fun reroutes(
+            updates: Flow<Snapshot>,
+            debounce: Duration = rerouteDebounce,
+            clock: Clock = Clock.liveValue,
+        ): Flow<Unit> = channelFlow {
+            var pending: Job? = null
+            var previous: Snapshot? = null
+            updates.collect { snapshot ->
+                if (snapshot.isReroute(previous)) {
+                    pending?.cancel()
+                    pending = launch {
+                        clock.sleep(debounce)
+                        send(Unit)
+                    }
+                } else if (snapshot.isOffline) {
+                    pending?.cancel()
+                    pending = null
+                }
+                previous = snapshot
+            }
+            pending?.cancel()
         }
     }
 }
@@ -187,10 +315,23 @@ object AppPhases {
         })
     }
 
-    fun phases(): Flow<AppPhase> = callbackFlow {
+    /**
+     * Calls [observer] synchronously with every phase from now on, for as long as the process
+     * lives (iOS `NotificationCenter.addObserver(queue: nil)`).
+     */
+    fun observe(observer: (AppPhase) -> Unit) {
+        installIfNeeded()
+        observers.add(observer)
+    }
+
+    private fun installIfNeeded() {
         if (!installed) {
             runCatching { dependency(AppContext).applicationContext as? Application }.getOrNull()?.let(::install)
         }
+    }
+
+    fun phases(): Flow<AppPhase> = callbackFlow {
+        installIfNeeded()
         val observer: (AppPhase) -> Unit = { trySend(it) }
         observers.add(observer)
         awaitClose { observers.remove(observer) }
@@ -199,7 +340,10 @@ object AppPhases {
 
 /** The network path for reducers: when to reconnect, and whether to wait. */
 data class NetworkPathClient(
-    /** Yields each time the path comes back or moves to another interface. */
+    /**
+     * Yields each time the path comes back or moves to another interface (Wi-Fi and cellular, a
+     * VPN re-pathing): a connection opened before may be stranded on the old route.
+     */
     val reroutes: () -> Flow<Unit>,
     val isOffline: () -> Boolean,
     val isConstrained: () -> Boolean = { false },
@@ -215,23 +359,41 @@ data class NetworkPathClient(
     val retryEnvironment: RetryEnvironment
         get() = RetryEnvironment(random = ::liveRandom, isOffline = isOffline, networkAvailable = available)
 
+    /**
+     * Returns at the next reroute, or once a request reaches the server (`persistenceID`) again,
+     * whichever comes first: whatever kept a connection away may be gone, so a loop waiting out a
+     * backoff tries now.
+     */
+    suspend fun nextReconnectCue(server: String) {
+        coroutineScope {
+            val reroute = async { nextReroute() }
+            val answer = async { serverAnswered(server) }
+            select {
+                reroute.onAwait {}
+                answer.onAwait {}
+            }
+            coroutineContext.cancelChildren()
+        }
+    }
+
+    /** Returns at the next reroute; never, if the path reports none. */
+    private suspend fun nextReroute() {
+        val rerouted = reroutes().firstOrNull()
+        if (rerouted != null) return
+        awaitCancellation()
+    }
+
     companion object Key : DependencyKey<NetworkPathClient> {
         override val liveValue: NetworkPathClient by lazy {
             NetworkPathClient(
                 reroutes = {
-                    flow {
-                        val monitor = NetworkPathMonitor.shared ?: return@flow
-                        var previous: NetworkPathMonitor.Snapshot? = null
-                        monitor.updates().collect { snapshot ->
-                            if (snapshot.isReroute(previous)) emit(Unit)
-                            previous = snapshot
-                        }
-                    }
+                    val monitor = NetworkPathMonitor.shared
+                    if (monitor == null) emptyFlow() else NetworkPathMonitor.reroutes(monitor.updates())
                 },
-                isOffline = { NetworkPathMonitor.shared?.current?.isSatisfied == false },
+                isOffline = { NetworkPathMonitor.shared?.current?.isOffline == true },
                 isConstrained = { NetworkPathMonitor.shared?.isConstrained == true },
                 isExpensive = { NetworkPathMonitor.shared?.isExpensive == true },
-                available = { NetworkPathMonitor.shared?.waitUntilSatisfied() },
+                available = { NetworkPathMonitor.shared?.waitUntilUsable() },
                 serverAnswered = { ServerContact.shared.next(it) },
                 appPhases = { AppPhases.phases() },
             )

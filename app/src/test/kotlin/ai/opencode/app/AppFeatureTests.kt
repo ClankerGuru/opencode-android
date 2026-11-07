@@ -1118,62 +1118,6 @@ class AppFeatureTests {
     }
 
     @Test
-    fun connectFallsBackToAnAlternateAddressAndAdoptsIt() = runTest {
-        val initialState = shared.appState().copy(
-            serverURL = "https://box.ts.net:4096",
-            alternateURLs = listOf("http://192.168.1.20:4096"),
-            password = "pw",
-        )
-        val store = store(
-            initialState,
-            OpenCodeClient.testValue.copy(
-                // Away from the tailnet, only the LAN address answers.
-                health = { server -> if (server.url != "http://192.168.1.20:4096") throw OpenCodeClientError("Offline") },
-                homeSnapshot = { emptySnapshot },
-            ),
-        )
-        store.exhaustive = false
-
-        store.send(AppFeature.Action.ConnectButtonTapped)
-        store.receiveCase<AppFeature.Action.HealthResponse>()
-
-        assertEquals("http://192.168.1.20:4096", store.state.serverURL)
-        assertEquals(listOf("https://box.ts.net:4096"), store.state.alternateURLs)
-        assertEquals("http://192.168.1.20:4096", savedServer?.url)
-        effects.skipInFlightEffects()
-    }
-
-    @Test
-    fun savedServerKeepsOneEntryWhicheverAddressWins() = runTest {
-        val tailnet = OpenCodeServer(
-            url = "https://box.ts.net:4096", username = "opencode", password = "pw",
-            alternateURLs = listOf("http://192.168.1.20:4096"),
-        )
-        val lan = tailnet.at("http://192.168.1.20:4096")
-        val initialState = shared.appState().load(tailnet)
-        saveAll(listOf(tailnet))
-        val store = store(
-            initialState,
-            OpenCodeClient.testValue.copy(
-                health = { server -> if (server.url != lan.url) throw OpenCodeClientError("Offline") },
-                homeSnapshot = { emptySnapshot },
-            ),
-        )
-        store.exhaustive = false
-
-        store.send(AppFeature.Action.ConnectButtonTapped)
-        store.receiveCase<AppFeature.Action.HealthResponse>()
-        assertEquals(listOf(lan), savedServers)
-        store.receiveCase<AppFeature.Action.HomeResponse>()
-
-        // Removing the entry by any of its addresses forgets the server.
-        store.send(AppFeature.Action.ServerDeleted(tailnet))
-        assertTrue(savedServers.isEmpty())
-        assertNull(savedServer)
-        store.finish()
-    }
-
-    @Test
     fun reconnectingTheSameAddressWithNewCredentialsReplacesTheSavedEntry() = runTest {
         val old = OpenCodeServer(url = "http://192.168.1.20:4096", username = "opencode", password = "old")
         val renamed = OpenCodeServer(url = old.url, username = "kit", password = "new")
@@ -1283,8 +1227,70 @@ class AppFeatureTests {
         store.finish()
     }
 
+    // Connecting picks the address, keeps the saved order: iOS `ServerLinkConnectionTests`, here for
+    // this file's harness (the rest of that suite is `:feature:drawer`'s `ServerLinkConnectionTests`).
+
     @Test
-    fun connectSavesReachableTailscaleInsteadOfFasterLAN() = runTest {
+    fun connectFallsBackToAnAlternateAddressAndAdoptsIt() = runTest {
+        val initialState = shared.appState().copy(
+            serverURL = "https://box.ts.net:4096",
+            alternateURLs = listOf("http://192.168.1.20:4096"),
+            password = "pw",
+        )
+        val store = store(
+            initialState,
+            OpenCodeClient.testValue.copy(
+                // Away from the tailnet, only the LAN address answers.
+                health = { server -> if (server.url != "http://192.168.1.20:4096") throw OpenCodeClientError("Offline") },
+                homeSnapshot = { emptySnapshot },
+            ),
+        )
+        store.exhaustive = false
+
+        store.send(AppFeature.Action.ConnectButtonTapped)
+        store.receiveCase<AppFeature.Action.HealthResponse>()
+
+        // The LAN address is used now; the server stays saved as entered.
+        assertEquals(AppFeature.State.Connection.LoadingHome(store.state.server.at("http://192.168.1.20:4096")), store.state.connection)
+        assertEquals("https://box.ts.net:4096", store.state.serverURL)
+        assertEquals(listOf("http://192.168.1.20:4096"), store.state.alternateURLs)
+        assertEquals("https://box.ts.net:4096", savedServer?.url)
+        effects.skipInFlightEffects()
+    }
+
+    @Test
+    fun savedServerKeepsOneEntryWhicheverAddressWins() = runTest {
+        val tailnet = OpenCodeServer(
+            url = "https://box.ts.net:4096", username = "opencode", password = "pw",
+            alternateURLs = listOf("http://192.168.1.20:4096"),
+        )
+        val lan = tailnet.at("http://192.168.1.20:4096")
+        val initialState = shared.appState().load(tailnet)
+        saveAll(listOf(tailnet))
+        val store = store(
+            initialState,
+            OpenCodeClient.testValue.copy(
+                health = { server -> if (server.url != lan.url) throw OpenCodeClientError("Offline") },
+                homeSnapshot = { emptySnapshot },
+            ),
+        )
+        store.exhaustive = false
+
+        store.send(AppFeature.Action.ConnectButtonTapped)
+        store.receiveCase<AppFeature.Action.HealthResponse>()
+        assertEquals(AppFeature.State.Connection.LoadingHome(lan), store.state.connection)
+        assertEquals(listOf(tailnet), savedServers)
+        store.receiveCase<AppFeature.Action.HomeResponse>()
+
+        // Removing the entry by any of its addresses forgets the server.
+        store.send(AppFeature.Action.ServerDeleted(tailnet))
+        assertTrue(savedServers.isEmpty())
+        assertNull(savedServer)
+        store.finish()
+    }
+
+    @Test
+    fun connectUsesTheFasterLANWithoutReorderingTheSavedAddresses() = runTest {
         val initialState = shared.appState().copy(
             serverURL = "http://192.168.1.20:4102",
             alternateURLs = listOf("http://100.84.220.87:4102"),
@@ -1302,9 +1308,11 @@ class AppFeatureTests {
         store.send(AppFeature.Action.ConnectButtonTapped)
         store.receiveCase<AppFeature.Action.HealthResponse>()
 
-        assertEquals("http://100.84.220.87:4102", store.state.serverURL)
-        assertEquals("http://100.84.220.87:4102", savedServer?.url)
-        assertEquals(listOf("http://192.168.1.20:4102"), store.state.alternateURLs)
+        // Fastest verified answer wins; no route is preferred over another.
+        assertEquals(AppFeature.State.Connection.LoadingHome(store.state.server), store.state.connection)
+        assertEquals("http://192.168.1.20:4102", store.state.serverURL)
+        assertEquals("http://192.168.1.20:4102", savedServer?.url)
+        assertEquals(listOf("http://100.84.220.87:4102"), store.state.alternateURLs)
         effects.skipInFlightEffects()
     }
 
@@ -1327,9 +1335,10 @@ class AppFeatureTests {
         store.send(AppFeature.Action.ConnectButtonTapped)
         store.receiveCase<AppFeature.Action.HealthResponse>()
 
-        assertEquals("https://fast.example:4096", store.state.serverURL)
-        assertEquals(listOf("https://slow.example:4096"), store.state.alternateURLs)
-        assertEquals("https://fast.example:4096", savedServer?.url)
+        assertEquals(AppFeature.State.Connection.LoadingHome(store.state.server.at("https://fast.example:4096")), store.state.connection)
+        assertEquals("https://slow.example:4096", store.state.serverURL)
+        assertEquals(listOf("https://fast.example:4096"), store.state.alternateURLs)
+        assertEquals("https://slow.example:4096", savedServer?.url)
         effects.skipInFlightEffects()
     }
 
@@ -1350,9 +1359,9 @@ class AppFeatureTests {
         store.send(AppFeature.Action.HealthResponse(firstID, Result.success(first)))
         store.send(AppFeature.Action.HealthResponse(firstID, Result.failure(OpenCodeClientError("A went offline"))))
 
-        assertEquals(winner, store.state.server)
-        assertEquals(winner, savedServer)
-        assertEquals(listOf(winner), savedServers)
+        assertEquals(second, store.state.server)
+        assertEquals(second, savedServer)
+        assertEquals(listOf(second), savedServers)
         assertEquals(AppFeature.State.Connection.LoadingHome(winner), store.state.connection)
         assertEquals(winner.id, store.state.connectingServerID)
         assertNull(store.state.home)

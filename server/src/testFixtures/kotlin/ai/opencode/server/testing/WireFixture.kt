@@ -11,8 +11,12 @@ import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Protocol
 import okhttp3.Response
+import okhttp3.ResponseBody.Companion.asResponseBody
 import okhttp3.ResponseBody.Companion.toResponseBody
 import okio.Buffer
+import okio.Source
+import okio.Timeout
+import okio.buffer
 import java.io.EOFException
 import java.io.IOException
 import java.net.ConnectException
@@ -47,6 +51,12 @@ class WireFixture(
 
         /** No HTTP response: the connection failed this way (an iOS `URLError.Code`, [UrlErrorCode]). */
         data class Failure(val code: Int) : Reply
+
+        /** Sends [status] and [body], then holds the connection open without another byte: a stream stranded on a route that went away. */
+        data class Open(val status: Int, val body: String) : Reply
+
+        /** Never answers at all: a blackholed address. */
+        data object Silent : Reply
 
         companion object {
             /** A bodiless reply, such as 204 or 404. */
@@ -116,6 +126,18 @@ class WireFixture(
         synchronized(lock) { captured += request }
         return when (val answer = reply(request)) {
             is Reply.Failure -> throw failure(answer.code)
+            is Reply.Open -> Response.Builder()
+                .request(urlRequest)
+                .protocol(Protocol.HTTP_1_1)
+                .code(answer.status)
+                .message("")
+                .header("Content-Type", "text/event-stream")
+                .body(HeldOpenSource(answer.body.encodeToByteArray(), chain).buffer().asResponseBody("text/event-stream".toMediaType()))
+                .build()
+            Reply.Silent -> {
+                waitUntilCancelled(chain)
+                throw IOException("Canceled")
+            }
             is Reply.Json -> {
                 val finalRequest = responseURL?.let { urlRequest.newBuilder().url(it).build() } ?: urlRequest
                 Response.Builder()
@@ -131,7 +153,35 @@ class WireFixture(
         }
     }
 
+    /** Sends [body], then blocks each read until the call is cancelled or its read timeout passes. */
+    private class HeldOpenSource(body: ByteArray, private val chain: Interceptor.Chain) : Source {
+        private val pending = Buffer().write(body)
+
+        override fun read(sink: Buffer, byteCount: Long): Long {
+            if (!pending.exhausted()) return pending.read(sink, byteCount)
+            waitUntilCancelled(chain)
+            throw IOException("Canceled")
+        }
+
+        override fun timeout(): Timeout = Timeout.NONE
+
+        override fun close() {}
+    }
+
     companion object {
+        /**
+         * Waits as a socket with nothing to read would: until the call is cancelled, or its read
+         * timeout passes (then it throws the timeout the socket would).
+         */
+        private fun waitUntilCancelled(chain: Interceptor.Chain) {
+            val limit = chain.readTimeoutMillis().toLong()
+            val started = System.nanoTime()
+            while (!chain.call().isCanceled()) {
+                if (limit > 0 && (System.nanoTime() - started) / 1_000_000 >= limit) throw SocketTimeoutException("timeout")
+                Thread.sleep(5)
+            }
+        }
+
         /** The JVM exception `UrlErrorCode.fromThrowable` reads back as [code]. */
         fun failure(code: Int): IOException = when (code) {
             UrlErrorCode.NOT_CONNECTED_TO_INTERNET -> ConnectException("Network is unreachable")

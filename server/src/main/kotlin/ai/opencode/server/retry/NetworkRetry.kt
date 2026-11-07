@@ -150,8 +150,15 @@ data class RetryPolicy(
         /** One attempt: the caller owns retrying, or a fast answer matters more. */
         val once = RetryPolicy(maxAttempts = 1, baseDelay = Duration.ZERO, maxDelay = Duration.ZERO, retryWindow = null, waitsForNetwork = false)
 
-        /** The event stream: waits within 2 s for a minute, then up to 15 s. */
-        val stream = RetryPolicy(maxAttempts = null, baseDelay = 1.seconds, maxDelay = 15.seconds, retryWindow = null, fastWindow = 60.seconds)
+        /**
+         * The event stream is also the recovery probe when no requests are in flight. Its waits
+         * stay within 2 s for the first 15 s, which covers a tunnel or Wi-Fi handoff, then double
+         * (4, 8, 16 … s) to five minutes, so a host that stays unreachable isn't sent a packet
+         * every second or two: some VPN clients stall the whole tunnel while packets to a dead
+         * peer queue. The stream's owner starts over at once when the route changes, the server
+         * answers, the app comes back, or the person taps Try Again.
+         */
+        val stream = RetryPolicy(maxAttempts = null, baseDelay = 1.seconds, maxDelay = 300.seconds, retryWindow = null, fastWindow = 15.seconds)
 
         /** Local consumers falling behind need time, not another address. */
         val streamOverflow = RetryPolicy(maxAttempts = null, baseDelay = 1.seconds, maxDelay = 15.seconds, retryWindow = null, waitsForNetwork = false)
@@ -328,6 +335,8 @@ class RetryPause internal constructor(
     sealed interface Kind {
         data class Sleep(val delay: Duration) : Kind
         data class Network(val limit: Duration?) : Kind
+
+        val waitsForNetwork: Boolean get() = this is Network
 
         val logSummary: String
             get() = when (this) {

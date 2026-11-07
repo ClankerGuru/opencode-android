@@ -48,6 +48,7 @@ import ai.opencode.feature.voice.VoiceCallServiceClient
 import ai.opencode.server.CachedHomeSnapshot
 import ai.opencode.server.ConnectionFailureDetail
 import ai.opencode.server.OpenCodeClient
+import ai.opencode.server.ServerLinkClient
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodePairingLink
 import ai.opencode.server.OpenCodeServer
@@ -56,8 +57,6 @@ import ai.opencode.server.friendlyName
 import ai.opencode.server.model.OpenCodeHomeSnapshot
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.remember
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
 /**
@@ -1021,8 +1020,10 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
                 ).withoutHome(),
             )
         }
-        // Adopt the complete winning target, not a URL combined with form auth.
-        var next = state.copy(connection = State.Connection.LoadingHome(server)).load(server)
+        // Adopt the complete winning target, not a URL combined with form auth, in the address
+        // order it was entered or paired with.
+        val saved = server.keepingAddressOrder(attempt.server)
+        var next = state.copy(connection = State.Connection.LoadingHome(server)).load(saved)
         // An edited entry is replaced only after its sessions load.
         val forgotten = ArrayList<Effect<Action>>()
         if (next.editingSavedServer == null) {
@@ -1036,7 +1037,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
                 next = reduced.state
                 forgotten += reduced.effect
             }
-            server.remember()
+            saved.remember()
         }
         val client = dependency(OpenCodeClient)
         return Reduced(
@@ -1126,8 +1127,9 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
     }
 
     /**
-     * Probes every address concurrently, but saves the healthiest external scope rather than
-     * whichever LAN address happened to answer first (iOS `connect(_:)`).
+     * Races every address at once ([ServerLinkClient.probe]): the first that answers as this
+     * server is used now, while the server is saved with the address order it was paired or
+     * entered with (iOS `connect(_:)`).
      */
     internal fun connect(
         state: State,
@@ -1141,9 +1143,13 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         val attempt = ConnectionAttempt(id = generation, server = next.server, pairing = pairing)
         next = next.copy(connection = State.Connection.Connecting, connectionGeneration = generation, connectionAttempt = attempt)
         if (!keepingHome) next = next.withoutHome()
-        val client = dependency(OpenCodeClient)
+        val link = dependency(ServerLinkClient)
         val health = Effect.run<Action> { send ->
-            val result = probe(client, attempt.server)
+            val result = try {
+                Result.success(link.probe(attempt.server))
+            } catch (error: OpenCodeClientError) {
+                Result.failure(error)
+            }
             send(Action.HealthResponse(attempt.id, result))
         }
         return Reduced(
@@ -1154,44 +1160,6 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
                 health.cancellable(CancelID.Health, cancelInFlight = true),
             ),
         )
-    }
-
-    private suspend fun probe(client: OpenCodeClient, server: OpenCodeServer): Result<OpenCodeServer> = coroutineScope {
-        var lastError = OpenCodeClientError(OpenCodeClientError.UNREACHABLE_MESSAGE)
-        val pending = HashMap<Int, Int>()
-        val healthy = HashMap<Int, OpenCodeServer>()
-        val results = Channel<Pair<Int, Result<OpenCodeServer>>>(Channel.UNLIMITED)
-        val jobs = server.candidateURLs.map { url ->
-            val candidate = server.at(url)
-            val rank = OpenCodeServer.reachabilityRank(url)
-            pending[rank] = (pending[rank] ?: 0) + 1
-            launch {
-                val result = try {
-                    client.health(candidate)
-                    Result.success(candidate)
-                } catch (error: OpenCodeClientError) {
-                    Result.failure(error)
-                }
-                results.send(rank to result)
-            }
-        }
-        repeat(jobs.size) {
-            val (rank, result) = results.receive()
-            pending[rank] = (pending[rank] ?: 1) - 1
-            result.fold(
-                onSuccess = { if (healthy[rank] == null) healthy[rank] = it },
-                onFailure = { error ->
-                    val clientError = error as OpenCodeClientError
-                    lastError = clientError.copy(connectionFailures = lastError.connectionFailures + clientError.connectionFailures)
-                },
-            )
-            val preferredRank = healthy.keys.minOrNull()
-            if (preferredRank != null && pending.none { it.key < preferredRank && it.value > 0 }) {
-                jobs.forEach { it.cancel() }
-                return@coroutineScope Result.success(healthy.getValue(preferredRank))
-            }
-        }
-        Result.failure(lastError)
     }
 
     companion object {

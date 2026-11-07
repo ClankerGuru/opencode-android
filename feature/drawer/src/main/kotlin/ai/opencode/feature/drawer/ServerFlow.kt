@@ -5,14 +5,6 @@ import ai.opencode.feature.session.ServerConnectionNotice
 import ai.opencode.feature.session.ServerFlowTunables
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.friendlyName
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.lifecycle.compose.currentStateAsState
-import kotlinx.coroutines.delay
 
 /*
  * Server Flow (OC-582, iOS `OpenCode/Drawer/ServerFlow.swift`, d8a311bd, graduated in p217):
@@ -113,9 +105,10 @@ enum class ServerMenuStatus(val title: String, val systemImage: SFSymbol) {
 }
 
 /**
- * iOS `ServerConnectionNotice.init?(status:credentialsRejected:errorMessage:server:isSwitching:reconnectingIsDue:)`:
- * null while connected, while the drawer switches servers (the switch is the drawer's to show),
- * and while a reconnect is still in its grace ([ServerConnectionGrace]).
+ * iOS `ServerConnectionNotice.init?(status:credentialsRejected:errorMessage:server:isSwitching:)`:
+ * null while connected and while the drawer switches servers (the switch is the drawer's to show).
+ * Pass [HomeConnectionFeature.State.displayedStatus], which reads connected while a reconnect is
+ * still in its grace.
  */
 operator fun ServerConnectionNotice.Companion.invoke(
     status: HomeConnectionFeature.State.ConnectionStatus,
@@ -123,7 +116,6 @@ operator fun ServerConnectionNotice.Companion.invoke(
     errorMessage: String?,
     server: OpenCodeServer,
     isSwitching: Boolean,
-    reconnectingIsDue: Boolean = true,
 ): ServerConnectionNotice? = of(
     isConnected = status == HomeConnectionFeature.State.ConnectionStatus.connected,
     isReconnecting = status == HomeConnectionFeature.State.ConnectionStatus.reconnecting,
@@ -131,39 +123,7 @@ operator fun ServerConnectionNotice.Companion.invoke(
     errorMessage = errorMessage,
     serverName = server.friendlyName,
     isSwitching = isSwitching,
-    reconnectingIsDue = reconnectingIsDue,
 )
-
-/**
- * iOS `ServerConnectionGrace`: holds “Reconnecting…” back for [ServerFlowTunables.grace]. Launch
- * restores Home as reconnecting until its first snapshot, so without it the pill flashed on every
- * launch and the transcript stepped up and back by its height. A retry from a pill already on
- * screen shows at once. The grace runs only while the app is in front (iOS `scenePhase ==
- * .active`, RESUMED here) and starts over after the background, where it could have run out.
- */
-@Composable
-internal fun ServerConnectionGrace(status: HomeConnectionFeature.State.ConnectionStatus, view: HomeViewState) {
-    val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
-    val isActive = lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
-    val isInBackground = !lifecycleState.isAtLeast(Lifecycle.State.STARTED)
-    val isReconnecting = status == HomeConnectionFeature.State.ConnectionStatus.reconnecting
-    val currentStatus by rememberUpdatedState(status)
-    LaunchedEffect(status) {
-        if (status != HomeConnectionFeature.State.ConnectionStatus.reconnecting) {
-            view.reconnectingPillIsDue = status == HomeConnectionFeature.State.ConnectionStatus.disconnected
-        }
-    }
-    LaunchedEffect(isInBackground) {
-        if (isInBackground && currentStatus == HomeConnectionFeature.State.ConnectionStatus.reconnecting) {
-            view.reconnectingPillIsDue = false
-        }
-    }
-    LaunchedEffect(isReconnecting && isActive) {
-        if (!isReconnecting || !isActive || view.reconnectingPillIsDue) return@LaunchedEffect
-        delay((ServerFlowTunables.grace * 1000).toLong())
-        view.reconnectingPillIsDue = true
-    }
-}
 
 /** The server the drawer shows, as the swap's motion needs it (iOS `ServerSwapTarget`). */
 data class ServerSwapTarget(

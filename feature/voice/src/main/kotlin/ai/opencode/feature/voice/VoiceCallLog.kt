@@ -5,8 +5,7 @@ import ai.opencode.core.log.AppLog
 import ai.opencode.core.sharing.InstantSerializer
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
-import android.content.Context
-import android.net.*
+import ai.opencode.server.retry.NetworkPathMonitor
 import kotlinx.coroutines.*
 import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.*
@@ -96,7 +95,6 @@ class VoiceCallLogUploadClient(val upload: suspend (VoiceCallLog) -> Boolean = {
 
 class VoiceCallLogRecorder(
     private val directory: File? = null,
-    private val context: Context? = null,
     private val date: DateClient = dependency(DateClient),
     private val upload: VoiceCallLogUploadClient = dependency(VoiceCallLogUploadClient),
     /** Seconds between in-progress writes of an open call. */
@@ -117,7 +115,7 @@ class VoiceCallLogRecorder(
     private val startedHere = mutableSetOf<UUID>()
     private var recoveryRan = false
     private val throttles = mutableMapOf<UUID, Throttle>()
-    private val networkWatches = mutableMapOf<UUID, ConnectivityManager.NetworkCallback>()
+    private val networkWatches = mutableMapOf<UUID, Job>()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val saving = mutableMapOf<UUID, VoiceCallLog>()
     /** Serial (iOS `liveQueue`): live writes, the save and delete after a hang-up, and launch
@@ -138,22 +136,31 @@ class VoiceCallLogRecorder(
         markDirty(id)
     }
     val hasOpenCalls: Boolean get() = synchronized(lock) { open.isNotEmpty() }
+    /** Notes the network's changes during the call. Reads the app's one path monitor
+     * ([NetworkPathMonitor]). */
     private fun watchNetwork(id: UUID) {
-        val manager = context?.getSystemService(ConnectivityManager::class.java) ?: return
+        val monitor = NetworkPathMonitor.shared ?: return
         stopWatchingNetwork(id)
-        val callback = object : ConnectivityManager.NetworkCallback() {
-            private var last: String? = null
-            private fun update(text: String) { if (text != last) { last = text; note(id, VoiceCallLog.Note.Kind.audio, "Network: $text") } }
-            override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) { update(describe(capabilities, manager.isActiveNetworkMetered, manager.restrictBackgroundStatus == ConnectivityManager.RESTRICT_BACKGROUND_STATUS_ENABLED)) }
-            override fun onLost(network: Network) { update("no connection") }
-            override fun onUnavailable() { update("no connection") }
+        val updates = monitor.updates()
+        val watch = scope.launch {
+            var last: String? = null
+            updates.collect { snapshot ->
+                val text = describe(snapshot)
+                if (text == last) return@collect
+                last = text
+                note(id, VoiceCallLog.Note.Kind.audio, "Network: $text")
+            }
         }
-        synchronized(lock) { networkWatches[id] = callback }
-        runCatching { manager.registerDefaultNetworkCallback(callback) }
+        val previous = synchronized(lock) {
+            val old = networkWatches[id]
+            networkWatches[id] = watch
+            old
+        }
+        previous?.cancel()
     }
     private fun stopWatchingNetwork(id: UUID) {
-        val callback = synchronized(lock) { networkWatches.remove(id) } ?: return
-        runCatching { context?.getSystemService(ConnectivityManager::class.java)?.unregisterNetworkCallback(callback) }
+        val watch = synchronized(lock) { networkWatches.remove(id) } ?: return
+        watch.cancel()
     }
     fun span(id: UUID, track: VoiceCallLog.Track, spanID: String, label: String? = null, detail: String? = null,
         end: Boolean = false, failed: Boolean = false, at: Instant = date.now()) {
@@ -442,16 +449,21 @@ class VoiceCallLogRecorder(
                 } == true)
         }
 
-        fun describe(capabilities: NetworkCapabilities?, expensive: Boolean = false, constrained: Boolean = false): String {
-            if (capabilities == null) return "no connection"
-            if (!capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) return "waiting for a connection"
-            val kind = when {
-                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "Wi-Fi"
-                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "cellular"
-                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "wired"
+        fun describe(path: NetworkPathMonitor.Snapshot): String {
+            if (!path.isSatisfied) {
+                return if (path.status == NetworkPathMonitor.Snapshot.Status.RequiresConnection) "waiting for a connection" else "no connection"
+            }
+            val kind = when (path.interfaces.firstOrNull()?.type) {
+                "wifi" -> "Wi-Fi"
+                "cellular" -> "cellular"
+                "wiredEthernet" -> "wired"
                 else -> "other"
             }
-            return listOfNotNull(kind, if (expensive) "expensive" else null, if (constrained) "Low Data Mode" else null).joinToString(" · ")
+            val parts = mutableListOf(kind)
+            if (path.routeSignature.size > 1) parts.add("VPN")
+            if (path.isExpensive) parts.add("expensive")
+            if (path.isConstrained) parts.add("Low Data Mode")
+            return parts.joinToString(" · ")
         }
     }
 }
@@ -472,7 +484,7 @@ class VoiceCallLogClient(val recorder: VoiceCallLogRecorder? = null) {
     fun delete(id: UUID) { recorder?.delete(id) }
     fun deleteAll() { recorder?.deleteAll() }
     companion object Key : DependencyKey<VoiceCallLogClient> {
-        override val liveValue by lazy { val context = dependency(AppContext); VoiceCallLogClient(VoiceCallLogRecorder(File(context.noBackupFilesDir, "VoiceCallLogs"), context)) }
+        override val liveValue by lazy { val context = dependency(AppContext); VoiceCallLogClient(VoiceCallLogRecorder(File(context.noBackupFilesDir, "VoiceCallLogs"))) }
         override val testValue = VoiceCallLogClient()
     }
 }

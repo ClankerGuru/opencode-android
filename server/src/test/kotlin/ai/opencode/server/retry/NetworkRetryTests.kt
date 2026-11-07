@@ -517,7 +517,7 @@ class RetryPolicyTests {
     @Test
     fun theStreamScheduleNeverEndsAndStartsOverAfterAConnection() {
         val backoff = RetryBackoff(RetryPolicy.stream)
-        val waits = (0 until 10).map { backoff.decide(transient, elapsed = 60.seconds, offline = false, unit = 1.0) }
+        val waits = (0 until 10).map { backoff.decide(transient, elapsed = 15.seconds, offline = false, unit = 1.0) }
         assertEquals(RetryBackoff.Decision.Retry(1.seconds), waits.first())
         assertTrue(waits.drop(1).all { it == RetryBackoff.Decision.Retry(2.seconds) })
         backoff.reset()
@@ -525,24 +525,25 @@ class RetryPolicyTests {
         assertEquals(RetryBackoff.Decision.WaitForNetwork(null), backoff.decide(transient, elapsed = Duration.ZERO, offline = true, unit = 1.0))
         backoff.reset()
         assertEquals(RetryBackoff.Decision.Retry(500.milliseconds), backoff.decide(transient, elapsed = Duration.ZERO, offline = false, unit = 0.0))
-        assertEquals(RetryBackoff.Decision.Retry(1.seconds), backoff.decide(transient, elapsed = 60.seconds, offline = false, unit = 0.0))
+        assertEquals(RetryBackoff.Decision.Retry(1.seconds), backoff.decide(transient, elapsed = 15.seconds, offline = false, unit = 0.0))
     }
 
+    /** Fast for a handoff's worth of time, then doubling to five minutes, so a host that stays away isn't sent a packet every couple of seconds. */
     @Test
-    fun streamBackoffSlowsAfterAMinuteAndAConnectionResetsItsWindow() = runTest {
+    fun streamBackoffSlowsAfterFifteenSecondsToFiveMinutesAndAConnectionResetsIt() = runTest {
         val clock = TestClock()
         val schedule = RetrySchedule(RetryPolicy.stream, clock, RetryEnvironment.online(1.0))
         assertEquals(RetryPause.Kind.Sleep(1.seconds), schedule.next(transient)?.kind)
-        clock.advance(60.seconds)
+        clock.advance(15.seconds)
         assertEquals(RetryPause.Kind.Sleep(2.seconds), schedule.next(transient)?.kind)
         clock.advance(1.seconds)
-        for (seconds in listOf(4, 8, 15, 15)) {
+        for (seconds in listOf(4, 8, 16, 32, 64, 128, 256, 300, 300)) {
             assertEquals(RetryPause.Kind.Sleep(seconds.seconds), schedule.next(transient)?.kind)
             clock.advance(seconds.seconds)
         }
         schedule.reset()
         assertEquals(RetryPause.Kind.Sleep(1.seconds), schedule.next(transient)?.kind)
-        clock.advance(60.seconds)
+        clock.advance(15.seconds)
         assertEquals(RetryPause.Kind.Sleep(2.seconds), schedule.next(transient)?.kind)
     }
 

@@ -14,6 +14,11 @@ import ai.opencode.server.clienttools.ClientToolsClient
 import ai.opencode.server.clienttools.ClientToolsEvent
 import ai.opencode.server.clienttools.ClientToolsTarget
 import ai.opencode.server.OpenCodeServer
+import ai.opencode.server.retry.NetworkPathClient
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.selects.select
 import java.util.UUID
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -33,6 +38,12 @@ class ClientToolsFeature : Reducer<ClientToolsFeature.State, ClientToolsFeature.
         val status: Status = Status.Idle,
         /** Closes since the server last finished a handshake: the backoff step. */
         val failures: Int = 0,
+        /**
+         * A request reaching the server already woke one wait since the socket was last attached.
+         * The server answering REST says nothing about the client MCP route, so it can't keep
+         * cutting the backoff short.
+         */
+        val answerWakeUsed: Boolean = false,
         /** The socket calls are arriving on; its going clears what they showed. */
         val connection: UUID? = null,
         val slot: Slot = Slot.Session,
@@ -71,6 +82,12 @@ class ClientToolsFeature : Reducer<ClientToolsFeature.State, ClientToolsFeature.
         data class Socket(val event: ClientToolsEvent) : Action
         data object RetryElapsed : Action
 
+        /** The network path changed: a dial in progress or a wait to redial goes again at once, with the backoff started over. */
+        data object Rerouted : Action
+
+        /** A request reached the server while waiting to redial: try once now ([State.answerWakeUsed]), keeping the backoff where it was. */
+        data object ServerAnswered : Action
+
         /** Answers a call nobody on the phone can take. */
         data class Refuse(val call: ClientToolCall, val message: String) : Action
         data class Delegate(val delegate: DelegateAction) : Action
@@ -84,7 +101,10 @@ class ClientToolsFeature : Reducer<ClientToolsFeature.State, ClientToolsFeature.
         data class Disconnected(val connection: UUID) : DelegateAction
     }
 
-    data class CancelID(val slot: State.Slot)
+    sealed interface CancelID {
+        data class Socket(val slot: State.Slot) : CancelID
+        data class Reroutes(val slot: State.Slot) : CancelID
+    }
 
     override fun reduce(state: State, action: Action): Reduced<State, Action> {
         when (action) {
@@ -92,25 +112,33 @@ class ClientToolsFeature : Reducer<ClientToolsFeature.State, ClientToolsFeature.
 
             is Action.TargetChanged -> {
                 if (action.target == state.target) return Reduced(state)
-                val changed = state.copy(target = action.target, failures = 0)
+                val changed = state.copy(target = action.target, failures = 0, answerWakeUsed = false)
                 val dropped = dropConnection(changed)
                 val target = action.target
+                val stop: Effect<Action> = Effect.merge(
+                    Effect.cancel(CancelID.Socket(state.slot)),
+                    Effect.cancel(CancelID.Reroutes(state.slot)),
+                )
                 if (target == null) {
                     AppLog.network.info { "client tools (${state.slot.rawValue}): disconnected" }
                     return Reduced(
                         dropped.state.copy(status = State.Status.Idle),
-                        Effect.merge(dropped.effect, Effect.cancel(CancelID(state.slot))),
+                        Effect.merge(dropped.effect, stop),
                     )
                 }
                 val unavailable = state.unavailableServer
                 if (unavailable != null && ClientToolsTarget.sameConnection(unavailable, target.server)) {
                     return Reduced(
                         dropped.state.copy(status = State.Status.Unavailable),
-                        Effect.merge(dropped.effect, Effect.cancel(CancelID(state.slot))),
+                        Effect.merge(dropped.effect, stop),
                     )
                 }
                 val connected = connect(dropped.state.copy(unavailableServer = null))
-                return Reduced(connected.state, Effect.merge(dropped.effect, connected.effect))
+                val networkPath = dependency(NetworkPathClient)
+                val reroutes = Effect.run<Action> { send ->
+                    networkPath.reroutes().collect { send(Action.Rerouted) }
+                }.cancellable(CancelID.Reroutes(state.slot), cancelInFlight = true)
+                return Reduced(connected.state, Effect.merge(dropped.effect, connected.effect, reroutes))
             }
 
             is Action.Socket -> return socket(state, action.event)
@@ -118,6 +146,18 @@ class ClientToolsFeature : Reducer<ClientToolsFeature.State, ClientToolsFeature.
             Action.RetryElapsed -> {
                 if (state.target == null || state.status == State.Status.Unavailable) return Reduced(state)
                 return connect(state)
+            }
+
+            Action.Rerouted -> {
+                if (state.target == null) return Reduced(state)
+                if (state.status != State.Status.Connecting && state.status != State.Status.Waiting) return Reduced(state)
+                AppLog.network.info { "client tools (${state.slot.rawValue}): route changed, dialling again" }
+                return connect(state.copy(failures = 0, answerWakeUsed = false))
+            }
+
+            Action.ServerAnswered -> {
+                if (state.target == null || state.status != State.Status.Waiting) return Reduced(state)
+                return connect(state.copy(answerWakeUsed = true))
             }
 
             is Action.Refuse -> {
@@ -136,7 +176,9 @@ class ClientToolsFeature : Reducer<ClientToolsFeature.State, ClientToolsFeature.
         when (event) {
             is ClientToolsEvent.Attached -> {
                 AppLog.network.info { "client tools (${state.slot.rawValue}): attached" }
-                return Reduced(state.copy(status = State.Status.Attached, failures = 0, connection = event.connection))
+                return Reduced(
+                    state.copy(status = State.Status.Attached, failures = 0, answerWakeUsed = false, connection = event.connection),
+                )
             }
 
             is ClientToolsEvent.Call -> {
@@ -152,14 +194,28 @@ class ClientToolsFeature : Reducer<ClientToolsFeature.State, ClientToolsFeature.
                 val disconnected: Effect<Action> = Effect.send(Action.Delegate(DelegateAction.Disconnected(event.connection)))
                 if (state.target == null) return Reduced(state.copy(connection = connection), disconnected)
                 val delay = backoff(state.failures)
+                val listensForAnswers = !state.answerWakeUsed
                 AppLog.network.notice {
-                    "client tools (${state.slot.rawValue}): closed (${event.reason}), retry in ${delay.inWholeMilliseconds} ms"
+                    val sooner = if (listensForAnswers) "sooner if the route changes or the server answers" else "sooner if the route changes"
+                    "client tools (${state.slot.rawValue}): closed (${event.reason}), retry in ${delay.inWholeMilliseconds} ms, $sooner"
                 }
                 val clock = dependency(Clock)
+                val networkPath = dependency(NetworkPathClient)
+                val server = state.target.server.persistenceID
                 val retry = Effect.run<Action> { send ->
-                    clock.sleep(delay)
-                    send(Action.RetryElapsed)
-                }.cancellable(CancelID(state.slot), cancelInFlight = true)
+                    // Whichever comes first: the backoff, or (once per stretch) a request reaching the server.
+                    val answered = coroutineScope {
+                        val waits = mutableListOf<Deferred<Boolean>>()
+                        waits.add(async { clock.sleep(delay); false })
+                        if (listensForAnswers) {
+                            waits.add(async { networkPath.serverAnswered(server); true })
+                        }
+                        val first = select { for (wait in waits) wait.onAwait { it } }
+                        for (wait in waits) wait.cancel()
+                        first
+                    }
+                    send(if (answered) Action.ServerAnswered else Action.RetryElapsed)
+                }.cancellable(CancelID.Socket(state.slot), cancelInFlight = true)
                 return Reduced(
                     state.copy(connection = connection, failures = state.failures + 1, status = State.Status.Waiting),
                     Effect.merge(disconnected, retry),
@@ -192,15 +248,18 @@ class ClientToolsFeature : Reducer<ClientToolsFeature.State, ClientToolsFeature.
         val clientTools = dependency(ClientToolsClient)
         val effect = Effect.run<Action> { send ->
             clientTools.connect(target).collect { event -> send(Action.Socket(event)) }
-        }.cancellable(CancelID(state.slot), cancelInFlight = true)
+        }.cancellable(CancelID.Socket(state.slot), cancelInFlight = true)
         return Reduced(state.copy(status = State.Status.Connecting), effect)
     }
 
     companion object {
-        /** 0.5 s doubling to 10 s, as OpenCode's own client MCP helper. */
+        /**
+         * 0.5 s doubling to a minute. A call can last a long time, in the background too, so a
+         * server that stays away isn't redialled every few seconds; a reroute redials at once instead.
+         */
         fun backoff(failures: Int): Duration {
-            val step = minOf(failures, 5)
-            val millis = minOf(500L * (1L shl step), 10_000L)
+            val step = minOf(failures, 7)
+            val millis = minOf(500L * (1L shl step), 60_000L)
             return millis.milliseconds
         }
     }

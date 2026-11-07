@@ -21,11 +21,11 @@ import ai.opencode.feature.voice.VoiceSessionBoard
 import ai.opencode.feature.voice.VoiceSessionBoardClient
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeServerEvent
+import ai.opencode.server.ServerLinkClient
 import ai.opencode.server.TranscriptCachePersistence
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.SessionActivity
 import ai.opencode.server.model.keepingFirstPrompts
-import ai.opencode.server.remember
 import ai.opencode.feature.voice.VoiceFeature
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
@@ -131,10 +131,22 @@ internal fun HomeFeature.reduceConnection(state: State, action: Action): HomeRed
     Action.LastKnownActivityExpired -> Reduced(state)
 
     Action.NetworkRerouted ->
-        if (!state.isStreaming || state.credentialsRejected) Reduced(state) else refreshSnapshot(state.unsettlingNotices())
+        if (!state.isStreaming || state.credentialsRejected || state.connection.isInBackground) {
+            Reduced(state)
+        } else {
+            refreshSnapshot(state.unsettlingNotices())
+        }
 
     Action.RetryConnectionTapped ->
         if (state.credentialsRejected) Reduced(state) else refreshSnapshot(state.unsettlingNotices())
+
+    Action.SceneBecameActive -> {
+        // Decided on the connection's state before it settles this action.
+        val silence = dependency(ServerLinkClient).streamSilence(state.server.persistenceID)
+        if (!state.connection.resyncsWhenActive(silence)) Reduced(state) else refreshSnapshot(state.unsettlingNotices())
+    }
+
+    Action.ReconnectingGraceElapsed, is Action.OfflineGraceElapsed -> Reduced(state)
 
     is Action.SnapshotRefreshed -> snapshotRefreshed(state, action)
 
@@ -292,9 +304,8 @@ private fun HomeFeature.snapshotRefreshed(state: State, action: Action.SnapshotR
             credentialsRejected = false,
             snapshotFailures = 0,
             lastKnownActivityDeadline = null,
-        ),
+        ).settleRecovery(),
     )
-    s.server.remember()
     s = s.initializingInbox()
     val needsAttentionRefresh = !wasConnected ||
         !s.isEventStreamLive ||
@@ -319,6 +330,7 @@ private fun HomeFeature.snapshotRefreshed(state: State, action: Action.SnapshotR
         voiceNotified.effect,
         Effect.cancel(HomeFeature.CancelID.SnapshotRetry),
         Effect.cancel(HomeFeature.CancelID.LastKnownActivity),
+        Effect.cancel(HomeFeature.CancelID.ConnectionGrace),
         retry,
     )
     // The open screen hears the server is back, a draft too: a draft that becomes a session in

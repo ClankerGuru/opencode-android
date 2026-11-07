@@ -8,6 +8,7 @@ import ai.opencode.core.sharing.shared
 import ai.opencode.feature.settings.ConnectionStatus
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.OpenCodeTransport
+import ai.opencode.server.ServerLinkClient
 import ai.opencode.server.retry.NetworkRetry
 import ai.opencode.server.retry.RetryPolicy
 import ai.opencode.server.retry.ServerContact
@@ -65,7 +66,7 @@ class ConnectionProbeClient(
     companion object Key : DependencyKey<ConnectionProbeClient> {
         override val liveValue: ConnectionProbeClient by lazy {
             ConnectionProbeClient(
-                check = { server -> liveCheck(server) },
+                check = { server -> liveCheck(dependency(ServerLinkClient).resolve(server)) },
                 reverseName = { address -> withContext(Dispatchers.IO) { reverseLookup(address) } },
             )
         }

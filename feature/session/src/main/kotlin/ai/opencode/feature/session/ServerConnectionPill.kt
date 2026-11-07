@@ -71,6 +71,10 @@ import kotlin.math.roundToInt
 object ServerFlowTunables {
     /** Switch back after (s). */
     const val timeout = 8.0
+    /** Offline after this long with two failed attempts (s). */
+    const val offlineGrace = 12.0
+    /** Offline sooner when the phone has no network at all (s). */
+    const val unsatisfiedOfflineGrace = 4.0
     /** Name roll. */
     val title = MotionSpring(0.36, 0.14)
     /** Name width. */
@@ -94,7 +98,11 @@ object ServerFlowTunables {
     const val rise = 6f
     const val scale = 0.94f
     const val enterBlur = 4f
-    /** How long “Reconnecting…” waits before it shows (s), so the first connect at launch and a quick reconnect never flash the pill. */
+    /**
+     * How long a reconnect stays quiet before “Reconnecting…” shows (s; the pill and the drawer
+     * title), so the first connect at launch, a return to the app and a quick reconnect never
+     * flash it (`HomeConnectionFeature.State.displayedStatus`).
+     */
     const val grace = 2.0
 }
 
@@ -141,10 +149,10 @@ data class ServerConnectionNotice(
 
     companion object {
         /**
-         * iOS `init?(status:credentialsRejected:errorMessage:server:isSwitching:reconnectingIsDue:)`
-         * without Home's status type: null while connected, while the drawer switches servers (the
-         * switch is the drawer's to show), and while a reconnect is still in its grace (the
-         * drawer's `ServerConnectionGrace`).
+         * iOS `init?(status:credentialsRejected:errorMessage:server:isSwitching:)` without Home's
+         * status type: null while connected and while the drawer switches servers (the switch is
+         * the drawer's to show). Pass Home's displayed status, which reads connected while a
+         * reconnect is still in its grace.
          */
         fun of(
             isConnected: Boolean,
@@ -153,13 +161,9 @@ data class ServerConnectionNotice(
             errorMessage: String?,
             serverName: String,
             isSwitching: Boolean,
-            reconnectingIsDue: Boolean = true,
         ): ServerConnectionNotice? {
             if (isSwitching || isConnected) return null
-            if (isReconnecting) {
-                if (!reconnectingIsDue) return null
-                return ServerConnectionNotice(Kind.reconnecting, serverName)
-            }
+            if (isReconnecting) return ServerConnectionNotice(Kind.reconnecting, serverName)
             if (credentialsRejected) return ServerConnectionNotice(Kind.signInFailed, serverName)
             val detail = errorMessage?.takeIf { it.isNotEmpty() && !it.startsWith("Couldn’t") }
             return ServerConnectionNotice(Kind.failed, serverName, detail)

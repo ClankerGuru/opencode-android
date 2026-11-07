@@ -13,11 +13,14 @@ import ai.opencode.server.clienttools.ClientTool
 import ai.opencode.server.clienttools.ClientToolsClient
 import ai.opencode.server.clienttools.ClientToolsEvent
 import ai.opencode.server.clienttools.ClientToolsTarget
+import ai.opencode.server.retry.NetworkPathClient
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import java.util.UUID
@@ -143,16 +146,124 @@ class ClientToolsTests {
         store.finish()
     }
 
-    @Test fun backoffDoublesToTenSeconds() {
+    @Test fun backoffDoublesToAMinute() {
         val delays = mutableListOf<kotlin.time.Duration>()
-        for (failures in 0..6) delays.add(ClientToolsFeature.backoff(failures))
+        for (failures in 0..9) delays.add(ClientToolsFeature.backoff(failures))
         assertEquals(
-            listOf(500.milliseconds, 1.seconds, 2.seconds, 4.seconds, 8.seconds, 10.seconds, 10.seconds),
+            listOf(
+                500.milliseconds, 1.seconds, 2.seconds, 4.seconds, 8.seconds, 16.seconds, 32.seconds,
+                60.seconds, 60.seconds, 60.seconds,
+            ),
             delays,
         )
     }
 
-    private suspend fun waitForSockets(sockets: List<Channel<ClientToolsEvent>>, count: Int) {
+    /**
+     * A long backoff mid-call doesn't hold the tools back once the network is back: a reroute
+     * redials at once and starts the backoff over.
+     */
+    @Test fun aRerouteWakesTheBackoffAndStartsItOver() = runTest {
+        val clock = TestClock()
+        val sockets = mutableListOf<Channel<ClientToolsEvent>>()
+        val reroutes = Channel<Unit>(Channel.UNLIMITED)
+        val store = TestStore(State(tools = screen), ClientToolsFeature(), this) {
+            this[Clock] = clock
+            this[NetworkPathClient] = NetworkPathClient.testValue.copy(reroutes = { reroutes.receiveAsFlow() })
+            this[ClientToolsClient] = ClientToolsClient(
+                connect = {
+                    val channel = Channel<ClientToolsEvent>(Channel.UNLIMITED)
+                    synchronized(sockets) { sockets.add(channel) }
+                    channel.receiveAsFlow()
+                },
+                reply = { _, _ -> true },
+            )
+        }
+        store.send(Action.TargetChanged(target)) { it.copy(target = target, status = State.Status.Connecting) }
+        waitForSockets(sockets, count = 1)
+        // Six failures in: the next wait is a minute.
+        for (index in 0 until 7) {
+            sockets[index].send(ClientToolsEvent.Closed(connection, "close code 1006"))
+            store.receive(Action.Socket(ClientToolsEvent.Closed(connection, "close code 1006"))) {
+                it.copy(status = State.Status.Waiting, failures = index + 1)
+            }
+            store.receive(Action.Delegate(DelegateAction.Disconnected(connection)))
+            if (index >= 6) break
+            clock.advance(ClientToolsFeature.backoff(index))
+            store.receive(Action.RetryElapsed) { it.copy(status = State.Status.Connecting) }
+            waitForSockets(sockets, count = index + 2)
+        }
+        reroutes.send(Unit)
+        store.receive(Action.Rerouted) { it.copy(status = State.Status.Connecting, failures = 0) }
+        waitForSockets(sockets, count = 8)
+
+        // A dial still in progress when the route changes starts over too.
+        reroutes.send(Unit)
+        store.receive(Action.Rerouted)
+        waitForSockets(sockets, count = 9)
+        store.send(Action.TargetChanged(null)) { it.copy(target = null, status = State.Status.Idle) }
+        reroutes.close()
+        store.finish()
+    }
+
+    /**
+     * The server answering REST says nothing about its client MCP route: it wakes one wait, then
+     * the backoff runs its course.
+     */
+    @Test fun aServerAnswerWakesOneWaitAndKeepsTheBackoff() = runTest {
+        val clock = TestClock()
+        val sockets = mutableListOf<Channel<ClientToolsEvent>>()
+        val answers = mutableListOf<CompletableDeferred<Unit>>()
+        val store = TestStore(State(tools = screen), ClientToolsFeature(), this) {
+            this[Clock] = clock
+            this[NetworkPathClient] = NetworkPathClient.testValue.copy(
+                serverAnswered = {
+                    val answer = CompletableDeferred<Unit>()
+                    synchronized(answers) { answers.add(answer) }
+                    answer.await()
+                },
+            )
+            this[ClientToolsClient] = ClientToolsClient(
+                connect = {
+                    val channel = Channel<ClientToolsEvent>(Channel.UNLIMITED)
+                    synchronized(sockets) { sockets.add(channel) }
+                    channel.receiveAsFlow()
+                },
+                reply = { _, _ -> true },
+            )
+        }
+        store.send(Action.TargetChanged(target)) { it.copy(target = target, status = State.Status.Connecting) }
+        waitForSockets(sockets, count = 1)
+        sockets[0].send(ClientToolsEvent.Closed(connection, "HTTP 502"))
+        store.receive(Action.Socket(ClientToolsEvent.Closed(connection, "HTTP 502"))) {
+            it.copy(status = State.Status.Waiting, failures = 1)
+        }
+        store.receive(Action.Delegate(DelegateAction.Disconnected(connection)))
+        waitForSockets(answers, count = 1)
+        synchronized(answers) { answers.removeAt(0) }.complete(Unit)
+        store.receive(Action.ServerAnswered) { it.copy(status = State.Status.Connecting, answerWakeUsed = true) }
+        waitForSockets(sockets, count = 2)
+        sockets[1].send(ClientToolsEvent.Closed(second, "HTTP 502"))
+        store.receive(Action.Socket(ClientToolsEvent.Closed(second, "HTTP 502"))) {
+            it.copy(status = State.Status.Waiting, failures = 2)
+        }
+        store.receive(Action.Delegate(DelegateAction.Disconnected(second)))
+        // No second wake: it waits out its backoff (1 s).
+        clock.advance(999.milliseconds)
+        assertEquals(2, synchronized(sockets) { sockets.size })
+        clock.advance(1.milliseconds)
+        store.receive(Action.RetryElapsed) { it.copy(status = State.Status.Connecting) }
+        waitForSockets(sockets, count = 3)
+        assertTrue("Not listening for answers again until attached", synchronized(answers) { answers.isEmpty() })
+        sockets[2].send(ClientToolsEvent.Attached(third))
+        store.receive(Action.Socket(ClientToolsEvent.Attached(third))) {
+            it.copy(status = State.Status.Attached, failures = 0, answerWakeUsed = false, connection = third)
+        }
+        store.send(Action.TargetChanged(null)) { it.copy(target = null, status = State.Status.Idle, connection = null) }
+        store.receive(Action.Delegate(DelegateAction.Disconnected(third)))
+        store.finish()
+    }
+
+    private suspend fun waitForSockets(sockets: List<Any>, count: Int) {
         for (attempt in 0 until 1_000) {
             if (synchronized(sockets) { sockets.size } >= count) break
             yield()

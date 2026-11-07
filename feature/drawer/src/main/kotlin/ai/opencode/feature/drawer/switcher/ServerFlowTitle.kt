@@ -236,7 +236,7 @@ fun ServerFlowTitle(
     modifier: Modifier = Modifier,
 ) {
     val current by store.observe { it.server }
-    val status by store.observe { it.connectionStatus }
+    val status by store.observe { it.connection.displayedStatus }
     val switchingTo by store.observe { it.switchingTo }
     val credentialsRejected by store.observe { it.credentialsRejected }
     val reachability by store.observe { it.serverReachability }

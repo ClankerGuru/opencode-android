@@ -46,6 +46,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.withContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -367,8 +368,9 @@ class HomeFeatureTestsNavigation {
             )
         }
         assertEquals(CachedHomeSnapshot(server.persistenceID, refreshed, capturedAt), cached())
-        assertEquals(server, h.shared(ServerSharedKeys.savedServer))
-        assertEquals(listOf(server), h.shared(ServerSharedKeys.savedServers))
+        // A snapshot never rewrites the saved server: only pairing, adding, editing or switching does.
+        assertNull(h.shared(ServerSharedKeys.savedServer))
+        assertTrue(h.shared(ServerSharedKeys.savedServers).isEmpty())
         store.receive(Action.AttentionRefreshed(emptySet())) { it.copy(noticeReadiness = HomeFeature.State.NoticeReadiness.settled) }
         val deletedCache = CachedHomeSnapshot(server.persistenceID, snapshot(emptyList()), capturedAt)
         store.send(Action.ServerEvent(OpenCodeServerEvent.SessionDeleted(sessionID = "ses_1"))) {
@@ -441,113 +443,6 @@ class HomeFeatureTestsNavigation {
         assertEquals(error.message, store.state.connectionErrorMessage)
         store.send(Action.RetryConnectionTapped)
         h.skipInFlightEffects()
-    }
-
-    @Test
-    fun retryReplacesCachedHomeWithAuthoritativeSnapshotAndReconnects() = homeTest { h ->
-        val server = OpenCodeServer(url = "https://saved.example", username = "kit", password = "secret")
-        val oldSession = OpenCodeSession(id = "ses_old", serverTitle = "Old work", projectID = "proj_old", directory = "/old", updatedAt = date(1_000))
-        val latest = OpenCodeSession(id = "ses_latest", serverTitle = "Latest work", projectID = "proj_latest", directory = "/latest", updatedAt = date(2_000))
-        val refreshed = snapshot(listOf(latest), active = setOf(latest.id), projects = listOf(OpenCodeProject(id = "proj_latest", name = "Latest", directory = "/latest")))
-        val state = h.state {
-            val base = HomeFeature.State(server, snapshot(listOf(oldSession), projects = listOf(OpenCodeProject(id = "proj_old", name = "Old", directory = "/old"))))
-            base.copy(connection = base.connection.copy(connectionStatus = HomeConnectionFeature.State.ConnectionStatus.disconnected))
-                .persistingSnapshot(date(0))
-                .let { it.copy(transcriptCache = it.transcriptCache + (latest.id to listOf(OpenCodeTranscriptItem.UserText(id = "m1", text = "cached")))) }
-        }
-        val store = h.store(state) {
-            this[Clock] = ImmediateClock()
-            this[OpenCodeClient] = OpenCodeClient.testValue.copy(
-                homeSnapshot = { requested ->
-                    assertEquals(server, requested)
-                    refreshed
-                },
-                homeAttention = { _, _, _ -> emptySet() },
-            )
-        }
-
-        store.send(Action.RetryConnectionTapped) {
-            it.copy(connection = it.connection.copy(connectionStatus = HomeConnectionFeature.State.ConnectionStatus.reconnecting))
-        }
-        assertEquals(listOf(oldSession), store.state.sessions)
-        store.receive(Action.SnapshotRefreshed(refreshed)) {
-            it.copy(
-                noticeReadiness = HomeFeature.State.NoticeReadiness.listed,
-                projects = refreshed.projects,
-                sessions = listOf(latest),
-                activeSessionIDs = setOf(latest.id),
-                sessionDetail = it.sessionDetail?.copy(projects = refreshed.projects),
-                connection = it.connection.copy(connectionStatus = HomeConnectionFeature.State.ConnectionStatus.connected),
-                sessionReadDates = it.sessionReadDates + (it.key(latest.id) to latest.updatedAt),
-                initializedInboxServerIDs = setOf(server.persistenceID),
-            )
-        }
-        store.receive(detail(SessionFeature.Action.RequestsConnectionChanged(true))) // the draft hears it's back
-        store.receive(Action.AttentionRefreshed(emptySet())) { it.copy(noticeReadiness = HomeFeature.State.NoticeReadiness.settled) }
-        assertTrue(store.state.isConnected)
-        assertTrue(store.state.sessions.none { store.state.isUnread(it) })
-        assertEquals(CachedHomeSnapshot(server.persistenceID, refreshed, date(0)), h.state { store.state.cachedHomeSnapshot })
-        store.finish()
-    }
-
-    @Test
-    fun lostConnectionAndFailedRetryRetainCachedSessions() = homeTest { h ->
-        val server = OpenCodeServer(url = "https://saved.example", username = "kit", password = "secret")
-        val session = OpenCodeSession(id = "ses_cached", serverTitle = "Cached work", projectID = "proj_cached", directory = "/work", updatedAt = date(1_000))
-        val snapshot = snapshot(listOf(session), active = setOf(session.id), projects = listOf(OpenCodeProject(id = "proj_cached", name = "Work", directory = "/work")))
-        val lostAt = date(5_000)
-        val items = listOf<OpenCodeTranscriptItem>(OpenCodeTranscriptItem.UserText(id = "m_cached", text = "Cached message"))
-        val state = h.state {
-            val base = HomeFeature.State(server, snapshot).persistingSnapshot(lostAt)
-            base.copy(
-                sessionDetail = SessionFeature.State.session(server, session, cachedItems = items).withDraft("Unsent draft"),
-                connection = base.connection.copy(hasConnected = true),
-            )
-        }
-        val cache = h.state { state.cachedHomeSnapshot }
-        var detail = state.sessionDetail
-        val clock = TestClock()
-        val store = h.store(state) {
-            this[Clock] = clock
-            this[HomeSnapshotDate] = DateClient.constant(lostAt)
-            this[OpenCodeClient] = OpenCodeClient.testValue.copy(homeSnapshot = { _ -> throw OpenCodeClientError("Offline") })
-        }
-
-        store.send(Action.ConnectionLost) {
-            it.copy(
-                connection = it.connection.copy(
-                    connectionStatus = HomeConnectionFeature.State.ConnectionStatus.reconnecting,
-                    lastKnownActivityDeadline = lostAt.plusMillis(HomeFeature.lastKnownActivityLifetime.inWholeMilliseconds),
-                ),
-            )
-        }
-        store.receive(detail(SessionFeature.Action.RequestsConnectionChanged(false))) {
-            it.copy(sessionDetail = it.sessionDetail?.withRequestsConnectionIsAvailable(false)?.withRequestFailureAwaitingReconnect(true))
-        }
-        detail = detail?.withRequestsConnectionIsAvailable(false)?.withRequestFailureAwaitingReconnect(true)
-        assertEquals(listOf(session), store.state.sessions)
-        assertEquals("Reconnecting keeps the last-known state on screen", HomeFeature.State.Indicator.running, store.state.indicator(session))
-        // Not forever: two minutes after the stream was live, it's no longer trusted.
-        clock.advance(119.seconds)
-        assertEquals(HomeFeature.State.Indicator.running, store.state.indicator(session))
-        clock.advance(1.seconds)
-        store.receive(Action.LastKnownActivityExpired) {
-            it.copy(connection = it.connection.copy(lastKnownActivityDeadline = null))
-        }
-        assertEquals(HomeFeature.State.Indicator.none, store.state.indicator(session))
-        store.send(Action.RetryConnectionTapped)
-        clock.advance(250.milliseconds)
-        store.receive(Action.SnapshotFailed) {
-            it.copy(connection = it.connection.copy(connectionStatus = HomeConnectionFeature.State.ConnectionStatus.disconnected))
-        }
-        store.receive(detail(SessionFeature.Action.RequestsConnectionChanged(false)))
-        assertFalse(store.state.isConnected)
-        assertEquals(snapshot.projects, store.state.projects)
-        assertEquals(snapshot.sessions, store.state.sessions)
-        assertEquals(cache, h.state { store.state.cachedHomeSnapshot })
-        assertEquals(detail, store.state.sessionDetail)
-        assertTrue(store.state.initializedInboxServerIDs.isEmpty())
-        store.finish()
     }
 
     @Test

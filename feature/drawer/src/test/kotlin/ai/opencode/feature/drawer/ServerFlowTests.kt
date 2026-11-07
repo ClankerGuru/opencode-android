@@ -88,11 +88,13 @@ class ServerFlowTests {
         assertEquals("Reconnecting to Studio…", reconnecting?.title)
         assertNull(reconnecting?.action)
         assertEquals(ServerConnectionNotice.Action.retry, reconnecting?.primary)
+        var inGrace = HomeConnectionFeature.State(server = studio).copy(connectionStatus = ConnectionStatus.reconnecting)
         val early = ServerConnectionNotice(
-            status = ConnectionStatus.reconnecting, credentialsRejected = false, errorMessage = null, server = studio, isSwitching = false,
-            reconnectingIsDue = false,
+            status = inGrace.displayedStatus, credentialsRejected = false, errorMessage = null, server = studio, isSwitching = false,
         )
         assertNull("a reconnect waits out its grace before the pill shows", early)
+        inGrace = inGrace.copy(showsRecovery = true)
+        assertEquals(ConnectionStatus.reconnecting, inGrace.displayedStatus)
 
         val failed = notice(ConnectionStatus.disconnected, error = "Tailscale is off")
         assertEquals("Couldn’t connect to Studio", failed?.title)

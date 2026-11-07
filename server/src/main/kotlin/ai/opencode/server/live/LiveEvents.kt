@@ -18,6 +18,14 @@ import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.OpenCodeServerEvent
 import ai.opencode.server.OpenCodeTransport
 import ai.opencode.server.SelfViewReceipts
+import ai.opencode.server.ServerLinkClient
+import ai.opencode.core.log.AppLog
+import ai.opencode.server.retry.TransportFailure
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 import ai.opencode.server.internal.ElementSerializer
 import ai.opencode.server.internal.WireJson
 import ai.opencode.server.internal.obj
@@ -91,6 +99,10 @@ private fun eventSource(server: OpenCodeServer, waiting: AtomicInteger): Flow<Op
     val activeCall = AtomicReference<Call?>(null)
     val operationID = NetworkRetry.streamOperationID.current() ?: UUID.randomUUID().toString().uppercase()
     val stream = StreamDiagnostics(operationID)
+    // On the retry clock, which a test can set (`NetworkRetry.clock`).
+    val watchdog = EventStreamWatchdog(NetworkRetry.clock.current() ?: Clock.liveValue)
+    val link = dependency(ServerLinkClient)
+    val poolReset = PoolResetWatch(link)
     launch(Dispatchers.IO) {
         try {
             val url = server.endpoint("/api/event") ?: throw OpenCodeClientError("Enter a valid HTTP or HTTPS server URL.")
@@ -100,6 +112,8 @@ private fun eventSource(server: OpenCodeServer, waiting: AtomicInteger): Flow<Op
             applyCapabilities(builder)
             val call = dependency(OpenCodeTransport).eventStream.newCall(builder.build())
             activeCall.set(call)
+            // A deadline that passed before the call existed had nothing to cancel.
+            if (watchdog.expiry != null || poolReset.fired) call.cancel()
             stream.record(DiagnosticsStreamName.ConnectStart)
             call.execute().use { response ->
                 if (response.code == 401) {
@@ -118,6 +132,8 @@ private fun eventSource(server: OpenCodeServer, waiting: AtomicInteger): Flow<Op
                 val source = response.body.source()
                 while (true) {
                     val line = source.readUtf8Line() ?: break
+                    watchdog.noteLine()
+                    link.noteStreamActivity(server.persistenceID)
                     stream.line(line)
                     if (!line.startsWith("data:")) continue
                     if (line.length - 5 > MAX_FRAME_BYTES ||
@@ -150,11 +166,164 @@ private fun eventSource(server: OpenCodeServer, waiting: AtomicInteger): Flow<Op
             val category = DiagnosticsErrorCategory.of(error)
             if (category == DiagnosticsErrorCategory.Timeout) stream.record(DiagnosticsStreamName.Stalled, errorCategory = category)
             stream.record(DiagnosticsStreamName.Disconnected, errorCategory = category, failurePhase = DiagnosticsFailurePhase.BodyRead)
-            close(streamTransportError(error))
+            val expiry = watchdog.expiry
+            if (poolReset.fired) {
+                // Fresh pools: a stream on the old one may be on a dead socket.
+                AppLog.stream.notice { "Event stream: connections reset; reconnecting" }
+                close(OpenCodeClientError.unreachable(TransportFailure.Interrupted))
+            } else if (expiry != null) {
+                // The watchdog cancelled the read; to the stream's owner it's a timeout, which it
+                // retries, not a cancellation.
+                AppLog.stream.notice { "Event stream ${if (expiry == EventStreamWatchdog.Expiry.Connect) "didn’t open" else "went silent"}; reconnecting" }
+                DiagnosticsRecorder.shared.recordLink("sse_watchdog", expiry.rawValue)
+                close(OpenCodeClientError.unreachable(TransportFailure.TimedOut))
+            } else {
+                close(streamTransportError(error))
+            }
+        } finally {
+            watchdog.stop()
+            poolReset.stop()
         }
     }
-    awaitClose { activeCall.get()?.cancel() }
+    watchdog.start(this) { activeCall.get()?.cancel() }
+    poolReset.start(this) { activeCall.get()?.cancel() }
+    awaitClose {
+        watchdog.stop()
+        poolReset.stop()
+        activeCall.get()?.cancel()
+    }
 }.buffer(EventBatcher.BUFFER_CAPACITY)
+
+/**
+ * Bounds an event stream that stops talking. The server sends `server.connected` as soon as the
+ * stream opens and a `: heartbeat` every 15 s, so a stream that hasn't opened in
+ * [CONNECT_DEADLINE], or has been silent for [IDLE_DEADLINE] (three missed heartbeats), is
+ * stranded on a dead route: a tunnel or NAT binding that went away without closing the socket
+ * leaves a read waiting a minute or more otherwise.
+ */
+internal class EventStreamWatchdog(private val clock: Clock) {
+    enum class Expiry(val rawValue: String) { Connect("connect"), Idle("idle") }
+
+    private val lock = Any()
+    private val origin = clock.now()
+
+    /** When the last line arrived, as time since the watchdog was made. */
+    private var lastLine: Duration? = null
+    private var expiryValue: Expiry? = null
+    private var timer: Job? = null
+    private var isStopped = false
+
+    /** Which deadline passed, if one did. */
+    val expiry: Expiry? get() = synchronized(lock) { expiryValue }
+
+    /** Starts timing in [scope]; [expire] runs once if a deadline passes. */
+    fun start(scope: CoroutineScope, expire: () -> Unit) {
+        val job = scope.launch {
+            clock.sleep(CONNECT_DEADLINE)
+            while (true) {
+                val last = synchronized(lock) { lastLine }
+                if (last == null) {
+                    fire(Expiry.Connect, expire)
+                    return@launch
+                }
+                // Measured from the last line, so silence ends it at the deadline however the
+                // lines before it fell.
+                val remaining = IDLE_DEADLINE - (clock.now() - origin - last)
+                if (remaining <= Duration.ZERO) {
+                    fire(Expiry.Idle, expire)
+                    return@launch
+                }
+                clock.sleep(remaining)
+            }
+        }
+        val stopped = synchronized(lock) {
+            timer = job
+            isStopped
+        }
+        if (stopped) job.cancel()
+    }
+
+    /** A line arrived: a frame or a heartbeat. */
+    fun noteLine() {
+        val now = clock.now() - origin
+        synchronized(lock) { lastLine = now }
+    }
+
+    fun stop() {
+        val job = synchronized(lock) {
+            isStopped = true
+            timer
+        }
+        job?.cancel()
+    }
+
+    private fun fire(expiry: Expiry, expire: () -> Unit) {
+        val fires = synchronized(lock) {
+            if (isStopped || expiryValue != null) {
+                false
+            } else {
+                expiryValue = expiry
+                true
+            }
+        }
+        if (fires) expire()
+    }
+
+    companion object {
+        val CONNECT_DEADLINE: Duration = 4500.milliseconds
+        val IDLE_DEADLINE: Duration = 45.seconds
+    }
+}
+
+/**
+ * Ends an event stream when the connection pools are reset (`ServerLinkClient.resetConnections`):
+ * the pools it was opened on are retired, and the socket under it may be the wedged one that
+ * prompted the reset. A move to another address doesn't end it: a stream that's delivering is
+ * the best evidence its address works.
+ */
+internal class PoolResetWatch(private val link: ServerLinkClient) {
+    private val lock = Any()
+    private val pools = link.epoch().pools
+    private var firedValue = false
+    private var isStopped = false
+    private var task: Job? = null
+
+    val fired: Boolean get() = synchronized(lock) { firedValue }
+
+    fun start(scope: CoroutineScope, expire: () -> Unit) {
+        val job = scope.launch {
+            while (true) {
+                val now = link.epoch()
+                if (now.pools != pools) {
+                    val fires = synchronized(lock) {
+                        if (isStopped || firedValue) {
+                            false
+                        } else {
+                            firedValue = true
+                            true
+                        }
+                    }
+                    if (fires) expire()
+                    return@launch
+                }
+                link.changed(now.changes)
+            }
+        }
+        val stopped = synchronized(lock) {
+            task = job
+            isStopped
+        }
+        if (stopped) job.cancel()
+    }
+
+    fun stop() {
+        val job = synchronized(lock) {
+            isStopped = true
+            task
+        }
+        job?.cancel()
+    }
+}
 
 /** The event stream's diagnostics marks (iOS `DiagnosticsRecorder.stream`): line counts and timings only. */
 private class StreamDiagnostics(private val operationID: String) {

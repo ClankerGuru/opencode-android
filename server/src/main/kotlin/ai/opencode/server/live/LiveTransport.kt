@@ -8,6 +8,8 @@ import ai.opencode.server.ConnectionFailureDetail
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.OpenCodeTransport
+import ai.opencode.server.ServerLinkClient
+import ai.opencode.server.ServerLinkEpoch
 import ai.opencode.server.UrlErrorCode
 import ai.opencode.server.internal.WireJson
 import ai.opencode.server.model.OpenCodeMediaReference
@@ -16,8 +18,10 @@ import ai.opencode.server.retry.RequestIdempotency
 import ai.opencode.server.retry.RetryPolicy
 import ai.opencode.server.retry.ServerContact
 import ai.opencode.server.retry.TransportFailure
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.JsonElement
@@ -205,14 +209,35 @@ internal suspend fun perform(
 ): MeasuredResponse {
     val url = server.endpoint(path, query) ?: throw OpenCodeClientError("Enter a valid HTTP or HTTPS server URL.")
     val contact = server.persistenceID
+    val idempotency = idempotency ?: RequestIdempotency.forMethod(method)
+    // Only a read that can be sent again is cut off when the link changes: not a send or a reply
+    // (whether it acted would be unknown), not a GET that spends something (a pairing code), not
+    // a long poll, and not a probe, which tests the one address it was given.
+    val interruptible = method == "GET" && !longPoll && !isConnectionProbe && idempotency == RequestIdempotency.Idempotent
+    val link = dependency(ServerLinkClient)
     try {
         return NetworkRetry.run(
             retry ?: NetworkRetry.currentPolicy(),
-            idempotency = idempotency ?: RequestIdempotency.forMethod(method),
+            idempotency = idempotency,
             label = "$method ${loggablePath(path)}",
             reachable = { ServerContact.shared.next(contact) },
         ) {
-            performOnce(url, path, method, body, timeout, followsRedirects, longPoll, server)
+            // Each attempt goes to whichever address answers now, so a retry follows the server
+            // to the address a race just found. A probe tests the one address it was given.
+            // Read before routing, so a change while the route is found counts.
+            val epoch = link.epoch()
+            val target = if (isConnectionProbe) server else link.route(server)
+            val targetURL = target.endpoint(path, query) ?: url
+            try {
+                performOnce(
+                    targetURL, path, method, body, timeout, followsRedirects, longPoll, isConnectionProbe,
+                    interruptibleSince = if (interruptible) epoch else null, server = target,
+                )
+            } catch (error: OpenCodeClientError) {
+                // The address in use didn't answer: the next attempt races again.
+                if (!isConnectionProbe && error.transport != null) link.invalidate(server, target.url)
+                throw error
+            }
         }
     } catch (error: OpenCodeClientError) {
         var failure = error
@@ -236,6 +261,8 @@ private suspend fun performOnce(
     timeout: Duration,
     followsRedirects: Boolean,
     longPoll: Boolean,
+    isConnectionProbe: Boolean,
+    interruptibleSince: ServerLinkEpoch?,
     server: OpenCodeServer,
 ): MeasuredResponse {
     val requestID = UUID.randomUUID().toString().uppercase()
@@ -243,17 +270,32 @@ private suspend fun performOnce(
     val clock = dependency(Clock)
     val started = clock.now()
     val transport = dependency(OpenCodeTransport)
+    val link = dependency(ServerLinkClient)
     val builder = Request.Builder().url(url)
         .method(method, requestBody(method, body))
         .header("Accept", "application/json")
     server.authorize(builder)
     applyCapabilities(builder)
     correlation.identify(builder, requestID)
-    val client = (if (longPoll) transport.longPoll else transport.request).withTimeout(timeout, followsRedirects)
+    // A read hung on a socket the phone has moved away from goes again on fresh pools or the
+    // server's new address instead of waiting out its timeout (`perform` decides which requests
+    // may be cut off).
     val response = try {
-        client.newCall(builder.build()).awaitResponse()
+        val send: suspend () -> RawResponse = {
+            val client = (if (longPoll) transport.longPoll else transport.request).withTimeout(timeout, followsRedirects)
+            client.newCall(builder.build()).awaitResponse()
+        }
+        if (interruptibleSince != null) untilLinkChanges(interruptibleSince, server, link, send) else send()
+    } catch (changed: LinkChanged) {
+        AppLog.network.notice {
+            "$method ${loggablePath(path)}: interrupted by a route or pool change after ${(clock.now() - started).logSummary}"
+        }
+        throw OpenCodeClientError.unreachable(TransportFailure.Interrupted)
     } catch (error: IOException) {
         val failure = TransportFailure.of(error, url, ServerContact.shared)
+        if (failure == TransportFailure.TimedOut && !longPoll && !isConnectionProbe && !NetworkRetry.environment.current().isOffline()) {
+            link.noteTimeout()
+        }
         if (currentCoroutineContext().isActive) {
             AppLog.network.notice {
                 "$method ${loggablePath(path)}: ${logDescription(error)} → ${failure?.rawValue ?: "not retryable"} after ${(clock.now() - started).logSummary}"
@@ -269,5 +311,33 @@ private suspend fun performOnce(
         throw statusError(response.code, response.headers["Retry-After"], locationMissing)
     }
     ServerContact.shared.heard(server.persistenceID, response.url)
+    link.noteAnswer()
     return MeasuredResponse(response.body, requestID, correlation)
+}
+
+private class LinkChanged : Exception()
+
+/**
+ * [work], unless the connection pools are reset or [server] moves to another address after
+ * [start] (read before the address was chosen): then it's cancelled and [LinkChanged] thrown.
+ */
+internal suspend fun <T> untilLinkChanges(
+    start: ServerLinkEpoch,
+    server: OpenCodeServer,
+    link: ServerLinkClient,
+    work: suspend () -> T,
+): T = coroutineScope {
+    val watch = launch {
+        while (true) {
+            // Checked before waiting too: a change may already have landed.
+            val now = link.epoch()
+            if (now.pools != start.pools || link.resolve(server).url != server.url) throw LinkChanged()
+            link.changed(now.changes)
+        }
+    }
+    try {
+        work()
+    } finally {
+        watch.cancel()
+    }
 }

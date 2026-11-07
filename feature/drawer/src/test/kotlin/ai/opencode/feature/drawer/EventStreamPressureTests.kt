@@ -183,24 +183,38 @@ class EventStreamPressureTests {
                 connectionStatus = HomeConnectionFeature.State.ConnectionStatus.reconnecting,
                 isEventStreamLive = false,
                 lastKnownActivityDeadline = now.plusMillis(HomeFeature.lastKnownActivityLifetime.inWholeMilliseconds),
+                isRecovering = true,
+                recoveryFailures = 1,
             )
         }
         clock.advance(1.seconds)
-        store.receive(HomeConnectionFeature.Action.ServerConnected(server)) { it.copy(isEventStreamLive = true) }
+        store.receive(HomeConnectionFeature.Action.ServerConnected(server)) {
+            it.copy(isEventStreamLive = true, isRecovering = false, recoveryFailures = 0)
+        }
         // Straight away again: the backoff climbs (up to 2 s).
         overflow(1)
         store.receive(HomeConnectionFeature.Action.ConnectionLost) {
-            it.copy(connectionStatus = HomeConnectionFeature.State.ConnectionStatus.disconnected, isEventStreamLive = false)
+            it.copy(isEventStreamLive = false, isRecovering = true, recoveryFailures = 1)
         }
         clock.advance(2.seconds)
-        store.receive(HomeConnectionFeature.Action.ServerConnected(server)) { it.copy(isEventStreamLive = true) }
+        store.receive(HomeConnectionFeature.Action.ServerConnected(server)) {
+            it.copy(isEventStreamLive = true, isRecovering = false, recoveryFailures = 0)
+        }
+        // The 2 s advance also reaches the quiet grace. This TestStore reduces an effect's action
+        // when it's received (iOS's as soon as it's sent), so the grace has already fired; the
+        // reconnect settled recovery, so it changes nothing.
+        store.receive(HomeConnectionFeature.Action.ReconnectingGraceElapsed)
         // Kept up for the quiet stretch, then fell behind: a climbing backoff would wait at least
         // 2 s; a restarted one at most 1 s.
         clock.advance(HomeConnectionFeature.overflowQuietStretch)
         overflow(2)
-        store.receive(HomeConnectionFeature.Action.ConnectionLost) { it.copy(isEventStreamLive = false) }
+        store.receive(HomeConnectionFeature.Action.ConnectionLost) {
+            it.copy(isEventStreamLive = false, isRecovering = true, recoveryFailures = 1)
+        }
         clock.advance(1.seconds)
-        store.receive(HomeConnectionFeature.Action.ServerConnected(server)) { it.copy(isEventStreamLive = true) }
+        store.receive(HomeConnectionFeature.Action.ServerConnected(server)) {
+            it.copy(isEventStreamLive = true, isRecovering = false, recoveryFailures = 0)
+        }
         assertEquals(4, streams.size)
         store.skipInFlightEffects()
     }

@@ -163,6 +163,8 @@ class AppIconBadgeTests {
 
         store.send(Action.ConnectionLost)
         store.send(Action.ConnectionLost)
+        // Offline once the grace has passed with two failed attempts.
+        store.receive({ it is Action.OfflineGraceElapsed }, "offlineGraceElapsed")
         assertEquals(HomeConnectionFeature.State.ConnectionStatus.disconnected, store.state.connectionStatus)
         assertNull(store.state.appBadgeLedger)
         assertEquals("Disconnected sessions read as none; the badge holds", before, published.size)

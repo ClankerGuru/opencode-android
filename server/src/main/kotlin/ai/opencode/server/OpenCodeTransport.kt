@@ -5,28 +5,69 @@ import ai.opencode.server.DiagnosticsInstrumentation.recordingDiagnostics
 import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * The OkHttp client pools behind the live client (iOS `URLSession`s). Under tests every pool
  * runs behind [TestNetworkBlock] (fixtures register hosts; unmocked network fails).
  * Per-request timeouts are applied on top with `newBuilder()`, sharing these pools.
+ * Read a pool where the call is made (`transport.request.newCall(…)`), never keep one: [reset]
+ * swaps in fresh ones.
  */
-class OpenCodeTransport(
-    val request: OkHttpClient,
-    val measuredRequest: OkHttpClient,
-    val longPoll: OkHttpClient,
-    val eventStream: OkHttpClient,
+class OpenCodeTransport private constructor(
+    private val current: () -> Pools,
     /**
-     * Immutable `media:<hash>` blobs (iOS `media`: ephemeral, no URL cache, 20 s request
-     * interval). Defaults to [request] for test transports that stub one client.
+     * Swaps every pool for a fresh one, so the next call opens a new connection instead of
+     * queueing behind sockets a sleep or a route change left wedged. Calls already running
+     * finish on the old pool.
      */
-    val media: OkHttpClient = request,
+    val reset: () -> Unit,
 ) {
-    companion object Key : DependencyKey<OpenCodeTransport> {
-        override val liveValue: OpenCodeTransport by lazy { pools(TransportSecurity.interceptor) }
+    class Pools(
+        val request: OkHttpClient,
+        val measuredRequest: OkHttpClient,
+        val longPoll: OkHttpClient,
+        val eventStream: OkHttpClient,
+        /**
+         * Immutable `media:<hash>` blobs (iOS `media`: ephemeral, no URL cache, 20 s request
+         * interval). Defaults to [request] for test transports that stub one client.
+         */
+        val media: OkHttpClient = request,
+    )
 
-        /** The pools, each request first passing [guard] (iOS ATS: [TransportSecurity]). */
-        private fun pools(guard: okhttp3.Interceptor?): OpenCodeTransport {
+    /** Fixed pools that never reset. */
+    constructor(
+        request: OkHttpClient,
+        measuredRequest: OkHttpClient,
+        longPoll: OkHttpClient,
+        eventStream: OkHttpClient,
+        media: OkHttpClient = request,
+    ) : this(Pools(request, measuredRequest, longPoll, eventStream, media))
+
+    constructor(pools: Pools) : this(current = { pools }, reset = {})
+
+    constructor(rotating: RotatingPools) : this(current = { rotating.current }, reset = { rotating.reset() })
+
+    val request: OkHttpClient get() = current().request
+    val measuredRequest: OkHttpClient get() = current().measuredRequest
+    val longPoll: OkHttpClient get() = current().longPoll
+    val eventStream: OkHttpClient get() = current().eventStream
+    val media: OkHttpClient get() = current().media
+
+    companion object Key : DependencyKey<OpenCodeTransport> {
+        override val liveValue: OpenCodeTransport by lazy { OpenCodeTransport(RotatingPools { pools(TransportSecurity.interceptor) }) }
+
+        /**
+         * Fresh pools (their own dispatcher and connection pool), each request first passing
+         * [guard] (iOS ATS: [TransportSecurity]).
+         */
+        internal fun pools(guard: okhttp3.Interceptor?): Pools {
             // OkHttp caps calls per host at 5 by default; the event stream and a `/wait` long poll
             // would hold two of them, and family/ancestry fan-out (six lookups plus active status)
             // needs more. iOS's URLSession has no such cap on in-flight requests.
@@ -38,7 +79,7 @@ class OpenCodeTransport(
             // Requests feed the diagnostics timeline (inert while recording is off); the event
             // stream records its own connect/disconnect marks instead.
             val recorded = base.newBuilder().recordingDiagnostics().build()
-            return OpenCodeTransport(
+            return Pools(
                 request = recorded,
                 measuredRequest = recorded.newBuilder().build(),
                 longPoll = recorded.newBuilder().build(),
@@ -74,5 +115,44 @@ class OpenCodeTransport(
                 media = live.media.blocked(),
             )
         }
+    }
+}
+
+/**
+ * The live pools, swapped on [reset]. A retired pool is shut down a moment later without
+ * cancelling its calls (iOS `finishTasksAndInvalidate`, never `invalidateAndCancel`): a cancelled
+ * POST reads as cancellation, which nothing retries or reconciles, so a send or a form reply in
+ * flight must finish (or time out) on its own. Its idle connections are closed and its
+ * dispatcher takes no new calls.
+ */
+class RotatingPools(private val make: () -> OpenCodeTransport.Pools) {
+    private val lock = Any()
+    private var pools: OpenCodeTransport.Pools = make()
+
+    val current: OpenCodeTransport.Pools get() = synchronized(lock) { pools }
+
+    fun reset() {
+        val fresh = make()
+        val retired = synchronized(lock) {
+            val old = pools
+            pools = fresh
+            old
+        }
+        retirement.launch {
+            delay(retireDelay)
+            // Closes the retired pools' idle sockets (the possibly wedged ones); calls still in
+            // flight finish on theirs. Unlike iOS's invalidated sessions, the retired clients stay
+            // usable, since a few holders (a call's WebRTC signalling client) keep one for their
+            // lifetime; their dispatchers' idle threads end on their own.
+            val clients = listOf(retired.request, retired.measuredRequest, retired.longPoll, retired.eventStream, retired.media)
+            for (client in clients) client.connectionPool.evictAll()
+        }
+    }
+
+    companion object {
+        /** Long enough for a call made from a pool read just before the swap to start on it. */
+        val retireDelay: Duration = 2.seconds
+
+        private val retirement = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     }
 }

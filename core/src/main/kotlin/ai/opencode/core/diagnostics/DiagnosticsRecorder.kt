@@ -413,6 +413,17 @@ class DiagnosticsRecorder(
         DiagnosticsEvent(kind = kind, monotonicSeconds = now, wallDate = wall, name = name, sessionID = sessionID, navigationEpoch = state.currentNavigationEpoch)
     }
 
+    /**
+     * How the app reaches its server: a path change, an address race, a stalled event stream.
+     * [detail] carries kinds, counts and timings only, never an address.
+     */
+    fun recordLink(name: String, detail: String) = record { now, wall ->
+        DiagnosticsEvent(
+            kind = DiagnosticsEvent.Kind.Stream, monotonicSeconds = now, wallDate = wall, name = name,
+            sessionID = null, navigationEpoch = state.currentNavigationEpoch, reason = detail,
+        )
+    }
+
     /** One live Motion Watch jump (kind, row kinds, stable IDs and detail only; never message text). */
     fun recordMotionJump(kind: String, sessionID: String?, rowKinds: List<String>, rows: List<String>, detail: String) {
         val name = "motion_jump_" + kind.replace("-", "_")

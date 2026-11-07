@@ -409,6 +409,9 @@ private fun connectionAction(action: Action): HomeConnectionFeature.Action? = wh
     Action.LastKnownActivityExpired -> HomeConnectionFeature.Action.LastKnownActivityExpired
     Action.NetworkRerouted -> HomeConnectionFeature.Action.NetworkRerouted
     Action.RetryConnectionTapped -> HomeConnectionFeature.Action.RetryConnectionTapped
+    Action.SceneBecameActive -> HomeConnectionFeature.Action.SceneBecameActive
+    Action.ReconnectingGraceElapsed -> HomeConnectionFeature.Action.ReconnectingGraceElapsed
+    is Action.OfflineGraceElapsed -> HomeConnectionFeature.Action.OfflineGraceElapsed(action.pathDown)
     is Action.ServerEvent -> HomeConnectionFeature.Action.ServerEvent(action.event)
     else -> null
 }
@@ -424,6 +427,9 @@ private fun homeAction(action: HomeConnectionFeature.Action): Action = when (act
     HomeConnectionFeature.Action.LastKnownActivityExpired -> Action.LastKnownActivityExpired
     HomeConnectionFeature.Action.NetworkRerouted -> Action.NetworkRerouted
     HomeConnectionFeature.Action.RetryConnectionTapped -> Action.RetryConnectionTapped
+    HomeConnectionFeature.Action.SceneBecameActive -> Action.SceneBecameActive
+    HomeConnectionFeature.Action.ReconnectingGraceElapsed -> Action.ReconnectingGraceElapsed
+    is HomeConnectionFeature.Action.OfflineGraceElapsed -> Action.OfflineGraceElapsed(action.pathDown)
     is HomeConnectionFeature.Action.ServerEvent -> Action.ServerEvent(action.event)
 }
 

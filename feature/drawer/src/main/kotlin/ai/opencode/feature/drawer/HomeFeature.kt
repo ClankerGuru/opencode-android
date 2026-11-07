@@ -683,6 +683,10 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         /** Last-known running state is too old to show while reconnecting. */
         data object LastKnownActivityExpired : Action
         data object RetryConnectionTapped : Action
+        /** Grace timers and scene activation: see [HomeConnectionFeature.Action]. */
+        data object SceneBecameActive : Action
+        data object ReconnectingGraceElapsed : Action
+        data class OfflineGraceElapsed(val pathDown: Boolean) : Action
         /** Server Flow: the note's Try Again or Pair Again. */
         data object ServerSwitchNoteActionTapped : Action
         /** The network path came back or moved to another interface. */
@@ -812,6 +816,7 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         data object SnapshotRetry : CancelID
         data object LastKnownActivity : CancelID
         data object NetworkPath : CancelID
+        data object ConnectionGrace : CancelID
         data object InAppNotice : CancelID
         data object LiveUpdatesAfterLeaving : CancelID
         data object SessionActivityWait : CancelID

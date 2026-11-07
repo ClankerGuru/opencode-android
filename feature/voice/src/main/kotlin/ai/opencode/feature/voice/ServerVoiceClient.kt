@@ -5,6 +5,7 @@ import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.log.AppLog
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.OpenCodeTransport
+import ai.opencode.server.ServerLinkClient
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
@@ -352,7 +353,7 @@ class ServerVoiceClient(
             method: String = "GET",
             body: ByteArray? = null,
         ): Request? {
-            val url = server.endpoint(path) ?: return null
+            val url = dependency(ServerLinkClient).resolve(server).endpoint(path) ?: return null
             val builder = Request.Builder().url(url).header("Accept", "application/json")
             if (body != null) {
                 builder.header("Content-Type", "application/json")
