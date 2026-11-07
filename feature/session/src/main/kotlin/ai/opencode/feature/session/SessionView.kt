@@ -283,6 +283,7 @@ fun SessionView(
                     header = resolvedHeader.header,
                     safeTop = WindowInsets.statusBarsIgnoringVisibility.inContainer().asPaddingValues().calculateTopPadding(),
                     scrolledUnderHeader = { scrollEdgeBridge.scrolledUnderHeader },
+                    transcriptPlaced = { scrollEdgeBridge.hasPlacedTranscript },
                     modifier = Modifier.align(Alignment.TopCenter),
                 )
                 // Behind the composer, so its × stays reachable: a tap anywhere else or a downward
