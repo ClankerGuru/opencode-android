@@ -50,6 +50,10 @@ import kotlinx.coroutines.launch
 class TranscriptListController(
     val state: LazyListState,
     private val scope: CoroutineScope,
+    /** What the reader opened; the list restores it when the activity is recreated. */
+    val disclosure: TranscriptDisclosureState = TranscriptDisclosureState(),
+    /** Following or browsing; the list restores it with the reader's row when the activity is recreated. */
+    val behavior: TranscriptScrollBehavior = TranscriptScrollBehavior(),
 ) {
     // Wiring the composable refreshes every composition.
     var send: (TranscriptAction) -> Unit = {}
@@ -63,9 +67,6 @@ class TranscriptListController(
     var configuration: TranscriptConfiguration = TranscriptConfiguration()
         private set
     var snapshot: TranscriptListSnapshot by mutableStateOf(TranscriptListSnapshot.empty)
-        private set
-    val behavior = TranscriptScrollBehavior()
-    var disclosure = TranscriptDisclosureState()
         private set
 
     private var entryStableIDs: Map<String, String> = emptyMap()
@@ -127,6 +128,7 @@ class TranscriptListController(
     private val entranceStarts = HashMap<String, Double>()
     private var disclosureEntryID: String? = null
     private var disclosureToggledAt = 0.0
+    private var disclosureGeneration = 0
     private val ride = GrowthRide()
     // LazyColumn lays out after the motion tick. Consume growth only after that layout;
     // dispatching before it clamps against yesterday's end and silently loses the ride.
@@ -149,14 +151,8 @@ class TranscriptListController(
     var placementSpring by mutableStateOf<ai.opencode.core.motion.MotionSpring?>(null)
         private set
 
-    /**
-     * Whether rows this update removes fade out where they were (iOS `fadeOut`: the few rows an
-     * update takes off the screen, like the copy button as Working takes its place). A refresh,
-     * catch-up or window swap replaces many at once; iOS reloads those, and here a bulk fade
-     * left disappearing rows stuck half-drawn over the new ones. They go at once.
-     */
-    var fadesRemovals by mutableStateOf(true)
-        private set
+    /** Visible rows fading out where they were (iOS `fadeOut(_:)`); attached by the composable. */
+    internal var rowExits: TranscriptRowExits? = null
     private var placementUntil = 0.0
 
     // New messages.
@@ -237,10 +233,19 @@ class TranscriptListController(
         val sessionChanged = (configuration.sessionID != old.sessionID && !draftBecameSession) ||
             configuration.historyGeneration != old.historyGeneration
         if (sessionChanged) {
+            // The first configuration (no snapshot yet) of a list restored browsing stays on the reader's row.
+            val restoresBrowsing = snapshot === TranscriptListSnapshot.empty && behavior.mode == TranscriptScrollBehavior.Mode.Browsing
             resetForSessionChange()
             // iOS: a session change clears the reply selection.
             pendingEffects += { replySelection.clear() }
-            pendingEffects += { execute(behavior.handle(TranscriptScrollBehavior.Event.SessionChanged)) }
+            if (restoresBrowsing) {
+                pendingEffects += {
+                    handleBehavior(TranscriptScrollBehavior.Event.UserLeftBottom)
+                    send(TranscriptAction.TranscriptBrowsingChanged(true))
+                }
+            } else {
+                pendingEffects += { execute(behavior.handle(TranscriptScrollBehavior.Event.SessionChanged)) }
+            }
         } else if (draftBecameSession && hasLaidOutContent && perfRows != null) {
             // The draft's first content frame was drawn before there was a session to tell.
             PerfTimeline.rowsShown(configuration.sessionID, perfRows)
@@ -379,6 +384,9 @@ class TranscriptListController(
         promotionUntil = 0.0
         followsSentRow = false
         disclosureSprings.clear()
+        disclosureEntryID = null
+        disclosureGeneration++
+        pendingEffects += { rowExits?.clear() }
         settledHeights.clear()
         enteringItems.clear()
         pendingEntrances.clear()
@@ -409,7 +417,8 @@ class TranscriptListController(
         emptyLoadingSince = null
         finishHandoff()
         agentReveal = ai.opencode.feature.transcript.user.TranscriptAgentMessageReveal()
-        disclosure = TranscriptDisclosureState().also { it.animateToggle = ::toggleDisclosure }
+        // The first configuration (no snapshot yet) keeps what the list restored.
+        if (snapshot !== TranscriptListSnapshot.empty) disclosure.clear()
     }
 
     private val pendingEffects = mutableListOf<() -> Unit>()
@@ -474,6 +483,7 @@ class TranscriptListController(
         if (previous != null && hasLaidOutContent) {
             val oldKeys = old.items.map { it.key }.toSet()
             val nextKeys = next.items.map { it.key }.toSet()
+            val leavingToPill = HashSet<String>()
             if (!reduceMotion && configuration.queuedPillTexts.isNotEmpty()) {
                 // iOS `leavingPending` → `flyIntoQueuedPill`: a pending row that went into the
                 // queued pill shrinks into it.
@@ -481,6 +491,7 @@ class TranscriptListController(
                     if (item !is TranscriptItemID.Message || item.key in nextKeys) continue
                     val row = old.rows[item.stableID] as? MessageRow.Queued ?: continue
                     if (row.input.isCompaction || row.note != null || row.input.id !in configuration.queuedPillTexts) continue
+                    leavingToPill += item.key
                     pendingEffects += { flyIntoQueuedPill(item.stableID) }
                 }
             }
@@ -518,7 +529,25 @@ class TranscriptListController(
             }
             val fades = old.items.count { it.key !in nextKeys } <= RowEntrance.MAXIMUM_ROWS &&
                 next.items.count { it.key !in oldKeys } <= RowEntrance.MAXIMUM_ROWS
-            if (fades != fadesRemovals) fadesRemovals = fades
+            if (!fades) {
+                pendingEffects += { rowExits?.clear() }
+            } else {
+                val handsOff = previous.workingHandsOffToCopy && !configuration.isRunning
+                val plannedExits = planRemovedRowExits(
+                    oldItems = old.items,
+                    nextKeys = nextKeys,
+                    skip = { item ->
+                        item == TranscriptItemID.Empty ||
+                            item.key in leavingToPill ||
+                            (handsOff && item == TranscriptItemID.Working) ||
+                            (item != TranscriptItemID.NewDivider && (reduceMotion || promoted))
+                    },
+                )
+                pendingEffects += {
+                    rowExits?.drop(nextKeys)
+                    if (startRowExits(plannedExits)) startMotion()
+                }
+            }
             if (arriving.size > RowEntrance.MAXIMUM_ROWS) {
                 landArrivals()
             } else {
@@ -561,6 +590,12 @@ class TranscriptListController(
                 }
             }
             growths.keys.retainAll(nextKeys)
+            softEdges.keys.retainAll(nextKeys)
+            if (disclosureSprings.keys.retainAll(nextKeys)) disclosureGeneration++
+            if (disclosureEntryID != null && disclosureEntryID !in nextKeys) {
+                disclosureEntryID = null
+                disclosureGeneration++
+            }
             settledHeights.keys.retainAll(nextKeys)
             enteringItems.retainAll(nextKeys)
             pendingEntrances.keys.retainAll(nextKeys)
@@ -720,6 +755,7 @@ class TranscriptListController(
         } else {
             cancelBorrowedDrag()
             finishGrowths()
+            rowExits?.clear()
             // The divider's motion can't step off screen: it lands at its end.
             finishDividerMotion()
         }
@@ -806,10 +842,11 @@ class TranscriptListController(
         val width = info.viewportSize.width / density
         if (!hasLaidOutContent) {
             // A session opens on its bottom; the self-sizing that follows its first frame lands.
+            // A browsing reader the list restored stays on their row.
             hasLaidOutContent = true
             lastVisibleHeight = visibleHeight
             lastContentWidth = width
-            landOnLastItem()
+            if (behavior.mode == TranscriptScrollBehavior.Mode.Following) landOnLastItem()
             arrivalsGlideAfter = transcriptNow() + BottomSpring.OPENING_SETTLE
             if (!firstFrameSent && keys.any { it is TranscriptItemID.Message || it is TranscriptItemID.Empty }) {
                 firstFrameSent = true
@@ -1367,7 +1404,12 @@ class TranscriptListController(
                 moved = true
             }
         }
-        // Entrances fade on the same clock.
+        // Entrances and exits fade on the same clock.
+        if (rowExits?.hasActive == true) {
+            val active = rowExits?.step(now) == true
+            frameTick++
+            moved = moved || active
+        }
         if (pendingEntrances.isNotEmpty()) {
             pendingEntrances.entries.removeAll { now - (entranceStarts[it.key] ?: it.value.first) > RowEntrance.WINDOW + RowEntrance.SETTLING_DURATION }
             entranceStarts.keys.retainAll(pendingEntrances.keys)
@@ -1387,7 +1429,7 @@ class TranscriptListController(
         }
         if (dividerMotion != null) stepDividerMotion(dividerDt)
         return moved || bottomSpring != null || growths.isNotEmpty() || disclosureSprings.isNotEmpty() ||
-            dividerMotion != null
+            dividerMotion != null || rowExits?.hasActive == true
     }
 
     private fun stepBottomSpring(spring: BottomSpring, dt: Double) {
@@ -1432,7 +1474,9 @@ class TranscriptListController(
         imageGrowths.values.forEach { it.settle() }
         pendingGrowthRide = null
         for ((key, spring) in disclosureSprings) settledHeights[key] = spring.target
+        if (disclosureSprings.isNotEmpty() || disclosureEntryID != null) disclosureGeneration++
         disclosureSprings.clear()
+        disclosureEntryID = null
         enteringItems.clear()
         ride.reset()
         frameTick++
@@ -1618,12 +1662,62 @@ class TranscriptListController(
         return progress.coerceIn(0f, 1f) to style
     }
 
+    private data class PlannedRowExit(
+        val key: String,
+        val top: Float,
+        val start: Double,
+        val anchor: Pair<String, Float>?,
+    )
+
+    /**
+     * iOS `fadeOut(_:)`: captures visible rows removed by a small update so they fade out over
+     * [RowEntrance.EXIT_DURATION] on the list's motion loop, anchored to a surviving neighbour so
+     * they scroll with the content around them.
+     */
+    private fun planRemovedRowExits(
+        oldItems: List<TranscriptItemID>,
+        nextKeys: Set<String>,
+        skip: (TranscriptItemID) -> Boolean,
+    ): List<PlannedRowExit> {
+        if (!isShowingToReader) return emptyList()
+        val info = lastLayout ?: return emptyList()
+        val viewportStart = info.viewportStartOffset
+        val viewportEnd = info.viewportEndOffset - viewportStart
+        val now = transcriptNow()
+        val planned = ArrayList<PlannedRowExit>()
+        for ((index, item) in oldItems.withIndex()) {
+            if (item.key in nextKeys || skip(item)) continue
+            val visible = info.visibleItemsInfo.firstOrNull { it.key == item.key } ?: continue
+            val top = (visible.offset - viewportStart).toFloat()
+            if (top + visible.size <= 0f || top >= viewportEnd) continue
+            // iOS `cell.contentView.alpha > 0.5`: a row barely faded in leaves without a second fade.
+            if (entrance(item.key)?.let { RowEntrance.pose(it.first, it.second).first <= 0.5f } == true) continue
+            val survivor = oldItems.take(index).lastOrNull { it.key in nextKeys }
+                ?.let { above -> info.visibleItemsInfo.firstOrNull { it.key == above.key } }
+                ?: oldItems.drop(index + 1).firstOrNull { it.key in nextKeys }
+                    ?.let { below -> info.visibleItemsInfo.firstOrNull { it.key == below.key } }
+            val anchor = survivor?.let { (it.key as String) to (it.offset - viewportStart).toFloat() }
+            planned += PlannedRowExit(item.key, top, now, anchor)
+        }
+        return planned
+    }
+
+    private fun startRowExits(planned: List<PlannedRowExit>): Boolean {
+        val exits = rowExits ?: return false
+        var started = false
+        for (item in planned) {
+            if (exits.fadeOut(item.key, item.top, item.start, item.anchor)) started = true
+        }
+        return started
+    }
+
     // MARK: Disclosure (iOS `toggleDisclosure`)
 
     private fun toggleDisclosure(entryID: String, opening: Boolean, crossFades: Boolean, toggle: () -> Unit) {
         // The tapped row never moves; its edge grows on the disclosure spring; the follower never chases it.
         stopBottomSpring()
         finishGrowths()
+        val generation = ++disclosureGeneration
         if (!reduceMotion) {
             disclosureEntryID = entryStableIDs[entryID]?.let { "m:$it" } ?: "m:$entryID"
             disclosureToggledAt = transcriptNow()
@@ -1633,7 +1727,9 @@ class TranscriptListController(
             // After the toggle's layout: like coming to rest, they follow only if the end is in view.
             androidx.compose.runtime.withFrameNanos { }
             androidx.compose.runtime.withFrameNanos { }
-            handleBehavior(TranscriptScrollBehavior.Event.DisclosureToggled(viewport()))
+            if (generation == disclosureGeneration) {
+                handleBehavior(TranscriptScrollBehavior.Event.DisclosureToggled(viewport()))
+            }
         }
     }
 
@@ -1751,7 +1847,12 @@ class TranscriptListController(
         dropDividerMotion()
         fittingNewMessages = generation
         pendingEntrances.remove(TranscriptItemID.NewDivider.key)
-        snapshot = snapshot.copy(items = snapshot.items - TranscriptItemID.NewDivider)
+        val remaining = snapshot.items - TranscriptItemID.NewDivider
+        if (reduceMotion && dividerIsInView) {
+            val planned = planRemovedRowExits(snapshot.items, remaining.mapTo(HashSet()) { it.key }) { it != TranscriptItemID.NewDivider }
+            if (startRowExits(planned)) startMotion()
+        }
+        snapshot = snapshot.copy(items = remaining)
         send(TranscriptAction.NewMessagesPassed(generation))
     }
 

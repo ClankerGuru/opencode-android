@@ -3,8 +3,23 @@ package ai.opencode.feature.transcript.list
 import ai.opencode.feature.transcript.TranscriptTunables
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.foundation.lazy.LazyListLayoutInfo
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.GraphicsContext
+import androidx.compose.ui.graphics.drawscope.ContentDrawScope
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.node.DrawModifierNode
+import androidx.compose.ui.node.ModifierNodeElement
+import androidx.compose.ui.node.invalidateDraw
 
 /**
  * How a new row arrives (iOS `RowEntrance.Style`). `Settling`: a quiet row landing among rows
@@ -33,6 +48,11 @@ object RowEntrance {
     private val arrivalEasing = CubicBezierEasing(0.2f, 0.8f, 0.2f, 1f)
     private val settlingEasing = FastOutSlowInEasing.let { CubicBezierEasing(0.42f, 0f, 0.58f, 1f) }
     private val withFlightEasing = CubicBezierEasing(0f, 0f, 0.58f, 1f)
+    /** iOS `.curveEaseOut` for `fadeOut(_:)`. */
+    private val exitEasing = CubicBezierEasing(0f, 0f, 0.58f, 1f)
+
+    /** Fade-out progress `0..1` along [EXIT_DURATION] (`0` at start, `1` gone). */
+    fun exitAlpha(progress: Float): Float = exitEasing.transform(progress.coerceIn(0f, 1f))
 
     /** Opacity and rise (dp, positive = below) at [progress] `0..1` of [style]'s duration. */
     fun pose(progress: Float, style: RowEntranceStyle): Pair<Float, Float> = when (style) {
@@ -63,5 +83,257 @@ fun Modifier.rowEntrance(entrance: () -> Pair<Float, RowEntranceStyle>?): Modifi
         val (opacity, rise) = RowEntrance.pose(current.first, current.second)
         alpha = opacity
         translationY = rise * density
+    }
+}
+
+/**
+ * Visible rows fading out where they were after a small update removes them (iOS `fadingPictures`
+ * / `fadeOut(_:)` in `TranscriptListViewController+RowPresentation.swift`).
+ *
+ * Decided at removal time in [TranscriptListController.applySnapshot] and stepped on the list's
+ * own motion loop instead of `LazyItemScope.animateItem(fadeOutSpec)`: `animateItem` bakes
+ * `fadeOutSpec` onto rows before the update that removes them (so a bulk replacement still started
+ * `LazyLayoutItemAnimator` disappearance fades on the old rows), and `LazyListState.requestScrollToItem`
+ * (`landOnLastItem`, `GrowthRide`, jumps) calls `LazyLayoutItemAnimator.reset()`, which in Compose
+ * 1.12.1 releases the disappearing layers while `LazyColumn`'s outer `RenderNode` still holds them
+ * without invalidating `displayingNode`, freezing the old rows over the list.
+ */
+@Stable
+internal class TranscriptRowExits(private val graphics: GraphicsContext) {
+    private class Exit(
+        val key: String,
+        val layer: GraphicsLayer,
+        val top: Float,
+        val start: Double,
+        val anchor: Pair<String, Float>?,
+    )
+
+    private val rows = HashMap<String, RowExitSourceNode>()
+    private val exits = ArrayList<Exit>()
+    internal var overlay: RowExitOverlayNode? = null
+
+    /** Read in [draw] so Compose's draw observer invalidates the outer layer alongside [overlay]. */
+    private var version by mutableIntStateOf(0)
+
+    val hasActive: Boolean get() = exits.isNotEmpty()
+
+    internal fun createLayer(): GraphicsLayer = graphics.createGraphicsLayer()
+
+    internal fun releaseLayer(layer: GraphicsLayer) = graphics.releaseGraphicsLayer(layer)
+
+    internal fun attach(row: RowExitSourceNode) {
+        rows[row.key] = row
+    }
+
+    internal fun detach(row: RowExitSourceNode) {
+        if (rows[row.key] === row) rows.remove(row.key)
+    }
+
+    /** Captures [key]'s last drawn layer to fade out over [RowEntrance.EXIT_DURATION]. */
+    fun fadeOut(key: String, top: Float, now: Double, anchor: Pair<String, Float>?): Boolean {
+        val layer = rows[key]?.handOver() ?: return false
+        if (layer.size.width <= 0 || layer.size.height <= 0) {
+            releaseLayer(layer)
+            return false
+        }
+        val iterator = exits.iterator()
+        while (iterator.hasNext()) {
+            val existing = iterator.next()
+            if (existing.key == key) {
+                iterator.remove()
+                releaseLayer(existing.layer)
+            }
+        }
+        exits += Exit(key = key, layer = layer, top = top, start = now, anchor = anchor)
+        invalidate()
+        return true
+    }
+
+    /** Drops any active exit whose row key returned in [keys]. */
+    fun drop(keys: Set<String>) {
+        if (exits.isEmpty()) return
+        var changed = false
+        val iterator = exits.iterator()
+        while (iterator.hasNext()) {
+            val exit = iterator.next()
+            if (exit.key in keys) {
+                iterator.remove()
+                releaseLayer(exit.layer)
+                changed = true
+            }
+        }
+        if (changed) invalidate()
+    }
+
+    /** Advances active fades to [now]; returns true while any remain fading. */
+    fun step(now: Double): Boolean {
+        if (exits.isEmpty()) return false
+        val iterator = exits.iterator()
+        while (iterator.hasNext()) {
+            val exit = iterator.next()
+            if (now - exit.start >= RowEntrance.EXIT_DURATION) {
+                iterator.remove()
+                releaseLayer(exit.layer)
+            }
+        }
+        invalidate()
+        return exits.isNotEmpty()
+    }
+
+    /** Ends and releases every active exit immediately (bulk swap, session change, off-screen). */
+    fun clear() {
+        if (exits.isEmpty()) return
+        exits.forEach { releaseLayer(it.layer) }
+        exits.clear()
+        invalidate()
+    }
+
+    /** Releases every active exit when the list leaves composition; row nodes release their own layers on detach. */
+    fun release() {
+        clear()
+        rows.clear()
+    }
+
+    fun draw(scope: DrawScope, startPaddingPx: Float, layoutInfo: LazyListLayoutInfo, now: Double) {
+        version
+        if (exits.isEmpty()) return
+        val visible = layoutInfo.visibleItemsInfo
+        val viewportStart = layoutInfo.viewportStartOffset
+        scope.clipRect(0f, 0f, scope.size.width, scope.size.height) {
+            for (exit in exits) {
+                val progress = ((now - exit.start) / RowEntrance.EXIT_DURATION).toFloat().coerceIn(0f, 1f)
+                val alpha = 1f - RowEntrance.exitAlpha(progress)
+                if (alpha <= 0.001f) continue
+                val shift = exit.anchor?.let { (anchorKey, anchorTop) ->
+                    val current = visible.firstOrNull { it.key == anchorKey } ?: return@let null
+                    (current.offset - viewportStart) - anchorTop
+                } ?: 0f
+                exit.layer.alpha = alpha
+                translate(left = startPaddingPx, top = exit.top + shift) {
+                    drawLayer(exit.layer)
+                }
+            }
+        }
+    }
+
+    private fun invalidate() {
+        version++
+        overlay?.invalidateDraw()
+    }
+}
+
+/** Records a row's latest drawing for [TranscriptRowExits] so a small removal can fade it out. */
+internal fun Modifier.rowExitSource(exits: TranscriptRowExits?, key: String): Modifier =
+    if (exits == null) this else this then RowExitSourceElement(exits, key)
+
+private data class RowExitSourceElement(val exits: TranscriptRowExits, val key: String) : ModifierNodeElement<RowExitSourceNode>() {
+    override fun create() = RowExitSourceNode(exits, key)
+    override fun update(node: RowExitSourceNode) = node.update(exits, key)
+}
+
+internal class RowExitSourceNode(var exits: TranscriptRowExits, var key: String) : Modifier.Node(), DrawModifierNode {
+    private var layer: GraphicsLayer? = null
+
+    fun handOver(): GraphicsLayer? {
+        val taken = layer ?: return null
+        layer = null
+        invalidateDraw()
+        return taken
+    }
+
+    fun update(exits: TranscriptRowExits, key: String) {
+        if (exits === this.exits && key == this.key) return
+        if (isAttached) this.exits.detach(this)
+        if (exits !== this.exits) dropLayer()
+        this.exits = exits
+        this.key = key
+        if (isAttached) {
+            exits.attach(this)
+            invalidateDraw()
+        }
+    }
+
+    override fun ContentDrawScope.draw() {
+        if (size.width <= 0f || size.height <= 0f) {
+            dropLayer()
+            return
+        }
+        val layer = layer ?: exits.createLayer().also { layer = it }
+        layer.record { this@draw.drawContent() }
+        drawLayer(layer)
+    }
+
+    override fun onAttach() {
+        exits.attach(this)
+        invalidateDraw()
+    }
+
+    override fun onReset() {
+        exits.detach(this)
+        dropLayer()
+    }
+
+    override fun onDetach() {
+        exits.detach(this)
+        dropLayer()
+    }
+
+    private fun dropLayer() {
+        layer?.let(exits::releaseLayer)
+        layer = null
+    }
+}
+
+/** Draws [exits] behind the live `LazyColumn` items, in the same painter's order as item exits. */
+internal fun Modifier.drawRowExits(
+    exits: TranscriptRowExits,
+    startPaddingPx: Float,
+    layoutInfo: () -> LazyListLayoutInfo,
+    now: () -> Double,
+): Modifier = this then RowExitOverlayElement(exits, startPaddingPx, layoutInfo, now)
+
+private data class RowExitOverlayElement(
+    val exits: TranscriptRowExits,
+    val startPaddingPx: Float,
+    val layoutInfo: () -> LazyListLayoutInfo,
+    val now: () -> Double,
+) : ModifierNodeElement<RowExitOverlayNode>() {
+    override fun create() = RowExitOverlayNode(exits, startPaddingPx, layoutInfo, now)
+    override fun update(node: RowExitOverlayNode) = node.update(exits, startPaddingPx, layoutInfo, now)
+}
+
+internal class RowExitOverlayNode(
+    var exits: TranscriptRowExits,
+    var startPaddingPx: Float,
+    var layoutInfo: () -> LazyListLayoutInfo,
+    var now: () -> Double,
+) : Modifier.Node(), DrawModifierNode {
+    fun update(
+        exits: TranscriptRowExits,
+        startPaddingPx: Float,
+        layoutInfo: () -> LazyListLayoutInfo,
+        now: () -> Double,
+    ) {
+        if (this.exits !== exits) {
+            if (this.exits.overlay === this) this.exits.overlay = null
+            this.exits = exits
+            if (isAttached) exits.overlay = this
+        }
+        this.startPaddingPx = startPaddingPx
+        this.layoutInfo = layoutInfo
+        this.now = now
+    }
+
+    override fun onAttach() {
+        exits.overlay = this
+    }
+
+    override fun onDetach() {
+        if (exits.overlay === this) exits.overlay = null
+    }
+
+    override fun ContentDrawScope.draw() {
+        exits.draw(this, startPaddingPx, layoutInfo(), now())
+        drawContent()
     }
 }

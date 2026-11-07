@@ -19,6 +19,7 @@ import ai.opencode.feature.transcript.LocalTranscriptRowContext
 import ai.opencode.feature.transcript.RowProps
 import ai.opencode.feature.transcript.TranscriptAction
 import ai.opencode.feature.transcript.TranscriptConfiguration
+import ai.opencode.feature.transcript.TranscriptDisclosureState
 import ai.opencode.feature.transcript.TranscriptLayoutTuning
 import ai.opencode.feature.transcript.TranscriptRowContext
 import ai.opencode.feature.transcript.links.LinkPreviewArrivals
@@ -70,6 +71,8 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.layout.onPlaced
@@ -101,6 +104,21 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlin.math.roundToInt
+
+@OptIn(ExperimentalFoundationApi::class)
+private fun transcriptListState(index: Int, offset: Int) = LazyListState(
+    // Prepare a viewport in the scroll direction rather than only the next row;
+    // retain half a viewport behind so a short reversal can reuse measured Markdown.
+    cacheWindow = LazyLayoutCacheWindow(aheadFraction = 1f, behindFraction = 0.5f),
+    firstVisibleItemIndex = index,
+    firstVisibleItemScrollOffset = offset,
+)
+
+/** `LazyListState.Saver` for a state with the list's cache window (Compose keeps that saver internal). */
+private val transcriptListStateSaver = listSaver<LazyListState, Int>(
+    save = { listOf(it.firstVisibleItemIndex, it.firstVisibleItemScrollOffset) },
+    restore = { transcriptListState(it[0], it[1]) },
+)
 
 /**
  * Slots for rows whose views live above this module (iOS reads them directly from one module):
@@ -154,15 +172,12 @@ private fun TranscriptListContent(
 ) {
     val scope = rememberCoroutineScope()
     val initialIndex = remember { (configuration.entries.size + configuration.queuedInputs.size + 2).coerceAtLeast(0) }
-    val listState = remember {
-        LazyListState(
-            // Prepare a viewport in the scroll direction rather than only the next row;
-            // retain half a viewport behind so a short reversal can reuse measured Markdown.
-            cacheWindow = LazyLayoutCacheWindow(aheadFraction = 1f, behindFraction = 0.5f),
-            firstVisibleItemIndex = initialIndex,
-        )
-    }
-    val controller = remember { TranscriptListController(listState, scope) }
+    // Like disclosure, where the reader is outlives the activity being recreated (a dark mode
+    // switch, font size, process death); a following reader still opens on the bottom.
+    val listState = rememberSaveable(saver = transcriptListStateSaver) { transcriptListState(initialIndex, 0) }
+    val behavior = rememberSaveable(saver = TranscriptScrollBehavior.Saver) { TranscriptScrollBehavior() }
+    val disclosure = rememberSaveable(saver = TranscriptDisclosureState.Saver) { TranscriptDisclosureState() }
+    val controller = remember { TranscriptListController(listState, scope, disclosure, behavior) }
     val density = LocalDensity.current
     val reduceMotion = rememberReduceMotion()
     val currentSend by rememberUpdatedState(send)
@@ -178,6 +193,16 @@ private fun TranscriptListContent(
     controller.isShowingToReader = resumed.isAtLeast(Lifecycle.State.RESUMED)
     controller.sendLanding = ai.opencode.feature.transcript.user.LocalSendLanding.current
     controller.flingBehavior = ScrollableDefaults.flingBehavior()
+    val graphics = LocalGraphicsContext.current
+    val rowExits = remember(controller, graphics) { TranscriptRowExits(graphics) }
+    controller.rowExits = rowExits
+    DisposableEffect(controller, rowExits) {
+        controller.rowExits = rowExits
+        onDispose {
+            if (controller.rowExits === rowExits) controller.rowExits = null
+            rowExits.release()
+        }
+    }
     // Applied in composition so this frame draws the new rows with their stable keys.
     controller.update(configuration)
     controller.obstructionChanged(contentPadding.calculateBottomPadding().value, WindowInsets.ime.inContainer().getBottom(density) / density.density)
@@ -357,6 +382,12 @@ private fun TranscriptListContent(
                     modifier = Modifier.fillMaxSize().testTag("transcript-list")
                         .semantics { customActions = listOf(CustomAccessibilityAction("Scroll to top", controller::scrollToTop)) }
                         .graphicsLayer { alpha = controller.handoffProgress() }
+                        .drawRowExits(
+                            exits = rowExits,
+                            startPaddingPx = with(density) { contentPadding.calculateStartPadding(direction).toPx() },
+                            layoutInfo = { listState.layoutInfo },
+                            now = ::transcriptNow,
+                        )
                         .then(if (controller.emptyHandoff != null) Modifier.clearAndSetSemantics { } else Modifier)
                         .onGloballyPositioned {
                             motionCoordinates[0] = it
@@ -373,11 +404,9 @@ private fun TranscriptListContent(
                             .animateItem(
                                 fadeInSpec = null,
                                 placementSpec = controller.placementSpring?.spec(),
-                                // Working handing off to the reply's end has already become it (iOS `handsOff`): no fade.
-                                fadeOutSpec = if (item == TranscriptItemID.Empty || !controller.fadesRemovals ||
-                                    (item == TranscriptItemID.Working && configuration.workingHandsOffToCopy)
-                                ) null else androidx.compose.animation.core.tween((RowEntrance.EXIT_DURATION * 1000).toInt(), easing = androidx.compose.animation.core.CubicBezierEasing(0f, 0f, 0.58f, 1f)) /* iOS .curveEaseOut */,
+                                fadeOutSpec = null,
                             )
+                            .then(if (item == TranscriptItemID.Empty) Modifier else Modifier.rowExitSource(rowExits, item.key))
                             .fillMaxWidth()
                             .wrapContentWidth()
                             .widthIn(max = TranscriptMetrics.readableColumnWidth)
