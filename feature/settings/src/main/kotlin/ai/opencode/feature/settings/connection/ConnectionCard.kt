@@ -706,10 +706,13 @@ private fun StatusRow(presentation: ConnectionStatusPresentation) {
 /**
  * iOS `LabeledContent` in a list: the label leading and the value trailing on one line when both
  * fit at their full widths; otherwise the value stacks under the label, leading, so the label
- * never breaks inside a word (QA D-01).
+ * never breaks inside a word (QA D-01). Once stacked it stays stacked while shown at that width
+ * and text size, so a value that changes width (Status's round trip, 9 ↔ 10 ms) can't flip the
+ * row and move every row below it (QA H-02).
  */
 @Composable
 private fun LabeledContent(label: String, modifier: Modifier = Modifier, value: @Composable () -> Unit) {
+    val stacked = remember(LocalDensity.current) { StackedWidth() }
     Layout(
         content = {
             Text(label, style = SettingsText.title, color = OpenCodeTheme.colors.text)
@@ -724,7 +727,9 @@ private fun LabeledContent(label: String, modifier: Modifier = Modifier, value: 
         val loose = constraints.copy(minWidth = 0, minHeight = 0)
         val labelPlaced = labelPart.measure(loose)
         val valuePlaced = valuePart.measure(loose)
-        if (labelPlaced.width + spacing + valuePlaced.width <= width) {
+        val stacks = stacked.width == width || labelPlaced.width + spacing + valuePlaced.width > width
+        if (stacks) stacked.width = width
+        if (!stacks) {
             val height = maxOf(labelPlaced.height, valuePlaced.height).coerceAtLeast(constraints.minHeight)
             layout(width, height) {
                 labelPlaced.placeRelative(0, (height - labelPlaced.height) / 2)
@@ -739,4 +744,9 @@ private fun LabeledContent(label: String, modifier: Modifier = Modifier, value: 
             }
         }
     }
+}
+
+/** The width a [LabeledContent] row stacked at; read and written only while it measures. */
+private class StackedWidth {
+    var width = -1
 }
