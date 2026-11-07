@@ -178,6 +178,16 @@ private fun TranscriptListContent(
     controller.isShowingToReader = resumed.isAtLeast(Lifecycle.State.RESUMED)
     controller.sendLanding = ai.opencode.feature.transcript.user.LocalSendLanding.current
     controller.flingBehavior = ScrollableDefaults.flingBehavior()
+    val graphics = LocalGraphicsContext.current
+    val rowExits = remember(controller, graphics) { TranscriptRowExits(graphics) }
+    controller.rowExits = rowExits
+    DisposableEffect(controller, rowExits) {
+        controller.rowExits = rowExits
+        onDispose {
+            if (controller.rowExits === rowExits) controller.rowExits = null
+            rowExits.release()
+        }
+    }
     // Applied in composition so this frame draws the new rows with their stable keys.
     controller.update(configuration)
     controller.obstructionChanged(contentPadding.calculateBottomPadding().value, WindowInsets.ime.inContainer().getBottom(density) / density.density)
@@ -357,6 +367,12 @@ private fun TranscriptListContent(
                     modifier = Modifier.fillMaxSize().testTag("transcript-list")
                         .semantics { customActions = listOf(CustomAccessibilityAction("Scroll to top", controller::scrollToTop)) }
                         .graphicsLayer { alpha = controller.handoffProgress() }
+                        .drawRowExits(
+                            exits = rowExits,
+                            startPaddingPx = with(density) { contentPadding.calculateStartPadding(direction).toPx() },
+                            layoutInfo = { listState.layoutInfo },
+                            now = ::transcriptNow,
+                        )
                         .then(if (controller.emptyHandoff != null) Modifier.clearAndSetSemantics { } else Modifier)
                         .onGloballyPositioned {
                             motionCoordinates[0] = it
@@ -373,11 +389,9 @@ private fun TranscriptListContent(
                             .animateItem(
                                 fadeInSpec = null,
                                 placementSpec = controller.placementSpring?.spec(),
-                                // Working handing off to the reply's end has already become it (iOS `handsOff`): no fade.
-                                fadeOutSpec = if (item == TranscriptItemID.Empty || !controller.fadesRemovals ||
-                                    (item == TranscriptItemID.Working && configuration.workingHandsOffToCopy)
-                                ) null else androidx.compose.animation.core.tween((RowEntrance.EXIT_DURATION * 1000).toInt(), easing = androidx.compose.animation.core.CubicBezierEasing(0f, 0f, 0.58f, 1f)) /* iOS .curveEaseOut */,
+                                fadeOutSpec = null,
                             )
+                            .then(if (item == TranscriptItemID.Empty) Modifier else Modifier.rowExitSource(rowExits, item.key))
                             .fillMaxWidth()
                             .wrapContentWidth()
                             .widthIn(max = TranscriptMetrics.readableColumnWidth)
