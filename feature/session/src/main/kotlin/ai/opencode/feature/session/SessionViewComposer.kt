@@ -134,6 +134,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
@@ -1037,23 +1038,32 @@ private fun SessionComposerEnv.DraftProjectsOverlay(modifier: Modifier) {
             val density = LocalDensity.current
             val headerBottom = WindowInsets.statusBarsIgnoringVisibility.getTop(density) + with(density) { host.headerHeight.dp.toPx() }
             var listTop by remember { mutableFloatStateOf(Float.POSITIVE_INFINITY) }
-            HiddenUnderComposerPanel(host.composerPanelCovers || listTop < headerBottom) {
-                Column(
-                    Modifier.onGloballyPositioned { listTop = it.positionInWindow().y },
-                    verticalArrangement = Arrangement.spacedBy(StarterPromptTunables.listGap.dp),
-                ) {
-                    AnimatedVisibility(visible = showsStarterPrompts, enter = fadeIn(), exit = fadeOut()) {
-                        StarterPromptList(s.starterPrompts, onPick = { store.send(Action.StarterPromptTapped(it)) })
+            val givesWay = listTop < headerBottom
+            val shown by animateFloatAsState(if (givesWay) 0f else 1f, Motion.easeOut(Motion.fadeFast), label = "givesWay")
+            // Faded out, it's measured but not placed, so taps reach the header under it (iOS
+            // `allowsHitTesting(false)`): the draft's title chooses the project there instead.
+            Layout(
+                content = {
+                    HiddenUnderComposerPanel(host.composerPanelCovers || givesWay) {
+                        Column(verticalArrangement = Arrangement.spacedBy(StarterPromptTunables.listGap.dp)) {
+                            AnimatedVisibility(visible = showsStarterPrompts, enter = fadeIn(), exit = fadeOut()) {
+                                StarterPromptList(s.starterPrompts, onPick = { store.send(Action.StarterPromptTapped(it)) })
+                            }
+                            DraftProjectList(
+                                identity = s.taskIdentity,
+                                projects = s.recentProjects,
+                                chosen = s.draftProject,
+                                isComposing = isComposingDraft,
+                                onPick = { store.send(Action.DraftProjectTapped(it)) },
+                                onAll = { store.send(Action.ProjectButtonTapped) },
+                            )
+                        }
                     }
-                    DraftProjectList(
-                        identity = s.taskIdentity,
-                        projects = s.recentProjects,
-                        chosen = s.draftProject,
-                        isComposing = isComposingDraft,
-                        onPick = { store.send(Action.DraftProjectTapped(it)) },
-                        onAll = { store.send(Action.ProjectButtonTapped) },
-                    )
-                }
+                },
+                modifier = Modifier.onGloballyPositioned { listTop = it.positionInWindow().y },
+            ) { measurables, constraints ->
+                val list = measurables.single().measure(constraints)
+                layout(list.width, list.height) { if (!givesWay || shown > 0f) list.place(0, 0) }
             }
         }
     }
