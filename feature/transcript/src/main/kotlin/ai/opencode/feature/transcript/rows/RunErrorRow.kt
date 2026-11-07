@@ -205,7 +205,7 @@ fun UndoneRow(redo: () -> Unit, modifier: Modifier = Modifier) {
             Modifier
                 .alignByBaseline()
                 .rowHitTarget(
-                    target = Modifier.clickable(
+                    target = Modifier.clip(OpenCodeShape.capsule).clickable(
                         role = Role.Button,
                         onClickLabel = "Restore the reverted messages and files until you send a new message",
                         onClick = redo,
