@@ -77,6 +77,7 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import java.time.Instant
 import kotlin.math.max
 import kotlin.math.min
@@ -457,8 +458,13 @@ fun DrawerListView(
         ) {
             val current = model
             itemsIndexed(current.items, key = { _, item -> item.key }, contentType = { _, item -> contentType(item) }) { index, item ->
+                // The dragged row draws above every other item, headers included, through its
+                // drag, landing and settle (iOS lifts it into a layer over the whole list). The
+                // z-order has to sit on the item's root: the list orders its items, not their content.
+                val isDragged = item is DrawerListItem.Session && pinDrag.draggingID == item.id
                 Box(
                     Modifier
+                        .zIndex(if (isDragged) 1f else 0f)
                         .serverSwapRow(serverSwap.takeIf { inputs.serverSwap != null }, current.serverID, current.reducedMotion) { index - listState.firstVisibleItemIndex }
                         .serverSwapPicture(swapPictures.takeIf { swapsRows }, item.key),
                 ) {
