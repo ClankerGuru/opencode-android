@@ -1614,6 +1614,11 @@ private fun SessionComposerEnv.Composer() {
         label = "composerRowFade",
     )
     val bodyLine = with(density) { OpenCodeTextStyles.body.lineHeight.toDp().value }
+    // The field's one line (as `ComposerTextInput` measures it): its floor when short of room.
+    val fieldLine = with(density) {
+        val style = ComposerTunables.textStyle.textStyle
+        if (style.lineHeight.isSp) style.lineHeight.toDp().value else style.fontSize.toDp().value * 1.3f
+    }
     val morph = LocalComposerKeyboardMorph.current
     // The keyboard morph moves the row frame by frame; a size animation on top would trail the keys.
     val morphMoving by remember(morph) {
@@ -1690,6 +1695,7 @@ private fun SessionComposerEnv.Composer() {
                     // iOS `KeyboardDrivenComposerLayout`: the row's expansion frame by frame.
                     progress = { morph.layoutProgress(inline = bar != null) },
                     inline = bar?.let { ComposerLayoutInline(hasLeading = it is RequestBar.Answer, lineHeight = bodyLine) },
+                    inputLineHeight = fieldLine,
                     input = {
                         Box(
                             Modifier
