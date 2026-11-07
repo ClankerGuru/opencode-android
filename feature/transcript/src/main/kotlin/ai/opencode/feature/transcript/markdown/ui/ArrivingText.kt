@@ -216,7 +216,15 @@ internal fun ArrivingText(
                         Modifier.pointerInput(presented) {
                             awaitEachGesture {
                                 val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                                val url = layout?.let { linkAt(it, presented, down.position) } ?: return@awaitEachGesture
+                                val laidOut = layout ?: return@awaitEachGesture
+                                val url = linkAt(laidOut, presented, down.position)
+                                if (url == null) {
+                                    // Off a link's glyphs the touch goes to the text: keep it from
+                                    // the node Compose lays over each link's whole box, which for a
+                                    // wrapped link spans both lines' full width.
+                                    if (!down.isConsumed && inLinkBox(laidOut, presented, down.position)) down.consume()
+                                    return@awaitEachGesture
+                                }
                                 // The link menu above owns the links it offers.
                                 if (MarkdownLinks.offersMenu(url)) return@awaitEachGesture
                                 down.consume()
@@ -280,6 +288,15 @@ private fun linkAt(layout: TextLayoutResult, presented: PresentedText, position:
         if (link != null) return link.tag
     }
     return null
+}
+
+/** Whether [position] is inside the box of the lines a link covers, where Compose places the link's own node. */
+private fun inLinkBox(layout: TextLayoutResult, presented: PresentedText, position: Offset): Boolean {
+    val length = layout.layoutInput.text.length
+    return presented.text.getLinkAnnotations(0, presented.text.length).any { range ->
+        val end = minOf(range.end, length)
+        range.start < end && layout.getPathForRange(range.start, end).getBounds().contains(position)
+    }
 }
 
 /** Erases each arriving chunk's characters by `1 - opacity` (DstOut over the offscreen layer). */
