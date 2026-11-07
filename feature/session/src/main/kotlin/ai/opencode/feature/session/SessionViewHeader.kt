@@ -25,6 +25,7 @@ import ai.opencode.feature.session.header.SessionContextGauge
 import ai.opencode.feature.session.header.SessionContextText
 import ai.opencode.server.model.OpenCodeExportFormat
 import ai.opencode.server.model.isUntitled
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.animateContentSize
@@ -40,11 +41,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -56,6 +61,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -65,8 +71,11 @@ import androidx.compose.ui.composed
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -76,6 +85,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.PopupProperties
 import kotlin.math.max
 
 // Port of iOS `Session/SessionView+Header.swift`: the header row (drawer or Back, the title
@@ -387,7 +397,8 @@ private val capsuleSmooth = MotionSpring(0.45, 0.0)
 private fun SessionMenuButton(store: StoreOf<State, Action>, model: SessionHeaderModel, listContext: SessionListContext) {
     var expanded by remember { mutableStateOf(false) }
     val value = model.contextTokens?.let { SessionContextText.accessibilityValue(it, model.contextLimit) } ?: ""
-    Box {
+    var anchorBottom by remember { mutableIntStateOf(0) }
+    Box(Modifier.onGloballyPositioned { anchorBottom = it.boundsInWindow().bottom.toInt() }) {
         OpenCodeIconButton(
             symbol = SFSymbol.Ellipsis,
             contentDescription = "More",
@@ -407,6 +418,7 @@ private fun SessionMenuButton(store: StoreOf<State, Action>, model: SessionHeade
         }
         SessionMenu(
             expanded = expanded,
+            anchorBottom = { anchorBottom },
             onDismiss = { expanded = false },
             title = model.sessionTitle ?: "Session",
             renameTitle = model.renameTitle,
@@ -419,10 +431,14 @@ private fun SessionMenuButton(store: StoreOf<State, Action>, model: SessionHeade
     }
 }
 
+/** Material's menu margin from the window's edge (`MenuVerticalMargin`). */
+private val sessionMenuMargin = 48.dp
+
 /** iOS `sessionMenuItems`: the session's own actions, its work, and deletion. */
 @Composable
 private fun SessionMenu(
     expanded: Boolean,
+    anchorBottom: () -> Int,
     onDismiss: () -> Unit,
     title: String,
     renameTitle: String,
@@ -433,7 +449,32 @@ private fun SessionMenu(
     var exportOpen by remember(expanded) { mutableStateOf(false) }
     fun menu(action: SessionSheetFeature.Action) = send(Action.SessionMenu(action))
     // No title heading: the header already shows it (6bbf321d); exports still name the file by it.
-    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+    // Not focusable: the composer keeps the keyboard while the menu is open, as iOS's Menu leaves
+    // the text view first responder. A focusable popup took focus, so the keyboard left as the
+    // menu was placed against the room above it, and the menu stayed up over the ⋮ (QA D-03).
+    // With the keyboard up the menu still hangs from the ⋮, capped to the room above the keys
+    // (it scrolls), rather than moving up over the button to fit.
+    BackHandler(enabled = expanded, onBack = onDismiss)
+    val density = LocalDensity.current
+    val windowHeight = LocalWindowInfo.current.containerSize.height
+    // Insets are read only while open, so the keyboard's animation doesn't recompose the header.
+    val room = if (expanded) {
+        val keyboard = WindowInsets.ime.getBottom(density)
+        if (keyboard > WindowInsets.navigationBars.getBottom(density)) {
+            val bottom = windowHeight - keyboard - WindowInsets.statusBars.getTop(density)
+            with(density) { (bottom - anchorBottom()).toDp() } - sessionMenuMargin
+        } else {
+            Dp.Unspecified
+        }
+    } else {
+        Dp.Unspecified
+    }
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismiss,
+        modifier = if (room != Dp.Unspecified) Modifier.heightIn(max = room.coerceAtLeast(headerButtonSize)) else Modifier,
+        properties = PopupProperties(focusable = false),
+    ) {
         listContext.isPinned?.let { isPinned ->
             MenuItem(if (isPinned) "Unpin" else "Pin", if (isPinned) SFSymbol.PinSlash else SFSymbol.Pin) {
                 menu(SessionSheetFeature.Action.PinTapped)
