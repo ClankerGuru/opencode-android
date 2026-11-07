@@ -111,11 +111,8 @@ fun AppearanceSettingsView(store: SettingsStore) {
             }
         }
         settingsSection(key = "theme", header = "Theme") {
+            // The clickable row merges its texts: "Theme", then the theme (iOS's label and value).
             SettingsRowFrame(
-                Modifier.semantics(mergeDescendants = true) {
-                    contentDescription = "Theme"
-                    stateDescription = appTheme.title
-                },
                 onClick = { store.send(SettingsFeature.Action.PagePushed(SettingsPage.Themes)) },
             ) {
                 val swatch = @Composable {

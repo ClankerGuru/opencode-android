@@ -84,6 +84,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -143,12 +144,12 @@ fun ServerFlowTitle(
                             role = Role.DropdownList,
                             onClickLabel = presentation.accessibilityHint,
                         ) { expanded = true }
-                        .semantics(mergeDescendants = true) {
+                        .clearAndSetSemantics {
                             contentDescription = shown.friendlyName
                             stateDescription = accessibilityValue
                             heading()
-                        }
-                        .testTag(DrawerTitle.TAG),
+                            testTag = DrawerTitle.TAG
+                        },
                 )
                 DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                     if (presentation.listsServers) {

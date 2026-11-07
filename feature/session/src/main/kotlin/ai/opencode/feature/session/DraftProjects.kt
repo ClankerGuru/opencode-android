@@ -295,7 +295,7 @@ private fun DraftProjectRow(title: String, symbol: SFSymbol, chosen: Boolean, ow
             .clickable(role = Role.Button, onClickLabel = hint, onClick = onClick)
             .padding(start = 17.dp, end = 16.dp)
             .testTag(tag)
-            .semantics(mergeDescendants = true) {
+            .clearAndSetSemantics {
                 selected = chosen
                 contentDescription = title
             },
