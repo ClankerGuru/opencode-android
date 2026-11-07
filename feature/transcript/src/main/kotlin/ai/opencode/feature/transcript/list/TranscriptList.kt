@@ -106,6 +106,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlin.math.roundToInt
+import kotlinx.coroutines.flow.first
 
 @OptIn(ExperimentalFoundationApi::class)
 private fun transcriptListState(index: Int, offset: Int) = LazyListState(
@@ -116,10 +117,26 @@ private fun transcriptListState(index: Int, offset: Int) = LazyListState(
     firstVisibleItemScrollOffset = offset,
 )
 
-/** `LazyListState.Saver` for a state with the list's cache window (Compose keeps that saver internal). */
-private val transcriptListStateSaver = listSaver<LazyListState, Int>(
-    save = { listOf(it.firstVisibleItemIndex, it.firstVisibleItemScrollOffset) },
-    restore = { transcriptListState(it[0], it[1]) },
+/**
+ * The list's state and, once restored, the reader's row by key with the offset within it: the
+ * rows before it can differ after a process death (a shorter history window, a row more or
+ * less), so the saved index alone would land on another row. The index stays the fallback.
+ */
+private class TranscriptListPosition(val state: LazyListState, var anchor: Pair<String, Int>? = null)
+
+/** `LazyListState.Saver` for a state with the list's cache window (Compose keeps that saver internal), plus the first row's key. */
+private val transcriptListPositionSaver = listSaver<TranscriptListPosition, Any>(
+    save = { position ->
+        val state = position.state
+        // A row not reached yet (its history still loading) stays the one to go back to.
+        position.anchor?.let { (key, offset) -> return@listSaver listOf(state.firstVisibleItemIndex, offset, key) }
+        val key = state.layoutInfo.visibleItemsInfo.firstOrNull { it.index == state.firstVisibleItemIndex }?.key as? String
+        listOfNotNull(state.firstVisibleItemIndex, state.firstVisibleItemScrollOffset, key)
+    },
+    restore = { saved ->
+        val offset = saved[1] as Int
+        TranscriptListPosition(transcriptListState(saved[0] as Int, offset), (saved.getOrNull(2) as? String)?.let { it to offset })
+    },
 )
 
 /**
@@ -176,7 +193,8 @@ private fun TranscriptListContent(
     val initialIndex = remember { (configuration.entries.size + configuration.queuedInputs.size + 2).coerceAtLeast(0) }
     // Like disclosure, where the reader is outlives the activity being recreated (a dark mode
     // switch, font size, process death); a following reader still opens on the bottom.
-    val listState = rememberSaveable(saver = transcriptListStateSaver) { transcriptListState(initialIndex, 0) }
+    val position = rememberSaveable(saver = transcriptListPositionSaver) { TranscriptListPosition(transcriptListState(initialIndex, 0)) }
+    val listState = position.state
     val behavior = rememberSaveable(saver = TranscriptScrollBehavior.Saver) { TranscriptScrollBehavior() }
     val disclosure = rememberSaveable(saver = TranscriptDisclosureState.Saver) { TranscriptDisclosureState() }
     val controller = remember { TranscriptListController(listState, scope, disclosure, behavior) }
@@ -209,6 +227,25 @@ private fun TranscriptListContent(
     controller.update(configuration)
     controller.obstructionChanged(contentPadding.calculateBottomPadding().value, WindowInsets.ime.inContainer().getBottom(density) / density.density)
     SideEffect { controller.flushEffects() }
+    // A restored browsing reader goes back to their row by its key once the rows hold it (a
+    // following reader lands on the bottom instead); the reader moving the list first ends it.
+    if (position.anchor != null) {
+        SideEffect {
+            val (key, offset) = position.anchor ?: return@SideEffect
+            if (behavior.mode != TranscriptScrollBehavior.Mode.Browsing) {
+                position.anchor = null
+                return@SideEffect
+            }
+            val index = controller.snapshot.items.indexOfFirst { it.key == key }
+            if (index < 0) return@SideEffect
+            position.anchor = null
+            listState.requestScrollToItem(index, offset)
+        }
+        LaunchedEffect(listState) {
+            snapshotFlow { listState.isScrollInProgress }.first { it }
+            position.anchor = null
+        }
+    }
 
     // iOS `TranscriptListViewController+TextSelection`: one selection across a reply's rows.
     val replySelection = controller.replySelection
