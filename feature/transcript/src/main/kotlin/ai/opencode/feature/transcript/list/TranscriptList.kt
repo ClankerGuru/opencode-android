@@ -19,6 +19,7 @@ import ai.opencode.feature.transcript.LocalTranscriptRowContext
 import ai.opencode.feature.transcript.RowProps
 import ai.opencode.feature.transcript.TranscriptAction
 import ai.opencode.feature.transcript.TranscriptConfiguration
+import ai.opencode.feature.transcript.TranscriptDisclosureState
 import ai.opencode.feature.transcript.TranscriptLayoutTuning
 import ai.opencode.feature.transcript.TranscriptRowContext
 import ai.opencode.feature.transcript.links.LinkPreviewArrivals
@@ -70,6 +71,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.layout.onPlaced
@@ -162,7 +164,8 @@ private fun TranscriptListContent(
             firstVisibleItemIndex = initialIndex,
         )
     }
-    val controller = remember { TranscriptListController(listState, scope) }
+    val disclosure = rememberSaveable(saver = TranscriptDisclosureState.Saver) { TranscriptDisclosureState() }
+    val controller = remember { TranscriptListController(listState, scope, disclosure) }
     val density = LocalDensity.current
     val reduceMotion = rememberReduceMotion()
     val currentSend by rememberUpdatedState(send)

@@ -50,6 +50,8 @@ import kotlinx.coroutines.launch
 class TranscriptListController(
     val state: LazyListState,
     private val scope: CoroutineScope,
+    /** What the reader opened; the list restores it when the activity is recreated. */
+    val disclosure: TranscriptDisclosureState = TranscriptDisclosureState(),
 ) {
     // Wiring the composable refreshes every composition.
     var send: (TranscriptAction) -> Unit = {}
@@ -65,8 +67,6 @@ class TranscriptListController(
     var snapshot: TranscriptListSnapshot by mutableStateOf(TranscriptListSnapshot.empty)
         private set
     val behavior = TranscriptScrollBehavior()
-    var disclosure = TranscriptDisclosureState()
-        private set
 
     private var entryStableIDs: Map<String, String> = emptyMap()
     private var queuedStableIDs: Map<String, String> = emptyMap()
@@ -409,7 +409,8 @@ class TranscriptListController(
         emptyLoadingSince = null
         finishHandoff()
         agentReveal = ai.opencode.feature.transcript.user.TranscriptAgentMessageReveal()
-        disclosure = TranscriptDisclosureState().also { it.animateToggle = ::toggleDisclosure }
+        // The first configuration (no snapshot yet) keeps what the list restored.
+        if (snapshot !== TranscriptListSnapshot.empty) disclosure.clear()
     }
 
     private val pendingEffects = mutableListOf<() -> Unit>()
