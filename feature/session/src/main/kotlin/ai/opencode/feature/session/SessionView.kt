@@ -768,10 +768,18 @@ private fun SessionSheets(store: StoreOf<State, Action>, listContext: SessionLis
     val activePicker by store.observe { it.activePicker }
     val dismiss = { store.send(Action.Binding(BindingAction.ActivePicker(null))) }
 
-    // iOS `onDismiss`: whichever sheet leaves, the Project sheet's folders reset.
+    // iOS `onDismiss`: whichever sheet leaves, the Project sheet's folders reset, and the
+    // keyboard the model chip put away comes back.
+    val panels = LocalSessionComposerHost.current?.modelPanels
     var shownPicker by remember { mutableStateOf(activePicker) }
     LaunchedEffect(activePicker) {
-        if (shownPicker != null && shownPicker != activePicker) store.send(Action.ProjectPickerDismissed)
+        if (shownPicker != null && shownPicker != activePicker) {
+            store.send(Action.ProjectPickerDismissed)
+            if (panels?.sheetRestoresFocus == true) {
+                panels.sheetRestoresFocus = false
+                panels.restoreFocusAfterModelList(store.state.taskIdentity)
+            }
+        }
         shownPicker = activePicker
     }
 

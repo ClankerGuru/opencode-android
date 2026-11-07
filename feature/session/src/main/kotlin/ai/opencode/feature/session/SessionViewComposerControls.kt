@@ -174,9 +174,11 @@ private fun SessionComposerEnv.ModelButton(enabled: Boolean) {
                 onClick = {
                     if (!enabled) return@ModelPickerChip
                     if (composerTextTakesDoubleTap()) return@ModelPickerChip
-                    // Put away under any picker sheet (iOS 07b2f5f8), or a row's level menu raises the
-                    // composer's keyboard over the sheet.
-                    if (host.messageFieldFocused) dismissKeyboard()
+                    // iOS `openModelPickerFromChip`: put away under the picker sheet (iOS 07b2f5f8), or a
+                    // row's level menu raises the composer's keyboard over it, and handed back as it closes.
+                    val focused = host.messageFieldFocused
+                    host.modelPanels?.sheetRestoresFocus = focused
+                    if (focused) dismissKeyboard()
                     store.send(Action.ModelButtonTapped)
                 },
                 targetDrop = ComposerLayoutMetrics.pickerTargetDrop.dp,
