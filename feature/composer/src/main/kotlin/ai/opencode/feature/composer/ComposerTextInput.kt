@@ -29,9 +29,13 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imeAnimationTarget
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.contextmenu.provider.LocalTextContextMenuToolbarProvider
+import androidx.compose.foundation.text.contextmenu.provider.TextContextMenuDataProvider
+import androidx.compose.foundation.text.contextmenu.provider.TextContextMenuProvider
 import androidx.compose.foundation.text.input.InputTransformation
 import androidx.compose.foundation.text.input.KeyboardActionHandler
 import androidx.compose.foundation.text.input.TextFieldBuffer
@@ -39,6 +43,7 @@ import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.placeCursorAtEnd
 import androidx.compose.foundation.text.input.then
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -57,6 +62,7 @@ import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
@@ -97,9 +103,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.android.awaitFrame
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
@@ -505,6 +513,36 @@ class ComposerTextInputController {
     }
 }
 
+/**
+ * The field's text toolbar ("Paste", a selection's actions), shown through [platform]. A toolbar
+ * that closes because the field became [covered] (the + menu, the drawer) is dismissed: the field
+ * still holds its toolbar state and asks to show it again whenever it's uncovered in a focused
+ * window, and those requests are swallowed until the field itself hides it (a tap, a long press,
+ * an edit, losing focus), which it only does in a focused, uncovered window. A long press then
+ * shows it as usual.
+ */
+private class CoverDismissedTextToolbar(
+    private val covered: () -> Boolean,
+    private val windowFocused: () -> Boolean,
+) : TextContextMenuProvider {
+    var platform: TextContextMenuProvider? = null
+    private var dismissedByCover = false
+
+    override suspend fun showTextContextMenu(dataProvider: TextContextMenuDataProvider) {
+        try {
+            if (dismissedByCover) awaitCancellation()
+            platform?.showTextContextMenu(dataProvider)
+        } catch (cancelled: CancellationException) {
+            dismissedByCover = when {
+                covered() -> true
+                windowFocused() -> false
+                else -> dismissedByCover
+            }
+            throw cancelled
+        }
+    }
+}
+
 /** The mounted field's [ComposerSwipeInput], refreshed every composition. */
 private class ComposerFieldSwipeInput : ComposerSwipeInput {
     var yieldsToText: () -> Boolean = { false }
@@ -812,6 +850,9 @@ fun ComposerTextInput(
         }
     }
     val caretHandleHeightPx = with(density) { 25.dp.toPx() }
+    // QA J-02: the + menu or the drawer taking the interaction ends the text toolbar (iOS's edit
+    // menu, Android's own fields), rather than just hiding it until it comes back over what moved in.
+    val toolbar = remember(windowInfo) { CoverDismissedTextToolbar({ covered }, { windowInfo.isWindowFocused }) }
 
     /** Whether a caret's drop handle would hang past the bottom of the field's [viewportHeight] (px). */
     fun caretHandleHangsOut(viewportHeight: Float): Boolean {
@@ -1197,7 +1238,14 @@ fun ComposerTextInput(
             }
             .verticalScroll(scroll, enabled = overflows),
     ) {
-        CompositionLocalProvider(LocalWindowInfo provides coverableWindowInfo) { BasicTextField(
+        // The platform toolbar the field would set up for itself, read from an empty container.
+        SelectionContainer(Modifier.size(0.dp).focusProperties { canFocus = false }) {
+            toolbar.platform = LocalTextContextMenuToolbarProvider.current
+        }
+        CompositionLocalProvider(
+            LocalWindowInfo provides coverableWindowInfo,
+            LocalTextContextMenuToolbarProvider provides toolbar,
+        ) { BasicTextField(
             state = state,
             modifier = Modifier
                 .fillMaxWidth()
