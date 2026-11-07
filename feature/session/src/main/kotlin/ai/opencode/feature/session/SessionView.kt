@@ -154,7 +154,9 @@ fun SessionView(
     val scrollEdgeBridge = rememberSaveable(saver = SessionScrollEdgeBridge.Saver) { SessionScrollEdgeBridge() }
     val backgroundWorkAnchor = rememberBackgroundWorkAnchor()
     // What the composer shares with the screen around it (the capsule's place, jump to latest, the + menu).
-    val composerHost = remember { SessionComposerHost() }
+    // The pill a session opens with (a cold launch's reconnect) is there from its first frame, as
+    // iOS's is, rather than rising in over the last row a frame later.
+    val composerHost = remember { SessionComposerHost().apply { connection = listContext.connection } }
     val importer = rememberSessionAttachmentImporter(store)
     val colors = OpenCodeTheme.colors
     val density = LocalDensity.current
