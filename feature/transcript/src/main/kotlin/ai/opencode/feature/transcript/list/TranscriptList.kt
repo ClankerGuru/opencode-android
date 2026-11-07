@@ -71,6 +71,8 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.retain.RetainedEffect
+import androidx.compose.runtime.retain.retain
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -317,7 +319,10 @@ private fun TranscriptListContent(
     if (controller.runEnded) textReveal.settleAll()
     // The list owns the session's link previews (iOS `TranscriptListViewController.linkPreviews`,
     // made anew for each session): an arrival bumps only its rows' revisions, which redraws them.
-    val linkPreviews = remember { LinkPreviewStore() }
+    // Retained like iOS's controller, which a trait change only redraws: a recreated activity
+    // (dark mode, font size, locale) keeps what loaded; leaving the session retires it.
+    val linkPreviews = retain { LinkPreviewStore() }
+    RetainedEffect(linkPreviews) { onRetire { linkPreviews.close() } }
     val linkRevisions = remember { mutableStateMapOf<String, Int>() }
     DisposableEffect(linkPreviews) {
         linkPreviews.onArrival = { rows ->
@@ -326,10 +331,7 @@ private fun TranscriptListContent(
                 linkRevisions[row] = linkPreviews.revision(row)
             }
         }
-        onDispose {
-            linkPreviews.onArrival = null
-            linkPreviews.close()
-        }
+        onDispose { linkPreviews.onArrival = null }
     }
     remember(linkPreviews) { LinkPreviewArrivals(linkPreviews) }.update(snapshot, configuration.isRunning, controller.hasLaidOutContent)
     // The list is its image previews' viewport (iOS `TranscriptListViewController:
