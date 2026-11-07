@@ -30,6 +30,7 @@ import ai.opencode.feature.transcript.markdown.ui.SharedTextContextMenus
 import ai.opencode.feature.transcript.markdown.ui.MarkdownStyle
 import ai.opencode.feature.transcript.markdown.ui.TranscriptTextReveal
 import ai.opencode.feature.transcript.selection.LocalTranscriptReplySelection
+import ai.opencode.feature.transcript.selection.TranscriptReplySelection
 import ai.opencode.feature.transcript.selection.TranscriptReplySelectionMenu
 import ai.opencode.feature.transcript.selection.transcriptReplySelectionGestures
 import ai.opencode.feature.transcript.selection.transcriptReplySelectionHandles
@@ -203,7 +204,8 @@ private fun TranscriptListContent(
     val listState = position.state
     val behavior = rememberSaveable(saver = TranscriptScrollBehavior.Saver) { TranscriptScrollBehavior() }
     val disclosure = rememberSaveable(saver = TranscriptDisclosureState.Saver) { TranscriptDisclosureState() }
-    val controller = remember { TranscriptListController(listState, scope, disclosure, behavior) }
+    val selection = rememberSaveable(saver = TranscriptReplySelection.Saver) { TranscriptReplySelection() }
+    val controller = remember { TranscriptListController(listState, scope, disclosure, behavior, selection) }
     val density = LocalDensity.current
     val reduceMotion = rememberReduceMotion()
     val currentSend by rememberUpdatedState(send)
@@ -284,6 +286,8 @@ private fun TranscriptListContent(
             if (replySelection.host === listSelection) replySelection.host = null
         }
     }
+    // After the controller's effects: a recreated activity's selection comes back once its reply is listed.
+    SideEffect { replySelection.restorePending() }
 
     LaunchedEffect(resumed) { controller.visibilityChanged() }
     // iOS `SessionView+Header` registers the transcript's knobs as the session draws.
