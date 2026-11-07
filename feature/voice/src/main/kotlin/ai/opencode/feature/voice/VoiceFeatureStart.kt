@@ -31,8 +31,6 @@ fun VoiceFeature.State.setActiveRoute(
     usesSessionDelegator: Boolean = false,
 ): VoiceFeature.State = copy(
     activeRoute = route,
-    activeEngine = route.engine,
-    activeProvider = route.provider,
     usesDelegator = usesDelegator,
     usesSessionDelegator = usesSessionDelegator,
 )

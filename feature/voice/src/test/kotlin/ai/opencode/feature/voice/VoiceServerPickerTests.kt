@@ -247,8 +247,6 @@ class VoiceServerPickerTests {
                 callPlace = VoiceCallPlace("Studio", VoiceProviderOption.Brand.openAI),
                 startedTarget = VoiceWorkTarget(server = server, sessionID = session.id, directory = session.directory),
                 activeRoute = VoiceRoute.Server(VoiceRoute.ServerRoute.OpenAI(VoiceRoute.OpenAI.gptLive)),
-                activeEngine = VoiceEngine.gptLive,
-                activeProvider = ServerVoiceProvider.openAI,
                 callPresenceID = presenceID,
             )
         }

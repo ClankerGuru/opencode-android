@@ -127,11 +127,8 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
          * one isn't a move.
          */
         val pendingModel: OpenCodeModelRef? = null,
-        /** The voice engine locked in when the call starts. */
-        val activeEngine: VoiceEngine? = VoiceEngine.gptLive,
+        /** The route locked in when the call starts: its engine and provider are what the call runs on. */
         val activeRoute: VoiceRoute = VoiceRoute.PhoneKey(VoiceEngine.gptLive),
-        /** The server voice provider locked in when the call starts. */
-        val activeProvider: ServerVoiceProvider = ServerVoiceProvider.openAI,
         /** Whether [supportServer] supports `POST /api/experimental/voice/session`. */
         val serverVoiceSupport: ServerVoiceSupport = ServerVoiceSupport.unknown,
         /**
@@ -283,6 +280,9 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
          * move: only those get a notice. Their own switches stay quiet.
          */
         val unpromptedMove: Int? get() = if (moveReason != null && moveReason in MoveReason.unprompted) moves else null
+
+        val activeEngine: VoiceEngine? get() = activeRoute.engine
+        val activeProvider: ServerVoiceProvider get() = activeRoute.provider
 
         val directoryName: String get() = lastPathComponent(target.directory)
 

@@ -21,6 +21,7 @@ import ai.opencode.feature.voice.VoiceCallLogClient
 import ai.opencode.feature.voice.VoiceCallLogRecorder
 import ai.opencode.feature.voice.VoiceEngine
 import ai.opencode.feature.voice.VoiceFeature
+import ai.opencode.feature.voice.VoiceRoute
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.OpenCodeServerEvent
@@ -29,9 +30,6 @@ import ai.opencode.server.model.OpenCodePendingRequests
 import ai.opencode.server.model.OpenCodeProject
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.OpenCodeSessionFamily
-import java.nio.file.Files
-import java.time.Instant
-import java.util.UUID
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.emptyFlow
 import org.junit.Assert.assertEquals
@@ -39,6 +37,9 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import java.nio.file.Files
+import java.time.Instant
+import java.util.UUID
 
 /**
  * Port of iOS `HomeFeatureTests+MovedSessions.swift`: a session whose folder is gone moves to its
@@ -161,7 +162,7 @@ class HomeFeatureTestsMovedSessions {
                 val (made, detail) = home.makeDetail(session, cachedItems = emptyList())
                 val voice = VoiceFeature.State(testServer, session)
                     .withPhase(VoiceFeature.State.Phase.Live)
-                    .copy(activeEngine = VoiceEngine.realtime, callLogID = logID)
+                    .copy(activeRoute = VoiceRoute.PhoneKey(VoiceEngine.realtime), callLogID = logID)
                 made.copy(sessionDetail = detail.copy(voice = voice))
             }
             var retargets = 0

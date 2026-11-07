@@ -136,8 +136,6 @@ class VoiceRouteTests {
                     callLogID = logID,
                     startedTarget = state.target,
                     activeRoute = route,
-                    activeEngine = route.engine,
-                    activeProvider = route.provider,
                     activeVoice = activeVoice,
                     diagnosesFailure = engine != VoiceEngine.grok,
                     callPlace = if (engine != VoiceEngine.grok) VoiceCallPlace("Localhost", VoiceProviderOption.Brand.gemini) else null,

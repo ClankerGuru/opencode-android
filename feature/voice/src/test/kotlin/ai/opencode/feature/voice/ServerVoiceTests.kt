@@ -257,8 +257,6 @@ class ServerVoiceTests {
                 callPlace = VoiceCallPlace("Server 1", VoiceProviderOption.Brand.openAI),
                 activeRoute = VoiceRoute.Server(VoiceRoute.ServerRoute.OpenAI(VoiceRoute.OpenAI.gptLive)),
                 startedTarget = startedTarget(),
-                activeEngine = VoiceEngine.gptLive,
-                activeProvider = ServerVoiceProvider.openAI,
                 activeVoice = CallVoice.marin,
                 usesDelegator = false,
                 callPresenceID = presenceID,
@@ -304,8 +302,6 @@ class ServerVoiceTests {
                 callPlace = VoiceCallPlace("Server 1", VoiceProviderOption.Brand.gemini),
                 activeRoute = VoiceRoute.Server(VoiceRoute.ServerRoute.GeminiLive),
                 startedTarget = startedTarget(),
-                activeEngine = null,
-                activeProvider = ServerVoiceProvider.geminiLive,
                 activeVoice = CallVoice.marin,
                 usesDelegator = false,
                 callPresenceID = presenceID,
@@ -365,8 +361,6 @@ class ServerVoiceTests {
                 callPlace = VoiceCallPlace("Server 1", VoiceProviderOption.Brand.openAI),
                 activeRoute = VoiceRoute.Server(VoiceRoute.ServerRoute.OpenAI(VoiceRoute.OpenAI.gptLive)),
                 startedTarget = startedTarget(),
-                activeEngine = VoiceEngine.gptLive,
-                activeProvider = ServerVoiceProvider.openAI,
                 activeVoice = CallVoice.marin,
                 usesDelegator = false,
                 callPresenceID = presenceID,
@@ -442,7 +436,6 @@ class ServerVoiceTests {
                 diagnosesFailure = true,
                 activeRoute = VoiceRoute.Unavailable(VoiceRoute.Reason.ServerUnsupported),
                 startedTarget = startedTarget(),
-                activeEngine = null,
                 activeVoice = CallVoice.marin,
                 usesDelegator = false,
                 callPresenceID = presenceID,
@@ -454,7 +447,7 @@ class ServerVoiceTests {
         assertEquals(ServerVoiceSupport.supported, shared.run { shared(VoiceSharedKeys.serverVoiceSupportByServer).value[server.persistenceID] })
         store.receive(VoiceFeature.Action.Delegate(VoiceFeature.DelegateAction.ServerVoiceSupportChanged(ServerVoiceSupport.supported)))
         store.receive(VoiceFeature.Action.CallRouteResolved(VoiceRoute.Server(VoiceRoute.ServerRoute.GeminiLive), usesDelegator = false)) {
-            it.copy(activeRoute = VoiceRoute.Server(VoiceRoute.ServerRoute.GeminiLive), activeProvider = ServerVoiceProvider.geminiLive)
+            it.copy(activeRoute = VoiceRoute.Server(VoiceRoute.ServerRoute.GeminiLive))
         }
         connectGate.complete(Unit)
         store.receive(VoiceFeature.Action.CallEvent(VoiceCallEvent.Connected)) {
@@ -495,8 +488,6 @@ class ServerVoiceTests {
                 callPlace = VoiceCallPlace("Server 1", VoiceProviderOption.Brand.openAI),
                 activeRoute = VoiceRoute.Server(VoiceRoute.ServerRoute.OpenAI(VoiceRoute.OpenAI.gptLive)),
                 startedTarget = startedTarget(),
-                activeEngine = VoiceEngine.gptLive,
-                activeProvider = ServerVoiceProvider.openAI,
                 activeVoice = CallVoice.marin,
                 usesDelegator = false,
                 callPresenceID = presenceID,
@@ -877,8 +868,6 @@ class ServerVoiceTests {
                 callPlace = VoiceCallPlace("Server 1", VoiceProviderOption.Brand.openAI),
                 activeRoute = VoiceRoute.Server(VoiceRoute.ServerRoute.OpenAI(VoiceRoute.OpenAI.gptLive)),
                 startedTarget = startedTarget(),
-                activeEngine = VoiceEngine.gptLive,
-                activeProvider = ServerVoiceProvider.openAI,
                 activeVoice = CallVoice.marin,
                 usesDelegator = true,
                 callPresenceID = presenceID,
@@ -973,8 +962,6 @@ class ServerVoiceTests {
         store.send(VoiceFeature.Action.Start) {
             it.copy(
                 startedTarget = startedTarget(),
-                activeEngine = VoiceEngine.gptLive,
-                activeProvider = ServerVoiceProvider.openAI,
                 activeVoice = CallVoice.marin,
                 usesDelegator = true,
                 callPresenceID = presenceID,

@@ -82,8 +82,6 @@ class VoiceSessionDelegatorServerVoiceTests {
         copy(
             startedTarget = VoiceWorkTarget(server = server, sessionID = session.id, directory = session.directory),
             activeRoute = route,
-            activeEngine = VoiceEngine.gptLive,
-            activeProvider = ServerVoiceProvider.openAI,
             activeVoice = CallVoice.marin,
             usesDelegator = usesDelegator,
             usesSessionDelegator = usesSessionDelegator,

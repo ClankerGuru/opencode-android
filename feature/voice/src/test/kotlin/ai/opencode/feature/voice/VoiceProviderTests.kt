@@ -227,8 +227,6 @@ class VoiceProviderTests {
                 diagnosesFailure = true,
                 startedTarget = VoiceWorkTarget(server = server, sessionID = session.id, directory = session.directory),
                 activeRoute = VoiceRoute.PhoneKey(VoiceEngine.gptLive),
-                activeEngine = VoiceEngine.gptLive,
-                activeProvider = ServerVoiceProvider.openAI,
                 activeVoice = CallVoice.marin,
                 callPresenceID = presenceID,
             )
@@ -286,8 +284,6 @@ class VoiceProviderTests {
                 callPlace = VoiceCallPlace("Studio", VoiceProviderOption.Brand.openAI),
                 startedTarget = VoiceWorkTarget(server = server, sessionID = session.id, directory = session.directory),
                 activeRoute = gptLiveServerRoute,
-                activeEngine = VoiceEngine.gptLive,
-                activeProvider = ServerVoiceProvider.openAI,
                 activeVoice = CallVoice.marin,
                 callPresenceID = presenceID,
             )
@@ -341,8 +337,6 @@ class VoiceProviderTests {
                 callPlace = VoiceCallPlace("My Mac", VoiceProviderOption.Brand.openAI),
                 startedTarget = VoiceWorkTarget(server = server, sessionID = session.id, directory = session.directory),
                 activeRoute = gptLiveServerRoute,
-                activeEngine = VoiceEngine.gptLive,
-                activeProvider = ServerVoiceProvider.openAI,
                 activeVoice = CallVoice.marin,
                 callPresenceID = presenceID,
             )
@@ -400,8 +394,6 @@ class VoiceProviderTests {
                 callPlace = VoiceCallPlace("My Mac", VoiceProviderOption.Brand.openAI),
                 startedTarget = VoiceWorkTarget(server = server, sessionID = session.id, directory = session.directory),
                 activeRoute = gptLiveServerRoute,
-                activeEngine = VoiceEngine.gptLive,
-                activeProvider = ServerVoiceProvider.openAI,
                 activeVoice = CallVoice.marin,
                 callPresenceID = presenceID,
             )
@@ -411,7 +403,7 @@ class VoiceProviderTests {
         }
         store.receive(VoiceFeature.Action.Delegate(VoiceFeature.DelegateAction.ServerVoiceSupportChanged(ServerVoiceSupport.unsupported)))
         store.receive(VoiceFeature.Action.CallRouteResolved(VoiceRoute.Unavailable(VoiceRoute.Reason.ServerUnsupported), usesDelegator = false)) {
-            it.copy(activeRoute = VoiceRoute.Unavailable(VoiceRoute.Reason.ServerUnsupported), activeEngine = null)
+            it.copy(activeRoute = VoiceRoute.Unavailable(VoiceRoute.Reason.ServerUnsupported))
         }
         store.receive(VoiceFeature.Action.CallEnded(errorMessage = ServerVoiceError.unsupportedServerNotice)) {
             it.withPhase(VoiceFeature.State.Phase.Failed(ServerVoiceError.unsupportedServerNotice))
@@ -473,8 +465,6 @@ class VoiceProviderTests {
                 callPlace = VoiceCallPlace("My Mac", VoiceProviderOption.Brand.openAI),
                 startedTarget = VoiceWorkTarget(server = studio, sessionID = session.id, directory = session.directory),
                 activeRoute = gptLiveServerRoute,
-                activeEngine = VoiceEngine.gptLive,
-                activeProvider = ServerVoiceProvider.openAI,
                 activeVoice = CallVoice.marin,
                 callPresenceID = presenceID,
             )

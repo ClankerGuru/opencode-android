@@ -80,7 +80,7 @@ class VoiceLiveTests {
         val home = h.state {
             var home = HomeFeature.State(server, OpenCodeHomeSnapshot(projects = listOf(project), sessions = listOf(other), activeSessionIDs = emptySet()))
             home = home.copy(sessionDetail = SessionFeature.State.draft(server, draftProject = project, projects = listOf(project)))
-            home.withCall(VoiceFeature.State(server, draftDirectory = project.directory, model = null).live().copy(activeEngine = VoiceEngine.gptLive))
+            home.withCall(VoiceFeature.State(server, draftDirectory = project.directory, model = null).live())
         }
 
         val updatedInstructions = LockIsolated(listOf<Pair<String, String?>>())

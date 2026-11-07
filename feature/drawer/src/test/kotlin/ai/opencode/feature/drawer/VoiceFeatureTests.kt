@@ -28,6 +28,7 @@ import ai.opencode.feature.voice.VoiceDelegator
 import ai.opencode.feature.voice.VoiceEngine
 import ai.opencode.feature.voice.VoiceFeature
 import ai.opencode.feature.voice.VoiceHandoff
+import ai.opencode.feature.voice.VoiceRoute
 import ai.opencode.feature.voice.VoiceTranscriptTail
 import ai.opencode.feature.voice.VoiceWorkAdmission
 import ai.opencode.server.OpenCodeClient
@@ -240,7 +241,7 @@ class VoiceFeatureTests {
         val home = h.state {
             var home = HomeFeature.State(server, OpenCodeHomeSnapshot(projects = listOf(project), sessions = listOf(a, b), activeSessionIDs = emptySet()))
             home = home.openingDetail(a)
-            home.withCall(VoiceFeature.State(server, a).live().copy(activeEngine = VoiceEngine.realtime))
+            home.withCall(VoiceFeature.State(server, a).live().copy(activeRoute = VoiceRoute.PhoneKey(VoiceEngine.realtime)))
         }
         val submitted = LockIsolated(listOf<String?>())
         val waited = LockIsolated(listOf<String>())
