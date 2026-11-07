@@ -5,6 +5,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlin.math.max
 import kotlin.math.min
@@ -51,7 +52,12 @@ class SessionScrollEdgeBridge {
         return now
     }
 
+    /** Whether the transcript has reported where it sits yet; until then the header's bar doesn't animate. */
+    var hasPlacedTranscript by mutableStateOf(false)
+        private set
+
     fun scrolled(underHeader: Float, revealDistance: Float) {
+        if (!hasPlacedTranscript) hasPlacedTranscript = true
         val capped = min(max(underHeader, 0f), max(revealDistance, MINIMUM_TRACKED_REVEAL)).roundToInt().toFloat()
         if (capped != scrolledUnderHeader) scrolledUnderHeader = capped
     }

@@ -277,11 +277,18 @@ private fun TranscriptListContent(
     // iOS `reportHeaderGeometry`: how far content sits above its resting top (dp), for the
     // session header's backdrop reveal. Past the first row it's simply "far".
     val currentScrolledUnderHeader by rememberUpdatedState(onScrolledUnderHeader)
+    val scrolledUnderHeader = {
+        if (listState.firstVisibleItemIndex > 0) Float.MAX_VALUE
+        else listState.firstVisibleItemScrollOffset / density.density
+    }
+    // Also reported as the list is first applied, before its first frame draws, so the header's
+    // bar is drawn with the rows on a cold launch rather than a frame later (G-01).
+    DisposableEffect(listState) {
+        currentScrolledUnderHeader(scrolledUnderHeader())
+        onDispose {}
+    }
     LaunchedEffect(listState) {
-        snapshotFlow {
-            if (listState.firstVisibleItemIndex > 0) Float.MAX_VALUE
-            else listState.firstVisibleItemScrollOffset / density.density
-        }.collect { currentScrolledUnderHeader(it) }
+        snapshotFlow { scrolledUnderHeader() }.collect { currentScrolledUnderHeader(it) }
     }
     var lastJump by remember { androidx.compose.runtime.mutableIntStateOf(jumpRequest) }
     LaunchedEffect(jumpRequest) {
