@@ -15,6 +15,7 @@ import ai.opencode.feature.transcript.markdown.rememberMarkdownBlocks
 import ai.opencode.feature.transcript.markdown.ui.DisclosedTransition
 import ai.opencode.feature.transcript.markdown.ui.LocalQuoteTextHandler
 import ai.opencode.feature.transcript.markdown.ui.LocalSessionLinks
+import ai.opencode.feature.transcript.markdown.ui.LocalMarkdownSecondary
 import ai.opencode.feature.transcript.markdown.ui.MarkdownBlocksView
 import ai.opencode.feature.transcript.markdown.ui.QuoteTextHandler
 import ai.opencode.feature.transcript.markdown.ui.SessionLinkContext
@@ -211,7 +212,7 @@ private fun CompactionView(entry: TranscriptEntry, id: String, info: OpenCodeCom
         }
         AnimatedVisibility(isExpanded, enter = DisclosedTransition.enter, exit = DisclosedTransition.exit) {
             val blocks = rememberMarkdownBlocks("$id-summary", info.summary)
-            CompositionLocalProvider(LocalContentColor provides colors.secondaryText) {
+            CompositionLocalProvider(LocalContentColor provides colors.secondaryText, LocalMarkdownSecondary provides true) {
                 MarkdownBlocksView(blocks, Modifier.fillMaxWidth().padding(start = 16.dp))
             }
         }
