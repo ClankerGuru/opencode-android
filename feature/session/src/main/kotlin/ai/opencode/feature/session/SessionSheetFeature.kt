@@ -10,10 +10,12 @@ import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
 import ai.opencode.core.store.cancellable
-import ai.opencode.feature.system.notifications.SessionNotificationsClient
 import ai.opencode.feature.session.sheet.asClientError
 import ai.opencode.feature.session.sheet.clientError
 import ai.opencode.feature.session.sheet.clientResult
+import ai.opencode.feature.system.notifications.NotificationPermission
+import ai.opencode.feature.system.notifications.NotificationPermissionClient
+import ai.opencode.feature.system.notifications.SessionNotificationsClient
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
@@ -287,6 +289,7 @@ class SessionSheetFeature : Reducer<SessionSheetFeature.State, SessionSheetFeatu
                 val isOn = action.isOn
                 val client = dependency(OpenCodeClient)
                 val notifications = dependency(SessionNotificationsClient)
+                val permission = dependency(NotificationPermissionClient)
                 val (server, sessionID) = state.server to state.sessionID
                 Reduced(
                     state.copy(alwaysNotifyPending = isOn),
@@ -294,6 +297,10 @@ class SessionSheetFeature : Reducer<SessionSheetFeature.State, SessionSheetFeatu
                         val error = clientError {
                             var callbackURL: String? = null
                             if (isOn) {
+                                // Never asked yet: ask here rather than send people to Settings.
+                                if (permission.status() == NotificationPermission.NotDetermined) {
+                                    permission.request()
+                                }
                                 // The same callback a send attaches: null when notifications are off.
                                 callbackURL = notifications.callbackURL(server)
                                     ?: throw OpenCodeClientError("Turn on notifications in Settings first.")
