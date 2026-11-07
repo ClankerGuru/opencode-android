@@ -109,8 +109,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
@@ -268,7 +270,9 @@ fun SessionView(
                 if (photoSheet.attachmentMenu != AttachmentMenuPhase.Closed) photoSheet.closeAttachmentMenu()
             },
         ) {
-            Box(Modifier.fillMaxSize().background(colors.canvas)) {
+            // TalkBack reads the header, then the transcript, then the composer, as VoiceOver reads
+            // iOS's top overlay first; the header draws over the transcript, so it came after it.
+            Box(Modifier.fillMaxSize().background(colors.canvas).semantics { isTraversalGroup = true }) {
                 if (errorMessage != null) {
                     LoadFailure(errorMessage.orEmpty(), onRetry = { store.send(Action.Task) })
                 } else {
@@ -296,7 +300,13 @@ fun SessionView(
                     onBack = onBack,
                     onCatchUpOpen = onCatchUpOpen,
                     onHeaderHeight = { headerHeight = it.roundToInt().toFloat() },
-                    modifier = Modifier.align(Alignment.TopCenter).windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility),
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility)
+                        .semantics {
+                            isTraversalGroup = true
+                            traversalIndex = -1f
+                        },
                 )
                 // One Picker's surface grows out of the composer, over the transcript and under the composer.
                 SessionOnePickerBackdrop(composerHost, Modifier.matchParentSize())
