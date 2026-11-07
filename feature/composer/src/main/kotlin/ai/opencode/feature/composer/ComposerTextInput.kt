@@ -101,6 +101,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.android.awaitFrame
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.abs
@@ -795,9 +797,49 @@ fun ComposerTextInput(
     // While the field is covered it reads as in an unfocused window, which hides them (the field
     // keeps its focus and keyboard); a hidden caret handle stays hidden until the next tap.
     val covered by rememberUpdatedState(isCovered || held)
+    // A tap's drop handle that would hang below the field sits over the control row (+, the
+    // model chip, Send) and takes the next tap meant for them. iOS shows no caret handle; this
+    // hides that one the same way, for two frames, so it stays hidden until the next tap.
+    var hidesCaretHandle by remember { mutableStateOf(false) }
     val coverableWindowInfo = remember(windowInfo) {
         object : WindowInfo by windowInfo {
-            override val isWindowFocused: Boolean get() = windowInfo.isWindowFocused && !covered
+            override val isWindowFocused: Boolean get() = windowInfo.isWindowFocused && !covered && !hidesCaretHandle
+        }
+    }
+    val caretHandleHeightPx = with(density) { 25.dp.toPx() }
+
+    /** Whether a caret's drop handle would hang past the bottom of the field's [viewportHeight] (px). */
+    fun caretHandleHangsOut(viewportHeight: Float): Boolean {
+        val selection = state.selection
+        if (!selection.collapsed || state.text.isEmpty()) return false
+        val layout = controller.layout ?: return false
+        val offset = selection.end.coerceIn(0, layout.layoutInput.text.length)
+        val caret = runCatching { layout.getCursorRect(offset) }.getOrNull() ?: return false
+        return caret.bottom + currentInsetPx - scroll.value + caretHandleHeightPx > viewportHeight
+    }
+
+    /** Hides a caret handle that would hang below the field, once the field has settled. */
+    suspend fun hideCaretHandleIfItHangsOut(viewportHeight: () -> Float) {
+        awaitFrame()
+        awaitFrame()
+        if (!caretHandleHangsOut(viewportHeight())) return
+        hidesCaretHandle = true
+        try {
+            awaitFrame()
+            awaitFrame()
+        } finally {
+            hidesCaretHandle = false
+        }
+    }
+
+    // The keyboard rising squeezes a field (A-10's cap): a handle that fit can end up hanging out.
+    // Checked once the field has settled and scrolled its caret back into view.
+    LaunchedEffect(scroll) {
+        snapshotFlow { scroll.viewportSize }.collectLatest { viewport ->
+            if (!hasFocus || viewport <= 0) return@collectLatest
+            delay(300)
+            snapshotFlow { scroll.isScrollInProgress }.first { !it }
+            hideCaretHandleIfItHangsOut { scroll.viewportSize.toFloat() }
         }
     }
 
@@ -1088,7 +1130,12 @@ fun ComposerTextInput(
                         val event = awaitPointerEvent(PointerEventPass.Initial)
                         val change = event.changes.firstOrNull { it.id == down.id } ?: break
                         if (event.changes.size > 1 || (change.position - down.position).getDistance() > tapSlopPx) isTap = false
-                        if (isTap && !change.pressed) noteTap(down.position, down.uptimeMillis, change.uptimeMillis, size.height.toFloat())
+                        if (isTap && !change.pressed) {
+                            noteTap(down.position, down.uptimeMillis, change.uptimeMillis, size.height.toFloat())
+                            // The field places the caret and shows its handle on this up.
+                            val viewportHeight = size.height.toFloat()
+                            settleScope.launch { hideCaretHandleIfItHangsOut { viewportHeight } }
+                        }
                         tracker.addPosition(change.uptimeMillis, change.position)
                         controller.swipeLatestUptime = change.uptimeMillis
                         val heldFor = (change.uptimeMillis - down.uptimeMillis) / 1000.0
