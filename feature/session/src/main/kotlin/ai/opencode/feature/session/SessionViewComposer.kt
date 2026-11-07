@@ -200,6 +200,8 @@ class SessionComposerHost {
     var isAttachmentMenuOpen by mutableStateOf(false)
     /** iOS `imageImporter.isLoading || fileImporter.isLoading`. */
     var isImportingAttachments by mutableStateOf(false)
+    /** iOS `imageImporter.isLoading`: only an image import holds Send and Return-key send. */
+    var isImportingImages by mutableStateOf(false)
     /** iOS `pendingAttachmentsRow` (VIEW-PICKERS): shown above the field when the composer has attachments. */
     var pendingAttachmentsRow: (@Composable (composerExpanded: Boolean) -> Unit)? by mutableStateOf(null)
     /** One Picker's panel (iOS `onePicker`), set by `SessionModelPickerOverlays`. */
@@ -1856,7 +1858,7 @@ private fun SessionComposerEnv.ComposerInput(expanded: Boolean, recording: Boole
             onCommandReturn = {
                 if (!recording) {
                     if (s.isAnsweringRequest) store.send(Action.CommandReturnTapped)
-                    else if (!host.isImportingAttachments) sendMessage(Action.CommandReturnTapped)
+                    else if (!host.isImportingImages) sendMessage(Action.CommandReturnTapped)
                 }
             },
             onNonSendNewline = { text -> if (!recording) store.send(Action.NonSendNewlineInserted(text)) },

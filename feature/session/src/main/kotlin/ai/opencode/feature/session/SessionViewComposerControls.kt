@@ -439,7 +439,7 @@ private fun SessionComposerEnv.HoldToDictate(label: String, content: @Composable
 internal fun SessionComposerEnv.TrailingButton(control: ComposerTrailingControl) {
     val steers = s.isRunning && control == ComposerTrailingControl.Send(enabled = true)
     val visualOffset = (ComposerTunables.innerHorizontal + (44 - ComposerTunables.buttonDiameter) / 2) - ComposerTunables.trailingGap
-    val disabled = (host.isImportingAttachments && control == ComposerTrailingControl.Send(enabled = true)) ||
+    val disabled = (host.isImportingImages && control == ComposerTrailingControl.Send(enabled = true)) ||
         (control is ComposerTrailingControl.Send && !control.enabled)
     val accessibilityLabel = when {
         s.isWaitingForUploads -> "Sending after uploads finish"
@@ -550,7 +550,7 @@ internal fun SessionComposerEnv.DictationTrailingControls(controls: ComposerCont
                 glyphSize = 12.dp,
             )
         }
-        val sendEnabled = !controls.isFinishing && canSend && !host.isImportingAttachments
+        val sendEnabled = !controls.isFinishing && canSend && !host.isImportingImages
         Box(
             Modifier
                 .clickable(enabled = sendEnabled, role = Role.Button) {
