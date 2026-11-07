@@ -3,6 +3,7 @@ package ai.opencode.feature.system.share
 import ai.opencode.core.log.AppLog
 import ai.opencode.feature.system.SystemAction
 import ai.opencode.feature.system.intents.SystemActionActivity
+import ai.opencode.feature.system.intents.SystemQuickAction
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -19,8 +20,8 @@ import androidx.core.graphics.drawable.IconCompat
  * long-lived sharing shortcut (iOS: a donated outgoing `INSendMessageIntent`) whose ID is
  * `share:` + the session's conversation (`ShareConversation.identifier`). Its category
  * matches the `<share-target>` in `res/xml/shortcuts.xml`, so choosing one opens
- * [ShareActivity] pointed there. They're excluded from the launcher, whose quick actions
- * (`qa:` IDs) stay the app's own; nothing here ever replaces or clears every shortcut.
+ * [ShareActivity] pointed there. Sharing shortcuts rank below the launcher's quick actions;
+ * excluding them from the launcher would also keep them out of the platform shortcut store.
  */
 object ShareSuggestion {
     const val CATEGORY = "ai.opencode.mobilecode.category.SHARE_SESSION"
@@ -44,7 +45,7 @@ object ShareSuggestion {
             .setIntent(SystemActionActivity.intent(context, action))
             .setCategories(setOf(CATEGORY))
             .setLongLived(true)
-            .setExcludedFromSurfaces(ShortcutInfoCompat.SURFACE_LAUNCHER)
+            .setRank(SystemQuickAction.LIMIT - SystemQuickAction.STATIC_COUNT)
             .build()
     }
 

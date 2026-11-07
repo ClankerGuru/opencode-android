@@ -9,6 +9,8 @@ import ai.opencode.feature.system.SessionDirectory
 import ai.opencode.feature.system.SystemAction
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.ServerID
+import androidx.core.content.pm.ShortcutInfoCompat
+import androidx.core.content.pm.ShortcutManagerCompat
 import java.io.File
 import java.net.ConnectException
 import java.nio.file.Files
@@ -114,6 +116,16 @@ class ShareCredentialsTests {
 @Config(sdk = [35])
 class ShareCredentialsFrameworkTests {
     @get:Rule val isolation = TestIsolationRule()
+
+    @Test
+    fun donatedSessionIsADynamicShortcutForTheShareTarget() {
+        val context = RuntimeEnvironment.getApplication()
+        ShareSuggestion.donate(context, "server", "ses_1", "Recent session")
+        val published = ShortcutManagerCompat.getDynamicShortcuts(context).single()
+        assertEquals(setOf(ShareSuggestion.CATEGORY), published.categories)
+        assertEquals("server:ses_1", ShareSuggestion.conversation(published.id))
+        assertFalse(ShareSuggestion.shortcut(context, "server", "ses_1", "Recent session").isExcludedFromSurfaces(ShortcutInfoCompat.SURFACE_LAUNCHER))
+    }
 
     @Test
     fun removingAServerForgetsItsCredentialsOnly() {
