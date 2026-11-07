@@ -317,6 +317,9 @@ class ComposerTextInputController {
     var isPublishingText = false
         private set
 
+    /** A send asked for the parent's text while the field was publishing (Return): taken once it's done. */
+    var syncsAfterPublish = false
+
     /** iOS `textFocusRequest`: the parent's last focus request; a new one places the caret at the end. */
     var textFocusRequest = 0
         private set
@@ -504,9 +507,13 @@ private class ComposerFieldSwipeInput : ComposerSwipeInput {
     var yieldsToText: () -> Boolean = { false }
     var claims: (Offset) -> Boolean = { false }
     var doubleTap: () -> Boolean = { false }
+    var flush: () -> Unit = {}
+    var sync: () -> Unit = {}
     override val isSwipeYieldedToText: Boolean get() = yieldsToText()
     override fun selectionClaims(rootPoint: Offset): Boolean = claims(rootPoint)
     override fun takesDoubleTap(): Boolean = doubleTap()
+    override fun flushEdits() = flush()
+    override fun takeParentText() = sync()
 }
 
 /**
@@ -615,9 +622,7 @@ fun ComposerTextInput(
     val currentReduceMotion by rememberUpdatedState(reduceMotion)
     val growthScope = rememberCoroutineScope()
 
-    // Programmatic updates (dictation, a restored draft, Share/Quote) follow the newest text;
-    // synced before the field measures so the first frame of an expand already has it.
-    SideEffect {
+    fun syncFromParent() {
         controller.syncText(state, text, currentText, focusRequest, hasFocus, autocompleteBridge) { newText ->
             // A send's clear shrinks on its own spring (`sendShrinkAnimation`); any other change lands at once.
             controller.heightSpring = ComposerLineGrowth.sendShrinkSpring(sendTransition?.takeShrinkOmega(), reduceMotion)
@@ -626,22 +631,31 @@ fun ComposerTextInput(
         }
     }
 
+    // Programmatic updates (dictation, a restored draft, Share/Quote) follow the newest text;
+    // synced before the field measures so the first frame of an expand already has it.
+    SideEffect { syncFromParent() }
+
     // The reader's own edits: report them, with a non-send newline first so the parent
     // never reads it as Return.
-    LaunchedEffect(state) {
-        snapshotFlow { state.text.toString() }.collect { newText ->
-            val previous = controller.externalText ?: return@collect
-            if (newText == previous) return@collect
-            controller.noteTextChange()
-            // A reader's own edit owns the caret; drop any pending follow-the-end.
-            controller.pinsToEnd = false
-            controller.followsCaret = true
-            val nonSendFrom = controller.nonSendEditFrom
-            controller.nonSendEditFrom = null
-            if (nonSendFrom != null && newText == nonSendFrom + "\n") currentOnNonSendNewline?.invoke(newText)
-            controller.publish(newText, currentOnTextChange)
-            currentBridge?.notifyCaretAfterEdit(newText, state.selection, state.composition)
+    fun publishEdit(newText: String) {
+        val previous = controller.externalText ?: return
+        if (newText == previous) return
+        controller.noteTextChange()
+        // A reader's own edit owns the caret; drop any pending follow-the-end.
+        controller.pinsToEnd = false
+        controller.followsCaret = true
+        val nonSendFrom = controller.nonSendEditFrom
+        controller.nonSendEditFrom = null
+        if (nonSendFrom != null && newText == nonSendFrom + "\n") currentOnNonSendNewline?.invoke(newText)
+        controller.publish(newText, currentOnTextChange)
+        currentBridge?.notifyCaretAfterEdit(newText, state.selection, state.composition)
+        if (controller.syncsAfterPublish) {
+            controller.syncsAfterPublish = false
+            syncFromParent()
         }
+    }
+    LaunchedEffect(state) {
+        snapshotFlow { state.text.toString() }.collect { newText -> publishEdit(newText) }
     }
 
     // Moving the caret off the end is reading or editing earlier text.
@@ -895,6 +909,14 @@ fun ComposerTextInput(
                 selectionClaims(coordinates.localPositionOf(coordinates.findRootCoordinates(), rootPoint), isFocused = hasFocus)
         }
         swipeInput.doubleTap = { takesDoubleTap(SystemClock.uptimeMillis()) }
+        // iOS reads the field's text, marked text included, and clears it before the keyboard's
+        // next commit (`finishCompositionIfNeeded`). Here an edit reaches the parent a frame late
+        // and the clear lands on the next composition, so a send in between sent a prefix and
+        // the next commit wrote the whole old text back: flush before the send, clear right after.
+        swipeInput.flush = { publishEdit(state.text.toString()) }
+        swipeInput.sync = {
+            if (controller.isPublishingText) controller.syncsAfterPublish = true else syncFromParent()
+        }
         sendTransition?.input = swipeInput
     }
     DisposableEffect(sendTransition, swipeInput) {

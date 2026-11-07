@@ -716,6 +716,7 @@ internal class SessionComposerEnv(
 
     /** iOS `sendMessage(_:)`. */
     fun sendMessage(action: Action = Action.SendTapped) {
+        host.sendTransition.input?.flushEdits()
         if (action == Action.ReturnKeyTapped && !canSend) {
             store.send(action)
             return
@@ -748,6 +749,7 @@ internal class SessionComposerEnv(
             )
         }
         store.send(action)
+        host.sendTransition.input?.takeParentText()
         // Nothing went (a failed upload): the capture and the shrink mustn't linger (iOS scopes
         // the shrink to the send's own transaction).
         if (store.state.sendGeneration == generation) {
