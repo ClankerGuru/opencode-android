@@ -47,6 +47,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -104,7 +105,8 @@ internal fun SessionComposerEnv.ComposerLeadingControls(expanded: Boolean, recor
         AttachmentButton()
         val chips = @Composable {
             Row(horizontalArrangement = Arrangement.spacedBy(ComposerTunables.leadingSpacing.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (agentSelection) AgentButton()
+                // The composer survives a server switch; the new detail needs its own chip mount to request agents.
+                if (agentSelection) key(s.taskIdentity) { AgentButton() }
                 ModelButton(enabled = expanded && !recording)
             }
         }
