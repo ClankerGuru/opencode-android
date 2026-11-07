@@ -74,9 +74,11 @@ internal fun TranscriptFileChips(
     trailingCorners: UserSurfaceCorners = UserSurfaceCorners.round,
     modifier: Modifier = Modifier,
 ) {
+    // iOS anchors the row trailing only `for: .alignment`: a row that fits sits at the end, one
+    // that doesn't starts at its first card.
     Box(modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
         Row(
-            Modifier.horizontalScroll(rememberScrollState(), reverseScrolling = true),
+            Modifier.horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(TranscriptMetrics.clustered),
         ) {
             for (file in files) {
