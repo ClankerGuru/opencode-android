@@ -40,6 +40,7 @@ import androidx.compose.foundation.text.input.placeCursorAtEnd
 import androidx.compose.foundation.text.input.then
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -83,6 +84,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.platform.WindowInfo
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextLayoutResult
@@ -546,6 +548,8 @@ private class ComposerFieldSwipeInput : ComposerSwipeInput {
  * taking focus while something else owns the composer (One Picker open). [currentText] reads
  * the parent's draft as it is now (a composition's [text] can lag the reader's edit), and a new
  * [focusRequest] places the caret at the end ([ComposerTextInputController.syncText]).
+ * [isCovered]: something is drawn over the field (the + menu); like the drawer's hold, it hides
+ * the field's handles and text toolbar, which are popup windows above the app's.
  */
 @OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
@@ -578,6 +582,7 @@ fun ComposerTextInput(
     refusesFocus: (() -> Boolean)? = null,
     currentText: (() -> String)? = null,
     focusRequest: Int = 0,
+    isCovered: Boolean = false,
 ) {
     val state = remember { TextFieldState(text, TextRange(text.length)) }
     val controller = remember { ComposerTextInputController() }
@@ -768,6 +773,17 @@ fun ComposerTextInput(
         if (!left || !hasFocus || drawerHold?.isHeld(fieldKey) == true || isKeyboardHeld) return@LaunchedEffect
         if (!windowInfo.isWindowFocused || !lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return@LaunchedEffect
         dismissKeyboard()
+    }
+
+    // The caret's drop handle, the selection handles and the text toolbar are popup windows over
+    // the app's, so they'd float above the + menu or the drawer (iOS keeps its caret in the field).
+    // While the field is covered it reads as in an unfocused window, which hides them (the field
+    // keeps its focus and keyboard); a hidden caret handle stays hidden until the next tap.
+    val covered by rememberUpdatedState(isCovered || held)
+    val coverableWindowInfo = remember(windowInfo) {
+        object : WindowInfo by windowInfo {
+            override val isWindowFocused: Boolean get() = windowInfo.isWindowFocused && !covered
+        }
     }
 
     fun focusKeyboard() {
@@ -1106,7 +1122,7 @@ fun ComposerTextInput(
             }
             .verticalScroll(scroll, enabled = overflows),
     ) {
-        BasicTextField(
+        CompositionLocalProvider(LocalWindowInfo provides coverableWindowInfo) { BasicTextField(
             state = state,
             modifier = Modifier
                 .fillMaxWidth()
@@ -1183,7 +1199,7 @@ fun ComposerTextInput(
                     if (autocompleteBridge != null) AutocompleteInlineChips(autocompleteBridge)
                 }
             },
-        )
+        ) }
     }
 }
 

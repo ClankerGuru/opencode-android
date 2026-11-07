@@ -1861,6 +1861,8 @@ private fun SessionComposerEnv.ComposerInput(expanded: Boolean, recording: Boole
             sendTransition = host.sendTransition,
             // One Picker in the keyboard's place keeps the field from taking it back.
             refusesFocus = { host.modelPanels?.onePicker?.isOpen == true },
+            // The + menu and its photo sheet draw over the field, which keeps the keyboard.
+            isCovered = host.isAttachmentMenuOpen,
         )
     }
 }
