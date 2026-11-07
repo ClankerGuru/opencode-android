@@ -34,7 +34,7 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 
 | Kotlin file | Why |
 | --- | --- |
-| `app/.../MainActivity.kt` (`RootStore`) | the root `Store` lives in a retained `ViewModel` so configuration changes keep state and effects |
+| `app/.../MainActivity.kt` (`RootStore`) | the root `Store` lives in a retained `ViewModel` so configuration changes keep state and effects (`ON_STOP` skips `ForegroundChanged(false)` when `isChangingConfigurations` is true, K-01) |
 | `app/.../MainActivity.kt` (`route`) | intents are iOS's `onOpenURL` and notification taps: `opencode://` (system actions, pairing), `opencode-ios://pair|connect`, `https://opencode.ai/pair` (App Link, `autoVerify`; needs `assetlinks.json` on opencode.ai), notification content intents |
 | `app/src/main/res/xml/data_extraction_rules.xml` | backup and device transfer exclude `support/` (incl. `composer-state.json`, `ComposerAttachments/`) and `documents/`, as iOS sets `isExcludedFromBackup` on file-stored shared values and the composer's state; preferences back up like UserDefaults |
 | `app/src/main/res/xml/network_security_config.xml` | cleartext permitted (the config can't name address ranges); iOS's ATS policy (`Info.plist` local networking + overlay `NSExceptionDomains`) is enforced in code by `server/.../TransportSecurity.kt` on the live transport |
