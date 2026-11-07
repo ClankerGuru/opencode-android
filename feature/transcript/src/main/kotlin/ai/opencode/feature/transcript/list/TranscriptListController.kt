@@ -763,6 +763,11 @@ class TranscriptListController(
         }
     }
 
+    /** A restored reader's row was just put back by its key: the reading row held from before no longer applies. */
+    fun forgetReadingAnchor() {
+        readingAnchor = null
+    }
+
     private fun captureReadingAnchor() {
         if (readingAnchor != null || (behavior.mode != TranscriptScrollBehavior.Mode.Browsing && !isUserGestureActive)) return
         val visible = lastLayout?.visibleItemsInfo ?: return

@@ -248,6 +248,8 @@ private fun TranscriptListContent(
             if (index < 0) return@SideEffect
             position.settleLayouts = 3
             listState.requestScrollToItem(index, offset)
+            // The controller may hold the row the list showed before (rows were prepended): not now.
+            controller.forgetReadingAnchor()
         }
         LaunchedEffect(listState) {
             snapshotFlow { listState.layoutInfo }.collect {
@@ -258,6 +260,7 @@ private fun TranscriptListContent(
                     position.anchor = null
                 } else {
                     listState.requestScrollToItem(index, offset)
+                    controller.forgetReadingAnchor()
                 }
             }
         }
