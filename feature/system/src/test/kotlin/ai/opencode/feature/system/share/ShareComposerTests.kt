@@ -5,10 +5,13 @@ import ai.opencode.core.dependencies.withDependencies
 import ai.opencode.core.files.ComposerFileStaging
 import ai.opencode.core.files.ComposerStagedFile
 import ai.opencode.core.testing.TestIsolationRule
+import ai.opencode.core.ui.SFSymbol
 import ai.opencode.feature.system.SessionDirectory
 import ai.opencode.feature.system.SystemAction
+import ai.opencode.feature.system.intents.SystemQuickAction
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.ServerID
+import android.content.Intent
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import java.io.File
@@ -118,13 +121,26 @@ class ShareCredentialsFrameworkTests {
     @get:Rule val isolation = TestIsolationRule()
 
     @Test
-    fun donatedSessionIsADynamicShortcutForTheShareTarget() {
+    fun donationsNeverAddToOrReorderTheLaunchersQuickActions() {
         val context = RuntimeEnvironment.getApplication()
-        ShareSuggestion.donate(context, "server", "ses_1", "Recent session")
-        val published = ShortcutManagerCompat.getDynamicShortcuts(context).single()
-        assertEquals(setOf(ShareSuggestion.CATEGORY), published.categories)
-        assertEquals("server:ses_1", ShareSuggestion.conversation(published.id))
-        assertFalse(ShareSuggestion.shortcut(context, "server", "ses_1", "Recent session").isExcludedFromSurfaces(ShortcutInfoCompat.SURFACE_LAUNCHER))
+        val sessions = (1..3).map { SystemQuickAction(SystemQuickAction.Kind.OpenSession, "Recent $it", symbol = SFSymbol.BubbleLeft, serverKey = "server", sessionID = "ses_$it") }
+        val startCall = SystemQuickAction(SystemQuickAction.Kind.StartCall, "Start Call", symbol = SFSymbol.Waveform, serverKey = "server")
+        for (items in listOf(emptyList(), sessions.take(1), sessions, listOf(startCall) + sessions.take(2))) {
+            // This module's JVM tests don't package launcher drawable resources. Seed the real
+            // shortcut manager with the launcher's IDs, labels and ranks; donate must leave them alone.
+            val launcher = items.mapIndexed { index, item ->
+                ShortcutInfoCompat.Builder(context, item.shortcutID).setShortLabel(item.title)
+                    .setRank(index).setIntent(Intent(Intent.ACTION_VIEW)).build()
+            }
+            ShortcutManagerCompat.setDynamicShortcuts(context, launcher)
+            for (n in 4 downTo 1) ShareSuggestion.donate(context, "server", "ses_$n")
+            val published = ShortcutManagerCompat.getDynamicShortcuts(context).sortedBy { it.rank }
+            assertEquals(items.map { it.shortcutID }, published.map { it.id })
+            for ((item, shortcut) in items.zip(published)) {
+                assertEquals(item.sessionID?.let { "server:$it" }, ShareSuggestion.conversation(shortcut.id))
+                assertEquals(item.title, shortcut.shortLabel)
+            }
+        }
     }
 
     @Test

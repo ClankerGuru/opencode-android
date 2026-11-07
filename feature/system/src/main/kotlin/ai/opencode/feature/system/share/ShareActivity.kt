@@ -131,7 +131,7 @@ class ShareActivity : ComponentActivity() {
             // close delay at most. They carry on either way.
             val body = ShareComposition.notificationBody(text, images, files)
             val followUp = followUps.launch {
-                val donated = async { ShareSuggestion.donate(context, sent.serverKey, sent.sessionID, sent.title) }
+                val donated = async { ShareSuggestion.donate(context, sent.serverKey, sent.sessionID) }
                 val notified = async { ShareNotifier.sent(context, sent.title, body, sent.serverKey, sent.sessionID) }
                 donated.await()
                 notified.await()
