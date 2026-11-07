@@ -268,7 +268,7 @@ internal fun SharedLocationCard(
 
 /**
  * A message's images, trailing: 200 alone, 130 each when several; up to three fit the column,
- * more scroll from the trailing end (iOS `TranscriptUserMessageView.images`).
+ * more scroll, starting at the first image (iOS `TranscriptUserMessageView.images`).
  */
 @Composable
 internal fun UserMessageImages(
@@ -297,6 +297,8 @@ internal fun UserMessageImages(
             .graphicsLayer { alpha = if (isPending) 0.6f else 1f },
         contentAlignment = Alignment.CenterEnd,
     ) {
-        if (images.size <= 3) strip(Modifier) else strip(Modifier.horizontalScroll(rememberScrollState(), reverseScrolling = true))
+        // iOS anchors the strip trailing only `for: .alignment`: a strip that fits sits at the end,
+        // one that doesn't starts at its first image.
+        if (images.size <= 3) strip(Modifier) else strip(Modifier.horizontalScroll(rememberScrollState()))
     }
 }
