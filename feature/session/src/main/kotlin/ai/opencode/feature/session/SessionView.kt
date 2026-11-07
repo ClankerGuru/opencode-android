@@ -96,6 +96,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -150,7 +151,7 @@ fun SessionView(
     onCatchUpOpen: (() -> Unit)? = null,
     hostedCall: VoiceStoreOf? = null,
 ) {
-    val scrollEdgeBridge = remember { SessionScrollEdgeBridge() }
+    val scrollEdgeBridge = rememberSaveable(saver = SessionScrollEdgeBridge.Saver) { SessionScrollEdgeBridge() }
     val backgroundWorkAnchor = rememberBackgroundWorkAnchor()
     // What the composer shares with the screen around it (the capsule's place, jump to latest, the + menu).
     val composerHost = remember { SessionComposerHost() }
@@ -162,7 +163,8 @@ fun SessionView(
     var rootOffset by remember { mutableStateOf(Offset.Zero) }
 
     // The header controls' laid-out height (dp); the backdrop follows it.
-    var headerHeight by remember { mutableFloatStateOf(SessionHeaderStyle.DEFAULT_HEADER_HEIGHT) }
+    // Saved with the composer's height (the bridge), so a recreated activity's first frame has the transcript's top inset.
+    var headerHeight by rememberSaveable { mutableFloatStateOf(SessionHeaderStyle.DEFAULT_HEADER_HEIGHT) }
     var showsBackgroundWork by remember { mutableStateOf(false) }
 
     val headerEnvironment = SessionHeaderStyle.Environment(

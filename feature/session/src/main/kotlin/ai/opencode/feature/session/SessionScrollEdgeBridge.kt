@@ -6,6 +6,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.setValue
 import kotlin.math.max
 import kotlin.math.min
@@ -65,5 +66,15 @@ class SessionScrollEdgeBridge {
     companion object {
         /** Tracked even when nothing reveals with the scroll, so a band that takes over draws at once. */
         const val MINIMUM_TRACKED_REVEAL = 24f
+
+        /**
+         * For the screen's `rememberSaveable`: the composer's last height outlives the activity
+         * being recreated, so a restored transcript's first frame already has its bottom inset and
+         * lays the reader's row out where it was (I-02), instead of a frame at a shorter scroll range.
+         */
+        val Saver: Saver<SessionScrollEdgeBridge, Float> = Saver(
+            save = { it.composerHeight },
+            restore = { SessionScrollEdgeBridge().apply { composerHeight = it } },
+        )
     }
 }
