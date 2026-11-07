@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imeAnimationTarget
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -784,10 +785,14 @@ fun ComposerTextInput(
     val windowInfo = LocalWindowInfo.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     var imeWasVisible by remember { mutableStateOf(false) }
+    val imeTarget = WindowInsets.imeAnimationTarget
     LaunchedEffect(imeVisible) {
         val left = imeWasVisible && !imeVisible
         imeWasVisible = imeVisible
         if (!left || !hasFocus || drawerHold?.isHeld(fieldKey) == true || isKeyboardHeld) return@LaunchedEffect
+        // A recreated window (dark mode, font size) first reports the old window's keys as shown,
+        // then as hidden while they rise for this field: keys on their way up aren't leaving.
+        if (imeTarget.getBottom(density) > 0) return@LaunchedEffect
         if (!windowInfo.isWindowFocused || !lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return@LaunchedEffect
         dismissKeyboard()
     }

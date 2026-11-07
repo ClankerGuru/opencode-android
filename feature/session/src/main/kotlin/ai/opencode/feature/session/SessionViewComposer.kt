@@ -66,6 +66,7 @@ import ai.opencode.feature.voice.holdsClientToolCard
 import ai.opencode.server.model.OpenCodeProject
 import ai.opencode.server.model.OpenCodeQueuedInput
 import ai.opencode.server.model.PastedText
+import android.os.Process
 import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
@@ -92,8 +93,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -118,6 +121,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -322,6 +327,46 @@ internal class SessionComposerViewState {
     var isImageDropTargeted by mutableStateOf(false)
 }
 
+/**
+ * Whether the message field had the keyboard when the activity was recreated, for the session it
+ * belonged to (a field the drawer holds with its keys down has none). The field loses its focus as
+ * the old activity's views go, after the first save, so later saves while configurations change
+ * keep what that one saw. Restored only within the same process: after process death iOS starts
+ * without the keyboard too.
+ */
+internal class ComposerKeyboardRestore(private val restored: SessionFeature.State.TaskIdentity? = null) {
+    var hadKeyboard: () -> Boolean = { false }
+    var changingConfigurations: () -> Boolean = { false }
+    var identity: SessionFeature.State.TaskIdentity? = null
+    private var pending = restored != null
+    private var savedKeyboard = false
+
+    /** Whether the field should take the keyboard back on [current]; true at most once. */
+    fun takeRestore(current: SessionFeature.State.TaskIdentity): Boolean {
+        val restores = pending && restored == current
+        pending = false
+        return restores
+    }
+
+    companion object {
+        private val process: String get() = "${Process.myPid()}:${Process.getStartUptimeMillis()}"
+
+        val Saver: Saver<ComposerKeyboardRestore, ArrayList<String>> = Saver(
+            save = { restore ->
+                restore.savedKeyboard = restore.hadKeyboard() || (restore.savedKeyboard && restore.changingConfigurations())
+                val identity = restore.identity?.takeIf { restore.savedKeyboard }
+                identity?.let { arrayListOf(process, it.serverID, it.visit.toString(), it.sessionID.orEmpty()) }
+            },
+            restore = { saved ->
+                val identity = saved.takeIf { it.size == 4 && it[0] == process }?.let {
+                    SessionFeature.State.TaskIdentity(it[1], it[2].toInt(), it[3].ifEmpty { null })
+                }
+                ComposerKeyboardRestore(identity)
+            },
+        )
+    }
+}
+
 /** iOS `composerPresentation`'s tuple. */
 data class ComposerPresentation(val expanded: Boolean, val controls: ComposerControls)
 
@@ -519,6 +564,18 @@ fun SessionComposer(
         if (host.isCatchUpCard || snapshot.composerFocusRequest <= 0 || request == view.handledFocusRequest) return@LaunchedEffect
         view.handledFocusRequest = request
         env.focus()
+    }
+    // A dark/light or text size switch recreates the activity, where iOS's field only redraws and
+    // keeps the keyboard: the field that had it (a draft, or a question's answer) takes it back once.
+    val keyboardRestore = rememberSaveable(saver = ComposerKeyboardRestore.Saver) { ComposerKeyboardRestore() }
+    val activity = LocalActivity.current
+    val ime = WindowInsets.ime
+    val density = LocalDensity.current
+    keyboardRestore.hadKeyboard = { host.messageFieldFocused && ime.getBottom(density) > 0 }
+    keyboardRestore.changingConfigurations = { activity?.isChangingConfigurations == true }
+    keyboardRestore.identity = snapshot.taskIdentity
+    LaunchedEffect(keyboardRestore) {
+        if (keyboardRestore.takeRestore(snapshot.taskIdentity) && !host.isCatchUpCard) env.focus()
     }
     // iOS `resetDictationPresentation()` and the hold's `onChange`.
     val recordingNow = snapshot.isPreparingDictation || snapshot.isDictating || snapshot.dictationHold != null
