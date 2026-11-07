@@ -17,6 +17,7 @@ import ai.opencode.core.ui.OpenCodeIconSize
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.openCodeTapTarget
+import ai.opencode.feature.composer.EscapeHandler
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.feature.session.header.BreathingTitleHold
@@ -454,7 +455,9 @@ private fun SessionMenu(
     // menu was placed against the room above it, and the menu stayed up over the ⋮ (QA D-03).
     // With the keyboard up the menu still hangs from the ⋮, capped to the room above the keys
     // (it scrolls), rather than moving up over the button to fit.
+    // A non-focusable popup gets neither Back nor a hardware Escape (QA L-04): both close it here.
     BackHandler(enabled = expanded, onBack = onDismiss)
+    EscapeHandler(enabled = expanded, onEscape = onDismiss)
     val density = LocalDensity.current
     val windowHeight = LocalWindowInfo.current.containerSize.height
     // Insets are read only while open, so the keyboard's animation doesn't recompose the header.
