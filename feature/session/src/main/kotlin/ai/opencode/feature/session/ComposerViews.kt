@@ -36,6 +36,9 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.indication
 import androidx.compose.material3.ripple
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -721,11 +724,28 @@ fun JumpToLatestPill(
     val slotOpen = if (reduceMotion) (if (isShown) 1f else 0f) else presence.value.coerceIn(0f, 1f)
     val interactions = remember { MutableInteractionSource() }
     val slotWidth = if (collapsesSlot) (48f + JumpToLatestPillMotion.gap) * slotOpen else 48f
-    // The empty slot takes no touches, as iOS's empty frame: [modifier] (the borrowed drag) wraps
-    // only the pill, so with nothing mounted a tap reaches the transcript under it, and a drag
-    // that started on the pill keeps its node as the pill leaves.
+    // iOS `allowsHitTesting(isShown)`: only a shown pill takes touches. Leaving (its fade-out) or
+    // gone, a tap or a drag reaches the transcript under it; the 48 dp slot never takes any, as
+    // iOS's empty frame. A finger already down on the pill keeps [modifier] (the borrowed drag)
+    // to release as the pill leaves under it (iOS `PassesDragsToTranscript.isDragging`).
+    var touched by remember { mutableStateOf(false) }
+    val tracksTouch = remember {
+        Modifier.pointerInput(Unit) {
+            awaitEachGesture {
+                awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                touched = true
+                try {
+                    do {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                    } while (event.changes.any { it.pressed })
+                } finally {
+                    touched = false
+                }
+            }
+        }
+    }
     Box(Modifier.width(slotWidth.dp).heightIn(min = 48.dp), contentAlignment = Alignment.CenterEnd) {
-        Box(modifier) {
+        Box(if (isShown || touched) modifier.then(tracksTouch) else Modifier) {
             if (mounted) {
                 val p = presence.value
                 Box(
@@ -740,18 +760,21 @@ fun JumpToLatestPill(
                                     .semantics { contentDescription = "Scroll to latest" }
                                     .testTag("scroll-to-latest")
                             } else {
-                                Modifier.clearAndSetSemantics { }.blockTouches()
+                                Modifier.clearAndSetSemantics { }
                             },
                         )
                         .openCodeTapTarget(accessibility = false),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Surface(
-                        shape = OpenCodeShape.circle,
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        tonalElevation = 2.dp,
-                        shadowElevation = 2.dp,
-                        modifier = Modifier.size(34.dp).clip(OpenCodeShape.circle).indication(interactions, ripple()),
+                    // Not an M3 Surface: a plain one swallows every touch on it, fading or not.
+                    Box(
+                        Modifier
+                            .size(34.dp)
+                            .shadow(2.dp, OpenCodeShape.circle)
+                            .clip(OpenCodeShape.circle)
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                            .indication(interactions, ripple()),
+                        contentAlignment = Alignment.Center,
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             OpenCodeIcon(SFSymbol.ArrowDown, contentDescription = null, size = 18.dp, tint = OpenCodeTheme.colors.text)
