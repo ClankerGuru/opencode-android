@@ -304,7 +304,7 @@ internal fun SessionComposerEnv.AnswerTrailingControls(bar: RequestBar) {
                             dismissKeyboard()
                             store.send(Action.SendTapped)
                         }
-                        .semantics(mergeDescendants = true) {
+                        .clearAndSetSemantics {
                             contentDescription = bar.verb.title
                             testTag = if (bar.verb == RequestBar.Verb.Deny) "request-deny" else "request-decline"
                         },
