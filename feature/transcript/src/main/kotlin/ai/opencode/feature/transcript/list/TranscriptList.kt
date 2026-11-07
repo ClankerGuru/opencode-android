@@ -106,7 +106,6 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.first
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -617,13 +616,7 @@ private fun GrowingRow(controller: TranscriptListController, key: String, modifi
                     )
                 }
             }
-            .layout { measurable, constraints ->
-                val placeable = measurable.measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
-                val measured = placeable.height / density
-                val height = controller.fittedHeight(key, measured, placeable.width / density)
-                val px = (height * density).roundToInt().coerceAtLeast(0)
-                layout(placeable.width, px) { placeable.place(0, 0) }
-            },
+            .topAnchoredRow(controller, key),
         contentAlignment = Alignment.TopStart,
     ) {
         content()
