@@ -74,7 +74,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -221,7 +220,6 @@ fun DrawerListSessionCell(
 
     Box(
         modifier
-            .zIndex(if (row.isLifted) 1f else 0f)
             .fillMaxWidth()
             .graphicsLayer {
                 translationY = pinDrag.translation(key) * density.density
