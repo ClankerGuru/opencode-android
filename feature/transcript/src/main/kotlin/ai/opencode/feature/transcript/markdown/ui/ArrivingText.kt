@@ -47,11 +47,10 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.layer.CompositingStrategy as LayerCompositingStrategy
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -151,6 +150,11 @@ internal fun ArrivingText(
     }
     // Focus's blur steps share a few layers, one per step (iOS: `ctx.drawLayer` per step).
     val blurLayers = if (sweep?.focus == true && sweep.blurPoints > 0) List(SweepParameters.STEPS) { rememberGraphicsLayer() } else null
+    // Offscreen layer for DstOut/Plus chunk fades (drawn inside `drawWithContent` instead of
+    // `Modifier.graphicsLayer`, whose `BlockGraphicsLayerModifier` invalidated Text semantics on
+    // every chunk).
+    val offscreenLayer = if (ends != null) rememberGraphicsLayer() else null
+    val quoteAction = LocalQuoteAccessibilityAction.current
     var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
     var pressed by remember { mutableStateOf<String?>(null) }
     // Web, pairing and session links hold to media's link menu (iOS `linkMenu(for:)`: the
@@ -188,24 +192,40 @@ internal fun ArrivingText(
                         Modifier
                     },
                 )
-                .graphicsLayer {
-                    compositingStrategy = if (ends != null) CompositingStrategy.Offscreen else CompositingStrategy.Auto
-                }
                 .drawWithContent {
                     val result = layout
-                    if (result != null && chipGlyphs != null) {
-                        for (chip in presented.chips) drawChipBackground(result, chip, emPx, chipStyle, chip.url == pressed)
-                    }
-                    drawContent()
-                    if (result != null && chipGlyphs != null) {
-                        for (chip in presented.chips) drawChipGlyph(result, chip, emPx, chipStyle, chipGlyphs)
-                    }
-                    if (result != null && active.isNotEmpty()) {
+                    val drawNow = if (result != null && active.isNotEmpty()) {
                         frame.longValue
-                        if (sweep == null) {
-                            eraseArriving(result, active, reveal.now())
-                        } else {
-                            sweepArriving(result, active, reveal.now(), sweep, blurLayers)
+                        reveal.now()
+                    } else {
+                        0.0
+                    }
+                    val fading = result != null && offscreenLayer != null && active.isNotEmpty() &&
+                        ends != null && drawNow < ends && size.width > 0f && size.height > 0f
+                    if (fading) {
+                        offscreenLayer.compositingStrategy = LayerCompositingStrategy.Offscreen
+                        offscreenLayer.record {
+                            if (chipGlyphs != null) {
+                                for (chip in presented.chips) drawChipBackground(result, chip, emPx, chipStyle, chip.url == pressed)
+                            }
+                            this@drawWithContent.drawContent()
+                            if (chipGlyphs != null) {
+                                for (chip in presented.chips) drawChipGlyph(result, chip, emPx, chipStyle, chipGlyphs)
+                            }
+                            if (sweep == null) {
+                                eraseArriving(result, active, drawNow)
+                            } else {
+                                sweepArriving(result, active, drawNow, sweep, blurLayers)
+                            }
+                        }
+                        drawLayer(offscreenLayer)
+                    } else {
+                        if (result != null && chipGlyphs != null) {
+                            for (chip in presented.chips) drawChipBackground(result, chip, emPx, chipStyle, chip.url == pressed)
+                        }
+                        drawContent()
+                        if (result != null && chipGlyphs != null) {
+                            for (chip in presented.chips) drawChipGlyph(result, chip, emPx, chipStyle, chipGlyphs)
                         }
                     }
                 }
@@ -249,6 +269,7 @@ internal fun ArrivingText(
                 .semantics {
                     // iOS `.accessibilityHint("Links to …")`: read after the text.
                     presented.linkHint?.let { stateDescription = it }
+                    if (quoteAction != null) customActions = listOf(quoteAction)
                     // The link menu gives TalkBack the links' actions (on its box).
                 },
         )
