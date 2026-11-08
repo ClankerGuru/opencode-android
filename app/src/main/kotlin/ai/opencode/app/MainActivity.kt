@@ -58,6 +58,7 @@ class MainActivity : ComponentActivity() {
     private var removeRequesters: List<() -> Unit> = emptyList()
 
     private class TouchModeExit(val at: Long, val hadFocus: Boolean)
+    private val typedNavigationKeys = setOf(KeyEvent.KEYCODE_SPACE, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER)
     private var touchModeLeft: TouchModeExit? = null
 
     /**
@@ -65,14 +66,17 @@ class MainActivity : ComponentActivity() {
      * the first focusable control (Home's ☰), so a space or Return pressed it and opened the drawer
      * (QA T-02). iOS gives buttons no key focus, so typing with no field focused does nothing:
      * the key that left touch mode takes that focus back and goes nowhere. Tab and the arrows
-     * still move focus (the framework consumes them before here), as do later keys.
+     * still move focus, as do later keys. The framework counts Space and Return as navigation
+     * keys too and consumes their press to leave touch mode before it gets here, so for those
+     * the release (pressed before touch mode was left) takes the focus back (QA F-70).
      */
     private fun dropsTypedFocus(event: KeyEvent): Boolean {
-        val exit = touchModeLeft
-        if (exit == null || event.action != KeyEvent.ACTION_DOWN) return false
+        val exit = touchModeLeft ?: return false
+        val consumedPress = event.action == KeyEvent.ACTION_UP && event.keyCode in typedNavigationKeys
+        if (event.action != KeyEvent.ACTION_DOWN && !consumedPress) return false
         touchModeLeft = null
         val focused = currentFocus
-        if (event.eventTime > exit.at || exit.hadFocus || focused == null) return false
+        if (event.downTime > exit.at || exit.hadFocus || focused == null) return false
         val content = findViewById<ViewGroup>(android.R.id.content)
         val focusability = content.descendantFocusability
         content.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
