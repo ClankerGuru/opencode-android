@@ -10,6 +10,7 @@ import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.drawerKeyboardField
 import ai.opencode.server.model.PastedText
 import android.net.Uri
+import android.os.Process
 import android.os.SystemClock
 import android.view.WindowInsetsController
 import androidx.compose.animation.core.Animatable
@@ -57,6 +58,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.snapshots.Snapshot
@@ -113,9 +116,11 @@ import kotlinx.coroutines.android.awaitFrame
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -126,8 +131,44 @@ import kotlin.math.roundToInt
 /** How long a recreated window's inherited keys stay up over the restored field before they count as its own. */
 private const val INHERITED_KEYS_SETTLE_MILLIS = 1_000L
 
+/** How long a recreated field waits for its draft to put its saved selection back (QA AG-01). */
+private const val SELECTION_RESTORE_MILLIS = 1_000L
+
 /** How long keys must stay hidden before they count as having left the focused field (A-01). */
 private const val KEYS_LEFT_SETTLE_MILLIS = 250L
+
+/**
+ * The field's selection, saved across an activity recreation (QA AG-01). Restored only in the same
+ * process and for a draft of the same length; after process death the caret starts at the end.
+ */
+internal class ComposerSavedSelection(private val saved: List<Int>? = null) {
+    // Until the field reports its own, a save keeps what was restored (switches in a row).
+    private var length = saved?.get(2) ?: 0
+    private var selection = saved?.let { TextRange(it[0], it[1]) } ?: TextRange.Zero
+
+    fun update(length: Int, selection: TextRange) {
+        this.length = length
+        this.selection = selection
+    }
+
+    fun restored(text: String): TextRange? {
+        val (start, end, savedLength) = saved ?: return null
+        if (savedLength != text.length || maxOf(start, end) > text.length) return null
+        return TextRange(start, end)
+    }
+
+    companion object {
+        private val process: String get() = "${Process.myPid()}:${Process.getStartUptimeMillis()}"
+
+        val Saver: Saver<ComposerSavedSelection, ArrayList<String>> = Saver(
+            save = { arrayListOf(process, it.selection.start.toString(), it.selection.end.toString(), it.length.toString()) },
+            restore = { saved ->
+                val values = saved.takeIf { it.size == 4 && it[0] == process }?.drop(1)?.mapNotNull { it.toIntOrNull() }
+                ComposerSavedSelection(values?.takeIf { it.size == 3 })
+            },
+        )
+    }
+}
 
 /**
  * The composer tunables the text input reads (iOS `ComposerTunables`, `Session/ComposerViews.swift`):
@@ -641,7 +682,19 @@ fun ComposerTextInput(
     focusRequest: Int = 0,
     isCovered: Boolean = false,
 ) {
-    val state = remember { TextFieldState(text, TextRange(text.length)) }
+    // QA AG-01: a dark/light or language switch recreates the activity, where iOS's text view keeps
+    // its selection (and rotation, handled in place, keeps it here): the caret or selection comes
+    // back where it was, for the same draft in the same process.
+    val savedSelection = rememberSaveable(saver = ComposerSavedSelection.Saver) { ComposerSavedSelection() }
+    val state = remember { TextFieldState(text, savedSelection.restored(text) ?: TextRange(text.length)) }
+    LaunchedEffect(state) {
+        // The draft can reach a recreated field a moment after it composes (its caret then at the end).
+        withTimeoutOrNull(SELECTION_RESTORE_MILLIS) {
+            val restored = snapshotFlow { savedSelection.restored(state.text.toString()) }.filterNotNull().first()
+            if (state.selection != restored) state.edit { selection = restored }
+        }
+        snapshotFlow { state.text.length to state.selection }.collect { (length, selection) -> savedSelection.update(length, selection) }
+    }
     val controller = remember { ComposerTextInputController() }
     val scroll = rememberScrollState()
     val focusRequester = remember { FocusRequester() }
