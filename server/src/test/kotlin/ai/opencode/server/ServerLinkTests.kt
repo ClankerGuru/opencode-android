@@ -179,6 +179,95 @@ class ServerLinkTests {
         assertEquals(2, calls.size)
     }
 
+    /** The LAN address in use, with its event stream on it. */
+    private fun streamingOnLAN(calls: MutableList<String>, now: AtomicReference<Duration>): ServerLinkStore {
+        val store = ServerLinkStore(health = { server -> calls += server.url }, now = { now.get() })
+        store.adopt(saved)
+        store.noteStreamActivity(saved)
+        return store
+    }
+
+    /**
+     * A request failing on an address whose stream delivered a line after it went goes straight
+     * back to it (no race, no extra round trip); a second in a row forgets it.
+     */
+    @Test fun aFailureWhileTheStreamKeepsTalkingKeepsTheAddressOnce() = runTest {
+        val calls = Collections.synchronizedList(mutableListOf<String>())
+        val now = AtomicReference(100.seconds)
+        val store = streamingOnLAN(calls, now)
+        val sent = now.get()
+        now.set(now.get() + 16.seconds)
+        // An idle stream's heartbeat, after the request went.
+        store.noteStreamActivity(saved)
+        store.requestFailed(saved, lan, sent)
+        assertEquals(lan, store.route(saved).url)
+        assertTrue("No race after one failure", calls.isEmpty())
+        store.requestFailed(saved, lan, sent)
+        store.route(saved)
+        assertTrue("Two in a row race again", calls.isNotEmpty())
+    }
+
+    @Test fun anAnswerFromTheServerStartsTheCountAgain() = runTest {
+        val calls = Collections.synchronizedList(mutableListOf<String>())
+        val now = AtomicReference(100.seconds)
+        val store = streamingOnLAN(calls, now)
+        val sent = now.get()
+        now.set(now.get() + 1.seconds)
+        store.noteStreamActivity(saved)
+        store.requestFailed(saved, lan, sent)
+        // A probe's answer, or another server's, says nothing about this address.
+        store.noteAnswer(null)
+        store.noteAnswer("other")
+        store.noteAnswer(saved.persistenceID)
+        store.requestFailed(saved, lan, sent)
+        assertEquals(lan, store.route(saved).url)
+        assertTrue(calls.isEmpty())
+    }
+
+    @Test fun noLineSinceTheRequestWentOrAnEndedStreamForgetsTheAddress() = runTest {
+        val calls = Collections.synchronizedList(mutableListOf<String>())
+        val now = AtomicReference(100.seconds)
+        // The stream's last line was before the request went: no proof it's up.
+        val quiet = streamingOnLAN(calls, now)
+        now.set(now.get() + 1.seconds)
+        quiet.requestFailed(saved, lan, now.get())
+        quiet.route(saved)
+        assertTrue("A line from before the request says nothing about it", calls.isNotEmpty())
+
+        calls.clear()
+        val ended = streamingOnLAN(calls, now)
+        val sent = now.get()
+        now.set(now.get() + 1.seconds)
+        ended.noteStreamActivity(saved)
+        ended.noteStreamEnded(saved)
+        ended.requestFailed(saved, lan, sent)
+        ended.route(saved)
+        assertTrue("Once the stream drops, a failure forgets the address", calls.isNotEmpty())
+
+        calls.clear()
+        val elsewhere = streamingOnLAN(calls, now)
+        now.set(now.get() + 1.seconds)
+        elsewhere.noteStreamActivity(saved.at(tailnet))
+        elsewhere.requestFailed(saved, lan, sent)
+        elsewhere.route(saved)
+        assertTrue("A stream on another address vouches only for that one", calls.isNotEmpty())
+    }
+
+    /** Settling on an address (the stream adopting it, a race) starts its count over. */
+    @Test fun adoptingAnAddressStartsItsCountOver() = runTest {
+        val calls = Collections.synchronizedList(mutableListOf<String>())
+        val now = AtomicReference(100.seconds)
+        val store = streamingOnLAN(calls, now)
+        val sent = now.get()
+        now.set(now.get() + 1.seconds)
+        store.noteStreamActivity(saved)
+        store.requestFailed(saved, lan, sent)
+        store.adopt(saved)
+        store.requestFailed(saved, lan, sent)
+        assertEquals(lan, store.route(saved).url)
+        assertTrue(calls.isEmpty())
+    }
+
     @Test fun aRouteChangeForgetsTheAddressWhateverItWas() = runTest {
         val calls = Collections.synchronizedList(mutableListOf<String>())
         val store = warmOnLAN(calls)
@@ -255,9 +344,10 @@ class ServerLinkTests {
 
     @Test fun streamSilenceCountsFromTheLastLine() {
         val store = ServerLinkStore(health = {})
-        assertNull(store.streamSilence("id"))
-        store.noteStreamActivity("id")
-        assertTrue((store.streamSilence("id") ?: 99.seconds) < 1.seconds)
+        val server = OpenCodeServer(url = "http://id", username = "", password = "")
+        assertNull(store.streamSilence(server.persistenceID))
+        store.noteStreamActivity(server)
+        assertTrue((store.streamSilence(server.persistenceID) ?: 99.seconds) < 1.seconds)
     }
 
     // Identity

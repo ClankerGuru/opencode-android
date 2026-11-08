@@ -228,6 +228,7 @@ internal suspend fun perform(
             val epoch = link.epoch()
             val target = if (isConnectionProbe) server else link.route(server)
             val targetURL = target.endpoint(path, query) ?: url
+            val sentAt = Clock.liveValue.now()
             try {
                 performOnce(
                     targetURL, path, method, body, timeout, followsRedirects, longPoll, isConnectionProbe,
@@ -235,7 +236,14 @@ internal suspend fun perform(
                 )
             } catch (error: OpenCodeClientError) {
                 // The address in use didn't answer: the next attempt races again.
-                if (!isConnectionProbe && error.transport != null) link.invalidate(server, target.url)
+                val transport = error.transport
+                if (!isConnectionProbe && transport != null) {
+                    if (transport == TransportFailure.NotSent) {
+                        link.invalidate(server, target.url)
+                    } else {
+                        link.requestFailed(server, target.url, sentAt)
+                    }
+                }
                 throw error
             }
         }
@@ -311,7 +319,7 @@ private suspend fun performOnce(
         throw statusError(response.code, response.headers["Retry-After"], locationMissing)
     }
     ServerContact.shared.heard(server.persistenceID, response.url)
-    link.noteAnswer()
+    link.noteAnswer(if (isConnectionProbe) null else server.persistenceID)
     return MeasuredResponse(response.body, requestID, correlation)
 }
 

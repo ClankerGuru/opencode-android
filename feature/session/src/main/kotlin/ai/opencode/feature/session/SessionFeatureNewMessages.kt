@@ -24,7 +24,7 @@ fun SessionFeature.State.noteLeaving(): SessionFeature.State {
     // next one arrives fresh rather than moving.
     val s = copy(newMessages = null, newMessagesFitThrough = null, newMessagesEarlierBaseline = null)
     if (s.newMessagesBaseline != null) return s
-    val unreadIndex = unreadMarkID?.let { id -> s.items.indexOfFirst { it.id == id } } ?: -1
+    val unreadIndex = unreadMarkID?.let { id -> s.items.indexOfLast { it.id == id } } ?: -1
     return when {
         earlierBaseline != null -> s.copy(
             newMessagesBaseline = earlierBaseline.seen,
@@ -33,13 +33,13 @@ fun SessionFeature.State.noteLeaving(): SessionFeature.State {
             newMessagesWatched = earlierBaseline.watched,
         )
         unreadIndex >= 0 -> s.copy(
-            newMessagesBaseline = s.items.subList(0, unreadIndex).mapTo(HashSet()) { it.id },
+            newMessagesBaseline = SessionFeature.SwitchSnapshot.seenTail(s.items.subList(0, unreadIndex)),
             newMessagesBaselineTimestamp = null,
             newMessagesUnread = unreadIndex == 0,
             newMessagesWatched = emptySet(),
         )
         else -> s.copy(
-            newMessagesBaseline = s.items.mapTo(HashSet()) { it.id },
+            newMessagesBaseline = SessionFeature.SwitchSnapshot.seenTail(s.items),
             newMessagesBaselineTimestamp = null,
             newMessagesUnread = false,
             newMessagesWatched = emptySet(),

@@ -1,5 +1,6 @@
 package ai.opencode.server.live
 
+import ai.opencode.core.diagnostics.LabMarks
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.TaskLocal
@@ -31,6 +32,8 @@ import ai.opencode.server.model.instantFromMillis
 import ai.opencode.server.model.nonEmpty
 import ai.opencode.server.model.trimmedWhitespace
 import kotlinx.serialization.json.JsonElement
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.time.Duration.Companion.seconds
 
 /** The context reading and next cursor of the transcript window just decoded, for `transcriptWithContextUsageAndCursor`. */
 internal class TranscriptContextCapture {
@@ -67,16 +70,27 @@ internal suspend fun requestTranscript(server: OpenCodeServer, sessionID: String
 internal suspend fun requestMessage(server: OpenCodeServer, sessionID: String, messageID: String): List<OpenCodeTranscriptItem> {
     val data = perform("/api/session/$sessionID/message/$messageID", server = server)
     val message = decoded(data.data, "message") { MessagePayload.decode(it.obj().req("data") { d -> d }) }
-    return transcriptItems(message)
+    return parsedItems(message)
 }
 
+/** Messages per older page: two of the reader's top-edge steps (`showEarlierTapped`), so every other step pages from memory. */
+internal const val HISTORY_PAGE_LIMIT = 80
+
 internal suspend fun requestHistoryPage(server: OpenCodeServer, sessionID: String, cursor: String?): OpenCodeTranscriptPage {
+    LabMarks.mark("history_page_request", sessionID)
     val data = perform(
         "/api/session/$sessionID/message",
-        query = listOf("limit" to "40", if (cursor != null) "cursor" to cursor else "order" to "desc"),
+        query = listOf("limit" to "$HISTORY_PAGE_LIMIT", if (cursor != null) "cursor" to cursor else "order" to "desc"),
+        // 80 messages can be a few hundred KB on a slow link.
+        timeout = 20.seconds,
         server = server,
     )
-    return decodeTranscriptPage(data.data, TranscriptContextCapture.current.current())
+    LabMarks.mark("history_page_response", sessionID)
+    LabMarks.mark("history_page_bytes(${data.data.size})", sessionID)
+    LabMarks.mark("history_page_decode_start", sessionID)
+    val page = decodeTranscriptPage(data.data, TranscriptContextCapture.current.current())
+    LabMarks.mark("history_page_decode_end", sessionID)
+    return page
 }
 
 /** Records the page's context and cursor for an enclosing [TranscriptContextCapture], as iOS does. */
@@ -87,7 +101,93 @@ internal fun decodeTranscriptPage(data: ByteArray, capture: TranscriptContextCap
     val payload = decoded(data, "transcript", MessagesPayload::decode)
     val next = payload.cursor?.next
     capture?.record(contextUsage(payload), next, payload.data.size)
-    return OpenCodeTranscriptPage(payload.data.asReversed().flatMap(::transcriptItems), next)
+    return OpenCodeTranscriptPage(payload.data.asReversed().flatMap(::parsedItems), next)
+}
+
+/**
+ * Rows parsed from messages already read, keyed by message ID and the message's content: a
+ * refresh of 30 messages where one changed parses (Markdown, syntax highlighting) only that one.
+ */
+private val parsedMessages = ParsedMessageCache()
+
+internal fun parsedItems(message: MessagePayload): List<OpenCodeTranscriptItem> =
+    parsedMessages.items(message.id, message.hashCode()) {
+        ParsedMessageCache.noteParsed()
+        transcriptItems(message)
+    }
+
+/** Benchmarks of a cold decode start from nothing. */
+internal fun clearParsedMessages() = parsedMessages.clear()
+
+/**
+ * The rows each message read so far parsed into, for messages whose content hasn't changed
+ * since. One entry per message (a message still streaming replaces its own), bounded, and never
+ * one holding inline image bytes or a large pasted file.
+ */
+internal class ParsedMessageCache {
+    private class Entry(val key: Int, val items: List<OpenCodeTranscriptItem>, var tick: Long)
+
+    private val entries = HashMap<String, Entry>()
+    private var tick = 0L
+
+    fun items(id: String, key: Int, parse: () -> List<OpenCodeTranscriptItem>): List<OpenCodeTranscriptItem> {
+        synchronized(this) {
+            val entry = entries[id]
+            if (entry != null && entry.key == key) {
+                tick += 1
+                entry.tick = tick
+                return entry.items
+            }
+        }
+        val items = parse()
+        if (holdsInlineBytes(items)) return items
+        synchronized(this) {
+            tick += 1
+            entries[id] = Entry(key, items, tick)
+            // Past the limit, the least recently read half goes.
+            if (entries.size > LIMIT) {
+                val newestFirst = entries.entries.sortedByDescending { it.value.tick }
+                val keep = HashSet<String>()
+                for (index in 0 until LIMIT / 2) keep += newestFirst[index].key
+                entries.keys.retainAll(keep)
+            }
+        }
+        return items
+    }
+
+    fun clear() = synchronized(this) {
+        entries.clear()
+        tick = 0
+    }
+
+    companion object {
+        const val LIMIT = 256
+
+        /** A pasted file bigger than this is parsed again rather than kept. */
+        const val LARGE_TEXT_BYTES = 64 * 1024
+
+        /** Counts messages parsed (not reused) while a test holds it. */
+        val parsed = TaskLocal<AtomicInteger?> { null }
+
+        fun noteParsed() {
+            parsed.currentBlocking()?.incrementAndGet()
+        }
+
+        private fun holdsInlineBytes(items: List<OpenCodeTranscriptItem>): Boolean {
+            for (item in items) {
+                when (item) {
+                    is OpenCodeTranscriptItem.UserImages ->
+                        if (item.images.any { it.data.isNotEmpty() }) return true
+                    is OpenCodeTranscriptItem.Tool ->
+                        if (item.call.imageAttachments.any { it.data.isNotEmpty() }) return true
+                    is OpenCodeTranscriptItem.UserFiles ->
+                        if (item.files.any { (it.text?.toByteArray()?.size ?: 0) > LARGE_TEXT_BYTES }) return true
+                    else -> {}
+                }
+            }
+            return false
+        }
+    }
 }
 
 private fun runErrorText(error: ErrorPayload): String {

@@ -1,5 +1,6 @@
 package ai.opencode.feature.session
 
+import ai.opencode.server.model.OpenCodeTranscriptItem
 import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.server.model.keepingFirstPrompt
 import ai.opencode.server.model.keepingFirstPrompts
@@ -15,13 +16,13 @@ fun SessionFeature.SwitchSnapshot.Companion.from(state: State): SessionFeature.S
     val seenItemIDs: Set<String>
     var hasUnseenItems = false
     val mark = state.newMessages
-    val markIndex = mark?.let { m -> state.items.indexOfFirst { it.id == m.itemID } } ?: -1
+    val markIndex = mark?.let { m -> state.items.indexOfLast { it.id == m.itemID } } ?: -1
     val baseline = state.newMessagesBaseline
     if (!state.readsOnView) {
         seenItemIDs = state.catchUpOpeningSeen ?: baseline ?: emptySet()
         hasUnseenItems = mark != null || state.newMessagesUnread
     } else if (markIndex >= 0) {
-        seenItemIDs = state.items.subList(0, markIndex).mapTo(HashSet()) { it.id }
+        seenItemIDs = SessionFeature.SwitchSnapshot.seenTail(state.items.subList(0, markIndex))
         hasUnseenItems = true
     } else if (baseline != null && (baseline.isNotEmpty() || state.newMessagesUnread || state.newMessagesBaselineTimestamp != null ||
             state.isTranscriptCovered || state.isBackgrounded || state.items.isEmpty())
@@ -29,7 +30,7 @@ fun SessionFeature.SwitchSnapshot.Companion.from(state: State): SessionFeature.S
         seenItemIDs = baseline + state.newMessagesWatched
         hasUnseenItems = state.newMessagesUnread
     } else {
-        seenItemIDs = state.items.mapTo(HashSet()) { it.id }
+        seenItemIDs = SessionFeature.SwitchSnapshot.seenTail(state.items)
     }
     return SessionFeature.SwitchSnapshot(
         session = session,
@@ -58,6 +59,21 @@ fun SessionFeature.SwitchSnapshot.Companion.from(state: State): SessionFeature.S
         seenItemIDs = seenItemIDs,
         hasUnseenItems = hasUnseenItems,
     )
+}
+
+/**
+ * The New divider goes after the last row the reader saw, so only the newest seen rows matter:
+ * the session reopens with its newest `initialFetchLimit` rows, and this keeps a few windows' worth
+ * in case some went meanwhile (a revert, a rewrite), never every row paged in.
+ */
+val SessionFeature.SwitchSnapshot.Companion.seenTailLimit: Int get() = 4 * SessionFeature.initialFetchLimit
+
+/** iOS `SwitchSnapshot.seenTail(_:)`: the IDs of the newest [seenTailLimit] rows. */
+fun SessionFeature.SwitchSnapshot.Companion.seenTail(items: List<OpenCodeTranscriptItem>): Set<String> {
+    val start = maxOf(0, items.size - seenTailLimit)
+    val ids = HashSet<String>()
+    for (index in start until items.size) ids += items[index].id
+    return ids
 }
 
 /** iOS `SwitchSnapshot.restore(into:)`. */

@@ -49,6 +49,58 @@ fun State.retainRenderedWindowStart(previousFirstID: String?): State {
     return if (visibleLimit != nextLimit) copy(visibleLimit = nextLimit) else this
 }
 
+/**
+ * The window a reader back at the end settles to: the last `settledWindowEntries` entries (at
+ * least `baseVisibleLimit` rows) from the end, or from Revert to Here's boundary so the undone
+ * turns stay folded under it; back to the start of the turn it would cut (a reply's Copy and link
+ * previews take the whole turn), within `settledWindowCap` rows; and the New divider with the row
+ * above it.
+ */
+val State.settledVisibleLimit: Int
+    get() {
+        val end = revertBoundaryIndex ?: items.size
+        var start = end
+        var entries = 0
+        while (entries < SessionFeature.settledWindowEntries && start > 0) {
+            start = TranscriptEntry.entryStart(start - 1, items)
+            entries += 1
+        }
+        if (start < end && start > 0 && TranscriptEntry.promptID(items[start]) == null) {
+            var prompt = -1
+            for (index in start - 1 downTo 0) {
+                if (TranscriptEntry.promptID(items[index]) != null) {
+                    prompt = index
+                    break
+                }
+            }
+            if (prompt >= 0) {
+                val cap = maxOf(0, items.size - SessionFeature.settledWindowCap)
+                start = minOf(start, TranscriptEntry.entryStart(maxOf(prompt, cap), items))
+            }
+        }
+        var limit = maxOf(SessionFeature.baseVisibleLimit, items.size - start)
+        val mark = newMessages
+        if (mark != null) {
+            val index = items.indexOfLast { it.id == mark.itemID }
+            if (index >= 0) limit = maxOf(limit, items.size - index + 1)
+        }
+        return limit
+    }
+
+/** Where Revert to Here's undone rows start, when they're loaded. */
+val State.revertBoundaryIndex: Int?
+    get() {
+        val boundary = session?.revertMessageID ?: return null
+        val rows = MessageRows(boundary)
+        for (index in items.indices) {
+            val item = items[index]
+            val isPrompt = item is OpenCodeTranscriptItem.UserText || item is OpenCodeTranscriptItem.UserImages ||
+                item is OpenCodeTranscriptItem.UserFiles
+            if (isPrompt && rows.contains(item)) return index
+        }
+        return null
+    }
+
 fun State.pinBrowsingWindowIfNeeded(): State {
     if (browsingWindowStartID == null) return this
     val start = windowStart

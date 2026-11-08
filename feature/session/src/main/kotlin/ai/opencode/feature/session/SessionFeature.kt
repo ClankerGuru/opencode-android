@@ -85,6 +85,7 @@ import ai.opencode.server.model.OpenCodeTranscriptPage
 import ai.opencode.server.retry.NetworkPathClient
 import java.time.Instant
 import java.util.UUID
+import kotlin.time.Duration.Companion.seconds
 import ai.opencode.feature.transcript.list.NewMessagesFold
 import ai.opencode.feature.transcript.list.NewMessagesEarlierBaseline
 
@@ -185,7 +186,7 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         val resync: ResyncState? = null,
         val refreshFailed: Boolean = false,
         val loadError: String? = null,
-        val visibleLimit: Int = 20,
+        val visibleLimit: Int = SessionFeature.baseVisibleLimit,
         /** The leading edge of the window when the reader leaves the live tail. */
         val browsingWindowStartID: String? = null,
         val earlierHistory: EarlierHistory = EarlierHistory.UnknownEdge,
@@ -544,6 +545,8 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         data class MessageInvalidated(val sessionID: String) : Action
         data class ExternalRunStateChanged(val isRunning: Boolean) : Action
         data class TranscriptBrowsingChanged(val isBrowsing: Boolean) : Action
+        /** The reader has been back at the end for [windowResetDelay]. */
+        data object RenderedWindowSettled : Action
         /** The reader reached the end with the New divider scrolled out of view. */
         data class NewMessagesPassed(val generation: Int) : Action
         /** Everything the mark covered fit on screen. */
@@ -942,12 +945,21 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         data object AutocompleteCommand : CancelID
         data object AutocompleteCommandWait : CancelID
         data object Agents : CancelID
+        data object WindowReset : CancelID
     }
 
     companion object {
         const val initialFetchLimit = 30
         /** The window fetched before the first frame; `firstContentFrameRendered` fills to [initialFetchLimit] right after. */
         const val firstFrameFetchLimit = 12
+        /** The rows a session opens with, and the least a reader back at the end keeps. */
+        const val baseVisibleLimit = 20
+        /** A reader back at the end keeps at least this many rows (entries) above it: more than a large tablet's screen even when every row is one line. */
+        const val settledWindowEntries = 45
+        /** The most rows a settled window reaches back to keep a turn whole. */
+        const val settledWindowCap = 120
+        /** How long after a browsing reader returns to the end the window lets go of the rows above: after Jump to latest's glide, however far it went. */
+        val windowResetDelay = 2.seconds
         /** What Try Again sends after a run error: V2 has no retry of its own. */
         const val tryAgainPrompt = "Continue"
 

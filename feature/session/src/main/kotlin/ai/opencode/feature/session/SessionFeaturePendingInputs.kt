@@ -703,18 +703,34 @@ internal fun recordSteeringPredecessor(id: String, state: State): State {
     return if (positions === state.pendingPromptPositions) state else state.copy(pendingPromptPositions = positions)
 }
 
-internal fun SessionFeature.Companion.containsMessage(messageID: String, items: List<OpenCodeTranscriptItem>): Boolean =
-    items.any { item(it, messageID) }
+/** Settlements are for recent messages: looked for from the end. */
+internal fun SessionFeature.Companion.containsMessage(messageID: String, items: List<OpenCodeTranscriptItem>): Boolean {
+    val rows = MessageRows(messageID)
+    for (index in items.indices.reversed()) {
+        if (rows.contains(items[index])) return true
+    }
+    return false
+}
 
-internal fun SessionFeature.Companion.item(item: OpenCodeTranscriptItem, messageID: String): Boolean = when (item) {
-    is OpenCodeTranscriptItem.UserText -> item.id == messageID
-    is OpenCodeTranscriptItem.Compaction -> item.id == messageID
-    is OpenCodeTranscriptItem.ModelSwitch -> item.id == messageID
-    is OpenCodeTranscriptItem.UserImages -> item.id == "$messageID-images"
-    is OpenCodeTranscriptItem.UserFiles -> item.id == "$messageID-files"
-    is OpenCodeTranscriptItem.Tool -> item.call.messageID == messageID || item.id == messageID || item.id.startsWith("$messageID-")
-    is OpenCodeTranscriptItem.AssistantMarkdown, is OpenCodeTranscriptItem.Info, is OpenCodeTranscriptItem.Notice,
-    is OpenCodeTranscriptItem.SendFailure, is OpenCodeTranscriptItem.RunError, is OpenCodeTranscriptItem.RunRetry,
-    is OpenCodeTranscriptItem.Undone,
-    -> item.id == messageID || item.id.startsWith("$messageID-")
+internal fun SessionFeature.Companion.item(item: OpenCodeTranscriptItem, messageID: String): Boolean =
+    MessageRows(messageID).contains(item)
+
+/** iOS `SessionFeature.MessageRows`: one message's rows, matched without building a string for every row a scan of the transcript passes. */
+internal class MessageRows(val messageID: String) {
+    private val prefix = "$messageID-"
+    private val images = "$messageID-images"
+    private val files = "$messageID-files"
+
+    fun contains(item: OpenCodeTranscriptItem): Boolean = when (item) {
+        is OpenCodeTranscriptItem.UserText -> item.id == messageID
+        is OpenCodeTranscriptItem.Compaction -> item.id == messageID
+        is OpenCodeTranscriptItem.ModelSwitch -> item.id == messageID
+        is OpenCodeTranscriptItem.UserImages -> item.id == images
+        is OpenCodeTranscriptItem.UserFiles -> item.id == files
+        is OpenCodeTranscriptItem.Tool -> item.call.messageID == messageID || item.id == messageID || item.id.startsWith(prefix)
+        is OpenCodeTranscriptItem.AssistantMarkdown, is OpenCodeTranscriptItem.Info, is OpenCodeTranscriptItem.Notice,
+        is OpenCodeTranscriptItem.SendFailure, is OpenCodeTranscriptItem.RunError, is OpenCodeTranscriptItem.RunRetry,
+        is OpenCodeTranscriptItem.Undone,
+        -> item.id == messageID || item.id.startsWith(prefix)
+    }
 }

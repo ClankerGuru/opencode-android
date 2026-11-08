@@ -357,7 +357,9 @@ internal fun SessionFeature.sendComposer(
         val clientSessionID: String? = if (existingSessionID == null) next.sharedSessionID ?: next.callSessionID ?: serverID.sessionID() else null
         next = next.copy(sharedSessionID = null)
         val (settled, cancelRevert) = next.settleRevertForNewPrompt()
-        next = settled.noteOwnSend().supersedeRunWork().copy(browsingWindowStartID = null, isAwaitingReply = true)
+        next = settled.noteOwnSend().supersedeRunWork()
+        val windowReset = if (next.browsingWindowStartID != null) scheduleWindowReset(next) else Effect.none()
+        next = next.copy(browsingWindowStartID = null, isAwaitingReply = true)
         val server = next.server
         val client = openCodeClient
         AppLog.send.info { "command send: session=${existingSessionID ?: clientSessionID ?: "none"} length=${command.argumentsText.length}" }
@@ -367,6 +369,7 @@ internal fun SessionFeature.sendComposer(
                 stopDictating,
                 Effect.cancel(SessionFeature.CancelID.AutocompleteAutoRun),
                 cancelRevert,
+                windowReset,
                 Effect.run<Action> { send ->
                     try {
                         val sessionID = if (existingSessionID != null) {
@@ -586,6 +589,7 @@ internal fun SessionFeature.submit(
         next,
         Effect.merge(
             cancelRevert,
+            if (wasBrowsing && !isRetry) scheduleWindowReset(next) else Effect.none(),
             deliver(
                 pending = pending, target = target, lane = lane, server = next.server,
                 reconcileFirst = isRetry, backgroundKey = backgroundKey,

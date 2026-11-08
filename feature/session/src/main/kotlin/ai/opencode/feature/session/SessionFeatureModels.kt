@@ -358,7 +358,7 @@ private fun SessionFeature.familyPicked(id: String, state: State): Reduced<State
         autoBackgroundClaims = emptyMap(),
         loadError = null,
         activePicker = null,
-        visibleLimit = 20,
+        visibleLimit = SessionFeature.baseVisibleLimit,
         browsingWindowStartID = null,
         earlierHistory = State.EarlierHistory.UnknownEdge,
         earlierHistoryInsertionID = null,
@@ -391,6 +391,7 @@ private fun SessionFeature.familyPicked(id: String, state: State): Reduced<State
             Effect.cancel(CancelID.AutocompleteCommand),
             Effect.cancel(CancelID.AutocompleteCommandWait),
             Effect.cancel(CancelID.Revert),
+            Effect.cancel(CancelID.WindowReset),
             // Clearing sessionSheet above cancels its auto-rename failure through ifLet teardown.
             endedCall,
             closesPage.effect,

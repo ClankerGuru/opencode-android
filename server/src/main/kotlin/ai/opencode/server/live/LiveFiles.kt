@@ -1,5 +1,6 @@
 package ai.opencode.server.live
 
+import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.log.AppLog
@@ -165,10 +166,16 @@ private suspend fun performUpload(server: OpenCodeServer, directory: String?, fi
     ) {
         val target = link.route(server)
         val url = target.endpoint("/api/experimental/fs/write", query) ?: throw OpenCodeClientError("Enter a valid HTTP or HTTPS server URL.")
+        val sentAt = Clock.liveValue.now()
         try {
             writeUpload(url, file, target, progress)
         } catch (error: OpenCodeClientError) {
-            if (error.transport != null) link.invalidate(server, target.url)
+            val transport = error.transport
+            if (transport == TransportFailure.NotSent) {
+                link.invalidate(server, target.url)
+            } else if (transport != null) {
+                link.requestFailed(server, target.url, sentAt)
+            }
             throw error
         }
     }

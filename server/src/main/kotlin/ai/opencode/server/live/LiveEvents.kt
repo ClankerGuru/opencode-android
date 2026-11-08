@@ -135,7 +135,7 @@ private fun eventSource(server: OpenCodeServer, waiting: AtomicInteger): Flow<Op
                 while (true) {
                     val line = source.readUtf8Line() ?: break
                     watchdog.noteLine()
-                    link.noteStreamActivity(server.persistenceID)
+                    link.noteStreamActivity(server)
                     stream.line(line)
                     if (!line.startsWith("data:")) continue
                     if (line.length - 5 > MAX_FRAME_BYTES ||
@@ -155,16 +155,21 @@ private fun eventSource(server: OpenCodeServer, waiting: AtomicInteger): Flow<Op
             }
             batches.flush()
             stream.record(DiagnosticsStreamName.Disconnected)
+            // Before the owner hears it ended, so its next request can't count a stream that's
+            // gone as live (the finally covers cancellation).
+            link.noteStreamEnded(server)
             close(OpenCodeClientError("The event stream ended."))
         } catch (cancelled: CancellationException) {
             stream.record(DiagnosticsStreamName.Disconnected, errorCategory = DiagnosticsErrorCategory.Cancelled, failurePhase = DiagnosticsFailurePhase.Cancelled)
             throw cancelled
         } catch (error: OpenCodeClientError) {
             batches.flush()
+            link.noteStreamEnded(server)
             if (error.statusCode == null) stream.record(DiagnosticsStreamName.Disconnected, errorCategory = DiagnosticsErrorCategory.Transport)
             close(error)
         } catch (error: Exception) {
             batches.flush()
+            link.noteStreamEnded(server)
             val category = DiagnosticsErrorCategory.of(error)
             if (category == DiagnosticsErrorCategory.Timeout) stream.record(DiagnosticsStreamName.Stalled, errorCategory = category)
             stream.record(DiagnosticsStreamName.Disconnected, errorCategory = category, failurePhase = DiagnosticsFailurePhase.BodyRead)
@@ -185,6 +190,7 @@ private fun eventSource(server: OpenCodeServer, waiting: AtomicInteger): Flow<Op
         } finally {
             watchdog.stop()
             poolReset.stop()
+            link.noteStreamEnded(server)
         }
     }
     // The live clock sleeps with `delay`, so on the collector's dispatcher a test dispatcher would

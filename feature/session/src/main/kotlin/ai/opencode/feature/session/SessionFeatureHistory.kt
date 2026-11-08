@@ -5,6 +5,7 @@ import ai.opencode.core.log.AppLog
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.cancellable
+import ai.opencode.core.tuning.AnimationTimeScale
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.CancelID
 import ai.opencode.feature.session.SessionFeature.State.EarlierHistory
@@ -14,6 +15,7 @@ import ai.opencode.server.model.OpenCodeTranscriptPage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
+import kotlin.math.roundToLong
 import kotlin.time.Duration.Companion.milliseconds
 
 // Port of iOS `SessionFeature+History.swift`.
@@ -49,15 +51,31 @@ internal fun SessionFeature.reduceHistory(
 
     is Action.TranscriptBrowsingChanged ->
         if (action.isBrowsing) {
-            Reduced(if (state.browsingWindowStartID == null) state.copy(browsingWindowStartID = state.firstVisibleItemID) else state)
+            val s = if (state.browsingWindowStartID == null) state.copy(browsingWindowStartID = state.firstVisibleItemID) else state
+            Reduced(s, Effect.cancel(CancelID.WindowReset))
         } else {
             val previousFirstID = state.visibleItems.firstOrNull()?.id
-            Reduced(state.copy(browsingWindowStartID = null).retainRenderedWindowStart(previousFirstID))
+            val s = state.copy(browsingWindowStartID = null).retainRenderedWindowStart(previousFirstID)
+            Reduced(s, scheduleWindowReset(s))
         }
 
+    is Action.RenderedWindowSettled -> {
+        if (state.browsingWindowStartID != null || !state.hasRenderedFirstContentFrame || state.isLoadingEarlier) {
+            Reduced(state)
+        } else {
+            val limit = state.settledVisibleLimit
+            Reduced(if (limit < state.visibleLimit) state.copy(visibleLimit = limit) else state)
+        }
+    }
+
     is Action.ShowEarlierTapped ->
-        if (state.isLoadingEarlier || !state.hasEarlierItems || state.session == null) Reduced(state)
-        else loadEarlierHistory(state.copy(visibleLimit = state.visibleLimit + 40).pinBrowsingWindowIfNeeded())
+        if (state.isLoadingEarlier || !state.hasEarlierItems || state.session == null) {
+            Reduced(state)
+        } else {
+            val loaded = loadEarlierHistory(state.copy(visibleLimit = state.visibleLimit + 40).pinBrowsingWindowIfNeeded())
+            // Paging back in is browsing: the window mustn't settle under it.
+            Reduced(loaded.state, Effect.merge(Effect.cancel(CancelID.WindowReset), loaded.effect))
+        }
 
     is Action.FillEarlierHistory -> loadEarlierHistory(state)
 
@@ -84,6 +102,13 @@ private fun SessionFeature.earlierHistoryResponse(
     val reachedLoadedItems = loading.reachedLoadedItems
     val retryPhase: EarlierHistory = if (reachedLoadedItems) EarlierHistory.Paging(cursor) else EarlierHistory.SeekingOverlap(cursor)
     var s = state.copy(earlierHistory = retryPhase)
+    // Home caches the newest rows and the read watermark; an older page changes neither unless it
+    // lands among them or moves the divider.
+    val cachedTail = SessionFeature.cacheTailIDs(s)
+    val previousMark = s.newMessages
+    // A divider at the top of the window: the page puts seen rows above it, which moves Home's
+    // seen watermark.
+    val markWasFirst = previousMark != null && previousMark.itemID == s.items.firstOrNull()?.id
     // Only rows this page added can link sessions not looked up yet.
     var added: List<OpenCodeTranscriptItem> = emptyList()
     val page: OpenCodeTranscriptPage? = action.result.getOrNull()
@@ -133,11 +158,14 @@ private fun SessionFeature.earlierHistoryResponse(
     // prepend transition.
     PerfTimeline.olderPageApplied(sessionID, exhausted = s.earlierHistory == EarlierHistory.Exhausted, failed = page == null)
     if (page == null) return Reduced(s)
+    val mark = s.newMessages
+    val publishes = mark != previousMark || SessionFeature.cacheTailIDs(s) != cachedTail ||
+        (markWasFirst && mark != null && mark.itemID != s.items.firstOrNull()?.id)
     return Reduced(
         s,
         Effect.merge(
             sessionLinksIn(added),
-            Effect.send(Action.AcceptedTranscriptUpdated(sessionID = sessionID, items = s.cacheableItems)),
+            if (publishes) Effect.send(Action.AcceptedTranscriptUpdated(sessionID = sessionID, items = s.cacheableItems)) else Effect.none(),
             if (s.earlierHistory != EarlierHistory.Exhausted && s.visibleLimit >= s.items.size) Effect.send(Action.FillEarlierHistory) else Effect.none(),
         ),
     )
@@ -312,4 +340,32 @@ internal fun SessionFeature.settleResync(state: SessionFeature.State, refreshID:
     } else {
         Reduced(state.copy(resync = resync.copy(responseReceived = true)))
     }
+}
+
+/** iOS `cacheTailIDs(_:)`: the newest rows Home caches, past the prompts it leaves out. */
+internal fun SessionFeature.Companion.cacheTailIDs(state: SessionFeature.State): List<String> {
+    val excluded = state.optimisticPromptIDs.size + state.failedSends.size
+    val count = SessionFeature.initialFetchLimit + 3 * excluded
+    val start = maxOf(0, state.items.size - count)
+    val ids = ArrayList<String>()
+    for (index in start until state.items.size) ids += state.items[index].id
+    return ids
+}
+
+/**
+ * The window keeps the rows a returning reader glides past; once they've been at the end a moment
+ * it lets go of the history paged in above (`RenderedWindowSettled`), so every later update works
+ * on a screen or two of rows rather than everything they paged through. The wait runs on the
+ * clock the glide runs on: slowed with animation slow motion (iOS also scales it by the lab's
+ * jump slow motion, which Android doesn't have).
+ */
+internal fun SessionFeature.scheduleWindowReset(state: SessionFeature.State): Effect<Action> {
+    if (!sessionTimers.windowReset || state.visibleLimit <= SessionFeature.baseVisibleLimit) return Effect.none()
+    val virtualSeconds = SessionFeature.windowResetDelay.inWholeMilliseconds / 1000.0
+    val delay = (AnimationTimeScale.shared.wallSeconds(virtualSeconds) * 1000).roundToLong().milliseconds
+    val clock = clock
+    return Effect.run<Action> { send ->
+        clock.sleep(delay)
+        send(Action.RenderedWindowSettled)
+    }.cancellable(CancelID.WindowReset, cancelInFlight = true)
 }

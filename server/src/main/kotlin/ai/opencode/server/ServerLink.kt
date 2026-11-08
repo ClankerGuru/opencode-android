@@ -92,8 +92,16 @@ data class ServerLinkClient(
      * the one in use and failed.
      */
     val invalidate: (server: OpenCodeServer, failingURL: String?) -> Unit = { _, _ -> },
-    /** The event stream for this `persistenceID` delivered a line. */
-    val noteStreamActivity: (server: String) -> Unit,
+    /**
+     * A request sent at `sentAt` reached `failingURL` (it wasn't `NotSent`) but got no answer:
+     * forgets the address like [invalidate], unless the event stream on it delivered a line since
+     * the request went (the address is up; that socket wedged), once in a row.
+     */
+    val requestFailed: (server: OpenCodeServer, failingURL: String, sentAt: Duration) -> Unit = { _, _, _ -> },
+    /** The event stream to `server.url` delivered a line. */
+    val noteStreamActivity: (server: OpenCodeServer) -> Unit,
+    /** The event stream to `server.url` ended. */
+    val noteStreamEnded: (server: OpenCodeServer) -> Unit = {},
     /** How long since that stream last delivered anything; null if it never has. */
     val streamSilence: (server: String) -> Duration?,
     /**
@@ -103,8 +111,8 @@ data class ServerLinkClient(
     val resetConnections: (reason: ServerLinkReset) -> Unit = {},
     /** A request (not a long poll) timed out on a network that's up. */
     val noteTimeout: () -> Unit = {},
-    /** A request was answered. */
-    val noteAnswer: () -> Unit = {},
+    /** A request was answered; by `server` (its `persistenceID`) unless it was an address probe. */
+    val noteAnswer: (server: String?) -> Unit = {},
     val epoch: () -> ServerLinkEpoch = { ServerLinkEpoch() },
     /** Returns once `epoch().changes` differs from `since`, or when cancelled. */
     val changed: suspend (since: Int) -> Unit = { awaitCancellation() },
@@ -116,11 +124,13 @@ data class ServerLinkClient(
             probe = { store.probe(it) },
             adopt = { store.adopt(it) },
             invalidate = { server, failingURL -> store.invalidate(server, failingURL) },
+            requestFailed = { server, failingURL, sentAt -> store.requestFailed(server, failingURL, sentAt) },
             noteStreamActivity = { store.noteStreamActivity(it) },
+            noteStreamEnded = { store.noteStreamEnded(it) },
             streamSilence = { store.streamSilence(it) },
             resetConnections = { store.reset(it) },
             noteTimeout = { store.noteTimeout() },
-            noteAnswer = { store.noteAnswer() },
+            noteAnswer = { store.noteAnswer(it) },
             epoch = { store.epoch },
             changed = { store.changed(it) },
         )
@@ -168,6 +178,12 @@ class ServerLinkStore(
     private val active = HashMap<String, String>()
     private val races = HashMap<String, Race>()
     private val activity = HashMap<String, Duration>()
+
+    /** The address each server's live event stream is on. */
+    private val streams = HashMap<String, String>()
+
+    /** Requests failed in a row on an address kept for its live stream. */
+    private val failures = HashMap<String, Int>()
     private val epochs = MutableStateFlow(ServerLinkEpoch())
     private var timeouts = 0
 
@@ -222,6 +238,7 @@ class ServerLinkStore(
             answeredSinceReset = false
             // Whichever address answered before may be on the network just left.
             active.clear()
+            failures.clear()
             val current = epochs.value
             epochs.value = current.copy(pools = current.pools + 1, changes = current.changes + 1)
         }
@@ -243,10 +260,11 @@ class ServerLinkStore(
         if (resets) reset(ServerLinkReset.Timeouts)
     }
 
-    fun noteAnswer() {
+    fun noteAnswer(server: String? = null) {
         synchronized(lock) {
             timeouts = 0
             answeredSinceReset = true
+            if (server != null) failures.remove(server)
         }
     }
 
@@ -309,6 +327,7 @@ class ServerLinkStore(
         synchronized(lock) {
             val previous = active[server.persistenceID]
             active[server.persistenceID] = server.url
+            failures.remove(server.persistenceID)
             if (previous != null && previous != server.url) moved()
         }
     }
@@ -318,18 +337,53 @@ class ServerLinkStore(
             val key = server.persistenceID
             val address = active[key] ?: return
             if (failingURL != null && failingURL != address) return
+            failures.remove(key)
             active.remove(key)
         }
     }
 
-    fun noteStreamActivity(server: String) {
-        val now = Clock.liveValue.now()
-        synchronized(lock) { activity[server] = now }
+    fun requestFailed(server: OpenCodeServer, failingURL: String, sentAt: Duration) {
+        val kept = synchronized(lock) {
+            val key = server.persistenceID
+            // The stream on this address heard from it after this request went: the next attempt
+            // goes straight back rather than racing first. Twice in a row, or with no line since,
+            // it's forgotten as usual.
+            val heard = activity[key]
+            if (active[key] != failingURL || streams[key] != failingURL || heard == null || heard <= sentAt) {
+                false
+            } else {
+                val count = (failures[key] ?: 0) + 1
+                if (count >= failuresBeforeForgetting) {
+                    false
+                } else {
+                    failures[key] = count
+                    true
+                }
+            }
+        }
+        if (!kept) invalidate(server, failingURL)
+    }
+
+    fun noteStreamActivity(server: OpenCodeServer) {
+        val now = now()
+        synchronized(lock) {
+            activity[server.persistenceID] = now
+            streams[server.persistenceID] = server.url
+        }
+    }
+
+    fun noteStreamEnded(server: OpenCodeServer) {
+        synchronized(lock) {
+            if (streams[server.persistenceID] != server.url) return
+            streams.remove(server.persistenceID)
+            failures.remove(server.persistenceID)
+        }
     }
 
     fun streamSilence(server: String): Duration? {
+        val now = now()
         val last = synchronized(lock) { activity[server] } ?: return null
-        return Clock.liveValue.now() - last
+        return now - last
     }
 
     private fun settle(key: String, id: UUID, result: Result<String>) {
@@ -338,6 +392,7 @@ class ServerLinkStore(
             if (races[key]?.id != id) return
             races.remove(key)
             val previous = active[key]
+            failures.remove(key)
             val winner = result.getOrNull()
             if (winner != null) {
                 active[key] = winner
@@ -365,6 +420,9 @@ class ServerLinkStore(
 
         /** Resets closer together than this are one (every window reroutes). */
         val resetSpacing: Duration = 1.seconds
+
+        /** Failures in a row on an address with a live stream before it's forgotten anyway. */
+        const val failuresBeforeForgetting = 2
 
         /**
          * Every address at once; the first that answers as this server wins and the rest are
