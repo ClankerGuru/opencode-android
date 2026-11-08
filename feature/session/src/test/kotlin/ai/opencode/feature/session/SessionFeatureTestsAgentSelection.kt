@@ -81,6 +81,9 @@ class SessionFeatureTestsAgentSelection {
         familySessions = familySessions.mapIndexed { index, session -> if (index == 0) session.copy(agent = agent) else session },
     )
 
+    /** `$0.agentSelection.listedDirectory = .init(directory: $0.effectiveDirectory)`. */
+    private fun State.listed(): State = copy(agentSelection = agentSelection.copy(listedDirectory = ListedDirectory(effectiveDirectory)))
+
     /** `$0.promptStates[sentID]?.admission = .admitted`. */
     private fun State.admitted(): State = copy(
         promptStates = promptStates.mapValues { (id, prompt) ->
@@ -120,10 +123,36 @@ class SessionFeatureTestsAgentSelection {
         }
         store.send(Action.AgentsRequested)
         store.receive({ it is Action.AgentsResponse && it.result.isSuccess }, "agentsResponse.success") {
-            it.withPrimaryAgents(agents)
+            it.withPrimaryAgents(agents).listed()
         }
         assertEquals(agents, store.state.knownPrimaryAgents)
         assertEquals(3, tries.value)
+    }
+
+    /**
+     * The chip mounts each time the composer expands: once its folder's list
+     * is in, mounting again asks the server for nothing.
+     */
+    @Test fun expandingTheComposerAgainDoesNotListAgentsAgain() = sessionTest { h ->
+        val asked = LockIsolated(0)
+        val agents = agents
+        val store = h.store(h.makeState(session = agentSession())) {
+            this[Clock] = ImmediateClock()
+            this[ExperimentalFeatures] = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.agentSelection))
+            this[OpenCodeClient] = this[OpenCodeClient].copy(
+                primaryAgents = { _, _ ->
+                    asked.increment()
+                    agents
+                },
+            )
+        }
+        store.send(Action.AgentsRequested)
+        store.receive({ it is Action.AgentsResponse && it.result.isSuccess }, "agentsResponse.success") {
+            it.withPrimaryAgents(agents).listed()
+        }
+        store.send(Action.AgentsRequested)
+        store.send(Action.AgentsRequested)
+        assertEquals("Listed once for the folder", 1, asked.value)
     }
 
     /** After the last try the failure is reported once, not retried forever. */
@@ -172,7 +201,7 @@ class SessionFeatureTestsAgentSelection {
         }
         store.receive(Action.AgentsRequested)
         store.receive({ it is Action.AgentsResponse && it.result.isSuccess }, "agentsResponse.success") {
-            it.withPrimaryAgents(manager)
+            it.withPrimaryAgents(manager).listed()
         }
         assertEquals(listOf<String?>("/srv/two"), asked.value)
     }
@@ -180,7 +209,7 @@ class SessionFeatureTestsAgentSelection {
     /** The list is kept for Settings; a pick is remembered for its session. */
     @Test fun aPickIsRememberedForItsSession() = sessionTest { h ->
         val store = h.agentStore(h.makeState(session = agentSession()), calls = LockIsolated(emptyList()))
-        store.send(Action.AgentsResponse(Result.success(agents))) { it.withPrimaryAgents(agents) }
+        store.send(Action.AgentsResponse(Result.success(agents))) { it.withPrimaryAgents(agents).listed() }
         assertEquals(agents, store.state.knownPrimaryAgents)
         assertEquals("Build", store.state.currentAgentName)
         store.send(Action.AgentPicked("plan"))

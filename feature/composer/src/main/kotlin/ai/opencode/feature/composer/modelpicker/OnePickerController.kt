@@ -76,6 +76,9 @@ class OnePickerController {
     /** Sections frozen during fold-out so nothing shifts while closing. */
     var frozenSections: List<ModelPickerSection>? by mutableStateOf(null)
 
+    /** The list's catalog, kept across openings ([OnePickerCatalogPrewarm]). */
+    val catalogCache = OnePickerCatalogCache()
+
     /** Incremented on each open from closed so the list starts at the top. */
     var openGeneration by mutableStateOf(0)
         private set

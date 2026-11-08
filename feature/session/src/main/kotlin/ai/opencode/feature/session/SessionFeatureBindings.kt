@@ -14,6 +14,7 @@ import ai.opencode.core.store.Reducer
 import ai.opencode.core.store.cancellable
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.State
+import ai.opencode.feature.composer.ComposerAutocompleteAction
 import ai.opencode.feature.composer.ComposerAutocompleteReducer
 import ai.opencode.feature.composer.DictationFeature
 import ai.opencode.feature.voice.DotScopeSimulation
@@ -164,27 +165,26 @@ internal fun SessionFeature.reduceCallAndBindings(state: State, action: Action):
         Reduced(if (state.voice?.phase == VoiceFeature.State.Phase.Ended) state.copy(voice = null) else state)
 
     is Action.Binding -> when (action.action) {
-        is BindingAction.Draft -> {
-            // A keyboard edit mid-dictation wins: stop transcribing rather than letting the next
-            // volatile result clobber what the user typed. Return's newline alone is a send, not a
-            // new answer.
-            var next = state
-            if (!next.isOnlyReturn(next.draft)) next = next.applyBarEdit()
-            next = next.clearEditedUndoDraft()
-            val stop = stopDictation(next)
-            val autocomplete = applyAutocomplete(
-                stop.state,
-                ComposerAutocompleteReducer.draftChanged(stop.state.autocomplete, stop.state.autocompleteHost, autocompleteEnvironment()),
-            )
-            Reduced(autocomplete.state, Effect.merge(stop.effect, autocomplete.effect))
-        }
+        is BindingAction.Draft -> draftEdited(state)
         else -> Reduced(state)
     }
 
-    is Action.Autocomplete -> applyAutocomplete(
-        state,
-        ComposerAutocompleteReducer.reduce(action.action, state.autocomplete, state.autocompleteHost, autocompleteEnvironment()),
-    )
+    is Action.Autocomplete -> {
+        val edit = action.action
+        if (edit is ComposerAutocompleteAction.TextEdited) {
+            // The binding's edit and the caret it left, in one pass.
+            val edited = draftEdited(if (state.draft != edit.text) state.withDraft(edit.text) else state)
+            val caret = edit.caret
+            if (caret is ComposerAutocompleteAction.CaretUpdate.Moved) {
+                val moved = reduceAutocomplete(ComposerAutocompleteAction.CaretChanged(caret.offset), edited.state)
+                Reduced(moved.state, Effect.merge(edited.effect, moved.effect))
+            } else {
+                edited
+            }
+        } else {
+            reduceAutocomplete(edit, state)
+        }
+    }
 
     // Folders are browsed only while the Project sheet is open. Cleared once it has gone, so its
     // stack never changes while it slides away.
@@ -409,3 +409,24 @@ internal fun applyAutocomplete(state: State, outcome: ComposerAutocompleteOutcom
 }
 
 // endregion
+
+/**
+ * iOS `draftEdited(_:)`: the draft changed in the field. A keyboard edit mid-dictation wins: stop
+ * transcribing rather than letting the next volatile result clobber what the user typed. Return's
+ * newline alone is a send, not a new answer.
+ */
+private fun SessionFeature.draftEdited(state: State): Reduced<State, Action> {
+    var next = state
+    if (!next.isOnlyReturn(next.draft)) next = next.applyBarEdit()
+    next = next.clearEditedUndoDraft()
+    val stop = stopDictation(next)
+    val autocomplete = applyAutocomplete(
+        stop.state,
+        ComposerAutocompleteReducer.draftChanged(stop.state.autocomplete, stop.state.autocompleteHost, autocompleteEnvironment()),
+    )
+    return Reduced(autocomplete.state, Effect.merge(stop.effect, autocomplete.effect))
+}
+
+/** iOS `reduceAutocomplete(_:_:)`. */
+private fun SessionFeature.reduceAutocomplete(action: ComposerAutocompleteAction, state: State): Reduced<State, Action> =
+    applyAutocomplete(state, ComposerAutocompleteReducer.reduce(action, state.autocomplete, state.autocompleteHost, autocompleteEnvironment()))

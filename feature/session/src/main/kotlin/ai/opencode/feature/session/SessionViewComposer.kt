@@ -327,7 +327,8 @@ data class ComposerPresentation(val expanded: Boolean, val controls: ComposerCon
 
 /** What the composer reads from [SessionFeature.State], compared as one value so it recomposes only on change. */
 internal data class ComposerSnapshot(
-    val draft: String,
+    /** iOS `draftShape`: only its edges, so typing doesn't recompose the composer ([ComposerInput] reads the text). */
+    val draftShape: DraftShape,
     val isDraft: Boolean,
     val isRunning: Boolean,
     val hasPromptContent: Boolean,
@@ -379,7 +380,7 @@ internal data class ComposerSnapshot(
         fun of(state: SessionFeature.State): ComposerSnapshot {
             val dock = state.dockRequestID
             return ComposerSnapshot(
-                draft = state.draft,
+                draftShape = state.draftShape,
                 isDraft = state.isDraft,
                 isRunning = state.isRunning,
                 hasPromptContent = state.hasPromptContent,
@@ -447,7 +448,6 @@ fun SessionComposer(
     val view = remember { SessionComposerViewState() }
     val snapshot by store.observe { ComposerSnapshot.of(it) }
     val returnKeySends by remember(store) { store.state.returnKeySends.flow }.collectAsState(store.state.returnKeySends.value)
-    val onePickerSetting by remember { shared(ExperimentalFeature.onePicker.key).flow }.collectAsState(false)
     val agentSelection by remember { shared(ExperimentalFeature.agentSelection.key).flow }
         .collectAsState(false)
     val autocomplete by store.observe { it.autocomplete }
@@ -467,7 +467,6 @@ fun SessionComposer(
         s = snapshot,
         reducedMotion = reducedMotion,
         returnKeySends = returnKeySends,
-        usesOnePicker = ExperimentalFeature.onePicker.isActive(onePickerSetting),
         agentSelection = ExperimentalFeature.agentSelection.isActive(agentSelection),
         autocomplete = autocomplete,
         focus = {
@@ -594,8 +593,6 @@ internal class SessionComposerEnv(
     val s: ComposerSnapshot,
     val reducedMotion: Boolean,
     val returnKeySends: Boolean,
-    /** iOS `usesOnePicker`: Experimental › One Picker is on. */
-    val usesOnePicker: Boolean,
     val agentSelection: Boolean,
     val autocomplete: ComposerAutocompleteState,
     val focus: () -> Unit,
@@ -663,7 +660,7 @@ internal class SessionComposerEnv(
             // row showing, so the model is at hand.
             val sheet = photoSheet
             val expanded = !s.isAnsweringRequest && (
-                s.isDraft || messageFieldFocused || dictationActive || s.draft.isNotEmpty() ||
+                s.isDraft || messageFieldFocused || dictationActive || !s.draftShape.isEmpty ||
                     hasComposerAttachments || s.dictationError != null || panelsHoldExpanded
                 )
             // Photos still decoding already count: their slots are in the row.
@@ -709,7 +706,7 @@ internal class SessionComposerEnv(
             val held = view.heldComposerPresentation
             if (s.dictationHold != null && held != null) return held.expanded
             return !s.isAnsweringRequest && (
-                s.isDraft || s.draft.isNotEmpty() || hasComposerAttachments || s.isDictating ||
+                s.isDraft || !s.draftShape.isEmpty || hasComposerAttachments || s.isDictating ||
                     s.isFinishingDictation || s.dictationError != null || panelsHoldExpanded
                 )
         }
@@ -1795,6 +1792,9 @@ private fun SessionComposerEnv.Composer() {
 @Composable
 private fun SessionComposerEnv.ComposerInput(expanded: Boolean, recording: Boolean, bar: RequestBar?) {
     val placeholder = bar?.placeholder ?: "Message"
+    // iOS `ComposerFieldScope` (3fa29077): the text is read here alone, so a keystroke recomposes
+    // the field and not the composer around it.
+    val draft by store.observe { it.draft }
     // iOS `KeyboardDrivenTextInset`: the keyboard morph scrubs the expanded top inset (none
     // inline); without a mounted morph the field follows [expanded].
     val topInsetFraction = LocalComposerKeyboardMorph.current?.layoutProgress(inline = bar != null)
@@ -1811,7 +1811,7 @@ private fun SessionComposerEnv.ComposerInput(expanded: Boolean, recording: Boole
             if (imagesSending) snap() else Motion.reducedFadeSpec(),
             label = "composer-placeholder",
         )
-        if (s.draft.isEmpty()) {
+        if (s.draftShape.isEmpty) {
             Text(
                 placeholder,
                 style = ComposerTunables.textStyle.textStyle,
@@ -1825,12 +1825,14 @@ private fun SessionComposerEnv.ComposerInput(expanded: Boolean, recording: Boole
         }
         val takesPaste = s.takesPasteAttachments
         ComposerTextInput(
-            text = s.draft,
+            text = draft,
             // The reducer's draft now, not the snapshot this composition captured (iOS 02e85073).
             currentText = { store.state.draft },
             focusRequest = s.composerFocusRequest,
             // Folded while dictating: keys typed into the hidden field don't reach the draft.
             onTextChange = { new -> onDraftEdited(new, recording) },
+            // A keystroke is one action: the draft and the caret it left (iOS d0b24aaa).
+            onEdit = { new, caret -> onDraftEdited(new, recording, caret) },
             isFocused = host.messageFieldFocused,
             onFocusedChange = { host.messageFieldFocused = it },
             expanded = expanded,
@@ -1870,12 +1872,20 @@ private fun SessionComposerEnv.ComposerInput(expanded: Boolean, recording: Boole
  * iOS `$store.draft` and its `onChange`: vertical fields swallow the send key as a newline; a single
  * appended "\n" is the return key (pastes never match this shape).
  */
-private fun SessionComposerEnv.onDraftEdited(new: String, recording: Boolean) {
+private fun SessionComposerEnv.onDraftEdited(
+    new: String,
+    recording: Boolean,
+    caret: ComposerAutocompleteAction.CaretUpdate? = null,
+) {
     // Folded while dictating: keys typed into the hidden field don't reach the draft.
     if (recording) return
     val old = store.state.draft
     if (new == old) return
-    store.send(Action.Binding(BindingAction.Draft(new)))
+    if (caret == null) {
+        store.send(Action.Binding(BindingAction.Draft(new)))
+    } else {
+        store.send(Action.Autocomplete(ComposerAutocompleteAction.TextEdited(new, caret)))
+    }
     // The photo sheet rests on the keyboard over the field: typing folds it away so the text shows
     // where it lands (iOS d82670c2).
     if (photoSheet?.morph?.isOpen == true) photoSheet.closePhotoSheet()

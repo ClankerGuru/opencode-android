@@ -1,7 +1,6 @@
 package ai.opencode.app
 
 import ai.opencode.core.dependencies.dependency
-import ai.opencode.core.experiments.migrateModelPicker
 import ai.opencode.core.log.AppLog
 import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.InstallHistory
@@ -28,7 +27,6 @@ import ai.opencode.server.OpenCodeServer
 internal fun migrateSettingsIfNeeded(savedServers: List<OpenCodeServer>) {
     val store = dependency(SharedStore)
     recordInstallHistory(store, savedServers)
-    ExperimentalFeature.migrateModelPicker(store)
     ExperimentalFeature.removeRetiredSwitches(store)
     ExperimentalFeature.adoptNewExperimentsIntoAll()
     removeRetiredOrbStyles(store)

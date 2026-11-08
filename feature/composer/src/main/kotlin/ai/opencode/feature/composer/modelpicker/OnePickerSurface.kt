@@ -100,6 +100,7 @@ import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
 
 // Port of iOS `Composer/ModelPicker/OnePickerSurface.swift`: One Picker's morphing surface. iOS
 // draws one Liquid Glass shape under the composer (`OnePickerGlassBackdrop`) and the panel's
@@ -213,6 +214,7 @@ fun OnePickerSurface(
                 controller.restingBottomComposer = liveComposer
             }
         }
+        OnePickerCatalogPrewarm(state, controller)
         if (controller.isShown) {
             val currentDismiss by rememberUpdatedState(onDismiss)
             if (controller.isOpen) {
@@ -224,7 +226,22 @@ fun OnePickerSurface(
                         .pointerInput(Unit) { detectTapGestures { if (controller.isOpen) currentDismiss() } },
                 )
             }
-            OnePickerPanelPlacement(state, controller, onEvent, onHideKeyboard, onDismiss, onPickModelAndClose)
+            // Built here, not in the placement's per-frame scope, and handed the morph as a
+            // lambda it reads in its own leaf, so a morph frame skips the panel (catalog, list
+            // actions, footer) and only resizes it (iOS 25174297).
+            val morph = remember(controller) { { OnePickerPanelMorph(controller.motion.pose, controller) } }
+            OnePickerPanelPlacement(controller) {
+                OnePickerPanelContent(
+                    state = state,
+                    controller = controller,
+                    isSheetFallback = false,
+                    morph = morph,
+                    onEvent = onEvent,
+                    onHideKeyboard = onHideKeyboard,
+                    onDismiss = onDismiss,
+                    onPickModelAndClose = onPickModelAndClose,
+                )
+            }
         }
     }
 }
@@ -232,12 +249,8 @@ fun OnePickerSurface(
 /** iOS `OnePickerPanelPlacement`: the panel's rows laid out at the pose, revealed with room. */
 @Composable
 private fun OnePickerPanelPlacement(
-    state: ModelPickerState,
     controller: OnePickerController,
-    onEvent: (ModelPickerEvent) -> Unit,
-    onHideKeyboard: () -> Unit,
-    onDismiss: () -> Unit,
-    onPickModelAndClose: (OpenCodeModel, String?) -> Unit,
+    content: @Composable () -> Unit,
 ) {
     val pose = controller.motion.pose
     val rect = pose.rect
@@ -253,7 +266,6 @@ private fun OnePickerPanelPlacement(
     val liveRoomGate = OnePickerSimulation.smoothstep(((visiblePanelHeight - 22) / 14).coerceIn(0.0, 1.0))
     val panelReveal = if (pose.composerOpacity > 0.005) min(pose.contentReveal, liveRoomGate) else pose.contentReveal
     val interactive = controller.isOpen && pose.contentReveal > 0.4
-    val morph = OnePickerPanelMorph(pose, controller)
 
     Box(
         Modifier
@@ -280,16 +292,7 @@ private fun OnePickerPanelPlacement(
                     // iOS `.allowsHitTesting(isOpen && contentReveal > 0.4)`: eat touches until then.
                     .let { if (interactive) it else it.pointerInput(Unit) { awaitEachGesture { awaitFirstDown(requireUnconsumed = false).consume() } } },
             ) {
-                OnePickerPanelContent(
-                    state = state,
-                    controller = controller,
-                    isSheetFallback = false,
-                    morph = morph,
-                    onEvent = onEvent,
-                    onHideKeyboard = onHideKeyboard,
-                    onDismiss = onDismiss,
-                    onPickModelAndClose = onPickModelAndClose,
-                )
+                content()
             }
         }
     }
@@ -358,7 +361,7 @@ fun OnePickerSheetHost(
                 state = state,
                 controller = fallbackController,
                 isSheetFallback = true,
-                morph = OnePickerPanelMorph.still,
+                morph = { OnePickerPanelMorph.still },
                 onEvent = onEvent,
                 onHideKeyboard = {},
                 onDismiss = { hideThen?.invoke(onDismiss) ?: onDismiss() },
@@ -371,27 +374,118 @@ fun OnePickerSheetHost(
 }
 
 /**
- * iOS `OnePickerCatalogCache.Key`: what the catalog and its row snapshots are built from. iOS
- * keys the catalogue by `SessionFeature.State.modelsRevision` (a counter `models`' `didSet`
- * bumps) so it never compares the whole catalogue; Kotlin's immutable lists compare by identity
- * first, so the key holds the list itself and only a new catalogue is compared in full.
+ * iOS `OnePickerCatalogCache`: the last catalog the panel built and the inputs it came from. Kept
+ * by [OnePickerController], so it outlives the panel: the next open reuses it, or the copy
+ * [OnePickerCatalogPrewarm] built while the list was shut, instead of building it on the
+ * opening's first frame. A plain class, so filling it never recomposes anything. Read and filled
+ * on the main thread only.
  */
-private data class OnePickerCatalogKey(
-    val models: List<OpenCodeModel>,
-    val visibility: Any?,
-    val showsHiddenModels: Boolean,
-    val favorites: Set<String>,
-    val recents: List<String>,
-    val currentModelID: String?,
-    val currentLevel: String?,
-    val modelVariants: Map<String, String>,
-    val filter: String,
-    val recentLimit: Int,
-    val showsAllModels: Boolean,
-    val frozen: List<ModelPickerSection>?,
-)
+class OnePickerCatalogCache {
+    /**
+     * iOS `OnePickerCatalogCache.Key`: what the catalog and its row snapshots are built from. iOS
+     * keys the catalogue by `SessionFeature.State.modelsRevision` (a counter `models`' `didSet`
+     * bumps) so it never compares the whole catalogue; Kotlin's immutable lists compare by
+     * identity first, so the key holds the list itself and only a new catalogue is compared in
+     * full. iOS's row height, level alpha and arc tunables are constants here, so they're left out.
+     */
+    data class Key(
+        val models: List<OpenCodeModel>,
+        val visibility: Any?,
+        val showsHiddenModels: Boolean,
+        val favorites: Set<String>,
+        val recents: List<String>,
+        val currentModelID: String?,
+        val currentLevel: String?,
+        val modelVariants: Map<String, String>,
+        val filter: String,
+        val recentLimit: Int,
+        val showsAllModels: Boolean,
+        val frozen: List<ModelPickerSection>?,
+    ) {
+        /**
+         * The catalog's inputs as they are now, listing [recents] as the picker's recent rows and
+         * [frozen] (closing) in place of the sections.
+         */
+        constructor(state: ModelPickerState, recents: List<String>, frozen: List<ModelPickerSection>?) : this(
+            models = state.models,
+            visibility = state.modelVisibility,
+            showsHiddenModels = state.showsAllModels,
+            favorites = state.favoriteModelIDs,
+            recents = recents,
+            currentModelID = state.currentModelInfo?.id,
+            currentLevel = state.currentLevel,
+            modelVariants = state.modelVariants,
+            filter = state.modelFilter,
+            recentLimit = OnePickerTunables.RECENTS,
+            showsAllModels = OnePickerTunables.SHOWS_ALL_MODELS,
+            frozen = frozen,
+        )
 
-private class OnePickerCatalog2(val sections: List<ModelPickerSection>, val snapshots: List<OnePickerSectionSnapshot>)
+        /** The same inputs, except for the frozen sections. */
+        fun matchesIgnoringFrozen(other: Key): Boolean = other.copy(frozen = frozen) == this
+    }
+
+    class Catalog(val sections: List<ModelPickerSection>, val snapshots: List<OnePickerSectionSnapshot>)
+
+    private var key: Key? = null
+    private var value: Catalog? = null
+
+    /** The sections last built, as the panel shows them: what a close freezes. */
+    val shownSections: List<ModelPickerSection>? get() = value?.sections
+
+    fun catalog(next: Key, build: () -> Catalog): Catalog {
+        val cached = value
+        val cachedKey = key
+        if (cached != null && cachedKey != null) {
+            if (cachedKey == next) return cached
+            // Freezing the sections already on screen (a close) changes nothing the rows show:
+            // the catalog and its snapshots stay as they are.
+            val frozen = next.frozen
+            if (frozen != null && cachedKey.matchesIgnoringFrozen(next) && frozen == cached.sections) {
+                key = next
+                return cached
+            }
+        }
+        val built = build()
+        key = next
+        value = built
+        return built
+    }
+
+    companion object {
+        /** The catalog and its row snapshots for [key], from the picker's models. */
+        fun build(key: Key, state: ModelPickerState): Catalog {
+            val sections = key.frozen ?: OnePickerCatalog.sections(
+                models = state.pickerModels,
+                favorites = key.favorites,
+                recents = key.recents,
+                currentModelID = key.currentModelID,
+                filter = key.filter,
+                recentLimit = key.recentLimit,
+                showsAllModels = key.showsAllModels,
+            )
+            return Catalog(sections, state.onePickerSnapshotSections(sections))
+        }
+    }
+}
+
+/**
+ * iOS `OnePickerCatalogPrewarm`: builds the next opening's catalog while the list is shut, half a
+ * second after the models, favorites, visibility or current model settle (off the frames of
+ * whatever changed them, a pick's close or the keyboard), so opening finds it in
+ * [OnePickerController.catalogCache] instead of building it on its first frame. iOS's run loop
+ * timer (bb4e47f7) is a coroutine delay here: a newer key cancels the pending build.
+ */
+@Composable
+private fun OnePickerCatalogPrewarm(state: ModelPickerState, controller: OnePickerController) {
+    val key = if (controller.isShown) null else OnePickerCatalogCache.Key(state, state.recentModelIDs, frozen = null)
+    LaunchedEffect(key) {
+        if (key == null) return@LaunchedEffect
+        delay(500)
+        if (controller.isShown) return@LaunchedEffect
+        controller.catalogCache.catalog(key) { OnePickerCatalogCache.build(key, state) }
+    }
+}
 
 /** iOS `snapshotSections(from:)`: each section's immutable row snapshots. */
 internal fun ModelPickerState.onePickerSnapshotSections(sections: List<ModelPickerSection>): List<OnePickerSectionSnapshot> {
@@ -447,7 +541,7 @@ private fun OnePickerPanelContent(
     state: ModelPickerState,
     controller: OnePickerController,
     isSheetFallback: Boolean,
-    morph: OnePickerPanelMorph,
+    morph: () -> OnePickerPanelMorph,
     onEvent: (ModelPickerEvent) -> Unit,
     onHideKeyboard: () -> Unit,
     onDismiss: () -> Unit,
@@ -458,33 +552,10 @@ private fun OnePickerPanelContent(
     var searchFieldFocused by remember { mutableStateOf(false) }
     var scrollEdges by remember { mutableStateOf(OnePickerScrollEdges()) }
 
+    // The catalog and its row snapshots, rebuilt only when one of their inputs changes.
     val frozen = if (!controller.isOpen && !isSheetFallback) controller.frozenSections else null
-    val key = OnePickerCatalogKey(
-        models = state.models,
-        visibility = state.modelVisibility,
-        showsHiddenModels = state.showsAllModels,
-        favorites = state.favoriteModelIDs,
-        recents = controller.recentsAtOpen,
-        currentModelID = state.currentModelInfo?.id,
-        currentLevel = state.currentLevel,
-        modelVariants = state.modelVariants,
-        filter = state.modelFilter,
-        recentLimit = OnePickerTunables.RECENTS,
-        showsAllModels = OnePickerTunables.SHOWS_ALL_MODELS,
-        frozen = frozen,
-    )
-    val catalog = remember(key) {
-        val sections = frozen ?: OnePickerCatalog.sections(
-            models = state.pickerModels,
-            favorites = key.favorites,
-            recents = key.recents,
-            currentModelID = key.currentModelID,
-            filter = key.filter,
-            recentLimit = key.recentLimit,
-            showsAllModels = key.showsAllModels,
-        )
-        OnePickerCatalog2(sections, state.onePickerSnapshotSections(sections))
-    }
+    val key = OnePickerCatalogCache.Key(state, controller.recentsAtOpen, frozen)
+    val catalog = controller.catalogCache.catalog(key) { OnePickerCatalogCache.build(key, state) }
     val isSearching = state.modelFilter.trim().isNotEmpty()
     val hiddenModelCount = state.hiddenModelCount
     val footer = if (hiddenModelCount > 0) OnePickerFooterSnapshot(hiddenModelCount, state.showsAllModels) else null
@@ -521,6 +592,8 @@ private fun OnePickerPanelContent(
             .semantics { dismiss { onDismiss(); true } }
             .testTag("model-list"),
     ) {
+        // The morph is read here, in the list's sizing scope, not in the panel's body.
+        val morph = morph()
         val currentHeight = maxHeight.value.toDouble()
         val bottomReserved = max(60.0, morph.composerControlsClearance)
         val windowListHeight = max(0.0, currentHeight - 24 - bottomReserved)

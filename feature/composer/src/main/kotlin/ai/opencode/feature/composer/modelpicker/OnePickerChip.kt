@@ -132,7 +132,9 @@ fun OnePickerChip(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        OnePickerChipRoll(key, animates, reduceMotion, label = "onePickerName") { rolled ->
+        // Only the name gives way when the chip runs out of room (iOS keeps the level word, arc and
+        // chevron `fixedSize`): weighted, it's measured after them and ellipsizes into what's left.
+        OnePickerChipRoll(key, animates, reduceMotion, label = "onePickerName", modifier = Modifier.weight(1f, fill = false)) { rolled ->
             Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (OnePickerTunables.CHIP_SHOWS_LOGO && (state.currentModel != null || model != null)) {
                     OnePickerProviderMark(
@@ -142,7 +144,14 @@ fun OnePickerChip(
                         tint = OpenCodeTheme.colors.secondaryText,
                     )
                 }
-                Text(rolled.shortName, style = ChipTextStyle, color = OpenCodeTheme.colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    rolled.shortName,
+                    style = ChipTextStyle,
+                    color = OpenCodeTheme.colors.text,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
             }
         }
         if (scale != null) {
@@ -199,6 +208,7 @@ private fun <T> OnePickerChipRoll(
     animates: Boolean,
     reduceMotion: Boolean,
     label: String,
+    modifier: Modifier = Modifier,
     content: @Composable (T) -> Unit,
 ) {
     val density = LocalDensity.current
@@ -206,6 +216,7 @@ private fun <T> OnePickerChipRoll(
     val roll: MotionSpring = OnePickerTunables.chipRoll
     AnimatedContent(
         targetState = target,
+        modifier = modifier,
         transitionSpec = {
             val size = SizeTransform(clip = false) { _, _ -> if (animates) OnePickerTunables.chipWidth.animation(reduceMotion) else snap() }
             if (!animates) {

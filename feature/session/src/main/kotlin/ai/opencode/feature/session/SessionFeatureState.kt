@@ -668,7 +668,7 @@ val State.isUploadingFiles: Boolean get() = composerAttachments.isUploadingFiles
 val State.isWaitingForUploads: Boolean get() = composerAttachments.isWaitingForUploads
 
 /** Something to send: text, inline media, or files. */
-val State.hasPromptContent: Boolean get() = draft.isNotBlank() || composerAttachments.hasContent
+val State.hasPromptContent: Boolean get() = draftShape.hasText || composerAttachments.hasContent
 
 /** The composer's text, inline media, and files, saved while elsewhere. */
 val State.draftState: DraftState

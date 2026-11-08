@@ -911,6 +911,18 @@ class ComposerAutocompleteTextBridge {
         emitCaretIfNeeded(text, selection, composition, requireDiffFromState = true)
     }
 
+    /**
+     * Where an edit left the caret, for the edit's own action ([ComposerAutocompleteAction.TextEdited]):
+     * what [notifyCaretAfterEdit] would have sent on its own.
+     */
+    fun caretUpdateAfterEdit(text: String, selection: TextRange, composition: TextRange?): ComposerAutocompleteAction.CaretUpdate {
+        if (!isEnabled || isUpdatingProgrammaticText || composition != null) return ComposerAutocompleteAction.CaretUpdate.Unchanged
+        val actual = normalizedCaretOffset(selection, text.length)
+        if (actual == caretUTF16Offset || actual == lastSentCaretOffset) return ComposerAutocompleteAction.CaretUpdate.Unchanged
+        lastSentCaretOffset = actual
+        return ComposerAutocompleteAction.CaretUpdate.Moved(actual)
+    }
+
     /** Call when the selection moves (iOS `textViewDidChangeSelection`). */
     fun selectionDidChange(text: String, selection: TextRange, composition: TextRange?, committedText: String) {
         if (text != committedText) return

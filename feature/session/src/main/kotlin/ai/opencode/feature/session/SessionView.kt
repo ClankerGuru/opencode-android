@@ -103,6 +103,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
@@ -112,7 +113,9 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.offset
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.flowOf
@@ -199,21 +202,10 @@ fun SessionView(
     // iOS `orbClearance`: the room a resting orb takes above the composer, so it covers none of
     // the transcript's end. Beside the composer's column or dragged well up it makes none; only
     // the screen showing makes room.
-    val floatingCallCenter = remember { FloatingCallCenter.shared }
-    val callLive by remember(callStore) { callStore?.let { call -> call.states.map { !it.phase.isTerminal } } ?: flowOf(false) }
-        .collectAsState(false)
-    var orbComposer by remember { mutableStateOf(Rect.Zero) }
-    val orbRoom = if (isCovered || !callLive) 0f else {
-        val orb = floatingCallCenter.restingOrb(composerTop = orbComposer.top)
-        if (orb == null) 0f else FloatingCallRestArea.clearance(orb, orbComposer, FloatingCallTunables.composerGap.value.toFloat())
-    }
-    val orbReducedMotion = rememberReduceMotion()
-    val orbClearance by animateFloatAsState(
-        orbRoom,
-        if (orbReducedMotion) Motion.easeInOut(0.2) else FloatingCallTunables.follow.spec(),
-        label = "orbClearance",
-    )
-    SideEffect { composerHost.orbClearance = orbClearance }
+    // The composer's frame lives in `orbGeometry` and is read only by `OrbClearance`, during a
+    // call, so the composer riding the keyboard doesn't recompose SessionView (iOS d0b24aaa).
+    val orbGeometry = remember { OrbClearanceGeometry() }
+    OrbClearance(callStore, orbGeometry, isCovered, composerHost)
 
     val work by store.observe(BackgroundWorkModel::from)
     val agentScope by store.observe { "${it.server.persistenceID}|${it.session?.id ?: "draft"}" }
@@ -313,13 +305,13 @@ fun SessionView(
                         .composerKeyboardStepHold()
                         .onSizeChanged { scrollEdgeBridge.composerHeight = with(density) { it.height.toDp().value } }
                         // The resting orb's room: the transcript's end rises above it.
-                        .padding(top = orbClearance.dp)
+                        .orbClearancePadding(composerHost)
                         // The composer without that room, for where the orb rests.
                         .onGloballyPositioned {
                             val b = it.boundsInWindow()
                             val d = density.density
                             val frame = Rect(b.left / d, b.top / d, b.right / d, b.bottom / d)
-                            if (orbComposer != frame) orbComposer = frame
+                            if (orbGeometry.composer != frame) orbGeometry.composer = frame
                         }
                         // A floating call rests above the composer.
                         .floatingCallComposer()
@@ -386,6 +378,51 @@ private data class BackgroundWorkModel(
  * ([SessionAttachmentCamera]); Paste (while the clipboard holds an image, checked as the menu
  * opens) attaches the clipboard's images through `PasteboardClient` and brings the keyboard back.
  */
+/** iOS `OrbClearanceGeometry`: the composer's frame in the window, in dp, for where the orb rests. */
+private class OrbClearanceGeometry {
+    var composer by mutableStateOf(Rect.Zero)
+}
+
+/**
+ * iOS `orbClearance`: the room a resting orb takes above the composer, so it covers none of the
+ * transcript's end. Beside the composer's column or dragged well up it makes none; only the screen
+ * showing makes room. A leaf, so following the composer recomposes only this.
+ */
+@Composable
+private fun OrbClearance(
+    callStore: VoiceStoreOf?,
+    geometry: OrbClearanceGeometry,
+    isCovered: Boolean,
+    host: SessionComposerHost,
+) {
+    val floatingCallCenter = remember { FloatingCallCenter.shared }
+    val callLive by remember(callStore) { callStore?.let { call -> call.states.map { !it.phase.isTerminal } } ?: flowOf(false) }
+        .collectAsState(false)
+    var orbRoom = 0f
+    if (!isCovered && callLive) {
+        val composer = geometry.composer
+        val orb = floatingCallCenter.restingOrb(composerTop = composer.top)
+        if (orb != null) {
+            orbRoom = FloatingCallRestArea.clearance(orb, composer, FloatingCallTunables.composerGap.value.toFloat())
+        }
+    }
+    val reducedMotion = rememberReduceMotion()
+    val orbClearance by animateFloatAsState(
+        orbRoom,
+        if (reducedMotion) Motion.easeInOut(0.2) else FloatingCallTunables.follow.spec(),
+        label = "orbClearance",
+    )
+    SideEffect { host.orbClearance = orbClearance }
+}
+
+/** Top padding of [SessionComposerHost.orbClearance], read while laying out rather than composing. */
+private fun Modifier.orbClearancePadding(host: SessionComposerHost): Modifier = layout { measurable, constraints ->
+    val top = host.orbClearance.dp.roundToPx()
+    val placeable = measurable.measure(constraints.offset(vertical = -top))
+    val height = constraints.constrainHeight(placeable.height + top)
+    layout(placeable.width, height) { placeable.place(0, top) }
+}
+
 @Composable
 private fun SessionAttachmentMenu(
     store: StoreOf<State, Action>,

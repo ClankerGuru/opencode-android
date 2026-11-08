@@ -256,3 +256,19 @@ internal fun SessionFeature.composedBody(): Reducer<State, Action> {
     }
     return builtBody
 }
+
+/**
+ * iOS `SessionFeature.State.DraftShape`: what the composer's chrome needs from the draft
+ * ([draftShape]). It changes as the first character comes or the last one goes, not on every
+ * keystroke, so a view reading it doesn't recompose as the person types.
+ */
+data class DraftShape(
+    val isEmpty: Boolean = true,
+    /** Something besides whitespace: there's text to send. */
+    val hasText: Boolean = false,
+) {
+    constructor(draft: String) : this(isEmpty = draft.isEmpty(), hasText = draft.isNotBlank())
+}
+
+/** iOS `State.draftShape`: whether [SessionFeature.State.draft] is empty or blank. */
+val SessionFeature.State.draftShape: DraftShape get() = DraftShape(draft)

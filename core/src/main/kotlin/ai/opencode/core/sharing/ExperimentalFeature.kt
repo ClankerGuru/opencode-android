@@ -43,7 +43,6 @@ enum class ExperimentalFeature(
     joinsAll: Boolean = true,
 ) {
     // Composer
-    onePicker("one-picker", "One Picker", ExperimentalGroup.composer, "cpu", "Favorites, recents, and inline levels"),
     agentSelection("agent-selection", "Agent Selection", ExperimentalGroup.composer, "person.crop.circle", "Choose Build, Plan, or your own"),
     hideModels("hide-models", "Hide Unused Models", ExperimentalGroup.composer, "eye.slash"),
 
@@ -113,10 +112,11 @@ enum class ExperimentalFeature(
 
         /**
          * Switches of removed experiments (Session Switcher, Title Is the Switch, Floating Call,
-         * Call Tray) and of ones now always on (Composer Autocomplete, Server Flow, New Plus Menu,
-         * Project Icons, Image Link Previews, Living Orb, New Messages Divider, Open Links from
-         * Calls, Audio in Calls, Server Details, Server Voice), with the call-style migration's
-         * markers. Nothing reads them; they're cleared at launch.
+         * Call Tray, the Model Picker menu and the switches before it) and of ones now always on
+         * (Composer Autocomplete, Server Flow, New Plus Menu, Project Icons, Image Link Previews,
+         * Living Orb, New Messages Divider, Open Links from Calls, Audio in Calls, Server Details,
+         * Server Voice, One Picker), with the call-style migration's markers. Nothing reads them;
+         * they're cleared at launch.
          */
         val retiredKeys: List<String> = buildList {
             add("experimental-session-switcher")
@@ -129,9 +129,13 @@ enum class ExperimentalFeature(
             add("experimental-call-tray")
             add("call-style-migrated-living-orb")
             add("call-style-migrated-orb-default")
+            add("experimental-model-picker")
+            add("experimental-new-model-picker")
+            add("experimental-custom-model-picker")
             val alwaysOn = listOf(
                 "image-link-previews", "living-orb", "new-messages-divider",
                 "open-links-from-calls", "audio-in-calls", "server-details", "server-voice",
+                "one-picker",
             )
             for (name in alwaysOn) {
                 add("experimental-$name")

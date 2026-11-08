@@ -25,7 +25,6 @@ import ai.opencode.feature.composer.RequestDockMetrics
 import ai.opencode.feature.composer.SelectionMark
 import ai.opencode.feature.composer.SelectionMarkWidth
 import ai.opencode.feature.composer.micPressGesture
-import ai.opencode.feature.composer.modelpicker.ModelPickerChip
 import ai.opencode.feature.composer.modelpicker.OnePickerChip
 import ai.opencode.feature.composer.modelpicker.OnePickerController
 import androidx.compose.animation.core.animateFloatAsState
@@ -140,48 +139,32 @@ private fun SessionComposerEnv.AgentButton() {
 }
 
 /**
- * The model control (iOS `modelButton`): composer's [ModelPickerChip] (tap opens the model
- * picker sheet); with One Picker on, its [OnePickerChip] (tap grows One Picker out of the
- * composer).
+ * The model control (iOS `modelButton`): One Picker's [OnePickerChip]; a tap grows One Picker
+ * out of the composer, or opens it in a sheet when the morph can't present.
  */
 @Composable
 private fun SessionComposerEnv.ModelButton(enabled: Boolean) {
     val picker = rememberModelPickerState(store)
     ComposerHidden(foldsComposerControls) {
-        if (usesOnePicker) {
-            val panels = host.modelPanels
-            val unmounted = remember { OnePickerController() }
-            OnePickerChip(
-                state = picker,
-                controller = panels?.onePicker ?: unmounted,
-                onEvent = { event -> modelPickerAction(event)?.let(store::send) },
-                // iOS `openOnePicker()`: the picker grows out of the composer in the keyboard's place.
-                onOpen = {
-                    if (composerTextTakesDoubleTap()) return@OnePickerChip
-                    if (panels != null && panels.canPresentOnePickerMorph) {
-                        panels.openOnePicker()
-                    } else {
-                        dismissKeyboard()
-                        store.send(Action.ModelButtonTapped)
-                    }
-                },
-                isEnabled = enabled && panels?.onePicker?.isOpen != true,
-                targetDrop = ComposerLayoutMetrics.pickerTargetDrop.dp,
-            )
-        } else {
-            ModelPickerChip(
-                state = picker,
-                onClick = {
-                    if (!enabled) return@ModelPickerChip
-                    if (composerTextTakesDoubleTap()) return@ModelPickerChip
-                    // Put away under any picker sheet (iOS 07b2f5f8), or a row's level menu raises the
-                    // composer's keyboard over the sheet.
-                    if (host.messageFieldFocused) dismissKeyboard()
+        val panels = host.modelPanels
+        val unmounted = remember { OnePickerController() }
+        OnePickerChip(
+            state = picker,
+            controller = panels?.onePicker ?: unmounted,
+            onEvent = { event -> modelPickerAction(event)?.let(store::send) },
+            // iOS `openOnePicker()`: the picker grows out of the composer in the keyboard's place.
+            onOpen = {
+                if (composerTextTakesDoubleTap()) return@OnePickerChip
+                if (panels != null && panels.canPresentOnePickerMorph) {
+                    panels.openOnePicker()
+                } else {
+                    dismissKeyboard()
                     store.send(Action.ModelButtonTapped)
-                },
-                targetDrop = ComposerLayoutMetrics.pickerTargetDrop.dp,
-            )
-        }
+                }
+            },
+            isEnabled = enabled && panels?.onePicker?.isOpen != true,
+            targetDrop = ComposerLayoutMetrics.pickerTargetDrop.dp,
+        )
     }
 }
 
@@ -244,7 +227,7 @@ internal fun SessionComposerEnv.AnswerLeadingControls(bar: RequestBar, recording
             Box(if (recording) Modifier else Modifier.blockTouches()) { AttachmentButton() }
         }
         if (bar is RequestBar.Answer) {
-            val draftEmpty = s.draft.isBlank()
+            val draftEmpty = !s.draftShape.hasText
             ComposerHidden(foldsComposerControls) {
                 Box(
                     Modifier
@@ -264,7 +247,7 @@ internal fun SessionComposerEnv.AnswerLeadingControls(bar: RequestBar, recording
                                             else -> "Answers with your words"
                                         },
                                     ) {
-                                        if (s.draft.isBlank()) focus() else store.send(Action.requestCustomMarkTapped)
+                                        if (!s.draftShape.hasText) focus() else store.send(Action.requestCustomMarkTapped)
                                     }
                                     .semantics(mergeDescendants = true) {
                                         contentDescription = "Your own answer"
@@ -300,7 +283,7 @@ internal fun SessionComposerEnv.AnswerTrailingControls(bar: RequestBar) {
                     Modifier
                         .padding(end = 5.dp)
                         .heightIn(min = 48.dp)
-                        .clickable(role = Role.Button, onClickLabel = if (s.draft.isNotEmpty()) "Tells the agent what to do instead" else null) {
+                        .clickable(role = Role.Button, onClickLabel = if (!s.draftShape.isEmpty) "Tells the agent what to do instead" else null) {
                             dismissKeyboard()
                             store.send(Action.SendTapped)
                         }

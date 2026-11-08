@@ -205,12 +205,26 @@ sealed interface ComposerAutocompleteAction {
     data class SessionsLoaded(val search: String, val sessions: List<OpenCodeSession>) : ComposerAutocompleteAction
     data class SessionsFailed(val search: String) : ComposerAutocompleteAction
     data class CaretChanged(val offset: Int?) : ComposerAutocompleteAction
+
+    /**
+     * A keystroke in the field: the new draft, and the caret when the edit left it somewhere the
+     * draft's change doesn't account for. One action, where a binding and [CaretChanged] were two
+     * passes (handled with the draft binding in `SessionFeatureBindings`).
+     */
+    data class TextEdited(val text: String, val caret: CaretUpdate) : ComposerAutocompleteAction
     data class MoveHighlight(val delta: Int) : ComposerAutocompleteAction
     data object ConfirmSelection : ComposerAutocompleteAction
     data class RowChosen(val id: String) : ComposerAutocompleteAction
     data object Dismissed : ComposerAutocompleteAction
     data class ChipDeleted(val chipID: UUID) : ComposerAutocompleteAction
     data class CommandFinished(val result: ComposerCommandResult) : ComposerAutocompleteAction
+
+    /** iOS `ComposerAutocompleteAction.CaretUpdate`: where an edit left the caret, as [CaretChanged] would have reported it. */
+    sealed interface CaretUpdate {
+        /** Where the draft's change moves it, or a composition is still open. */
+        data object Unchanged : CaretUpdate
+        data class Moved(val offset: Int?) : CaretUpdate
+    }
 }
 
 /**
@@ -540,6 +554,9 @@ object ComposerAutocompleteReducer {
                 if (next.isProseWithoutMatches) return close(next, draft, env)
                 outcome(next, draft, Effect.none())
             }
+
+            // `SessionFeature` takes the draft first (`draftEdited`), then the caret.
+            is ComposerAutocompleteAction.TextEdited -> outcome(state, draft, Effect.none())
 
             is ComposerAutocompleteAction.CaretChanged ->
                 draftChanged(state.setCaret(action.offset, draft.length), host, env, isCaretUpdate = true)

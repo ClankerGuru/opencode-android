@@ -90,7 +90,7 @@ class ExperimentalFeatureTests {
             ExperimentalGroup.entries.flatMap { it.features }.toSet(),
         )
         assertEquals(
-            listOf(ExperimentalFeature.onePicker, ExperimentalFeature.agentSelection, ExperimentalFeature.hideModels),
+            listOf(ExperimentalFeature.agentSelection, ExperimentalFeature.hideModels),
             ExperimentalGroup.composer.features,
         )
         assertEquals(
@@ -115,11 +115,12 @@ class ExperimentalFeatureTests {
             "session-switcher", "server-title-switch",
             "composer-autocomplete", "server-flow", "plus-menu-sheet", "project-icons",
             "floating-call", "call-tray", "image-link-previews", "living-orb", "new-messages-divider",
-            "open-links-from-calls", "audio-in-calls", "server-details", "server-voice",
+            "open-links-from-calls", "audio-in-calls", "server-details", "server-voice", "one-picker",
+            "model-picker", "new-model-picker", "custom-model-picker",
         )
         val leftovers = listOf(
             "experimental-all-saved-living-orb", "experimental-all-skip-image-link-previews", "experimental-all-saved-server-voice",
-            "call-style-migrated-living-orb", "call-style-migrated-orb-default",
+            "experimental-all-saved-one-picker", "call-style-migrated-living-orb", "call-style-migrated-orb-default",
         )
         withFreshStorage {
             val defaults = dependency(SharedStore)
@@ -142,40 +143,6 @@ class ExperimentalFeatureTests {
             }
             assertTrue("Live experiments keep their switch", defaults.bool("experimental-in-app-browser"))
         }
-    }
-
-    @Test
-    fun aSavedSheetOrGrowBecomesOnePickerOnce() {
-        fun migrated(setup: (SharedStore) -> Unit): Pair<Boolean, Boolean> = withFreshStorage {
-            val defaults = dependency(SharedStore)
-            setup(defaults)
-            ExperimentalFeature.migrateModelPicker(defaults)
-            val keys = listOf(LEGACY_MODEL_PICKER_KEY) + legacyModelPickerSwitchKeys
-            var leftover = false
-            for (key in keys) {
-                if (defaults.contains(SharedKey.appStorage<String?>(key, null))) leftover = true
-            }
-            defaults.bool("experimental-one-picker") to leftover
-        }
-        fun SharedStore.saveStyle(style: String) = reference(SharedKey.appStorage<String?>(LEGACY_MODEL_PICKER_KEY, null)).set(style)
-
-        assertEquals(false to false, migrated { })
-        assertEquals(false to false, migrated { it.saveStyle("today") })
-        for (style in listOf("sheet", "one-picker", "grow-from-composer")) {
-            assertEquals(style, true to false, migrated { it.saveStyle(style) })
-        }
-        for (key in legacyModelPickerSwitchKeys) {
-            assertEquals(key, true to false, migrated { it.save(key, true) })
-            assertEquals(key, false to false, migrated { it.save(key, false) })
-        }
-        assertEquals(
-            "One Picker already on stays on",
-            true to false,
-            migrated {
-                it.saveStyle("today")
-                it.save("experimental-one-picker", true)
-            },
-        )
     }
 
     /** `VoiceAudioDemoMode` lives in `:feature:voice`; its half of this test belongs there. */
