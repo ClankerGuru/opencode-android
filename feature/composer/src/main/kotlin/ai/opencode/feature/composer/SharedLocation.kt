@@ -242,7 +242,7 @@ class LocationClient(
     /**
      * Pre-renders the composer's compact map snapshot before the location response lands so
      * the card reveals with its map already in cache, bounded by [timeout] (1.2 s default) so
-     * slow tiles never hold the card on “Finding Location…”. As iOS's `MapSnapshotGate`, the
+     * slow tiles never hold the card on “Finding Location…”. As under iOS's `OneShotRequestGate`, the
      * snapshot runs in its own job, so the wait ends at [timeout] even when the snapshot ignores
      * cancellation; it is cancelled then.
      */

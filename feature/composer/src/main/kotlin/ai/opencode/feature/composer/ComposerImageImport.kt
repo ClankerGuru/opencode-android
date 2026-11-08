@@ -193,7 +193,8 @@ class ComposerImageImporter(private val scope: CoroutineScope) {
         onFailure: (UUID?) -> Unit = {},
         onCancel: () -> Unit = {},
         onCompletion: (Result) -> Unit = {},
-        limit: Int = AttachmentPickerButton.maxPhotoSelection(plusMenu = false),
+        /** Pastes, shares and quotes: four images at a time. */
+        limit: Int = 4,
     ) {
         cancel()
         for (dropped in sources.drop(limit)) onFailure(dropped.attachmentID)

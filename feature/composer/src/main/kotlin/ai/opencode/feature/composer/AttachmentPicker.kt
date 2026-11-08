@@ -70,7 +70,6 @@ import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -99,7 +98,7 @@ interface AttachmentPlusPeek {
 
 /**
  * The composer's + button (iOS `AttachmentPickerButton`). A tap opens the attachment menu
- * ([AttachmentMenuOverlay]), which grows up out of the button; touching down and holding
+ * ([ai.opencode.feature.composer.plusmenu.PlusMenuGlassSurface]), which grows up out of the button; touching down and holding
  * opens it too, and the finger can slide across the rows and release on one to choose it.
  * While the menu is open the + turns into a × that closes it. While dictating the same + turns
  * into the recording's ×, which cancels it, and a filled circle grows in behind it in the same
@@ -114,17 +113,11 @@ object AttachmentPickerButton {
         val isEnabled: Boolean = true,
     )
 
-    /** Main's picker: [maxPhotoSelection] without the New Plus Menu. */
-    const val MAX_PHOTO_SELECTION = 4
-
-    /** New Plus Menu's photo sheet takes up to 8 photos; main's picker stays at 4. */
-    fun maxPhotoSelection(plusMenu: Boolean): Int = if (plusMenu) 8 else MAX_PHOTO_SELECTION
+    /** The + menu and the photo sheet take up to 8 photos (iOS `maxPhotoSelection`). */
+    const val MAX_PHOTO_SELECTION = 8
 
     /** How long a touch rests on + before the menu opens under it. */
-    val holdDuration: Duration = 250.milliseconds
-
-    fun holdDuration(plusMenuSheet: Boolean): Duration =
-        if (plusMenuSheet) PlusMenuTunables.HOLD_DURATION.seconds else holdDuration
+    val holdDuration: Duration = PlusMenuTunables.HOLD_DURATION.seconds
 
     /** Moving this far (dp) before the hold elapses opens the menu at once. */
     internal const val DRAG_DISTANCE = 10f
@@ -253,7 +246,7 @@ fun AttachmentPickerButton(
             press.began(isOpen = currentIsOpen)
             if (!currentIsOpen) {
                 hold = scope.launch {
-                    delay(AttachmentPickerButton.holdDuration(plusMenuSheet = currentPeek != null))
+                    delay(AttachmentPickerButton.holdDuration)
                     openByHold()
                 }
             }

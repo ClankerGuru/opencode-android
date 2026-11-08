@@ -35,7 +35,7 @@ import kotlin.time.Duration.Companion.seconds
  *
  * Dropped: `locationEntranceTrace…`'s `LocationAttachmentTrace` recorder and parser (a lab
  * trace; the entrance metrics it records are checked directly); `locationTappedDelivers…`'s
- * `MapSnapshotGate` half (iOS's bridge for `MKMapSnapshotter`, whose `cancel()` never calls back;
+ * `OneShotRequestGate` half (iOS's bridge for `MKMapSnapshotter`, whose `cancel()` never calls back;
  * Android's snapshots come from cancellable OkHttp tile calls).
  */
 @RunWith(RobolectricTestRunner::class)

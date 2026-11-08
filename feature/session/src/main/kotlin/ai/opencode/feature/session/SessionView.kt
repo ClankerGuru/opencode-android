@@ -24,7 +24,7 @@ import ai.opencode.core.ui.SFSymbol
 import ai.opencode.feature.composer.AttachmentMenuDismissArea
 import ai.opencode.feature.composer.ComposerDismissTarget
 import ai.opencode.feature.composer.AttachmentMenuItem
-import ai.opencode.feature.composer.AttachmentMenuOverlay
+import ai.opencode.feature.composer.AttachmentMenuMeasure
 import ai.opencode.feature.composer.AttachmentMenuPhase
 import ai.opencode.feature.composer.AttachmentMenuPress
 import ai.opencode.feature.composer.ComposerAutocompleteAction
@@ -377,7 +377,7 @@ private data class BackgroundWorkModel(
 /**
  * The + menu (iOS `attachmentMenuOverlay`, `toggleAttachmentMenu` and `chooseAttachment`) and what
  * it opens: Photos (the composer's photo sheet, growing out of the menu), Files (the system document picker) and Location (one at a time). The menu is
- * :feature:composer's [AttachmentMenuOverlay], growing out of the + ([AttachmentPickerButton] in
+ * :feature:composer's [PlusMenuGlassSurface] (measured by [AttachmentMenuMeasure]), growing out of the + ([AttachmentPickerButton] in
  * the composer's row, which also chooses a row by sliding to it); it keeps the field's focus, and
  * choosing a picker gives the keyboard up, which returns once something is attached if the field
  * had it. System Back closes it (iOS's escape action).
@@ -523,22 +523,9 @@ private fun SessionAttachmentMenu(
             sheet.closeAttachmentMenu()
         }
     }
-    AttachmentMenuOverlay(
-        phase = phase,
-        onPhaseChange = { next -> if (next == AttachmentMenuPhase.Closed) sheet.closeAttachmentMenu() else sheet.attachmentMenu = next },
-        anchors = host.attachmentAnchors,
-        press = press,
-        items = items,
-        includesVideos = supportsFileUploads,
-        onChoose = chooseTapped,
-        onPaste = paste,
-        modifier = Modifier.fillMaxSize(),
-        // iOS `overComposer: usesPlusMenuSheet`: the New Plus Menu's rows are measured and
-        // anchored here and drawn by `PlusMenuGlassSurface`, over the composer.
-        overComposer = true,
-        handedOff = false,
-        identity = taskIdentity,
-    )
+    // iOS `AttachmentMenuMeasure`: the rows are measured and anchored here and drawn by
+    // `PlusMenuGlassSurface`, over the composer.
+    AttachmentMenuMeasure(anchors = host.attachmentAnchors, items = items, modifier = Modifier.fillMaxSize())
     // iOS `PlusMenuGlassSurface(isOpen:handsOff:…)`: the photo sheet takes the menu's surface
     // while it's shown and gives it back as Back's fold lands (`photoSheetMenuTakesBack`).
     // At rest its full-screen layers would still take TalkBack's touch over the header and

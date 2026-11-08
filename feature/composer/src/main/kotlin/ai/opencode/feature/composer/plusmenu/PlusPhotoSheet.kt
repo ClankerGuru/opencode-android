@@ -156,12 +156,14 @@ class PlusPhotoLibrary(private val client: PhotoLibraryClient = dependency(Photo
         private set
 
     /**
-     * Picks held while the sheet folds away after Add or Back, so the Add pill and the order
+     * The picks shown while the sheet folds away after Add or Back, so the Add pill and the order
      * badges stay as they were and dissolve with the sheet instead of changing on the tap.
      */
-    var closingPicks: List<String> by mutableStateOf(emptyList())
-        private set
-    val closingPickCount: Int get() = closingPicks.size
+    private var closingPicks: List<String>? by mutableStateOf(null)
+
+    /** What the sheet shows: its picks, or the last set while it folds away. */
+    val shownPicks: List<String> get() = closingPicks ?: picks
+    val shownPickCount: Int get() = shownPicks.size
 
     /** Top visible photo ID when the user scrolled the library, so reopening the sheet in the same session returns there. */
     var savedScrollPhotoID: String? = null
@@ -282,11 +284,11 @@ class PlusPhotoLibrary(private val client: PhotoLibraryClient = dependency(Photo
     }
 
     fun toggle(id: String) {
-        resetClosingPicks()
+        closingPicks = null
         if (id in picks) {
             picks = picks - id
             haptics.play(Haptic.selection)
-        } else if (picks.size < AttachmentPickerButton.maxPhotoSelection(plusMenu = true)) {
+        } else if (picks.size < AttachmentPickerButton.MAX_PHOTO_SELECTION) {
             picks = picks + id
             haptics.play(Haptic.selection)
         } else {
@@ -299,13 +301,13 @@ class PlusPhotoLibrary(private val client: PhotoLibraryClient = dependency(Photo
         haptics.play(Haptic.tap)
     }
 
-    fun order(id: String): Int? = (if (picks.isEmpty()) closingPicks else picks).indexOf(id).takeIf { it >= 0 }?.plus(1)
+    fun order(id: String): Int? = shownPicks.indexOf(id).takeIf { it >= 0 }?.plus(1)
 
     /** Picks handed over to be attached; the sheet starts over next time. */
     fun takePicks(): List<String> {
-        closingPicks = picks
         val taken = picks
-        picks = emptyList()
+        closingPicks = taken
+        clearPicks()
         return taken
     }
 
@@ -320,7 +322,7 @@ class PlusPhotoLibrary(private val client: PhotoLibraryClient = dependency(Photo
     }
 
     fun resetClosingPicks() {
-        if (closingPicks.isNotEmpty()) closingPicks = emptyList()
+        if (closingPicks != null) closingPicks = null
     }
 
     fun resetSavedScrollPosition() {
@@ -914,7 +916,7 @@ fun PlusPhotoSheetContent(
                 PlusPhotoTile(
                     photo = photo,
                     order = library.order(photo.id),
-                    canPickMore = library.picks.size < AttachmentPickerButton.maxPhotoSelection(plusMenu = true),
+                    canPickMore = library.picks.size < AttachmentPickerButton.MAX_PHOTO_SELECTION,
                     scale = density,
                     inFlight = flights.hidesPhoto(photo.id),
                     flights = flights,
@@ -987,7 +989,7 @@ object PlusPhotoSheetFootDefaults {
 }
 
 /**
- * Back on the leading edge and the trailing [PlusPhotoPill] along the photo sheet's foot: All
+ * Back on the leading edge and the trailing [PlusPhotoPillControl] along the photo sheet's foot: All
  * Photos with no picks (expands the sheet), Add N Photos once photos are picked; a long press
  * offers All Photos and, under limited access, Select More Photos…. iOS `PlusPhotoSheetFoot`.
  */
@@ -1000,7 +1002,7 @@ fun PlusPhotoSheetFoot(
     onAdd: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val count = if (library.picks.isEmpty()) library.closingPickCount else library.picks.size
+    val count = library.shownPickCount
     Row(
         modifier
             .fillMaxWidth()
@@ -1018,7 +1020,7 @@ fun PlusPhotoSheetFoot(
             },
         )
         Spacer(Modifier.weight(1f).width(12.dp))
-        PlusPhotoPill(
+        PlusPhotoPillControl(
             count = count,
             isLimited = library.access == PhotoLibraryAccess.Limited,
             onAllPhotos = onAllPhotos,
@@ -1146,7 +1148,7 @@ private fun PlusPhotoTile(
             .clearAndSetSemantics {
                 contentDescription = if (photo.isVideo) "Video" else "Photo"
                 stateDescription = if (full) {
-                    listOf(description, "${AttachmentPickerButton.maxPhotoSelection(plusMenu = true)} photos is the most you can add")
+                    listOf(description, "${AttachmentPickerButton.MAX_PHOTO_SELECTION} photos is the most you can add")
                         .filter { it.isNotEmpty() }.joinToString(", ")
                 } else {
                     description

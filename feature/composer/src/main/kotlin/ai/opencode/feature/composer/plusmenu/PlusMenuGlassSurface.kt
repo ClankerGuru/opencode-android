@@ -9,7 +9,7 @@ import ai.opencode.feature.composer.AttachmentMenuAnchors
 import ai.opencode.feature.composer.AttachmentMenuItem
 import ai.opencode.feature.composer.AttachmentMenuMetrics
 import ai.opencode.feature.composer.AttachmentMenuMotion
-import ai.opencode.feature.composer.AttachmentMenuOverlay
+import ai.opencode.feature.composer.AttachmentMenuMeasure
 import ai.opencode.feature.composer.AttachmentMenuRows
 import ai.opencode.feature.composer.ComposerMorph
 import ai.opencode.feature.composer.PlusMenuTunables
@@ -71,7 +71,7 @@ import kotlin.math.roundToInt
  * above the keys ([PlusMenuPlacement.visibleMenu] with `coversKeyboard = false`, iOS's own
  * fallback when its guarded keyboard surface is unavailable); `KeyboardBandSurface` is n/a.
  *
- * [AttachmentMenuOverlay] (with `overComposer = true`) still measures the rows and publishes
+ * [AttachmentMenuMeasure] measures the rows and publishes
  * [anchors]; this draws them. Put it in a full-screen box over the session.
  *
  * @param handsOff the photo sheet took the glass: the menu leaves at once, and the next open
@@ -205,8 +205,8 @@ private fun PlusMenuWindowContent(
         generation += 1
         val closing = generation
         if (isOpen) {
-            launch { glass.animateTo(1f, AttachmentMenuMotion.open(reduceMotion, plusMenuSheet = true)) }
-            expanded.animateTo(1f, AttachmentMenuMotion.open(reduceMotion, plusMenuSheet = true))
+            launch { glass.animateTo(1f, AttachmentMenuMotion.open(reduceMotion)) }
+            expanded.animateTo(1f, AttachmentMenuMotion.open(reduceMotion))
             return@LaunchedEffect
         }
         if (reduceMotion) {
@@ -262,7 +262,7 @@ private fun PlusMenuWindowContent(
                             val translation = dragged / density.density
                             val velocity = tracker.calculateVelocity().y / density.density
                             // iOS `predictedEndTranslation`: about a fifth of a second of the throw.
-                            if (AttachmentMenuOverlay.dragDismisses(translation, translation + velocity * 0.2f)) onDismiss()
+                            if (PlusMenuPlacement.dragDismisses(translation, translation + velocity * 0.2f)) onDismiss()
                         },
                     )
                 }
@@ -359,4 +359,7 @@ object PlusMenuPlacement {
 
     fun foot(composer: Rect, screenBottom: Float, keyboardTop: Float?, drop: Float, floor: Float = AttachmentMenuMetrics.overComposerFloor.value): Float =
         min(composer.bottom + drop, screenBottom - floor)
+
+    /** A drag on the menu (dp) past either threshold puts it away. */
+    fun dragDismisses(translation: Float, predicted: Float): Boolean = translation > 50 || predicted > 160
 }

@@ -43,7 +43,7 @@ class RequestAnswerTests {
                 formRequests = listOf(twoQuestions),
                 formAnswers = mapOf(twoQuestions.id to twoQuestions.defaultAnswers),
                 requestErrors = mapOf(twoQuestions.id to "Required"),
-                failedReplyIDs = setOf(twoQuestions.id),
+                requestFailures = mapOf(twoQuestions.id to RequestDockFeature.State.RequestFailure.Reply),
             ),
             RequestDockFeature(),
             this,
@@ -64,7 +64,7 @@ class RequestAnswerTests {
             it.copy(
                 formAnswers = it.formAnswers + (twoQuestions.id to (it.formAnswers.getValue(twoQuestions.id) + ("q1" to OpenCodeFormValue.Strings(listOf("Parking"))))),
                 requestErrors = it.requestErrors - twoQuestions.id,
-                failedReplyIDs = it.failedReplyIDs - twoQuestions.id,
+                requestFailures = it.requestFailures - twoQuestions.id,
             )
         }
         store.finish()

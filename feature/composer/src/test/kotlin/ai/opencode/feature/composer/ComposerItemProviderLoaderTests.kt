@@ -108,11 +108,10 @@ class ComposerItemProviderLoaderTests {
         assertEquals(listOf<Byte>(1, 2, 3), imported)
     }
 
-    /** 4 with New Plus Menu off, as on main; 8 with it on. */
+    /** The importer's own default (pastes, shares, quotes) is 4; the + menu and photo sheet pass 8. */
     @Test fun imageImportEnforcesSelectionLimitOnce() = runTest {
-        for (plusMenu in listOf(false, true)) {
-            val limit = AttachmentPickerButton.maxPhotoSelection(plusMenu = plusMenu)
-            assertEquals(if (plusMenu) 8 else 4, limit)
+        for (limit in listOf(4, 8)) {
+            if (limit == 8) assertEquals(8, AttachmentPickerButton.MAX_PHOTO_SELECTION)
             val importer = importer()
             val imported = mutableListOf<Byte>()
 

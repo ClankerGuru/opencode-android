@@ -142,12 +142,6 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
     val recentPeek = RecentPhotoPeek()
 
     /**
-     * iOS `usesPlusMenuSheet`: the New Plus Menu (OC-354, graduated in iOS p217) grows out of the
-     * composer and into the photo sheet. Always on; the branches that read this are inert as on iOS.
-     */
-    val usesPlusMenuSheet: Boolean get() = true
-
-    /**
      * iOS `plusMenuRests`: no menu, sheet, camera or recent-photo peek up, so nothing in the
      * + menu's overlay is there to read.
      */
@@ -226,7 +220,7 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
         if (menu == Rect.Zero) return
         library.resetClosingPicks()
         menuTakesBack = false
-        if (usesPlusMenuSheet) flights.cancelAll()
+        flights.cancelAll()
         val compactTop = composerSheetTop(host.attachmentAnchors.composer)
         if (!morph.isOpening) source = menu
         detent = PlusPhotoSheetDetent().also { it.open(compactTop, ceiling) }
@@ -381,7 +375,7 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
     /** iOS `closeAttachmentMenu()`. */
     fun closeAttachmentMenu() {
         if (morph.isOpening) return closePhotoSheet()
-        if (usesPlusMenuSheet && morph.isShown && !foldsToComposer) {
+        if (morph.isShown && !foldsToComposer) {
             morph.reset()
             landsOn = null
         }
@@ -390,7 +384,7 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
 
     /** iOS `toggleAttachmentMenu()`'s New Plus Menu half: a sheet still folding goes at once. */
     fun prepareMenuOpening() {
-        if (usesPlusMenuSheet && !morph.isOpening) {
+        if (!morph.isOpening) {
             if (morph.isShown) morph.reset()
             foldsToComposer = false
         }
@@ -400,7 +394,7 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
     fun menuClosed() {
         if (morph.isOpening) {
             foldPhotoSheet()
-        } else if (usesPlusMenuSheet && morph.isShown && !foldsToComposer) {
+        } else if (morph.isShown && !foldsToComposer) {
             morph.reset()
             landsOn = null
         }
@@ -424,7 +418,7 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
         foldsToComposer = false
         camera.expanded = false
         recentPeek.hide()
-        if (usesPlusMenuSheet) flights.cancelAll()
+        flights.cancelAll()
         restoresFocus = false
         keepsMenu = false
         library.clearPicks()
@@ -435,7 +429,7 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
     /** iOS `showRecentPhotos()`: a hold on +: the newest photos over the composer, if readable and the menu isn't up. */
     fun showRecentPhotos(): Boolean {
         val composer = composerOnScreen ?: return false
-        if (!usesPlusMenuSheet || attachmentMenu != AttachmentMenuPhase.Closed || !library.canRead || library.photos.isEmpty()) return false
+        if (attachmentMenu != AttachmentMenuPhase.Closed || !library.canRead || library.photos.isEmpty()) return false
         recentPeek.show(library.photos.map { it.id }, above = composer)
         return recentPeek.isShown
     }
@@ -446,22 +440,20 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
         val batch = UUID.randomUUID()
         val attachmentID = UUID.randomUUID()
         val photoID = "camera-$attachmentID"
-        val flies = usesPlusMenuSheet && !reducedMotion
+        val flies = !reducedMotion
         val rest = if (morph.isOpening && restoresFocus) restingComposer else null
         importer.imageImporter.cancel()
-        if (usesPlusMenuSheet) {
-            if (flies) {
-                val sourceFrame = camera.captureSourceFrame(env.density, fallback = composerOnScreen ?: Rect.Zero)
-                if (sourceFrame != Rect.Zero) {
-                    val image = runCatching { BitmapFactory.decodeByteArray(data, 0, data.size)?.asImageBitmap() }.getOrNull()
-                    flights.source(
-                        photoID,
-                        PhotoFlights.Source(frame = sourceFrame, radius = PlusCameraTunables.captureRadius * env.density, image = image, isEphemeral = true),
-                    )
-                }
+        if (flies) {
+            val sourceFrame = camera.captureSourceFrame(env.density, fallback = composerOnScreen ?: Rect.Zero)
+            if (sourceFrame != Rect.Zero) {
+                val image = runCatching { BitmapFactory.decodeByteArray(data, 0, data.size)?.asImageBitmap() }.getOrNull()
+                flights.source(
+                    photoID,
+                    PhotoFlights.Source(frame = sourceFrame, radius = PlusCameraTunables.captureRadius * env.density, image = image, isEphemeral = true),
+                )
             }
-            flights.reserve(listOf(attachmentID), batch)
         }
+        flights.reserve(listOf(attachmentID), batch)
         closePhotoSheet()
         if (flies) flights.launch(listOf(PhotoFlights.Pick(photoID, attachmentID)), batch, restingComposer = rest)
         startImageImport(listOf(ComposerImageSource.Loader(attachmentID) { data }), batch, onAdded = env.host?.let { it::focusComposer })
@@ -476,7 +468,7 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
         val importer = env.importer ?: return
         val batch = UUID.randomUUID()
         val picks = ids.take(AttachmentPickerButton.MAX_PHOTO_SELECTION).map { PhotoFlights.Pick(it, UUID.randomUUID()) }
-        val flies = usesPlusMenuSheet && !reducedMotion && picks.isNotEmpty()
+        val flies = !reducedMotion && picks.isNotEmpty()
         val rest = if (morph.isOpening && restoresFocus) restingComposer else null
         if (picks.isEmpty()) {
             if (morph.isOpening) closePhotoSheet()
@@ -484,15 +476,13 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
         }
         importer.imageImporter.cancel()
         if (morph.isOpening) closePhotoSheet()
-        if (usesPlusMenuSheet) {
-            // Reserve the 76×76 slots now, so the composer grows with the folding sheet instead
-            // of jumping once the JPEGs are encoded. A row that isn't showing yet mounts collapsed
-            // and opens on the next frame (the composer's row effect calls `revealHeldRow()`).
-            val state = env.store?.state
-            val holdsRow = flies && state != null && state.pendingAttachments.isEmpty() &&
-                state.pendingFiles.isEmpty() && flights.reservedAttachments.isEmpty()
-            flights.reserve(picks.map { it.attachment }, batch, holdingRow = holdsRow)
-        }
+        // Reserve the 76×76 slots now, so the composer grows with the folding sheet instead
+        // of jumping once the JPEGs are encoded. A row that isn't showing yet mounts collapsed
+        // and opens on the next frame (the composer's row effect calls `revealHeldRow()`).
+        val state = env.store?.state
+        val holdsRow = flies && state != null && state.pendingAttachments.isEmpty() &&
+            state.pendingFiles.isEmpty() && flights.reservedAttachments.isEmpty()
+        flights.reserve(picks.map { it.attachment }, batch, holdingRow = holdsRow)
         if (flies) flights.launch(picks, batch, restingComposer = rest)
         val library = library
         startImageImport(picks.map { pick -> ComposerImageSource.Loader(pick.attachment) { library.imageData(pick.photo) } }, batch)
@@ -504,13 +494,11 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
         importer.startImageImport(
             sources,
             onAdded = onAdded,
-            onFailure = { failed -> if (failed != null && usesPlusMenuSheet) flights.dropReservation(failed) },
-            onCancel = { if (usesPlusMenuSheet) flights.importFinished(batch) },
+            onFailure = { failed -> if (failed != null) flights.dropReservation(failed) },
+            onCancel = { flights.importFinished(batch) },
             onCompletion = {
-                if (usesPlusMenuSheet) {
-                    attachmentsChanged()
-                    flights.importFinished(batch)
-                }
+                attachmentsChanged()
+                flights.importFinished(batch)
             },
         )
     }

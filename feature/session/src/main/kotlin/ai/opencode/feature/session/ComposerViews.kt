@@ -143,9 +143,6 @@ object ComposerTunables {
     /** New Plus Menu's tile corners: concentric with the composer's, [attachmentInset] in. */
     val attachmentRadius: Float get() = max(cornerRadius - attachmentInset, 6f)
 
-    /** iOS `attachmentRadius(plusMenu:)`: off, the row keeps main's 22. */
-    fun attachmentRadius(plusMenu: Boolean): Float = if (plusMenu) attachmentRadius else 22f
-
     const val plusOffset = 28f
     /** Nudges the + glyph's ink inside its target (OC-477). */
     const val plusInkOffset = 0f

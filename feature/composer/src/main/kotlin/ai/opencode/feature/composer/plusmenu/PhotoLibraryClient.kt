@@ -4,6 +4,7 @@ import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.log.AppLog
+import ai.opencode.feature.composer.OneShotRequestGate
 import android.Manifest
 import android.app.Activity
 import android.content.ComponentCallbacks2
@@ -23,10 +24,8 @@ import android.graphics.Shader
 import android.graphics.Typeface
 import android.net.Uri
 import android.os.Bundle
-import android.os.CancellationSignal
 import android.os.Handler
 import android.os.Looper
-import android.os.OperationCanceledException
 import android.provider.MediaStore
 import android.util.LruCache
 import android.util.Size
@@ -250,38 +249,6 @@ class PhotoLibraryClient(
 }
 
 /**
- * Synchronizes one cancellable MediaStore request: the coroutine's cancellation cancels the
- * platform request through its [CancellationSignal] exactly once, and a cancelled or failed
- * request resumes with null. iOS `PhotoRequestGate` (which guards a `PHImageRequestID` and a
- * continuation); on Android the signal plus structured cancellation are the whole gate.
- */
-class PhotoRequestGate {
-    val signal = CancellationSignal()
-
-    val isCancelled: Boolean get() = signal.isCanceled
-
-    fun cancel() {
-        if (!signal.isCanceled) signal.cancel()
-    }
-
-    /** Runs [load] on the IO dispatcher, cancelling the platform request if the caller is cancelled. */
-    suspend fun <T : Any> run(load: (CancellationSignal) -> T?): T? = withContext(Dispatchers.IO) {
-        val job = coroutineContext[Job]
-        val handle = job?.invokeOnCompletion { if (it != null) cancel() }
-        try {
-            if (isCancelled) null else load(signal)
-        } catch (_: OperationCanceledException) {
-            null
-        } catch (error: Exception) {
-            if (error is kotlinx.coroutines.CancellationException) throw error
-            null
-        } finally {
-            handle?.dispose()
-        }
-    }
-}
-
-/**
  * Serializes the asset cache, preheat start/stop, and lifecycle generation under one lock so
  * [stopCaching] can't race a fetch. iOS `PhotoCacheGate`.
  */
@@ -343,7 +310,7 @@ private class LivePhotoLibrary(private val context: Context) {
                     if (!isActive) return@launch
                     val key = "${asset.uri}@$pixels"
                     if (warm.get(key) != null) continue
-                    val image = PhotoRequestGate().run { signal -> resolver.loadThumbnail(asset.uri, Size(pixels, pixels), signal) }
+                    val image = OneShotRequestGate().run { signal -> resolver.loadThumbnail(asset.uri, Size(pixels, pixels), signal) }
                     if (image != null) warm.put(key, image.asImageBitmap())
                 }
             }
@@ -501,13 +468,13 @@ private class LivePhotoLibrary(private val context: Context) {
         val pixels = max(1, (side * max(scale, 1f)).roundToInt())
         // The warm cache was filled at the grid's size; a hit is the opportunistic answer.
         warm.get("${asset.uri}@$pixels")?.let { return it }
-        return PhotoRequestGate().run { signal -> resolver.loadThumbnail(asset.uri, Size(pixels, pixels), signal) }
+        return OneShotRequestGate().run { signal -> resolver.loadThumbnail(asset.uri, Size(pixels, pixels), signal) }
             ?.asImageBitmap()
     }
 
     suspend fun loadImageData(id: String): ByteArray? {
         val asset = resolveAsset(id) ?: return null
-        val gate = PhotoRequestGate()
+        val gate = OneShotRequestGate()
         if (asset.isVideo) {
             return gate.run { signal ->
                 val frame = resolver.loadThumbnail(asset.uri, Size(1600, 1600), signal)

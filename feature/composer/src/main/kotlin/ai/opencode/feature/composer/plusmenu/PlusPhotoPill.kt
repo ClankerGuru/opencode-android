@@ -53,10 +53,10 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 /**
- * iOS `PhotoPillTunables`, the parts the Compose pill uses. iOS ships its UIKit control
- * (`composer.photoPill.uikit`, `PlusPhotoPillUIKit.swift`) whose width spring, prefix exit and
- * count roll this pill's one progress stands in for; the Tuning Panel's systemTint/tintOpacity
- * toggles stay at their defaults (an accent fill over the surface, fully opaque).
+ * iOS `PhotoPillTunables` (`PlusPhotoPillUIKit.swift`), the parts the Compose pill uses: this
+ * pill's one progress stands in for iOS's width spring, prefix exit and count roll; the Tuning
+ * Panel's systemTint/tintOpacity toggles stay at their defaults (an accent fill over the
+ * surface, fully opaque).
  */
 object PhotoPillTunables {
     /** The outgoing prefix's least scale as it leaves (and the incoming one's as it enters). */
@@ -64,7 +64,7 @@ object PhotoPillTunables {
 }
 
 /**
- * The photo sheet's trailing pill (iOS `PlusPhotoPill`): one control and one surface across zero,
+ * The photo sheet's trailing pill (iOS `PlusPhotoPillControl`): one control and one surface across zero,
  * one and several picks. Every part of the label and the capsule's width follow one animated
  * progress (the pick count) on [PickerTunables.photoAdd], so they move together on every frame
  * and reverse together when a pick is undone mid-spring: “All Photos” → “Add 1 Photo” →
@@ -73,7 +73,7 @@ object PhotoPillTunables {
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun PlusPhotoPill(
+fun PlusPhotoPillControl(
     count: Int,
     isLimited: Boolean,
     onAllPhotos: () -> Unit,
@@ -153,10 +153,11 @@ fun PlusPhotoPill(
 }
 
 /**
- * iOS `PhotoPillLabelLayout`: All / Add N, Photo and the plural s from the animated count. The
- * prefix's width moves from All's to Add N's over the first pick, and the s takes |count − 1| of
- * its width (gone at one pick), so the label's width, and the capsule around it, is continuous
- * at every frame. Both prefixes end where Photo starts. Only layout and layers read [progress].
+ * The label (iOS `PhotoPillView`'s, measured by `PhotoPillMetrics`): All / Add N, Photo and the
+ * plural s from the animated count. The prefix's width moves from All's to Add N's over the first
+ * pick, and the s takes |count − 1| of its width (gone at one pick), so the label's width, and the
+ * capsule around it, is continuous at every frame. Both prefixes end where Photo starts. Only
+ * layout and layers read [progress].
  */
 @Composable
 private fun PhotoPillLabel(count: Int, progress: () -> Float, reduceMotion: Boolean) {
@@ -217,7 +218,7 @@ private fun Modifier.prefixSwap(progress: () -> Float, incoming: Boolean, reduce
         alpha = visibility
     }.then(if (reduceMotion) Modifier else Modifier.transitionBlur { (1f - PhotoPillLabelMath.prefixVisibility(progress(), incoming)) * blurPx })
 
-/** The pill label's progress math (iOS `PhotoPillPrefixSwap` / `PhotoPillSuffixReveal`). */
+/** The pill label's progress math (iOS `PhotoPillView`'s prefix swap and suffix reveal). */
 internal object PhotoPillLabelMath {
     fun prefixVisibility(progress: Float, incoming: Boolean): Float {
         val p = progress.coerceIn(0f, 1f)

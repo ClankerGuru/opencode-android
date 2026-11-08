@@ -719,8 +719,7 @@ class RequestAnswerTests {
         store.send(Action.requestCollapseChanged(slack.id, collapsed = true))
         store.send(Action.requestDismissTapped)
         store.receive(requestResponseFinished, "requestResponseFinished")
-        assertEquals(setOf(slack.id), store.state.requestDock.failedDismissalIDs)
-        assertTrue(store.state.failedReplyIDs.isEmpty())
+        assertEquals(mapOf(slack.id to RequestDockFeature.State.RequestFailure.Dismissal), store.state.requestDock.requestFailures)
         assertFalse(store.state.requestDock.dockReplyFailed)
         assertEquals("Couldn’t dismiss request", store.state.requestDock.replyFailureTitle(slack.id, isForm = true))
         // Folded, it opens to show the line.
@@ -748,7 +747,7 @@ class RequestAnswerTests {
         store.send(Action.formValueChanged(slack.id, "q0", OpenCodeFormValue.Str("Draft it instead")))
         store.send(Action.SendTapped)
         store.receive(requestResponseFinished, "requestResponseFinished")
-        assertEquals(setOf(slack.id), store.state.requestDock.settledRequestIDs)
+        assertEquals(mapOf(slack.id to RequestDockFeature.State.RequestFailure.Settled), store.state.requestDock.requestFailures)
         assertFalse(store.state.requestDock.dockReplyFailed)
         assertEquals("Couldn’t send answer", store.state.requestDock.replyFailureTitle(slack.id, isForm = true))
         // The refresh no longer lists it, but it stays with its error and words.
@@ -764,7 +763,7 @@ class RequestAnswerTests {
         // × clears it here, with no DELETE.
         store.send(Action.requestDismissTapped)
         assertTrue(store.state.formRequests.isEmpty())
-        assertTrue(store.state.requestDock.settledRequestIDs.isEmpty())
+        assertTrue(store.state.requestDock.requestFailures.isEmpty())
         assertEquals(0, dismissals.value)
     }
 

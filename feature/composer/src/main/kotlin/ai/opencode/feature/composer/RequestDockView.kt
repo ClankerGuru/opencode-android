@@ -256,7 +256,7 @@ fun RequestDockView(
     val idle = dock.respondingRequestIDs.isEmpty()
     LaunchedEffect(idle) {
         val id = dock.dockRequestID
-        if (idle && id != null && id in dock.failedReplyIDs) state.sentAction = null
+        if (idle && id != null && dock.requestFailures[id] == RequestDockFeature.State.RequestFailure.Reply) state.sentAction = null
     }
 
     val shown = live ?: lastShown ?: return

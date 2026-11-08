@@ -535,7 +535,7 @@ fun PendingAttachmentsRow(
     val inset = ComposerTunables.attachmentInset.dp
     val inner = if (styled) ComposerTunables.innerHorizontal.dp else 0.dp
     val parentTop = if (composerExpanded) 0.dp else ComposerTunables.innerVertical.dp
-    val radius = ComposerTunables.attachmentRadius(plusMenu = styled).dp
+    val radius = ComposerTunables.attachmentRadius.dp
     val locationHeight = SharedLocationCard.compactMapHeight + SharedLocationCard.compactFooterHeight()
     val rowHeightTarget = if (!styled) {
         PendingAttachmentMetrics.slotSide
