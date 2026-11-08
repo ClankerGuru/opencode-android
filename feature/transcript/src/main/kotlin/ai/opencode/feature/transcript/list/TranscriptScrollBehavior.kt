@@ -22,6 +22,12 @@ class TranscriptScrollBehavior {
         val canRequestEarlierHistory: Boolean,
         /** The reader's finger (or its deceleration) owns the list. */
         val isUserScrolling: Boolean = false,
+        /**
+         * Android: a browsing reader's row, saved across process death, isn't listed yet (its
+         * history page is still to load). The list clamped short of it is not the reader at the
+         * end, and earlier history is read until the row is there.
+         */
+        val holdsRestoredRow: Boolean = false,
     )
 
     sealed interface Event {
@@ -241,7 +247,7 @@ class TranscriptScrollBehavior {
     }
 
     private fun requestEarlierHistoryIfNeeded(viewport: Viewport, commands: MutableList<Command>) {
-        if (!viewport.canRequestEarlierHistory || holdsEarlierHistory || viewport.offsetY >= viewport.visibleHeight ||
+        if (!viewport.canRequestEarlierHistory || holdsEarlierHistory || (viewport.offsetY >= viewport.visibleHeight && !viewport.holdsRestoredRow) ||
             requestedEarlierHistory
         ) {
             return
@@ -257,7 +263,7 @@ class TranscriptScrollBehavior {
 
     /** A browsing reader the end came up to is at the bottom now: they follow again. */
     private fun followIfPastTheEnd(viewport: Viewport, commands: MutableList<Command>) {
-        if (distanceFromBottom(viewport) > REST_DISTANCE) return
+        if (viewport.holdsRestoredRow || distanceFromBottom(viewport) > REST_DISTANCE) return
         mode = Mode.Following
         setJumpButton(false, commands)
         commands += Command.ScrollToBottom(animated = false)

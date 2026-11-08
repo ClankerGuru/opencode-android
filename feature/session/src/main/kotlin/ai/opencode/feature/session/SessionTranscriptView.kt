@@ -514,6 +514,8 @@ object SessionTranscriptView {
             isLoadingEarlier = state.isLoadingEarlier,
             earlierHistoryError = state.earlierHistoryError,
             isLoading = state.isTranscriptLoading,
+            listsAllHistory = state.initialTranscriptIsFresh && state.earlierHistory == SessionFeature.State.EarlierHistory.Exhausted &&
+                !state.hasEarlierItems && !state.isTranscriptLoading,
             showsEmptyState = state.showsEmptyState,
             isRunning = showsWorking,
             workingHandsOffToCopy = working?.handsOffToCopy == true,
