@@ -336,7 +336,10 @@ fun SettingsToggleRow(
     enabled: Boolean = true,
 ) {
     SettingsRowFrame(
-        modifier.toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = onCheckedChange),
+        modifier
+            .toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = onCheckedChange)
+            // Spelled out so the change is sent as a state description, which TalkBack speaks on the focused row.
+            .semantics { stateDescription = if (checked) "On" else "Off" },
         onClick = null,
     ) {
         if (symbol != null) SettingsIcon(symbol, tint)
