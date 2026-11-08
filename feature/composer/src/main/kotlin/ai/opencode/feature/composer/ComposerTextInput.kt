@@ -120,6 +120,9 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
+/** How long a recreated window's inherited keys stay up over the restored field before they count as its own. */
+private const val INHERITED_KEYS_SETTLE_MILLIS = 1_000L
+
 /**
  * The composer tunables the text input reads (iOS `ComposerTunables`, `Session/ComposerViews.swift`):
  * their baked defaults. The session area's composer tunables keep the same names.
@@ -823,9 +826,26 @@ fun ComposerTextInput(
     val windowInfo = LocalWindowInfo.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     var imeWasVisible by remember { mutableStateOf(false) }
+    // A recreated window (dark mode, language, font size) starts out reporting the old window's
+    // keys as up before it has focus. Until keys come up in this window, or those keys have
+    // stayed up over the restored, focused field for a moment, a hide is the system moving the
+    // old window's keys (sometimes reported before the restored field's rise starts), not the
+    // keys leaving.
+    var keysInherited by remember { mutableStateOf(imeVisible && !windowInfo.isWindowFocused) }
+    var inheritedKeysWentDown by remember { mutableStateOf(false) }
+    LaunchedEffect(keysInherited, hasFocus, imeVisible, windowInfo.isWindowFocused) {
+        if (!keysInherited || !hasFocus || !imeVisible || !windowInfo.isWindowFocused) return@LaunchedEffect
+        delay(INHERITED_KEYS_SETTLE_MILLIS)
+        keysInherited = false
+    }
     val imeTarget = WindowInsets.imeAnimationTarget
     LaunchedEffect(imeVisible) {
         val left = imeWasVisible && !imeVisible
+        if (keysInherited) {
+            if (!imeVisible) inheritedKeysWentDown = true else if (inheritedKeysWentDown) keysInherited = false
+            imeWasVisible = imeVisible
+            return@LaunchedEffect
+        }
         imeWasVisible = imeVisible
         if (!left || !hasFocus || drawerHold?.isHeld(fieldKey) == true || isKeyboardHeld) return@LaunchedEffect
         // A recreated window (dark mode, font size) first reports the old window's keys as shown,
