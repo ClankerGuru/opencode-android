@@ -32,6 +32,7 @@ import ai.opencode.feature.transcript.markdown.ui.TranscriptTextReveal
 import ai.opencode.feature.transcript.selection.LocalTranscriptReplySelection
 import ai.opencode.feature.transcript.selection.TranscriptReplySelection
 import ai.opencode.feature.transcript.selection.TranscriptReplySelectionMenu
+import ai.opencode.feature.transcript.user.findActivity
 import ai.opencode.feature.transcript.selection.transcriptReplySelectionGestures
 import ai.opencode.feature.transcript.selection.transcriptReplySelectionHandles
 import ai.opencode.feature.transcript.rows.NewMessagesDivider
@@ -41,12 +42,16 @@ import ai.opencode.feature.transcript.user.TranscriptMessageRow
 import ai.opencode.feature.transcript.user.UserMessageRun
 import ai.opencode.feature.transcript.user.queuedPillSource
 import ai.opencode.server.model.OpenCodeQueuedInput
+import android.window.OnBackInvokedCallback
+import android.window.OnBackInvokedDispatcher
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.ScrollableDefaults
 import androidx.compose.foundation.magnifier
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
@@ -98,6 +103,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalGraphicsContext
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -133,6 +139,27 @@ private class TranscriptListPosition(val state: LazyListState, var anchor: Pair<
      * frame late, so the first layout clamps a row near the end, and it's asked for again.
      */
     var settleLayouts = 0
+}
+
+/**
+ * Android (QA AI-02): while a reply's text is selected, Back ends the selection before the
+ * screen's own Back, as it dismisses any platform text selection and as the user bubble's
+ * selection does (iOS has no Back; a tap elsewhere ends it there). Its own scope, so the
+ * selection starting or ending doesn't recompose the list. Not while the keyboard is up: Back
+ * puts the keys away first (A-01), then ends the selection.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ReplySelectionBackHandler(selection: TranscriptReplySelection) {
+    if (!selection.isSelected || WindowInsets.isImeVisible) return
+    val activity = LocalContext.current.findActivity() ?: return
+    DisposableEffect(activity, selection) {
+        val callback = OnBackInvokedCallback { selection.clear(byReader = true) }
+        // At the app's own priority, registered as the selection begins: what opens over it later
+        // (the drawer, a menu, an in-window sheet) registers after it and takes Back first.
+        activity.onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT, callback)
+        onDispose { activity.onBackInvokedDispatcher.unregisterOnBackInvokedCallback(callback) }
+    }
 }
 
 /** V-01: whether the list hides while a row restored after process death loads ([decide]d on the list's first composition). */
@@ -352,6 +379,7 @@ private fun TranscriptListContent(
     }
     // After the controller's effects: a recreated activity's selection comes back once its reply is listed.
     SideEffect { replySelection.restorePending() }
+    ReplySelectionBackHandler(replySelection)
 
     LaunchedEffect(resumed) { controller.visibilityChanged() }
     // iOS `SessionView+Header` registers the transcript's knobs as the session draws.
