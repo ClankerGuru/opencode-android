@@ -7,6 +7,8 @@ import ai.opencode.core.motion.SpringSolver
 import ai.opencode.core.motion.motionFrameLoop
 import ai.opencode.core.motion.rememberFrameDurationSeconds
 import ai.opencode.core.motion.rememberReduceMotion
+import ai.opencode.core.touch.TouchRecovery
+import ai.opencode.core.touch.rememberTouchRecovery
 import ai.opencode.core.ui.BackSwipeRules
 import ai.opencode.core.ui.OpenCodeTheme
 import androidx.activity.BackEventCompat
@@ -131,6 +133,11 @@ fun SessionPageStack(
     val currentOnPop by rememberUpdatedState(onPop)
     val currentOnTopChanged by rememberUpdatedState(onTopChanged)
     val motion = remember { SessionPageStackMotion(scope, pages) }
+    rememberTouchRecovery(
+        owner = TouchRecovery.Owner.Browser,
+        inspect = { if (enabled) motion.strandedPopFault() else null },
+        release = { motion.finishTransition() },
+    )
     SideEffect {
         motion.reducedMotion = reduceMotion
         motion.frameDuration = frameDuration
@@ -607,8 +614,22 @@ internal class SessionPageStackMotion(
         dragging = false
     }
 
+    /**
+     * iOS `SessionPageStack.touchRecovery` inspect: a pop whose page has already left (slid off
+     * the edge or faded out) but never landed still has the leaving page on top taking every
+     * touch. A drag in flight or a pop still on screen keeps its transition.
+     */
+    fun strandedPopFault(): TouchRecovery.Fault? {
+        if (!isPopping || dragging || landing == null) return null
+        val top = pages.lastOrNull() ?: return null
+        val offEdge = width > 0 && offset >= width - 1f
+        val invisible = topAlpha <= 0.01f
+        if (!offEdge && !invisible) return null
+        return TouchRecovery.Fault(TouchRecovery.Reason.Transition, top)
+    }
+
     /** A transition still running lands where it was going. */
-    private fun finishTransition() {
+    fun finishTransition() {
         stopMotion()
         val land = landing ?: return
         landing = null

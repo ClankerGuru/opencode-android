@@ -171,7 +171,8 @@ val HomeFeature.State.visibleSessions: List<OpenCodeSession>
         for (session in sessions) known += session.id
         val extra = mutableListOf<OpenCodeSession>()
         for (result in found.results) {
-            if (result.id in known || result.isArchived || result.id in recentlyDeletedIDs) continue
+            // A server that ignores the parentID filter still only offers roots here.
+            if (result.id in known || result.parentID != null || result.isArchived || result.id in recentlyDeletedIDs) continue
             if (!current && !result.title.contains(search, ignoreCase = true)) continue
             extra += result
         }

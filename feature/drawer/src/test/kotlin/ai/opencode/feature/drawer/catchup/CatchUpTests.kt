@@ -25,7 +25,10 @@ import ai.opencode.feature.drawer.persistingTranscriptCache
 import ai.opencode.feature.drawer.publishingTranscript
 import ai.opencode.feature.drawer.recentSessions
 import ai.opencode.feature.drawer.sessionKey
+import ai.opencode.feature.drawer.statusSnapshot
 import ai.opencode.feature.drawer.visibleSessions
+import ai.opencode.feature.drawer.list.DrawerListInputs
+import ai.opencode.feature.drawer.list.DrawerListModel
 import ai.opencode.feature.session.*
 import ai.opencode.feature.system.SystemIntegrationClient
 import ai.opencode.feature.system.share.ShareInboxClient
@@ -71,10 +74,20 @@ class CatchUpTests {
 
     val server = OpenCodeServer(url = "http://localhost:9", username = "", password = "")
 
-    fun session(id: String, updated: Long, idle: Long = 2_000, viewed: Long = 1_000) = OpenCodeSession(
+    fun session(id: String, updated: Long, idle: Long = 2_000, viewed: Long = 1_000, parent: String? = null) = OpenCodeSession(
         id = id, serverTitle = id, projectID = "p", directory = "/project",
         updatedAt = Instant.ofEpochSecond(updated), idleMilliseconds = idle, viewedMilliseconds = viewed,
+        parentID = parent,
     )
+
+    /** A Home holding [sessions], set up the way the app's own tests hold one. */
+    fun home(listing: List<OpenCodeSession>, attention: Set<String> = emptySet()): HomeFeature.State {
+        val state = HomeFeature.State(
+            server,
+            OpenCodeHomeSnapshot(projects = emptyList(), sessions = listing, activeSessionIDs = emptySet()),
+        )
+        return state.copy(attentionSessionIDs = attention)
+    }
 
     /** unread (older), waiting, running, read, unread (newer). */
     fun home(
@@ -534,6 +547,42 @@ class CatchUpTests {
         assertEquals(2_500L, store.state.sessionDetail?.viewedIdle?.get("child"))
         assertEquals(2_000L, store.state.sessionDetail?.familySessions?.firstOrNull { it.id == "newer" }?.viewedMilliseconds)
         assertFalse(store.state.isUnread(store.state.byID("newer")))
+    }
+
+    /**
+     * A subagent's session never joins Catch Up, unread or not: it reaches the reader from its
+     * parent, as in Recents (TestFlight build 682).
+     */
+    @Test fun subagentSessionsNeverJoinCatchUp() {
+        val root = session("root", updated = 10)
+        val child = session("child", updated = 20, parent = root.id)
+        val state = home(listing = listOf(child, root))
+        assertTrue("its own session is genuinely unread", state.isUnread(state.byID(child.id)))
+        assertEquals(listOf(root.id), state.catchUpSessions.map { it.id })
+        assertFalse(state.statusSnapshot().needsCatchUp(child))
+        val model = DrawerListModel.build(
+            state = state,
+            inputs = DrawerListInputs(selectedSessionID = null, showsProjectIcons = false, reducedMotion = false, increasedContrast = false),
+            liftedID = null,
+            catchUpMounted = true,
+            whatsNewMounted = false,
+            now = Instant.ofEpochSecond(100),
+            timestamp = { _, _ -> "" },
+            project = { _, _ -> null },
+        )
+        assertEquals("the drawer's Catch Up row counts roots", 1, model.shortcuts.catchUpCount)
+    }
+
+    /**
+     * A request inside a subagent waits in its parent's card: Home reports pending input by family
+     * root, and the child's own unread session stays behind it.
+     */
+    @Test fun aSubagentsPendingRequestWaitsInItsParentsCatchUpCard() {
+        val root = session("root", updated = 10, idle = 1_000, viewed = 1_000)
+        val child = session("child", updated = 20, parent = root.id)
+        val state = home(listing = listOf(child, root), attention = setOf(root.id))
+        assertEquals(listOf(root.id), state.catchUpSessions.map { it.id })
+        assertEquals(HomeFeature.State.Indicator.attention, state.indicator(state.byID(root.id)))
     }
 
     @Test fun mutedSessionsStayListedButNeverJoinCatchUpOrBadges() = runTest {

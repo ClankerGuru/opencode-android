@@ -6,6 +6,9 @@ import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.motion.rememberReduceMotion
+import ai.opencode.feature.transcript.selection.LocalTranscriptReplySelection
+import ai.opencode.feature.transcript.selection.TranscriptSelectionLeafKey
+import ai.opencode.feature.transcript.selection.transcriptSelectionAnchor
 import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.TileMode
@@ -117,8 +120,11 @@ internal fun ArrivingText(
     color: Color,
     modifier: Modifier = Modifier,
     softWrap: Boolean = true,
+    selectionKey: TranscriptSelectionLeafKey? = null,
 ) {
     val context = LocalTranscriptRowContext.current
+    // In a reply the list owns one selection across all its text (iOS `selectableTranscriptText`).
+    val replySelection = if (selectionKey != null) LocalTranscriptReplySelection.current else null
     val send by rememberUpdatedState(context.send)
     val reveal = LocalTranscriptTextReveal.current ?: remember { TranscriptTextReveal() }
     val colors = OpenCodeTheme.colors
@@ -175,6 +181,13 @@ internal fun ArrivingText(
             inlineContent = presented.inlineContent,
             onTextLayout = { layout = it },
             modifier = Modifier
+                .then(
+                    if (replySelection != null && selectionKey != null) {
+                        Modifier.transcriptSelectionAnchor(selectionKey, replySelection) { layout }
+                    } else {
+                        Modifier
+                    },
+                )
                 .graphicsLayer {
                     compositingStrategy = if (ends != null) CompositingStrategy.Offscreen else CompositingStrategy.Auto
                 }

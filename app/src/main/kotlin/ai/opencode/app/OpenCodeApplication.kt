@@ -4,6 +4,7 @@ import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.DependencyValues
 import ai.opencode.core.haptics.AudioSessionHaptics
 import ai.opencode.core.log.AppLog
+import ai.opencode.core.scene.ActiveScene
 import ai.opencode.devtools.DevTools
 import ai.opencode.feature.session.AgentActivityLedger
 import ai.opencode.feature.transcript.markdown.withMarkdownStream
@@ -52,6 +53,8 @@ class OpenCodeApplication : Application() {
         }
         // Foreground/background phases for retries and reconnects, from the first activity start.
         AppPhases.install(this)
+        // The app's windows, from the first activity: the one in use and the one a URL opens beside.
+        ActiveScene.install(this)
         if (BuildConfig.DEBUG) AppLog.minimumPriority = Log.DEBUG
         DevTools.install()
         // Voice's admitted sends, log uploads, diagnostics sinks and screen hold (installed

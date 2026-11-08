@@ -569,6 +569,8 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         data class SceneActiveChanged(val isActive: Boolean) : Action
         /** The scene went to the background (not merely inactive). */
         data object SceneEnteredBackground : Action
+        /** The empty composer's call button: logs its trigger, then [VoiceTapped]. */
+        data object CallButtonTapped : Action
         data object VoiceTapped : Action
         /** Dictation let go of the audio session: the call it waited for starts. */
         data class CallAudioYielded(val atEar: Boolean) : Action

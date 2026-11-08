@@ -27,6 +27,8 @@ import androidx.compose.ui.graphics.graphicsLayer
  * @param revealItem a streamed reply's item: text that arrives fades in. Null shows the
  *   blocks as history (compaction summaries, the file viewer).
  * @param imageScope the reply these blocks belong to, when they're only part of it.
+ * @param selectionItemID the reply row these blocks are (iOS `selectionItemID`): their text
+ *   joins the list's one selection across the reply. Null keeps each block selectable alone.
  */
 @Composable
 fun MarkdownBlocksView(
@@ -36,6 +38,7 @@ fun MarkdownBlocksView(
     isGrowing: Boolean = false,
     revealItem: String? = rowID,
     @Suppress("UNUSED_PARAMETER") imageScope: AgentImageScope? = null,
+    selectionItemID: String? = null,
 ) {
     val style = currentMarkdownStyle()
     // The list's reveal when it provides one; otherwise this row's own (a row LazyColumn
@@ -63,6 +66,7 @@ fun MarkdownBlocksView(
                         Modifier.padding(top = style.gap(if (index == 0) null else blocks[index - 1].kind, block.kind)),
                         arrivals = arrivals[block.id].orEmpty(),
                         isGrowingTail = isGrowing && index == blocks.size - 1,
+                        selectionItemID = selectionItemID,
                     )
                     imageLinks[block.id]?.let { ai.opencode.feature.transcript.links.BlockImageLinks(block, it) }
                     }

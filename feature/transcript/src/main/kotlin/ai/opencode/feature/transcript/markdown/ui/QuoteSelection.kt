@@ -2,13 +2,8 @@ package ai.opencode.feature.transcript.markdown.ui
 
 import ai.opencode.feature.transcript.markdown.MarkdownQuote
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
-import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.text.contextmenu.builder.item
-import androidx.compose.foundation.text.contextmenu.data.TextContextMenuItem
-import androidx.compose.foundation.text.contextmenu.data.TextContextMenuKeys
-import androidx.compose.foundation.text.contextmenu.modifier.appendTextContextMenuComponents
-import androidx.compose.foundation.text.contextmenu.modifier.filterTextContextMenuComponents
 import androidx.compose.foundation.text.contextmenu.provider.LocalTextContextMenuDropdownProvider
 import androidx.compose.foundation.text.contextmenu.provider.LocalTextContextMenuToolbarProvider
 import androidx.compose.foundation.text.contextmenu.provider.TextContextMenuProvider
@@ -20,26 +15,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusProperties
-import androidx.compose.ui.platform.ClipEntry
-import androidx.compose.ui.platform.Clipboard
-import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 
-/** A block whose text can be quoted (iOS `QuoteSelectionBlockSource`). */
-class QuoteSelectionBlockSource private constructor(
-    val isCodeBlock: Boolean,
-    val codeLanguage: String?,
-    private val kind: OpenCodeMarkdownBlock.Kind,
-) {
-    /** The selection as quoted: a code block's selection keeps its fence. */
-    fun formatted(selected: String): String? {
-        val formatted = if (isCodeBlock) MarkdownQuote.fencedCode(selected, codeLanguage) else selected
-        return if (MarkdownQuote.blockquote(formatted) != null) formatted else null
-    }
-
+/**
+ * A block whose text can be quoted whole (iOS `QuoteSelectionBlockSource`): TalkBack's Quote
+ * action, as iOS keeps VoiceOver's. A selection's Quote is the reply selection's menu.
+ */
+class QuoteSelectionBlockSource private constructor(private val kind: OpenCodeMarkdownBlock.Kind) {
     /** The whole block, for TalkBack's Quote action. */
     fun fullBlockQuoteText(): String? = when (kind) {
         is OpenCodeMarkdownBlock.Kind.Paragraph -> kind.text.text.takeIf { MarkdownQuote.blockquote(it) != null }
@@ -67,89 +52,52 @@ class QuoteSelectionBlockSource private constructor(
             is OpenCodeMarkdownBlock.Kind.NumberedItem -> prose(kind, kind.text.text)
             is OpenCodeMarkdownBlock.Kind.ListItem -> prose(kind, kind.text.text)
             is OpenCodeMarkdownBlock.Kind.Code ->
-                if (kind.code.source.isBlank()) null else QuoteSelectionBlockSource(true, kind.code.language, kind)
+                if (kind.code.source.isBlank()) null else QuoteSelectionBlockSource(kind)
             else -> null
         }
 
         private fun prose(kind: OpenCodeMarkdownBlock.Kind, text: String) =
-            if (text.isBlank()) null else QuoteSelectionBlockSource(false, null, kind)
+            if (text.isBlank()) null else QuoteSelectionBlockSource(kind)
     }
 }
 
 /**
- * The clipboard Copy writes to, unless Quote asked for the selection: then the copied text
- * goes to Quote and the system clipboard is left alone.
+ * A block's selectable text (iOS `selectableTranscriptText`). In a reply ([inReply]) the list's
+ * reply selection selects across all of the reply's text, Copy and Quote included, so the text
+ * here only anchors to it (through `ArrivingText`'s `selectionKey`) and TalkBack gets a Quote
+ * action for the whole block, sent as `TranscriptAction.QuoteTextTapped` by the row's
+ * [LocalQuoteTextHandler]. Elsewhere (a compaction summary, a file in the viewer) the block is
+ * selectable on its own, as iOS's `.textSelection(.enabled)`.
  */
-private class QuoteClipboard(var base: Clipboard) : Clipboard {
-    var capture: ((String) -> Unit)? = null
-
-    override suspend fun getClipEntry(): ClipEntry? = base.getClipEntry()
-
-    override suspend fun setClipEntry(clipEntry: ClipEntry?) {
-        val take = capture
-        if (take != null) {
-            capture = null
-            val text = clipEntry?.clipData?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.text?.toString()
-            if (text != null) take(text)
-            return
-        }
-        base.setClipEntry(clipEntry)
-    }
-
-    @Deprecated("Use the suspend APIs")
-    override val nativeClipboard get() = base.nativeClipboard
-}
-
-/**
- * Selectable reply text that offers Quote beside Copy (iOS `quoteSelectionSource(for:handler:)`
- * and the hosting cell's Quote menu action): the selection is read through the selection's
- * own Copy (into a private clipboard), formatted (a code block's selection keeps its fence),
- * and sent as `TranscriptAction.QuoteTextTapped` by the row's [LocalQuoteTextHandler]; the
- * session plays the tap. TalkBack gets a Quote action for the whole block.
- */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun QuoteSelectionContainer(kind: OpenCodeMarkdownBlock.Kind, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    val handler = LocalQuoteTextHandler.current
-    val source = remember(kind, handler != null) { if (handler != null) QuoteSelectionBlockSource.of(kind) else null }
-    if (handler == null || source == null) {
+fun QuoteSelectionContainer(
+    kind: OpenCodeMarkdownBlock.Kind,
+    inReply: Boolean,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    if (!inReply) {
         SelectionContainer(modifier) { content() }
         return
     }
-    val currentHandler by rememberUpdatedState(handler)
-    val systemClipboard = LocalClipboard.current
-    val clipboard = remember { QuoteClipboard(systemClipboard) }.also { it.base = systemClipboard }
-    val copyItem = remember { arrayOfNulls<TextContextMenuItem>(1) }
-    CompositionLocalProvider(LocalClipboard provides clipboard) {
-        SelectionContainer(
-            modifier
-                .filterTextContextMenuComponents { component ->
-                    if (component.key == TextContextMenuKeys.CopyKey && component is TextContextMenuItem) copyItem[0] = component
-                    true
-                }
-                .appendTextContextMenuComponents {
-                    item(key = QuoteMenuKey, label = "Quote") {
-                        val copy = copyItem[0]
-                        if (copy != null) {
-                            clipboard.capture = { selected -> source.formatted(selected)?.let { currentHandler.quote(it) } }
-                            copy.onClick(this)
-                        }
-                        close()
-                    }
-                }
-                .semantics {
-                    customActions = listOf(
-                        CustomAccessibilityAction("Quote") {
-                            source.fullBlockQuoteText()?.let { currentHandler.quote(it) }
-                            true
-                        },
-                    )
-                },
-        ) { content() }
+    val handler = LocalQuoteTextHandler.current
+    val source = remember(kind, handler != null) { if (handler != null) QuoteSelectionBlockSource.of(kind) else null }
+    if (handler == null || source == null) {
+        Box(modifier) { content() }
+        return
     }
+    val currentHandler by rememberUpdatedState(handler)
+    Box(
+        modifier.semantics {
+            customActions = listOf(
+                CustomAccessibilityAction("Quote") {
+                    source.fullBlockQuoteText()?.let { currentHandler.quote(it) }
+                    true
+                },
+            )
+        },
+    ) { content() }
 }
-
-private object QuoteMenuKey
 
 /**
  * One selection toolbar and one dropdown for every [SelectionContainer] in [content]

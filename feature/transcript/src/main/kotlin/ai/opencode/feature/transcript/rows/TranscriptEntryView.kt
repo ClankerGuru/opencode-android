@@ -108,7 +108,7 @@ private fun ItemView(entry: TranscriptEntry, item: OpenCodeTranscriptItem, rowID
                 LocalQuoteTextHandler provides quote,
                 LocalSessionLinks provides SessionLinkContext(props.sessionLinks, rowID),
             ) {
-                MarkdownBlocksView(blocks, Modifier.fillMaxWidth(), rowID = item.id, isGrowing = props.isGrowing)
+                MarkdownBlocksView(blocks, Modifier.fillMaxWidth(), rowID = item.id, isGrowing = props.isGrowing, selectionItemID = item.id)
             }
         }
 

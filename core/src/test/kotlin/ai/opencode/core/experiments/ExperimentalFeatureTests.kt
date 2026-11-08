@@ -66,7 +66,7 @@ class ExperimentalFeatureTests {
     /** Welcome Preview moved to Developer › Playgrounds; it's not in the pane. */
     @Test
     fun welcomePreviewLeftExperimental() {
-        assertEquals(listOf(ExperimentalFeature.welcomePreview), ExperimentalFeature.allCases.filter { it.isGraduated })
+        assertEquals(listOf(ExperimentalFeature.welcomePreview), ExperimentalFeature.allCases.filter { it.group == null })
         assertFalse(ExperimentalGroup.entries.flatMap { it.features }.contains(ExperimentalFeature.welcomePreview))
     }
 
@@ -74,18 +74,19 @@ class ExperimentalFeatureTests {
     fun everyExperimentHasACopyForSettings() {
         for (feature in ExperimentalFeature.allCases) {
             assertTrue(feature.title.isNotEmpty())
-            assertTrue(feature.summary.isNotEmpty())
-            assertFalse("One line, no trailing period", feature.summary.endsWith("."))
-            assertTrue("A few words: ${feature.summary}", feature.summary.split(" ").filter { it.isNotEmpty() }.size <= 6)
+            val summary = feature.summary ?: continue
+            assertTrue(summary.isNotEmpty())
+            assertFalse("One line, no trailing period", summary.endsWith("."))
+            assertTrue("A few words: $summary", summary.split(" ").filter { it.isNotEmpty() }.size <= 6)
         }
         assertEquals("In-App Browser", ExperimentalFeature.inAppBrowser.title)
     }
 
     @Test
     fun everyExperimentSitsInOneGroupInAStableOrder() {
-        assertEquals(listOf(ExperimentalGroup.composer, ExperimentalGroup.calls, ExperimentalGroup.transcript, ExperimentalGroup.drawer), ExperimentalGroup.entries)
+        assertEquals(listOf(ExperimentalGroup.composer, ExperimentalGroup.calls, ExperimentalGroup.drawer, ExperimentalGroup.transcript), ExperimentalGroup.entries)
         assertEquals(
-            ExperimentalFeature.allCases.filter { !it.isGraduated }.toSet(),
+            ExperimentalFeature.allCases.filter { it.group != null }.toSet(),
             ExperimentalGroup.entries.flatMap { it.features }.toSet(),
         )
         assertEquals(
@@ -95,19 +96,16 @@ class ExperimentalFeatureTests {
         assertEquals(
             listOf(
                 ExperimentalFeature.serverVoice, ExperimentalFeature.backgroundCallIntent, ExperimentalFeature.voiceSessionDelegator,
-                ExperimentalFeature.shareScreenWithAgents, ExperimentalFeature.openLinksFromCalls, ExperimentalFeature.audioInCalls,
+                ExperimentalFeature.shareScreenWithAgents,
             ),
             ExperimentalGroup.calls.features,
         )
-        assertEquals(listOf(ExperimentalFeature.inAppBrowser), ExperimentalGroup.transcript.features)
         assertEquals(
-            listOf(
-                ExperimentalFeature.inboxSidebar, ExperimentalFeature.serverDetails,
-                ExperimentalFeature.sessionLiveActivity, ExperimentalFeature.soundEffects,
-            ),
+            listOf(ExperimentalFeature.inboxSidebar, ExperimentalFeature.sessionLiveActivity, ExperimentalFeature.soundEffects),
             ExperimentalGroup.drawer.features,
         )
-        assertEquals(listOf("Composer", "Calls", "Transcript", "Drawer"), ExperimentalGroup.entries.map { it.title })
+        assertEquals(listOf(ExperimentalFeature.inAppBrowser), ExperimentalGroup.transcript.features)
+        assertEquals(listOf("Composer", "Calls", "Drawer", "Transcript"), ExperimentalGroup.entries.map { it.title })
     }
 
     /** Removed experiments and ones now always on (p217) leave no switch behind, whatever was saved. */
@@ -117,6 +115,7 @@ class ExperimentalFeatureTests {
             "session-switcher", "server-title-switch",
             "composer-autocomplete", "server-flow", "plus-menu-sheet", "project-icons",
             "floating-call", "call-tray", "image-link-previews", "living-orb", "new-messages-divider",
+            "open-links-from-calls", "audio-in-calls", "server-details",
         )
         val leftovers = listOf(
             "experimental-all-saved-living-orb", "experimental-all-skip-image-link-previews",

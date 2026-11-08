@@ -10,9 +10,8 @@ import ai.opencode.core.experiments.ExperimentalGroup
  * phone. Lives in `:core` because Composer, Transcript, Voice,
  * Drawer and Settings all read it; Settings owns the list UI.
  *
- * iOS declares each experiment in its own `Experimental/Features/<Name>Experiment.swift` and
- * generates the registry at build time (`scripts/registries.py`); this enum is that registry, one
- * entry per iOS file with the file's fields, declared in [order]. [allCases] is iOS `allCases`.
+ * The entries are the whole list, in Settings order, as iOS's enum cases are; each one carries
+ * its title, group, symbol and summary (iOS `row`). [allCases] is iOS `allCases`.
  *
  * Code reads it with `dependency(ExperimentalFeatures)(feature)` (reducers) or
  * `shared(experimental(feature))` (views).
@@ -22,19 +21,15 @@ enum class ExperimentalFeature(
     /** The switch's key (`experimental-<rawValue>`) and lab name. */
     val rawValue: String,
     val title: String,
-    /** Settings section the switch sits in. */
-    val group: ExperimentalGroup,
-    /** A few words under the title, one line. */
-    val summary: String,
+    /**
+     * The Settings › Experimental section it sits in; null for a switch that lives on another
+     * Settings page (Welcome Preview, in Developer › Playgrounds).
+     */
+    val group: ExperimentalGroup?,
     /** SF Symbol name (iOS `systemImage`), drawn through `OpenCodeIcons`. */
     val symbol: String,
-    /** Settings position: lower first. Leave gaps (10, 20, …) so a new one can slot between. */
-    val order: Int,
-    /**
-     * Graduated: its switch left Experimental for a regular Settings page (Welcome Preview →
-     * Developer › Playgrounds). It keeps its `experimental-…` key, so a saved choice carries over.
-     */
-    val isGraduated: Boolean = false,
+    /** A few words under the title, only when they add something to it. */
+    val summary: String? = null,
     /**
      * Removed on iOS but still read by modules whose port of the removal hasn't landed. Not in
      * [allCases], never listed, never on.
@@ -42,61 +37,65 @@ enum class ExperimentalFeature(
     val isRetired: Boolean = false,
     /**
      * All Experiments switches it (iOS `joinsAll`). False for experiments that ask for a
-     * permission or share data, which stay a choice of their own; graduated ones never join.
+     * permission or share data, which stay a choice of their own, and for switches outside the
+     * pane.
      */
     joinsAll: Boolean = true,
 ) {
-    onePicker("one-picker", "One Picker", ExperimentalGroup.composer, "Favorites, recents, and inline levels", "cpu", order = 15),
-    agentSelection("agent-selection", "Agent Selection", ExperimentalGroup.composer, "Choose Build, Plan, or your own", "person.crop.circle", order = 30),
-    hideModels("hide-models", "Hide Unused Models", ExperimentalGroup.composer, "Choose models the picker lists", "eye.slash", order = 40),
-    inboxSidebar("inbox-sidebar", "Inbox Sidebar", ExperimentalGroup.drawer, "Sessions as an inbox", "tray", order = 90),
-    serverDetails("server-details", "Server Details", ExperimentalGroup.drawer, "MCP servers, skills, and accounts", "server.rack", order = 110),
-    welcomePreview("welcome-preview", "Welcome Preview", ExperimentalGroup.drawer, "The new first-run welcome", "hand.wave", order = 130, isGraduated = true),
-    sessionLiveActivity(
-        "session-live-activity", "Session Live Activity", ExperimentalGroup.drawer, "Follow runs on the Lock Screen",
-        "platter.filled.top.iphone", order = 140,
-    ),
-    soundEffects("sound-effects", "Sound Effects", ExperimentalGroup.drawer, "Soft sounds for replies and requests", "speaker.wave.2.fill", order = 150),
-    inAppBrowser("in-app-browser", "In-App Browser", ExperimentalGroup.transcript, "Open web pages inside a session", "safari", order = 160),
-    serverVoice("server-voice", "Server Voice", ExperimentalGroup.calls, "Server-key calls and Gemini Live", "waveform", order = 170),
+    // Composer
+    onePicker("one-picker", "One Picker", ExperimentalGroup.composer, "cpu", "Favorites, recents, and inline levels"),
+    agentSelection("agent-selection", "Agent Selection", ExperimentalGroup.composer, "person.crop.circle", "Choose Build, Plan, or your own"),
+    hideModels("hide-models", "Hide Unused Models", ExperimentalGroup.composer, "eye.slash"),
+
+    // Calls
+    serverVoice("server-voice", "Server Voice", ExperimentalGroup.calls, "waveform", "Server-key calls and Gemini Live"),
     backgroundCallIntent(
-        "background-call-intent", "Background Action Button Call", ExperimentalGroup.calls, "Calls start without opening the app",
-        "button.programmable", order = 180,
+        "background-call-intent", "Background Action Button Call", ExperimentalGroup.calls, "button.programmable",
+        "Calls start without opening the app",
         // Starts the microphone with the app in the background.
         joinsAll = false,
     ),
-    voiceSessionDelegator(
-        "voice-session-delegator", "OpenCode Session Delegator", ExperimentalGroup.calls, "Delegate calls to an OpenCode session",
-        "bubble.left.and.bubble.right", order = 190,
-    ),
+    voiceSessionDelegator("voice-session-delegator", "OpenCode Session Delegator", ExperimentalGroup.calls, "bubble.left.and.bubble.right"),
     shareScreenWithAgents(
-        "share-screen-with-agents", "Share Screen with Agents", ExperimentalGroup.calls, "Agents may ask to see it",
-        "rectangle.on.rectangle", order = 200,
+        "share-screen-with-agents", "Share Screen with Agents", ExperimentalGroup.calls, "rectangle.on.rectangle",
+        "Agents may ask to see it",
         // Sends a picture of the app to the agent.
         joinsAll = false,
     ),
-    openLinksFromCalls("open-links-from-calls", "Open Links from Calls", ExperimentalGroup.calls, "Agents may open links", "arrow.up.forward.app", order = 210),
-    audioInCalls("audio-in-calls", "Audio in Calls", ExperimentalGroup.calls, "Agents can play music on calls", "music.note", order = 220),
+
+    // Drawer
+    inboxSidebar("inbox-sidebar", "Inbox Sidebar", ExperimentalGroup.drawer, "tray"),
+    sessionLiveActivity(
+        "session-live-activity", "Session Live Activity", ExperimentalGroup.drawer, "platter.filled.top.iphone",
+        "Follow runs on the Lock Screen",
+    ),
+    soundEffects("sound-effects", "Sound Effects", ExperimentalGroup.drawer, "speaker.wave.2.fill", "Soft sounds for replies and requests"),
+
+    // Transcript
+    inAppBrowser("in-app-browser", "In-App Browser", ExperimentalGroup.transcript, "safari"),
+
+    // Settings › Developer › Playgrounds, beside Show Welcome
+    welcomePreview("welcome-preview", "Welcome Preview", null, "hand.wave", "The new first-run welcome"),
 
     // Removed on iOS; kept only until the modules that still read them port the removal.
 
     /** iOS cd6be7c6 removed the Since You Left experiment. Never on. */
     @Deprecated("Removed on iOS (cd6be7c6)")
-    sinceYouLeft("since-you-left", "Since You Left", ExperimentalGroup.transcript, "Recap activity since you left", "clock.arrow.circlepath", order = Int.MAX_VALUE, isRetired = true),
+    sinceYouLeft("since-you-left", "Since You Left", ExperimentalGroup.transcript, "clock.arrow.circlepath", "Recap activity since you left", isRetired = true),
 
     /** iOS c75d4a1e removed the Session Switcher experiment. Never on; its switch is cleared at launch. */
     @Deprecated("Removed on iOS (c75d4a1e)")
-    sessionSwitcher("session-switcher", "Session Switcher", ExperimentalGroup.drawer, "Swipe sideways or up through sessions", "square.stack", order = Int.MAX_VALUE, isRetired = true),
+    sessionSwitcher("session-switcher", "Session Switcher", ExperimentalGroup.drawer, "square.stack", "Swipe sideways or up through sessions", isRetired = true),
 
     /** iOS c75d4a1e removed Title Is the Switch. Never on; its switch is cleared at launch. */
     @Deprecated("Removed on iOS (c75d4a1e)")
-    serverTitleSwitch("server-title-switch", "Title Is the Switch", ExperimentalGroup.drawer, "Connect and switch from the title", "server.rack", order = Int.MAX_VALUE, isRetired = true),
+    serverTitleSwitch("server-title-switch", "Title Is the Switch", ExperimentalGroup.drawer, "server.rack", "Connect and switch from the title", isRetired = true),
     ;
 
     val id: String get() = rawValue
 
-    /** All Experiments switches it: it didn't opt out and hasn't graduated (iOS `joinsAll`). */
-    val joinsAll: Boolean = joinsAll && !isGraduated && !isRetired
+    /** All Experiments switches it: it didn't opt out and sits in the pane (iOS `joinsAll`). */
+    val joinsAll: Boolean = joinsAll && group != null && !isRetired
 
     /** Retired: always off. */
     private val isOff: Boolean get() = isRetired
@@ -105,9 +104,9 @@ enum class ExperimentalFeature(
     fun isActive(stored: Boolean): Boolean = if (isOff) false else stored
 
     companion object {
-        /** Every experiment, in Settings order ([order], then key). Retired ones aside. */
+        /** Every experiment, in Settings order (declaration order). Retired ones aside. */
         val allCases: List<ExperimentalFeature> by lazy {
-            entries.filter { !it.isRetired }.sortedWith(compareBy({ it.order }, { it.rawValue }))
+            entries.filter { !it.isRetired }
         }
 
         /** The registered experiment with this key, or null (iOS `init?(rawValue:)`). */
@@ -116,8 +115,8 @@ enum class ExperimentalFeature(
         /**
          * Switches of removed experiments (Session Switcher, Title Is the Switch, Floating Call,
          * Call Tray) and of ones now always on (Composer Autocomplete, Server Flow, New Plus Menu,
-         * Project Icons, Image Link Previews, Living Orb, New Messages Divider), with the
-         * call-style migration's markers. Nothing reads them; they're cleared at launch.
+         * Project Icons, Image Link Previews, Living Orb, New Messages Divider, Open Links from
+         * Calls, Audio in Calls, Server Details), with the call-style migration's markers. Nothing reads them; they're cleared at launch.
          */
         val retiredKeys: List<String> = buildList {
             add("experimental-session-switcher")
@@ -130,7 +129,11 @@ enum class ExperimentalFeature(
             add("experimental-call-tray")
             add("call-style-migrated-living-orb")
             add("call-style-migrated-orb-default")
-            for (name in listOf("image-link-previews", "living-orb", "new-messages-divider")) {
+            val alwaysOn = listOf(
+                "image-link-previews", "living-orb", "new-messages-divider",
+                "open-links-from-calls", "audio-in-calls", "server-details",
+            )
+            for (name in alwaysOn) {
                 add("experimental-$name")
                 add("experimental-all-skip-$name")
                 add("experimental-all-saved-$name")

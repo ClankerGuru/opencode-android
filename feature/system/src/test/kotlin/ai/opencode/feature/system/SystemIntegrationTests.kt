@@ -1,5 +1,6 @@
 package ai.opencode.feature.system
 
+import ai.opencode.core.log.SystemActionOrigin
 import ai.opencode.core.testing.TestIsolationRule
 import ai.opencode.feature.system.intents.ControlIntents
 import ai.opencode.feature.system.intents.OpenCodeControlKind
@@ -258,10 +259,13 @@ class SessionControlTests {
     @Test
     fun controlIntentsPostTheirChoice() {
         assertEquals(
-            SystemAction(serverKey, SystemAction.Destination.Session("ses_newer"), startsCall = true),
+            SystemAction(serverKey, SystemAction.Destination.Session("ses_newer"), startsCall = true, origin = SystemActionOrigin.control),
             ControlIntents.perform(OpenCodeControlKind.START_CALL, "$serverKey:ses_newer"),
         )
-        assertEquals(SystemAction(destination = SystemAction.Destination.LastViewed, startsCall = true), ControlIntents.perform(OpenCodeControlKind.START_CALL, null))
+        assertEquals(
+            SystemAction(destination = SystemAction.Destination.LastViewed, startsCall = true, origin = SystemActionOrigin.control),
+            ControlIntents.perform(OpenCodeControlKind.START_CALL, null),
+        )
         assertEquals(SystemAction(destination = SystemAction.Destination.Draft(null)), ControlIntents.perform(OpenCodeControlKind.OPEN_SESSION, SessionEntity.NEW_SESSION_ID))
         assertEquals(SystemAction(destination = SystemAction.Destination.Draft(null)), ControlIntents.perform(OpenCodeControlKind.NEW_SESSION, null))
     }
@@ -347,7 +351,7 @@ class QuickActionTests {
             assertEquals(item.action, SystemQuickAction.action(item.kind.rawValue, item.userInfo))
         }
         assertEquals(
-            SystemAction(serverKey, SystemAction.Destination.LastViewed, startsCall = true),
+            SystemAction(serverKey, SystemAction.Destination.LastViewed, startsCall = true, origin = SystemActionOrigin.quickAction),
             SystemQuickAction.action("ai.opencode.mobilecode.start-call", mapOf("server" to serverKey)),
         )
         // The static New Session item carries no user info.

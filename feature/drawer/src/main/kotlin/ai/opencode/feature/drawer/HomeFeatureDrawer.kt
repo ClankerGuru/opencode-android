@@ -1,5 +1,6 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.core.log.CallTrigger
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.dependency
@@ -19,7 +20,6 @@ import ai.opencode.feature.composer.SharedComposerDraft
 import ai.opencode.feature.composer.SharedDraftTarget
 import ai.opencode.feature.drawer.HomeFeature.Action
 import ai.opencode.feature.drawer.HomeFeature.State
-import ai.opencode.feature.media.BrowserFeature
 import ai.opencode.feature.session.*
 import ai.opencode.feature.settings.SettingsFeature
 import ai.opencode.feature.system.SystemAction
@@ -54,12 +54,13 @@ internal fun HomeFeature.reduceDrawer(state: State, action: Action): HomeReduced
             if (detail != null && (detail.session != null || detail.draftProject != null)) {
                 var s = state
                 if (detail.voice?.phase?.isTerminal == true) s = s.updatingDetail { it.copy(voice = null) }
+                CallTrigger.Drawer.log()
                 val top = s.subagentStack.lastOrNull()
                 if (top != null) return Reduced(s, Effect.send(Action.SubagentStack(top.navigationID, SessionFeature.Action.VoiceTapped)))
                 return Reduced(s, Effect.send(Action.detail(SessionFeature.Action.VoiceTapped)))
             }
             // Nothing behind it to call: Start Voice Call's Last Viewed path.
-            return openSystemDestination(state, SystemAction.Destination.LastViewed, startsCall = true)
+            return openSystemDestination(state, SystemAction.Destination.LastViewed, startsCall = true, trigger = CallTrigger.Drawer)
         }
 
         Action.ManageServersTapped ->
@@ -342,7 +343,7 @@ private fun HomeFeature.sessionTapped(state: State, sessionID: String): HomeRedu
         val viewed = openViewedSession(s, session, cachedItems = null, opensDetail = false)
         s = viewed.state.copy(nextMoveReason = null).promotingCatchUpDetail()
         // The drawer's row for the session on screen goes back to it, from under any page or subagent.
-        if (s.sessionDetail?.browser?.isOpen == true) s = s.updatingDetail { it.copy(browser = BrowserFeature.State()) }
+        if (s.sessionDetail?.browser?.isOpen == true) s = s.updatingDetail { it.copy(browser = it.browser.close()) }
         s = s.poppingSubagents(toDepth = 0, reason = moveReason).pushingPendingSubagent(moveReason)
         val pushedID = s.subagentStack.lastOrNull()?.session?.id ?: return Reduced(s, viewed.effect)
         val cancelled = cancelBackgroundTranscriptReads(s, setOf(sessionID, pushedID))

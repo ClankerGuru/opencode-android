@@ -32,14 +32,11 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.indication
 import androidx.compose.material3.ripple
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.onClick
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -77,8 +74,6 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.Measurable
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalViewConfiguration
-import androidx.compose.ui.platform.ViewConfiguration
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -121,6 +116,12 @@ object ComposerTunables {
     val textStyle = ComposerTextStyle.body
 
     const val horizontalMargin = 20f
+
+    /**
+     * With the keyboard up the composer widens to this margin, the same as its gap above the
+     * keys, so a tiny even margin rings it.
+     */
+    const val keyboardHorizontalMargin = 8f
     const val bottomGap = 0f
     const val keyboardGap = 8f
     const val innerHorizontal = 6f
@@ -186,6 +187,25 @@ object ComposerLayoutMetrics {
     val collapsedTextInset: Float get() = ComposerTunables.textLeading
     val expandedRowGap: Float get() = ComposerTunables.expandedRowGap
     val configuredRowHeight: Float get() = max(32f, ComposerTunables.barHeight - 2 * ComposerTunables.innerVertical)
+
+    /**
+     * iOS `pickerTargetDrop`: how far the row's pickers (model, agent) sit their targets below
+     * their ink, down to the glass's bottom edge (the composer pads its bottom by
+     * `innerVertical`), away from the text above. Taps aimed at the text kept opening the model
+     * picker.
+     *
+     * Only the pickers: they're bare text with no visible edge, so where their target sits can't
+     * be seen. + and the mic, Send and Call are glass or circle faces, and their target stays on
+     * the face you can see: don't lower them to match.
+     *
+     * Android: the 48 dp targets already overhang the 44 dp row by 2 dp, so they drop that much
+     * less (4 dp) to end on the same edge.
+     */
+    val pickerTargetDrop: Float
+        get() {
+            val overhang = max(0f, (48f - configuredRowHeight) / 2)
+            return max(0f, ComposerTunables.innerVertical - overhang)
+        }
 
     fun inputX(progress: Float, inline: ComposerLayoutInline?): Float {
         // On the request panel's edge: titles 12 dp after the marks, or the panel's 20 dp edge.
@@ -561,61 +581,6 @@ fun ComposerControlLabel(
                 )
             }
         }
-    }
-}
-
-// endregion
-
-// region Stop
-
-/**
- * iOS `ComposerStopButton`: the run's Stop. Held (0.5 s, iOS `LongPressGesture`'s default), it
- * starts a call instead ([onHold]) and that press's release never stops the run. TalkBack's
- * activation always stops; the call is its own action.
- */
-@Composable
-fun ComposerStopButton(
-    holdStartsCall: Boolean,
-    onStop: () -> Unit,
-    onHold: () -> Unit,
-    modifier: Modifier = Modifier,
-    label: @Composable () -> Unit,
-) {
-    val base = LocalViewConfiguration.current
-    val config = remember(base) {
-        object : ViewConfiguration by base {
-            override val longPressTimeoutMillis: Long get() = 500
-        }
-    }
-    val interactions = remember { MutableInteractionSource() }
-    CompositionLocalProvider(LocalViewConfiguration provides config) {
-        Box(
-            modifier
-                .indication(interactions, ripple(bounded = false, radius = 22.dp))
-                .pointerInput(holdStartsCall) {
-                    detectTapGestures(
-                        onPress = { offset ->
-                            val press = PressInteraction.Press(offset)
-                            interactions.emit(press)
-                            val released = tryAwaitRelease()
-                            interactions.emit(if (released) PressInteraction.Release(press) else PressInteraction.Cancel(press))
-                        },
-                        onLongPress = if (holdStartsCall) {
-                            { onHold() }
-                        } else {
-                            null
-                        },
-                        onTap = { onStop() },
-                    )
-                }
-                // Assistive activation always stops; the call is its own action.
-                .semantics {
-                    role = Role.Button
-                    onClick { onStop(); true }
-                }
-                .openCodeTapTarget(accessibility = false),
-            contentAlignment = Alignment.Center,
-        ) { label() }
     }
 }
 

@@ -1,5 +1,8 @@
 package ai.opencode.app
 
+import ai.opencode.core.dependencies.Clock
+import ai.opencode.core.dependencies.DateClient
+import ai.opencode.core.dependencies.TestClock
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.PresentationAction
 import ai.opencode.core.testing.TestIsolationRule
@@ -27,6 +30,7 @@ import ai.opencode.server.model.OpenCodeSession
 import java.time.Instant
 import java.util.UUID
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
@@ -93,47 +97,48 @@ class ClientToolsTests {
         }
     }
 
-    @Test fun theAppOffersTheOpenSessionsDirectoryAndRefusesARequestWithNoCall() = runTest {
+    @Test fun theSocketOpensForACallAndClosesWhenItEnds() = runTest {
         val sockets = Locked<List<ClientToolsTarget>>(emptyList())
-        val replies = Locked<List<ClientToolResult>>(emptyList())
-        val events = Channel<ClientToolsEvent>(Channel.UNLIMITED)
         val effects = detachedScope(coroutineContext)
         val store = shared.appStore(appWithSession(), effects) {
+            this[DateClient] = DateClient.constant(Instant.ofEpochSecond(1_000))
+            this[Clock] = TestClock()
             this[ClientToolsClient] = ClientToolsClient(
                 connect = { target ->
                     sockets.update { it + target }
-                    events.receiveAsFlow()
+                    emptyFlow()
                 },
-                reply = { _, result ->
-                    replies.update { it + result }
-                    true
-                },
+                reply = { _, _ -> true },
             )
         }
+        val tools = setOf(ClientTool.voiceOpenURL, ClientTool.voicePlayAudio, ClientTool.voiceAudioControl)
 
-        store.send(AppFeature.Action.ClientTools(ClientToolsFeature.Action.ToolsChanged(screen))) {
-            it.withClientTools { c -> c.copy(tools = screen) }
+        // An open session, in the foreground or coming back to it, isn't a call: every tool
+        // refuses without one, so nothing connects.
+        store.send(AppFeature.Action.ClientTools(ClientToolsFeature.Action.ToolsChanged(tools))) {
+            it.withClientTools { c -> c.copy(tools = tools) }
         }
-        store.receive(AppFeature.Action.ClientTools(ClientToolsFeature.Action.TargetChanged(target))) {
-            it.withClientTools { c -> c.copy(target = target, status = ClientToolsFeature.State.Status.Connecting) }
-        }
-
-        val request = call(9, ClientTool.voiceRequestScreen, sessionID = "ses_agent")
-        events.send(ClientToolsEvent.Call(request))
-        store.receive(AppFeature.Action.ClientTools(ClientToolsFeature.Action.Socket(ClientToolsEvent.Call(request)))) {
-            it.withClientTools { c -> c.copy(connection = connection) }
-        }
-        store.receive(AppFeature.Action.ClientTools(ClientToolsFeature.Action.Delegate(ClientToolsFeature.DelegateAction.ToolCalled(request))))
-        store.receive(AppFeature.Action.ClientTools(ClientToolsFeature.Action.Refuse(request, VoiceScreenRequestFeature.Refusal.noCall)))
-        assertEquals(listOf(target), sockets.value)
-
         store.send(AppFeature.Action.ForegroundChanged(false)) { it.copy(isInForeground = false) }
-        store.receive(AppFeature.Action.ClientTools(ClientToolsFeature.Action.TargetChanged(null))) {
-            it.withClientTools { c -> c.copy(target = null, status = ClientToolsFeature.State.Status.Idle, connection = null) }
-        }
-        store.receive(AppFeature.Action.ClientTools(ClientToolsFeature.Action.Delegate(ClientToolsFeature.DelegateAction.Disconnected(connection))))
-        store.finish()
-        assertEquals(listOf(ClientToolResult.failure(VoiceScreenRequestFeature.Refusal.noCall)), replies.value)
+        store.send(AppFeature.Action.ForegroundChanged(true)) { it.copy(isInForeground = true) }
+        assertEquals(emptyList<ClientToolsTarget>(), sockets.value)
+
+        // Starting a call runs the whole call machinery; only the socket is checked here.
+        store.exhaustive = false
+        store.send(AppFeature.Action.Home(HomeFeature.Action.detail(SessionFeature.Action.VoiceTapped)))
+        store.receive({ it is AppFeature.Action.ClientTools && it.action is ClientToolsFeature.Action.TargetChanged }, "targetChanged")
+        val onCall = ClientToolsTarget(server = server, directory = session.directory, tools = tools)
+        assertEquals(false, store.state.home?.sessionDetail?.voice?.phase?.isTerminal)
+        assertEquals(onCall, store.state.clientTools.target)
+        assertEquals(ClientToolsFeature.State.Status.Connecting, store.state.clientTools.status)
+        waitFor { sockets.value.isNotEmpty() }
+        assertEquals(listOf(onCall), sockets.value)
+
+        store.send(voiceAction(VoiceFeature.Action.Delegate(VoiceFeature.DelegateAction.Ended)))
+        store.receive({ it is AppFeature.Action.ClientTools && it.action is ClientToolsFeature.Action.TargetChanged }, "targetChanged")
+        assertNull(store.state.home?.sessionDetail?.voice)
+        assertNull(store.state.clientTools.target)
+        assertEquals(ClientToolsFeature.State.Status.Idle, store.state.clientTools.status)
+        assertEquals(listOf(onCall), sockets.value)
         effects.skipInFlightEffects()
     }
 
@@ -353,7 +358,7 @@ class ClientToolsTests {
     }
 
     @Test fun nothingIsOfferedWhileTheExperimentIsOff() {
-        var state = appWithSession()
+        var state = appWithSession().withVoice(liveVoice())
         assertNull(state.clientToolsTarget)
         state = state.withClientTools { it.copy(tools = screen) }
         assertEquals(target, state.clientToolsTarget)

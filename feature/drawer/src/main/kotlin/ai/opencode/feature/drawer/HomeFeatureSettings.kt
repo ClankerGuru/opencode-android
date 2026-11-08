@@ -1,5 +1,6 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.core.log.CallTrigger
 import ai.opencode.feature.session.*
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
@@ -229,7 +230,7 @@ internal fun HomeFeature.tryWhatsNew(destination: WhatsNewEntry.Destination, ent
             }
             if (destination == WhatsNewEntry.Destination.Call) {
                 // A pushed subagent's call belongs to the root, aimed at the top.
-                val call = if (top == null) startSystemCall(s) else startCallOnTop(s)
+                val call = if (top == null) startSystemCall(s, trigger = CallTrigger.WhatsNew) else startCallOnTop(s)
                 s = call.state
                 effects += call.effect
             } else {

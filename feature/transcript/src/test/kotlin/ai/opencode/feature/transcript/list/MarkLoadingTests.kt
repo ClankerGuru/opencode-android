@@ -2,9 +2,11 @@ package ai.opencode.feature.transcript.list
 
 import ai.opencode.feature.transcript.TranscriptConfiguration
 import ai.opencode.feature.transcript.TranscriptEntry
+import ai.opencode.core.tuning.AnimationTimeScale
 import ai.opencode.server.model.OpenCodeTranscriptItem
 import androidx.compose.foundation.lazy.LazyListState
 import kotlinx.coroutines.test.TestScope
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -25,6 +27,12 @@ import org.junit.Test
  * - cancellingHandoffRestoresInteractionAndRemovesPresentation (`TranscriptMarkHandoff` snapshots
  *   the list into a `UIView` picture and masks its layer; Android crossfades `emptyHandoff` in
  *   composition)
+ * - activeHandoffDoesNotCountTowardDisabledInvariant (DEBUG `TranscriptTouchSafety` invariant; n/a,
+ *   see docs/parity/devtools.md)
+ *
+ * The hand-off tests read "interaction" as [TranscriptListController.emptyHandoff]: while it is set,
+ * the leaving mark takes every touch and the list hides from TalkBack. iOS's `TestClock` is the
+ * [TestScope] scheduler, and its `AnimationTimeScale` parameter the shared scale, reset at once.
  */
 class MarkLoadingTests {
     @Test
@@ -100,5 +108,52 @@ class MarkLoadingTests {
         assertEquals(0.0, MarkLoadingTiming(start = controller.emptyLoadingSince).opacity(1.0), 0.0)
         assertNull(controller.emptyHandoff)
     }
-}
 
+    @Test
+    fun backgroundDuringLoadingHandoffRestoresInteraction() {
+        val controller = TranscriptListController(LazyListState(), TestScope())
+        controller.beginHandoff(loading = true, showsEmpty = false, since = 0.0, time = transcriptNow(), hold = 0.2, fade = MarkLoadingTunables.fadeOut)
+        assertNotNull(controller.emptyHandoff)
+        controller.isShowingToReader = false
+        controller.visibilityChanged()
+        controller.isShowingToReader = true
+        controller.visibilityChanged()
+        assertNull(controller.emptyHandoff)
+    }
+
+    @Test
+    fun suspendedAnimationCannotKeepTranscriptDisabledPastDeadline() {
+        for (scale in AnimationTimeScale.supportedScales) {
+            val scope = TestScope()
+            // No frame loop runs here: the hand-off can only end by its own deadline.
+            val controller = TranscriptListController(LazyListState(), scope)
+            try {
+                AnimationTimeScale.shared.setScale(scale, bypassAccessCheck = true)
+                controller.beginHandoff(loading = true, showsEmpty = false, since = 0.0, time = transcriptNow(), hold = 1.0, fade = MarkLoadingTunables.fadeOut)
+            } finally {
+                AnimationTimeScale.shared.reset()
+            }
+            // Maximum supported hold (1 s) and fade (0.5 s) must finish even at 0.1×.
+            scope.testScheduler.advanceTimeBy((1500 / scale).toLong())
+            scope.testScheduler.runCurrent()
+            assertNotNull("scale $scale", controller.emptyHandoff)
+            scope.testScheduler.advanceTimeBy(200)
+            scope.testScheduler.runCurrent()
+            assertNull("scale $scale", controller.emptyHandoff)
+        }
+    }
+
+    @Test
+    fun cancelledHandoffDeadlineCannotUnlockItsReplacement() {
+        val scope = TestScope()
+        val controller = TranscriptListController(LazyListState(), scope)
+        controller.beginHandoff(loading = true, showsEmpty = false, since = 0.0, time = transcriptNow(), hold = 0.2, fade = MarkLoadingTunables.fadeOut)
+        controller.beginHandoff(loading = true, showsEmpty = false, since = 0.0, time = transcriptNow(), hold = 2.0, fade = MarkLoadingTunables.fadeOut)
+        scope.testScheduler.advanceTimeBy(1700)
+        scope.testScheduler.runCurrent()
+        assertNotNull(controller.emptyHandoff)
+        scope.testScheduler.advanceTimeBy(1000)
+        scope.testScheduler.runCurrent()
+        assertNull(controller.emptyHandoff)
+    }
+}

@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -66,7 +67,9 @@ import java.util.Locale
 /**
  * Settings › Developer (iOS `DiagnosticsView`), with Android's developer tools. Pass
  * [onClose] to show a back arrow on the main page (the settings stack owns navigation into it),
- * and [onOpenPlaygrounds] to list Settings' Playgrounds under Tuning, as iOS does.
+ * [onOpenPlaygrounds] to list Settings' Playgrounds under Tuning, as iOS does, and
+ * [onOpenServerDetails] to end the page with Settings' Server Details row (iOS
+ * `ServerDetailsSettingsSection`, shown while there is a server).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,6 +78,7 @@ fun DevToolsView(
     modifier: Modifier = Modifier,
     onClose: (() -> Unit)? = null,
     onOpenPlaygrounds: (() -> Unit)? = null,
+    onOpenServerDetails: (() -> Unit)? = null,
 ) {
     LaunchedEffect(store) { store.send(DevToolsFeature.Action.Task) }
     val state by store.collectState()
@@ -103,7 +107,7 @@ fun DevToolsView(
     ) { padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {
             when (state.route) {
-                DevToolsFeature.Route.Main -> MainPage(state, send, onOpenPlaygrounds)
+                DevToolsFeature.Route.Main -> MainPage(state, send, onOpenPlaygrounds, onOpenServerDetails)
                 DevToolsFeature.Route.Troubleshooting -> TroubleshootingPage(state)
                 DevToolsFeature.Route.Logs -> LogsPage(state, send)
                 DevToolsFeature.Route.Network -> NetworkPage(state, send)
@@ -149,7 +153,12 @@ private fun Actions(state: DevToolsFeature.State, send: (DevToolsFeature.Action)
 // Main page
 
 @Composable
-private fun MainPage(state: DevToolsFeature.State, send: (DevToolsFeature.Action) -> Unit, onOpenPlaygrounds: (() -> Unit)?) {
+private fun MainPage(
+    state: DevToolsFeature.State,
+    send: (DevToolsFeature.Action) -> Unit,
+    onOpenPlaygrounds: (() -> Unit)?,
+    onOpenServerDetails: (() -> Unit)?,
+) {
     LazyColumn(Modifier.fillMaxSize()) {
         section("Recording and Diagnostics")
         item {
@@ -236,6 +245,11 @@ private fun MainPage(state: DevToolsFeature.State, send: (DevToolsFeature.Action
                 }
             }
             footer("Exports the timeline, app log, device and build as a zip. No server addresses, credentials or message text.")
+        }
+
+        if (onOpenServerDetails != null) {
+            item(key = "server-details-gap") { Spacer(Modifier.height(16.dp)) }
+            item(key = "server-details") { NavigationRow("Server Details", SFSymbol.ServerRack, onClick = onOpenServerDetails) }
         }
     }
 }

@@ -28,8 +28,8 @@ import java.net.URI
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `ServerDetailsTests.swift` ("Server Details"): Settings › Server Details
- * (experimental `serverDetails`, OC-513).
+ * Port of iOS `ServerDetailsTests.swift` ("Server Details"): Settings › Developer › Server
+ * Details (OC-513).
  *
  * Not here: `decodesEveryMCPStatus`, `decodesCredentialAndEnvironmentAccounts` and
  * `onlyMCPConnectIsRetriedWhenUnsent` exercise `:server`'s internal payload decoding and

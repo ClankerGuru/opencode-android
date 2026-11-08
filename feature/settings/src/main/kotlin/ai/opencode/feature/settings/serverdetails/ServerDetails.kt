@@ -31,8 +31,8 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `Settings/ServerDetails.swift`: Settings › Server Details (experimental
- * `serverDetails`, OC-513, D-125 Overview Tiles): the server's MCP servers, provider sign-ins and
+ * Port of iOS `Settings/ServerDetails.swift`: Settings › Developer › Server Details (OC-513,
+ * D-125 Overview Tiles): the server's MCP servers, provider sign-ins and
  * skills as three tiles that open into trays, with problems as banners on top. One read of each,
  * for the server's own folder; actions use the routes the server has.
  *

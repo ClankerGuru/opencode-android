@@ -2,9 +2,9 @@ package ai.opencode.feature.session
 
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
+import ai.opencode.core.store.rememberScope
+import ai.opencode.feature.media.BrowserFeature
 import ai.opencode.feature.media.BrowserPage
-import ai.opencode.feature.media.BrowserPeek
-import ai.opencode.feature.media.BrowserWebViews
 import ai.opencode.feature.media.browserBackAction
 import ai.opencode.feature.media.browserStackID
 import androidx.activity.compose.BackHandler
@@ -18,24 +18,22 @@ import java.util.UUID
 // The drawer area's stack pushes [sessionBrowserStackPage] and draws [SessionBrowserPage] for it.
 
 /**
- * The page pushed over the session: media's [BrowserPage] on the session's `browser` state, its
- * reply peek and pending requests, its actions sent as `.browser(_)`, and the session's
+ * The page pushed over the session: media's [BrowserPage] on the session's scoped `browser` store
+ * (iOS `owner.scope(\.browser, action: \.browser)`), its [browserReplyStatus], and the session's
  * [WorkingIndicator] in the reply capsule. System Back steps back through the page's history,
  * dismisses Ask, and from the first page closes it ([browserBackAction]).
  */
 @Composable
 fun SessionBrowserPage(store: StoreOf<SessionFeature.State, SessionFeature.Action>, modifier: Modifier = Modifier) {
-    val browser by store.observe { it.browser }
-    val peek by store.observe { it.browserPeek }
-    val hasPendingRequests by store.observe { it.hasPendingRequests }
-    BackHandler(enabled = browser.isOpen) {
-        store.send(SessionFeature.Action.Browser(browserBackAction(store.state.browser)))
+    val browser = store.rememberScope(state = { it.browser }, action = { child: BrowserFeature.Action -> SessionFeature.Action.Browser(child) })
+    val isOpen by browser.observe { it.isOpen }
+    val replyStatus by store.observe { it.browserReplyStatus }
+    BackHandler(enabled = isOpen) {
+        browser.send(browserBackAction(browser.state))
     }
     BrowserPage(
-        browser = browser,
-        peek = peek?.let { BrowserPeek(it.text) },
-        hasPendingRequests = hasPendingRequests,
-        onAction = { store.send(SessionFeature.Action.Browser(it)) },
+        store = browser,
+        replyStatus = replyStatus,
         workingIndicator = { needsInput -> WorkingIndicator(WorkingActivity(needsInput = needsInput)) },
         modifier = modifier,
     )
@@ -51,7 +49,7 @@ fun sessionBrowserStackPage(state: SessionFeature.State): SessionStackPage? {
     return SessionStackPage(
         id = browserStackPageID(pageID),
         paneTitle = state.browser.title.ifEmpty { null },
-        yieldsBackSwipe = { BrowserWebViews.shared.canGoBack(pageID) },
+        yieldsBackSwipe = { state.browser.canGoBack },
     )
 }
 

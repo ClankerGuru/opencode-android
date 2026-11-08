@@ -2,8 +2,6 @@ package ai.opencode.feature.voice
 
 import ai.opencode.core.dependencies.*
 import ai.opencode.core.log.AppLog
-import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
 import android.Manifest
@@ -296,9 +294,7 @@ class VoiceAudioEngine(
                 currentCoroutineContext().ensureActive()
                 startQualityReports()
                 // Audio in Calls: an agent's track plays on this call's route until it stops.
-                if (dependency(ExperimentalFeatures)(ExperimentalFeature.audioInCalls)) {
-                    callAudio = CallAudioPlayer.shared.also { it.attach(id, demo) }
-                }
+                callAudio = CallAudioPlayer.shared.also { it.attach(id, demo) }
             }
             // One ordered queue, so the loop has let go before the connect cue plays.
             val commands = Channel<CueCommand>(Channel.UNLIMITED)

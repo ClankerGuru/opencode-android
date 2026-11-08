@@ -81,6 +81,10 @@ fun List<TextEdit>.mapOffset(original: Int): Int {
     return original + delta
 }
 
+/** Drawn characters [start]..[end] that read as [text] when selected (an icon slot, typeset math). */
+@Immutable
+data class AtomicRun(val start: Int, val end: Int, val text: String)
+
 /** One chip in a reply's text, on its padding and label (iOS `SessionChip`). */
 @Immutable
 data class SessionChip(val id: String, val muted: Boolean, val isSubagent: Boolean, val start: Int, val end: Int, val url: String)
@@ -105,6 +109,12 @@ class PresentedText(
     val hasMath: Boolean,
     /** TalkBack's hint: “Links to …” (iOS `InlineLinkPresentation.hint`). */
     val linkHint: String?,
+    /**
+     * Drawn characters that stand for other text in a reply selection (iOS
+     * `TranscriptSelectionText.leaf(_:)`): a link's icon slot reads nothing, typeset math reads
+     * its source with its delimiters.
+     */
+    val atomics: List<AtomicRun> = emptyList(),
 ) {
     fun mapArrivals(arrivals: List<TranscriptTextReveal.Arrival>): List<TranscriptTextReveal.Arrival> =
         if (edits.isEmpty()) arrivals else arrivals.map { it.copy(offset = edits.mapOffset(it.offset)) }
@@ -170,6 +180,7 @@ object MarkdownPresentation {
         val hosts = mutableListOf<String>()
         var originalOffset = 0
         var hasMath = false
+        val atomics = mutableListOf<AtomicRun>()
         val totalLength = inline.text.length
 
         val text = buildAnnotatedString {
@@ -206,6 +217,7 @@ object MarkdownPresentation {
                                 val isOpen = options.isGrowing && originalOffset + groupLength >= totalLength
                                 val domain = MarkdownLinks.iconDomain(url)
                                 val id = "icon:$groupIndex"
+                                atomics += AtomicRun(length, length + wordJoiner.length, "")
                                 appendInlineContent(id, wordJoiner)
                                 inlineContent[id] = linkIcon(url, domain, isOpen, options.textSize, colors, siteIcon!!)
                                 edits += TextEdit(originalOffset, 0, 1)
@@ -240,6 +252,7 @@ object MarkdownPresentation {
                         } else {
                             hasMath = true
                             val id = "math:$groupIndex:$runIndex"
+                            atomics += AtomicRun(length, length + run.text.length, delimiter.open + run.text + delimiter.close)
                             appendInlineContent(id, run.text)
                             val tint = if (run.secondary) colors.secondaryText else options.foreground
                             inlineContent[id] = mathContent(rendered, tint, density)
@@ -259,6 +272,7 @@ object MarkdownPresentation {
             fetchableLinks = fetchable,
             hasMath = hasMath,
             linkHint = if (hosts.isEmpty()) null else "Links to " + listFormatted(hosts),
+            atomics = atomics,
         )
     }
 

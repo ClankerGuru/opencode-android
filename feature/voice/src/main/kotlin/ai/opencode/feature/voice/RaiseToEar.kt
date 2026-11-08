@@ -19,6 +19,7 @@ class RaiseToEarDetector(
     private val context: Context? = null,
     private val clock: Clock = dependency(Clock),
     private val heldUp: (() -> Boolean)? = null,
+    private val gravitySource: (() -> Gravity?)? = null,
     private val onNote: (String) -> Unit = { dependency(VoiceCallLogClient).noteCurrent(VoiceCallLog.Note.Kind.marker, it) },
 ) : SensorEventListener {
     private val manager = context?.getSystemService(SensorManager::class.java)
@@ -26,6 +27,7 @@ class RaiseToEarDetector(
     private var pending: Job? = null
     private var onRaise: (() -> Boolean)? = null
     private var onNear: ((Boolean) -> Unit)? = null
+    private var callIsLive: () -> Boolean = { false }
     var isNear = false; private set
     var isAtEar = false; private set
     private var started = false
@@ -34,10 +36,16 @@ class RaiseToEarDetector(
     private var hasAccelerometer = false
     private var proximityScreen: PowerManager.WakeLock? = null
     data class Gravity(val x: Double, val y: Double, val z: Double)
+    /**
+     * [onRaise] reports whether a call took the raise (started, or already running); one refused
+     * (while dictating) doesn't leave the phone at the ear, so the next raise counts at once.
+     * [callIsLive] picks the posture: starting a call needs [isAtEarPosture], a call already
+     * running moves to the receiver on the looser [isHeldUp].
+     */
     @SuppressLint("WakelockTimeout") // Proximity monitor lifetime, released by stop in monitor's finally.
-    fun start(onRaise: () -> Boolean, onNear: (Boolean) -> Unit) {
+    fun start(onRaise: () -> Boolean, onNear: (Boolean) -> Unit, callIsLive: () -> Boolean = { false }) {
         if (started) return
-        this.onRaise = onRaise; this.onNear = onNear
+        this.onRaise = onRaise; this.onNear = onNear; this.callIsLive = callIsLive
         val proximity = manager?.getDefaultSensor(Sensor.TYPE_PROXIMITY) ?: return
         started = manager.registerListener(this, proximity, SensorManager.SENSOR_DELAY_NORMAL, Handler(Looper.getMainLooper()))
         if (!started) return
@@ -55,7 +63,7 @@ class RaiseToEarDetector(
         pending?.cancel(); pending = null; manager?.unregisterListener(this); started = false; gravity = null; hasAccelerometer = false
         proximityScreen?.let { if (it.isHeld) it.release() }; proximityScreen = null
         if (isAtEar) onNear?.invoke(false)
-        isAtEar = false; isNear = false; onRaise = null; onNear = null
+        isAtEar = false; isNear = false; onRaise = null; onNear = null; callIsLive = { false }
         scope.cancel()
     }
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
@@ -78,7 +86,7 @@ class RaiseToEarDetector(
         isNear = near; val hadPending = pending != null; pending?.cancel(); pending = null
         if (near) {
             if (isAtEar) { if (hadPending) onNote("Cancelled lower (proximity re-covered at ear)"); return }
-            if (!isHeldUp(true)) return
+            if (!isHeldUpForRaise()) return
             pending = scope.launch { clock.sleep(dwell); completeRaise() }
         } else {
             if (!isAtEar) return
@@ -96,7 +104,7 @@ class RaiseToEarDetector(
         }
     }
     private fun completeRaise() {
-        if (!isNear || !isHeldUp(true)) return
+        if (!isNear || !isHeldUpForRaise()) return
         isAtEar = true; pending = null; onNear?.invoke(true)
         if (onRaise?.invoke() != true) isAtEar = false
     }
@@ -107,25 +115,47 @@ class RaiseToEarDetector(
         onNote("Debounced lower (${duration.inWholeMilliseconds} ms clear${if (capped) " cap reached" else ", phone lowered"})")
         onNear?.invoke(false)
     }
-    private fun isHeldUp(default: Boolean) = heldUp?.invoke() ?: gravity?.let(::isHeldUp) ?: default
+    /**
+     * To start a call: held up with the screen near vertical ([isAtEarPosture]), not tipped back
+     * to read. A live call keeps the looser [isHeldUp] for moving to the receiver. No motion
+     * data: trust proximity.
+     */
+    private fun isHeldUpForRaise(): Boolean {
+        heldUp?.let { return it() }
+        val gravity = currentGravity() ?: return true
+        return if (callIsLive()) isHeldUp(gravity) else isAtEarPosture(gravity)
+    }
+    private fun currentGravity(): Gravity? = if (gravitySource != null) gravitySource.invoke() else gravity
+    private fun isHeldUp(default: Boolean) = heldUp?.invoke() ?: currentGravity()?.let(::isHeldUp) ?: default
     companion object {
-        val dwell = 350.milliseconds; val lowerDwell = 800.milliseconds; val lowerCap = 2500.milliseconds; val motionPoll = 100.milliseconds
+        /** How long the phone must be up and covered before it counts as raised. At 350 ms a
+         * finger or palm passing over the sensor while reading could start a call. */
+        val dwell = 600.milliseconds; val lowerDwell = 800.milliseconds; val lowerCap = 2500.milliseconds; val motionPoll = 100.milliseconds
         fun isSupported(context: Context) = context.getSystemService(SensorManager::class.java).getDefaultSensor(Sensor.TYPE_PROXIMITY) != null
+        /** Upright or tilted on its side (with the top never pointing down into a pocket), rather
+         * than face up or down on a table. Keeps a call at the ear. */
         fun isHeldUp(gravity: Gravity) = abs(gravity.z) < 0.75 && (gravity.y < -0.35 || (abs(gravity.x) > 0.55 && gravity.y < -0.15))
+        /** Held up with the screen within about 30° of vertical, as against a cheek. Reading tips
+         * the screen back 40° or more (|z| ≥ 0.65), where a hand over the sensor isn't a raise. */
+        fun isAtEarPosture(gravity: Gravity) = abs(gravity.z) < 0.5 && isHeldUp(gravity)
     }
 }
-class RaiseToEarClient(val isSupported: () -> Boolean, val monitor: suspend (() -> Boolean, (Boolean) -> Unit) -> Unit) {
+class RaiseToEarClient(
+    val isSupported: () -> Boolean,
+    /** onRaise, onNear, callIsLive ([RaiseToEarDetector.start]). */
+    val monitor: suspend (() -> Boolean, (Boolean) -> Unit, () -> Boolean) -> Unit,
+) {
     companion object Key : DependencyKey<RaiseToEarClient> {
         override val liveValue by lazy {
             val context = dependency(AppContext)
-            RaiseToEarClient({ RaiseToEarDetector.isSupported(context) }, { onRaise, onNear ->
+            RaiseToEarClient({ RaiseToEarDetector.isSupported(context) }, { onRaise, onNear, callIsLive ->
                 withContext(Dispatchers.Main.immediate) {
                     val detector = RaiseToEarDetector(context)
-                    try { detector.start(onRaise, onNear); awaitCancellation() } finally { detector.stop() }
+                    try { detector.start(onRaise, onNear, callIsLive); awaitCancellation() } finally { detector.stop() }
                 }
             })
         }
-        override val testValue = RaiseToEarClient({ false }, { _, _ -> })
+        override val testValue = RaiseToEarClient({ false }, { _, _, _ -> })
     }
 }
 class VoiceAtEarBox(initial: Boolean = false) {

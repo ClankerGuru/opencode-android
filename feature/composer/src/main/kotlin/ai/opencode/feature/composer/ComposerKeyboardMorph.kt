@@ -253,8 +253,10 @@ fun ComposerKeyboardMorphState?.layoutProgress(inline: Boolean): Float =
 /**
  * iOS `ComposerKeyboardSpacing`: the composer's top padding (`innerVertical`, taken back as the
  * row opens unless folded for dictation, [fold] 0…1 animated with the fold) or its bottom gap
- * (`bottomGap` resting, `keyboardGap` above the keys, on the keyboard's progress). Measured
- * frame by frame in layout, so the composer's height follows without recomposing.
+ * (`bottomGap` resting, `keyboardGap` above the keys, on the keyboard's progress). [sides] adds
+ * side margins that go from `rest` to `keyboard` on the keyboard's progress, like the bottom gap
+ * (iOS d1a9e59f); null adds none. Measured frame by frame in layout, so the composer's size
+ * follows without recomposing.
  */
 fun Modifier.composerKeyboardSpacing(
     morph: ComposerKeyboardMorphState?,
@@ -263,6 +265,7 @@ fun Modifier.composerKeyboardSpacing(
     bottomGap: Dp,
     keyboardGap: Dp,
     fold: () -> Float = { 0f },
+    sides: ComposerSideMargins? = null,
 ): Modifier = layout { measurable, constraints ->
     val progress = morph?.keyboard?.progress ?: 0f
     val pad = if (top) {
@@ -270,10 +273,20 @@ fun Modifier.composerKeyboardSpacing(
     } else {
         bottomGap.toPx() + (keyboardGap.toPx() - bottomGap.toPx()) * progress
     }.roundToInt().coerceAtLeast(0)
-    val placeable = measurable.measure(constraints.offset(vertical = -pad))
+    var side = 0
+    if (sides != null) {
+        val rest = sides.rest.toPx()
+        val keyboard = sides.keyboard.toPx()
+        side = (rest + (keyboard - rest) * progress).roundToInt().coerceAtLeast(0)
+    }
+    val placeable = measurable.measure(constraints.offset(horizontal = -side * 2, vertical = -pad))
+    val width = (placeable.width + side * 2).coerceIn(constraints.minWidth, constraints.maxWidth)
     val height = (placeable.height + pad).coerceIn(constraints.minHeight, constraints.maxHeight)
-    layout(placeable.width, height) { placeable.place(0, if (top) pad else 0) }
+    layout(width, height) { placeable.place(side, if (top) pad else 0) }
 }
+
+/** The composer area's side margins at rest and with the keyboard up (iOS `sides`). */
+data class ComposerSideMargins(val rest: Dp, val keyboard: Dp)
 
 /**
  * iOS `ComposerKeyboardReveal`: the row's controls fade, blur and rise their travel in with the

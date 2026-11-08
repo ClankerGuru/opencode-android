@@ -8,6 +8,7 @@ import ai.opencode.feature.system.clienttools.ClientToolsFeature.Action
 import ai.opencode.feature.system.clienttools.ClientToolsFeature.DelegateAction
 import ai.opencode.feature.system.clienttools.ClientToolsFeature.State
 import ai.opencode.server.OpenCodeServer
+import ai.opencode.server.clienttools.ClientMcpProtocol
 import ai.opencode.server.clienttools.ClientTool
 import ai.opencode.server.clienttools.ClientToolsClient
 import ai.opencode.server.clienttools.ClientToolsEvent
@@ -72,9 +73,9 @@ class ClientToolsTests {
         waitForSockets(sockets, count = 2)
 
         // A second failure before any handshake backs off longer.
-        sockets[1].send(ClientToolsEvent.Closed(second, "HTTP 404"))
+        sockets[1].send(ClientToolsEvent.Closed(second, "HTTP 502"))
         sockets[1].close()
-        store.receive(Action.Socket(ClientToolsEvent.Closed(second, "HTTP 404"))) {
+        store.receive(Action.Socket(ClientToolsEvent.Closed(second, "HTTP 502"))) {
             it.copy(status = State.Status.Waiting, failures = 2)
         }
         store.receive(Action.Delegate(DelegateAction.Disconnected(second)))
@@ -92,6 +93,53 @@ class ClientToolsTests {
         store.send(Action.TargetChanged(renamed))
         store.send(Action.TargetChanged(null)) { it.copy(target = null, status = State.Status.Idle, connection = null) }
         store.receive(Action.Delegate(DelegateAction.Disconnected(third)))
+        store.finish()
+    }
+
+    @Test fun aServerWithoutTheRouteIsNotRetriedUntilTheServerChanges() = runTest {
+        val clock = TestClock()
+        val sockets = mutableListOf<Channel<ClientToolsEvent>>()
+        val store = TestStore(State(tools = screen), ClientToolsFeature(), this) {
+            this[Clock] = clock
+            this[ClientToolsClient] = ClientToolsClient(
+                connect = {
+                    val channel = Channel<ClientToolsEvent>(Channel.UNLIMITED)
+                    synchronized(sockets) { sockets.add(channel) }
+                    channel.receiveAsFlow()
+                },
+                reply = { _, _ -> true },
+            )
+        }
+        assertEquals(setOf(404, 405, 501), ClientMcpProtocol.PERMANENT_STATUSES)
+
+        store.send(Action.TargetChanged(target)) { it.copy(target = target, status = State.Status.Connecting) }
+        waitForSockets(sockets, count = 1)
+        sockets[0].send(ClientToolsEvent.Unavailable(connection, 404))
+        sockets[0].close()
+        store.receive(Action.Socket(ClientToolsEvent.Unavailable(connection, 404))) {
+            it.copy(status = State.Status.Unavailable, unavailableServer = server)
+        }
+        store.receive(Action.Delegate(DelegateAction.Disconnected(connection)))
+        // No backoff: nothing wakes to try again.
+        clock.advance(60.seconds)
+        assertEquals(1, synchronized(sockets) { sockets.size })
+
+        // Backgrounding and coming back (the target goes and returns), or a different tool list,
+        // still finds the same server without the route.
+        store.send(Action.TargetChanged(null)) { it.copy(target = null, status = State.Status.Idle) }
+        store.send(Action.TargetChanged(target)) { it.copy(target = target, status = State.Status.Unavailable) }
+        val more = ClientToolsTarget(server = server, directory = "/work/app", tools = setOf(ClientTool.voiceRequestScreen, ClientTool.voiceOpenURL))
+        store.send(Action.TargetChanged(more)) { it.copy(target = more) }
+        clock.advance(60.seconds)
+        assertEquals(1, synchronized(sockets) { sockets.size })
+
+        // A changed server (here its password) tries again.
+        val changed = ClientToolsTarget(server = server.copy(password = "new"), directory = "/work/app", tools = screen)
+        store.send(Action.TargetChanged(changed)) {
+            it.copy(target = changed, status = State.Status.Connecting, unavailableServer = null)
+        }
+        waitForSockets(sockets, count = 2)
+        store.send(Action.TargetChanged(null)) { it.copy(target = null, status = State.Status.Idle) }
         store.finish()
     }
 

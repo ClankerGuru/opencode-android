@@ -337,7 +337,7 @@ class WhatsNewTests {
             if (destination is WhatsNewEntry.Destination.Open && destination.page is WhatsNewEntry.SettingsDestination.Experiment) {
                 val id = (destination.page as WhatsNewEntry.SettingsDestination.Experiment).id
                 assertTrue("${entry.id} opens an experiment that exists", ExperimentalFeature.fromRawValue(id) != null)
-                assertTrue("${entry.id} opens its graduated setting's own page", ExperimentalFeature.fromRawValue(id)?.isGraduated != true)
+                assertTrue("${entry.id} opens a switch that's in the pane", ExperimentalFeature.fromRawValue(id)?.group != null)
             }
             if (destination is WhatsNewEntry.Destination.Prompt) {
                 assertTrue("${entry.id} types a prompt", destination.text.isNotEmpty())

@@ -235,10 +235,8 @@ private fun LabScreen(server: OpenCodeServer, initialSession: String?, section: 
             if (browserState.isOpen) {
                 MediaBackHandler(enabled = true) { browser.send(browserBackAction(browser.state)) }
                 BrowserPage(
-                    browser = browserState,
-                    peek = null,
-                    hasPendingRequests = false,
-                    onAction = { browser.send(it) },
+                    store = browser,
+                    replyStatus = null,
                     workingIndicator = {},
                 )
             }

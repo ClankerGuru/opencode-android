@@ -257,7 +257,11 @@ fun ServerFlowTitle(
     )
 }
 
-private val chevronWidth = 20.dp
+private val chevronSize = 18.dp
+private val chevronGap = 6.dp
+
+/** The chevron and its gap (iOS measures it, as it grows with Dynamic Type; Android's is a fixed 18 dp). */
+private val chevronWidth = chevronSize + chevronGap
 
 @Composable
 private fun Label(
@@ -273,7 +277,7 @@ private fun Label(
     Row(
         modifier.heightIn(min = 48.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(chevronGap),
     ) {
         Names(shown, presentation, motion, limit)
         if (chevron) {
@@ -282,7 +286,7 @@ private fun Label(
                 tween(DrawerTitle.CROSS_FADE_MILLIS, easing = Motion.EaseInOut),
                 label = "server-flow-chevron",
             )
-            OpenCodeIcon(SFSymbol.ChevronDown, contentDescription = null, size = 18.dp, tint = chevronColor)
+            OpenCodeIcon(SFSymbol.ChevronDown, contentDescription = null, size = chevronSize, tint = chevronColor)
         }
     }
 }
@@ -310,10 +314,11 @@ private fun Names(shown: OpenCodeServer, presentation: DrawerTitle.Presentation,
             },
         contentAlignment = Alignment.CenterStart,
     ) {
-        // The shown name's natural width, which the title springs to.
+        // The shown name's width, truncated to the room, which the title springs to, so the
+        // chevron sits right after a truncated name (iOS ffbc8f9f).
         val id = shown.persistenceID
         Name(
-            shown.friendlyName, presentation, limit = null,
+            shown.friendlyName, presentation, limit = limit,
             modifier = Modifier
                 .wrapContentWidth(Alignment.Start, unbounded = true)
                 .onSizeChanged { motion.measured(id, it.width.toFloat()) }
@@ -342,7 +347,7 @@ private fun Names(shown: OpenCodeServer, presentation: DrawerTitle.Presentation,
 }
 
 @Composable
-private fun Name(text: String, presentation: DrawerTitle.Presentation, limit: Dp?, modifier: Modifier = Modifier) {
+private fun Name(text: String, presentation: DrawerTitle.Presentation, limit: Dp, modifier: Modifier = Modifier) {
     val colors = OpenCodeTheme.colors
     val color by animateColorAsState(
         if (presentation.isDimmed) colors.secondaryText else colors.text,
@@ -351,7 +356,7 @@ private fun Name(text: String, presentation: DrawerTitle.Presentation, limit: Dp
     )
     Text(
         text,
-        modifier = if (limit != null) modifier.widthIn(max = limit) else modifier,
+        modifier = modifier.widthIn(max = limit),
         style = DrawerTunables.titleFont.font.copy(fontWeight = FontWeight.Bold),
         color = color,
         maxLines = 1,

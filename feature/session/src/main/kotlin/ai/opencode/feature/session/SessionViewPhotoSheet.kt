@@ -6,6 +6,7 @@ import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
 import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.core.ui.inContainer
 import ai.opencode.feature.composer.AttachmentMenuMetrics
 import ai.opencode.feature.composer.AttachmentMenuPhase
 import ai.opencode.feature.composer.AttachmentPickerButton
@@ -757,8 +758,9 @@ internal fun SessionPhotoSheetEnvironment(
 ) {
     val density = LocalDensity.current
     val reduceMotion = rememberReduceMotion()
-    val ime = WindowInsets.ime.getBottom(density)
-    val navigation = WindowInsets.navigationBars.getBottom(density)
+    // The session's own space: a Catch Up card's edges, not the window's ([inContainer]).
+    val ime = WindowInsets.ime.inContainer().getBottom(density)
+    val navigation = WindowInsets.navigationBars.inContainer().getBottom(density)
     SideEffect {
         state.env = SessionPhotoSheetState.Env(
             store = store,

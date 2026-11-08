@@ -5,6 +5,7 @@ import ai.opencode.core.diagnostics.PerfTimeline
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.core.ui.inContainer
 import ai.opencode.feature.media.AgentImageViewport
 import ai.opencode.feature.media.AgentImageVisibility
 import ai.opencode.feature.media.LinkPreviewStore
@@ -21,10 +22,16 @@ import ai.opencode.feature.transcript.TranscriptConfiguration
 import ai.opencode.feature.transcript.TranscriptLayoutTuning
 import ai.opencode.feature.transcript.TranscriptRowContext
 import ai.opencode.feature.transcript.links.LinkPreviewArrivals
+import ai.opencode.feature.transcript.markdown.ui.LocalInlineLinkStyle
 import ai.opencode.feature.transcript.markdown.ui.LocalLinkPreviewRow
 import ai.opencode.feature.transcript.markdown.ui.LocalTranscriptTextReveal
 import ai.opencode.feature.transcript.markdown.ui.SharedTextContextMenus
+import ai.opencode.feature.transcript.markdown.ui.MarkdownStyle
 import ai.opencode.feature.transcript.markdown.ui.TranscriptTextReveal
+import ai.opencode.feature.transcript.selection.LocalTranscriptReplySelection
+import ai.opencode.feature.transcript.selection.TranscriptReplySelectionMenu
+import ai.opencode.feature.transcript.selection.transcriptReplySelectionGestures
+import ai.opencode.feature.transcript.selection.transcriptReplySelectionHandles
 import ai.opencode.feature.transcript.rows.NewMessagesDivider
 import ai.opencode.feature.transcript.user.LocalSendLanding
 import ai.opencode.feature.transcript.user.QueuedPillSource
@@ -34,6 +41,7 @@ import ai.opencode.feature.transcript.user.queuedPillSource
 import ai.opencode.server.model.OpenCodeQueuedInput
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.ScrollableDefaults
+import androidx.compose.foundation.magnifier
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
@@ -64,6 +72,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
@@ -171,8 +180,27 @@ private fun TranscriptListContent(
     controller.flingBehavior = ScrollableDefaults.flingBehavior()
     // Applied in composition so this frame draws the new rows with their stable keys.
     controller.update(configuration)
-    controller.obstructionChanged(contentPadding.calculateBottomPadding().value, WindowInsets.ime.getBottom(density) / density.density)
+    controller.obstructionChanged(contentPadding.calculateBottomPadding().value, WindowInsets.ime.inContainer().getBottom(density) / density.density)
     SideEffect { controller.flushEffects() }
+
+    // iOS `TranscriptListViewController+TextSelection`: one selection across a reply's rows.
+    val replySelection = controller.replySelection
+    val listSelection = remember(controller) { TranscriptListSelection(controller, listState, scope) }
+    listSelection.configuration = configuration
+    listSelection.style = MarkdownStyle(layoutTuning, OpenCodeTheme.colors)
+    listSelection.density = density
+    listSelection.linkStyle = LocalInlineLinkStyle.current
+    listSelection.topPadding = with(density) { contentPadding.calculateTopPadding().toPx() }
+    listSelection.bottomPadding = with(density) { contentPadding.calculateBottomPadding().toPx() }
+    replySelection.density = density.density
+    DisposableEffect(listSelection) {
+        replySelection.host = listSelection
+        onDispose {
+            // iOS: the list leaving clears the selection.
+            replySelection.clear()
+            if (replySelection.host === listSelection) replySelection.host = null
+        }
+    }
 
     LaunchedEffect(resumed) { controller.visibilityChanged() }
     // iOS `SessionView+Header` registers the transcript's knobs as the session draws.
@@ -299,6 +327,7 @@ private fun TranscriptListContent(
         LocalTranscriptLayoutTuning provides layoutTuning,
         LocalTranscriptTextReveal provides textReveal,
         LocalLinkPreviewStore provides linkPreviews,
+        LocalTranscriptReplySelection provides replySelection,
         // A covering screen isn't composed and a stopped activity's frame clock pauses, so
         // only the lifecycle below RESUMED is left to gate (iOS `emptyPulsePaused`).
         LocalTranscriptTimelinePaused provides TranscriptTimelineGate.pauses(
@@ -308,8 +337,21 @@ private fun TranscriptListContent(
             drawn = true,
         ),
     ) {
-        Box(modifier.nestedScroll(controller.nestedScrollConnection)) {
+        Box(
+            modifier
+                .nestedScroll(controller.nestedScrollConnection)
+                .onPlaced { replySelection.container = it }
+                .transcriptReplySelectionGestures(replySelection)
+                .transcriptReplySelectionHandles(replySelection)
+                .magnifier(sourceCenter = { replySelection.magnifierCenter }),
+        ) {
             SharedTextContextMenus {
+                TranscriptReplySelectionMenu(
+                    replySelection,
+                    isScrolling = { listState.isScrollInProgress },
+                    onCopy = { currentSend(TranscriptAction.CopyTextTapped(it)) },
+                    onQuote = { currentSend(TranscriptAction.QuoteTextTapped(it)) },
+                )
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize().testTag("transcript-list")

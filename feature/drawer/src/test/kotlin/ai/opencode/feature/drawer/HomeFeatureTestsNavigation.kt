@@ -41,7 +41,9 @@ import ai.opencode.server.model.OpenCodeProject
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.OpenCodeSessionFamily
 import ai.opencode.server.model.OpenCodeTranscriptItem
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.withContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -235,12 +237,14 @@ class HomeFeatureTestsNavigation {
         assertTrue("the finger lifting after the switch sends nothing", sent.value.isEmpty())
 
         store.send(detail(SessionFeature.Action.dictationSendTapped))
-        repeat(200) {
-            if (sent.value.isEmpty()) {
-                // iOS's store reduces what effects send as they send it; this one when asked.
-                store.skipReceivedActions()
-                settle(1)
-            }
+        // The send runs on the effects' own threads, so wait real time for it (up to 5 s): a
+        // fixed number of yields ran out on a slow CI runner before the prompt went out.
+        val deadline = System.nanoTime() + 5_000_000_000L
+        while (sent.value.isEmpty() && System.nanoTime() < deadline) {
+            // iOS's store reduces what effects send as they send it; this one when asked.
+            store.skipReceivedActions()
+            settle(1)
+            withContext(Dispatchers.IO) { Thread.sleep(5) }
         }
         assertEquals(listOf(Sent(second.id, "first words and more, sent")), sent.value)
 

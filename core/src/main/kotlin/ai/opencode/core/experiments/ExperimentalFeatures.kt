@@ -15,7 +15,7 @@ typealias ExperimentalFeatures = ai.opencode.core.sharing.ExperimentalFeatures
 
 /**
  * One experimental feature's switch (iOS `.experimental(feature)`): `experimental-<raw>`, off by
- * default unless it has graduated.
+ * default.
  */
 val ExperimentalFeature.key: SharedKey<Boolean> get() = experimentalKeys.getValue(this)
 
@@ -25,9 +25,9 @@ private val experimentalKeys: Map<ExperimentalFeature, SharedKey<Boolean>> =
 /** SF Symbol name (iOS `systemImage`). */
 val ExperimentalFeature.systemImage: String get() = symbol
 
-/** The sections of Settings › Experimental, in order, all open. */
+/** Settings › Experimental's sections, in order, all open. */
 enum class ExperimentalGroup {
-    composer, calls, transcript, drawer;
+    composer, calls, drawer, transcript;
 
     val id: String get() = name
 
@@ -39,9 +39,9 @@ enum class ExperimentalGroup {
             drawer -> "Drawer"
         }
 
-    /** The group's experiments, graduated ones aside. */
+    /** The group's experiments, in Settings order. */
     val features: List<ExperimentalFeature>
-        get() = ExperimentalFeature.allCases.filter { it.group == this && !it.isGraduated }
+        get() = ExperimentalFeature.allCases.filter { it.group == this }
 }
 
 /** The removed Model Picker menu's saved style (`today`, `sheet`, `one-picker`, `grow-from-composer`). */

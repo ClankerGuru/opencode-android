@@ -1,5 +1,6 @@
 package ai.opencode.feature.voice
 
+import ai.opencode.core.log.CallTrigger
 import ai.opencode.server.model.VoiceViewingPage
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.UuidClient
@@ -609,6 +610,8 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
          */
         data object StartIfNeeded : Action
         data object RejoinTapped : Action
+        /** A failed call's Try Again. */
+        data object TryAgainTapped : Action
         data object CallDropped : Action
         data object ReconnectingShown : Action
         data class CallEvent(val event: VoiceCallEvent) : Action
@@ -905,7 +908,13 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
                 if (state.phase.isTerminal) Reduced(state) else finish(state, State.Phase.Dropped)
             }
 
+            Action.TryAgainTapped -> {
+                CallTrigger.TryAgain.log()
+                Reduced(state, Effect.send(Action.Start))
+            }
+
             Action.RejoinTapped -> {
+                CallTrigger.Rejoin.log()
                 // The new call's instructions carry this call's tail as the previous call.
                 val next = state.copy(previousEndedAt = dependency(DateClient).now(), captions = emptyList()).clearLiveReply()
                 Reduced(next, Effect.send(Action.Start))

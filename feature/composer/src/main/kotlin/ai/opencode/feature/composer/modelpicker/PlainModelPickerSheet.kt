@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -370,13 +371,15 @@ private fun PlainModelRow(model: OpenCodeModel, state: ModelPickerState, onEvent
 /**
  * The composer's model chip with One Picker off (`SessionView+ComposerControls.swift`): reads
  * `"<Model> ⌄"` or `"<Model> · <Level> ⌄"`. TalkBack: **Choose model**, its value the label.
- * Secondary text, subheadline medium, ≥ 48 dp tall.
+ * Secondary text, subheadline medium, ≥ 48 dp tall. [targetDrop]: how far its target sits below
+ * its ink (the composer's `pickerTargetDrop`).
  */
 @Composable
 fun ModelPickerChip(
     state: ModelPickerState,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    targetDrop: Dp = 0.dp,
 ) {
     val secondary = OpenCodeTheme.colors.secondaryText
     Box(modifier) {
@@ -384,6 +387,9 @@ fun ModelPickerChip(
         ProviderIconPrewarm(state)
         Row(
             Modifier
+                // The target sits [targetDrop] below the ink (iOS `openCodeTapTarget(lowered:)`):
+                // the chip's touch and TalkBack bounds move down and its ink moves back up.
+                .offset(y = targetDrop)
                 .clickable(role = Role.Button, onClick = onClick)
                 .heightIn(min = 48.dp)
                 .clearAndSetSemantics {
@@ -391,7 +397,8 @@ fun ModelPickerChip(
                     stateDescription = state.currentModelLabel
                     role = Role.Button
                 }
-                .testTag("composer-model"),
+                .testTag("composer-model")
+                .offset(y = -targetDrop),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {

@@ -1,7 +1,10 @@
 package ai.opencode.feature.composer.plusmenu
 
+import ai.opencode.core.log.AppLog
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.rememberReduceMotion
+import ai.opencode.core.touch.TouchRecovery
+import ai.opencode.core.touch.rememberTouchRecovery
 import ai.opencode.feature.composer.AttachmentMenuAnchors
 import ai.opencode.feature.composer.AttachmentMenuItem
 import ai.opencode.feature.composer.AttachmentMenuMetrics
@@ -115,6 +118,27 @@ fun PlusMenuGlassSurface(
         }
     }
 
+    // iOS `update(from:)`: touch ownership follows intent, even during a zero-sized layout. A
+    // close that loses its geometry can't run its collapse to retire, so it retires now.
+    val hasGeometry = anchors.menu.width > 0f && size.width > 0f
+    LaunchedEffect(hasGeometry, isOpen, hosted) {
+        if (!hasGeometry && !isOpen && hosted) {
+            AppLog.app.error("transcript_touch_recovered owner=plus_menu reason=closed_without_geometry")
+            hosted = false
+        }
+    }
+
+    // iOS `plusMenuTouchRecovery`: a closed menu still hosted after its collapse (one second,
+    // well past the close) retires.
+    val host = remember { PlusMenuHost() }
+    rememberTouchRecovery(
+        owner = TouchRecovery.Owner.PlusMenu,
+        inspect = {
+            if (hosted && !isOpen && !handsOff) TouchRecovery.Fault(TouchRecovery.Reason.Closed, host) else null
+        },
+        release = { hosted = false },
+    )
+
     Box(
         modifier
             .fillMaxSize()
@@ -125,7 +149,7 @@ fun PlusMenuGlassSurface(
             }
             .clearAndSetSemantics {},
     ) {
-        if (!hosted || anchors.menu.width <= 0f || size.width <= 0f) return@Box
+        if (!hosted || !hasGeometry) return@Box
         val keyboardTop = if (imeBottom > 0) (rootHeight - imeBottom - origin.y).takeIf { it < size.height } else null
         val proposed = anchors.menu.translate(-origin)
         val menu = with(density) {
@@ -277,6 +301,9 @@ private fun PlusMenuWindowContent(
         }
     }
 }
+
+/** What a stranded Plus menu's touch recovery names in the log (iOS `PlusMenuHostingController`). */
+private class PlusMenuHost
 
 private object PlusMenuWindowContent {
     /** The + frame shrunk about its centre to [fraction] of its size. */
