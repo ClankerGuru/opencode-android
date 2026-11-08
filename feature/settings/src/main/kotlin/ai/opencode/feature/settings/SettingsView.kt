@@ -64,6 +64,8 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
@@ -232,7 +234,7 @@ fun SettingsPageScaffold(
                                 title,
                                 modifier = Modifier
                                     .graphicsLayer { this.alpha = alpha }
-                                    .then(if (titleVisible) Modifier else Modifier.clearAndSetSemantics {}),
+                                    .then(if (titleVisible) Modifier.semantics { heading() } else Modifier.clearAndSetSemantics {}),
                             )
                         },
                         navigationIcon = back,
@@ -242,7 +244,7 @@ fun SettingsPageScaffold(
                     )
                 } else {
                     LargeFlexibleTopAppBar(
-                        title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.semantics { heading() }) },
                         navigationIcon = back,
                         actions = actions,
                         scrollBehavior = scrollBehavior,

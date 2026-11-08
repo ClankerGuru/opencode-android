@@ -55,6 +55,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.toggleableState
@@ -98,7 +99,7 @@ fun DevToolsView(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text(title) },
+                title = { Text(title, Modifier.semantics { heading() }) },
                 navigationIcon = {
                     val back = if (state.route != DevToolsFeature.Route.Main) ({ send(DevToolsFeature.Action.BackTapped) }) else onClose
                     if (back != null) IconButton(onClick = back) { OpenCodeIcon(SFSymbol.ChevronBackward, "Back") }
@@ -260,7 +261,7 @@ private fun LazyListScope.section(title: String) {
     item(key = "section-$title") {
         Text(
             title,
-            Modifier.padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 8.dp),
+            Modifier.padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 8.dp).semantics { heading() },
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.primary,
         )
