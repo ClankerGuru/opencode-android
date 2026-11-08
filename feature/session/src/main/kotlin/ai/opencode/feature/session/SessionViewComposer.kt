@@ -102,6 +102,7 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
@@ -144,6 +145,7 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
@@ -1083,6 +1085,7 @@ private fun HiddenUnderComposerPanel(covered: Boolean, modifier: Modifier = Modi
     Box(modifier.alpha(alpha).then(if (covered) Modifier.clearAndSetSemantics { }.blockTouches() else Modifier)) { content() }
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun SessionComposerEnv.DraftProjectsOverlay(modifier: Modifier) {
     // The list leaving (smooth 0.38 s), and folding down to its chosen row and back.
@@ -1099,8 +1102,17 @@ private fun SessionComposerEnv.DraftProjectsOverlay(modifier: Modifier) {
         contentAlignment = Alignment.BottomCenter,
     ) {
         AnimatedVisibility(visible = showsDraftProjects, enter = enter, exit = exit) {
-            HiddenUnderComposerPanel(host.composerPanelCovers) {
-                Column(verticalArrangement = Arrangement.spacedBy(StarterPromptTunables.listGap.dp)) {
+            // Android: in a short window (landscape with the keys up, a split screen) the list
+            // would stand over the header and under the status bar. It gives way there, as the
+            // header gives way to the composer (its A-10 cap). iOS phones are portrait-only.
+            val density = LocalDensity.current
+            val headerBottom = WindowInsets.statusBarsIgnoringVisibility.getTop(density) + with(density) { host.headerHeight.dp.toPx() }
+            var listTop by remember { mutableFloatStateOf(Float.POSITIVE_INFINITY) }
+            HiddenUnderComposerPanel(host.composerPanelCovers || listTop < headerBottom) {
+                Column(
+                    Modifier.onGloballyPositioned { listTop = it.positionInWindow().y },
+                    verticalArrangement = Arrangement.spacedBy(StarterPromptTunables.listGap.dp),
+                ) {
                     AnimatedVisibility(visible = showsStarterPrompts, enter = fadeIn(), exit = fadeOut()) {
                         StarterPromptList(s.starterPrompts, onPick = { store.send(Action.StarterPromptTapped(it)) })
                     }
