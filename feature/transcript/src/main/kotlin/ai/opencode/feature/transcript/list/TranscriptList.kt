@@ -19,6 +19,7 @@ import ai.opencode.feature.transcript.LocalTranscriptRowContext
 import ai.opencode.feature.transcript.RowProps
 import ai.opencode.feature.transcript.TranscriptAction
 import ai.opencode.feature.transcript.TranscriptConfiguration
+import ai.opencode.feature.transcript.TranscriptDisclosureState
 import ai.opencode.feature.transcript.TranscriptLayoutTuning
 import ai.opencode.feature.transcript.TranscriptRowContext
 import ai.opencode.feature.transcript.links.LinkPreviewArrivals
@@ -29,6 +30,7 @@ import ai.opencode.feature.transcript.markdown.ui.SharedTextContextMenus
 import ai.opencode.feature.transcript.markdown.ui.MarkdownStyle
 import ai.opencode.feature.transcript.markdown.ui.TranscriptTextReveal
 import ai.opencode.feature.transcript.selection.LocalTranscriptReplySelection
+import ai.opencode.feature.transcript.selection.TranscriptReplySelection
 import ai.opencode.feature.transcript.selection.TranscriptReplySelectionMenu
 import ai.opencode.feature.transcript.selection.transcriptReplySelectionGestures
 import ai.opencode.feature.transcript.selection.transcriptReplySelectionHandles
@@ -70,6 +72,10 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.retain.RetainedEffect
+import androidx.compose.runtime.retain.retain
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.layout.onPlaced
@@ -100,7 +106,44 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import kotlin.math.roundToInt
+import kotlinx.coroutines.flow.first
+
+@OptIn(ExperimentalFoundationApi::class)
+private fun transcriptListState(index: Int, offset: Int) = LazyListState(
+    // Prepare a viewport in the scroll direction rather than only the next row;
+    // retain half a viewport behind so a short reversal can reuse measured Markdown.
+    cacheWindow = LazyLayoutCacheWindow(aheadFraction = 1f, behindFraction = 0.5f),
+    firstVisibleItemIndex = index,
+    firstVisibleItemScrollOffset = offset,
+)
+
+/**
+ * The list's state and, once restored, the reader's row by key with the offset within it: the
+ * rows before it can differ after a process death (a shorter history window, a row more or
+ * less), so the saved index alone would land on another row. The index stays the fallback.
+ */
+private class TranscriptListPosition(val state: LazyListState, var anchor: Pair<String, Int>? = null) {
+    /**
+     * Layouts left to settle a row put back: the composer's height reaches the list's padding a
+     * frame late, so the first layout clamps a row near the end, and it's asked for again.
+     */
+    var settleLayouts = 0
+}
+
+/** `LazyListState.Saver` for a state with the list's cache window (Compose keeps that saver internal), plus the first row's key. */
+private val transcriptListPositionSaver = listSaver<TranscriptListPosition, Any>(
+    save = { position ->
+        val state = position.state
+        // A row not reached yet (its history still loading) stays the one to go back to.
+        position.anchor?.let { (key, offset) -> return@listSaver listOf(state.firstVisibleItemIndex, offset, key) }
+        val key = state.layoutInfo.visibleItemsInfo.firstOrNull { it.index == state.firstVisibleItemIndex }?.key as? String
+        listOfNotNull(state.firstVisibleItemIndex, state.firstVisibleItemScrollOffset, key)
+    },
+    restore = { saved ->
+        val offset = saved[1] as Int
+        TranscriptListPosition(transcriptListState(saved[0] as Int, offset), (saved.getOrNull(2) as? String)?.let { it to offset })
+    },
+)
 
 /**
  * Slots for rows whose views live above this module (iOS reads them directly from one module):
@@ -154,15 +197,14 @@ private fun TranscriptListContent(
 ) {
     val scope = rememberCoroutineScope()
     val initialIndex = remember { (configuration.entries.size + configuration.queuedInputs.size + 2).coerceAtLeast(0) }
-    val listState = remember {
-        LazyListState(
-            // Prepare a viewport in the scroll direction rather than only the next row;
-            // retain half a viewport behind so a short reversal can reuse measured Markdown.
-            cacheWindow = LazyLayoutCacheWindow(aheadFraction = 1f, behindFraction = 0.5f),
-            firstVisibleItemIndex = initialIndex,
-        )
-    }
-    val controller = remember { TranscriptListController(listState, scope) }
+    // Like disclosure, where the reader is outlives the activity being recreated (a dark mode
+    // switch, font size, process death); a following reader still opens on the bottom.
+    val position = rememberSaveable(saver = transcriptListPositionSaver) { TranscriptListPosition(transcriptListState(initialIndex, 0)) }
+    val listState = position.state
+    val behavior = rememberSaveable(saver = TranscriptScrollBehavior.Saver) { TranscriptScrollBehavior() }
+    val disclosure = rememberSaveable(saver = TranscriptDisclosureState.Saver) { TranscriptDisclosureState() }
+    val selection = rememberSaveable(saver = TranscriptReplySelection.Saver) { TranscriptReplySelection() }
+    val controller = remember { TranscriptListController(listState, scope, disclosure, behavior, selection) }
     val density = LocalDensity.current
     val reduceMotion = rememberReduceMotion()
     val currentSend by rememberUpdatedState(send)
@@ -178,10 +220,55 @@ private fun TranscriptListContent(
     controller.isShowingToReader = resumed.isAtLeast(Lifecycle.State.RESUMED)
     controller.sendLanding = ai.opencode.feature.transcript.user.LocalSendLanding.current
     controller.flingBehavior = ScrollableDefaults.flingBehavior()
+    val graphics = LocalGraphicsContext.current
+    val rowExits = remember(controller, graphics) { TranscriptRowExits(graphics) }
+    controller.rowExits = rowExits
+    DisposableEffect(controller, rowExits) {
+        controller.rowExits = rowExits
+        onDispose {
+            if (controller.rowExits === rowExits) controller.rowExits = null
+            rowExits.release()
+        }
+    }
     // Applied in composition so this frame draws the new rows with their stable keys.
     controller.update(configuration)
     controller.obstructionChanged(contentPadding.calculateBottomPadding().value, WindowInsets.ime.inContainer().getBottom(density) / density.density)
     SideEffect { controller.flushEffects() }
+    // A restored browsing reader goes back to their row by its key once the rows hold it (a
+    // following reader lands on the bottom instead); the reader moving the list first ends it.
+    if (position.anchor != null) {
+        SideEffect {
+            val (key, offset) = position.anchor ?: return@SideEffect
+            if (behavior.mode != TranscriptScrollBehavior.Mode.Browsing) {
+                position.anchor = null
+                return@SideEffect
+            }
+            if (position.settleLayouts > 0) return@SideEffect
+            val index = controller.snapshot.items.indexOfFirst { it.key == key }
+            if (index < 0) return@SideEffect
+            position.settleLayouts = 3
+            listState.requestScrollToItem(index, offset)
+            // The controller may hold the row the list showed before (rows were prepended): not now.
+            controller.forgetReadingAnchor()
+        }
+        LaunchedEffect(listState) {
+            snapshotFlow { listState.layoutInfo }.collect {
+                val (key, offset) = position.anchor ?: return@collect
+                if (position.settleLayouts <= 0) return@collect
+                val index = controller.snapshot.items.indexOfFirst { item -> item.key == key }
+                if (index < 0 || (listState.firstVisibleItemIndex == index && listState.firstVisibleItemScrollOffset == offset) || --position.settleLayouts == 0) {
+                    position.anchor = null
+                } else {
+                    listState.requestScrollToItem(index, offset)
+                    controller.forgetReadingAnchor()
+                }
+            }
+        }
+        LaunchedEffect(listState) {
+            snapshotFlow { listState.isScrollInProgress }.first { it }
+            position.anchor = null
+        }
+    }
 
     // iOS `TranscriptListViewController+TextSelection`: one selection across a reply's rows.
     val replySelection = controller.replySelection
@@ -201,6 +288,8 @@ private fun TranscriptListContent(
             if (replySelection.host === listSelection) replySelection.host = null
         }
     }
+    // After the controller's effects: a recreated activity's selection comes back once its reply is listed.
+    SideEffect { replySelection.restorePending() }
 
     LaunchedEffect(resumed) { controller.visibilityChanged() }
     // iOS `SessionView+Header` registers the transcript's knobs as the session draws.
@@ -252,11 +341,18 @@ private fun TranscriptListContent(
     // iOS `reportHeaderGeometry`: how far content sits above its resting top (dp), for the
     // session header's backdrop reveal. Past the first row it's simply "far".
     val currentScrolledUnderHeader by rememberUpdatedState(onScrolledUnderHeader)
+    val scrolledUnderHeader = {
+        if (listState.firstVisibleItemIndex > 0) Float.MAX_VALUE
+        else listState.firstVisibleItemScrollOffset / density.density
+    }
+    // Also reported as the list is first applied, before its first frame draws, so the header's
+    // bar is drawn with the rows on a cold launch rather than a frame later (G-01).
+    DisposableEffect(listState) {
+        currentScrolledUnderHeader(scrolledUnderHeader())
+        onDispose {}
+    }
     LaunchedEffect(listState) {
-        snapshotFlow {
-            if (listState.firstVisibleItemIndex > 0) Float.MAX_VALUE
-            else listState.firstVisibleItemScrollOffset / density.density
-        }.collect { currentScrolledUnderHeader(it) }
+        snapshotFlow { scrolledUnderHeader() }.collect { currentScrolledUnderHeader(it) }
     }
     var lastJump by remember { androidx.compose.runtime.mutableIntStateOf(jumpRequest) }
     LaunchedEffect(jumpRequest) {
@@ -292,7 +388,10 @@ private fun TranscriptListContent(
     if (controller.runEnded) textReveal.settleAll()
     // The list owns the session's link previews (iOS `TranscriptListViewController.linkPreviews`,
     // made anew for each session): an arrival bumps only its rows' revisions, which redraws them.
-    val linkPreviews = remember { LinkPreviewStore() }
+    // Retained like iOS's controller, which a trait change only redraws: a recreated activity
+    // (dark mode, font size, locale) keeps what loaded; leaving the session retires it.
+    val linkPreviews = retain { LinkPreviewStore() }
+    RetainedEffect(linkPreviews) { onRetire { linkPreviews.close() } }
     val linkRevisions = remember { mutableStateMapOf<String, Int>() }
     DisposableEffect(linkPreviews) {
         linkPreviews.onArrival = { rows ->
@@ -301,10 +400,7 @@ private fun TranscriptListContent(
                 linkRevisions[row] = linkPreviews.revision(row)
             }
         }
-        onDispose {
-            linkPreviews.onArrival = null
-            linkPreviews.close()
-        }
+        onDispose { linkPreviews.onArrival = null }
     }
     remember(linkPreviews) { LinkPreviewArrivals(linkPreviews) }.update(snapshot, configuration.isRunning, controller.hasLaidOutContent)
     // The list is its image previews' viewport (iOS `TranscriptListViewController:
@@ -357,6 +453,12 @@ private fun TranscriptListContent(
                     modifier = Modifier.fillMaxSize().testTag("transcript-list")
                         .semantics { customActions = listOf(CustomAccessibilityAction("Scroll to top", controller::scrollToTop)) }
                         .graphicsLayer { alpha = controller.handoffProgress() }
+                        .drawRowExits(
+                            exits = rowExits,
+                            startPaddingPx = with(density) { contentPadding.calculateStartPadding(direction).toPx() },
+                            layoutInfo = { listState.layoutInfo },
+                            now = ::transcriptNow,
+                        )
                         .then(if (controller.emptyHandoff != null) Modifier.clearAndSetSemantics { } else Modifier)
                         .onGloballyPositioned {
                             motionCoordinates[0] = it
@@ -373,11 +475,9 @@ private fun TranscriptListContent(
                             .animateItem(
                                 fadeInSpec = null,
                                 placementSpec = controller.placementSpring?.spec(),
-                                // Working handing off to the reply's end has already become it (iOS `handsOff`): no fade.
-                                fadeOutSpec = if (item == TranscriptItemID.Empty || !controller.fadesRemovals ||
-                                    (item == TranscriptItemID.Working && configuration.workingHandsOffToCopy)
-                                ) null else androidx.compose.animation.core.tween((RowEntrance.EXIT_DURATION * 1000).toInt(), easing = androidx.compose.animation.core.CubicBezierEasing(0f, 0f, 0.58f, 1f)) /* iOS .curveEaseOut */,
+                                fadeOutSpec = null,
                             )
+                            .then(if (item == TranscriptItemID.Empty) Modifier else Modifier.rowExitSource(rowExits, item.key))
                             .fillMaxWidth()
                             .wrapContentWidth()
                             .widthIn(max = TranscriptMetrics.readableColumnWidth)
@@ -526,13 +626,7 @@ private fun GrowingRow(controller: TranscriptListController, key: String, modifi
                     )
                 }
             }
-            .layout { measurable, constraints ->
-                val placeable = measurable.measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
-                val measured = placeable.height / density
-                val height = controller.fittedHeight(key, measured, placeable.width / density)
-                val px = (height * density).roundToInt().coerceAtLeast(0)
-                layout(placeable.width, px) { placeable.place(0, 0) }
-            },
+            .topAnchoredRow(controller, key),
         contentAlignment = Alignment.TopStart,
     ) {
         content()

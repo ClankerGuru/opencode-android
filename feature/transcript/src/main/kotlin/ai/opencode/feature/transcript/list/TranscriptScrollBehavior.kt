@@ -1,5 +1,6 @@
 package ai.opencode.feature.transcript.list
 
+import androidx.compose.runtime.saveable.Saver
 import kotlin.math.max
 
 /**
@@ -262,6 +263,15 @@ class TranscriptScrollBehavior {
     }
 
     companion object {
+        /**
+         * For the list's `rememberSaveable`: a browsing reader stays browsing when the activity is
+         * recreated, where iOS's list only redraws. The rest belongs to one gesture and starts over.
+         */
+        val Saver: Saver<TranscriptScrollBehavior, Boolean> = Saver(
+            save = { it.mode == Mode.Browsing },
+            restore = { browsing -> TranscriptScrollBehavior().apply { if (browsing) mode = Mode.Browsing } },
+        )
+
         /** A drag farther than this from the bottom, or from where a following reader started it, leaves the bottom. */
         const val LEAVE_DISTANCE = 120f
         /** Coming to rest within this of the bottom is following again. */
