@@ -11,6 +11,7 @@ import ai.opencode.feature.drawer.catchup.CatchUpStack
 import ai.opencode.feature.drawer.catchup.CatchUpStage
 import ai.opencode.feature.drawer.catchup.CatchUpStageProxy
 import ai.opencode.feature.drawer.catchup.rememberCatchUpStackController
+import ai.opencode.feature.drawer.list.LocalDrawerVisible
 import ai.opencode.feature.drawer.list.rememberInboxSidebarOn
 import ai.opencode.feature.drawer.motion.DrawerCorner
 import ai.opencode.feature.drawer.motion.DrawerDepth
@@ -289,6 +290,7 @@ fun SessionDrawerContainer(
     ) {
         // The modal drawer, over the card; or the sidebar, beside it.
         if (drawerComposed) {
+            val drawerVisible = drawerShows && (sidebarShown == null || controller.isSidebarVisible)
             val hiddenFromAccessibility = !drawerShows || catchUp != null ||
                 if (sidebarShown != null) !controller.isSidebarVisible else motion.isDrawerHiddenFromAccessibility.value
             Box(
@@ -320,7 +322,9 @@ fun SessionDrawerContainer(
                     }
                     .then(if (hiddenFromAccessibility) Modifier.clearAndSetSemantics {} else Modifier),
             ) {
-                drawer()
+                CompositionLocalProvider(LocalDrawerVisible provides drawerVisible) {
+                    drawer()
+                }
                 if (sidebarShown != null) {
                     // The sidebar's edge against the session.
                     Box(
