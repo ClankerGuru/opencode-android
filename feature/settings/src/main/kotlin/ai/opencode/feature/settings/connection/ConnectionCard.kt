@@ -98,6 +98,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.currentStateAsState
 import java.util.WeakHashMap
+import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
 /** iOS `HomeFeature.State.credentialsRejectedStatus`: the HTTP status a refused sign-in comes back with. */
@@ -200,7 +201,8 @@ private fun ConnectionCardContent(
     // changing value unspoken. TalkBack re-reads the focused card whenever anything it speaks changes
     // (state, label or a merged child), so the card speaks the status word, not the live milliseconds:
     // a new word is still read; the number stays on screen and on the server page's Status row.
-    val accessibilityValue = listOf(presentation.spokenWord, monitor.server.host, monitor.route.rawValue).joinToString(", ")
+    val accessibilityValue = listOf(rememberSettledSpokenWord(presentation.spokenWord), monitor.server.host, monitor.route.rawValue)
+        .joinToString(", ")
 
     // Where the inline action sits: reserved after the status, the real button drawn over the card
     // (outside its click and its merged semantics), as iOS's `RetryReservation`.
@@ -448,6 +450,28 @@ data class ConnectionStatusPresentation(
             )
         }
     }
+}
+
+/** How long a status word holds before TalkBack is given it (see [rememberSettledSpokenWord]). */
+private const val SPOKEN_STATUS_SETTLE_MS = 500L
+
+/**
+ * [word] once it has held for [SPOKEN_STATUS_SETTLE_MS]; until then the word before it. Android
+ * divergence (iOS's VoiceOver leaves a focused element's value changes unspoken): TalkBack speaks
+ * each new word on a focused node, and a dropped server passes through Reconnecting for a moment
+ * (~150 ms) on its way to Offline. TalkBack read both changes after the second, so "Offline, …"
+ * was spoken twice (QA F-62); a word that doesn't last isn't given to it. The screen still shows
+ * every word at once.
+ */
+@Composable
+private fun rememberSettledSpokenWord(word: String): String {
+    var settled by remember { mutableStateOf(word) }
+    LaunchedEffect(word) {
+        if (word == settled) return@LaunchedEffect
+        delay(SPOKEN_STATUS_SETTLE_MS)
+        settled = word
+    }
+    return settled
 }
 
 /** The status colour: red for an alert, else secondary. */
