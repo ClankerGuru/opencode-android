@@ -14,8 +14,10 @@ import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.core.ui.accessibilityFocusRequest
 import ai.opencode.core.ui.excludedFromDrawerPan
 import ai.opencode.core.ui.openCodeTapTarget
+import ai.opencode.core.ui.rememberAccessibilityFocusRequest
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.composer.AttachmentMenuPhase
 import ai.opencode.feature.composer.AttachmentPickerButton
@@ -46,8 +48,12 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -73,6 +79,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlin.math.min
+import kotlinx.coroutines.delay
 
 // Port of iOS `Session/SessionView+ComposerControls.swift`: the composer's leading and trailing
 // controls, the request bar's controls, the mic's hold-to-dictate wiring and the dictation row.
@@ -448,6 +455,29 @@ internal fun SessionComposerEnv.TrailingButton(control: ComposerTrailingControl)
     }
     // iOS `persistentSend`: New Plus Menu's Send stays put, dimmed while there's nothing to send.
     val persistentSend = control is ComposerTrailingControl.Send
+    // QA AF-01: VoiceOver stays in the trailing slot when the Send just pressed turns into Stop, or
+    // the Stop into Send: iOS swaps the control inside one slot whose accessibility element keeps
+    // its frame (SessionView+ComposerControls.swift:400-447). Here each control is its own node,
+    // so TalkBack lost its focus with the pressed one and fell back to the screen's first element
+    // ("Open sessions"); the control that replaces it within a few seconds takes it instead.
+    val kind = when (control) {
+        ComposerTrailingControl.Stop -> true
+        is ComposerTrailingControl.Send -> false
+        else -> null
+    }
+    var follows by remember { mutableIntStateOf(0) }
+    var following by remember { mutableStateOf(false) }
+    LaunchedEffect(kind) {
+        val press = host.trailingPress ?: return@LaunchedEffect
+        if (kind == null || press.first == kind) return@LaunchedEffect
+        host.trailingPress = null
+        if (System.nanoTime() - press.second > TRAILING_FOCUS_FOLLOW_NANOS) return@LaunchedEffect
+        follows += 1
+        following = true
+        delay(1_000)
+        following = false
+    }
+    val followFocus = rememberAccessibilityFocusRequest(follows.takeIf { following })
     val label: @Composable () -> Unit = {
         if (persistentSend) {
             ComposerSendLabel(
@@ -472,7 +502,7 @@ internal fun SessionComposerEnv.TrailingButton(control: ComposerTrailingControl)
         )
         }
     }
-    val semantics = Modifier.semantics(mergeDescendants = true) {
+    val semantics = Modifier.accessibilityFocusRequest(followFocus).semantics(mergeDescendants = true) {
         contentDescription = accessibilityLabel
         testTag = control.accessibilityLabel
         if (control == ComposerTrailingControl.Stop && s.isInterrupting) stateDescription = "Stopping"
@@ -496,7 +526,10 @@ internal fun SessionComposerEnv.TrailingButton(control: ComposerTrailingControl)
             control == ComposerTrailingControl.Mic -> HoldToDictate(label = "Dictate message") { label() }
             control == ComposerTrailingControl.Stop -> ComposerStopButton(
                 holdStartsCall = holdingStopStartsCall,
-                onStop = { store.send(Action.InterruptTapped) },
+                onStop = {
+                    host.trailingPress = true to System.nanoTime()
+                    store.send(Action.InterruptTapped)
+                },
                 onHold = { store.send(Action.StopLongPressed) },
                 modifier = semantics,
             ) { label() }
@@ -517,7 +550,10 @@ internal fun SessionComposerEnv.TrailingButton(control: ComposerTrailingControl)
                         interactionSource = remember { MutableInteractionSource() },
                         indication = ripple(bounded = false, radius = 22.dp),
                         role = Role.Button,
-                    ) { sendMessage() }
+                    ) {
+                        host.trailingPress = false to System.nanoTime()
+                        sendMessage()
+                    }
                     .openCodeTapTarget(accessibility = false)
                     .then(semantics),
                 contentAlignment = Alignment.Center,
@@ -570,3 +606,6 @@ internal fun SessionComposerEnv.DictationTrailingControls(controls: ComposerCont
         }
     }
 }
+
+/** How long a pressed Send or Stop waits for the control that replaces it to take TalkBack's focus (QA AF-01). */
+private const val TRAILING_FOCUS_FOLLOW_NANOS = 10_000_000_000L

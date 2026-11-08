@@ -261,6 +261,9 @@ class SessionComposerHost {
     /** The message field has the keyboard (iOS `messageFieldFocused`); the field follows it. */
     var messageFieldFocused by mutableStateOf(false)
         internal set
+
+    /** The trailing control pressed last (`true` Stop, `false` Send) and when ([System.nanoTime]); see `TrailingButton`. */
+    internal var trailingPress: Pair<Boolean, Long>? = null
     internal var focusAction: () -> Unit = {}
     internal var dismissAction: () -> Unit = {}
 
