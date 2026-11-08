@@ -50,6 +50,10 @@ import kotlinx.coroutines.launch
 class TranscriptListController(
     val state: LazyListState,
     private val scope: CoroutineScope,
+    /** What the reader opened; the list restores it when the activity is recreated. */
+    val disclosure: TranscriptDisclosureState = TranscriptDisclosureState(),
+    /** Following or browsing; the list restores it with the reader's row when the activity is recreated. */
+    val behavior: TranscriptScrollBehavior = TranscriptScrollBehavior(),
 ) {
     // Wiring the composable refreshes every composition.
     var send: (TranscriptAction) -> Unit = {}
@@ -63,9 +67,6 @@ class TranscriptListController(
     var configuration: TranscriptConfiguration = TranscriptConfiguration()
         private set
     var snapshot: TranscriptListSnapshot by mutableStateOf(TranscriptListSnapshot.empty)
-        private set
-    val behavior = TranscriptScrollBehavior()
-    var disclosure = TranscriptDisclosureState()
         private set
 
     private var entryStableIDs: Map<String, String> = emptyMap()
@@ -237,10 +238,19 @@ class TranscriptListController(
         val sessionChanged = (configuration.sessionID != old.sessionID && !draftBecameSession) ||
             configuration.historyGeneration != old.historyGeneration
         if (sessionChanged) {
+            // The first configuration (no snapshot yet) of a list restored browsing stays on the reader's row.
+            val restoresBrowsing = snapshot === TranscriptListSnapshot.empty && behavior.mode == TranscriptScrollBehavior.Mode.Browsing
             resetForSessionChange()
             // iOS: a session change clears the reply selection.
             pendingEffects += { replySelection.clear() }
-            pendingEffects += { execute(behavior.handle(TranscriptScrollBehavior.Event.SessionChanged)) }
+            if (restoresBrowsing) {
+                pendingEffects += {
+                    handleBehavior(TranscriptScrollBehavior.Event.UserLeftBottom)
+                    send(TranscriptAction.TranscriptBrowsingChanged(true))
+                }
+            } else {
+                pendingEffects += { execute(behavior.handle(TranscriptScrollBehavior.Event.SessionChanged)) }
+            }
         } else if (draftBecameSession && hasLaidOutContent && perfRows != null) {
             // The draft's first content frame was drawn before there was a session to tell.
             PerfTimeline.rowsShown(configuration.sessionID, perfRows)
@@ -409,7 +419,8 @@ class TranscriptListController(
         emptyLoadingSince = null
         finishHandoff()
         agentReveal = ai.opencode.feature.transcript.user.TranscriptAgentMessageReveal()
-        disclosure = TranscriptDisclosureState().also { it.animateToggle = ::toggleDisclosure }
+        // The first configuration (no snapshot yet) keeps what the list restored.
+        if (snapshot !== TranscriptListSnapshot.empty) disclosure.clear()
     }
 
     private val pendingEffects = mutableListOf<() -> Unit>()
@@ -806,10 +817,11 @@ class TranscriptListController(
         val width = info.viewportSize.width / density
         if (!hasLaidOutContent) {
             // A session opens on its bottom; the self-sizing that follows its first frame lands.
+            // A browsing reader the list restored stays on their row.
             hasLaidOutContent = true
             lastVisibleHeight = visibleHeight
             lastContentWidth = width
-            landOnLastItem()
+            if (behavior.mode == TranscriptScrollBehavior.Mode.Following) landOnLastItem()
             arrivalsGlideAfter = transcriptNow() + BottomSpring.OPENING_SETTLE
             if (!firstFrameSent && keys.any { it is TranscriptItemID.Message || it is TranscriptItemID.Empty }) {
                 firstFrameSent = true
