@@ -17,6 +17,10 @@ import android.content.pm.PackageManager
 import androidx.activity.result.contract.ActivityResultContracts
 import kotlinx.coroutines.CompletableDeferred
 import android.os.Bundle
+import android.os.SystemClock
+import android.view.KeyEvent
+import android.view.ViewGroup
+import android.view.Window
 import androidx.activity.ComponentActivity
 import ai.opencode.devtools.DevTools
 import ai.opencode.devtools.DevToolsOverlay
@@ -52,6 +56,30 @@ class MainActivity : ComponentActivity() {
         microphoneRequest = null
     }
     private var removeRequesters: List<() -> Unit> = emptyList()
+
+    private class TouchModeExit(val at: Long, val hadFocus: Boolean)
+    private var touchModeLeft: TouchModeExit? = null
+
+    /**
+     * A typed key with nothing focused leaves touch mode, and the framework then gives key focus to
+     * the first focusable control (Home's ☰), so a space or Return pressed it and opened the drawer
+     * (QA T-02). iOS gives buttons no key focus, so typing with no field focused does nothing:
+     * the key that left touch mode takes that focus back and goes nowhere. Tab and the arrows
+     * still move focus (the framework consumes them before here), as do later keys.
+     */
+    private fun dropsTypedFocus(event: KeyEvent): Boolean {
+        val exit = touchModeLeft
+        if (exit == null || event.action != KeyEvent.ACTION_DOWN) return false
+        touchModeLeft = null
+        val focused = currentFocus
+        if (event.eventTime > exit.at || exit.hadFocus || focused == null) return false
+        val content = findViewById<ViewGroup>(android.R.id.content)
+        val focusability = content.descendantFocusability
+        content.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
+        focused.clearFocus()
+        content.descendantFocusability = focusability
+        return true
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Debug lab hooks run before anything reads the store (iOS runs them before `OpenCodeApp.store`).
@@ -90,6 +118,13 @@ class MainActivity : ComponentActivity() {
             PerfFrameSampler.startIfRequested()
         }
         setContent { DevToolsOverlay { AppView(store) } }
+        window.decorView.viewTreeObserver.addOnTouchModeChangeListener { inTouchMode ->
+            touchModeLeft = if (inTouchMode) null else TouchModeExit(SystemClock.uptimeMillis(), currentFocus != null)
+        }
+        val callback = window.callback
+        window.callback = object : Window.Callback by callback {
+            override fun dispatchKeyEvent(event: KeyEvent): Boolean = dropsTypedFocus(event) || callback.dispatchKeyEvent(event)
+        }
         if (root.follows) followShownSession()
         // A recreated activity already handled its launch intent.
         if (savedInstanceState == null) handle(intent)
