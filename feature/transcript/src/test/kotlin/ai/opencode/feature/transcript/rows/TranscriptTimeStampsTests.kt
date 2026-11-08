@@ -1,5 +1,6 @@
 package ai.opencode.feature.transcript.rows
 
+import ai.opencode.core.ui.appFormattingLocale
 import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.TranscriptEntry
 import ai.opencode.server.model.OpenCodePromptSource

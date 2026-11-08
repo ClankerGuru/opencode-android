@@ -12,9 +12,9 @@ import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
 import ai.opencode.core.store.cancellable
+import ai.opencode.core.ui.appFormattingLocale
 import ai.opencode.feature.drawer.icons.resolved
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
-import ai.opencode.feature.transcript.rows.appFormattingLocale
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer

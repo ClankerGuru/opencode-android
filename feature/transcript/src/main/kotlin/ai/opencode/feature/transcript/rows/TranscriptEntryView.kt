@@ -3,6 +3,7 @@ package ai.opencode.feature.transcript.rows
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.core.ui.appFormattingLocale
 import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.LocalTranscriptRowContext
 import ai.opencode.feature.transcript.RowProps
@@ -162,7 +163,7 @@ private fun CompactionView(entry: TranscriptEntry, id: String, info: OpenCodeCom
     }
     val usage = info.inputTokens?.let { input ->
         info.outputTokens?.let { output ->
-            val format = NumberFormat.getIntegerInstance()
+            val format = NumberFormat.getIntegerInstance(appFormattingLocale())
             "${format.format(input)} in · ${format.format(output)} out"
         }
     }

@@ -1,6 +1,6 @@
 package ai.opencode.feature.drawer.motion
 
-import ai.opencode.feature.transcript.rows.appFormattingLocale
+import ai.opencode.core.ui.appFormattingLocale
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable

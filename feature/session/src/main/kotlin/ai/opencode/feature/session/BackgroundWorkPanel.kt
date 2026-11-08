@@ -19,6 +19,7 @@ import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.RollingNumber
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.core.ui.appFormattingLocale
 import ai.opencode.feature.transcript.list.TranscriptBorrowedDrag
 import ai.opencode.feature.transcript.list.passesDragsToTranscript
 import ai.opencode.feature.voice.VoiceLabEnvironment
@@ -1128,7 +1129,8 @@ object ShellElapsedTimeFormat {
         val h = seconds / 3600
         val m = (seconds % 3600) / 60
         val s = seconds % 60
-        return if (seconds >= 3600) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(seconds / 60, s)
+        val locale = appFormattingLocale()
+        return if (seconds >= 3600) "%d:%02d:%02d".format(locale, h, m, s) else "%d:%02d".format(locale, seconds / 60, s)
     }
 
     fun spoken(seconds: Long): String {

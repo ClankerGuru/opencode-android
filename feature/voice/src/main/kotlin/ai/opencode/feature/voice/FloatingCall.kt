@@ -115,6 +115,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -1599,7 +1600,7 @@ internal fun FloatingCallDuration(connectedAt: Instant?, status: String, modifie
             delay(1_000 - Math.floorMod(millis, 1_000L))
         }
     }
-    val text = if (connectedAt == null) status else "%d:%02d".format(seconds / 60, seconds % 60)
+    val text = if (connectedAt == null) status else "%d:%02d".format(Locale.ROOT, seconds / 60, seconds % 60)
     Text(
         text,
         style = OpenCodeTextStyles.footnote.copy(fontFeatureSettings = "tnum"),

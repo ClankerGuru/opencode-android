@@ -1,5 +1,6 @@
 package ai.opencode.feature.transcript.rows
 
+import ai.opencode.core.ui.appFormattingLocale
 import ai.opencode.feature.transcript.TranscriptEntry
 import ai.opencode.server.model.OpenCodeTranscriptItem
 import android.icu.text.DateFormat
@@ -305,19 +306,6 @@ object TranscriptTimeStamps {
     /** What TalkBack reads: “Wednesday, 8:24 AM”. */
     fun accessibilityLabel(text: String): String = text.split("\t", limit = 2).joinToString(", ")
 }
-
-/**
- * The locale dates and times are written in: English, the app's only language, with the user's
- * region and preferences (hour cycle, numbering). iOS formats with `Locale.current`, which in an
- * English-only bundle is English in the user's region (“Gestern” never appears beside English
- * text, a German region still gets its 24-hour clock and day-month order).
- */
-fun appFormattingLocale(system: Locale = Locale.getDefault(Locale.Category.FORMAT)): Locale =
-    try {
-        Locale.Builder().setLocale(system).setLanguage("en").setScript("").setVariant("").build()
-    } catch (_: java.util.IllformedLocaleException) {
-        Locale.Builder().setLanguage("en").build()
-    }
 
 /** Bounded minute-and-day string cache shared by transcript and drawer timestamps (iOS `MinuteTimestampCache`). */
 class MinuteTimestampCache {
