@@ -169,7 +169,7 @@ private fun MainPage(
                 "Developer Mode",
                 null,
                 state.developerMode,
-                hint = "Adds Report a Problem to the session menu and uploads voice calls to the OpenCode log server",
+                hint = "Toggle adding Report a Problem to the session menu and uploading voice calls to the OpenCode log server",
             ) { send(DevToolsFeature.Action.DeveloperModeChanged(it)) }
         }
         item {
@@ -178,12 +178,12 @@ private fun MainPage(
                 null,
                 state.recordDiagnostics,
                 enabled = !state.developerMode,
-                hint = "Records a bounded timeline of timing and network metadata on this phone",
+                hint = "Toggle recording a bounded timeline of timing and network metadata on this phone",
             ) { send(DevToolsFeature.Action.RecordDiagnosticsChanged(it)) }
         }
         if (state.isInternalBuild && state.recordDiagnostics) {
             item {
-                SwitchRow("Include Transcripts", null, state.includesTranscripts, hint = "Keeps a short excerpt of each voice turn in the timeline") {
+                SwitchRow("Include Transcripts", null, state.includesTranscripts, hint = "Toggle keeping a short excerpt of each voice turn in the timeline") {
                     send(DevToolsFeature.Action.IncludeTranscriptsChanged(it))
                 }
             }

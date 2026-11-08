@@ -1193,7 +1193,7 @@ private fun SessionComposerEnv.QueuedActivity(hasQueued: Boolean) {
             title = "$count queued",
             rolls = true,
             onClick = { view.showsQueuedMessages = true },
-            onClickLabel = "Shows messages waiting for this response to finish",
+            onClickLabel = "Show messages waiting for this response to finish",
             accessibilityLabel = if (count == 1) "1 queued message" else "$count queued messages",
             modifier = Modifier
                 // A queued send's words shrink into it (iOS `scrollEdgeBridge.queuedPillFrame`).
