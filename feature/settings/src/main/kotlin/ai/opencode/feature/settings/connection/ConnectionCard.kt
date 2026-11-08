@@ -204,7 +204,7 @@ private fun ConnectionCardContent(
                     contentDescription = monitor.name
                     stateDescription = accessibilityValue
                     role = Role.Button
-                    onClick(label = "Shows the server") { onOpen(); true }
+                    onClick(label = "Show the server") { onOpen(); true }
                 },
         ) {
             ConnectionScopeView(

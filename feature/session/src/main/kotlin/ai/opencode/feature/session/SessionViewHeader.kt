@@ -309,9 +309,9 @@ private fun HeaderTitle(
         val onClick: () -> Unit = onCatchUpOpen
             ?: { store.send(if (model.isDraft) Action.ProjectButtonTapped else Action.SessionInfoTapped) }
         val hint = when {
-            onCatchUpOpen != null -> "Opens the session and leaves Catch Up"
-            model.isDraft -> if (model.canChooseProject) "Chooses where the session starts" else null
-            else -> "Shows session details"
+            onCatchUpOpen != null -> "Open the session and leave Catch Up"
+            model.isDraft -> if (model.canChooseProject) "Choose where the session starts" else null
+            else -> "Show session details"
         }
         val value = if (model.isDraft) {
             ""

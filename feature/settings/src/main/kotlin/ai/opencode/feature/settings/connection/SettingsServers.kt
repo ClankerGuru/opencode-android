@@ -191,7 +191,7 @@ private fun SettingsServerRow(
                 .clearAndSetSemantics {
                     contentDescription = name
                     stateDescription = if (isCurrent) "Current server, ${server.host}" else server.host
-                    if (!isCurrent) onClick(label = "Switches to this server") { onSwitch(server); true }
+                    if (!isCurrent) onClick(label = "Switch to this server") { onSwitch(server); true }
                 }
                 .heightIn(min = 52.dp)
                 .padding(start = 16.dp, top = 8.dp, bottom = 8.dp, end = 4.dp),

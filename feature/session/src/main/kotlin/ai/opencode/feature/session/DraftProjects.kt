@@ -251,7 +251,7 @@ fun DraftProjectList(
                             chosen = rowIsChosen,
                             ownHighlight = reducedMotion,
                             iconWidth = iconWidth,
-                            hint = if (isComposing) "Chooses where the session starts" else null,
+                            hint = if (isComposing) "Choose where the session starts" else null,
                             onClick = { if (isComposing) onAll() else onPick(project) },
                             tag = "draft-project-row",
                         )

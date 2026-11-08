@@ -1467,7 +1467,7 @@ private fun FloatingCallOrbControls(isMuted: Boolean, statusText: String, reduce
             contentDescription = "Voice call"
             stateDescription = statusText
             testTag = "floating-call-orb"
-            onClick(label = "Shows the call’s controls") {
+            onClick(label = "Show the call’s controls") {
                 onExpand()
                 true
             }

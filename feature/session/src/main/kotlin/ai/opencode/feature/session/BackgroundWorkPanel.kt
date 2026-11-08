@@ -835,7 +835,7 @@ fun BackgroundWorkPresentation(
                                 Modifier
                                     // iOS `CapsuleDragsTranscript`: a vertical drag on the capsule scrolls the transcript.
                                     .passesDragsToTranscript(transcript)
-                                    .clickable(onClickLabel = "Shows running subagents and shells") {
+                                    .clickable(onClickLabel = "Show running subagents and shells") {
                                         onToggle()
                                         onPresentedChange(!isPresented)
                                     }
@@ -985,7 +985,7 @@ private fun BackgroundWorkRows(
                 androidx.compose.runtime.key(agent.id) {
                     BackgroundWorkRow(
                         title = agent.title,
-                        accessibilityHint = "Opens the subagent’s session",
+                        accessibilityHint = "Open the subagent’s session",
                         onTap = { onOpenSubagent(agent.id) },
                         modifier = Modifier.testTag("background-subagent-${agent.id}"),
                     ) {
@@ -1011,7 +1011,7 @@ private fun BackgroundWorkRows(
                         isCommand = true,
                         startedAt = shell.startedAt,
                         isLive = isLive,
-                        accessibilityHint = "Shows the shell’s output",
+                        accessibilityHint = "Show the shell’s output",
                         onTap = { onOpenShell(shell.id) },
                         modifier = Modifier.testTag("background-shell-${shell.id}"),
                     ) {

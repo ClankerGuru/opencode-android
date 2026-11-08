@@ -81,7 +81,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.testTag
@@ -174,7 +173,8 @@ fun ServerFlowTitle(
                                     expanded = false
                                     if (!isShown) onSwitch(server)
                                 },
-                                modifier = Modifier.semantics { selected = isShown },
+                                // Picking a server switches to it, so it reads as chosen, not as a toggle.
+                                modifier = Modifier.semantics { if (isShown) stateDescription = "Selected" },
                             )
                         }
                         HorizontalDivider()

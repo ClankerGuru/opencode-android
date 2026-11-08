@@ -67,7 +67,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -299,9 +298,11 @@ fun DrawerListSessionCell(
                 .clearAndSetSemantics {
                     testTag = "drawer-session-row-${row.session.id}"
                     contentDescription = row.session.title
-                    stateDescription = row.accessibilityValue
+                    // iOS's `.selected` trait as words: `selected` would make the row checkable,
+                    // and TalkBack would offer "double-tap to toggle" on a row that opens.
+                    stateDescription = listOfNotNull(if (row.selected) "Selected" else null, row.accessibilityValue.ifEmpty { null })
+                        .joinToString(", ")
                     role = Role.Button
-                    selected = row.selected
                     onClick { currentActions.select(); true }
                     customActions = buildList {
                         add(CustomAccessibilityAction(if (row.isPinnedSection) "Unpin" else "Pin") { currentActions.togglePin(); true })
