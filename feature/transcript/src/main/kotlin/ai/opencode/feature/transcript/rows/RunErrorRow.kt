@@ -8,6 +8,7 @@ import ai.opencode.core.ui.OpenCodeIconSize
 import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.feature.media.withinNodeLimit
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -92,7 +93,7 @@ fun RunErrorRow(
                 contentDescription = error.line
                 customActions = actions.drop(1).map { action ->
                     CustomAccessibilityAction(menuTitle(action)) { perform(action); true }
-                } + CustomAccessibilityAction("Copy Error") { copy(error.details); true }
+                }.plus(CustomAccessibilityAction("Copy Error") { copy(error.details); true }).withinNodeLimit()
             },
             horizontalArrangement = Arrangement.spacedBy(spacing),
         ) {
