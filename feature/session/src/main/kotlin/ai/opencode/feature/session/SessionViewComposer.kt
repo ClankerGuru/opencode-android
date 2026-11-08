@@ -8,6 +8,7 @@ import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
+import ai.opencode.core.ui.LocalDrawerKeyboardSignals
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
@@ -66,6 +67,7 @@ import ai.opencode.feature.voice.holdsClientToolCard
 import ai.opencode.server.model.OpenCodeProject
 import ai.opencode.server.model.OpenCodeQueuedInput
 import ai.opencode.server.model.PastedText
+import android.content.res.Configuration
 import android.os.Process
 import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedVisibility
@@ -142,6 +144,7 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -329,9 +332,10 @@ internal class SessionComposerViewState {
 
 /**
  * Whether the message field had the keyboard when the activity was recreated, for the session it
- * belonged to (a field the drawer holds with its keys down has none). The field loses its focus as
- * the old activity's views go, after the first save, so later saves while configurations change
- * keep what that one saw. Restored only within the same process: after process death iOS starts
+ * belonged to (a field the drawer holds with its keys down has none; on a hardware keyboard the
+ * focused field has it with no soft keys up, and the system keeps them down when it comes back).
+ * The field loses its focus as the old activity's views go, after the first save, so later saves
+ * while configurations change keep what that one saw. Restored only within the same process: after process death iOS starts
  * without the keyboard too.
  */
 internal class ComposerKeyboardRestore(private val restored: SessionFeature.State.TaskIdentity? = null) {
@@ -571,7 +575,14 @@ fun SessionComposer(
     val activity = LocalActivity.current
     val ime = WindowInsets.ime
     val density = LocalDensity.current
-    keyboardRestore.hadKeyboard = { host.messageFieldFocused && ime.getBottom(density) > 0 }
+    val configuration = LocalConfiguration.current
+    val drawerHold = LocalDrawerKeyboardSignals.current
+    // iOS keeps the first responder across a trait change with or without the software keyboard.
+    val typesOnHardwareKeys = configuration.keyboard != Configuration.KEYBOARD_NOKEYS &&
+        configuration.hardKeyboardHidden == Configuration.HARDKEYBOARDHIDDEN_NO
+    keyboardRestore.hadKeyboard = {
+        host.messageFieldFocused && (ime.getBottom(density) > 0 || (typesOnHardwareKeys && drawerHold?.holdsCardField != true))
+    }
     keyboardRestore.changingConfigurations = { activity?.isChangingConfigurations == true }
     keyboardRestore.identity = snapshot.taskIdentity
     LaunchedEffect(keyboardRestore) {
