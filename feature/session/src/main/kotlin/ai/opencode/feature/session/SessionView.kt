@@ -104,6 +104,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
@@ -304,6 +305,7 @@ fun SessionView(
                 )
                 // One Picker's surface grows out of the composer, over the transcript and under the composer.
                 SessionOnePickerBackdrop(composerHost, Modifier.matchParentSize())
+                val statusBar = WindowInsets.statusBarsIgnoringVisibility.inContainer()
                 Column(
                     Modifier
                         .align(Alignment.BottomCenter)
@@ -311,6 +313,19 @@ fun SessionView(
                         .navigationBarsPadding()
                         .imePadding()
                         .padding(bottom = if (onCatchUpOpen == null) 0.dp else CATCH_UP_COMPOSER_CLEARANCE.dp)
+                        // The room between the status bar and the keyboard (iOS `requestPanelInputs.room`):
+                        // the composer never grows past it. Short of room (landscape with the keys up, a
+                        // split screen) the header gives way, then the field's lines, then the
+                        // attachments (`ComposerFoldLayout`), never the control row.
+                        .layout { measurable, constraints ->
+                            val room = if (constraints.hasBoundedHeight) {
+                                (constraints.maxHeight - statusBar.getTop(this)).coerceAtLeast(constraints.minHeight)
+                            } else {
+                                constraints.maxHeight
+                            }
+                            val placeable = measurable.measure(constraints.copy(maxHeight = room))
+                            layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+                        }
                         // The readable column (iOS `readableColumn()`): 720 wide at most.
                         .widthIn(max = TranscriptMetrics.readableColumnWidth)
                         // iOS `ComposerKeyboardStepHold`: the composer glides after a docked IME's unanimated step.
