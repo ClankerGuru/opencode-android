@@ -899,6 +899,8 @@ fun ComposerTextInput(
     }
     // Each time the app leaves the foreground (Home, Recents): A-01's wait below doesn't outlive it.
     var pauses by remember { mutableIntStateOf(0) }
+    // [pauses] when the keys were last seen coming up (QA AJ-01).
+    var pausesWhenShown by remember { mutableIntStateOf(0) }
     DisposableEffect(lifecycle) {
         val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_PAUSE) pauses++ }
         lifecycle.addObserver(observer)
@@ -913,6 +915,7 @@ fun ComposerTextInput(
             return@LaunchedEffect
         }
         imeWasVisible = imeVisible
+        if (imeVisible) pausesWhenShown = pauses
         if (!left || !hasFocus || drawerHold?.isHeld(fieldKey) == true || isKeyboardHeld) return@LaunchedEffect
         // A recreated window (dark mode, font size) first reports the old window's keys as shown,
         // then as hidden while they rise for this field: keys on their way up aren't leaving.
@@ -920,6 +923,9 @@ fun ComposerTextInput(
         // Keys the background took (Home, Recents) haven't left: the field keeps its focus and the
         // keys come back with the app, as iOS's text view stays first responder (QA AG-02).
         if (!windowInfo.isWindowFocused || !lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return@LaunchedEffect
+        // After a quick return (QA AJ-01) the background's hide can reach the field only once the app
+        // is back in front: keys last seen up before the app left went with it, not with the reader.
+        if (pauses != pausesWhenShown) return@LaunchedEffect
         // Keys that take no room (Gboard floating, or its toolbar over a hardware keyboard) keep
         // the target at 0 and, as a recreated window re-attaches them, can flick hidden and straight
         // back: only keys that stay down have left (a flick back restarts this effect). The wait
