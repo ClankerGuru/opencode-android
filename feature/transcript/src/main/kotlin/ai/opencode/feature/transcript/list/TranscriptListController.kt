@@ -63,6 +63,21 @@ class TranscriptListController(
     var density: Float = 1f
     var frameDuration: Double = 1.0 / 60.0
     var reduceMotion: Boolean = false
+    /**
+     * Active TalkBack / screen-reader touch exploration: lands row height and follow updates in one
+     * pass (like [reduceMotion]) instead of stepping `RowGrowth` / `GrowthRide` / `BottomSpring` at
+     * 60 Hz, which otherwise emits continuous `TYPE_VIEW_SCROLLED` + subtree bounds events that
+     * TalkBack's `ScrollEventInterpreter` treats as manual scrolling. Sighted (`false`) is untouched.
+     */
+    var touchExploration: Boolean = false
+        set(value) {
+            if (field == value) return
+            field = value
+            if (value) {
+                stopBottomSpring()
+                finishGrowths()
+            }
+        }
     /** Whether the reader can watch the list move now (on screen, app resumed). */
     var isShowingToReader: Boolean = true
 
@@ -563,7 +578,7 @@ class TranscriptListController(
                     }?.takeIf { it.isFromAgent }?.let { agentReveal.arrive(it.id) }
                     // The flight owns a local send's arrival. Its destination must be measured
                     // at full height, not clipped to a pixel while the follower looks for it.
-                    if (!sent && !promoted && !reduceMotion) {
+                    if (!sent && !promoted && !reduceMotion && !touchExploration) {
                         enteringItems += item.key
                         if (item !in handoff) pendingEntrances[item.key] = t to RowEntranceStyle.Arrival
                     }
@@ -935,7 +950,7 @@ class TranscriptListController(
         if (distance <= 0.5f) return
         val t = transcriptNow()
         val lastVisible = lastLayout?.visibleItemsInfo?.lastOrNull()?.index == snapshot.items.lastIndex
-        val glides = !reduceMotion && hasLaidOutContent && t >= arrivalsGlideAfter && !isUserGestureActive && isShowingToReader
+        val glides = !reduceMotion && !touchExploration && hasLaidOutContent && t >= arrivalsGlideAfter && !isUserGestureActive && isShowingToReader
         // Not yet measured rows at the end come into view as the glide scrolls (LazyColumn clamps at the end).
         if (glides && (lastVisible || distance <= viewport.visibleHeight) && distance <= viewport.visibleHeight * BottomSpring.ARRIVAL_REACH) {
             springToBottom(if (viewportChanged) {
@@ -1171,7 +1186,7 @@ class TranscriptListController(
         for (command in commands) {
             when (command) {
                 is TranscriptScrollBehavior.Command.AdjustOffset -> if (command.by != 0f) state.dispatchRawDelta(command.by * density)
-                is TranscriptScrollBehavior.Command.ScrollToBottom -> scrollToBottom(command.animated && !reduceMotion)
+                is TranscriptScrollBehavior.Command.ScrollToBottom -> scrollToBottom(command.animated && !reduceMotion && !touchExploration)
                 is TranscriptScrollBehavior.Command.SetTrailingSpace -> {
                     if (command.space > trailingSpace) heldSpaceDrain = HeldSpaceDrain()
                     trailingSpace = command.space
@@ -1221,7 +1236,7 @@ class TranscriptListController(
         val viewport = viewport()
         val distance = distanceFromBottom(viewport)
         if (distance <= 1f) return
-        if (reduceMotion) {
+        if (reduceMotion || touchExploration) {
             landOnLastItem()
             return
         }
@@ -1585,7 +1600,7 @@ class TranscriptListController(
         val changedOnScreen = !entering && !runResized && settled != null && row != null && !isAboveReadingAnchor(key)
         val browsingGrows = browsingRevised && changedOnScreen
         if (changedOnScreen) browsingRevisedRows.remove(key)
-        val changedRowMayGrow = (revised || browsingGrows) && !reduceMotion && hasLaidOutContent && isShowingToReader &&
+        val changedRowMayGrow = (revised || browsingGrows) && !reduceMotion && !touchExploration && hasLaidOutContent && isShowingToReader &&
             !isUserGestureActive && jumpGlide == null && transcriptNow() >= promotionUntil &&
             transcriptNow() >= catchUpLandsUntil && abs(measured - from) <= lastVisibleHeight
         if (!allowsGrowth(measured - from) && !changedRowMayGrow) {
@@ -1627,7 +1642,7 @@ class TranscriptListController(
     private fun allowsGrowth(delta: Float): Boolean {
         val t = transcriptNow()
         val visible = lastVisibleHeight
-        return !reduceMotion && hasLaidOutContent && isShowingToReader &&
+        return !reduceMotion && !touchExploration && hasLaidOutContent && isShowingToReader &&
             behavior.mode == TranscriptScrollBehavior.Mode.Following && !isUserGestureActive &&
             t >= arrivalsGlideAfter && t >= catchUpLandsUntil && jumpGlide == null &&
             t >= promotionUntil &&

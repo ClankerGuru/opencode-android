@@ -62,6 +62,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.SemanticsPropertyReceiver
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
@@ -383,26 +384,55 @@ object LinkMenuText {
 
     /**
      * Every link's actions, in order, as iOS puts them on the text. Android allows one node only
-     * [MAX_CUSTOM_ACCESSIBILITY_ACTIONS], so when they don't all fit, the first links keep all of
-     * theirs and the rest are listed behind one [moreLinks] action, whose chooser opens a link's
-     * own menu.
+     * [MAX_CUSTOM_ACCESSIBILITY_ACTIONS], less the [reserved] slots the caller's own actions
+     * (Quote) take, so when they don't all fit, the first links keep all of theirs and the rest
+     * are listed behind one [moreLinks] action, whose chooser opens a link's own menu.
      */
-    fun accessibilityActions(links: List<String>, actionsFor: (String) -> List<LinkMenuAction>): AccessibilityActions {
+    fun accessibilityActions(
+        links: List<String>,
+        actionsFor: (String) -> List<LinkMenuAction>,
+        reserved: Int = 0,
+    ): AccessibilityActions {
+        val limit = MAX_CUSTOM_ACCESSIBILITY_ACTIONS - reserved
         val perLink = links.map { url -> url to actionsFor(url) }
         val all = perLink.flatMap { (url, actions) -> actions.map { it to url } }
-        if (all.size <= MAX_CUSTOM_ACCESSIBILITY_ACTIONS) return AccessibilityActions(all, emptyList())
+        if (all.size <= limit) return AccessibilityActions(all, emptyList())
         val kept = ArrayList<Pair<LinkMenuAction, String>>()
         var cut = perLink.size
         for ((index, entry) in perLink.withIndex()) {
             val (url, actions) = entry
             // One slot stays for More Links.
-            if (kept.size + actions.size > MAX_CUSTOM_ACCESSIBILITY_ACTIONS - 1) {
+            if (kept.size + actions.size > limit - 1) {
                 cut = index
                 break
             }
             actions.mapTo(kept) { it to url }
         }
         return AccessibilityActions(kept, perLink.drop(cut).map { it.first })
+    }
+
+    /**
+     * The text's TalkBack actions on its one node: the links' ([accessibilityActions]), More
+     * Links when they don't all fit, then the caller's [trailing] ones (the block's Quote, which
+     * iOS adds on the block around the text: `MarkdownBlockView.swift:50` around
+     * `ArrivingText.swift:119`'s `linkMenu`), never more than [MAX_CUSTOM_ACCESSIBILITY_ACTIONS].
+     */
+    fun accessibilityCustomActions(
+        links: List<String>,
+        actionsFor: (String) -> List<LinkMenuAction>,
+        linkText: (String) -> String?,
+        trailing: List<CustomAccessibilityAction>,
+        perform: (LinkMenuAction, String) -> Unit,
+        showMore: (List<String>) -> Unit,
+    ): List<CustomAccessibilityAction> {
+        val plan = accessibilityActions(links, actionsFor, reserved = trailing.size)
+        return buildList {
+            for ((action, url) in plan.actions) {
+                add(CustomAccessibilityAction(accessibilityName(action, url, links, linkText)) { perform(action, url); true })
+            }
+            if (plan.more.isNotEmpty()) add(CustomAccessibilityAction(moreLinks) { showMore(plan.more); true })
+            addAll(trailing)
+        }.withinNodeLimit()
     }
 
     /** A link's row in the More Links chooser: a session's name, or the link named as its actions name it. */
@@ -556,6 +586,8 @@ fun LinkMenu(
     textLayout: () -> TextLayoutResult?,
     onOpen: (String) -> Unit,
     modifier: Modifier = Modifier,
+    /** The text's own TalkBack actions (Quote), on the same node after the links' (only when it has links). */
+    trailingActions: List<CustomAccessibilityAction> = emptyList(),
     content: @Composable () -> Unit,
 ) {
     val handler = LocalLinkMenu.current
@@ -580,25 +612,24 @@ fun LinkMenu(
     val pressColor = colors.text.copy(alpha = if (colors.isDark) 0.16f else 0.1f)
     val liftFill = MaterialTheme.colorScheme.surface
     HapticEffect(Haptic.threshold, menu?.value) { old, new -> old == null && new != null }
+    val accessibilityActions = remember(links, linkTexts, trailingActions, handler) {
+        LinkMenuText.accessibilityCustomActions(
+            links,
+            handler::accessibilityActions,
+            linkTexts::get,
+            trailingActions,
+            perform = handler.perform,
+            showMore = { chooser = it },
+        )
+    }
+    val accessibilitySemantics: SemanticsPropertyReceiver.() -> Unit = remember(accessibilityActions) {
+        { customActions = accessibilityActions }
+    }
 
     Box(
         modifier
-            .semantics {
-                val plan = LinkMenuText.accessibilityActions(links, handler::accessibilityActions)
-                customActions = buildList {
-                    for ((action, url) in plan.actions) {
-                        add(
-                            CustomAccessibilityAction(LinkMenuText.accessibilityName(action, url, links, linkTexts::get)) {
-                                handler.perform(action, url)
-                                true
-                            },
-                        )
-                    }
-                    if (plan.more.isNotEmpty()) {
-                        add(CustomAccessibilityAction(LinkMenuText.moreLinks) { chooser = plan.more; true })
-                    }
-                }.withinNodeLimit()
-            }
+            // Remembered, so a streaming paragraph's chunks leave the node's semantics alone (AH-01).
+            .semantics(properties = accessibilitySemantics)
             // A session chip darkens while a finger is on it: over the text, as iOS's press layer.
             .drawWithContent {
                 drawContent()

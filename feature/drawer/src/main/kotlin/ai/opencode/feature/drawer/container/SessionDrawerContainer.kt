@@ -73,7 +73,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.GraphicsContext
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
@@ -98,6 +97,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsPropertyReceiver
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
@@ -231,7 +231,8 @@ fun SessionDrawerContainer(
     // Catch Up just ended and the morph hasn't started yet (it starts in this pass's effects):
     // the stage stays mounted so the morph can fade it.
     val exiting = catchUp == null && controller.catchUp != null
-    val stackStage = catchUp ?: if (exiting || exitMorph) controller.lastStage else null
+    val hasFlyingCards = controller.catchUpStack.flyingCards.isNotEmpty()
+    val stackStage = catchUp ?: if (exiting || exitMorph || hasFlyingCards) controller.lastStage else null
     val cardInStack = catchUp != null
     val chromeMounted = catchUp != null || exiting || exitMorph
     // Catch Up began this pass; its morph (which fades the drawer out) starts in this pass's effects.
@@ -317,32 +318,36 @@ fun SessionDrawerContainer(
                     .width(width)
                     .fillMaxHeight()
                     .align(Alignment.CenterStart)
-                    .zIndex(if (modal && (catchUp == null || drawerPosed)) 1f else 0f)
+                    .zIndex(if (modal && drawerShows && (entering || drawerPosed || motion.isPresented || motion.isCardMoving)) 1f else 0f)
                     .drawerPanDrawer(panRegions)
-                    .graphicsLayer {
-                        if (modal) {
-                            if (controller.drawerScale.floatValue.isNaN()) {
-                                // The drawer's trailing edge rides the finger, as the card's leading edge did.
-                                val shown = min(motion.offset, width.value)
-                                translationX = (shown - width.value).dp.toPx() * if (rtl) -1 else 1
-                            }
-                            shape = ModalDrawerShape
-                            clip = true
+                    .layout { measurable, constraints ->
+                        val placeable = measurable.measure(constraints)
+                        val placed = drawerShows && (!modal || entering || drawerPosed || motion.isPresented || motion.isCardMoving)
+                        if (placed) {
+                            layout(constraints.maxWidth, constraints.maxHeight) { placeable.placeRelative(0, 0) }
+                        } else {
+                            layout(0, 0) {}
                         }
-                        alpha = if (drawerShows && controller.drawerScale.floatValue.isNaN()) controller.drawerAlpha.floatValue else if (drawerShows) 1f else 0f
                     }
-                    .containerPoseLayer { size, densityPx ->
+                    .containerPoseLayer { _, densityPx ->
                         val override = controller.drawerScale.floatValue
                         if (!override.isNaN()) {
                             scaleX = override
                             scaleY = override
                             alpha = if (drawerShows) controller.drawerAlpha.floatValue else 0f
-                        } else if (!modal) {
+                        } else if (modal) {
+                            // The drawer's trailing edge rides the finger, as the card's leading edge did.
+                            val shown = min(motion.offset, width.value)
+                            translationX = (shown - width.value) * densityPx * if (rtl) -1 else 1
+                            alpha = if (drawerShows) controller.drawerAlpha.floatValue else 0f
+                        } else {
                             val scale = DrawerDepth.scale(motion.progress, motion.reducedMotion || !motion.recedes)
                             scaleX = scale
                             scaleY = scale
+                            alpha = if (drawerShows) controller.drawerAlpha.floatValue else 0f
                         }
                     }
+                    .then(if (modal) Modifier.clip(ModalDrawerShape) else Modifier)
                     .then(if (hiddenFromAccessibility) Modifier.clearAndMergeSemantics() else Modifier),
             ) {
                 CompositionLocalProvider(LocalDrawerVisible provides drawerVisible) {
@@ -367,8 +372,9 @@ fun SessionDrawerContainer(
             Box(
                 Modifier
                     .fillMaxSize()
+                    .zIndex(if (modal) 2f else 0f)
                     .containerPoseLayer { _, _ ->
-                        alpha = controller.chromeAlpha.floatValue
+                        alpha = if (entering) 0f else controller.chromeAlpha.floatValue
                         val scale = controller.chromeScale.floatValue
                         scaleX = scale
                         scaleY = scale
@@ -396,6 +402,13 @@ fun SessionDrawerContainer(
 
         if (stackStage != null) {
             val outgoing = controller.outgoing
+            val returningToModalDrawer = modal && ((exiting && isPresented) || morph == CatchUpModeMorph.ReturnToDrawer)
+            val leavingSnapshot = if (!cardInStack && returningToModalDrawer) {
+                outgoing ?: if (exiting && !reducedMotion) controller.pendingCardSnapshot else null
+            } else {
+                null
+            }
+            val stackCornerPx = with(density) { CatchUpMetrics.cornerRadius.toPx() }
             CatchUpStack(
                 stage = stackStage,
                 controller = controller.catchUpStack,
@@ -404,9 +417,48 @@ fun SessionDrawerContainer(
                 undoCard = controller::undoCard,
                 previewRevision = previewRevision,
                 revealsPreviewOnBegin = false,
+                isExiting = !cardInStack,
                 panRegions = panRegions,
-                modifier = Modifier.containerPoseLayer { _, densityPx ->
-                    translationX = controller.stackOffset.floatValue * densityPx * if (rtl) -1 else 1
+                modifier = Modifier
+                    .zIndex(if (modal) 3f else 0f)
+                    .containerPoseLayer { _, densityPx ->
+                        translationX = controller.stackOffset.floatValue * densityPx * if (rtl) -1 else 1
+                        translationY = controller.stackTy.floatValue * densityPx
+                        alpha = if (entering && modal) 0f else controller.stackAlpha.floatValue
+                    },
+                leavingCard = if (leavingSnapshot != null) {
+                    {
+                        Box(
+                            Modifier
+                                .fillMaxSize()
+                                .clearAndMergeSemantics()
+                                .containerPoseLayer { size, _ ->
+                                    alpha = if (exiting) 1f else controller.outgoingAlpha.floatValue
+                                    setRoundRectOutline(Offset.Zero, size, stackCornerPx)
+                                    clip = true
+                                },
+                        ) {
+                            Image(
+                                leavingSnapshot,
+                                contentDescription = null,
+                                contentScale = ContentScale.FillBounds,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                            Box(
+                                Modifier
+                                    .fillMaxSize()
+                                    .drawBehind {
+                                        drawRoundRect(
+                                            color = borderColor,
+                                            cornerRadius = CornerRadius(stackCornerPx),
+                                            style = Stroke(borderWidthPx),
+                                        )
+                                    },
+                            )
+                        }
+                    }
+                } else {
+                    null
                 },
                 card = {
                     if (cardInStack) {
@@ -436,27 +488,15 @@ fun SessionDrawerContainer(
             val contentHidden = motion.isContentHiddenFromAccessibility.value
             val outgoing = controller.outgoing
             val outgoingRect = controller.outgoingRect
+            val openingOrFinishingIntoSession = morph == CatchUpModeMorph.OpenIntoSession || morph == CatchUpModeMorph.FinishIntoSession
+            val returningOnModal = modal && ((exiting && isPresented) || morph == CatchUpModeMorph.ReturnToDrawer)
             Box(
                 Modifier
                     .fillMaxSize()
+                    .zIndex(if (modal && openingOrFinishingIntoSession) 3f else 0f)
                     .sidebarLeading(controller)
-                    .then(
-                        if (!modal) {
-                            Modifier.graphicsLayer {
-                                if (!controller.cardPosed) {
-                                    val offset = motion.offset
-                                    translationX = offset.dp.toPx() * if (rtl) -1 else 1
-                                    val radius = DrawerCorner.radius(motion.isCardMoving, offset, displayRadius.value)
-                                    shape = if (radius > 0f) RoundedCornerShape(radius.dp) else RectangleShape
-                                    clip = radius > 0f
-                                }
-                            }
-                        } else {
-                            Modifier
-                        },
-                    )
                     .containerPoseLayer { size, densityPx ->
-                        if (controller.cardPosed) {
+                        if (controller.cardPosed && !returningOnModal) {
                             translationX = controller.cardTx.floatValue * densityPx * if (rtl) -1 else 1
                             translationY = controller.cardTy.floatValue * densityPx
                             val scale = controller.cardScale.floatValue
@@ -466,6 +506,14 @@ fun SessionDrawerContainer(
                             val mask = controller.currentMask() ?: Rect(Offset.Zero, size)
                             setRoundRectOutline(mask.topLeft, mask.size, controller.cardRadius.floatValue * densityPx)
                             clip = true
+                        } else if (!modal) {
+                            val offset = motion.offset
+                            translationX = offset * densityPx * if (rtl) -1 else 1
+                            val radius = DrawerCorner.radius(motion.isCardMoving, offset, displayRadius.value)
+                            if (radius > 0f) {
+                                setRoundRectOutline(Offset.Zero, size, radius * densityPx)
+                                clip = true
+                            }
                         }
                     }
                     .drawerPanCard(panRegions)
@@ -474,7 +522,7 @@ fun SessionDrawerContainer(
                 Box(
                     Modifier
                         .fillMaxSize()
-                        .graphicsLayer { alpha = controller.contentAlpha.floatValue }
+                        .containerPoseLayer { _, _ -> alpha = controller.contentAlpha.floatValue }
                         .then(if (contentHidden) Modifier.clearAndMergeSemantics() else Modifier)
                         // Consumes nothing; it's here to be inserted with this slot. Catch Up's
                         // stack consumes the system bars around the moved session, and a session
@@ -510,7 +558,7 @@ fun SessionDrawerContainer(
                             },
                     )
                 }
-                if (outgoing != null && outgoingRect != null) {
+                if (!returningOnModal && outgoing != null && outgoingRect != null) {
                     Image(
                         outgoing,
                         contentDescription = null,
@@ -528,7 +576,7 @@ fun SessionDrawerContainer(
                         .fillMaxSize()
                         .drawBehind {
                             val alpha = controller.borderAlpha.floatValue
-                            if (!controller.cardPosed || alpha <= 0f) return@drawBehind
+                            if (!controller.cardPosed || returningOnModal || alpha <= 0f) return@drawBehind
                             val mask = controller.currentMask() ?: Rect(Offset.Zero, size)
                             val radius = controller.cardRadius.floatValue.dp.toPx()
                             drawRoundRect(
@@ -546,18 +594,23 @@ fun SessionDrawerContainer(
                         .fillMaxSize()
                         .drawBehind {
                             val override = controller.scrimAlpha.floatValue
-                            val progress = if (!override.isNaN()) override else motion.progress
+                            val progress = if (returningOnModal) 1f else if (!override.isNaN()) override else motion.progress
                             if (progress > 0f) drawRect(scrimColor, alpha = scrimColor.alpha * progress)
                         }
                         .then(
                             if (scrimInteractive) {
+                                Modifier.pointerInput(controller) { detectTapGestures { controller.closeDrawer() } }
+                            } else {
                                 Modifier
-                                    .pointerInput(controller) { detectTapGestures { controller.closeDrawer() } }
-                                    .semantics {
-                                        contentDescription = "Close session list"
-                                        role = Role.Button
-                                        onClick { controller.closeDrawer() }
-                                    }
+                            },
+                        )
+                        .then(
+                            if (scrimInteractive && contentHidden) {
+                                Modifier.semantics {
+                                    contentDescription = "Close session list"
+                                    role = Role.Button
+                                    onClick { controller.closeDrawer() }
+                                }
                             } else {
                                 Modifier
                             },
@@ -756,7 +809,9 @@ private object ClearAndMergeDrawerSemanticsElement : ModifierNodeElement<ClearAn
 private class ClearAndMergeDrawerSemanticsNode : Modifier.Node(), SemanticsModifierNode {
     override val shouldClearDescendantSemantics: Boolean get() = true
     override val shouldMergeDescendantSemantics: Boolean get() = true
-    override fun SemanticsPropertyReceiver.applySemantics() = Unit
+    override fun SemanticsPropertyReceiver.applySemantics() {
+        hideFromAccessibility()
+    }
 }
 
 /** Material's modal drawer scrim (the `scrim` role at 32%). */

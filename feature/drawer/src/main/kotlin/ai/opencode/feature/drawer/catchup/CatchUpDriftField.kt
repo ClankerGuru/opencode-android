@@ -83,7 +83,7 @@ fun CatchUpDriftFieldView(isFinished: Boolean, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun rememberTouchExplorationEnabled(): Boolean {
+internal fun rememberTouchExplorationEnabled(): Boolean {
     val context = LocalContext.current
     val manager = remember(context) { context.getSystemService(AccessibilityManager::class.java) }
     var enabled by remember(manager) { mutableStateOf(manager?.isTouchExplorationEnabled == true) }

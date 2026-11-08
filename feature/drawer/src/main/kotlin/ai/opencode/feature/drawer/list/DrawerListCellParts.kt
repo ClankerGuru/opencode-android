@@ -4,6 +4,7 @@ import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.feature.drawer.catchup.rememberTouchExplorationEnabled
 import ai.opencode.feature.drawer.icons.ProjectAvatarPalette
 import ai.opencode.feature.drawer.icons.ProjectIcon
 import ai.opencode.feature.drawer.icons.ProjectIconClient
@@ -120,7 +121,7 @@ val LocalDrawerVisible = compositionLocalOf { true }
 fun DrawerListActivityRing(isSpinning: Boolean, opaqueTail: Boolean, modifier: Modifier = Modifier) {
     val color = OpenCodeTheme.colors.secondaryText
     val tail = if (opaqueTail) color else color.copy(alpha = 0f)
-    val spinning = isSpinning && LocalDrawerVisible.current
+    val spinning = isSpinning && LocalDrawerVisible.current && !rememberTouchExplorationEnabled()
     val rotation = if (spinning) {
         val transition = rememberInfiniteTransition(label = "drawer-activity-ring")
         transition.animateFloat(
