@@ -81,6 +81,9 @@ class AccessibilityFocusTarget {
 
     /** Moves TalkBack's focus onto the element now; false if it isn't composed or the move was refused. */
     fun focus(): Boolean = node?.let { it.isAttached && it.moveAccessibilityFocus() } == true
+
+    /** Whether TalkBack's focus is on the element now; false while touch exploration is off. */
+    val isFocused: Boolean get() = node?.let { it.isAttached && it.hasAccessibilityFocus() } == true
 }
 
 /** Makes this element the one [target]'s [AccessibilityFocusTarget.focus] moves TalkBack to. */
@@ -88,15 +91,27 @@ fun Modifier.accessibilityFocusTarget(target: AccessibilityFocusTarget): Modifie
 
 private fun <N> N.moveAccessibilityFocus(): Boolean where N : Modifier.Node, N : CompositionLocalConsumerModifierNode {
     if (!currentValueOf(LocalAccessibilityFocusMoves)) return false
+    val id = accessibilityNodeId() ?: return false
+    return currentValueOf(LocalView).accessibilityNodeProvider?.performAction(id, AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS, null) == true
+}
+
+private fun <N> N.hasAccessibilityFocus(): Boolean where N : Modifier.Node, N : CompositionLocalConsumerModifierNode {
+    val view = currentValueOf(LocalView)
+    if (view.context.getSystemService(AccessibilityManager::class.java)?.isTouchExplorationEnabled != true) return false
+    val id = accessibilityNodeId() ?: return false
+    return view.accessibilityNodeProvider?.createAccessibilityNodeInfo(id)?.isAccessibilityFocused == true
+}
+
+/** The marked element's virtual view id in its view's accessibility node provider. */
+private fun <N> N.accessibilityNodeId(): Int? where N : Modifier.Node, N : CompositionLocalConsumerModifierNode {
     val view = currentValueOf(LocalView)
     // The only place that reads a semantics tree. The accessibility node provider's virtual view
     // ids are semantics node ids, and nothing public maps a modifier node to its id
     // (`requireSemanticsInfo()`, `LayoutNode` and the view's `Owner` are internal), so the
     // tree comes from `RootForTest`, the public interface every Compose view implements.
-    val root = (view as? RootForTest)?.semanticsOwner?.unmergedRootSemanticsNode ?: return false
+    val root = (view as? RootForTest)?.semanticsOwner?.unmergedRootSemanticsNode ?: return null
     // Absent while something hides it (a cleared ancestor): then there's nothing to focus.
-    val id = root.find { it.config.getOrNull(AccessibilityFocusMarker) === this }?.id ?: return false
-    return view.accessibilityNodeProvider?.performAction(id, AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS, null) == true
+    return root.find { it.config.getOrNull(AccessibilityFocusMarker) === this }?.id
 }
 
 private fun SemanticsNode.find(match: (SemanticsNode) -> Boolean): SemanticsNode? =

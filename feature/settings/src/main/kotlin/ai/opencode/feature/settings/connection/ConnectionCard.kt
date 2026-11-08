@@ -11,8 +11,10 @@ import ai.opencode.core.ui.RollingNumber
 import ai.opencode.core.ui.RollingNumberAlignment
 import ai.opencode.core.ui.RollingNumberStyle
 import ai.opencode.core.ui.AccessibilityFocusRequest
+import ai.opencode.core.ui.AccessibilityFocusTarget
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.accessibilityFocusRequest
+import ai.opencode.core.ui.accessibilityFocusTarget
 import ai.opencode.core.ui.openCodeTapTarget
 import ai.opencode.feature.settings.ConnectionStatus
 import ai.opencode.feature.settings.SettingsButtonRow
@@ -721,13 +723,31 @@ fun ServerPage(store: SettingsStore) {
     }
 }
 
-/** The page's Status row (iOS `LabeledContent("Status")`): glyph, then the word and round trip. */
+/**
+ * The page's Status row (iOS `LabeledContent("Status")`): glyph, then the word and round trip.
+ *
+ * Android divergence: iOS's value is the word and the live round trip, and VoiceOver reads it as
+ * it is when the row is reached but leaves its changes unspoken. TalkBack re-reads a focused node
+ * whenever what it speaks changes, so it read the row again on every check (QA F-61). The spoken
+ * round trip follows the live one while TalkBack is elsewhere, so the row still reads the current
+ * number when reached, and holds while TalkBack is on it; a new status word (settled, as the
+ * card's) is still read. The screen updates on every check.
+ */
 @Composable
 private fun StatusRow(presentation: ConnectionStatusPresentation) {
     val color = presentation.foreground()
-    SettingsRowFrame(Modifier.clearAndSetSemantics {
+    val word = rememberSettledSpokenWord(presentation.spokenWord)
+    val focus = remember { AccessibilityFocusTarget() }
+    val spoken = remember { SpokenStatus() }
+    val live = if (word == presentation.spokenWord) presentation.spokenStatus else word
+    if (spoken.word != word || !focus.isFocused) {
+        spoken.word = word
+        spoken.text = live
+    }
+    val text = spoken.text
+    SettingsRowFrame(Modifier.accessibilityFocusTarget(focus).clearAndSetSemantics {
         contentDescription = "Status"
-        stateDescription = presentation.spokenStatus
+        stateDescription = text
     }) {
         LabeledContent("Status", Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -748,6 +768,12 @@ private fun StatusRow(presentation: ConnectionStatusPresentation) {
             }
         }
     }
+}
+
+/** What the Status row last gave TalkBack, and the status word it was for; read and written while it composes. */
+private class SpokenStatus {
+    var word: String? = null
+    var text: String = ""
 }
 
 /**
