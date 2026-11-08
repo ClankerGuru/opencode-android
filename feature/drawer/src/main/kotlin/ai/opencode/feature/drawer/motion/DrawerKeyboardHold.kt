@@ -176,6 +176,8 @@ class DrawerKeyboardHold(
 
     override fun releaseFocus(): Boolean = focusRelease()
 
+    override val holdsCardField: Boolean get() = heldField?.inDrawer == false
+
     override fun cardFieldFocusChanged(key: Any, focused: Boolean, clearFocus: () -> Unit) =
         fieldFocusChanged(Field(key, inDrawer = false, clearFocus), focused)
 
