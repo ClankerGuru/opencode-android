@@ -13,6 +13,7 @@ import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.RollingNumber
 import ai.opencode.core.ui.RollingNumberAlignment
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.core.ui.accessibilityFocusRequest
 import ai.opencode.core.ui.highContrastForeground
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -118,6 +119,8 @@ fun CatchUpChrome(
                         symbol = SFSymbol.ChevronBackward,
                         contentDescription = "Leave Catch Up",
                         onClick = onExit,
+                        // The stage opens on its first element, as VoiceOver does on a screen change.
+                        modifier = Modifier.accessibilityFocusRequest(Unit),
                         style = OpenCodeIconButtonStyle.Circle,
                     )
                     Spacer(Modifier.weight(1f))

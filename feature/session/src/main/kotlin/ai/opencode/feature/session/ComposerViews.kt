@@ -649,6 +649,8 @@ fun ComposerPillLabel(
     onClick: (() -> Unit)? = null,
     /** iOS `accessibilityHint`: TalkBack's click label (“Double tap to …”). */
     onClickLabel: String? = null,
+    /** iOS `accessibilityLabel`: read instead of [title], not after it. */
+    accessibilityLabel: String? = null,
     leading: @Composable () -> Unit,
 ) {
     // Slim surface, full 48 dp target; the press shows on the capsule.
@@ -656,11 +658,13 @@ fun ComposerPillLabel(
     Box(
         modifier
             .then(if (onClick != null) Modifier.clickable(interactionSource = interactions, indication = null, role = Role.Button, onClickLabel = onClickLabel, onClick = onClick) else Modifier)
+            .then(if (accessibilityLabel != null) Modifier.semantics { contentDescription = accessibilityLabel } else Modifier)
             .openCodeTapTarget(accessibility = false),
         contentAlignment = Alignment.Center,
     ) {
         Surface(
             modifier = Modifier
+                .then(if (accessibilityLabel != null) Modifier.clearAndSetSemantics {} else Modifier)
                 .padding(vertical = 5.dp)
                 .clip(OpenCodeShape.capsule)
                 .indication(interactions, ripple()),
