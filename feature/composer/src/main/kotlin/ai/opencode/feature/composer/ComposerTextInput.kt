@@ -104,6 +104,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
@@ -843,6 +844,13 @@ fun ComposerTextInput(
         delay(INHERITED_KEYS_SETTLE_MILLIS)
         keysInherited = false
     }
+    // Each time the app leaves the foreground (Home, Recents): A-01's wait below doesn't outlive it.
+    var pauses by remember { mutableIntStateOf(0) }
+    DisposableEffect(lifecycle) {
+        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_PAUSE) pauses++ }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
+    }
     val imeTarget = WindowInsets.imeAnimationTarget
     LaunchedEffect(imeVisible) {
         val left = imeWasVisible && !imeVisible
@@ -856,10 +864,16 @@ fun ComposerTextInput(
         // A recreated window (dark mode, font size) first reports the old window's keys as shown,
         // then as hidden while they rise for this field: keys on their way up aren't leaving.
         if (imeTarget.getBottom(density) > 0) return@LaunchedEffect
+        // Keys the background took (Home, Recents) haven't left: the field keeps its focus and the
+        // keys come back with the app, as iOS's text view stays first responder (QA AG-02).
+        if (!windowInfo.isWindowFocused || !lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return@LaunchedEffect
         // Keys that take no room (Gboard floating, or its toolbar over a hardware keyboard) keep
         // the target at 0 and, as a recreated window re-attaches them, can flick hidden and straight
-        // back: only keys that stay down have left (a flick back restarts this effect).
+        // back: only keys that stay down have left (a flick back restarts this effect). The wait
+        // can end only once the app is back from the background; then the keys went with it.
+        val pausesBefore = pauses
         delay(KEYS_LEFT_SETTLE_MILLIS)
+        if (pauses != pausesBefore) return@LaunchedEffect
         if (!hasFocus || drawerHold?.isHeld(fieldKey) == true || isKeyboardHeld) return@LaunchedEffect
         if (!windowInfo.isWindowFocused || !lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return@LaunchedEffect
         // QA AF-02: on the drawer's card the drawer takes the focus (`releaseFocus`) instead of it
