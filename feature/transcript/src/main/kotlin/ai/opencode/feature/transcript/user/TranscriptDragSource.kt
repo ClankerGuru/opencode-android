@@ -20,7 +20,11 @@ import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.SuspendingPointerInputModifierNode
+import androidx.compose.ui.node.CompositionLocalConsumerModifierNode
 import androidx.compose.ui.node.DelegatingNode
+import androidx.compose.ui.node.currentValueOf
+import androidx.compose.ui.layout.LayoutCoordinates
+import ai.opencode.feature.transcript.selection.LocalTranscriptReplySelection
 import androidx.compose.ui.node.DrawModifierNode
 import androidx.compose.ui.node.LayoutAwareModifierNode
 import androidx.compose.ui.unit.IntSize
@@ -397,12 +401,17 @@ private class TranscriptDragSourceNode(
     var radius: Dp,
     var onLift: (() -> Unit)?,
     var onDragStart: (() -> Unit)?,
-) : DelegatingNode(), DrawModifierNode, LayoutAwareModifierNode {
+) : DelegatingNode(), DrawModifierNode, LayoutAwareModifierNode, CompositionLocalConsumerModifierNode {
     private var layer: GraphicsLayer? = null
     private var size = IntSize.Zero
+    private var coordinates: LayoutCoordinates? = null
 
     override fun onRemeasured(size: IntSize) {
         this.size = size
+    }
+
+    override fun onPlaced(coordinates: LayoutCoordinates) {
+        this.coordinates = coordinates
     }
 
     private val dragAndDrop = delegate(
@@ -434,6 +443,7 @@ private class TranscriptDragSourceNode(
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
             val longPress = awaitLongPressOrCancellation(down.id) ?: return@awaitEachGesture
+            if (selectionOwnsHold(longPress.position)) return@awaitEachGesture
             // The menu the lift opens stays unfocusable while held, so this touch isn't cancelled.
             TranscriptLiftHold.isHeld = onLift != null
             onLift?.invoke()
@@ -457,6 +467,20 @@ private class TranscriptDragSourceNode(
                 TranscriptLiftHold.isHeld = false
             }
         }
+    }
+
+    /**
+     * iOS `selectionOwnsHold`: a reply selection on the move owns its touch, and so does a hold
+     * that selects code or a formula: nothing lifts from under them.
+     */
+    private fun selectionOwnsHold(position: androidx.compose.ui.geometry.Offset): Boolean {
+        val selection = currentValueOf(LocalTranscriptReplySelection) ?: return false
+        if (selection.isDragging) return true
+        if (payload !is TranscriptDragPayload.Code) return false
+        val list = selection.container ?: return false
+        val coordinates = coordinates ?: return false
+        if (!list.isAttached || !coordinates.isAttached) return false
+        return selection.holdSelects(list.localPositionOf(coordinates, position))
     }
 
     override fun ContentDrawScope.draw() {

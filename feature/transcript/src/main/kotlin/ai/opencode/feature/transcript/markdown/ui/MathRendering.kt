@@ -5,6 +5,9 @@ import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
 import ai.opencode.feature.transcript.selection.LocalTranscriptReplySelection
 import ai.opencode.feature.transcript.selection.TranscriptSelectionLeafKey
 import ai.opencode.feature.transcript.selection.transcriptSelectionAnchor
+import ai.opencode.feature.transcript.user.TranscriptDragPayload
+import ai.opencode.feature.transcript.user.TranscriptDragSurfaceStyle
+import ai.opencode.feature.transcript.user.transcriptDragSource
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.util.LruCache
@@ -107,11 +110,22 @@ fun MathDisplayView(math: OpenCodeMarkdownBlock.MathBlock, selection: Transcript
     val colors = OpenCodeTheme.colors
     val fontSizePx = InlineMath.fontSizePx(MarkdownStyle.bodyTextSize, density) * 1.15f
     val rendered = remember(math.source, fontSizePx) { MathRenderer.render(math.source, fontSizePx, display = true) }
+    // In a reply a hold selects the equation; a hold on one already selected lifts it to drag
+    // as its TeX (iOS `.transcriptDragSource(.code(source: math.raw, language: "tex"))`).
+    var drag: Modifier = Modifier
+    if (selection != null) {
+        drag = Modifier.transcriptDragSource(
+            TranscriptDragPayload.Code(math.raw, "tex"),
+            cornerRadius = 10.dp,
+            surface = TranscriptDragSurfaceStyle.Band,
+        )
+    }
     MarkdownBand(
         modifier.clearAndSetSemantics {
             contentDescription = "Equation"
             stateDescription = math.source
         },
+        bandModifier = drag,
     ) {
         val replySelection = if (selection != null) LocalTranscriptReplySelection.current else null
         if (rendered != null) {

@@ -91,6 +91,8 @@ class TranscriptReplySelection {
         internal val document: TranscriptSelectionDocument,
         val offset: Int,
         val isLink: Boolean,
+        /** Code or a formula: a hold on it while it's selected lifts its block to drag. */
+        val liftsWhenSelected: Boolean,
     )
 
     class HandleHit internal constructor(val isEnd: Boolean, internal val caret: Rect)
@@ -300,7 +302,32 @@ class TranscriptReplySelection {
         val leaf = document.leaves[index]
         val local = leaf.textOffset(best.drawnOffset(bestLocal))
         val offset = document.nearestBoundary(document.offset(index, local))
-        return Hit(document, offset, leaf.isLink(local))
+        val liftsWhenSelected = leaf.role is TranscriptSelectionLeaf.Role.Code || leaf.role == TranscriptSelectionLeaf.Role.Math
+        return Hit(document, offset, leaf.isLink(local), liftsWhenSelected)
+    }
+
+    /**
+     * iOS `holdSelects(at:)`: a hold at [point] (in the list) selects reply text. Code and
+     * formula drag sources ask this first, so their lift can't take a hold that selects.
+     */
+    fun holdSelects(point: Offset): Boolean {
+        val host = host ?: return false
+        if (point.y < host.visibleTop || host.isCoasting) return false
+        val hit = hit(point) ?: return false
+        return holdSelects(hit)
+    }
+
+    /**
+     * A hold on a link opens its menu instead, and one on code or a formula that's already
+     * selected lifts its block to drag.
+     */
+    internal fun holdSelects(hit: Hit): Boolean {
+        if (hit.isLink) return false
+        if (!hit.liftsWhenSelected || hit.document !== document) return true
+        val range = range() ?: return true
+        if (range.length == 0) return true
+        val insideSelection = hit.offset >= range.start && hit.offset <= range.end
+        return !insideSelection
     }
 
     /** The document offset nearest [point] among the reply's leaves on screen, at any distance. */
@@ -647,8 +674,8 @@ internal fun Modifier.transcriptReplySelectionGestures(selection: TranscriptRepl
             val lifted = withTimeoutOrNull(TranscriptReplySelection.HOLD_MILLIS) { awaitLiftOrMove(down.id, point) }
             if (lifted == null) {
                 val hit = selection.hit(point)
-                // A hold on a link opens its menu instead.
-                if (hit == null || hit.isLink) return@awaitEachGesture
+                // A hold on a link opens its menu instead; one on selected code lifts its block.
+                if (hit == null || !selection.holdSelects(hit)) return@awaitEachGesture
                 if (!selection.beginSweep(hit, point)) return@awaitEachGesture
                 while (true) {
                     val event = awaitPointerEvent(PointerEventPass.Initial)

@@ -20,6 +20,7 @@ import ai.opencode.feature.transcript.selection.TranscriptSelectionLeafKey
 import ai.opencode.server.model.AgentFileReference
 import ai.opencode.feature.transcript.user.TranscriptDragContext
 import ai.opencode.feature.transcript.user.TranscriptDragPayload
+import ai.opencode.feature.transcript.user.TranscriptDragSurfaceStyle
 import ai.opencode.feature.transcript.user.transcriptDragSource
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.background
@@ -125,7 +126,17 @@ private fun BlockContent(kind: Kind, grown: List<TranscriptTextReveal.Arrival>, 
         )
         is Kind.Code -> {
             val text = remember(kind.code, colors) { PresentedText.plain(MarkdownPresentation.code(kind.code, colors)) }
-            MarkdownBand {
+            // In a reply a hold selects the code; a hold on code already selected lifts the
+            // block to drag (iOS `.transcriptDragSource(.code(...))`; the selection owns the hold).
+            var drag: Modifier = Modifier
+            if (selection != null) {
+                drag = Modifier.transcriptDragSource(
+                    TranscriptDragPayload.Code(kind.code.source, kind.code.language),
+                    cornerRadius = 10.dp,
+                    surface = TranscriptDragSurfaceStyle.Band,
+                )
+            }
+            MarkdownBand(bandModifier = drag) {
                 QuoteSelectionContainer(kind, inReply = selection != null) {
                     ArrivingText(text, grown, MarkdownStyle.codeTextStyle(style.tuning.codeLeading), colors.text, softWrap = false, selectionKey = selection)
                 }

@@ -103,18 +103,22 @@ class TableRules {
  * `MarkdownBand`). Content starts at the prose edge and scrolls out to the screen edges,
  * fading where more lies past them. A table's rules keep the viewport's width while its
  * columns scroll underneath.
+ *
+ * @param bandModifier applied to the band at its full width, past the gutters: a drag source
+ *   there lifts the whole band.
  */
 @Composable
 fun MarkdownBand(
     modifier: Modifier = Modifier,
     rules: TableRules? = null,
+    bandModifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
     val colors = OpenCodeTheme.colors
     val gutter = LocalTranscriptLayoutTuning.current.contentGutter.dp
     val scroll = rememberScrollState()
     val hairline = with(LocalDensity.current) { 1f.toDp() }
-    Column(modifier.bleedHorizontal(gutter)) {
+    Column(modifier.bleedHorizontal(gutter).then(bandModifier)) {
         HairlineRule()
         Box(
             Modifier
