@@ -59,6 +59,10 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusTarget
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
@@ -257,12 +261,20 @@ fun SessionDrawerContainer(
     val borderWidthPx = if (isDark) with(density) { 1.dp.toPx() } else 1f
     // Inbox Sidebar rows swipe Mark as Read and Archive themselves (iOS `rowsOwnSwipes`).
     val inboxSidebarOn = rememberInboxSidebarOn()
+    // Where the card's or drawer's input focus goes when the container takes it away (QA AD-01).
+    // `clearFocus` also drops the view's own focus; out of touch mode (after any key, TalkBack's
+    // Back included) the window gives it straight back, and TalkBack follows that input-focus
+    // event to the screen's first element (Catch Up's "N Left", the drawer's scrim) after its own
+    // focus had landed. Moving the focus to this target instead leaves the view's focus alone.
+    val focusSink = remember { FocusRequester() }
+    var holdsFocus by remember { mutableStateOf(false) }
 
     Box(
         modifier
             .fillMaxSize()
             .background(colors.canvas)
             .onSizeChanged { controller.containerSizePx = it }
+            .onFocusChanged { holdsFocus = it.hasFocus }
             .drawerDirectionalPan(
                 regions = panRegions,
                 isDrawerPresented = { motion.isPresented },
@@ -294,6 +306,7 @@ fun SessionDrawerContainer(
                 }
             },
     ) {
+        Box(Modifier.focusRequester(focusSink).focusTarget())
         // The modal drawer, over the card; or the sidebar, beside it.
         if (drawerComposed) {
             val drawerVisible = drawerShows && (sidebarShown == null || controller.isSidebarVisible)
@@ -596,7 +609,8 @@ fun SessionDrawerContainer(
         motion.keyboardHold = keyboardHold
         controller.isSheetPresented = { sheet }
         controller.isContentPushed = { pushed }
-        controller.clearFocus = { focusManager.clearFocus(force = true) }
+        // Nothing focused, nothing to take: a clear would only drop and regain the view's focus.
+        controller.clearFocus = { if (holdsFocus && !focusSink.requestFocus()) focusManager.clearFocus(force = true) }
         controller.cardLayer = cardLayer
         controller.chromeLayer = chromeLayer
         controller.onArrived = onArrived
