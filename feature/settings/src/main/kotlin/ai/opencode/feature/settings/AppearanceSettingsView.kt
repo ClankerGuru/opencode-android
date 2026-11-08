@@ -96,6 +96,8 @@ fun AppearanceSettingsView(store: SettingsStore) {
     val scheme by remember { shared(ThemeSharedKeys.appearanceColorScheme).flow }.collectAsState()
     val isDark = scheme.resolveIsDark(isSystemInDarkTheme())
     val send = { action: HomeSettingsFeature.Action -> store.send(SettingsFeature.Action.Settings(action)) }
+    // QA U-02: Back from the Theme picker puts TalkBack back on the Theme row.
+    val returnFocus = rememberSettingsReturnFocus(store, page = SettingsPage.Appearance)
 
     SettingsPageScaffold(title = "Appearance", store = store) {
         settingsSection(key = "mode", header = "Mode") {
@@ -113,7 +115,11 @@ fun AppearanceSettingsView(store: SettingsStore) {
         settingsSection(key = "theme", header = "Theme") {
             // The clickable row merges its texts: "Theme", then the theme (iOS's label and value).
             SettingsRowFrame(
-                onClick = { store.send(SettingsFeature.Action.PagePushed(SettingsPage.Themes)) },
+                modifier = returnFocus.on(SettingsPage.Themes),
+                onClick = {
+                    returnFocus.opened(SettingsPage.Themes)
+                    store.send(SettingsFeature.Action.PagePushed(SettingsPage.Themes))
+                },
             ) {
                 val swatch = @Composable {
                     ThemeSwatchTile(

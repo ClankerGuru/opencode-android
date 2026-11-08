@@ -632,7 +632,9 @@ fun PendingAttachmentsRow(
                         height = ComposerFileChip.height,
                         fill = MaterialTheme.colorScheme.surfaceContainerHighest,
                         shape = RoundedCornerShape(ComposerFileChip.cornerRadius),
-                        headerTrailingInset = 14.dp,
+                        // iOS 14 pt, plus the × reaching further in here: its 48 dp target (iOS
+                        // 44 pt) centres the 22 dp disc 2 dp further in, and the disc is ~1 dp wider.
+                        headerTrailingInset = 17.dp,
                     )
                 }
                 else -> {

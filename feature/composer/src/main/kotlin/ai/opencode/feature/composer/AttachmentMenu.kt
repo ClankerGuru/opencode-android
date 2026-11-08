@@ -8,6 +8,7 @@ import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.core.ui.accessibilityFocusRequest
 import ai.opencode.core.ui.openCodeTapTarget
 import ai.opencode.feature.composer.plusmenu.PlusMenuPlacement
 import android.net.Uri
@@ -288,6 +289,8 @@ fun AttachmentMenuRows(
     /** New Plus Menu: the menu's fixed width; otherwise the rows size to their content. */
     menuWidth: Dp? = null,
     onRowFrame: ((AttachmentMenuItem, Rect) -> Unit)? = null,
+    /** Each new non-null value moves TalkBack's focus onto the top row ([accessibilityFocusRequest]). */
+    focusRequest: Any? = null,
     onChoose: (AttachmentMenuItem) -> Unit = {},
     onPaste: () -> Unit = {},
 ) {
@@ -332,7 +335,8 @@ fun AttachmentMenuRows(
                             .clickable(role = Role.Button) {
                                 if (item == AttachmentMenuItem.Paste) onPaste() else onChoose(item)
                             }
-                            .semantics { testTag = "attachment-menu-${item.name.lowercase()}" },
+                            .semantics { testTag = "attachment-menu-${item.name.lowercase()}" }
+                            .accessibilityFocusRequest(if (index == 0) focusRequest else null),
                     ) { label(highlighted == item) }
                 }
             }

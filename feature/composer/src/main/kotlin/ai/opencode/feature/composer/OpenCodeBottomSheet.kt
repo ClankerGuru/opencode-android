@@ -1,6 +1,9 @@
 package ai.opencode.feature.composer
 
+import android.view.KeyEvent
+import android.view.Window
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Box
@@ -44,6 +47,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.util.WeakHashMap
 
 private class SheetPresentation(val content: @Composable () -> Unit)
 private val LocalSheetPresentations = staticCompositionLocalOf<MutableList<SheetPresentation>?> { null }
@@ -176,8 +180,52 @@ private fun InWindowSheet(
             content = content,
         )
     }
+    EscapeHandler { scope.launch { sheetState.hide(); if (!sheetState.isVisible) dismiss() } }
     LaunchedEffect(sheetState) {
         snapshotFlow { sheetState.hasExpandedState }.first { it }
         sheetState.show()
+    }
+}
+
+private class EscapeHandlers(val original: Window.Callback) {
+    val handlers = mutableListOf<() -> Unit>()
+}
+
+private val escapeHandlers = WeakHashMap<Window, EscapeHandlers>()
+
+/**
+ * A hardware Escape calls [onEscape] while [enabled], as iOS dismisses menus and sheets on Esc;
+ * the newest handler takes it. Compose sends keys only to the focused node, and the sheet host
+ * clears focus while a non-focusable popup (the session ⋮ menu) never gets keys, so the window
+ * sees Escape first, ahead of its views. With no handler Escape goes on as before.
+ */
+@Composable
+fun EscapeHandler(enabled: Boolean = true, onEscape: () -> Unit) {
+    val window = LocalActivity.current?.window ?: return
+    val current by rememberUpdatedState(onEscape)
+    DisposableEffect(window, enabled) {
+        if (!enabled) return@DisposableEffect onDispose { }
+        val handler = { current() }
+        val entry = escapeHandlers.getOrPut(window) {
+            val original = window.callback
+            EscapeHandlers(original).also { entry ->
+                window.callback = object : Window.Callback by original {
+                    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+                        val top = entry.handlers.lastOrNull()
+                        if (top == null || event.keyCode != KeyEvent.KEYCODE_ESCAPE) return original.dispatchKeyEvent(event)
+                        if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) top()
+                        return true
+                    }
+                }
+            }
+        }
+        entry.handlers += handler
+        onDispose {
+            entry.handlers.remove(handler)
+            if (entry.handlers.isEmpty()) {
+                window.callback = entry.original
+                escapeHandlers.remove(window)
+            }
+        }
     }
 }

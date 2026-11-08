@@ -48,6 +48,7 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.isTraversalGroup
+import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.semantics.traversalIndex
@@ -146,8 +147,7 @@ fun PlusMenuGlassSurface(
                 origin = it.positionInRoot()
                 size = androidx.compose.ui.geometry.Size(it.size.width.toFloat(), it.size.height.toFloat())
                 rootHeight = it.findRootCoordinates().size.height.toFloat()
-            }
-            .clearAndSetSemantics {},
+            },
     ) {
         if (!hosted || !hasGeometry) return@Box
         val keyboardTop = if (imeBottom > 0) (rootHeight - imeBottom - origin.y).takeIf { it < size.height } else null
@@ -240,6 +240,8 @@ private fun PlusMenuWindowContent(
             Box(
                 Modifier
                     .fillMaxSize()
+                    // iOS `accessibilityHidden(true)`: TalkBack reaches only the menu.
+                    .clearAndSetSemantics {}
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onDismiss),
             )
         }
@@ -266,11 +268,19 @@ private fun PlusMenuWindowContent(
                         },
                     )
                 }
-                .semantics {
-                    isTraversalGroup = true
-                    testTag = "attachment-menu"
-                    traversalIndex = -1f
-                },
+                // iOS `accessibilityElement(children: .contain)` + `.isModal`, hidden unless open
+                // (`accessibilityHidden(!isOpen || (reduceMotion && !expanded))`). The screen hides
+                // what's behind it; announced as it appears, as TalkBack announces a dialog.
+                .then(
+                    if (interactive) {
+                        Modifier.semantics {
+                            isTraversalGroup = true
+                            testTag = "attachment-menu"
+                            traversalIndex = -1f
+                            paneTitle = "Attachment options"
+                        }
+                    } else Modifier.clearAndSetSemantics {},
+                ),
             shape = shape,
             color = MaterialTheme.colorScheme.surfaceContainer,
             tonalElevation = 3.dp,
@@ -287,6 +297,8 @@ private fun PlusMenuWindowContent(
                     entranceProgress = expanded.value,
                     menuWidth = with(density) { menu.width.toDp() },
                     reduceMotion = reduceMotion,
+                    // Once its rows have arrived, TalkBack's focus moves onto the top one.
+                    focusRequest = if (isOpen && expanded.value > 0.99f) generation else null,
                     onChoose = onChoose,
                     onPaste = onPaste,
                     modifier = Modifier
@@ -332,6 +344,7 @@ fun PlusMenuRowsHost(
     isDragging: Boolean = false,
     menuWidth: androidx.compose.ui.unit.Dp? = null,
     reduceMotion: Boolean = rememberReduceMotion(),
+    focusRequest: Any? = null,
 ) {
     AttachmentMenuRows(
         items = items,
@@ -344,6 +357,7 @@ fun PlusMenuRowsHost(
         entranceScale = if (reduceMotion) 1f else PlusMenuTunables.MENU_SCALE,
         largeMenu = true,
         menuWidth = menuWidth,
+        focusRequest = focusRequest,
         onChoose = { item -> if (isInteractive && !isDragging) onChoose(item) },
         onPaste = { if (isInteractive && !isDragging) onPaste() },
     )

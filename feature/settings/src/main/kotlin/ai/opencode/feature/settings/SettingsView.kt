@@ -16,6 +16,7 @@ import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.ThemeSharedKeys
+import ai.opencode.core.ui.accessibilityFocusRequest
 import ai.opencode.feature.settings.connection.ConnectionCard
 import ai.opencode.feature.settings.connection.ServerPage
 import ai.opencode.feature.settings.onboarding.OnboardingPlaygroundView
@@ -50,9 +51,13 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -67,6 +72,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.ui.NavDisplay
+import kotlinx.coroutines.delay
 
 /** Every Settings store page composables take (pages, not list rows, may hold a store). */
 typealias SettingsStore = StoreOf<SettingsFeature.State, SettingsFeature.Action>
@@ -264,23 +270,34 @@ private fun SettingsRootPage(store: SettingsStore) {
     val developerMode by remember { shared(SharedKeys.developerMode).flow }.collectAsState()
     val hideModels by remember { shared(ExperimentalFeature.hideModels.key).flow }.collectAsState()
     val notificationPermission by store.observe { it.notificationPermission }
-    val push = { page: SettingsPage -> store.send(SettingsFeature.Action.PagePushed(page)) }
+    val returnFocus = rememberSettingsReturnFocus(store, page = null)
+    val push = { page: SettingsPage ->
+        returnFocus.opened(page)
+        store.send(SettingsFeature.Action.PagePushed(page))
+    }
 
     SettingsPageScaffold(title = "Settings", store = store) {
         item(key = "connection", contentType = "connection") {
-            ConnectionCard(store, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            ConnectionCard(
+                store,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                onOpen = { returnFocus.opened(SettingsPage.Server) },
+                focusRequest = returnFocus.request(SettingsPage.Server),
+            )
         }
         // Preferences: Appearance, Sessions, Models, Voice and Notifications.
         settingsSection(key = "preferences") {
-            SettingsRow("Appearance", "paintpalette.fill", SettingsTint.Purple, value = appTheme.title) { push(SettingsPage.Appearance) }
-            SettingsDivider(inset = true)
-            SettingsRow("Sessions", "bubble.left.fill", SettingsTint.Blue) { push(SettingsPage.Sessions) }
-            if (ExperimentalFeature.hideModels.isActive(hideModels)) {
-                SettingsDivider(inset = true)
-                SettingsRow("Models", "cpu", SettingsTint.Teal) { push(SettingsPage.Models) }
+            SettingsRow("Appearance", "paintpalette.fill", SettingsTint.Purple, value = appTheme.title, modifier = returnFocus.on(SettingsPage.Appearance)) {
+                push(SettingsPage.Appearance)
             }
             SettingsDivider(inset = true)
-            SettingsRow("Voice", "waveform", SettingsTint.Indigo, value = if (voiceModeEnabled) "On" else "Off") {
+            SettingsRow("Sessions", "bubble.left.fill", SettingsTint.Blue, modifier = returnFocus.on(SettingsPage.Sessions)) { push(SettingsPage.Sessions) }
+            if (ExperimentalFeature.hideModels.isActive(hideModels)) {
+                SettingsDivider(inset = true)
+                SettingsRow("Models", "cpu", SettingsTint.Teal, modifier = returnFocus.on(SettingsPage.Models)) { push(SettingsPage.Models) }
+            }
+            SettingsDivider(inset = true)
+            SettingsRow("Voice", "waveform", SettingsTint.Indigo, value = if (voiceModeEnabled) "On" else "Off", modifier = returnFocus.on(SettingsPage.Voice)) {
                 push(SettingsPage.Voice)
             }
             notificationPermission?.let { permission ->
@@ -290,11 +307,12 @@ private fun SettingsRootPage(store: SettingsStore) {
                     "bell.badge.fill",
                     SettingsTint.Red,
                     value = if (permission == NotificationPermission.Enabled) "On" else "Off",
+                    modifier = returnFocus.on(SettingsPage.Notifications),
                 ) { push(SettingsPage.Notifications) }
             }
         }
         settingsSection(key = "whats-new") {
-            SettingsRow("What’s New", "sparkles", SettingsTint.Orange) { push(SettingsPage.WhatsNew) }
+            SettingsRow("What’s New", "sparkles", SettingsTint.Orange, modifier = returnFocus.on(SettingsPage.WhatsNew)) { push(SettingsPage.WhatsNew) }
         }
         settingsSection(
             key = "experimental",
@@ -312,14 +330,49 @@ private fun SettingsRootPage(store: SettingsStore) {
                 }
             },
         ) {
-            ExperimentalSettingsRow { push(SettingsPage.Experimental()) }
+            ExperimentalSettingsRow(returnFocus.on(SettingsPage.Experimental())) { push(SettingsPage.Experimental()) }
             SettingsDivider(inset = true)
-            SettingsRow("Developer", "hammer.fill", SettingsTint.Teal, value = if (developerMode) "On" else "Off") {
+            SettingsRow("Developer", "hammer.fill", SettingsTint.Teal, value = if (developerMode) "On" else "Off", modifier = returnFocus.on(SettingsPage.Developer)) {
                 push(SettingsPage.Developer)
             }
         }
     }
 }
+
+/**
+ * QA U-02: when NavigationStack pops a page, VoiceOver goes back to the row that pushed it;
+ * TalkBack landed on Back instead. A page remembers which of its rows pushed the page above it
+ * ([opened]), and once it's the top page again that row takes TalkBack's focus back ([on], `:core`'s
+ * `accessibilityFocusRequest`, a no-op without touch exploration). The row is forgotten soon after,
+ * so the list scrolling it away and back doesn't move the focus again.
+ */
+@Stable
+internal class SettingsReturnFocus(private val opener: MutableState<String?>, private val returning: String?) {
+    fun opened(page: SettingsPage) {
+        opener.value = page.toString()
+    }
+
+    fun request(page: SettingsPage): Any? = page.toString().takeIf { it == returning }
+
+    fun on(page: SettingsPage): Modifier = Modifier.accessibilityFocusRequest(request(page))
+}
+
+/** [SettingsReturnFocus] for the page showing [page] (null: Settings' root). */
+@Composable
+internal fun rememberSettingsReturnFocus(store: SettingsStore, page: SettingsPage?): SettingsReturnFocus {
+    val opener = rememberSaveable { mutableStateOf<String?>(null) }
+    val isTop by store.observe { it.path.lastOrNull() == page }
+    val returning = opener.value.takeIf { isTop }
+    LaunchedEffect(returning) {
+        if (returning == null) return@LaunchedEffect
+        delay(SETTINGS_RETURN_FOCUS_HOLD_MS)
+        opener.value = null
+    }
+    return remember(opener, returning) { SettingsReturnFocus(opener, returning) }
+}
+
+/** How long a returning row keeps its focus request: well past the two frames it waits before moving TalkBack. */
+private const val SETTINGS_RETURN_FOCUS_HOLD_MS = 1_000L
 
 /** Shared body for pages whose list sits under [SettingsPageScaffold]. */
 internal fun LazyListScope.footerOnly(key: Any, content: @Composable ColumnScope.() -> Unit) {

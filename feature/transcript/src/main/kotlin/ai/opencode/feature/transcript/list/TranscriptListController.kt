@@ -54,6 +54,8 @@ class TranscriptListController(
     val disclosure: TranscriptDisclosureState = TranscriptDisclosureState(),
     /** Following or browsing; the list restores it with the reader's row when the activity is recreated. */
     val behavior: TranscriptScrollBehavior = TranscriptScrollBehavior(),
+    /** The list's one selection across a reply's text; the list restores it when the activity is recreated. */
+    val replySelection: TranscriptReplySelection = TranscriptReplySelection(),
 ) {
     // Wiring the composable refreshes every composition.
     var send: (TranscriptAction) -> Unit = {}
@@ -761,6 +763,11 @@ class TranscriptListController(
         }
     }
 
+    /** A restored reader's row was just put back by its key: the reading row held from before no longer applies. */
+    fun forgetReadingAnchor() {
+        readingAnchor = null
+    }
+
     private fun captureReadingAnchor() {
         if (readingAnchor != null || (behavior.mode != TranscriptScrollBehavior.Mode.Browsing && !isUserGestureActive)) return
         val visible = lastLayout?.visibleItemsInfo ?: return
@@ -1113,9 +1120,6 @@ class TranscriptListController(
     }
 
     // MARK: Reply selection (iOS `TranscriptListViewController+TextSelection`)
-
-    /** The list's one selection across a reply's text. */
-    val replySelection = TranscriptReplySelection()
 
     /**
      * iOS `selectionHoldsFollowing`: a reader at the end who selects browses while it lasts (new

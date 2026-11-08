@@ -217,6 +217,9 @@ fun ComposerMorphSurface(
         Box(
             Modifier
                 .fillMaxSize()
+                // iOS `accessibilityHidden(true)`. Ahead of the clickable: after it, the clearing
+                // would leave the click's own semantics, a full-screen "Unlabelled" button.
+                .clearAndSetSemantics {}
                 .then(
                     if (morph.isOpen) {
                         Modifier.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onDismiss)
@@ -224,8 +227,7 @@ fun ComposerMorphSurface(
                         Modifier
                     },
                 )
-                .excludedFromDrawerPan(morph.isOpen)
-                .clearAndSetSemantics {},
+                .excludedFromDrawerPan(morph.isOpen),
         )
         // The backdrop: everything above the sheet dims, growing with the morph; it takes no touches.
         val strength = progress.coerceIn(0f, 1f)
@@ -304,8 +306,8 @@ fun ComposerMorphSurface(
                     Box(
                         Modifier
                             .fillMaxSize()
-                            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
-                            .clearAndSetSemantics {},
+                            .clearAndSetSemantics {}
+                            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {},
                     )
                 }
             }
@@ -385,8 +387,8 @@ fun ComposerMorphSurface(
                         Box(
                             Modifier
                                 .matchParentSize()
-                                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
-                                .clearAndSetSemantics {},
+                                .clearAndSetSemantics {}
+                                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {},
                         )
                     }
                 }

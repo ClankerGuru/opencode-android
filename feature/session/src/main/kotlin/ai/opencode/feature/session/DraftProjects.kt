@@ -75,7 +75,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
@@ -310,7 +309,9 @@ private fun DraftProjectRow(
             .padding(start = 17.dp, end = 16.dp)
             .testTag(tag)
             .clearAndSetSemantics {
-                selected = chosen
+                // iOS's `.isSelected` trait as words: `selected` would make the row checkable,
+                // and TalkBack would offer "double-tap to toggle" on a row that picks.
+                if (chosen) stateDescription = "Selected"
                 contentDescription = title
             },
         verticalAlignment = Alignment.CenterVertically,
@@ -512,8 +513,8 @@ private fun ProjectList(
                             .padding(horizontal = ProjectPickerTunables.rowInset, vertical = ProjectPickerTunables.rowPadding)
                             .clearAndSetSemantics {
                                 contentDescription = project.name
-                                stateDescription = project.directory
-                                selected = chosen
+                                // iOS's `.isSelected` trait as words, not a checkable `selected`.
+                                stateDescription = listOfNotNull(if (chosen) "Selected" else null, project.directory).joinToString(", ")
                                 role = Role.Button
                             },
                         verticalAlignment = Alignment.CenterVertically,

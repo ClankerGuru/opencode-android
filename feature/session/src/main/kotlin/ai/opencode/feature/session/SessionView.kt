@@ -67,6 +67,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -98,11 +99,13 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -111,8 +114,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
@@ -153,10 +158,12 @@ fun SessionView(
     onCatchUpOpen: (() -> Unit)? = null,
     hostedCall: VoiceStoreOf? = null,
 ) {
-    val scrollEdgeBridge = remember { SessionScrollEdgeBridge() }
+    val scrollEdgeBridge = rememberSaveable(saver = SessionScrollEdgeBridge.Saver) { SessionScrollEdgeBridge() }
     val backgroundWorkAnchor = rememberBackgroundWorkAnchor()
     // What the composer shares with the screen around it (the capsule's place, jump to latest, the + menu).
-    val composerHost = remember { SessionComposerHost() }
+    // The pill a session opens with (a cold launch's reconnect) is there from its first frame, as
+    // iOS's is, rather than rising in over the last row a frame later.
+    val composerHost = remember { SessionComposerHost().apply { connection = listContext.connection } }
     val importer = rememberSessionAttachmentImporter(store)
     val colors = OpenCodeTheme.colors
     val density = LocalDensity.current
@@ -165,7 +172,8 @@ fun SessionView(
     var rootOffset by remember { mutableStateOf(Offset.Zero) }
 
     // The header controls' laid-out height (dp); the backdrop follows it.
-    var headerHeight by remember { mutableFloatStateOf(SessionHeaderStyle.DEFAULT_HEADER_HEIGHT) }
+    // Saved with the composer's height (the bridge), so a recreated activity's first frame has the transcript's top inset.
+    var headerHeight by rememberSaveable { mutableFloatStateOf(SessionHeaderStyle.DEFAULT_HEADER_HEIGHT) }
     var showsBackgroundWork by remember { mutableStateOf(false) }
 
     val headerEnvironment = SessionHeaderStyle.Environment(
@@ -223,7 +231,8 @@ fun SessionView(
     val identity by store.observe { it.transcriptIdentity }
     // Read in composition, not in the SideEffect: SideEffect reads aren't observed, so an import
     // finishing would leave the host's copy stale.
-    val isImportingAttachments = importer.isLoadingImages || importer.isLoadingFiles
+    val isImportingImages = importer.isLoadingImages
+    val isImportingAttachments = isImportingImages || importer.isLoadingFiles
 
     SideEffect {
         composerHost.backgroundWorkAnchor = backgroundWorkAnchor
@@ -233,6 +242,7 @@ fun SessionView(
         composerHost.onJumpToLatest = { scrollEdgeBridge.jumpRequest += 1 }
         composerHost.borrowedDrag = scrollEdgeBridge.borrowedDrag
         composerHost.isImportingAttachments = isImportingAttachments
+        composerHost.isImportingImages = isImportingImages
         composerHost.importer = importer
         composerHost.headerHeight = headerHeight
         if (composerHost.pendingAttachmentsRow == null) composerHost.pendingAttachmentsRow = { expanded -> SessionPendingAttachments(store, composerHost.sendTransition.images, expanded) }
@@ -272,15 +282,26 @@ fun SessionView(
                 composerHost.dismissComposerKeyboard()
                 if (photoSheet.attachmentMenu != AttachmentMenuPhase.Closed) photoSheet.closeAttachmentMenu()
             },
+            // iOS: the + menu is an `.isModal` container in its own window, so VoiceOver reaches
+            // nothing beneath it. TalkBack has no modal, so the screen under it (the + too) hides.
+            modifier = if (photoSheet.plusMenuIsOpen) Modifier.clearAndSetSemantics {} else Modifier,
         ) {
-            Box(Modifier.fillMaxSize().background(colors.canvas)) {
-                if (errorMessage != null) {
-                    LoadFailure(errorMessage.orEmpty(), onRetry = { store.send(Action.Task) })
-                } else {
-                    // A draft's transcript carries on into the session it became, so the first
-                    // send's bubble and Working never remount mid-flight.
-                    key(identity) {
-                        SessionTranscriptView(store, scrollEdgeBridge, resolvedHeader.transcriptTop, holdsWorking = listContext.connection != null)
+            // TalkBack reads the header, then the transcript, then the composer, as VoiceOver reads
+            // iOS's top overlay first; the header draws over the transcript, so it came after it.
+            Box(Modifier.fillMaxSize().background(colors.canvas).semantics { isTraversalGroup = true }) {
+                ComposedAfterComposer {
+                    // Read while measuring, after the header has laid out: the first frame rests the
+                    // transcript under the header's real height, not the default's.
+                    val measuredHeader = headerEnvironment.copy(headerHeight = headerHeight)
+                    val transcriptTop = remember(measuredHeader) { HeaderBlurTunables.resolved(measuredHeader).transcriptTop }
+                    if (errorMessage != null) {
+                        LoadFailure(errorMessage.orEmpty(), onRetry = { store.send(Action.Task) })
+                    } else {
+                        // A draft's transcript carries on into the session it became, so the first
+                        // send's bubble and Working never remount mid-flight.
+                        key(identity) {
+                            SessionTranscriptView(store, scrollEdgeBridge, transcriptTop, holdsWorking = listContext.connection != null)
+                        }
                     }
                 }
                 SessionHeaderBackdrop(
@@ -289,6 +310,7 @@ fun SessionView(
                     header = resolvedHeader.header,
                     safeTop = WindowInsets.statusBarsIgnoringVisibility.inContainer().asPaddingValues().calculateTopPadding(),
                     scrolledUnderHeader = { scrollEdgeBridge.scrolledUnderHeader },
+                    transcriptPlaced = { scrollEdgeBridge.hasPlacedTranscript },
                     modifier = Modifier.align(Alignment.TopCenter),
                 )
                 // Behind the composer, so its × stays reachable: a tap anywhere else or a downward
@@ -301,7 +323,13 @@ fun SessionView(
                     onBack = onBack,
                     onCatchUpOpen = onCatchUpOpen,
                     onHeaderHeight = { headerHeight = it.roundToInt().toFloat() },
-                    modifier = Modifier.align(Alignment.TopCenter).windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility),
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility)
+                        .semantics {
+                            isTraversalGroup = true
+                            traversalIndex = -1f
+                        },
                 )
                 // One Picker's surface grows out of the composer, over the transcript and under the composer.
                 SessionOnePickerBackdrop(composerHost, Modifier.matchParentSize())
@@ -581,7 +609,7 @@ private fun SessionAttachmentMenu(
     Box(Modifier.fillMaxSize().then(if (sheet.plusMenuRests) Modifier.clearAndSetSemantics {} else Modifier)) {
         PlusMenuGlassSurface(
             anchors = host.attachmentAnchors,
-            isOpen = phase == AttachmentMenuPhase.Menu && (!sheet.morph.isShown || sheet.menuTakesBack),
+            isOpen = sheet.plusMenuIsOpen,
             handsOff = sheet.morph.isShown && !sheet.menuTakesBack,
             items = items,
             highlighted = press.highlighted,
@@ -762,6 +790,23 @@ internal fun shareText(context: android.content.Context, text: String) {
     }
 }
 
+/**
+ * The transcript, composed while the screen measures, after the composer and the header: the
+ * parent Box measures a `matchParentSize` child after its other children, and their size callbacks
+ * have written [SessionScrollEdgeBridge.composerHeight] and the header's height by then. So the
+ * list's first frame already rests between them (on a cold launch its bottom inset used to be 0 and
+ * its top the default header's for the first frames: the last row sat under the composer, then the
+ * list jumped), as iOS lays the composer out before the list. Placement, and so drawing order,
+ * stays the parent's child order.
+ */
+@Composable
+private fun BoxScope.ComposedAfterComposer(content: @Composable BoxScope.() -> Unit) {
+    SubcomposeLayout(Modifier.matchParentSize()) { constraints ->
+        val placeables = subcompose(Unit) { Box(Modifier.fillMaxSize(), content = content) }.map { it.measure(constraints) }
+        layout(constraints.maxWidth, constraints.maxHeight) { placeables.forEach { it.place(0, 0) } }
+    }
+}
+
 /** iOS `ContentUnavailableView` for a session that couldn't load. */
 @Composable
 private fun LoadFailure(message: String, onRetry: () -> Unit) {
@@ -804,10 +849,18 @@ private fun SessionSheets(store: StoreOf<State, Action>, listContext: SessionLis
     val activePicker by store.observe { it.activePicker }
     val dismiss = { store.send(Action.Binding(BindingAction.ActivePicker(null))) }
 
-    // iOS `onDismiss`: whichever sheet leaves, the Project sheet's folders reset.
+    // iOS `onDismiss`: whichever sheet leaves, the Project sheet's folders reset, and the
+    // keyboard the model chip put away comes back.
+    val panels = LocalSessionComposerHost.current?.modelPanels
     var shownPicker by remember { mutableStateOf(activePicker) }
     LaunchedEffect(activePicker) {
-        if (shownPicker != null && shownPicker != activePicker) store.send(Action.ProjectPickerDismissed)
+        if (shownPicker != null && shownPicker != activePicker) {
+            store.send(Action.ProjectPickerDismissed)
+            if (panels?.sheetRestoresFocus == true) {
+                panels.sheetRestoresFocus = false
+                panels.restoreFocusAfterModelList(store.state.taskIdentity)
+            }
+        }
         shownPicker = activePicker
     }
 

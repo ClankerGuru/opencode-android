@@ -11,6 +11,7 @@ import ai.opencode.core.ui.RollingNumber
 import ai.opencode.core.ui.RollingNumberAlignment
 import ai.opencode.core.ui.RollingNumberStyle
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.core.ui.accessibilityFocusRequest
 import ai.opencode.core.ui.openCodeTapTarget
 import ai.opencode.feature.settings.ConnectionStatus
 import ai.opencode.feature.settings.SettingsButtonRow
@@ -147,7 +148,14 @@ private fun RunWhileResumed(monitor: ConnectionMonitor) {
  * the server refused the saved password, which no retry can fix.
  */
 @Composable
-fun ConnectionCard(store: SettingsStore, modifier: Modifier = Modifier) {
+fun ConnectionCard(
+    store: SettingsStore,
+    modifier: Modifier = Modifier,
+    /** Called as the card opens the server page, before it's pushed. */
+    onOpen: () -> Unit = {},
+    /** Each new non-null value moves TalkBack's focus onto the card (`accessibilityFocusRequest`). */
+    focusRequest: Any? = null,
+) {
     val server by store.observe { it.server }
     val status by store.observe { it.connectionStatus }
     val switchingTo by store.observe { it.switchingTo }
@@ -158,7 +166,11 @@ fun ConnectionCard(store: SettingsStore, modifier: Modifier = Modifier) {
     RunWhileResumed(monitor)
     ConnectionCardContent(
         monitor = monitor,
-        onOpen = { store.send(SettingsFeature.Action.PagePushed(SettingsPage.Server)) },
+        onOpen = {
+            onOpen()
+            store.send(SettingsFeature.Action.PagePushed(SettingsPage.Server))
+        },
+        focusRequest = focusRequest,
         onRetry = { monitor.retry { store.send(SettingsFeature.Action.Delegate(SettingsDelegate.RetryConnection)) } },
         onEditServer = { store.send(SettingsFeature.Action.Delegate(SettingsDelegate.EditServer(current))) },
         modifier = modifier,
@@ -169,6 +181,7 @@ fun ConnectionCard(store: SettingsStore, modifier: Modifier = Modifier) {
 private fun ConnectionCardContent(
     monitor: ConnectionMonitor,
     onOpen: () -> Unit,
+    focusRequest: Any?,
     onRetry: () -> Unit,
     onEditServer: () -> Unit,
     modifier: Modifier = Modifier,
@@ -182,7 +195,11 @@ private fun ConnectionCardContent(
     val wellShape = RoundedCornerShape(ConnectionCardMetrics.cornerRadius - ConnectionCardMetrics.boxInset)
     val wellFill = if (colors.isDark) Color.Black.copy(alpha = if (colors.highContrast) 0.5f else 0.32f) else colors.groupedCanvas
     val wellEdge = (if (colors.isDark) Color.White else Color.Black).copy(alpha = if (colors.highContrast) 0.16f else 0.06f)
-    val accessibilityValue = listOf(presentation.spokenStatus, monitor.server.host, monitor.route.rawValue).joinToString(", ")
+    // Android divergence: iOS's value carries the round trip, and VoiceOver leaves a focused element's
+    // changing value unspoken. TalkBack re-reads the focused card whenever anything it speaks changes
+    // (state, label or a merged child), so the card speaks the status word, not the live milliseconds:
+    // a new word is still read; the number stays on screen and on the server page's Status row.
+    val accessibilityValue = listOf(presentation.spokenWord, monitor.server.host, monitor.route.rawValue).joinToString(", ")
 
     // Where the inline action sits: reserved after the status, the real button drawn over the card
     // (outside its click and its merged semantics), as iOS's `RetryReservation`.
@@ -200,6 +217,8 @@ private fun ConnectionCardContent(
                 .clip(cardShape)
                 .background(colors.groupedCard)
                 .clickable(interactionSource = interaction, indication = ripple(), role = Role.Button, onClick = onOpen)
+                // Ahead of the clearing below, which would drop its marker.
+                .accessibilityFocusRequest(focusRequest)
                 .clearAndSetSemantics {
                     contentDescription = monitor.name
                     stateDescription = accessibilityValue
@@ -389,6 +408,9 @@ data class ConnectionStatusPresentation(
             if (code != null) return "$word, HTTP $code"
             return milliseconds?.let { "$word, $it milliseconds" } ?: word
         }
+
+    /** [spokenStatus] without the round trip, for the card (see `ConnectionCard`). */
+    val spokenWord: String get() = code?.let { "$word, HTTP $it" } ?: word
 
     /** The word, with a refused sign-in's status code. */
     val text: String get() = code?.let { "$word · $it" } ?: word
