@@ -1,6 +1,8 @@
 package ai.opencode.feature.drawer.catchup
 
 import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionPhase
+import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeIconButton
 import ai.opencode.core.ui.OpenCodeIconButtonStyle
@@ -81,7 +83,8 @@ fun CatchUpChrome(
     SideEffect { if (remaining > 0) displayedRemaining = remaining }
     val shownRemaining = if (remaining > 0) remaining else displayedRemaining
     val finished = remaining == 0
-    val spec = if (reducedMotion) Motion.easeOut<Float>(0.2) else Motion.easeOut(0.22)
+    // The chrome leaves on `microOut` (iOS 03adf07a), a fade under Reduce Motion.
+    val spec = MotionRole.MicroIn.animation<Float>(if (finished) MotionPhase.Exit else MotionPhase.Enter, reducedMotion)
     val finishedProgress by animateFloatAsState(if (finished) 1f else 0f, spec, label = "CatchUpChromeFinish")
 
     Box(modifier.fillMaxSize()) {

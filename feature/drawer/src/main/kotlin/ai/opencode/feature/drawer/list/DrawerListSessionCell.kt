@@ -1,6 +1,7 @@
 package ai.opencode.feature.drawer.list
 
-import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.MotionRole
+import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
@@ -16,7 +17,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -75,7 +75,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.roundToInt
 
 /*
  * Port of iOS `DrawerListSessionCell.swift`: a drawer session row. The project tile, the fading
@@ -94,6 +93,8 @@ class DrawerListRowActions(
     val select: () -> Unit,
     val pressed: () -> Unit,
     val menu: () -> List<DrawerRowMenuItem>,
+    /** The list is scrolling or flinging: a finger on it isn't a press. */
+    val isListMoving: () -> Boolean,
     /** The held finger moved: start the pin drag at this list `y` (dp). */
     val beginDrag: (fingerY: Float) -> Unit,
     val moveDrag: (fingerY: Float, uptimeMillis: Long) -> Unit,
@@ -119,9 +120,6 @@ interface DrawerListRevealValues {
 object DrawerListSessionCell {
     /** The status slot (ring or dot). */
     val indicatorSize: Dp = 18.dp
-
-    /** iOS `.snappy(duration: 0.25)`: the status coming and going, and the title making room. */
-    val statusSpring = MotionSpring(0.25, 0.15)
 
     /** iOS `.systemOrange`, the dot of a session that needs your input. */
     fun attentionColor(isDark: Boolean): Color = if (isDark) Color(0xFFFF9F0A) else Color(0xFFFF9500)
@@ -162,30 +160,33 @@ fun DrawerListSessionCell(
     }
     val titleStyle = DrawerListFonts.font(DrawerTunables.rowFont.font, weight)
 
-    // The status comes and goes on a snappy spring for the same session; another row's arrives in place.
+    // The dot and the ring arrive on `MotionRole.MicroIn` and leave on its exit (iOS 03adf07a),
+    // cross-fading under Reduce Motion, for the same session; another row's arrives in place.
     val previousID = remember { arrayOf(row.session.id) }
-    val animateStatus = previousID[0] == row.session.id && !row.reducedMotion
+    val animateStatus = previousID[0] == row.session.id
     previousID[0] = row.session.id
-    val statusSpec = if (animateStatus) DrawerListSessionCell.statusSpring.spec<Float>() else snap()
+    val statusPhase = if (row.indicator == Indicator.none) MotionPhase.Exit else MotionPhase.Enter
+    val statusSpec = if (animateStatus) MotionRole.MicroIn.animation<Float>(statusPhase, row.reducedMotion) else snap()
     val ringAlpha by animateFloatAsState(if (row.indicator == Indicator.running) 1f else 0f, statusSpec, label = "ring")
     val dotAlpha by animateFloatAsState(
         if (row.indicator == Indicator.attention || row.indicator == Indicator.unread) 1f else 0f,
         statusSpec,
         label = "dot",
     )
+    // The title makes room for the status on the indicator's own spring.
     val statusInset by animateDpAsState(
         if (row.indicator == Indicator.none) 0.dp else DrawerListSessionCell.indicatorSize + DrawerTunables.statusGap,
-        if (animateStatus) DrawerListSessionCell.statusSpring.spec() else snap(),
+        if (animateStatus && !row.reducedMotion) MotionRole.MicroIn.animation() else snap(),
         label = "status-inset",
     )
 
-    // The card-edge fade: on with the first dp of slide, eased in over `revealFadeIn`.
+    // The card-edge fade: on with the first dp of slide, reaching full strength on `MotionRole.Swap`.
     val masking by remember(row.reducedMotion) { derivedStateOf { DrawerRevealFade.masks(row.reducedMotion, reveal.offset) } }
     val veil = remember { Animatable(1f) }
     LaunchedEffect(masking) {
-        if (masking && DrawerTunables.revealFadeIn > 0) {
+        if (masking) {
             veil.snapTo(1f)
-            veil.animateTo(0f, tween((DrawerTunables.revealFadeIn * 1000).roundToInt(), easing = ai.opencode.core.motion.Motion.EaseOut))
+            veil.animateTo(0f, MotionRole.Swap.animation())
         } else {
             veil.snapTo(0f)
         }
@@ -193,8 +194,8 @@ fun DrawerListSessionCell(
 
     val held = hold.isHeld || row.isLifted
     val raisedSurface = if (colors.isDark) MaterialTheme.colorScheme.surfaceContainerHigh else colors.canvas
-    // The raised surface comes down over `holdSettle` once a hold lets go (iOS `settleAfterMenu`),
-    // and a dropped row puts its surface down over `pinLandFade`, shadowless (iOS `land()`).
+    // The raised surface leaves on swap's exit once a hold lets go (iOS `settleAfterMenu`), and a
+    // dropped row puts its surface down the same way, shadowless (iOS `land()`).
     val surface = remember { Animatable(0f) }
     val wasLifted = remember { booleanArrayOf(false) }
     var landingSurface by remember { mutableStateOf(false) }
@@ -208,8 +209,7 @@ fun DrawerListSessionCell(
         val landed = wasLifted[0]
         wasLifted[0] = false
         landingSurface = landed
-        val seconds = if (landed) DrawerTunables.pinLandFade.value else DrawerTunables.holdSettle.value
-        surface.animateTo(0f, tween((seconds * 1000).roundToInt(), easing = ai.opencode.core.motion.Motion.EaseOut))
+        surface.animateTo(0f, MotionRole.Swap.animation(MotionPhase.Exit))
         landingSurface = false
     }
     val cornerRadius = DrawerMetrics.rowCornerRadius
@@ -283,6 +283,7 @@ fun DrawerListSessionCell(
                         select = { currentActions.select() },
                         pressed = { currentActions.pressed() },
                         menu = { currentActions.menu() },
+                        isListMoving = { currentActions.isListMoving() },
                         beginDrag = { currentActions.beginDrag(it.y) },
                         moveDrag = { point, time -> currentActions.moveDrag(point.y, time) },
                         endDrag = { point, cancelled -> currentActions.endDrag(point.x, point.y, cancelled) },

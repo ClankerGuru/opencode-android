@@ -6,8 +6,7 @@ import ai.opencode.feature.drawer.HomeFeature.State.Indicator
 import ai.opencode.feature.drawer.ServerSwapTarget
 import ai.opencode.feature.drawer.ServerSwitchNote
 import ai.opencode.feature.drawer.drawerListFooter
-import ai.opencode.feature.drawer.pinnedSessions
-import ai.opencode.feature.drawer.recentSessions
+import ai.opencode.feature.drawer.drawerSessions
 import ai.opencode.feature.drawer.statusSnapshot
 import ai.opencode.feature.drawer.style.DrawerSectionHeaderKind
 import ai.opencode.server.OpenCodeServer
@@ -192,8 +191,10 @@ data class DrawerListModel(
                 if (state.deletionError != null) add(DrawerListItem.DeletionError)
             }
 
-            val pinned = state.pinnedSessions
-            val recents = state.recentSessions
+            // One pass for both lists (iOS f5636460).
+            val sessions = state.drawerSessions
+            val pinned = sessions.pinned
+            val recents = sessions.recents
             val rows = LinkedHashMap<String, DrawerListRow>()
             val headerFollows = HashMap<DrawerSectionHeaderKind, Boolean>()
 

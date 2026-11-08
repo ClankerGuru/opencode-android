@@ -2,7 +2,8 @@ package ai.opencode.feature.drawer.switcher
 
 import ai.opencode.core.motion.transitionBlur
 
-import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.AmbientTimeline
+import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.experiments.key
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.sharing.shared
@@ -25,12 +26,6 @@ import ai.opencode.server.ServerSharedKeys
 import ai.opencode.server.friendlyName
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -123,9 +118,10 @@ fun ServerFlowTitle(
         credentialsRejected = credentialsRejected,
     )
     val previous = remember { mutableStateOf<ServerSwapTarget?>(null) }
+    val reducedMotion = rememberReduceMotion()
     SideEffect {
-        // iOS `.onChange(of: target, initial: true) { old, new in motion.sync(new, animated: old != new) }`.
-        motion.sync(target, animated = previous.value != null && previous.value != target)
+        // iOS `.onChange(of: target, initial: true) { old, new in motion.sync(new, animated: old != new, reduceMotion:) }`.
+        motion.sync(target, animated = previous.value != null && previous.value != target, reduceMotion = reducedMotion)
         previous.value = target
     }
     val accessibilityValue = if (switchingTo == null) presentation.accessibilityValue else "Connecting"
@@ -283,7 +279,7 @@ private fun Label(
         if (chevron) {
             val chevronColor by animateColorAsState(
                 if (presentation.isDimmed && !colors.highContrast) colors.tertiaryText else colors.secondaryText,
-                tween(DrawerTitle.CROSS_FADE_MILLIS, easing = Motion.EaseInOut),
+                MotionRole.Swap.animation(reduceMotion = rememberReduceMotion()),
                 label = "server-flow-chevron",
             )
             OpenCodeIcon(SFSymbol.ChevronDown, contentDescription = null, size = chevronSize, tint = chevronColor)
@@ -351,7 +347,7 @@ private fun Name(text: String, presentation: DrawerTitle.Presentation, limit: Dp
     val colors = OpenCodeTheme.colors
     val color by animateColorAsState(
         if (presentation.isDimmed) colors.secondaryText else colors.text,
-        tween(DrawerTitle.CROSS_FADE_MILLIS, easing = Motion.EaseInOut),
+        MotionRole.Swap.animation(reduceMotion = rememberReduceMotion()),
         label = "server-flow-name",
     )
     Text(
@@ -366,8 +362,9 @@ private fun Name(text: String, presentation: DrawerTitle.Presentation, limit: Dp
 
 /**
  * iOS `ServerFlowUnderline`: the line under the name while a server connects. A sweep runs along it
- * (1.3 s, the iOS bezier 0.4/0/0.2/1, which is `FastOutSlowInEasing`), and it fills when the server
- * answers. Reduce Motion holds the sweep. Hidden from TalkBack.
+ * once per `AmbientClock.sweepPeriod` (in step with every other sweep; eased by the iOS bezier
+ * 0.4/0/0.2/1, which is `FastOutSlowInEasing`), and it fills when the server answers. Reduce Motion
+ * holds the sweep. Hidden from TalkBack.
  */
 @Composable
 fun ServerFlowUnderline(presence: Float, fill: Float, reducedMotion: Boolean, modifier: Modifier = Modifier) {
@@ -375,32 +372,23 @@ fun ServerFlowUnderline(presence: Float, fill: Float, reducedMotion: Boolean, mo
     val colors = OpenCodeTheme.colors
     val track = colors.tertiaryText.copy(alpha = colors.tertiaryText.alpha * 0.5f)
     val ink = colors.secondaryText
-    val sweeps = !reducedMotion && fill < 1f
-    val phase = if (sweeps) {
-        val transition = rememberInfiniteTransition(label = "server-flow-underline")
-        val value by transition.animateFloat(
-            0f, 1f,
-            infiniteRepeatable(tween(1300, easing = LinearEasing), RepeatMode.Restart),
-            label = "server-flow-sweep",
-        )
-        FastOutSlowInEasing.transform(value)
-    } else {
-        0f
-    }
-    Canvas(
-        modifier
-            .fillMaxWidth()
-            .height(2.dp)
-            .alpha(presence)
-            .clipToBounds()
-            .clearAndSetSemantics {},
-    ) {
-        val radius = CornerRadius(size.height / 2, size.height / 2)
-        drawRoundRect(track, cornerRadius = radius)
-        if (!reducedMotion) {
-            val segment = size.width * 0.32f
-            drawRoundRect(ink, topLeft = Offset(segment * (-1 + 4.2f * phase), 0f), size = Size(segment, size.height), cornerRadius = radius)
+    AmbientTimeline(isActive = fill < 1f, reduceMotion = reducedMotion) { sample ->
+        val phase = FastOutSlowInEasing.transform(sample.sweep.toFloat())
+        Canvas(
+            modifier
+                .fillMaxWidth()
+                .height(2.dp)
+                .alpha(presence)
+                .clipToBounds()
+                .clearAndSetSemantics {},
+        ) {
+            val radius = CornerRadius(size.height / 2, size.height / 2)
+            drawRoundRect(track, cornerRadius = radius)
+            if (!reducedMotion && !sample.isSettled) {
+                val segment = size.width * 0.32f
+                drawRoundRect(ink, topLeft = Offset(segment * (-1 + 4.2f * phase), 0f), size = Size(segment, size.height), cornerRadius = radius)
+            }
+            drawRoundRect(ink, size = Size(size.width * fill.coerceAtLeast(0.0001f), size.height), cornerRadius = radius)
         }
-        drawRoundRect(ink, size = Size(size.width * fill.coerceAtLeast(0.0001f), size.height), cornerRadius = radius)
     }
 }

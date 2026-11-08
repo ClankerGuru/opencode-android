@@ -1,8 +1,11 @@
 package ai.opencode.feature.drawer.list
 
 import ai.opencode.core.motion.MotionFrameAction
+import ai.opencode.core.motion.MotionPhase
+import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.motion.SpringSolver
 import ai.opencode.core.motion.motionFrameLoop
+import ai.opencode.core.motion.retarget
 import ai.opencode.core.tuning.AnimationTimeScale
 import ai.opencode.feature.drawer.style.DrawerMetrics
 import ai.opencode.feature.drawer.style.DrawerTunables
@@ -155,7 +158,7 @@ class DrawerPinDrag {
 
     /**
      * How lifted the dragged row is, 0…1 (iOS `DrawerLiftedRow.lift`): it grows by
-     * [DrawerTunables.pinLiftScale] on [DrawerTunables.pinLiftSpring] as it lifts, and settles
+     * [DrawerTunables.pinLiftScale] on `MotionRole.MicroIn` as it lifts, and settles
      * back as it lands.
      */
     var liftProgress: Float by mutableFloatStateOf(0f)
@@ -193,7 +196,7 @@ class DrawerPinDrag {
     private val samples = ArrayDeque<Pair<Long, Float>>()
 
     /** The lift's spring (iOS `DrawerLiftedRow.lift`). */
-    private var liftSpring = SpringSolver.of(duration = 0.15, value = 0.0)
+    private var liftSpring = SpringSolver(MotionRole.MicroIn, value = 0.0, target = 0.0)
     /**
      * Where the finger holds the lifted row, from its centre. iOS centres its hidden cell on the
      * finger under the system's platter; Android shows the row itself, so it keeps the grip.
@@ -217,8 +220,8 @@ class DrawerPinDrag {
     internal var hasAutoScrolled = false
 
     internal val cellSprings = HashMap<ItemKey, SpringSolver>()
-    internal var emptyZoneSpring = SpringSolver.of(duration = 0.42, bounce = 0.0)
-    internal var hoverSpring = SpringSolver.of(duration = 0.26, bounce = 0.0)
+    internal var emptyZoneSpring = SpringSolver(MotionRole.Layout, value = 0.0, target = 0.0)
+    internal var hoverSpring = SpringSolver(MotionRole.Swap, value = 0.0, target = 0.0)
 
     private var onZoneCrossed: ((Boolean) -> Unit)? = null
     private var onSlotChanged: (() -> Unit)? = null
@@ -230,18 +233,19 @@ class DrawerPinDrag {
 
     val rowStride: Float get() = DrawerMetrics.rowHeight.value + DrawerTunables.rowGap.value
 
-    internal fun makeSpring(value: Float, target: Float): SpringSolver {
-        val duration = if (reducedMotion) 0.18 else DrawerTunables.pinDragSpring.duration
-        val bounce = if (reducedMotion) 0.0 else DrawerTunables.pinDragSpring.bounce
-        return SpringSolver.of(
-            duration = max(duration, 0.12),
-            bounce = bounce,
-            value = value.toDouble(),
-            target = target.toDouble(),
-            positionEpsilon = 0.08,
-            velocityEpsilon = 0.5,
-        )
-    }
+    /** Rows and the empty zone make room on `MotionRole.Layout`. */
+    internal fun makeSpring(value: Float, target: Float): SpringSolver = SpringSolver(
+        MotionRole.Layout,
+        value = value.toDouble(),
+        target = target.toDouble(),
+        reduceMotion = reducedMotion,
+        positionEpsilon = 0.08,
+        velocityEpsilon = 0.5,
+    )
+
+    /** The hovered section's highlight changes on `MotionRole.Swap`. */
+    internal fun makeHoverSpring(value: Double): SpringSolver =
+        SpringSolver(MotionRole.Swap, value = value, target = value, reduceMotion = reducedMotion)
 
     /** The list this drag moves (iOS `prepareCollectionViewIfNeeded`). */
     fun attach(host: DrawerPinDragHost) {
@@ -305,21 +309,18 @@ class DrawerPinDrag {
         lastFingerY = fingerY
         hasAutoScrolled = false
         samples.clear()
+        // It lifts out on `MotionRole.MicroIn`; under Reduce Motion it's lifted at once.
         liftSpring = if (reducedMotion) {
-            SpringSolver.of(duration = 0.15, value = 1.0, target = 1.0)
+            SpringSolver(MotionRole.MicroIn, value = 1.0, target = 1.0)
         } else {
-            SpringSolver(DrawerTunables.pinLiftSpring, value = 0.0, target = 1.0, positionEpsilon = 0.002, velocityEpsilon = 0.02)
+            SpringSolver(MotionRole.MicroIn, value = 0.0, target = 1.0, positionEpsilon = 0.002, velocityEpsilon = 0.02)
         }
         liftProgress = liftSpring.value.toFloat()
 
         captureInitialGeometry()
         grabOffset = visibleItem(ItemKey.Row(sessionID))?.let { fingerY - (it.minY + it.height / 2) } ?: 0f
         emptyZoneSpring = makeSpring(0f, 0f)
-        hoverSpring = SpringSolver.of(
-            duration = if (reducedMotion) 0.15 else 0.24,
-            bounce = 0.0,
-            value = if (isPinnedSection) 1.0 else 0.0,
-        )
+        hoverSpring = makeHoverSpring(if (isPinnedSection) 1.0 else 0.0)
         startFrameLoop(host)
     }
 
@@ -386,10 +387,6 @@ class DrawerPinDrag {
         return ((last.second - first.second) / dt).coerceIn(-RELEASE_VELOCITY_LIMIT, RELEASE_VELOCITY_LIMIT)
     }
 
-    /** The drop's spring (iOS `pinDropSpring`; 0.2 s without bounce under Reduce Motion). */
-    private val dropSpring: ai.opencode.core.motion.MotionSpring
-        get() = if (reducedMotion) ai.opencode.core.motion.MotionSpring(duration = 0.2) else DrawerTunables.pinDropSpring
-
     /** The slot the lifted row lands in on drop, as its top in dp (iOS `landingTarget`). */
     fun landingSlotMinY(): Float? {
         val draggedID = activeSessionID ?: return null
@@ -451,7 +448,7 @@ class DrawerPinDrag {
 
         isCancellingEmptyZone = emptyZoneSpring.value > 0.5
         emptyZoneSpring.retarget(0.0)
-        liftSpring.retarget(0.0, duration = dropSpring.duration, bounce = 0.0)
+        liftSpring.retarget(0.0, MotionRole.MicroIn, MotionPhase.Exit, reduceMotion = reducedMotion)
         hoverSpring.retarget(if (startedInPinned) 1.0 else 0.0)
         retargetSprings()
 
@@ -500,20 +497,19 @@ class DrawerPinDrag {
         }
         retargetSprings()
         // The row springs from where it is, at the finger's speed, into its slot (iOS
-        // `DrawerLiftedRow.beginLanding`), and settles its lift on the way.
-        val drop = dropSpring
+        // `DrawerLiftedRow.beginLanding`) on `MotionRole.Release`, and settles its lift on the way.
         cellSprings[ItemKey.Row(draggedID)]?.let { row ->
-            cellSprings[ItemKey.Row(draggedID)] = SpringSolver.of(
-                duration = drop.duration,
-                bounce = drop.bounce,
+            cellSprings[ItemKey.Row(draggedID)] = SpringSolver(
+                MotionRole.Release,
                 value = row.value,
                 velocity = releaseVelocity(),
                 target = row.target,
+                reduceMotion = reducedMotion,
                 positionEpsilon = 0.3,
                 velocityEpsilon = 12.0,
             )
         }
-        liftSpring.retarget(0.0, duration = drop.duration, bounce = 0.0)
+        liftSpring.retarget(0.0, MotionRole.MicroIn, MotionPhase.Exit, reduceMotion = reducedMotion)
         scheduleLandingFallback()
     }
 

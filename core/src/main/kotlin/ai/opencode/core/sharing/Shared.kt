@@ -115,7 +115,9 @@ internal class SharedReference<T>(
         if (new == old) return
         state.value = new
         // Inside the lock (it only enqueues onto the serial writer), so writes keep transition order.
-        bytes.write(key.storage, key.id, json.encodeToString(key.serializer, new).encodeToByteArray())
+        // Encoded by the writer: a large file value (Home's snapshots) isn't encoded on the main
+        // thread (iOS 24057173).
+        bytes.writeEncoded(key.storage, key.id) { json.encodeToString(key.serializer, new).encodeToByteArray() }
     }
 
     /** Drops the saved value and goes back to the default ([SharedStore.remove]). */
@@ -176,6 +178,9 @@ class SharedStore internal constructor(private val bytes: SharedBytes) {
 internal interface SharedBytes {
     fun read(kind: SharedStorageKind, id: String): ByteArray?
     fun write(kind: SharedStorageKind, id: String, data: ByteArray?)
+
+    /** [write] with the bytes made by [encode], which a live store may run off the caller's thread. */
+    fun writeEncoded(kind: SharedStorageKind, id: String, encode: () -> ByteArray) = write(kind, id, encode())
     fun flush() {}
 }
 

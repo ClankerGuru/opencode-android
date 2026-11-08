@@ -1,5 +1,6 @@
 package ai.opencode.core.ui
 
+import ai.opencode.core.motion.MotionTunables
 import ai.opencode.core.tuning.AnimationTimeScale
 import ai.opencode.core.tuning.swiftRounded
 import java.text.BreakIterator
@@ -15,14 +16,15 @@ import kotlin.math.pow
 import kotlin.math.sqrt
 
 /**
- * Motion parameters for [RollingNumber] (iOS `RollingNumberStyle`; defaults are iOS's
- * `RollingNumberTunables`, D-50 option 3 "Metal Reel + Vertical Smear").
+ * Motion parameters for [RollingNumber] (iOS `RollingNumberStyle`): a roll runs on
+ * `Motion.layout`, its places `Motion.staggerStep` apart; the reel's look defaults to iOS's
+ * `RollingNumberTunables` (D-50 option 3 "Metal Reel + Vertical Smear").
  */
 data class RollingNumberStyle(
     /** Perceptual roll duration in seconds (`stiffness = (2π / d)²`). */
-    val duration: Double = 0.34,
+    val duration: Double = MotionTunables.layoutSpring.duration.defaultValue,
     /** 0 is critically damped; positive values (≤ 0.3) allow a subtle overshoot. */
-    val bounce: Double = 0.0,
+    val bounce: Double = MotionTunables.layoutSpring.bounce.defaultValue,
     /** Smear fast-moving reels vertically. */
     val motionBlur: Boolean = true,
     /** Multiplier on the vertical smear at peak speed (24 rows/s). */
@@ -30,16 +32,13 @@ data class RollingNumberStyle(
     /** Top and bottom edge alpha fade as a fraction of line height. */
     val edgeFade: Float = 0.18f,
     /** Cascade delay in seconds between newly added digit places, keyed from the right. */
-    val stagger: Double = 0.025,
+    val stagger: Double = MotionTunables.staggerStep.defaultValue,
     /** Keypad mode: typing or deleting a trailing digit (`12 → 120`) keeps leading digits in place. */
     val preservesTypedPrefix: Boolean = false,
 ) {
     companion object {
-        /** iOS Tuning Panel presets (Numbers). */
+        /** The baked defaults. */
         val Native = RollingNumberStyle()
-        val Snappy = RollingNumberStyle(duration = 0.24, stagger = 0.015, blurAmount = 0.65, edgeFade = 0.16f)
-        val Gentle = RollingNumberStyle(duration = 0.46, stagger = 0.03, blurAmount = 1.05, edgeFade = 0.2f)
-        val Lively = RollingNumberStyle(duration = 0.3, bounce = 0.1, stagger = 0.02, blurAmount = 1.15, edgeFade = 0.2f)
     }
 }
 

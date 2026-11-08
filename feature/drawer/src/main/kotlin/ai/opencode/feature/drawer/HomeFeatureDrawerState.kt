@@ -179,23 +179,43 @@ val HomeFeature.State.visibleSessions: List<OpenCodeSession>
         return local + extra
     }
 
-val HomeFeature.State.pinnedSessions: List<OpenCodeSession>
-    get() {
-        val keys = pinnedSessionKeys
-        if (keys.isEmpty()) return emptyList()
-        val prefix = server.persistenceID + "|"
-        if (keys.none { it.startsWith(prefix) }) return emptyList()
-        val indexed = visibleSessions.associateBy { prefix + it.id }
-        return keys.mapNotNull { indexed[it] }
-    }
+val HomeFeature.State.pinnedSessions: List<OpenCodeSession> get() = drawerSessions.pinned
 
-val HomeFeature.State.recentSessions: List<OpenCodeSession>
+val HomeFeature.State.recentSessions: List<OpenCodeSession> get() = drawerSessions.recents
+
+/** The drawer's two lists (iOS's `(pinned:, recents:)` tuple). */
+data class DrawerSessions(val pinned: List<OpenCodeSession>, val recents: List<OpenCodeSession>)
+
+/**
+ * Pinned (in pin order) and Recents (newest first), from one pass over `visibleSessions`: the
+ * drawer's list builds both on every change.
+ */
+val HomeFeature.State.drawerSessions: DrawerSessions
     get() {
-        val pinned = pinnedSessionKeys.toHashSet()
         val visible = visibleSessions
-        val prefix = if (pinned.isEmpty()) "" else server.persistenceID + "|"
-        val unpinned = if (pinned.isEmpty()) visible else visible.filter { (prefix + it.id) !in pinned }
-        return unpinned.sortedByDescending { it.updatedAt }
+        val prefix = server.persistenceID + "|"
+        // This server's pins, by session ID, in order.
+        val pinnedIDs = mutableListOf<String>()
+        for (key in pinnedSessionKeys) {
+            if (key.startsWith(prefix)) pinnedIDs += key.removePrefix(prefix)
+        }
+        if (pinnedIDs.isEmpty()) return DrawerSessions(emptyList(), visible.sortedByDescending { it.updatedAt })
+        val pinnedSet = pinnedIDs.toHashSet()
+        val byID = HashMap<String, OpenCodeSession>()
+        val recents = mutableListOf<OpenCodeSession>()
+        for (session in visible) {
+            if (session.id in pinnedSet) {
+                if (session.id !in byID) byID[session.id] = session
+            } else {
+                recents += session
+            }
+        }
+        val pinned = mutableListOf<OpenCodeSession>()
+        for (id in pinnedIDs) {
+            val session = byID[id] ?: continue
+            pinned += session
+        }
+        return DrawerSessions(pinned, recents.sortedByDescending { it.updatedAt })
     }
 
 /** Waiting sessions first, then newest. */

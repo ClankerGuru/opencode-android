@@ -75,20 +75,8 @@ object ServerFlowTunables {
     const val offlineGrace = 12.0
     /** Offline sooner when the phone has no network at all (s). */
     const val unsatisfiedOfflineGrace = 4.0
-    /** Name roll. */
-    val title = MotionSpring(0.36, 0.14)
-    /** Name width. */
-    val width = MotionSpring(0.4, 0.1)
-    /** Rows in. */
-    val list = MotionSpring(0.4, 0.0)
-    /** Rows and name out. */
-    val exit = MotionSpring(0.26, 0.0)
-    /** Row follows the one above. */
-    val follow = MotionSpring(0.08, 0.0)
-    /** Underline fills. */
-    val fill = MotionSpring(0.28, 0.0)
-    /** Underline fades. */
-    val fade = MotionSpring(0.7, 0.0)
+    /** How far each ghost row trails the one above (s); the springs themselves are `MotionRole`s. */
+    const val chainLag = 0.08
     const val titleTravel = 22f
     const val listTravel = 28f
     const val blur = 2f

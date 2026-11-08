@@ -3,11 +3,13 @@ package ai.opencode.feature.drawer.motion
 import ai.opencode.core.diagnostics.PerfTimeline
 import ai.opencode.core.log.AppLog
 import ai.opencode.feature.transcript.list.TranscriptMotionTrace
-import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionFrameAction
-import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.MotionPhase
+import ai.opencode.core.motion.MotionRelease
+import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.motion.PresenceGate
 import ai.opencode.core.motion.SpringSolver
+import ai.opencode.core.motion.retarget
 import ai.opencode.core.motion.motionFrameLoop
 import ai.opencode.core.motion.rememberFrameDurationSeconds
 import android.view.RoundedCorner
@@ -59,8 +61,6 @@ import kotlin.math.pow
  * the `DrawerTunables` of `DrawerStyle.swift` (metrics), which another file owns.
  */
 object DrawerMotionTunables {
-    /** Card spring ω (iOS `drawer.card.omega`, 28.5). */
-    const val CARD_OMEGA = 28.5
     /** List recede scale (iOS `drawer.depth.recedeScale`, 0.96). */
     const val RECEDE_SCALE = 0.96f
     /** List dim, dark (iOS `drawer.dim.dark`, 0.7). */
@@ -69,8 +69,6 @@ object DrawerMotionTunables {
     const val DIM_LIGHT = 0.6f
     /** List dim falloff power (iOS `drawer.dim.power`, 1.3). */
     const val DIM_POWER = 1.3f
-    /** Shortcut enter/exit (iOS `drawer.shortcuts.morph`, 0.34 s, no bounce). */
-    val shortcutMorph = MotionSpring(0.34, 0.0)
     /** Shortcut exit blur (iOS `drawer.shortcuts.blur`, 6). */
     val shortcutBlur: Dp = 6.dp
     /** Shortcut exit scale (iOS `drawer.shortcuts.scale`, 0.96). */
@@ -147,9 +145,8 @@ class DrawerShortcutSlot(isOpen: Boolean = false) {
             if (began2 != null) generation = began2
         }
         delayRemaining = max(0.0, delay)
-        val duration = if (reducedMotion) Motion.reducedFade else DrawerMotionTunables.shortcutMorph.duration
-        val bounce = if (reducedMotion) 0.0 else DrawerMotionTunables.shortcutMorph.bounce
-        solver.retarget(if (open) 1.0 else 0.0, duration = duration, bounce = bounce)
+        // Opens on layout, closes on collapse (iOS 03adf07a).
+        solver.retarget(if (open) 1.0 else 0.0, role = MotionRole.Layout, phase = if (open) MotionPhase.Enter else MotionPhase.Exit, reduceMotion = reducedMotion)
     }
 
     /** Advances [dt] seconds; returns whether the slot is settled. */
@@ -174,7 +171,7 @@ class DrawerShortcutSlot(isOpen: Boolean = false) {
 
     private companion object {
         fun makeSolver(value: Double) = SpringSolver(
-            DrawerMotionTunables.shortcutMorph,
+            MotionRole.Layout,
             value = value,
             target = value,
             positionEpsilon = 0.004,
@@ -390,8 +387,8 @@ class DrawerSpring(position: Double, var velocity: Double, target: Double, val b
     }
 
     companion object {
-        /** Natural frequency: from rest, 330 dp arrives in about 0.28 s. */
-        val OMEGA: Double get() = DrawerMotionTunables.CARD_OMEGA
+        /** `MotionRole.Release`'s natural frequency (`releaseOmega`): from rest, 330 dp arrives in about 0.28 s. */
+        val OMEGA: Double get() = MotionRole.Release.curve().springParameters.omega
         const val ARRIVAL_TOLERANCE = 1.0
     }
 }
@@ -453,7 +450,8 @@ fun rememberDisplayCornerRadius(): Dp {
  *
  * - The pan feeds [beginDrag] / [drag] / [endDrag] / [cancelDrag] (see `Modifier.drawerPan`).
  * - The drawer button calls [setPresented]; a tap on the card or Escape calls [close].
- * - Release: a flick faster than 250 dp/s decides, otherwise the halfway mark; the card then
+ * - Release: one commit rule (`MotionRelease.shouldCommit`): a flick decides, otherwise the
+ *   halfway mark; the card then
  *   rides [DrawerSpring] from the finger's velocity. Reduce Motion places it without moving.
  * - [Callbacks.onCommitted] fires when a release or tap commits to the other side (play
  *   `Haptic.snap`); programmatic closes (a row, New Session) stay quiet, as on iOS.
@@ -627,7 +625,7 @@ class DrawerMotionState(
     fun endDrag(velocity: Float) {
         if (consumeIgnoredEnd()) return
         isDragging = false
-        val presented = if (abs(velocity) > FLICK_VELOCITY) velocity > 0 else offset > width / 2
+        val presented = MotionRelease.shouldCommit(translation = offset.toDouble(), velocity = velocity.toDouble(), distance = width.toDouble())
         val changed = presented != isPresented
         presentedState.value = presented
         if (changed) callbacks.onCommitted()
@@ -768,11 +766,6 @@ class DrawerMotionState(
         offsetState.floatValue = newOffset
         callbacks.onProgress(progress)
         keyboardHold?.follow(progress)
-    }
-
-    private companion object {
-        /** iOS `abs(velocity) > 250` pt/s. */
-        const val FLICK_VELOCITY = 250f
     }
 }
 

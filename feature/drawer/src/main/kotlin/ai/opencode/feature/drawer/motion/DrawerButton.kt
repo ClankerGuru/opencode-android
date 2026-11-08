@@ -2,8 +2,9 @@ package ai.opencode.feature.drawer.motion
 
 import ai.opencode.core.motion.transitionBlur
 
-import ai.opencode.core.motion.Motion
-import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.MotionPhase
+import ai.opencode.core.motion.MotionRole
+import ai.opencode.core.motion.MotionTunables
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeMinTapTarget
@@ -17,12 +18,12 @@ import ai.opencode.feature.session.InAppNotice
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
@@ -43,22 +44,18 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
@@ -81,184 +78,11 @@ import kotlin.math.min
 
 /**
  * Port of `OpenCode/Drawer/DrawerButton.swift`: the session header's drawer button, its badge
- * dot's Brighten arrival (OC-431), and the In-App Notice capsule it grows into.
+ * dot, and the In-App Notice capsule it grows into.
  *
  * Used by the session header: `:feature:session` sits below `:feature:drawer`, so Home passes
  * [DrawerButton] into the session as a slot rather than the session importing it.
  */
-
-/** Developer Mode → Tuning → Session → Drawer Dot Arrival (iOS `DrawerDotTunables`; baked defaults). */
-object DrawerDotTunables {
-    const val BRIGHTEN_DURATION = 0.6
-    const val BRIGHTEN_FLASH = 0.85
-    const val BRIGHTEN_GLOW = 5.5
-}
-
-/** Instantaneous visual pose of the drawer button's badge dot (iOS `DrawerDotPose`). */
-data class DrawerDotPose(
-    val isVisible: Boolean = false,
-    val opacity: Double = 0.0,
-    val scale: Double = 1.0,
-    val flash: Double = 0.0,
-    val glowOpacity: Double = 0.0,
-    val glowRadius: Double = 0.0,
-    val glowScale: Double = 1.0,
-) {
-    companion object {
-        val hidden = DrawerDotPose()
-        val resting = DrawerDotPose(isVisible = true, opacity = 1.0, scale = 1.0)
-    }
-}
-
-/**
- * Continuous, retargetable state machine for the dot's Brighten arrival and removal (iOS
- * `DrawerDotArrival`). Initial load starts settled ([initial]), so opening or restoring a
- * session while another is already unread or waiting never replays the entrance. Times in
- * seconds on one monotonic clock.
- */
-data class DrawerDotArrival(
-    val targetBadge: DrawerBadge? = null,
-    val displayedBadge: DrawerBadge? = null,
-    val reduceMotion: Boolean = false,
-    val parameters: Parameters = Parameters(),
-    val startTime: Double = 0.0,
-    val duration: Double = 0.0,
-    val isEntering: Boolean = false,
-    val isSettledState: Boolean = true,
-    /** Pose captured when a transition was interrupted mid-flight. */
-    val anchorPose: DrawerDotPose = DrawerDotPose.hidden,
-    val hasAnchor: Boolean = false,
-) {
-    data class Parameters(
-        val brightenDuration: Double = DrawerDotTunables.BRIGHTEN_DURATION,
-        val brightenFlash: Double = DrawerDotTunables.BRIGHTEN_FLASH,
-        val brightenGlow: Double = DrawerDotTunables.BRIGHTEN_GLOW,
-    )
-
-    fun isSettled(time: Double): Boolean {
-        if (isSettledState || duration <= 0) return true
-        return time - startTime >= duration - 1e-9
-    }
-
-    val settleSeconds: Double get() = if (isSettledState) 0.0 else max(0.0, duration)
-
-    fun pose(time: Double): DrawerDotPose {
-        if (isSettled(time)) return if (targetBadge != null) DrawerDotPose.resting else DrawerDotPose.hidden
-        val elapsed = max(0.0, time - startTime)
-        val u = min(1.0, max(0.0, if (duration > 0) elapsed / duration else 1.0))
-
-        if (!isEntering) {
-            val s = smoothstep(u)
-            val opacity = anchorPose.opacity * (1 - s)
-            if (!(opacity > 1e-4 || anchorPose.glowOpacity * (1 - s) > 1e-4)) return DrawerDotPose.hidden
-            return DrawerDotPose(
-                isVisible = true,
-                opacity = opacity,
-                scale = if (reduceMotion) 1.0 else anchorPose.scale + (0.75 - anchorPose.scale) * s,
-                flash = anchorPose.flash * (1 - s),
-                glowOpacity = if (reduceMotion) 0.0 else anchorPose.glowOpacity * (1 - s),
-                glowRadius = anchorPose.glowRadius,
-                glowScale = anchorPose.glowScale,
-            )
-        }
-
-        if (reduceMotion) {
-            val s = smoothstep(u)
-            val startOpacity = if (hasAnchor) anchorPose.opacity else 0.0
-            return DrawerDotPose(isVisible = true, opacity = startOpacity + (1 - startOpacity) * s, scale = 1.0)
-        }
-
-        val fadeIn = smoothstep(min(1.0, elapsed / 0.09))
-        val envelope = brightenEnvelope(u)
-        val flash = parameters.brightenFlash * envelope
-        var raw = DrawerDotPose(
-            isVisible = true,
-            opacity = fadeIn,
-            scale = 1.0,
-            flash = flash,
-            glowOpacity = 0.78 * flash,
-            glowRadius = parameters.brightenGlow * (0.65 + 0.35 * envelope),
-            glowScale = 1 + 0.55 * envelope,
-        )
-        if (hasAnchor && anchorPose.isVisible) {
-            // Carry on smoothly from a partial mid-exit pose without snapping back to 0.
-            val blend = smoothstep(min(1.0, u / 0.35))
-            raw = raw.copy(
-                opacity = max(raw.opacity, anchorPose.opacity * (1 - blend) + raw.opacity * blend),
-                scale = anchorPose.scale * (1 - blend) + raw.scale * blend,
-            )
-        }
-        return raw
-    }
-
-    /**
-     * Retargets to [nextBadge] at [time], preserving continuity if interrupted mid-flight. Plays
-     * the arrival only when the dot first appears (`null → badge`), never while already showing.
-     */
-    fun retargeted(nextBadge: DrawerBadge?, reduceMotion: Boolean, parameters: Parameters = Parameters(), time: Double): DrawerDotArrival {
-        val currentPose = pose(time)
-        if (nextBadge == null) {
-            if (!(currentPose.isVisible && currentPose.opacity > 1e-3)) return initial(null)
-            return DrawerDotArrival(
-                targetBadge = null,
-                displayedBadge = displayedBadge ?: targetBadge ?: DrawerBadge.Unread,
-                reduceMotion = reduceMotion,
-                parameters = parameters,
-                startTime = time,
-                duration = if (reduceMotion) REDUCED_FADE_DURATION else EXIT_DURATION,
-                isEntering = false,
-                isSettledState = false,
-                anchorPose = currentPose,
-                hasAnchor = true,
-            )
-        }
-        // Already showing (or mid-arrival): update the badge colour in place without re-firing.
-        if (targetBadge != null) return copy(targetBadge = nextBadge, displayedBadge = nextBadge)
-
-        val dur = if (reduceMotion) REDUCED_FADE_DURATION else max(0.1, parameters.brightenDuration)
-        val interruptingExit = !isSettled(time) && !isEntering && currentPose.isVisible
-        return DrawerDotArrival(
-            targetBadge = nextBadge,
-            displayedBadge = nextBadge,
-            reduceMotion = reduceMotion,
-            parameters = parameters,
-            startTime = time,
-            duration = dur,
-            isEntering = true,
-            isSettledState = dur <= 0,
-            anchorPose = if (interruptingExit) currentPose else DrawerDotPose.hidden,
-            hasAnchor = interruptingExit,
-        )
-    }
-
-    companion object {
-        const val REDUCED_FADE_DURATION = 0.18
-        const val EXIT_DURATION = 0.22
-
-        fun initial(badge: DrawerBadge?): DrawerDotArrival = DrawerDotArrival(
-            targetBadge = badge,
-            displayedBadge = badge,
-            isEntering = badge != null,
-            isSettledState = true,
-            anchorPose = if (badge != null) DrawerDotPose.resting else DrawerDotPose.hidden,
-        )
-
-        fun smoothstep(u: Double): Double {
-            val x = min(1.0, max(0.0, u))
-            return x * x * (3 - 2 * x)
-        }
-
-        /** Fast ignition to 1.0 at u = 0.12 followed by a C1-smooth cooling curve to 0 at u = 1.0. */
-        private fun brightenEnvelope(u: Double): Double {
-            val x = min(1.0, max(0.0, u))
-            val peak = 0.12
-            if (x <= peak) return smoothstep(x / peak)
-            val v = (x - peak) / (1 - peak)
-            val rem = 1 - v
-            return rem * rem * (1 + 2 * v)
-        }
-    }
-}
 
 /** Cross-fades the label when another event updates it in place (iOS `.id(shown.events.map { "\($0.sessionID)|\($0.kind)" })`). */
 private val InAppNotice.identity: String get() = events.joinToString(",") { "${it.sessionID}|${it.kind}" }
@@ -272,14 +96,12 @@ private object DrawerBadgeColors {
 @Composable
 private fun isDarkTheme(): Boolean = OpenCodeTheme.colors.isDark
 
-/** The capsule's grow (iOS `.spring(duration: 0.5, bounce: 0.12)`). */
-private val growSpring = MotionSpring(0.5, 0.12)
-/** The capsule's fold (iOS `.smooth(duration: 0.42)`). */
-private val foldSpring = MotionSpring(0.42, 0.0)
-/** In-place notice update (iOS `.smooth(duration: 0.3)`). */
-private val updateSpring = MotionSpring(0.3, 0.0)
-/** Reduce Motion cross-fade (iOS `.easeInOut(duration: 0.25)`). */
-private const val FADE_SECONDS = 0.25
+/**
+ * The capsule grows from the button on `MotionRole.PanelOpen` and folds back on its exit
+ * (`panelClose`); under Reduce Motion it cross-fades (`MotionRole.Reduced`).
+ */
+private fun <T> grow(reduceMotion: Boolean = false) = MotionRole.PanelOpen.animation<T>(MotionPhase.Enter, reduceMotion)
+private fun <T> fold(reduceMotion: Boolean = false) = MotionRole.PanelOpen.animation<T>(MotionPhase.Exit, reduceMotion)
 
 /**
  * The session header's drawer button (iOS `DrawerButton`). With In-App Notices on, it grows into
@@ -320,13 +142,13 @@ fun DrawerButton(
         if (notice != null) {
             shown = notice
             expanded = true
-            if (!reducedMotion) reveal.animateTo(labelFrame, growSpring.spec())
+            if (!reducedMotion) reveal.animateTo(labelFrame, grow())
         } else if (expanded) {
             expanded = false
             if (!reducedMotion) {
-                reveal.animateTo(0f, foldSpring.spec())
+                reveal.animateTo(0f, fold())
             } else {
-                kotlinx.coroutines.delay(motionMillis(FADE_SECONDS).toLong())
+                kotlinx.coroutines.delay(motionMillis(MotionRole.PanelOpen.curve(MotionPhase.Exit, reduceMotion = true).duration).toLong())
             }
             if (!expanded && generation == foldGeneration) shown = null
         } else {
@@ -335,7 +157,7 @@ fun DrawerButton(
     }
     // The label measured a new width: the capsule grows to it (iOS `onGeometryChange` → `grow`).
     LaunchedEffect(labelWidthPx) {
-        if (expanded && !reducedMotion) scope.launch { reveal.animateTo(labelFrame, growSpring.spec()) }
+        if (expanded && !reducedMotion) scope.launch { reveal.animateTo(labelFrame, grow()) }
     }
     // The header gave it more or less room: the capsule takes it at once (iOS `onChange(of: maxWidth)`).
     LaunchedEffect(maxWidth) {
@@ -372,8 +194,8 @@ fun DrawerButton(
             )
             AnimatedVisibility(
                 visible = expanded,
-                enter = fadeIn(tween(motionMillis(FADE_SECONDS), easing = Motion.EaseInOut)),
-                exit = fadeOut(tween(motionMillis(FADE_SECONDS), easing = Motion.EaseInOut)),
+                enter = fadeIn(grow(reduceMotion = true)),
+                exit = fadeOut(fold(reduceMotion = true)),
                 modifier = Modifier.wrapContentWidth(Alignment.Start, unbounded = true),
             ) {
                 DrawerButtonCapsule(
@@ -404,7 +226,7 @@ fun DrawerButton(
                 onNoticeTapped = onNoticeTapped,
             )
         }
-        // Outside the clipped capsule so the arrival glow never clips.
+        // Outside the clipped capsule.
         Box(Modifier.size(size), contentAlignment = Alignment.TopEnd) {
             DrawerBadgeDot(dotBadge)
         }
@@ -435,7 +257,7 @@ private fun DrawerButtonCapsule(
     // capsule's fill shows only while it grows into a notice.
     val fill by animateColorAsState(
         targetValue = if (shown != null && expanded) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent,
-        animationSpec = if (expanded) growSpring.spec() else foldSpring.spec(),
+        animationSpec = if (expanded) grow() else fold(),
         label = "drawer-button-fill",
     )
     Surface(
@@ -466,7 +288,7 @@ private fun DrawerButtonCapsule(
             if (shown != null) {
                 val labelAlpha by animateFloatAsState(
                     targetValue = if (expanded) 1f else 0f,
-                    animationSpec = if (expanded) growSpring.spec() else foldSpring.spec(),
+                    animationSpec = if (expanded) grow() else fold(),
                     label = "drawer-notice-alpha",
                 )
                 Box(
@@ -493,13 +315,10 @@ private fun DrawerButtonCapsule(
                     AnimatedContent(
                         targetState = shown,
                         contentKey = { it.identity },
+                        // The new label swaps in on the frame the old one starts to leave.
                         transitionSpec = {
-                            val spec: FiniteAnimationSpec<Float> = if (reducedMotion) {
-                                tween<Float>(motionMillis(FADE_SECONDS), easing = Motion.EaseInOut)
-                            } else {
-                                updateSpring.spec()
-                            }
-                            fadeIn(spec) togetherWith fadeOut(spec)
+                            fadeIn(MotionRole.Swap.animation(MotionPhase.Enter, reducedMotion)) togetherWith
+                                fadeOut(MotionRole.Swap.animation(MotionPhase.Exit, reducedMotion))
                         },
                         label = "drawer-notice",
                     ) { model ->
@@ -554,8 +373,9 @@ fun DrawerNoticeLabel(notice: InAppNotice, modifier: Modifier = Modifier) {
 
 /**
  * The drawer button's dot (iOS `DrawerBadgeDot`): another session needs input (orange) or is
- * unread (blue). Arrives at full size over-bright with a soft glow halo and settles to its
- * normal colour. The pose is read in the draw block, so the arrival never recomposes.
+ * unread (blue). It arrives on `MotionRole.MicroIn` and leaves on `microOut`; one already showing
+ * when the button appears (opening or restoring a session) is simply there, and a change of
+ * colour while it shows lands in place.
  */
 @Composable
 fun DrawerBadgeDot(badge: DrawerBadge?, modifier: Modifier = Modifier) {
@@ -563,79 +383,40 @@ fun DrawerBadgeDot(badge: DrawerBadge?, modifier: Modifier = Modifier) {
     val highContrast = rememberHighContrast()
     val isDark = isDarkTheme()
     val background = MaterialTheme.colorScheme.background
-    var arrival by remember { mutableStateOf(DrawerDotArrival.initial(badge)) }
-    var didMount by remember { mutableStateOf(false) }
-    var moving by remember { mutableStateOf(false) }
-    val now = remember { mutableDoubleStateOf(monotonicSeconds()) }
-
-    LaunchedEffect(badge) {
-        if (!didMount) {
-            didMount = true
-            arrival = DrawerDotArrival.initial(badge)
-            moving = false
-            return@LaunchedEffect
-        }
-        val time = monotonicSeconds()
-        arrival = arrival.retargeted(badge, reducedMotion, DrawerDotArrival.Parameters(), time)
-        moving = !arrival.isSettled(time)
-        // iOS `TimelineView(.animation)`: one frame clock while it moves.
-        while (moving) {
-            withFrameNanos { now.doubleValue = it / 1e9 }
-            if (arrival.isSettled(now.doubleValue)) moving = false
-        }
-    }
-
-    val displayed = arrival.displayedBadge ?: badge
-    // A 10 dp slot, offset (-3, 3) into the button's corner; the halo draws outside it unclipped.
-    Canvas(modifier.offset(x = (-3).dp, y = 3.dp).size(10.dp)) {
-        val pose = if (moving) arrival.pose(now.doubleValue) else if (badge != null) DrawerDotPose.resting else DrawerDotPose.hidden
-        if (!pose.isVisible || displayed == null) return@Canvas
-        val base = if (displayed == DrawerBadge.Attention) DrawerBadgeColors.orange(isDark) else DrawerBadgeColors.blue(isDark)
-        val radius = size.minDimension / 2
-        if (pose.glowOpacity > 0.001) {
-            val glowRadius = (if (highContrast) max(1.5, pose.glowRadius * 0.45) else pose.glowRadius).dp.toPx()
-            val glowAlpha = min(1.0, pose.glowOpacity * if (highContrast) 1.15 else 1.0).toFloat()
-            val core = radius * pose.glowScale.toFloat()
-            // A soft disc standing in for SwiftUI's blurred circle.
-            drawCircle(
-                brush = Brush.radialGradient(
-                    0f to base.copy(alpha = glowAlpha),
-                    (core / (core + glowRadius)).coerceIn(0f, 1f) to base.copy(alpha = glowAlpha * 0.6f),
-                    1f to base.copy(alpha = 0f),
-                    center = center,
-                    radius = core + glowRadius,
-                ),
-                radius = core + glowRadius,
-            )
-            if (highContrast) {
-                drawCircle(base, radius = core, alpha = min(1.0, pose.glowOpacity * 0.9).toFloat(), style = Stroke(1.4.dp.toPx()))
+    // The last colour shown, so the dot keeps it while it leaves.
+    var lastBadge by remember { mutableStateOf(badge) }
+    if (badge != null) lastBadge = badge
+    val scale = if (reducedMotion) 1f else MotionTunables.microInScale.value
+    // A 10 dp slot, offset (-3, 3) into the button's corner.
+    Box(modifier.offset(x = (-3).dp, y = 3.dp).size(10.dp)) {
+        AnimatedVisibility(
+            visible = badge != null,
+            enter = fadeIn(MotionRole.MicroIn.animation(MotionPhase.Enter, reducedMotion)) +
+                scaleIn(MotionRole.MicroIn.animation(MotionPhase.Enter, reducedMotion), initialScale = scale),
+            exit = fadeOut(MotionRole.MicroIn.animation(MotionPhase.Exit, reducedMotion)) +
+                scaleOut(MotionRole.MicroIn.animation(MotionPhase.Exit, reducedMotion), targetScale = scale),
+        ) {
+            Canvas(Modifier.size(10.dp)) {
+                val color = if (lastBadge == DrawerBadge.Attention) DrawerBadgeColors.orange(isDark) else DrawerBadgeColors.blue(isDark)
+                val radius = size.minDimension / 2
+                drawCircle(color, radius = radius)
+                if (highContrast) {
+                    drawCircle(background, radius = radius - 0.625.dp.toPx(), style = Stroke(1.25.dp.toPx()))
+                }
             }
-        }
-        val scaled = radius * pose.scale.toFloat()
-        // `.brightness(flash * 0.28)` then a white flash overlay.
-        val bright = lerp(base, Color.White, (pose.flash * 0.28).toFloat().coerceIn(0f, 1f))
-        val flashed = lerp(bright, Color.White, min(1.0, pose.flash * if (highContrast) 0.88 else 0.78).toFloat().coerceIn(0f, 1f))
-        drawCircle(flashed, radius = scaled, alpha = pose.opacity.toFloat())
-        if (highContrast) {
-            drawCircle(background, radius = scaled - 0.625.dp.toPx(), alpha = pose.opacity.toFloat(), style = Stroke(1.25.dp.toPx()))
         }
     }
 }
 
-private fun monotonicSeconds(): Double = System.nanoTime() / 1e9
-
 /**
  * The header's title while the drawer button's label covers it (iOS `steppingAside`): fades and
- * blurs out before the label reaches it, comes back once it has folded past, and stops taking
- * touches and TalkBack focus while aside.
+ * blurs out as the label grows, comes back as it folds, and stops taking touches and TalkBack
+ * focus while aside.
  */
 fun Modifier.steppingAside(aside: Boolean, reducedMotion: Boolean): Modifier = composed {
-    val spec = when {
-        reducedMotion -> tween<Float>(motionMillis(FADE_SECONDS), easing = Motion.EaseInOut)
-        aside -> tween(motionMillis(0.18), easing = Motion.EaseOut)
-        // `.smooth(duration: 0.35).delay(0.12)`
-        else -> MotionSpring(0.35, 0.0).animation(reduceMotion = false, delaySeconds = 0.12)
-    }
+    // Swaps out on `swap`'s exit (quicker than the capsule grows) on the frame the capsule starts
+    // to grow, and back in on the frame it starts to fold.
+    val spec = MotionRole.Swap.animation<Float>(if (aside) MotionPhase.Exit else MotionPhase.Enter, reducedMotion)
     val progress by animateFloatAsState(if (aside) 1f else 0f, spec, label = "stepping-aside")
     val blurred = if (!reducedMotion && progress > 0.001f) Modifier.transitionBlur((6 * progress).dp) else Modifier
     this

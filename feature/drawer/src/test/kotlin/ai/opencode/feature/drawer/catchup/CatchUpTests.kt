@@ -684,8 +684,6 @@ class CatchUpTests {
                 position = Offset(84f, 18f),
                 velocity = Offset(initialVx, 0f),
                 target = Offset.Zero,
-                response = 0.38,
-                dampingRatio = 1.0f,
             )
             var prevX = spring.position.x
             var settled = false

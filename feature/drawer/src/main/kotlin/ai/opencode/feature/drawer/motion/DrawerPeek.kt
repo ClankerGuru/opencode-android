@@ -44,17 +44,30 @@ object DrawerTimestamp {
         zone: ZoneId = ZoneId.systemDefault(),
         locale: Locale = Locale.getDefault(),
         hour24: Boolean? = null,
-    ): String {
-        val today = now.atZone(zone).truncatedTo(ChronoUnit.DAYS)
-        val dayOfDate = date.atZone(zone).truncatedTo(ChronoUnit.DAYS)
-        val days = ChronoUnit.DAYS.between(dayOfDate.toLocalDate(), today.toLocalDate()).toInt()
-        // iOS `MinuteTimestampCache`: one entry per minute, day bucket, locale and zone.
-        val key = "${date.epochSecond / 60}|$days|${locale.toLanguageTag()}|${zone.id}|$hour24"
-        cache[key]?.let { return it }
-        val formatted = uncachedText(date.atZone(zone), today, days, locale, hour24)
-        if (cache.size > 2_000) cache.clear()
-        cache[key] = formatted
-        return formatted
+    ): String = Day(now, zone, locale, hour24).text(date)
+
+    /** Today, worked out once for a list of times (`DrawerListModel.build`). */
+    class Day(
+        now: Instant,
+        private val zone: ZoneId = ZoneId.systemDefault(),
+        private val locale: Locale = Locale.getDefault(),
+        private val hour24: Boolean? = null,
+    ) {
+        private val today = now.atZone(zone).truncatedTo(ChronoUnit.DAYS)
+        private val todayDate = today.toLocalDate()
+        private val tag = locale.toLanguageTag()
+
+        fun text(date: Instant): String {
+            val zoned = date.atZone(zone)
+            val days = ChronoUnit.DAYS.between(zoned.toLocalDate(), todayDate).toInt()
+            // iOS `MinuteTimestampCache`: one entry per minute, day bucket, locale and zone.
+            val key = "${date.epochSecond / 60}|$days|$tag|${zone.id}|$hour24"
+            cache[key]?.let { return it }
+            val formatted = uncachedText(zoned, today, days, locale, hour24)
+            if (cache.size > 2_000) cache.clear()
+            cache[key] = formatted
+            return formatted
+        }
     }
 
     private fun uncachedText(date: ZonedDateTime, today: ZonedDateTime, days: Int, locale: Locale, hour24: Boolean?): String {

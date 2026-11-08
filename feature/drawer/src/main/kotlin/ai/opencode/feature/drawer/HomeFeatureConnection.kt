@@ -5,6 +5,7 @@ import ai.opencode.feature.session.*
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.diagnostics.LabMarks
+import ai.opencode.core.sharing.SharedStore
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.cancellable
@@ -28,8 +29,10 @@ import ai.opencode.server.model.SessionActivity
 import ai.opencode.server.model.keepingFirstPrompts
 import ai.opencode.feature.voice.VoiceFeature
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
 import kotlin.time.Duration.Companion.milliseconds
 import ai.opencode.feature.voice.VoiceAppState
 import ai.opencode.feature.composer.DictationFeature
@@ -71,7 +74,13 @@ internal fun HomeFeature.reduceConnection(state: State, action: Action): HomeRed
         shareInbox.publishTargets(state.shareTargets)
         shareInbox.publishCredentials(ShareCredentials(state.server), true)
         val persistence = dependency(TranscriptCachePersistence)
-        Reduced(state, Effect.merge(Effect.run { persistence.flush() }, flushPersistedComposer(state)))
+        val sharedStore = dependency(SharedStore)
+        val flush = Effect.run<Action> {
+            persistence.flush()
+            // Home's snapshots and read dates still waiting for the writer land too (iOS 24057173).
+            withContext(Dispatchers.IO) { sharedStore.flush() }
+        }
+        Reduced(state, Effect.merge(flush, flushPersistedComposer(state)))
     }
 
     Action.SceneEnteredBackground -> {

@@ -1,8 +1,6 @@
 package ai.opencode.feature.drawer.style
 
-import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.tuning.Tunable
-import ai.opencode.core.tuning.TunableSpring
 import ai.opencode.core.tuning.TuningStore
 import ai.opencode.core.ui.OpenCodeColors
 import ai.opencode.core.ui.OpenCodeIcon
@@ -194,20 +192,31 @@ enum class DrawerSectionBreak { Header, Gap, Hairline }
  * no Tuning Panel (`:devtools` is Android-native), so only the defaults are ported. iOS
  * points are dp; text sizes come from [DrawerTextStyle] in sp.
  *
- * The motion tunables (`cardOmega`, `recedeScale`, `dim*`, `shortcut*`, `searchMorph`) live
+ * The motion tunables (`recedeScale`, `dim*`, `shortcut*`) live
  * with their owners (`DrawerMotion.swift`, `DrawerSearchPill.swift`).
  */
 object DrawerTunables {
+    private val registeredStores = java.util.Collections.newSetFromMap(java.util.WeakHashMap<TuningStore, Boolean>())
+
     /**
-     * iOS `DrawerTunables.register(in:)`: lists the drawer's tunable knobs (the pin drag's shadow,
-     * edge scroll, menu move and settles; the rest stay constants, as Android has no presets).
+     * iOS `DrawerTuningRegistration.registerIfNeeded`: [register] once per store while tuning is
+     * on, so the list's every pass doesn't list the knobs again.
+     */
+    fun registerIfNeeded(store: TuningStore = TuningStore.shared) {
+        if (!store.isEnabled) return
+        synchronized(registeredStores) {
+            if (!registeredStores.add(store)) return
+        }
+        register(store)
+    }
+
+    /**
+     * iOS `DrawerTunables.register(in:)`: lists the drawer's tunable knobs (the pin drag's shadow
+     * and edge scroll; motion runs on the shared motion roles, the rest stay constants).
      */
     fun register(store: TuningStore = TuningStore.shared) {
         if (!store.isEnabled) return
         store.register(pinLiftShadow, pinLiftShadowY, pinLiftShadowRadius, pinEdgeBand, pinEdgeSpeed)
-        store.register(pinMoveSpring)
-        store.register(callButtonSpring)
-        store.register(pinMoveFade, holdSettle, pinLandFade)
     }
 
     // Spacing (DrawerStyle.swift). The leading edge is derived (`rowEdge + textInset`).
@@ -312,18 +321,13 @@ object DrawerTunables {
     /**
      * While the time reveal slides the rows, they fade out at the card's edge
      * (`DrawerListSessionCell`): the fade moves onto the edge over the first
-     * [revealFadeRamp] dp of slide and reaches full strength over [revealFadeIn] seconds.
+     * [revealFadeRamp] dp of slide and reaches full strength on `MotionRole.Swap`.
      */
     val revealFadeRamp: Dp = 32.dp
-    /** Card fade ease-in (s). */
-    const val revealFadeIn: Double = 0.2
-    /** Pin drag spring. */
-    val pinDragSpring: MotionSpring = MotionSpring(duration = 0.42, bounce = 0.0)
     /**
-     * The dragged row (iOS `DrawerLiftedRow`): it grows by [pinLiftScale] as it lifts on
-     * [pinLiftSpring], then springs from the finger's release into its slot on [pinDropSpring].
+     * The dragged row (iOS `DrawerLiftedRow`): it grows by [pinLiftScale] as it lifts
+     * (`MotionRole.MicroIn`), then springs from the finger's release into its slot (`MotionRole.Release`).
      */
-    val pinLiftSpring: MotionSpring = MotionSpring(duration = 0.28, bounce = 0.1)
     /** Dragged row grow. */
     const val pinLiftScale: Float = 1.03f
     /** Dragged row shadow: its opacity at full lift (iOS `DrawerLiftedRowView.apply(lift:)`). */
@@ -332,8 +336,6 @@ object DrawerTunables {
     val pinLiftShadowY = Tunable("drawer.pin.liftShadowY", "Dragged row shadow drop", default = 6f, range = 0.0..24.0, step = 0.5)
     /** Dragged row shadow blur, dp. */
     val pinLiftShadowRadius = Tunable("drawer.pin.liftShadowRadius", "Dragged row shadow blur", default = 14f, range = 0.0..40.0, step = 0.5)
-    /** Dragged row landing. */
-    val pinDropSpring: MotionSpring = MotionSpring(duration = 0.36, bounce = 0.12)
     /**
      * Holding the dragged row within [pinEdgeBand] dp of the list's top or bottom scrolls it, up
      * to [pinEdgeSpeed] dp a second at the edge.
@@ -341,22 +343,8 @@ object DrawerTunables {
     val pinEdgeBand = Tunable("drawer.pin.edgeBand", "Drag scroll edge", default = 64f, range = 24.0..140.0, step = 1.0)
     /** Drag scroll speed, dp/s. */
     val pinEdgeSpeed = Tunable("drawer.pin.edgeSpeed", "Drag scroll speed", default = 900f, range = 100.0..2400.0, step = 10.0)
-    /**
-     * Pin and Unpin from the menu: the row travels to its new section, the rows between make
-     * room and the Pinned header fades in or out, as one move. Under Reduce Motion the list
-     * cross-fades over [pinMoveFade].
-     */
-    val pinMoveSpring = TunableSpring("drawer.pin.move", "Pin and Unpin move", duration = 0.36, bounce = 0.0)
-    /** The call button beside Settings coming and going as a call starts and ends. */
-    val callButtonSpring = TunableSpring("drawer.call.button", "Call button in and out", duration = 0.36, bounce = 0.0)
-    /** Pin and Unpin fade (Reduce Motion), s. */
-    val pinMoveFade = Tunable("drawer.pin.moveFade", "Pin and Unpin fade (Reduce Motion)", default = 0.2, range = 0.0..0.6, step = 0.01)
     /** Held row. */
     val holdStyle: DrawerHoldStyle = DrawerHoldStyle.InPlace
-    /** How long the menu's card takes to put its raised surface down as it returns to the list, s. */
-    val holdSettle = Tunable("drawer.hold.settle", "Held row settle", default = 0.3, range = 0.0..0.8, step = 0.01)
-    /** How long a dropped row keeps the drag's raised surface, fading it out, s. */
-    val pinLandFade = Tunable("drawer.pin.landFade", "Dropped row settle", default = 0.22, range = 0.0..0.8, step = 0.01)
     /**
      * How much of the system's grow to undo: the held row's preview starts this much
      * smaller. iOS grows a drawer row about 9.2 %, so 1.09 leaves it about 1 %.

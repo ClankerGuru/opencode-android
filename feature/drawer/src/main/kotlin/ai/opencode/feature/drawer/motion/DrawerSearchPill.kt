@@ -4,7 +4,8 @@ import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.motion.Motion
-import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.MotionPhase
+import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeMinTapTarget
 import ai.opencode.feature.drawer.style.DrawerMetrics
@@ -16,9 +17,8 @@ import ai.opencode.core.ui.SFSymbol
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.clickable
@@ -84,8 +84,12 @@ import kotlin.math.roundToInt
 object DrawerSearchPillDefaults {
     /** The circle at rest and the field's height (`DrawerTunables.searchSize`, at least Android's 48 dp target). */
     val size: Dp get() = maxOf(DrawerTunables.searchSize, OpenCodeMinTapTarget)
-    /** About 0.3 s with a small bounce (iOS `drawer.search.morph`). */
-    val morph = MotionSpring(0.3, 0.15)
+    /**
+     * The capsule grows from its circle on `MotionRole.PanelOpen` and folds back on its exit;
+     * under Reduce Motion the two states cross-fade (iOS `morph(opening:reduceMotion:)`).
+     */
+    fun <T> morph(opening: Boolean, reduceMotion: Boolean = false): FiniteAnimationSpec<T> =
+        MotionRole.PanelOpen.animation(if (opening) MotionPhase.Enter else MotionPhase.Exit, reduceMotion)
     /** The magnifier's box, centred in the circle and, opened, starting on the drawer's text inset. */
     val glyphWidth: Dp = 20.dp
     /** Between the open field and the × button. */
@@ -162,7 +166,7 @@ fun DrawerSearchPill(
             }
         }
         if (isSearching) runCatching { focusRequester.requestFocus() }
-        open.animateTo(if (isSearching) 1f else 0f, if (reducedMotion) Motion.reducedFadeSpec() else DrawerSearchPillDefaults.morph.spec())
+        open.animateTo(if (isSearching) 1f else 0f, DrawerSearchPillDefaults.morph(isSearching, reducedMotion))
     }
 
     val field: @Composable (Modifier) -> Unit = { fieldModifier ->
@@ -275,8 +279,8 @@ private fun SearchCapsule(
     modifier: Modifier,
     field: @Composable (Modifier) -> Unit,
 ) {
-    val leading by animateFloatAsState(leadingPadding.value, DrawerSearchPillDefaults.morph.spec(), label = "search-leading")
-    val trailing by animateFloatAsState(trailingPadding.value, DrawerSearchPillDefaults.morph.spec(), label = "search-trailing")
+    val leading by animateFloatAsState(leadingPadding.value, DrawerSearchPillDefaults.morph(isSearching), label = "search-leading")
+    val trailing by animateFloatAsState(trailingPadding.value, DrawerSearchPillDefaults.morph(isSearching), label = "search-trailing")
     Surface(
         shape = OpenCodeShape.capsule,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -312,8 +316,8 @@ private fun SearchCapsule(
             // iOS `.transition(.opacity)` inside the morph's `withAnimation`: the field fades on the morph spring.
             AnimatedVisibility(
                 isSearching,
-                enter = fadeIn(DrawerSearchPillDefaults.morph.spec()),
-                exit = fadeOut(DrawerSearchPillDefaults.morph.spec()),
+                enter = fadeIn(DrawerSearchPillDefaults.morph(opening = true)),
+                exit = fadeOut(DrawerSearchPillDefaults.morph(opening = false)),
                 modifier = Modifier.weight(1f),
             ) {
                 field(Modifier.fillMaxWidth())
@@ -359,14 +363,15 @@ private fun Modifier.blockingTouches(block: Boolean): Modifier = if (!block) {
 }
 
 /**
- * The drawer's title fades out beneath the opening search, quicker than the capsule grows, and
- * stops taking touches and TalkBack focus (iOS `DrawerSearchTitleFade`).
+ * The drawer's title fades out beneath the opening search (swap's exit, quicker than the capsule
+ * grows) and back on its entrance, and stops taking touches and TalkBack focus (iOS
+ * `DrawerSearchTitleFade`).
  */
 fun Modifier.drawerSearchTitleFade(state: DrawerSearchState): Modifier = composed {
     val searching = state.isSearching
     val alpha by animateFloatAsState(
         if (searching) 0f else 1f,
-        Motion.easeOut(if (searching) 0.12 else 0.2),
+        MotionRole.Swap.animation(if (searching) MotionPhase.Exit else MotionPhase.Enter),
         label = "drawer-search-title",
     )
     graphicsLayer { this.alpha = alpha }
@@ -379,7 +384,8 @@ fun Modifier.drawerSearchFocusFade(state: DrawerSearchState, reducedMotion: Bool
     val focused = state.isFocused
     val alpha by animateFloatAsState(
         if (focused) 0f else 1f,
-        if (reducedMotion) snap() else tween(motionMillis(0.15), easing = Motion.EaseOut),
+        // iOS 03adf07a: fades on swap (a cross-fade under Reduce Motion) instead of popping.
+        MotionRole.Swap.animation(if (focused) MotionPhase.Exit else MotionPhase.Enter, reducedMotion),
         label = "drawer-search-focus",
     )
     graphicsLayer { this.alpha = alpha }

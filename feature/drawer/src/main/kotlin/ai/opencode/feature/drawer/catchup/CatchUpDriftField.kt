@@ -58,7 +58,15 @@ fun CatchUpDriftFieldView(isFinished: Boolean, modifier: Modifier = Modifier) {
     }
     LaunchedEffect(reduceMotion, isPaused) {
         if (reduceMotion || isPaused) return@LaunchedEffect
-        while (true) withFrameNanos { now.doubleValue = it / 1e9 }
+        // A slow drift: 30 frames a second look the same as 60 (iOS 22ddb6a0), so the field
+        // redraws only every other frame or so (a little early, so 60 Hz lands on every second).
+        val frameSeconds = 1.0 / CatchUpDriftRenderer.FRAMES_PER_SECOND
+        while (true) {
+            withFrameNanos { frameNanos ->
+                val time = frameNanos / 1e9
+                if (time - now.doubleValue >= frameSeconds - FRAME_SLACK_SECONDS) now.doubleValue = time
+            }
+        }
     }
 
     Canvas(modifier.clearAndSetSemantics {}) {
@@ -79,8 +87,10 @@ fun CatchUpDriftFieldView(isFinished: Boolean, modifier: Modifier = Modifier) {
     }
 }
 
+private const val FRAME_SLACK_SECONDS = 0.002
+
 /** Owns the shader and its uniforms (iOS `CatchUpDriftRenderer`). */
-private class CatchUpDriftRenderer {
+internal class CatchUpDriftRenderer {
     private val shader = RuntimeShader(SHADER)
     private val startTime = clock()
 
@@ -145,6 +155,12 @@ private class CatchUpDriftRenderer {
     }
 
     companion object {
+        /**
+         * The field drifts over seconds, so it's drawn 30 times a second (iOS `framesPerSecond`).
+         * Android draws it at the screen's own density: a [RuntimeShader] brush has no cheaper
+         * lower-resolution target short of an offscreen hardware renderer (iOS `resolution` 0.75).
+         */
+        const val FRAMES_PER_SECOND = 30
         const val STACK_LEVEL = 0.28f
         const val FINISH_LEVEL = 0.56f
         const val STILL_TIME = 1.3f

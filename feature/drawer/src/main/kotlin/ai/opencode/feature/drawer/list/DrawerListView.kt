@@ -1,6 +1,6 @@
 package ai.opencode.feature.drawer.list
 
-import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.motion.MotionFrameAction
 import ai.opencode.core.motion.SpringSolver
 import ai.opencode.core.motion.motionFrameLoop
@@ -9,7 +9,7 @@ import ai.opencode.core.store.StoreOf
 import ai.opencode.feature.drawer.DrawerListFooter
 import ai.opencode.feature.drawer.HomeFeature
 import ai.opencode.feature.drawer.SessionPagesAction
-import ai.opencode.feature.drawer.icons.resolved
+import ai.opencode.feature.drawer.icons.OpenCodeProjectLookup
 import ai.opencode.feature.drawer.isPinned
 import ai.opencode.feature.drawer.motion.DrawerPanRegions
 import ai.opencode.feature.drawer.motion.DrawerShortcutInputs
@@ -18,18 +18,15 @@ import ai.opencode.feature.drawer.motion.DrawerTimeReveal
 import ai.opencode.feature.drawer.motion.DrawerTimestamp
 import ai.opencode.feature.drawer.motion.ServerSwapMotion
 import ai.opencode.feature.drawer.motion.drawerPanList
-import ai.opencode.feature.drawer.pinnedSessions
-import ai.opencode.feature.drawer.recentSessions
+import ai.opencode.feature.drawer.drawerSessions
 import ai.opencode.feature.drawer.style.DrawerEmptyPinDropZone
 import ai.opencode.feature.drawer.style.DrawerHeaderScrollState
 import ai.opencode.feature.drawer.style.DrawerSectionHeaderKind
 import ai.opencode.feature.drawer.style.DrawerTunables
 import ai.opencode.feature.drawer.visibleSessions
 import ai.opencode.feature.session.ServerFlowTunables
-import ai.opencode.server.model.OpenCodeProject
 import android.view.accessibility.AccessibilityManager
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -122,9 +119,43 @@ internal class DrawerListReveal(private val timeReveal: DrawerTimeReveal) : Draw
     override val progress: Float get() = if (isLive) timeReveal.progress else heldProgress
 }
 
-/** The last model built, so unchanged rows keep their instances. */
-private class DrawerListModelHolder {
+/**
+ * The last model built, so unchanged rows keep their instances; and the gate that keeps a hidden
+ * drawer from building (iOS `DrawerListController`'s deferred builds, f5636460 and 34a02fc4).
+ */
+internal class DrawerListModelHolder {
     var model = DrawerListModel()
+
+    /** Models built, for the perf gate tests (iOS `builds`). */
+    var builds = 0
+        private set
+
+    /** The first build done hidden, before the drawer shows (iOS's prewarm). */
+    private var hasBuilt = false
+    private var wasHidden = false
+
+    /**
+     * This build is the first since the drawer was hidden: what changed while hidden lands in
+     * place instead of animating (iOS `isRevealing`). Cleared once the shortcuts have synced.
+     */
+    var isRevealing = false
+
+    /**
+     * The model to show. While the drawer is hidden it keeps the last one, once there is one (the
+     * prewarm builds it hidden so the first open doesn't); call [build] only when it should change.
+     */
+    fun model(isHidden: Boolean, build: () -> DrawerListModel): DrawerListModel {
+        if (isHidden && hasBuilt) {
+            wasHidden = true
+            return model
+        }
+        if (!isHidden && wasHidden) isRevealing = true
+        wasHidden = isHidden
+        hasBuilt = true
+        builds += 1
+        model = stabilized(model, build())
+        return model
+    }
 }
 
 /**
@@ -175,30 +206,38 @@ fun DrawerListView(
     val whatsNewMounted = shortcutMotion.isWhatsNewMounted(fallback = holder.model.shortcuts.showsWhatsNew)
     val mounted = rememberUpdatedState(catchUpMounted to whatsNewMounted)
 
+    // While the drawer is hidden this reads nothing but the flag, so Home's changes don't rebuild it.
+    val drawerHidden = LocalDrawerHidden.current
     val model by remember {
         derivedStateOf {
-            val next = DrawerListModel.build(
-                state = homeState.value,
-                inputs = currentInputs.value,
-                liftedID = liftedID.value,
-                catchUpMounted = mounted.value.first,
-                whatsNewMounted = mounted.value.second,
-                now = Instant.now(),
-                timestamp = { date, now -> DrawerTimestamp.text(date, now, hour24 = hour24) },
-                project = { session, projects -> OpenCodeProject.resolved(session, projects) },
-            )
-            stabilized(holder.model, next).also { holder.model = it }
+            holder.model(isHidden = drawerHidden.value) {
+                val state = homeState.value
+                // Today and the projects worked out once for every row (iOS f5636460).
+                val day = DrawerTimestamp.Day(Instant.now(), hour24 = hour24)
+                val projects = OpenCodeProjectLookup(state.projects)
+                DrawerListModel.build(
+                    state = state,
+                    inputs = currentInputs.value,
+                    liftedID = liftedID.value,
+                    catchUpMounted = mounted.value.first,
+                    whatsNewMounted = mounted.value.second,
+                    now = Instant.now(),
+                    timestamp = { date, _ -> day.text(date) },
+                    project = { session, _ -> projects.resolved(session) },
+                )
+            }
         }
     }
     val isSettingsShown by remember { derivedStateOf { homeState.value.isSettingsShown } }
 
-    // iOS `DrawerTunables.register(in:)`: the drawer's knobs join the tuning panel while it's on.
-    SideEffect { DrawerTunables.register() }
+    // iOS `DrawerTuningRegistration.registerIfNeeded`: the drawer's knobs join the tuning panel
+    // once while it's on.
+    SideEffect { DrawerTunables.registerIfNeeded() }
 
     // Server Flow: before the rows it moves, as the title may not have drawn it yet.
     val hasApplied = remember { booleanArrayOf(false) }
     SideEffect {
-        inputs.serverSwap?.let { serverSwap?.sync(it, animated = hasApplied[0]) }
+        inputs.serverSwap?.let { serverSwap?.sync(it, animated = hasApplied[0], reduceMotion = inputs.reducedMotion) }
         hasApplied[0] = true
     }
 
@@ -212,7 +251,8 @@ fun DrawerListView(
         searchIsEmpty = model.search.isEmpty(),
         serverID = model.serverID,
         isSettingsShown = isSettingsShown,
-        isDrawerVisible = isDrawerVisible,
+        // What changed while the drawer was hidden lands in place on reveal (iOS 34a02fc4).
+        isDrawerVisible = isDrawerVisible && !holder.isRevealing,
         reducedMotion = model.reducedMotion,
     )
     val lastShortcutInputs = remember { arrayOfNulls<DrawerShortcutInputs>(1) }
@@ -221,6 +261,7 @@ fun DrawerListView(
             lastShortcutInputs[0] = shortcutInputs
             shortcutMotion.sync(shortcutInputs)
         }
+        holder.isRevealing = false
     }
 
     // The time reveal, sprung back from where the rows were.
@@ -314,6 +355,7 @@ fun DrawerListView(
 
     fun beginPinDrag(id: String, fingerY: Float) {
         val state = store.state
+        val sessions = state.drawerSessions
         val unpinnedOrder = state.visibleSessions
             .filter { it.id == id || !state.isPinned(it.id) }
             .sortedByDescending { it.updatedAt }
@@ -321,8 +363,8 @@ fun DrawerListView(
         pinDrag.beginDrag(
             sessionID = id,
             isPinnedSection = state.isPinned(id),
-            pinnedIDs = state.pinnedSessions.map { it.id },
-            recentIDs = state.recentSessions.map { it.id },
+            pinnedIDs = sessions.pinned.map { it.id },
+            recentIDs = sessions.recents.map { it.id },
             unpinnedRecentsIndex = unpinnedOrder.indexOf(id).coerceAtLeast(0),
             showsShortcuts = state.search.isEmpty() && (mounted.value.first || mounted.value.second),
             reducedMotion = currentInputs.value.reducedMotion,
@@ -373,7 +415,7 @@ fun DrawerListView(
             Snapshot.withoutReadObservation {
                 swapPictures.swap(server = shownServer, next = model.serverID, info = listState.layoutInfo, firstVisible = listState.firstVisibleItemIndex, motion = serverSwap)
             }
-        } else if ((switched || (ghosted && swapsRows)) && !model.reducedMotion) {
+        } else if (switched || (ghosted && swapsRows)) {
             listFades[0] += 1
         }
         shownList[0] = model.serverID to model.items
@@ -381,7 +423,8 @@ fun DrawerListView(
     LaunchedEffect(listFades[0]) {
         if (listFades[0] == 0) return@LaunchedEffect
         listAlpha.snapTo(0f)
-        listAlpha.animateTo(1f, tween(250, easing = Motion.EaseInOut))
+        // iOS `Motion.swap.crossDissolve` (Reduce Motion: `Motion.reduced`).
+        listAlpha.animateTo(1f, MotionRole.Swap.animation(reduceMotion = model.reducedMotion))
     }
 
     if (DrawerListPerfProbe.isEnabled) {
@@ -488,7 +531,7 @@ fun DrawerListView(
                     is DrawerListItem.Session -> {
                         val row = current.rows[item.id] ?: return@itemsIndexed
                         val rowActions = remember(row.session.id, row.unread, row.isPinnedSection) {
-                            rowActions(row, store, holder, pinDrag, liftedID, { currentActions }, ::beginPinDrag)
+                            rowActions(row, store, holder, pinDrag, liftedID, listState, { currentActions }, ::beginPinDrag)
                         }
                         DrawerListSessionCell(
                             row = row,
@@ -543,6 +586,7 @@ private fun rowActions(
     holder: DrawerListModelHolder,
     pinDrag: DrawerPinDrag,
     liftedID: androidx.compose.runtime.MutableState<String?>,
+    listState: LazyListState,
     actions: () -> DrawerListActions,
     beginPinDrag: (String, Float) -> Unit,
 ): DrawerListRowActions {
@@ -552,6 +596,7 @@ private fun rowActions(
         select = { actions().select(id) },
         pressed = { store.send(HomeFeature.Action.DrawerRowPressed(id)) },
         menu = { holder.model.rows[id]?.let { actions().menu(it) }.orEmpty() },
+        isListMoving = { listState.isScrollInProgress },
         beginDrag = { y -> beginPinDrag(id, y) },
         moveDrag = { y, time -> pinDrag.updateDrag(y, time) },
         endDrag = { x, y, cancelled ->
@@ -575,14 +620,17 @@ private fun rowActions(
     )
 }
 
-/** iOS `DrawerTimeReveal`'s release: springs the rows back from where they are. */
+/**
+ * iOS `DrawerTimeReveal`'s release: back on `MotionRole.Release`, critically damped from where the
+ * rows are, no bounce on the way home. Under Reduce Motion the time fades out (`Reduced`).
+ */
 private suspend fun springBack(reveal: DrawerListReveal, reducedMotion: Boolean, frameDuration: Double) {
     val startOffset = reveal.heldOffset
     val startProgress = reveal.heldProgress
     val spring = if (reducedMotion) {
-        SpringSolver.of(duration = 0.2, bounce = 0.0, value = 1.0, target = 0.0, positionEpsilon = 0.002, velocityEpsilon = 0.02)
+        SpringSolver(MotionRole.Reduced, value = 1.0, target = 0.0, positionEpsilon = 0.002, velocityEpsilon = 0.02)
     } else {
-        SpringSolver.of(duration = 0.4, bounce = 0.2, value = startOffset.toDouble(), target = 0.0, positionEpsilon = 0.1, velocityEpsilon = 1.0)
+        SpringSolver(MotionRole.Release, value = startOffset.toDouble(), target = 0.0, positionEpsilon = 0.1, velocityEpsilon = 1.0)
     }
     motionFrameLoop(frameDurationSeconds = frameDuration) { tick ->
         val step = spring.step(tick.dt)

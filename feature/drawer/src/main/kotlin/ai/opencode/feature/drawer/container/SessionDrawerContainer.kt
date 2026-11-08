@@ -11,6 +11,7 @@ import ai.opencode.feature.drawer.catchup.CatchUpStack
 import ai.opencode.feature.drawer.catchup.CatchUpStage
 import ai.opencode.feature.drawer.catchup.CatchUpStageProxy
 import ai.opencode.feature.drawer.catchup.rememberCatchUpStackController
+import ai.opencode.feature.drawer.list.LocalDrawerHidden
 import ai.opencode.feature.drawer.list.rememberInboxSidebarOn
 import ai.opencode.feature.drawer.motion.DrawerCorner
 import ai.opencode.feature.drawer.motion.DrawerDepth
@@ -239,6 +240,8 @@ fun SessionDrawerContainer(
         drawerPrewarmed = true
     }
     val drawerComposed = drawerShows || drawerEverShown[0] || drawerPrewarmed
+    // While it can't show, the composed drawer builds nothing and nothing in it ticks (iOS f5636460).
+    val drawerHidden = rememberUpdatedState(!drawerShows)
     // Android: the phone's drawer is a Material modal drawer. It slides in over the session,
     // which stays put under a scrim, instead of the session sliding aside as iOS's card does.
     val modal = sidebarShown == null
@@ -320,7 +323,7 @@ fun SessionDrawerContainer(
                     }
                     .then(if (hiddenFromAccessibility) Modifier.clearAndSetSemantics {} else Modifier),
             ) {
-                drawer()
+                CompositionLocalProvider(LocalDrawerHidden provides drawerHidden) { drawer() }
                 if (sidebarShown != null) {
                     // The sidebar's edge against the session.
                     Box(

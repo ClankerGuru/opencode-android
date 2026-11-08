@@ -10,9 +10,6 @@ import ai.opencode.core.store.TestStore
 import ai.opencode.core.testing.TestIsolationRule
 import ai.opencode.core.testing.eventually
 import ai.opencode.feature.drawer.HomeFeature.State.Indicator
-import ai.opencode.feature.drawer.motion.DrawerDotArrival
-import ai.opencode.feature.drawer.motion.DrawerDotPose
-import ai.opencode.feature.drawer.motion.DrawerDotTunables
 import ai.opencode.feature.session.DrawerBadge
 import ai.opencode.feature.session.SessionFeature
 import ai.opencode.feature.session.withRequestsConnectionIsAvailable
@@ -39,7 +36,6 @@ import org.junit.Rule
 import org.junit.Test
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.math.abs
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
@@ -47,7 +43,7 @@ import kotlin.time.Duration.Companion.seconds
  * Port of iOS `DrawerActivityTests.swift`: the drawer's running indicators, matched to the TUI
  * and the desktop app: a root shows Working while it or any session in its family runs
  * (subagents moved to the background run their own sessions); shells don't count. Plus
- * `DrawerDotArrivalTests` (the drawer button's dot).
+ * `DrawerDotTests` (the drawer button's dot).
  *
  * Stores run their effects in `backgroundScope` (iOS `skipInFlightEffects`). iOS's
  * `withObservationTracking` probes of `busySessionIDs` become before/after comparisons of
@@ -56,11 +52,7 @@ import kotlin.time.Duration.Companion.seconds
  * Other modules (`:app`, `AppFeature`):
  * - `aRelaunchShowsCachedRunningStateOnlyWhileItIsFresh`
  * - `theSingleCacheOfEarlierBuildsMovesIntoPerServerCaches`
- * - `DrawerDotArrivalTests.initialLoadOrRestoreWithDotAlreadyShowingStartsAtRest`'s AppFeature
- *   restore half (the `DrawerDotArrival.initial` half is ported).
- *
- * Partially ported: `tunablesRegisterWithBrightenDefaults` (Android bakes Tunables; no Tuning
- * registry), so only the defaults and `Parameters()` are asserted.
+ * - `DrawerDotTests.restoredSnapshotShowsTheDotAtOnce`
  */
 class DrawerActivityTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -534,10 +526,9 @@ class DrawerActivityTests {
     }
 }
 
-class DrawerDotArrivalTests {
+class DrawerDotTests {
     @get:Rule val isolation = TestIsolationRule()
 
-    private val frame = 1.0 / 60
     private val server = OpenCodeServer(url = "https://drawer-dot.example", username = "", password = "")
 
     private fun session(id: String, idle: Long? = null, viewed: Long? = null) = OpenCodeSession(
@@ -545,158 +536,38 @@ class DrawerDotArrivalTests {
         updatedAt = Instant.ofEpochSecond(10), idleMilliseconds = idle, viewedMilliseconds = viewed,
     )
 
+    /** The dot appears once per run of unread or waiting sessions elsewhere, changes colour in place, and goes once they're all read. */
     @Test
-    fun tunablesRegisterWithBrightenDefaults() {
-        assertEquals(0.6, DrawerDotTunables.BRIGHTEN_DURATION, 0.0)
-        assertEquals(0.85, DrawerDotTunables.BRIGHTEN_FLASH, 0.0)
-        assertEquals(5.5, DrawerDotTunables.BRIGHTEN_GLOW, 0.0)
-        assertEquals(DrawerDotArrival.Parameters(brightenDuration = 0.6, brightenFlash = 0.85, brightenGlow = 5.5), DrawerDotArrival.Parameters())
-    }
-
-    @Test
-    fun initialLoadOrRestoreWithDotAlreadyShowingStartsAtRest() {
-        val unread = DrawerDotArrival.initial(DrawerBadge.Unread)
-        assertTrue(unread.isSettled(0.0))
-        assertEquals(DrawerDotPose.resting, unread.pose(0.0))
-
-        val attention = DrawerDotArrival.initial(DrawerBadge.Attention)
-        assertTrue(attention.isSettled(0.0))
-        assertEquals(DrawerDotPose.resting, attention.pose(0.0))
-
-        val hidden = DrawerDotArrival.initial(null)
-        assertTrue(hidden.isSettled(0.0))
-        assertEquals(DrawerDotPose.hidden, hidden.pose(0.0))
-    }
-
-    @Test
-    fun brightenArrivesAtFullSizeWithGlowAndCoolsToRestingDot() {
-        val start = 10.0
-        val arrival = DrawerDotArrival.initial(null).retargeted(DrawerBadge.Unread, reduceMotion = false, parameters = DrawerDotArrival.Parameters(), time = start)
-        assertFalse(arrival.isSettled(start))
-        val pPeak = arrival.pose(start + arrival.duration * 0.12)
-        val pMid = arrival.pose(start + arrival.duration * 0.35)
-        val pEnd = arrival.pose(start + arrival.duration)
-
-        assertTrue(abs(pPeak.scale - 1.0) < 1e-5)
-        assertTrue(abs(pMid.scale - 1.0) < 1e-5)
-        assertTrue(pPeak.flash > 0.8)
-        assertTrue(pMid.flash > 0.2 && pMid.flash < pPeak.flash)
-        assertTrue(pMid.glowOpacity > 0.15)
-        assertTrue(pMid.glowRadius > 3.5)
-        assertTrue(pMid.glowScale > 1.1)
-
-        // Settles at duration and remains at `resting` forever after.
-        assertTrue(arrival.isSettled(start + arrival.duration))
-        assertEquals(DrawerDotPose.resting, pEnd)
-        assertEquals(DrawerDotPose.resting, arrival.pose(start + arrival.duration + 5.0))
-    }
-
-    @Test
-    fun arrivalFiresOncePerAppearanceAndNeverRepeatsWhileVisible() {
+    fun badgeAppearsOncePerRunAndChangesColourInPlace() {
         val open = session("ses_open", idle = 1_000, viewed = 1_000)
         val s1 = session("ses_1", idle = 1_000, viewed = 1_000)
         val s2 = session("ses_2", idle = 1_000, viewed = 1_000)
         val s3 = session("ses_3", idle = 1_000, viewed = 1_000)
         var state = HomeFeature.State(server, OpenCodeHomeSnapshot(projects = emptyList(), sessions = listOf(open, s1, s2, s3), activeSessionIDs = emptySet()))
-        assertNull(state.drawerBadge(excluding = open.id))
-
-        var arrival = DrawerDotArrival.initial(state.drawerBadge(excluding = open.id))
-        var arrivalCount = 0
-        fun syncBadge(time: Double) {
-            val wasSettled = arrival.isSettled(time)
-            val hadTarget = arrival.targetBadge != null
-            arrival = arrival.retargeted(state.drawerBadge(excluding = open.id), reduceMotion = false, parameters = DrawerDotArrival.Parameters(), time = time)
-            if (!hadTarget && arrival.targetBadge != null && !arrival.isSettled(time) && wasSettled) arrivalCount += 1
+        val badges = mutableListOf(state.drawerBadge(excluding = open.id))
+        fun record() {
+            badges.add(state.drawerBadge(excluding = open.id))
         }
         fun editSession(index: Int, edit: (OpenCodeSession) -> OpenCodeSession) {
             state = state.copy(sessions = state.sessions.toMutableList().also { it[index] = edit(it[index]) })
         }
 
-        // 1. First session becomes unread (0 -> 1): dot appears and fires arrival once.
         editSession(1) { it.copy(idleMilliseconds = 2_000) }
-        syncBadge(1.0)
-        assertEquals(1, arrivalCount)
-        assertFalse(arrival.isSettled(1.0))
-
-        // Settle the first arrival.
-        val settledAt = 1.0 + arrival.duration
-        assertTrue(arrival.isSettled(settledAt))
-        assertEquals(DrawerDotPose.resting, arrival.pose(settledAt))
-
-        // 2. Unread count changes (1 -> 2 -> 3) while dot is showing: never re-fires.
+        record()
         editSession(2) { it.copy(idleMilliseconds = 3_000) }
-        syncBadge(2.0)
-        assertTrue(arrival.isSettled(2.0))
-        assertEquals(DrawerDotPose.resting, arrival.pose(2.0))
-
-        editSession(3) { it.copy(idleMilliseconds = 4_000) }
-        syncBadge(3.0)
-        assertTrue(arrival.isSettled(3.0))
-        assertEquals(DrawerDotPose.resting, arrival.pose(3.0))
-
-        // 3. Another session needs input and resolves back while the dot is already showing:
-        // colour updates in place without re-firing the arrival animation.
+        record()
         state = state.copy(attentionSessionIDs = setOf(s2.id))
-        syncBadge(4.0)
-        assertEquals(DrawerBadge.Attention, arrival.displayedBadge)
-        assertTrue(arrival.isSettled(4.0))
-        assertEquals(DrawerDotPose.resting, arrival.pose(4.0))
-
+        record()
         state = state.copy(attentionSessionIDs = emptySet())
-        syncBadge(5.0)
-        assertEquals(DrawerBadge.Unread, arrival.displayedBadge)
-        assertTrue(arrival.isSettled(5.0))
-        assertEquals(DrawerDotPose.resting, arrival.pose(5.0))
-        assertEquals(1, arrivalCount)
-
-        // 4. All other sessions are read (3 -> 0): dot exits to hidden.
+        record()
         for (i in 1..3) editSession(i) { it.copy(viewedMilliseconds = it.idleMilliseconds) }
-        syncBadge(6.0)
-        assertNull(arrival.targetBadge)
-        val hiddenAt = 6.0 + arrival.duration
-        assertTrue(arrival.isSettled(hiddenAt))
-        assertEquals(DrawerDotPose.hidden, arrival.pose(hiddenAt))
+        record()
+        editSession(3) { it.copy(idleMilliseconds = 5_000) }
+        record()
 
-        // 5. A new unread session arrives after the dot disappeared: fires once for the new appearance.
-        editSession(1) { it.copy(idleMilliseconds = 5_000) }
-        syncBadge(7.0)
-        assertEquals(2, arrivalCount)
-        assertFalse(arrival.isSettled(7.0))
-    }
-
-    @Test
-    fun disappearingMidAnimationContinuesSmoothlyWithoutJumping() {
-        val start = 0.0
-        val entering = DrawerDotArrival.initial(null).retargeted(DrawerBadge.Unread, reduceMotion = false, time = start)
-        val interruptAt = entering.duration * 0.32
-        val before = entering.pose(interruptAt)
-        val exiting = entering.retargeted(null, reduceMotion = false, time = interruptAt)
-        val after = exiting.pose(interruptAt)
-
-        assertTrue(abs(after.opacity - before.opacity) < 1e-9)
-        assertTrue(abs(after.scale - before.scale) < 1e-6)
-        assertTrue(abs(after.flash - before.flash) < 1e-9)
-        assertTrue(abs(after.glowOpacity - before.glowOpacity) < 1e-9)
-
-        // Consecutive 60 Hz frames during exit never jump.
-        val opacities = generateSequence(interruptAt) { it + frame }.takeWhile { it <= interruptAt + exiting.duration }.map { exiting.pose(it).opacity }.toList()
-        val maxStep = opacities.zipWithNext { a, b -> abs(b - a) }.maxOrNull() ?: 0.0
-        assertTrue(maxStep < 0.15)
-        assertEquals(DrawerDotPose.hidden, exiting.pose(interruptAt + exiting.duration))
-    }
-
-    @Test
-    fun reduceMotionUsesPlainFadeWithNoGlowOrFlash() {
-        val arrival = DrawerDotArrival.initial(null).retargeted(DrawerBadge.Unread, reduceMotion = true, time = 0.0)
-        var t = 0.0
-        while (t <= arrival.duration) {
-            val pose = arrival.pose(t)
-            assertEquals(1.0, pose.scale, 0.0)
-            assertEquals(0.0, pose.flash, 0.0)
-            assertEquals(0.0, pose.glowOpacity, 0.0)
-            assertEquals(0.0, pose.glowRadius, 0.0)
-            t += frame
-        }
-        assertEquals(DrawerDotPose.resting, arrival.pose(arrival.duration))
+        assertEquals(
+            listOf(null, DrawerBadge.Unread, DrawerBadge.Unread, DrawerBadge.Attention, DrawerBadge.Unread, null, DrawerBadge.Unread),
+            badges,
+        )
     }
 }

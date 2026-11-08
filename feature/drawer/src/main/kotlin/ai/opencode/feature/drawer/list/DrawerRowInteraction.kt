@@ -20,13 +20,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.AwaitPointerEventScope
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 
 /*
  * Port of iOS `DrawerRowInteraction.swift`: a drawer row's touches. A tap opens the session; a
- * finger coming down tells Home first (`pressed`, so its transcript warms); a hold opens the menu
+ * finger resting on the row for [DRAWER_ROW_PRESS_DELAY_MS], or a tap, tells Home first (`pressed`,
+ * so its transcript warms), but never a finger that scrolls the list or lands on a moving one
+ * (iOS `Coordinator.pressDelay`); a hold opens the menu
  * over the lifted row; moving the held finger lifts the row to pin, unpin or reorder it
  * ([DrawerPinDrag]), as iOS's context menu and drag interactions share one view.
  *
@@ -61,9 +64,14 @@ class DrawerRowInteraction(
     val reorderable: Boolean,
     val isPinnedSection: Boolean = false,
     val select: () -> Unit,
-    /** A finger came down on the row, ahead of any tap. */
+    /**
+     * A finger rested on the row ([DRAWER_ROW_PRESS_DELAY_MS]) or tapped it, ahead of the tap's
+     * selection; never a finger that scrolls the list.
+     */
     val pressed: () -> Unit,
     val menu: () -> List<DrawerRowMenuItem>,
+    /** The list is scrolling or flinging (iOS `Coordinator.isMoving`). */
+    val isListMoving: () -> Boolean = { false },
     /** The held finger moved: the drag begins at [fingerInList] (dp, the list's coordinates). */
     val beginDrag: ((fingerInList: Offset) -> Unit)? = null,
     /** The finger moved while dragging (dp, the list's coordinates). */
@@ -72,6 +80,15 @@ class DrawerRowInteraction(
     val endDrag: (fingerInList: Offset, cancelled: Boolean) -> Unit = { _, _ -> },
     val lifted: (String?) -> Unit = {},
 )
+
+/**
+ * How long a finger rests on a row before it's a press (the session's transcript starts loading),
+ * unless the list starts scrolling first (iOS `Coordinator.pressDelay`).
+ */
+const val DRAWER_ROW_PRESS_DELAY_MS = 80L
+
+/** How a finger's first moments on a row ended. */
+private enum class DrawerRowTouch { Tapped, Taken, Rested }
 
 /** A row's hold: its menu on screen, or a drag under way (iOS `Coordinator.isMenuVisible`/`isDragActive`). */
 @Stable
@@ -117,30 +134,49 @@ fun Modifier.drawerRowInteraction(
             val pointer = down.id
             // A new touch on the row: an earlier hold's menu never lingers.
             if (hold.isMenuVisible) hold.dismissMenu()
-            current.pressed()
             val slop = viewConfiguration.touchSlop
 
-            // Before the hold: a tap, or a drag someone else (the list, the drawer) takes.
-            var tapped = false
-            val held = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
-                while (true) {
-                    val event = awaitPointerEvent()
-                    val change = event.changes.firstOrNull { it.id == pointer } ?: break
-                    if (change.isConsumed) break
-                    if (!change.pressed) {
-                        tapped = true
-                        change.consume()
-                        break
+            // Waits up to [timeoutMillis] for the finger to lift (a tap), or for a drag someone
+            // else (the list, the drawer) takes; otherwise the finger rested.
+            suspend fun AwaitPointerEventScope.awaitTouch(timeoutMillis: Long): DrawerRowTouch {
+                var outcome = DrawerRowTouch.Rested
+                withTimeoutOrNull(timeoutMillis) {
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull { it.id == pointer }
+                        if (change == null || change.isConsumed) {
+                            outcome = DrawerRowTouch.Taken
+                            break
+                        }
+                        if (!change.pressed) {
+                            change.consume()
+                            outcome = DrawerRowTouch.Tapped
+                            break
+                        }
+                        if ((change.position - down.position).getDistance() > slop) {
+                            outcome = DrawerRowTouch.Taken
+                            break
+                        }
                     }
-                    if ((change.position - down.position).getDistance() > slop) break
                 }
-                Unit
-            } == null
-            if (tapped) {
+                return outcome
+            }
+
+            // A finger landing on a moving list stops it, and isn't choosing a row: no press.
+            val landedOnMovingList = current.isListMoving()
+            var touch = awaitTouch(DRAWER_ROW_PRESS_DELAY_MS)
+            val pressDue = touch == DrawerRowTouch.Tapped || touch == DrawerRowTouch.Rested
+            if (pressDue && !landedOnMovingList && !current.isListMoving()) current.pressed()
+
+            // Before the hold: a tap, or a drag someone else takes.
+            if (touch == DrawerRowTouch.Rested) {
+                touch = awaitTouch(viewConfiguration.longPressTimeoutMillis - DRAWER_ROW_PRESS_DELAY_MS)
+            }
+            if (touch == DrawerRowTouch.Tapped) {
                 current.select()
                 return@awaitEachGesture
             }
-            if (!held) return@awaitEachGesture
+            if (touch == DrawerRowTouch.Taken) return@awaitEachGesture
 
             // The hold: the menu over the lifted row.
             haptics.play(Haptic.tap)

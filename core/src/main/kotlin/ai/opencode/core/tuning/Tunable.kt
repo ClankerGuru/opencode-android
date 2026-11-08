@@ -34,9 +34,9 @@ import kotlin.random.Random
  *
  * ```kotlin
  * object DrawerTunables {
- *     val cardOmega = Tunable("drawer.card.omega", "Card spring ω", default = 28.5, range = 10.0..60.0)
+ *     val recedeScale = Tunable("drawer.depth.recedeScale", "List recede scale", default = 0.96, range = 0.85..1.0)
  * }
- * val omega = DrawerTunables.cardOmega.value
+ * val scale = DrawerTunables.recedeScale.value
  * ```
  *
  * Same keys, labels, defaults, ranges and steps as iOS, so a value tuned on one phone means the
