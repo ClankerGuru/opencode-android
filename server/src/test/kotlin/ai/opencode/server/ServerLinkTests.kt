@@ -550,7 +550,7 @@ class ServerLinkTests {
         val fixture = WireFixture { Reply.Open(200, "data: {\"type\":\"server.connected\"}\n\n") }
         try {
             // Its first line arrives before the clock moves: silence counts from there.
-            expectTimeout(fixture, EventStreamWatchdog.IDLE_DEADLINE)
+            expectTimeout(fixture, EventStreamWatchdog.IDLE_DEADLINE, sendsALine = true)
         } finally {
             fixture.close()
         }
@@ -560,33 +560,41 @@ class ServerLinkTests {
     @Test fun aStreamThatNeverAnswersEndsAtTheConnectDeadline() {
         val fixture = WireFixture { Reply.Silent }
         try {
-            expectTimeout(fixture, EventStreamWatchdog.CONNECT_DEADLINE)
+            expectTimeout(fixture, EventStreamWatchdog.CONNECT_DEADLINE, sendsALine = false)
         } finally {
             fixture.close()
         }
     }
 
-    private fun expectTimeout(fixture: WireFixture, deadline: Duration) = runBlocking {
+    private fun expectTimeout(fixture: WireFixture, deadline: Duration, sendsALine: Boolean) = runBlocking {
         val clock = TestClock()
         val outcome = AtomicReference<OpenCodeClientError?>(null)
         val done = AtomicBoolean(false)
+        val sawLine = AtomicBoolean(false)
         val reader = launch(Dispatchers.Default) {
-            NetworkRetry.clock.withValue(clock) {
-                try {
-                    OpenCodeClient.liveValue.events(fixture.server).collect {}
-                } catch (error: OpenCodeClientError) {
-                    outcome.set(error)
-                } catch (error: CancellationException) {
-                    throw error
-                } catch (error: Throwable) {
-                    fail("Unexpected $error")
+            // The stream tells the link about each line; the test waits on that, not on a fixed
+            // pause, so a slow machine can't read the first line after time has moved.
+            withDependenciesSuspending({
+                this[ServerLinkClient] = ServerLinkClient.testValue.copy(noteStreamActivity = { sawLine.set(true) })
+            }) {
+                NetworkRetry.clock.withValue(clock) {
+                    try {
+                        OpenCodeClient.liveValue.events(fixture.server).collect {}
+                    } catch (error: OpenCodeClientError) {
+                        outcome.set(error)
+                    } catch (error: CancellationException) {
+                        throw error
+                    } catch (error: Throwable) {
+                        fail("Unexpected $error")
+                    }
                 }
             }
             done.set(true)
         }
-        // Let the request and its first frame land before time moves.
-        for (attempt in 0 until 50) {
-            if (fixture.requests.isNotEmpty()) break
+        // Let the request (and its first line, when the fixture sends one) land before time moves.
+        for (attempt in 0 until 500) {
+            val landed = if (sendsALine) sawLine.get() else fixture.requests.isNotEmpty()
+            if (landed) break
             delay(10)
         }
         delay(50)
@@ -596,6 +604,11 @@ class ServerLinkTests {
         for (attempt in 0 until 40) {
             if (done.get()) break
             clock.advance(500.milliseconds)
+            delay(10)
+        }
+        // Past the deadline; a loaded machine can take a moment to wind the stream down.
+        for (attempt in 0 until 500) {
+            if (done.get()) break
             delay(10)
         }
         reader.cancel()
