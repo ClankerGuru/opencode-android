@@ -127,6 +127,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draganddrop.DragAndDropEvent
@@ -165,6 +166,7 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -337,15 +339,26 @@ internal class SessionComposerViewState {
  * belonged to (a field the drawer holds with its keys down has none; on a hardware keyboard the
  * focused field has it with no soft keys up, and the system keeps them down when it comes back).
  * The field loses its focus as the old activity's views go, after the first save, so later saves
- * while configurations change keep what that one saw. Restored only within the same process: after process death iOS starts
- * without the keyboard too.
+ * of the same switch keep what that one saw. A field still being restored (its focus not
+ * yet back, or its keys not yet up) when the next switch comes keeps it too. Restored only within
+ * the same process: after process death iOS starts without the keyboard too.
  */
 internal class ComposerKeyboardRestore(private val restored: SessionFeature.State.TaskIdentity? = null) {
     var hadKeyboard: () -> Boolean = { false }
     var changingConfigurations: () -> Boolean = { false }
     var identity: SessionFeature.State.TaskIdentity? = null
+    /** The restored field still has its focus (and isn't held by the drawer). */
+    var keepsRestoredFocus: () -> Boolean = { false }
+    /** The field took the keyboard back and hasn't let go of its focus since. */
+    var isRestoring = false
     private var pending = restored != null
     private var savedKeyboard = false
+    /** The last save came while configurations were changing (the same switch saves more than once). */
+    private var savedWhileChanging = false
+
+    /** A recreation saving now, before or during this restore, keeps the field's keyboard. */
+    private fun stillRestoring(): Boolean =
+        (pending && restored == identity) || (isRestoring && keepsRestoredFocus())
 
     /** Whether the field should take the keyboard back on [current]; true at most once. */
     fun takeRestore(current: SessionFeature.State.TaskIdentity): Boolean {
@@ -359,7 +372,12 @@ internal class ComposerKeyboardRestore(private val restored: SessionFeature.Stat
 
         val Saver: Saver<ComposerKeyboardRestore, ArrayList<String>> = Saver(
             save = { restore ->
-                restore.savedKeyboard = restore.hadKeyboard() || (restore.savedKeyboard && restore.changingConfigurations())
+                // Only an earlier save of this same switch carries over, never one from before it
+                // (leaving the screen, going to the background).
+                val changing = restore.changingConfigurations()
+                val carries = restore.savedKeyboard && changing && restore.savedWhileChanging
+                restore.savedKeyboard = restore.hadKeyboard() || restore.stillRestoring() || carries
+                restore.savedWhileChanging = changing
                 val identity = restore.identity?.takeIf { restore.savedKeyboard }
                 identity?.let { arrayListOf(process, it.serverID, it.visit.toString(), it.sessionID.orEmpty()) }
             },
@@ -585,10 +603,15 @@ fun SessionComposer(
     keyboardRestore.hadKeyboard = {
         host.messageFieldFocused && (ime.getBottom(density) > 0 || (typesOnHardwareKeys && drawerHold?.holdsCardField != true))
     }
+    keyboardRestore.keepsRestoredFocus = { host.messageFieldFocused && drawerHold?.holdsCardField != true }
     keyboardRestore.changingConfigurations = { activity?.isChangingConfigurations == true }
     keyboardRestore.identity = snapshot.taskIdentity
     LaunchedEffect(keyboardRestore) {
-        if (keyboardRestore.takeRestore(snapshot.taskIdentity) && !host.isCatchUpCard) env.focus()
+        if (!keyboardRestore.takeRestore(snapshot.taskIdentity) || host.isCatchUpCard) return@LaunchedEffect
+        env.focus()
+        keyboardRestore.isRestoring = true
+        snapshotFlow { host.messageFieldFocused }.first { !it }
+        keyboardRestore.isRestoring = false
     }
     // iOS `resetDictationPresentation()` and the hold's `onChange`.
     val recordingNow = snapshot.isPreparingDictation || snapshot.isDictating || snapshot.dictationHold != null

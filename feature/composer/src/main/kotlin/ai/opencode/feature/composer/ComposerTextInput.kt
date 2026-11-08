@@ -11,6 +11,7 @@ import ai.opencode.core.ui.drawerKeyboardField
 import ai.opencode.server.model.PastedText
 import android.net.Uri
 import android.os.SystemClock
+import android.view.WindowInsetsController
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.content.MediaType
@@ -90,6 +91,7 @@ import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.WindowInfo
 import androidx.compose.ui.semantics.contentDescription
@@ -122,6 +124,9 @@ import kotlin.math.roundToInt
 
 /** How long a recreated window's inherited keys stay up over the restored field before they count as its own. */
 private const val INHERITED_KEYS_SETTLE_MILLIS = 1_000L
+
+/** How long keys must stay hidden before they count as having left the focused field (A-01). */
+private const val KEYS_LEFT_SETTLE_MILLIS = 250L
 
 /**
  * The composer tunables the text input reads (iOS `ComposerTunables`, `Session/ComposerViews.swift`):
@@ -851,8 +856,30 @@ fun ComposerTextInput(
         // A recreated window (dark mode, font size) first reports the old window's keys as shown,
         // then as hidden while they rise for this field: keys on their way up aren't leaving.
         if (imeTarget.getBottom(density) > 0) return@LaunchedEffect
+        // Keys that take no room (Gboard floating, or its toolbar over a hardware keyboard) keep
+        // the target at 0 and, as a recreated window re-attaches them, can flick hidden and straight
+        // back: only keys that stay down have left (a flick back restarts this effect).
+        delay(KEYS_LEFT_SETTLE_MILLIS)
+        if (!hasFocus || drawerHold?.isHeld(fieldKey) == true || isKeyboardHeld) return@LaunchedEffect
         if (!windowInfo.isWindowFocused || !lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return@LaunchedEffect
         dismissKeyboard()
+    }
+
+    // A recreated window asks for the restored field's keys before it is the IME's target; when
+    // switches come quickly the system drops that request and the keys never come. The first time
+    // this window can control the keys, a field that already has focus asks for them again.
+    val view = LocalView.current
+    DisposableEffect(view) {
+        val controller = view.windowInsetsController
+        val listener = object : WindowInsetsController.OnControllableInsetsChangedListener {
+            override fun onControllableInsetsChanged(controller: WindowInsetsController, types: Int) {
+                if (types and android.view.WindowInsets.Type.ime() == 0) return
+                controller.removeOnControllableInsetsChangedListener(this)
+                if (hasFocus && !held) keyboard?.show()
+            }
+        }
+        controller?.addOnControllableInsetsChangedListener(listener)
+        onDispose { controller?.removeOnControllableInsetsChangedListener(listener) }
     }
 
     // The caret's drop handle, the selection handles and the text toolbar are popup windows over
