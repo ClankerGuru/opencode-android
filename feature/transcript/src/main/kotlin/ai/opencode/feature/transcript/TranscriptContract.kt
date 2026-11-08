@@ -104,6 +104,11 @@ data class TranscriptConfiguration(
     val isLoadingEarlier: Boolean = false,
     val earlierHistoryError: String? = null,
     val isLoading: Boolean = false,
+    /**
+     * Android: the server's transcript is in and every earlier page is listed. Unlike
+     * `!hasEarlierItems`, never true for a restored cache still waiting for its first read.
+     */
+    val listsAllHistory: Boolean = false,
     val showsEmptyState: Boolean = true,
     val isRunning: Boolean = false,
     /**
