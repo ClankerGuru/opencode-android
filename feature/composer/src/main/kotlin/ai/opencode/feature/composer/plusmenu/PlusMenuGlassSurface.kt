@@ -357,6 +357,17 @@ object PlusMenuPlacement {
         return menu.translate(0f, min(0f, keyboardTop - gap - menu.bottom))
     }
 
-    fun foot(composer: Rect, screenBottom: Float, keyboardTop: Float?, drop: Float, floor: Float = AttachmentMenuMetrics.overComposerFloor.value): Float =
-        min(composer.bottom + drop, screenBottom - floor)
+    /**
+     * [navigationBarInset] (Android only): the navigation bar's height over [screenBottom] while
+     * the keyboard is down. The foot stays out of it, since Android keeps that area for system
+     * gestures, whereas iOS draws its home indicator over the menu.
+     */
+    fun foot(
+        composer: Rect,
+        screenBottom: Float,
+        keyboardTop: Float?,
+        drop: Float,
+        floor: Float = AttachmentMenuMetrics.overComposerFloor.value,
+        navigationBarInset: Float = 0f,
+    ): Float = min(composer.bottom + drop, screenBottom - max(navigationBarInset, floor))
 }

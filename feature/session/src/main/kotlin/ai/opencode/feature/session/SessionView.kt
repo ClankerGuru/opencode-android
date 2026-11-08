@@ -220,6 +220,9 @@ fun SessionView(
     val agentScope by store.observe { "${it.server.persistenceID}|${it.session?.id ?: "draft"}" }
     val errorMessage by store.observe { it.errorMessage }
     val identity by store.observe { it.transcriptIdentity }
+    // Read in composition, not in the SideEffect: SideEffect reads aren't observed, so an import
+    // finishing would leave the host's copy stale.
+    val isImportingAttachments = importer.isLoadingImages || importer.isLoadingFiles
 
     SideEffect {
         composerHost.backgroundWorkAnchor = backgroundWorkAnchor
@@ -228,7 +231,7 @@ fun SessionView(
         composerHost.onConnectionAction = onConnectionAction
         composerHost.onJumpToLatest = { scrollEdgeBridge.jumpRequest += 1 }
         composerHost.borrowedDrag = scrollEdgeBridge.borrowedDrag
-        composerHost.isImportingAttachments = importer.isLoadingImages || importer.isLoadingFiles
+        composerHost.isImportingAttachments = isImportingAttachments
         composerHost.importer = importer
         composerHost.headerHeight = headerHeight
         if (composerHost.pendingAttachmentsRow == null) composerHost.pendingAttachmentsRow = { expanded -> SessionPendingAttachments(store, composerHost.sendTransition.images, expanded) }
