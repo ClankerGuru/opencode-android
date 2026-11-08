@@ -247,8 +247,9 @@ private fun TranscriptListContent(
             if (position.settleLayouts > 0) return@SideEffect
             val index = controller.snapshot.items.indexOfFirst { it.key == key }
             if (index < 0) {
-                // All of the history is listed and the row isn't in it: nothing to go back to.
-                if (configuration.entries.isNotEmpty() && !configuration.hasEarlierItems && !configuration.isLoadingEarlier) position.anchor = null
+                // All of the history is listed and the row isn't in it: nothing to go back to. (Not
+                // `!hasEarlierItems`: a restored cache says that before its first read lands, F-65.)
+                if (configuration.listsAllHistory) position.anchor = null
                 return@SideEffect
             }
             position.settleLayouts = 3
