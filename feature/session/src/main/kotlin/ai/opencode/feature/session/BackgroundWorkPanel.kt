@@ -19,7 +19,9 @@ import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.RollingNumber
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.core.ui.AccessibilityFocusRequest
 import ai.opencode.core.ui.accessibilityFocusRequest
+import ai.opencode.core.ui.rememberAccessibilityFocusRequest
 import ai.opencode.feature.transcript.list.TranscriptBorrowedDrag
 import ai.opencode.feature.transcript.list.passesDragsToTranscript
 import ai.opencode.feature.voice.VoiceLabEnvironment
@@ -473,6 +475,7 @@ fun BackgroundWorkPresentation(
     var capsuleMounted by remember { mutableStateOf(hasWork) }
     // TalkBack's way back to the capsule once the panel has folded into it (iOS: the modal panel ends on the capsule's button).
     var capsuleFocus by remember { mutableStateOf<Int?>(null) }
+    val capsuleFocusRequest = rememberAccessibilityFocusRequest(capsuleFocus)
     // 0 = the capsule's bounds, 1 = the panel's.
     val progress = remember { Animatable(0f) }
     val capsuleAlpha = remember { Animatable(if (hasWork) 1f else 0f) }
@@ -835,7 +838,7 @@ fun BackgroundWorkPresentation(
                     Modifier
                         .fillMaxSize()
                         .graphicsLayer { alpha = 1f - progress.value }
-                        .accessibilityFocusRequest(capsuleFocus)
+                        .accessibilityFocusRequest(capsuleFocusRequest)
                         .then(
                             // iOS draws the capsule's button only while its glass is up (`capsuleShown`):
                             // a capsule fading with the work, or gone, takes no touch.
@@ -903,7 +906,7 @@ fun BackgroundWorkPresentation(
                         scrollState = scrollState,
                         isLive = rowsOpen,
                         // Landed open, TalkBack moves into the panel (iOS `.isModal` once settled).
-                        focusRequest = if (settled && !hidden) motion else null,
+                        focusRequest = rememberAccessibilityFocusRequest(if (settled && !hidden) motion else null),
                         onContentHeight = ::measured,
                         onOpenSubagent = { id ->
                             if (!dragController.drag.isDragging) {
@@ -953,7 +956,7 @@ private fun <T> OnChange(value: T, action: (old: T, new: T) -> Unit) {
  * @param probe where the shells' output is read, for their glyphs.
  * @param scrollState the list's scroll position; scrolls once the rows outgrow the panel.
  * @param isLive the orbs, shell glyphs and clocks run. A hidden measuring copy holds still.
- * @param focusRequest each new non-null value moves TalkBack's focus onto the first row's section header.
+ * @param focusRequest moves TalkBack's focus onto the first row's section header, once.
  * @param onContentHeight the rows' natural height in dp, whenever it changes.
  */
 @Composable
@@ -967,7 +970,7 @@ fun BackgroundWorkPanel(
     probe: ShellGlyphProbe? = null,
     scrollState: ScrollState = rememberScrollState(),
     isLive: Boolean = true,
-    focusRequest: Any? = null,
+    focusRequest: AccessibilityFocusRequest? = null,
     onContentHeight: (Float) -> Unit = {},
 ) {
     val density = LocalDensity.current
@@ -986,7 +989,7 @@ private fun BackgroundWorkRows(
     shells: List<OpenCodeShell>,
     probe: ShellGlyphProbe?,
     isLive: Boolean,
-    focusRequest: Any?,
+    focusRequest: AccessibilityFocusRequest?,
     onOpenSubagent: (String) -> Unit,
     onOpenShell: (String) -> Unit,
     modifier: Modifier = Modifier,

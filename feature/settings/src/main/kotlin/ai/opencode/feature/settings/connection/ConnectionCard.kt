@@ -10,6 +10,7 @@ import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.RollingNumber
 import ai.opencode.core.ui.RollingNumberAlignment
 import ai.opencode.core.ui.RollingNumberStyle
+import ai.opencode.core.ui.AccessibilityFocusRequest
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.accessibilityFocusRequest
 import ai.opencode.core.ui.openCodeTapTarget
@@ -153,8 +154,8 @@ fun ConnectionCard(
     modifier: Modifier = Modifier,
     /** Called as the card opens the server page, before it's pushed. */
     onOpen: () -> Unit = {},
-    /** Each new non-null value moves TalkBack's focus onto the card (`accessibilityFocusRequest`). */
-    focusRequest: Any? = null,
+    /** Moves TalkBack's focus onto the card once (`accessibilityFocusRequest`). */
+    focusRequest: AccessibilityFocusRequest? = null,
 ) {
     val server by store.observe { it.server }
     val status by store.observe { it.connectionStatus }
@@ -181,7 +182,7 @@ fun ConnectionCard(
 private fun ConnectionCardContent(
     monitor: ConnectionMonitor,
     onOpen: () -> Unit,
-    focusRequest: Any?,
+    focusRequest: AccessibilityFocusRequest?,
     onRetry: () -> Unit,
     onEditServer: () -> Unit,
     modifier: Modifier = Modifier,

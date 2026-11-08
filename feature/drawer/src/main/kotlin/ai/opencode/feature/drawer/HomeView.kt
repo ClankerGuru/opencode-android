@@ -15,6 +15,7 @@ import ai.opencode.core.store.PresentationAction
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
 import ai.opencode.core.store.scope
+import ai.opencode.core.ui.LocalAccessibilityFocusMoves
 import ai.opencode.core.ui.OpenCodeIconButton
 import ai.opencode.core.ui.OpenCodeIconButtonStyle
 import ai.opencode.core.ui.OpenCodeTheme
@@ -532,13 +533,16 @@ private fun CatchUpPreviewCard(store: StoreOf<HomeFeature.State, HomeFeature.Act
     DisposableEffect(previews) { onDispose { previews.close() } }
     val preview = previews.store(session, home)
     SideEffect { previews.commit() }
-    SessionView(
-        preview,
-        Modifier.fillMaxSize().clearAndMergeSemantics(),
-        listContext = remember(session, revision) { home.sessionListContext(session) },
-        onCatchUpOpen = {},
-        isInertPreview = true,
-    )
+    // A picture of the next session: nothing in it moves TalkBack's focus (QA W-05).
+    CompositionLocalProvider(LocalAccessibilityFocusMoves provides false) {
+        SessionView(
+            preview,
+            Modifier.fillMaxSize().clearAndMergeSemantics(),
+            listContext = remember(session, revision) { home.sessionListContext(session) },
+            onCatchUpOpen = {},
+            isInertPreview = true,
+        )
+    }
 }
 
 /**

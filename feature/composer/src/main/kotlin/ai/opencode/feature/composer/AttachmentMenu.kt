@@ -7,6 +7,7 @@ import ai.opencode.core.motion.transitionBlur
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.core.ui.AccessibilityFocusRequest
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.accessibilityFocusRequest
 import ai.opencode.core.ui.openCodeTapTarget
@@ -289,8 +290,8 @@ fun AttachmentMenuRows(
     /** New Plus Menu: the menu's fixed width; otherwise the rows size to their content. */
     menuWidth: Dp? = null,
     onRowFrame: ((AttachmentMenuItem, Rect) -> Unit)? = null,
-    /** Each new non-null value moves TalkBack's focus onto the top row ([accessibilityFocusRequest]). */
-    focusRequest: Any? = null,
+    /** Moves TalkBack's focus onto the top row once ([accessibilityFocusRequest]). */
+    focusRequest: AccessibilityFocusRequest? = null,
     onChoose: (AttachmentMenuItem) -> Unit = {},
     onPaste: () -> Unit = {},
 ) {
