@@ -46,8 +46,8 @@ class LinkPreviewClient(
     /** A fresh result already in memory, without waiting, so a reopened session draws its cards at once. */
     val cached: (LinkPreviewTarget) -> LinkPreviewResult? = { null },
     /**
-     * Last known rich metadata, even after its fresh TTL has expired, so a reopened session or
-     * expired card keeps its rich view while revalidating.
+     * Last known rich metadata, even after its fresh TTL has expired, so an expired card keeps
+     * its rich view while revalidating. Memory only: a cold miss is null rather than a disk read.
      */
     val stale: (LinkPreviewTarget) -> LinkPreviewMetadata? = { null },
     val load: suspend (LinkPreviewTarget) -> LinkPreviewResult = { LinkPreviewResult.Unavailable },
@@ -312,18 +312,15 @@ class LinkPreviewLoader(
 
     fun cached(target: LinkPreviewTarget): LinkPreviewResult? = cache.freshMemory(target.key)?.result
 
+    /**
+     * The last known rich metadata, from memory only: a card asks this while it draws, so it
+     * must never read the disk. A cold miss is null, and the record on disk reaches memory
+     * inside [load].
+     */
     fun stale(target: LinkPreviewTarget): LinkPreviewMetadata? {
-        val now = cache.now()
-        cache.withMemory { it[target.key] }?.let { record ->
-            return if (record.retentionDate > now) record.metadata else null
-        }
-        val record = cache.readDisk(target.key) ?: return null
-        val metadata = record.metadata
-        if (record.retentionDate > now && metadata != null) {
-            cache.withMemory { it[target.key] = record }
-            return metadata
-        }
-        return null
+        val record = cache.withMemory { it[target.key] } ?: return null
+        if (record.retentionDate <= cache.now()) return null
+        return record.metadata
     }
 
     suspend fun load(target: LinkPreviewTarget): LinkPreviewResult {

@@ -4,6 +4,7 @@ import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.dependency
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -18,6 +19,9 @@ import kotlin.time.Duration.Companion.seconds
  * Shapes of images read before, so a preview opens at its own shape before anything is read
  * again (iOS `AgentImageSizeCache`). Keyed by a hash of the server and path, at most [LIMIT]
  * entries, oldest out first, saved at most once a second off the main thread.
+ *
+ * The file is read once, off the main thread, when the cache is made: a composable asks [size]
+ * while it draws, and that only ever reads memory.
  */
 class AgentImageSizeCache(private val file: File?) {
     @Serializable
@@ -29,25 +33,34 @@ class AgentImageSizeCache(private val file: File?) {
     )
 
     private val lock = Any()
-    private var stored: Stored? = null
+    private var stored = Stored()
+
+    /** The file's shapes are in [stored]: until then [size] answers null rather than reading it. */
+    private var warmed = false
+    private var reading: Job? = null
     private var pendingSave = false
 
-    private fun load(): Stored {
-        stored?.let { return it }
-        val loaded = file?.takeIf { it.exists() }?.let { runCatching { json.decodeFromString<Stored>(it.readText()) }.getOrNull() } ?: Stored()
-        stored = loaded
-        return loaded
+    init {
+        warm()
+    }
+
+    /** Reads the shapes remembered on disk, on an IO coroutine, once. */
+    fun warm(): Job? = synchronized(lock) {
+        reading?.let { return@synchronized it }
+        if (file == null) return@synchronized null
+        val job = saveScope.launch { readFromDisk() }
+        reading = job
+        job
     }
 
     fun size(key: AgentImageKey): AgentImageSize? = synchronized(lock) {
-        val pair = load().sizes[hash(key)] ?: return null
+        val pair = stored.sizes[hash(key)] ?: return null
         if (pair.size != 2 || pair[0] <= 0 || pair[1] <= 0) return null
         AgentImageSize(pair[0], pair[1])
     }
 
     fun store(size: AgentImageSize, key: AgentImageKey) {
         val changed = synchronized(lock) {
-            val stored = load()
             val hash = hash(key)
             val value = listOf(size.width, size.height)
             if (stored.sizes[hash] == value) return@synchronized false
@@ -63,12 +76,11 @@ class AgentImageSizeCache(private val file: File?) {
         if (changed) save()
     }
 
-    fun entityTag(key: AgentImageKey): String? = synchronized(lock) { load().tags?.get(hash(key)) }
+    fun entityTag(key: AgentImageKey): String? = synchronized(lock) { stored.tags?.get(hash(key)) }
 
     /** The ETag the stored shape belongs to (null forgets it). */
     fun storeEntityTag(entityTag: String?, key: AgentImageKey) {
         val changed = synchronized(lock) {
-            val stored = load()
             val hash = hash(key)
             if (stored.sizes[hash] == null || stored.tags?.get(hash) == entityTag) return@synchronized false
             val tags = stored.tags ?: LinkedHashMap<String, String>().also { stored.tags = it }
@@ -78,9 +90,47 @@ class AgentImageSizeCache(private val file: File?) {
         if (changed) save()
     }
 
+    /**
+     * The file's shapes arrive under whatever was stored while it was read. The file is read and
+     * decoded outside the lock, so a composable asking [size] while the launch warm runs never
+     * waits on the disk.
+     */
+    private fun readFromDisk() {
+        val started = synchronized(lock) {
+            if (warmed) return@synchronized false
+            warmed = true
+            true
+        }
+        if (!started) return
+        val disk = file?.takeIf { it.exists() }
+            ?.let { runCatching { json.decodeFromString<Stored>(it.readText()) }.getOrNull() }
+            ?: Stored()
+        val merged = synchronized(lock) {
+            val pending = stored
+            if (pending.sizes.isEmpty() && pending.order.isEmpty()) {
+                stored = disk
+                return@synchronized false
+            }
+            disk.order.removeAll { pending.sizes.containsKey(it) }
+            disk.order.addAll(pending.order)
+            disk.sizes.putAll(pending.sizes)
+            val newerTags = pending.tags
+            if (newerTags != null) {
+                val tags = disk.tags ?: LinkedHashMap<String, String>().also { disk.tags = it }
+                tags.putAll(newerTags)
+            }
+            stored = disk
+            true
+        }
+        // Shapes stored before the file was read are in the file it now holds.
+        if (merged) save()
+    }
+
     private fun save() {
         val file = file ?: return
         val scheduled = synchronized(lock) {
+            // Before the file is read, a save would write away the shapes it holds.
+            if (!warmed) return@synchronized false
             val wasPending = pendingSave
             pendingSave = true
             !wasPending
@@ -90,8 +140,9 @@ class AgentImageSizeCache(private val file: File?) {
             delay(1.seconds)
             val text = synchronized(lock) {
                 pendingSave = false
-                stored?.let { json.encodeToString(Stored.serializer(), it.copy(sizes = LinkedHashMap(it.sizes), order = ArrayList(it.order), tags = it.tags?.let(::LinkedHashMap))) }
-            } ?: return@launch
+                val it = stored
+                json.encodeToString(Stored.serializer(), it.copy(sizes = LinkedHashMap(it.sizes), order = ArrayList(it.order), tags = it.tags?.let(::LinkedHashMap)))
+            }
             runCatching {
                 val temporary = File(file.parentFile, file.name + ".tmp")
                 temporary.writeText(text)

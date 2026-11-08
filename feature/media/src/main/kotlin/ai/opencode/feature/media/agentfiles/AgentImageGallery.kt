@@ -1,6 +1,7 @@
 package ai.opencode.feature.media
 
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
@@ -9,8 +10,6 @@ import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.AgentFileReference
 import android.graphics.Bitmap
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.EaseIn
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -633,7 +632,8 @@ private fun AgentImagePixels(
     val previews = remember { dependency(AgentImagePreviews) }
     val reduceMotion = rememberReduceMotion()
     val landed = loadedAt ?: 0.0
-    val fade = if (reduceMotion) AgentImageTunables.appear else AgentImageTunables.pixelFade
+    // A tile-sized cross-fade from the placeholder, on the dim role's length.
+    val fade = (if (reduceMotion) MotionRole.Reduced else MotionRole.Dim).curve().duration
     // Kept by the store: a recomposed row carries on from the first frame's clock.
     val begin = previews.fadeStart(mediaID, landed, agentImageNow(), PIXELS_FRESH, if (reduceMotion) 0.0 else notBefore)
     val opacity = rememberAgentImageFade(begin, fade)
@@ -664,16 +664,17 @@ internal fun rememberAgentImageFade(begin: Double, duration: Double): State<Floa
 }
 
 /**
- * A tile fades in where it first appears, over [AgentImageTunables.appear] (kept by the store,
- * so a recomposed row never fades again; iOS `AgentImageAppearance`): the bento's placeholders
- * come up as the row's soft edge passes them, and under Reduce Motion, where the row lands at
- * once, this is their cross-fade. Nothing in a bento moves once it's laid out.
+ * A tile fades in where it first appears, over the swap role's fade in (kept by the store, so a
+ * recomposed row never fades again; iOS `AgentImageAppearance`): the bento's placeholders come up
+ * as the row's soft edge passes them, and under Reduce Motion, where the row lands at once, this
+ * is their cross-fade (the reduced role). Nothing in a bento moves once it's laid out.
  */
 @Composable
 internal fun rememberAgentImageAppearance(id: String): State<Float> {
     val previews = remember { dependency(AgentImagePreviews) }
+    val reduceMotion = rememberReduceMotion()
     val shown = previews.tileFirstShown(id, agentImageNow())
-    return rememberAgentImageFade(shown, AgentImageTunables.appear)
+    return rememberAgentImageFade(shown, MotionRole.Swap.curve(reduceMotion = reduceMotion).duration)
 }
 
 /** Nothing at first, so a quick read never flashes a spinner; a slow one shows a small one, faded in (iOS `AgentImageWaiting`). */
@@ -683,7 +684,7 @@ private fun AgentImageWaiting() {
     val opacity = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
         delay(900)
-        if (reduceMotion) opacity.snapTo(1f) else opacity.animateTo(1f, tween(300, easing = EaseIn))
+        opacity.animateTo(1f, MotionRole.Swap.animation(reduceMotion = reduceMotion))
     }
     CircularProgressIndicator(
         modifier = Modifier

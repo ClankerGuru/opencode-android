@@ -5,6 +5,8 @@ import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.scene.ActiveScene
 import ai.opencode.server.OpenCodePairingLink
 import ai.opencode.server.model.OpenCodePageContext
@@ -279,18 +281,19 @@ class BrowserWebViews private constructor() {
             .withEndAction { arrive(webView, reduceMotion = false) }.start()
     }
 
-    /** The page before comes in from beneath, as a pop reveals its parent. */
+    /** The page before comes in from beneath, as a pop reveals its parent, on the release role. */
     private fun arrive(webView: WebView, reduceMotion: Boolean) {
         if (webView.canGoBack()) webView.goBack()
+        val duration = Motion.millis(MotionRole.Release.curve(reduceMotion = reduceMotion).duration).toLong()
         if (reduceMotion) {
             webView.translationX = 0f
             webView.alpha = 0.4f
-            webView.animate().alpha(1f).setDuration(250).start()
+            webView.animate().alpha(1f).setDuration(duration).start()
             return
         }
         webView.translationX = -webView.width * PARALLAX
         webView.alpha = 0.6f
-        webView.animate().translationX(0f).alpha(1f).setDuration(350).setInterpolator(DecelerateInterpolator(1.5f)).start()
+        webView.animate().translationX(0f).alpha(1f).setDuration(duration).setInterpolator(DecelerateInterpolator(1.5f)).start()
     }
 
     // Hold menu

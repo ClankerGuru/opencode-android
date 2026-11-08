@@ -1,7 +1,9 @@
 package ai.opencode.feature.settings.whatsnew
 
 import ai.opencode.core.experiments.key
-import ai.opencode.core.motion.rememberReduceMotion
+import ai.opencode.core.motion.AmbientClock
+import ai.opencode.core.motion.AmbientRate
+import ai.opencode.core.motion.AmbientTimeline
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.observe
@@ -57,12 +59,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -86,9 +86,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.lifecycle.compose.currentStateAsState
 import java.text.NumberFormat
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -475,17 +472,15 @@ private fun WhatsNewSmallerRow(entry: WhatsNewEntry, onClick: (() -> Unit)?) {
 
 /**
  * A feature's symbol lit on the app's LED dot grid (3.5 dp pitch), in the feature's colour with a
- * soft glow, under a slow sweep of light. Still under reduce motion, while the app isn't in the
- * foreground, and off screen (it leaves composition with its list item).
+ * soft glow, under a slow sweep of light on the shared ambient clock (iOS `AmbientTimelineView`,
+ * background rate). Still under reduce motion, while the app isn't in the foreground, and off
+ * screen (it leaves composition with its list item).
  */
 @Composable
 private fun WhatsNewDotSymbol(symbol: String, tint: Color, modifier: Modifier = Modifier) {
     val resources = LocalResources.current
     val density = LocalDensity.current
     val isDark = OpenCodeTheme.colors.isDark
-    val reduceMotion = rememberReduceMotion()
-    val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
-    val still = reduceMotion || !lifecycle.isAtLeast(Lifecycle.State.RESUMED)
     var size by remember { mutableStateOf(IntSize.Zero) }
     val pitch = with(density) { DOT_PITCH.dp.toPx() }
     val field by produceState<DotField?>(null, symbol, size, pitch) {
@@ -495,55 +490,44 @@ private fun WhatsNewDotSymbol(symbol: String, tint: Color, modifier: Modifier = 
             DotField.make(drawable, size.width.toFloat(), size.height.toFloat(), pitch)
         }
     }
-    var elapsed by remember { mutableFloatStateOf(0f) }
-    LaunchedEffect(still) {
-        if (still) return@LaunchedEffect
-        var start = 0L
-        var last = 0L
-        // 30 fps, like iOS's TimelineView(minimumInterval: 1/30); only the draw phase reads it.
-        while (true) {
-            withFrameNanos { now ->
-                if (start == 0L) start = now - (elapsed * 1e9).toLong()
-                if (now - last >= 33_000_000L) {
-                    last = now
-                    elapsed = ((now - start) / 1e9).toFloat()
-                }
-            }
-        }
-    }
     val unit = density.density
     val glowPaint = remember(unit) {
         Paint().also { it.asFrameworkPaint().maskFilter = BlurMaskFilter(5f * unit, BlurMaskFilter.Blur.NORMAL) }
     }
-    Box(
-        modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(if (isDark) Color(0.04f, 0.04f, 0.04f) else Color(0.965f, 0.965f, 0.965f))
-            .onSizeChanged { size = it },
-    ) {
-        Canvas(Modifier.fillMaxSize()) {
-            val field = field ?: return@Canvas
-            if (field.width != this.size.width || field.height != this.size.height) return@Canvas
-            val ink = if (isDark) Color.White.copy(alpha = 0.075f) else Color.Black.copy(alpha = 0.07f)
-            drawPath(field.unlit, ink)
-            // A band of light crossing left to right, leaning with the rows.
-            val sweep = if (still) null else ((elapsed / SWEEP_PERIOD) % 1f) * (field.columns + 40) - 20
-            val levels = Array(4) { Path() }
-            for (dot in field.lit) {
-                val band = sweep?.let { exp(-(dot.column - dot.row * 0.35f - it).pow(2) / 60f) } ?: 0f
-                val value = min(1f, dot.coverage * (0.78f + 0.22f * dot.shade) + band * 0.35f * dot.coverage)
-                val radius = (0.95f + 0.45f * value) * unit
-                val level = min(3, (value * 4).toInt())
-                levels[level].addOval(Rect(dot.x - radius, dot.y - radius, dot.x + radius, dot.y + radius))
-            }
-            val glow = if (isDark) 0.75f else 0.4f
-            drawIntoCanvas { canvas ->
-                levels.forEachIndexed { index, path ->
-                    glowPaint.color = tint.copy(alpha = levelAlpha(index) * glow)
-                    canvas.drawPath(path, glowPaint)
+    // On the shared ambient clock: a large, slow field, so the background rate (30 Hz).
+    AmbientTimeline(rate = AmbientRate.Background) { sample ->
+        // The band keeps its own slower period, on the clock's (slow-motion aware) time.
+        val phase = if (sample.isSettled) null else AmbientClock.phase(AmbientClock.mediaTime(), SWEEP_PERIOD).toFloat()
+        Box(
+            modifier
+                .clip(RoundedCornerShape(20.dp))
+                .background(if (isDark) Color(0.04f, 0.04f, 0.04f) else Color(0.965f, 0.965f, 0.965f))
+                .onSizeChanged { size = it },
+        ) {
+            Canvas(Modifier.fillMaxSize()) {
+                val field = field ?: return@Canvas
+                if (field.width != this.size.width || field.height != this.size.height) return@Canvas
+                val ink = if (isDark) Color.White.copy(alpha = 0.075f) else Color.Black.copy(alpha = 0.07f)
+                drawPath(field.unlit, ink)
+                // A band of light crossing left to right, leaning with the rows.
+                val sweep = phase?.let { it * (field.columns + 40) - 20 }
+                val levels = Array(4) { Path() }
+                for (dot in field.lit) {
+                    val band = sweep?.let { exp(-(dot.column - dot.row * 0.35f - it).pow(2) / 60f) } ?: 0f
+                    val value = min(1f, dot.coverage * (0.78f + 0.22f * dot.shade) + band * 0.35f * dot.coverage)
+                    val radius = (0.95f + 0.45f * value) * unit
+                    val level = min(3, (value * 4).toInt())
+                    levels[level].addOval(Rect(dot.x - radius, dot.y - radius, dot.x + radius, dot.y + radius))
                 }
+                val glow = if (isDark) 0.75f else 0.4f
+                drawIntoCanvas { canvas ->
+                    levels.forEachIndexed { index, path ->
+                        glowPaint.color = tint.copy(alpha = levelAlpha(index) * glow)
+                        canvas.drawPath(path, glowPaint)
+                    }
+                }
+                levels.forEachIndexed { index, path -> drawPath(path, tint.copy(alpha = levelAlpha(index))) }
             }
-            levels.forEachIndexed { index, path -> drawPath(path, tint.copy(alpha = levelAlpha(index))) }
         }
     }
 }
@@ -551,7 +535,7 @@ private fun WhatsNewDotSymbol(symbol: String, tint: Color, modifier: Modifier = 
 private fun levelAlpha(index: Int): Float = 0.3f + 0.7f * (index + 0.5f) / 4f
 
 private const val DOT_PITCH = 3.5f
-private const val SWEEP_PERIOD = 4.2f
+private const val SWEEP_PERIOD = 4.2
 
 /** Which dots a symbol lights on a grid: each dot's share of the symbol's ink, from a 4× supersampled rendering. */
 internal class DotField(

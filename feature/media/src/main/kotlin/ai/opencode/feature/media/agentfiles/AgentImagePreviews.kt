@@ -4,6 +4,7 @@ import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.log.AppLog
+import ai.opencode.core.motion.MotionRole
 import ai.opencode.server.retry.NetworkPathMonitor
 import android.content.ComponentCallbacks2
 import android.content.res.Configuration
@@ -881,10 +882,13 @@ class AgentImagePreviews(
                 dispatcher = Dispatchers.Unconfined,
             )
 
-        /** When the pixels of a decided batch's [index]th tile may begin to fade in: a gentle stagger from when it was decided. */
+        /**
+         * When the pixels of a decided batch's [index]th tile may begin to fade in: the shared
+         * stagger (`staggerStep` apart, within `staggerCap`) from when it was decided.
+         */
         fun pixelsNotBefore(batch: BentoBatch?, index: Int): Double {
             batch ?: return 0.0
-            return batch.decidedAt + AgentImageTunables.pixelStagger * index
+            return batch.decidedAt + MotionRole.staggerDelay(index)
         }
 
         /** No shape to draw yet, nor a card: out of the layout. */

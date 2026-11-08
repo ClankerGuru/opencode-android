@@ -1,7 +1,7 @@
 package ai.opencode.feature.settings.connection
 
-import ai.opencode.core.motion.Motion
-import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.MotionTransition
+import ai.opencode.core.motion.MotionTunables
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.observe
 import ai.opencode.core.ui.AlertTextFields
@@ -40,8 +40,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -176,6 +174,7 @@ private fun ConnectionCardContent(
     val colors = OpenCodeTheme.colors
     val presentation = ConnectionStatusPresentation(monitor.display)
     val action = CardAction.of(presentation.status)
+    val reduceMotion = rememberReduceMotion()
     // Android divergence: a ripple answers the press (iOS shrinks the card to 97.5 % and tints it).
     val interaction = remember { MutableInteractionSource() }
     val cardShape = RoundedCornerShape(ConnectionCardMetrics.cornerRadius)
@@ -236,8 +235,9 @@ private fun ConnectionCardContent(
         val anchor = slot
         AnimatedVisibility(
             visible = action != null && anchor != null,
-            enter = scaleIn(initialScale = 0.9f) + fadeIn(),
-            exit = scaleOut(targetScale = 0.9f) + fadeOut(),
+            // iOS: the retry arrives on micro.
+            enter = MotionTransition.micro(reduceMotion).enter,
+            exit = MotionTransition.micro(reduceMotion).exit,
             modifier = Modifier.matchParentSize().layout { measurable, constraints ->
                 val placeable = measurable.measure(constraints.copy(minWidth = 0, minHeight = 0))
                 val center = anchor?.center
@@ -432,8 +432,8 @@ data class ConnectionStatusPresentation(
 private fun ConnectionStatusPresentation.foreground(): Color =
     if (isAlert) OpenCodeTheme.colors.destructive else OpenCodeTheme.colors.secondaryText
 
-/** iOS `RollingNumberTunables` duration and bounce for the round trip. */
-private val millisecondsRoll = RollingNumberStyle(duration = 0.34, bounce = 0.0)
+/** The round trip rolls on the layout role (iOS `Motion.layout`: 0.34 s, no bounce). */
+private val millisecondsRoll = RollingNumberStyle(duration = MotionTunables.layoutSpring.duration.value, bounce = 0.0)
 
 /**
  * Port of iOS `ConnectionStatusLabel`: a measured line keeps its identity, so its glyph swaps and
@@ -454,17 +454,8 @@ private fun ConnectionStatusLabel(
         AnimatedContent(
             targetState = presentation,
             contentKey = { if (it.milliseconds == null) it.word else "measured" },
-            transitionSpec = {
-                if (reduceMotion) {
-                    fadeIn(Motion.reducedFadeSpec()) togetherWith fadeOut(Motion.reducedFadeSpec())
-                } else {
-                    // iOS `ConnectionCard`: the monitor's changes animate `.smooth(duration: 0.42)`.
-                    val smooth = MotionSpring(0.42)
-                    val spring = smooth.spec<androidx.compose.ui.unit.IntOffset>()
-                    (slideInVertically(spring) { it / 2 } + fadeIn(smooth.spec())) togetherWith
-                        (slideOutVertically(spring) { -it / 2 } + fadeOut(smooth.spec()))
-                }
-            },
+            // iOS `ConnectionMonitor`: the status line swaps in place on the swap role.
+            transitionSpec = { MotionTransition.swap(reduceMotion).content },
             contentAlignment = Alignment.CenterEnd,
             label = "ConnectionStatus-$identity",
         ) { shown ->

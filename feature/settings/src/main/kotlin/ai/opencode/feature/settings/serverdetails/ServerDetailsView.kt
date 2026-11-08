@@ -1,7 +1,9 @@
 package ai.opencode.feature.settings.serverdetails
 
 import ai.opencode.core.diagnostics.HidesFromScreenshots
-import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.MotionPhase
+import ai.opencode.core.motion.MotionRole
+import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.collectState
 import ai.opencode.core.store.scope
@@ -111,6 +113,7 @@ fun ServerDetailsPage(store: SettingsStore) {
     val send = details::send
 
     val refresh = rememberPullToRefreshState()
+    val reduceMotion = rememberReduceMotion()
     // iOS `.refreshable` shows its spinner until the pulled read ends, not for other reloads.
     var pulled by remember { mutableStateOf(false) }
     val isLoading = stateOrNull?.isLoading == true
@@ -136,7 +139,7 @@ fun ServerDetailsPage(store: SettingsStore) {
                     state.mcpError?.let { error ->
                         item(key = "mcp-error") {
                             Row(
-                                Modifier.animateItem(ErrorFade, ErrorPlacement, ErrorFade).fillMaxWidth().padding(horizontal = 20.dp).padding(vertical = 6.dp),
+                                Modifier.animateItem(errorFade(MotionPhase.Enter, reduceMotion), errorPlacement(MotionPhase.Enter, reduceMotion), errorFade(MotionPhase.Exit, reduceMotion)).fillMaxWidth().padding(horizontal = 20.dp).padding(vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                             ) {
@@ -151,15 +154,15 @@ fun ServerDetailsPage(store: SettingsStore) {
                                 mcp = mcp,
                                 onTap = { send(ServerDetailsFeature.Action.TrayChanged(ServerDetailsFeature.Tray.Server(mcp.name))) },
                                 action = { ServerDetailsFeature.Action.primaryAction(mcp)?.let(send) },
-                                modifier = Modifier.animateItem(ListFade, ListPlacement, ListFade).tileRow(),
+                                modifier = Modifier.animateItem(listFade(reduceMotion), listPlacement(reduceMotion), listFade(reduceMotion)).tileRow(),
                             )
                         }
                     }
                     item(key = "mcp-tile") {
-                        McpTile(state.mcpServers, { send(ServerDetailsFeature.Action.TrayChanged(ServerDetailsFeature.Tray.Mcp)) }, Modifier.animateItem(ListFade, ListPlacement, ListFade).tileRow())
+                        McpTile(state.mcpServers, { send(ServerDetailsFeature.Action.TrayChanged(ServerDetailsFeature.Tray.Mcp)) }, Modifier.animateItem(listFade(reduceMotion), listPlacement(reduceMotion), listFade(reduceMotion)).tileRow())
                     }
                     item(key = "accounts-skills") {
-                        Row(Modifier.animateItem(ListFade, ListPlacement, ListFade).tileRow(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
+                        Row(Modifier.animateItem(listFade(reduceMotion), listPlacement(reduceMotion), listFade(reduceMotion)).tileRow(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
                             AccountsTile(capabilities.accounts, { send(ServerDetailsFeature.Action.TrayChanged(ServerDetailsFeature.Tray.Accounts)) }, Modifier.weight(1f))
                             SkillsTile(capabilities.skills, { send(ServerDetailsFeature.Action.TrayChanged(ServerDetailsFeature.Tray.Skills)) }, Modifier.weight(1f))
                         }
@@ -227,13 +230,15 @@ private fun CodeAlert(instructions: String, send: (ServerDetailsFeature.Action) 
     )
 }
 
-/** iOS `.animation(.spring(duration: 0.4, bounce: 0), value: mcpServers)` over the banners and tiles. */
-private val ListPlacement get() = MotionSpring(0.4).spec(IntOffset.VisibilityThreshold)
-private val ListFade get() = MotionSpring(0.4).spec<Float>()
+/** iOS `.animation(Motion.layout.animation(reduceMotion:), value: mcpServers)` over the banners and tiles. */
+private fun listPlacement(reduceMotion: Boolean) =
+    MotionRole.Layout.animation(reduceMotion = reduceMotion, visibilityThreshold = IntOffset.VisibilityThreshold)
+private fun listFade(reduceMotion: Boolean) = MotionRole.Layout.animation<Float>(reduceMotion = reduceMotion)
 
-/** iOS `.animation(.spring(duration: 0.3, bounce: 0), value: mcpError)`. */
-private val ErrorPlacement get() = MotionSpring(0.3).spec(IntOffset.VisibilityThreshold)
-private val ErrorFade get() = MotionSpring(0.3).spec<Float>()
+/** iOS `.animation(Motion.layout.animation(mcpError == nil ? .exit : .enter, ...), value: mcpError)`. */
+private fun errorPlacement(phase: MotionPhase, reduceMotion: Boolean) =
+    MotionRole.Layout.animation(phase, reduceMotion, visibilityThreshold = IntOffset.VisibilityThreshold)
+private fun errorFade(phase: MotionPhase, reduceMotion: Boolean) = MotionRole.Layout.animation<Float>(phase, reduceMotion)
 
 private fun Modifier.tileRow(): Modifier = fillMaxWidth().padding(horizontal = 16.dp).padding(top = 6.dp, bottom = 6.dp)
 

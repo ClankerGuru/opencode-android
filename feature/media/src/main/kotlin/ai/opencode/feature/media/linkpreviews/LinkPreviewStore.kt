@@ -383,6 +383,16 @@ class LinkPreviewStore(
             } else {
                 deferredLinks.clear(key)
             }
+            // A record kept on disk reaches memory inside the load: show it while it
+            // revalidates, rather than dropping a rich card back to a plain link.
+            if (results[key] == null) {
+                val stale = client.stale(target)
+                if (stale != null) {
+                    results[key] = LinkPreviewResult.Loaded(stale)
+                    bitmaps.remove(key)
+                    arrived(rows)
+                }
+            }
             if (result == LinkPreviewResult.Deferred && isLoaded(results[key])) {
                 // Stale-while-revalidate: keep the last good rich metadata when a refresh fails
                 // while offline, rate-limited, or on a 5xx response.

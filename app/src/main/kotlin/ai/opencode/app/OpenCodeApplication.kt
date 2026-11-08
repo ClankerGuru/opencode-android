@@ -6,6 +6,7 @@ import ai.opencode.core.haptics.AudioSessionHaptics
 import ai.opencode.core.log.AppLog
 import ai.opencode.core.scene.ActiveScene
 import ai.opencode.devtools.DevTools
+import ai.opencode.feature.media.AgentImageSizeCache
 import ai.opencode.feature.session.AgentActivityLedger
 import ai.opencode.feature.transcript.markdown.withMarkdownStream
 import ai.opencode.server.EventBatcherHooks
@@ -82,6 +83,9 @@ class OpenCodeApplication : Application() {
         // after AppDependencies so the recorder gets the installed uploader.
         val voiceCallLog = dependency(VoiceCallLogClient)
         launchScope.launch(Dispatchers.IO) { voiceCallLog.recoverInterrupted() }
+        // Remembered image shapes are read off the main thread now, so the first preview that
+        // asks finds them in memory (iOS `AgentImageSizeCache.live.warm()`).
+        AgentImageSizeCache.live.warm()
         launchScope.launch {
             AppPhases.phases().collect { phase ->
                 if (phase == AppPhase.Background) launch(Dispatchers.IO) { voiceCallLog.persistOpenCalls() }

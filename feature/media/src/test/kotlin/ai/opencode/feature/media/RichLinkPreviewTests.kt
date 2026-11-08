@@ -8,6 +8,8 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import java.io.IOException
+import java.nio.file.Files
 
 /** Port of iOS `RichLinkPreviewTests.swift`. Times are milliseconds. */
 class RichLinkPreviewTests {
@@ -106,6 +108,38 @@ class RichLinkPreviewTests {
         assertEquals(LinkPreviewResult.Deferred, limited.load(target))
         assertNull(limited.cached(target))
         assertNull(limited.stale(target))
+    }
+
+    @Test
+    fun aColdMissReadsTheDiskInsideTheLoadNotWhileDrawing() = runTest {
+        val directory = Files.createTempDirectory("link-previews-").toFile()
+        try {
+            val time = Locked(0L)
+            val target = LinkPreviewTarget.of("https://github.com/acme/widget")!!
+            val writer = LinkPreviewLoader(
+                fetch = { LinkPreviewResponse("""{"full_name":"acme/widget","description":"Uploads"}""".toByteArray(), 200) },
+                directory = directory,
+                now = { time.current },
+            )
+            val first = writer.load(target)
+            val metadata = (first as? LinkPreviewResult.Loaded)?.metadata
+            assertTrue("Expected metadata", metadata != null)
+            assertEquals("what was just read is in memory", metadata, writer.stale(target))
+
+            // A fresh process: memory is empty and the record is on disk. Drawing asks `stale`
+            // for it and must not read the file; the load brings it back.
+            time.update { it + 301_000 }
+            val reader = LinkPreviewLoader(
+                fetch = { throw IOException("The Internet connection appears to be offline.") },
+                directory = directory,
+                now = { time.current },
+            )
+            assertNull("no disk read while a card draws", reader.stale(target))
+            assertEquals(LinkPreviewResult.Deferred, reader.load(target))
+            assertEquals("the record reached memory inside the load", metadata, reader.stale(target))
+        } finally {
+            directory.deleteRecursively()
+        }
     }
 
     /**

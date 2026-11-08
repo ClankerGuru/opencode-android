@@ -26,7 +26,7 @@ import ai.opencode.feature.voice.VoiceServerChoice
 import ai.opencode.feature.voice.VoiceCallSoundPack
 import ai.opencode.feature.voice.VoiceSharedKeys
 import ai.opencode.server.ServerSharedKeys
-import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.MotionRole
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -186,11 +186,11 @@ fun VoiceSettingsView(store: SettingsStore) {
                 if (!state.showsProviderRow) {
                     if (divider()) SettingsDivider()
                     KeyRow(state, reduceMotion) { voice.send(VoiceSettingsFeature.Action.KeyRowTapped) }
-                    // iOS inserts the editor with `.snappy(duration: 0.2)`, at once under Reduce Motion.
+                    // iOS inserts the editor on the layout role; under Reduce Motion it fades in place.
                     AnimatedVisibility(
                         visible = state.isEditingKey && keySource.isPhoneKey,
-                        enter = if (reduceMotion) EnterTransition.None else expandVertically(KeySnappy.spec()) + fadeIn(KeySnappy.spec()),
-                        exit = if (reduceMotion) ExitTransition.None else shrinkVertically(KeySnappy.spec()) + fadeOut(KeySnappy.spec()),
+                        enter = keyEditorEnter(reduceMotion),
+                        exit = keyEditorExit(reduceMotion),
                     ) {
                         Column {
                             SettingsDivider()
@@ -254,7 +254,7 @@ private fun KeyRow(state: VoiceSettingsFeature.State, reduceMotion: Boolean, onT
     }
     val rotation by animateFloatAsState(
         if (state.isEditingKey) 90f else 0f,
-        if (reduceMotion) snap() else KeySnappy.spec(),
+        if (reduceMotion) snap() else MotionRole.Layout.animation(),
         label = "key-chevron",
     )
     val stacked = isAccessibilitySize()
@@ -311,8 +311,16 @@ private fun KeyStatusAccessory(state: VoiceSettingsFeature.State, rotation: Floa
     }
 }
 
-/** SwiftUI `.snappy(duration: 0.2)`: the key row's chevron and editor. */
-private val KeySnappy = MotionSpring(duration = 0.2, bounce = 0.15)
+/** The key editor opens on the layout role (iOS `keyRow`); under Reduce Motion, the reduced fade. */
+private fun keyEditorEnter(reduceMotion: Boolean): EnterTransition {
+    if (reduceMotion) return fadeIn(MotionRole.Layout.animation(reduceMotion = true))
+    return expandVertically(MotionRole.Layout.animation()) + fadeIn(MotionRole.Layout.animation())
+}
+
+private fun keyEditorExit(reduceMotion: Boolean): ExitTransition {
+    if (reduceMotion) return fadeOut(MotionRole.Layout.animation(reduceMotion = true))
+    return shrinkVertically(MotionRole.Layout.animation()) + fadeOut(MotionRole.Layout.animation())
+}
 
 /** Settings → Voice → Voice: the voices the selected model offers, each with a cached TTS preview. */
 object CallVoicePicker {

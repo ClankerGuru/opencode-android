@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings
 
+import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.ui.AppTheme
@@ -13,7 +14,6 @@ import ai.opencode.core.ui.ThemeDefinition
 import ai.opencode.core.ui.rememberThemeDefinition
 import ai.opencode.core.ui.ThemeSharedKeys
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -69,7 +69,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
-import androidx.compose.animation.core.EaseInOut
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
@@ -216,9 +215,10 @@ fun ThemesSettingsView(store: SettingsStore) {
                     .padding(bottom = SoftEdgeBottomInset)
                     .onSizeChanged { headerHeight = it.height },
             ) {
+                // A theme or light/dark change swaps the preview (iOS `Motion.swap`).
                 Crossfade(
                     appTheme to isDark,
-                    animationSpec = tween(if (reduceMotion) 0 else 220, easing = EaseInOut),
+                    animationSpec = MotionRole.Swap.animation(reduceMotion = reduceMotion),
                     label = "theme-preview",
                 ) { (theme, dark) ->
                     AppearanceTranscriptPreview(theme, dark)

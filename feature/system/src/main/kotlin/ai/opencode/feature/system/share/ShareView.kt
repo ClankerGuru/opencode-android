@@ -4,7 +4,10 @@ import ai.opencode.core.motion.transitionBlur
 
 import ai.opencode.core.files.AttachmentFileType
 import ai.opencode.core.motion.Motion
-import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.AmbientClock
+import ai.opencode.core.motion.MotionRole
+import ai.opencode.core.motion.MotionTransition
+import ai.opencode.core.motion.motionPressEffect
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeIconButton
@@ -28,10 +31,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -395,7 +395,8 @@ private fun Status(state: ShareModel.State, actions: ShareActions, reduceMotion:
     }
 }
 
-private fun <T> phaseAnimation(reduceMotion: Boolean) = MotionSpring(0.24, 0.15).animation<T>(reduceMotion)
+/** The sheet moving into its sending, sent or failed layout, on the layout role. */
+private fun <T> phaseAnimation(reduceMotion: Boolean) = MotionRole.Layout.animation<T>(reduceMotion = reduceMotion)
 
 /**
  * What sits above the bar while it sends: dimmed and locked in place, then lifted away (faded
@@ -404,7 +405,7 @@ private fun <T> phaseAnimation(reduceMotion: Boolean) = MotionSpring(0.24, 0.15)
  */
 @Composable
 private fun Modifier.sendingStage(phase: ShareModel.Phase, reduceMotion: Boolean, rest: Float): Modifier {
-    val spec = MotionSpring(0.3, 0.0).animation<Float>(reduceMotion)
+    val spec = MotionRole.MicroOut.animation<Float>(reduceMotion = reduceMotion)
     val alpha by animateFloatAsState(
         when (phase) {
             ShareModel.Phase.Sent -> 0f
@@ -416,7 +417,7 @@ private fun Modifier.sendingStage(phase: ShareModel.Phase, reduceMotion: Boolean
     )
     val lift by animateDpAsState(
         if (phase == ShareModel.Phase.Sent && !reduceMotion) (-14).dp else 0.dp,
-        MotionSpring(0.3, 0.0).animation(reduceMotion),
+        MotionRole.MicroOut.animation(reduceMotion = reduceMotion),
         label = "stageLift",
     )
     val density = LocalDensity.current
@@ -650,7 +651,7 @@ private suspend fun centre(state: LazyListState, index: Int, animated: Boolean) 
     }
     val viewport = state.layoutInfo.viewportEndOffset + state.layoutInfo.viewportStartOffset
     val delta = (info.offset + info.size / 2f) - viewport / 2f
-    if (animated) state.animateScrollBy(delta, MotionSpring(0.5, 0.15).spec()) else state.scrollBy(delta)
+    if (animated) state.animateScrollBy(delta, MotionRole.Layout.animation()) else state.scrollBy(delta)
 }
 
 @Composable
@@ -822,9 +823,10 @@ private fun MessageBar(state: ShareModel.State, actions: ShareActions, reduceMot
                 val destination = state.destination
                 androidx.compose.animation.AnimatedVisibility(
                     visible = phase == ShareModel.Phase.Sent && destination != null,
-                    enter = if (reduceMotion) fadeIn(Motion.reducedFadeSpec()) else fadeIn(phaseAnimation(reduceMotion)) +
-                        slideInVertically(phaseAnimation(reduceMotion)) { -it / 3 },
-                    exit = fadeOut(phaseAnimation(reduceMotion)),
+                    // The words give way upward to where they went, on the swap's fade in.
+                    enter = if (reduceMotion) MotionTransition.swap(true).enter else fadeIn(MotionRole.Swap.animation()) +
+                        slideInVertically(MotionRole.Swap.animation()) { -it / 3 },
+                    exit = MotionTransition.swap(reduceMotion).exit,
                 ) {
                     Text(
                         "Sent to ${destination?.title ?: ""}",
@@ -848,18 +850,14 @@ private fun SendButton(state: ShareModel.State, onSend: () -> Unit, reduceMotion
     val phase = state.phase
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val pressScale by animateFloatAsState(
-        if (pressed && !reduceMotion) 0.92f else 1f,
-        MotionSpring(0.16, 0.15).spec(),
-        label = "sendPress",
-    )
     val pop = remember { Animatable(1f) }
     val sent = phase == ShareModel.Phase.Sent
     LaunchedEffect(sent) {
-        // Plays as the checkmark arrives: 0.11 + 0.17 s, settled as the sheet starts to go.
+        // Plays as the checkmark arrives (the sheet closes before Sent ever ends): out like a
+        // press going down, back on micro in.
         if (sent && !reduceMotion) {
-            pop.animateTo(ShareComposition.SendMotion.POP_SCALE, tween(110, easing = Motion.EaseInOut))
-            pop.animateTo(1f, MotionSpring(0.17, 0.15).spec())
+            pop.animateTo(ShareComposition.SendMotion.POP_SCALE, MotionRole.Press.animation())
+            pop.animateTo(1f, MotionRole.MicroIn.animation())
         } else {
             pop.snapTo(1f)
         }
@@ -890,20 +888,16 @@ private fun SendButton(state: ShareModel.State, onSend: () -> Unit, reduceMotion
         Box(
             Modifier
                 .size(34.dp)
-                .scale(pressScale * pop.value)
+                // The shared press (a dim under Reduce Motion), times the Sent pop.
+                .motionPressEffect(pressed, reduceMotion)
+                .scale(pop.value)
                 .background(if (lit) colors.text else colors.inlineCodeFill, OpenCodeShape.circle),
             contentAlignment = Alignment.Center,
         ) {
             AnimatedContent(
                 targetState = glyph,
-                transitionSpec = {
-                    if (reduceMotion) {
-                        fadeIn(Motion.reducedFadeSpec()) togetherWith fadeOut(Motion.reducedFadeSpec())
-                    } else {
-                        (scaleIn(phaseAnimation(false), initialScale = 0.55f) + fadeIn(phaseAnimation(false))) togetherWith
-                            (scaleOut(phaseAnimation(false), targetScale = 0.55f) + fadeOut(phaseAnimation(false)))
-                    }
-                },
+                // Arrow, spinner and checkmark swap in the same circle.
+                transitionSpec = { MotionTransition.swap(reduceMotion).content },
                 label = "sendGlyph",
             ) { current ->
                 when (current) {
@@ -921,16 +915,21 @@ private fun SendButton(state: ShareModel.State, onSend: () -> Unit, reduceMotion
     }
 }
 
-/** The sending arc, drawn in the background colour on the label-coloured circle. */
+/**
+ * The sending arc, drawn in the background colour on the label-coloured circle. It turns once
+ * per half of the ambient sweep, and holds still under Reduce Motion.
+ */
 @Composable
 private fun SendingSpinner(color: androidx.compose.ui.graphics.Color) {
+    val reduceMotion = rememberReduceMotion()
     val transition = rememberInfiniteTransition(label = "spinner")
-    val angle by transition.animateFloat(
+    val turn by transition.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(800, easing = LinearEasing), RepeatMode.Restart),
+        animationSpec = infiniteRepeatable(tween(Motion.millis(AmbientClock.sweepPeriod / 2), easing = LinearEasing), RepeatMode.Restart),
         label = "spinnerAngle",
     )
+    val angle = if (reduceMotion) 0f else turn
     Canvas(Modifier.size(15.dp).semantics { hideFromAccessibility() }) {
         val stroke = 2.2.dp.toPx()
         rotate(angle) {

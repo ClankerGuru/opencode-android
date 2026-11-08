@@ -2,7 +2,8 @@ package ai.opencode.feature.settings
 
 import ai.opencode.core.experiments.ExperimentalFeature
 import ai.opencode.core.experiments.key
-import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionPhase
+import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.motion.PageTransitions
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.sharing.SharedKeys
@@ -26,7 +27,6 @@ import ai.opencode.feature.settings.whatsnew.WhatsNewSmallerListPage
 import ai.opencode.feature.system.notifications.NotificationPermission
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -188,7 +188,7 @@ fun SettingsPageScaffold(
     title: String,
     store: SettingsStore,
     modifier: Modifier = Modifier,
-    /** False hides the bar's title (fading over 0.15 s, ease-out), as What's New's entry page does until its own title scrolls under the bar. */
+    /** False hides the bar's title (fading on the swap role), as What's New's entry page does until its own title scrolls under the bar. */
     titleVisible: Boolean = true,
     /** Whether the page draws its own title, so the bar stays small (What's New's entry page). */
     drawsOwnTitle: Boolean = false,
@@ -222,7 +222,9 @@ fun SettingsPageScaffold(
                 if (drawsOwnTitle) {
                     TopAppBar(
                         title = {
-                            val alpha by animateFloatAsState(if (titleVisible) 1f else 0f, tween(150, easing = Motion.EaseOut), label = "settings-title")
+                            val reduceMotion = rememberReduceMotion()
+                            val phase = if (titleVisible) MotionPhase.Enter else MotionPhase.Exit
+                            val alpha by animateFloatAsState(if (titleVisible) 1f else 0f, MotionRole.Swap.animation(phase, reduceMotion), label = "settings-title")
                             Text(
                                 title,
                                 modifier = Modifier

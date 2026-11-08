@@ -1,13 +1,13 @@
 package ai.opencode.feature.media
 
 import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.motion.rememberReduceMotion
 import android.graphics.Bitmap
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationEndReason
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.animate
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.splineBasedDecay
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -422,7 +422,8 @@ class MediaZoomState internal constructor(image: Bitmap) {
             set(scale, offset)
             animation = scope.launch {
                 try {
-                    animate(0f, 1f, animationSpec = tween(200, easing = Motion.EaseInOut)) { value, _ -> fade = value }
+                    // The reduced cross-fade (iOS `Motion.reduced`).
+                    animate(0f, 1f, animationSpec = MotionRole.Reduced.animation(reduceMotion = true)) { value, _ -> fade = value }
                 } finally {
                     fade = 1f
                     fadingFrom = null

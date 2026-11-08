@@ -6,7 +6,9 @@ import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.log.AppLog
-import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionPhase
+import ai.opencode.core.motion.MotionRole
+import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
@@ -484,8 +486,10 @@ fun TranscriptImageViewer(
         }
 
         val safe = WindowInsets.systemBarsIgnoringVisibility.union(WindowInsets.displayCutout)
-        val enter = fadeIn(Motion.easeOut(0.18))
-        val exit = fadeOut(Motion.easeOut(0.18))
+        // The controls swap in and out (iOS `Motion.swap`).
+        val reduceMotion = rememberReduceMotion()
+        val enter = fadeIn(MotionRole.Swap.animation(MotionPhase.Enter, reduceMotion))
+        val exit = fadeOut(MotionRole.Swap.animation(MotionPhase.Exit, reduceMotion))
         Box(Modifier.fillMaxSize().windowInsetsPadding(safe)) {
             AnimatedVisibility(
                 visible = controlsVisible,

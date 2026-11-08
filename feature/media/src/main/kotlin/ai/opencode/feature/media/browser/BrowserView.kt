@@ -5,7 +5,8 @@ import ai.opencode.core.motion.Motion
 import ai.opencode.core.scene.ActiveScene
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
-import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.MotionPhase
+import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeShape
@@ -251,20 +252,22 @@ fun browserBackAction(browser: BrowserFeature.State): BrowserFeature.Action = wh
  */
 fun browserStackID(pageID: UUID): Long = pageID.mostSignificantBits or (1L shl 62)
 
-/** SwiftUI `.snappy(duration: 0.3)`: a 0.3 s spring with 0.15 bounce. */
-private val snappy = MotionSpring(duration = 0.3, bounce = 0.15)
-
 /**
- * iOS `appear`: moves up from the bottom and fades in on `.snappy(duration: 0.3)`; under Reduce
- * Motion iOS drops the animation (`animation(nil)`), so it just appears.
+ * iOS `appear`: Ask and the reply capsule rise from the bottom as panels (panel open) and fold
+ * away on panel close; under Reduce Motion, the reduced cross-fade.
  */
-private fun appear(reduceMotion: Boolean): EnterTransition =
-    if (reduceMotion) EnterTransition.None
-    else slideInVertically(snappy.spec(IntOffset.VisibilityThreshold)) { it } + fadeIn(snappy.spec())
+private fun appear(reduceMotion: Boolean): EnterTransition {
+    if (reduceMotion) return fadeIn(MotionRole.PanelOpen.animation(reduceMotion = true))
+    val role = MotionRole.PanelOpen
+    return slideInVertically(role.animation(visibilityThreshold = IntOffset.VisibilityThreshold)) { it } + fadeIn(role.animation())
+}
 
-private fun disappear(reduceMotion: Boolean): ExitTransition =
-    if (reduceMotion) ExitTransition.None
-    else slideOutVertically(snappy.spec(IntOffset.VisibilityThreshold)) { it } + fadeOut(snappy.spec())
+private fun disappear(reduceMotion: Boolean): ExitTransition {
+    if (reduceMotion) return fadeOut(MotionRole.PanelOpen.animation(MotionPhase.Exit, reduceMotion = true))
+    val role = MotionRole.PanelOpen
+    return slideOutVertically(role.animation(MotionPhase.Exit, visibilityThreshold = IntOffset.VisibilityThreshold)) { it } +
+        fadeOut(role.animation(MotionPhase.Exit))
+}
 
 @Composable
 private fun Bar(store: StoreOf<BrowserFeature.State, BrowserFeature.Action>, page: BrowserFeature.State.Snapshot?) {

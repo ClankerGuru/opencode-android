@@ -1,7 +1,7 @@
 package ai.opencode.feature.settings.serverdetails
 
 import ai.opencode.core.motion.Motion
-import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.motion.PageTransitions
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeIcon
@@ -201,6 +201,7 @@ private fun MCPServersList(
 ) {
     val servers = state.mcpServers
     val connected = servers.count { it.status == OpenCodeMCPServer.Status.Connected }
+    val reduceMotion = rememberReduceMotion()
     Column(Modifier.fillMaxWidth()) {
         TrayHeader("MCP Servers", "$connected of ${servers.size} connected", close)
         LazyColumn(contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp)) {
@@ -211,8 +212,8 @@ private fun MCPServersList(
                     index == servers.lastIndex -> RoundedCornerShape(bottomStart = 26.dp, bottomEnd = 26.dp)
                     else -> RoundedCornerShape(0.dp)
                 }
-                // iOS `.animation(.spring(duration: 0.3, bounce: 0), value: servers)`.
-                Column(Modifier.animateItem(MotionSpring(0.3).spec(), MotionSpring(0.3).spec(IntOffset.VisibilityThreshold), MotionSpring(0.3).spec()).padding(horizontal = 16.dp).clip(shape).background(OpenCodeTheme.colors.groupedCard)) {
+                // iOS `.animation(Motion.layout.animation(reduceMotion:), value: servers)`.
+                Column(Modifier.animateItem(MotionRole.Layout.animation(reduceMotion = reduceMotion), MotionRole.Layout.animation(reduceMotion = reduceMotion, visibilityThreshold = IntOffset.VisibilityThreshold), MotionRole.Layout.animation(reduceMotion = reduceMotion)).padding(horizontal = 16.dp).clip(shape).background(OpenCodeTheme.colors.groupedCard)) {
                     MCPServerRow(
                         mcp = mcp,
                         onOpen = { open(mcp.name) },
