@@ -1,10 +1,12 @@
 package ai.opencode.feature.drawer.list
 
 import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.ui.AccessibilityFocusRequest
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.core.ui.accessibilityFocusRequest
 import ai.opencode.feature.drawer.HomeFeature.State.Indicator
 import ai.opencode.feature.drawer.motion.DrawerTimeReveal
 import ai.opencode.feature.drawer.style.DrawerMetrics
@@ -43,9 +45,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.foundation.focusable
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -136,7 +135,7 @@ fun DrawerListSessionCell(
     pinDrag: DrawerPinDrag,
     listCoordinates: () -> LayoutCoordinates?,
     modifier: Modifier = Modifier,
-    focusRequester: FocusRequester? = null,
+    returnFocus: AccessibilityFocusRequest? = null,
 ) {
     val colors = OpenCodeTheme.colors
     val density = LocalDensity.current
@@ -294,7 +293,8 @@ fun DrawerListSessionCell(
                     list = listCoordinates,
                     row = { rowCoordinates[0] },
                 )
-                .then(if (focusRequester != null) Modifier.focusRequester(focusRequester).focusable() else Modifier)
+                // Ahead of the clearing below, which would drop its marker.
+                .accessibilityFocusRequest(returnFocus)
                 .clearAndSetSemantics {
                     testTag = "drawer-session-row-${row.session.id}"
                     contentDescription = row.session.title
