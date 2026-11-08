@@ -168,7 +168,10 @@ class SessionDrawerController internal constructor(
      * fades that picture out over the new content (iOS `pendingExitSnapshot`).
      */
     fun captureCardThen(then: () -> Unit) {
-        if (reducedMotion || cardLayer == null) {
+        // Finishing Catch Up: the last card already handed over to its flying snapshot (`live.alpha == 0`),
+        // so there is no live card to snapshot (and reading `cardLayer` back would stall the flight).
+        val liveHidden = catchUp != null && catchUpStack.live.alpha <= 0.01f
+        if (reducedMotion || cardLayer == null || liveHidden) {
             pendingSnapshot = null
             pendingStageSnapshot = null
             then()
@@ -176,10 +179,12 @@ class SessionDrawerController internal constructor(
         }
         scope.launch {
             pendingSnapshot = captureCard()
-            pendingStageSnapshot = if (catchUp != null) capture(chromeLayer) else null
+            pendingStageSnapshot = null
             then()
         }
     }
+
+    internal val pendingCardSnapshot: ImageBitmap? get() = pendingSnapshot
 
     private var pendingSnapshot: ImageBitmap? = null
     private var pendingStageSnapshot: ImageBitmap? = null
@@ -470,6 +475,9 @@ class SessionDrawerController internal constructor(
         }
         catchUp = stage
         if (stage != null) lastStage = stage
+        // iOS `wasShowingCard = cardView.alpha > 0.01`: once the last card hands over to its flying
+        // snapshot (`live.alpha == 0`), there is no live card left to linger as `outgoing`.
+        val wasShowingCard = previous != null && previous.cardID != null && catchUpStack.live.alpha > 0.01f
         // iOS `stack.end(...)` on leaving: a card drag under way is nobody's now. (The stack keeps
         // its stage until the exit morph unmounts it, so its preview fades with the stage.)
         if (previous != null && stage == null) catchUpStack.dropDrag()
@@ -481,8 +489,8 @@ class SessionDrawerController internal constructor(
         }
         when {
             previous == null && stage != null -> enter(animated, startOffset, startProgress, stage.cardID != null)
-            previous != null && stage == null && returnsToDrawer && sidebarShown == null -> returnToDrawer(animated, previous.cardID != null)
-            previous != null && stage == null -> exitIntoSession(animated, previous.cardID != null)
+            previous != null && stage == null && returnsToDrawer && sidebarShown == null -> returnToDrawer(animated, wasShowingCard)
+            previous != null && stage == null -> exitIntoSession(animated, wasShowingCard)
             else -> Unit
         }
     }

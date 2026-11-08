@@ -107,10 +107,12 @@ fun CatchUpStack(
     previewRevision: Int = 0,
     revealsPreviewOnBegin: Boolean = true,
     handlesPan: Boolean = true,
+    isExiting: Boolean = false,
     panRegions: DrawerPanRegions? = null,
     /** What [proxy]'s buttons do (the drawer container lands its morph first, iOS `dismissCard`/`undoCard`). */
     dismissCard: (CatchUpDisposition) -> Unit = controller::fling,
     undoCard: () -> Unit = controller::undo,
+    leavingCard: (@Composable () -> Unit)? = null,
     card: @Composable (sessionID: String?) -> Unit,
     preview: @Composable (sessionID: String, revision: Int) -> Unit,
 ) {
@@ -149,14 +151,16 @@ fun CatchUpStack(
         controller.liveLayer = liveLayer
         proxy?.dismiss = dismissCard
         proxy?.undo = undoCard
-        val current = controller.currentStage
-        when {
-            current == null -> {
-                controller.begin(stage)
-                if (revealsPreviewOnBegin) controller.revealPreview(animated = !reducedMotion)
+        if (!isExiting) {
+            val current = controller.currentStage
+            when {
+                current == null -> {
+                    controller.begin(stage)
+                    if (revealsPreviewOnBegin) controller.revealPreview(animated = !reducedMotion)
+                }
+                current.queue != stage.queue || current.undoDirection != stage.undoDirection -> controller.update(stage)
+                else -> controller.refreshCallbacks(stage)
             }
-            current.queue != stage.queue || current.undoDirection != stage.undoDirection -> controller.update(stage)
-            else -> controller.refreshCallbacks(stage)
         }
     }
     DisposableEffect(controller) {
@@ -194,7 +198,7 @@ fun CatchUpStack(
                         controller.refreshTuning()
                     }
                 }
-                .then(if (handlesPan) Modifier.catchUpPan(controller, panRegions) else Modifier),
+                .then(if (handlesPan && !isExiting) Modifier.catchUpPan(controller, panRegions) else Modifier),
         ) {
             // The card behind: the next session, dimmed, inert and hidden from TalkBack.
             Box(
@@ -234,6 +238,10 @@ fun CatchUpStack(
                 if (!flying.aboveLive) key(flying.id) { CatchUpFlyingCardView(flying, cornerRadius, borderWidth, baseBorder) }
             }
 
+            if (leavingCard != null) {
+                leavingCard()
+            }
+
             // The live card: the only interactive one.
             Box(
                 Modifier
@@ -241,6 +249,7 @@ fun CatchUpStack(
                     .catchUpCardSurface(
                         layerState = controller.live,
                         cornerRadius = cornerRadius,
+                        skipWhenHidden = { isExiting },
                     ),
             ) {
                 Box(
@@ -440,8 +449,10 @@ private class CatchUpCardSurfaceNode(
     private var layerOwner: GraphicsContext? = null
 
     override fun ContentDrawScope.draw() {
-        if (skipWhenHidden() || size.width <= 0f || size.height <= 0f) {
-            dropLayer()
+        val alpha = layerState.alpha
+        val p = layerState.pose
+        if (skipWhenHidden() || alpha <= 0.001f || size.width <= 0f || size.height <= 0f) {
+            if (skipWhenHidden() || size.width <= 0f || size.height <= 0f) dropLayer()
             return
         }
         val graphics = currentValueOf(LocalGraphicsContext)
@@ -450,13 +461,12 @@ private class CatchUpCardSurfaceNode(
             layer = it
             layerOwner = graphics
         }
-        val p = layerState.pose
         activeLayer.translationX = p.tx * density
         activeLayer.translationY = p.ty * density
         activeLayer.rotationZ = Math.toDegrees(p.rotation.toDouble()).toFloat()
         activeLayer.scaleX = p.scale
         activeLayer.scaleY = p.scale
-        activeLayer.alpha = layerState.alpha
+        activeLayer.alpha = alpha
         activeLayer.setRoundRectOutline(Offset.Zero, size, cornerRadius.toPx())
         activeLayer.clip = true
         if (shadow) {

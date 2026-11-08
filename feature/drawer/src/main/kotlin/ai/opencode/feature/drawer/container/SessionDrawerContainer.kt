@@ -227,7 +227,8 @@ fun SessionDrawerContainer(
     // Catch Up just ended and the morph hasn't started yet (it starts in this pass's effects):
     // the stage stays mounted so the morph can fade it.
     val exiting = catchUp == null && controller.catchUp != null
-    val stackStage = catchUp ?: if (exiting || exitMorph) controller.lastStage else null
+    val hasFlyingCards = controller.catchUpStack.flyingCards.isNotEmpty()
+    val stackStage = catchUp ?: if (exiting || exitMorph || hasFlyingCards) controller.lastStage else null
     val cardInStack = catchUp != null
     val chromeMounted = catchUp != null || exiting || exitMorph
     // Catch Up began this pass; its morph (which fades the drawer out) starts in this pass's effects.
@@ -387,6 +388,13 @@ fun SessionDrawerContainer(
 
         if (stackStage != null) {
             val outgoing = controller.outgoing
+            val returningToModalDrawer = modal && ((exiting && isPresented) || morph == CatchUpModeMorph.ReturnToDrawer)
+            val leavingSnapshot = if (!cardInStack && returningToModalDrawer) {
+                outgoing ?: if (exiting && !reducedMotion) controller.pendingCardSnapshot else null
+            } else {
+                null
+            }
+            val stackCornerPx = with(density) { CatchUpMetrics.cornerRadius.toPx() }
             CatchUpStack(
                 stage = stackStage,
                 controller = controller.catchUpStack,
@@ -395,9 +403,44 @@ fun SessionDrawerContainer(
                 undoCard = controller::undoCard,
                 previewRevision = previewRevision,
                 revealsPreviewOnBegin = false,
+                isExiting = !cardInStack,
                 panRegions = panRegions,
                 modifier = Modifier.containerPoseLayer { _, densityPx ->
                     translationX = controller.stackOffset.floatValue * densityPx * if (rtl) -1 else 1
+                },
+                leavingCard = if (leavingSnapshot != null) {
+                    {
+                        Box(
+                            Modifier
+                                .fillMaxSize()
+                                .clearAndMergeSemantics()
+                                .containerPoseLayer { size, _ ->
+                                    alpha = if (exiting) 1f else controller.outgoingAlpha.floatValue
+                                    setRoundRectOutline(Offset.Zero, size, stackCornerPx)
+                                    clip = true
+                                },
+                        ) {
+                            Image(
+                                leavingSnapshot,
+                                contentDescription = null,
+                                contentScale = ContentScale.FillBounds,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                            Box(
+                                Modifier
+                                    .fillMaxSize()
+                                    .drawBehind {
+                                        drawRoundRect(
+                                            color = borderColor,
+                                            cornerRadius = CornerRadius(stackCornerPx),
+                                            style = Stroke(borderWidthPx),
+                                        )
+                                    },
+                            )
+                        }
+                    }
+                } else {
+                    null
                 },
                 card = {
                     if (cardInStack) {
@@ -494,7 +537,8 @@ fun SessionDrawerContainer(
                             },
                     )
                 }
-                if (outgoing != null && outgoingRect != null) {
+                val returningOnModal = modal && ((exiting && isPresented) || morph == CatchUpModeMorph.ReturnToDrawer)
+                if (!returningOnModal && outgoing != null && outgoingRect != null) {
                     Image(
                         outgoing,
                         contentDescription = null,
