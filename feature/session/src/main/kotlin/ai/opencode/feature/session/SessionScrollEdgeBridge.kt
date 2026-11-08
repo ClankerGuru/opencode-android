@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.setValue
 import kotlin.math.max
 import kotlin.math.min
@@ -24,6 +25,12 @@ import kotlin.math.roundToInt
 class SessionScrollEdgeBridge {
     /** The composer area's height (dp), the list's bottom content inset. */
     var composerHeight by mutableFloatStateOf(0f)
+
+    /**
+     * What the transcript last said about Jump to latest (the composer host shows it). Saved with
+     * the composer's height, so a recreated screen's pill is there from its first frame (F-38).
+     */
+    var reportedShowsJumpButton = false
 
     /** Content scrolled under the header (dp), capped at the reveal distance and rounded. */
     var scrolledUnderHeader by mutableFloatStateOf(0f)
@@ -71,10 +78,11 @@ class SessionScrollEdgeBridge {
          * For the screen's `rememberSaveable`: the composer's last height outlives the activity
          * being recreated, so a restored transcript's first frame already has its bottom inset and
          * lays the reader's row out where it was (I-02), instead of a frame at a shorter scroll range.
+         * Jump to latest's last state goes with it (F-38).
          */
-        val Saver: Saver<SessionScrollEdgeBridge, Float> = Saver(
-            save = { it.composerHeight },
-            restore = { SessionScrollEdgeBridge().apply { composerHeight = it } },
+        val Saver: Saver<SessionScrollEdgeBridge, Any> = listSaver(
+            save = { listOf(it.composerHeight, it.reportedShowsJumpButton) },
+            restore = { SessionScrollEdgeBridge().apply { composerHeight = it[0] as Float; reportedShowsJumpButton = it[1] as Boolean } },
         )
     }
 }

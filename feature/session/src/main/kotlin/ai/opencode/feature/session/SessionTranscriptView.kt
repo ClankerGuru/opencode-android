@@ -233,7 +233,12 @@ fun SessionTranscriptView(
         }
     }
     // A new screen starts without the jump button (iOS `resetShowsJumpButton`).
-    DisposableEffect(host) { onDispose { host?.showsJumpButton = false } }
+    DisposableEffect(host) {
+        onDispose {
+            host?.showsJumpButton = false
+            scrollEdgeBridge.reportedShowsJumpButton = false
+        }
+    }
 
     // Against a Catch Up card's own edges, not the window's ([inContainer]).
     val safeTop = WindowInsets.statusBarsIgnoringVisibility.inContainer().asPaddingValues().calculateTopPadding()
@@ -252,7 +257,10 @@ fun SessionTranscriptView(
                 bottom = bottomObstruction + scrollEdgeBridge.composerHeight.dp,
             ),
             jumpRequest = scrollEdgeBridge.jumpRequest,
-            onShowsJumpButtonChanged = { host?.showsJumpButton = it },
+            onShowsJumpButtonChanged = {
+                host?.showsJumpButton = it
+                scrollEdgeBridge.reportedShowsJumpButton = it
+            },
             slots = slots,
             layoutTuning = TranscriptTunables.layoutSnapshot(),
             onScrolledUnderHeader = { scrollEdgeBridge.scrolled(underHeader = it, revealDistance = top.revealDistance) },

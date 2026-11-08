@@ -217,6 +217,9 @@ private fun TranscriptListContent(
     val resumed by lifecycle.currentStateFlow.collectAsState()
     controller.send = { currentSend(it) }
     controller.setShowsJumpButton = { currentShowsJump(it) }
+    // The screen may start the pill as it last was (F-38); once laid out, this list says what its
+    // own restored state shows, so the two can't disagree.
+    LaunchedEffect(controller) { currentShowsJump(behavior.showsJumpButton) }
     controller.density = density.density
     controller.frameDuration = ai.opencode.core.motion.rememberFrameDurationSeconds()
     controller.reduceMotion = reduceMotion

@@ -163,7 +163,13 @@ fun SessionView(
     // What the composer shares with the screen around it (the capsule's place, jump to latest, the + menu).
     // The pill a session opens with (a cold launch's reconnect) is there from its first frame, as
     // iOS's is, rather than rising in over the last row a frame later.
-    val composerHost = remember { SessionComposerHost().apply { connection = listContext.connection } }
+    // So is the jump button a recreated screen showed (F-38).
+    val composerHost = remember {
+        SessionComposerHost().apply {
+            connection = listContext.connection
+            showsJumpButton = scrollEdgeBridge.reportedShowsJumpButton
+        }
+    }
     val importer = rememberSessionAttachmentImporter(store)
     val colors = OpenCodeTheme.colors
     val density = LocalDensity.current
