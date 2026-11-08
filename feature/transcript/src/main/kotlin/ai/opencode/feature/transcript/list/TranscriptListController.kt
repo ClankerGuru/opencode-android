@@ -779,6 +779,9 @@ class TranscriptListController(
 
     private fun heightOf(item: LazyListItemInfo): Float = item.size / density
 
+    /** The key of a row put back after process death that the list hasn't reached yet (see [TranscriptScrollBehavior.Viewport.holdsRestoredRow]). */
+    var restoringRowKey: () -> String? = { null }
+
     /** iOS `viewport` from LazyColumn's layout: measured heights where known, the average elsewhere. */
     fun viewport(info: LazyListLayoutInfo = state.layoutInfo): TranscriptScrollBehavior.Viewport {
         val visible = info.visibleItemsInfo
@@ -786,8 +789,9 @@ class TranscriptListController(
         val keys = snapshot.items
         val average = if (measuredHeights.isEmpty()) 80f else measuredHeights.values.average().toFloat()
         val canRequest = configuration.hasEarlierItems && !configuration.isLoadingEarlier && configuration.earlierHistoryError == null
+        val holdsRestoredRow = restoringRowKey() != null
         if (visible.isEmpty() || keys.isEmpty()) {
-            return TranscriptScrollBehavior.Viewport(0f, 0f, visibleHeight, 0f, canRequest, isUserGestureActive)
+            return TranscriptScrollBehavior.Viewport(0f, 0f, visibleHeight, 0f, canRequest, isUserGestureActive, holdsRestoredRow)
         }
         val first = visible.first()
         var before = 0f
@@ -809,6 +813,7 @@ class TranscriptListController(
             trailingSpace = trailingSpace,
             canRequestEarlierHistory = canRequest,
             isUserScrolling = isUserGestureActive,
+            holdsRestoredRow = holdsRestoredRow,
         )
     }
 

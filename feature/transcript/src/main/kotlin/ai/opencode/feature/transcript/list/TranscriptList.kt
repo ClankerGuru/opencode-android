@@ -213,6 +213,7 @@ private fun TranscriptListContent(
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val resumed by lifecycle.currentStateFlow.collectAsState()
     controller.send = { currentSend(it) }
+    controller.restoringRowKey = { position.anchor?.first }
     controller.setShowsJumpButton = { currentShowsJump(it) }
     controller.density = density.density
     controller.frameDuration = ai.opencode.core.motion.rememberFrameDurationSeconds()
@@ -245,7 +246,11 @@ private fun TranscriptListContent(
             }
             if (position.settleLayouts > 0) return@SideEffect
             val index = controller.snapshot.items.indexOfFirst { it.key == key }
-            if (index < 0) return@SideEffect
+            if (index < 0) {
+                // All of the history is listed and the row isn't in it: nothing to go back to.
+                if (configuration.entries.isNotEmpty() && !configuration.hasEarlierItems && !configuration.isLoadingEarlier) position.anchor = null
+                return@SideEffect
+            }
             position.settleLayouts = 3
             listState.requestScrollToItem(index, offset)
             // The controller may hold the row the list showed before (rows were prepended): not now.
