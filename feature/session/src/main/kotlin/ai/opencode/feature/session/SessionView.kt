@@ -26,8 +26,10 @@ import ai.opencode.feature.composer.AttachmentMenuItem
 import ai.opencode.feature.composer.AttachmentMenuOverlay
 import ai.opencode.feature.composer.AttachmentMenuPhase
 import ai.opencode.feature.composer.AttachmentMenuPress
+import ai.opencode.feature.composer.AttachmentPickerButton
 import ai.opencode.feature.composer.ComposerAutocompleteAction
 import ai.opencode.feature.composer.ComposerPhotoViewer
+import ai.opencode.feature.composer.ComposerPickers
 import ai.opencode.feature.composer.LocationClientError
 import ai.opencode.feature.composer.LocationPermissionPrompt
 import ai.opencode.feature.composer.PastedTextViewer
@@ -375,7 +377,8 @@ private data class BackgroundWorkModel(
 
 /**
  * The + menu (iOS `attachmentMenuOverlay`, `toggleAttachmentMenu` and `chooseAttachment`) and what
- * it opens: Photos (the composer's photo sheet, growing out of the menu), Files (the system document picker) and Location (one at a time). The menu is
+ * it opens: Photos (the composer's photo sheet, growing out of the menu; on Android
+ * the system photo picker, since the app has no photo library access), Files (the system document picker) and Location (one at a time). The menu is
  * :feature:composer's [AttachmentMenuOverlay], growing out of the + ([AttachmentPickerButton] in
  * the composer's row, which also chooses a row by sliding to it); it keeps the field's focus, and
  * choosing a picker gives the keyboard up, which returns once something is attached if the field
@@ -408,6 +411,9 @@ private fun SessionAttachmentMenu(
     val dictating by store.observe { it.isPreparingDictation || it.isDictating || it.dictationHold != null }
     val files = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         if (uris.isNotEmpty()) importer.importPickedFiles(uris, onFocus = host::focusComposer)
+    }
+    val photos = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        importer.importPickedMedia(ComposerPickers.uris(result.resultCode, result.data), onAdded = host::focusComposer)
     }
 
     // Another session in place: the menu closes at once, and the sheet with it.
@@ -467,7 +473,19 @@ private fun SessionAttachmentMenu(
     fun choose(item: AttachmentMenuItem) {
         if (phase != AttachmentMenuPhase.Menu || sheet.morph.isOpening) return
         when (item) {
-            AttachmentMenuItem.Photos -> sheet.openPhotoSheet()
+            // Android: with no photo library access (Play policy) the system picker stands in for the sheet.
+            AttachmentMenuItem.Photos -> if (sheet.library.usesSystemPicker) {
+                sheet.attachmentMenuRestoresFocus = false
+                sheet.closeAttachmentMenu()
+                photos.launch(
+                    ComposerPickers.photosIntent(
+                        maxItems = AttachmentPickerButton.maxPhotoSelection(plusMenu = true),
+                        includesVideos = supportsFileUploads,
+                    ),
+                )
+            } else {
+                sheet.openPhotoSheet()
+            }
             AttachmentMenuItem.Files -> {
                 sheet.attachmentMenuRestoresFocus = false
                 sheet.closeAttachmentMenu()

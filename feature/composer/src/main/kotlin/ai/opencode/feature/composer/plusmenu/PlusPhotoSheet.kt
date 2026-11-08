@@ -202,6 +202,9 @@ class PlusPhotoLibrary(private val client: PhotoLibraryClient = dependency(Photo
 
     val canRead: Boolean get() = access.canRead
 
+    /** Android only: no library to read ([PhotoLibraryAccess.Unavailable]), so Photos opens the system photo picker instead of the sheet. */
+    val usesSystemPicker: Boolean get() = client.access() == PhotoLibraryAccess.Unavailable
+
     fun cacheKey(id: String, side: Float, scale: Float): ThumbnailCacheKey {
         val pixelSide = (side * max(scale, 1f)).roundToInt()
         return ThumbnailCacheKey(id, pixelSide, photosById[id]?.modified)
