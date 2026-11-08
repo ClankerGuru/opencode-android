@@ -67,6 +67,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
@@ -106,6 +107,7 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -129,6 +131,17 @@ private class TranscriptListPosition(val state: LazyListState, var anchor: Pair<
      */
     var settleLayouts = 0
 }
+
+/** V-01: whether the list hides while a row restored after process death loads ([decide]d on the list's first composition). */
+private class RestoreHide {
+    var decide = true
+    var hides by mutableStateOf(false)
+    /** The jump button the list last asked for, shown once it stops hiding. */
+    var jump = false
+}
+
+/** Longest a restoring list stays invisible waiting for its row's page; then it shows where it is and still goes back to the row when it lands. */
+private const val RESTORE_HIDE_LIMIT_MS = 2_500L
 
 /** `LazyListState.Saver` for a state with the list's cache window (Compose keeps that saver internal), plus the first row's key. */
 private val transcriptListPositionSaver = listSaver<TranscriptListPosition, Any>(
@@ -214,7 +227,11 @@ private fun TranscriptListContent(
     val resumed by lifecycle.currentStateFlow.collectAsState()
     controller.send = { currentSend(it) }
     controller.restoringRowKey = { position.anchor?.first }
-    controller.setShowsJumpButton = { currentShowsJump(it) }
+    // V-01: a reader whose row, saved across process death, isn't listed yet (its page is still
+    // loading) would see the list clamped at the end and then jump. It stays invisible until the
+    // row is put back, the restore ends, or RESTORE_HIDE_LIMIT_MS passes; header and composer show.
+    val restoreHide = remember { RestoreHide() }
+    controller.setShowsJumpButton = { restoreHide.jump = it; currentShowsJump(it && !restoreHide.hides) }
     controller.density = density.density
     controller.frameDuration = ai.opencode.core.motion.rememberFrameDurationSeconds()
     controller.reduceMotion = reduceMotion
@@ -233,6 +250,18 @@ private fun TranscriptListContent(
     }
     // Applied in composition so this frame draws the new rows with their stable keys.
     controller.update(configuration)
+    if (restoreHide.decide) {
+        restoreHide.decide = false
+        val key = position.anchor?.first
+        restoreHide.hides = key != null && behavior.mode == TranscriptScrollBehavior.Mode.Browsing &&
+            controller.snapshot.items.none { it.key == key }
+    }
+    val endRestoreHide = {
+        if (restoreHide.hides) {
+            restoreHide.hides = false
+            currentShowsJump(restoreHide.jump)
+        }
+    }
     controller.obstructionChanged(contentPadding.calculateBottomPadding().value, WindowInsets.ime.inContainer().getBottom(density) / density.density)
     SideEffect { controller.flushEffects() }
     // A restored browsing reader goes back to their row by its key once the rows hold it (a
@@ -242,6 +271,7 @@ private fun TranscriptListContent(
             val (key, offset) = position.anchor ?: return@SideEffect
             if (behavior.mode != TranscriptScrollBehavior.Mode.Browsing) {
                 position.anchor = null
+                endRestoreHide()
                 return@SideEffect
             }
             if (position.settleLayouts > 0) return@SideEffect
@@ -249,11 +279,16 @@ private fun TranscriptListContent(
             if (index < 0) {
                 // All of the history is listed and the row isn't in it: nothing to go back to. (Not
                 // `!hasEarlierItems`: a restored cache says that before its first read lands, F-65.)
-                if (configuration.listsAllHistory) position.anchor = null
+                if (configuration.listsAllHistory) {
+                    position.anchor = null
+                    endRestoreHide()
+                }
                 return@SideEffect
             }
             position.settleLayouts = 3
             listState.requestScrollToItem(index, offset)
+            // This frame lays the row out where it was: the list shows from it.
+            endRestoreHide()
             // The controller may hold the row the list showed before (rows were prepended): not now.
             controller.forgetReadingAnchor()
         }
@@ -264,6 +299,7 @@ private fun TranscriptListContent(
                 val index = controller.snapshot.items.indexOfFirst { item -> item.key == key }
                 if (index < 0 || (listState.firstVisibleItemIndex == index && listState.firstVisibleItemScrollOffset == offset) || --position.settleLayouts == 0) {
                     position.anchor = null
+                    endRestoreHide()
                 } else {
                     listState.requestScrollToItem(index, offset)
                     controller.forgetReadingAnchor()
@@ -273,6 +309,13 @@ private fun TranscriptListContent(
         LaunchedEffect(listState) {
             snapshotFlow { listState.isScrollInProgress }.first { it }
             position.anchor = null
+            endRestoreHide()
+        }
+    }
+    if (restoreHide.hides) {
+        LaunchedEffect(restoreHide) {
+            delay(RESTORE_HIDE_LIMIT_MS)
+            endRestoreHide()
         }
     }
 
@@ -458,7 +501,7 @@ private fun TranscriptListContent(
                     state = listState,
                     modifier = Modifier.fillMaxSize().testTag("transcript-list")
                         .semantics { customActions = listOf(CustomAccessibilityAction("Scroll to top", controller::scrollToTop)) }
-                        .graphicsLayer { alpha = controller.handoffProgress() }
+                        .graphicsLayer { alpha = if (restoreHide.hides) 0f else controller.handoffProgress() }
                         .drawRowExits(
                             exits = rowExits,
                             startPaddingPx = with(density) { contentPadding.calculateStartPadding(direction).toPx() },
