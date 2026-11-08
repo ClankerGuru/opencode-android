@@ -65,6 +65,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -102,6 +103,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
@@ -272,13 +274,19 @@ fun SessionView(
             },
         ) {
             Box(Modifier.fillMaxSize().background(colors.canvas)) {
-                if (errorMessage != null) {
-                    LoadFailure(errorMessage.orEmpty(), onRetry = { store.send(Action.Task) })
-                } else {
-                    // A draft's transcript carries on into the session it became, so the first
-                    // send's bubble and Working never remount mid-flight.
-                    key(identity) {
-                        SessionTranscriptView(store, scrollEdgeBridge, resolvedHeader.transcriptTop, holdsWorking = listContext.connection != null)
+                ComposedAfterComposer {
+                    // Read while measuring, after the header has laid out: the first frame rests the
+                    // transcript under the header's real height, not the default's.
+                    val measuredHeader = headerEnvironment.copy(headerHeight = headerHeight)
+                    val transcriptTop = remember(measuredHeader) { HeaderBlurTunables.resolved(measuredHeader).transcriptTop }
+                    if (errorMessage != null) {
+                        LoadFailure(errorMessage.orEmpty(), onRetry = { store.send(Action.Task) })
+                    } else {
+                        // A draft's transcript carries on into the session it became, so the first
+                        // send's bubble and Working never remount mid-flight.
+                        key(identity) {
+                            SessionTranscriptView(store, scrollEdgeBridge, transcriptTop, holdsWorking = listContext.connection != null)
+                        }
                     }
                 }
                 SessionHeaderBackdrop(
@@ -728,6 +736,23 @@ internal fun shareText(context: android.content.Context, text: String) {
     try {
         context.startActivity(android.content.Intent.createChooser(send, null).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
     } catch (_: android.content.ActivityNotFoundException) {
+    }
+}
+
+/**
+ * The transcript, composed while the screen measures, after the composer and the header: the
+ * parent Box measures a `matchParentSize` child after its other children, and their size callbacks
+ * have written [SessionScrollEdgeBridge.composerHeight] and the header's height by then. So the
+ * list's first frame already rests between them (on a cold launch its bottom inset used to be 0 and
+ * its top the default header's for the first frames: the last row sat under the composer, then the
+ * list jumped), as iOS lays the composer out before the list. Placement, and so drawing order,
+ * stays the parent's child order.
+ */
+@Composable
+private fun BoxScope.ComposedAfterComposer(content: @Composable BoxScope.() -> Unit) {
+    SubcomposeLayout(Modifier.matchParentSize()) { constraints ->
+        val placeables = subcompose(Unit) { Box(Modifier.fillMaxSize(), content = content) }.map { it.measure(constraints) }
+        layout(constraints.maxWidth, constraints.maxHeight) { placeables.forEach { it.place(0, 0) } }
     }
 }
 
