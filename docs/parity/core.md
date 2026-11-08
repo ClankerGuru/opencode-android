@@ -89,7 +89,6 @@ Ported from iOS `OpenCodeTests/` into `core/src/test` (JVM, same names). Shared 
 | `VoiceScreenshotToolTests.swift` | `diagnostics/VoiceScreenshotToolTests.kt` | 1 (`problemReportsAndVoiceScreenshotsKeepSeparatePolicies`, the `Marks` half; the window password-field half scans UIKit views) | the screenshot tool tests → `:feature:voice`; `settingsCredentialsAreMarkedForEveryScreenshot` hosts a UIKit window (the marks are `HidesFromScreenshots` calls, covered by this policy test) | |
 
 Round 2 (ui helper): no `:core` production bugs found. `InternalBuild.detect(isDebug, installingPackageName)` was pulled out of
-`isEnabled` (unchanged behaviour) so `InternalBuildTests` can check it. 147 `:core` tests in total, all passing
-`isEnabled` (unchanged behaviour) so `InternalBuildTests` can check it. 153 `:core` tests in total, all passing
+`isEnabled` (unchanged behaviour) so `InternalBuildTests` can check it. 152 `:core` tests in total, all passing
 (`./gradlew :core:testDebugUnitTest`). Robolectric (test-only) runs only `LiveHapticsFrameworkTests`; `LiveHaptics` is `internal` (was
 `private`) so it can.

@@ -102,5 +102,4 @@ Production bugs the ported tests found: none.
 `AgentFileReferenceTests`, `PagePromptBodyTests` and the first two `LowDataModeTests` (owner `:server`) are in
 server.md's table.
 
-Total: 188 media tests, all passing (`./gradlew :feature:media:testDebugUnitTest`: 188 run, 0 failed).
-Total: 190 media tests, all passing (`./gradlew :feature:media:testDebugUnitTest`: 190 run, 0 failed).
+Total: 191 media tests, all passing (`./gradlew :feature:media:testDebugUnitTest`: 191 run, 0 failed).
