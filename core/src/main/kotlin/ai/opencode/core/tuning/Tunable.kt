@@ -173,7 +173,23 @@ object TuningTitle {
 data class TuningContext(val id: String, val label: String? = null, val groups: List<String> = listOf(id)) {
     val displayTitle: String get() = label ?: TuningTitle.format(id)
 
+    /** iOS `panelGroups`: its groups, then the global ones every screen lists ([globalGroups]). */
+    val panelGroups: List<String>
+        get() {
+            val result = ArrayList(groups)
+            for (group in globalGroups) {
+                if (group !in groups) result += group
+            }
+            return result
+        }
+
     companion object {
+        /**
+         * iOS `TuningPanelGroups.globalGroups` (here so `:core` can read it): groups every screen
+         * lists after its own. The motion roles move everything, so they're tunable wherever you are.
+         */
+        val globalGroups = listOf("motion")
+
         val session = TuningContext("session", groups = listOf("session", "motion", "composer", "modelPicker", "projectPicker", "call", "transcript", "numbers", "launch", "mark"))
         val motion = TuningContext("motion")
         val drawer = TuningContext("drawer")
@@ -182,6 +198,7 @@ data class TuningContext(val id: String, val label: String? = null, val groups: 
         val transcriptPlayground = TuningContext("transcriptPlayground", label = "Transcript", groups = listOf("transcript", "session", "composer", "launch"))
         val sessionListPlayground = TuningContext("sessionListPlayground", label = "Session List", groups = listOf("drawer", "catchUp", "launch"))
         val catchUpPlayground = TuningContext("catchUpPlayground", label = "Catch Up", groups = listOf("catchUp", "drawer"))
+        val motionPlayground = TuningContext("motionPlayground", label = "Motion", groups = listOf("motion"))
         val composerPlayground = TuningContext("composerPlayground", label = "Composer", groups = listOf("launch", "composer", "modelPicker", "projectPicker", "drawer", "transcript", "call"))
     }
 }

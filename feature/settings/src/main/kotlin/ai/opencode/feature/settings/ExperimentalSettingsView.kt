@@ -9,6 +9,7 @@ import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.observe
 import ai.opencode.devtools.DevTools
 import ai.opencode.devtools.DevToolsView
+import ai.opencode.devtools.playgrounds.MotionPlaygroundView
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.snap
@@ -205,6 +206,10 @@ fun PlaygroundsSettingsView(store: SettingsStore) {
             SettingsRow("Onboarding", "dot.radiowaves.left.and.right", SettingsTint.Indigo, showsChevron = false) {
                 send(HomeSettingsFeature.Action.OnboardingPlaygroundOpened)
             }
+            SettingsDivider(inset = true)
+            SettingsRow("Motion", "sparkles", SettingsTint.Indigo, showsChevron = false) {
+                store.send(SettingsFeature.Action.PagePushed(SettingsPage.MotionPlayground))
+            }
         }
         settingsSection(key = "welcome-preview", footer = footerText("The first-run welcome, shown before any server is paired.")) {
             ExperimentalFeatureToggle(
@@ -219,5 +224,13 @@ fun PlaygroundsSettingsView(store: SettingsStore) {
                 }
             }
         }
+    }
+}
+
+/** Settings › Playgrounds › Motion: iOS `MotionPlaygroundView`, one example per motion role. */
+@Composable
+fun MotionPlaygroundSettingsView(store: SettingsStore) {
+    SettingsPageScaffold(title = "Motion", store = store) {
+        item(key = "motion-playground") { MotionPlaygroundView() }
     }
 }

@@ -1,6 +1,7 @@
 package ai.opencode.core.ui
 
 import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.motion.MotionSpring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -242,12 +243,10 @@ private fun RollingNumberSection() = Section("Rolling number") {
 }
 
 @Composable
-private fun MotionSection() = Section("Motion (duration s, bounce → ζ, stiffness)") {
-    listOf(
-        "morphOpen" to Motion.morphOpen, "morphClose" to Motion.morphClose, "panelOpen" to Motion.panelOpen,
-        "settle" to Motion.settle, "disclosureOpen" to Motion.disclosureOpen, "disclosureClose" to Motion.disclosureClose,
-        "microPop" to Motion.microPop, "microExit" to Motion.microExit, "drawerSlide" to Motion.drawerSlide,
-    ).forEach { (name, spring) -> MotionRow(name, spring) }
+private fun MotionSection() = Section("Motion roles (enter curve: duration s, bounce → ζ, stiffness)") {
+    for (role in MotionRole.entries) {
+        MotionRow(role.name, role.spring)
+    }
 }
 
 @Composable

@@ -146,6 +146,7 @@ private fun SettingsPageContent(store: SettingsStore, page: SettingsPage) {
         is SettingsPage.Experimental -> ExperimentalSettingsView(store, focus = page.focus?.let(ExperimentalFeature::fromRawValue))
         SettingsPage.Developer -> DeveloperSettingsView(store)
         SettingsPage.Playgrounds -> PlaygroundsSettingsView(store)
+        SettingsPage.MotionPlayground -> MotionPlaygroundSettingsView(store)
     }
 }
 

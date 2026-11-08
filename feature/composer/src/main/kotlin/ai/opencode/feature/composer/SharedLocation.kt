@@ -598,7 +598,7 @@ private fun MapPin() {
  * Unified composer location attachment card that keeps a single stable
  * `220 × (72 + compactFooterHeight)` frame across “Finding Location…” and the resolved
  * [SharedLocationCard], animating in once (the session's `PresenceGate` drives [gateProgress]:
- * `Motion.panelOpen` in, `Motion.disclosureClose` out) and revealing the map and address in
+ * `Motion.legacyPanelOpen` in, `Motion.disclosureClose` out) and revealing the map and address in
  * place with [motionBlurReveal] when ready, without a second pop or height snap.
  *
  * [gateProgress] is the gate's target (0 or 1); this animates toward it and reports
@@ -627,7 +627,7 @@ fun ComposerLocationAttachment(
 
     LaunchedEffect(Unit) { onAppear() }
     LaunchedEffect(gateProgress) {
-        val spec = if (gateProgress >= 1f) Motion.panelOpen.animation<Float>(reduceMotion) else Motion.disclosureClose.animation(reduceMotion)
+        val spec = if (gateProgress >= 1f) Motion.legacyPanelOpen.animation<Float>(reduceMotion) else Motion.disclosureClose.animation(reduceMotion)
         if (gate.value == gateProgress) return@LaunchedEffect
         gate.animateTo(gateProgress, spec)
         onGateSettled(gateProgress)
@@ -635,7 +635,7 @@ fun ComposerLocationAttachment(
     LaunchedEffect(location) {
         if (location != null) {
             displayedLocation = location
-            if (resolved.value < 1f) resolved.animateTo(1f, Motion.panelOpen.animation(reduceMotion))
+            if (resolved.value < 1f) resolved.animateTo(1f, Motion.legacyPanelOpen.animation(reduceMotion))
         }
     }
     LaunchedEffect(isLocating) {
