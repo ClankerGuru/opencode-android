@@ -60,12 +60,30 @@ token=$(call "$token_uri" -X POST \
   --data-urlencode "assertion=$header.$claims.$signature" | jq -r '.access_token')
 auth=(-H "Authorization: Bearer $token")
 
-edit=$(call "$api/edits" -X POST "${auth[@]}" -H 'Content-Type: application/json' -d '{}' | jq -r '.id')
-release=$(jq -cn --arg track "$track" --arg name "$release_name" --arg code "$version_code" '{
-  track: $track,
-  releases: [{name: $name, versionCodes: [$code], status: "completed"}]
-}')
-call "$api/edits/$edit/tracks/$track" -X PUT "${auth[@]}" -H 'Content-Type: application/json' \
-  -d "$release" >/dev/null
-call "$api/edits/$edit:commit" -X POST "${auth[@]}" >/dev/null
-echo "Released $release_name (versionCode $version_code) to the $track track."
+# put_on_track <status>: one edit that sets the track's release and commits it. Each step
+# returns on failure itself: `set -e` doesn't apply inside a function called as an `if` test.
+put_on_track() {
+  local edit release
+  edit=$(call "$api/edits" -X POST "${auth[@]}" -H 'Content-Type: application/json' -d '{}' | jq -r '.id') || return 1
+  release=$(jq -cn --arg track "$track" --arg name "$release_name" --arg code "$version_code" --arg status "$1" '{
+    track: $track,
+    releases: [{name: $name, versionCodes: [$code], status: $status}]
+  }') || return 1
+  call "$api/edits/$edit/tracks/$track" -X PUT "${auth[@]}" -H 'Content-Type: application/json' \
+    -d "$release" >/dev/null || return 1
+  call "$api/edits/$edit:commit" -X POST "${auth[@]}" >/dev/null || return 1
+}
+
+errors=$(mktemp)
+trap 'rm -f "$key_file" "$errors"' EXIT
+if put_on_track completed 2>"$errors"; then
+  echo "Released $release_name (versionCode $version_code) to the $track track."
+elif grep -q 'Only releases with status draft may be created on draft app' "$errors"; then
+  # Until Google has reviewed the app once, Play only takes draft releases on non-internal
+  # tracks. Leave this one as the track's draft for someone to send for review in Play Console.
+  put_on_track draft
+  echo "::warning::$release_name (versionCode $version_code) is a draft on the $track track: the app hasn't passed its first review, so send it for review in Play Console (Publishing overview)."
+else
+  cat "$errors" >&2
+  exit 1
+fi

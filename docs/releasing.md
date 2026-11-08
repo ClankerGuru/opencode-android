@@ -66,3 +66,8 @@ release from a new commit instead.
   Unset it (`gh variable delete PLAY_OPEN_TESTING`) to stop. Google reviews open testing
   releases, so a build can take a while to reach testers; a newer release replaces one still in
   review. Anyone opts in at https://play.google.com/apps/testing/ai.opencode.mobilecode.
+- Until Google has reviewed the app once, Play only accepts draft releases outside internal
+  testing ("Only releases with status draft may be created on draft app"). `play-promote.sh`
+  then leaves the build as the open testing track's draft and the job warns: send it for review
+  in Play Console (Publishing overview → Send changes for review). v0.2.2 (33) was the first,
+  sent for review on 2026-11-08.
