@@ -875,7 +875,7 @@ private fun SessionSheets(store: StoreOf<State, Action>, listContext: SessionLis
                     ) {
                         AgentActivityGlyph(
                             AgentActivitySource.Subagent(activity),
-                            Modifier.semantics { contentDescription = "Status"; stateDescription = status.text },
+                            Modifier.clearAndSetSemantics { contentDescription = "Status"; stateDescription = status.text },
                             size = size,
                         )
                     }
