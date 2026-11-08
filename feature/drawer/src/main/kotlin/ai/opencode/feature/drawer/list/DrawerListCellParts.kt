@@ -33,6 +33,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,6 +62,7 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
@@ -101,16 +103,25 @@ object DrawerListFonts {
 }
 
 /**
+ * Whether the drawer is shown on screen (iOS `DrawerListActivityRing.didMoveToWindow`): a
+ * prewarmed drawer kept hidden behind the session card pauses its row rings so they neither spin
+ * off screen nor wake the frame clock.
+ */
+val LocalDrawerVisible = compositionLocalOf { true }
+
+/**
  * The Working ring (iOS `DrawerListActivityRing`): an open arc (72 % of the circle, 1.8 dp,
- * round caps) with a fading tail, turned once every 0.8 s in the layer (no recomposition per
- * frame). Pass `isSpinning = running && !reduceMotion`: it stops under reduce motion.
- * [opaqueTail] (high contrast) draws the tail at full strength. Size it with [modifier].
+ * round caps) with a fading tail, turned once every 0.8 s in the draw phase (no recomposition or
+ * positional layer invalidation per frame). Pass `isSpinning = running && !reduceMotion`: it stops
+ * under reduce motion and while the drawer is hidden. [opaqueTail] (high contrast) draws the tail
+ * at full strength. Size it with [modifier].
  */
 @Composable
 fun DrawerListActivityRing(isSpinning: Boolean, opaqueTail: Boolean, modifier: Modifier = Modifier) {
     val color = OpenCodeTheme.colors.secondaryText
     val tail = if (opaqueTail) color else color.copy(alpha = 0f)
-    val rotation = if (isSpinning) {
+    val spinning = isSpinning && LocalDrawerVisible.current
+    val rotation = if (spinning) {
         val transition = rememberInfiniteTransition(label = "drawer-activity-ring")
         transition.animateFloat(
             initialValue = 0f,
@@ -121,11 +132,7 @@ fun DrawerListActivityRing(isSpinning: Boolean, opaqueTail: Boolean, modifier: M
     } else {
         null
     }
-    Canvas(
-        modifier
-            .clearAndSetSemantics {}
-            .graphicsLayer { rotationZ = rotation?.value ?: 0f },
-    ) {
+    Canvas(modifier.clearAndSetSemantics {}) {
         val inset = 0.9.dp.toPx()
         val brush = Brush.sweepGradient(
             0f to tail,
@@ -134,15 +141,17 @@ fun DrawerListActivityRing(isSpinning: Boolean, opaqueTail: Boolean, modifier: M
             0.9f to tail,
             center = center,
         )
-        drawArc(
-            brush = brush,
-            startAngle = 0f,
-            sweepAngle = 360f * 0.72f,
-            useCenter = false,
-            topLeft = Offset(inset, inset),
-            size = Size(size.width - inset * 2, size.height - inset * 2),
-            style = Stroke(width = 1.8.dp.toPx(), cap = StrokeCap.Round),
-        )
+        rotate(degrees = rotation?.value ?: 0f) {
+            drawArc(
+                brush = brush,
+                startAngle = 0f,
+                sweepAngle = 360f * 0.72f,
+                useCenter = false,
+                topLeft = Offset(inset, inset),
+                size = Size(size.width - inset * 2, size.height - inset * 2),
+                style = Stroke(width = 1.8.dp.toPx(), cap = StrokeCap.Round),
+            )
+        }
     }
 }
 

@@ -75,7 +75,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
@@ -147,16 +146,21 @@ data class DraftProjectOrder(
  * slide-and-fade (iOS blur-replace) when it changes; a cross-fade under Reduce Motion.
  */
 @Composable
-fun ProjectHeaderSubtitle(project: String, modifier: Modifier = Modifier, content: @Composable (String) -> Unit = { Text(it) }) {
+fun ProjectHeaderSubtitle(
+    project: String,
+    modifier: Modifier = Modifier,
+    animates: Boolean = true,
+    content: @Composable (String) -> Unit = { Text(it) },
+) {
     val reducedMotion = rememberReduceMotion()
     AnimatedContent(
         targetState = project,
         modifier = modifier,
         transitionSpec = {
-            if (reducedMotion) {
-                fadeIn(Motion.easeInOut(ProjectPickerTunables.reducedFade)) togetherWith fadeOut(Motion.easeInOut(ProjectPickerTunables.reducedFade))
-            } else {
-                (slideInVertically(ProjectPickerTunables.subtitle.spec()) { it / 2 } + fadeIn(ProjectPickerTunables.subtitle.spec())) togetherWith
+            when {
+                !animates -> (fadeIn(tween(0)) togetherWith fadeOut(tween(0))) using null
+                reducedMotion -> fadeIn(Motion.easeInOut(ProjectPickerTunables.reducedFade)) togetherWith fadeOut(Motion.easeInOut(ProjectPickerTunables.reducedFade))
+                else -> (slideInVertically(ProjectPickerTunables.subtitle.spec()) { it / 2 } + fadeIn(ProjectPickerTunables.subtitle.spec())) togetherWith
                     (slideOutVertically(ProjectPickerTunables.subtitle.spec()) { -it / 2 } + fadeOut(ProjectPickerTunables.subtitle.spec()))
             }
         },
@@ -251,7 +255,7 @@ fun DraftProjectList(
                             chosen = rowIsChosen,
                             ownHighlight = reducedMotion,
                             iconWidth = iconWidth,
-                            hint = if (isComposing) "Chooses where the session starts" else null,
+                            hint = if (isComposing) "Choose where the session starts" else null,
                             onClick = { if (isComposing) onAll() else onPick(project) },
                             tag = "draft-project-row",
                             takesTouches = !hidden,
@@ -309,8 +313,10 @@ private fun DraftProjectRow(
             .then(if (takesTouches) Modifier.clickable(role = Role.Button, onClickLabel = hint, onClick = onClick) else Modifier)
             .padding(start = 17.dp, end = 16.dp)
             .testTag(tag)
-            .semantics(mergeDescendants = true) {
-                selected = chosen
+            .clearAndSetSemantics {
+                // iOS's `.isSelected` trait as words: `selected` would make the row checkable,
+                // and TalkBack would offer "double-tap to toggle" on a row that picks.
+                if (chosen) stateDescription = "Selected"
                 contentDescription = title
             },
         verticalAlignment = Alignment.CenterVertically,
@@ -512,8 +518,8 @@ private fun ProjectList(
                             .padding(horizontal = ProjectPickerTunables.rowInset, vertical = ProjectPickerTunables.rowPadding)
                             .clearAndSetSemantics {
                                 contentDescription = project.name
-                                stateDescription = project.directory
-                                selected = chosen
+                                // iOS's `.isSelected` trait as words, not a checkable `selected`.
+                                stateDescription = listOfNotNull(if (chosen) "Selected" else null, project.directory).joinToString(", ")
                                 role = Role.Button
                             },
                         verticalAlignment = Alignment.CenterVertically,

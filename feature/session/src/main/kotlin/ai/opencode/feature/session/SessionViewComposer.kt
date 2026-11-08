@@ -127,6 +127,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draganddrop.DragAndDropEvent
@@ -140,6 +141,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
@@ -153,7 +155,6 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
@@ -165,6 +166,7 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -264,6 +266,9 @@ class SessionComposerHost {
     /** The message field has the keyboard (iOS `messageFieldFocused`); the field follows it. */
     var messageFieldFocused by mutableStateOf(false)
         internal set
+
+    /** The trailing control pressed last (`true` Stop, `false` Send) and when ([System.nanoTime]); see `TrailingButton`. */
+    internal var trailingPress: Pair<Boolean, Long>? = null
     internal var focusAction: () -> Unit = {}
     internal var dismissAction: () -> Unit = {}
 
@@ -337,15 +342,26 @@ internal class SessionComposerViewState {
  * belonged to (a field the drawer holds with its keys down has none; on a hardware keyboard the
  * focused field has it with no soft keys up, and the system keeps them down when it comes back).
  * The field loses its focus as the old activity's views go, after the first save, so later saves
- * while configurations change keep what that one saw. Restored only within the same process: after process death iOS starts
- * without the keyboard too.
+ * of the same switch keep what that one saw. A field still being restored (its focus not
+ * yet back, or its keys not yet up) when the next switch comes keeps it too. Restored only within
+ * the same process: after process death iOS starts without the keyboard too.
  */
 internal class ComposerKeyboardRestore(private val restored: SessionFeature.State.TaskIdentity? = null) {
     var hadKeyboard: () -> Boolean = { false }
     var changingConfigurations: () -> Boolean = { false }
     var identity: SessionFeature.State.TaskIdentity? = null
+    /** The restored field still has its focus (and isn't held by the drawer). */
+    var keepsRestoredFocus: () -> Boolean = { false }
+    /** The field took the keyboard back and hasn't let go of its focus since. */
+    var isRestoring = false
     private var pending = restored != null
     private var savedKeyboard = false
+    /** The last save came while configurations were changing (the same switch saves more than once). */
+    private var savedWhileChanging = false
+
+    /** A recreation saving now, before or during this restore, keeps the field's keyboard. */
+    private fun stillRestoring(): Boolean =
+        (pending && restored == identity) || (isRestoring && keepsRestoredFocus())
 
     /** Whether the field should take the keyboard back on [current]; true at most once. */
     fun takeRestore(current: SessionFeature.State.TaskIdentity): Boolean {
@@ -359,7 +375,12 @@ internal class ComposerKeyboardRestore(private val restored: SessionFeature.Stat
 
         val Saver: Saver<ComposerKeyboardRestore, ArrayList<String>> = Saver(
             save = { restore ->
-                restore.savedKeyboard = restore.hadKeyboard() || (restore.savedKeyboard && restore.changingConfigurations())
+                // Only an earlier save of this same switch carries over, never one from before it
+                // (leaving the screen, going to the background).
+                val changing = restore.changingConfigurations()
+                val carries = restore.savedKeyboard && changing && restore.savedWhileChanging
+                restore.savedKeyboard = restore.hadKeyboard() || restore.stillRestoring() || carries
+                restore.savedWhileChanging = changing
                 val identity = restore.identity?.takeIf { restore.savedKeyboard }
                 identity?.let { arrayListOf(process, it.serverID, it.visit.toString(), it.sessionID.orEmpty()) }
             },
@@ -585,10 +606,15 @@ fun SessionComposer(
     keyboardRestore.hadKeyboard = {
         host.messageFieldFocused && (ime.getBottom(density) > 0 || (typesOnHardwareKeys && drawerHold?.holdsCardField != true))
     }
+    keyboardRestore.keepsRestoredFocus = { host.messageFieldFocused && drawerHold?.holdsCardField != true }
     keyboardRestore.changingConfigurations = { activity?.isChangingConfigurations == true }
     keyboardRestore.identity = snapshot.taskIdentity
     LaunchedEffect(keyboardRestore) {
-        if (keyboardRestore.takeRestore(snapshot.taskIdentity) && !host.isCatchUpCard) env.focus()
+        if (!keyboardRestore.takeRestore(snapshot.taskIdentity) || host.isCatchUpCard) return@LaunchedEffect
+        env.focus()
+        keyboardRestore.isRestoring = true
+        snapshotFlow { host.messageFieldFocused }.first { !it }
+        keyboardRestore.isRestoring = false
     }
     // iOS `resetDictationPresentation()` and the hold's `onChange`.
     val recordingNow = snapshot.isPreparingDictation || snapshot.isDictating || snapshot.dictationHold != null
@@ -1108,23 +1134,32 @@ private fun SessionComposerEnv.DraftProjectsOverlay(modifier: Modifier) {
             val density = LocalDensity.current
             val headerBottom = WindowInsets.statusBarsIgnoringVisibility.getTop(density) + with(density) { host.headerHeight.dp.toPx() }
             var listTop by remember { mutableFloatStateOf(Float.POSITIVE_INFINITY) }
-            HiddenUnderComposerPanel(host.composerPanelCovers || listTop < headerBottom) {
-                Column(
-                    Modifier.onGloballyPositioned { listTop = it.positionInWindow().y },
-                    verticalArrangement = Arrangement.spacedBy(StarterPromptTunables.listGap.dp),
-                ) {
-                    AnimatedVisibility(visible = showsStarterPrompts, enter = fadeIn(), exit = fadeOut()) {
-                        StarterPromptList(s.starterPrompts, onPick = { store.send(Action.StarterPromptTapped(it)) })
+            val givesWay = listTop < headerBottom
+            val shown by animateFloatAsState(if (givesWay) 0f else 1f, Motion.easeOut(Motion.fadeFast), label = "givesWay")
+            // Faded out, it's measured but not placed, so taps reach the header under it (iOS
+            // `allowsHitTesting(false)`): the draft's title chooses the project there instead.
+            Layout(
+                content = {
+                    HiddenUnderComposerPanel(host.composerPanelCovers || givesWay) {
+                        Column(verticalArrangement = Arrangement.spacedBy(StarterPromptTunables.listGap.dp)) {
+                            AnimatedVisibility(visible = showsStarterPrompts, enter = fadeIn(), exit = fadeOut()) {
+                                StarterPromptList(s.starterPrompts, onPick = { store.send(Action.StarterPromptTapped(it)) })
+                            }
+                            DraftProjectList(
+                                identity = s.taskIdentity,
+                                projects = s.recentProjects,
+                                chosen = s.draftProject,
+                                isComposing = isComposingDraft,
+                                onPick = { store.send(Action.DraftProjectTapped(it)) },
+                                onAll = { store.send(Action.ProjectButtonTapped) },
+                            )
+                        }
                     }
-                    DraftProjectList(
-                        identity = s.taskIdentity,
-                        projects = s.recentProjects,
-                        chosen = s.draftProject,
-                        isComposing = isComposingDraft,
-                        onPick = { store.send(Action.DraftProjectTapped(it)) },
-                        onAll = { store.send(Action.ProjectButtonTapped) },
-                    )
-                }
+                },
+                modifier = Modifier.onGloballyPositioned { listTop = it.positionInWindow().y },
+            ) { measurables, constraints ->
+                val list = measurables.single().measure(constraints)
+                layout(list.width, list.height) { if (!givesWay || shown > 0f) list.place(0, 0) }
             }
         }
     }
@@ -1195,16 +1230,14 @@ private fun SessionComposerEnv.QueuedActivity(hasQueued: Boolean) {
             title = "$count queued",
             rolls = true,
             onClick = { view.showsQueuedMessages = true },
-            onClickLabel = "Shows messages waiting for this response to finish",
+            onClickLabel = "Show messages waiting for this response to finish",
+            accessibilityLabel = if (count == 1) "1 queued message" else "$count queued messages",
             modifier = Modifier
                 // A queued send's words shrink into it (iOS `scrollEdgeBridge.queuedPillFrame`).
                 .onGloballyPositioned { host.queuedPillFrame = it.boundsInWindow() }
                 .passesDragsToTranscript(host.borrowedDrag)
                 .coveredByBackgroundWork()
-                .semantics {
-                    contentDescription = if (count == 1) "1 queued message" else "$count queued messages"
-                    testTag = "queued-messages"
-                },
+                .semantics { testTag = "queued-messages" },
         ) {
             OpenCodeIcon(SFSymbol.TextBubble, contentDescription = null, size = 17.dp, modifier = Modifier.offset(y = ComposerTunables.queuedGlyphDrop.dp))
         }

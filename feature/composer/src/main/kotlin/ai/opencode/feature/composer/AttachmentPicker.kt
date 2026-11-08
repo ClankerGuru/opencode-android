@@ -9,6 +9,8 @@ import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.core.ui.accessibilityFocusRequest
+import ai.opencode.core.ui.rememberAccessibilityFocusRequest
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
@@ -214,6 +216,8 @@ fun AttachmentPickerButton(
         if (wasOpen && !isOpen) closes += 1
         wasOpen = isOpen
     }
+    // One move per close: laid out again later (the session moved into Catch Up's stack), the + doesn't take it again (QA W-05).
+    val closeFocus = rememberAccessibilityFocusRequest(closes.takeIf { it > 0 })
     val pop = remember { PlusPop() }
     var wasPopping by remember { mutableStateOf(popsOnClose) }
     LaunchedEffect(popsOnClose) {
@@ -335,7 +339,7 @@ fun AttachmentPickerButton(
             .then(menuGesture)
             .then(dictationTap)
             // Ahead of the clearing below, which would drop its marker.
-            .accessibilityFocusRequest(closes.takeIf { it > 0 })
+            .accessibilityFocusRequest(closeFocus)
             .clearAndSetSemantics {
                 role = Role.Button
                 contentDescription = label

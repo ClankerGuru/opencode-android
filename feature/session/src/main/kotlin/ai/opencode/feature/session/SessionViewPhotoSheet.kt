@@ -6,6 +6,9 @@ import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
 import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.core.ui.AccessibilityFocusRequest
+import ai.opencode.core.ui.accessibilityFocusRequest
+import ai.opencode.core.ui.rememberAccessibilityFocusRequest
 import ai.opencode.core.ui.inContainer
 import ai.opencode.feature.composer.AttachmentMenuMetrics
 import ai.opencode.feature.composer.AttachmentMenuPhase
@@ -15,7 +18,6 @@ import ai.opencode.feature.composer.ComposerMorph
 import ai.opencode.feature.composer.ComposerMorphGeometry
 import ai.opencode.feature.composer.ComposerMorphSurface
 import ai.opencode.feature.composer.ComposerMorphTunables
-import ai.opencode.feature.composer.accessibilityFocusRequest
 import ai.opencode.feature.composer.modelpicker.ModelPickerTunables
 import ai.opencode.feature.composer.plusmenu.PhotoFlights
 import ai.opencode.feature.composer.plusmenu.PhotoLibraryAccessHost
@@ -674,7 +676,7 @@ private fun PhotoSheetBody(state: SessionPhotoSheetState) {
                 onToggle = state::togglePhotoSheetExpand,
                 // TalkBack's focus moves into the sheet once its content has arrived, onto its
                 // first element, as it does into a system bottom sheet (it was on the menu's row).
-                focusRequest = if (state.morph.isOpening && contentArrived) state.morph.generation else null,
+                focusRequest = rememberAccessibilityFocusRequest(if (state.morph.isOpening && contentArrived) state.morph.generation else null),
             )
             Box(Modifier.weight(1f).fillMaxWidth().nestedScroll(connection)) {
                 PlusPhotoSheetContent(
@@ -707,7 +709,7 @@ private fun PhotoSheetGrabber(
     onDrag: (Float) -> Unit,
     onDragEnded: (predicted: Float, velocity: Float) -> Unit,
     onToggle: () -> Unit,
-    focusRequest: Any? = null,
+    focusRequest: AccessibilityFocusRequest? = null,
 ) {
     val density = LocalDensity.current.density
     val currentDrag by rememberUpdatedState(onDrag)

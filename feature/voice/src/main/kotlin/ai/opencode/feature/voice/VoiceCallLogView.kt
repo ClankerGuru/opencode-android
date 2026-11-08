@@ -82,6 +82,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.drawText
@@ -138,7 +139,7 @@ fun VoiceCallLogList(
         modifier = modifier,
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("History", style = OpenCodeTextStyles.headline) },
+                title = { Text("History", style = OpenCodeTextStyles.headline, modifier = Modifier.semantics { heading() }) },
                 navigationIcon = {
                     IconButton(onClick = onBack) { OpenCodeIcon(SFSymbol.ChevronBackward, contentDescription = "Back") }
                 },
@@ -313,7 +314,7 @@ fun VoiceCallReplayView(log: VoiceCallLog, onBack: () -> Unit, modifier: Modifie
         modifier = modifier,
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text(log.title, style = OpenCodeTextStyles.headline, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                title = { Text(log.title, style = OpenCodeTextStyles.headline, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.semantics { heading() }) },
                 navigationIcon = {
                     IconButton(onClick = onBack) { OpenCodeIcon(SFSymbol.ChevronBackward, contentDescription = "Back") }
                 },

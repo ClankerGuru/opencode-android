@@ -10,7 +10,9 @@ import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.drawerKeyboardField
 import ai.opencode.server.model.PastedText
 import android.net.Uri
+import android.os.Process
 import android.os.SystemClock
+import android.view.WindowInsetsController
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.content.MediaType
@@ -56,6 +58,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.snapshots.Snapshot
@@ -90,6 +94,7 @@ import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.WindowInfo
 import androidx.compose.ui.semantics.contentDescription
@@ -102,6 +107,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
@@ -110,9 +116,11 @@ import kotlinx.coroutines.android.awaitFrame
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -122,6 +130,45 @@ import kotlin.math.roundToInt
 
 /** How long a recreated window's inherited keys stay up over the restored field before they count as its own. */
 private const val INHERITED_KEYS_SETTLE_MILLIS = 1_000L
+
+/** How long a recreated field waits for its draft to put its saved selection back (QA AG-01). */
+private const val SELECTION_RESTORE_MILLIS = 1_000L
+
+/** How long keys must stay hidden before they count as having left the focused field (A-01). */
+private const val KEYS_LEFT_SETTLE_MILLIS = 250L
+
+/**
+ * The field's selection, saved across an activity recreation (QA AG-01). Restored only in the same
+ * process and for a draft of the same length; after process death the caret starts at the end.
+ */
+internal class ComposerSavedSelection(private val saved: List<Int>? = null) {
+    // Until the field reports its own, a save keeps what was restored (switches in a row).
+    private var length = saved?.get(2) ?: 0
+    private var selection = saved?.let { TextRange(it[0], it[1]) } ?: TextRange.Zero
+
+    fun update(length: Int, selection: TextRange) {
+        this.length = length
+        this.selection = selection
+    }
+
+    fun restored(text: String): TextRange? {
+        val (start, end, savedLength) = saved ?: return null
+        if (savedLength != text.length || maxOf(start, end) > text.length) return null
+        return TextRange(start, end)
+    }
+
+    companion object {
+        private val process: String get() = "${Process.myPid()}:${Process.getStartUptimeMillis()}"
+
+        val Saver: Saver<ComposerSavedSelection, ArrayList<String>> = Saver(
+            save = { arrayListOf(process, it.selection.start.toString(), it.selection.end.toString(), it.length.toString()) },
+            restore = { saved ->
+                val values = saved.takeIf { it.size == 4 && it[0] == process }?.drop(1)?.mapNotNull { it.toIntOrNull() }
+                ComposerSavedSelection(values?.takeIf { it.size == 3 })
+            },
+        )
+    }
+}
 
 /**
  * The composer tunables the text input reads (iOS `ComposerTunables`, `Session/ComposerViews.swift`):
@@ -635,7 +682,19 @@ fun ComposerTextInput(
     focusRequest: Int = 0,
     isCovered: Boolean = false,
 ) {
-    val state = remember { TextFieldState(text, TextRange(text.length)) }
+    // QA AG-01: a dark/light or language switch recreates the activity, where iOS's text view keeps
+    // its selection (and rotation, handled in place, keeps it here): the caret or selection comes
+    // back where it was, for the same draft in the same process.
+    val savedSelection = rememberSaveable(saver = ComposerSavedSelection.Saver) { ComposerSavedSelection() }
+    val state = remember { TextFieldState(text, savedSelection.restored(text) ?: TextRange(text.length)) }
+    LaunchedEffect(state) {
+        // The draft can reach a recreated field a moment after it composes (its caret then at the end).
+        withTimeoutOrNull(SELECTION_RESTORE_MILLIS) {
+            val restored = snapshotFlow { savedSelection.restored(state.text.toString()) }.filterNotNull().first()
+            if (state.selection != restored) state.edit { selection = restored }
+        }
+        snapshotFlow { state.text.length to state.selection }.collect { (length, selection) -> savedSelection.update(length, selection) }
+    }
     val controller = remember { ComposerTextInputController() }
     val scroll = rememberScrollState()
     val focusRequester = remember { FocusRequester() }
@@ -838,6 +897,13 @@ fun ComposerTextInput(
         delay(INHERITED_KEYS_SETTLE_MILLIS)
         keysInherited = false
     }
+    // Each time the app leaves the foreground (Home, Recents): A-01's wait below doesn't outlive it.
+    var pauses by remember { mutableIntStateOf(0) }
+    DisposableEffect(lifecycle) {
+        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_PAUSE) pauses++ }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
+    }
     val imeTarget = WindowInsets.imeAnimationTarget
     LaunchedEffect(imeVisible) {
         val left = imeWasVisible && !imeVisible
@@ -851,8 +917,42 @@ fun ComposerTextInput(
         // A recreated window (dark mode, font size) first reports the old window's keys as shown,
         // then as hidden while they rise for this field: keys on their way up aren't leaving.
         if (imeTarget.getBottom(density) > 0) return@LaunchedEffect
+        // Keys the background took (Home, Recents) haven't left: the field keeps its focus and the
+        // keys come back with the app, as iOS's text view stays first responder (QA AG-02).
         if (!windowInfo.isWindowFocused || !lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return@LaunchedEffect
-        dismissKeyboard()
+        // Keys that take no room (Gboard floating, or its toolbar over a hardware keyboard) keep
+        // the target at 0 and, as a recreated window re-attaches them, can flick hidden and straight
+        // back: only keys that stay down have left (a flick back restarts this effect). The wait
+        // can end only once the app is back from the background; then the keys went with it.
+        val pausesBefore = pauses
+        delay(KEYS_LEFT_SETTLE_MILLIS)
+        if (pauses != pausesBefore) return@LaunchedEffect
+        if (!hasFocus || drawerHold?.isHeld(fieldKey) == true || isKeyboardHeld) return@LaunchedEffect
+        if (!windowInfo.isWindowFocused || !lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return@LaunchedEffect
+        // QA AF-02: on the drawer's card the drawer takes the focus (`releaseFocus`) instead of it
+        // being cleared. `clearFocus` also drops the window's view focus, and after a key (Back,
+        // or TalkBack's Back) the window gives it straight back: an input-focus event TalkBack
+        // follows to the screen's first element ("Open sessions"). VoiceOver stays on the text
+        // view as UIKit resigns it (iOS `dismissKeyboard`, ComposerTextInput.swift:802-805). The
+        // field still loses its focus: the caret goes and `onFocusedChange(false)` reaches the host.
+        if (drawerHold?.releaseFocus() != true) dismissKeyboard()
+    }
+
+    // A recreated window asks for the restored field's keys before it is the IME's target; when
+    // switches come quickly the system drops that request and the keys never come. The first time
+    // this window can control the keys, a field that already has focus asks for them again.
+    val view = LocalView.current
+    DisposableEffect(view) {
+        val controller = view.windowInsetsController
+        val listener = object : WindowInsetsController.OnControllableInsetsChangedListener {
+            override fun onControllableInsetsChanged(controller: WindowInsetsController, types: Int) {
+                if (types and android.view.WindowInsets.Type.ime() == 0) return
+                controller.removeOnControllableInsetsChangedListener(this)
+                if (hasFocus && !held) keyboard?.show()
+            }
+        }
+        controller?.addOnControllableInsetsChangedListener(listener)
+        onDispose { controller?.removeOnControllableInsetsChangedListener(listener) }
     }
 
     // The caret's drop handle, the selection handles and the text toolbar are popup windows over

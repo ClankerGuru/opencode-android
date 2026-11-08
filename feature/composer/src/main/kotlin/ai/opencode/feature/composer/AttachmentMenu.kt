@@ -7,14 +7,12 @@ import ai.opencode.core.motion.transitionBlur
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.core.ui.AccessibilityFocusRequest
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.core.ui.accessibilityFocusRequest
 import ai.opencode.core.ui.openCodeTapTarget
 import ai.opencode.feature.composer.plusmenu.PlusMenuPlacement
 import android.net.Uri
-import android.view.View
-import android.view.ViewTreeObserver
-import android.view.accessibility.AccessibilityManager
-import android.view.accessibility.AccessibilityNodeInfo
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector4D
@@ -62,7 +60,6 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -85,20 +82,10 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInRoot
-import androidx.compose.ui.node.CompositionLocalConsumerModifierNode
-import androidx.compose.ui.node.ModifierNodeElement
-import androidx.compose.ui.node.currentValueOf
-import androidx.compose.ui.node.RootForTest
-import androidx.compose.ui.node.SemanticsModifierNode
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.SemanticsNode
-import androidx.compose.ui.semantics.SemanticsPropertyKey
-import androidx.compose.ui.semantics.SemanticsPropertyReceiver
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -113,15 +100,12 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
-import kotlin.coroutines.resume
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
 
 /**
  * Where the attachment menu is (iOS `AttachmentMenuPhase`). The menu and the photo card are one
@@ -306,8 +290,8 @@ fun AttachmentMenuRows(
     /** New Plus Menu: the menu's fixed width; otherwise the rows size to their content. */
     menuWidth: Dp? = null,
     onRowFrame: ((AttachmentMenuItem, Rect) -> Unit)? = null,
-    /** Each new non-null value moves TalkBack's focus onto the top row ([accessibilityFocusRequest]). */
-    focusRequest: Any? = null,
+    /** Moves TalkBack's focus onto the top row once ([accessibilityFocusRequest]). */
+    focusRequest: AccessibilityFocusRequest? = null,
     onChoose: (AttachmentMenuItem) -> Unit = {},
     onPaste: () -> Unit = {},
 ) {
@@ -360,80 +344,6 @@ fun AttachmentMenuRows(
         }
     }
 }
-
-/**
- * Moves TalkBack's focus onto this element each time [request] becomes a new non-null value.
- * VoiceOver moves into an `.isModal` container as it appears and back out as it goes (iOS
- * `AttachmentMenu.swift` `accessibilityAddTraits(.isModal)`); Compose has no modal semantics, so
- * the + menu moves it itself. Nothing happens while touch exploration is off.
- */
-fun Modifier.accessibilityFocusRequest(request: Any?): Modifier = this then AccessibilityFocusRequestElement(request)
-
-private data class AccessibilityFocusRequestElement(val request: Any?) : ModifierNodeElement<AccessibilityFocusRequestNode>() {
-    override fun create() = AccessibilityFocusRequestNode(request)
-    override fun update(node: AccessibilityFocusRequestNode) = node.update(request)
-}
-
-private class AccessibilityFocusRequestNode(private var request: Any?) :
-    Modifier.Node(), SemanticsModifierNode, CompositionLocalConsumerModifierNode {
-    private var pending: Job? = null
-
-    override fun SemanticsPropertyReceiver.applySemantics() {
-        this[AccessibilityFocusTarget] = this@AccessibilityFocusRequestNode
-    }
-
-    override fun onAttach() = focus()
-
-    fun update(next: Any?) {
-        if (next == request) return
-        request = next
-        if (isAttached) focus()
-    }
-
-    private fun focus() {
-        pending?.cancel()
-        if (request == null) return
-        pending = coroutineScope.launch {
-            // Its semantics are published with the frame that lays it out.
-            withFrameNanos {}
-            withFrameNanos {}
-            val view = currentValueOf(LocalView)
-            if (view.context.getSystemService(AccessibilityManager::class.java)?.isTouchExplorationEnabled != true) return@launch
-            // Another window is on top (the document picker Files opened): a move made now is
-            // lost, and back here TalkBack falls back to the first content. So it moves once this
-            // window has its focus back.
-            if (!view.hasWindowFocus()) {
-                view.awaitWindowFocus()
-                withFrameNanos {}
-            }
-            val root = (view as? RootForTest)?.semanticsOwner?.unmergedRootSemanticsNode ?: return@launch
-            // Absent while something hides it (a cleared ancestor): then there's nothing to focus.
-            val id = root.find { it.config.getOrNull(AccessibilityFocusTarget) === this@AccessibilityFocusRequestNode }?.id ?: return@launch
-            view.accessibilityNodeProvider?.performAction(id, AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS, null)
-        }
-    }
-
-    private fun SemanticsNode.find(match: (SemanticsNode) -> Boolean): SemanticsNode? =
-        if (match(this)) this else children.firstNotNullOfOrNull { it.find(match) }
-
-    private suspend fun View.awaitWindowFocus() {
-        if (hasWindowFocus()) return
-        suspendCancellableCoroutine { continuation ->
-            val observer = viewTreeObserver
-            val listener = object : ViewTreeObserver.OnWindowFocusChangeListener {
-                override fun onWindowFocusChanged(hasFocus: Boolean) {
-                    if (!hasFocus) return
-                    if (observer.isAlive) observer.removeOnWindowFocusChangeListener(this)
-                    continuation.resume(Unit)
-                }
-            }
-            observer.addOnWindowFocusChangeListener(listener)
-            continuation.invokeOnCancellation { if (observer.isAlive) observer.removeOnWindowFocusChangeListener(listener) }
-        }
-    }
-}
-
-private val AccessibilityFocusTarget = SemanticsPropertyKey<AccessibilityFocusRequestNode>("AccessibilityFocusTarget")
 
 private val AttachmentMenuRowHighlightRadius: Dp = AttachmentMenuMetrics.cornerRadius - AttachmentMenuMetrics.padding
 

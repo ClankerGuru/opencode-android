@@ -11,6 +11,7 @@ import ai.opencode.feature.drawer.catchup.CatchUpStack
 import ai.opencode.feature.drawer.catchup.CatchUpStage
 import ai.opencode.feature.drawer.catchup.CatchUpStageProxy
 import ai.opencode.feature.drawer.catchup.rememberCatchUpStackController
+import ai.opencode.feature.drawer.list.LocalDrawerVisible
 import ai.opencode.feature.drawer.list.rememberInboxSidebarOn
 import ai.opencode.feature.drawer.motion.DrawerCorner
 import ai.opencode.feature.drawer.motion.DrawerDepth
@@ -58,39 +59,49 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusTarget
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.GraphicsContext
 import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.node.CompositionLocalConsumerModifierNode
+import androidx.compose.ui.node.DrawModifierNode
+import androidx.compose.ui.node.ModifierNodeElement
+import androidx.compose.ui.node.SemanticsModifierNode
+import androidx.compose.ui.node.currentValueOf
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalGraphicsContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsPropertyReceiver
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
@@ -250,12 +261,20 @@ fun SessionDrawerContainer(
     val borderWidthPx = if (isDark) with(density) { 1.dp.toPx() } else 1f
     // Inbox Sidebar rows swipe Mark as Read and Archive themselves (iOS `rowsOwnSwipes`).
     val inboxSidebarOn = rememberInboxSidebarOn()
+    // Where the card's or drawer's input focus goes when the container takes it away (QA AD-01).
+    // `clearFocus` also drops the view's own focus; out of touch mode (after any key, TalkBack's
+    // Back included) the window gives it straight back, and TalkBack follows that input-focus
+    // event to the screen's first element (Catch Up's "N Left", the drawer's scrim) after its own
+    // focus had landed. Moving the focus to this target instead leaves the view's focus alone.
+    val focusSink = remember { FocusRequester() }
+    var holdsFocus by remember { mutableStateOf(false) }
 
     Box(
         modifier
             .fillMaxSize()
             .background(colors.canvas)
             .onSizeChanged { controller.containerSizePx = it }
+            .onFocusChanged { holdsFocus = it.hasFocus }
             .drawerDirectionalPan(
                 regions = panRegions,
                 isDrawerPresented = { motion.isPresented },
@@ -287,8 +306,10 @@ fun SessionDrawerContainer(
                 }
             },
     ) {
+        Box(Modifier.focusRequester(focusSink).focusTarget())
         // The modal drawer, over the card; or the sidebar, beside it.
         if (drawerComposed) {
+            val drawerVisible = drawerShows && (sidebarShown == null || controller.isSidebarVisible)
             val hiddenFromAccessibility = !drawerShows || catchUp != null ||
                 if (sidebarShown != null) !controller.isSidebarVisible else motion.isDrawerHiddenFromAccessibility.value
             Box(
@@ -299,28 +320,34 @@ fun SessionDrawerContainer(
                     .zIndex(if (modal && (catchUp == null || drawerPosed)) 1f else 0f)
                     .drawerPanDrawer(panRegions)
                     .graphicsLayer {
-                        val override = controller.drawerScale.floatValue
                         if (modal) {
-                            if (override.isNaN()) {
+                            if (controller.drawerScale.floatValue.isNaN()) {
                                 // The drawer's trailing edge rides the finger, as the card's leading edge did.
                                 val shown = min(motion.offset, width.value)
                                 translationX = (shown - width.value).dp.toPx() * if (rtl) -1 else 1
-                            } else {
-                                scaleX = override
-                                scaleY = override
                             }
                             shape = ModalDrawerShape
                             clip = true
-                        } else {
-                            val scale = if (!override.isNaN()) override else DrawerDepth.scale(motion.progress, motion.reducedMotion || !motion.recedes)
+                        }
+                        alpha = if (drawerShows && controller.drawerScale.floatValue.isNaN()) controller.drawerAlpha.floatValue else if (drawerShows) 1f else 0f
+                    }
+                    .containerPoseLayer { size, densityPx ->
+                        val override = controller.drawerScale.floatValue
+                        if (!override.isNaN()) {
+                            scaleX = override
+                            scaleY = override
+                            alpha = if (drawerShows) controller.drawerAlpha.floatValue else 0f
+                        } else if (!modal) {
+                            val scale = DrawerDepth.scale(motion.progress, motion.reducedMotion || !motion.recedes)
                             scaleX = scale
                             scaleY = scale
                         }
-                        alpha = if (drawerShows) controller.drawerAlpha.floatValue else 0f
                     }
-                    .then(if (hiddenFromAccessibility) Modifier.clearAndSetSemantics {} else Modifier),
+                    .then(if (hiddenFromAccessibility) Modifier.clearAndMergeSemantics() else Modifier),
             ) {
-                drawer()
+                CompositionLocalProvider(LocalDrawerVisible provides drawerVisible) {
+                    drawer()
+                }
                 if (sidebarShown != null) {
                     // The sidebar's edge against the session.
                     Box(
@@ -340,7 +367,7 @@ fun SessionDrawerContainer(
             Box(
                 Modifier
                     .fillMaxSize()
-                    .graphicsLayer {
+                    .containerPoseLayer { _, _ ->
                         alpha = controller.chromeAlpha.floatValue
                         val scale = controller.chromeScale.floatValue
                         scaleX = scale
@@ -359,7 +386,7 @@ fun SessionDrawerContainer(
                                 chromeLayer.record { this@drawWithContent.drawContent() }
                                 drawLayer(chromeLayer)
                             }
-                            .then(if (catchUp == null) Modifier.clearAndSetSemantics {} else Modifier),
+                            .then(if (catchUp == null) Modifier.clearAndMergeSemantics() else Modifier),
                     ) {
                         chrome()
                     }
@@ -378,8 +405,8 @@ fun SessionDrawerContainer(
                 previewRevision = previewRevision,
                 revealsPreviewOnBegin = false,
                 panRegions = panRegions,
-                modifier = Modifier.graphicsLayer {
-                    translationX = controller.stackOffset.floatValue.dp.toPx() * if (rtl) -1 else 1
+                modifier = Modifier.containerPoseLayer { _, densityPx ->
+                    translationX = controller.stackOffset.floatValue * densityPx * if (rtl) -1 else 1
                 },
                 card = {
                     if (cardInStack) {
@@ -413,22 +440,32 @@ fun SessionDrawerContainer(
                 Modifier
                     .fillMaxSize()
                     .sidebarLeading(controller)
-                    .graphicsLayer {
+                    .then(
+                        if (!modal) {
+                            Modifier.graphicsLayer {
+                                if (!controller.cardPosed) {
+                                    val offset = motion.offset
+                                    translationX = offset.dp.toPx() * if (rtl) -1 else 1
+                                    val radius = DrawerCorner.radius(motion.isCardMoving, offset, displayRadius.value)
+                                    shape = if (radius > 0f) RoundedCornerShape(radius.dp) else RectangleShape
+                                    clip = radius > 0f
+                                }
+                            }
+                        } else {
+                            Modifier
+                        },
+                    )
+                    .containerPoseLayer { size, densityPx ->
                         if (controller.cardPosed) {
-                            translationX = controller.cardTx.floatValue.dp.toPx() * if (rtl) -1 else 1
-                            translationY = controller.cardTy.floatValue.dp.toPx()
+                            translationX = controller.cardTx.floatValue * densityPx * if (rtl) -1 else 1
+                            translationY = controller.cardTy.floatValue * densityPx
                             val scale = controller.cardScale.floatValue
                             scaleX = scale
                             scaleY = scale
                             alpha = controller.cardAlpha.floatValue
-                            shape = MaskShape(controller.currentMask(), controller.cardRadius.floatValue.dp.toPx())
+                            val mask = controller.currentMask() ?: Rect(Offset.Zero, size)
+                            setRoundRectOutline(mask.topLeft, mask.size, controller.cardRadius.floatValue * densityPx)
                             clip = true
-                        } else if (!modal) {
-                            val offset = motion.offset
-                            translationX = offset.dp.toPx() * if (rtl) -1 else 1
-                            val radius = DrawerCorner.radius(motion.isCardMoving, offset, displayRadius.value)
-                            shape = if (radius > 0f) RoundedCornerShape(radius.dp) else RectangleShape
-                            clip = radius > 0f
                         }
                     }
                     .drawerPanCard(panRegions)
@@ -438,7 +475,7 @@ fun SessionDrawerContainer(
                     Modifier
                         .fillMaxSize()
                         .graphicsLayer { alpha = controller.contentAlpha.floatValue }
-                        .then(if (contentHidden) Modifier.clearAndSetSemantics {} else Modifier)
+                        .then(if (contentHidden) Modifier.clearAndMergeSemantics() else Modifier)
                         // Consumes nothing; it's here to be inserted with this slot. Catch Up's
                         // stack consumes the system bars around the moved session, and a session
                         // moved back here kept reading those consumed insets (its header under the
@@ -572,7 +609,9 @@ fun SessionDrawerContainer(
         motion.keyboardHold = keyboardHold
         controller.isSheetPresented = { sheet }
         controller.isContentPushed = { pushed }
-        controller.clearFocus = { focusManager.clearFocus(force = true) }
+        // Nothing focused, nothing to take: a clear would only drop and regain the view's focus.
+        controller.clearFocus = { if (holdsFocus && !focusSink.requestFocus()) focusManager.clearFocus(force = true) }
+        keyboardHold.focusRelease = { focusSink.requestFocus() }
         controller.cardLayer = cardLayer
         controller.chromeLayer = chromeLayer
         controller.onArrived = onArrived
@@ -620,19 +659,104 @@ private fun Modifier.placedAt(rect: Rect): Modifier = layout { measurable, const
     layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(rect.left.roundToInt(), rect.top.roundToInt()) }
 }
 
-/** The card's frame mask (iOS `installCardFrameMaskAndBorder`): [rect] in px, or the whole card. */
-private class MaskShape(private val rect: Rect?, private val radius: Float) : Shape {
-    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
-        val bounds = rect ?: Rect(Offset.Zero, size)
-        return Outline.Rounded(RoundRect(bounds, CornerRadius(radius)))
-    }
-}
-
 /** The mask between its start and end frames at the morph's progress, or `null` for the whole card. */
 internal fun SessionDrawerController.currentMask(): Rect? {
     val start = cardMaskStart ?: return null
     val end = cardMaskEnd ?: return null
     return lerp(start, end, maskProgress.floatValue)
+}
+
+/**
+ * Applies Catch Up enter/exit/return poses in a pure [DrawModifierNode] backed by a
+ * [GraphicsContext] [GraphicsLayer] rather than `Modifier.graphicsLayer`, so per-frame
+ * `scaleX/Y`, `translationX/Y` and frame-mask changes neither emit `SemanticsProperties.Shape`
+ * invalidations nor re-fire descendant `onGloballyPositioned` observers inside hosted screens.
+ */
+private fun Modifier.containerPoseLayer(block: GraphicsLayer.(size: Size, density: Float) -> Unit): Modifier =
+    this then ContainerPoseLayerElement(block)
+
+private data class ContainerPoseLayerElement(
+    val block: GraphicsLayer.(size: Size, density: Float) -> Unit,
+) : ModifierNodeElement<ContainerPoseLayerNode>() {
+    override fun create() = ContainerPoseLayerNode(block)
+    override fun update(node: ContainerPoseLayerNode) {
+        node.block = block
+    }
+}
+
+private class ContainerPoseLayerNode(
+    var block: GraphicsLayer.(size: Size, density: Float) -> Unit,
+) : Modifier.Node(), DrawModifierNode, CompositionLocalConsumerModifierNode {
+    private var layer: GraphicsLayer? = null
+    private var layerOwner: GraphicsContext? = null
+
+    override fun ContentDrawScope.draw() {
+        if (size.width <= 0f || size.height <= 0f) {
+            dropLayer()
+            return
+        }
+        val graphics = currentValueOf(LocalGraphicsContext)
+        if (layerOwner !== graphics) dropLayer()
+        val activeLayer = layer ?: graphics.createGraphicsLayer().also {
+            layer = it
+            layerOwner = graphics
+        }
+        activeLayer.alpha = 1f
+        activeLayer.scaleX = 1f
+        activeLayer.scaleY = 1f
+        activeLayer.translationX = 0f
+        activeLayer.translationY = 0f
+        activeLayer.clip = false
+        activeLayer.block(size, density)
+        if (activeLayer.alpha <= 0.001f) {
+            return
+        }
+        val identity = activeLayer.alpha >= 0.999f &&
+            activeLayer.scaleX == 1f &&
+            activeLayer.scaleY == 1f &&
+            activeLayer.translationX == 0f &&
+            activeLayer.translationY == 0f &&
+            !activeLayer.clip
+        if (identity) {
+            dropLayer()
+            drawContent()
+            return
+        }
+        activeLayer.record { this@draw.drawContent() }
+        drawLayer(activeLayer)
+    }
+
+    override fun onReset() = dropLayer()
+
+    override fun onDetach() = dropLayer()
+
+    private fun dropLayer() {
+        val existing = layer ?: return
+        layer = null
+        layerOwner?.releaseGraphicsLayer(existing)
+        layerOwner = null
+    }
+}
+
+/**
+ * Clears descendant semantics like `clearAndSetSemantics {}` while also setting
+ * `shouldMergeDescendantSemantics = true`, so `sendSubtreeChangeAccessibilityEvents` stops at this
+ * hidden container instead of dispatching per-descendant null-node `TYPE_WINDOW_CONTENT_CHANGED`
+ * events whenever a hidden drawer, stage, preview card or background session card lays out.
+ */
+internal fun Modifier.clearAndMergeSemantics(): Modifier = this then ClearAndMergeDrawerSemanticsElement
+
+private object ClearAndMergeDrawerSemanticsElement : ModifierNodeElement<ClearAndMergeDrawerSemanticsNode>() {
+    override fun create() = ClearAndMergeDrawerSemanticsNode()
+    override fun update(node: ClearAndMergeDrawerSemanticsNode) = Unit
+    override fun hashCode(): Int = System.identityHashCode(this)
+    override fun equals(other: Any?): Boolean = other === this
+}
+
+private class ClearAndMergeDrawerSemanticsNode : Modifier.Node(), SemanticsModifierNode {
+    override val shouldClearDescendantSemantics: Boolean get() = true
+    override val shouldMergeDescendantSemantics: Boolean get() = true
+    override fun SemanticsPropertyReceiver.applySemantics() = Unit
 }
 
 /** Material's modal drawer scrim (the `scrim` role at 32%). */
