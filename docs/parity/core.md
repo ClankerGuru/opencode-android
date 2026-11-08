@@ -37,9 +37,9 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 | `OpenCode/Core/HapticsClient.swift` | 503 | `core/.../haptics/HapticsClient.kt`, `feature/voice/.../VoiceCallSounds.kt` (`VoiceCallHaptic`, `VoiceHapticDesign`) | done | `Haptic` vocabulary, `HapticsClient.play/prepare`, `HapticEffect` (= `.haptic(_:trigger:condition:)`), foreground + system-setting gating, the diagnostics trace line with `AudioSessionHaptics` (audio mode from `AudioManager`; `:app` wires `dictating`/`call` from the window stores). Voice call cues (`voiceTick/HangUp/Glide`, Core Haptics patterns → `VibrationEffect` compositions) live in `:feature:voice`. `HapticLabCaption` is DEBUG lab tooling (n/a). `lightTap` (iOS f0670c5d, the + menu and its photo rows: plays `selection`'s feedback). iOS's Motion X-ray `noteEvent` per haptic is DEBUG lab tooling (n/a) |
 | `OpenCode/Core/Keychain.swift` | 79 | `core/.../sharing/Shared.kt` (`SharedKey.keychain`), `LiveSharedBytes.kt` | done | JSON-encoded value sealed with an AES-256-GCM Android Keystore key in `noBackupFilesDir/keychain/` |
 | `OpenCode/Core/KeychainStorage.swift` | 84 | `core/.../sharing/LiveSharedBytes.kt`, `InMemorySharedBytes` | done | test containers get in-memory storage, as `.inMemory()` |
-| `OpenCode/Core/Motion/MotionConstants.swift` | 197 | see core-ui.md | sync: — | Sync 440b77f0 (3e496d99): see core-ui.md. |
+| `OpenCode/Core/Motion/MotionConstants.swift` | 197 | see core-ui.md | — | Sync 440b77f0 (3e496d99): see core-ui.md. |
 | `OpenCode/Core/Motion/MotionDisplayLink.swift` | 90 | see core-ui.md | — | |
-| `OpenCode/Core/Motion/PresenceGate.swift` | 367 | see core-ui.md | sync: — |  |
+| `OpenCode/Core/Motion/PresenceGate.swift` | 367 | see core-ui.md | — | Sync 440b77f0 (85945779): see core-ui.md (MotionPresence and the micro/swap/roll transitions). |
 | `OpenCode/Core/Motion/SpringSolver.swift` | 223 | see core-ui.md | — | Sync 440b77f0 (1385761f): see core-ui.md. |
 | `OpenCode/Core/RollingNumber/RollingNumber.swift` | 928 | see core-ui.md | — | |
 | `OpenCode/Core/RollingNumber/RollingNumberShaders.metal` | 33 | see core-ui.md | — | |
