@@ -294,11 +294,9 @@ private fun ThemeOptionRow(
     onClick: () -> Unit,
 ) {
     val variant = definition.variant(isDark)
+    // The clickable row merges its title: the theme's name once (iOS's label), then selected.
     SettingsRowFrame(
-        Modifier.semantics(mergeDescendants = true) {
-            contentDescription = theme.title
-            selected = isSelected
-        },
+        Modifier.semantics { selected = isSelected },
         onClick = onClick,
         role = Role.RadioButton,
     ) {
