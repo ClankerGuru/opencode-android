@@ -151,7 +151,6 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
@@ -1195,15 +1194,13 @@ private fun SessionComposerEnv.QueuedActivity(hasQueued: Boolean) {
             rolls = true,
             onClick = { view.showsQueuedMessages = true },
             onClickLabel = "Shows messages waiting for this response to finish",
+            accessibilityLabel = if (count == 1) "1 queued message" else "$count queued messages",
             modifier = Modifier
                 // A queued send's words shrink into it (iOS `scrollEdgeBridge.queuedPillFrame`).
                 .onGloballyPositioned { host.queuedPillFrame = it.boundsInWindow() }
                 .passesDragsToTranscript(host.borrowedDrag)
                 .coveredByBackgroundWork()
-                .semantics {
-                    contentDescription = if (count == 1) "1 queued message" else "$count queued messages"
-                    testTag = "queued-messages"
-                },
+                .semantics { testTag = "queued-messages" },
         ) {
             OpenCodeIcon(SFSymbol.TextBubble, contentDescription = null, size = 17.dp, modifier = Modifier.offset(y = ComposerTunables.queuedGlyphDrop.dp))
         }
