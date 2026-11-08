@@ -66,6 +66,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
@@ -84,6 +85,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -433,13 +435,14 @@ private fun TranscriptListContent(
             drawn = true,
         ),
     ) {
+        val showsMagnifier by remember(replySelection) { derivedStateOf { replySelection.magnifierCenter.isSpecified } }
         Box(
             modifier
                 .nestedScroll(controller.nestedScrollConnection)
                 .onPlaced { replySelection.container = it }
                 .transcriptReplySelectionGestures(replySelection)
                 .transcriptReplySelectionHandles(replySelection)
-                .magnifier(sourceCenter = { replySelection.magnifierCenter }),
+                .then(if (showsMagnifier) Modifier.magnifier(sourceCenter = { replySelection.magnifierCenter }) else Modifier),
         ) {
             SharedTextContextMenus {
                 TranscriptReplySelectionMenu(
