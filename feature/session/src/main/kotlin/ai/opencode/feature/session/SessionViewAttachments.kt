@@ -218,6 +218,9 @@ class SessionAttachmentImporter internal constructor(
                     }
                 }
             },
+            // iOS `maxPhotoSelection(plusMenu: usesPlusMenuSheet)`; the session always uses the
+            // New Plus Menu (`SessionPhotoSheetState.usesPlusMenuSheet`), so its sheet's 8.
+            limit = AttachmentPickerButton.maxPhotoSelection(plusMenu = true),
         )
     }
 
@@ -333,12 +336,12 @@ class SessionAttachmentImporter internal constructor(
     /**
      * iOS `syncPickedPhotos` / `addLibraryPhotos`: photos picked in the system picker attach at
      * once — images on the inline image path, videos as uploads (when the server takes them).
-     * At most [AttachmentPickerButton.MAX_PHOTO_SELECTION]. [onAdded] is `focusComposer`.
+     * At most `maxPhotoSelection(plusMenu = true)` (8), the photo sheet's limit. [onAdded] is `focusComposer`.
      */
     fun importPickedMedia(uris: List<Uri>, onAdded: (() -> Unit)? = null) {
         if (uris.isEmpty()) return
         scope.launch {
-            val picks = uris.take(AttachmentPickerButton.MAX_PHOTO_SELECTION)
+            val picks = uris.take(AttachmentPickerButton.maxPhotoSelection(plusMenu = true))
             val kinds = withContext(Dispatchers.IO) { picks.map { it to ComposerPickers.isVideo(it) } }
             val videos = kinds.filter { it.second }.map { it.first }
             val images = kinds.filterNot { it.second }.map { it.first }

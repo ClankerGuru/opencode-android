@@ -24,6 +24,7 @@ import ai.opencode.feature.composer.AttachmentMenuItem
 import ai.opencode.feature.composer.AttachmentMenuOverlay
 import ai.opencode.feature.composer.AttachmentMenuPhase
 import ai.opencode.feature.composer.AttachmentMenuPress
+import ai.opencode.feature.composer.AttachmentPickerButton
 import ai.opencode.feature.composer.ComposerAutocompleteAction
 import ai.opencode.feature.composer.ComposerPhotoViewer
 import ai.opencode.feature.composer.ComposerPickers
@@ -471,7 +472,12 @@ private fun SessionAttachmentMenu(
             AttachmentMenuItem.Photos -> if (sheet.library.usesSystemPicker) {
                 sheet.attachmentMenuRestoresFocus = false
                 sheet.closeAttachmentMenu()
-                photos.launch(ComposerPickers.photosIntent(includesVideos = supportsFileUploads))
+                photos.launch(
+                    ComposerPickers.photosIntent(
+                        maxItems = AttachmentPickerButton.maxPhotoSelection(plusMenu = true),
+                        includesVideos = supportsFileUploads,
+                    ),
+                )
             } else {
                 sheet.openPhotoSheet()
             }
