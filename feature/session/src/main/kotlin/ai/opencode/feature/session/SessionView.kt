@@ -227,6 +227,10 @@ fun SessionView(
     val agentScope by store.observe { "${it.server.persistenceID}|${it.session?.id ?: "draft"}" }
     val errorMessage by store.observe { it.errorMessage }
     val identity by store.observe { it.transcriptIdentity }
+    // Read in composition, not in the SideEffect: SideEffect reads aren't observed, so an import
+    // finishing would leave the host's copy stale.
+    val isImportingImages = importer.isLoadingImages
+    val isImportingAttachments = isImportingImages || importer.isLoadingFiles
 
     SideEffect {
         composerHost.backgroundWorkAnchor = backgroundWorkAnchor
@@ -235,7 +239,8 @@ fun SessionView(
         composerHost.onConnectionAction = onConnectionAction
         composerHost.onJumpToLatest = { scrollEdgeBridge.jumpRequest += 1 }
         composerHost.borrowedDrag = scrollEdgeBridge.borrowedDrag
-        composerHost.isImportingAttachments = importer.isLoadingImages || importer.isLoadingFiles
+        composerHost.isImportingAttachments = isImportingAttachments
+        composerHost.isImportingImages = isImportingImages
         composerHost.importer = importer
         composerHost.headerHeight = headerHeight
         if (composerHost.pendingAttachmentsRow == null) composerHost.pendingAttachmentsRow = { expanded -> SessionPendingAttachments(store, composerHost.sendTransition.images, expanded) }
@@ -275,6 +280,9 @@ fun SessionView(
                 composerHost.dismissComposerKeyboard()
                 if (photoSheet.attachmentMenu != AttachmentMenuPhase.Closed) photoSheet.closeAttachmentMenu()
             },
+            // iOS: the + menu is an `.isModal` container in its own window, so VoiceOver reaches
+            // nothing beneath it. TalkBack has no modal, so the screen under it (the + too) hides.
+            modifier = if (photoSheet.plusMenuIsOpen) Modifier.clearAndSetSemantics {} else Modifier,
         ) {
             // TalkBack reads the header, then the transcript, then the composer, as VoiceOver reads
             // iOS's top overlay first; the header draws over the transcript, so it came after it.
@@ -583,7 +591,7 @@ private fun SessionAttachmentMenu(
     Box(Modifier.fillMaxSize().then(if (sheet.plusMenuRests) Modifier.clearAndSetSemantics {} else Modifier)) {
         PlusMenuGlassSurface(
             anchors = host.attachmentAnchors,
-            isOpen = phase == AttachmentMenuPhase.Menu && (!sheet.morph.isShown || sheet.menuTakesBack),
+            isOpen = sheet.plusMenuIsOpen,
             handsOff = sheet.morph.isShown && !sheet.menuTakesBack,
             items = items,
             highlighted = press.highlighted,
@@ -823,10 +831,18 @@ private fun SessionSheets(store: StoreOf<State, Action>, listContext: SessionLis
     val activePicker by store.observe { it.activePicker }
     val dismiss = { store.send(Action.Binding(BindingAction.ActivePicker(null))) }
 
-    // iOS `onDismiss`: whichever sheet leaves, the Project sheet's folders reset.
+    // iOS `onDismiss`: whichever sheet leaves, the Project sheet's folders reset, and the
+    // keyboard the model chip put away comes back.
+    val panels = LocalSessionComposerHost.current?.modelPanels
     var shownPicker by remember { mutableStateOf(activePicker) }
     LaunchedEffect(activePicker) {
-        if (shownPicker != null && shownPicker != activePicker) store.send(Action.ProjectPickerDismissed)
+        if (shownPicker != null && shownPicker != activePicker) {
+            store.send(Action.ProjectPickerDismissed)
+            if (panels?.sheetRestoresFocus == true) {
+                panels.sheetRestoresFocus = false
+                panels.restoreFocusAfterModelList(store.state.taskIdentity)
+            }
+        }
         shownPicker = activePicker
     }
 

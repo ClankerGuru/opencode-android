@@ -11,12 +11,17 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewModelScope
 import kotlin.time.Duration.Companion.milliseconds
@@ -45,14 +50,23 @@ class ShareActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val model = holder.model ?: createModel()
 
-        lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                holder.finishRequested.first { it }
-                finish()
-            }
-        }
-
         setContent {
+            val ime = WindowInsets.ime
+            val density = LocalDensity.current
+            val keyboard = LocalSoftwareKeyboardController.current
+            LaunchedEffect(ime, density, keyboard) {
+                repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    holder.finishRequested.first { it }
+                    // Translucent activities share IME geometry with the window behind them.
+                    // Finish after the actual hide, not its request or animation target.
+                    if (hasWindowFocus() && ime.getBottom(density) > 0) {
+                        keyboard?.hide()
+                        // A keyboard that doesn't honor hide must not trap the caller here.
+                        withTimeoutOrNull(1000.milliseconds) { snapshotFlow { ime.getBottom(density) }.first { it == 0 } }
+                    }
+                    finish()
+                }
+            }
             OpenCodeAppTheme {
                 val state by model.state.collectAsStateWithLifecycle()
                 // Back (and the back gesture) cancel, as a swipe down does on iOS.
@@ -64,7 +78,7 @@ class ShareActivity : ComponentActivity() {
                         onChoose = model::choose,
                         onCancel = ::cancel,
                         onSend = ::send,
-                        onSendLater = { if (model.sendLater()) holder.finishShare() },
+                        onSendLater = { if (!holder.completed && model.sendLater()) holder.finishShare() },
                         onContinue = ::continueInApp,
                         onDone = holder::finishShare,
                         onDismissSaveError = model::dismissSaveError,
@@ -95,16 +109,15 @@ class ShareActivity : ComponentActivity() {
     private fun cancel() {
         val model = holder.model ?: return
         if (model.current.isBusy || holder.completed) return
-        holder.completed = true
         model.discardFiles()
         setResult(RESULT_CANCELED)
-        finish()
+        holder.finishShare()
     }
 
     /** Waits for the server to take it, shows the checkmark, then goes. */
     private fun send() {
         val model = holder.model ?: return
-        if (!model.current.canSend) return
+        if (holder.completed || !model.current.canSend) return
         val context = applicationContext
         holder.viewModelScope.launch {
             val state = model.current
@@ -118,7 +131,7 @@ class ShareActivity : ComponentActivity() {
             // close delay at most. They carry on either way.
             val body = ShareComposition.notificationBody(text, images, files)
             val followUp = followUps.launch {
-                val donated = async { ShareSuggestion.donate(context, sent.serverKey, sent.sessionID, sent.title) }
+                val donated = async { ShareSuggestion.donate(context, sent.serverKey, sent.sessionID) }
                 val notified = async { ShareNotifier.sent(context, sent.title, body, sent.serverKey, sent.sessionID) }
                 donated.await()
                 notified.await()
@@ -136,7 +149,7 @@ class ShareActivity : ComponentActivity() {
      */
     private fun continueInApp() {
         val model = holder.model ?: return
-        if (!model.saveToContinue()) return
+        if (holder.completed || !model.saveToContinue()) return
         val title = model.current.destination?.title ?: "OpenCode"
         val opened = packageManager.getLaunchIntentForPackage(packageName) != null &&
             runCatching { SystemActionActivity.openApp(this) }.isSuccess

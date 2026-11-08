@@ -159,9 +159,11 @@ internal fun PastedTextCard(id: String, text: String, summary: PastedTextSummary
                 style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium),
                 color = OpenCodeTheme.colors.text,
                 maxLines = 1,
-                modifier = Modifier.weight(1f, fill = false),
+                overflow = TextOverflow.Ellipsis,
+                // iOS `Spacer(minLength: 6)` gives way before the title does.
+                modifier = Modifier.weight(1f),
             )
-            Spacer(Modifier.weight(1f).width(6.dp))
+            Spacer(Modifier.width(6.dp))
             Text(
                 summary.length,
                 style = OpenCodeTextStyles.caption1.copy(fontFeatureSettings = "tnum"),
