@@ -40,6 +40,7 @@ import ai.opencode.feature.transcript.rows.ReplyCopyGlyph
 import ai.opencode.feature.transcript.rows.TranscriptFonts
 import ai.opencode.feature.transcript.rows.TranscriptRowSlots
 import ai.opencode.feature.transcript.rows.TranscriptTimeStamps
+import ai.opencode.feature.transcript.rows.appFormattingLocale
 import ai.opencode.feature.transcript.user.TranscriptSendFailure
 import ai.opencode.feature.transcript.user.TranscriptUserMessage
 import ai.opencode.server.OpenCodePairingLink
@@ -374,7 +375,7 @@ object SessionTranscriptView {
             mark: NewMessagesMark?,
             now: Instant = Instant.now(),
             zone: ZoneId = ZoneId.systemDefault(),
-            locale: Locale = Locale.getDefault(),
+            locale: Locale = appFormattingLocale(),
             hour24: Boolean? = null,
         ): Pair<List<TranscriptEntry>, NewMessagesPlacement?> {
             val nowSecond = now.epochSecond

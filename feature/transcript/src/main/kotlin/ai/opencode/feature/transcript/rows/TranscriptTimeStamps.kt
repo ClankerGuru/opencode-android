@@ -58,7 +58,7 @@ object TranscriptTimeStamps {
         sentNow: Boolean? = null,
         now: Instant = Instant.now(),
         zone: ZoneId = ZoneId.systemDefault(),
-        locale: Locale = Locale.getDefault(),
+        locale: Locale = appFormattingLocale(),
         hour24: Boolean? = null,
     ): Map<String, String> {
         val promptIDs = items.map(TranscriptEntry::promptID)
@@ -237,7 +237,7 @@ object TranscriptTimeStamps {
         showsDay: Boolean,
         now: Instant,
         zone: ZoneId = ZoneId.systemDefault(),
-        locale: Locale = Locale.getDefault(),
+        locale: Locale = appFormattingLocale(),
         hour24: Boolean? = null,
     ): String {
         // The transcript asks on every update; the same minute reads the same until the day it
@@ -274,7 +274,7 @@ object TranscriptTimeStamps {
     }
 
     /** Today and Yesterday by calendar day, the weekday for the rest of the week, else “Mon, Oct 5”. */
-    fun day(time: Instant, now: Instant, zone: ZoneId = ZoneId.systemDefault(), locale: Locale = Locale.getDefault()): String {
+    fun day(time: Instant, now: Instant, zone: ZoneId = ZoneId.systemDefault(), locale: Locale = appFormattingLocale()): String {
         val days = daysBetween(time, now, zone)
         val context = DisplayContext.CAPITALIZATION_FOR_BEGINNING_OF_SENTENCE
         return when (days) {
@@ -305,6 +305,19 @@ object TranscriptTimeStamps {
     /** What TalkBack reads: “Wednesday, 8:24 AM”. */
     fun accessibilityLabel(text: String): String = text.split("\t", limit = 2).joinToString(", ")
 }
+
+/**
+ * The locale dates and times are written in: English, the app's only language, with the user's
+ * region and preferences (hour cycle, numbering). iOS formats with `Locale.current`, which in an
+ * English-only bundle is English in the user's region (“Gestern” never appears beside English
+ * text, a German region still gets its 24-hour clock and day-month order).
+ */
+fun appFormattingLocale(system: Locale = Locale.getDefault(Locale.Category.FORMAT)): Locale =
+    try {
+        Locale.Builder().setLocale(system).setLanguage("en").setScript("").setVariant("").build()
+    } catch (_: java.util.IllformedLocaleException) {
+        Locale.Builder().setLanguage("en").build()
+    }
 
 /** Bounded minute-and-day string cache shared by transcript and drawer timestamps (iOS `MinuteTimestampCache`). */
 class MinuteTimestampCache {
