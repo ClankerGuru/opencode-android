@@ -69,6 +69,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import android.os.SystemClock
 import android.view.accessibility.AccessibilityManager
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -112,6 +113,7 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -190,7 +192,7 @@ fun TranscriptList(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun TranscriptListContent(
-    configuration: TranscriptConfiguration,
+    rawConfiguration: TranscriptConfiguration,
     send: (TranscriptAction) -> Unit,
     modifier: Modifier,
     contentPadding: PaddingValues,
@@ -202,6 +204,8 @@ private fun TranscriptListContent(
     borrowedDrag: TranscriptBorrowedDrag?,
 ) {
     val scope = rememberCoroutineScope()
+    val touchExploration = rememberTouchExploration()
+    val configuration = rememberPresentedConfiguration(rawConfiguration, touchExploration)
     val initialIndex = remember { (configuration.entries.size + configuration.queuedInputs.size + 2).coerceAtLeast(0) }
     // Like disclosure, where the reader is outlives the activity being recreated (a dark mode
     // switch, font size, process death); a following reader still opens on the bottom.
@@ -213,7 +217,6 @@ private fun TranscriptListContent(
     val controller = remember { TranscriptListController(listState, scope, disclosure, behavior, selection) }
     val density = LocalDensity.current
     val reduceMotion = rememberReduceMotion()
-    val touchExploration = rememberTouchExploration()
     val currentSend by rememberUpdatedState(send)
     val currentShowsJump by rememberUpdatedState(onShowsJumpButtonChanged)
 
@@ -649,6 +652,60 @@ private fun GrowingRow(controller: TranscriptListController, key: String, modifi
     ) {
         content()
     }
+}
+
+private const val TALKBACK_TAIL_STREAM_INTERVAL_MS = 1_500L
+
+/**
+ * Under TalkBack touch exploration, coalesces in-place tail `AssistantMarkdown` streaming updates
+ * ([TranscriptConfiguration.differsOnlyInTailAssistantMarkdown]) to [TALKBACK_TAIL_STREAM_INTERVAL_MS]
+ * so per-chunk text and scroll updates don't saturate TalkBack's `ProcessorEventQueue`. The first
+ * chunk of a reply and any structural change (run start, Stop / completion, tool rows, sends) apply
+ * immediately; sighted (`!touchExploration`) returns [configuration] untouched.
+ */
+@Composable
+private fun rememberPresentedConfiguration(
+    configuration: TranscriptConfiguration,
+    touchExploration: Boolean,
+): TranscriptConfiguration {
+    if (!touchExploration) return configuration
+    val state = remember { PresentedConfigurationState(configuration) }
+    val nowMs = SystemClock.uptimeMillis()
+    val current = state.presented
+    if (configuration == current) {
+        state.pending = null
+        return current
+    }
+    if (!configuration.differsOnlyInTailAssistantMarkdown(current)) {
+        state.presented = configuration
+        state.pending = null
+        state.lastTailApplyUptimeMs = nowMs
+        return configuration
+    }
+    val elapsed = nowMs - state.lastTailApplyUptimeMs
+    if (elapsed >= TALKBACK_TAIL_STREAM_INTERVAL_MS) {
+        state.presented = configuration
+        state.pending = null
+        state.lastTailApplyUptimeMs = nowMs
+        return configuration
+    }
+    state.pending = configuration
+    val waitMs = (TALKBACK_TAIL_STREAM_INTERVAL_MS - elapsed).coerceAtLeast(16L)
+    LaunchedEffect(state, state.lastTailApplyUptimeMs, state.pending != null) {
+        if (state.pending == null) return@LaunchedEffect
+        delay(waitMs)
+        val next = state.pending ?: return@LaunchedEffect
+        state.pending = null
+        state.lastTailApplyUptimeMs = SystemClock.uptimeMillis()
+        state.presented = next
+    }
+    return state.presented
+}
+
+private class PresentedConfigurationState(initial: TranscriptConfiguration) {
+    var presented by mutableStateOf(initial)
+    var pending: TranscriptConfiguration? = null
+    var lastTailApplyUptimeMs: Long = 0L
 }
 
 @Composable
