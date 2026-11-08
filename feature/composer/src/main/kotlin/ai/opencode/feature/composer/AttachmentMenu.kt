@@ -11,6 +11,8 @@ import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.openCodeTapTarget
 import ai.opencode.feature.composer.plusmenu.PlusMenuPlacement
 import android.net.Uri
+import android.view.View
+import android.view.ViewTreeObserver
 import android.view.accessibility.AccessibilityManager
 import android.view.accessibility.AccessibilityNodeInfo
 import androidx.activity.compose.BackHandler
@@ -111,6 +113,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
+import kotlin.coroutines.resume
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -118,6 +121,7 @@ import kotlin.math.sqrt
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 
 /**
  * Where the attachment menu is (iOS `AttachmentMenuPhase`). The menu and the photo card are one
@@ -395,6 +399,13 @@ private class AccessibilityFocusRequestNode(private var request: Any?) :
             withFrameNanos {}
             val view = currentValueOf(LocalView)
             if (view.context.getSystemService(AccessibilityManager::class.java)?.isTouchExplorationEnabled != true) return@launch
+            // Another window is on top (the document picker Files opened): a move made now is
+            // lost, and back here TalkBack falls back to the first content. So it moves once this
+            // window has its focus back.
+            if (!view.hasWindowFocus()) {
+                view.awaitWindowFocus()
+                withFrameNanos {}
+            }
             val root = (view as? RootForTest)?.semanticsOwner?.unmergedRootSemanticsNode ?: return@launch
             // Absent while something hides it (a cleared ancestor): then there's nothing to focus.
             val id = root.find { it.config.getOrNull(AccessibilityFocusTarget) === this@AccessibilityFocusRequestNode }?.id ?: return@launch
@@ -404,6 +415,22 @@ private class AccessibilityFocusRequestNode(private var request: Any?) :
 
     private fun SemanticsNode.find(match: (SemanticsNode) -> Boolean): SemanticsNode? =
         if (match(this)) this else children.firstNotNullOfOrNull { it.find(match) }
+
+    private suspend fun View.awaitWindowFocus() {
+        if (hasWindowFocus()) return
+        suspendCancellableCoroutine { continuation ->
+            val observer = viewTreeObserver
+            val listener = object : ViewTreeObserver.OnWindowFocusChangeListener {
+                override fun onWindowFocusChanged(hasFocus: Boolean) {
+                    if (!hasFocus) return
+                    if (observer.isAlive) observer.removeOnWindowFocusChangeListener(this)
+                    continuation.resume(Unit)
+                }
+            }
+            observer.addOnWindowFocusChangeListener(listener)
+            continuation.invokeOnCancellation { if (observer.isAlive) observer.removeOnWindowFocusChangeListener(listener) }
+        }
+    }
 }
 
 private val AccessibilityFocusTarget = SemanticsPropertyKey<AccessibilityFocusRequestNode>("AccessibilityFocusTarget")
