@@ -34,6 +34,9 @@ interface DrawerKeyboardSignals {
      */
     fun isHeld(key: Any): Boolean
 
+    /** A field on the card is held while the drawer moves or rests open (its keys are the drawer's). */
+    val holdsCardField: Boolean get() = false
+
     /**
      * A text field on the card gained or lost focus (iOS `textDidBegin/EndEditing` on the card).
      * [clearFocus] lets the drawer take the focus away when the card changes.

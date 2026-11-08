@@ -174,9 +174,11 @@ private fun SessionComposerEnv.ModelButton(enabled: Boolean) {
                 onClick = {
                     if (!enabled) return@ModelPickerChip
                     if (composerTextTakesDoubleTap()) return@ModelPickerChip
-                    // Put away under any picker sheet (iOS 07b2f5f8), or a row's level menu raises the
-                    // composer's keyboard over the sheet.
-                    if (host.messageFieldFocused) dismissKeyboard()
+                    // iOS `openModelPickerFromChip`: put away under the picker sheet (iOS 07b2f5f8), or a
+                    // row's level menu raises the composer's keyboard over it, and handed back as it closes.
+                    val focused = host.messageFieldFocused
+                    host.modelPanels?.sheetRestoresFocus = focused
+                    if (focused) dismissKeyboard()
                     store.send(Action.ModelButtonTapped)
                 },
                 targetDrop = ComposerLayoutMetrics.pickerTargetDrop.dp,
@@ -437,7 +439,7 @@ private fun SessionComposerEnv.HoldToDictate(label: String, content: @Composable
 internal fun SessionComposerEnv.TrailingButton(control: ComposerTrailingControl) {
     val steers = s.isRunning && control == ComposerTrailingControl.Send(enabled = true)
     val visualOffset = (ComposerTunables.innerHorizontal + (44 - ComposerTunables.buttonDiameter) / 2) - ComposerTunables.trailingGap
-    val disabled = (host.isImportingAttachments && control == ComposerTrailingControl.Send(enabled = true)) ||
+    val disabled = (host.isImportingImages && control == ComposerTrailingControl.Send(enabled = true)) ||
         (control is ComposerTrailingControl.Send && !control.enabled)
     val accessibilityLabel = when {
         s.isWaitingForUploads -> "Sending after uploads finish"
@@ -548,7 +550,7 @@ internal fun SessionComposerEnv.DictationTrailingControls(controls: ComposerCont
                 glyphSize = 12.dp,
             )
         }
-        val sendEnabled = !controls.isFinishing && canSend && !host.isImportingAttachments
+        val sendEnabled = !controls.isFinishing && canSend && !host.isImportingImages
         Box(
             Modifier
                 .clickable(enabled = sendEnabled, role = Role.Button) {

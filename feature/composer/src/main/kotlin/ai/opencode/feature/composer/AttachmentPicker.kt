@@ -34,6 +34,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -205,6 +206,14 @@ fun AttachmentPickerButton(
         label = "dictation-circle-color",
     )
     val glyphX by animateFloatAsState(if (isDictating) 0f else glyphOffset, dictationSpec, label = "plus-glyph-x")
+    // The menu gave TalkBack's focus a place of its own; as it closes, the focus comes back here
+    // (VoiceOver returns from an `.isModal` container by itself).
+    var closes by remember { mutableIntStateOf(0) }
+    var wasOpen by remember { mutableStateOf(isOpen) }
+    LaunchedEffect(isOpen) {
+        if (wasOpen && !isOpen) closes += 1
+        wasOpen = isOpen
+    }
     val pop = remember { PlusPop() }
     var wasPopping by remember { mutableStateOf(popsOnClose) }
     LaunchedEffect(popsOnClose) {
@@ -325,6 +334,8 @@ fun AttachmentPickerButton(
             }
             .then(menuGesture)
             .then(dictationTap)
+            // Ahead of the clearing below, which would drop its marker.
+            .accessibilityFocusRequest(closes.takeIf { it > 0 })
             .clearAndSetSemantics {
                 role = Role.Button
                 contentDescription = label

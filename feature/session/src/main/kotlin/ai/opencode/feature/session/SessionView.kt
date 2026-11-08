@@ -102,6 +102,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
@@ -218,6 +219,10 @@ fun SessionView(
     val agentScope by store.observe { "${it.server.persistenceID}|${it.session?.id ?: "draft"}" }
     val errorMessage by store.observe { it.errorMessage }
     val identity by store.observe { it.transcriptIdentity }
+    // Read in composition, not in the SideEffect: SideEffect reads aren't observed, so an import
+    // finishing would leave the host's copy stale.
+    val isImportingImages = importer.isLoadingImages
+    val isImportingAttachments = isImportingImages || importer.isLoadingFiles
 
     SideEffect {
         composerHost.backgroundWorkAnchor = backgroundWorkAnchor
@@ -226,7 +231,8 @@ fun SessionView(
         composerHost.onConnectionAction = onConnectionAction
         composerHost.onJumpToLatest = { scrollEdgeBridge.jumpRequest += 1 }
         composerHost.borrowedDrag = scrollEdgeBridge.borrowedDrag
-        composerHost.isImportingAttachments = importer.isLoadingImages || importer.isLoadingFiles
+        composerHost.isImportingAttachments = isImportingAttachments
+        composerHost.isImportingImages = isImportingImages
         composerHost.importer = importer
         composerHost.headerHeight = headerHeight
         if (composerHost.pendingAttachmentsRow == null) composerHost.pendingAttachmentsRow = { expanded -> SessionPendingAttachments(store, composerHost.sendTransition.images, expanded) }
@@ -266,6 +272,9 @@ fun SessionView(
                 composerHost.dismissComposerKeyboard()
                 if (photoSheet.attachmentMenu != AttachmentMenuPhase.Closed) photoSheet.closeAttachmentMenu()
             },
+            // iOS: the + menu is an `.isModal` container in its own window, so VoiceOver reaches
+            // nothing beneath it. TalkBack has no modal, so the screen under it (the + too) hides.
+            modifier = if (photoSheet.plusMenuIsOpen) Modifier.clearAndSetSemantics {} else Modifier,
         ) {
             Box(Modifier.fillMaxSize().background(colors.canvas)) {
                 if (errorMessage != null) {
@@ -299,6 +308,7 @@ fun SessionView(
                 )
                 // One Picker's surface grows out of the composer, over the transcript and under the composer.
                 SessionOnePickerBackdrop(composerHost, Modifier.matchParentSize())
+                val statusBar = WindowInsets.statusBarsIgnoringVisibility.inContainer()
                 Column(
                     Modifier
                         .align(Alignment.BottomCenter)
@@ -306,6 +316,19 @@ fun SessionView(
                         .navigationBarsPadding()
                         .imePadding()
                         .padding(bottom = if (onCatchUpOpen == null) 0.dp else CATCH_UP_COMPOSER_CLEARANCE.dp)
+                        // The room between the status bar and the keyboard (iOS `requestPanelInputs.room`):
+                        // the composer never grows past it. Short of room (landscape with the keys up, a
+                        // split screen) the header gives way, then the field's lines, then the
+                        // attachments (`ComposerFoldLayout`), never the control row.
+                        .layout { measurable, constraints ->
+                            val room = if (constraints.hasBoundedHeight) {
+                                (constraints.maxHeight - statusBar.getTop(this)).coerceAtLeast(constraints.minHeight)
+                            } else {
+                                constraints.maxHeight
+                            }
+                            val placeable = measurable.measure(constraints.copy(maxHeight = room))
+                            layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+                        }
                         // The readable column (iOS `readableColumn()`): 720 wide at most.
                         .widthIn(max = TranscriptMetrics.readableColumnWidth)
                         // iOS `ComposerKeyboardStepHold`: the composer glides after a docked IME's unanimated step.
@@ -545,7 +568,7 @@ private fun SessionAttachmentMenu(
     Box(Modifier.fillMaxSize().then(if (sheet.plusMenuRests) Modifier.clearAndSetSemantics {} else Modifier)) {
         PlusMenuGlassSurface(
             anchors = host.attachmentAnchors,
-            isOpen = phase == AttachmentMenuPhase.Menu && (!sheet.morph.isShown || sheet.menuTakesBack),
+            isOpen = sheet.plusMenuIsOpen,
             handsOff = sheet.morph.isShown && !sheet.menuTakesBack,
             items = items,
             highlighted = press.highlighted,
@@ -768,10 +791,18 @@ private fun SessionSheets(store: StoreOf<State, Action>, listContext: SessionLis
     val activePicker by store.observe { it.activePicker }
     val dismiss = { store.send(Action.Binding(BindingAction.ActivePicker(null))) }
 
-    // iOS `onDismiss`: whichever sheet leaves, the Project sheet's folders reset.
+    // iOS `onDismiss`: whichever sheet leaves, the Project sheet's folders reset, and the
+    // keyboard the model chip put away comes back.
+    val panels = LocalSessionComposerHost.current?.modelPanels
     var shownPicker by remember { mutableStateOf(activePicker) }
     LaunchedEffect(activePicker) {
-        if (shownPicker != null && shownPicker != activePicker) store.send(Action.ProjectPickerDismissed)
+        if (shownPicker != null && shownPicker != activePicker) {
+            store.send(Action.ProjectPickerDismissed)
+            if (panels?.sheetRestoresFocus == true) {
+                panels.sheetRestoresFocus = false
+                panels.restoreFocusAfterModelList(store.state.taskIdentity)
+            }
+        }
         shownPicker = activePicker
     }
 
