@@ -395,16 +395,24 @@ class LinkHitLayout(
     private fun <T> hit(items: List<Pair<IntRange, T>>, point: Offset, predicate: (T) -> Boolean = { true }): Hit<T>? {
         for ((range, value) in items) {
             if (!predicate(value)) continue
-            val rects = rects(range)
-            if (rects.any { Rect(it.left - slopX, it.top - slopY, it.right + slopX, it.bottom + slopY).contains(point) }) {
-                return Hit(value, rects)
+            if (rects(range, leadingBelow = true).any { Rect(it.left - slopX, it.top - slopY, it.right + slopX, it.bottom + slopY).contains(point) }) {
+                return Hit(value, rects(range))
             }
         }
         return null
     }
 
     /** One rect per line the range covers (TextKit's enclosing rects). */
-    fun rects(range: IntRange): List<Rect> {
+    fun rects(range: IntRange): List<Rect> = rects(range, leadingBelow = false)
+
+    /**
+     * With [leadingBelow], each line's rect starts at its glyphs' top and carries the leading
+     * down to the next line's glyphs, as TextKit's line fragments do (iOS hit-tests those). Compose
+     * spreads the leading mostly above each line, so the slop around a wrapped link's second line
+     * reached into the words of the line above (QA F-55). The text's first line is trimmed to its
+     * glyphs, so its baseline gives the ascent.
+     */
+    private fun rects(range: IntRange, leadingBelow: Boolean): List<Rect> {
         val textLength = layout.layoutInput.text.length
         val start = range.first.coerceIn(0, textLength)
         val end = (range.last + 1).coerceIn(start, textLength)
@@ -423,10 +431,19 @@ class LinkHitLayout(
                 left = minOf(left, box.left)
                 right = maxOf(right, box.right)
             }
-            result += Rect(left, layout.getLineTop(line), right, layout.getLineBottom(line))
+            result += if (leadingBelow) {
+                val bottom = if (line + 1 < layout.lineCount) maxOf(layout.getLineBottom(line), glyphTop(line + 1)) else layout.getLineBottom(line)
+                Rect(left, glyphTop(line), right, bottom)
+            } else {
+                Rect(left, layout.getLineTop(line), right, layout.getLineBottom(line))
+            }
         }
         return result
     }
+
+    private val ascent: Float get() = layout.getLineBaseline(0) - layout.getLineTop(0)
+
+    private fun glyphTop(line: Int): Float = maxOf(layout.getLineTop(line), layout.getLineBaseline(line) - ascent)
 }
 
 /**
