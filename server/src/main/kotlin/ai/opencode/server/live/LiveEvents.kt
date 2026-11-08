@@ -49,6 +49,7 @@ import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.plus
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -100,7 +101,8 @@ private fun eventSource(server: OpenCodeServer, waiting: AtomicInteger): Flow<Op
     val operationID = NetworkRetry.streamOperationID.current() ?: UUID.randomUUID().toString().uppercase()
     val stream = StreamDiagnostics(operationID)
     // On the retry clock, which a test can set (`NetworkRetry.clock`).
-    val watchdog = EventStreamWatchdog(NetworkRetry.clock.current() ?: Clock.liveValue)
+    val scriptedClock = NetworkRetry.clock.current()
+    val watchdog = EventStreamWatchdog(scriptedClock ?: Clock.liveValue)
     val link = dependency(ServerLinkClient)
     val poolReset = PoolResetWatch(link)
     launch(Dispatchers.IO) {
@@ -185,7 +187,12 @@ private fun eventSource(server: OpenCodeServer, waiting: AtomicInteger): Flow<Op
             poolReset.stop()
         }
     }
-    watchdog.start(this) { activeCall.get()?.cancel() }
+    // The live clock sleeps with `delay`, so on the collector's dispatcher a test dispatcher would
+    // skip its virtual time ahead to the deadline while the read waits on OkHttp's thread,
+    // cancelling a stream that's about to answer. It runs on Dispatchers.Default instead, where
+    // the deadlines are real seconds. A scripted clock is moved by its test, so it stays here.
+    val watchdogScope = if (scriptedClock == null) this + Dispatchers.Default else this
+    watchdog.start(watchdogScope) { activeCall.get()?.cancel() }
     poolReset.start(this) { activeCall.get()?.cancel() }
     awaitClose {
         watchdog.stop()
