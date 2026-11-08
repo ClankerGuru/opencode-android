@@ -218,6 +218,9 @@ class SessionAttachmentImporter internal constructor(
                     }
                 }
             },
+            // iOS `maxPhotoSelection(plusMenu: usesPlusMenuSheet)`; the session always uses the
+            // New Plus Menu (`SessionPhotoSheetState.usesPlusMenuSheet`), so its sheet's 8.
+            limit = AttachmentPickerButton.maxPhotoSelection(plusMenu = true),
         )
     }
 

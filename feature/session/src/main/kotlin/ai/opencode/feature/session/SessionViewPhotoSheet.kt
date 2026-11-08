@@ -479,7 +479,7 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
     fun addLibraryPhotos(ids: List<String>) {
         val importer = env.importer ?: return
         val batch = UUID.randomUUID()
-        val picks = ids.take(AttachmentPickerButton.MAX_PHOTO_SELECTION).map { PhotoFlights.Pick(it, UUID.randomUUID()) }
+        val picks = ids.take(AttachmentPickerButton.maxPhotoSelection(plusMenu = true)).map { PhotoFlights.Pick(it, UUID.randomUUID()) }
         val flies = usesPlusMenuSheet && !reducedMotion && picks.isNotEmpty()
         val rest = if (morph.isOpening && restoresFocus) restingComposer else null
         if (picks.isEmpty()) {
