@@ -6,6 +6,7 @@ import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
 import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.core.ui.accessibilityFocusRequest
 import ai.opencode.core.ui.inContainer
 import ai.opencode.feature.composer.AttachmentMenuMetrics
 import ai.opencode.feature.composer.AttachmentMenuPhase
@@ -15,7 +16,6 @@ import ai.opencode.feature.composer.ComposerMorph
 import ai.opencode.feature.composer.ComposerMorphGeometry
 import ai.opencode.feature.composer.ComposerMorphSurface
 import ai.opencode.feature.composer.ComposerMorphTunables
-import ai.opencode.feature.composer.accessibilityFocusRequest
 import ai.opencode.feature.composer.modelpicker.ModelPickerTunables
 import ai.opencode.feature.composer.plusmenu.PhotoFlights
 import ai.opencode.feature.composer.plusmenu.PhotoLibraryAccessHost

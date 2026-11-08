@@ -9,6 +9,7 @@ import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
+import ai.opencode.core.ui.AccessibilityFocusTarget
 import ai.opencode.core.ui.OpenCodeColors
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeIconButton
@@ -16,6 +17,7 @@ import ai.opencode.core.ui.OpenCodeIconButtonStyle
 import ai.opencode.core.ui.OpenCodeIconSize
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.core.ui.accessibilityFocusTarget
 import ai.opencode.core.ui.openCodeTapTarget
 import ai.opencode.feature.composer.EscapeHandler
 import ai.opencode.feature.session.SessionFeature.Action
@@ -28,7 +30,6 @@ import ai.opencode.server.model.OpenCodeExportFormat
 import ai.opencode.server.model.isUntitled
 import android.view.View
 import android.view.accessibility.AccessibilityManager
-import android.view.accessibility.AccessibilityNodeInfo
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
@@ -82,20 +83,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.node.RootForTest
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.SemanticsActions
-import androidx.compose.ui.semantics.SemanticsNode
-import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.getAllSemanticsNodes
-import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
@@ -423,10 +418,11 @@ private fun SessionMenuButton(store: StoreOf<State, Action>, model: SessionHeade
     // returns to the menu's button); otherwise the sheet leaving dropped it into the transcript.
     var returnsFocusAfterInfo by remember { mutableStateOf(false) }
     val showsInfo by store.observe { it.activePicker == State.ActivePicker.session }
+    val more = remember { AccessibilityFocusTarget() }
     LaunchedEffect(showsInfo) {
         if (showsInfo || !returnsFocusAfterInfo) return@LaunchedEffect
         returnsFocusAfterInfo = false
-        view.focusSessionMenuButtonForAccessibility()
+        view.focusSessionMenuButtonForAccessibility(more)
     }
     Box(Modifier.onGloballyPositioned { anchorBottom = it.boundsInWindow().bottom.toInt() }) {
         OpenCodeIconButton(
@@ -437,6 +433,7 @@ private fun SessionMenuButton(store: StoreOf<State, Action>, model: SessionHeade
             style = OpenCodeIconButtonStyle.Standard,
             modifier = Modifier
                 .testTag("session-menu")
+                .accessibilityFocusTarget(more)
                 .semantics { if (value.isNotEmpty()) stateDescription = value },
         )
         val fraction = model.contextFraction
@@ -453,6 +450,7 @@ private fun SessionMenuButton(store: StoreOf<State, Action>, model: SessionHeade
             title = model.sessionTitle ?: "Session",
             renameTitle = model.renameTitle,
             listContext = listContext,
+            more = more,
             send = {
                 expanded = false
                 if (it == Action.SessionInfoTapped) returnsFocusAfterInfo = true
@@ -480,6 +478,7 @@ private fun SessionMenu(
     title: String,
     renameTitle: String,
     listContext: SessionListContext,
+    more: AccessibilityFocusTarget,
     send: (Action) -> Unit,
 ) {
     val developerMode by remember { shared(SharedKeys.developerMode) }.flow.collectAsState()
@@ -502,12 +501,13 @@ private fun SessionMenu(
     val context = LocalContext.current
     val talkBack = remember(context) { context.getSystemService(AccessibilityManager::class.java) }
     val isOpen by rememberUpdatedState(expanded)
+    val firstRow = remember { AccessibilityFocusTarget() }
     DisposableEffect(expanded, hostView) {
         if (!expanded || talkBack?.isTouchExplorationEnabled != true) return@DisposableEffect onDispose { }
         val previous = hostView.importantForAccessibility
         onDispose {
             hostView.importantForAccessibility = previous
-            hostView.focusSessionMenuButtonForAccessibility()
+            hostView.focusSessionMenuButtonForAccessibility(more)
         }
     }
     val density = LocalDensity.current
@@ -538,18 +538,26 @@ private fun SessionMenu(
                 while (!menuView.isAttachedToWindow) withFrameNanos { }
                 withTimeoutOrNull(MENU_WINDOW_LISTED_MS) { menuView.awaitFrameCommit() }
                 delay(MENU_WINDOW_LISTED_MS)
-                val focused = menuView.focusForAccessibility { true }
+                val focused = firstRow.focus()
                 // Hidden only once the menu has the focus: TalkBack otherwise recovers from losing
                 // More by focusing the keyboard.
                 if (focused && isOpen) hostView.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
             }
         }
         listContext.isPinned?.let { isPinned ->
-            MenuItem(if (isPinned) "Unpin" else "Pin", if (isPinned) SFSymbol.PinSlash else SFSymbol.Pin) {
+            MenuItem(
+                if (isPinned) "Unpin" else "Pin",
+                if (isPinned) SFSymbol.PinSlash else SFSymbol.Pin,
+                Modifier.accessibilityFocusTarget(firstRow),
+            ) {
                 menu(SessionSheetFeature.Action.PinTapped)
             }
         }
-        MenuItem("Rename", SFSymbol.Pencil) { menu(SessionSheetFeature.Action.RenameTapped(currentTitle = renameTitle)) }
+        MenuItem(
+            "Rename",
+            SFSymbol.Pencil,
+            if (listContext.isPinned == null) Modifier.accessibilityFocusTarget(firstRow) else Modifier,
+        ) { menu(SessionSheetFeature.Action.RenameTapped(currentTitle = renameTitle)) }
         MenuItem("Copy Session ID", SFSymbol.SquareOnSquare) { menu(SessionSheetFeature.Action.CopySessionIDTapped) }
         if (listContext.isPinned != null) {
             MenuItem(
@@ -613,25 +621,11 @@ private suspend fun View.awaitFrameCommit() = suspendCancellableCoroutine { cont
     invalidate()
 }
 
-/**
- * Moves TalkBack's focus to the topmost visible clickable node of this view's composition that [matches]
- * (accessibility focus only: input focus, and so the keyboard, stays where it is).
- */
-private fun View.focusForAccessibility(matches: (SemanticsNode) -> Boolean): Boolean {
-    val owner = (this as? RootForTest)?.semanticsOwner ?: return false
-    val node = owner.getAllSemanticsNodes(mergingEnabled = true)
-        // Rows a scrolling menu clips away have empty bounds.
-        .filter { SemanticsActions.OnClick in it.config && !it.boundsInWindow.isEmpty && matches(it) }
-        .minWithOrNull(compareBy({ it.boundsInWindow.top }, { it.boundsInWindow.left }))
-        ?: return false
-    return accessibilityNodeProvider?.performAction(node.id, AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS, null) == true
-}
-
 /** TalkBack back on More, once the menu or what it opened has gone, unless a dialog it opened (Rename, Delete) has the focus. */
-private fun View.focusSessionMenuButtonForAccessibility() {
+private fun View.focusSessionMenuButtonForAccessibility(more: AccessibilityFocusTarget) {
     if (context.getSystemService(AccessibilityManager::class.java)?.isTouchExplorationEnabled != true) return
     postDelayed({
-        if (hasWindowFocus()) focusForAccessibility { it.config.getOrNull(SemanticsProperties.TestTag) == "session-menu" }
+        if (hasWindowFocus()) more.focus()
     }, MENU_FOCUS_DELAY_MS)
 }
 
