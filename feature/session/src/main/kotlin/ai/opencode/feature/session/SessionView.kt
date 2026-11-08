@@ -290,13 +290,19 @@ fun SessionView(
                 composerHost.dismissComposerKeyboard()
                 if (photoSheet.attachmentMenu != AttachmentMenuPhase.Closed) photoSheet.closeAttachmentMenu()
             },
+            // TalkBack reads the header, then the transcript, then the background-work capsule, then
+            // the composer, as VoiceOver reads iOS's top overlay first and the rest top to bottom: the
+            // header draws over the transcript, so it came after it (QA P-06). The group is the
+            // presentation's, not the screen's, so the capsule drawn over the screen sits in it by
+            // its place above the composer (iOS `SessionView+Composer.swift:209-241`), not after
+            // everything (QA AB-02).
             // iOS: the + menu is an `.isModal` container in its own window, so VoiceOver reaches
             // nothing beneath it. TalkBack has no modal, so the screen under it (the + too) hides.
-            modifier = if (photoSheet.plusMenuIsOpen) Modifier.clearAndSetSemantics {} else Modifier,
+            modifier = Modifier
+                .semantics { isTraversalGroup = true }
+                .then(if (photoSheet.plusMenuIsOpen) Modifier.clearAndSetSemantics {} else Modifier),
         ) {
-            // TalkBack reads the header, then the transcript, then the composer, as VoiceOver reads
-            // iOS's top overlay first; the header draws over the transcript, so it came after it.
-            Box(Modifier.fillMaxSize().background(colors.canvas).semantics { isTraversalGroup = true }) {
+            Box(Modifier.fillMaxSize().background(colors.canvas)) {
                 ComposedAfterComposer {
                     // Read while measuring, after the header has laid out: the first frame rests the
                     // transcript under the header's real height, not the default's.
