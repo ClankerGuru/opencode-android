@@ -159,11 +159,13 @@ private class AgentImageGrowthHoldNode(
         }
         activeLayer.translationY = -liftPx
         activeLayer.compositingStrategy = if (cutPx > 0.5f) CompositingStrategy.Offscreen else CompositingStrategy.Auto
+        // Read outside `record`: its scope's `density` recursed into itself (StackOverflowError).
+        val softEdgePx = if (softEdge) TranscriptTunables.growthSoftEdge * density else 0f
         activeLayer.record {
             this@draw.drawContent()
             if (cutPx > 0.5f) {
                 val bottom = maxOf(0f, size.height - cutPx)
-                val depth = agentImageGrowthDepth(size.height, cutPx, if (softEdge) TranscriptTunables.growthSoftEdge * density else 0f)
+                val depth = agentImageGrowthDepth(size.height, cutPx, softEdgePx)
                 if (depth > 0f) {
                     drawRect(
                         Brush.verticalGradient(0f to Color.Transparent, 1f to Color.Black, startY = bottom - depth, endY = bottom),

@@ -494,6 +494,31 @@ class LinkMenuTests {
         val rootSlash = "https://example.com/"
         assertEquals("example.com link 2", LinkMenuText.accessibilityTarget(rootSlash, listOf(root, rootSlash)))
     }
+
+    /** Android-only (AL-01): the block's Quote shares the links' node, after their actions and inside the 32-action cap. */
+    @Test
+    fun quoteJoinsTheLinksActionsWithinTheNodeLimit() {
+        val quote = CustomAccessibilityAction("Quote") { true }
+        val browserOn = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.inAppBrowser))
+        val many = List(50) { "https://example.net/n-$it" }
+        val crowded = LinkMenuText.accessibilityCustomActions(
+            many, { LinkMenuAction.actions(it, browserOn) }, { null }, listOf(quote), perform = { _, _ -> }, showMore = {},
+        ).map { it.label }
+        assertTrue("${crowded.size} actions on one node", crowded.size <= MAX_CUSTOM_ACCESSIBILITY_ACTIONS)
+        assertEquals(listOf(LinkMenuText.moreLinks, "Quote"), crowded.takeLast(2))
+        assertEquals(crowded.size, crowded.toSet().size)
+
+        val seven = List(7) { "https://example.net/n-${it + 1}" }
+        val shown = seven.associateWith { "\u2060" + it.removePrefix("https://") }
+        val labels = LinkMenuText.accessibilityCustomActions(
+            seven, { LinkMenuAction.actions(it, ExperimentalFeatures.testValue) }, shown::get, listOf(quote), perform = { _, _ -> }, showMore = {},
+        ).map { it.label }
+        assertEquals(29, labels.size)
+        assertEquals(29, labels.toSet().size)
+        assertEquals("Open example.net/n-4 in Browser", labels[12])
+        assertEquals("Quote", labels.last())
+        assertTrue(LinkMenuText.moreLinks !in labels)
+    }
 }
 
 /**

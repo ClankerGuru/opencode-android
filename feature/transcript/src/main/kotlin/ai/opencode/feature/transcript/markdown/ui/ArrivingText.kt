@@ -73,6 +73,7 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 import ai.opencode.feature.media.LinkMenu
 import ai.opencode.feature.media.LinkMenuHandler
+import ai.opencode.feature.media.LinkMenuText
 import ai.opencode.feature.media.LocalLinkMenu
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.text.AnnotatedString
@@ -165,6 +166,11 @@ internal fun ArrivingText(
     // from the hold); file links stay this text's own (tap opens the viewer).
     val linkMenu = remember { LinkMenuHandler { action, url -> MarkdownLinkActions.perform(action, url, send) } }
     val menuText = remember(presented.text) { linkMenuText(presented.text) }
+    // A paragraph with menu links has one TalkBack node for the links' actions and Quote, the link
+    // menu's (AL-01: an action on the Text too made TalkBack stop there, short of the links').
+    val hasMenuLinks = remember(menuText) { LinkMenuText.webLinks(menuText).isNotEmpty() }
+    val quoteOnLinkMenu = quoteAction != null && hasMenuLinks
+    val textQuoteAction = quoteAction.takeUnless { quoteOnLinkMenu }
     val chipGlyphs = if (presented.chips.isEmpty()) null else ChipGlyphs(
         session = painterResource(SFSymbol.BubbleLeftFill.drawable),
         subagent = painterResource(SFSymbol.ArrowTurnDownRight.drawable),
@@ -181,7 +187,13 @@ internal fun ArrivingText(
     val touchTargets = remember(viewConfiguration) { exactTouchTargets(viewConfiguration) }
 
     CompositionLocalProvider(LocalLinkMenu provides linkMenu) {
-    LinkMenu(menuText, textLayout = { layout }, onOpen = { MarkdownLinkActions.tap(it, send) }, modifier = modifier) {
+    LinkMenu(
+        menuText,
+        textLayout = { layout },
+        onOpen = { MarkdownLinkActions.tap(it, send) },
+        modifier = modifier,
+        trailingActions = if (quoteOnLinkMenu) listOfNotNull(quoteAction) else emptyList(),
+    ) {
         // Compose widens each link's own clickable node to a 48 dp touch target, past the
         // link's glyphs and even past this text's box (M-02: a tap in the gap above a line
         // opened its link). Links take touches only on their glyphs, as on iOS, so the link
@@ -288,8 +300,8 @@ internal fun ArrivingText(
                     .semantics {
                         // iOS `.accessibilityHint("Links to …")`: read after the text.
                         presented.linkHint?.let { stateDescription = it }
-                        if (quoteAction != null) customActions = listOf(quoteAction)
-                        // The link menu gives TalkBack the links' actions (on its box).
+                        // With menu links, Quote joins the links' actions on the link menu's box.
+                        if (textQuoteAction != null) customActions = listOf(textQuoteAction)
                     },
             )
         }
