@@ -1172,7 +1172,7 @@ private fun SessionComposerEnv.QueuedActivity(hasQueued: Boolean) {
             title = "$count queued",
             rolls = true,
             onClick = { view.showsQueuedMessages = true },
-            onClickLabel = "Shows messages waiting for this response to finish",
+            onClickLabel = "Show messages waiting for this response to finish",
             modifier = Modifier
                 // A queued send's words shrink into it (iOS `scrollEdgeBridge.queuedPillFrame`).
                 .onGloballyPositioned { host.queuedPillFrame = it.boundsInWindow() }

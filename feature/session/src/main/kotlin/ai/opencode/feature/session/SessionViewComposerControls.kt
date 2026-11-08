@@ -262,8 +262,8 @@ internal fun SessionComposerEnv.AnswerLeadingControls(bar: RequestBar, recording
                                         // iOS `accessibilityHint`: TalkBack's click label.
                                         onClickLabel = when {
                                             draftEmpty -> "Type or dictate your own answer"
-                                            bar.isCustom -> "Sets your words aside"
-                                            else -> "Answers with your words"
+                                            bar.isCustom -> "Set your words aside"
+                                            else -> "Answer with your words"
                                         },
                                     ) {
                                         if (s.draft.isBlank()) focus() else store.send(Action.requestCustomMarkTapped)
@@ -302,7 +302,7 @@ internal fun SessionComposerEnv.AnswerTrailingControls(bar: RequestBar) {
                     Modifier
                         .padding(end = 5.dp)
                         .heightIn(min = 48.dp)
-                        .clickable(role = Role.Button, onClickLabel = if (s.draft.isNotEmpty()) "Tells the agent what to do instead" else null) {
+                        .clickable(role = Role.Button, onClickLabel = if (s.draft.isNotEmpty()) "Tell the agent what to do instead" else null) {
                             dismissKeyboard()
                             store.send(Action.SendTapped)
                         }
@@ -488,7 +488,7 @@ internal fun SessionComposerEnv.TrailingButton(control: ComposerTrailingControl)
                 onSend = { sendMessage(if (it == ai.opencode.server.model.OpenCodeDelivery.Queue) Action.QueueTapped else Action.SendTapped) },
                 enabled = !disabled,
                 // iOS `accessibilityHint` “Steers at the next step. Touch and hold to queue after this response.”
-                clickLabel = "Steers at the next step",
+                clickLabel = "Steer at the next step",
                 longClickLabel = "Queue after this response",
             ) { menuModifier ->
                 Box(menuModifier.openCodeTapTarget(accessibility = false).then(semantics), contentAlignment = Alignment.Center) { label() }

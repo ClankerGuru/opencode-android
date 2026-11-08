@@ -336,7 +336,7 @@ fun DictationScopeBar(
                     label = if (finishing) "Finishing dictation" else "Stop recording",
                     hidden = !p.isLocked || p.isLeaving,
                     order = 0f,
-                    hint = "Puts the words in your message",
+                    hint = "Put the words in your message",
                     onClick = { guarded(onStop) },
                 )
             }
@@ -365,7 +365,7 @@ fun DictationScopeBar(
                     DeliveryMenu(
                         onSend = { delivery -> guarded { onSend(delivery) } },
                         enabled = p.isLocked && !p.isSending,
-                        clickLabel = if (isRunning) "Steers at the next step" else null,
+                        clickLabel = if (isRunning) "Steer at the next step" else null,
                         longClickLabel = if (isRunning) "Queue after this response" else null,
                     ) { menuModifier ->
                         button(menuModifier, false)
