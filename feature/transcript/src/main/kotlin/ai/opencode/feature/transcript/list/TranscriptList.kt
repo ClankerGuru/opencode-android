@@ -212,11 +212,14 @@ private fun TranscriptListContent(
     val initialIndex = remember { (configuration.entries.size + configuration.queuedInputs.size + 2).coerceAtLeast(0) }
     // Like disclosure, where the reader is outlives the activity being recreated (a dark mode
     // switch, font size, process death); a following reader still opens on the bottom.
-    val position = rememberSaveable(saver = transcriptListPositionSaver) { TranscriptListPosition(transcriptListState(initialIndex, 0)) }
+    // Saved under the session's own key, not the composition path: the session screen keys the list
+    // by a draft's visit until it's restored as its session after process death (F-72).
+    val saveKey = "transcript-list|${configuration.server?.persistenceID}|${configuration.sessionID}"
+    val position = rememberSaveable(saver = transcriptListPositionSaver, key = "$saveKey|position") { TranscriptListPosition(transcriptListState(initialIndex, 0)) }
     val listState = position.state
-    val behavior = rememberSaveable(saver = TranscriptScrollBehavior.Saver) { TranscriptScrollBehavior() }
-    val disclosure = rememberSaveable(saver = TranscriptDisclosureState.Saver) { TranscriptDisclosureState() }
-    val selection = rememberSaveable(saver = TranscriptReplySelection.Saver) { TranscriptReplySelection() }
+    val behavior = rememberSaveable(saver = TranscriptScrollBehavior.Saver, key = "$saveKey|behavior") { TranscriptScrollBehavior() }
+    val disclosure = rememberSaveable(saver = TranscriptDisclosureState.Saver, key = "$saveKey|disclosure") { TranscriptDisclosureState() }
+    val selection = rememberSaveable(saver = TranscriptReplySelection.Saver, key = "$saveKey|selection") { TranscriptReplySelection() }
     val controller = remember { TranscriptListController(listState, scope, disclosure, behavior, selection) }
     val density = LocalDensity.current
     val reduceMotion = rememberReduceMotion()
