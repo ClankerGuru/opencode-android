@@ -363,7 +363,7 @@ fun AttachmentMenuRows(
  * `AttachmentMenu.swift` `accessibilityAddTraits(.isModal)`); Compose has no modal semantics, so
  * the + menu moves it itself. Nothing happens while touch exploration is off.
  */
-internal fun Modifier.accessibilityFocusRequest(request: Any?): Modifier = this then AccessibilityFocusRequestElement(request)
+fun Modifier.accessibilityFocusRequest(request: Any?): Modifier = this then AccessibilityFocusRequestElement(request)
 
 private data class AccessibilityFocusRequestElement(val request: Any?) : ModifierNodeElement<AccessibilityFocusRequestNode>() {
     override fun create() = AccessibilityFocusRequestNode(request)

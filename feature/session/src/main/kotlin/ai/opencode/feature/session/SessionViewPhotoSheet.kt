@@ -15,6 +15,7 @@ import ai.opencode.feature.composer.ComposerMorph
 import ai.opencode.feature.composer.ComposerMorphGeometry
 import ai.opencode.feature.composer.ComposerMorphSurface
 import ai.opencode.feature.composer.ComposerMorphTunables
+import ai.opencode.feature.composer.accessibilityFocusRequest
 import ai.opencode.feature.composer.modelpicker.ModelPickerTunables
 import ai.opencode.feature.composer.plusmenu.PhotoFlights
 import ai.opencode.feature.composer.plusmenu.PhotoLibraryAccessHost
@@ -49,6 +50,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -662,6 +664,7 @@ private fun PhotoSheetBody(state: SessionPhotoSheetState) {
             }
         }
     }
+    val contentArrived by remember(state) { derivedStateOf { state.morph.content.value > 0.99f } }
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
             PhotoSheetGrabber(
@@ -669,6 +672,9 @@ private fun PhotoSheetBody(state: SessionPhotoSheetState) {
                 onDrag = state::dragPhotoSheet,
                 onDragEnded = { predicted, velocity -> state.settlePhotoSheet(predicted, velocity) },
                 onToggle = state::togglePhotoSheetExpand,
+                // TalkBack's focus moves into the sheet once its content has arrived, onto its
+                // first element, as it does into a system bottom sheet (it was on the menu's row).
+                focusRequest = if (state.morph.isOpening && contentArrived) state.morph.generation else null,
             )
             Box(Modifier.weight(1f).fillMaxWidth().nestedScroll(connection)) {
                 PlusPhotoSheetContent(
@@ -701,6 +707,7 @@ private fun PhotoSheetGrabber(
     onDrag: (Float) -> Unit,
     onDragEnded: (predicted: Float, velocity: Float) -> Unit,
     onToggle: () -> Unit,
+    focusRequest: Any? = null,
 ) {
     val density = LocalDensity.current.density
     val currentDrag by rememberUpdatedState(onDrag)
@@ -729,6 +736,8 @@ private fun PhotoSheetGrabber(
                 }
             }
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onToggle)
+            // Ahead of the clearing below, which would drop its marker.
+            .accessibilityFocusRequest(focusRequest)
             .clearAndSetSemantics {
                 contentDescription = "Sheet Grabber"
                 stateDescription = if (isExpanded) "Full" else "Half"
