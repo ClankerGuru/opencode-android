@@ -461,6 +461,8 @@ private fun SessionFeature.refreshResponse(
     var observed = refresh.observed
     val current = s.session
     if (current != null && observed.id == current.id) {
+        // A message settlement carries the session it started with, not a title read from the server.
+        if (!refresh.observedIsRead) observed = observed.copy(serverTitle = current.serverTitle)
         if (!refresh.observedIsRead || inFlight.revertChanged) {
             observed = observed.copy(revertMessageID = current.revertMessageID)
         }
