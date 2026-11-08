@@ -9,7 +9,6 @@ import ai.opencode.feature.drawer.HomeFeature.State.Indicator
 import ai.opencode.feature.drawer.motion.DrawerTimeReveal
 import ai.opencode.feature.drawer.style.DrawerMetrics
 import ai.opencode.feature.drawer.style.DrawerRowEmphasis
-import ai.opencode.feature.drawer.style.DrawerRowLayout
 import ai.opencode.feature.drawer.style.DrawerSelectionStyle
 import ai.opencode.feature.drawer.style.DrawerTone
 import ai.opencode.feature.drawer.style.DrawerTunables
@@ -19,7 +18,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -163,7 +161,6 @@ fun DrawerListSessionCell(
         else -> colors.text.copy(alpha = colors.text.alpha * emphasis.opacity(row.increasedContrast, DrawerTunables.readOpacity))
     }
     val titleStyle = DrawerListFonts.font(DrawerTunables.rowFont.font, weight)
-    val twoLine = DrawerTunables.rowLayout == DrawerRowLayout.TwoLine && !row.showsProjectIcons
 
     // The status comes and goes on a snappy spring for the same session; another row's arrives in place.
     val previousID = remember { arrayOf(row.session.id) }
@@ -341,7 +338,7 @@ fun DrawerListSessionCell(
                         .padding(start = DrawerMetrics.textInset, end = DrawerMetrics.trailingInset),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    if (row.showsProjectIcons && row.project != null) {
+                    if (row.project != null) {
                         val side = DrawerListProjectTile.side(DrawerTunables.projectIconSize, density.fontScale)
                         DrawerListProjectTile(
                             project = row.project,
@@ -353,28 +350,16 @@ fun DrawerListSessionCell(
                         )
                         Spacer(Modifier.width(DrawerTunables.projectIconGap))
                     }
-                    Column(Modifier.weight(1f)) {
-                        DrawerListTitleView(
-                            text = row.session.title,
-                            style = titleStyle,
-                            color = titleColor,
-                            fade = DrawerTunables.titleFade,
-                            time = row.time,
-                            reducedMotion = row.reducedMotion,
-                            modifier = Modifier.fillMaxWidth().padding(end = statusInset.coerceAtLeast(0.dp)),
-                            revealProgress = { reveal.progress },
-                        )
-                        if (twoLine) {
-                            val subtitle = listOfNotNull(row.project?.name, row.time).filter { it.isNotEmpty() }.joinToString(" · ")
-                            Text(
-                                subtitle,
-                                style = DrawerListFonts.monospacedDigits(DrawerListFonts.font(OpenCodeTextStyles.subheadline, FontWeight.Normal)),
-                                color = if (onTint) Color.White.copy(alpha = 0.8f) else colors.secondaryText,
-                                maxLines = 1,
-                                modifier = Modifier.padding(top = 1.dp),
-                            )
-                        }
-                    }
+                    DrawerListTitleView(
+                        text = row.session.title,
+                        style = titleStyle,
+                        color = titleColor,
+                        fade = DrawerTunables.titleFade,
+                        time = row.time,
+                        reducedMotion = row.reducedMotion,
+                        modifier = Modifier.weight(1f).padding(end = statusInset.coerceAtLeast(0.dp)),
+                        revealProgress = { reveal.progress },
+                    )
                 }
                 // The status, at the trailing end of the title's line.
                 Box(

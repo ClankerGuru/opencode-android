@@ -490,12 +490,13 @@ fun HomeFeature.State.syncingSeenWatermark(detail: SessionFeature.State, session
 
 fun HomeFeature.State.sessionKey(id: String): String = "${server.persistenceID}|$id"
 fun HomeFeature.State.isPinned(id: String): Boolean = sessionKey(id) in pinnedSessionKeys
-fun HomeFeature.State.isMuted(id: String): Boolean = sessionKey(id) in mutedSessionKeys
-fun HomeFeature.State.isUnread(session: OpenCodeSession): Boolean {
-    if (sessionKey(session.id) in manuallyUnreadSessionKeys) return true
-    session.idleMilliseconds?.let { return it > (session.viewedMilliseconds ?: -1) }
-    return sessionReadDates[sessionKey(session.id)]?.let { it < session.updatedAt } ?: true
-}
+
+/**
+ * One implementation, in `StatusSnapshot`, so the drawer's bulk loops and a single question here
+ * can't drift. Neither reads the busy set, so it isn't computed for them.
+ */
+fun HomeFeature.State.isMuted(id: String): Boolean = statusSnapshot(busy = emptySet()).isMuted(id)
+fun HomeFeature.State.isUnread(session: OpenCodeSession): Boolean = statusSnapshot(busy = emptySet()).isUnread(session)
 
 /**
  * Moves a session to the top of Recents the moment the reader sends, rather than when the next list
@@ -637,12 +638,12 @@ fun HomeFeature.State.drawerBadge(excluding: String?): DrawerBadge? {
     ) {
         return null
     }
-    val attention = attentionSessionIDs
+    val status = statusSnapshot(busy = emptySet())
     val unreadCandidates = mutableListOf<String>()
     for (session in sessions) {
-        if (session.id == excluding || session.isArchived || isMuted(session.id)) continue
-        if (session.id in attention) return DrawerBadge.Attention
-        if (isUnread(session)) unreadCandidates += session.id
+        if (session.id == excluding || session.isArchived || status.isMuted(session.id)) continue
+        if (session.id in status.attention) return DrawerBadge.Attention
+        if (status.isUnread(session)) unreadCandidates += session.id
     }
     if (unreadCandidates.isEmpty()) return null
     val busy = busySessionIDs

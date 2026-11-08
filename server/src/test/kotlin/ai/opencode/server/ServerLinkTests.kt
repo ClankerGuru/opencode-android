@@ -89,7 +89,6 @@ class ServerLinkTests {
         assertTrue("The losing attempt is cancelled, not left holding a socket", lanCancelled.get())
         assertEquals(tailnet, store.resolve(saved).url)
         assertEquals(tailnet, store.route(saved).url)
-        assertEquals("Tailscale", store.lastRace(saved.persistenceID)?.route)
         // The saved server itself is untouched: the winner lives in memory.
         assertEquals(lan, saved.url)
     }

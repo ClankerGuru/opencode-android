@@ -41,7 +41,6 @@ import ai.opencode.feature.drawer.style.DrawerEdgeStyle
 import ai.opencode.feature.drawer.style.DrawerFooterBackdrop
 import ai.opencode.feature.drawer.style.DrawerHeaderBackdrop
 import ai.opencode.feature.drawer.style.DrawerMetrics
-import ai.opencode.feature.drawer.style.DrawerRowLayout
 import ai.opencode.feature.drawer.style.DrawerSectionBreak
 import ai.opencode.feature.drawer.style.DrawerTunables
 import ai.opencode.feature.drawer.switcher.ServerFlowTitle
@@ -207,11 +206,9 @@ fun HomeDrawer(
 
     val inputs = DrawerListInputs(
         selectedSessionID = selectedSessionID,
-        showsProjectIcons = true,
         reducedMotion = reducedMotion,
         increasedContrast = highContrast,
         alwaysShowsHeaders = DrawerTunables.sectionBreak == DrawerSectionBreak.Header,
-        twoLineRows = DrawerTunables.rowLayout == DrawerRowLayout.TwoLine,
         serverSwap = serverSwapTarget,
     )
     val actions = remember(store, viewState) {
@@ -299,7 +296,6 @@ fun HomeDrawer(
                     text = search,
                     onTextChange = { store.send(HomeFeature.Action.SearchChanged(it)) },
                     reducedMotion = reducedMotion,
-                    onBegin = viewState::beginSearch,
                     onEnd = viewState::endSearch,
                     keyboardHold = viewState.keyboardHold,
                 )

@@ -187,9 +187,6 @@ enum class DrawerHoldStyle { Card, InPlace, Flat }
 /** What sits between the shortcuts, Pinned and Recents: a header, a gap alone, or a hairline. */
 enum class DrawerSectionBreak { Header, Gap, Hairline }
 
-/** One line (the title), or two (the title, then its project and time). */
-enum class DrawerRowLayout { OneLine, TwoLine }
-
 /**
  * The drawer's tunables (iOS `DrawerTunables` in `DrawerStyle.swift` and
  * `DrawerBackdrops.swift`) as their shipped defaults. iOS exposes them in Developer Mode's
@@ -288,8 +285,6 @@ object DrawerTunables {
     val selection: DrawerSelectionStyle = DrawerSelectionStyle.Fill
     /** Selected fill. */
     const val selectionOpacity: Float = 0.14f
-    /** Row layout. */
-    val rowLayout: DrawerRowLayout = DrawerRowLayout.OneLine
     /** Search button size. */
     val searchSize: Dp = 44.dp
     /** Project icon size. */

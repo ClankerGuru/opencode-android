@@ -119,7 +119,7 @@ class ServerFlowTests {
             serverSwitchNote = ServerSwitchNote(server = studio, returnedTo = "Laptop", reason = ServerSwitchNote.Reason.Unreachable),
         )
         var inputs = DrawerListInputs(
-            selectedSessionID = null, showsProjectIcons = false, reducedMotion = false, increasedContrast = false,
+            selectedSessionID = null, reducedMotion = false, increasedContrast = false,
         )
         fun build() = DrawerListModel.build(
             state = home, inputs = inputs, liftedID = null, catchUpMounted = false, whatsNewMounted = false,

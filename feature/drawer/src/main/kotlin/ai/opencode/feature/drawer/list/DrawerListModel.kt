@@ -67,7 +67,6 @@ data class DrawerListRow(
     val isLifted: Boolean,
     val time: String,
     val project: OpenCodeProject?,
-    val showsProjectIcons: Boolean,
     val server: OpenCodeServer,
     val reducedMotion: Boolean,
     val increasedContrast: Boolean,
@@ -107,13 +106,10 @@ data class DrawerListShortcuts(
 /** The list's view-local inputs beyond Home's state (iOS `DrawerListInputs`, minus UIKit insets). */
 data class DrawerListInputs(
     val selectedSessionID: String?,
-    val showsProjectIcons: Boolean,
     val reducedMotion: Boolean,
     val increasedContrast: Boolean,
     /** iOS `DrawerTunables.sectionBreak == .header`: section headers always show. */
     val alwaysShowsHeaders: Boolean = true,
-    /** iOS `DrawerTunables.rowLayout == .twoLine`: rows name their project even without icons. */
-    val twoLineRows: Boolean = false,
     /** Server Flow: the server the drawer shows, which may still be connecting. */
     val serverSwap: ServerSwapTarget? = null,
 )
@@ -142,7 +138,8 @@ data class DrawerListModel(
         /**
          * Home's state as the drawer shows it: shortcuts, then Pinned and Recents with their headers.
          * [timestamp] is iOS `DrawerTimestamp.text(for:now:)`; [project] resolves a row's project
-         * (iOS `OpenCodeProject.resolved(for:in:)`, or `SessionListContext.project` for two-line rows).
+         * (iOS `OpenCodeProject.resolved(for:in:)`). Every row has a project: a session in the home folder
+         * or at the server's root gets one derived from its directory, so its tile is stable from the first frame.
          */
         fun build(
             state: HomeFeature.State,
@@ -209,8 +206,7 @@ data class DrawerListModel(
                 unread = status.isUnread(session),
                 isLifted = liftedID == session.id,
                 time = timestamp(session.updatedAt, now),
-                project = if (inputs.showsProjectIcons || inputs.twoLineRows) project(session, state.projects) else null,
-                showsProjectIcons = inputs.showsProjectIcons,
+                project = project(session, state.projects),
                 server = state.server,
                 reducedMotion = inputs.reducedMotion,
                 increasedContrast = inputs.increasedContrast,

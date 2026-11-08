@@ -139,7 +139,7 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 | `OpenCode/Settings/WhatsNew/Entries/2026-10-20-10-subagent-capsule-press.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-10-subagent-capsule-press.kt` | done |  |
 | `OpenCode/Settings/WhatsNew/Entries/2026-10-20-11-advanced-settings-open.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-11-advanced-settings-open.kt` | done |  |
 | `OpenCode/Settings/WhatsNew/Entries/2026-10-20-12-revert-to-here.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-12-revert-to-here.kt` | done |  |
-| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-13-drag-from-transcript.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-13-drag-from-transcript.kt` | sync: done |  |
+| `OpenCode/Settings/WhatsNew/Entries/2026-10-20-13-drag-from-transcript.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-13-drag-from-transcript.kt` | done | Sync 440b77f0 (cda508ba): example copy now "Select a line of code in a reply, then hold the selection and drag the block into Notes." (iOS copy; Android can't drag code yet). |
 | `OpenCode/Settings/WhatsNew/Entries/2026-10-20-14-tuning-glass-tap-targets.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-14-tuning-glass-tap-targets.kt` | done |  |
 | `OpenCode/Settings/WhatsNew/Entries/2026-10-20-15-new-session-project-continuity.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-15-new-session-project-continuity.kt` | done |  |
 | `OpenCode/Settings/WhatsNew/Entries/2026-10-20-16-simple-session-loading.swift` | 3 | `feature/settings/.../whatsnew/entries/2026-10-20-16-simple-session-loading.kt` | done |  |

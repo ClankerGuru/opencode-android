@@ -133,14 +133,19 @@ data class RetryPolicy(
         return minOf(maxDelay, uncapped)
     }
 
-    /** "Equal jitter": uniformly between half the ceiling and the ceiling. [unit] is in 0..<1. */
-    fun delay(n: Int, unit: Double): Duration {
-        val ceiling = ceiling(n)
-        val clamped = unit.coerceIn(0.0, 1.0)
-        return ceiling / 2 + (ceiling / 2) * clamped
-    }
+    fun delay(n: Int, unit: Double): Duration = jitter(ceiling(n), unit)
 
     companion object {
+        /**
+         * "Equal jitter": uniformly between half [ceiling] and [ceiling]. [unit] is in 0..<1.
+         * Unlike full jitter, every wait is at least half its ceiling, so the retries are spread
+         * over a few seconds of dropout instead of possibly bunching at its start.
+         */
+        fun jitter(ceiling: Duration, unit: Double): Duration {
+            val clamped = unit.coerceIn(0.0, 1.0)
+            return ceiling / 2 + (ceiling / 2) * clamped
+        }
+
         /** Every request: five attempts over 7.5–15 s of waits, within 30 s of the first failure. */
         val request = RetryPolicy(maxAttempts = 5, baseDelay = 1.seconds, maxDelay = 8.seconds, retryWindow = 30.seconds)
 
@@ -234,7 +239,7 @@ class RetryBackoff(val policy: RetryPolicy) {
                 slowFailures += 1
                 minOf(policy.maxDelay, policy.fastMaxDelay * (1L shl minOf(slowFailures, 30)).toDouble())
             }
-            delay = ceiling / 2 + ceiling / 2 * unit.coerceIn(0.0, 1.0)
+            delay = RetryPolicy.jitter(ceiling, unit)
         } else {
             delay = policy.delay(failures, unit)
         }

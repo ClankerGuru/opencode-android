@@ -96,8 +96,6 @@ data class ServerLinkClient(
     val noteStreamActivity: (server: String) -> Unit,
     /** How long since that stream last delivered anything; null if it never has. */
     val streamSilence: (server: String) -> Duration?,
-    /** The latest race for this `persistenceID`. */
-    val lastRace: (server: String) -> ServerLinkRace?,
     /**
      * Starts every connection over: fresh pools (`OpenCodeTransport.reset`), addresses raced
      * again, reads in flight interrupted to retry on them.
@@ -120,7 +118,6 @@ data class ServerLinkClient(
             invalidate = { server, failingURL -> store.invalidate(server, failingURL) },
             noteStreamActivity = { store.noteStreamActivity(it) },
             streamSilence = { store.streamSilence(it) },
-            lastRace = { store.lastRace(it) },
             resetConnections = { store.reset(it) },
             noteTimeout = { store.noteTimeout() },
             noteAnswer = { store.noteAnswer() },
@@ -151,7 +148,6 @@ data class ServerLinkClient(
             adopt = {},
             noteStreamActivity = {},
             streamSilence = { null },
-            lastRace = { null },
         )
     }
 }
@@ -172,7 +168,6 @@ class ServerLinkStore(
     private val active = HashMap<String, String>()
     private val races = HashMap<String, Race>()
     private val activity = HashMap<String, Duration>()
-    private val lastRaces = HashMap<String, ServerLinkRace>()
     private val epochs = MutableStateFlow(ServerLinkEpoch())
     private var timeouts = 0
 
@@ -297,9 +292,9 @@ class ServerLinkStore(
             } else {
                 val id = UUID.randomUUID()
                 val task = scope.async {
-                    val (outcome, summary) = race(server, health)
+                    val (outcome, _) = race(server, health)
                     val winner = outcome.map { it.url }
-                    settle(key, id, winner, summary)
+                    settle(key, id, winner)
                     winner
                 }
                 races[key] = Race(id, credentials, task)
@@ -337,14 +332,11 @@ class ServerLinkStore(
         return Clock.liveValue.now() - last
     }
 
-    fun lastRace(server: String): ServerLinkRace? = synchronized(lock) { lastRaces[server] }
-
-    private fun settle(key: String, id: UUID, result: Result<String>, summary: ServerLinkRace) {
+    private fun settle(key: String, id: UUID, result: Result<String>) {
         synchronized(lock) {
             // A race superseded by one with other credentials says nothing now.
             if (races[key]?.id != id) return
             races.remove(key)
-            lastRaces[key] = summary
             val previous = active[key]
             val winner = result.getOrNull()
             if (winner != null) {

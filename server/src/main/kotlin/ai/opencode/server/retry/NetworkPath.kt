@@ -346,8 +346,6 @@ data class NetworkPathClient(
      */
     val reroutes: () -> Flow<Unit>,
     val isOffline: () -> Boolean,
-    val isConstrained: () -> Boolean = { false },
-    val isExpensive: () -> Boolean = { false },
     /** Returns once a network path is available (or at once if one is). */
     val available: suspend () -> Unit,
     /** Returns the next time the server with this `persistenceID` answers a request, or when cancelled. */
@@ -391,8 +389,6 @@ data class NetworkPathClient(
                     if (monitor == null) emptyFlow() else NetworkPathMonitor.reroutes(monitor.updates())
                 },
                 isOffline = { NetworkPathMonitor.shared?.current?.isOffline == true },
-                isConstrained = { NetworkPathMonitor.shared?.isConstrained == true },
-                isExpensive = { NetworkPathMonitor.shared?.isExpensive == true },
                 available = { NetworkPathMonitor.shared?.waitUntilUsable() },
                 serverAnswered = { ServerContact.shared.next(it) },
                 appPhases = { AppPhases.phases() },

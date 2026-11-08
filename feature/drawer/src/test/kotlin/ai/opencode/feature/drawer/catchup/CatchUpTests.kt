@@ -562,7 +562,7 @@ class CatchUpTests {
         assertFalse(state.statusSnapshot().needsCatchUp(child))
         val model = DrawerListModel.build(
             state = state,
-            inputs = DrawerListInputs(selectedSessionID = null, showsProjectIcons = false, reducedMotion = false, increasedContrast = false),
+            inputs = DrawerListInputs(selectedSessionID = null, reducedMotion = false, increasedContrast = false),
             liftedID = null,
             catchUpMounted = true,
             whatsNewMounted = false,

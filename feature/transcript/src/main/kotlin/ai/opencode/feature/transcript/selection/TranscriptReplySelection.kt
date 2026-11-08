@@ -91,7 +91,6 @@ class TranscriptReplySelection {
         internal val document: TranscriptSelectionDocument,
         val offset: Int,
         val isLink: Boolean,
-        val isCode: Boolean,
     )
 
     class HandleHit internal constructor(val isEnd: Boolean, internal val caret: Rect)
@@ -301,7 +300,7 @@ class TranscriptReplySelection {
         val leaf = document.leaves[index]
         val local = leaf.textOffset(best.drawnOffset(bestLocal))
         val offset = document.nearestBoundary(document.offset(index, local))
-        return Hit(document, offset, leaf.isLink(local), leaf.role is TranscriptSelectionLeaf.Role.Code)
+        return Hit(document, offset, leaf.isLink(local))
     }
 
     /** The document offset nearest [point] among the reply's leaves on screen, at any distance. */

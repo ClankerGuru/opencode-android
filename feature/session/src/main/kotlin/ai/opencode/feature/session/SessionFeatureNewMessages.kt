@@ -92,11 +92,10 @@ fun SessionFeature.State.absorbFittingNewMessages(): SessionFeature.State {
 /**
  * Places the divider above the first row the reader hasn't seen. The read after their return
  * [settles] it: with nothing new the divider goes, and what arrives from then on arrives in front
- * of them. The list shows the divider only with the experiment on and when what it marks doesn't
- * fit on screen (`newMessagesFit`). With it off the mark is still placed, without a divider: it's
- * what lets a following reader glide to what arrived instead of the rows landing in one frame.
- * Only rows that [keptShapes] (grew or were added, [NewMessagesFold.keepsShapes]) may reuse a fold
- * found before.
+ * of them. The list draws that divider only when what it marks doesn't fit on screen
+ * (`newMessagesFit`); without one the mark is still placed, and is what lets a following reader
+ * glide to what arrived instead of the rows landing in one frame. Only rows that [keptShapes]
+ * (grew or were added, [NewMessagesFold.keepsShapes]) may reuse a fold found before.
  */
 fun SessionFeature.State.updateNewMessagesMark(settles: Boolean, keptShapes: Boolean = false): SessionFeature.State {
     var s = if (keptShapes) this else copy(newMessagesFolded = null)

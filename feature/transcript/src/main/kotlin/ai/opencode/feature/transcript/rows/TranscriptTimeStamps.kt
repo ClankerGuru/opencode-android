@@ -169,17 +169,18 @@ object TranscriptTimeStamps {
     /** Whether [id] carries an OpenCode timestamp minted at or before [milliseconds]. */
     fun isAtOrBefore(milliseconds: Long, id: String): Boolean? {
         val ahead = millisecondsAhead(milliseconds, id) ?: return null
-        return ahead == 0L || ahead > (MS_MASK shr 1)
+        return ahead == 0L || ahead > HALF_RANGE
     }
 
     /** Whether [id] carries an OpenCode timestamp minted strictly before [milliseconds]. */
     fun isBefore(milliseconds: Long, id: String): Boolean? {
         val ahead = millisecondsAhead(milliseconds, id) ?: return null
-        return ahead > (MS_MASK shr 1)
+        return ahead > HALF_RANGE
     }
 
-    /** The 36 bits of milliseconds an ID holds. */
+    /** The 36 bits of milliseconds an ID holds, and half of them: more than that ahead is really behind. */
     private const val MS_MASK: Long = 0xF_FFFF_FFFFL
+    private const val HALF_RANGE: Long = MS_MASK shr 1
 
     /** How far [id]'s milliseconds are ahead of [milliseconds], wrapped to the ID's 36 bits. */
     private fun millisecondsAhead(milliseconds: Long, id: String): Long? {

@@ -110,7 +110,6 @@ class DrawerSearchState {
  *
  * @param keyboardHold the drawer's [DrawerKeyboardHold]: search's keyboard belongs to the
  *   drawer, never the peeking card.
- * @param onBegin search opens (Home records the drawer's search began).
  * @param onEnd search closes (Home clears the query).
  */
 @Composable
@@ -119,7 +118,6 @@ fun DrawerSearchPill(
     text: String,
     onTextChange: (String) -> Unit,
     reducedMotion: Boolean,
-    onBegin: () -> Unit,
     onEnd: () -> Unit,
     modifier: Modifier = Modifier,
     keyboardHold: DrawerKeyboardHold? = null,
@@ -141,7 +139,6 @@ fun DrawerSearchPill(
             runCatching { focusRequester.requestFocus() }
             state.isFocused = true
         } else {
-            onBegin()
             state.isSearching = true
             state.isFocused = true
         }
