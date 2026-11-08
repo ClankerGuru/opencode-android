@@ -4,6 +4,7 @@ import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.ui.appFormattingLocale
 import ai.opencode.feature.composer.AttachmentPickerButton
 import ai.opencode.feature.composer.ComposerMorph
 import ai.opencode.feature.composer.ComposerMorphTunables
@@ -1128,7 +1129,7 @@ private fun PlusPhotoTile(
         label = "tile-limit",
     )
     val washColor = MaterialTheme.colorScheme.background
-    val description = listOfNotNull(photo.formattedDuration, photo.created?.let(tileDateFormatter::format)).joinToString(", ")
+    val description = listOfNotNull(photo.formattedDuration, photo.created?.let(tileDateFormatter.withLocale(appFormattingLocale())::format)).joinToString(", ")
     Box(
         Modifier
             .aspectRatio(1f)

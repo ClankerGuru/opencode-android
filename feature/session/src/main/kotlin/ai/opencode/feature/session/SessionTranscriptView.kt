@@ -13,6 +13,7 @@ import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.ProviderIcon
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.core.ui.appFormattingLocale
 import ai.opencode.core.ui.inContainer
 import ai.opencode.feature.composer.PastedTextViewer
 import ai.opencode.feature.media.AgentFileViewer
@@ -374,7 +375,7 @@ object SessionTranscriptView {
             mark: NewMessagesMark?,
             now: Instant = Instant.now(),
             zone: ZoneId = ZoneId.systemDefault(),
-            locale: Locale = Locale.getDefault(),
+            locale: Locale = appFormattingLocale(),
             hour24: Boolean? = null,
         ): Pair<List<TranscriptEntry>, NewMessagesPlacement?> {
             val nowSecond = now.epochSecond

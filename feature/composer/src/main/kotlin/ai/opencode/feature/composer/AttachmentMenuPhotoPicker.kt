@@ -9,6 +9,7 @@ import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeSecondaryButton
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.core.ui.appFormattingLocale
 import ai.opencode.feature.composer.plusmenu.LibraryPhoto
 import ai.opencode.feature.composer.plusmenu.PhotoLibraryAccess
 import ai.opencode.feature.composer.plusmenu.PhotoLibraryAccessHost
@@ -352,7 +353,7 @@ private fun InlinePhotoTile(
         animationSpec = if (reduceMotion) snap() else MotionSpring(0.25, 0.2).spec(),
         label = "inline-tile-badge",
     )
-    val description = listOfNotNull(photo.formattedDuration, photo.created?.let(tileDateFormatter::format)).joinToString(", ")
+    val description = listOfNotNull(photo.formattedDuration, photo.created?.let(tileDateFormatter.withLocale(appFormattingLocale())::format)).joinToString(", ")
     Box(
         Modifier
             .aspectRatio(1f)

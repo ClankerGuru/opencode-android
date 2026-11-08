@@ -1,5 +1,6 @@
 package ai.opencode.app
 
+import ai.opencode.feature.system.LeftToRight
 import ai.opencode.feature.system.NotificationDestination
 import ai.opencode.feature.system.SystemAction
 import ai.opencode.feature.system.share.ShareConversation
@@ -12,6 +13,7 @@ import ai.opencode.feature.system.notifications.NotificationPermission
 import ai.opencode.feature.system.notifications.NotificationPermissionClient
 import ai.opencode.feature.voice.VoiceMicrophonePermission
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import androidx.activity.result.contract.ActivityResultContracts
@@ -56,6 +58,11 @@ class MainActivity : ComponentActivity() {
         microphoneRequest = null
     }
     private var removeRequesters: List<() -> Unit> = emptyList()
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(newBase)
+        applyOverrideConfiguration(LeftToRight.configuration())
+    }
 
     private class TouchModeExit(val at: Long, val hadFocus: Boolean)
     private val typedNavigationKeys = setOf(KeyEvent.KEYCODE_SPACE, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER)
