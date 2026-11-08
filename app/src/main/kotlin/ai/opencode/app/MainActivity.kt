@@ -116,7 +116,7 @@ class MainActivity : ComponentActivity() {
                         removeRequesters.forEach { it() }
                         removeRequesters = emptyList()
                     }
-                    Lifecycle.Event.ON_STOP -> store.send(AppFeature.Action.ForegroundChanged(false))
+                    Lifecycle.Event.ON_STOP -> if (!isChangingConfigurations) store.send(AppFeature.Action.ForegroundChanged(false))
                     else -> Unit
                 }
             },
