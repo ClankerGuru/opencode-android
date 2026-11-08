@@ -292,6 +292,13 @@ class LinkMenuHandler(val perform: (LinkMenuAction, String) -> Unit) {
 /** iOS `EnvironmentValues.linkMenu`. */
 val LocalLinkMenu = staticCompositionLocalOf<LinkMenuHandler?> { null }
 
+/** The most custom actions one node may carry: past it Android throws as the tree is read (VoiceOver has no cap). */
+const val MAX_CUSTOM_ACCESSIBILITY_ACTIONS = 32
+
+/** [this], cut to what one node may carry ([MAX_CUSTOM_ACCESSIBILITY_ACTIONS]). */
+fun List<CustomAccessibilityAction>.withinNodeLimit(): List<CustomAccessibilityAction> =
+    if (size <= MAX_CUSTOM_ACCESSIBILITY_ACTIONS) this else take(MAX_CUSTOM_ACCESSIBILITY_ACTIONS)
+
 /** Port of iOS `LinkMenuText`. */
 object LinkMenuText {
     /** The text's web links, once each, in order. */
@@ -325,6 +332,42 @@ object LinkMenuText {
             LinkMenuAction.Share -> "Share Link to $host"
             LinkMenuAction.OpenSession, LinkMenuAction.CopySessionID -> action.title
         }
+    }
+
+    /** TalkBack's name for the action that lists the links whose actions don't fit on the text. */
+    const val moreLinks = "More Links"
+
+    /** What the text's links give TalkBack: [actions] on the text, and the links behind [moreLinks]. */
+    data class AccessibilityActions(val actions: List<Pair<LinkMenuAction, String>>, val more: List<String>)
+
+    /**
+     * Every link's actions, in order, as iOS puts them on the text. Android allows one node only
+     * [MAX_CUSTOM_ACCESSIBILITY_ACTIONS], so when they don't all fit, the first links keep all of
+     * theirs and the rest are listed behind one [moreLinks] action, whose chooser opens a link's
+     * own menu.
+     */
+    fun accessibilityActions(links: List<String>, actionsFor: (String) -> List<LinkMenuAction>): AccessibilityActions {
+        val perLink = links.map { url -> url to actionsFor(url) }
+        val all = perLink.flatMap { (url, actions) -> actions.map { it to url } }
+        if (all.size <= MAX_CUSTOM_ACCESSIBILITY_ACTIONS) return AccessibilityActions(all, emptyList())
+        val kept = ArrayList<Pair<LinkMenuAction, String>>()
+        var cut = perLink.size
+        for ((index, entry) in perLink.withIndex()) {
+            val (url, actions) = entry
+            // One slot stays for More Links.
+            if (kept.size + actions.size > MAX_CUSTOM_ACCESSIBILITY_ACTIONS - 1) {
+                cut = index
+                break
+            }
+            actions.mapTo(kept) { it to url }
+        }
+        return AccessibilityActions(kept, perLink.drop(cut).map { it.first })
+    }
+
+    /** A link's row in the More Links chooser: a session's name, or the address. */
+    fun chooserTitle(url: String): String {
+        val id = SessionLink.id(url) ?: return url
+        return SessionLink.title(url) ?: SessionLink.shortID(id)
     }
 
     /**
@@ -432,7 +475,9 @@ class LinkHitLayout(
 /**
  * Holding a web link in [text] opens the link menu with a preview of the link; tapping it still
  * opens it as before ([onOpen], the row's link opener). Touches anywhere else go to the text
- * underneath (selection included). TalkBack gets the menu's actions on the text. Port of iOS
+ * underneath (selection included). TalkBack gets the menu's actions on the text; when they pass
+ * Android's 32-per-node cap, the rest of the links sit behind More Links, a chooser that opens a
+ * link's menu ([LinkMenuText.accessibilityActions]; Compose's own link nodes take no custom actions). Port of iOS
  * `View.linkMenu(for:…)` (`LinkMenuModifier` + `LinkMenuOverlay` + `LinkMenuView`); wrap the
  * text's `Text` in it and pass its latest [TextLayoutResult].
  */
@@ -457,6 +502,7 @@ fun LinkMenu(
     val slopX = with(density) { 6.dp.toPx() }
     val slopY = with(density) { 5.dp.toPx() }
     var menu by remember { mutableStateOf<LinkHitLayout.Hit<String>?>(null) }
+    var chooser by remember { mutableStateOf<List<String>?>(null) }
     var pressed by remember { mutableStateOf<Path?>(null) }
     val pressAlpha = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
@@ -468,14 +514,20 @@ fun LinkMenu(
     Box(
         modifier
             .semantics {
-                customActions = links.flatMap { url ->
-                    handler.accessibilityActions(url).map { action ->
-                        CustomAccessibilityAction(LinkMenuText.accessibilityName(action, url, links)) {
-                            handler.perform(action, url)
-                            true
-                        }
+                val plan = LinkMenuText.accessibilityActions(links, handler::accessibilityActions)
+                customActions = buildList {
+                    for ((action, url) in plan.actions) {
+                        add(
+                            CustomAccessibilityAction(LinkMenuText.accessibilityName(action, url, links)) {
+                                handler.perform(action, url)
+                                true
+                            },
+                        )
                     }
-                }
+                    if (plan.more.isNotEmpty()) {
+                        add(CustomAccessibilityAction(LinkMenuText.moreLinks) { chooser = plan.more; true })
+                    }
+                }.withinNodeLimit()
             }
             // A session chip darkens while a finger is on it: over the text, as iOS's press layer.
             .drawWithContent {
@@ -541,6 +593,23 @@ fun LinkMenu(
             },
     ) {
         content()
+        chooser?.let { more ->
+            DropdownMenu(expanded = true, onDismissRequest = { chooser = null }) {
+                for (url in more) {
+                    DropdownMenuItem(
+                        text = { Text(LinkMenuText.chooserTitle(url), maxLines = 2, overflow = TextOverflow.Ellipsis) },
+                        leadingIcon = {
+                            OpenCodeIcon(if (SessionLink.id(url) == null) "globe" else "bubble.left.and.text.bubble.right", contentDescription = null)
+                        },
+                        onClick = {
+                            chooser = null
+                            val laidOut = textLayout()?.let { LinkHitLayout(it, webRanges, slopX = slopX, slopY = slopY).laidOutLinks }
+                            menu = laidOut?.firstOrNull { it.value == url } ?: LinkHitLayout.Hit(url, emptyList())
+                        },
+                    )
+                }
+            }
+        }
         menu?.let { hit ->
             val anchor = hit.rects.firstOrNull() ?: Rect.Zero
             Box(

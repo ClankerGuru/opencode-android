@@ -8,6 +8,7 @@ import ai.opencode.core.testing.TestIsolationRule
 import ai.opencode.server.OpenCodePairingLink
 import ai.opencode.server.model.AgentFileReference
 import ai.opencode.server.model.PageShareRequest
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withLink
@@ -437,6 +438,33 @@ class LinkMenuTests {
         assertEquals(listOf(docs, post), LinkMenuText.webLinks(text))
         assertEquals("Copy Link", LinkMenuText.accessibilityName(LinkMenuAction.Copy, url = docs, among = listOf(docs)))
         assertEquals("Share Link to example.com", LinkMenuText.accessibilityName(LinkMenuAction.Share, url = docs, among = listOf(docs, post)))
+    }
+
+    /** Android-only (AA-01): Android throws once a node has more than 32 custom actions; VoiceOver has no cap. */
+    @Test
+    fun manyLinksKeepEveryLinkReachableWithinTheNodeLimit() {
+        val browserOn = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.inAppBrowser))
+        val actionsFor = { url: String -> LinkMenuAction.actions(url, browserOn) }
+        val links = List(50) { "https://example.net/n-$it" }
+
+        val plan = LinkMenuText.accessibilityActions(links, actionsFor)
+        val onNode = plan.actions.size + if (plan.more.isEmpty()) 0 else 1
+        assertTrue("$onNode actions on one node", onNode <= MAX_CUSTOM_ACCESSIBILITY_ACTIONS)
+        // The first links keep all their actions, in order; every other link is behind More Links.
+        val kept = plan.actions.map { it.second }.distinct()
+        assertEquals(links, kept + plan.more)
+        assertEquals(kept.flatMap { url -> actionsFor(url).map { it to url } }, plan.actions)
+        assertEquals(6, kept.size)
+
+        // A few links keep the flat list iOS has, with no More Links.
+        val few = links.take(6)
+        val fits = LinkMenuText.accessibilityActions(few, actionsFor)
+        assertEquals(few.flatMap { url -> actionsFor(url).map { it to url } }, fits.actions)
+        assertTrue(fits.more.isEmpty())
+
+        val guarded = List(50) { CustomAccessibilityAction("Action $it") { true } }.withinNodeLimit()
+        assertEquals(MAX_CUSTOM_ACCESSIBILITY_ACTIONS, guarded.size)
+        assertEquals("Action 0", guarded.first().label)
     }
 }
 
