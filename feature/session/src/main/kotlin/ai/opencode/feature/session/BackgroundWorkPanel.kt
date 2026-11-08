@@ -1072,12 +1072,14 @@ private fun BackgroundWorkRow(
             modifier = Modifier.weight(1f).clearAndSetSemantics { },
         )
         if (startedAt != null) {
-            ShellElapsedTime(
-                since = startedAt,
-                isPaused = !isLive,
-                style = OpenCodeTextStyles.subheadline.copy(fontFeatureSettings = "tnum"),
-                color = OpenCodeTheme.colors.secondaryText,
-            )
+            Box(Modifier.clearAndSetSemantics { }) {
+                ShellElapsedTime(
+                    since = startedAt,
+                    isPaused = !isLive,
+                    style = OpenCodeTextStyles.subheadline.copy(fontFeatureSettings = "tnum"),
+                    color = OpenCodeTheme.colors.secondaryText,
+                )
+            }
         }
         OpenCodeIcon(SFSymbol.ChevronRight, contentDescription = null, size = 16.dp, tint = OpenCodeTheme.colors.tertiaryText)
     }
