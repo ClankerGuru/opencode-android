@@ -98,7 +98,7 @@ class VoiceCallLogRecorder(
     private val date: DateClient = dependency(DateClient),
     private val upload: VoiceCallLogUploadClient = dependency(VoiceCallLogUploadClient),
     /** Seconds between in-progress writes of an open call. */
-    private val liveInterval: Double = 3.0,
+    private val liveInterval: Double = liveWriteInterval,
     private val watchesNetwork: Boolean = true,
     private val isDeveloperMode: () -> Boolean = { shared(SharedKeys.developerMode).value },
     private val writeFile: (ByteArray, File) -> Unit = ::writeAtomically,
@@ -422,6 +422,9 @@ class VoiceCallLogRecorder(
     fun deleteAll() { list().forEach { delete(it.id) } }
     companion object {
         const val keep = 40
+        /** Each write re-encodes the whole growing log; backgrounding and hang-up write at once,
+         * so this only bounds what a crash can lose. */
+        const val liveWriteInterval = 10.0
         const val interruptedNote = "⚠︎ Call interrupted: the app quit before hang-up"
 
         /** The default write: a sibling temp file renamed over the target. Android's

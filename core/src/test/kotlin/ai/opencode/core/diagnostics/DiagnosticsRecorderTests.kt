@@ -62,6 +62,19 @@ class DiagnosticsRecorderTests {
     }
 
     @Test
+    fun unfinishedRequestTimingsAreSweptPeriodicallyNotPerEvent() {
+        val clock = Clock()
+        val recorder = DiagnosticsRecorder(enabled = true, maximumEvents = 5_000, retentionSeconds = 900.0, monotonicNow = clock::now)
+        val events = DiagnosticsRecorder.REQUEST_PRUNE_EVERY_EVENTS * 4
+        for (index in 0 until events) {
+            recorder.requestStarted(id = "r$index", method = "GET", url = url, reason = null)
+        }
+        // One sweep at the first event (nothing had run yet), then one every 64
+        // events: four for 256, not one per event.
+        assertEquals(4, recorder.requestPruneCount)
+    }
+
+    @Test
     fun streamProgressCountsLinesNotWireBytesAndOnlyMarksLongGaps() {
         val progress = DiagnosticsStreamProgress(startedAt = 1.0)
         val first = progress.receiveLine(byteCount = 12, now = 2.0)

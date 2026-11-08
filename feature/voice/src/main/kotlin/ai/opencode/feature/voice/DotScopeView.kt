@@ -79,7 +79,8 @@ sealed interface DotScopeMode {
  * only while the scope is visible: not [LocalDotScopeCovered], and the
  * lifecycle resumed (iOS `scenePhase == .active`). A paused scope keeps its last frame and
  * resumes with a reset clock, so it never fast-forwards. Under Reduce Motion it draws one still
- * frame whenever its inputs change.
+ * frame whenever its inputs change. After [DotScopeRenderer.QUIET_AFTER] of silence only the
+ * slow carrier moves, so it draws every other frame (iOS halves `preferredFramesPerSecond`).
  */
 @Composable
 fun DotScopeView(
@@ -114,8 +115,11 @@ fun DotScopeView(
             if (scope.render(nowSeconds = System.nanoTime() / 1e9, pixelWidth = size.width, pixelHeight = size.height, scale = density)) frame++
             return@LaunchedEffect
         }
+        var frames = 0L
         while (true) {
             val nanos = withFrameNanos { it }
+            frames++
+            if (!DotScopeRenderer.drawsFrame(isQuiet = scope.isQuiet, frame = frames)) continue
             configure()
             if (scope.render(nowSeconds = nanos / 1e9, pixelWidth = size.width, pixelHeight = size.height, scale = density)) frame++
         }
@@ -177,6 +181,14 @@ class DotScopeRenderer private constructor() {
     var mode: DotScopeMode = DotScopeMode.Preview(active = false)
     var isDark = true
     var isStill = false
+
+    /** When a voice was last above [QUIET_LEVEL]. Worker, under frameMutex. */
+    private var lastHeard = Double.NEGATIVE_INFINITY
+
+    /** Nothing on screen moves faster than a slow breath: half the frame rate draws the same picture. */
+    @Volatile
+    var isQuiet = false
+        private set
 
     private val shader = RuntimeShader(DotScopeShaders.dotScopeFragment)
     private var grid: DotScopeGrid? = null
@@ -270,6 +282,7 @@ class DotScopeRenderer private constructor() {
                 is DotScopeMode.Dictation -> true
             }
             simulation = DotScopeSimulation.still(connected)
+            isQuiet = true
             insets = target
             simulation.windowInsets = target
         } else {
@@ -283,14 +296,21 @@ class DotScopeRenderer private constructor() {
             } ?: target
             insets = eased
             simulation.windowInsets = eased
+            val loudest: Float
             when (mode) {
                 is DotScopeMode.Dictation -> {
+                    loudest = snapshot.user
                     simulation.advance(elapsed, you = snapshot.user, agent = snapshot.assistant, connected = true)
                 }
                 is DotScopeMode.Preview -> {
+                    val carrier = if (mode.active) 1f else 0f
+                    // Connecting or disconnecting eases the carrier in and out.
+                    loudest = if (abs(simulation.live - carrier) > 0.01f) 1f else max(snapshot.user, snapshot.assistant)
                     simulation.advance(elapsed, you = snapshot.user, agent = snapshot.assistant, connected = mode.active)
                 }
             }
+            if (loudest > QUIET_LEVEL) lastHeard = nowSeconds
+            isQuiet = isQuiet(lastHeard = lastHeard, now = nowSeconds)
         }
         simulation.render(grid, field)
     }
@@ -346,11 +366,27 @@ class DotScopeRenderer private constructor() {
         /**
          * Builds the shader once off the main thread, so the first scope (a held mic's bar)
          * appears at once. Android compiles AGSL lazily per program; this warms the
-         * process's shader cache like iOS `DotScopeRenderer.prepare()`.
+         * process's shader cache like iOS `DotScopeRenderer.prepare()`, at most once a launch.
          */
         fun prepare() {
+            if (prepared) return
+            prepared = true
             Thread { runCatching { RuntimeShader(DotScopeShaders.dotScopeFragment) } }.start()
         }
+
+        @Volatile
+        private var prepared = false
+
+        const val QUIET_LEVEL = 0.02f
+
+        /** Long enough for the last syllable's trails to fade. */
+        const val QUIET_AFTER = 1.5
+
+        /** Silent long enough that only the slow carrier moves. */
+        fun isQuiet(lastHeard: Double, now: Double): Boolean = now - lastHeard > QUIET_AFTER
+
+        /** Whether display frame [frame] draws: all of them, or every other one while quiet. */
+        fun drawsFrame(isQuiet: Boolean, frame: Long): Boolean = !isQuiet || frame % 2 == 0L
 
         fun make(): DotScopeRenderer? = runCatching { DotScopeRenderer() }
             .onFailure { AppLog.voice.error("dot_scope_shader_failed type=${it.javaClass.simpleName}") }

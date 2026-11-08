@@ -356,7 +356,12 @@ object VoiceHandoff {
         "will", "with", "work", "working", "yeah", "yep", "yes", "you", "your",
     )
 
-    const val replyLimit = 1_600
+    /**
+     * The most of a session's reply the voice agent gets, about eight minutes
+     * spoken: room for a walkthrough the user asked for (1,600 cut those off
+     * at about a minute). Longer material belongs in a file.
+     */
+    const val replyLimit = 8_000
 
     fun completion(reply: String): String {
         val trimmed = reply.trim()

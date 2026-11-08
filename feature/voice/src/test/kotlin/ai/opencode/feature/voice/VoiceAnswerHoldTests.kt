@@ -51,6 +51,25 @@ class VoiceAnswerHoldTests {
     }
 
     /**
+     * A walkthrough the user asked for runs long: all of it goes to the voice
+     * agent, in order. Until Nov 7 it stopped at 1,600 characters and two chunks.
+     */
+    @Test fun aLongAnswerTheUserAskedForIsSentWhole() = runTest {
+        val call = idleCall()
+        asked(call)
+        call.advance(500)
+        val walkthrough = (1..80).joinToString(" ") { "Step $it of the walkthrough explains one more part of the rules." }
+        assertTrue(walkthrough.length > 5_000)
+        val output = VoiceHandoff.completion(VoiceSessionDelegator.spokenReply(walkthrough))
+        val chunks = LiveContentChunker.commentaryChunks(output)
+        assertTrue(chunks.size > 2)
+        call.coordinator.completeFunction(callID = "del_rules", output = output)
+        call.waitFor { call.spoken().size == chunks.size }
+        assertEquals("Every sentence, nothing cut", walkthrough, call.spoken().joinToString(" "))
+        call.coordinator.end()
+    }
+
+    /**
      * While the voice agent speaks a delegation's answer, a result waits for
      * it to finish (up to the longer limit) rather than cutting it off.
      */

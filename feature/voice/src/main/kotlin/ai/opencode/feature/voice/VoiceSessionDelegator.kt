@@ -36,7 +36,8 @@ object VoiceSessionDelegator {
 
     val activeCallBlock = """
         [Voice call active]
-        The user is on a live voice call on their phone. Reply in 1–3 plain spoken sentences with no Markdown, code blocks, or raw IDs; write long output to files or subagents and give a spoken summary first.
+        The user is on a live voice call on their phone, and your reply is read aloud. Keep it short by default, a few spoken sentences. When they ask for detail, an explanation, a walkthrough, or to be taught something, answer at whatever length it needs; it is read in full.
+        Either way, write plain spoken prose with no Markdown, lists, code blocks, or raw IDs. Put very long material (full code, logs, long reports) in a file and speak a summary of it.
         When walking through a list one item at a time, end with a single line naming the next item ("Next is X; keep, drop, or note?").
     """.trimIndent()
 

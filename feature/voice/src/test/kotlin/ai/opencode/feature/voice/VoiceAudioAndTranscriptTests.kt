@@ -1085,7 +1085,7 @@ class VoiceTranscriptTests {
         assertEquals(JsonArray(listOf(JsonPrimitive("user: look at the failing test"))), decoded["transcript_delta"])
 
         assertEquals("[COMPLETE] OpenCode finished without a text reply.", VoiceHandoff.completion("  "))
-        assertEquals("[COMPLETE] ".length + VoiceHandoff.replyLimit, VoiceHandoff.completion("x".repeat(2_000)).length)
+        assertEquals("[COMPLETE] ".length + VoiceHandoff.replyLimit, VoiceHandoff.completion("x".repeat(VoiceHandoff.replyLimit + 400)).length)
 
         val codeBlock = "```swift\n" + "let value = 42\n".repeat(120) + "```"
         val replyWithCode = "Updated the parser.\n\n$codeBlock\n\nAll 42 tests in the suite now pass."
@@ -1095,6 +1095,14 @@ class VoiceTranscriptTests {
         assertFalse(completion.contains("let value = 42"))
         assertTrue(LiveContentChunker.commentaryChunks(completion).first().contains("All 42 tests in the suite now pass."))
         assertEquals("[COMPLETE] The session returned a code block in the transcript.", VoiceHandoff.completion(codeBlock))
+    }
+
+    /** A watched session's long reply, a walkthrough the user asked for, reaches
+     * the voice agent whole (it was cut at 1,600 characters until Nov 7). */
+    @Test fun aWatchedSessionsLongReplyIsNotCut() {
+        val reply = (1..150).joinToString(" ") { "Part $it of the explanation." }
+        assertTrue(reply.length > 4_000)
+        assertTrue(ReplyWatch.Outcome.Replied(reply).notice("HOME").endsWith("Its reply: $reply"))
     }
 
     @Test fun userWordsAreWhatWasSaidSinceThePreviousDelegation() {

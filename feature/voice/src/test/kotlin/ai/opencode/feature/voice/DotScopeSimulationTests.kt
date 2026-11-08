@@ -284,4 +284,18 @@ class DotScopeSimulationTests {
             assertTrue("$fronts", fronts[5] < window)
         }
     }
+
+    /**
+     * iOS also drives an `MTKView`'s `preferredFramesPerSecond` and a covering sheet; Android's
+     * scope skips every other display frame while quiet, and a cover pauses it through
+     * `LocalDotScopeCovered`.
+     */
+    @Test fun quietScopesHalveTheirRateAndCoveringSheetsPauseThem() {
+        for (frame in 1L..4L) assertTrue(DotScopeRenderer.drawsFrame(isQuiet = false, frame = frame))
+        var drawn = 0
+        for (frame in 1L..60L) if (DotScopeRenderer.drawsFrame(isQuiet = true, frame = frame)) drawn++
+        assertEquals(30, drawn)
+        assertFalse(DotScopeRenderer.isQuiet(lastHeard = 10.0, now = 11.0))
+        assertTrue(DotScopeRenderer.isQuiet(lastHeard = 10.0, now = 10 + DotScopeRenderer.QUIET_AFTER + 0.01))
+    }
 }

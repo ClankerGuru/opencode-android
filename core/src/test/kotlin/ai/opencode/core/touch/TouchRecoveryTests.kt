@@ -138,4 +138,123 @@ class TouchRecoveryTests {
         assertTrue(watch.expedite(touchBegan = 21.0, now = 23.1, wall = 23.1))
         assertEquals(2, releases)
     }
+
+    /** A sampler with a hand-driven clock and timer. */
+    private class SamplerRig {
+        var wall = 0.0
+        var starts = 0
+        var stops = 0
+        var tick: (() -> Unit)? = null
+        val sampler = TouchRecoverySampler(
+            clock = { TouchRecoverySampler.Time(now = wall, wall = wall) },
+            schedule = { tick ->
+                starts += 1
+                this.tick = tick
+                val stop = {
+                    stops += 1
+                    this.tick = null
+                }
+                stop
+            },
+        )
+
+        /** Runs the timer until it stops or [end], as the main looper would. */
+        fun run(end: Double) {
+            while (true) {
+                val tick = tick ?: return
+                if (wall >= end) return
+                wall += TouchRecoverySampler.INTERVAL
+                tick()
+            }
+        }
+    }
+
+    @Test
+    fun samplerSleepsOnceItsWindowPassesQuietly() {
+        val rig = SamplerRig()
+        var inspected = 0
+        val watch = TouchRecovery(
+            owner = TouchRecovery.Owner.Drawer,
+            inspect = {
+                inspected += 1
+                null
+            },
+            release = {},
+        )
+        rig.sampler.add(watch)
+        assertTrue(rig.sampler.isRunning)
+        rig.run(end = 60.0)
+        assertFalse("At rest the sampler stops: 0 Hz", rig.sampler.isRunning)
+        assertTrue(rig.wall <= TouchRecoverySampler.WINDOW + TouchRecoverySampler.INTERVAL)
+        assertEquals(Math.round(TouchRecoverySampler.WINDOW / TouchRecoverySampler.INTERVAL).toInt(), rig.sampler.ticks)
+        assertEquals(1, rig.starts)
+        assertEquals(1, rig.stops)
+        // A minute at rest costs nothing.
+        val quiet = rig.sampler.ticks
+        rig.wall += 60
+        assertEquals(quiet, rig.sampler.ticks)
+        assertEquals(quiet, inspected)
+        // A transition arms a fresh window, and arming again only extends it.
+        rig.sampler.arm()
+        rig.sampler.arm()
+        assertEquals(2, rig.starts)
+        rig.run(end = rig.wall + 60)
+        assertFalse(rig.sampler.isRunning)
+        assertEquals(2, rig.stops)
+    }
+
+    @Test
+    fun samplerStaysAwakeUntilAStandingFaultIsReleasedAndItsBackoffEnds() {
+        val rig = SamplerRig()
+        val holder = Holder()
+        var fault: TouchRecovery.Fault? = null
+        var releases = 0
+        val watch = TouchRecovery(
+            owner = TouchRecovery.Owner.Drawer,
+            inspect = { fault },
+            release = {
+                releases += 1
+                fault = null
+            },
+        )
+        rig.sampler.add(watch)
+        rig.run(end = 3.0)
+        // A fault born late in the window keeps it open past the window's end.
+        fault = TouchRecovery.Fault(TouchRecovery.Reason.Disabled, holder)
+        rig.run(end = 4.9)
+        assertEquals("Released a second after it was first seen", 1, releases)
+        assertTrue(rig.sampler.isRunning)
+        rig.run(end = 6.0)
+        assertTrue("Past its window but backing off: a fault that comes straight back is still watched", rig.sampler.isRunning)
+        rig.run(end = 60.0)
+        assertFalse(rig.sampler.isRunning)
+        assertTrue(rig.wall <= 4.5 + TouchRecovery.backoff(1) + TouchRecoverySampler.INTERVAL)
+    }
+
+    @Test
+    fun aTouchOnAnIdleSamplerSeesAStandingFaultAtOnce() {
+        val rig = SamplerRig()
+        val holder = Holder()
+        var fault: TouchRecovery.Fault? = null
+        var releases = 0
+        val watch = TouchRecovery(
+            owner = TouchRecovery.Owner.Transcript,
+            inspect = { fault },
+            release = {
+                releases += 1
+                fault = null
+            },
+        )
+        rig.sampler.add(watch)
+        rig.run(end = 60.0)
+        assertFalse(rig.sampler.isRunning)
+        // Stranded while nothing was sampling; the finger finds it.
+        fault = TouchRecovery.Fault(TouchRecovery.Reason.Disabled, holder)
+        rig.wall = 100.0
+        rig.sampler.touched()
+        assertTrue(rig.sampler.isRunning)
+        rig.wall = 100.3
+        rig.sampler.expedite(touchBegan = 100.0)
+        assertEquals("Seen when the finger came down, so a dead drag releases it", 1, releases)
+    }
 }

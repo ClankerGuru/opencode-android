@@ -353,6 +353,10 @@ class VoiceSteeringInstructionsTests {
         )
         assertTrue(realtime.contains("any status or outcome question goes to `delegate` unless a completed result on this call directly answers it"))
         assertTrue(VoiceSessionDelegator.activeCallBlock.contains("Next is X; keep, drop, or note?"))
+        // Short by default, long when asked (Kit, Nov 7: a fixed 1–3 sentences was too rigid).
+        assertTrue(VoiceSessionDelegator.activeCallBlock.contains("Keep it short by default"))
+        assertTrue(VoiceSessionDelegator.activeCallBlock.contains("When they ask for detail, an explanation, a walkthrough, or to be taught something, answer at whatever length it needs"))
+        assertFalse(VoiceSessionDelegator.activeCallBlock.contains("1–3"))
         assertFalse(realtime.contains("Warm, witty, concise."))
         // The acknowledgements stay as brief and natural as the rest of the voice.
         for (text in listOf(live, realtime)) {

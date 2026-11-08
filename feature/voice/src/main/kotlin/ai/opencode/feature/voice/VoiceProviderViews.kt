@@ -170,29 +170,38 @@ fun VoiceProviderStatus(state: VoiceProviderState, modifier: Modifier = Modifier
 }
 
 /**
- * Above the call bar while a call connects through a server (the Server Voice experiment): who
- * runs it and where, “Connecting via My Mac…”.
+ * Above the call bar while a call connects through a server: who runs it and where,
+ * “Connecting via My Mac…”. A capsule on the call's surface, like the failure and ended cards in
+ * the same slot (iOS glass): it floats over the transcript, where bare text ran into the messages
+ * behind it.
  */
 @Composable
 fun VoiceConnectingCaption(place: VoiceCallPlace, text: String, modifier: Modifier = Modifier) {
     SideEffect { VoiceProviderTunables.register() }
-    Row(
+    Box(
         modifier
             .fillMaxWidth()
-            .padding(start = 12.dp, end = 12.dp, bottom = 8.dp)
-            .semantics(mergeDescendants = true) {}
-            .testTag("voice-connecting-caption"),
-        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(start = 12.dp, end = 12.dp, bottom = 8.dp),
+        contentAlignment = Alignment.Center,
     ) {
-        VoiceProviderTile(place.brand, size = VoiceProviderTunables.connectingTile.value)
-        Text(
-            text,
-            style = OpenCodeTextStyles.footnote,
-            color = OpenCodeTheme.colors.secondaryText,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Row(
+            Modifier
+                .callSurface(CircleShape, VoiceCallSurfaceDefaults.color)
+                .padding(start = 6.dp, end = 12.dp, top = 6.dp, bottom = 6.dp)
+                .semantics(mergeDescendants = true) {}
+                .testTag("voice-connecting-caption"),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            VoiceProviderTile(place.brand, size = VoiceProviderTunables.connectingTile.value)
+            Text(
+                text,
+                style = OpenCodeTextStyles.footnote,
+                color = OpenCodeTheme.colors.secondaryText,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 

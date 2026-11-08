@@ -7,6 +7,7 @@ import ai.opencode.server.OpenCodePairingLink
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.diagnostics.PerfFrameSampler
 import ai.opencode.core.diagnostics.PerfTimeline
+import ai.opencode.core.touch.TouchRecoveryClient
 import ai.opencode.feature.composer.DictationPermissionClient
 import ai.opencode.feature.system.notifications.NotificationPermission
 import ai.opencode.feature.system.notifications.NotificationPermissionClient
@@ -17,6 +18,7 @@ import android.content.pm.PackageManager
 import androidx.activity.result.contract.ActivityResultContracts
 import kotlinx.coroutines.CompletableDeferred
 import android.os.Bundle
+import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import ai.opencode.devtools.DevTools
 import ai.opencode.devtools.DevToolsOverlay
@@ -149,6 +151,15 @@ class MainActivity : ComponentActivity() {
         val shown = root.shown ?: root.pendingTarget ?: return
         outState.putString(SessionWindowTarget.EXTRA_SERVER_ID, shown.serverID)
         outState.putString(SessionWindowTarget.EXTRA_SESSION_ID, shown.sessionID)
+    }
+
+    /**
+     * A finger coming down arms touch recovery's sampler (iOS `TouchRecoveryArmRecognizer` on
+     * every window): it only watches, never consumes.
+     */
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_DOWN) dependency(TouchRecoveryClient).touched()
+        return super.dispatchTouchEvent(event)
     }
 
     override fun onDestroy() {

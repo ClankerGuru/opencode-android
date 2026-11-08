@@ -149,8 +149,9 @@ class LiveProtocolTests {
 
         val longSentence = "The test suite verified another module cleanly. ".repeat(50)
         val split = LiveContentChunker.commentaryChunks("[COMPLETE] $longSentence", maxCharacters = 400)
-        assertEquals(LiveContentChunker.maxCommentaryChunks, split.size)
+        assertTrue(split.size > 2)
         assertTrue(split.all { it.length <= 400 })
+        assertEquals("Every chunk is kept", longSentence.trim(), split.joinToString(" "))
     }
 
     @Test fun liveInstructionsFollowPromptingGuideTemplate() {
