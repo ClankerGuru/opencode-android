@@ -1,6 +1,7 @@
 package ai.opencode.feature.transcript.list
 
 import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.listSaver
 import kotlin.math.max
 
 /**
@@ -271,11 +272,18 @@ class TranscriptScrollBehavior {
     companion object {
         /**
          * For the list's `rememberSaveable`: a browsing reader stays browsing when the activity is
-         * recreated, where iOS's list only redraws. The rest belongs to one gesture and starts over.
+         * recreated, where iOS's list only redraws, and Jump to latest stays as it was (the screen
+         * saves what it showed too, so the pill is there from the first frame, F-38). The rest
+         * belongs to one gesture and starts over.
          */
-        val Saver: Saver<TranscriptScrollBehavior, Boolean> = Saver(
-            save = { it.mode == Mode.Browsing },
-            restore = { browsing -> TranscriptScrollBehavior().apply { if (browsing) mode = Mode.Browsing } },
+        val Saver: Saver<TranscriptScrollBehavior, Any> = listSaver(
+            save = { listOf(it.mode == Mode.Browsing, it.showsJumpButton) },
+            restore = { saved ->
+                TranscriptScrollBehavior().apply {
+                    if (saved[0] as Boolean) mode = Mode.Browsing
+                    showsJumpButton = saved[1] as Boolean
+                }
+            },
         )
 
         /** A drag farther than this from the bottom, or from where a following reader started it, leaves the bottom. */

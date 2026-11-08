@@ -67,6 +67,7 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.semantics.Role
@@ -436,7 +437,11 @@ fun ProjectPickerSheet(
     onCancel: () -> Unit,
     folderBrowser: StoreOf<FolderBrowserFeature.State, FolderBrowserFeature.Action>?,
 ) {
-    ModalBottomSheet(onDismissRequest = onCancel, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)) {
+    // iOS's `[.medium, .large]` detents. In a compact-height window (a landscape phone) UIKit
+    // ignores detents and presents the sheet at full height; half of it there showed only the
+    // title, the search and a row under the gesture bar (QA F-36).
+    val compactHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() } < 480.dp
+    ModalBottomSheet(onDismissRequest = onCancel, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = compactHeight)) {
         val routes = folderBrowser?.let { browser -> browser.collectState().value.routes }.orEmpty()
         BackHandler(enabled = routes.isNotEmpty()) {
             folderBrowser?.send(FolderBrowserFeature.Action.RoutesChanged(routes.dropLast(1)))

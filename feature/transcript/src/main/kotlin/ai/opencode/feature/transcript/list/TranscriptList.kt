@@ -32,6 +32,7 @@ import ai.opencode.feature.transcript.markdown.ui.TranscriptTextReveal
 import ai.opencode.feature.transcript.selection.LocalTranscriptReplySelection
 import ai.opencode.feature.transcript.selection.TranscriptReplySelection
 import ai.opencode.feature.transcript.selection.TranscriptReplySelectionMenu
+import ai.opencode.feature.transcript.user.findActivity
 import ai.opencode.feature.transcript.selection.transcriptReplySelectionGestures
 import ai.opencode.feature.transcript.selection.transcriptReplySelectionHandles
 import ai.opencode.feature.transcript.rows.NewMessagesDivider
@@ -41,12 +42,16 @@ import ai.opencode.feature.transcript.user.TranscriptMessageRow
 import ai.opencode.feature.transcript.user.UserMessageRun
 import ai.opencode.feature.transcript.user.queuedPillSource
 import ai.opencode.server.model.OpenCodeQueuedInput
+import android.window.OnBackInvokedCallback
+import android.window.OnBackInvokedDispatcher
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.ScrollableDefaults
 import androidx.compose.foundation.magnifier
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
@@ -98,6 +103,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalGraphicsContext
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -135,12 +141,31 @@ private class TranscriptListPosition(val state: LazyListState, var anchor: Pair<
     var settleLayouts = 0
 }
 
+/**
+ * Android (QA AI-02): while a reply's text is selected, Back ends the selection before the
+ * screen's own Back, as it dismisses any platform text selection and as the user bubble's
+ * selection does (iOS has no Back; a tap elsewhere ends it there). Its own scope, so the
+ * selection starting or ending doesn't recompose the list. Not while the keyboard is up: Back
+ * puts the keys away first (A-01), then ends the selection.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ReplySelectionBackHandler(selection: TranscriptReplySelection) {
+    if (!selection.isSelected || WindowInsets.isImeVisible) return
+    val activity = LocalContext.current.findActivity() ?: return
+    DisposableEffect(activity, selection) {
+        val callback = OnBackInvokedCallback { selection.clear(byReader = true) }
+        // At the app's own priority, registered as the selection begins: what opens over it later
+        // (the drawer, a menu, an in-window sheet) registers after it and takes Back first.
+        activity.onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT, callback)
+        onDispose { activity.onBackInvokedDispatcher.unregisterOnBackInvokedCallback(callback) }
+    }
+}
+
 /** V-01: whether the list hides while a row restored after process death loads ([decide]d on the list's first composition). */
 private class RestoreHide {
     var decide = true
     var hides by mutableStateOf(false)
-    /** The jump button the list last asked for, shown once it stops hiding. */
-    var jump = false
 }
 
 /** Longest a restoring list stays invisible waiting for its row's page; then it shows where it is and still goes back to the row when it lands. */
@@ -176,7 +201,9 @@ class TranscriptSlots(
  * is there, browsing otherwise. [contentPadding] is the header above and the composer's own
  * obstruction below (iOS `contentInset`); the keyboard is the session's `imePadding`.
  * [jumpRequest] increments when the reader taps Jump to latest; [onShowsJumpButtonChanged]
- * reports the behavior's button visibility.
+ * reports the behavior's button visibility. [onHidesChanged] reports the list staying invisible
+ * while a row saved across process death loads (V-01): the button keeps its state meanwhile and
+ * should be drawn only once the rows are (AI-01).
  */
 @Composable
 fun TranscriptList(
@@ -190,10 +217,11 @@ fun TranscriptList(
     layoutTuning: TranscriptLayoutTuning = LocalTranscriptLayoutTuning.current,
     onScrolledUnderHeader: (Float) -> Unit = {},
     borrowedDrag: TranscriptBorrowedDrag? = null,
+    onHidesChanged: (Boolean) -> Unit = {},
 ) {
     // A new session is a new list (iOS resets the controller; the draft becoming its session keeps it).
     key(configuration.sessionID ?: "draft", configuration.historyGeneration) {
-        TranscriptListContent(configuration, send, modifier, contentPadding, jumpRequest, onShowsJumpButtonChanged, slots, layoutTuning, onScrolledUnderHeader, borrowedDrag)
+        TranscriptListContent(configuration, send, modifier, contentPadding, jumpRequest, onShowsJumpButtonChanged, slots, layoutTuning, onScrolledUnderHeader, borrowedDrag, onHidesChanged)
     }
 }
 
@@ -210,6 +238,7 @@ private fun TranscriptListContent(
     layoutTuning: TranscriptLayoutTuning,
     onScrolledUnderHeader: (Float) -> Unit,
     borrowedDrag: TranscriptBorrowedDrag?,
+    onHidesChanged: (Boolean) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val initialIndex = remember { (configuration.entries.size + configuration.queuedInputs.size + 2).coerceAtLeast(0) }
@@ -228,6 +257,7 @@ private fun TranscriptListContent(
     val reduceMotion = rememberReduceMotion()
     val currentSend by rememberUpdatedState(send)
     val currentShowsJump by rememberUpdatedState(onShowsJumpButtonChanged)
+    val currentHidesChanged by rememberUpdatedState(onHidesChanged)
 
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val resumed by lifecycle.currentStateFlow.collectAsState()
@@ -237,7 +267,12 @@ private fun TranscriptListContent(
     // loading) would see the list clamped at the end and then jump. It stays invisible until the
     // row is put back, the restore ends, or RESTORE_HIDE_LIMIT_MS passes; header and composer show.
     val restoreHide = remember { RestoreHide() }
-    controller.setShowsJumpButton = { restoreHide.jump = it; currentShowsJump(it && !restoreHide.hides) }
+    // While it hides, the jump button's changes still go out, and the screen draws the button only
+    // with the rows ([onHidesChanged]), so it's at rest on the frame the list shows (AI-01).
+    controller.setShowsJumpButton = { currentShowsJump(it) }
+    // The screen may start the pill as it last was (F-38); once laid out, this list says what its
+    // own restored state shows, so the two can't disagree.
+    LaunchedEffect(controller) { currentShowsJump(behavior.showsJumpButton) }
     controller.density = density.density
     controller.frameDuration = ai.opencode.core.motion.rememberFrameDurationSeconds()
     controller.reduceMotion = reduceMotion
@@ -261,11 +296,12 @@ private fun TranscriptListContent(
         val key = position.anchor?.first
         restoreHide.hides = key != null && behavior.mode == TranscriptScrollBehavior.Mode.Browsing &&
             controller.snapshot.items.none { it.key == key }
+        if (restoreHide.hides) currentHidesChanged(true)
     }
     val endRestoreHide = {
         if (restoreHide.hides) {
             restoreHide.hides = false
-            currentShowsJump(restoreHide.jump)
+            currentHidesChanged(false)
         }
     }
     controller.obstructionChanged(contentPadding.calculateBottomPadding().value, WindowInsets.ime.inContainer().getBottom(density) / density.density)
@@ -345,6 +381,7 @@ private fun TranscriptListContent(
     }
     // After the controller's effects: a recreated activity's selection comes back once its reply is listed.
     SideEffect { replySelection.restorePending() }
+    ReplySelectionBackHandler(replySelection)
 
     LaunchedEffect(resumed) { controller.visibilityChanged() }
     // iOS `SessionView+Header` registers the transcript's knobs as the session draws.
